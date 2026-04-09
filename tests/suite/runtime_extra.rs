@@ -172,6 +172,34 @@ fn srand_returns_abs_seed_and_rand_reproducible() {
 }
 
 #[test]
+fn fc_case_folds_ascii() {
+    assert_eq!(eval_string(r#"fc("Hello")"#), "hello");
+}
+
+#[test]
+fn study_returns_utf8_byte_length() {
+    assert_eq!(eval_int(r#"study "hello""#), 5);
+    assert_eq!(eval_int(r#"study "café""#), 5);
+}
+
+#[test]
+fn pos_tracks_scalar_g_matches() {
+    assert_eq!(
+        eval_int(
+            r#"my $s = "foo"; my $n = 0; while ($s =~ /o/g) { $n = pos($s) } $n"#,
+        ),
+        3
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn crypt_unix_non_empty() {
+    let p = eval_string(r#"crypt("ab", "aa")"#);
+    assert_eq!(p.len(), 13);
+}
+
+#[test]
 fn or_assign_via_expansion_not_token() {
     // `||=` is not tokenized yet; spell the Perl 5 expansion.
     assert_eq!(eval_int("my $x = 0; $x = $x || 9; $x"), 9);
