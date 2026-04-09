@@ -15,6 +15,11 @@ fn accepts_pmap_chunked_block() {
 }
 
 #[test]
+fn accepts_async_await() {
+    p("my $t = async { 1 }; my $x = await($t);");
+}
+
+#[test]
 fn accepts_pgrep_block() {
     p("my @r = pgrep { $_ > 0 } (1, -1, 2);");
 }

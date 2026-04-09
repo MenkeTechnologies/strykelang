@@ -1266,7 +1266,8 @@ impl<'a> VM<'a> {
                 Op::AsyncBlock(block_idx) => {
                     let block = self.blocks[*block_idx as usize].clone();
                     let subs = self.interp.subs.clone();
-                    let scope_capture = self.interp.scope.capture();
+                    let (scope_capture, atomic_arrays, atomic_hashes) =
+                        self.interp.scope.capture_with_atomics();
                     let result_slot: Arc<Mutex<Option<PerlResult<PerlValue>>>> =
                         Arc::new(Mutex::new(None));
                     let join_slot: Arc<Mutex<Option<std::thread::JoinHandle<()>>>> =
@@ -1276,6 +1277,9 @@ impl<'a> VM<'a> {
                         let mut local_interp = Interpreter::new();
                         local_interp.subs = subs;
                         local_interp.scope.restore_capture(&scope_capture);
+                        local_interp
+                            .scope
+                            .restore_atomics(&atomic_arrays, &atomic_hashes);
                         let out = match local_interp.exec_block_no_scope(&block) {
                             Ok(v) => Ok(v),
                             Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
@@ -1764,7 +1768,7 @@ impl<'a> VM<'a> {
             }
             Some(BuiltinId::GlobPar) => {
                 let pats: Vec<String> = args.iter().map(|v| v.to_string()).collect();
-                Ok(crate::perl_fs::glob_patterns(&pats))
+                Ok(crate::perl_fs::glob_par_patterns(&pats))
             }
             Some(BuiltinId::Opendir) => {
                 let handle = args.first().map(|v| v.to_string()).unwrap_or_default();

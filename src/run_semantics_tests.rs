@@ -365,3 +365,21 @@ fn pmap_chunked_preserves_order_and_values() {
     "#;
     assert_eq!(ri(s), 20);
 }
+
+#[test]
+fn async_await_returns_block_value() {
+    assert_eq!(ri(r#"my $t = async { 40 + 2 }; await($t);"#), 42);
+}
+
+#[test]
+fn async_await_two_tasks() {
+    assert_eq!(
+        ri(r#"my $a = async { 10 }; my $b = async { 32 }; await($a) + await($b);"#),
+        42
+    );
+}
+
+#[test]
+fn await_passes_through_non_task() {
+    assert_eq!(ri(r#"await(7);"#), 7);
+}
