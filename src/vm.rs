@@ -257,7 +257,18 @@ impl<'a> VM<'a> {
         let mut slot_buf = crate::jit::linear_slot_ops_max_index(ops).and_then(|max| {
             let mut v = vec![0i64; max as usize + 1];
             for i in 0..=max {
-                v[i as usize] = self.interp.scope.get_scalar_slot(i).as_integer()?;
+                let pv = self.interp.scope.get_scalar_slot(i);
+                v[i as usize] = match pv.as_integer() {
+                    Some(n) => n,
+                    None if pv.is_undef() => {
+                        if crate::jit::slot_undef_prefill_ok(ops, i) {
+                            0
+                        } else {
+                            return None;
+                        }
+                    }
+                    None => return None,
+                };
             }
             Some(v)
         });

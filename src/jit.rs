@@ -982,6 +982,35 @@ pub(crate) fn linear_slot_ops_max_index(ops: &[Op]) -> Option<u8> {
     max_scalar_slot_index(ops_before_halt(ops))
 }
 
+/// When building the dense `i64` slot buffer for the JIT, [`PerlValue::as_integer`] is `None` for
+/// `undef`. It is still safe to prefill that slot as `0` (matching [`PerlValue::to_int`] on undef)
+/// when no [`Op::GetScalarSlot`] for `slot` runs **before** the slot is written in this linear
+/// sequence (e.g. `DeclareScalarSlot` / inc-dec / set). Otherwise the VM must stay on the
+/// interpreter so `GetScalarSlot` can observe real `undef`.
+pub(crate) fn slot_undef_prefill_ok(ops: &[Op], slot: u8) -> bool {
+    let seq = ops_before_halt(ops);
+    let mut written = false;
+    for op in seq {
+        match op {
+            Op::GetScalarSlot(s) if *s == slot => {
+                if !written {
+                    return false;
+                }
+            }
+            Op::DeclareScalarSlot(s) | Op::SetScalarSlot(s) | Op::SetScalarSlotKeep(s) if *s == slot => {
+                written = true;
+            }
+            Op::PreIncSlot(s) | Op::PostIncSlot(s) | Op::PreDecSlot(s) | Op::PostDecSlot(s)
+                if *s == slot =>
+            {
+                written = true;
+            }
+            _ => {}
+        }
+    }
+    true
+}
+
 /// Slot indices written by [`Op::SetScalarSlot`] / [`Op::SetScalarSlotKeep`] before [`Op::Halt`],
 /// sorted and deduplicated (for syncing the slot buffer back into the interpreter scope).
 pub(crate) fn linear_slot_ops_written_indices(ops: &[Op]) -> Vec<u8> {
@@ -1495,5 +1524,90 @@ mod tests {
         let mut vm = VM::new(&c, &mut interp);
         let v = vm.execute().expect("vm");
         assert_eq!(v.to_int(), 1);
+    }
+
+    #[test]
+    fn jit_declare_and_slot_inc_dec() {
+        let post_inc = vec![
+            Op::LoadInt(10),
+            Op::DeclareScalarSlot(0),
+            Op::PostIncSlot(0),
+            Op::Pop,
+            Op::GetScalarSlot(0),
+            Op::Halt,
+        ];
+        let mut slots = [0i64];
+        assert_eq!(
+            try_run_linear_ops(&post_inc, Some(&mut slots), None, None, &[])
+                .expect("jit")
+                .to_int(),
+            11
+        );
+        assert_eq!(slots[0], 11);
+
+        let pre_inc = vec![
+            Op::LoadInt(0),
+            Op::DeclareScalarSlot(0),
+            Op::PreIncSlot(0),
+            Op::Halt,
+        ];
+        let mut slots = [0i64];
+        assert_eq!(
+            try_run_linear_ops(&pre_inc, Some(&mut slots), None, None, &[])
+                .expect("jit")
+                .to_int(),
+            1
+        );
+        assert_eq!(slots[0], 1);
+
+        let pre_dec = vec![
+            Op::LoadInt(5),
+            Op::DeclareScalarSlot(0),
+            Op::PreDecSlot(0),
+            Op::Halt,
+        ];
+        let mut slots = [0i64];
+        assert_eq!(
+            try_run_linear_ops(&pre_dec, Some(&mut slots), None, None, &[])
+                .expect("jit")
+                .to_int(),
+            4
+        );
+        assert_eq!(slots[0], 4);
+    }
+
+    #[test]
+    fn vm_chunk_jit_declare_slot_post_inc() {
+        use crate::interpreter::Interpreter;
+        use crate::vm::VM;
+
+        let mut c = Chunk::new();
+        c.emit(Op::LoadInt(10), 1);
+        c.emit(Op::DeclareScalarSlot(0), 1);
+        c.emit(Op::PostIncSlot(0), 1);
+        c.emit(Op::Pop, 1);
+        c.emit(Op::GetScalarSlot(0), 1);
+        c.emit(Op::Halt, 1);
+        let mut interp = Interpreter::new();
+        let mut vm = VM::new(&c, &mut interp);
+        let v = vm.execute().expect("vm");
+        assert_eq!(v.to_int(), 11);
+    }
+
+    #[test]
+    fn slot_undef_prefill_requires_no_get_before_write() {
+        assert!(!slot_undef_prefill_ok(
+            &[Op::GetScalarSlot(0), Op::Halt],
+            0
+        ));
+        assert!(slot_undef_prefill_ok(
+            &[
+                Op::LoadInt(1),
+                Op::DeclareScalarSlot(0),
+                Op::GetScalarSlot(0),
+                Op::Halt,
+            ],
+            0,
+        ));
     }
 }
