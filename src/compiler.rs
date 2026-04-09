@@ -673,6 +673,9 @@ impl Compiler {
     fn compile_statement(&mut self, stmt: &Statement) -> Result<(), CompileError> {
         let line = stmt.line;
         match &stmt.kind {
+            StmtKind::FormatDecl { .. } => {
+                return Err(CompileError::Unsupported("format".into()));
+            }
             StmtKind::Expression(expr) => {
                 self.compile_expr_ctx(expr, WantarrayCtx::Void)?;
                 self.chunk.emit(Op::Pop, line);

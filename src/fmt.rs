@@ -279,6 +279,15 @@ fn format_statement(s: &Statement) -> String {
             )
         }
         StmtKind::DefaultCase { body } => format!("default {{\n{}\n}}", format_block(body)),
+        StmtKind::FormatDecl { name, lines } => {
+            let mut s = format!("format {} =\n", name);
+            for ln in lines {
+                s.push_str(ln);
+                s.push('\n');
+            }
+            s.push('.');
+            s
+        }
         StmtKind::Tie {
             target,
             class,

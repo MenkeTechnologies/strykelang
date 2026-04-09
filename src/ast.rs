@@ -154,6 +154,11 @@ pub enum StmtKind {
         class: Expr,
         args: Vec<Expr>,
     },
+    /// `format NAME =` picture/value lines … `.` — report templates for `write`.
+    FormatDecl {
+        name: String,
+        lines: Vec<String>,
+    },
 }
 
 /// Target of `tie` (hash, array, or scalar).

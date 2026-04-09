@@ -75,6 +75,7 @@ pub(crate) fn try_builtin(
         "par_csv_read" => Some(builtin_par_csv_read(args)),
         "dataframe" => Some(builtin_dataframe(args)),
         "par_pipeline" => Some(crate::par_pipeline::run_par_pipeline(interp, args, line)),
+        "write" => Some(interp.write_format_execute(args, line)),
         _ => None,
     }
 }

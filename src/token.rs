@@ -22,6 +22,11 @@ pub enum Token {
     Ident(String),
     Label(String),
     PackageSep,
+    /// `format NAME =` … body … `.` (body lines without the closing `.`)
+    FormatDecl {
+        name: String,
+        lines: Vec<String>,
+    },
 
     // Arithmetic
     Plus,

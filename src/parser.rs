@@ -1,5 +1,6 @@
 use crate::ast::*;
 use crate::error::{PerlError, PerlResult};
+use crate::lexer::Lexer;
 use crate::token::Token;
 
 pub struct Parser {
@@ -102,6 +103,18 @@ impl Parser {
         };
 
         let mut stmt = match self.peek().clone() {
+            Token::FormatDecl { .. } => {
+                let tok_line = self.peek_line();
+                let (tok, _) = self.advance();
+                match tok {
+                    Token::FormatDecl { name, lines } => Statement {
+                        label: label.clone(),
+                        kind: StmtKind::FormatDecl { name, lines },
+                        line: tok_line,
+                    },
+                    _ => unreachable!(),
+                }
+            }
             Token::Ident(ref kw) => match kw.as_str() {
                 "if" => self.parse_if()?,
                 "unless" => self.parse_unless()?,
@@ -2696,14 +2709,14 @@ impl Parser {
                 })
             }
             "chomp" => {
-                let a = self.parse_one_arg()?;
+                let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Chomp(Box::new(a)),
                     line,
                 })
             }
             "chop" => {
-                let a = self.parse_one_arg()?;
+                let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Chop(Box::new(a)),
                     line,
@@ -4350,4 +4363,33 @@ fn merge_expr_list(parts: Vec<Expr>) -> Expr {
             line,
         }
     }
+}
+
+/// Comma-separated expressions on a `format` value line (below a picture line).
+pub fn parse_format_value_line(line: &str) -> PerlResult<Vec<Expr>> {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return Ok(vec![]);
+    }
+    let mut lexer = Lexer::new(trimmed);
+    let tokens = lexer.tokenize()?;
+    let mut parser = Parser::new(tokens);
+    let mut exprs = Vec::new();
+    loop {
+        if parser.at_eof() {
+            break;
+        }
+        exprs.push(parser.parse_expression()?);
+        if parser.eat(&Token::Comma) {
+            continue;
+        }
+        if !parser.at_eof() {
+            return Err(PerlError::syntax(
+                "Extra tokens in format value line",
+                parser.peek_line(),
+            ));
+        }
+        break;
+    }
+    Ok(exprs)
 }

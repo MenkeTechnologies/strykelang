@@ -358,6 +358,46 @@ impl Lexer {
         s
     }
 
+    /// Body lines for `format N =` … `.` (excluding the closing `.` line).
+    fn read_format_body(&mut self) -> PerlResult<Vec<String>> {
+        while self.peek().is_some_and(|c| c == ' ' || c == '\t') {
+            self.advance();
+        }
+        if self.peek() == Some('\n') {
+            self.advance();
+        }
+        let mut lines = Vec::new();
+        loop {
+            let mut line = String::new();
+            while let Some(c) = self.peek() {
+                if c == '\n' {
+                    self.advance();
+                    break;
+                }
+                if c == '\r' {
+                    self.advance();
+                    if self.peek() == Some('\n') {
+                        self.advance();
+                    }
+                    break;
+                }
+                line.push(c);
+                self.advance();
+            }
+            if line.trim() == "." {
+                break;
+            }
+            lines.push(line);
+            if self.peek().is_none() {
+                return Err(PerlError::syntax(
+                    "Unterminated format (expected '.' on its own line before end of file)",
+                    self.line,
+                ));
+            }
+        }
+        Ok(lines)
+    }
+
     fn read_variable_name(&mut self) -> String {
         // Handle special vars like $_, $!, $0, $/, $^I, etc.
         match self.peek() {
@@ -846,6 +886,21 @@ impl Lexer {
 
                 // Special multi-char constructs
                 match ident.as_str() {
+                    "format" => {
+                        self.skip_whitespace_and_comments();
+                        let fname = self.read_package_qualified_identifier();
+                        self.skip_whitespace_and_comments();
+                        if self.peek() != Some('=') {
+                            return Err(PerlError::syntax(
+                                "Expected '=' after format name",
+                                self.line,
+                            ));
+                        }
+                        self.advance();
+                        let lines = self.read_format_body()?;
+                        self.last_was_term = false;
+                        return Ok(Token::FormatDecl { name: fname, lines });
+                    }
                     "qw" => {
                         let tok = self.read_qw()?;
                         self.last_was_term = true;

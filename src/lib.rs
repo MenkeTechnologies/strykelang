@@ -7,6 +7,7 @@ mod crypt_util;
 pub mod data_section;
 pub mod error;
 pub mod fmt;
+pub mod format;
 pub mod interpreter;
 pub mod lexer;
 pub mod list_util;

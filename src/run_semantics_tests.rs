@@ -623,7 +623,6 @@ fn perl_compat_use_overload_stringify() {
 }
 
 /// CPAN-style single `use overload` with coderef handlers for `+` and `""`.
-/// `stringify` uses a constant return: arrow/hash on the invocant in overload subs is still limited.
 #[test]
 fn perl_compat_use_overload_combined_coderef() {
     assert_eq!(
@@ -631,7 +630,7 @@ fn perl_compat_use_overload_combined_coderef() {
         package O;
         use overload '+' => \&add, '""' => \&stringify;
         sub add { my ($a, $b) = @_; $a->{n} + $b->{n} }
-        sub stringify { "v7" }
+        sub stringify { "v" . $_[0]->{n} }
         package main;
         my $a = O->new(n => 2);
         my $b = O->new(n => 3);
@@ -644,7 +643,7 @@ fn perl_compat_use_overload_combined_coderef() {
         package O;
         use overload '+' => \&add, '""' => \&stringify;
         sub add { my ($a, $b) = @_; $a->{n} + $b->{n} }
-        sub stringify { "v7" }
+        sub stringify { "v" . $_[0]->{n} }
         package main;
         my $o = bless { n => 7 }, "O";
         "$o"

@@ -321,6 +321,8 @@ pub struct Interpreter {
     pub(crate) tied_arrays: HashMap<String, PerlValue>,
     /// `use overload` — class → Perl overload key → short method name in that package.
     pub(crate) overload_table: HashMap<String, HashMap<String, String>>,
+    /// `format NAME =` bodies (parsed) keyed `Package::NAME`.
+    pub(crate) format_templates: HashMap<String, Arc<crate::format::FormatTemplate>>,
     /// Limited typeglob: I/O handle alias (`*FOO` → underlying handle name).
     pub(crate) glob_handle_alias: HashMap<String, String>,
     /// Parallel to [`Scope`] frames: `local *GLOB` entries to restore on [`Self::scope_pop_hook`].
@@ -444,6 +446,7 @@ impl Interpreter {
         scope.declare_hash("SIG", IndexMap::new());
         scope.declare_array("-", vec![]);
         scope.declare_array("+", vec![]);
+        scope.declare_scalar("~", PerlValue::string("STDOUT".to_string()));
 
         let script_start_time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -513,6 +516,7 @@ impl Interpreter {
             tied_scalars: HashMap::new(),
             tied_arrays: HashMap::new(),
             overload_table: HashMap::new(),
+            format_templates: HashMap::new(),
             glob_handle_alias: HashMap::new(),
             glob_restore_frames: vec![Vec::new()],
         };
@@ -666,6 +670,76 @@ impl Interpreter {
         if hash_name == "ENV" {
             self.materialize_env_if_needed();
         }
+    }
+
+    /// `exists $href->{k}` / `exists $obj->{k}` — container is a hash ref or blessed hash-like value.
+    fn exists_arrow_hash_element(
+        &self,
+        container: PerlValue,
+        key: &str,
+        line: usize,
+    ) -> PerlResult<bool> {
+        if let Some(r) = container.as_hash_ref() {
+            return Ok(r.read().contains_key(key));
+        }
+        if let Some(b) = container.as_blessed_ref() {
+            let data = b.data.read();
+            if let Some(r) = data.as_hash_ref() {
+                return Ok(r.read().contains_key(key));
+            }
+            if let Some(hm) = data.as_hash_map() {
+                return Ok(hm.contains_key(key));
+            }
+            return Err(PerlError::runtime(
+                "exists argument is not a HASH reference",
+                line,
+            )
+            .into());
+        }
+        Err(PerlError::runtime(
+            "exists argument is not a HASH reference",
+            line,
+        )
+        .into())
+    }
+
+    /// `delete $href->{k}` / `delete $obj->{k}` — same container rules as [`Self::exists_arrow_hash_element`].
+    fn delete_arrow_hash_element(
+        &self,
+        container: PerlValue,
+        key: &str,
+        line: usize,
+    ) -> PerlResult<PerlValue> {
+        if let Some(r) = container.as_hash_ref() {
+            return Ok(r
+                .write()
+                .shift_remove(key)
+                .unwrap_or(PerlValue::UNDEF));
+        }
+        if let Some(b) = container.as_blessed_ref() {
+            let mut data = b.data.write();
+            if let Some(r) = data.as_hash_ref() {
+                return Ok(r
+                    .write()
+                    .shift_remove(key)
+                    .unwrap_or(PerlValue::UNDEF));
+            }
+            if let Some(mut map) = data.as_hash_map() {
+                let v = map.shift_remove(key).unwrap_or(PerlValue::UNDEF);
+                *data = PerlValue::hash(map);
+                return Ok(v);
+            }
+            return Err(PerlError::runtime(
+                "delete argument is not a HASH reference",
+                line,
+            )
+            .into());
+        }
+        Err(PerlError::runtime(
+            "delete argument is not a HASH reference",
+            line,
+        )
+        .into())
     }
 
     /// Paths from `@INC` for `require` / `use` (non-empty; defaults to `.` if unset).
@@ -1272,6 +1346,12 @@ impl Interpreter {
                         ent.insert(k.clone(), v.clone());
                     }
                 }
+                StmtKind::FormatDecl { name, lines } => {
+                    let pkg = self.current_package();
+                    let key = format!("{}::{}", pkg, name);
+                    let tmpl = crate::format::parse_format_template(lines)?;
+                    self.format_templates.insert(key, Arc::new(tmpl));
+                }
                 StmtKind::No { module, imports } => {
                     self.exec_no_stmt(module, imports, stmt.line)?;
                 }
@@ -1818,7 +1898,8 @@ impl Interpreter {
                 | StmtKind::Begin(_)
                 | StmtKind::End(_)
                 | StmtKind::Use { .. }
-                | StmtKind::No { .. } => continue,
+                | StmtKind::No { .. }
+                | StmtKind::FormatDecl { .. } => continue,
                 _ => {
                     match self.exec_statement(stmt) {
                         Ok(val) => last = val,
@@ -2871,6 +2952,10 @@ impl Interpreter {
                 stmt.line,
             )
             .into()),
+            StmtKind::FormatDecl { .. } => {
+                // Registered in `prepare_program_top_level`; no per-statement runtime effect.
+                Ok(PerlValue::UNDEF)
+            }
             StmtKind::Continue(block) => self.exec_block_smart(block),
         }
     }
@@ -4410,6 +4495,16 @@ impl Interpreter {
                     }
                     Ok(self.scope.delete_hash_element(hash, &k))
                 }
+                ExprKind::ArrowDeref {
+                    expr: inner,
+                    index,
+                    kind: DerefKind::Hash,
+                } => {
+                    let k = self.eval_expr(index)?.to_string();
+                    let container = self.eval_expr(inner)?;
+                    self.delete_arrow_hash_element(container, &k, line)
+                        .map_err(Into::into)
+                }
                 _ => Err(PerlError::runtime("delete requires hash element", line).into()),
             },
             ExprKind::Exists(expr) => match &expr.kind {
@@ -4438,6 +4533,16 @@ impl Interpreter {
                             0
                         },
                     ))
+                }
+                ExprKind::ArrowDeref {
+                    expr: inner,
+                    index,
+                    kind: DerefKind::Hash,
+                } => {
+                    let k = self.eval_expr(index)?.to_string();
+                    let container = self.eval_expr(inner)?;
+                    let yes = self.exists_arrow_hash_element(container, &k, line)?;
+                    Ok(PerlValue::integer(if yes { 1 } else { 0 }))
                 }
                 _ => Err(PerlError::runtime("exists requires hash element", line).into()),
             },
@@ -5239,6 +5344,89 @@ impl Interpreter {
         line: usize,
     ) -> Result<String, FlowOrError> {
         perl_sprintf_format_with(fmt, args, |v| self.stringify_value(v.clone(), line))
+    }
+
+    /// Expand a compiled [`crate::format::FormatTemplate`] using current expression evaluation.
+    pub(crate) fn render_format_template(
+        &mut self,
+        tmpl: &crate::format::FormatTemplate,
+        line: usize,
+    ) -> Result<String, FlowOrError> {
+        use crate::format::{FormatRecord, PictureSegment};
+        let mut buf = String::new();
+        for rec in &tmpl.records {
+            match rec {
+                FormatRecord::Literal(s) => {
+                    buf.push_str(s);
+                    buf.push('\n');
+                }
+                FormatRecord::Picture { segments, exprs } => {
+                    let mut vals: Vec<String> = Vec::new();
+                    for e in exprs {
+                        let v = self.eval_expr(e)?;
+                        vals.push(self.stringify_value(v, line)?);
+                    }
+                    let mut vi = 0usize;
+                    let mut line_out = String::new();
+                    for seg in segments {
+                        match seg {
+                            PictureSegment::Literal(t) => line_out.push_str(t),
+                            PictureSegment::Field {
+                                width,
+                                align,
+                                kind: _,
+                            } => {
+                                let s = vals.get(vi).map(|s| s.as_str()).unwrap_or("");
+                                vi += 1;
+                                line_out.push_str(&crate::format::pad_field(s, *width, *align));
+                            }
+                        }
+                    }
+                    buf.push_str(&line_out);
+                    buf.push('\n');
+                }
+            }
+        }
+        Ok(buf)
+    }
+
+    /// `write` — output one record using `$~` format name in the current package (subset of Perl).
+    pub(crate) fn write_format_execute(
+        &mut self,
+        args: &[PerlValue],
+        line: usize,
+    ) -> PerlResult<PerlValue> {
+        if !args.is_empty() {
+            return Err(PerlError::runtime(
+                "write: filehandle argument not implemented (use selected STDOUT)",
+                line,
+            ));
+        }
+        let pkg = self.current_package();
+        let mut fmt_name = self.scope.get_scalar("~").to_string();
+        if fmt_name.is_empty() {
+            fmt_name = "STDOUT".to_string();
+        }
+        let key = format!("{}::{}", pkg, fmt_name);
+        let tmpl = self
+            .format_templates
+            .get(&key)
+            .map(Arc::clone)
+            .ok_or_else(|| {
+                PerlError::runtime(
+                    format!("Unknown format `{}` in package `{}`", fmt_name, pkg),
+                    line,
+                )
+            })?;
+        let out = self.render_format_template(&tmpl, line).map_err(|e| match e {
+            FlowOrError::Error(e) => e,
+            FlowOrError::Flow(_) => PerlError::runtime("write: unexpected control flow", line),
+        })?;
+        print!("{}", out);
+        if self.output_autoflush {
+            let _ = IoWrite::flush(&mut io::stdout());
+        }
+        Ok(PerlValue::integer(1))
     }
 
     fn try_overload_stringify(&mut self, v: &PerlValue, line: usize) -> Option<ExecResult> {

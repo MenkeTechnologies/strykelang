@@ -73,6 +73,20 @@ fn delete_missing_key_undef() {
 }
 
 #[test]
+fn exists_delete_on_hash_reference_arrow() {
+    assert_eq!(
+        eval_int(r#"my $r = { a => 1, b => 2 }; (exists $r->{a}) + (exists $r->{z})"#),
+        1
+    );
+    assert_eq!(
+        eval_int(
+            r#"my $r = { a => 1 }; my $v = delete $r->{a}; (exists $r->{a}) + (defined($v) ? 1 : 0)"#,
+        ),
+        1
+    );
+}
+
+#[test]
 fn keys_in_sorted_join() {
     assert_eq!(
         eval_string(r#"my %h = (z => 1, a => 2); join("", sort keys %h)"#),
