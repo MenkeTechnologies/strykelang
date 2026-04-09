@@ -34,6 +34,14 @@ fn parse_and_run_string_returns_err_on_runtime_failure() {
 }
 
 #[test]
+fn parse_and_run_string_accumulates_state_across_calls() {
+    let mut interp = Interpreter::new();
+    parse_and_run_string("my $x = 10;", &mut interp).expect("first");
+    let v = parse_and_run_string("$x + 5", &mut interp).expect("second");
+    assert_eq!(v.to_int(), 15);
+}
+
+#[test]
 fn parse_and_run_string_preserves_subroutine_definitions() {
     let mut interp = Interpreter::new();
     parse_and_run_string("sub api_t { return 40 + 2; }", &mut interp).expect("define");

@@ -31,6 +31,11 @@ fn accepts_pmap_chunked_block() {
 }
 
 #[test]
+fn accepts_pmap_chunked_empty_list() {
+    p("my @r = pmap_chunked 3 { $_ } ();");
+}
+
+#[test]
 fn accepts_async_await() {
     p("my $t = async { 1 }; my $x = await($t);");
 }

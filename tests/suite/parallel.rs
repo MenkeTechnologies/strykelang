@@ -23,10 +23,35 @@ fn parallel_map_progress_flag_runs() {
     );
 }
 
+/// Failed `pmap` elements stringify as empty between commas; order matches the input list.
+#[test]
+fn parallel_map_mixed_undef_slots_preserve_positions() {
+    assert_eq!(
+        eval_string(r#"join(",", pmap { $_ == 1 ? 1/0 : $_ * 2 } (1, 2, 3))"#),
+        ",4,6",
+    );
+}
+
+#[test]
+fn pmap_chunked_preserves_input_order() {
+    assert_eq!(
+        eval_string(r#"join(",", pmap_chunked 2 { $_ * 2 } (1, 2, 3, 4))"#),
+        "2,4,6,8",
+    );
+}
+
 #[test]
 fn parallel_grep() {
     let result = eval("my @a = pgrep { $_ % 2 == 0 } (1,2,3,4,5,6); scalar @a");
     assert_eq!(result.to_int(), 3);
+}
+
+#[test]
+fn parallel_grep_progress_flag_runs() {
+    assert_eq!(
+        eval_string(r#"join(",", pgrep { $_ % 2 == 0 } (1, 2, 3, 4), progress => 0)"#),
+        "2,4",
+    );
 }
 
 #[test]
