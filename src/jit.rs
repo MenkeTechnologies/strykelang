@@ -71,7 +71,9 @@
 //! and calls [`try_run_block_ops`] with `Some(validated)` so CFG validation is not run again inside
 //! compilation. Callers may pass `None` for the last argument to [`try_run_block_ops`] to validate
 //! internally (unit tests). For buffer mode only, use [`block_jit_validate`] then [`ValidatedBlockCfg::buffer_mode`].
-//! Then the opcode dispatch loop.
+//! Then the opcode dispatch loop. On each opcode step, [`crate::vm::VM`] may run [`try_run_linear_sub`]
+//! at a sub entry: [`sub_entry_segment`] stops at [`Op::Return`] (void return, empty stack) or
+//! [`Op::ReturnValue`] (value return).
 
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeSet, HashMap, VecDeque};
@@ -854,6 +856,20 @@ fn validate_linear_seq(seq: &[Op], constants: &[PerlValue]) -> bool {
     stack.len() == 1
 }
 
+/// Linear sequence for a void `return;` — stack must be empty after the last op (no `Return`/`ReturnValue` in `seq`).
+fn validate_linear_void_seq(seq: &[Op], constants: &[PerlValue]) -> bool {
+    let mut stack: Vec<Cell> = Vec::new();
+    for op in seq {
+        if simulate_one_op(op, &mut stack, constants).is_none() {
+            return false;
+        }
+        if stack.len() > 256 {
+            return false;
+        }
+    }
+    stack.is_empty()
+}
+
 fn linear_result_cell_seq(seq: &[Op], constants: &[PerlValue]) -> Option<Cell> {
     let mut stack: Vec<Cell> = Vec::new();
     for op in seq {
@@ -1070,6 +1086,173 @@ fn compile_linear_ops(seq: &[Op], constants: &[PerlValue]) -> Option<LinearJit> 
         run,
         ret_nanboxed,
     })
+}
+
+/// Subroutine body that ends with [`Op::Return`] — stack empty; native code returns `undef` nanbox bits.
+fn compile_linear_void_ops(seq: &[Op], constants: &[PerlValue]) -> Option<LinearJit> {
+    if !seq.is_empty() && !validate_linear_void_seq(seq, constants) {
+        return None;
+    }
+    let need_any_table = needs_table(seq);
+    let mut module = new_jit_module()?;
+
+    let needs_pow = seq.iter().any(|o| matches!(o, Op::Pow));
+    let pow_i64_id = if needs_pow {
+        let mut ps = module.make_signature();
+        ps.params.push(AbiParam::new(types::I64));
+        ps.params.push(AbiParam::new(types::I64));
+        ps.returns.push(AbiParam::new(types::I64));
+        Some(
+            module
+                .declare_function("perlrs_jit_pow_i64", Linkage::Import, &ps)
+                .ok()?,
+        )
+    } else {
+        None
+    };
+    let pow_f64_id = if needs_pow {
+        let mut ps = module.make_signature();
+        ps.params.push(AbiParam::new(types::F64));
+        ps.params.push(AbiParam::new(types::F64));
+        ps.returns.push(AbiParam::new(types::F64));
+        Some(
+            module
+                .declare_function("perlrs_jit_pow_f64", Linkage::Import, &ps)
+                .ok()?,
+        )
+    } else {
+        None
+    };
+
+    let needs_fmod = seq.iter().any(|o| matches!(o, Op::Mod));
+    let fmod_f64_id = if needs_fmod {
+        let mut ps = module.make_signature();
+        ps.params.push(AbiParam::new(types::F64));
+        ps.params.push(AbiParam::new(types::F64));
+        ps.returns.push(AbiParam::new(types::F64));
+        Some(
+            module
+                .declare_function("perlrs_jit_fmod_f64", Linkage::Import, &ps)
+                .ok()?,
+        )
+    } else {
+        None
+    };
+
+    let needs_lognot = seq.iter().any(|o| matches!(o, Op::LogNot));
+    let lognot_id = if needs_lognot {
+        let mut ps = module.make_signature();
+        ps.params.push(AbiParam::new(types::I64));
+        ps.returns.push(AbiParam::new(types::I64));
+        Some(
+            module
+                .declare_function("perlrs_jit_lognot_i64", Linkage::Import, &ps)
+                .ok()?,
+        )
+    } else {
+        None
+    };
+
+    let ptr_ty = module.target_config().pointer_type();
+    let mut sig = module.make_signature();
+    if need_any_table {
+        sig.params.push(AbiParam::new(ptr_ty));
+        sig.params.push(AbiParam::new(ptr_ty));
+        sig.params.push(AbiParam::new(ptr_ty));
+    }
+    sig.returns.push(AbiParam::new(types::I64));
+
+    let fid = module
+        .declare_function("linear_void", Linkage::Local, &sig)
+        .ok()?;
+
+    let mut ctx = module.make_context();
+    ctx.func.signature = sig;
+    ctx.func.name = UserFuncName::user(0, fid.as_u32());
+
+    let mut fctx = FunctionBuilderContext::new();
+    {
+        let mut bcx = FunctionBuilder::new(&mut ctx.func, &mut fctx);
+        let entry = bcx.create_block();
+        bcx.append_block_params_for_function_params(entry);
+        bcx.switch_to_block(entry);
+
+        let slot_base = if need_any_table {
+            Some(bcx.block_params(entry)[0])
+        } else {
+            None
+        };
+        let plain_base = if need_any_table {
+            Some(bcx.block_params(entry)[1])
+        } else {
+            None
+        };
+        let arg_base = if need_any_table {
+            Some(bcx.block_params(entry)[2])
+        } else {
+            None
+        };
+
+        let pow_i64_ref = pow_i64_id.map(|pid| module.declare_func_in_func(pid, bcx.func));
+        let pow_f64_ref = pow_f64_id.map(|pid| module.declare_func_in_func(pid, bcx.func));
+        let fmod_f64_ref = fmod_f64_id.map(|pid| module.declare_func_in_func(pid, bcx.func));
+        let lognot_ref = lognot_id.map(|lid| module.declare_func_in_func(lid, bcx.func));
+
+        let mut stack: Vec<(cranelift_codegen::ir::Value, JitTy)> = Vec::with_capacity(32);
+        for op in seq {
+            emit_data_op(
+                &mut bcx,
+                false,
+                op,
+                &mut stack,
+                slot_base,
+                plain_base,
+                arg_base,
+                pow_i64_ref,
+                pow_f64_ref,
+                fmod_f64_ref,
+                lognot_ref,
+                constants,
+            )?;
+        }
+        if !stack.is_empty() {
+            return None;
+        }
+        let undef_bits = PerlValue::UNDEF.raw_bits() as i64;
+        let ret = bcx.ins().iconst(types::I64, undef_bits);
+        bcx.ins().return_(&[ret]);
+        bcx.seal_all_blocks();
+        bcx.finalize();
+    }
+
+    module.define_function(fid, &mut ctx).ok()?;
+    module.clear_context(&mut ctx);
+    module.finalize_definitions().ok()?;
+    let ptr = module.get_finalized_function(fid);
+    let run = if need_any_table {
+        LinearRun::Tables(unsafe {
+            std::mem::transmute::<
+                *const u8,
+                unsafe extern "C" fn(*const i64, *const i64, *const i64) -> i64,
+            >(ptr)
+        })
+    } else {
+        LinearRun::Nullary(unsafe {
+            std::mem::transmute::<*const u8, unsafe extern "C" fn() -> i64>(ptr)
+        })
+    };
+    Some(LinearJit {
+        module,
+        run,
+        ret_nanboxed: true,
+    })
+}
+
+fn hash_linear_sub_key(seq: &[Op], constants: &[PerlValue], void: bool) -> u64 {
+    let mut h = DefaultHasher::new();
+    void.hash(&mut h);
+    hash_ops(seq, constants).hash(&mut h);
+    h.finish()
 }
 
 static LINEAR_CACHE: OnceLock<Mutex<HashMap<u64, Box<LinearJit>>>> = OnceLock::new();
@@ -1324,16 +1507,27 @@ pub(crate) fn try_run_linear_ops(
     Some(pv)
 }
 
-/// Ops from `entry_ip` up to (but not including) the terminating [`Op::ReturnValue`].
-pub(crate) fn sub_return_value_segment(ops: &[Op], entry_ip: usize) -> Option<&[Op]> {
+/// How a compiled subroutine ends before the VM pops the call frame.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SubTerminator {
+    /// Bare `return;` — [`Op::Return`], no value on stack.
+    Void,
+    /// `return EXPR` or implicit final expression / `undef` — [`Op::ReturnValue`].
+    Value,
+}
+
+/// Ops from `entry_ip` up to (but not including) the first [`Op::Return`] or [`Op::ReturnValue`].
+pub(crate) fn sub_entry_segment(ops: &[Op], entry_ip: usize) -> Option<(&[Op], SubTerminator)> {
     let tail = ops.get(entry_ip..)?;
     let rel = tail
         .iter()
         .position(|o| matches!(o, Op::Return | Op::ReturnValue))?;
-    match tail.get(rel) {
-        Some(Op::ReturnValue) => Some(&tail[..rel]),
-        _ => None,
-    }
+    let term = match tail.get(rel)? {
+        Op::Return => SubTerminator::Void,
+        Op::ReturnValue => SubTerminator::Value,
+        _ => return None,
+    };
+    Some((&tail[..rel], term))
 }
 
 pub(crate) fn segment_blocks_subroutine_linear_jit(seg: &[Op]) -> bool {
@@ -1355,7 +1549,7 @@ pub(crate) fn segment_blocks_subroutine_linear_jit(seg: &[Op]) -> bool {
     })
 }
 
-/// Linear JIT for a compiled subroutine body (from [`sub_return_value_segment`]).
+/// Linear JIT for a compiled subroutine body (see [`sub_entry_segment`]).
 pub(crate) fn try_run_linear_sub(
     ops: &[Op],
     entry_ip: usize,
@@ -1364,8 +1558,8 @@ pub(crate) fn try_run_linear_sub(
     arg_i64: Option<&[i64]>,
     constants: &[PerlValue],
 ) -> Option<PerlValue> {
-    let seq = sub_return_value_segment(ops, entry_ip)?;
-    if seq.is_empty() || segment_blocks_subroutine_linear_jit(seq) {
+    let (seq, term) = sub_entry_segment(ops, entry_ip)?;
+    if segment_blocks_subroutine_linear_jit(seq) {
         return None;
     }
     if let Some(max) = max_scalar_slot_index(seq) {
@@ -1388,7 +1582,7 @@ pub(crate) fn try_run_linear_sub(
             return None;
         }
     }
-    let key = hash_ops(seq, constants);
+    let key = hash_linear_sub_key(seq, constants, term == SubTerminator::Void);
     let slot_ptr = slot_i64
         .as_mut()
         .map(|s| s.as_mut_ptr() as *const i64)
@@ -1406,7 +1600,10 @@ pub(crate) fn try_run_linear_sub(
         }
     }
 
-    let jit = compile_linear_ops(seq, constants)?;
+    let jit = match term {
+        SubTerminator::Void => compile_linear_void_ops(seq, constants)?,
+        SubTerminator::Value => compile_linear_ops(seq, constants)?,
+    };
     let r = jit.invoke(slot_ptr, plain_ptr, arg_ptr);
     let pv = jit.result_to_perl(r);
 
@@ -3357,6 +3554,21 @@ mod tests {
         // Mimics `sub { }` tail: LoadUndef; ReturnValue
         let ops = vec![Op::LoadUndef, Op::ReturnValue];
         let v = try_run_linear_sub(&ops, 0, None, None, None, &[]).expect("sub jit");
+        assert!(v.is_undef());
+    }
+
+    #[test]
+    fn try_run_linear_sub_void_bare_return() {
+        // `sub { return; }` — first op is Return, empty segment.
+        let ops = vec![Op::Return];
+        let v = try_run_linear_sub(&ops, 0, None, None, None, &[]).expect("void sub jit");
+        assert!(v.is_undef());
+    }
+
+    #[test]
+    fn try_run_linear_sub_void_after_const_pop() {
+        let ops = vec![Op::LoadInt(7), Op::Pop, Op::Return];
+        let v = try_run_linear_sub(&ops, 0, None, None, None, &[]).expect("void sub jit");
         assert!(v.is_undef());
     }
 

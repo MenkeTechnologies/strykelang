@@ -99,7 +99,7 @@ impl<'a> VM<'a> {
         let ops = &self.ops;
         let constants = &self.constants;
         let names = &self.names;
-        let Some(seg) = crate::jit::sub_return_value_segment(ops, ip) else {
+        let Some((seg, _)) = crate::jit::sub_entry_segment(ops, ip) else {
             return Ok(false);
         };
         let mut slot_buf = crate::jit::linear_slot_ops_max_index_seq(seg).and_then(|max| {
