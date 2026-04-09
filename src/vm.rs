@@ -12,7 +12,10 @@ use crate::ast::{Block, Expr, MatchArm, PerlTypeName};
 use crate::bytecode::{BuiltinId, Chunk, Op, RuntimeSubDecl};
 use crate::compiler::scalar_compound_op_from_byte;
 use crate::error::{ErrorKind, PerlError, PerlResult};
-use crate::interpreter::{Flow, FlowOrError, Interpreter, WantarrayCtx};
+use crate::interpreter::{
+    fold_preduce_init_step, merge_preduce_init_partials, preduce_init_fold_identity, Flow,
+    FlowOrError, Interpreter, WantarrayCtx,
+};
 use crate::pmap_progress::{FanProgress, PmapProgress};
 use crate::sort_fast::{sort_magic_cmp, SortBlockFast};
 use crate::value::{PerlAsyncTask, PerlBarrier, PerlHeap, PerlSub, PerlValue, PipelineInner};
@@ -2662,6 +2665,24 @@ impl<'a> VM<'a> {
                         }
                         Ok(())
                     }
+                    Op::LoadRegex(pat_idx, flags_idx) => {
+                        let pattern = constants[*pat_idx as usize].as_str_or_empty();
+                        let flags = constants[*flags_idx as usize].as_str_or_empty();
+                        let line = self.line();
+                        let pattern_owned = pattern.clone();
+                        let re = match self.interp.compile_regex(&pattern, &flags, line) {
+                            Ok(r) => r,
+                            Err(FlowOrError::Error(e)) => return Err(e),
+                            Err(FlowOrError::Flow(_)) => {
+                                return Err(PerlError::runtime(
+                                    "unexpected flow in qr// compile",
+                                    line,
+                                ));
+                            }
+                        };
+                        self.push(PerlValue::regex(re, pattern_owned));
+                        Ok(())
+                    }
                     Op::ConcatAppend(idx) => {
                         let rhs = self.pop();
                         let n = names[*idx as usize].as_str();
@@ -3353,6 +3374,355 @@ impl<'a> VM<'a> {
                             self.push(PerlValue::array(results));
                             Ok(())
                         }
+                    }
+                    Op::ReduceWithBlock(block_idx) => {
+                        let list = self.pop().to_list();
+                        let idx = *block_idx as usize;
+                        let subs = self.interp.subs.clone();
+                        let scope_capture = self.interp.scope.capture();
+                        if list.is_empty() {
+                            self.push(PerlValue::UNDEF);
+                            return Ok(());
+                        }
+                        if list.len() == 1 {
+                            self.push(list.into_iter().next().unwrap());
+                            return Ok(());
+                        }
+                        let mut items = list;
+                        let mut acc = items.remove(0);
+                        let rest = items;
+                        if let Some(&(start, end)) =
+                            self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
+                        {
+                            let shared = Arc::new(ParallelBlockVmShared::from_vm(self));
+                            for b in rest {
+                                let mut local_interp = Interpreter::new();
+                                local_interp.subs = subs.clone();
+                                local_interp.scope.restore_capture(&scope_capture);
+                                let _ = local_interp.scope.set_scalar("a", acc);
+                                let _ = local_interp.scope.set_scalar("b", b);
+                                let mut vm = shared.worker_vm(&mut local_interp);
+                                let mut op_count = 0u64;
+                                acc = match vm.run_block_region(start, end, &mut op_count) {
+                                    Ok(v) => v,
+                                    Err(_) => PerlValue::UNDEF,
+                                };
+                            }
+                        } else {
+                            let block = self.blocks[idx].clone();
+                            for b in rest {
+                                let mut local_interp = Interpreter::new();
+                                local_interp.subs = subs.clone();
+                                local_interp.scope.restore_capture(&scope_capture);
+                                let _ = local_interp.scope.set_scalar("a", acc);
+                                let _ = local_interp.scope.set_scalar("b", b);
+                                acc = match local_interp.exec_block(&block) {
+                                    Ok(val) => val,
+                                    Err(_) => PerlValue::UNDEF,
+                                };
+                            }
+                        }
+                        self.push(acc);
+                        Ok(())
+                    }
+                    Op::PReduceWithBlock(block_idx) => {
+                        let list = self.pop().to_list();
+                        let progress_flag = self.pop().is_true();
+                        let idx = *block_idx as usize;
+                        let subs = self.interp.subs.clone();
+                        let scope_capture = self.interp.scope.capture();
+                        if list.is_empty() {
+                            self.push(PerlValue::UNDEF);
+                            return Ok(());
+                        }
+                        if list.len() == 1 {
+                            self.push(list.into_iter().next().unwrap());
+                            return Ok(());
+                        }
+                        let pmap_progress = PmapProgress::new(progress_flag, list.len());
+                        if let Some(&(start, end)) =
+                            self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
+                        {
+                            let shared = Arc::new(ParallelBlockVmShared::from_vm(self));
+                            let result = list
+                                .into_par_iter()
+                                .map(|x| {
+                                    pmap_progress.tick();
+                                    x
+                                })
+                                .reduce_with(|a, b| {
+                                    let mut local_interp = Interpreter::new();
+                                    local_interp.subs = subs.clone();
+                                    local_interp.scope.restore_capture(&scope_capture);
+                                    let _ = local_interp.scope.set_scalar("a", a);
+                                    let _ = local_interp.scope.set_scalar("b", b);
+                                    let mut vm = shared.worker_vm(&mut local_interp);
+                                    let mut op_count = 0u64;
+                                    match vm.run_block_region(start, end, &mut op_count) {
+                                        Ok(val) => val,
+                                        Err(_) => PerlValue::UNDEF,
+                                    }
+                                });
+                            pmap_progress.finish();
+                            self.push(result.unwrap_or(PerlValue::UNDEF));
+                            Ok(())
+                        } else {
+                            let block = self.blocks[idx].clone();
+                            let result = list
+                                .into_par_iter()
+                                .map(|x| {
+                                    pmap_progress.tick();
+                                    x
+                                })
+                                .reduce_with(|a, b| {
+                                    let mut local_interp = Interpreter::new();
+                                    local_interp.subs = subs.clone();
+                                    local_interp.scope.restore_capture(&scope_capture);
+                                    let _ = local_interp.scope.set_scalar("a", a);
+                                    let _ = local_interp.scope.set_scalar("b", b);
+                                    match local_interp.exec_block(&block) {
+                                        Ok(val) => val,
+                                        Err(_) => PerlValue::UNDEF,
+                                    }
+                                });
+                            pmap_progress.finish();
+                            self.push(result.unwrap_or(PerlValue::UNDEF));
+                            Ok(())
+                        }
+                    }
+                    Op::PReduceInitWithBlock(block_idx) => {
+                        let init_val = self.pop();
+                        let list = self.pop().to_list();
+                        let progress_flag = self.pop().is_true();
+                        let idx = *block_idx as usize;
+                        let subs = self.interp.subs.clone();
+                        let scope_capture = self.interp.scope.capture();
+                        let cap: &[(String, PerlValue)] = scope_capture.as_slice();
+                        let block = self.blocks[idx].clone();
+                        if list.is_empty() {
+                            self.push(init_val);
+                            return Ok(());
+                        }
+                        if list.len() == 1 {
+                            let v = fold_preduce_init_step(
+                                &subs,
+                                cap,
+                                &block,
+                                preduce_init_fold_identity(&init_val),
+                                list.into_iter().next().unwrap(),
+                            );
+                            self.push(v);
+                            return Ok(());
+                        }
+                        let pmap_progress = PmapProgress::new(progress_flag, list.len());
+                        let result = list
+                            .into_par_iter()
+                            .fold(
+                                || preduce_init_fold_identity(&init_val),
+                                |acc, item| {
+                                    pmap_progress.tick();
+                                    fold_preduce_init_step(&subs, cap, &block, acc, item)
+                                },
+                            )
+                            .reduce(
+                                || preduce_init_fold_identity(&init_val),
+                                |a, b| merge_preduce_init_partials(a, b, &block, &subs, cap),
+                            );
+                        pmap_progress.finish();
+                        self.push(result);
+                        Ok(())
+                    }
+                    Op::PMapReduceWithBlocks(map_idx, reduce_idx) => {
+                        let list = self.pop().to_list();
+                        let progress_flag = self.pop().is_true();
+                        let map_i = *map_idx as usize;
+                        let reduce_i = *reduce_idx as usize;
+                        let subs = self.interp.subs.clone();
+                        let scope_capture = self.interp.scope.capture();
+                        if list.is_empty() {
+                            self.push(PerlValue::UNDEF);
+                            return Ok(());
+                        }
+                        if list.len() == 1 {
+                            let mut local_interp = Interpreter::new();
+                            local_interp.subs = subs.clone();
+                            local_interp.scope.restore_capture(&scope_capture);
+                            let _ = local_interp
+                                .scope
+                                .set_scalar("_", list.into_iter().next().unwrap());
+                            let map_block = self.blocks[map_i].clone();
+                            let v = match local_interp.exec_block_no_scope(&map_block) {
+                                Ok(v) => v,
+                                Err(_) => PerlValue::UNDEF,
+                            };
+                            self.push(v);
+                            return Ok(());
+                        }
+                        let pmap_progress = PmapProgress::new(progress_flag, list.len());
+                        let map_range = self
+                            .block_bytecode_ranges
+                            .get(map_i)
+                            .and_then(|r| r.as_ref())
+                            .copied();
+                        let reduce_range = self
+                            .block_bytecode_ranges
+                            .get(reduce_i)
+                            .and_then(|r| r.as_ref())
+                            .copied();
+                        if let (Some((map_start, map_end)), Some((reduce_start, reduce_end))) =
+                            (map_range, reduce_range)
+                        {
+                            let shared = Arc::new(ParallelBlockVmShared::from_vm(self));
+                            let result = list
+                                .into_par_iter()
+                                .map(|item| {
+                                    let mut local_interp = Interpreter::new();
+                                    local_interp.subs = subs.clone();
+                                    local_interp.scope.restore_capture(&scope_capture);
+                                    let _ = local_interp.scope.set_scalar("_", item);
+                                    let mut vm = shared.worker_vm(&mut local_interp);
+                                    let mut op_count = 0u64;
+                                    let val = match vm.run_block_region(map_start, map_end, &mut op_count)
+                                    {
+                                        Ok(val) => val,
+                                        Err(_) => PerlValue::UNDEF,
+                                    };
+                                    pmap_progress.tick();
+                                    val
+                                })
+                                .reduce_with(|a, b| {
+                                    let mut local_interp = Interpreter::new();
+                                    local_interp.subs = subs.clone();
+                                    local_interp.scope.restore_capture(&scope_capture);
+                                    let _ = local_interp.scope.set_scalar("a", a);
+                                    let _ = local_interp.scope.set_scalar("b", b);
+                                    let mut vm = shared.worker_vm(&mut local_interp);
+                                    let mut op_count = 0u64;
+                                    match vm.run_block_region(reduce_start, reduce_end, &mut op_count) {
+                                        Ok(val) => val,
+                                        Err(_) => PerlValue::UNDEF,
+                                    }
+                                });
+                            pmap_progress.finish();
+                            self.push(result.unwrap_or(PerlValue::UNDEF));
+                            Ok(())
+                        } else {
+                            let map_block = self.blocks[map_i].clone();
+                            let reduce_block = self.blocks[reduce_i].clone();
+                            let result = list
+                                .into_par_iter()
+                                .map(|item| {
+                                    let mut local_interp = Interpreter::new();
+                                    local_interp.subs = subs.clone();
+                                    local_interp.scope.restore_capture(&scope_capture);
+                                    let _ = local_interp.scope.set_scalar("_", item);
+                                    let val = match local_interp.exec_block_no_scope(&map_block) {
+                                        Ok(val) => val,
+                                        Err(_) => PerlValue::UNDEF,
+                                    };
+                                    pmap_progress.tick();
+                                    val
+                                })
+                                .reduce_with(|a, b| {
+                                    let mut local_interp = Interpreter::new();
+                                    local_interp.subs = subs.clone();
+                                    local_interp.scope.restore_capture(&scope_capture);
+                                    let _ = local_interp.scope.set_scalar("a", a);
+                                    let _ = local_interp.scope.set_scalar("b", b);
+                                    match local_interp.exec_block_no_scope(&reduce_block) {
+                                        Ok(val) => val,
+                                        Err(_) => PerlValue::UNDEF,
+                                    }
+                                });
+                            pmap_progress.finish();
+                            self.push(result.unwrap_or(PerlValue::UNDEF));
+                            Ok(())
+                        }
+                    }
+                    Op::PcacheWithBlock(block_idx) => {
+                        let list = self.pop().to_list();
+                        let progress_flag = self.pop().is_true();
+                        let idx = *block_idx as usize;
+                        let subs = self.interp.subs.clone();
+                        let scope_capture = self.interp.scope.capture();
+                        let block = self.blocks[idx].clone();
+                        let cache = &*crate::pcache::GLOBAL_PCACHE;
+                        let pmap_progress = PmapProgress::new(progress_flag, list.len());
+                        if let Some(&(start, end)) =
+                            self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
+                        {
+                            let shared = Arc::new(ParallelBlockVmShared::from_vm(self));
+                            let results: Vec<PerlValue> = list
+                                .into_par_iter()
+                                .map(|item| {
+                                    let k = crate::pcache::cache_key(&item);
+                                    if let Some(v) = cache.get(&k) {
+                                        pmap_progress.tick();
+                                        return v.clone();
+                                    }
+                                    let mut local_interp = Interpreter::new();
+                                    local_interp.subs = subs.clone();
+                                    local_interp.scope.restore_capture(&scope_capture);
+                                    let _ = local_interp.scope.set_scalar("_", item.clone());
+                                    let mut vm = shared.worker_vm(&mut local_interp);
+                                    let mut op_count = 0u64;
+                                    let val = match vm.run_block_region(start, end, &mut op_count) {
+                                        Ok(v) => v,
+                                        Err(_) => PerlValue::UNDEF,
+                                    };
+                                    cache.insert(k, val.clone());
+                                    pmap_progress.tick();
+                                    val
+                                })
+                                .collect();
+                            pmap_progress.finish();
+                            self.push(PerlValue::array(results));
+                            Ok(())
+                        } else {
+                            let results: Vec<PerlValue> = list
+                                .into_par_iter()
+                                .map(|item| {
+                                    let k = crate::pcache::cache_key(&item);
+                                    if let Some(v) = cache.get(&k) {
+                                        pmap_progress.tick();
+                                        return v.clone();
+                                    }
+                                    let mut local_interp = Interpreter::new();
+                                    local_interp.subs = subs.clone();
+                                    local_interp.scope.restore_capture(&scope_capture);
+                                    let _ = local_interp.scope.set_scalar("_", item.clone());
+                                    let val = match local_interp.exec_block_no_scope(&block) {
+                                        Ok(v) => v,
+                                        Err(_) => PerlValue::UNDEF,
+                                    };
+                                    cache.insert(k, val.clone());
+                                    pmap_progress.tick();
+                                    val
+                                })
+                                .collect();
+                            pmap_progress.finish();
+                            self.push(PerlValue::array(results));
+                            Ok(())
+                        }
+                    }
+                    Op::Pselect { n_rx, has_timeout } => {
+                        let timeout = if *has_timeout {
+                            let t = self.pop().to_number();
+                            Some(std::time::Duration::from_secs_f64(t.max(0.0)))
+                        } else {
+                            None
+                        };
+                        let mut rx_vals = Vec::with_capacity(*n_rx as usize);
+                        for _ in 0..*n_rx {
+                            rx_vals.push(self.pop());
+                        }
+                        rx_vals.reverse();
+                        let line = self.line();
+                        let v = crate::pchannel::pselect_recv_with_optional_timeout(
+                            &rx_vals, timeout, line,
+                        )?;
+                        self.push(v);
+                        Ok(())
                     }
                     Op::PGrepWithBlock(block_idx) => {
                         let list = self.pop().to_list();

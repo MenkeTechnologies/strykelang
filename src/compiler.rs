@@ -3119,8 +3119,14 @@ impl Compiler {
             }
 
             // ── Regex literal ──
-            ExprKind::Regex(_, _) => {
-                return Err(CompileError::Unsupported("Regex literal as value".into()));
+            ExprKind::Regex(pattern, flags) => {
+                let pat_idx = self
+                    .chunk
+                    .add_constant(PerlValue::string(pattern.clone()));
+                let flags_idx = self
+                    .chunk
+                    .add_constant(PerlValue::string(flags.clone()));
+                self.chunk.emit(Op::LoadRegex(pat_idx, flags_idx), line);
             }
 
             // ── Map/Grep/Sort with blocks ──
@@ -3255,24 +3261,90 @@ impl Compiler {
                     self.chunk.emit(Op::PSortNoBlockParallel, line);
                 }
             }
-            ExprKind::ReduceExpr { .. } => {
-                return Err(CompileError::Unsupported("reduce".into()));
+            ExprKind::ReduceExpr { block, list } => {
+                self.compile_expr(list)?;
+                let block_idx = self.chunk.add_block(block.clone());
+                self.chunk.emit(Op::ReduceWithBlock(block_idx), line);
             }
-            ExprKind::PReduceExpr { .. } => {
-                // No PReduce op — fall back to tree-walker
-                return Err(CompileError::Unsupported("preduce".into()));
+            ExprKind::PReduceExpr {
+                block,
+                list,
+                progress,
+            } => {
+                if let Some(p) = progress {
+                    self.compile_expr(p)?;
+                } else {
+                    self.chunk.emit(Op::LoadInt(0), line);
+                }
+                self.compile_expr(list)?;
+                let block_idx = self.chunk.add_block(block.clone());
+                self.chunk.emit(Op::PReduceWithBlock(block_idx), line);
             }
-            ExprKind::PReduceInitExpr { .. } => {
-                return Err(CompileError::Unsupported("preduce_init".into()));
+            ExprKind::PReduceInitExpr {
+                init,
+                block,
+                list,
+                progress,
+            } => {
+                if let Some(p) = progress {
+                    self.compile_expr(p)?;
+                } else {
+                    self.chunk.emit(Op::LoadInt(0), line);
+                }
+                self.compile_expr(list)?;
+                self.compile_expr(init)?;
+                let block_idx = self.chunk.add_block(block.clone());
+                self.chunk.emit(Op::PReduceInitWithBlock(block_idx), line);
             }
-            ExprKind::PMapReduceExpr { .. } => {
-                return Err(CompileError::Unsupported("pmap_reduce".into()));
+            ExprKind::PMapReduceExpr {
+                map_block,
+                reduce_block,
+                list,
+                progress,
+            } => {
+                if let Some(p) = progress {
+                    self.compile_expr(p)?;
+                } else {
+                    self.chunk.emit(Op::LoadInt(0), line);
+                }
+                self.compile_expr(list)?;
+                let map_idx = self.chunk.add_block(map_block.clone());
+                let reduce_idx = self.chunk.add_block(reduce_block.clone());
+                self.chunk.emit(Op::PMapReduceWithBlocks(map_idx, reduce_idx), line);
             }
-            ExprKind::PcacheExpr { .. } => {
-                return Err(CompileError::Unsupported("pcache".into()));
+            ExprKind::PcacheExpr {
+                block,
+                list,
+                progress,
+            } => {
+                if let Some(p) = progress {
+                    self.compile_expr(p)?;
+                } else {
+                    self.chunk.emit(Op::LoadInt(0), line);
+                }
+                self.compile_expr(list)?;
+                let block_idx = self.chunk.add_block(block.clone());
+                self.chunk.emit(Op::PcacheWithBlock(block_idx), line);
             }
-            ExprKind::PselectExpr { .. } => {
-                return Err(CompileError::Unsupported("pselect".into()));
+            ExprKind::PselectExpr { receivers, timeout } => {
+                let n = receivers.len();
+                if n > u8::MAX as usize {
+                    return Err(CompileError::Unsupported("pselect: too many receivers".into()));
+                }
+                for r in receivers {
+                    self.compile_expr(r)?;
+                }
+                let has_timeout = timeout.is_some();
+                if let Some(t) = timeout {
+                    self.compile_expr(t)?;
+                }
+                self.chunk.emit(
+                    Op::Pselect {
+                        n_rx: n as u8,
+                        has_timeout,
+                    },
+                    line,
+                );
             }
             ExprKind::FanExpr {
                 count,

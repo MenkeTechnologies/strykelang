@@ -34,7 +34,7 @@ use crate::value::{
 
 /// Merge two counting-hash accumulators (parallel `preduce_init` partials).
 /// Returns a hashref so arrow deref (`$acc->{k}`) stays valid after parallel merge.
-fn preduce_init_merge_maps(
+pub(crate) fn preduce_init_merge_maps(
     mut acc: IndexMap<String, PerlValue>,
     b: IndexMap<String, PerlValue>,
 ) -> PerlValue {
@@ -48,7 +48,7 @@ fn preduce_init_merge_maps(
 
 /// Combine two partial results from `preduce_init`: hash/hashref maps add per-key counts; otherwise
 /// the fold block is invoked with `$a` / `$b` as the two partial accumulators (associative combine).
-fn merge_preduce_init_partials(
+pub(crate) fn merge_preduce_init_partials(
     a: PerlValue,
     b: PerlValue,
     block: &Block,
@@ -92,7 +92,7 @@ fn merge_preduce_init_partials(
 
 /// Seed each parallel chunk from `init` without sharing mutable hashref storage (plain `clone` on
 /// `HashRef` reuses the same `Arc<RwLock<…>>`).
-fn preduce_init_fold_identity(init: &PerlValue) -> PerlValue {
+pub(crate) fn preduce_init_fold_identity(init: &PerlValue) -> PerlValue {
     if let Some(m) = init.as_hash_map() {
         return PerlValue::hash(m.clone());
     }
@@ -102,7 +102,7 @@ fn preduce_init_fold_identity(init: &PerlValue) -> PerlValue {
     init.clone()
 }
 
-fn fold_preduce_init_step(
+pub(crate) fn fold_preduce_init_step(
     subs: &HashMap<String, Arc<PerlSub>>,
     scope_capture: &[(String, PerlValue)],
     block: &Block,

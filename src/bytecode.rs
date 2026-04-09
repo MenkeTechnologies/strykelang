@@ -179,6 +179,8 @@ pub enum Op {
     /// Dynamic `=~` / `!~`: pattern from RHS, subject from LHS; empty flags.
     /// stack: `[subject, pattern]` (pattern on top) → 0/1; `true` = negate (`!~`).
     RegexMatchDyn(bool),
+    /// Regex literal as a value (`qr/PAT/FLAGS`) — pattern and flags string pool indices.
+    LoadRegex(u16, u16),
 
     // ── Assign helpers ──
     /// SetScalar that also leaves the value on the stack (for chained assignment)
@@ -247,6 +249,18 @@ pub enum Op {
     PSortWithBlock(u16),
     /// psort @list (no block) — stack: \[progress_flag, list\] → \[sorted\]
     PSortNoBlockParallel,
+    /// `reduce { BLOCK } @list` — block_idx; stack: \[list\] → \[accumulator\]
+    ReduceWithBlock(u16),
+    /// `preduce { BLOCK } @list` — block_idx; stack: \[progress_flag, list\] → \[accumulator\]
+    PReduceWithBlock(u16),
+    /// `preduce_init EXPR, { BLOCK } @list` — block_idx; stack: \[progress_flag, list, init\] → \[accumulator\]
+    PReduceInitWithBlock(u16),
+    /// `pmap_reduce { MAP } { REDUCE } @list` — map and reduce block indices; stack: \[progress_flag, list\] → \[scalar\]
+    PMapReduceWithBlocks(u16, u16),
+    /// `pcache { BLOCK } @list` — block_idx; stack: \[progress_flag, list\] → \[array\]
+    PcacheWithBlock(u16),
+    /// `pselect($rx1, ... [, timeout => SECS])` — stack: \[rx0, …, rx_{n-1}\] with optional timeout on top
+    Pselect { n_rx: u8, has_timeout: bool },
     /// fan N { BLOCK } — block_idx; stack: \[progress_flag, count\] (`progress_flag` is 0/1)
     FanWithBlock(u16),
     /// fan { BLOCK } — block_idx; stack: \[progress_flag\]; COUNT = rayon pool size (`pe -j`)
