@@ -490,7 +490,7 @@ impl<'a> VM<'a> {
                 Op::Concat => {
                     let b = self.pop();
                     let a = self.pop();
-                    let mut s = a.to_string();
+                    let mut s = a.into_string();
                     b.append_to(&mut s);
                     self.push(PerlValue::String(s));
                 }
@@ -1037,6 +1037,12 @@ impl<'a> VM<'a> {
                             return Err(PerlError::runtime("unexpected flow in =~", line));
                         }
                     }
+                }
+                Op::ConcatAppend(idx) => {
+                    let rhs = self.pop();
+                    let n = names[*idx as usize].as_str();
+                    let result = self.interp.scope.scalar_concat_inplace(n, &rhs);
+                    self.push(result);
                 }
                 Op::ChompInPlace(lvalue_idx) => {
                     let val = self.pop();

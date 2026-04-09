@@ -1074,6 +1074,12 @@ impl Compiler {
                 if let ExprKind::ScalarVar(name) = &target.kind {
                     self.check_scalar_mutable(name, line)?;
                     let idx = self.chunk.intern_name(name);
+                    // Fast path: `.=` on scalar → in-place append (no clone)
+                    if *op == BinOp::Concat {
+                        self.compile_expr(value)?;
+                        self.chunk.emit(Op::ConcatAppend(idx), line);
+                        return Ok(());
+                    }
                     self.chunk.emit(Op::GetScalar(idx), line);
                     self.compile_expr(value)?;
                     let op_code = match op {
@@ -1083,7 +1089,7 @@ impl Compiler {
                         BinOp::Div => Op::Div,
                         BinOp::Mod => Op::Mod,
                         BinOp::Pow => Op::Pow,
-                        BinOp::Concat => Op::Concat,
+                        BinOp::Concat => unreachable!(),
                         BinOp::BitAnd => Op::BitAnd,
                         BinOp::BitOr => Op::BitOr,
                         BinOp::BitXor => Op::BitXor,

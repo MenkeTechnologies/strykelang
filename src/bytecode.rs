@@ -167,6 +167,9 @@ pub enum Op {
     ChompInPlace(u16),
     /// `chop` on assignable expr: stack has value → chopped char; uses `chunk.lvalues[idx]`.
     ChopInPlace(u16),
+    /// `$var .= expr` — append to scalar string in-place without cloning.
+    /// Stack: [value_to_append] → [resulting_string]. u16 = name pool index of target scalar.
+    ConcatAppend(u16),
     /// reverse — stack: \[list\] → \[reversed\]
     ReverseOp,
     /// pmap { BLOCK } @list — block_idx; stack: \[list\] → \[mapped\]

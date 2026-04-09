@@ -459,6 +459,34 @@ impl Scope {
         old
     }
 
+    /// Append `rhs` to a scalar string in-place (no clone of the existing string).
+    /// If the scalar is not yet a String, it is converted first.
+    #[inline]
+    pub fn scalar_concat_inplace(&mut self, name: &str, rhs: &PerlValue) -> PerlValue {
+        for frame in self.frames.iter_mut().rev() {
+            if let Some(entry) = frame.scalars.iter_mut().find(|(k, _)| k == name) {
+                match &mut entry.1 {
+                    PerlValue::String(ref mut s) => {
+                        rhs.append_to(s);
+                        return entry.1.clone();
+                    }
+                    other => {
+                        let mut s = other.to_string();
+                        rhs.append_to(&mut s);
+                        entry.1 = PerlValue::String(s);
+                        return entry.1.clone();
+                    }
+                }
+            }
+        }
+        // Variable not found — create as new string
+        let mut s = String::new();
+        rhs.append_to(&mut s);
+        let val = PerlValue::String(s);
+        self.frames[0].set_scalar(name, val.clone());
+        val
+    }
+
     #[inline]
     pub fn set_scalar(&mut self, name: &str, val: PerlValue) -> Result<(), PerlError> {
         for frame in self.frames.iter_mut().rev() {
