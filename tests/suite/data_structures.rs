@@ -27,3 +27,8 @@ fn empty_array_in_list_context() {
 fn string_repeat_zero_is_empty() {
     assert_eq!(eval_string(r#""x" x 0"#), "");
 }
+
+#[test]
+fn empty_hash_has_zero_keys() {
+    assert_eq!(eval_int(r#"my %h = (); scalar keys %h"#), 0);
+}

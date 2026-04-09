@@ -98,6 +98,14 @@ fn list_util_product_scalar() {
 }
 
 #[test]
+fn list_util_uniqstr_case_sensitive() {
+    let mut interp = Interpreter::new();
+    let p = parse(r#"join(",", List::Util::uniqstr("a", "A", "a"))"#).expect("parse");
+    let v = interp.execute(&p).expect("run");
+    assert_eq!(v.to_string(), "a,A,a");
+}
+
+#[test]
 fn list_util_pairs_returns_blessed_arrays() {
     let mut interp = Interpreter::new();
     let p = parse("join(\",\", List::Util::pairs(\"a\", 1, \"b\", 2))").expect("parse");
