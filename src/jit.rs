@@ -3267,6 +3267,26 @@ mod tests {
     }
 
     #[test]
+    fn block_jit_jump_if_defined_keep_raw_get_arg() {
+        let ops = vec![
+            Op::GetArg(0),
+            Op::JumpIfDefinedKeep(4),
+            Op::LoadInt(0),
+            Op::Halt,
+            Op::Halt,
+        ];
+        let args = [PerlValue::UNDEF.raw_bits() as i64];
+        let (v, mode) = try_run_block_ops(&ops, None, None, Some(&args), &[]).expect("jit");
+        assert_eq!(mode, BlockJitBufferMode::I64AsPerlValueBits);
+        assert_eq!(v.to_int(), 0);
+
+        let args = [PerlValue::integer(99).raw_bits() as i64];
+        let (v, mode) = try_run_block_ops(&ops, None, None, Some(&args), &[]).expect("jit");
+        assert_eq!(mode, BlockJitBufferMode::I64AsPerlValueBits);
+        assert_eq!(v.to_int(), 99);
+    }
+
+    #[test]
     fn join_cell_succeeds_on_representative_pairs() {
         let cells = [
             Cell::Const(0),
