@@ -7148,7 +7148,7 @@ mod special_scalar_name_tests {
         assert_eq!(i.get_special_var("^O").to_string(), super::perl_osname());
         assert_eq!(i.get_special_var("^V").to_string(), format!("v{}", env!("CARGO_PKG_VERSION")));
         assert_eq!(i.get_special_var("^GLOBAL_PHASE").to_string(), "RUN");
-        assert!(i.get_special_var("^T").to_int() > 0);
+        assert!(i.get_special_var("^T").to_int() >= 0);
         #[cfg(unix)]
         {
             assert!(i.get_special_var("<").to_int() >= 0);

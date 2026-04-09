@@ -511,7 +511,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - `qw()`, `q()`, `qq()`
 - POD documentation skipping
 - Shebang line handling
-- **Special variables** — Not full perlvar(5): see [`SPECIAL_VARIABLES.md`](SPECIAL_VARIABLES.md) for `$_`, `$/`, `$!`, `$1`…, `%+`, `@-`/`@+`, `$]`/`$;`, `$^I`/`$^D`/`$^P`/`$^S`/`$^W`, `$ARGV` with `<>`, `@ARGV`/`%ENV`/`@INC`/`%INC`, `%SIG` (hash only; OS delivery not wired), **`$?`** / **`$|`** (see Perl-compat bullets above). Commonly missed Perl specials: **`$^O`**, **`$^T`**, **`$^V`**, **`$^E`**, **`$^H`** / phase bits (**`${^WARNING_BITS}`**, **`${^GLOBAL_PHASE}`**, …), **`$<`**/**`$>`**/**`$(`**/**`$)`**, **`${^MATCH}`** / **`${^PREMATCH}`** / **`${^POSTMATCH}`**; full **`$!`**/**`$@`** dualvar; real **`%SIG`** delivery; **`English`**.
+- **Special variables** — Not full perlvar(5): see [`SPECIAL_VARIABLES.md`](SPECIAL_VARIABLES.md) for `$_`, `$/`, `$!`, `$1`…, `%+`, `@-`/`@+`, `$]`/`$;`, **`$^O`** / **`$^T`** / **`$^V`** / **`$^E`** / **`$^H`**, **`${^WARNING_BITS}`** / **`${^GLOBAL_PHASE}`**, **`$<`**/**`$>`**/**`$(`**/**`$)`** (Unix ids; non-Unix stubs), **`${^MATCH}`** / **`${^PREMATCH}`** / **`${^POSTMATCH}`** (same data as `$&` / `` $` `` / `$'` when driven by the regex engine), `$^I`/`$^D`/`$^P`/`$^S`/`$^W`, `$ARGV` with `<>`, `@ARGV`/`%ENV`/`@INC`/`%INC`, `%SIG` (hash only; OS delivery not wired), **`$?`** / **`$|`** (see Perl-compat bullets above). Still missing vs Perl 5: full **`$!`**/**`$@`** dualvar; real **`%SIG`** delivery; **`English`**; full **`$^V`** as a version object; **`${^GLOBAL_PHASE}`** transitions (perlrs keeps a string, default **`RUN`**).
 
 ---
 

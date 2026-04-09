@@ -38,6 +38,15 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 | `$^P` | Debugger flags | `perl_debug_flags` (`i64`). |
 | `$^S` | Exception state (in eval) | `eval_nesting > 0` while `eval` runs (tree-walker and VM `eval` / `evalblock`). |
 | `$^W` | Warnings | `warnings` boolean (`true` → `1`). |
+| `$^O` | OS name | `perl_osname()` maps `std::env::consts::OS` toward Perl names (`linux`, `darwin`, `MSWin32`, …). |
+| `$^T` | Script start time | `Interpreter.script_start_time` (seconds since Unix epoch, set in `Interpreter::new`). |
+| `$^V` | Version string | `v{CARGO_PKG_VERSION}` (e.g. `v0.1.11`); not a full Perl `version` object. |
+| `$^E` | Extended OS error | `std::io::Error::last_os_error().to_string()` (not Windows `GetLastError` semantics). |
+| `$^H` | Compile-time hints | `compile_hints` (`i64`); read/write via `get_special_var` / `set_special_var`. |
+| `${^WARNING_BITS}` | Warnings bitmask | `warning_bits` (`i64`); read/write via `get_special_var` / `set_special_var`. |
+| `${^GLOBAL_PHASE}` | Interpreter phase | `global_phase` string (default `RUN`); read-only assignment in `set_special_var`. |
+| `$<` / `$>` / `$(` / `$)` | Real/effective uid/gid | On Unix `libc::getuid` / `geteuid` / `getgid` / `getegid`; on non-Unix all `0`. |
+| `${^MATCH}` / `${^PREMATCH}` / `${^POSTMATCH}` | Regexp spellings | Same as `$&` / `` $` `` / `$'` data on `Interpreter` (`last_match`, `prematch`, `postmatch`). |
 | `__PACKAGE__` | Current package | Scalar in scope; `package` statements update it. |
 | `wantarray` | List/scalar/void context | `WantarrayCtx` on interpreter; `ExprKind::Wantarray` / `BuiltinId::Wantarray`. |
 
@@ -54,6 +63,9 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 | `pos $_` | Supported with `regex_pos` map; edge cases may differ from Perl. |
 | `%SIG` | Storage only; **no** Unix signal delivery into subs. |
 | `$^I` | In-place editing is **not** implemented; the value is stored for compatibility. |
+| `$^V` | String form only (`v…` from crate version); not a Perl `version` object. |
+| `$^E` | Uses `std::io::Error::last_os_error()`, not Perl’s per-platform extended error. |
+| `${^GLOBAL_PHASE}` | Single string field; not full Perl phase transitions (`BEGIN`/`CHECK`/…). |
 
 ---
 
@@ -63,36 +75,27 @@ Single-character names after `$` are accepted (`src/lexer.rs` `read_variable_nam
 
 **`$^X` (caret + letter):** The lexer reads **`^` plus one alphabetic character** as names like `^I`, `^O`, `^W` (see `read_variable_name`).
 
+**`${^NAME}` (brace form):** `{` … `}` after `$` is read as the inner name (e.g. **`^MATCH`**, **`^WARNING_BITS`**) and must match `get_special_var` arms.
+
 ---
 
 ## Not implemented (common Perl specials)
 
 | Category | Examples |
 |----------|----------|
-| **Match / regexp** | `$&` / `` $` `` / `$'` / `$+` are also set on the scalar stash from `apply_regex_captures`; `${^MATCH}` / `${^PREMATCH}` / `${^POSTMATCH}` / `${^LAST_SUBMATCH_RESULT}` use the same interpreter state via `get_special_var`. |
-| **Process / status** | `$^E` extended OS error, `$PROCESS_ID` aliases. (`$?` is set after `system`, `capture`, and `close` on pipe children; POSIX-style packed status.) |
-| **Ids / groups** | `$<` `$>` `$(` `$)` real/effective uid/gid. |
+| **Match / regexp** | Other `${^…}` names beyond those listed above; stash-backed `$&` / `$1` / `` $` `` / `$'` / `$+` still differ from full Perl regexp engine. |
+| **Process / status** | `$PROCESS_ID` aliases. (`$?` is set after `system`, `capture`, and `close` on pipe children; POSIX-style packed status.) |
 | **Perlio / globs** | Many handle-related specials beyond what IO builtins use. |
-| **Compiler / phase** | `$^H`, `${^WARNING_BITS}`, `${^GLOBAL_PHASE}`, etc. |
-| **Time** | `$^T` base time, `$^V` version object. |
 | **English.pm** | No `English` module tying long names to these variables. |
 
 ---
 
 ## Short list (what’s still missing)
 
-**Commonly missed Perl specials:** **`$^O`**, **`$^T`**, **`$^V`**, **`$^E`**, **`$^H`** / phase bits (**`${^WARNING_BITS}`**, **`${^GLOBAL_PHASE}`**, …), **`$<`**/**`$>`**/**`$(`**/**`$)`**; full **`$!`**/**`$@`** dualvar; real **`%SIG`**; **`English`** (see tables below).
-
-If you only care about **common Perl specials** not yet covered (see **Partially implemented** for things that exist but differ):
+**Still commonly missing vs stock Perl 5:** full **`$!`**/**`$@`** dualvar; real **`%SIG`** delivery; **`English`**; full **`$^V`** as a version object; **`${^GLOBAL_PHASE}`** lifecycle matching Perl; **`exists`/`delete` on non-`$hash{key}` lvalues** (e.g. `exists $ref->{k}`).
 
 | Area | Perl | Notes |
 |------|------|--------|
-| OS / identity | `$^O` | Not in `get_special_var` (lexer allows `$^O`). |
-| Time / version | `$^T`, `$^V` | `$^T`: start time exists internally but is **not** exposed as `$^T`. `$^V` (version object) **not** in `get_special_var`. |
-| OS error | `$^E` | Extended OS error (Perl uses it heavily on Windows). |
-| Compiler / phase | `$^H`, `${^WARNING_BITS}`, `${^GLOBAL_PHASE}`, … | Not wired. |
-| Process ids | `$<`, `$>`, `$(`, `$)` | Real/effective uid/gid. |
-| Match spellings | `${^MATCH}`, `${^PREMATCH}`, `${^POSTMATCH}` | Not via `get_special_var`. After a match, `$&`, `` $` ``, `$'`, `$+` are set on the **stash** as `"&"`, `` ` ``, `"'"`, `"+"` in `apply_regex_captures` — not the `${^…}` variable names. |
 | Dualvar | `$!`, `$@` | String reads only; not full dualvar; writes don’t round-trip (see partial table). |
 | Signals | `%SIG` | Hash exists; **no** delivery of OS signals into Perl subs. |
 | Aliases | `English` | No long-name aliases module. |
