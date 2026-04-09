@@ -597,6 +597,125 @@ impl Parser {
         })
     }
 
+    /// `match (EXPR) { PATTERN => EXPR, ... }`
+    fn parse_algebraic_match_expr(&mut self, line: usize) -> PerlResult<Expr> {
+        self.expect(&Token::LParen)?;
+        let subject = self.parse_expression()?;
+        self.expect(&Token::RParen)?;
+        self.expect(&Token::LBrace)?;
+        let mut arms = Vec::new();
+        while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            if self.eat(&Token::Semicolon) {
+                continue;
+            }
+            let pattern = self.parse_match_pattern()?;
+            self.expect(&Token::FatArrow)?;
+            // Use assign-level parsing so commas separate arms, not `List` elements.
+            let body = self.parse_assign_expr()?;
+            arms.push(MatchArm { pattern, body });
+            self.eat(&Token::Comma);
+        }
+        self.expect(&Token::RBrace)?;
+        Ok(Expr {
+            kind: ExprKind::AlgebraicMatch {
+                subject: Box::new(subject),
+                arms,
+            },
+            line,
+        })
+    }
+
+    fn parse_match_pattern(&mut self) -> PerlResult<MatchPattern> {
+        match self.peek().clone() {
+            Token::Regex(pattern, flags) => {
+                self.advance();
+                Ok(MatchPattern::Regex { pattern, flags })
+            }
+            Token::Ident(ref s) if s == "_" => {
+                self.advance();
+                Ok(MatchPattern::Any)
+            }
+            Token::LBracket => self.parse_match_array_pattern(),
+            Token::LBrace => self.parse_match_hash_pattern(),
+            Token::LParen => {
+                self.advance();
+                let e = self.parse_expression()?;
+                self.expect(&Token::RParen)?;
+                Ok(MatchPattern::Value(Box::new(e)))
+            }
+            _ => {
+                let e = self.parse_assign_expr()?;
+                Ok(MatchPattern::Value(Box::new(e)))
+            }
+        }
+    }
+
+    fn parse_match_array_pattern(&mut self) -> PerlResult<MatchPattern> {
+        self.expect(&Token::LBracket)?;
+        let mut elems = Vec::new();
+        if self.eat(&Token::RBracket) {
+            return Ok(MatchPattern::Array(vec![]));
+        }
+        loop {
+            if matches!(self.peek(), Token::Star) {
+                self.advance();
+                elems.push(MatchArrayElem::Rest);
+                self.eat(&Token::Comma);
+                if !matches!(self.peek(), Token::RBracket) {
+                    return Err(PerlError::syntax(
+                        "`*` must be the last element in an array match pattern",
+                        self.peek_line(),
+                    ));
+                }
+                self.expect(&Token::RBracket)?;
+                return Ok(MatchPattern::Array(elems));
+            }
+            let e = self.parse_assign_expr()?;
+            elems.push(MatchArrayElem::Expr(e));
+            if self.eat(&Token::Comma) {
+                if matches!(self.peek(), Token::RBracket) {
+                    break;
+                }
+                continue;
+            }
+            break;
+        }
+        self.expect(&Token::RBracket)?;
+        Ok(MatchPattern::Array(elems))
+    }
+
+    fn parse_match_hash_pattern(&mut self) -> PerlResult<MatchPattern> {
+        self.expect(&Token::LBrace)?;
+        let mut pairs = Vec::new();
+        while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            if self.eat(&Token::Semicolon) {
+                continue;
+            }
+            let key = self.parse_assign_expr()?;
+            self.expect(&Token::FatArrow)?;
+            match self.advance().0 {
+                Token::Ident(ref s) if s == "_" => {
+                    pairs.push(MatchHashPair::KeyOnly { key });
+                }
+                Token::ScalarVar(name) => {
+                    pairs.push(MatchHashPair::Capture { key, name });
+                }
+                tok => {
+                    return Err(PerlError::syntax(
+                        format!(
+                            "hash match pattern must bind with `=> $name` or `=> _`, got {:?}",
+                            tok
+                        ),
+                        self.peek_line(),
+                    ));
+                }
+            }
+            self.eat(&Token::Comma);
+        }
+        self.expect(&Token::RBrace)?;
+        Ok(MatchPattern::Hash(pairs))
+    }
+
     /// `eval_timeout SECS { ... }`
     fn parse_eval_timeout(&mut self) -> PerlResult<Statement> {
         let line = self.peek_line();
@@ -2948,6 +3067,7 @@ impl Parser {
                     line,
                 })
             }
+            "match" => self.parse_algebraic_match_expr(line),
             "grep" => {
                 let (block, list) = self.parse_block_list()?;
                 Ok(Expr {

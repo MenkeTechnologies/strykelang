@@ -1300,6 +1300,30 @@ mod tests {
     }
 
     #[test]
+    fn str_eq_heap_strings_fast_path() {
+        let a = PerlValue::string("hello".into());
+        let b = PerlValue::string("hello".into());
+        assert!(a.str_eq(&b));
+        assert!(!a.str_eq(&PerlValue::string("hell".into())));
+    }
+
+    #[test]
+    fn str_eq_fallback_matches_stringified_equality() {
+        let n = PerlValue::integer(42);
+        let s = PerlValue::string("42".into());
+        assert!(n.str_eq(&s));
+        assert!(!PerlValue::integer(1).str_eq(&PerlValue::string("2".into())));
+    }
+
+    #[test]
+    fn str_cmp_heap_strings_fast_path() {
+        assert_eq!(
+            PerlValue::string("a".into()).str_cmp(&PerlValue::string("b".into())),
+            Ordering::Less
+        );
+    }
+
+    #[test]
     fn scalar_context_array_and_hash() {
         let a =
             PerlValue::array(vec![PerlValue::integer(1), PerlValue::integer(2)]).scalar_context();

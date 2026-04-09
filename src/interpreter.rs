@@ -1751,6 +1751,156 @@ impl Interpreter {
         topic.to_string() == c.to_string()
     }
 
+    fn eval_algebraic_match(
+        &mut self,
+        subject: &Expr,
+        arms: &[MatchArm],
+        line: usize,
+    ) -> ExecResult {
+        let val = self.eval_expr(subject)?;
+        for arm in arms {
+            if let Some(bindings) = self.match_pattern_try(&val, &arm.pattern, line)? {
+                self.scope.push_frame();
+                for (name, v) in bindings {
+                    self.scope.declare_scalar(&name, v);
+                }
+                let out = self.eval_expr(&arm.body);
+                self.scope.pop_frame();
+                return out;
+            }
+        }
+        Err(PerlError::runtime(
+            "match: no arm matched the value (add a `_` catch-all)",
+            line,
+        )
+        .into())
+    }
+
+    fn match_pattern_try(
+        &mut self,
+        subject: &PerlValue,
+        pattern: &MatchPattern,
+        line: usize,
+    ) -> Result<Option<Vec<(String, PerlValue)>>, FlowOrError> {
+        match pattern {
+            MatchPattern::Any => Ok(Some(vec![])),
+            MatchPattern::Regex { pattern, flags } => {
+                let re = self.compile_regex(pattern, flags, line)?;
+                let s = subject.to_string();
+                if re.is_match(&s) {
+                    Ok(Some(vec![]))
+                } else {
+                    Ok(None)
+                }
+            }
+            MatchPattern::Value(expr) => {
+                let pv = self.eval_expr(expr)?;
+                if self.smartmatch_when(subject, &pv) {
+                    Ok(Some(vec![]))
+                } else {
+                    Ok(None)
+                }
+            }
+            MatchPattern::Array(elems) => {
+                let Some(arr) = Self::match_value_as_array(subject) else {
+                    return Ok(None);
+                };
+                self.match_array_pattern_elems(&arr, elems, line)
+            }
+            MatchPattern::Hash(pairs) => {
+                let Some(h) = Self::match_value_as_hash(subject) else {
+                    return Ok(None);
+                };
+                self.match_hash_pattern_pairs(&h, pairs, line)
+            }
+        }
+    }
+
+    fn match_value_as_array(v: &PerlValue) -> Option<Vec<PerlValue>> {
+        if let Some(a) = v.as_array_vec() {
+            return Some(a);
+        }
+        if let Some(r) = v.as_array_ref() {
+            return Some(r.read().clone());
+        }
+        None
+    }
+
+    fn match_value_as_hash(v: &PerlValue) -> Option<IndexMap<String, PerlValue>> {
+        if let Some(h) = v.as_hash_map() {
+            return Some(h);
+        }
+        if let Some(r) = v.as_hash_ref() {
+            return Some(r.read().clone());
+        }
+        None
+    }
+
+    fn match_array_pattern_elems(
+        &mut self,
+        arr: &[PerlValue],
+        elems: &[MatchArrayElem],
+        line: usize,
+    ) -> Result<Option<Vec<(String, PerlValue)>>, FlowOrError> {
+        let has_rest = elems.iter().any(|e| matches!(e, MatchArrayElem::Rest));
+        let mut idx = 0usize;
+        for (i, elem) in elems.iter().enumerate() {
+            match elem {
+                MatchArrayElem::Rest => {
+                    if i != elems.len() - 1 {
+                        return Err(PerlError::runtime(
+                            "internal: `*` must be last in array match pattern",
+                            line,
+                        )
+                        .into());
+                    }
+                    return Ok(Some(vec![]));
+                }
+                MatchArrayElem::Expr(e) => {
+                    if idx >= arr.len() {
+                        return Ok(None);
+                    }
+                    let expected = self.eval_expr(e)?;
+                    if !self.smartmatch_when(&arr[idx], &expected) {
+                        return Ok(None);
+                    }
+                    idx += 1;
+                }
+            }
+        }
+        if !has_rest && idx != arr.len() {
+            return Ok(None);
+        }
+        Ok(Some(vec![]))
+    }
+
+    fn match_hash_pattern_pairs(
+        &mut self,
+        h: &IndexMap<String, PerlValue>,
+        pairs: &[MatchHashPair],
+        _line: usize,
+    ) -> Result<Option<Vec<(String, PerlValue)>>, FlowOrError> {
+        let mut binds = Vec::new();
+        for pair in pairs {
+            match pair {
+                MatchHashPair::KeyOnly { key } => {
+                    let ks = self.eval_expr(key)?.to_string();
+                    if !h.contains_key(&ks) {
+                        return Ok(None);
+                    }
+                }
+                MatchHashPair::Capture { key, name } => {
+                    let ks = self.eval_expr(key)?.to_string();
+                    let Some(v) = h.get(&ks) else {
+                        return Ok(None);
+                    };
+                    binds.push((name.clone(), v.clone()));
+                }
+            }
+        }
+        Ok(Some(binds))
+    }
+
     /// Check if a block declares variables (needs its own scope frame).
     #[inline]
     fn block_needs_scope(block: &Block) -> bool {
@@ -3379,6 +3529,9 @@ impl Interpreter {
                     crate::parallel_trace::fan_worker_set_index(None);
                 });
                 Ok(PerlValue::UNDEF)
+            }
+            ExprKind::AlgebraicMatch { subject, arms } => {
+                self.eval_algebraic_match(subject, arms, line)
             }
             ExprKind::AsyncBlock { body } => Ok(self.spawn_async_block(body)),
             ExprKind::Trace { body } => {
@@ -5919,5 +6072,28 @@ mod regex_expand_tests {
         let re = i.compile_regex(r"\Qa.c\E", "", 1).expect("regex");
         assert!(re.is_match("a.c"));
         assert!(!re.is_match("abc"));
+    }
+}
+
+#[cfg(test)]
+mod special_scalar_name_tests {
+    use super::Interpreter;
+
+    #[test]
+    fn special_scalar_name_for_get_matches_magic_globals() {
+        assert!(Interpreter::is_special_scalar_name_for_get("0"));
+        assert!(Interpreter::is_special_scalar_name_for_get("!"));
+        assert!(Interpreter::is_special_scalar_name_for_get("^W"));
+        assert!(!Interpreter::is_special_scalar_name_for_get("foo"));
+        assert!(!Interpreter::is_special_scalar_name_for_get("plainvar"));
+    }
+
+    #[test]
+    fn special_scalar_name_for_set_matches_set_special_var_arms() {
+        assert!(Interpreter::is_special_scalar_name_for_set("0"));
+        assert!(Interpreter::is_special_scalar_name_for_set("^D"));
+        assert!(Interpreter::is_special_scalar_name_for_set("ARGV"));
+        assert!(!Interpreter::is_special_scalar_name_for_set("foo"));
+        assert!(!Interpreter::is_special_scalar_name_for_set("__PACKAGE__"));
     }
 }

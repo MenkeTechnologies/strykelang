@@ -1053,7 +1053,7 @@ impl Lexer {
                     | "capture" | "fetch_url" | "fetch" | "fetch_json" | "fetch_async"
                     | "fetch_async_json" | "par_fetch" | "par_csv_read" | "join" | "split"
                     | "reverse" | "not" | "ref" | "scalar" | "try" | "catch" | "finally" | "given"
-                    | "when" | "default" | "eval_timeout" | "tie" => false,
+                    | "when" | "default" | "eval_timeout" | "tie" | "match" => false,
                     _ => matches!(tok, Token::Ident(_)),
                 };
                 Ok(tok)

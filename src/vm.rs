@@ -2577,6 +2577,95 @@ mod tests {
     }
 
     #[test]
+    fn vm_scalar_plain_roundtrip_and_keep() {
+        let mut c = Chunk::new();
+        let i = c.intern_name("plainvar");
+        c.emit(Op::LoadInt(99), 1);
+        c.emit(Op::SetScalarPlain(i), 1);
+        c.emit(Op::GetScalarPlain(i), 1);
+        c.emit(Op::Halt, 1);
+        assert_eq!(run_chunk(&c).expect("vm").to_int(), 99);
+
+        let mut c = Chunk::new();
+        let k = c.intern_name("keepme");
+        c.emit(Op::LoadInt(5), 1);
+        c.emit(Op::SetScalarKeepPlain(k), 1);
+        c.emit(Op::Halt, 1);
+        assert_eq!(run_chunk(&c).expect("vm").to_int(), 5);
+    }
+
+    #[test]
+    fn vm_get_scalar_plain_skips_special_global_zero() {
+        let mut c = Chunk::new();
+        let idx = c.intern_name("0");
+        c.emit(Op::GetScalar(idx), 1);
+        c.emit(Op::Halt, 1);
+        assert_eq!(run_chunk(&c).expect("vm").to_string(), "perlrs");
+
+        let mut c = Chunk::new();
+        let idx = c.intern_name("0");
+        c.emit(Op::GetScalarPlain(idx), 1);
+        c.emit(Op::Halt, 1);
+        assert!(run_chunk(&c).expect("vm").is_undef());
+    }
+
+    #[test]
+    fn vm_slot_pre_post_inc_dec() {
+        let mut c = Chunk::new();
+        c.emit(Op::LoadInt(10), 1);
+        c.emit(Op::DeclareScalarSlot(0), 1);
+        c.emit(Op::PostIncSlot(0), 1);
+        c.emit(Op::Pop, 1);
+        c.emit(Op::GetScalarSlot(0), 1);
+        c.emit(Op::Halt, 1);
+        assert_eq!(run_chunk(&c).expect("vm").to_int(), 11);
+
+        let mut c = Chunk::new();
+        c.emit(Op::LoadInt(0), 1);
+        c.emit(Op::DeclareScalarSlot(0), 1);
+        c.emit(Op::PreIncSlot(0), 1);
+        c.emit(Op::Halt, 1);
+        assert_eq!(run_chunk(&c).expect("vm").to_int(), 1);
+
+        let mut c = Chunk::new();
+        c.emit(Op::LoadInt(5), 1);
+        c.emit(Op::DeclareScalarSlot(0), 1);
+        c.emit(Op::PreDecSlot(0), 1);
+        c.emit(Op::Halt, 1);
+        assert_eq!(run_chunk(&c).expect("vm").to_int(), 4);
+
+        let mut c = Chunk::new();
+        c.emit(Op::LoadInt(3), 1);
+        c.emit(Op::DeclareScalarSlot(0), 1);
+        c.emit(Op::PostDecSlot(0), 1);
+        c.emit(Op::Pop, 1);
+        c.emit(Op::GetScalarSlot(0), 1);
+        c.emit(Op::Halt, 1);
+        assert_eq!(run_chunk(&c).expect("vm").to_int(), 2);
+    }
+
+    #[test]
+    fn vm_str_eq_ne_heap_strings() {
+        let mut c = Chunk::new();
+        let a = c.add_constant(PerlValue::string("same".into()));
+        let b = c.add_constant(PerlValue::string("same".into()));
+        c.emit(Op::LoadConst(a), 1);
+        c.emit(Op::LoadConst(b), 1);
+        c.emit(Op::StrEq, 1);
+        c.emit(Op::Halt, 1);
+        assert_eq!(run_chunk(&c).expect("vm").to_int(), 1);
+
+        let mut c = Chunk::new();
+        let a = c.add_constant(PerlValue::string("a".into()));
+        let b = c.add_constant(PerlValue::string("b".into()));
+        c.emit(Op::LoadConst(a), 1);
+        c.emit(Op::LoadConst(b), 1);
+        c.emit(Op::StrNe, 1);
+        c.emit(Op::Halt, 1);
+        assert_eq!(run_chunk(&c).expect("vm").to_int(), 1);
+    }
+
+    #[test]
     fn vm_num_eq_ine() {
         let mut c = Chunk::new();
         c.emit(Op::LoadInt(1), 1);

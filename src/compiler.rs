@@ -2216,6 +2216,10 @@ impl Compiler {
                 self.chunk.emit(Op::LoadUndef, line);
             }
 
+            ExprKind::AlgebraicMatch { .. } => {
+                return Err(CompileError::Unsupported("algebraic match expression".into()));
+            }
+
             // ── Match (regex) ──
             ExprKind::Match {
                 expr,
@@ -2663,6 +2667,26 @@ mod tests {
                 >= 1
         );
         assert_last_halt(&chunk);
+    }
+
+    #[test]
+    fn compile_plain_scalar_read_emits_get_scalar_plain() {
+        let chunk = compile_snippet("my $a = 1; $a + 0;").expect("compile");
+        assert!(
+            chunk.ops.iter().any(|o| matches!(o, Op::GetScalarPlain(_))),
+            "expected GetScalarPlain for non-special $a, ops={:?}",
+            chunk.ops
+        );
+    }
+
+    #[test]
+    fn compile_sub_postfix_inc_emits_post_inc_slot() {
+        let chunk = compile_snippet("sub f { my $x = 0; $x++; return $x; }").expect("compile");
+        assert!(
+            chunk.ops.iter().any(|o| matches!(o, Op::PostIncSlot(_))),
+            "expected PostIncSlot in compiled sub body, ops={:?}",
+            chunk.ops
+        );
     }
 
     #[test]

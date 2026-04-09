@@ -221,6 +221,7 @@ pub const KEYWORDS: &[&str] = &[
     "sort",
     "reverse",
     "map",
+    "match",
     "grep",
     "keys",
     "values",

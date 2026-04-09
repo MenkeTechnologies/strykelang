@@ -246,6 +246,45 @@ pub enum Sigil {
 
 pub type Block = Vec<Statement>;
 
+// ── Algebraic `match` expression (perlrs extension) ──
+
+/// One arm of [`ExprKind::AlgebraicMatch`]: `PATTERN => EXPR`.
+#[derive(Debug, Clone, Serialize)]
+pub struct MatchArm {
+    pub pattern: MatchPattern,
+    pub body: Expr,
+}
+
+/// Pattern for algebraic `match` (distinct from the `=~` / regex [`ExprKind::Match`]).
+#[derive(Debug, Clone, Serialize)]
+pub enum MatchPattern {
+    /// `_` — matches anything.
+    Any,
+    /// `/regex/` — subject stringified, tested with `Regex::is_match`.
+    Regex { pattern: String, flags: String },
+    /// Arbitrary expression compared for equality / smart-match against the subject.
+    Value(Box<Expr>),
+    /// `[1, 2, *]` — prefix elements match; optional `*` matches any tail (must be last).
+    Array(Vec<MatchArrayElem>),
+    /// `{ name => $n, ... }` — required keys; `$n` binds the value for the arm body.
+    Hash(Vec<MatchHashPair>),
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub enum MatchArrayElem {
+    Expr(Expr),
+    /// Rest-of-array wildcard (only valid as the last element).
+    Rest,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub enum MatchHashPair {
+    /// `key => _` — key must exist.
+    KeyOnly { key: Expr },
+    /// `key => $name` — key must exist; value is bound to `$name` in the arm.
+    Capture { key: Expr, name: String },
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct Expr {
     pub kind: ExprKind,
@@ -715,6 +754,12 @@ pub enum ExprKind {
     PostfixForeach {
         expr: Box<Expr>,
         list: Box<Expr>,
+    },
+
+    /// `match (EXPR) { PATTERN => EXPR, ... }` — first matching arm; bindings scoped to the arm body.
+    AlgebraicMatch {
+        subject: Box<Expr>,
+        arms: Vec<MatchArm>,
     },
 }
 

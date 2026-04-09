@@ -827,5 +827,60 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::PostfixForeach { expr, list } => {
             format!("{} foreach {}", format_expr(expr), format_expr(list))
         }
+        ExprKind::AlgebraicMatch { subject, arms } => {
+            let arms_s = arms
+                .iter()
+                .map(|a| {
+                    format!(
+                        "{} => {}",
+                        format_match_pattern(&a.pattern),
+                        format_expr(&a.body)
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("match ({}) {{ {} }}", format_expr(subject), arms_s)
+        }
+    }
+}
+
+fn format_match_pattern(p: &crate::ast::MatchPattern) -> String {
+    use crate::ast::{MatchArrayElem, MatchHashPair, MatchPattern};
+    match p {
+        MatchPattern::Any => "_".to_string(),
+        MatchPattern::Regex { pattern, flags } => {
+            if flags.is_empty() {
+                format!("/{}/", pattern)
+            } else {
+                format!("/{}/{}/", pattern, flags)
+            }
+        }
+        MatchPattern::Value(e) => format_expr(e),
+        MatchPattern::Array(elems) => {
+            let inner = elems
+                .iter()
+                .map(|x| match x {
+                    MatchArrayElem::Expr(e) => format_expr(e),
+                    MatchArrayElem::Rest => "*".to_string(),
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("[{}]", inner)
+        }
+        MatchPattern::Hash(pairs) => {
+            let inner = pairs
+                .iter()
+                .map(|pair| match pair {
+                    MatchHashPair::KeyOnly { key } => {
+                        format!("{} => _", format_expr(key))
+                    }
+                    MatchHashPair::Capture { key, name } => {
+                        format!("{} => ${}", format_expr(key), name)
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("{{ {} }}", inner)
+        }
     }
 }
