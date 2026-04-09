@@ -1,5 +1,11 @@
 //! Unix `crypt(3)` wrapper for Perl `crypt` (DES / system hashing).
 
+// On Linux, `crypt(3)` is in libcrypt; the default link line does not include it, so lld fails
+// with undefined `crypt` unless we name the library explicitly (see CI on ubuntu-latest).
+#[cfg(target_os = "linux")]
+#[link(name = "crypt")]
+unsafe extern "C" {}
+
 /// Hash `plaintext` with `salt` using the platform libc `crypt`.
 /// On non-Unix targets, returns an empty string.
 pub fn perl_crypt(plaintext: &str, salt: &str) -> String {
