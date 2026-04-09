@@ -3177,8 +3177,21 @@ impl Compiler {
                 let block_idx = self.chunk.add_block(block.clone());
                 self.chunk.emit(Op::PMapWithBlock(block_idx), line);
             }
-            ExprKind::PMapChunkedExpr { .. } => {
-                return Err(CompileError::Unsupported("pmap_chunked".into()));
+            ExprKind::PMapChunkedExpr {
+                chunk_size,
+                block,
+                list,
+                progress,
+            } => {
+                if let Some(p) = progress {
+                    self.compile_expr(p)?;
+                } else {
+                    self.chunk.emit(Op::LoadInt(0), line);
+                }
+                self.compile_expr(chunk_size)?;
+                self.compile_expr(list)?;
+                let block_idx = self.chunk.add_block(block.clone());
+                self.chunk.emit(Op::PMapChunkedWithBlock(block_idx), line);
             }
             ExprKind::PGrepExpr {
                 block,
@@ -3294,11 +3307,13 @@ impl Compiler {
                 let block_idx = self.chunk.add_block(body.clone());
                 self.chunk.emit(Op::AsyncBlock(block_idx), line);
             }
-            ExprKind::Trace { .. } => {
-                return Err(CompileError::Unsupported("trace".into()));
+            ExprKind::Trace { body } => {
+                let block_idx = self.chunk.add_block(body.clone());
+                self.chunk.emit(Op::TraceBlock(block_idx), line);
             }
-            ExprKind::Timer { .. } => {
-                return Err(CompileError::Unsupported("timer".into()));
+            ExprKind::Timer { body } => {
+                let block_idx = self.chunk.add_block(body.clone());
+                self.chunk.emit(Op::TimerBlock(block_idx), line);
             }
             ExprKind::Await(e) => {
                 self.compile_expr(e)?;

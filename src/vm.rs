@@ -3136,6 +3136,45 @@ impl<'a> VM<'a> {
                         self.interp.eval_nesting -= 1;
                         Ok(())
                     }
+                    Op::TraceBlock(block_idx) => {
+                        let block = self.blocks[*block_idx as usize].clone();
+                        crate::parallel_trace::trace_enter();
+                        self.interp.eval_nesting += 1;
+                        match self.interp.exec_block(&block) {
+                            Ok(v) => {
+                                self.interp.clear_eval_error();
+                                self.push(v);
+                            }
+                            Err(FlowOrError::Error(e)) => {
+                                self.interp.set_eval_error(e.to_string());
+                                self.push(PerlValue::UNDEF);
+                            }
+                            Err(_) => self.push(PerlValue::UNDEF),
+                        }
+                        self.interp.eval_nesting -= 1;
+                        crate::parallel_trace::trace_leave();
+                        Ok(())
+                    }
+                    Op::TimerBlock(block_idx) => {
+                        let block = self.blocks[*block_idx as usize].clone();
+                        let start = std::time::Instant::now();
+                        self.interp.eval_nesting += 1;
+                        let _ = match self.interp.exec_block(&block) {
+                            Ok(v) => {
+                                self.interp.clear_eval_error();
+                                v
+                            }
+                            Err(FlowOrError::Error(e)) => {
+                                self.interp.set_eval_error(e.to_string());
+                                PerlValue::UNDEF
+                            }
+                            Err(_) => PerlValue::UNDEF,
+                        };
+                        self.interp.eval_nesting -= 1;
+                        let ms = start.elapsed().as_secs_f64() * 1000.0;
+                        self.push(PerlValue::float(ms));
+                        Ok(())
+                    }
                     Op::Given(idx) => {
                         let (topic, body) = &self.given_entries[*idx as usize];
                         let v = vm_interp_result(self.interp.exec_given(topic, body), self.line())?;
@@ -3225,6 +3264,92 @@ impl<'a> VM<'a> {
                                 })
                                 .collect();
                             pmap_progress.finish();
+                            self.push(PerlValue::array(results));
+                            Ok(())
+                        }
+                    }
+                    Op::PMapChunkedWithBlock(block_idx) => {
+                        let list = self.pop().to_list();
+                        let chunk_n = self.pop().to_int().max(1) as usize;
+                        let progress_flag = self.pop().is_true();
+                        let idx = *block_idx as usize;
+                        let subs = self.interp.subs.clone();
+                        let (scope_capture, atomic_arrays, atomic_hashes) =
+                            self.interp.scope.capture_with_atomics();
+                        let indexed_chunks: Vec<(usize, Vec<PerlValue>)> = list
+                            .chunks(chunk_n)
+                            .enumerate()
+                            .map(|(i, c)| (i, c.to_vec()))
+                            .collect();
+                        let n_chunks = indexed_chunks.len();
+                        let pmap_progress = PmapProgress::new(progress_flag, n_chunks);
+                        if let Some(&(start, end)) =
+                            self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
+                        {
+                            let shared = Arc::new(ParallelBlockVmShared::from_vm(self));
+                            let mut chunk_results: Vec<(usize, Vec<PerlValue>)> = indexed_chunks
+                                .into_par_iter()
+                                .map(|(chunk_idx, chunk)| {
+                                    let mut local_interp = Interpreter::new();
+                                    local_interp.subs = subs.clone();
+                                    local_interp.scope.restore_capture(&scope_capture);
+                                    local_interp
+                                        .scope
+                                        .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                    local_interp.enable_parallel_guard();
+                                    let mut out = Vec::with_capacity(chunk.len());
+                                    for item in chunk {
+                                        let _ = local_interp.scope.set_scalar("_", item);
+                                        let mut vm = shared.worker_vm(&mut local_interp);
+                                        let mut op_count = 0u64;
+                                        let val = match vm.run_block_region(start, end, &mut op_count)
+                                        {
+                                            Ok(v) => v,
+                                            Err(_) => PerlValue::UNDEF,
+                                        };
+                                        out.push(val);
+                                    }
+                                    pmap_progress.tick();
+                                    (chunk_idx, out)
+                                })
+                                .collect();
+                            pmap_progress.finish();
+                            chunk_results.sort_by_key(|(i, _)| *i);
+                            let results: Vec<PerlValue> =
+                                chunk_results.into_iter().flat_map(|(_, v)| v).collect();
+                            self.push(PerlValue::array(results));
+                            Ok(())
+                        } else {
+                            let block = self.blocks[idx].clone();
+                            let mut chunk_results: Vec<(usize, Vec<PerlValue>)> = indexed_chunks
+                                .into_par_iter()
+                                .map(|(chunk_idx, chunk)| {
+                                    let mut local_interp = Interpreter::new();
+                                    local_interp.subs = subs.clone();
+                                    local_interp.scope.restore_capture(&scope_capture);
+                                    local_interp
+                                        .scope
+                                        .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                    local_interp.enable_parallel_guard();
+                                    let mut out = Vec::with_capacity(chunk.len());
+                                    for item in chunk {
+                                        let _ = local_interp.scope.set_scalar("_", item);
+                                        local_interp.scope_push_hook();
+                                        let val = match local_interp.exec_block_no_scope(&block) {
+                                            Ok(val) => val,
+                                            Err(_) => PerlValue::UNDEF,
+                                        };
+                                        local_interp.scope_pop_hook();
+                                        out.push(val);
+                                    }
+                                    pmap_progress.tick();
+                                    (chunk_idx, out)
+                                })
+                                .collect();
+                            pmap_progress.finish();
+                            chunk_results.sort_by_key(|(i, _)| *i);
+                            let results: Vec<PerlValue> =
+                                chunk_results.into_iter().flat_map(|(_, v)| v).collect();
                             self.push(PerlValue::array(results));
                             Ok(())
                         }

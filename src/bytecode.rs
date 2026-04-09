@@ -237,6 +237,8 @@ pub enum Op {
     ReverseOp,
     /// pmap { BLOCK } @list — block_idx; stack: \[progress_flag, list\] → \[mapped\] (`progress_flag` is 0/1)
     PMapWithBlock(u16),
+    /// pmap_chunked N { BLOCK } @list — block_idx; stack: \[progress_flag, chunk_n, list\] → \[mapped\]
+    PMapChunkedWithBlock(u16),
     /// pgrep { BLOCK } @list — block_idx; stack: \[progress_flag, list\] → \[filtered\]
     PGrepWithBlock(u16),
     /// pfor { BLOCK } @list — block_idx; stack: \[progress_flag, list\] → \[\]
@@ -255,6 +257,10 @@ pub enum Op {
     FanCapWithBlockAuto(u16),
     /// eval { BLOCK } — block_idx; stack: \[\] → result
     EvalBlock(u16),
+    /// `trace { BLOCK }` — block_idx; stack: \[\] → block value (stderr tracing for mysync mutations)
+    TraceBlock(u16),
+    /// `timer { BLOCK }` — block_idx; stack: \[\] → elapsed ms as float
+    TimerBlock(u16),
     /// `given (EXPR) { when ... default ... }` — index into [`Chunk::given_entries`]; stack: \[\] → topic result
     Given(u16),
     /// `eval_timeout SECS { ... }` — index into [`Chunk::eval_timeout_entries`]; stack: \[\] → block value
