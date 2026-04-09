@@ -6,7 +6,9 @@
 //! [`Op::BitXor`], [`Op::BitNot`], [`Op::Shl`]/[`Op::Shr`] (shift amount masked to 6 bits),
 //! [`Op::Div`] only when the VM would use the **exact integer quotient** (`a % b == 0`),
 //! [`Op::Mod`] when the divisor is never dynamically zero (constant non-zero or folded stack),
-//! [`Op::Pow`] when both operands constant-fold and `0 ≤ exponent ≤ 63` (VM integer `wrapping_pow`),
+//! [`Op::Pow`] when the VM’s integer `wrapping_pow` path applies: exponent `0..=63`, and either both
+//! operands constant-fold or the exponent is constant in that range and the base is an integer path
+//! (dynamic base from slot/plain/arg reads that materialize as `i64`),
 //! [`Op::Pop`], [`Op::Dup`], optional trailing [`Op::Halt`], [`Op::LoadConst`] when the pool entry is
 //! an integer ([`PerlValue::as_integer`]), [`Op::BitAnd`]/[`Op::BitOr`] (same integer path as the VM
 //! when operands are not set values).
@@ -348,6 +350,9 @@ fn validate_linear(ops: &[Op], constants: &[PerlValue]) -> bool {
                 match (a, b) {
                     (Cell::Const(x), Cell::Const(y)) if y >= 0 && y <= 63 => {
                         stack.push(Cell::Const(x.wrapping_pow(y as u32)));
+                    }
+                    (Cell::Dyn, Cell::Const(y)) if y >= 0 && y <= 63 => {
+                        stack.push(Cell::Dyn);
                     }
                     _ => return false,
                 }
@@ -1067,10 +1072,12 @@ fn linear_needs_args(seq: &[Op]) -> bool {
 /// If `ops` is a supported pure-int linear sequence, run compiled code and return the result.
 /// Otherwise returns [`None`] (VM should interpret as usual).
 ///
-/// When the sequence contains [`Op::GetScalarSlot`], [`Op::SetScalarSlot`], or
-/// [`Op::SetScalarSlotKeep`], pass `Some` **mutable** slice whose length is `max(slot_index) + 1`
-/// and whose `i` entries are the slot values as `i64` (same as [`PerlValue::as_integer`]). Set ops
-/// update this buffer in place.
+/// When the sequence contains [`Op::GetScalarSlot`], [`Op::SetScalarSlot`],
+/// [`Op::SetScalarSlotKeep`], [`Op::DeclareScalarSlot`], or slot [`Op::PreIncSlot`] /
+/// [`Op::PostIncSlot`] / [`Op::PreDecSlot`] / [`Op::PostDecSlot`], pass `Some` **mutable** slice
+/// whose length is `max(slot_index) + 1` and whose `i` entries are the slot values as `i64`
+/// (same as [`PerlValue::as_integer`], with [`crate::jit::slot_undef_prefill_ok`] handling for
+/// `undef` where documented). Slot writes update this buffer in place.
 ///
 /// When it contains [`Op::GetScalarPlain`], pass `Some` slice whose length is
 /// `max(name_index) + 1` with `PerlValue::as_integer` of `scope.get_scalar` for each name index.
@@ -1352,6 +1359,35 @@ mod tests {
     }
 
     #[test]
+    fn jit_pow_dynamic_base_const_exp() {
+        let ops = vec![
+            Op::GetScalarSlot(0),
+            Op::LoadInt(3),
+            Op::Pow,
+            Op::Halt,
+        ];
+        let mut slots = [2i64];
+        assert_eq!(
+            try_run_linear_ops(&ops, Some(&mut slots), None, None, &[])
+                .expect("jit")
+                .to_int(),
+            8
+        );
+    }
+
+    #[test]
+    fn jit_rejects_pow_const_base_dynamic_exp() {
+        let ops = vec![
+            Op::LoadInt(2),
+            Op::GetScalarSlot(0),
+            Op::Pow,
+            Op::Halt,
+        ];
+        let mut slots = [3i64];
+        assert!(try_run_linear_ops(&ops, Some(&mut slots), None, None, &[]).is_none());
+    }
+
+    #[test]
     fn jit_load_const_add() {
         let pool = [PerlValue::integer(40)];
         let ops = vec![Op::LoadConst(0), Op::LoadInt(2), Op::Add, Op::Halt];
@@ -1609,5 +1645,23 @@ mod tests {
             ],
             0,
         ));
+    }
+
+    #[test]
+    fn vm_chunk_jit_pow_slot_to_const_exp() {
+        use crate::interpreter::Interpreter;
+        use crate::vm::VM;
+
+        let mut c = Chunk::new();
+        c.emit(Op::LoadInt(2), 1);
+        c.emit(Op::DeclareScalarSlot(0), 1);
+        c.emit(Op::GetScalarSlot(0), 1);
+        c.emit(Op::LoadInt(3), 1);
+        c.emit(Op::Pow, 1);
+        c.emit(Op::Halt, 1);
+        let mut interp = Interpreter::new();
+        let mut vm = VM::new(&c, &mut interp);
+        let v = vm.execute().expect("vm");
+        assert_eq!(v.to_int(), 8);
     }
 }
