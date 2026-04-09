@@ -10,7 +10,7 @@
 [![CI](https://github.com/MenkeTechnologies/perlrs/actions/workflows/ci.yml/badge.svg)](https://github.com/MenkeTechnologies/perlrs/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/perlrs.svg)](https://crates.io/crates/perlrs)
 [![Downloads](https://img.shields.io/crates/d/perlrs.svg)](https://crates.io/crates/perlrs)
-[![Docs.rs](https://docs.rs/perlrs/badge.svg)](https://docs.rs/perlrs)
+[![API docs](https://img.shields.io/badge/API%20docs-GitHub%20Pages-8f4cb5)](https://menketechnologies.github.io/perlrs/perlrs/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ### `[PARALLEL PERL5 INTERPRETER // RUST-POWERED EXECUTION ENGINE]`
@@ -292,6 +292,8 @@ pe examples/parallel_demo.pl
 ## [0x08] DEVELOPMENT & CI
 
 Pull requests and pushes to `main` run the workflow in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). You can also run it manually from the repository **Actions** tab (**workflow dispatch**). On a pull request, the **Checks** tab (or the merge box) shows the aggregate status; open the **CI** workflow run for per-job logs (Check, Test, Format, Clippy, Doc, Release Build).
+
+**API documentation (Rust):** Rust uses `cargo doc`, not `cargo docs`. Browse locally with `cargo doc --no-deps --open`. After enabling **GitHub Pages** (Settings → Pages → deploy from branch `gh-pages` / `/ (root)`), the [published rustdoc](https://menketechnologies.github.io/perlrs/perlrs/) is updated by the [Docs workflow](.github/workflows/docs.yml) on each push to `main`. docs.rs may lag or be unavailable until a successful docs build is listed for the crate on [crates.io](https://crates.io/crates/perlrs).
 
 ---
 

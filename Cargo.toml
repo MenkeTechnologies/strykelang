@@ -6,6 +6,7 @@ description = "A highly parallel Perl 5 interpreter written in Rust"
 license = "MIT"
 authors = ["MenkeTechnologies"]
 repository = "https://github.com/MenkeTechnologies/perlrs"
+documentation = "https://menketechnologies.github.io/perlrs/perlrs/"
 
 [[bin]]
 name = "perlrs"
