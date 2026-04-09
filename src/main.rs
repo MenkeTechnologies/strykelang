@@ -152,77 +152,84 @@ struct Cli {
 fn print_cyberpunk_help() {
     let version = env!("CARGO_PKG_VERSION");
     let threads = rayon::current_num_threads();
-    println!(
-        r#" ██████╗ ███████╗██████╗ ██╗     ██████╗ ███████╗
- ██╔══██╗██╔════╝██╔══██╗██║     ██╔══██╗██╔════╝
- ██████╔╝█████╗  ██████╔╝██║     ██████╔╝███████╗
- ██╔═══╝ ██╔══╝  ██╔══██╗██║     ██╔══██╗╚════██║
- ██║     ███████╗██║  ██║███████╗██║  ██║███████║
- ╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚══════╝
- ┌──────────────────────────────────────────────────────┐
- │ STATUS: ONLINE  // CORES: {threads:<2} // SIGNAL: ████████░░ │
- └──────────────────────────────────────────────────────┘
-  >> PARALLEL PERL5 INTERPRETER // RUST-POWERED v{version} <<"#
-    );
+
+    // ANSI color codes
+    const C: &str = "\x1b[36m"; // cyan
+    const M: &str = "\x1b[35m"; // magenta
+    const R: &str = "\x1b[31m"; // red
+    const Y: &str = "\x1b[33m"; // yellow
+    const G: &str = "\x1b[32m"; // green
+    const N: &str = "\x1b[0m"; // reset
+
+    println!("{C} ██████╗ ███████╗██████╗ ██╗     ██████╗ ███████╗{N}");
+    println!("{C} ██╔══██╗██╔════╝██╔══██╗██║     ██╔══██╗██╔════╝{N}");
+    println!("{M} ██████╔╝█████╗  ██████╔╝██║     ██████╔╝███████╗{N}");
+    println!("{M} ██╔═══╝ ██╔══╝  ██╔══██╗██║     ██╔══██╗╚════██║{N}");
+    println!("{R} ██║     ███████╗██║  ██║███████╗██║  ██║███████║{N}");
+    println!("{R} ╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚══════╝{N}");
+    println!("{C} ┌──────────────────────────────────────────────────────┐{N}");
+    println!("{C} │ STATUS: ONLINE  // CORES: {threads:<2} // SIGNAL: ████████░░ │{N}");
+    println!("{C} └──────────────────────────────────────────────────────┘{N}");
+    println!("{M}  >> PARALLEL PERL5 INTERPRETER // RUST-POWERED v{version} <<{N}");
     println!();
     println!();
     println!("A highly parallel Perl 5 interpreter written in Rust");
     println!();
-    println!("  USAGE: perlrs [switches] [--] [programfile] [arguments]");
+    println!("{Y}  USAGE:{N} pe [switches] [--] [programfile] [arguments]");
     println!();
-    println!("  ── EXECUTION ──────────────────────────────────────────");
-    println!("  -e CODE                // One line of program (several -e's allowed)");
-    println!("  -E CODE                // Like -e, but enables all optional features");
-    println!("  -c                     // Check syntax only (runs BEGIN and CHECK blocks)");
-    println!("  -d[t][:MOD]            // Run program under debugger or module Devel::MOD");
-    println!("  -D[number/letters]     // Set debugging flags");
-    println!("  -u                     // Dump core after parsing program");
-    println!("  ── INPUT PROCESSING ─────────────────────────────────");
-    println!("  -n                     // Assume \"while (<>) {{...}}\" loop around program");
-    println!("  -p                     // Like -n but print line also, like sed");
-    println!("  -a                     // Autosplit mode (splits $_ into @F)");
-    println!("  -F/pattern/            // split() pattern for -a switch");
-    println!("  -l[octnum]             // Enable line ending processing");
-    println!("  -0[octal]              // Specify record separator (\\0 if no arg)");
-    println!("  -g                     // Slurp all input at once (alias for -0777)");
-    println!("  -i[extension]          // Edit <> files in place (backup if ext supplied)");
-    println!("  ── MODULES & PATHS ──────────────────────────────────");
-    println!("  -M MODULE              // Execute \"use module...\" before program");
-    println!("  -m MODULE              // Execute \"use module ()\" before program (no import)");
-    println!("  -I DIRECTORY           // Specify @INC directory (several allowed)");
-    println!("  -f                     // Don't do $sitelib/sitecustomize.pl at startup");
-    println!("  -S                     // Look for programfile using PATH");
-    println!("  -x[directory]          // Ignore text before #!perl line");
-    println!("  ── UNICODE & SAFETY ─────────────────────────────────");
-    println!("  -C[number/list]        // Enable listed Unicode features");
-    println!("  -t                     // Enable tainting warnings");
-    println!("  -T                     // Enable tainting checks");
-    println!("  -U                     // Allow unsafe operations");
-    println!("  -s                     // Enable switch parsing for programfile args");
-    println!("  ── WARNINGS ─────────────────────────────────────────");
-    println!("  -w                     // Enable many useful warnings");
-    println!("  -W                     // Enable all warnings");
-    println!("  -X                     // Disable all warnings");
-    println!("  ── INFO ─────────────────────────────────────────────");
-    println!("  -v                     // Print version, patchlevel and license");
-    println!("  -V[:configvar]         // Print configuration summary");
-    println!("  -h, --help             // Print help");
-    println!("  ── PARALLEL EXTENSIONS (perlrs) ─────────────────────");
-    println!("  -j N                   // Set number of parallel threads (rayon)");
-    println!("  pmap  {{BLOCK}} @list    // Parallel map across all cores");
-    println!("  pgrep {{BLOCK}} @list    // Parallel grep across all cores");
-    println!("  pfor  {{BLOCK}} @list    // Parallel foreach across all cores");
-    println!("  psort {{BLOCK}} @list    // Parallel sort across all cores");
-    println!("  ── POSITIONAL ─────────────────────────────────────────");
-    println!("  [programfile]          // Perl script to execute");
-    println!("  [arguments]            // Arguments passed to script (@ARGV)");
+    println!("{C}  ── EXECUTION ──────────────────────────────────────────{N}");
+    println!("  -e CODE                {G}//{N} One line of program (several -e's allowed)");
+    println!("  -E CODE                {G}//{N} Like -e, but enables all optional features");
+    println!("  -c                     {G}//{N} Check syntax only (runs BEGIN and CHECK blocks)");
+    println!("  -d[t][:MOD]            {G}//{N} Run program under debugger or module Devel::MOD");
+    println!("  -D[number/letters]     {G}//{N} Set debugging flags");
+    println!("  -u                     {G}//{N} Dump core after parsing program");
+    println!("{C}  ── INPUT PROCESSING ─────────────────────────────────{N}");
+    println!("  -n                     {G}//{N} Assume \"while (<>) {{...}}\" loop around program");
+    println!("  -p                     {G}//{N} Like -n but print line also, like sed");
+    println!("  -a                     {G}//{N} Autosplit mode (splits $_ into @F)");
+    println!("  -F/pattern/            {G}//{N} split() pattern for -a switch");
+    println!("  -l[octnum]             {G}//{N} Enable line ending processing");
+    println!("  -0[octal]              {G}//{N} Specify record separator (\\0 if no arg)");
+    println!("  -g                     {G}//{N} Slurp all input at once (alias for -0777)");
+    println!("  -i[extension]          {G}//{N} Edit <> files in place (backup if ext supplied)");
+    println!("{C}  ── MODULES & PATHS ──────────────────────────────────{N}");
+    println!("  -M MODULE              {G}//{N} Execute \"use module...\" before program");
+    println!("  -m MODULE              {G}//{N} Execute \"use module ()\" before program (no import)");
+    println!("  -I DIRECTORY           {G}//{N} Specify @INC directory (several allowed)");
+    println!("  -f                     {G}//{N} Don't do $sitelib/sitecustomize.pl at startup");
+    println!("  -S                     {G}//{N} Look for programfile using PATH");
+    println!("  -x[directory]          {G}//{N} Ignore text before #!perl line");
+    println!("{C}  ── UNICODE & SAFETY ─────────────────────────────────{N}");
+    println!("  -C[number/list]        {G}//{N} Enable listed Unicode features");
+    println!("  -t                     {G}//{N} Enable tainting warnings");
+    println!("  -T                     {G}//{N} Enable tainting checks");
+    println!("  -U                     {G}//{N} Allow unsafe operations");
+    println!("  -s                     {G}//{N} Enable switch parsing for programfile args");
+    println!("{C}  ── WARNINGS ─────────────────────────────────────────{N}");
+    println!("  -w                     {G}//{N} Enable many useful warnings");
+    println!("  -W                     {G}//{N} Enable all warnings");
+    println!("  -X                     {G}//{N} Disable all warnings");
+    println!("{C}  ── INFO ─────────────────────────────────────────────{N}");
+    println!("  -v                     {G}//{N} Print version, patchlevel and license");
+    println!("  -V[:configvar]         {G}//{N} Print configuration summary");
+    println!("  -h, --help             {G}//{N} Print help");
+    println!("{C}  ── PARALLEL EXTENSIONS (perlrs) ─────────────────────{N}");
+    println!("  -j N                   {G}//{N} Set number of parallel threads (rayon)");
+    println!("  pmap  {{BLOCK}} @list    {G}//{N} Parallel map across all cores");
+    println!("  pgrep {{BLOCK}} @list    {G}//{N} Parallel grep across all cores");
+    println!("  pfor  {{BLOCK}} @list    {G}//{N} Parallel foreach across all cores");
+    println!("  psort {{BLOCK}} @list    {G}//{N} Parallel sort across all cores");
+    println!("{C}  ── POSITIONAL ─────────────────────────────────────────{N}");
+    println!("  [programfile]          {G}//{N} Perl script to execute");
+    println!("  [arguments]            {G}//{N} Arguments passed to script (@ARGV)");
     println!();
     println!();
-    println!("  ── SYSTEM ─────────────────────────────────────────");
-    println!("  v{version} // (c) MenkeTechnologies");
-    println!("  There is more than one way to do it — in parallel.");
-    println!("  >>> PARSE. EXECUTE. PARALLELIZE. OWN YOUR CORES. <<<");
-    println!(" ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░");
+    println!("{C}  ── SYSTEM ─────────────────────────────────────────{N}");
+    println!("{M}  v{version} {N}// {Y}(c) MenkeTechnologies{N}");
+    println!("{M}  There is more than one way to do it — in parallel.{N}");
+    println!("{Y}  >>> PARSE. EXECUTE. PARALLELIZE. OWN YOUR CORES. <<<{N}");
+    println!("{C} ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░{N}");
 }
 
 fn main() {
