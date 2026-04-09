@@ -77,6 +77,24 @@ Single-character names after `$` are accepted (`src/lexer.rs` `read_variable_nam
 
 ---
 
+## Short list (what’s still missing)
+
+If you only care about **common Perl specials** not yet covered (see **Partially implemented** for things that exist but differ):
+
+| Area | Perl | Notes |
+|------|------|--------|
+| OS / identity | `$^O` | Not in `get_special_var` (lexer allows `$^O`). |
+| Time / version | `$^T`, `$^V` | `$^T`: start time exists internally but is **not** exposed as `$^T`. `$^V` (version object) **not** in `get_special_var`. |
+| OS error | `$^E` | Extended OS error (Perl uses it heavily on Windows). |
+| Compiler / phase | `$^H`, `${^WARNING_BITS}`, `${^GLOBAL_PHASE}`, … | Not wired. |
+| Process ids | `$<`, `$>`, `$(`, `$)` | Real/effective uid/gid. |
+| Match spellings | `${^MATCH}`, `${^PREMATCH}`, `${^POSTMATCH}` | Not via `get_special_var`. After a match, `$&`, `` $` ``, `$'`, `$+` are set on the **stash** as `"&"`, `` ` ``, `"'"`, `"+"` in `apply_regex_captures` — not the `${^…}` variable names. |
+| Dualvar | `$!`, `$@` | String reads only; not full dualvar; writes don’t round-trip (see partial table). |
+| Signals | `%SIG` | Hash exists; **no** delivery of OS signals into Perl subs. |
+| Aliases | `English` | No long-name aliases module. |
+
+---
+
 ## Maintenance
 
 When adding I/O, regex, or `eval` behavior, update this file if new globals become meaningful or if `get_special_var` / `set_special_var` change.

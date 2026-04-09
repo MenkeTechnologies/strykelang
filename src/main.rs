@@ -1,9 +1,13 @@
-use std::io::{self, BufRead, IsTerminal, Read as IoRead, Write};
+use std::fs::File;
+use std::io::{self, BufRead, BufReader, IsTerminal, Read as IoRead, Write};
+use std::path::{Path, PathBuf};
 use std::process;
 
 use clap::Parser;
+use rand::Rng;
 
-use perlrs::error::ErrorKind;
+use perlrs::ast::Program;
+use perlrs::error::{ErrorKind, PerlError};
 use perlrs::interpreter::Interpreter;
 
 mod repl;
@@ -309,6 +313,161 @@ pub(crate) fn module_prelude(cli: &Cli) -> String {
     full_code
 }
 
+/// When `-e` / `-E` supplies the program, the optional positional `SCRIPT` is actually the first
+/// `@ARGV` element (Perl semantics), not a second script path. Fold it into `args`.
+fn normalize_argv_after_dash_e(cli: &mut Cli) {
+    if (!cli.execute.is_empty() || !cli.execute_features.is_empty()) && cli.script.is_some() {
+        let mut v = vec![cli.script.take().unwrap()];
+        v.extend(cli.args.drain(..));
+        cli.args = v;
+    }
+}
+
+/// Unique temp path next to `target` for atomic in-place replace (`rename` into place).
+fn adjacent_temp_path(target: &Path) -> PathBuf {
+    let dir = target.parent().unwrap_or_else(|| Path::new("."));
+    let name = target
+        .file_name()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "file".to_string());
+    let rnd: u32 = rand::thread_rng().gen();
+    dir.join(format!("{name}.pe-tmp-{rnd}"))
+}
+
+/// Write `new_content` to `path` in place; optional backup `path` + `inplace_edit` (Perl `$^I`).
+fn commit_in_place_edit(path: &Path, inplace_edit: &str, new_content: &str) -> std::io::Result<()> {
+    let tmp = adjacent_temp_path(path);
+    std::fs::write(&tmp, new_content)?;
+    if !inplace_edit.is_empty() {
+        let backup = PathBuf::from(format!("{}{}", path.display(), inplace_edit));
+        let _ = std::fs::remove_file(&backup);
+        std::fs::rename(path, &backup)?;
+    }
+    std::fs::rename(&tmp, path)?;
+    Ok(())
+}
+
+/// `-n` / `-p` input loop: `@ARGV` files when non-empty, else stdin; `-i` rewrites named files.
+fn run_line_mode_loop(
+    cli: &Cli,
+    interp: &mut Interpreter,
+    program: &Program,
+    slurp: bool,
+) -> Result<(), PerlError> {
+    let inplace = cli.inplace.is_some();
+    let use_argv_files = !interp.argv.is_empty();
+    let suppressed_stdout_for_inplace = inplace && use_argv_files;
+    let print_to_stdout = cli.print_mode && !suppressed_stdout_for_inplace;
+
+    if slurp {
+        if use_argv_files {
+            for path in interp.argv.clone() {
+                interp.line_number = 0;
+                interp.argv_current_file = path.clone();
+                let content = std::fs::read_to_string(&path).map_err(|e| {
+                    PerlError::new(
+                        ErrorKind::IO,
+                        format!("Can't open {}: {}", path, e),
+                        0,
+                        "-e",
+                    )
+                })?;
+                if let Some(output) = interp.process_line(&content, program)? {
+                    if inplace {
+                        commit_in_place_edit(Path::new(&path), &interp.inplace_edit, &output)
+                            .map_err(|e| {
+                                PerlError::new(
+                                    ErrorKind::IO,
+                                    e.to_string(),
+                                    0,
+                                    "-e",
+                                )
+                            })?;
+                    } else if cli.print_mode {
+                        print!("{}", output);
+                        let _ = io::stdout().flush();
+                    }
+                }
+            }
+        } else {
+            let mut input = String::new();
+            io::stdin().read_to_string(&mut input).ok();
+            if let Some(output) = interp.process_line(&input, program)? {
+                if print_to_stdout {
+                    print!("{}", output);
+                    let _ = io::stdout().flush();
+                }
+            }
+        }
+        return Ok(());
+    }
+
+    if use_argv_files {
+        for path in interp.argv.clone() {
+            interp.line_number = 0;
+            interp.argv_current_file = path.clone();
+            let file = File::open(&path).map_err(|e| {
+                PerlError::new(
+                    ErrorKind::IO,
+                    format!("Can't open {}: {}", path, e),
+                    0,
+                    "-e",
+                )
+            })?;
+            let reader = BufReader::new(file);
+            let mut accumulated = String::new();
+            for line in reader.lines() {
+                let l = line.map_err(|e| {
+                    PerlError::new(
+                        ErrorKind::IO,
+                        format!("Error reading {}: {}", path, e),
+                        0,
+                        "-e",
+                    )
+                })?;
+                let input = format!("{}\n", l);
+                if let Some(output) = interp.process_line(&input, program)? {
+                    if print_to_stdout {
+                        print!("{}", output);
+                        let _ = io::stdout().flush();
+                    }
+                    if inplace {
+                        accumulated.push_str(&output);
+                    }
+                }
+            }
+            if inplace {
+                commit_in_place_edit(Path::new(&path), &interp.inplace_edit, &accumulated)
+                    .map_err(|e| PerlError::new(ErrorKind::IO, e.to_string(), 0, "-e"))?;
+            }
+        }
+    } else {
+        let stdin = io::stdin();
+        for line in stdin.lock().lines() {
+            match line {
+                Ok(l) => {
+                    let input = format!("{}\n", l);
+                    match interp.process_line(&input, program) {
+                        Ok(Some(output)) => {
+                            if print_to_stdout {
+                                print!("{}", output);
+                                let _ = io::stdout().flush();
+                            }
+                        }
+                        Ok(None) => {}
+                        Err(e) => return Err(e),
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error reading input: {}", e);
+                    break;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut Interpreter, filename: &str) {
     interp.set_file(filename);
     interp.warnings = (cli.warnings || cli.all_warnings) && !cli.no_warnings;
@@ -349,7 +508,16 @@ pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut Interpreter, filenam
         eprintln!("perlrs: taint mode acknowledged but not enforced");
     }
 
-    let mut argv: Vec<String> = if cli.script.is_some() {
+    if let Some(ref ext_opt) = cli.inplace {
+        interp.inplace_edit = ext_opt.clone().unwrap_or_default();
+    }
+
+    // Trailing arguments become `@ARGV` for `perl script.pl …` and for `perl -e '…' …` (Perl
+    // compatibility).
+    let mut argv: Vec<String> = if cli.script.is_some()
+        || !cli.execute.is_empty()
+        || !cli.execute_features.is_empty()
+    {
         cli.args.clone()
     } else {
         Vec::new()
@@ -432,7 +600,8 @@ pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut Interpreter, filenam
 }
 
 fn main() {
-    let cli = Cli::parse();
+    let mut cli = Cli::parse();
+    normalize_argv_after_dash_e(&mut cli);
 
     if cli.help {
         print_cyberpunk_help();
@@ -603,53 +772,15 @@ fn main() {
             process::exit(255);
         }
 
-        if slurp {
-            // Slurp: read all input at once
-            let mut input = String::new();
-            io::stdin().read_to_string(&mut input).ok();
-            match interp.process_line(&input, &program) {
-                Ok(Some(output)) => {
-                    if cli.print_mode {
-                        print!("{}", output);
-                        let _ = io::stdout().flush();
-                    }
-                }
-                Ok(None) => {}
-                Err(e) => {
-                    if let ErrorKind::Exit(code) = e.kind {
-                        process::exit(code);
-                    }
-                    eprintln!("{}", e);
-                }
+        if let Err(e) = run_line_mode_loop(&cli, &mut interp, &program, slurp) {
+            if let Some(p) = interp.profiler.take() {
+                p.print_report();
             }
-        } else {
-            let stdin = io::stdin();
-            for line in stdin.lock().lines() {
-                match line {
-                    Ok(l) => {
-                        let input = format!("{}\n", l);
-                        match interp.process_line(&input, &program) {
-                            Ok(Some(output)) => {
-                                if cli.print_mode {
-                                    print!("{}", output);
-                                    let _ = io::stdout().flush();
-                                }
-                            }
-                            Ok(None) => {}
-                            Err(e) => {
-                                if let ErrorKind::Exit(code) = e.kind {
-                                    process::exit(code);
-                                }
-                                eprintln!("{}", e);
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Error reading input: {}", e);
-                        break;
-                    }
-                }
+            if let ErrorKind::Exit(code) = e.kind {
+                process::exit(code);
             }
+            eprintln!("{}", e);
+            process::exit(255);
         }
         if let Some(p) = interp.profiler.take() {
             p.print_report();
