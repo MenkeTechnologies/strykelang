@@ -7403,6 +7403,9 @@ impl Interpreter {
 
     fn heap_compare(&mut self, cmp: &Arc<PerlSub>, a: &PerlValue, b: &PerlValue) -> Ordering {
         self.scope_push_hook();
+        if let Some(ref env) = cmp.closure_env {
+            self.scope.restore_capture(env);
+        }
         let _ = self.scope.set_scalar("a", a.clone());
         let _ = self.scope.set_scalar("b", b.clone());
         let ord = match self.exec_block_no_scope(&cmp.body) {

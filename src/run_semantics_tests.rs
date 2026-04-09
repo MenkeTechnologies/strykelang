@@ -417,6 +417,29 @@ fn heap_numeric_comparator_pops_sorted() {
 }
 
 #[test]
+fn heap_block_comparator_readme_form() {
+    let s = r#"
+        my $pq = heap({ $a <=> $b });
+        $pq->push(3);
+        my $min = $pq->pop();
+        $min;
+    "#;
+    assert_eq!(ri(s), 3);
+}
+
+#[test]
+fn heap_sub_comparator_sees_outer_lexical() {
+    let s = r#"
+        my $bias = 0;
+        my $pq = heap(sub { $a <=> ($b + $bias) });
+        $pq->push(1);
+        $pq->push(100);
+        $pq->pop() + 0;
+    "#;
+    assert_eq!(ri(s), 1);
+}
+
+#[test]
 fn trace_fan_mysync_runs() {
     let s = r#"
         mysync $counter = 0;
