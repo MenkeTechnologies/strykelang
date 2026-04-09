@@ -409,6 +409,8 @@ pub enum ExprKind {
     PMapExpr {
         block: Block,
         list: Box<Expr>,
+        /// `pmap { } @list, progress => EXPR` — when truthy, print a progress bar on stderr.
+        progress: Option<Box<Expr>>,
     },
     /// `pmap_chunked N { BLOCK } @list` — parallel map in batches of N (one interpreter per chunk).
     PMapChunkedExpr {

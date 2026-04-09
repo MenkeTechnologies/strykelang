@@ -15,6 +15,14 @@ fn parallel_map_preserves_input_order_in_results() {
 }
 
 #[test]
+fn parallel_map_progress_flag_runs() {
+    assert_eq!(
+        eval_string(r#"join(",", pmap { $_ * 2 } (1,2,3,4), progress => 0)"#),
+        "2,4,6,8"
+    );
+}
+
+#[test]
 fn parallel_grep() {
     let result = eval("my @a = pgrep { $_ % 2 == 0 } (1,2,3,4,5,6); scalar @a");
     assert_eq!(result.to_int(), 3);

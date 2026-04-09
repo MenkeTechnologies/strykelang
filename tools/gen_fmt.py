@@ -578,7 +578,15 @@ def main() -> None:
                 Some(l) => format!("split({}, {}, {})", format_expr(pattern), format_expr(string), format_expr(l)),
                 None => format!("split({}, {})", format_expr(pattern), format_expr(string)),
             }""",
-        "PMapExpr": 'format!("pmap {{\\n{}\\n}} {}", format_block(block), format_expr(list))',
+        "PMapExpr": """match progress {
+                Some(p) => format!(
+                    "pmap {{\\n{}\\n}} {}, progress => {}",
+                    format_block(block),
+                    format_expr(list),
+                    format_expr(p)
+                ),
+                None => format!("pmap {{\\n{}\\n}} {}", format_block(block), format_expr(list)),
+            }""",
         "PMapChunkedExpr": 'format!("pmap_chunked {} {{\\n{}\\n}} {}", format_expr(chunk_size), format_block(block), format_expr(list))',
         "PGrepExpr": 'format!("pgrep {{\\n{}\\n}} {}", format_block(block), format_expr(list))',
         "PForExpr": 'format!("pfor {{\\n{}\\n}} {}", format_block(block), format_expr(list))',

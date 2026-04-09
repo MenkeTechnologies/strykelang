@@ -15,6 +15,7 @@ pub mod pack;
 pub mod par_lines;
 pub mod parallel_trace;
 pub mod parser;
+mod pmap_progress;
 pub mod pchannel;
 pub mod perl_fs;
 pub mod perl_inc;

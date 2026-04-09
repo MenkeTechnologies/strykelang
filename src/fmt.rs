@@ -561,8 +561,20 @@ pub fn format_expr(e: &Expr) -> String {
             ),
             None => format!("split({}, {})", format_expr(pattern), format_expr(string)),
         },
-        ExprKind::PMapExpr { block, list } => {
-            format!("pmap {{\n{}\n}} {}", format_block(block), format_expr(list))
+        ExprKind::PMapExpr {
+            block,
+            list,
+            progress,
+        } => {
+            let base = format!(
+                "pmap {{\n{}\n}} {}",
+                format_block(block),
+                format_expr(list)
+            );
+            match progress {
+                Some(p) => format!("{}, progress => {}", base, format_expr(p)),
+                None => base,
+            }
         }
         ExprKind::PMapChunkedExpr {
             chunk_size,

@@ -23,6 +23,13 @@ impl Parser {
         self.tokens.get(self.pos).map(|(_, l)| *l).unwrap_or(0)
     }
 
+    fn peek_at(&self, offset: usize) -> &Token {
+        self.tokens
+            .get(self.pos + offset)
+            .map(|(t, _)| t)
+            .unwrap_or(&Token::Eof)
+    }
+
     fn advance(&mut self) -> (Token, usize) {
         let tok = self
             .tokens
@@ -2946,11 +2953,12 @@ impl Parser {
             }
             // Parallel extensions
             "pmap" => {
-                let (block, list) = self.parse_block_list()?;
+                let (block, list, progress) = self.parse_pmap_block_list()?;
                 Ok(Expr {
                     kind: ExprKind::PMapExpr {
                         block,
                         list: Box::new(list),
+                        progress: progress.map(Box::new),
                     },
                     line,
                 })
@@ -3557,6 +3565,34 @@ impl Parser {
         Ok((block, list))
     }
 
+    /// Like [`parse_block_list`] but supports a trailing `, progress => EXPR` option for `pmap`.
+    fn parse_pmap_block_list(&mut self) -> PerlResult<(Block, Expr, Option<Expr>)> {
+        let block = self.parse_block()?;
+        self.eat(&Token::Comma);
+        let mut parts = vec![self.parse_assign_expr()?];
+        loop {
+            if !self.eat(&Token::Comma) && !self.eat(&Token::FatArrow) {
+                break;
+            }
+            if matches!(
+                self.peek(),
+                Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof
+            ) {
+                break;
+            }
+            if let Token::Ident(ref kw) = self.peek().clone() {
+                if kw == "progress" && matches!(self.peek_at(1), Token::FatArrow) {
+                    self.advance();
+                    self.expect(&Token::FatArrow)?;
+                    let prog = self.parse_assign_expr()?;
+                    return Ok((block, merge_expr_list(parts), Some(prog)));
+                }
+            }
+            parts.push(self.parse_assign_expr()?);
+        }
+        Ok((block, merge_expr_list(parts), None))
+    }
+
     fn parse_one_arg(&mut self) -> PerlResult<Expr> {
         if matches!(self.peek(), Token::LParen) {
             self.advance();
@@ -3819,6 +3855,18 @@ impl Parser {
 
         Expr {
             kind: ExprKind::InterpolatedString(parts),
+            line,
+        }
+    }
+}
+
+fn merge_expr_list(parts: Vec<Expr>) -> Expr {
+    if parts.len() == 1 {
+        parts.into_iter().next().unwrap()
+    } else {
+        let line = parts.first().map(|e| e.line).unwrap_or(0);
+        Expr {
+            kind: ExprKind::List(parts),
             line,
         }
     }

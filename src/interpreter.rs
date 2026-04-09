@@ -18,6 +18,7 @@ use crate::ast::*;
 use crate::builtins::PerlSocket;
 use crate::crypt_util::perl_crypt;
 use crate::error::{ErrorKind, PerlError, PerlResult};
+use crate::pmap_progress::PmapProgress;
 use crate::profiler::Profiler;
 use crate::scope::Scope;
 use crate::sort_fast::{detect_sort_block_fast, sort_magic_cmp};
@@ -831,6 +832,7 @@ impl Interpreter {
         } else {
             ("<".to_string(), mode_s)
         };
+        let handle_return = handle_name.clone();
         match actual_mode.as_str() {
             "-|" => {
                 let mut cmd = piped_shell_command(&path);
@@ -871,7 +873,7 @@ impl Interpreter {
                     self.io_file_slots.insert(handle_name.clone(), raw);
                 }
                 self.input_handles
-                    .insert(handle_name, BufReader::new(Box::new(file)));
+                    .insert(handle_name.clone(), BufReader::new(Box::new(file)));
             }
             ">" => {
                 let file = std::fs::File::create(&path).map_err(|e| {
@@ -881,7 +883,8 @@ impl Interpreter {
                 if let Ok(raw) = file.try_clone() {
                     self.io_file_slots.insert(handle_name.clone(), raw);
                 }
-                self.output_handles.insert(handle_name, Box::new(file));
+                self.output_handles
+                    .insert(handle_name.clone(), Box::new(file));
             }
             ">>" => {
                 let file = std::fs::OpenOptions::new()
@@ -895,7 +898,8 @@ impl Interpreter {
                 if let Ok(raw) = file.try_clone() {
                     self.io_file_slots.insert(handle_name.clone(), raw);
                 }
-                self.output_handles.insert(handle_name, Box::new(file));
+                self.output_handles
+                    .insert(handle_name.clone(), Box::new(file));
             }
             _ => {
                 return Err(PerlError::runtime(
@@ -904,7 +908,7 @@ impl Interpreter {
                 ));
             }
         }
-        Ok(PerlValue::Integer(1))
+        Ok(PerlValue::IOHandle(handle_return))
     }
 
     pub(crate) fn close_builtin_execute(&mut self, name: String) -> PerlResult<PerlValue> {
@@ -2870,13 +2874,24 @@ impl Interpreter {
                     line,
                 )?)
             }
-            ExprKind::PMapExpr { block, list } => {
+            ExprKind::PMapExpr {
+                block,
+                list,
+                progress,
+            } => {
+                let show_progress = progress
+                    .as_ref()
+                    .map(|p| self.eval_expr(p))
+                    .transpose()?
+                    .map(|v| v.is_true())
+                    .unwrap_or(false);
                 let list_val = self.eval_expr(list)?;
                 let items = list_val.to_list();
                 let block = block.clone();
                 let subs = self.subs.clone();
                 let (scope_capture, atomic_arrays, atomic_hashes) =
                     self.scope.capture_with_atomics();
+                let pmap_progress = PmapProgress::new(show_progress, items.len());
 
                 let results: Vec<PerlValue> = items
                     .into_par_iter()
@@ -2888,12 +2903,15 @@ impl Interpreter {
                             .scope
                             .restore_atomics(&atomic_arrays, &atomic_hashes);
                         let _ = local_interp.scope.set_scalar("_", item);
-                        match local_interp.exec_block(&block) {
+                        let val = match local_interp.exec_block(&block) {
                             Ok(val) => val,
                             Err(_) => PerlValue::Undef,
-                        }
+                        };
+                        pmap_progress.tick();
+                        val
                     })
                     .collect();
+                pmap_progress.finish();
                 Ok(PerlValue::Array(results))
             }
             ExprKind::PMapChunkedExpr {
@@ -4454,6 +4472,198 @@ impl Interpreter {
         }
     }
 
+    /// True if `name` is a registered or standard process-global handle.
+    pub(crate) fn is_bound_handle(&self, name: &str) -> bool {
+        matches!(name, "STDIN" | "STDOUT" | "STDERR")
+            || self.input_handles.contains_key(name)
+            || self.output_handles.contains_key(name)
+            || self.io_file_slots.contains_key(name)
+            || self.pipe_children.contains_key(name)
+    }
+
+    /// IO::File-style methods on handle values (`$fh->print`, `STDOUT->say`, …).
+    pub(crate) fn io_handle_method(
+        &mut self,
+        name: &str,
+        method: &str,
+        args: &[PerlValue],
+        line: usize,
+    ) -> PerlResult<PerlValue> {
+        match method {
+            "print" => self.io_handle_print(name, args, false, line),
+            "say" => self.io_handle_print(name, args, true, line),
+            "printf" => self.io_handle_printf(name, args, line),
+            "getline" | "readline" => {
+                if !args.is_empty() {
+                    return Err(PerlError::runtime(
+                        format!("{}: too many arguments", method),
+                        line,
+                    ));
+                }
+                self.readline_builtin_execute(Some(name))
+            }
+            "close" => {
+                if !args.is_empty() {
+                    return Err(PerlError::runtime("close: too many arguments", line));
+                }
+                self.close_builtin_execute(name.to_string())
+            }
+            "eof" => {
+                if !args.is_empty() {
+                    return Err(PerlError::runtime("eof: too many arguments", line));
+                }
+                let at_eof = !self.has_input_handle(name);
+                Ok(PerlValue::Integer(if at_eof { 1 } else { 0 }))
+            }
+            "getc" => {
+                if !args.is_empty() {
+                    return Err(PerlError::runtime("getc: too many arguments", line));
+                }
+                match crate::builtins::try_builtin(
+                    self,
+                    "getc",
+                    &[PerlValue::String(name.to_string())],
+                    line,
+                ) {
+                    Some(r) => r,
+                    None => Err(PerlError::runtime("getc: not available", line)),
+                }
+            }
+            "binmode" => match crate::builtins::try_builtin(
+                self,
+                "binmode",
+                &[PerlValue::String(name.to_string())],
+                line,
+            ) {
+                Some(r) => r,
+                None => Err(PerlError::runtime("binmode: not available", line)),
+            },
+            "fileno" => match crate::builtins::try_builtin(
+                self,
+                "fileno",
+                &[PerlValue::String(name.to_string())],
+                line,
+            ) {
+                Some(r) => r,
+                None => Err(PerlError::runtime("fileno: not available", line)),
+            },
+            "flush" => {
+                if !args.is_empty() {
+                    return Err(PerlError::runtime("flush: too many arguments", line));
+                }
+                self.io_handle_flush(name, line)
+            }
+            _ => Err(PerlError::runtime(
+                format!("Unknown method for filehandle: {}", method),
+                line,
+            )),
+        }
+    }
+
+    fn io_handle_flush(&mut self, handle_name: &str, line: usize) -> PerlResult<PerlValue> {
+        match handle_name {
+            "STDOUT" => {
+                let _ = IoWrite::flush(&mut io::stdout());
+            }
+            "STDERR" => {
+                let _ = IoWrite::flush(&mut io::stderr());
+            }
+            name => {
+                if let Some(writer) = self.output_handles.get_mut(name) {
+                    let _ = IoWrite::flush(&mut *writer);
+                } else {
+                    return Err(PerlError::runtime(
+                        format!("flush on unopened filehandle {}", name),
+                        line,
+                    ));
+                }
+            }
+        }
+        Ok(PerlValue::Integer(1))
+    }
+
+    fn io_handle_print(
+        &mut self,
+        handle_name: &str,
+        args: &[PerlValue],
+        newline: bool,
+        line: usize,
+    ) -> PerlResult<PerlValue> {
+        if newline && (self.feature_bits & FEAT_SAY) == 0 {
+            return Err(PerlError::runtime(
+                "say() is disabled (enable with use feature 'say' or use feature ':5.10')",
+                line,
+            ));
+        }
+        let mut output = String::new();
+        for (i, val) in args.iter().enumerate() {
+            if i > 0 && !self.ofs.is_empty() {
+                output.push_str(&self.ofs);
+            }
+            output.push_str(&val.to_string());
+        }
+        if newline {
+            output.push('\n');
+        }
+        output.push_str(&self.ors);
+
+        match handle_name {
+            "STDOUT" => {
+                print!("{}", output);
+                let _ = io::stdout().flush();
+            }
+            "STDERR" => {
+                eprint!("{}", output);
+                let _ = io::stderr().flush();
+            }
+            name => {
+                if let Some(writer) = self.output_handles.get_mut(name) {
+                    let _ = writer.write_all(output.as_bytes());
+                } else {
+                    return Err(PerlError::runtime(
+                        format!("print on unopened filehandle {}", name),
+                        line,
+                    ));
+                }
+            }
+        }
+        Ok(PerlValue::Integer(1))
+    }
+
+    fn io_handle_printf(
+        &mut self,
+        handle_name: &str,
+        args: &[PerlValue],
+        line: usize,
+    ) -> PerlResult<PerlValue> {
+        if args.is_empty() {
+            return Ok(PerlValue::Integer(1));
+        }
+        let fmt = args[0].to_string();
+        let output = perl_sprintf(&fmt, &args[1..]);
+        match handle_name {
+            "STDOUT" => {
+                print!("{}", output);
+                let _ = IoWrite::flush(&mut io::stdout());
+            }
+            "STDERR" => {
+                eprint!("{}", output);
+                let _ = IoWrite::flush(&mut io::stderr());
+            }
+            name => {
+                if let Some(writer) = self.output_handles.get_mut(name) {
+                    let _ = writer.write_all(output.as_bytes());
+                } else {
+                    return Err(PerlError::runtime(
+                        format!("printf on unopened filehandle {}", name),
+                        line,
+                    ));
+                }
+            }
+        }
+        Ok(PerlValue::Integer(1))
+    }
+
     /// `deque` / `heap` method dispatch (`$q->push_back`, `$pq->pop`, …).
     pub(crate) fn try_native_method(
         &mut self,
@@ -4463,6 +4673,10 @@ impl Interpreter {
         line: usize,
     ) -> Option<PerlResult<PerlValue>> {
         match receiver {
+            PerlValue::IOHandle(name) => Some(self.io_handle_method(name, method, args, line)),
+            PerlValue::String(s) if self.is_bound_handle(s) => {
+                Some(self.io_handle_method(s, method, args, line))
+            }
             PerlValue::SqliteConn(c) => {
                 Some(crate::native_data::sqlite_dispatch(c, method, args, line))
             }

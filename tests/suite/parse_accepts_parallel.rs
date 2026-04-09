@@ -10,6 +10,12 @@ fn accepts_pmap_block() {
 }
 
 #[test]
+fn accepts_pmap_progress_option() {
+    p("my @r = pmap { $_ * 2 } (1, 2, 3), progress => 0;");
+    p("my @s = pmap { $_ } (1), progress => 1;");
+}
+
+#[test]
 fn accepts_pmap_chunked_block() {
     p("my @r = pmap_chunked 2 { $_ * 2 } (1, 2, 3, 4);");
 }

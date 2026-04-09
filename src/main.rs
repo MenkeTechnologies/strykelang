@@ -235,7 +235,9 @@ fn print_cyberpunk_help() {
     println!("  -h, --help             {G}//{N} Print help");
     println!("{C}  ── PARALLEL EXTENSIONS (perlrs) ─────────────────────{N}");
     println!("  -j N                   {G}//{N} Set number of parallel threads (rayon)");
-    println!("  pmap  {{BLOCK}} @list    {G}//{N} Parallel map across all cores");
+    println!(
+        "  pmap  {{BLOCK}} @list [, progress => EXPR] {G}//{N} Parallel map; optional stderr progress bar"
+    );
     println!(
         "  pmap_chunked N {{BLOCK}} @list {G}//{N} Parallel map in batches of N items per thread"
     );
