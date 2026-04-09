@@ -3905,7 +3905,8 @@ impl Interpreter {
                     msg = "Died".to_string();
                 }
                 if !msg.ends_with('\n') {
-                    msg.push_str(&format!(" at {} line {}", self.file, line));
+                    // Match Perl 5: `message at FILE line N.` (trailing period before newline).
+                    msg.push_str(&format!(" at {} line {}.", self.file, line));
                     msg.push('\n');
                 }
                 Err(PerlError::die(msg, line).into())
@@ -3920,7 +3921,7 @@ impl Interpreter {
                     msg = "Warning: something's wrong".to_string();
                 }
                 if !msg.ends_with('\n') {
-                    msg.push_str(&format!(" at {} line {}", self.file, line));
+                    msg.push_str(&format!(" at {} line {}.", self.file, line));
                     msg.push('\n');
                 }
                 eprint!("{}", msg);

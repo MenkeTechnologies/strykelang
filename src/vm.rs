@@ -2155,7 +2155,7 @@ impl<'a> VM<'a> {
                     msg = "Died".to_string();
                 }
                 if !msg.ends_with('\n') {
-                    msg.push_str(&format!(" at {} line {}", self.interp.file, line));
+                    msg.push_str(&format!(" at {} line {}.", self.interp.file, line));
                     msg.push('\n');
                 }
                 Err(PerlError::die(msg, line))
