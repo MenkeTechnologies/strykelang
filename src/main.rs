@@ -195,7 +195,9 @@ fn print_cyberpunk_help() {
     println!("  -i[extension]          {G}//{N} Edit <> files in place (backup if ext supplied)");
     println!("{C}  ── MODULES & PATHS ──────────────────────────────────{N}");
     println!("  -M MODULE              {G}//{N} Execute \"use module...\" before program");
-    println!("  -m MODULE              {G}//{N} Execute \"use module ()\" before program (no import)");
+    println!(
+        "  -m MODULE              {G}//{N} Execute \"use module ()\" before program (no import)"
+    );
     println!("  -I DIRECTORY           {G}//{N} Specify @INC directory (several allowed)");
     println!("  -f                     {G}//{N} Don't do $sitelib/sitecustomize.pl at startup");
     println!("  -S                     {G}//{N} Look for programfile using PATH");

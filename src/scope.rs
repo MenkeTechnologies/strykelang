@@ -1,23 +1,99 @@
 use indexmap::IndexMap;
-use std::collections::HashMap;
 
 use crate::value::PerlValue;
 
 /// A single lexical scope frame.
+/// Uses Vec instead of HashMap — for typical Perl code with < 10 variables per
+/// scope, linear scan is faster than hashing due to cache locality and zero
+/// hash overhead.
 #[derive(Debug, Clone)]
 struct Frame {
-    /// Variable storage: name (without sigil) → value
-    scalars: HashMap<String, PerlValue>,
-    arrays: HashMap<String, Vec<PerlValue>>,
-    hashes: HashMap<String, IndexMap<String, PerlValue>>,
+    scalars: Vec<(String, PerlValue)>,
+    arrays: Vec<(String, Vec<PerlValue>)>,
+    hashes: Vec<(String, IndexMap<String, PerlValue>)>,
 }
 
 impl Frame {
+    #[inline]
     fn new() -> Self {
         Self {
-            scalars: HashMap::new(),
-            arrays: HashMap::new(),
-            hashes: HashMap::new(),
+            scalars: Vec::new(),
+            arrays: Vec::new(),
+            hashes: Vec::new(),
+        }
+    }
+
+    #[inline]
+    fn get_scalar(&self, name: &str) -> Option<&PerlValue> {
+        // Linear scan — faster than HashMap for N < ~15
+        self.scalars.iter().find(|(k, _)| k == name).map(|(_, v)| v)
+    }
+
+    #[inline]
+    fn has_scalar(&self, name: &str) -> bool {
+        self.scalars.iter().any(|(k, _)| k == name)
+    }
+
+    #[inline]
+    fn set_scalar(&mut self, name: &str, val: PerlValue) {
+        if let Some(entry) = self.scalars.iter_mut().find(|(k, _)| k == name) {
+            entry.1 = val;
+        } else {
+            self.scalars.push((name.to_string(), val));
+        }
+    }
+
+    #[inline]
+    fn get_array(&self, name: &str) -> Option<&Vec<PerlValue>> {
+        self.arrays.iter().find(|(k, _)| k == name).map(|(_, v)| v)
+    }
+
+    #[inline]
+    fn has_array(&self, name: &str) -> bool {
+        self.arrays.iter().any(|(k, _)| k == name)
+    }
+
+    #[inline]
+    fn get_array_mut(&mut self, name: &str) -> Option<&mut Vec<PerlValue>> {
+        self.arrays
+            .iter_mut()
+            .find(|(k, _)| k == name)
+            .map(|(_, v)| v)
+    }
+
+    #[inline]
+    fn set_array(&mut self, name: &str, val: Vec<PerlValue>) {
+        if let Some(entry) = self.arrays.iter_mut().find(|(k, _)| k == name) {
+            entry.1 = val;
+        } else {
+            self.arrays.push((name.to_string(), val));
+        }
+    }
+
+    #[inline]
+    fn get_hash(&self, name: &str) -> Option<&IndexMap<String, PerlValue>> {
+        self.hashes.iter().find(|(k, _)| k == name).map(|(_, v)| v)
+    }
+
+    #[inline]
+    fn has_hash(&self, name: &str) -> bool {
+        self.hashes.iter().any(|(k, _)| k == name)
+    }
+
+    #[inline]
+    fn get_hash_mut(&mut self, name: &str) -> Option<&mut IndexMap<String, PerlValue>> {
+        self.hashes
+            .iter_mut()
+            .find(|(k, _)| k == name)
+            .map(|(_, v)| v)
+    }
+
+    #[inline]
+    fn set_hash(&mut self, name: &str, val: IndexMap<String, PerlValue>) {
+        if let Some(entry) = self.hashes.iter_mut().find(|(k, _)| k == name) {
+            entry.1 = val;
+        } else {
+            self.hashes.push((name.to_string(), val));
         }
     }
 }
@@ -38,16 +114,18 @@ impl Default for Scope {
 impl Scope {
     pub fn new() -> Self {
         let mut s = Self {
-            frames: Vec::with_capacity(16),
+            frames: Vec::with_capacity(32),
         };
-        s.frames.push(Frame::new()); // global frame
+        s.frames.push(Frame::new());
         s
     }
 
+    #[inline]
     pub fn push_frame(&mut self) {
         self.frames.push(Frame::new());
     }
 
+    #[inline]
     pub fn pop_frame(&mut self) {
         if self.frames.len() > 1 {
             self.frames.pop();
@@ -56,44 +134,46 @@ impl Scope {
 
     // ── Scalars ──
 
+    #[inline]
     pub fn declare_scalar(&mut self, name: &str, val: PerlValue) {
         if let Some(frame) = self.frames.last_mut() {
-            frame.scalars.insert(name.to_string(), val);
+            frame.set_scalar(name, val);
         }
     }
 
+    #[inline]
     pub fn get_scalar(&self, name: &str) -> PerlValue {
         for frame in self.frames.iter().rev() {
-            if let Some(val) = frame.scalars.get(name) {
+            if let Some(val) = frame.get_scalar(name) {
                 return val.clone();
             }
         }
         PerlValue::Undef
     }
 
+    #[inline]
     pub fn set_scalar(&mut self, name: &str, val: PerlValue) {
-        // Walk frames from innermost; if declared, update there.
         for frame in self.frames.iter_mut().rev() {
-            if frame.scalars.contains_key(name) {
-                frame.scalars.insert(name.to_string(), val);
+            if frame.has_scalar(name) {
+                frame.set_scalar(name, val);
                 return;
             }
         }
-        // Not found — assign in global scope.
-        self.frames[0].scalars.insert(name.to_string(), val);
+        self.frames[0].set_scalar(name, val);
     }
 
     // ── Arrays ──
 
+    #[inline]
     pub fn declare_array(&mut self, name: &str, val: Vec<PerlValue>) {
         if let Some(frame) = self.frames.last_mut() {
-            frame.arrays.insert(name.to_string(), val);
+            frame.set_array(name, val);
         }
     }
 
     pub fn get_array(&self, name: &str) -> Vec<PerlValue> {
         for frame in self.frames.iter().rev() {
-            if let Some(val) = frame.arrays.get(name) {
+            if let Some(val) = frame.get_array(name) {
                 return val.clone();
             }
         }
@@ -101,36 +181,45 @@ impl Scope {
     }
 
     pub fn get_array_mut(&mut self, name: &str) -> &mut Vec<PerlValue> {
-        // Find which frame contains this array (index-based to satisfy borrow checker).
         let mut target_idx = None;
         for i in (0..self.frames.len()).rev() {
-            if self.frames[i].arrays.contains_key(name) {
+            if self.frames[i].has_array(name) {
                 target_idx = Some(i);
                 break;
             }
         }
         let idx = target_idx.unwrap_or(0);
-        self.frames[idx].arrays.entry(name.to_string()).or_default()
+        let frame = &mut self.frames[idx];
+        if frame.get_array_mut(name).is_none() {
+            frame.arrays.push((name.to_string(), Vec::new()));
+        }
+        frame.get_array_mut(name).unwrap()
     }
 
     pub fn set_array(&mut self, name: &str, val: Vec<PerlValue>) {
         for frame in self.frames.iter_mut().rev() {
-            if frame.arrays.contains_key(name) {
-                frame.arrays.insert(name.to_string(), val);
+            if frame.has_array(name) {
+                frame.set_array(name, val);
                 return;
             }
         }
-        self.frames[0].arrays.insert(name.to_string(), val);
+        self.frames[0].set_array(name, val);
     }
 
+    /// Direct element access — no full-array clone.
+    #[inline]
     pub fn get_array_element(&self, name: &str, index: i64) -> PerlValue {
-        let arr = self.get_array(name);
-        let idx = if index < 0 {
-            (arr.len() as i64 + index) as usize
-        } else {
-            index as usize
-        };
-        arr.get(idx).cloned().unwrap_or(PerlValue::Undef)
+        for frame in self.frames.iter().rev() {
+            if let Some(arr) = frame.get_array(name) {
+                let idx = if index < 0 {
+                    (arr.len() as i64 + index) as usize
+                } else {
+                    index as usize
+                };
+                return arr.get(idx).cloned().unwrap_or(PerlValue::Undef);
+            }
+        }
+        PerlValue::Undef
     }
 
     pub fn set_array_element(&mut self, name: &str, index: i64, val: PerlValue) {
@@ -149,15 +238,16 @@ impl Scope {
 
     // ── Hashes ──
 
+    #[inline]
     pub fn declare_hash(&mut self, name: &str, val: IndexMap<String, PerlValue>) {
         if let Some(frame) = self.frames.last_mut() {
-            frame.hashes.insert(name.to_string(), val);
+            frame.set_hash(name, val);
         }
     }
 
     pub fn get_hash(&self, name: &str) -> IndexMap<String, PerlValue> {
         for frame in self.frames.iter().rev() {
-            if let Some(val) = frame.hashes.get(name) {
+            if let Some(val) = frame.get_hash(name) {
                 return val.clone();
             }
         }
@@ -167,28 +257,38 @@ impl Scope {
     pub fn get_hash_mut(&mut self, name: &str) -> &mut IndexMap<String, PerlValue> {
         let mut target_idx = None;
         for i in (0..self.frames.len()).rev() {
-            if self.frames[i].hashes.contains_key(name) {
+            if self.frames[i].has_hash(name) {
                 target_idx = Some(i);
                 break;
             }
         }
         let idx = target_idx.unwrap_or(0);
-        self.frames[idx].hashes.entry(name.to_string()).or_default()
+        let frame = &mut self.frames[idx];
+        if frame.get_hash_mut(name).is_none() {
+            frame.hashes.push((name.to_string(), IndexMap::new()));
+        }
+        frame.get_hash_mut(name).unwrap()
     }
 
     pub fn set_hash(&mut self, name: &str, val: IndexMap<String, PerlValue>) {
         for frame in self.frames.iter_mut().rev() {
-            if frame.hashes.contains_key(name) {
-                frame.hashes.insert(name.to_string(), val);
+            if frame.has_hash(name) {
+                frame.set_hash(name, val);
                 return;
             }
         }
-        self.frames[0].hashes.insert(name.to_string(), val);
+        self.frames[0].set_hash(name, val);
     }
 
+    /// Direct element access — no full-hash clone.
+    #[inline]
     pub fn get_hash_element(&self, name: &str, key: &str) -> PerlValue {
-        let hash = self.get_hash(name);
-        hash.get(key).cloned().unwrap_or(PerlValue::Undef)
+        for frame in self.frames.iter().rev() {
+            if let Some(hash) = frame.get_hash(name) {
+                return hash.get(key).cloned().unwrap_or(PerlValue::Undef);
+            }
+        }
+        PerlValue::Undef
     }
 
     pub fn set_hash_element(&mut self, name: &str, key: &str, val: PerlValue) {
@@ -201,12 +301,17 @@ impl Scope {
         hash.shift_remove(key).unwrap_or(PerlValue::Undef)
     }
 
+    /// Direct check — no full-hash clone.
+    #[inline]
     pub fn exists_hash_element(&self, name: &str, key: &str) -> bool {
-        let hash = self.get_hash(name);
-        hash.contains_key(key)
+        for frame in self.frames.iter().rev() {
+            if let Some(hash) = frame.get_hash(name) {
+                return hash.contains_key(key);
+            }
+        }
+        false
     }
 
-    /// Capture current scope as flat list of (name, value) pairs for closures.
     pub fn capture(&self) -> Vec<(String, PerlValue)> {
         let mut captured = Vec::new();
         for frame in &self.frames {
@@ -217,7 +322,6 @@ impl Scope {
         captured
     }
 
-    /// Restore captured variables into a new frame.
     pub fn restore_capture(&mut self, captured: &[(String, PerlValue)]) {
         for (name, val) in captured {
             if let Some(stripped) = name.strip_prefix('$') {

@@ -44,6 +44,14 @@ fn shift_unshift() {
 }
 
 #[test]
+fn unshift_multiple_values() {
+    assert_eq!(
+        eval_string(r#"my @a = (1); unshift @a, 2, 3; join(",", @a)"#),
+        "2,3,1"
+    );
+}
+
+#[test]
 fn splice_remove_insert() {
     assert_eq!(
         eval_string(r#"my @a = (1,2,3,4,5); join(",", splice @a, 1, 2)"#),
