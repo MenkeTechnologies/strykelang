@@ -136,44 +136,7 @@ Each parallel block receives its own interpreter context with captured lexical s
 
 ## [0x04] CLI FLAGS
 
-All standard Perl 5 CLI flags are supported:
-
-```
-  ── DATA I/O ──────────────────────────────────────────
-  -0[octal]          // Specify record separator (\0 if no arg; -0777 for slurp)
-  -a                 // Autosplit mode with -n or -p (splits $_ into @F)
-  -C[number/list]    // Enable listed Unicode features
-  -c                 // Check syntax only (runs BEGIN and CHECK blocks)
-  -d[t][:MOD]        // Run program under debugger or module Devel::MOD
-  -D[number/letters] // Set debugging flags
-  -e CODE            // One line of program (several -e's allowed)
-  -E CODE            // Like -e, but enables all optional features
-  -f                 // Don't do $sitelib/sitecustomize.pl at startup
-  -F/pattern/        // split() pattern for -a switch
-  -g                 // Read all input in one go (slurp), alias for -0777
-  -i[extension]      // Edit <> files in place (backup if extension supplied)
-  -I DIRECTORY       // Specify @INC directory (several allowed)
-  -l[octnum]         // Enable line ending processing
-  -M MODULE          // Execute "use module..." before program
-  -m MODULE          // Execute "use module ()" before program (no import)
-  -n                 // Assume "while (<>) { ... }" loop around program
-  -p                 // Like -n but print line also, like sed
-  -s                 // Enable switch parsing for programfile args
-  -S                 // Look for programfile using PATH
-  -t                 // Enable tainting warnings
-  -T                 // Enable tainting checks
-  -u                 // Dump core after parsing program
-  -U                 // Allow unsafe operations
-  -v                 // Print version, patchlevel and license
-  -V[:configvar]     // Print configuration summary
-  -w                 // Enable many useful warnings
-  -W                 // Enable all warnings
-  -x[directory]      // Ignore text before #!perl line
-  -X                 // Disable all warnings
-
-  ── PARALLEL EXTENSIONS ───────────────────────────────
-  -j N               // Set number of parallel threads (rayon)
-```
+![pe -h](img/pe-help.png)
 
 ---
 
