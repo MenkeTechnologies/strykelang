@@ -505,7 +505,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - **Parser** // Recursive descent with Pratt precedence climbing for expressions
 - **Interpreter** // Tree-walking execution with proper lexical scoping, `Arc<RwLock>` for thread-safe reference types
 - **Parallelism** // Each parallel block gets an isolated interpreter with captured scope; rayon handles work-stealing scheduling
-- **VM** // `src/vm.rs` match-dispatch loop over bytecode ops; further speedups can come from op fusion (common opcode sequences) or platform-specific computed-goto dispatch in the hot loop (not implemented here)
+- **VM** // `src/vm.rs` match-dispatch loop; compiled subs use **slot** ops for frame-local `my` scalars (`GetScalarSlot`, `PreIncSlot`, …, O(1)); non-special names use **plain** load/store ops to skip the special-variable dispatch path; string `eq` / `cmp` compare heap strings without per-op `String` allocations when both operands are heap strings; the execution budget is checked on a fixed stride through the hot loop (not once per opcode). Further speedups: op fusion, computed-goto dispatch (not implemented here)
 
 ---
 

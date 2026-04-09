@@ -17,7 +17,11 @@ pub enum Op {
 
     // ── Scalars (u16 = name pool index) ──
     GetScalar(u16),
+    /// Like `GetScalar` but reads `scope.get_scalar` only (no Perl special-variable dispatch).
+    GetScalarPlain(u16),
     SetScalar(u16),
+    /// Like `SetScalar` but calls `scope.set_scalar` only (no special-variable dispatch).
+    SetScalarPlain(u16),
     DeclareScalar(u16),
     /// Like `DeclareScalar` but the binding is immutable after initialization.
     DeclareScalarFrozen(u16),
@@ -108,6 +112,11 @@ pub enum Op {
     PreDec(u16),
     PostInc(u16),
     PostDec(u16),
+    /// Pre-increment on a frame [`Scope::scalar_slots`] entry (compiled `my $x` fast path).
+    PreIncSlot(u8),
+    PreDecSlot(u8),
+    PostIncSlot(u8),
+    PostDecSlot(u8),
 
     // ── Functions ──
     /// Call subroutine: name index, arg count, [`WantarrayCtx`](crate::interpreter::WantarrayCtx) as u8
@@ -149,6 +158,8 @@ pub enum Op {
     // ── Assign helpers ──
     /// SetScalar that also leaves the value on the stack (for chained assignment)
     SetScalarKeep(u16),
+    /// `SetScalarKeep` for non-special scalars (see `SetScalarPlain`).
+    SetScalarKeepPlain(u16),
 
     // ── Block-based operations (u16 = index into chunk.blocks) ──
     /// map { BLOCK } @list — block_idx; stack: \[list\] → \[mapped\]

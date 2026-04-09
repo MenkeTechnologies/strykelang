@@ -933,7 +933,25 @@ impl PerlValue {
         a.partial_cmp(&b).unwrap_or(Ordering::Equal)
     }
 
+    /// String equality for `eq` / `cmp` without allocating when both sides are heap strings.
+    #[inline]
+    pub fn str_eq(&self, other: &PerlValue) -> bool {
+        if nanbox::is_heap(self.0) && nanbox::is_heap(other.0) {
+            match unsafe { (self.heap_ref(), other.heap_ref()) } {
+                (HeapObject::String(a), HeapObject::String(b)) => return a == b,
+                _ => {}
+            }
+        }
+        self.to_string() == other.to_string()
+    }
+
     pub fn str_cmp(&self, other: &PerlValue) -> Ordering {
+        if nanbox::is_heap(self.0) && nanbox::is_heap(other.0) {
+            match unsafe { (self.heap_ref(), other.heap_ref()) } {
+                (HeapObject::String(a), HeapObject::String(b)) => return a.cmp(b),
+                _ => {}
+            }
+        }
         self.to_string().cmp(&other.to_string())
     }
 

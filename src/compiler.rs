@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::ast::*;
 use crate::bytecode::{BuiltinId, Chunk, Op};
-use crate::interpreter::WantarrayCtx;
+use crate::interpreter::{Interpreter, WantarrayCtx};
 use crate::sort_fast::detect_sort_block_fast;
 use crate::value::PerlValue;
 
@@ -100,8 +100,10 @@ impl Compiler {
         let name = &self.chunk.names[name_idx as usize];
         if let Some(slot) = self.scalar_slot(name) {
             self.chunk.emit(Op::GetScalarSlot(slot), line);
-        } else {
+        } else if Interpreter::is_special_scalar_name_for_get(name) {
             self.chunk.emit(Op::GetScalar(name_idx), line);
+        } else {
+            self.chunk.emit(Op::GetScalarPlain(name_idx), line);
         }
     }
 
@@ -110,8 +112,10 @@ impl Compiler {
         let name = &self.chunk.names[name_idx as usize];
         if let Some(slot) = self.scalar_slot(name) {
             self.chunk.emit(Op::SetScalarSlot(slot), line);
-        } else {
+        } else if Interpreter::is_special_scalar_name_for_set(name) {
             self.chunk.emit(Op::SetScalar(name_idx), line);
+        } else {
+            self.chunk.emit(Op::SetScalarPlain(name_idx), line);
         }
     }
 
@@ -120,8 +124,46 @@ impl Compiler {
         let name = &self.chunk.names[name_idx as usize];
         if let Some(slot) = self.scalar_slot(name) {
             self.chunk.emit(Op::SetScalarSlotKeep(slot), line);
-        } else {
+        } else if Interpreter::is_special_scalar_name_for_set(name) {
             self.chunk.emit(Op::SetScalarKeep(name_idx), line);
+        } else {
+            self.chunk.emit(Op::SetScalarKeepPlain(name_idx), line);
+        }
+    }
+
+    fn emit_pre_inc(&mut self, name_idx: u16, line: usize) {
+        let name = &self.chunk.names[name_idx as usize];
+        if let Some(slot) = self.scalar_slot(name) {
+            self.chunk.emit(Op::PreIncSlot(slot), line);
+        } else {
+            self.chunk.emit(Op::PreInc(name_idx), line);
+        }
+    }
+
+    fn emit_pre_dec(&mut self, name_idx: u16, line: usize) {
+        let name = &self.chunk.names[name_idx as usize];
+        if let Some(slot) = self.scalar_slot(name) {
+            self.chunk.emit(Op::PreDecSlot(slot), line);
+        } else {
+            self.chunk.emit(Op::PreDec(name_idx), line);
+        }
+    }
+
+    fn emit_post_inc(&mut self, name_idx: u16, line: usize) {
+        let name = &self.chunk.names[name_idx as usize];
+        if let Some(slot) = self.scalar_slot(name) {
+            self.chunk.emit(Op::PostIncSlot(slot), line);
+        } else {
+            self.chunk.emit(Op::PostInc(name_idx), line);
+        }
+    }
+
+    fn emit_post_dec(&mut self, name_idx: u16, line: usize) {
+        let name = &self.chunk.names[name_idx as usize];
+        if let Some(slot) = self.scalar_slot(name) {
+            self.chunk.emit(Op::PostDecSlot(slot), line);
+        } else {
+            self.chunk.emit(Op::PostDec(name_idx), line);
         }
     }
 
@@ -760,15 +802,15 @@ impl Compiler {
 
                 let loop_start = self.chunk.len();
                 // Check: $i < scalar @list
-                self.chunk.emit(Op::GetScalar(counter_name), line);
+                self.emit_get_scalar(counter_name, line);
                 self.chunk.emit(Op::ArrayLen(list_name), line);
                 self.chunk.emit(Op::NumLt, line);
                 let exit_jump = self.chunk.emit(Op::JumpIfFalse(0), line);
 
                 // $var = $list[$i]
-                self.chunk.emit(Op::GetScalar(counter_name), line);
+                self.emit_get_scalar(counter_name, line);
                 self.chunk.emit(Op::GetArrayElem(list_name), line);
-                self.chunk.emit(Op::SetScalar(var_name), line);
+                self.emit_set_scalar(var_name, line);
 
                 let mut ctx = LoopCtx {
                     label: label.clone(),
@@ -779,7 +821,7 @@ impl Compiler {
                 ctx.continue_target = self.chunk.len();
 
                 // $i++
-                self.chunk.emit(Op::PreInc(counter_name), line);
+                self.emit_pre_inc(counter_name, line);
                 self.chunk.emit(Op::Pop, line);
                 self.chunk.emit(Op::Jump(loop_start), line);
 
@@ -824,7 +866,7 @@ impl Compiler {
                 let val_idx = self.chunk.add_constant(PerlValue::string(name.clone()));
                 let name_idx = self.chunk.intern_name("__PACKAGE__");
                 self.chunk.emit(Op::LoadConst(val_idx), line);
-                self.chunk.emit(Op::SetScalar(name_idx), line);
+                self.emit_set_scalar(name_idx, line);
             }
             StmtKind::SubDecl { .. } => {
                 // Already handled in compile_program
@@ -1154,7 +1196,7 @@ impl Compiler {
                     if let ExprKind::ScalarVar(name) = &expr.kind {
                         self.check_scalar_mutable(name, line)?;
                         let idx = self.chunk.intern_name(name);
-                        self.chunk.emit(Op::PreInc(idx), line);
+                        self.emit_pre_inc(idx, line);
                     } else {
                         return Err(CompileError::Unsupported("PreInc on non-scalar".into()));
                     }
@@ -1163,7 +1205,7 @@ impl Compiler {
                     if let ExprKind::ScalarVar(name) = &expr.kind {
                         self.check_scalar_mutable(name, line)?;
                         let idx = self.chunk.intern_name(name);
-                        self.chunk.emit(Op::PreDec(idx), line);
+                        self.emit_pre_dec(idx, line);
                     } else {
                         return Err(CompileError::Unsupported("PreDec on non-scalar".into()));
                     }
@@ -1194,10 +1236,10 @@ impl Compiler {
                     let idx = self.chunk.intern_name(name);
                     match op {
                         PostfixOp::Increment => {
-                            self.chunk.emit(Op::PostInc(idx), line);
+                            self.emit_post_inc(idx, line);
                         }
                         PostfixOp::Decrement => {
-                            self.chunk.emit(Op::PostDec(idx), line);
+                            self.emit_post_dec(idx, line);
                         }
                     }
                 } else {
@@ -2155,19 +2197,19 @@ impl Compiler {
                 let underscore = self.chunk.intern_name("_");
 
                 let loop_start = self.chunk.len();
-                self.chunk.emit(Op::GetScalar(counter), line);
+                self.emit_get_scalar(counter, line);
                 self.chunk.emit(Op::ArrayLen(list_name), line);
                 self.chunk.emit(Op::NumLt, line);
                 let exit_jump = self.chunk.emit(Op::JumpIfFalse(0), line);
 
-                self.chunk.emit(Op::GetScalar(counter), line);
+                self.emit_get_scalar(counter, line);
                 self.chunk.emit(Op::GetArrayElem(list_name), line);
-                self.chunk.emit(Op::SetScalar(underscore), line);
+                self.emit_set_scalar(underscore, line);
 
                 self.compile_expr(expr)?;
                 self.chunk.emit(Op::Pop, line);
 
-                self.chunk.emit(Op::PreInc(counter), line);
+                self.emit_pre_inc(counter, line);
                 self.chunk.emit(Op::Pop, line);
                 self.chunk.emit(Op::Jump(loop_start), line);
                 self.chunk.patch_jump_here(exit_jump);
@@ -2398,7 +2440,7 @@ impl Compiler {
             }
             StringPart::ScalarVar(name) => {
                 let idx = self.chunk.intern_name(name);
-                self.chunk.emit(Op::GetScalar(idx), line);
+                self.emit_get_scalar(idx, line);
             }
             StringPart::ArrayVar(name) => {
                 let idx = self.chunk.intern_name(name);
@@ -2616,7 +2658,7 @@ mod tests {
             chunk
                 .ops
                 .iter()
-                .filter(|o| matches!(o, Op::GetScalar(_)))
+                .filter(|o| matches!(o, Op::GetScalar(_) | Op::GetScalarPlain(_)))
                 .count()
                 >= 1
         );

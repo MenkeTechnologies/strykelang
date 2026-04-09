@@ -4830,6 +4830,23 @@ impl Interpreter {
         }
     }
 
+    /// True when [`get_special_var`] must run instead of [`Scope::get_scalar`].
+    pub(crate) fn is_special_scalar_name_for_get(name: &str) -> bool {
+        matches!(
+            name,
+            "$$" | "0" | "!" | "@" | "/" | "\\" | "," | "." | "]" | ";" | "ARGV"
+                | "^I" | "^D" | "^P" | "^S" | "^W"
+        )
+    }
+
+    /// True when [`set_special_var`] must run instead of [`Scope::set_scalar`].
+    pub(crate) fn is_special_scalar_name_for_set(name: &str) -> bool {
+        matches!(
+            name,
+            "0" | "/" | "\\" | "," | ";" | "^I" | "^D" | "^P" | "^W" | "$$" | "]" | "^S" | "ARGV"
+        )
+    }
+
     pub(crate) fn get_special_var(&self, name: &str) -> PerlValue {
         match name {
             "$$" => PerlValue::integer(std::process::id() as i64),

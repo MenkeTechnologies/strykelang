@@ -142,7 +142,8 @@ impl<'a> VM<'a> {
             }
 
             op_count += 1;
-            if op_count > MAX_OPS {
+            // Check only every 256 ops — keeps the hot path to one branch per iteration.
+            if (op_count & 0xFF) == 0 && op_count > MAX_OPS {
                 return Err(PerlError::runtime(
                     "VM execution limit exceeded (possible infinite loop)",
                     self.line(),
@@ -174,6 +175,11 @@ impl<'a> VM<'a> {
                     let val = self.interp.get_special_var(n);
                     self.push(val);
                 }
+                Op::GetScalarPlain(idx) => {
+                    let n = names[*idx as usize].as_str();
+                    let val = self.interp.scope.get_scalar(n);
+                    self.push(val);
+                }
                 Op::SetScalar(idx) => {
                     let val = self.pop();
                     let n = names[*idx as usize].as_str();
@@ -182,12 +188,30 @@ impl<'a> VM<'a> {
                         .set_special_var(&n, &val)
                         .map_err(|e| e.at_line(self.line()))?;
                 }
+                Op::SetScalarPlain(idx) => {
+                    let val = self.pop();
+                    let n = names[*idx as usize].as_str();
+                    self.require_scalar_mutable(&n)?;
+                    self.interp
+                        .scope
+                        .set_scalar(&n, val)
+                        .map_err(|e| e.at_line(self.line()))?;
+                }
                 Op::SetScalarKeep(idx) => {
                     let val = self.peek().clone();
                     let n = names[*idx as usize].as_str();
                     self.require_scalar_mutable(&n)?;
                     self.interp
                         .set_special_var(&n, &val)
+                        .map_err(|e| e.at_line(self.line()))?;
+                }
+                Op::SetScalarKeepPlain(idx) => {
+                    let val = self.peek().clone();
+                    let n = names[*idx as usize].as_str();
+                    self.require_scalar_mutable(&n)?;
+                    self.interp
+                        .scope
+                        .set_scalar(&n, val)
                         .map_err(|e| e.at_line(self.line()))?;
                 }
                 Op::DeclareScalar(idx) => {
@@ -593,43 +617,43 @@ impl<'a> VM<'a> {
                 Op::StrEq => {
                     let b = self.pop();
                     let a = self.pop();
-                    self.push(PerlValue::integer(if a.to_string() == b.to_string() {
-                        1
-                    } else {
-                        0
-                    }));
+                    self.push(PerlValue::integer(if a.str_eq(&b) { 1 } else { 0 }));
                 }
                 Op::StrNe => {
                     let b = self.pop();
                     let a = self.pop();
-                    self.push(PerlValue::integer(if a.to_string() != b.to_string() {
-                        1
-                    } else {
-                        0
-                    }));
+                    self.push(PerlValue::integer(if !a.str_eq(&b) { 1 } else { 0 }));
                 }
                 Op::StrLt => {
                     let b = self.pop();
                     let a = self.pop();
-                    self.push(PerlValue::integer(if a.to_string() < b.to_string() {
-                        1
-                    } else {
-                        0
-                    }));
+                    self.push(PerlValue::integer(
+                        if a.str_cmp(&b) == std::cmp::Ordering::Less {
+                            1
+                        } else {
+                            0
+                        },
+                    ));
                 }
                 Op::StrGt => {
                     let b = self.pop();
                     let a = self.pop();
-                    self.push(PerlValue::integer(if a.to_string() > b.to_string() {
-                        1
-                    } else {
-                        0
-                    }));
+                    self.push(PerlValue::integer(
+                        if a.str_cmp(&b) == std::cmp::Ordering::Greater {
+                            1
+                        } else {
+                            0
+                        },
+                    ));
                 }
                 Op::StrLe => {
                     let b = self.pop();
                     let a = self.pop();
-                    self.push(PerlValue::integer(if a.to_string() <= b.to_string() {
+                    let o = a.str_cmp(&b);
+                    self.push(PerlValue::integer(if matches!(
+                        o,
+                        std::cmp::Ordering::Less | std::cmp::Ordering::Equal
+                    ) {
                         1
                     } else {
                         0
@@ -638,7 +662,11 @@ impl<'a> VM<'a> {
                 Op::StrGe => {
                     let b = self.pop();
                     let a = self.pop();
-                    self.push(PerlValue::integer(if a.to_string() >= b.to_string() {
+                    let o = a.str_cmp(&b);
+                    self.push(PerlValue::integer(if matches!(
+                        o,
+                        std::cmp::Ordering::Greater | std::cmp::Ordering::Equal
+                    ) {
                         1
                     } else {
                         0
@@ -647,7 +675,7 @@ impl<'a> VM<'a> {
                 Op::StrCmp => {
                     let b = self.pop();
                     let a = self.pop();
-                    let cmp = a.to_string().cmp(&b.to_string());
+                    let cmp = a.str_cmp(&b);
                     self.push(PerlValue::integer(match cmp {
                         std::cmp::Ordering::Less => -1,
                         std::cmp::Ordering::Greater => 1,
@@ -779,6 +807,34 @@ impl<'a> VM<'a> {
                         .scope
                         .set_scalar(&n, new_val)
                         .map_err(|e| e.at_line(self.line()))?;
+                    self.push(old);
+                }
+                Op::PreIncSlot(slot) => {
+                    let val = self.interp.scope.get_scalar_slot(*slot).to_int() + 1;
+                    let new_val = PerlValue::integer(val);
+                    self.interp
+                        .scope
+                        .set_scalar_slot(*slot, new_val.clone());
+                    self.push(new_val);
+                }
+                Op::PreDecSlot(slot) => {
+                    let val = self.interp.scope.get_scalar_slot(*slot).to_int() - 1;
+                    let new_val = PerlValue::integer(val);
+                    self.interp
+                        .scope
+                        .set_scalar_slot(*slot, new_val.clone());
+                    self.push(new_val);
+                }
+                Op::PostIncSlot(slot) => {
+                    let old = self.interp.scope.get_scalar_slot(*slot);
+                    let new_val = PerlValue::integer(old.to_int() + 1);
+                    self.interp.scope.set_scalar_slot(*slot, new_val);
+                    self.push(old);
+                }
+                Op::PostDecSlot(slot) => {
+                    let old = self.interp.scope.get_scalar_slot(*slot);
+                    let new_val = PerlValue::integer(old.to_int() - 1);
+                    self.interp.scope.set_scalar_slot(*slot, new_val);
                     self.push(old);
                 }
 
