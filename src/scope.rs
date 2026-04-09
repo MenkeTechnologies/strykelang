@@ -361,6 +361,45 @@ impl Scope {
         PerlValue::Undef
     }
 
+    /// True if any frame has a lexical scalar binding for `name` (`my` / `our` / assignment).
+    #[inline]
+    pub fn scalar_binding_exists(&self, name: &str) -> bool {
+        for frame in self.frames.iter().rev() {
+            if frame.has_scalar(name) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// True if any frame or atomic slot holds an array named `name`.
+    #[inline]
+    pub fn array_binding_exists(&self, name: &str) -> bool {
+        if self.find_atomic_array(name).is_some() {
+            return true;
+        }
+        for frame in self.frames.iter().rev() {
+            if frame.has_array(name) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// True if any frame or atomic slot holds a hash named `name`.
+    #[inline]
+    pub fn hash_binding_exists(&self, name: &str) -> bool {
+        if self.find_atomic_hash(name).is_some() {
+            return true;
+        }
+        for frame in self.frames.iter().rev() {
+            if frame.has_hash(name) {
+                return true;
+            }
+        }
+        false
+    }
+
     /// Get the raw scalar value WITHOUT unwrapping Atomic.
     /// Used by scope.capture() to preserve the Arc for sharing across threads.
     #[inline]

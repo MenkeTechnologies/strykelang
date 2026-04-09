@@ -18,7 +18,8 @@ fn begin_defines_subroutine_visible_to_main() {
 fn begin_runs_before_main_and_can_set_global_scalar() {
     // `my` in main has not run when BEGIN executes; use a package/global scalar so the
     // assignment is visible to later main-line code (matches minimal Perl semantics here).
-    assert_eq!(eval_int("BEGIN { $seen = 1 } $seen"), 1);
+    // Package global without `my`/`our` — disable strict vars for this snippet (implicit stash write).
+    assert_eq!(eval_int("no strict 'vars'; BEGIN { $seen = 1 } $seen"), 1);
 }
 
 #[test]

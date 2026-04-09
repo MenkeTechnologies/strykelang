@@ -221,6 +221,9 @@ impl Interpreter {
         let mut scope = Scope::new();
         scope.declare_array("INC", vec![PerlValue::String(".".to_string())]);
         scope.declare_hash("INC", IndexMap::new());
+        scope.declare_array("ARGV", vec![]);
+        scope.declare_array("_", vec![]);
+        scope.declare_hash("ENV", env.clone());
 
         Self {
             scope,
@@ -247,7 +250,8 @@ impl Interpreter {
             strict_subs: false,
             strict_vars: false,
             utf8_pragma: false,
-            feature_bits: 0,
+            // Like Perl 5.10+, `say` is enabled by default; `no feature 'say'` disables it.
+            feature_bits: FEAT_SAY,
             num_threads: rayon::current_num_threads(),
             regex_cache: HashMap::new(),
             regex_pos: HashMap::new(),
@@ -274,6 +278,58 @@ impl Interpreter {
             v.push(".".to_string());
         }
         v
+    }
+
+    #[inline]
+    fn strict_scalar_exempt(name: &str) -> bool {
+        matches!(name, "_" | "0" | "!" | "@" | "/" | "\\" | "," | "." | "__PACKAGE__")
+            || name.chars().all(|c| c.is_ascii_digit())
+    }
+
+    fn check_strict_scalar_var(&self, name: &str, line: usize) -> Result<(), FlowOrError> {
+        if !self.strict_vars
+            || Self::strict_scalar_exempt(name)
+            || name.contains("::")
+            || self.scope.scalar_binding_exists(name)
+        {
+            return Ok(());
+        }
+        Err(PerlError::runtime(
+            format!(
+                "Global symbol \"${}\" requires explicit package name (did you forget to declare \"my ${}\"?)",
+                name, name
+            ),
+            line,
+        )
+        .into())
+    }
+
+    fn check_strict_array_var(&self, name: &str, line: usize) -> Result<(), FlowOrError> {
+        if !self.strict_vars || name.contains("::") || self.scope.array_binding_exists(name) {
+            return Ok(());
+        }
+        Err(PerlError::runtime(
+            format!(
+                "Global symbol \"@{}\" requires explicit package name (did you forget to declare \"my @{}\"?)",
+                name, name
+            ),
+            line,
+        )
+        .into())
+    }
+
+    fn check_strict_hash_var(&self, name: &str, line: usize) -> Result<(), FlowOrError> {
+        if !self.strict_vars || name.contains("::") || self.scope.hash_binding_exists(name) {
+            return Ok(());
+        }
+        Err(PerlError::runtime(
+            format!(
+                "Global symbol \"%{}\" requires explicit package name (did you forget to declare \"my %{}\"?)",
+                name, name
+            ),
+            line,
+        )
+        .into())
     }
 
     fn looks_like_version_only(spec: &str) -> bool {
@@ -1996,10 +2052,12 @@ impl Interpreter {
                     match part {
                         StringPart::Literal(s) => result.push_str(s),
                         StringPart::ScalarVar(name) => {
+                            self.check_strict_scalar_var(name, line)?;
                             let val = self.get_special_var(name);
                             result.push_str(&val.to_string());
                         }
                         StringPart::ArrayVar(name) => {
+                            self.check_strict_array_var(name, line)?;
                             let arr = self.scope.get_array(name);
                             let joined = arr
                                 .iter()
@@ -2018,18 +2076,30 @@ impl Interpreter {
             }
 
             // Variables
-            ExprKind::ScalarVar(name) => Ok(self.get_special_var(name)),
-            ExprKind::ArrayVar(name) => Ok(PerlValue::Array(self.scope.get_array(name))),
-            ExprKind::HashVar(name) => Ok(PerlValue::Hash(self.scope.get_hash(name))),
+            ExprKind::ScalarVar(name) => {
+                self.check_strict_scalar_var(name, line)?;
+                Ok(self.get_special_var(name))
+            }
+            ExprKind::ArrayVar(name) => {
+                self.check_strict_array_var(name, line)?;
+                Ok(PerlValue::Array(self.scope.get_array(name)))
+            }
+            ExprKind::HashVar(name) => {
+                self.check_strict_hash_var(name, line)?;
+                Ok(PerlValue::Hash(self.scope.get_hash(name)))
+            }
             ExprKind::ArrayElement { array, index } => {
+                self.check_strict_array_var(array, line)?;
                 let idx = self.eval_expr(index)?.to_int();
                 Ok(self.scope.get_array_element(array, idx))
             }
             ExprKind::HashElement { hash, key } => {
+                self.check_strict_hash_var(hash, line)?;
                 let k = self.eval_expr(key)?.to_string();
                 Ok(self.scope.get_hash_element(hash, &k))
             }
             ExprKind::ArraySlice { array, indices } => {
+                self.check_strict_array_var(array, line)?;
                 let mut result = Vec::new();
                 for idx_expr in indices {
                     let idx = self.eval_expr(idx_expr)?.to_int();
@@ -2038,6 +2108,7 @@ impl Interpreter {
                 Ok(PerlValue::Array(result))
             }
             ExprKind::HashSlice { hash, keys } => {
+                self.check_strict_hash_var(hash, line)?;
                 let mut result = Vec::new();
                 for key_expr in keys {
                     let k = self.eval_expr(key_expr)?.to_string();
@@ -2082,6 +2153,19 @@ impl Interpreter {
                 match kind {
                     Sigil::Scalar => match val {
                         PerlValue::ScalarRef(r) => Ok(r.read().clone()),
+                        PerlValue::String(s) => {
+                            if self.strict_refs {
+                                return Err(PerlError::runtime(
+                                    format!(
+                                        "Can't use string (\"{}\") as a SCALAR ref while \"strict refs\" in use",
+                                        s
+                                    ),
+                                    line,
+                                )
+                                .into());
+                            }
+                            Ok(self.get_special_var(&s))
+                        }
                         _ => Err(PerlError::runtime(
                             "Can't dereference non-reference as scalar",
                             line,
@@ -2090,6 +2174,19 @@ impl Interpreter {
                     },
                     Sigil::Array => match val {
                         PerlValue::ArrayRef(r) => Ok(PerlValue::Array(r.read().clone())),
+                        PerlValue::String(s) => {
+                            if self.strict_refs {
+                                return Err(PerlError::runtime(
+                                    format!(
+                                        "Can't use string (\"{}\") as an ARRAY ref while \"strict refs\" in use",
+                                        s
+                                    ),
+                                    line,
+                                )
+                                .into());
+                            }
+                            Ok(PerlValue::Array(self.scope.get_array(&s)))
+                        }
                         _ => Err(PerlError::runtime(
                             "Can't dereference non-reference as array",
                             line,
@@ -2098,6 +2195,19 @@ impl Interpreter {
                     },
                     Sigil::Hash => match val {
                         PerlValue::HashRef(r) => Ok(PerlValue::Hash(r.read().clone())),
+                        PerlValue::String(s) => {
+                            if self.strict_refs {
+                                return Err(PerlError::runtime(
+                                    format!(
+                                        "Can't use string (\"{}\") as a HASH ref while \"strict refs\" in use",
+                                        s
+                                    ),
+                                    line,
+                                )
+                                .into());
+                            }
+                            Ok(PerlValue::Hash(self.scope.get_hash(&s)))
+                        }
                         _ => Err(PerlError::runtime(
                             "Can't dereference non-reference as hash",
                             line,
@@ -2218,6 +2328,7 @@ impl Interpreter {
             ExprKind::UnaryOp { op, expr } => match op {
                 UnaryOp::PreIncrement => {
                     if let ExprKind::ScalarVar(name) = &expr.kind {
+                        self.check_strict_scalar_var(name, line)?;
                         return Ok(self
                             .scope
                             .atomic_mutate(name, |v| PerlValue::Integer(v.to_int() + 1)));
@@ -2229,6 +2340,7 @@ impl Interpreter {
                 }
                 UnaryOp::PreDecrement => {
                     if let ExprKind::ScalarVar(name) = &expr.kind {
+                        self.check_strict_scalar_var(name, line)?;
                         return Ok(self
                             .scope
                             .atomic_mutate(name, |v| PerlValue::Integer(v.to_int() - 1)));
@@ -2262,6 +2374,7 @@ impl Interpreter {
                 // For scalar variables, use atomic_mutate_post to hold the lock
                 // for the entire read-modify-write (critical for mysync).
                 if let ExprKind::ScalarVar(name) = &expr.kind {
+                    self.check_strict_scalar_var(name, line)?;
                     let f: fn(&PerlValue) -> PerlValue = match op {
                         PostfixOp::Increment => |v| PerlValue::Integer(v.to_int() + 1),
                         PostfixOp::Decrement => |v| PerlValue::Integer(v.to_int() - 1),
@@ -2289,6 +2402,7 @@ impl Interpreter {
                 let rhs = self.eval_expr(value)?;
                 // For scalar targets, use atomic_mutate to hold the lock
                 if let ExprKind::ScalarVar(name) = &target.kind {
+                    self.check_strict_scalar_var(name, line)?;
                     let op = *op;
                     return Ok(self.scope.atomic_mutate(name, |old| match op {
                         BinOp::Add => match (old, &rhs) {
@@ -2336,6 +2450,7 @@ impl Interpreter {
                 }
                 // For hash element targets: $h{key} += 1
                 if let ExprKind::HashElement { hash, key } = &target.kind {
+                    self.check_strict_hash_var(hash, line)?;
                     let k = self.eval_expr(key)?.to_string();
                     let op = *op;
                     return Ok(self.scope.atomic_hash_mutate(hash, &k, |old| match op {
@@ -2361,6 +2476,7 @@ impl Interpreter {
                 }
                 // For array element targets: $a[i] += 1
                 if let ExprKind::ArrayElement { array, index } = &target.kind {
+                    self.check_strict_array_var(array, line)?;
                     let idx = self.eval_expr(index)?.to_int();
                     let op = *op;
                     return Ok(self.scope.atomic_array_mutate(array, idx, |old| match op {
@@ -4048,6 +4164,20 @@ impl Interpreter {
                 {
                     self.set_special_var(name, &val)?;
                 } else {
+                    if self.strict_vars
+                        && !Self::strict_scalar_exempt(name)
+                        && !name.contains("::")
+                        && !self.scope.scalar_binding_exists(name)
+                    {
+                        return Err(PerlError::runtime(
+                            format!(
+                                "Global symbol \"${}\" requires explicit package name (did you forget to declare \"my ${}\"?)",
+                                name, name
+                            ),
+                            target.line,
+                        )
+                        .into());
+                    }
                     self.scope
                         .set_scalar(name, val)
                         .map_err(|e| FlowOrError::Error(e.at_line(target.line)))?;
@@ -4062,10 +4192,36 @@ impl Interpreter {
                     )
                     .into());
                 }
+                if self.strict_vars
+                    && !name.contains("::")
+                    && !self.scope.array_binding_exists(name)
+                {
+                    return Err(PerlError::runtime(
+                        format!(
+                            "Global symbol \"@{}\" requires explicit package name (did you forget to declare \"my @{}\"?)",
+                            name, name
+                        ),
+                        target.line,
+                    )
+                    .into());
+                }
                 self.scope.set_array(name, val.to_list());
                 Ok(PerlValue::Undef)
             }
             ExprKind::HashVar(name) => {
+                if self.strict_vars
+                    && !name.contains("::")
+                    && !self.scope.hash_binding_exists(name)
+                {
+                    return Err(PerlError::runtime(
+                        format!(
+                            "Global symbol \"%{}\" requires explicit package name (did you forget to declare \"my %{}\"?)",
+                            name, name
+                        ),
+                        target.line,
+                    )
+                    .into());
+                }
                 let items = val.to_list();
                 let mut map = IndexMap::new();
                 let mut i = 0;
@@ -4077,6 +4233,19 @@ impl Interpreter {
                 Ok(PerlValue::Undef)
             }
             ExprKind::ArrayElement { array, index } => {
+                if self.strict_vars
+                    && !array.contains("::")
+                    && !self.scope.array_binding_exists(array)
+                {
+                    return Err(PerlError::runtime(
+                        format!(
+                            "Global symbol \"@{}\" requires explicit package name (did you forget to declare \"my @{}\"?)",
+                            array, array
+                        ),
+                        target.line,
+                    )
+                    .into());
+                }
                 if self.scope.is_array_frozen(array) {
                     return Err(PerlError::runtime(
                         format!("Modification of a frozen value: @{}", array),
@@ -4089,6 +4258,19 @@ impl Interpreter {
                 Ok(PerlValue::Undef)
             }
             ExprKind::HashElement { hash, key } => {
+                if self.strict_vars
+                    && !hash.contains("::")
+                    && !self.scope.hash_binding_exists(hash)
+                {
+                    return Err(PerlError::runtime(
+                        format!(
+                            "Global symbol \"%{}\" requires explicit package name (did you forget to declare \"my %{}\"?)",
+                            hash, hash
+                        ),
+                        target.line,
+                    )
+                    .into());
+                }
                 if self.scope.is_hash_frozen(hash) {
                     return Err(PerlError::runtime(
                         format!("Modification of a frozen value: %%{}", hash),
@@ -4231,7 +4413,13 @@ impl Interpreter {
                 if let Some(r) = self.try_autoload_call(name, args, line, want) {
                     return r;
                 }
-                Err(PerlError::runtime(format!("Undefined subroutine &{}", name), line).into())
+                let mut msg = format!("Undefined subroutine &{}", name);
+                if self.strict_subs {
+                    msg.push_str(
+                        " (strict subs: declare the sub or use a fully qualified name before calling)",
+                    );
+                }
+                Err(PerlError::runtime(msg, line).into())
             }
         }
     }
@@ -4652,6 +4840,13 @@ impl Interpreter {
         newline: bool,
         line: usize,
     ) -> ExecResult {
+        if newline && (self.feature_bits & FEAT_SAY) == 0 {
+            return Err(PerlError::runtime(
+                "say() is disabled (enable with use feature 'say' or use feature ':5.10')",
+                line,
+            )
+            .into());
+        }
         let mut output = String::new();
         for (i, a) in args.iter().enumerate() {
             if i > 0 && !self.ofs.is_empty() {

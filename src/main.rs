@@ -382,28 +382,33 @@ pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut Interpreter, filenam
         interp.scope.set_hash_element("ENV", k, v.clone());
     }
 
-    let mut inc_dirs: Vec<perlrs::value::PerlValue> = cli
-        .include
-        .iter()
-        .map(|d| perlrs::value::PerlValue::String(d.clone()))
-        .collect();
+    // Order: `-I`, then system `perl`’s @INC, then script dir, `PERLRS_INC`, then `.` (deduped).
+    let mut inc_paths: Vec<String> = cli.include.clone();
+    perlrs::perl_inc::push_unique_string_paths(
+        &mut inc_paths,
+        perlrs::perl_inc::paths_from_system_perl(),
+    );
     if filename != "-e" && filename != "-" && filename != "repl" {
         if let Some(parent) = std::path::Path::new(filename).parent() {
             if !parent.as_os_str().is_empty() {
-                inc_dirs.push(perlrs::value::PerlValue::String(
-                    parent.to_string_lossy().into_owned(),
-                ));
+                perlrs::perl_inc::push_unique_string_paths(
+                    &mut inc_paths,
+                    vec![parent.to_string_lossy().into_owned()],
+                );
             }
         }
     }
     if let Ok(extra) = std::env::var("PERLRS_INC") {
-        for p in std::env::split_paths(&extra) {
-            inc_dirs.push(perlrs::value::PerlValue::String(
-                p.to_string_lossy().into_owned(),
-            ));
-        }
+        let extra: Vec<String> = std::env::split_paths(&extra)
+            .map(|p| p.to_string_lossy().into_owned())
+            .collect();
+        perlrs::perl_inc::push_unique_string_paths(&mut inc_paths, extra);
     }
-    inc_dirs.push(perlrs::value::PerlValue::String(".".to_string()));
+    perlrs::perl_inc::push_unique_string_paths(&mut inc_paths, vec![".".to_string()]);
+    let inc_dirs: Vec<perlrs::value::PerlValue> = inc_paths
+        .into_iter()
+        .map(perlrs::value::PerlValue::String)
+        .collect();
     interp.scope.declare_array("INC", inc_dirs);
 
     if cli.debugger.is_some() {
