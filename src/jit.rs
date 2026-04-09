@@ -10,11 +10,11 @@
 //! Compiles straight-line (no branches) sequences in a single Cranelift basic block.
 //!
 //! ## Block JIT
-//! Compiles integer bytecode **with control flow** (loops, conditionals, short-circuit `&&`/`||`)
-//! via a full basic-block CFG. Entry stack heights are computed by BFS; unreachable blocks (dead
-//! code after unconditional jumps) are emitted as traps. Supports all the same data ops as the
-//! linear JIT plus [`Op::Jump`], [`Op::JumpIfTrue`], [`Op::JumpIfFalse`],
-//! [`Op::JumpIfFalseKeep`], and [`Op::JumpIfTrueKeep`].
+//! Compiles bytecode **with control flow** (loops, conditionals, short-circuit `&&`/`||`) via a
+//! basic-block CFG. Abstract stacks at each block entry are computed by **fixpoint merge**
+//! ([`merge_stack_entry`] + [`join_cell`]); unreachable blocks (dead code after unconditional
+//! jumps) are emitted as traps. Same data ops as the linear JIT plus [`Op::Jump`],
+//! [`Op::JumpIfTrue`], [`Op::JumpIfFalse`], [`Op::JumpIfFalseKeep`], and [`Op::JumpIfTrueKeep`].
 //!
 //! ## Eligible data ops (both tiers)
 //! [`Op::LoadInt`], [`Op::LoadFloat`] (non-integral literals become float cells),
@@ -42,8 +42,9 @@
 //! when any table is needed.
 //!
 //! ## Validation
-//! Both tiers simulate a [`Cell`] stack so we only emit `sdiv`/`srem` when safe and only call
-//! [`perlrs_jit_pow_i64`] when the VM’s integer fast path applies.
+//! Linear tier: [`validate_linear`] / [`linear_result_cell`]. Block tier: [`validate_block_cfg`]
+//! (stack merge at joins, merged [`Cell`] for the `Halt` result). Both ensure we only emit
+//! `sdiv`/`srem` when safe and only call [`perlrs_jit_pow_i64`] when the VM’s integer fast path applies.
 //!
 //! ## Not JIT’d (linear)
 //! Inexact integer `Div`, `Mod` with unknown divisor, integer `Pow` outside `0..=63`, `BitAnd`/`BitOr`
@@ -1178,9 +1179,6 @@ pub(crate) fn try_run_linear_ops(
     arg_i64: Option<&[i64]>,
     constants: &[PerlValue],
 ) -> Option<PerlValue> {
-    if !validate_linear(ops, constants) {
-        return None;
-    }
     let seq = ops_before_halt(ops);
     if let Some(max) = max_scalar_slot_index(seq) {
         let sl = slot_i64.as_mut()?;
@@ -1233,7 +1231,7 @@ pub(crate) fn try_run_linear_ops(
     Some(pv)
 }
 
-// ── Block-based JIT: compiles integer bytecode with control flow (loops, conditionals). ──
+// ── Block-based JIT: control-flow bytecode (loops, conditionals, short-circuit booleans). ──
 
 struct CfgBlock {
     start: usize,
@@ -2259,9 +2257,6 @@ pub(crate) fn try_run_block_ops(
     arg_i64: Option<&[i64]>,
     constants: &[PerlValue],
 ) -> Option<PerlValue> {
-    if validate_block_cfg(ops, constants).is_none() {
-        return None;
-    }
     // Slot buffer bounds.
     if let Some(max) = block_slot_ops_max_index(ops) {
         let sl = slot_i64.as_mut()?;
