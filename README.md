@@ -130,7 +130,47 @@ my @result = pmap { $_ ** 2 } pgrep { $_ > 100 } @data;
 pe -j 8 -e 'my @r = pmap { heavy_work($_) } @data'
 ```
 
-Each parallel block receives its own interpreter context with captured lexical scope // no data races.
+Each parallel block receives its own interpreter context with captured lexical scope // no data races. Use `mysync` to share state.
+
+#### THREAD-SAFE SHARED STATE // `mysync`
+
+`mysync` declares variables backed by `Arc<Mutex>` that are shared across parallel blocks. All reads/writes go through the lock automatically. Compound operations (`++`, `+=`, `.=`) are fully atomic — the lock is held for the entire read-modify-write cycle.
+
+```perl
+# shared scalar — atomic increment
+mysync $counter = 0;
+fan 10000 { $counter++ };
+print $counter;  # always exactly 10000
+
+# shared array — thread-safe push/pop/shift
+mysync @results;
+pfor { push @results, $_ * $_ } (1..100);
+print scalar @results;  # always exactly 100
+
+# shared hash — atomic element access
+mysync %histogram;
+pfor { $histogram{$_ % 10} += 1 } (0..999);
+# each bucket is exactly 100
+
+# mix all three
+mysync $total = 0;
+mysync @items;
+mysync %stats;
+fan 1000 {
+    $total++;
+    push @items, $_;
+    $stats{$_ % 5} += 1;
+};
+# $total == 1000, @items == 1000, sum(%stats) == 1000
+```
+
+Without `mysync`, each parallel thread gets an independent copy — changes are not visible to other threads or the parent. With `mysync`, all threads share the same underlying storage via `Arc<Mutex>`.
+
+ ┌──────────────────────────────────────────────────────────────┐
+ │ ATOMIC OPS: $x++ &nbsp;&nbsp; ++$x &nbsp;&nbsp; $x += N &nbsp;&nbsp; $x .= "s"         │
+ │ ATOMIC OPS: $h{k} += N &nbsp;&nbsp; $a[i] += N &nbsp;&nbsp; push @a, $v      │
+ │ LOCK SCOPE: held for full read-modify-write // zero races   │
+ └──────────────────────────────────────────────────────────────┘
 
 ---
 
