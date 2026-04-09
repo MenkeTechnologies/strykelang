@@ -89,6 +89,15 @@ pub struct Interpreter {
     pub(crate) regex_pos: HashMap<String, Option<usize>>,
     /// PRNG for `rand` / `srand` (matches Perl-style seeding, not crypto).
     pub(crate) rand_rng: StdRng,
+    /// Directory handles from `opendir`: name → snapshot + read cursor (`readdir` / `rewinddir` / …).
+    pub(crate) dir_handles: HashMap<String, DirHandleState>,
+}
+
+/// Buffered directory listing for Perl `opendir` / `readdir` (Rust `ReadDir` is single-pass).
+#[derive(Debug, Clone)]
+pub(crate) struct DirHandleState {
+    pub entries: Vec<String>,
+    pub pos: usize,
 }
 
 impl Default for Interpreter {
@@ -128,6 +137,76 @@ impl Interpreter {
             regex_cache: HashMap::new(),
             regex_pos: HashMap::new(),
             rand_rng: StdRng::from_entropy(),
+            dir_handles: HashMap::new(),
+        }
+    }
+
+    pub(crate) fn opendir_handle(&mut self, handle: &str, path: &str) -> PerlValue {
+        match std::fs::read_dir(path) {
+            Ok(rd) => {
+                let entries: Vec<String> = rd
+                    .filter_map(|e| {
+                        e.ok()
+                            .map(|e| e.file_name().to_string_lossy().into_owned())
+                    })
+                    .collect();
+                self.dir_handles.insert(
+                    handle.to_string(),
+                    DirHandleState { entries, pos: 0 },
+                );
+                PerlValue::Integer(1)
+            }
+            Err(e) => {
+                self.errno = e.to_string();
+                PerlValue::Integer(0)
+            }
+        }
+    }
+
+    pub(crate) fn readdir_handle(&mut self, handle: &str) -> PerlValue {
+        if let Some(dh) = self.dir_handles.get_mut(handle) {
+            if dh.pos < dh.entries.len() {
+                let s = dh.entries[dh.pos].clone();
+                dh.pos += 1;
+                PerlValue::String(s)
+            } else {
+                PerlValue::Undef
+            }
+        } else {
+            PerlValue::Undef
+        }
+    }
+
+    pub(crate) fn closedir_handle(&mut self, handle: &str) -> PerlValue {
+        PerlValue::Integer(if self.dir_handles.remove(handle).is_some() {
+            1
+        } else {
+            0
+        })
+    }
+
+    pub(crate) fn rewinddir_handle(&mut self, handle: &str) -> PerlValue {
+        if let Some(dh) = self.dir_handles.get_mut(handle) {
+            dh.pos = 0;
+            PerlValue::Integer(1)
+        } else {
+            PerlValue::Integer(0)
+        }
+    }
+
+    pub(crate) fn telldir_handle(&mut self, handle: &str) -> PerlValue {
+        self.dir_handles
+            .get(handle)
+            .map(|dh| PerlValue::Integer(dh.pos as i64))
+            .unwrap_or(PerlValue::Undef)
+    }
+
+    pub(crate) fn seekdir_handle(&mut self, handle: &str, pos: usize) -> PerlValue {
+        if let Some(dh) = self.dir_handles.get_mut(handle) {
+            dh.pos = pos.min(dh.entries.len());
+            PerlValue::Integer(1)
+        } else {
+            PerlValue::Integer(0)
         }
     }
 
@@ -1954,6 +2033,33 @@ impl Interpreter {
                 } else {
                     Ok(PerlValue::Integer(0))
                 }
+            }
+
+            ExprKind::Opendir { handle, path } => {
+                let h = self.eval_expr(handle)?.to_string();
+                let p = self.eval_expr(path)?.to_string();
+                Ok(self.opendir_handle(&h, &p))
+            }
+            ExprKind::Readdir(e) => {
+                let h = self.eval_expr(e)?.to_string();
+                Ok(self.readdir_handle(&h))
+            }
+            ExprKind::Closedir(e) => {
+                let h = self.eval_expr(e)?.to_string();
+                Ok(self.closedir_handle(&h))
+            }
+            ExprKind::Rewinddir(e) => {
+                let h = self.eval_expr(e)?.to_string();
+                Ok(self.rewinddir_handle(&h))
+            }
+            ExprKind::Telldir(e) => {
+                let h = self.eval_expr(e)?.to_string();
+                Ok(self.telldir_handle(&h))
+            }
+            ExprKind::Seekdir { handle, position } => {
+                let h = self.eval_expr(handle)?.to_string();
+                let pos = self.eval_expr(position)?.to_int().max(0) as usize;
+                Ok(self.seekdir_handle(&h, pos))
             }
 
             // File tests

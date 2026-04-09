@@ -237,6 +237,8 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
  │ **Numeric**: abs, int, sqrt, sin, cos, atan2, exp, log,     │
  │ rand, srand                                                 │
  │ **I/O**: print, say, printf, open, close, eof, readline     │
+ │ **Directory**: opendir, readdir, closedir, rewinddir,        │
+ │ telldir, seekdir                                              │
  │ **File tests**: -e, -f, -d, -l, -r, -w, -s, -z             │
  │ **System**: system, exec, exit, chdir, mkdir, unlink, stat, │
  │ lstat, link, symlink, readlink, glob                          │

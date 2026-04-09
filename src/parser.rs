@@ -2542,6 +2542,66 @@ impl Parser {
                     line,
                 })
             }
+            "opendir" => {
+                let args = self.parse_builtin_args()?;
+                if args.len() != 2 {
+                    return Err(PerlError::syntax(
+                        "opendir requires two arguments",
+                        line,
+                    ));
+                }
+                Ok(Expr {
+                    kind: ExprKind::Opendir {
+                        handle: Box::new(args[0].clone()),
+                        path: Box::new(args[1].clone()),
+                    },
+                    line,
+                })
+            }
+            "readdir" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::Readdir(Box::new(a)),
+                    line,
+                })
+            }
+            "closedir" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::Closedir(Box::new(a)),
+                    line,
+                })
+            }
+            "rewinddir" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::Rewinddir(Box::new(a)),
+                    line,
+                })
+            }
+            "telldir" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::Telldir(Box::new(a)),
+                    line,
+                })
+            }
+            "seekdir" => {
+                let args = self.parse_builtin_args()?;
+                if args.len() != 2 {
+                    return Err(PerlError::syntax(
+                        "seekdir requires two arguments",
+                        line,
+                    ));
+                }
+                Ok(Expr {
+                    kind: ExprKind::Seekdir {
+                        handle: Box::new(args[0].clone()),
+                        position: Box::new(args[1].clone()),
+                    },
+                    line,
+                })
+            }
             "eof" => {
                 if matches!(self.peek(), Token::LParen) {
                     self.advance();

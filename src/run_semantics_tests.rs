@@ -270,3 +270,19 @@ fn glob_finds_rs_sources_under_src() {
         "glob src/*.rs should match at least one file, got {n}"
     );
 }
+
+#[test]
+fn opendir_readdir_returns_name() {
+    assert_eq!(
+        ri(r#"opendir D, "."; my $x = readdir D; closedir D; $x ne "" ? 1 : 0;"#),
+        1
+    );
+}
+
+#[test]
+fn rewinddir_resets_read_position() {
+    assert_eq!(
+        ri(r#"opendir D, "."; readdir D; rewinddir D; (telldir D) == 0 ? 1 : 0;"#),
+        1
+    );
+}

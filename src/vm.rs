@@ -1631,6 +1631,32 @@ impl<'a> VM<'a> {
                 let pats: Vec<String> = args.iter().map(|v| v.to_string()).collect();
                 Ok(crate::perl_fs::glob_patterns(&pats))
             }
+            Some(BuiltinId::Opendir) => {
+                let handle = args.first().map(|v| v.to_string()).unwrap_or_default();
+                let path = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+                Ok(self.interp.opendir_handle(&handle, &path))
+            }
+            Some(BuiltinId::Readdir) => {
+                let handle = args.first().map(|v| v.to_string()).unwrap_or_default();
+                Ok(self.interp.readdir_handle(&handle))
+            }
+            Some(BuiltinId::Closedir) => {
+                let handle = args.first().map(|v| v.to_string()).unwrap_or_default();
+                Ok(self.interp.closedir_handle(&handle))
+            }
+            Some(BuiltinId::Rewinddir) => {
+                let handle = args.first().map(|v| v.to_string()).unwrap_or_default();
+                Ok(self.interp.rewinddir_handle(&handle))
+            }
+            Some(BuiltinId::Telldir) => {
+                let handle = args.first().map(|v| v.to_string()).unwrap_or_default();
+                Ok(self.interp.telldir_handle(&handle))
+            }
+            Some(BuiltinId::Seekdir) => {
+                let handle = args.first().map(|v| v.to_string()).unwrap_or_default();
+                let pos = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
+                Ok(self.interp.seekdir_handle(&handle, pos))
+            }
             Some(BuiltinId::Eval) => {
                 let code = args
                     .into_iter()

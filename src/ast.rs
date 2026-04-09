@@ -411,6 +411,19 @@ pub enum ExprKind {
     ReadLine(Option<String>),
     Eof(Option<Box<Expr>>),
 
+    Opendir {
+        handle: Box<Expr>,
+        path: Box<Expr>,
+    },
+    Readdir(Box<Expr>),
+    Closedir(Box<Expr>),
+    Rewinddir(Box<Expr>),
+    Telldir(Box<Expr>),
+    Seekdir {
+        handle: Box<Expr>,
+        position: Box<Expr>,
+    },
+
     // File tests
     FileTest {
         op: char,

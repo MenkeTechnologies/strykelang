@@ -1329,6 +1329,38 @@ impl Compiler {
                         .emit(Op::CallBuiltin(BuiltinId::Eof as u16, 0), line);
                 }
             }
+            ExprKind::Opendir { handle, path } => {
+                self.compile_expr(handle)?;
+                self.compile_expr(path)?;
+                self.chunk
+                    .emit(Op::CallBuiltin(BuiltinId::Opendir as u16, 2), line);
+            }
+            ExprKind::Readdir(e) => {
+                self.compile_expr(e)?;
+                self.chunk
+                    .emit(Op::CallBuiltin(BuiltinId::Readdir as u16, 1), line);
+            }
+            ExprKind::Closedir(e) => {
+                self.compile_expr(e)?;
+                self.chunk
+                    .emit(Op::CallBuiltin(BuiltinId::Closedir as u16, 1), line);
+            }
+            ExprKind::Rewinddir(e) => {
+                self.compile_expr(e)?;
+                self.chunk
+                    .emit(Op::CallBuiltin(BuiltinId::Rewinddir as u16, 1), line);
+            }
+            ExprKind::Telldir(e) => {
+                self.compile_expr(e)?;
+                self.chunk
+                    .emit(Op::CallBuiltin(BuiltinId::Telldir as u16, 1), line);
+            }
+            ExprKind::Seekdir { handle, position } => {
+                self.compile_expr(handle)?;
+                self.compile_expr(position)?;
+                self.chunk
+                    .emit(Op::CallBuiltin(BuiltinId::Seekdir as u16, 2), line);
+            }
 
             // ── File tests ──
             ExprKind::FileTest { op, expr } => {
