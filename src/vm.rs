@@ -274,6 +274,10 @@ impl<'a> VM<'a> {
             Some(v)
         });
 
+        // Match tree-walker `exec_statement_inner`: deliver `%SIG` and set `$^C` latch (Unix).
+        if let Err(e) = crate::perl_signal::poll(self.interp) {
+            return Err(e);
+        }
         if let Some(v) =
             crate::jit::try_run_linear_ops(ops, slot_buf.as_deref(), plain_buf.as_deref(), constants)
         {
@@ -283,6 +287,10 @@ impl<'a> VM<'a> {
         loop {
             if self.ip >= len {
                 break;
+            }
+
+            if let Err(e) = crate::perl_signal::poll(self.interp) {
+                return Err(e);
             }
 
             op_count += 1;

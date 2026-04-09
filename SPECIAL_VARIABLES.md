@@ -34,7 +34,7 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 | `@INC` | Library path | Array of search dirs; `%INC` used for loaded paths in `require`. |
 | `%INC` | Loaded modules | Hash entries set by `require`/`use` (see `require_execute`). |
 | `%ENV` | Environment | Hash in scope; filled from `std::env::vars()` on first access (`Interpreter::materialize_env_if_needed`) to reduce cold-start cost. |
-| `%SIG` | Signal handlers | Hash in scope. On **Unix**, `SIGINT` / `SIGTERM` / `SIGALRM` / `SIGCHLD` are registered (`signal_hook`); [`perl_signal::poll`](src/perl_signal.rs) runs **between statements** and invokes code refs (`IGNORE` / `DEFAULT` are no-ops). Non-Unix: no OS delivery. |
+| `%SIG` | Signal handlers | Hash in scope. On **Unix**, `SIGINT` / `SIGTERM` / `SIGALRM` / `SIGCHLD` are registered (`signal_hook`); [`perl_signal::poll`](src/perl_signal.rs) runs **before each tree-walker statement** (`exec_statement_inner`) and **before each VM opcode** (and once before the linear JIT fast path). Invokes code refs (`IGNORE` / `DEFAULT` are no-ops). Non-Unix: no OS delivery. |
 | `$]` | Numeric language version | `get_special_var("]")` → `perl_bracket_version()` (emulated Perl 5.x.y level; see `perl_bracket_version` in `src/interpreter.rs`). |
 | `$;` | Subscript separator | `subscript_sep` field; default `\x1c` (Perl `\034`). |
 | `$^I` | In-place edit extension | `inplace_edit` string; lexer reads `$^` + letter as variable name `^I`. The **`pe`/`perlrs` driver** sets this from **`-i`** / **`-i.ext`** (backup suffix) and applies in-place rewrites for **`-n`/`-p`** over **`@ARGV`** files. |
@@ -79,7 +79,7 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 | `$1`…`$n`, `%+`, `@-`, `@+` | Driven by the **Rust `regex` crate**; Perl’s regexp engine differs (lookbehind, backtracking, etc.). |
 | `@_` | Works as the **subroutine argument array** in user subs; not fully identical to Perl’s XS calling conventions. |
 | `pos $_` | Supported with `regex_pos` map; edge cases may differ from Perl. |
-| `%SIG` | On Unix, delivery is **between statements** only (not mid-op); handlers see `$^C==1` on the first read after `SIGINT` if the latch was set; see [`perl_signal`](src/perl_signal.rs). |
+| `%SIG` / `$^C` | Tree-walker: **between statements**. VM: **between opcodes** (not inside a single native/Rust op). `$^C` reads `1` once after `SIGINT` if the latch was set; see [`perl_signal`](src/perl_signal.rs). |
 | `$^I` | The **`pe`/`perlrs` driver** applies **`-i`** / **`-i.bak`** for **`-n`/`-p`** over **`@ARGV`**; value is stored for compatibility with other code paths. |
 | `$^V` | String form only (`v…` from crate version); not a Perl `version` object. |
 | `$^E` | Uses `std::io::Error::last_os_error()`, not Perl’s per-platform extended error. |
@@ -103,7 +103,7 @@ Single-character names after `$` are accepted (`src/lexer.rs` `read_variable_nam
 
 | Category | Examples |
 |----------|----------|
-| **Match / regexp** | Stash-backed `$&` / `$1` / `` $` `` / `$'` / `$+` and Rust `regex` still differ from Perl’s regexp engine; `${^…}` beyond dedicated fields are stubs in `special_caret_scalars`. |
+| **Match / regexp** | Stash-backed `$&` / `$1` / `` $` `` / `$'` / `$+` and Rust `regex` still differ from Perl’s regexp engine; `${^…}` beyond dedicated fields are stubs in `special_caret_scalars` (except documented rows above). **Windows-only** `${^…}` names (e.g. Win32-specific perlvars) are not modeled; use `special_caret_scalars` / `undef`. |
 | **Process / status** | `$PROCESS_ID` aliases. (`$?` is set after `system`, `capture`, and `close` on pipe children; POSIX-style packed status.) |
 | **Perlio / globs** | Many handle-related specials beyond what IO builtins use. |
 | **English.pm** | No `English` module tying long names to these variables. |
@@ -112,7 +112,7 @@ Single-character names after `$` are accepted (`src/lexer.rs` `read_variable_nam
 
 ## Short list (what’s still missing)
 
-**Still commonly missing vs stock Perl 5:** full **`$@`** dualvar (if Perl exposes one for your platform); **`English`**; full **`$^V`** as a version object; **`${^GLOBAL_PHASE}`** lifecycle matching Perl. **`exists $href->{key}`** / **`delete $href->{key}`** (hash references and blessed hash-like objects) are implemented; other exotic **`exists`/`delete`** targets may still differ from Perl 5.
+**Still commonly missing vs stock Perl 5:** **`English`** (long-name aliases); **full `perlform` state machine** (formats/`write` are implemented but not full Perl parity); full **`$^V`** as a version object; **`${^GLOBAL_PHASE}`** lifecycle matching Perl; Windows-only **`${^…}`** internals. **`exists $href->{key}`** / **`delete $href->{key}`** (hash references and blessed hash-like objects) are implemented; other exotic **`exists`/`delete`** targets may still differ from Perl 5.
 
 | Area | Perl | Notes |
 |------|------|--------|

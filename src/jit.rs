@@ -40,14 +40,12 @@ use crate::bytecode::Op;
 use crate::value::PerlValue;
 
 type LinearFn0 = unsafe extern "C" fn() -> i64;
-type LinearFn1 = unsafe extern "C" fn(*const i64) -> i64;
-type LinearFn2 = unsafe extern "C" fn(*const i64, *const i64) -> i64;
+/// Slot table, plain name table, compiled-sub arg table (fixed order; unused pointers may be null).
+type LinearFn3 = unsafe extern "C" fn(*const i64, *const i64, *const i64) -> i64;
 
 enum LinearRun {
     Nullary(LinearFn0),
-    SlotsOnly(LinearFn1),
-    PlainOnly(LinearFn1),
-    SlotsPlain(LinearFn2),
+    Tables(LinearFn3),
 }
 
 struct LinearJit {
@@ -57,12 +55,10 @@ struct LinearJit {
 }
 
 impl LinearJit {
-    fn invoke(&self, slots: *const i64, plain: *const i64) -> i64 {
+    fn invoke(&self, slots: *const i64, plain: *const i64, args: *const i64) -> i64 {
         match &self.run {
             LinearRun::Nullary(f) => unsafe { f() },
-            LinearRun::SlotsOnly(f) => unsafe { f(slots) },
-            LinearRun::PlainOnly(f) => unsafe { f(plain) },
-            LinearRun::SlotsPlain(f) => unsafe { f(slots, plain) },
+            LinearRun::Tables(f) => unsafe { f(slots, plain, args) },
         }
     }
 }

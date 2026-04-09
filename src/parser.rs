@@ -312,10 +312,17 @@ impl Parser {
                 "default" => self.parse_default_stmt()?,
                 "eval_timeout" => self.parse_eval_timeout()?,
                 _ => {
-                    let expr = self.parse_expression()?;
-                    let stmt = self.maybe_postfix_modifier(expr)?;
-                    self.eat(&Token::Semicolon);
-                    stmt
+                    // `foo;` or `{ foo }` — bareword statement is a zero-arg call (topic `$_` at runtime).
+                    if let Some(expr) = self.try_parse_bareword_stmt_call() {
+                        let stmt = self.maybe_postfix_modifier(expr)?;
+                        self.eat(&Token::Semicolon);
+                        stmt
+                    } else {
+                        let expr = self.parse_expression()?;
+                        let stmt = self.maybe_postfix_modifier(expr)?;
+                        self.eat(&Token::Semicolon);
+                        stmt
+                    }
                 }
             },
             Token::LBrace => {
@@ -469,6 +476,41 @@ impl Parser {
                 kind: StmtKind::Expression(expr),
                 line,
             }),
+        }
+    }
+
+    /// `name;` or `name}` — a bare identifier statement is a sub call with no explicit args (`$_` implied).
+    fn try_parse_bareword_stmt_call(&mut self) -> Option<Expr> {
+        let saved = self.pos;
+        let line = self.peek_line();
+        let mut name = match self.peek() {
+            Token::Ident(n) => n.clone(),
+            _ => return None,
+        };
+        self.advance();
+        while self.eat(&Token::PackageSep) {
+            match self.advance() {
+                (Token::Ident(part), _) => {
+                    name = format!("{}::{}", name, part);
+                }
+                _ => {
+                    self.pos = saved;
+                    return None;
+                }
+            }
+        }
+        match self.peek() {
+            Token::Semicolon | Token::RBrace => Some(Expr {
+                kind: ExprKind::FuncCall {
+                    name,
+                    args: vec![],
+                },
+                line,
+            }),
+            _ => {
+                self.pos = saved;
+                None
+            }
         }
     }
 

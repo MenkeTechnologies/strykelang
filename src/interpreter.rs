@@ -6365,6 +6365,14 @@ impl Interpreter {
         Some(self.call_sub(&sub, args, want, line))
     }
 
+    fn with_topic_default_args(&self, args: Vec<PerlValue>) -> Vec<PerlValue> {
+        if args.is_empty() {
+            vec![self.scope.get_scalar("_").clone()]
+        } else {
+            args
+        }
+    }
+
     fn call_named_sub(
         &mut self,
         name: &str,
@@ -6373,6 +6381,7 @@ impl Interpreter {
         want: WantarrayCtx,
     ) -> ExecResult {
         if let Some(sub) = self.resolve_sub_by_name(name) {
+            let args = self.with_topic_default_args(args);
             return self.call_sub(&sub, args, want, line);
         }
         match name {
@@ -6423,6 +6432,7 @@ impl Interpreter {
                 Ok(PerlValue::barrier(PerlBarrier(Arc::new(Barrier::new(n)))))
             }
             _ => {
+                let args = self.with_topic_default_args(args);
                 if let Some(r) = self.try_autoload_call(name, args, line, want) {
                     return r;
                 }
