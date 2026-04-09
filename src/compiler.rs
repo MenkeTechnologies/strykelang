@@ -954,6 +954,11 @@ impl Compiler {
                         BinOp::Mod => Op::Mod,
                         BinOp::Pow => Op::Pow,
                         BinOp::Concat => Op::Concat,
+                        BinOp::BitAnd => Op::BitAnd,
+                        BinOp::BitOr => Op::BitOr,
+                        BinOp::BitXor => Op::BitXor,
+                        BinOp::ShiftLeft => Op::Shl,
+                        BinOp::ShiftRight => Op::Shr,
                         _ => return Err(CompileError::Unsupported("CompoundAssign op".into())),
                     };
                     self.chunk.emit(op_code, line);
@@ -1919,6 +1924,9 @@ impl Compiler {
             ExprKind::AsyncBlock { body } => {
                 let block_idx = self.chunk.add_block(body.clone());
                 self.chunk.emit(Op::AsyncBlock(block_idx), line);
+            }
+            ExprKind::Trace { .. } => {
+                return Err(CompileError::Unsupported("trace".into()));
             }
             ExprKind::Await(e) => {
                 self.compile_expr(e)?;

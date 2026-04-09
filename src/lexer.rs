@@ -686,6 +686,11 @@ impl Lexer {
                     self.last_was_term = false;
                     return Ok(Token::LogAnd);
                 }
+                if self.peek() == Some('=') {
+                    self.advance();
+                    self.last_was_term = false;
+                    return Ok(Token::BitAndAssign);
+                }
                 self.last_was_term = false;
                 Ok(Token::BitAnd)
             }
@@ -700,6 +705,11 @@ impl Lexer {
                     }
                     self.last_was_term = false;
                     return Ok(Token::LogOr);
+                }
+                if self.peek() == Some('=') {
+                    self.advance();
+                    self.last_was_term = false;
+                    return Ok(Token::BitOrAssign);
                 }
                 self.last_was_term = false;
                 Ok(Token::BitOr)
@@ -999,7 +1009,7 @@ impl Lexer {
                     | "sub" | "if" | "unless" | "while" | "until" | "for" | "foreach" | "elsif"
                     | "use" | "no" | "require" | "eval" | "do" | "map" | "grep" | "sort"
                     | "pmap" | "pgrep" | "pfor" | "psort" | "preduce" | "fan" | "pchannel"
-                    | "async" | "await" | "slurp" | "fetch_url"
+                    | "async" | "trace" | "await" | "slurp" | "fetch_url"
                     | "join"
                     | "split" | "reverse" | "not" | "ref" | "scalar" => false,
                     _ => matches!(tok, Token::Ident(_)),
@@ -1212,6 +1222,19 @@ mod tests {
         assert!(matches!(t[0].0, Token::Integer(3)));
         assert!(matches!(t[1].0, Token::BitAnd));
         assert!(matches!(t[2].0, Token::Integer(5)));
+    }
+
+    #[test]
+    fn tokenize_bitwise_or_and_assign() {
+        let mut l = Lexer::new("$a |= $b");
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[0].0, Token::ScalarVar(ref s) if s == "a"));
+        assert!(matches!(t[1].0, Token::BitOrAssign));
+        assert!(matches!(t[2].0, Token::ScalarVar(ref s) if s == "b"));
+
+        let mut l = Lexer::new("$a &= $b");
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[1].0, Token::BitAndAssign));
     }
 
     #[test]

@@ -139,3 +139,26 @@ fn set_new_union_intersection() {
     "#;
     assert_eq!(eval_int(code), 402);
 }
+
+#[test]
+fn mysync_set_union_intersection() {
+    let code = r#"
+        mysync $s = Set->new(1, 2, 3);
+        mysync $t = Set->new(2, 3, 4);
+        my $u = $s | $t;
+        my $i = $s & $t;
+        scalar $u * 100 + scalar $i
+    "#;
+    assert_eq!(eval_int(code), 402);
+}
+
+#[test]
+fn mysync_set_or_assign() {
+    let code = r#"
+        mysync $s = Set->new(1);
+        my $t = Set->new(2);
+        $s |= $t;
+        scalar $s
+    "#;
+    assert_eq!(eval_int(code), 2);
+}

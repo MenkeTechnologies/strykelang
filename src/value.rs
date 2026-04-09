@@ -421,32 +421,39 @@ pub fn set_from_elements<I: IntoIterator<Item = PerlValue>>(items: I) -> PerlVal
     PerlValue::Set(Arc::new(map))
 }
 
-pub fn set_union(a: &PerlValue, b: &PerlValue) -> Option<PerlValue> {
-    match (a, b) {
-        (PerlValue::Set(ia), PerlValue::Set(ib)) => {
-            let mut m = (**ia).clone();
-            for (k, v) in ib.iter() {
-                m.entry(k.clone()).or_insert_with(|| v.clone());
-            }
-            Some(PerlValue::Set(Arc::new(m)))
-        }
+/// Underlying set for union/intersection, including `mysync $s` (`Atomic` wrapping `Set`).
+#[inline]
+pub fn set_payload(v: &PerlValue) -> Option<Arc<PerlSet>> {
+    match v {
+        PerlValue::Set(s) => Some(Arc::clone(s)),
+        PerlValue::Atomic(arc) => match &*arc.lock() {
+            PerlValue::Set(s) => Some(Arc::clone(s)),
+            _ => None,
+        },
         _ => None,
     }
 }
 
-pub fn set_intersection(a: &PerlValue, b: &PerlValue) -> Option<PerlValue> {
-    match (a, b) {
-        (PerlValue::Set(ia), PerlValue::Set(ib)) => {
-            let mut m = PerlSet::new();
-            for (k, v) in ia.iter() {
-                if ib.contains_key(k) {
-                    m.insert(k.clone(), v.clone());
-                }
-            }
-            Some(PerlValue::Set(Arc::new(m)))
-        }
-        _ => None,
+pub fn set_union(a: &PerlValue, b: &PerlValue) -> Option<PerlValue> {
+    let ia = set_payload(a)?;
+    let ib = set_payload(b)?;
+    let mut m = (*ia).clone();
+    for (k, v) in ib.iter() {
+        m.entry(k.clone()).or_insert_with(|| v.clone());
     }
+    Some(PerlValue::Set(Arc::new(m)))
+}
+
+pub fn set_intersection(a: &PerlValue, b: &PerlValue) -> Option<PerlValue> {
+    let ia = set_payload(a)?;
+    let ib = set_payload(b)?;
+    let mut m = PerlSet::new();
+    for (k, v) in ia.iter() {
+        if ib.contains_key(k) {
+            m.insert(k.clone(), v.clone());
+        }
+    }
+    Some(PerlValue::Set(Arc::new(m)))
 }
 
 // ── Helpers ──

@@ -1052,6 +1052,30 @@ impl Parser {
                     line,
                 })
             }
+            Token::BitAndAssign => {
+                self.advance();
+                let r = self.parse_assign_expr()?;
+                Ok(Expr {
+                    kind: ExprKind::CompoundAssign {
+                        target: Box::new(expr),
+                        op: BinOp::BitAnd,
+                        value: Box::new(r),
+                    },
+                    line,
+                })
+            }
+            Token::BitOrAssign => {
+                self.advance();
+                let r = self.parse_assign_expr()?;
+                Ok(Expr {
+                    kind: ExprKind::CompoundAssign {
+                        target: Box::new(expr),
+                        op: BinOp::BitOr,
+                        value: Box::new(r),
+                    },
+                    line,
+                })
+            }
             Token::DefinedOrAssign => {
                 self.advance();
                 let r = self.parse_assign_expr()?;
@@ -2499,6 +2523,19 @@ impl Parser {
                 let block = self.parse_block()?;
                 Ok(Expr {
                     kind: ExprKind::AsyncBlock { body: block },
+                    line,
+                })
+            }
+            "trace" => {
+                if !matches!(self.peek(), Token::LBrace) {
+                    return Err(PerlError::syntax(
+                        "trace must be followed by { BLOCK }",
+                        line,
+                    ));
+                }
+                let block = self.parse_block()?;
+                Ok(Expr {
+                    kind: ExprKind::Trace { body: block },
                     line,
                 })
             }

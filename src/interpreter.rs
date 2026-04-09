@@ -1085,6 +1085,23 @@ impl Interpreter {
                             rhs.append_to(&mut s);
                             PerlValue::String(s)
                         }
+                        BinOp::BitAnd => {
+                            if let Some(s) = crate::value::set_intersection(old, &rhs) {
+                                s
+                            } else {
+                                PerlValue::Integer(old.to_int() & rhs.to_int())
+                            }
+                        }
+                        BinOp::BitOr => {
+                            if let Some(s) = crate::value::set_union(old, &rhs) {
+                                s
+                            } else {
+                                PerlValue::Integer(old.to_int() | rhs.to_int())
+                            }
+                        }
+                        BinOp::BitXor => PerlValue::Integer(old.to_int() ^ rhs.to_int()),
+                        BinOp::ShiftLeft => PerlValue::Integer(old.to_int() << rhs.to_int()),
+                        BinOp::ShiftRight => PerlValue::Integer(old.to_int() >> rhs.to_int()),
                         _ => PerlValue::Float(old.to_number() + rhs.to_number()),
                     }));
                 }
@@ -1492,11 +1509,19 @@ impl Interpreter {
                     local_interp
                         .scope
                         .set_scalar("_", PerlValue::Integer(i as i64));
+                    crate::parallel_trace::fan_worker_set_index(Some(i as i64));
                     let _ = local_interp.exec_block(&block);
+                    crate::parallel_trace::fan_worker_set_index(None);
                 });
                 Ok(PerlValue::Undef)
             }
             ExprKind::AsyncBlock { body } => Ok(self.spawn_async_block(body)),
+            ExprKind::Trace { body } => {
+                crate::parallel_trace::trace_enter();
+                let out = self.exec_block(body);
+                crate::parallel_trace::trace_leave();
+                out
+            }
             ExprKind::Await(expr) => {
                 let v = self.eval_expr(expr)?;
                 match v {

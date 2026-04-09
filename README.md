@@ -146,9 +146,25 @@ pe -j 8 -e 'my @r = pmap { heavy_work($_) } @data'
 
 Each parallel block receives its own interpreter context with captured lexical scope // no data races. Use `mysync` to share state.
 
+#### EXECUTION TRACE // `trace`
+
+Wrap parallel (or any) code to print **`mysync` scalar** mutations to **stderr** — useful when debugging races or ordering. Under `fan N { }`, lines are tagged with the worker index (same as `$_`).
+
+```perl
+mysync $counter = 0;
+trace { fan 10 { $counter++ } };
+# stderr: [thread 0] $counter: 0 → 1
+# stderr: [thread 3] $counter: 1 → 2
+# ... (order varies)
+```
+
+Outside `fan`, mutations are labeled `[main]`.
+
 #### THREAD-SAFE SHARED STATE // `mysync`
 
-`mysync` declares variables backed by `Arc<Mutex>` that are shared across parallel blocks. All reads/writes go through the lock automatically. Compound operations (`++`, `+=`, `.=`) are fully atomic — the lock is held for the entire read-modify-write cycle.
+`mysync` declares variables backed by `Arc<Mutex>` that are shared across parallel blocks. All reads/writes go through the lock automatically. Compound operations (`++`, `+=`, `.=`, and `|=`, `&=` on scalars holding a native `Set`) are fully atomic — the lock is held for the entire read-modify-write cycle.
+
+For **`mysync` scalars that hold a `Set`** (from `mysync $s = Set->new(...)`), union (`|`) and intersection (`&`) treat the stored value as a set even when the underlying storage is the mutex-wrapped scalar; bitwise `|` / `&` on plain integers is unchanged.
 
 ```perl
 # shared scalar — atomic increment
@@ -181,7 +197,7 @@ fan 1000 {
 Without `mysync`, each parallel thread gets an independent copy — changes are not visible to other threads or the parent. With `mysync`, all threads share the same underlying storage via `Arc<Mutex>`.
 
  ┌──────────────────────────────────────────────────────────────┐
- │ ATOMIC OPS: $x++ &nbsp;&nbsp; ++$x &nbsp;&nbsp; $x += N &nbsp;&nbsp; $x .= "s"         │
+ │ ATOMIC OPS: $x++ &nbsp;&nbsp; ++$x &nbsp;&nbsp; $x += N &nbsp;&nbsp; $x .= "s" &nbsp;&nbsp; $s |= $t (Set) │
  │ ATOMIC OPS: $h{k} += N &nbsp;&nbsp; $a[i] += N &nbsp;&nbsp; push @a, $v      │
  │ LOCK SCOPE: held for full read-modify-write // zero races   │
  └──────────────────────────────────────────────────────────────┘
@@ -219,7 +235,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - String comparison: `eq`, `ne`, `lt`, `gt`, `le`, `ge`, `cmp`
 - Logical: `&&`, `||`, `//`, `!`, `and`, `or`, `not`
 - Bitwise: `&`, `|`, `^`, `~`, `<<`, `>>` (for native `Set` values, `|` / `&` are union / intersection instead of integer bitwise ops)
-- Assignment: `=`, `+=`, `-=`, `*=`, `/=`, `.=`, `//=`, etc.
+- Assignment: `=`, `+=`, `-=`, `*=`, `/=`, `.=`, `|=`, `&=`, `//=`, etc.
 - Regex: `=~`, `!~`
 - Range: `..`
 - Arrow dereference: `->`

@@ -82,6 +82,10 @@ pub enum Token {
     XorAssign,
     ShiftLeftAssign,
     ShiftRightAssign,
+    /// Bitwise `&=`
+    BitAndAssign,
+    /// Bitwise `|=`
+    BitOrAssign,
     DefinedOrAssign,
 
     // Increment/Decrement
@@ -293,6 +297,7 @@ pub const KEYWORDS: &[&str] = &[
     "fan",
     "pchannel",
     "async",
+    "trace",
     "await",
     "slurp",
     "fetch_url",
@@ -378,6 +383,7 @@ mod tests {
         assert!(matches!(keyword_or_ident("psort"), Token::Ident(s) if s == "psort"));
         assert!(matches!(keyword_or_ident("preduce"), Token::Ident(s) if s == "preduce"));
         assert!(matches!(keyword_or_ident("fan"), Token::Ident(s) if s == "fan"));
+        assert!(matches!(keyword_or_ident("trace"), Token::Ident(s) if s == "trace"));
     }
 
     #[test]
