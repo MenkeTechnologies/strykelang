@@ -142,11 +142,14 @@ fn run_worker(
         if let Some(env) = sub.closure_env.as_ref() {
             interp.scope.restore_capture(env);
         }
+        interp.enable_parallel_guard();
         let _ = interp.scope.set_scalar("_", item);
+        interp.scope_push_hook();
         let out = match interp.exec_block_no_scope(&sub.body) {
             Ok(v) => v,
             Err(FlowOrError::Flow(Flow::Return(v))) => v,
             Err(e) => {
+                interp.scope_pop_hook();
                 let mut g = err.lock();
                 if g.is_none() {
                     *g = Some(flow_err_msg(e));
@@ -154,6 +157,7 @@ fn run_worker(
                 break;
             }
         };
+        interp.scope_pop_hook();
         if let Some(c) = &last_stage_counter {
             c.fetch_add(1, Ordering::SeqCst);
         }
@@ -283,10 +287,17 @@ pub(crate) fn run_par_pipeline(
                 if let Some(env) = sub.closure_env.as_ref() {
                     local_interp.scope.restore_capture(env);
                 }
+                local_interp.enable_parallel_guard();
                 let _ = local_interp.scope.set_scalar("_", item);
-                match local_interp.exec_block_no_scope(&sub.body) {
+                local_interp.scope_push_hook();
+                let out = match local_interp.exec_block_no_scope(&sub.body) {
+                    Ok(v) => Ok(v),
+                    Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
+                    Err(e) => Err(e),
+                };
+                local_interp.scope_pop_hook();
+                match out {
                     Ok(v) => v,
-                    Err(FlowOrError::Flow(Flow::Return(v))) => v,
                     Err(e) => {
                         let mut g = err_w.lock();
                         if g.is_none() {

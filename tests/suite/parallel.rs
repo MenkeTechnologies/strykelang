@@ -118,6 +118,23 @@ fn parallel_map_single_element() {
     assert_eq!(eval_string(r#"join(",", pmap { $_ * 2 } (21))"#), "42");
 }
 
+/// Captured non-atomic lexicals cannot be assigned from parallel workers (data race prevention).
+#[test]
+fn parallel_block_rejects_captured_lexical_assignment() {
+    assert_eq!(
+        eval_err_kind(r#"my $x = 0; pmap { $x = 1 } (1); 1"#),
+        ErrorKind::Runtime,
+    );
+}
+
+#[test]
+fn parallel_block_allows_mysync_scalar_mutation() {
+    assert_eq!(
+        eval_int(r#"mysync $c = 0; pmap { $c++ } (1, 2, 3); $c"#),
+        3
+    );
+}
+
 #[test]
 fn parallel_grep_single_element() {
     assert_eq!(eval_int(r#"scalar pgrep { $_ > 0 } (7)"#), 1);

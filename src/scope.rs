@@ -178,6 +178,11 @@ pub struct Scope {
     frames: Vec<Frame>,
     /// Recycled frames to avoid allocation on every push_frame/pop_frame cycle.
     frame_pool: Vec<Frame>,
+    /// When true (rayon worker / parallel block), reject writes to outer captured lexicals unless
+    /// the binding is `mysync` (atomic) or a loop topic (`$_`, `$a`, `$b`). Package names with `::`
+    /// are exempt. Requires at least two frames (captured + block locals); use [`Self::push_frame`]
+    /// before running a block body on a worker.
+    parallel_guard: bool,
 }
 
 impl Default for Scope {
@@ -191,9 +196,80 @@ impl Scope {
         let mut s = Self {
             frames: Vec::with_capacity(32),
             frame_pool: Vec::with_capacity(32),
+            parallel_guard: false,
         };
         s.frames.push(Frame::new());
         s
+    }
+
+    /// Enable [`Self::parallel_guard`] for parallel worker interpreters (pmap, fan, …).
+    #[inline]
+    pub fn set_parallel_guard(&mut self, enabled: bool) {
+        self.parallel_guard = enabled;
+    }
+
+    #[inline]
+    pub fn parallel_guard(&self) -> bool {
+        self.parallel_guard
+    }
+
+    #[inline]
+    fn parallel_skip_special_name(name: &str) -> bool {
+        name.contains("::")
+    }
+
+    /// Loop/sort topic scalars that parallel ops assign before each iteration.
+    #[inline]
+    fn parallel_allowed_topic_scalar(name: &str) -> bool {
+        matches!(name, "_" | "a" | "b")
+    }
+
+    /// Regex / runtime scratch arrays live on an outer frame; parallel match still mutates them.
+    #[inline]
+    fn parallel_allowed_internal_array(name: &str) -> bool {
+        matches!(name, "-" | "+" | "^CAPTURE" | "^CAPTURE_ALL")
+    }
+
+    /// `%ENV`, `%INC`, and regex named-capture hash `"+"` — same outer-frame issue as internal arrays.
+    #[inline]
+    fn parallel_allowed_internal_hash(name: &str) -> bool {
+        matches!(name, "+" | "ENV" | "INC")
+    }
+
+    fn check_parallel_scalar_write(&self, name: &str) -> Result<(), PerlError> {
+        if !self.parallel_guard || Self::parallel_skip_special_name(name) {
+            return Ok(());
+        }
+        if Self::parallel_allowed_topic_scalar(name) {
+            return Ok(());
+        }
+        let inner = self.frames.len().saturating_sub(1);
+        for (i, frame) in self.frames.iter().enumerate().rev() {
+            if frame.has_scalar(name) {
+                if let Some(v) = frame.get_scalar(name) {
+                    if v.as_atomic_arc().is_some() {
+                        return Ok(());
+                    }
+                }
+                if i != inner {
+                    return Err(PerlError::runtime(
+                        format!(
+                            "cannot assign to captured non-mysync variable `${}` in a parallel block",
+                            name
+                        ),
+                        0,
+                    ));
+                }
+                return Ok(());
+            }
+        }
+        Err(PerlError::runtime(
+            format!(
+                "cannot assign to undeclared variable `${}` in a parallel block",
+                name
+            ),
+            0,
+        ))
     }
 
     #[inline]
@@ -294,19 +370,24 @@ impl Scope {
     pub fn pop_frame(&mut self) {
         if self.frames.len() > 1 {
             let mut frame = self.frames.pop().expect("pop_frame");
+            // Local restore must write outer bindings even when parallel_guard is on
+            // (user code cannot mutate captured vars; unwind is not user mutation).
+            let saved_guard = self.parallel_guard;
+            self.parallel_guard = false;
             for entry in frame.local_restores.drain(..).rev() {
                 match entry {
                     LocalRestore::Scalar(name, old) => {
                         let _ = self.set_scalar(&name, old);
                     }
                     LocalRestore::Array(name, old) => {
-                        self.set_array(&name, old);
+                        let _ = self.set_array(&name, old);
                     }
                     LocalRestore::Hash(name, old) => {
-                        self.set_hash(&name, old);
+                        let _ = self.set_hash(&name, old);
                     }
                 }
             }
+            self.parallel_guard = saved_guard;
             // Return frame to pool for reuse (avoids allocation on next push_frame).
             if self.frame_pool.len() < 64 {
                 self.frame_pool.push(frame);
@@ -339,7 +420,7 @@ impl Scope {
                 .local_restores
                 .push(LocalRestore::Array(name.to_string(), old));
         }
-        self.set_array(name, val);
+        self.set_array(name, val)?;
         Ok(())
     }
 
@@ -361,7 +442,7 @@ impl Scope {
                 .local_restores
                 .push(LocalRestore::Hash(name.to_string(), old));
         }
-        self.set_hash(name, val);
+        self.set_hash(name, val)?;
         Ok(())
     }
 
@@ -574,7 +655,12 @@ impl Scope {
     /// Append `rhs` to a scalar string in-place (no clone of the existing string).
     /// If the scalar is not yet a String, it is converted first.
     #[inline]
-    pub fn scalar_concat_inplace(&mut self, name: &str, rhs: &PerlValue) -> PerlValue {
+    pub fn scalar_concat_inplace(
+        &mut self,
+        name: &str,
+        rhs: &PerlValue,
+    ) -> Result<PerlValue, PerlError> {
+        self.check_parallel_scalar_write(name)?;
         for frame in self.frames.iter_mut().rev() {
             if let Some(entry) = frame.scalars.iter_mut().find(|(k, _)| k == name) {
                 // Use `into_string` + `append_to` so heap strings take the `Arc::try_unwrap`
@@ -582,7 +668,7 @@ impl Scope {
                 let mut s = std::mem::replace(&mut entry.1, PerlValue::UNDEF).into_string();
                 rhs.append_to(&mut s);
                 entry.1 = PerlValue::string(s);
-                return entry.1.clone();
+                return Ok(entry.1.clone());
             }
         }
         // Variable not found — create as new string
@@ -590,11 +676,12 @@ impl Scope {
         rhs.append_to(&mut s);
         let val = PerlValue::string(s);
         self.frames[0].set_scalar(name, val.clone());
-        val
+        Ok(val)
     }
 
     #[inline]
     pub fn set_scalar(&mut self, name: &str, val: PerlValue) -> Result<(), PerlError> {
+        self.check_parallel_scalar_write(name)?;
         for frame in self.frames.iter_mut().rev() {
             // If the existing value is Atomic, write through the lock
             if let Some(v) = frame.get_scalar(name) {
@@ -701,61 +788,103 @@ impl Scope {
         Vec::new()
     }
 
-    pub fn get_array_mut(&mut self, name: &str) -> &mut Vec<PerlValue> {
-        // Note: can't return &mut into a Mutex. Callers needing atomic array
-        // mutation should use atomic_array_mutate instead. For non-atomic arrays:
-        let mut target_idx = None;
+    fn resolve_array_frame_idx(&self, name: &str) -> Option<usize> {
         if name.contains("::") {
-            target_idx = Some(0);
-        } else {
-            for i in (0..self.frames.len()).rev() {
-                if self.frames[i].has_array(name) {
-                    target_idx = Some(i);
-                    break;
-                }
+            return Some(0);
+        }
+        for i in (0..self.frames.len()).rev() {
+            if self.frames[i].has_array(name) {
+                return Some(i);
             }
         }
-        let idx = target_idx.unwrap_or(0);
+        None
+    }
+
+    fn check_parallel_array_write(&self, name: &str) -> Result<(), PerlError> {
+        if !self.parallel_guard
+            || Self::parallel_skip_special_name(name)
+            || Self::parallel_allowed_internal_array(name)
+        {
+            return Ok(());
+        }
+        let inner = self.frames.len().saturating_sub(1);
+        match self.resolve_array_frame_idx(name) {
+            None => Err(PerlError::runtime(
+                format!(
+                    "cannot modify undeclared array `@{}` in a parallel block",
+                    name
+                ),
+                0,
+            )),
+            Some(idx) if idx != inner => Err(PerlError::runtime(
+                format!(
+                    "cannot modify captured non-mysync array `@{}` in a parallel block",
+                    name
+                ),
+                0,
+            )),
+            Some(_) => Ok(()),
+        }
+    }
+
+    pub fn get_array_mut(&mut self, name: &str) -> Result<&mut Vec<PerlValue>, PerlError> {
+        // Note: can't return &mut into a Mutex. Callers needing atomic array
+        // mutation should use atomic_array_mutate instead. For non-atomic arrays:
+        if self.find_atomic_array(name).is_some() {
+            return Err(PerlError::runtime(
+                "get_array_mut: use atomic path for mysync arrays",
+                0,
+            ));
+        }
+        self.check_parallel_array_write(name)?;
+        let idx = match self.resolve_array_frame_idx(name) {
+            Some(i) => i,
+            None => 0,
+        };
         let frame = &mut self.frames[idx];
         if frame.get_array_mut(name).is_none() {
             frame.arrays.push((name.to_string(), Vec::new()));
         }
-        frame.get_array_mut(name).unwrap()
+        Ok(frame.get_array_mut(name).unwrap())
     }
 
     /// Push to array — works for both regular and atomic arrays.
-    pub fn push_to_array(&mut self, name: &str, val: PerlValue) {
+    pub fn push_to_array(&mut self, name: &str, val: PerlValue) -> Result<(), PerlError> {
         if let Some(aa) = self.find_atomic_array(name) {
             aa.0.lock().push(val);
-            return;
+            return Ok(());
         }
-        self.get_array_mut(name).push(val);
+        self.get_array_mut(name)?.push(val);
+        Ok(())
     }
 
     /// Pop from array — works for both regular and atomic arrays.
-    pub fn pop_from_array(&mut self, name: &str) -> PerlValue {
+    pub fn pop_from_array(&mut self, name: &str) -> Result<PerlValue, PerlError> {
         if let Some(aa) = self.find_atomic_array(name) {
-            return aa.0.lock().pop().unwrap_or(PerlValue::UNDEF);
+            return Ok(aa.0.lock().pop().unwrap_or(PerlValue::UNDEF));
         }
-        self.get_array_mut(name).pop().unwrap_or(PerlValue::UNDEF)
+        Ok(self
+            .get_array_mut(name)?
+            .pop()
+            .unwrap_or(PerlValue::UNDEF))
     }
 
     /// Shift from array — works for both regular and atomic arrays.
-    pub fn shift_from_array(&mut self, name: &str) -> PerlValue {
+    pub fn shift_from_array(&mut self, name: &str) -> Result<PerlValue, PerlError> {
         if let Some(aa) = self.find_atomic_array(name) {
             let mut guard = aa.0.lock();
-            return if guard.is_empty() {
+            return Ok(if guard.is_empty() {
                 PerlValue::UNDEF
             } else {
                 guard.remove(0)
-            };
+            });
         }
-        let arr = self.get_array_mut(name);
-        if arr.is_empty() {
+        let arr = self.get_array_mut(name)?;
+        Ok(if arr.is_empty() {
             PerlValue::UNDEF
         } else {
             arr.remove(0)
-        }
+        })
     }
 
     /// Get array length — works for both regular and atomic arrays.
@@ -779,18 +908,20 @@ impl Scope {
         0
     }
 
-    pub fn set_array(&mut self, name: &str, val: Vec<PerlValue>) {
+    pub fn set_array(&mut self, name: &str, val: Vec<PerlValue>) -> Result<(), PerlError> {
         if let Some(aa) = self.find_atomic_array(name) {
             *aa.0.lock() = val;
-            return;
+            return Ok(());
         }
+        self.check_parallel_array_write(name)?;
         for frame in self.frames.iter_mut().rev() {
             if frame.has_array(name) {
                 frame.set_array(name, val);
-                return;
+                return Ok(());
             }
         }
         self.frames[0].set_array(name, val);
+        Ok(())
     }
 
     /// Direct element access — works for both regular and atomic arrays.
@@ -818,7 +949,12 @@ impl Scope {
         PerlValue::UNDEF
     }
 
-    pub fn set_array_element(&mut self, name: &str, index: i64, val: PerlValue) {
+    pub fn set_array_element(
+        &mut self,
+        name: &str,
+        index: i64,
+        val: PerlValue,
+    ) -> Result<(), PerlError> {
         if let Some(aa) = self.find_atomic_array(name) {
             let mut arr = aa.0.lock();
             let idx = if index < 0 {
@@ -830,9 +966,9 @@ impl Scope {
                 arr.resize(idx + 1, PerlValue::UNDEF);
             }
             arr[idx] = val;
-            return;
+            return Ok(());
         }
-        let arr = self.get_array_mut(name);
+        let arr = self.get_array_mut(name)?;
         let idx = if index < 0 {
             let len = arr.len() as i64;
             (len + index).max(0) as usize
@@ -843,6 +979,7 @@ impl Scope {
             arr.resize(idx + 1, PerlValue::UNDEF);
         }
         arr[idx] = val;
+        Ok(())
     }
 
     // ── Hashes ──
@@ -878,34 +1015,85 @@ impl Scope {
         IndexMap::new()
     }
 
-    pub fn get_hash_mut(&mut self, name: &str) -> &mut IndexMap<String, PerlValue> {
-        let mut target_idx = None;
+    fn resolve_hash_frame_idx(&self, name: &str) -> Option<usize> {
+        if name.contains("::") {
+            return Some(0);
+        }
         for i in (0..self.frames.len()).rev() {
             if self.frames[i].has_hash(name) {
-                target_idx = Some(i);
-                break;
+                return Some(i);
             }
         }
-        let idx = target_idx.unwrap_or(0);
+        None
+    }
+
+    fn check_parallel_hash_write(&self, name: &str) -> Result<(), PerlError> {
+        if !self.parallel_guard
+            || Self::parallel_skip_special_name(name)
+            || Self::parallel_allowed_internal_hash(name)
+        {
+            return Ok(());
+        }
+        let inner = self.frames.len().saturating_sub(1);
+        match self.resolve_hash_frame_idx(name) {
+            None => Err(PerlError::runtime(
+                format!(
+                    "cannot modify undeclared hash `%{}` in a parallel block",
+                    name
+                ),
+                0,
+            )),
+            Some(idx) if idx != inner => Err(PerlError::runtime(
+                format!(
+                    "cannot modify captured non-mysync hash `%{}` in a parallel block",
+                    name
+                ),
+                0,
+            )),
+            Some(_) => Ok(()),
+        }
+    }
+
+    pub fn get_hash_mut(
+        &mut self,
+        name: &str,
+    ) -> Result<&mut IndexMap<String, PerlValue>, PerlError> {
+        if self.find_atomic_hash(name).is_some() {
+            return Err(PerlError::runtime(
+                "get_hash_mut: use atomic path for mysync hashes",
+                0,
+            ));
+        }
+        self.check_parallel_hash_write(name)?;
+        let idx = match self.resolve_hash_frame_idx(name) {
+            Some(i) => i,
+            None => 0,
+        };
         let frame = &mut self.frames[idx];
         if frame.get_hash_mut(name).is_none() {
             frame.hashes.push((name.to_string(), IndexMap::new()));
         }
-        frame.get_hash_mut(name).unwrap()
+        Ok(frame.get_hash_mut(name).unwrap())
     }
 
-    pub fn set_hash(&mut self, name: &str, val: IndexMap<String, PerlValue>) {
+    pub fn set_hash(
+        &mut self,
+        name: &str,
+        val: IndexMap<String, PerlValue>,
+    ) -> Result<(), PerlError> {
         if let Some(ah) = self.find_atomic_hash(name) {
             *ah.0.lock() = val;
-            return;
+            return Ok(());
         }
+        self.check_parallel_hash_write(name)?;
         for frame in self.frames.iter_mut().rev() {
             if frame.has_hash(name) {
                 frame.set_hash(name, val);
-                return;
+                return Ok(());
             }
         }
         self.frames[0].set_hash(name, val);
+        Ok(())
     }
 
     #[inline]
@@ -928,19 +1116,19 @@ impl Scope {
         name: &str,
         key: &str,
         f: impl FnOnce(&PerlValue) -> PerlValue,
-    ) -> PerlValue {
+    ) -> Result<PerlValue, PerlError> {
         if let Some(ah) = self.find_atomic_hash(name) {
             let mut guard = ah.0.lock();
             let old = guard.get(key).cloned().unwrap_or(PerlValue::UNDEF);
             let new_val = f(&old);
             guard.insert(key.to_string(), new_val.clone());
-            return new_val;
+            return Ok(new_val);
         }
         // Non-atomic fallback
         let old = self.get_hash_element(name, key);
         let new_val = f(&old);
-        self.set_hash_element(name, key, new_val.clone());
-        new_val
+        self.set_hash_element(name, key, new_val.clone())?;
+        Ok(new_val)
     }
 
     /// Atomically read-modify-write an array element. Returns the new value.
@@ -949,7 +1137,7 @@ impl Scope {
         name: &str,
         index: i64,
         f: impl FnOnce(&PerlValue) -> PerlValue,
-    ) -> PerlValue {
+    ) -> Result<PerlValue, PerlError> {
         if let Some(aa) = self.find_atomic_array(name) {
             let mut guard = aa.0.lock();
             let idx = if index < 0 {
@@ -963,30 +1151,36 @@ impl Scope {
             let old = guard[idx].clone();
             let new_val = f(&old);
             guard[idx] = new_val.clone();
-            return new_val;
+            return Ok(new_val);
         }
         // Non-atomic fallback
         let old = self.get_array_element(name, index);
         let new_val = f(&old);
-        self.set_array_element(name, index, new_val.clone());
-        new_val
+        self.set_array_element(name, index, new_val.clone())?;
+        Ok(new_val)
     }
 
-    pub fn set_hash_element(&mut self, name: &str, key: &str, val: PerlValue) {
+    pub fn set_hash_element(
+        &mut self,
+        name: &str,
+        key: &str,
+        val: PerlValue,
+    ) -> Result<(), PerlError> {
         if let Some(ah) = self.find_atomic_hash(name) {
             ah.0.lock().insert(key.to_string(), val);
-            return;
+            return Ok(());
         }
-        let hash = self.get_hash_mut(name);
+        let hash = self.get_hash_mut(name)?;
         hash.insert(key.to_string(), val);
+        Ok(())
     }
 
-    pub fn delete_hash_element(&mut self, name: &str, key: &str) -> PerlValue {
+    pub fn delete_hash_element(&mut self, name: &str, key: &str) -> Result<PerlValue, PerlError> {
         if let Some(ah) = self.find_atomic_hash(name) {
-            return ah.0.lock().shift_remove(key).unwrap_or(PerlValue::UNDEF);
+            return Ok(ah.0.lock().shift_remove(key).unwrap_or(PerlValue::UNDEF));
         }
-        let hash = self.get_hash_mut(name);
-        hash.shift_remove(key).unwrap_or(PerlValue::UNDEF)
+        let hash = self.get_hash_mut(name)?;
+        Ok(hash.shift_remove(key).unwrap_or(PerlValue::UNDEF))
     }
 
     #[inline]
@@ -1245,7 +1439,8 @@ mod tests {
     fn set_array_element_extends_array_with_undef_gaps() {
         let mut s = Scope::new();
         s.declare_array("a", vec![]);
-        s.set_array_element("a", 2, PerlValue::integer(7));
+        s.set_array_element("a", 2, PerlValue::integer(7))
+            .unwrap();
         assert_eq!(s.get_array_element("a", 2).to_int(), 7);
         assert!(s.get_array_element("a", 0).is_undef());
     }
@@ -1285,9 +1480,10 @@ mod tests {
         s.declare_hash("h", m);
         assert_eq!(s.get_hash_element("h", "k").to_int(), 1);
         assert!(s.exists_hash_element("h", "k"));
-        s.set_hash_element("h", "k", PerlValue::integer(99));
+        s.set_hash_element("h", "k", PerlValue::integer(99))
+            .unwrap();
         assert_eq!(s.get_hash_element("h", "k").to_int(), 99);
-        let del = s.delete_hash_element("h", "k");
+        let del = s.delete_hash_element("h", "k").unwrap();
         assert_eq!(del.to_int(), 99);
         assert!(!s.exists_hash_element("h", "k"));
     }
@@ -1359,19 +1555,19 @@ mod tests {
         let mut s = Scope::new();
         s.declare_array("a", vec![]);
         assert_eq!(s.array_len("a"), 0);
-        s.push_to_array("a", PerlValue::integer(1));
-        s.push_to_array("a", PerlValue::integer(2));
+        s.push_to_array("a", PerlValue::integer(1)).unwrap();
+        s.push_to_array("a", PerlValue::integer(2)).unwrap();
         assert_eq!(s.array_len("a"), 2);
-        assert_eq!(s.pop_from_array("a").to_int(), 2);
-        assert_eq!(s.pop_from_array("a").to_int(), 1);
-        assert!(s.pop_from_array("a").is_undef());
+        assert_eq!(s.pop_from_array("a").unwrap().to_int(), 2);
+        assert_eq!(s.pop_from_array("a").unwrap().to_int(), 1);
+        assert!(s.pop_from_array("a").unwrap().is_undef());
     }
 
     #[test]
     fn shift_from_array_drops_front() {
         let mut s = Scope::new();
         s.declare_array("a", vec![PerlValue::integer(1), PerlValue::integer(2)]);
-        assert_eq!(s.shift_from_array("a").to_int(), 1);
+        assert_eq!(s.shift_from_array("a").unwrap().to_int(), 1);
         assert_eq!(s.array_len("a"), 1);
     }
 
@@ -1434,7 +1630,8 @@ mod tests {
         s.restore_atomics(&[("ax".into(), aa.clone())], &[("hx".into(), ah.clone())]);
         assert_eq!(s.get_array_element("ax", 0).to_int(), 1);
         assert_eq!(s.array_len("ax"), 1);
-        s.set_hash_element("hx", "k", PerlValue::integer(2));
+        s.set_hash_element("hx", "k", PerlValue::integer(2))
+            .unwrap();
         assert_eq!(s.get_hash_element("hx", "k").to_int(), 2);
     }
 }

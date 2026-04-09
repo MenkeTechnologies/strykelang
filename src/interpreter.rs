@@ -78,6 +78,7 @@ fn merge_preduce_init_partials(
     let mut local_interp = Interpreter::new();
     local_interp.subs = subs.clone();
     local_interp.scope.restore_capture(scope_capture);
+    local_interp.enable_parallel_guard();
     local_interp
         .scope
         .declare_array("_", vec![a.clone(), b.clone()]);
@@ -111,6 +112,7 @@ fn fold_preduce_init_step(
     let mut local_interp = Interpreter::new();
     local_interp.subs = subs.clone();
     local_interp.scope.restore_capture(scope_capture);
+    local_interp.enable_parallel_guard();
     local_interp
         .scope
         .declare_array("_", vec![acc.clone(), item.clone()]);
@@ -907,6 +909,13 @@ impl Interpreter {
         let _ = self.english_lexical_scalars.pop();
     }
 
+    /// After [`Scope::restore_capture`] / [`Scope::restore_atomics`] on a parallel or async worker,
+    /// reject writes to non-`mysync` outer captured lexicals (block locals use `scope_push_hook`).
+    #[inline]
+    pub(crate) fn enable_parallel_guard(&mut self) {
+        self.scope.set_parallel_guard(true);
+    }
+
     /// Pop scope frames until [`Scope::depth`] == `target_depth`, running [`Self::scope_pop_hook`]
     /// each time so `glob_restore_frames` / `english_lexical_scalars` stay aligned with
     /// [`Self::scope_push_hook`]. The bytecode VM must use this after [`Op::Call`] /
@@ -950,7 +959,9 @@ impl Interpreter {
         self.env = std::env::vars()
             .map(|(k, v)| (k, PerlValue::string(v)))
             .collect();
-        self.scope.set_hash("ENV", self.env.clone());
+        self.scope
+            .set_hash("ENV", self.env.clone())
+            .expect("set %ENV");
         self.env_materialized = true;
     }
 
@@ -1545,7 +1556,7 @@ impl Interpreter {
             )
         })?;
         self.scope
-            .set_hash_element("INC", &key, PerlValue::string(key.clone()));
+            .set_hash_element("INC", &key, PerlValue::string(key.clone()))?;
         let saved_pkg = self.scope.get_scalar("__PACKAGE__");
         let r = crate::parse_and_run_string(&code, self);
         let _ = self.scope.set_scalar("__PACKAGE__", saved_pkg);
@@ -1571,7 +1582,7 @@ impl Interpreter {
                 let abs = full.canonicalize().unwrap_or(full);
                 let abs_s = abs.to_string_lossy().into_owned();
                 self.scope
-                    .set_hash_element("INC", relpath, PerlValue::string(abs_s));
+                    .set_hash_element("INC", relpath, PerlValue::string(abs_s))?;
                 let saved_pkg = self.scope.get_scalar("__PACKAGE__");
                 let r = crate::parse_and_run_string(&code, self);
                 let _ = self.scope.set_scalar("__PACKAGE__", saved_pkg);
@@ -2037,25 +2048,25 @@ impl Interpreter {
                 end_arr.push(PerlValue::integer(-1));
             }
         }
-        self.scope.set_array("-", start_arr);
-        self.scope.set_array("+", end_arr);
+        self.scope.set_array("-", start_arr)?;
+        self.scope.set_array("+", end_arr)?;
         let mut named = IndexMap::new();
         for name in re.capture_names().flatten() {
             if let Some(m) = caps.name(name) {
                 named.insert(name.to_string(), PerlValue::string(m.text.to_string()));
             }
         }
-        self.scope.set_hash("+", named);
+        self.scope.set_hash("+", named)?;
         let cap_flat = crate::perl_regex::numbered_capture_flat(caps);
-        self.scope.set_array("^CAPTURE", cap_flat.clone());
+        self.scope.set_array("^CAPTURE", cap_flat.clone())?;
         match capture_all {
             CaptureAllMode::Empty => {
-                self.scope.set_array("^CAPTURE_ALL", vec![]);
+                self.scope.set_array("^CAPTURE_ALL", vec![])?;
             }
             CaptureAllMode::Append => {
                 let mut rows = self.scope.get_array("^CAPTURE_ALL");
                 rows.push(PerlValue::array(cap_flat));
-                self.scope.set_array("^CAPTURE_ALL", rows);
+                self.scope.set_array("^CAPTURE_ALL", rows)?;
             }
             CaptureAllMode::Skip => {}
         }
@@ -2101,7 +2112,7 @@ impl Interpreter {
             let key = pos_key.to_string();
             let start = self.regex_pos.get(&key).copied().flatten().unwrap_or(0);
             if start == 0 {
-                self.scope.set_array("^CAPTURE_ALL", vec![]);
+                self.scope.set_array("^CAPTURE_ALL", vec![])?;
             }
             if start > s.len() {
                 self.regex_pos.insert(key, None);
@@ -2127,7 +2138,7 @@ impl Interpreter {
                 )));
                 last_caps = Some(caps);
             }
-            self.scope.set_array("^CAPTURE_ALL", rows);
+            self.scope.set_array("^CAPTURE_ALL", rows)?;
             let matches: Vec<PerlValue> = match &*re {
                 PerlCompiledRegex::Rust(r) => r
                     .find_iter(&s)
@@ -2183,7 +2194,7 @@ impl Interpreter {
                 )));
                 last = Some(caps);
             }
-            self.scope.set_array("^CAPTURE_ALL", rows);
+            self.scope.set_array("^CAPTURE_ALL", rows)?;
             last
         } else {
             re.captures(&s)
@@ -2261,7 +2272,7 @@ impl Interpreter {
             Some(v) => v.to_int().max(0) as usize,
         };
         let rep_vals: Vec<PerlValue> = args.iter().skip(3).cloned().collect();
-        let arr = self.scope.get_array_mut(&arr_name);
+        let arr = self.scope.get_array_mut(&arr_name)?;
         let end = (off + len).min(arr.len());
         let removed: Vec<PerlValue> = arr.drain(off..end).collect();
         for (i, v) in rep_vals.into_iter().enumerate() {
@@ -2281,7 +2292,7 @@ impl Interpreter {
         }
         let arr_name = args[0].to_string();
         let vals: Vec<PerlValue> = args.iter().skip(1).cloned().collect();
-        let arr = self.scope.get_array_mut(&arr_name);
+        let arr = self.scope.get_array_mut(&arr_name)?;
         for (i, v) in vals.into_iter().enumerate() {
             arr.insert(i, v);
         }
@@ -2478,6 +2489,7 @@ impl Interpreter {
             interp.subs = subs;
             interp.scope.restore_capture(&scalars);
             interp.scope.restore_atomics(&aar, &ahash);
+            interp.enable_parallel_guard();
             let r = match interp.exec_block(&block) {
                 Ok(v) => Ok(v),
                 Err(FlowOrError::Error(e)) => Err(e),
@@ -2519,11 +2531,14 @@ impl Interpreter {
                 argv.iter().map(|s| PerlValue::string(s.clone())).collect(),
             );
             for (k, v) in env {
-                interp.scope.set_hash_element("ENV", &k, v);
+                interp.scope
+                    .set_hash_element("ENV", &k, v)
+                    .expect("set ENV in timeout thread");
             }
             interp.scope.declare_array("INC", inc);
             interp.scope.restore_capture(&scalars);
             interp.scope.restore_atomics(&aar, &ahash);
+            interp.enable_parallel_guard();
             let out: PerlResult<PerlValue> = match interp.exec_block(&block) {
                 Ok(v) => Ok(v),
                 Err(FlowOrError::Error(e)) => Err(e),
@@ -3989,7 +4004,7 @@ impl Interpreter {
                             PerlValue::string(s)
                         }
                         _ => PerlValue::float(old.to_number() + rhs.to_number()),
-                    }));
+                    })?);
                 }
                 // For array element targets: $a[i] += 1
                 if let ExprKind::ArrayElement { array, index } = &target.kind {
@@ -4005,7 +4020,7 @@ impl Interpreter {
                             }
                         }
                         _ => PerlValue::float(old.to_number() + rhs.to_number()),
-                    }));
+                    })?);
                 }
                 let old = self.eval_expr(target)?;
                 let new_val = self.eval_binop(*op, &old, &rhs, line)?;
@@ -4353,6 +4368,7 @@ impl Interpreter {
                         local_interp
                             .scope
                             .restore_atomics(&atomic_arrays, &atomic_hashes);
+                        local_interp.enable_parallel_guard();
                         let _ = local_interp
                             .scope
                             .set_scalar("_", PerlValue::string(line_str));
@@ -4424,6 +4440,7 @@ impl Interpreter {
                         local_interp
                             .scope
                             .restore_atomics(&atomic_arrays, &atomic_hashes);
+                        local_interp.enable_parallel_guard();
                         let _ = local_interp.scope.set_scalar("_", item);
                         let val = match local_interp.exec_block(&block) {
                             Ok(val) => val,
@@ -4474,6 +4491,7 @@ impl Interpreter {
                         local_interp
                             .scope
                             .restore_atomics(&atomic_arrays, &atomic_hashes);
+                        local_interp.enable_parallel_guard();
                         let mut out = Vec::with_capacity(chunk.len());
                         for item in chunk {
                             let _ = local_interp.scope.set_scalar("_", item);
@@ -4521,6 +4539,7 @@ impl Interpreter {
                         local_interp
                             .scope
                             .restore_atomics(&atomic_arrays, &atomic_hashes);
+                        local_interp.enable_parallel_guard();
                         let _ = local_interp.scope.set_scalar("_", item.clone());
                         let keep = match local_interp.exec_block(&block) {
                             Ok(val) => val.is_true(),
@@ -4567,6 +4586,7 @@ impl Interpreter {
                     local_interp
                         .scope
                         .restore_atomics(&atomic_arrays, &atomic_hashes);
+                    local_interp.enable_parallel_guard();
                     let _ = local_interp.scope.set_scalar("_", item);
                     match local_interp.exec_block(&block) {
                         Ok(_) => {}
@@ -4629,6 +4649,7 @@ impl Interpreter {
                             local_interp
                                 .scope
                                 .restore_atomics(&atomic_arrays, &atomic_hashes);
+                            local_interp.enable_parallel_guard();
                             let _ = local_interp
                                 .scope
                                 .set_scalar("_", PerlValue::integer(i as i64));
@@ -4664,6 +4685,7 @@ impl Interpreter {
                     local_interp
                         .scope
                         .restore_atomics(&atomic_arrays, &atomic_hashes);
+                    local_interp.enable_parallel_guard();
                     let _ = local_interp
                         .scope
                         .set_scalar("_", PerlValue::integer(i as i64));
@@ -5075,10 +5097,14 @@ impl Interpreter {
                     let val = self.eval_expr(v)?;
                     if let Some(items) = val.as_array_vec() {
                         for item in items {
-                            self.scope.push_to_array(&arr_name, item);
+                            self.scope
+                                .push_to_array(&arr_name, item)
+                                .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
                         }
                     } else {
-                        self.scope.push_to_array(&arr_name, val);
+                        self.scope
+                            .push_to_array(&arr_name, val)
+                            .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
                     }
                 }
                 let len = self.scope.array_len(&arr_name);
@@ -5086,11 +5112,15 @@ impl Interpreter {
             }
             ExprKind::Pop(array) => {
                 let arr_name = self.extract_array_name(array)?;
-                Ok(self.scope.pop_from_array(&arr_name))
+                self.scope
+                    .pop_from_array(&arr_name)
+                    .map_err(|e| FlowOrError::Error(e.at_line(line)))
             }
             ExprKind::Shift(array) => {
                 let arr_name = self.extract_array_name(array)?;
-                Ok(self.scope.shift_from_array(&arr_name))
+                self.scope
+                    .shift_from_array(&arr_name)
+                    .map_err(|e| FlowOrError::Error(e.at_line(line)))
             }
             ExprKind::Unshift { array, values } => {
                 let arr_name = self.extract_array_name(array)?;
@@ -5099,7 +5129,10 @@ impl Interpreter {
                     let val = self.eval_expr(v)?;
                     vals.push(val);
                 }
-                let arr = self.scope.get_array_mut(&arr_name);
+                let arr = self
+                    .scope
+                    .get_array_mut(&arr_name)
+                    .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
                 for (i, v) in vals.into_iter().enumerate() {
                     arr.insert(i, v);
                 }
@@ -5121,14 +5154,20 @@ impl Interpreter {
                 let len = if let Some(l) = length {
                     self.eval_expr(l)?.to_int() as usize
                 } else {
-                    let arr = self.scope.get_array_mut(&arr_name);
+                    let arr = self
+                        .scope
+                        .get_array_mut(&arr_name)
+                        .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
                     arr.len() - off
                 };
                 let mut rep_vals = Vec::new();
                 for r in replacement {
                     rep_vals.push(self.eval_expr(r)?);
                 }
-                let arr = self.scope.get_array_mut(&arr_name);
+                let arr = self
+                    .scope
+                    .get_array_mut(&arr_name)
+                    .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
                 let end = (off + len).min(arr.len());
                 let removed: Vec<PerlValue> = arr.drain(off..end).collect();
                 for (i, v) in rep_vals.into_iter().enumerate() {
@@ -5155,7 +5194,9 @@ impl Interpreter {
                             );
                         }
                     }
-                    Ok(self.scope.delete_hash_element(hash, &k))
+                    self.scope
+                        .delete_hash_element(hash, &k)
+                        .map_err(|e| FlowOrError::Error(e.at_line(line)))
                 }
                 ExprKind::ArrowDeref {
                     expr: inner,
@@ -6456,7 +6497,7 @@ impl Interpreter {
                     )
                     .into());
                 }
-                self.scope.set_array(name, val.to_list());
+                self.scope.set_array(name, val.to_list())?;
                 Ok(PerlValue::UNDEF)
             }
             ExprKind::HashVar(name) => {
@@ -6478,7 +6519,7 @@ impl Interpreter {
                     map.insert(items[i].to_string(), items[i + 1].clone());
                     i += 2;
                 }
-                self.scope.set_hash(name, map);
+                self.scope.set_hash(name, map)?;
                 Ok(PerlValue::UNDEF)
             }
             ExprKind::ArrayElement { array, index } => {
@@ -6524,7 +6565,7 @@ impl Interpreter {
                         };
                     }
                 }
-                self.scope.set_array_element(&aname, idx, val);
+                self.scope.set_array_element(&aname, idx, val)?;
                 Ok(PerlValue::UNDEF)
             }
             ExprKind::HashElement { hash, key } => {
@@ -6567,7 +6608,7 @@ impl Interpreter {
                         };
                     }
                 }
-                self.scope.set_hash_element(hash, &k, val);
+                self.scope.set_hash_element(hash, &k, val)?;
                 Ok(PerlValue::UNDEF)
             }
             ExprKind::ArrowDeref {
@@ -8004,11 +8045,14 @@ impl Interpreter {
                 local_interp
                     .scope
                     .restore_atomics(&atomic_arrays, &atomic_hashes);
+                local_interp.enable_parallel_guard();
                 let _ = local_interp.scope.set_scalar("_", item);
+                local_interp.scope_push_hook();
                 let val = match local_interp.exec_block_no_scope(&sub.body) {
                     Ok(val) => val,
                     Err(_) => PerlValue::UNDEF,
                 };
+                local_interp.scope_pop_hook();
                 pmap_progress.tick();
                 val
             })
@@ -8038,11 +8082,14 @@ impl Interpreter {
                 local_interp
                     .scope
                     .restore_atomics(&atomic_arrays, &atomic_hashes);
+                local_interp.enable_parallel_guard();
                 let _ = local_interp.scope.set_scalar("_", item.clone());
+                local_interp.scope_push_hook();
                 let keep = match local_interp.exec_block_no_scope(&sub.body) {
                     Ok(val) => val.is_true(),
                     Err(_) => false,
                 };
+                local_interp.scope_pop_hook();
                 if keep {
                     Some((i, item))
                 } else {
@@ -8075,11 +8122,14 @@ impl Interpreter {
                 local_interp
                     .scope
                     .restore_atomics(&atomic_arrays, &atomic_hashes);
+                local_interp.enable_parallel_guard();
                 let _ = local_interp.scope.set_scalar("_", item);
+                local_interp.scope_push_hook();
                 let val = match local_interp.exec_block_no_scope(&sub.body) {
                     Ok(val) => val,
                     Err(_) => PerlValue::UNDEF,
                 };
+                local_interp.scope_pop_hook();
                 (i, val)
             })
             .collect();
@@ -8181,11 +8231,14 @@ impl Interpreter {
                             local_interp
                                 .scope
                                 .restore_atomics(&atomic_arrays, &atomic_hashes);
+                            local_interp.enable_parallel_guard();
                             let _ = local_interp.scope.set_scalar("_", item.clone());
+                            local_interp.scope_push_hook();
                             let keep = match local_interp.exec_block_no_scope(&sub.body) {
                                 Ok(val) => val.is_true(),
                                 Err(_) => false,
                             };
+                            local_interp.scope_pop_hook();
                             pmap_progress.tick();
                             if keep {
                                 Some(item)
@@ -8212,7 +8265,9 @@ impl Interpreter {
                         local_interp
                             .scope
                             .restore_atomics(&atomic_arrays, &atomic_hashes);
+                        local_interp.enable_parallel_guard();
                         let _ = local_interp.scope.set_scalar("_", item);
+                        local_interp.scope_push_hook();
                         match local_interp.exec_block_no_scope(&sub.body) {
                             Ok(_) => {}
                             Err(e) => {
@@ -8229,6 +8284,7 @@ impl Interpreter {
                                 }
                             }
                         }
+                        local_interp.scope_pop_hook();
                         pmap_progress.tick();
                     });
                     pmap_progress.finish();
@@ -8262,12 +8318,20 @@ impl Interpreter {
                             local_interp
                                 .scope
                                 .restore_atomics(&atomic_arrays, &atomic_hashes);
+                            local_interp.enable_parallel_guard();
                             let mut out = Vec::with_capacity(chunk.len());
                             for item in chunk {
                                 let _ = local_interp.scope.set_scalar("_", item);
+                                local_interp.scope_push_hook();
                                 match local_interp.exec_block_no_scope(&sub.body) {
-                                    Ok(val) => out.push(val),
-                                    Err(_) => out.push(PerlValue::UNDEF),
+                                    Ok(val) => {
+                                        local_interp.scope_pop_hook();
+                                        out.push(val);
+                                    }
+                                    Err(_) => {
+                                        local_interp.scope_pop_hook();
+                                        out.push(PerlValue::UNDEF);
+                                    }
                                 }
                             }
                             pmap_progress.tick();
@@ -8292,9 +8356,11 @@ impl Interpreter {
                                     let mut local_interp = Interpreter::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
+                                    local_interp.enable_parallel_guard();
                                     let _ = local_interp.scope.set_scalar("a", a.clone());
                                     let _ = local_interp.scope.set_scalar("b", b.clone());
-                                    match local_interp.exec_block_no_scope(&cmp_block.body) {
+                                    local_interp.scope_push_hook();
+                                    let ord = match local_interp.exec_block_no_scope(&cmp_block.body) {
                                         Ok(v) => {
                                             let n = v.to_int();
                                             if n < 0 {
@@ -8306,7 +8372,9 @@ impl Interpreter {
                                             }
                                         }
                                         Err(_) => std::cmp::Ordering::Equal,
-                                    }
+                                    };
+                                    local_interp.scope_pop_hook();
+                                    ord
                                 });
                             }
                         }
@@ -8333,11 +8401,14 @@ impl Interpreter {
                             let mut local_interp = Interpreter::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
+                            local_interp.enable_parallel_guard();
                             let _ = local_interp.scope.set_scalar("_", item.clone());
+                            local_interp.scope_push_hook();
                             let val = match local_interp.exec_block_no_scope(&sub.body) {
                                 Ok(v) => v,
                                 Err(_) => PerlValue::UNDEF,
                             };
+                            local_interp.scope_pop_hook();
                             cache.insert(k, val.clone());
                             pmap_progress.tick();
                             val
@@ -8366,6 +8437,7 @@ impl Interpreter {
                             let mut local_interp = Interpreter::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
+                            local_interp.enable_parallel_guard();
                             let _ = local_interp.scope.set_scalar("a", a);
                             let _ = local_interp.scope.set_scalar("b", b);
                             match local_interp.exec_block(&block) {
@@ -8589,11 +8661,14 @@ impl Interpreter {
                                     interp.subs = subs.clone();
                                     interp.scope.restore_capture(&capture);
                                     interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
+                                    interp.enable_parallel_guard();
                                     let _ = interp.scope.set_scalar("_", item.clone());
+                                    interp.scope_push_hook();
                                     let keep = match interp.exec_block_no_scope(&sub.body) {
                                         Ok(val) => val.is_true(),
                                         Err(_) => false,
                                     };
+                                    interp.scope_pop_hook();
                                     if keep && tx.send(item).is_err() {
                                         break;
                                     }
@@ -8611,11 +8686,14 @@ impl Interpreter {
                                     interp.subs = subs.clone();
                                     interp.scope.restore_capture(&capture);
                                     interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
+                                    interp.enable_parallel_guard();
                                     let _ = interp.scope.set_scalar("_", item);
+                                    interp.scope_push_hook();
                                     let mapped = match interp.exec_block_no_scope(&sub.body) {
                                         Ok(val) => val,
                                         Err(_) => PerlValue::UNDEF,
                                     };
+                                    interp.scope_pop_hook();
                                     if tx.send(mapped).is_err() {
                                         break;
                                     }
@@ -8656,7 +8734,9 @@ impl Interpreter {
                                     interp
                                         .scope
                                         .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                    interp.enable_parallel_guard();
                                     let _ = interp.scope.set_scalar("_", item.clone());
+                                    interp.scope_push_hook();
                                     match interp.exec_block_no_scope(&sub.body) {
                                         Ok(_) => {}
                                         Err(e) => {
@@ -8670,9 +8750,11 @@ impl Interpreter {
                                             if g.is_none() {
                                                 *g = Some(msg);
                                             }
+                                            interp.scope_pop_hook();
                                             break;
                                         }
                                     }
+                                    interp.scope_pop_hook();
                                     if tx.send(item).is_err() {
                                         break;
                                     }
@@ -8698,11 +8780,14 @@ impl Interpreter {
                                         interp
                                             .scope
                                             .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                        interp.enable_parallel_guard();
                                         let _ = interp.scope.set_scalar("_", item);
+                                        interp.scope_push_hook();
                                         let v = match interp.exec_block_no_scope(&sub.body) {
                                             Ok(v) => v,
                                             Err(_) => PerlValue::UNDEF,
                                         };
+                                        interp.scope_pop_hook();
                                         crate::pcache::GLOBAL_PCACHE.insert(k, v.clone());
                                         v
                                     };
@@ -9055,7 +9140,7 @@ impl Interpreter {
                 .split(line_str.trim_end_matches('\n'))
                 .map(|s| PerlValue::string(s.to_string()))
                 .collect();
-            self.scope.set_array("F", fields);
+            self.scope.set_array("F", fields)?;
         }
 
         for stmt in &program.statements {

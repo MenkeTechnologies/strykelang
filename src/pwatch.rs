@@ -108,6 +108,7 @@ pub fn run_pwatch(
                         local_interp.subs = subs;
                         local_interp.scope.restore_capture(&scalars);
                         local_interp.scope.restore_atomics(&aa, &ah);
+                        local_interp.enable_parallel_guard();
                         let _ = local_interp
                             .scope
                             .set_scalar("_", PerlValue::string(path_string));

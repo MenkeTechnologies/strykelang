@@ -831,7 +831,8 @@ impl<'a> VM<'a> {
     ) -> PerlResult<()> {
         let block = self.blocks[block_idx as usize].clone();
         let subs = self.interp.subs.clone();
-        let scope_capture = self.interp.scope.capture();
+        let (scope_capture, atomic_arrays, atomic_hashes) =
+            self.interp.scope.capture_with_atomics();
         let fan_progress = FanProgress::new(progress, n);
         let first_err: Arc<Mutex<Option<PerlError>>> = Arc::new(Mutex::new(None));
         (0..n).into_par_iter().for_each(|i| {
@@ -843,10 +844,15 @@ impl<'a> VM<'a> {
             local_interp.subs = subs.clone();
             local_interp.suppress_stdout = progress;
             local_interp.scope.restore_capture(&scope_capture);
+            local_interp
+                .scope
+                .restore_atomics(&atomic_arrays, &atomic_hashes);
+            local_interp.enable_parallel_guard();
             let _ = local_interp
                 .scope
                 .set_scalar("_", PerlValue::integer(i as i64));
             crate::parallel_trace::fan_worker_set_index(Some(i as i64));
+            local_interp.scope_push_hook();
             match local_interp.exec_block_no_scope(&block) {
                 Ok(_) => {}
                 Err(e) => {
@@ -863,6 +869,7 @@ impl<'a> VM<'a> {
                     }
                 }
             }
+            local_interp.scope_pop_hook();
             crate::parallel_trace::fan_worker_set_index(None);
             fan_progress.finish_worker(i);
         });
@@ -883,7 +890,8 @@ impl<'a> VM<'a> {
     ) -> PerlResult<()> {
         let block = self.blocks[block_idx as usize].clone();
         let subs = self.interp.subs.clone();
-        let scope_capture = self.interp.scope.capture();
+        let (scope_capture, atomic_arrays, atomic_hashes) =
+            self.interp.scope.capture_with_atomics();
         let fan_progress = FanProgress::new(progress, n);
         let pairs: Vec<(usize, Result<PerlValue, FlowOrError>)> = (0..n)
             .into_par_iter()
@@ -893,11 +901,17 @@ impl<'a> VM<'a> {
                 local_interp.subs = subs.clone();
                 local_interp.suppress_stdout = progress;
                 local_interp.scope.restore_capture(&scope_capture);
+                local_interp
+                    .scope
+                    .restore_atomics(&atomic_arrays, &atomic_hashes);
+                local_interp.enable_parallel_guard();
                 let _ = local_interp
                     .scope
                     .set_scalar("_", PerlValue::integer(i as i64));
                 crate::parallel_trace::fan_worker_set_index(Some(i as i64));
+                local_interp.scope_push_hook();
                 let res = local_interp.exec_block_no_scope(&block);
+                local_interp.scope_pop_hook();
                 crate::parallel_trace::fan_worker_set_index(None);
                 fan_progress.finish_worker(i);
                 (i, res)
@@ -1457,7 +1471,10 @@ impl<'a> VM<'a> {
                         let val = self.pop();
                         let n = names[*idx as usize].as_str();
                         self.require_array_mutable(n)?;
-                        self.interp.scope.set_array(n, val.to_list());
+                        self.interp
+                            .scope
+                            .set_array(n, val.to_list())
+                            .map_err(|e| e.at_line(self.line()))?;
                         Ok(())
                     }
                     Op::DeclareArray(idx) => {
@@ -1486,21 +1503,34 @@ impl<'a> VM<'a> {
                         let val = self.pop();
                         let n = names[*idx as usize].as_str();
                         self.require_array_mutable(n)?;
-                        self.interp.scope.set_array_element(n, index, val);
+                        self.interp
+                            .scope
+                            .set_array_element(n, index, val)
+                            .map_err(|e| e.at_line(self.line()))?;
                         Ok(())
                     }
                     Op::PushArray(idx) => {
                         let val = self.pop();
                         let n = names[*idx as usize].as_str();
                         self.require_array_mutable(n)?;
-                        let arr = self.interp.scope.get_array_mut(n);
+                        let line = self.line();
+                        let arr = self
+                            .interp
+                            .scope
+                            .get_array_mut(n)
+                            .map_err(|e| e.at_line(line))?;
                         arr.push(val);
                         Ok(())
                     }
                     Op::PopArray(idx) => {
                         let n = names[*idx as usize].as_str();
                         self.require_array_mutable(n)?;
-                        let arr = self.interp.scope.get_array_mut(n);
+                        let line = self.line();
+                        let arr = self
+                            .interp
+                            .scope
+                            .get_array_mut(n)
+                            .map_err(|e| e.at_line(line))?;
                         let val = arr.pop().unwrap_or(PerlValue::UNDEF);
                         self.push(val);
                         Ok(())
@@ -1508,7 +1538,12 @@ impl<'a> VM<'a> {
                     Op::ShiftArray(idx) => {
                         let n = names[*idx as usize].as_str();
                         self.require_array_mutable(n)?;
-                        let arr = self.interp.scope.get_array_mut(n);
+                        let line = self.line();
+                        let arr = self
+                            .interp
+                            .scope
+                            .get_array_mut(n)
+                            .map_err(|e| e.at_line(line))?;
                         let val = if arr.is_empty() {
                             PerlValue::UNDEF
                         } else {
@@ -1544,7 +1579,10 @@ impl<'a> VM<'a> {
                         }
                         let n = names[*idx as usize].as_str();
                         self.require_hash_mutable(n)?;
-                        self.interp.scope.set_hash(n, map);
+                        self.interp
+                            .scope
+                            .set_hash(n, map)
+                            .map_err(|e| e.at_line(self.line()))?;
                         Ok(())
                     }
                     Op::DeclareHash(idx) => {
@@ -1628,7 +1666,10 @@ impl<'a> VM<'a> {
                         if n == "ENV" {
                             self.interp.materialize_env_if_needed();
                         }
-                        self.interp.scope.set_hash_element(n, &key, val);
+                        self.interp
+                            .scope
+                            .set_hash_element(n, &key, val)
+                            .map_err(|e| e.at_line(self.line()))?;
                         Ok(())
                     }
                     Op::DeleteHashElem(idx) => {
@@ -1638,7 +1679,11 @@ impl<'a> VM<'a> {
                         if n == "ENV" {
                             self.interp.materialize_env_if_needed();
                         }
-                        let val = self.interp.scope.delete_hash_element(n, &key);
+                        let val = self
+                            .interp
+                            .scope
+                            .delete_hash_element(n, &key)
+                            .map_err(|e| e.at_line(self.line()))?;
                         self.push(val);
                         Ok(())
                     }
@@ -2622,7 +2667,12 @@ impl<'a> VM<'a> {
                     Op::ConcatAppend(idx) => {
                         let rhs = self.pop();
                         let n = names[*idx as usize].as_str();
-                        let result = self.interp.scope.scalar_concat_inplace(n, &rhs);
+                        let line = self.line();
+                        let result = self
+                            .interp
+                            .scope
+                            .scalar_concat_inplace(n, &rhs)
+                            .map_err(|e| e.at_line(line))?;
                         self.push(result);
                         Ok(())
                     }
@@ -3122,7 +3172,8 @@ impl<'a> VM<'a> {
                         let progress_flag = self.pop().is_true();
                         let idx = *block_idx as usize;
                         let subs = self.interp.subs.clone();
-                        let scope_capture = self.interp.scope.capture();
+                        let (scope_capture, atomic_arrays, atomic_hashes) =
+                            self.interp.scope.capture_with_atomics();
                         let pmap_progress = PmapProgress::new(progress_flag, list.len());
                         if let Some(&(start, end)) =
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
@@ -3134,6 +3185,10 @@ impl<'a> VM<'a> {
                                     let mut local_interp = Interpreter::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
+                                    local_interp
+                                        .scope
+                                        .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                    local_interp.enable_parallel_guard();
                                     let _ = local_interp.scope.set_scalar("_", item);
                                     let mut vm = shared.worker_vm(&mut local_interp);
                                     let mut op_count = 0u64;
@@ -3156,11 +3211,17 @@ impl<'a> VM<'a> {
                                     let mut local_interp = Interpreter::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
+                                    local_interp
+                                        .scope
+                                        .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                    local_interp.enable_parallel_guard();
                                     let _ = local_interp.scope.set_scalar("_", item);
+                                    local_interp.scope_push_hook();
                                     let val = match local_interp.exec_block_no_scope(&block) {
                                         Ok(val) => val,
                                         Err(_) => PerlValue::UNDEF,
                                     };
+                                    local_interp.scope_pop_hook();
                                     pmap_progress.tick();
                                     val
                                 })
@@ -3175,7 +3236,8 @@ impl<'a> VM<'a> {
                         let progress_flag = self.pop().is_true();
                         let idx = *block_idx as usize;
                         let subs = self.interp.subs.clone();
-                        let scope_capture = self.interp.scope.capture();
+                        let (scope_capture, atomic_arrays, atomic_hashes) =
+                            self.interp.scope.capture_with_atomics();
                         let pmap_progress = PmapProgress::new(progress_flag, list.len());
                         if let Some(&(start, end)) =
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
@@ -3187,6 +3249,10 @@ impl<'a> VM<'a> {
                                     let mut local_interp = Interpreter::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
+                                    local_interp
+                                        .scope
+                                        .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                    local_interp.enable_parallel_guard();
                                     let _ = local_interp.scope.set_scalar("_", item.clone());
                                     let mut vm = shared.worker_vm(&mut local_interp);
                                     let mut op_count = 0u64;
@@ -3214,11 +3280,17 @@ impl<'a> VM<'a> {
                                     let mut local_interp = Interpreter::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
+                                    local_interp
+                                        .scope
+                                        .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                    local_interp.enable_parallel_guard();
                                     let _ = local_interp.scope.set_scalar("_", item.clone());
+                                    local_interp.scope_push_hook();
                                     let keep = match local_interp.exec_block_no_scope(&block) {
                                         Ok(val) => val.is_true(),
                                         Err(_) => false,
                                     };
+                                    local_interp.scope_pop_hook();
                                     pmap_progress.tick();
                                     if keep {
                                         Some(item)
@@ -3239,7 +3311,8 @@ impl<'a> VM<'a> {
                         let pmap_progress = PmapProgress::new(progress_flag, list.len());
                         let idx = *block_idx as usize;
                         let subs = self.interp.subs.clone();
-                        let scope_capture = self.interp.scope.capture();
+                        let (scope_capture, atomic_arrays, atomic_hashes) =
+                            self.interp.scope.capture_with_atomics();
                         let first_err: Arc<Mutex<Option<PerlError>>> = Arc::new(Mutex::new(None));
                         if let Some(&(start, end)) =
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
@@ -3252,6 +3325,10 @@ impl<'a> VM<'a> {
                                 let mut local_interp = Interpreter::new();
                                 local_interp.subs = subs.clone();
                                 local_interp.scope.restore_capture(&scope_capture);
+                                local_interp
+                                    .scope
+                                    .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                local_interp.enable_parallel_guard();
                                 let _ = local_interp.scope.set_scalar("_", item);
                                 let mut vm = shared.worker_vm(&mut local_interp);
                                 let mut op_count = 0u64;
@@ -3275,7 +3352,12 @@ impl<'a> VM<'a> {
                                 let mut local_interp = Interpreter::new();
                                 local_interp.subs = subs.clone();
                                 local_interp.scope.restore_capture(&scope_capture);
+                                local_interp
+                                    .scope
+                                    .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                local_interp.enable_parallel_guard();
                                 let _ = local_interp.scope.set_scalar("_", item);
+                                local_interp.scope_push_hook();
                                 match local_interp.exec_block_no_scope(&block) {
                                     Ok(_) => {}
                                     Err(e) => {
@@ -3292,6 +3374,7 @@ impl<'a> VM<'a> {
                                         }
                                     }
                                 }
+                                local_interp.scope_pop_hook();
                                 pmap_progress.tick();
                             });
                         }
@@ -3309,7 +3392,8 @@ impl<'a> VM<'a> {
                         pmap_progress.tick();
                         let idx = *block_idx as usize;
                         let subs = self.interp.subs.clone();
-                        let scope_capture = self.interp.scope.capture();
+                        let (scope_capture, atomic_arrays, atomic_hashes) =
+                            self.interp.scope.capture_with_atomics();
                         if let Some(&(start, end)) =
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
                         {
@@ -3318,6 +3402,10 @@ impl<'a> VM<'a> {
                                 let mut local_interp = Interpreter::new();
                                 local_interp.subs = subs.clone();
                                 local_interp.scope.restore_capture(&scope_capture);
+                                local_interp
+                                    .scope
+                                    .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                local_interp.enable_parallel_guard();
                                 let _ = local_interp.scope.set_scalar("a", a.clone());
                                 let _ = local_interp.scope.set_scalar("b", b.clone());
                                 let mut vm = shared.worker_vm(&mut local_interp);
@@ -3342,9 +3430,14 @@ impl<'a> VM<'a> {
                                 let mut local_interp = Interpreter::new();
                                 local_interp.subs = subs.clone();
                                 local_interp.scope.restore_capture(&scope_capture);
+                                local_interp
+                                    .scope
+                                    .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                local_interp.enable_parallel_guard();
                                 let _ = local_interp.scope.set_scalar("a", a.clone());
                                 let _ = local_interp.scope.set_scalar("b", b.clone());
-                                match local_interp.exec_block_no_scope(&block) {
+                                local_interp.scope_push_hook();
+                                let ord = match local_interp.exec_block_no_scope(&block) {
                                     Ok(v) => {
                                         let n = v.to_int();
                                         if n < 0 {
@@ -3356,7 +3449,9 @@ impl<'a> VM<'a> {
                                         }
                                     }
                                     Err(_) => std::cmp::Ordering::Equal,
-                                }
+                                };
+                                local_interp.scope_pop_hook();
+                                ord
                             });
                         }
                         pmap_progress.tick();
@@ -3439,12 +3534,15 @@ impl<'a> VM<'a> {
                             local_interp
                                 .scope
                                 .restore_atomics(&atomic_arrays, &atomic_hashes);
+                            local_interp.enable_parallel_guard();
+                            local_interp.scope_push_hook();
                             let out = match local_interp.exec_block_no_scope(&block) {
                                 Ok(v) => Ok(v),
                                 Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
                                 Err(FlowOrError::Error(e)) => Err(e),
                                 Err(_) => Ok(PerlValue::UNDEF),
                             };
+                            local_interp.scope_pop_hook();
                             *rs.lock() = Some(out);
                         });
                         *join_slot.lock() = Some(h);
