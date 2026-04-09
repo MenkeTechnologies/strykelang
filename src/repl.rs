@@ -101,10 +101,7 @@ impl Completer for ReplHelper {
         _ctx: &Context<'_>,
     ) -> rustyline::Result<(usize, Vec<Pair>)> {
         let (start, prefix) = completion_word_start(line, pos);
-        if prefix.starts_with('$')
-            || prefix.starts_with('@')
-            || prefix.starts_with('%')
-        {
+        if prefix.starts_with('$') || prefix.starts_with('@') || prefix.starts_with('%') {
             return Ok((start, self.word_pairs(prefix)?));
         }
 
@@ -250,5 +247,4 @@ mod tests {
         assert_eq!(st, 3);
         assert_eq!(pre, "");
     }
-
 }

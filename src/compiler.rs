@@ -1123,9 +1123,7 @@ impl Compiler {
                 self.emit_get_scalar(idx, line);
             }
             ExprKind::ArrayVar(name) => {
-                let idx = self
-                    .chunk
-                    .intern_name(&self.qualify_stash_array_name(name));
+                let idx = self.chunk.intern_name(&self.qualify_stash_array_name(name));
                 self.chunk.emit(Op::GetArray(idx), line);
             }
             ExprKind::HashVar(name) => {
@@ -1529,9 +1527,7 @@ impl Compiler {
             // ── Array ops ──
             ExprKind::Push { array, values } => {
                 if let ExprKind::ArrayVar(name) = &array.kind {
-                    let idx = self
-                        .chunk
-                        .intern_name(&self.qualify_stash_array_name(name));
+                    let idx = self.chunk.intern_name(&self.qualify_stash_array_name(name));
                     for v in values {
                         self.compile_expr(v)?;
                         self.chunk.emit(Op::PushArray(idx), line);
@@ -1543,9 +1539,7 @@ impl Compiler {
             }
             ExprKind::Pop(array) => {
                 if let ExprKind::ArrayVar(name) = &array.kind {
-                    let idx = self
-                        .chunk
-                        .intern_name(&self.qualify_stash_array_name(name));
+                    let idx = self.chunk.intern_name(&self.qualify_stash_array_name(name));
                     self.chunk.emit(Op::PopArray(idx), line);
                 } else {
                     return Err(CompileError::Unsupported("Pop on non-array".into()));
@@ -1553,9 +1547,7 @@ impl Compiler {
             }
             ExprKind::Shift(array) => {
                 if let ExprKind::ArrayVar(name) = &array.kind {
-                    let idx = self
-                        .chunk
-                        .intern_name(&self.qualify_stash_array_name(name));
+                    let idx = self.chunk.intern_name(&self.qualify_stash_array_name(name));
                     self.chunk.emit(Op::ShiftArray(idx), line);
                 } else {
                     return Err(CompileError::Unsupported("Shift on non-array".into()));
@@ -1568,9 +1560,7 @@ impl Compiler {
             // Splice is already handled by Unsupported above
             ExprKind::ScalarContext(inner) => {
                 if let ExprKind::ArrayVar(name) = &inner.kind {
-                    let idx = self
-                        .chunk
-                        .intern_name(&self.qualify_stash_array_name(name));
+                    let idx = self.chunk.intern_name(&self.qualify_stash_array_name(name));
                     self.chunk.emit(Op::ArrayLen(idx), line);
                 } else {
                     self.compile_expr(inner)?;
@@ -2293,7 +2283,9 @@ impl Compiler {
             }
 
             ExprKind::AlgebraicMatch { .. } => {
-                return Err(CompileError::Unsupported("algebraic match expression".into()));
+                return Err(CompileError::Unsupported(
+                    "algebraic match expression".into(),
+                ));
             }
 
             // ── Match (regex) ──
@@ -2391,7 +2383,11 @@ impl Compiler {
             }
 
             // ── Parallel extensions ──
-            ExprKind::PMapExpr { block, list, progress } => {
+            ExprKind::PMapExpr {
+                block,
+                list,
+                progress,
+            } => {
                 if let Some(p) = progress {
                     self.compile_expr(p)?;
                 } else {
@@ -2526,9 +2522,7 @@ impl Compiler {
                 self.emit_get_scalar(idx, line);
             }
             StringPart::ArrayVar(name) => {
-                let idx = self
-                    .chunk
-                    .intern_name(&self.qualify_stash_array_name(name));
+                let idx = self.chunk.intern_name(&self.qualify_stash_array_name(name));
                 self.chunk.emit(Op::GetArray(idx), line);
             }
             StringPart::Expr(e) => {

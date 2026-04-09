@@ -293,6 +293,8 @@ Each `async` worker gets a **clone of the interpreter’s subs** and a **capture
 
 **CSV** — [`csv`](https://crates.io/crates/csv) backed. `csv_read(path)` returns an array of **hashrefs** (first row is the header). `csv_write(path, row, …)` or `csv_write(path, \@rows)` writes rows (each row is a hash or hashref); header columns are the union of keys in first-seen order.
 
+**DataFrame** — `dataframe(path)` loads the same CSV shape into a **columnar** value (not an array of hashrefs). Methods: `->nrow` / `->nrows`, `->ncol` / `->ncols`; `->filter(sub { … })` runs the coderef with `$_` bound to each row as a hashref; `->group_by("col")` sets the grouping column for a following `->sum("amount")`, which returns a small two-column frame (group key, sum). Without `group_by`, `->sum("col")` returns a single numeric total. JSON encoding represents a frame as an array of row objects.
+
 **SQLite** — embedded database via [`rusqlite`](https://crates.io/crates/rusqlite) with **bundled** libsqlite (no system SQLite required). `sqlite(path)` returns a handle: `->exec(sql, ?…)`, `->query(sql, ?…)` (rows as hashrefs), `->last_insert_rowid`.
 
 **Structs** — `struct Name { field => Type, … }` with `Type` one of `Int`, `Str`, `Float`. Constructor: `Name->new(field => value, …)`. Field read: `$obj->fieldname` (same as a method call). The VM builds native struct instances (not plain blessed hashes) when the struct is declared in the same program.
@@ -386,7 +388,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - Blessed references (basic OOP)
 - `typed my $x : Int|Str|Float` (runtime-checked assignments)
 - `struct Name { field => Type, … }` with `Name->new(…)` and `$obj->field`
-- Native CSV (`csv_read` / `csv_write`) and SQLite (`sqlite` + `->exec` / `->query`)
+- Native CSV (`csv_read` / `csv_write`), columnar `dataframe(path)` with `->filter` / `->group_by` / `->sum`, and SQLite (`sqlite` + `->exec` / `->query`)
 - `fetch` / `fetch_json` (HTTP GET via `ureq`; JSON → Perl values); `json_encode` / `json_decode` (standalone JSON string ↔ Perl values)
 
 #### CONTROL FLOW
@@ -457,7 +459,8 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
  │ **System**: system, exec, exit, chdir, mkdir, unlink, rename, │
  │ chmod, chown (Unix), stat, lstat, link, symlink, readlink,   │
  │ glob, glob_par, ppool, barrier,                               │
- │ **Data**: csv_read, csv_write (header row → AoH), sqlite     │
+ │ **Data**: csv_read, csv_write (header row → AoH), dataframe, │
+ │ sqlite                                                        │
  │ fork, wait, waitpid, kill, alarm, sleep, times (Unix where  │
  │ noted in source)                                            │
  │ **Socket** (std::net): socket, bind, listen, accept,         │
@@ -472,6 +475,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 
 #### EXTENSIONS BEYOND STOCK PERL 5
 - **`csv_read PATH` / `csv_write PATH, \@rows`** — native CSV via the Rust `csv` crate. The first row is column headers; each data row is a hashref (string cells). `csv_write` uses the first row’s key order for columns.
+- **`dataframe(PATH)`** — same CSV load as `csv_read`, but stored columnar; methods `->filter`, `->group_by`, `->sum`, `->nrow` / `->ncol` (see **DataFrame** under native CSV above).
 - **`sqlite(PATH)`** — embedded SQLite via `rusqlite` (bundled libsqlite). Handle methods: `->exec(SQL, ?bind…)`, `->query(SQL, ?bind…)` (array of hashrefs), `->last_insert_rowid`.
 - **`par_lines PATH, sub { ... }`** — memory-map the file, split into line-aligned byte chunks, process chunks in parallel with rayon; each line sets `$_` for the coderef (CRLF-safe; tree-walker only; use `mysync` for shared counters across workers).
 - **`pwatch GLOB, sub { ... }`** — register native file/directory watches with the `notify` crate (inotify/kqueue/FSEvents); block in the event loop and dispatch each glob-matching path to the coderef on a rayon worker with `$_` set to the path (tree-walker only; use `mysync` for shared state).

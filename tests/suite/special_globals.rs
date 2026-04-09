@@ -1,9 +1,9 @@
 //! High-impact Perl globals: `$]`, `$;`, `$^*`, `$ARGV` + `<>`, `@-` / `@+`, `$^S`, `%INC` / `%SIG`.
 
 use crate::common::*;
-use perlrs::perl_bracket_version;
 use perlrs::interpreter::Interpreter;
 use perlrs::parse;
+use perlrs::perl_bracket_version;
 use perlrs::value::PerlValue;
 
 #[test]
@@ -49,8 +49,7 @@ fn diamond_sets_argv_scalar() {
     std::fs::write(&base, "hello\n").expect("write temp");
     let path = base.to_string_lossy().into_owned();
 
-    let program = parse("my $line = <>; length($line) + length($ARGV)")
-        .expect("parse");
+    let program = parse("my $line = <>; length($line) + length($ARGV)").expect("parse");
     let mut interp = Interpreter::new();
     interp
         .scope
@@ -75,7 +74,5 @@ fn require_populates_inc_hash() {
     let mut interp = Interpreter::new();
     let v = interp.execute(&program).expect("run");
     assert!(v.to_int() >= 1);
-    assert!(interp
-        .scope
-        .exists_hash_element("INC", "Trivial.pm"));
+    assert!(interp.scope.exists_hash_element("INC", "Trivial.pm"));
 }

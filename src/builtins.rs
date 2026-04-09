@@ -73,8 +73,17 @@ pub(crate) fn try_builtin(
         "fetch_async_json" => Some(builtin_fetch_async_json(args)),
         "par_fetch" => Some(builtin_par_fetch(args)),
         "par_csv_read" => Some(builtin_par_csv_read(args)),
+        "dataframe" => Some(builtin_dataframe(args)),
         _ => None,
     }
+}
+
+fn builtin_dataframe(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let path = args.first().map(|v| v.to_string()).unwrap_or_default();
+    if path.is_empty() {
+        return Err(PerlError::runtime("dataframe needs a file path", 0));
+    }
+    crate::native_data::dataframe_from_path(&path)
 }
 
 fn builtin_csv_read(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -184,9 +193,7 @@ fn builtin_par_fetch(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
     let out: Vec<PerlValue> = urls
         .into_par_iter()
-        .map(|u| {
-            crate::native_data::fetch(&u.to_string()).unwrap_or(PerlValue::UNDEF)
-        })
+        .map(|u| crate::native_data::fetch(&u.to_string()).unwrap_or(PerlValue::UNDEF))
         .collect();
     Ok(PerlValue::array(out))
 }

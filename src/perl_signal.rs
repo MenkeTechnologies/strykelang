@@ -32,21 +32,19 @@ mod unix {
     static SIGCHLD_P: AtomicBool = AtomicBool::new(false);
 
     pub fn poll(interp: &mut Interpreter) -> PerlResult<()> {
-        INIT.call_once(|| {
-            unsafe {
-                let _ = signal_hook::low_level::register(SIGINT, || {
-                    SIGINT_P.store(true, Ordering::SeqCst);
-                });
-                let _ = signal_hook::low_level::register(SIGTERM, || {
-                    SIGTERM_P.store(true, Ordering::SeqCst);
-                });
-                let _ = signal_hook::low_level::register(SIGALRM, || {
-                    SIGALRM_P.store(true, Ordering::SeqCst);
-                });
-                let _ = signal_hook::low_level::register(SIGCHLD, || {
-                    SIGCHLD_P.store(true, Ordering::SeqCst);
-                });
-            }
+        INIT.call_once(|| unsafe {
+            let _ = signal_hook::low_level::register(SIGINT, || {
+                SIGINT_P.store(true, Ordering::SeqCst);
+            });
+            let _ = signal_hook::low_level::register(SIGTERM, || {
+                SIGTERM_P.store(true, Ordering::SeqCst);
+            });
+            let _ = signal_hook::low_level::register(SIGALRM, || {
+                SIGALRM_P.store(true, Ordering::SeqCst);
+            });
+            let _ = signal_hook::low_level::register(SIGCHLD, || {
+                SIGCHLD_P.store(true, Ordering::SeqCst);
+            });
         });
         if SIGINT_P.swap(false, Ordering::SeqCst) {
             interp.invoke_sig_handler("INT")?;

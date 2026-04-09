@@ -68,6 +68,32 @@ pub struct CaptureResult {
     pub exitcode: i64,
 }
 
+/// Columnar table from `dataframe(path)`; chain `filter`, `group_by`, `sum`, `nrow`.
+#[derive(Debug, Clone)]
+pub struct PerlDataFrame {
+    pub columns: Vec<String>,
+    pub cols: Vec<Vec<PerlValue>>,
+    /// When set, `sum(col)` aggregates rows by this column.
+    pub group_by: Option<String>,
+}
+
+impl PerlDataFrame {
+    #[inline]
+    pub fn nrows(&self) -> usize {
+        self.cols.first().map(|c| c.len()).unwrap_or(0)
+    }
+
+    #[inline]
+    pub fn ncols(&self) -> usize {
+        self.columns.len()
+    }
+
+    #[inline]
+    pub fn col_index(&self, name: &str) -> Option<usize> {
+        self.columns.iter().position(|c| c == name)
+    }
+}
+
 /// Heap payload when [`PerlValue`] is not an immediate or raw [`f64`] bits.
 #[derive(Debug, Clone)]
 pub(crate) enum HeapObject {
@@ -97,6 +123,7 @@ pub(crate) enum HeapObject {
     Barrier(PerlBarrier),
     SqliteConn(Arc<Mutex<rusqlite::Connection>>),
     StructInst(Arc<StructInstance>),
+    DataFrame(Arc<Mutex<PerlDataFrame>>),
 }
 
 /// NaN-boxed value: one `u64` (immediates, raw float bits, or tagged heap pointer).
@@ -114,9 +141,13 @@ impl Clone for PerlValue {
         if nanbox::is_heap(self.0) {
             let arc = self.heap_arc();
             match &*arc {
-                HeapObject::Array(v) => PerlValue::from_heap(Arc::new(HeapObject::Array(v.clone()))),
+                HeapObject::Array(v) => {
+                    PerlValue::from_heap(Arc::new(HeapObject::Array(v.clone())))
+                }
                 HeapObject::Hash(h) => PerlValue::from_heap(Arc::new(HeapObject::Hash(h.clone()))),
-                HeapObject::String(s) => PerlValue::from_heap(Arc::new(HeapObject::String(s.clone()))),
+                HeapObject::String(s) => {
+                    PerlValue::from_heap(Arc::new(HeapObject::String(s.clone())))
+                }
                 HeapObject::Integer(n) => PerlValue::integer(*n),
                 HeapObject::Float(f) => PerlValue::float(*f),
                 _ => PerlValue::from_heap(Arc::clone(&arc)),
@@ -477,6 +508,15 @@ impl PerlValue {
     }
 
     #[inline]
+    pub fn as_dataframe(&self) -> Option<Arc<Mutex<PerlDataFrame>>> {
+        self.with_heap(|h| match h {
+            HeapObject::DataFrame(d) => Some(Arc::clone(d)),
+            _ => None,
+        })
+        .flatten()
+    }
+
+    #[inline]
     pub fn as_deque(&self) -> Option<Arc<Mutex<VecDeque<PerlValue>>>> {
         self.with_heap(|h| match h {
             HeapObject::Deque(d) => Some(Arc::clone(d)),
@@ -664,6 +704,11 @@ impl PerlValue {
         Self::from_heap(Arc::new(HeapObject::StructInst(s)))
     }
 
+    #[inline]
+    pub fn dataframe(df: Arc<Mutex<PerlDataFrame>>) -> Self {
+        Self::from_heap(Arc::new(HeapObject::DataFrame(df)))
+    }
+
     /// Heap string payload, if any (allocates).
     #[inline]
     pub fn as_str(&self) -> Option<String> {
@@ -710,6 +755,10 @@ impl PerlValue {
             HeapObject::ChannelRx(_) => buf.push_str("PCHANNEL::Rx"),
             HeapObject::AsyncTask(_) => buf.push_str("AsyncTask"),
             HeapObject::Pipeline(_) => buf.push_str("Pipeline"),
+            HeapObject::DataFrame(d) => {
+                let g = d.lock();
+                buf.push_str(&format!("DataFrame({}x{})", g.nrows(), g.ncols()));
+            }
             HeapObject::Capture(_) => buf.push_str("Capture"),
             HeapObject::Ppool(_) => buf.push_str("Ppool"),
             HeapObject::Barrier(_) => buf.push_str("Barrier"),
@@ -758,6 +807,7 @@ impl PerlValue {
             HeapObject::Set(s) => !s.is_empty(),
             HeapObject::Deque(d) => !d.lock().is_empty(),
             HeapObject::Heap(h) => !h.lock().items.is_empty(),
+            HeapObject::DataFrame(d) => d.lock().nrows() > 0,
             HeapObject::Pipeline(_) | HeapObject::Capture(_) => true,
             _ => true,
         }
@@ -779,7 +829,8 @@ impl PerlValue {
         }
         if nanbox::is_heap(bits) {
             unsafe {
-                let arc = Arc::from_raw(nanbox::decode_heap_ptr::<HeapObject>(bits) as *mut HeapObject);
+                let arc =
+                    Arc::from_raw(nanbox::decode_heap_ptr::<HeapObject>(bits) as *mut HeapObject);
                 match Arc::try_unwrap(arc) {
                     Ok(HeapObject::String(s)) => return s,
                     Ok(o) => return PerlValue::from_heap(Arc::new(o)).to_string(),
@@ -827,7 +878,13 @@ impl PerlValue {
             HeapObject::Deque(d) => d.lock().len() as f64,
             HeapObject::Heap(h) => h.lock().items.len() as f64,
             HeapObject::Pipeline(p) => p.lock().source.len() as f64,
-            HeapObject::Capture(_) | HeapObject::Ppool(_) | HeapObject::Barrier(_) | HeapObject::SqliteConn(_) | HeapObject::StructInst(_) | HeapObject::IOHandle(_) => 1.0,
+            HeapObject::DataFrame(d) => d.lock().nrows() as f64,
+            HeapObject::Capture(_)
+            | HeapObject::Ppool(_)
+            | HeapObject::Barrier(_)
+            | HeapObject::SqliteConn(_)
+            | HeapObject::StructInst(_)
+            | HeapObject::IOHandle(_) => 1.0,
             _ => 0.0,
         }
     }
@@ -853,7 +910,13 @@ impl PerlValue {
             HeapObject::Deque(d) => d.lock().len() as i64,
             HeapObject::Heap(h) => h.lock().items.len() as i64,
             HeapObject::Pipeline(p) => p.lock().source.len() as i64,
-            HeapObject::Capture(_) | HeapObject::Ppool(_) | HeapObject::Barrier(_) | HeapObject::SqliteConn(_) | HeapObject::StructInst(_) | HeapObject::IOHandle(_) => 1,
+            HeapObject::DataFrame(d) => d.lock().nrows() as i64,
+            HeapObject::Capture(_)
+            | HeapObject::Ppool(_)
+            | HeapObject::Barrier(_)
+            | HeapObject::SqliteConn(_)
+            | HeapObject::StructInst(_)
+            | HeapObject::IOHandle(_) => 1,
             _ => 0,
         }
     }
@@ -888,6 +951,7 @@ impl PerlValue {
             HeapObject::Deque(_) => "Deque".to_string(),
             HeapObject::Heap(_) => "Heap".to_string(),
             HeapObject::Pipeline(_) => "Pipeline".to_string(),
+            HeapObject::DataFrame(_) => "DataFrame".to_string(),
             HeapObject::Capture(_) => "Capture".to_string(),
             HeapObject::Ppool(_) => "Ppool".to_string(),
             HeapObject::Barrier(_) => "Barrier".to_string(),
@@ -916,6 +980,7 @@ impl PerlValue {
             HeapObject::Deque(_) => PerlValue::string("Deque".into()),
             HeapObject::Heap(_) => PerlValue::string("Heap".into()),
             HeapObject::Pipeline(_) => PerlValue::string("Pipeline".into()),
+            HeapObject::DataFrame(_) => PerlValue::string("DataFrame".into()),
             HeapObject::Capture(_) => PerlValue::string("Capture".into()),
             HeapObject::Ppool(_) => PerlValue::string("Ppool".into()),
             HeapObject::Barrier(_) => PerlValue::string("Barrier".into()),
@@ -1056,6 +1121,10 @@ impl fmt::Display for PerlValue {
             HeapObject::Barrier(_) => f.write_str("Barrier"),
             HeapObject::SqliteConn(_) => f.write_str("SqliteConn"),
             HeapObject::StructInst(s) => write!(f, "{}=STRUCT(...)", s.def.name),
+            HeapObject::DataFrame(d) => {
+                let g = d.lock();
+                write!(f, "DataFrame({} rows)", g.nrows())
+            }
             HeapObject::Integer(n) => write!(f, "{n}"),
             HeapObject::Float(fl) => write!(f, "{}", format_float(*fl)),
         }
@@ -1136,6 +1205,7 @@ pub fn set_member_key(v: &PerlValue) -> String {
         HeapObject::Barrier(b) => format!("br:{:p}", Arc::as_ptr(&b.0)),
         HeapObject::SqliteConn(c) => format!("sql:{:p}", Arc::as_ptr(c)),
         HeapObject::StructInst(s) => format!("st:{}:{:?}", s.def.name, s.values),
+        HeapObject::DataFrame(d) => format!("df:{:p}", Arc::as_ptr(d)),
         HeapObject::Integer(n) => format!("i:{n}"),
         HeapObject::Float(fl) => format!("f:{}", fl.to_bits()),
     }
@@ -1226,6 +1296,20 @@ fn format_float(f: f64) -> String {
         // Perl uses %g-like formatting
         let s = format!("{}", f);
         s
+    }
+}
+
+impl PerlDataFrame {
+    /// One row as a hashref (`$_` in `filter`).
+    pub fn row_hashref(&self, row: usize) -> PerlValue {
+        let mut m = IndexMap::new();
+        for (i, col) in self.columns.iter().enumerate() {
+            m.insert(
+                col.clone(),
+                self.cols[i].get(row).cloned().unwrap_or(PerlValue::UNDEF),
+            );
+        }
+        PerlValue::hash_ref(Arc::new(RwLock::new(m)))
     }
 }
 
@@ -1430,7 +1514,10 @@ mod tests {
 
     #[test]
     fn as_str_only_on_string_variant() {
-        assert_eq!(PerlValue::string("x".into()).as_str(), Some("x".to_string()));
+        assert_eq!(
+            PerlValue::string("x".into()).as_str(),
+            Some("x".to_string())
+        );
         assert_eq!(PerlValue::integer(1).as_str(), None);
     }
 

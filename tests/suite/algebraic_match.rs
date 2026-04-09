@@ -32,55 +32,47 @@ fn parse_algebraic_match_shape() {
 
 #[test]
 fn match_regex_literal_arm() {
-    let v = run(
-        r#"my $r = match ("42") {
+    let v = run(r#"my $r = match ("42") {
         /^\d+$/ => "number",
         _ => "other",
     };
     $r;
-    "#,
-    )
+    "#)
     .expect("run");
     assert_eq!(v.to_string(), "number");
 }
 
 #[test]
 fn match_array_prefix_and_rest() {
-    let v = run(
-        r#"my $a = [1, 2, 9];
+    let v = run(r#"my $a = [1, 2, 9];
     my $r = match ($a) {
         [1, 2, *] => "ok",
         _ => "no",
     };
     $r;
-    "#,
-    )
+    "#)
     .expect("run");
     assert_eq!(v.to_string(), "ok");
 }
 
 #[test]
 fn match_hash_capture_and_interpolation() {
-    let v = run(
-        r#"my $h = { name => "Alice" };
+    let v = run(r#"my $h = { name => "Alice" };
     my $r = match ($h) {
         { name => $n } => "has name: " . $n,
         _ => "other",
     };
     $r;
-    "#,
-    )
+    "#)
     .expect("run");
     assert_eq!(v.to_string(), "has name: Alice");
 }
 
 #[test]
 fn match_non_exhaustive_errors() {
-    let e = run(
-        r#"match (1) {
+    let e = run(r#"match (1) {
         2 => "two",
-    }"#
-    )
+    }"#)
     .expect_err("should fail");
     let msg = e.to_string();
     assert!(

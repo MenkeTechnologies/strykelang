@@ -186,7 +186,13 @@ fn format_statement(s: &Statement) -> String {
         StmtKind::UseOverload { pairs } => {
             let inner = pairs
                 .iter()
-                .map(|(k, v)| format!("'{}' => '{}'", k.replace('\'', "\\'"), v.replace('\'', "\\'")))
+                .map(|(k, v)| {
+                    format!(
+                        "'{}' => '{}'",
+                        k.replace('\'', "\\'"),
+                        v.replace('\'', "\\'")
+                    )
+                })
                 .collect::<Vec<_>>()
                 .join(", ");
             format!("use overload {inner};")
@@ -602,11 +608,7 @@ pub fn format_expr(e: &Expr) -> String {
             list,
             progress,
         } => {
-            let base = format!(
-                "pmap {{\n{}\n}} {}",
-                format_block(block),
-                format_expr(list)
-            );
+            let base = format!("pmap {{\n{}\n}} {}", format_block(block), format_expr(list));
             match progress {
                 Some(p) => format!("{}, progress => {}", base, format_expr(p)),
                 None => base,

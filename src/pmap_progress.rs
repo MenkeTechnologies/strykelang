@@ -51,14 +51,7 @@ fn write_bar(stderr: &mut dyn Write, done: usize, total: usize) {
     const W: usize = 40;
     let filled = (done * W) / total.max(1);
     let pct = (done * 100) / total.max(1);
-    let bar: String = (0..W)
-        .map(|i| if i < filled { '#' } else { '-' })
-        .collect();
-    write!(
-        stderr,
-        "\r[pmap] [{}] {:3}% ({}/{})",
-        bar, pct, done, total
-    )
-    .ok();
+    let bar: String = (0..W).map(|i| if i < filled { '#' } else { '-' }).collect();
+    write!(stderr, "\r[pmap] [{}] {:3}% ({}/{})", bar, pct, done, total).ok();
     stderr.flush().ok();
 }

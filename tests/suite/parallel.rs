@@ -123,7 +123,9 @@ fn preduce_init_histogram_merges_partials() {
         1
     );
     assert_eq!(
-        eval_int(r#"my $h = preduce_init {}, { my ($acc, $item) = @_; $acc->{$item}++; $acc } ("x","y","x"); $h->{"x"}"#),
+        eval_int(
+            r#"my $h = preduce_init {}, { my ($acc, $item) = @_; $acc->{$item}++; $acc } ("x","y","x"); $h->{"x"}"#
+        ),
         2
     );
 }

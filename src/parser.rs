@@ -540,10 +540,7 @@ impl Parser {
         let class = self.parse_assign_expr()?;
         let mut args = Vec::new();
         while self.eat(&Token::Comma) {
-            if matches!(
-                self.peek(),
-                Token::Semicolon | Token::RBrace | Token::Eof
-            ) {
+            if matches!(self.peek(), Token::Semicolon | Token::RBrace | Token::Eof) {
                 break;
             }
             args.push(self.parse_assign_expr()?);
@@ -4002,7 +3999,9 @@ impl Parser {
     }
 
     /// Like [`parse_block_list`] but supports a trailing `, progress => EXPR` (for `pmap`, `pgrep`, `preduce`).
-    fn parse_block_then_list_optional_progress(&mut self) -> PerlResult<(Block, Expr, Option<Expr>)> {
+    fn parse_block_then_list_optional_progress(
+        &mut self,
+    ) -> PerlResult<(Block, Expr, Option<Expr>)> {
         let block = self.parse_block()?;
         self.eat(&Token::Comma);
         let mut parts = vec![self.parse_assign_expr()?];

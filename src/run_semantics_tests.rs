@@ -538,16 +538,14 @@ fn qualified_sub_call_across_packages() {
 #[test]
 fn isa_visible_from_main_after_package_blocks() {
     assert_eq!(
-        ri(
-            r#"
+        ri(r#"
         package P;
         sub meth { 10 }
         package C;
         our @ISA = ("P");
         package main;
         scalar @C::ISA
-        "#
-        ),
+        "#),
         1
     );
 }
@@ -555,8 +553,7 @@ fn isa_visible_from_main_after_package_blocks() {
 #[test]
 fn perl_compat_super_calls_parent_method() {
     assert_eq!(
-        ri(
-            r#"
+        ri(r#"
         package P;
         sub meth { 10 }
         package C;
@@ -565,8 +562,7 @@ fn perl_compat_super_calls_parent_method() {
         package main;
         my $o = bless {}, "C";
         $o->meth();
-        "#
-        ),
+        "#),
         15
     );
 }
@@ -574,8 +570,7 @@ fn perl_compat_super_calls_parent_method() {
 #[test]
 fn perl_compat_use_overload_dispatches_add() {
     assert_eq!(
-        ri(
-            r#"
+        ri(r#"
         package O;
         use overload '+' => 'add';
         sub add { my ($a, $b) = @_; $a->{n} + $b->{n} }
@@ -583,8 +578,7 @@ fn perl_compat_use_overload_dispatches_add() {
         my $a = O->new(n => 2);
         my $b = O->new(n => 3);
         $a + $b;
-        "#
-        ),
+        "#),
         5
     );
 }
@@ -592,8 +586,7 @@ fn perl_compat_use_overload_dispatches_add() {
 #[test]
 fn perl_compat_tie_scalar_fetch_store() {
     assert_eq!(
-        ri(
-            r#"
+        ri(r#"
         package T;
         sub TIESCALAR { bless { v => 0 }, shift }
         sub FETCH { $_[0]->{v} }
@@ -603,8 +596,7 @@ fn perl_compat_tie_scalar_fetch_store() {
         tie $x, "T";
         $x = 7;
         $x;
-        "#
-        ),
+        "#),
         7
     );
 }
@@ -613,8 +605,7 @@ fn perl_compat_tie_scalar_fetch_store() {
 #[cfg(unix)]
 #[test]
 fn perl_compat_local_typeglob_aliases_handle() {
-    let out = rs(
-        r#"
+    let out = rs(r#"
         my $f = "/tmp/perlrs_tg_" . $$;
         open OUT, ">", $f;
         local *G = *OUT;
@@ -625,7 +616,6 @@ fn perl_compat_local_typeglob_aliases_handle() {
         close IN;
         unlink $f;
         $s;
-    "#,
-    );
+    "#);
     assert!(out.contains("xyz"));
 }

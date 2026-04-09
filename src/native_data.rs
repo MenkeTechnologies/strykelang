@@ -10,7 +10,7 @@ use serde_json::Value as JsonValue;
 
 use crate::ast::StructDef;
 use crate::error::{PerlError, PerlResult};
-use crate::value::{HeapObject, PerlValue, StructInstance};
+use crate::value::{HeapObject, PerlDataFrame, PerlValue, StructInstance};
 
 /// Parallel row→hashref conversion after a sequential CSV parse (good CPU parallelism on wide files).
 pub(crate) fn par_csv_read(path: &str) -> PerlResult<PerlValue> {
@@ -38,6 +38,33 @@ pub(crate) fn par_csv_read(path: &str) -> PerlResult<PerlValue> {
         })
         .collect();
     Ok(PerlValue::array(rows))
+}
+
+/// Columnar dataframe from a CSV path (header row + string cells; use `sum` etc. with numeric strings).
+pub(crate) fn dataframe_from_path(path: &str) -> PerlResult<PerlValue> {
+    let mut rdr = csv::Reader::from_path(path)
+        .map_err(|e| PerlError::runtime(format!("dataframe: {}: {}", path, e), 0))?;
+    let headers: Vec<String> = rdr
+        .headers()
+        .map_err(|e| PerlError::runtime(format!("dataframe: {}: {}", path, e), 0))?
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    let ncols = headers.len();
+    let mut cols: Vec<Vec<PerlValue>> = (0..ncols).map(|_| Vec::new()).collect();
+    for rec in rdr.records() {
+        let record = rec.map_err(|e| PerlError::runtime(format!("dataframe: {}", e), 0))?;
+        for i in 0..ncols {
+            let cell = record.get(i).unwrap_or("");
+            cols[i].push(PerlValue::string(cell.to_string()));
+        }
+    }
+    let df = PerlDataFrame {
+        columns: headers,
+        cols,
+        group_by: None,
+    };
+    Ok(PerlValue::dataframe(Arc::new(Mutex::new(df))))
 }
 
 pub(crate) fn csv_read(path: &str) -> PerlResult<PerlValue> {
@@ -303,9 +330,8 @@ pub(crate) fn json_encode(v: &PerlValue) -> PerlResult<String> {
 
 /// Parse a JSON string into [`PerlValue`] (same mapping as [`fetch_json`]).
 pub(crate) fn json_decode(s: &str) -> PerlResult<PerlValue> {
-    let v: JsonValue = serde_json::from_str(s.trim()).map_err(|e| {
-        PerlError::runtime(format!("json_decode: {}", e), 0)
-    })?;
+    let v: JsonValue = serde_json::from_str(s.trim())
+        .map_err(|e| PerlError::runtime(format!("json_decode: {}", e), 0))?;
     Ok(json_to_perl(v))
 }
 
@@ -407,6 +433,20 @@ fn perl_to_json_value(v: &PerlValue) -> PerlResult<JsonValue> {
             out.push(perl_to_json_value(&x)?);
         }
         return Ok(JsonValue::Array(out));
+    }
+
+    if let Some(df) = v.as_dataframe() {
+        let g = df.lock();
+        let n = g.nrows();
+        let mut rows = Vec::with_capacity(n);
+        for r in 0..n {
+            let mut m = serde_json::Map::new();
+            for (i, col) in g.columns.iter().enumerate() {
+                m.insert(col.clone(), perl_to_json_value(&g.cols[i][r])?);
+            }
+            rows.push(JsonValue::Object(m));
+        }
+        return Ok(JsonValue::Array(rows));
     }
 
     Err(PerlError::runtime(

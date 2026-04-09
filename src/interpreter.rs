@@ -1,9 +1,9 @@
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
-#[cfg(unix)]
-use std::os::unix::process::ExitStatusExt;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Cursor, Read, Write as IoWrite};
+#[cfg(unix)]
+use std::os::unix::process::ExitStatusExt;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Barrier};
@@ -17,17 +17,17 @@ use rayon::prelude::*;
 use caseless::default_case_fold_str;
 
 use crate::ast::*;
-use crate::mro::linearize_c3;
 use crate::builtins::PerlSocket;
 use crate::crypt_util::perl_crypt;
 use crate::error::{ErrorKind, PerlError, PerlResult};
+use crate::mro::linearize_c3;
 use crate::pmap_progress::PmapProgress;
 use crate::profiler::Profiler;
 use crate::scope::Scope;
 use crate::sort_fast::{detect_sort_block_fast, sort_magic_cmp};
 use crate::value::{
-    CaptureResult, PerlAsyncTask, PerlBarrier, PerlHeap, PerlPpool, PerlSub, PerlValue,
-    PipelineInner, PipelineOp,
+    CaptureResult, PerlAsyncTask, PerlBarrier, PerlDataFrame, PerlHeap, PerlPpool, PerlSub,
+    PerlValue, PipelineInner, PipelineOp,
 };
 
 /// Merge two counting-hash accumulators (parallel `preduce_init` partials).
@@ -76,7 +76,9 @@ fn merge_preduce_init_partials(
     let mut local_interp = Interpreter::new();
     local_interp.subs = subs.clone();
     local_interp.scope.restore_capture(scope_capture);
-    let _ = local_interp.scope.declare_array("_", vec![a.clone(), b.clone()]);
+    let _ = local_interp
+        .scope
+        .declare_array("_", vec![a.clone(), b.clone()]);
     let _ = local_interp.scope.set_scalar("a", a);
     let _ = local_interp.scope.set_scalar("b", b);
     match local_interp.exec_block(block) {
@@ -107,7 +109,9 @@ fn fold_preduce_init_step(
     let mut local_interp = Interpreter::new();
     local_interp.subs = subs.clone();
     local_interp.scope.restore_capture(scope_capture);
-    let _ = local_interp.scope.declare_array("_", vec![acc.clone(), item.clone()]);
+    let _ = local_interp
+        .scope
+        .declare_array("_", vec![acc.clone(), item.clone()]);
     let _ = local_interp.scope.set_scalar("a", acc);
     let _ = local_interp.scope.set_scalar("b", item);
     match local_interp.exec_block(block) {
@@ -528,8 +532,7 @@ impl Interpreter {
                 return Some(fq);
             }
         }
-        mro
-            .iter()
+        mro.iter()
             .skip(start)
             .find(|p| *p != "UNIVERSAL")
             .map(|pkg| format!("{}::{}", pkg, method))
@@ -628,9 +631,29 @@ impl Interpreter {
     fn strict_scalar_exempt(name: &str) -> bool {
         matches!(
             name,
-            "_" | "0" | "!" | "@" | "/" | "\\" | "," | "." | "__PACKAGE__" | "$$"
-                | "|" | "?" | "\"" | "&" | "`" | "'" | "+" | "<" | ">" | "(" | ")"
-                | "]" | ";" | "ARGV"
+            "_" | "0"
+                | "!"
+                | "@"
+                | "/"
+                | "\\"
+                | ","
+                | "."
+                | "__PACKAGE__"
+                | "$$"
+                | "|"
+                | "?"
+                | "\""
+                | "&"
+                | "`"
+                | "'"
+                | "+"
+                | "<"
+                | ">"
+                | "("
+                | ")"
+                | "]"
+                | ";"
+                | "ARGV"
         ) || name.chars().all(|c| c.is_ascii_digit())
             || name.starts_with('^')
     }
@@ -2512,8 +2535,7 @@ impl Interpreter {
                                     self.record_exporter_our_array_name(&decl.name, &items);
                                 }
                                 let aname = self.stash_array_name_for_package(&decl.name);
-                                self.scope
-                                    .declare_array_frozen(&aname, items, decl.frozen);
+                                self.scope.declare_array_frozen(&aname, items, decl.frozen);
                             }
                             Sigil::Hash => {
                                 let items = val.to_list();
@@ -2652,9 +2674,7 @@ impl Interpreter {
                             let stored = if val.is_mysync_deque_or_heap() {
                                 val
                             } else {
-                                PerlValue::atomic(std::sync::Arc::new(
-                                    parking_lot::Mutex::new(val),
-                                ))
+                                PerlValue::atomic(std::sync::Arc::new(parking_lot::Mutex::new(val)))
                             };
                             self.scope.declare_scalar(&decl.name, stored);
                         }
@@ -2728,25 +2748,16 @@ impl Interpreter {
                 args,
             } => {
                 let pkg = self.eval_expr(class)?.to_string();
-                let pkg = pkg
-                    .trim_matches(|c| c == '\'' || c == '"')
-                    .to_string();
+                let pkg = pkg.trim_matches(|c| c == '\'' || c == '"').to_string();
                 let tie_ctor = match target {
                     TieTarget::Hash(_) => "TIEHASH",
                     TieTarget::Array(_) => "TIEARRAY",
                     TieTarget::Scalar(_) => "TIESCALAR",
                 };
                 let tie_fn = format!("{}::{}", pkg, tie_ctor);
-                let sub = self
-                    .subs
-                    .get(&tie_fn)
-                    .cloned()
-                    .ok_or_else(|| {
-                        PerlError::runtime(
-                            format!("tie: cannot find &{}", tie_fn),
-                            stmt.line,
-                        )
-                    })?;
+                let sub = self.subs.get(&tie_fn).cloned().ok_or_else(|| {
+                    PerlError::runtime(format!("tie: cannot find &{}", tie_fn), stmt.line)
+                })?;
                 let mut call_args = vec![PerlValue::string(pkg.clone())];
                 for a in args {
                     call_args.push(self.eval_expr(a)?);
@@ -2993,11 +3004,10 @@ impl Interpreter {
                             }
                             return Ok(self.get_special_var(&s));
                         }
-                        Err(PerlError::runtime(
-                            "Can't dereference non-reference as scalar",
-                            line,
+                        Err(
+                            PerlError::runtime("Can't dereference non-reference as scalar", line)
+                                .into(),
                         )
-                        .into())
                     }
                     Sigil::Array => {
                         if let Some(r) = val.as_array_ref() {
@@ -3016,11 +3026,10 @@ impl Interpreter {
                             }
                             return Ok(PerlValue::array(self.scope.get_array(&s)));
                         }
-                        Err(PerlError::runtime(
-                            "Can't dereference non-reference as array",
-                            line,
+                        Err(
+                            PerlError::runtime("Can't dereference non-reference as array", line)
+                                .into(),
                         )
-                        .into())
                     }
                     Sigil::Hash => {
                         if let Some(r) = val.as_hash_ref() {
@@ -3040,21 +3049,19 @@ impl Interpreter {
                             self.touch_env_hash(&s);
                             return Ok(PerlValue::hash(self.scope.get_hash(&s)));
                         }
-                        Err(PerlError::runtime(
-                            "Can't dereference non-reference as hash",
-                            line,
+                        Err(
+                            PerlError::runtime("Can't dereference non-reference as hash", line)
+                                .into(),
                         )
-                        .into())
                     }
                     Sigil::Typeglob => {
                         if let Some(s) = val.as_str() {
                             return Ok(PerlValue::string(self.resolve_io_handle_name(&s)));
                         }
-                        Err(PerlError::runtime(
-                            "Can't dereference non-reference as typeglob",
-                            line,
+                        Err(
+                            PerlError::runtime("Can't dereference non-reference as typeglob", line)
+                                .into(),
                         )
-                        .into())
                     }
                 }
             }
@@ -3072,11 +3079,10 @@ impl Interpreter {
                             };
                             return Ok(arr.get(i).cloned().unwrap_or(PerlValue::UNDEF));
                         }
-                        Err(PerlError::runtime(
-                            "Can't use arrow deref on non-array-ref",
-                            line,
+                        Err(
+                            PerlError::runtime("Can't use arrow deref on non-array-ref", line)
+                                .into(),
                         )
-                        .into())
                     }
                     DerefKind::Hash => {
                         let key = self.eval_expr(index)?.to_string();
@@ -3099,11 +3105,10 @@ impl Interpreter {
                             )
                             .into());
                         }
-                        Err(PerlError::runtime(
-                            "Can't use arrow deref on non-hash-ref",
-                            line,
+                        Err(
+                            PerlError::runtime("Can't use arrow deref on non-hash-ref", line)
+                                .into(),
                         )
-                        .into())
                     }
                     DerefKind::Call => {
                         // $coderef->(args)
@@ -3835,7 +3840,11 @@ impl Interpreter {
                             Err(_) => false,
                         };
                         pmap_progress.tick();
-                        if keep { Some(item) } else { None }
+                        if keep {
+                            Some(item)
+                        } else {
+                            None
+                        }
                     })
                     .collect();
                 pmap_progress.finish();
@@ -4047,20 +4056,23 @@ impl Interpreter {
                 let scope_capture = self.scope.capture();
                 let pmap_progress = PmapProgress::new(show_progress, items.len());
 
-                let result = items.into_par_iter().map(|x| {
-                    pmap_progress.tick();
-                    x
-                }).reduce_with(|a, b| {
-                    let mut local_interp = Interpreter::new();
-                    local_interp.subs = subs.clone();
-                    local_interp.scope.restore_capture(&scope_capture);
-                    let _ = local_interp.scope.set_scalar("a", a);
-                    let _ = local_interp.scope.set_scalar("b", b);
-                    match local_interp.exec_block(&block) {
-                        Ok(val) => val,
-                        Err(_) => PerlValue::UNDEF,
-                    }
-                });
+                let result = items
+                    .into_par_iter()
+                    .map(|x| {
+                        pmap_progress.tick();
+                        x
+                    })
+                    .reduce_with(|a, b| {
+                        let mut local_interp = Interpreter::new();
+                        local_interp.subs = subs.clone();
+                        local_interp.scope.restore_capture(&scope_capture);
+                        let _ = local_interp.scope.set_scalar("a", a);
+                        let _ = local_interp.scope.set_scalar("b", b);
+                        match local_interp.exec_block(&block) {
+                            Ok(val) => val,
+                            Err(_) => PerlValue::UNDEF,
+                        }
+                    });
                 pmap_progress.finish();
                 Ok(result.unwrap_or(PerlValue::UNDEF))
             }
@@ -4139,9 +4151,7 @@ impl Interpreter {
                     let mut local_interp = Interpreter::new();
                     local_interp.subs = subs.clone();
                     local_interp.scope.restore_capture(&scope_capture);
-                    let _ = local_interp
-                        .scope
-                        .set_scalar("_", items[0].clone());
+                    let _ = local_interp.scope.set_scalar("_", items[0].clone());
                     return match local_interp.exec_block_no_scope(&map_block) {
                         Ok(v) => Ok(v),
                         Err(_) => Ok(PerlValue::UNDEF),
@@ -4218,7 +4228,9 @@ impl Interpreter {
                 } else {
                     None
                 };
-                Ok(crate::pchannel::pselect_recv_with_optional_timeout(&rx_vals, dur, line)?)
+                Ok(crate::pchannel::pselect_recv_with_optional_timeout(
+                    &rx_vals, dur, line,
+                )?)
             }
 
             // Array ops
@@ -4361,17 +4373,15 @@ impl Interpreter {
             }
             ExprKind::Length(expr) => {
                 let val = self.eval_expr(expr)?;
-                Ok(
-                    if let Some(a) = val.as_array_vec() {
-                        PerlValue::integer(a.len() as i64)
-                    } else if let Some(h) = val.as_hash_map() {
-                        PerlValue::integer(h.len() as i64)
-                    } else if let Some(b) = val.as_bytes_arc() {
-                        PerlValue::integer(b.len() as i64)
-                    } else {
-                        PerlValue::integer(val.to_string().len() as i64)
-                    },
-                )
+                Ok(if let Some(a) = val.as_array_vec() {
+                    PerlValue::integer(a.len() as i64)
+                } else if let Some(h) = val.as_hash_map() {
+                    PerlValue::integer(h.len() as i64)
+                } else if let Some(b) = val.as_bytes_arc() {
+                    PerlValue::integer(b.len() as i64)
+                } else {
+                    PerlValue::integer(val.to_string().len() as i64)
+                })
             }
             ExprKind::Substr {
                 string,
@@ -5092,16 +5102,17 @@ impl Interpreter {
         let sub_short = map.get(key)?;
         let fq = format!("{}::{}", class, sub_short);
         let sub = self.subs.get(&fq)?.clone();
-        Some(self.call_sub(
-            &sub,
-            vec![invocant, other],
-            WantarrayCtx::Scalar,
-            line,
-        ))
+        Some(self.call_sub(&sub, vec![invocant, other], WantarrayCtx::Scalar, line))
     }
 
     #[inline]
-    fn eval_binop(&mut self, op: BinOp, lv: &PerlValue, rv: &PerlValue, _line: usize) -> ExecResult {
+    fn eval_binop(
+        &mut self,
+        op: BinOp,
+        lv: &PerlValue,
+        rv: &PerlValue,
+        _line: usize,
+    ) -> ExecResult {
         Ok(match op {
             // ── Integer fast paths: avoid f64 conversion when both operands are i64 ──
             BinOp::Add => {
@@ -5338,8 +5349,12 @@ impl Interpreter {
                     let full = format!("{}::STORE", class);
                     if let Some(sub) = self.subs.get(&full).cloned() {
                         let arg_vals = vec![obj, val];
-                        return match self.call_sub(&sub, arg_vals, WantarrayCtx::Scalar, target.line)
-                        {
+                        return match self.call_sub(
+                            &sub,
+                            arg_vals,
+                            WantarrayCtx::Scalar,
+                            target.line,
+                        ) {
                             Ok(_) => Ok(PerlValue::UNDEF),
                             Err(FlowOrError::Flow(_)) => Ok(PerlValue::UNDEF),
                             Err(FlowOrError::Error(e)) => Err(FlowOrError::Error(e)),
@@ -5427,8 +5442,12 @@ impl Interpreter {
                     let full = format!("{}::STORE", class);
                     if let Some(sub) = self.subs.get(&full).cloned() {
                         let arg_vals = vec![obj, PerlValue::integer(idx), val];
-                        return match self.call_sub(&sub, arg_vals, WantarrayCtx::Scalar, target.line)
-                        {
+                        return match self.call_sub(
+                            &sub,
+                            arg_vals,
+                            WantarrayCtx::Scalar,
+                            target.line,
+                        ) {
                             Ok(_) => Ok(PerlValue::UNDEF),
                             Err(FlowOrError::Flow(_)) => Ok(PerlValue::UNDEF),
                             Err(FlowOrError::Error(e)) => Err(FlowOrError::Error(e)),
@@ -5466,8 +5485,12 @@ impl Interpreter {
                     let full = format!("{}::STORE", class);
                     if let Some(sub) = self.subs.get(&full).cloned() {
                         let arg_vals = vec![obj, PerlValue::string(k), val];
-                        return match self.call_sub(&sub, arg_vals, WantarrayCtx::Scalar, target.line)
-                        {
+                        return match self.call_sub(
+                            &sub,
+                            arg_vals,
+                            WantarrayCtx::Scalar,
+                            target.line,
+                        ) {
                             Ok(_) => Ok(PerlValue::UNDEF),
                             Err(FlowOrError::Flow(_)) => Ok(PerlValue::UNDEF),
                             Err(FlowOrError::Error(e)) => Err(FlowOrError::Error(e)),
@@ -5477,7 +5500,11 @@ impl Interpreter {
                 self.scope.set_hash_element(hash, &k, val);
                 Ok(PerlValue::UNDEF)
             }
-            ExprKind::ArrowDeref { expr, index, kind: DerefKind::Hash } => {
+            ExprKind::ArrowDeref {
+                expr,
+                index,
+                kind: DerefKind::Hash,
+            } => {
                 let key = self.eval_expr(index)?.to_string();
                 let container = self.eval_expr(expr)?;
                 if let Some(b) = container.as_blessed_ref() {
@@ -5515,8 +5542,23 @@ impl Interpreter {
     pub(crate) fn is_special_scalar_name_for_get(name: &str) -> bool {
         matches!(
             name,
-            "$$" | "0" | "!" | "@" | "/" | "\\" | "," | "." | "]" | ";" | "ARGV"
-                | "^I" | "^D" | "^P" | "^S" | "^W" | "?" | "|"
+            "$$" | "0"
+                | "!"
+                | "@"
+                | "/"
+                | "\\"
+                | ","
+                | "."
+                | "]"
+                | ";"
+                | "ARGV"
+                | "^I"
+                | "^D"
+                | "^P"
+                | "^S"
+                | "^W"
+                | "?"
+                | "|"
         )
     }
 
@@ -5524,7 +5566,18 @@ impl Interpreter {
     pub(crate) fn is_special_scalar_name_for_set(name: &str) -> bool {
         matches!(
             name,
-            "0" | "/" | "\\" | "," | ";" | "^I" | "^D" | "^P" | "^W" | "$$" | "]" | "^S" | "ARGV"
+            "0" | "/"
+                | "\\"
+                | ","
+                | ";"
+                | "^I"
+                | "^D"
+                | "^P"
+                | "^W"
+                | "$$"
+                | "]"
+                | "^S"
+                | "ARGV"
                 | "|"
         )
     }
@@ -5913,6 +5966,9 @@ impl Interpreter {
             }
             return None;
         }
+        if let Some(d) = receiver.as_dataframe() {
+            return Some(self.dataframe_method(d, method, args, line));
+        }
         if let Some(d) = receiver.as_deque() {
             return Some(self.deque_method(d, method, args, line));
         }
@@ -5941,6 +5997,164 @@ impl Interpreter {
             }
         }
         None
+    }
+
+    /// `dataframe(path)` — `filter`, `group_by`, `sum`, `nrow`, `ncol`.
+    fn dataframe_method(
+        &mut self,
+        d: Arc<Mutex<PerlDataFrame>>,
+        method: &str,
+        args: &[PerlValue],
+        line: usize,
+    ) -> PerlResult<PerlValue> {
+        match method {
+            "nrow" | "nrows" => {
+                if !args.is_empty() {
+                    return Err(PerlError::runtime(
+                        format!("dataframe {} takes no arguments", method),
+                        line,
+                    ));
+                }
+                Ok(PerlValue::integer(d.lock().nrows() as i64))
+            }
+            "ncol" | "ncols" => {
+                if !args.is_empty() {
+                    return Err(PerlError::runtime(
+                        format!("dataframe {} takes no arguments", method),
+                        line,
+                    ));
+                }
+                Ok(PerlValue::integer(d.lock().ncols() as i64))
+            }
+            "filter" => {
+                if args.len() != 1 {
+                    return Err(PerlError::runtime(
+                        "dataframe filter expects 1 argument (sub)",
+                        line,
+                    ));
+                }
+                let Some(sub) = args[0].as_code_ref() else {
+                    return Err(PerlError::runtime(
+                        "dataframe filter expects a code reference",
+                        line,
+                    ));
+                };
+                let df_guard = d.lock();
+                let n = df_guard.nrows();
+                let mut keep = vec![false; n];
+                for r in 0..n {
+                    let row = df_guard.row_hashref(r);
+                    self.scope_push_hook();
+                    let _ = self.scope.set_scalar("_", row);
+                    if let Some(ref env) = sub.closure_env {
+                        self.scope.restore_capture(env);
+                    }
+                    let pass = match self.exec_block_no_scope(&sub.body) {
+                        Ok(v) => v.is_true(),
+                        Err(_) => false,
+                    };
+                    self.scope_pop_hook();
+                    keep[r] = pass;
+                }
+                let columns = df_guard.columns.clone();
+                let cols: Vec<Vec<PerlValue>> = (0..df_guard.ncols())
+                    .map(|i| {
+                        let mut out = Vec::new();
+                        for r in 0..n {
+                            if keep[r] {
+                                out.push(df_guard.cols[i][r].clone());
+                            }
+                        }
+                        out
+                    })
+                    .collect();
+                let group_by = df_guard.group_by.clone();
+                drop(df_guard);
+                let new_df = PerlDataFrame {
+                    columns,
+                    cols,
+                    group_by,
+                };
+                Ok(PerlValue::dataframe(Arc::new(Mutex::new(new_df))))
+            }
+            "group_by" => {
+                if args.len() != 1 {
+                    return Err(PerlError::runtime(
+                        "dataframe group_by expects 1 column name",
+                        line,
+                    ));
+                }
+                let key = args[0].to_string();
+                let inner = d.lock();
+                if inner.col_index(&key).is_none() {
+                    return Err(PerlError::runtime(
+                        format!("dataframe group_by: unknown column \"{}\"", key),
+                        line,
+                    ));
+                }
+                let new_df = PerlDataFrame {
+                    columns: inner.columns.clone(),
+                    cols: inner.cols.clone(),
+                    group_by: Some(key),
+                };
+                Ok(PerlValue::dataframe(Arc::new(Mutex::new(new_df))))
+            }
+            "sum" => {
+                if args.len() != 1 {
+                    return Err(PerlError::runtime(
+                        "dataframe sum expects 1 column name",
+                        line,
+                    ));
+                }
+                let col_name = args[0].to_string();
+                let inner = d.lock();
+                let val_idx = inner.col_index(&col_name).ok_or_else(|| {
+                    PerlError::runtime(
+                        format!("dataframe sum: unknown column \"{}\"", col_name),
+                        line,
+                    )
+                })?;
+                match &inner.group_by {
+                    Some(gcol) => {
+                        let gi = inner.col_index(gcol).ok_or_else(|| {
+                            PerlError::runtime(
+                                format!("dataframe sum: unknown group column \"{}\"", gcol),
+                                line,
+                            )
+                        })?;
+                        let mut acc: IndexMap<String, f64> = IndexMap::new();
+                        for r in 0..inner.nrows() {
+                            let k = inner.cols[gi][r].to_string();
+                            let v = inner.cols[val_idx][r].to_number();
+                            *acc.entry(k).or_insert(0.0) += v;
+                        }
+                        let keys: Vec<String> = acc.keys().cloned().collect();
+                        let sums: Vec<f64> = acc.values().copied().collect();
+                        let cols = vec![
+                            keys.into_iter().map(PerlValue::string).collect(),
+                            sums.into_iter().map(PerlValue::float).collect(),
+                        ];
+                        let columns = vec![gcol.clone(), format!("sum_{}", col_name)];
+                        let out = PerlDataFrame {
+                            columns,
+                            cols,
+                            group_by: None,
+                        };
+                        Ok(PerlValue::dataframe(Arc::new(Mutex::new(out))))
+                    }
+                    None => {
+                        let total: f64 = (0..inner.nrows())
+                            .map(|r| inner.cols[val_idx][r].to_number())
+                            .sum();
+                        Ok(PerlValue::float(total))
+                    }
+                }
+            }
+            _ => Err(PerlError::runtime(
+                format!("Unknown method for dataframe: {}", method),
+                line,
+            )),
+        }
     }
 
     fn deque_method(
