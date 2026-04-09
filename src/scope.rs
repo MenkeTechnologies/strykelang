@@ -556,7 +556,7 @@ impl Scope {
                 captured.push((format!("${}", k), v.clone()));
             }
             // Capture atomic arrays as special markers with the Arc
-            for (k, aa) in &frame.atomic_arrays {
+            for (k, _aa) in &frame.atomic_arrays {
                 // Store as "$__atomic_array__NAME" with the Arc wrapped in a PerlValue
                 // We use a special prefix that restore_capture will recognize
                 captured.push((
@@ -568,7 +568,7 @@ impl Scope {
                 // Hack: we can't put Arc<Mutex<Vec>> in PerlValue. Instead,
                 // we'll store the array name and let restore_capture re-find it.
             }
-            for (k, ah) in &frame.atomic_hashes {
+            for (k, _ah) in &frame.atomic_hashes {
                 captured.push((
                     format!("%sync_{}", k),
                     PerlValue::Atomic(Arc::new(Mutex::new(PerlValue::String(String::new())))),
