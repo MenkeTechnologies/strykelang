@@ -117,6 +117,17 @@ fn list_util_mesh_interleaves_array_refs() {
 }
 
 #[test]
+fn list_util_zip_shortest_pairs_rows_by_min_length() {
+    let mut interp = Interpreter::new();
+    let p = parse(
+        "my @z = List::Util::zip_shortest([1, 2, 3], [10, 20]); scalar @z + $z[0]->[0] + $z[0]->[1] + $z[1]->[0] + $z[1]->[1]",
+    )
+    .expect("parse");
+    let v = interp.execute(&p).expect("run");
+    assert_eq!(v.to_int(), 2 + 1 + 10 + 2 + 20);
+}
+
+#[test]
 fn list_util_pairs_returns_blessed_arrays() {
     let mut interp = Interpreter::new();
     let p = parse("join(\",\", List::Util::pairs(\"a\", 1, \"b\", 2))").expect("parse");

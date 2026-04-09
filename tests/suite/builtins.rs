@@ -82,3 +82,8 @@ fn die_in_eval() {
     let result = interp.execute(&program);
     assert!(result.is_ok());
 }
+
+#[test]
+fn ref_anon_sub_is_code() {
+    assert_eq!(eval_string(r#"ref(sub { 1 })"#), "CODE");
+}
