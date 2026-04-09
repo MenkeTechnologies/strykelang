@@ -15,9 +15,9 @@ pub mod pack;
 pub mod par_lines;
 pub mod parallel_trace;
 pub mod parser;
-pub mod perl_inc;
 pub mod pchannel;
 pub mod perl_fs;
+pub mod perl_inc;
 pub mod ppool;
 pub mod profiler;
 pub mod pwatch;
@@ -95,6 +95,9 @@ pub fn try_vm_execute(
     let comp = compiler::Compiler::new();
     match comp.compile_program(program) {
         Ok(chunk) => {
+            if std::env::var("PERLRS_TRACE_VM").is_ok() {
+                eprintln!("[perlrs] VM path: compiled {} ops", chunk.ops.len());
+            }
             for def in &chunk.struct_defs {
                 interp
                     .struct_defs
@@ -108,12 +111,20 @@ pub fn try_vm_execute(
                     if e.message.starts_with("VM: unimplemented op")
                         || e.message.starts_with("Unimplemented builtin") =>
                 {
+                    if std::env::var("PERLRS_TRACE_VM").is_ok() {
+                        eprintln!("[perlrs] VM fallback: {}", e.message);
+                    }
                     None
                 }
                 Err(e) => Some(Err(e)),
             }
         }
-        Err(_) => None,
+        Err(ref ce) => {
+            if std::env::var("PERLRS_TRACE_VM").is_ok() {
+                eprintln!("[perlrs] Compile fallback: {:?}", ce);
+            }
+            None
+        }
     }
 }
 

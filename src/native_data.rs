@@ -73,7 +73,10 @@ fn hash_like(v: &PerlValue) -> PerlResult<IndexMap<String, PerlValue>> {
         PerlValue::HashRef(r) => Ok(r.read().clone()),
         PerlValue::Blessed(b) => match &*b.data.read() {
             PerlValue::Hash(h) => Ok(h.clone()),
-            _ => Err(PerlError::runtime("csv_write: row must be hash or hashref", 0)),
+            _ => Err(PerlError::runtime(
+                "csv_write: row must be hash or hashref",
+                0,
+            )),
         },
         _ => Err(PerlError::runtime(
             "csv_write: row must be hash or hashref",
@@ -102,7 +105,7 @@ pub(crate) fn sqlite_dispatch(
             }
             let sql = args[0].to_string();
             let params: Vec<Value> = args[1..].iter().map(perl_to_sql_value).collect();
-            let n = exec_sql(&*c, &sql, &params)?;
+            let n = exec_sql(&c, &sql, &params)?;
             Ok(PerlValue::Integer(n as i64))
         }
         "query" => {
@@ -111,7 +114,7 @@ pub(crate) fn sqlite_dispatch(
             }
             let sql = args[0].to_string();
             let params: Vec<Value> = args[1..].iter().map(perl_to_sql_value).collect();
-            query_sql(&*c, &sql, &params, line)
+            query_sql(&c, &sql, &params, line)
         }
         "last_insert_rowid" => {
             if !args.is_empty() {
@@ -134,12 +137,7 @@ fn exec_sql(conn: &Connection, sql: &str, params: &[Value]) -> PerlResult<usize>
         .map_err(|e| PerlError::runtime(format!("sqlite exec: {}", e), 0))
 }
 
-fn query_sql(
-    conn: &Connection,
-    sql: &str,
-    params: &[Value],
-    line: usize,
-) -> PerlResult<PerlValue> {
+fn query_sql(conn: &Connection, sql: &str, params: &[Value], line: usize) -> PerlResult<PerlValue> {
     let mut stmt = conn
         .prepare(sql)
         .map_err(|e| PerlError::runtime(format!("sqlite query: {}", e), line))?;
@@ -205,10 +203,7 @@ pub(crate) fn struct_new(
         let k = args[i].to_string();
         let v = args[i + 1].clone();
         let idx = def.field_index(&k).ok_or_else(|| {
-            PerlError::runtime(
-                format!("struct {}: unknown field `{}`", def.name, k),
-                line,
-            )
+            PerlError::runtime(format!("struct {}: unknown field `{}`", def.name, k), line)
         })?;
         let ty = def.fields[idx].1;
         ty.check_value(&v).map_err(|msg| {
@@ -249,8 +244,8 @@ pub(crate) fn fetch(url: &str) -> PerlResult<PerlValue> {
 /// GET `url`, parse JSON, map to [`PerlValue`] (objects → `HashRef`, arrays → `Array`, etc.).
 pub(crate) fn fetch_json(url: &str) -> PerlResult<PerlValue> {
     let s = http_get_body(url)?;
-    let v: JsonValue =
-        serde_json::from_str(&s).map_err(|e| PerlError::runtime(format!("fetch_json: {}", e), 0))?;
+    let v: JsonValue = serde_json::from_str(&s)
+        .map_err(|e| PerlError::runtime(format!("fetch_json: {}", e), 0))?;
     Ok(json_to_perl(v))
 }
 

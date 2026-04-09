@@ -1025,16 +1025,13 @@ impl Lexer {
                     | "say" | "die" | "warn" | "push" | "pop" | "shift" | "unshift" | "splice"
                     | "delete" | "exists" | "chomp" | "chop" | "defined" | "keys" | "values"
                     | "each" | "sub" | "struct" | "if" | "unless" | "while" | "until" | "for"
-                    | "foreach"
-                    | "elsif" | "use" | "no" | "require" | "eval" | "do" | "map" | "grep"
-                    | "sort" | "pmap" | "pmap_chunked" | "pipeline" | "pgrep" | "pfor"
-                    | "par_lines" | "pwatch" | "psort" | "reduce" | "preduce" | "fan" | "pchannel"
-                    | "pselect"
-                    | "async" | "trace"
-                    | "timer" | "await" | "slurp" | "capture" | "fetch_url" | "fetch"
-                    | "fetch_json" | "join" | "split"
-                    | "reverse" | "not" | "ref" | "scalar"
-                    | "try" | "catch" | "given" | "when" | "default" | "eval_timeout" => false,
+                    | "foreach" | "elsif" | "use" | "no" | "require" | "eval" | "do" | "map"
+                    | "grep" | "sort" | "pmap" | "pmap_chunked" | "pipeline" | "pgrep" | "pfor"
+                    | "par_lines" | "pwatch" | "psort" | "reduce" | "preduce" | "fan"
+                    | "pchannel" | "pselect" | "async" | "trace" | "timer" | "await" | "slurp"
+                    | "capture" | "fetch_url" | "fetch" | "fetch_json" | "join" | "split"
+                    | "reverse" | "not" | "ref" | "scalar" | "try" | "catch" | "given" | "when"
+                    | "default" | "eval_timeout" => false,
                     _ => matches!(tok, Token::Ident(_)),
                 };
                 Ok(tok)

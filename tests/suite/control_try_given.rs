@@ -29,59 +29,51 @@ fn parse_eval_timeout_shape() {
 
 #[test]
 fn try_catch_runs_catch_on_die() {
-    let v = run(
-        r#"
+    let v = run(r#"
         try {
             die "boom";
         } catch ($err) {
             42;
         }
-    "#,
-    )
+    "#)
     .expect("run");
     assert_eq!(v.to_int(), 42);
 }
 
 #[test]
 fn given_when_first_match() {
-    let v = run(
-        r#"
+    let v = run(r#"
         given (7) {
             when (0) { 0; }
             when (7) { 99; }
             default { -1; }
         }
-    "#,
-    )
+    "#)
     .expect("run");
     assert_eq!(v.to_int(), 99);
 }
 
 #[test]
 fn given_when_string_eq() {
-    let v = run(
-        r#"
+    let v = run(r#"
         given ("hello") {
             when ("world") { 0; }
             when ("hello") { 1; }
             default { 2; }
         }
-    "#,
-    )
+    "#)
     .expect("run");
     assert_eq!(v.to_int(), 1);
 }
 
 #[test]
 fn given_when_regex() {
-    let v = run(
-        r#"
+    let v = run(r#"
         given ("12345") {
             when (/^\d+$/) { 1; }
             default { 0; }
         }
-    "#,
-    )
+    "#)
     .expect("run");
     assert_eq!(v.to_int(), 1);
 }
@@ -94,14 +86,12 @@ fn eval_timeout_returns_block_value() {
 
 #[test]
 fn eval_timeout_exceeded_errors() {
-    let e = run(
-        r#"
+    let e = run(r#"
         eval_timeout 0 {
             my $i = 0;
             $i = $i + 1 while $i < 999999999;
         }
-    "#,
-    )
+    "#)
     .expect_err("timeout");
     assert!(
         e.message.contains("eval_timeout") && e.message.contains("exceeded"),

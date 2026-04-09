@@ -44,9 +44,7 @@ fn line_before(line: &str, pos: usize) -> (usize, &str) {
     let start = before
         .char_indices()
         .rev()
-        .find(|(_, c)| {
-            c.is_whitespace() || matches!(c, '(' | ',' | ';' | '[' | '{' | '|')
-        })
+        .find(|(_, c)| c.is_whitespace() || matches!(c, '(' | ',' | ';' | '[' | '{' | '|'))
         .map(|(i, c)| i + c.len_utf8())
         .unwrap_or(0);
     (start, line.get(start..pos).unwrap_or(""))
@@ -89,12 +87,7 @@ impl Completer for ReplHelper {
 impl Hinter for ReplHelper {
     type Hint = String;
 
-    fn hint(
-        &self,
-        _line: &str,
-        _pos: usize,
-        _ctx: &Context<'_>,
-    ) -> Option<String> {
+    fn hint(&self, _line: &str, _pos: usize, _ctx: &Context<'_>) -> Option<String> {
         None
     }
 }

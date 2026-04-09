@@ -22,9 +22,8 @@ pub fn run_pwatch(
     atomic_hashes: Vec<(String, AtomicHash)>,
     line: usize,
 ) -> PerlResult<PerlValue> {
-    let gpat = glob::Pattern::new(pattern).map_err(|e| {
-        PerlError::runtime(format!("pwatch: invalid glob pattern: {}", e), line)
-    })?;
+    let gpat = glob::Pattern::new(pattern)
+        .map_err(|e| PerlError::runtime(format!("pwatch: invalid glob pattern: {}", e), line))?;
 
     let expanded: Vec<PathBuf> = glob::glob(pattern)
         .map_err(|e| PerlError::runtime(format!("pwatch: glob: {}", e), line))?
@@ -102,7 +101,7 @@ pub fn run_pwatch(
                         let _ = local_interp
                             .scope
                             .set_scalar("_", PerlValue::String(path_string));
-                        let _ = local_interp.call_sub(&*sub, vec![], WantarrayCtx::Void, line);
+                        let _ = local_interp.call_sub(&sub, vec![], WantarrayCtx::Void, line);
                     });
                 }
             }
@@ -110,10 +109,7 @@ pub fn run_pwatch(
                 return Err(PerlError::runtime(format!("pwatch: {}", e), line));
             }
             Err(_) => {
-                return Err(PerlError::runtime(
-                    "pwatch: watcher channel closed",
-                    line,
-                ));
+                return Err(PerlError::runtime("pwatch: watcher channel closed", line));
             }
         }
     }

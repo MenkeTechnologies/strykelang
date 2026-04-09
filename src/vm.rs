@@ -798,12 +798,9 @@ impl<'a> VM<'a> {
                         if let Some(ref env) = sub.closure_env {
                             self.interp.scope.restore_capture(env);
                         }
-                        let result = if let Some(r) = crate::list_util::native_dispatch(
-                            &mut self.interp,
-                            &sub,
-                            &argv,
-                            want,
-                        ) {
+                        let result = if let Some(r) =
+                            crate::list_util::native_dispatch(self.interp, &sub, &argv, want)
+                        {
                             r
                         } else {
                             self.interp.exec_block_no_scope(&sub.body)

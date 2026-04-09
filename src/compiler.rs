@@ -345,8 +345,7 @@ impl Compiler {
                         if let Some(ty) = decl.type_annotation {
                             if frozen {
                                 return Err(CompileError::Unsupported(
-                                    "typed frozen my — use `typed my` without frozen"
-                                        .into(),
+                                    "typed frozen my — use `typed my` without frozen".into(),
                                 ));
                             }
                             let name = self.chunk.names[name_idx as usize].clone();
@@ -693,12 +692,7 @@ impl Compiler {
                 // Already handled in compile_program
             }
             StmtKind::StructDecl { def } => {
-                if self
-                    .chunk
-                    .struct_defs
-                    .iter()
-                    .any(|d| d.name == def.name)
-                {
+                if self.chunk.struct_defs.iter().any(|d| d.name == def.name) {
                     return Err(CompileError::Unsupported(format!(
                         "duplicate struct `{}`",
                         def.name

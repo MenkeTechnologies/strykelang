@@ -43,10 +43,41 @@ pub fn install_list_util(interp: &mut Interpreter) {
 }
 
 const LIST_UTIL_ROOT: &[&str] = &[
-    "all", "any", "first", "min", "max", "minstr", "maxstr", "none", "notall", "product", "reduce",
-    "reductions", "sum", "sum0", "sample", "shuffle", "uniq", "uniqint", "uniqnum", "uniqstr", "zip",
-    "zip_longest", "zip_shortest", "mesh", "mesh_longest", "mesh_shortest", "head", "tail", "pairs",
-    "unpairs", "pairkeys", "pairvalues", "pairmap", "pairgrep", "pairfirst",
+    "all",
+    "any",
+    "first",
+    "min",
+    "max",
+    "minstr",
+    "maxstr",
+    "none",
+    "notall",
+    "product",
+    "reduce",
+    "reductions",
+    "sum",
+    "sum0",
+    "sample",
+    "shuffle",
+    "uniq",
+    "uniqint",
+    "uniqnum",
+    "uniqstr",
+    "zip",
+    "zip_longest",
+    "zip_shortest",
+    "mesh",
+    "mesh_longest",
+    "mesh_shortest",
+    "head",
+    "tail",
+    "pairs",
+    "unpairs",
+    "pairkeys",
+    "pairvalues",
+    "pairmap",
+    "pairgrep",
+    "pairfirst",
 ];
 
 const PAIR_METHODS: &[&str] = &["key", "value", "TO_JSON"];
@@ -88,9 +119,13 @@ pub(crate) fn native_dispatch(
         "List::Util::pairgrep" => Some(pairgrep_map(interp, args, want, PairMode::Grep)),
         "List::Util::pairmap" => Some(pairgrep_map(interp, args, want, PairMode::Map)),
         "List::Util::pairfirst" => Some(pairgrep_map(interp, args, want, PairMode::First)),
-        "List::Util::zip" | "List::Util::zip_longest" => Some(dispatch_ok(zip_mesh(args, ZipMesh::ZipLongest))),
+        "List::Util::zip" | "List::Util::zip_longest" => {
+            Some(dispatch_ok(zip_mesh(args, ZipMesh::ZipLongest)))
+        }
         "List::Util::zip_shortest" => Some(dispatch_ok(zip_mesh(args, ZipMesh::ZipShortest))),
-        "List::Util::mesh" | "List::Util::mesh_longest" => Some(dispatch_ok(zip_mesh(args, ZipMesh::MeshLongest))),
+        "List::Util::mesh" | "List::Util::mesh_longest" => {
+            Some(dispatch_ok(zip_mesh(args, ZipMesh::MeshLongest)))
+        }
         "List::Util::mesh_shortest" => Some(dispatch_ok(zip_mesh(args, ZipMesh::MeshShortest))),
         "List::Util::_Pair::key" => Some(dispatch_ok(pair_accessor(args, 0))),
         "List::Util::_Pair::value" => Some(dispatch_ok(pair_accessor(args, 1))),
@@ -154,10 +189,7 @@ fn minmax(args: &[PerlValue], mode: MinMax) -> crate::error::PerlResult<PerlValu
     Ok(m)
 }
 
-fn uniq_with_want(
-    args: &[PerlValue],
-    want: WantarrayCtx,
-) -> crate::error::PerlResult<PerlValue> {
+fn uniq_with_want(args: &[PerlValue], want: WantarrayCtx) -> crate::error::PerlResult<PerlValue> {
     let a = uniq_list(args)?;
     if want == WantarrayCtx::Scalar {
         if let PerlValue::Array(ref x) = a {
@@ -235,7 +267,7 @@ fn uniqint_list(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
     let mut out = Vec::new();
     let mut prev: Option<i64> = None;
     let mut have = false;
-    for x in args.iter().cloned() {
+    for x in args {
         let n = x.to_int();
         if !have || prev != Some(n) {
             out.push(PerlValue::Integer(n));
@@ -416,10 +448,7 @@ fn reduce_like(
     for i in 1..items.len() {
         let _ = interp.scope.set_scalar("a", acc.clone());
         let _ = interp.scope.set_scalar("b", items[i].clone());
-        acc = match interp.call_sub(&code, vec![], WantarrayCtx::Scalar, 0) {
-            Ok(v) => v,
-            Err(e) => return Err(e),
-        };
+        acc = interp.call_sub(&code, vec![], WantarrayCtx::Scalar, 0)?;
         if reductions {
             chain.push(acc.clone());
         }
@@ -481,11 +510,7 @@ fn any_all_none(
     }))
 }
 
-fn first_native(
-    interp: &mut Interpreter,
-    args: &[PerlValue],
-    _want: WantarrayCtx,
-) -> ExecResult {
+fn first_native(interp: &mut Interpreter, args: &[PerlValue], _want: WantarrayCtx) -> ExecResult {
     let code = match args.first() {
         Some(PerlValue::CodeRef(s)) => s.clone(),
         _ => {
@@ -499,10 +524,7 @@ fn first_native(
     let items: Vec<PerlValue> = args[1..].to_vec();
     for it in items {
         let _ = interp.scope.set_scalar("_", it.clone());
-        let v = match interp.call_sub(&code, vec![], WantarrayCtx::Scalar, 0) {
-            Ok(v) => v,
-            Err(e) => return Err(e),
-        };
+        let v = interp.call_sub(&code, vec![], WantarrayCtx::Scalar, 0)?;
         if v.is_true() {
             return Ok(it);
         }
@@ -532,14 +554,14 @@ fn unpairs_native(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
         match x {
             PerlValue::ArrayRef(r) => {
                 let g = r.read();
-                out.push(g.get(0).cloned().unwrap_or(PerlValue::Undef));
+                out.push(g.first().cloned().unwrap_or(PerlValue::Undef));
                 out.push(g.get(1).cloned().unwrap_or(PerlValue::Undef));
             }
             PerlValue::Blessed(b) if b.class == "List::Util::_Pair" => {
                 let d = b.data.read();
                 if let PerlValue::ArrayRef(r) = &*d {
                     let g = r.read();
-                    out.push(g.get(0).cloned().unwrap_or(PerlValue::Undef));
+                    out.push(g.first().cloned().unwrap_or(PerlValue::Undef));
                     out.push(g.get(1).cloned().unwrap_or(PerlValue::Undef));
                 }
             }
@@ -712,11 +734,7 @@ fn zip_mesh(args: &[PerlValue], mode: ZipMesh) -> crate::error::PerlResult<PerlV
             for i in 0..len {
                 let mut row = Vec::new();
                 for a in &arrays {
-                    row.push(
-                        a.get(i)
-                            .cloned()
-                            .unwrap_or(PerlValue::Undef),
-                    );
+                    row.push(a.get(i).cloned().unwrap_or(PerlValue::Undef));
                 }
                 out.push(PerlValue::ArrayRef(Arc::new(RwLock::new(row))));
             }
@@ -726,11 +744,7 @@ fn zip_mesh(args: &[PerlValue], mode: ZipMesh) -> crate::error::PerlResult<PerlV
             let mut out = Vec::new();
             for i in 0..len {
                 for a in &arrays {
-                    out.push(
-                        a.get(i)
-                            .cloned()
-                            .unwrap_or(PerlValue::Undef),
-                    );
+                    out.push(a.get(i).cloned().unwrap_or(PerlValue::Undef));
                 }
             }
             Ok(PerlValue::Array(out))

@@ -47,10 +47,7 @@ pub fn pselect_recv(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
         Ok(v) => v,
         Err(_) => PerlValue::Undef,
     };
-    Ok(PerlValue::Array(vec![
-        val,
-        PerlValue::Integer(idx as i64),
-    ]))
+    Ok(PerlValue::Array(vec![val, PerlValue::Integer(idx as i64)]))
 }
 
 /// `$tx->send($v)` and `$rx->recv` without package subs.

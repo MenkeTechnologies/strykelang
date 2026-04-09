@@ -287,8 +287,7 @@ impl Interpreter {
         matches!(
             name,
             "_" | "0" | "!" | "@" | "/" | "\\" | "," | "." | "__PACKAGE__" | "$$"
-        )
-            || name.chars().all(|c| c.is_ascii_digit())
+        ) || name.chars().all(|c| c.is_ascii_digit())
     }
 
     fn check_strict_scalar_var(&self, name: &str, line: usize) -> Result<(), FlowOrError> {
@@ -1387,7 +1386,7 @@ impl Interpreter {
                 argv.iter().map(|s| PerlValue::String(s.clone())).collect(),
             );
             for (k, v) in env {
-                let _ = interp.scope.set_hash_element("ENV", &k, v);
+                interp.scope.set_hash_element("ENV", &k, v);
             }
             interp.scope.declare_array("INC", inc);
             interp.scope.restore_capture(&scalars);
@@ -4231,9 +4230,7 @@ impl Interpreter {
                 Ok(PerlValue::Undef)
             }
             ExprKind::HashVar(name) => {
-                if self.strict_vars
-                    && !name.contains("::")
-                    && !self.scope.hash_binding_exists(name)
+                if self.strict_vars && !name.contains("::") && !self.scope.hash_binding_exists(name)
                 {
                     return Err(PerlError::runtime(
                         format!(
@@ -4280,9 +4277,7 @@ impl Interpreter {
                 Ok(PerlValue::Undef)
             }
             ExprKind::HashElement { hash, key } => {
-                if self.strict_vars
-                    && !hash.contains("::")
-                    && !self.scope.hash_binding_exists(hash)
+                if self.strict_vars && !hash.contains("::") && !self.scope.hash_binding_exists(hash)
                 {
                     return Err(PerlError::runtime(
                         format!(

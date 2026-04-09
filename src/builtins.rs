@@ -73,10 +73,7 @@ fn builtin_csv_read(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 fn builtin_csv_write(args: &[PerlValue]) -> PerlResult<PerlValue> {
     if args.is_empty() {
-        return Err(PerlError::runtime(
-            "csv_write needs path and row list",
-            0,
-        ));
+        return Err(PerlError::runtime("csv_write needs path and row list", 0));
     }
     let path = args[0].to_string();
     if args.len() == 2 {
