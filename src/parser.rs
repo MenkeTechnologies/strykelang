@@ -284,6 +284,33 @@ impl Parser {
                         line,
                     }
                 }
+                "UNITCHECK" => {
+                    self.advance();
+                    let block = self.parse_block()?;
+                    Statement {
+                        label: None,
+                        kind: StmtKind::UnitCheck(block),
+                        line,
+                    }
+                }
+                "CHECK" => {
+                    self.advance();
+                    let block = self.parse_block()?;
+                    Statement {
+                        label: None,
+                        kind: StmtKind::Check(block),
+                        line,
+                    }
+                }
+                "INIT" => {
+                    self.advance();
+                    let block = self.parse_block()?;
+                    Statement {
+                        label: None,
+                        kind: StmtKind::Init(block),
+                        line,
+                    }
+                }
                 "goto" => {
                     self.advance();
                     let target = self.parse_expression()?;
@@ -626,6 +653,7 @@ impl Parser {
                 | "fc"
                 | "fetch_url"
                 | "glob_par"
+                | "par_sed"
                 | "glob"
                 | "grep"
                 | "heap"
@@ -648,6 +676,7 @@ impl Parser {
                 | "opendir"
                 | "ord"
                 | "par_lines"
+                | "par_walk"
                 | "pcache"
                 | "pchannel"
                 | "pfor"
@@ -3593,6 +3622,38 @@ impl Parser {
                     line,
                 })
             }
+            "par_walk" => {
+                let path = self.parse_assign_expr()?;
+                self.expect(&Token::Comma)?;
+                let callback = self.parse_assign_expr()?;
+                let progress = if self.eat(&Token::Comma) {
+                    match self.peek() {
+                        Token::Ident(ref kw)
+                            if kw == "progress" && matches!(self.peek_at(1), Token::FatArrow) =>
+                        {
+                            self.advance();
+                            self.expect(&Token::FatArrow)?;
+                            Some(Box::new(self.parse_assign_expr()?))
+                        }
+                        _ => {
+                            return Err(PerlError::syntax(
+                                "par_walk: expected `progress => EXPR` after comma",
+                                line,
+                            ));
+                        }
+                    }
+                } else {
+                    None
+                };
+                Ok(Expr {
+                    kind: ExprKind::ParWalkExpr {
+                        path: Box::new(path),
+                        callback: Box::new(callback),
+                        progress,
+                    },
+                    line,
+                })
+            }
             "pwatch" => {
                 let path = self.parse_assign_expr()?;
                 self.expect(&Token::Comma)?;
@@ -4174,6 +4235,32 @@ impl Parser {
                 };
                 Ok(Expr {
                     kind: ExprKind::GlobPar { args, progress },
+                    line,
+                })
+            }
+            "par_sed" => {
+                let args = self.parse_builtin_args()?;
+                let progress = if self.eat(&Token::Comma) {
+                    match self.peek().clone() {
+                        Token::Ident(ref kw)
+                            if kw == "progress" && matches!(self.peek_at(1), Token::FatArrow) =>
+                        {
+                            self.advance();
+                            self.expect(&Token::FatArrow)?;
+                            Some(Box::new(self.parse_assign_expr()?))
+                        }
+                        _ => {
+                            return Err(PerlError::syntax(
+                                "par_sed: expected `progress => EXPR` after comma",
+                                line,
+                            ));
+                        }
+                    }
+                } else {
+                    None
+                };
+                Ok(Expr {
+                    kind: ExprKind::ParSed { args, progress },
                     line,
                 })
             }

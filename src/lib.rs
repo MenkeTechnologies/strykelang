@@ -21,6 +21,7 @@ mod nanbox;
 pub mod native_data;
 pub mod pack;
 pub mod par_lines;
+pub mod par_walk;
 pub mod par_pipeline;
 pub mod parallel_trace;
 pub mod parser;

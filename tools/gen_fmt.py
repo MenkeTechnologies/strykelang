@@ -78,6 +78,12 @@ def main() -> None:
                 .unwrap_or_else(|| "return;".to_string()),"""
             if name == "Begin":
                 return '        StmtKind::Begin(b) => format!("BEGIN {{\\n{}\\n}}", format_block(b)),'
+            if name == "UnitCheck":
+                return '        StmtKind::UnitCheck(b) => format!("UNITCHECK {{\\n{}\\n}}", format_block(b)),'
+            if name == "Check":
+                return '        StmtKind::Check(b) => format!("CHECK {{\\n{}\\n}}", format_block(b)),'
+            if name == "Init":
+                return '        StmtKind::Init(b) => format!("INIT {{\\n{}\\n}}", format_block(b)),'
             if name == "End":
                 return '        StmtKind::End(b) => format!("END {{\\n{}\\n}}", format_block(b)),'
             if name == "Continue":
@@ -629,6 +635,15 @@ def main() -> None:
                 ),
                 None => format!("par_lines({}, {})", format_expr(path), format_expr(callback)),
             }""",
+        "ParWalkExpr": """match progress {
+                Some(p) => format!(
+                    "par_walk({}, {}, progress => {})",
+                    format_expr(path),
+                    format_expr(callback),
+                    format_expr(p)
+                ),
+                None => format!("par_walk({}, {})", format_expr(path), format_expr(callback)),
+            }""",
         "PwatchExpr": 'format!("pwatch({}, {})", format_expr(path), format_expr(callback))',
         "PSortExpr": """match (cmp, progress) {
                 (Some(b), Some(p)) => format!(
@@ -721,6 +736,10 @@ def main() -> None:
         "GlobPar": """match progress {
                 Some(p) => format!("glob_par({}), progress => {}", format_expr_list(args), format_expr(p)),
                 None => format!("glob_par({})", format_expr_list(args)),
+            }""",
+        "ParSed": """match progress {
+                Some(p) => format!("par_sed({}), progress => {}", format_expr_list(args), format_expr(p)),
+                None => format!("par_sed({})", format_expr_list(args)),
             }""",
         "Bless": """match class {
                 Some(c) => format!("bless({}, {})", format_expr(ref_expr), format_expr(c)),

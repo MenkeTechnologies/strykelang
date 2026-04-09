@@ -57,6 +57,8 @@ fn accepts_pfor_psort_pcache_par_lines_progress() {
     p("my @t = psort (3, 1, 2), progress => 1;");
     p("my @u = pcache { $_ } (1, 2), progress => 1;");
     p(r#"par_lines "x.txt", sub { 1 }, progress => 1;"#);
+    p(r#"par_walk "/tmp", sub { 1 }, progress => 1;"#);
+    p(r#"par_sed "a", "b", "f1.txt", "f2.txt", progress => 0;"#);
 }
 
 #[test]

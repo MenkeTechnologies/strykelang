@@ -283,6 +283,8 @@ pub enum Op {
     Pselect { n_rx: u8, has_timeout: bool },
     /// `par_lines PATH, sub { } [, progress => EXPR]` — index into [`Chunk::par_lines_entries`]; stack: \[\] → `undef`
     ParLines(u16),
+    /// `par_walk PATH, sub { } [, progress => EXPR]` — index into [`Chunk::par_walk_entries`]; stack: \[\] → `undef`
+    ParWalk(u16),
     /// `pwatch GLOB, sub { }` — index into [`Chunk::pwatch_entries`]; stack: \[\] → result
     Pwatch(u16),
     /// fan N { BLOCK } — block_idx; stack: \[progress_flag, count\] (`progress_flag` is 0/1)
@@ -510,6 +512,10 @@ pub enum BuiltinId {
     GlobParProgress,
     /// `par_pipeline_stream(...)` — streaming pipeline with bounded channels between stages.
     ParPipelineStream,
+    /// `par_sed(PATTERN, REPLACEMENT, FILES...)` — parallel in-place regex substitution per file.
+    ParSed,
+    /// `par_sed(..., progress => EXPR)` — last stack arg is truthy progress flag.
+    ParSedProgress,
     /// `each EXPR` — matches tree interpreter (returns empty list).
     Each,
 }
@@ -558,6 +564,8 @@ pub struct Chunk {
     pub runtime_sub_decls: Vec<RuntimeSubDecl>,
     /// `par_lines PATH, sub { } [, progress => EXPR]` — evaluated by interpreter inside VM.
     pub par_lines_entries: Vec<(Expr, Expr, Option<Expr>)>,
+    /// `par_walk PATH, sub { } [, progress => EXPR]` — evaluated by interpreter inside VM.
+    pub par_walk_entries: Vec<(Expr, Expr, Option<Expr>)>,
     /// `pwatch GLOB, sub { }` — evaluated by interpreter inside VM.
     pub pwatch_entries: Vec<(Expr, Expr)>,
     /// `substr $var, OFF, LEN, REPL` — four-arg form (mutates `LHS`); evaluated by interpreter inside VM.
@@ -595,6 +603,7 @@ impl Chunk {
             algebraic_match_entries: Vec::new(),
             runtime_sub_decls: Vec::new(),
             par_lines_entries: Vec::new(),
+            par_walk_entries: Vec::new(),
             pwatch_entries: Vec::new(),
             substr_four_arg_entries: Vec::new(),
             keys_expr_entries: Vec::new(),
@@ -697,6 +706,18 @@ impl Chunk {
     ) -> u16 {
         let idx = self.par_lines_entries.len() as u16;
         self.par_lines_entries.push((path, callback, progress));
+        idx
+    }
+
+    /// `par_walk PATH, sub { } [, progress => EXPR]` — returns pool index for [`Op::ParWalk`].
+    pub fn add_par_walk_entry(
+        &mut self,
+        path: Expr,
+        callback: Expr,
+        progress: Option<Expr>,
+    ) -> u16 {
+        let idx = self.par_walk_entries.len() as u16;
+        self.par_walk_entries.push((path, callback, progress));
         idx
     }
 

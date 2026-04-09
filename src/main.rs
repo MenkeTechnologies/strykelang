@@ -265,6 +265,12 @@ fn print_cyberpunk_help() {
         "  par_lines PATH, CODE [, progress => EXPR] {G}//{N} mmap + parallel line scan (tree-walker)"
     );
     println!(
+        "  par_walk PATH, CODE [, progress => EXPR] {G}//{N} parallel recursive dir walk; topic is each path"
+    );
+    println!(
+        "  par_sed PATTERN, REPLACEMENT, FILES... [, progress => EXPR] {G}//{N} parallel in-place regex replace per file (g)"
+    );
+    println!(
         "  pipeline @list ->filter/map/take/collect {G}//{N} Lazy iterator (runs on collect); chain ->pmap/pgrep/pfor/pmap_chunked/psort/pcache/preduce/… like top-level p*"
     );
     println!(

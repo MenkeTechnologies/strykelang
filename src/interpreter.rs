@@ -5,8 +5,9 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader, Cursor, Read, Write as IoWrite};
 #[cfg(unix)]
 use std::os::unix::process::ExitStatusExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Barrier, OnceLock};
 
 use indexmap::IndexMap;
@@ -262,6 +263,12 @@ pub struct Interpreter {
     pub field_separator: Option<String>,
     /// BEGIN blocks
     begin_blocks: Vec<Block>,
+    /// `UNITCHECK` blocks (LIFO at run)
+    unit_check_blocks: Vec<Block>,
+    /// `CHECK` blocks (LIFO at run)
+    check_blocks: Vec<Block>,
+    /// `INIT` blocks (FIFO at run)
+    init_blocks: Vec<Block>,
     /// END blocks
     end_blocks: Vec<Block>,
     /// -w warnings / `use warnings` / `$^W`
@@ -591,6 +598,9 @@ impl Interpreter {
             auto_split: false,
             field_separator: None,
             begin_blocks: Vec::new(),
+            unit_check_blocks: Vec::new(),
+            check_blocks: Vec::new(),
+            init_blocks: Vec::new(),
             end_blocks: Vec::new(),
             warnings: false,
             output_autoflush: false,
@@ -692,6 +702,9 @@ impl Interpreter {
             auto_split: self.auto_split,
             field_separator: self.field_separator.clone(),
             begin_blocks: self.begin_blocks.clone(),
+            unit_check_blocks: self.unit_check_blocks.clone(),
+            check_blocks: self.check_blocks.clone(),
+            init_blocks: self.init_blocks.clone(),
             end_blocks: self.end_blocks.clone(),
             warnings: self.warnings,
             output_autoflush: self.output_autoflush,
@@ -920,6 +933,9 @@ impl Interpreter {
     /// run does not execute them again.
     pub(crate) fn clear_begin_end_blocks_after_vm_compile(&mut self) {
         self.begin_blocks.clear();
+        self.unit_check_blocks.clear();
+        self.check_blocks.clear();
+        self.init_blocks.clear();
         self.end_blocks.clear();
     }
 
@@ -1723,6 +1739,9 @@ impl Interpreter {
                     self.exec_no_stmt(module, imports, stmt.line)?;
                 }
                 StmtKind::Begin(block) => self.begin_blocks.push(block.clone()),
+                StmtKind::UnitCheck(block) => self.unit_check_blocks.push(block.clone()),
+                StmtKind::Check(block) => self.check_blocks.push(block.clone()),
+                StmtKind::Init(block) => self.init_blocks.push(block.clone()),
                 StmtKind::End(block) => self.end_blocks.push(block.clone()),
                 _ => {}
             }
@@ -2375,15 +2394,53 @@ impl Interpreter {
                 FlowOrError::Flow(_) => PerlError::runtime("Unexpected flow control in BEGIN", 0),
             })?;
         }
-        if !begins.is_empty() {
-            self.global_phase = "RUN".to_string();
+
+        // UNITCHECK — reverse order of compilation (end of unit, before CHECK).
+        let ucs = std::mem::take(&mut self.unit_check_blocks);
+        if !ucs.is_empty() {
+            self.global_phase = "UNITCHECK".to_string();
         }
+        for block in ucs.iter().rev() {
+            self.exec_block(block).map_err(|e| match e {
+                FlowOrError::Error(e) => e,
+                FlowOrError::Flow(_) => PerlError::runtime("Unexpected flow control in UNITCHECK", 0),
+            })?;
+        }
+
+        // CHECK — reverse order (end of compile phase).
+        let checks = std::mem::take(&mut self.check_blocks);
+        if !checks.is_empty() {
+            self.global_phase = "CHECK".to_string();
+        }
+        for block in checks.iter().rev() {
+            self.exec_block(block).map_err(|e| match e {
+                FlowOrError::Error(e) => e,
+                FlowOrError::Flow(_) => PerlError::runtime("Unexpected flow control in CHECK", 0),
+            })?;
+        }
+
+        // INIT — forward order (before main runtime).
+        let inits = std::mem::take(&mut self.init_blocks);
+        if !inits.is_empty() {
+            self.global_phase = "INIT".to_string();
+        }
+        for block in &inits {
+            self.exec_block(block).map_err(|e| match e {
+                FlowOrError::Error(e) => e,
+                FlowOrError::Flow(_) => PerlError::runtime("Unexpected flow control in INIT", 0),
+            })?;
+        }
+
+        self.global_phase = "RUN".to_string();
 
         // Execute main program
         let mut last = PerlValue::UNDEF;
         for stmt in &program.statements {
             match &stmt.kind {
                 StmtKind::Begin(_)
+                | StmtKind::UnitCheck(_)
+                | StmtKind::Check(_)
+                | StmtKind::Init(_)
                 | StmtKind::End(_)
                 | StmtKind::Use { .. }
                 | StmtKind::No { .. }
@@ -3381,7 +3438,11 @@ impl Interpreter {
             StmtKind::Next(label) => Err(Flow::Next(label.clone()).into()),
             StmtKind::Redo(label) => Err(Flow::Redo(label.clone()).into()),
             StmtKind::Block(block) => self.exec_block(block),
-            StmtKind::Begin(_) | StmtKind::End(_) => Ok(PerlValue::UNDEF),
+            StmtKind::Begin(_)
+            | StmtKind::UnitCheck(_)
+            | StmtKind::Check(_)
+            | StmtKind::Init(_)
+            | StmtKind::End(_) => Ok(PerlValue::UNDEF),
             StmtKind::Empty => Ok(PerlValue::UNDEF),
             StmtKind::Goto { .. } => {
                 Err(PerlError::runtime("goto reached outside goto-aware block", stmt.line).into())
@@ -4153,7 +4214,9 @@ impl Interpreter {
                 } else if method == "new" && !*super_call {
                     // Default constructor
                     self.builtin_new(&class, arg_vals, line)
-                } else if let Some(r) = self.try_autoload_call(&full_name, arg_vals, line, ctx) {
+                } else if let Some(r) =
+                    self.try_autoload_call(&full_name, arg_vals, line, ctx, Some(&class))
+                {
                     r
                 } else {
                     Err(PerlError::runtime(
@@ -4335,6 +4398,16 @@ impl Interpreter {
                 callback,
                 progress,
             } => self.eval_par_lines_expr(
+                path.as_ref(),
+                callback.as_ref(),
+                progress.as_deref(),
+                line,
+            ),
+            ExprKind::ParWalkExpr {
+                path,
+                callback,
+                progress,
+            } => self.eval_par_walk_expr(
                 path.as_ref(),
                 callback.as_ref(),
                 progress.as_deref(),
@@ -5617,6 +5690,17 @@ impl Interpreter {
                     Ok(crate::perl_fs::glob_par_patterns(&pats))
                 }
             }
+            ExprKind::ParSed { args, progress } => {
+                let has_progress = progress.is_some();
+                let mut vals: Vec<PerlValue> = Vec::new();
+                for a in args {
+                    vals.push(self.eval_expr(a)?);
+                }
+                if let Some(p) = progress {
+                    vals.push(self.eval_expr(p.as_ref())?);
+                }
+                Ok(self.builtin_par_sed(&vals, line, has_progress)?)
+            }
             ExprKind::Bless { ref_expr, class } => {
                 let val = self.eval_expr(ref_expr)?;
                 let class_name = if let Some(c) = class {
@@ -6680,23 +6764,55 @@ impl Interpreter {
         }
     }
 
-    /// If `sub AUTOLOAD` exists, set `$AUTOLOAD` to the fully qualified missing sub or method name
-    /// and invoke the handler (same argument list as the missing call).
+    /// Walk C3 MRO from `start_package` and return the first `Package::AUTOLOAD` (`AUTOLOAD` in `main`).
+    pub(crate) fn resolve_autoload_sub(&self, start_package: &str) -> Option<Arc<PerlSub>> {
+        let root = if start_package.is_empty() {
+            "main"
+        } else {
+            start_package
+        };
+        for pkg in self.mro_linearize(root) {
+            let key = if pkg == "main" {
+                "AUTOLOAD".to_string()
+            } else {
+                format!("{}::AUTOLOAD", pkg)
+            };
+            if let Some(s) = self.subs.get(&key) {
+                return Some(s.clone());
+            }
+        }
+        None
+    }
+
+    /// If an `AUTOLOAD` exists in the invocant's inheritance chain, set `$AUTOLOAD` to the fully
+    /// qualified missing sub or method name and invoke the handler (same argument list as the
+    /// missing call). For plain subs, `method_invocant_class` is `None` and the search starts from
+    /// the package prefix of the missing name (or current package).
     pub(crate) fn try_autoload_call(
         &mut self,
         missing_name: &str,
         args: Vec<PerlValue>,
         line: usize,
         want: WantarrayCtx,
+        method_invocant_class: Option<&str>,
     ) -> Option<ExecResult> {
-        let sub = self.subs.get("AUTOLOAD")?.clone();
         let pkg = self.current_package();
         let full = if missing_name.contains("::") {
             missing_name.to_string()
         } else {
             format!("{}::{}", pkg, missing_name)
         };
-        if let Err(e) = self.scope.set_scalar("AUTOLOAD", PerlValue::string(full)) {
+        let start_pkg = method_invocant_class.unwrap_or_else(|| {
+            full.rsplit_once("::")
+                .map(|(p, _)| p)
+                .filter(|p| !p.is_empty())
+                .unwrap_or("main")
+        });
+        let sub = self.resolve_autoload_sub(start_pkg)?;
+        if let Err(e) = self
+            .scope
+            .set_scalar("AUTOLOAD", PerlValue::string(full.clone()))
+        {
             return Some(Err(e.into()));
         }
         Some(self.call_sub(&sub, args, want, line))
@@ -6799,7 +6915,7 @@ impl Interpreter {
             }
             _ => {
                 let args = self.with_topic_default_args(args);
-                if let Some(r) = self.try_autoload_call(name, args, line, want) {
+                if let Some(r) = self.try_autoload_call(name, args, line, want, None) {
                     return r;
                 }
                 let mut msg = format!("Undefined subroutine &{}", name);
@@ -9162,6 +9278,139 @@ impl Interpreter {
         Ok(PerlValue::UNDEF)
     }
 
+    /// `par_walk PATH, sub { } [, progress => EXPR]` — parallel recursive directory walk (also used by VM).
+    pub(crate) fn eval_par_walk_expr(
+        &mut self,
+        path: &Expr,
+        callback: &Expr,
+        progress: Option<&Expr>,
+        line: usize,
+    ) -> Result<PerlValue, FlowOrError> {
+        let show_progress = progress
+            .map(|p| self.eval_expr(p))
+            .transpose()?
+            .map(|v| v.is_true())
+            .unwrap_or(false);
+        let path_val = self.eval_expr(path)?;
+        let roots: Vec<PathBuf> = if let Some(arr) = path_val.as_array_vec() {
+            arr.into_iter()
+                .map(|v| PathBuf::from(v.to_string()))
+                .collect()
+        } else {
+            vec![PathBuf::from(path_val.to_string())]
+        };
+        let cb_val = self.eval_expr(callback)?;
+        let sub = if let Some(s) = cb_val.as_code_ref() {
+            s
+        } else {
+            return Err(PerlError::runtime(
+                "par_walk: second argument must be a code reference",
+                line,
+            )
+            .into());
+        };
+        let subs = self.subs.clone();
+        let (scope_capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
+
+        if show_progress {
+            let paths = crate::par_walk::collect_paths(&roots);
+            let pmap_progress = PmapProgress::new(true, paths.len());
+            paths.into_par_iter().try_for_each(|p| {
+                let s = p.to_string_lossy().into_owned();
+                let mut local_interp = Interpreter::new();
+                local_interp.subs = subs.clone();
+                local_interp.scope.restore_capture(&scope_capture);
+                local_interp
+                    .scope
+                    .restore_atomics(&atomic_arrays, &atomic_hashes);
+                local_interp.enable_parallel_guard();
+                let _ = local_interp.scope.set_scalar("_", PerlValue::string(s));
+                match local_interp.call_sub(sub.as_ref(), vec![], WantarrayCtx::Void, line) {
+                    Ok(_) => {}
+                    Err(e) => return Err(e),
+                }
+                pmap_progress.tick();
+                Ok(())
+            })?;
+            pmap_progress.finish();
+        } else {
+            for r in &roots {
+                par_walk_recursive(
+                    r.as_path(),
+                    &sub,
+                    &subs,
+                    &scope_capture,
+                    &atomic_arrays,
+                    &atomic_hashes,
+                    line,
+                )?;
+            }
+        }
+        Ok(PerlValue::UNDEF)
+    }
+
+    /// `par_sed(PATTERN, REPLACEMENT, FILES...)` — parallel in-place regex substitution per file (`g` semantics).
+    pub(crate) fn builtin_par_sed(
+        &mut self,
+        args: &[PerlValue],
+        line: usize,
+        has_progress: bool,
+    ) -> PerlResult<PerlValue> {
+        let show_progress = if has_progress {
+            args.last().map(|v| v.is_true()).unwrap_or(false)
+        } else {
+            false
+        };
+        let slice = if has_progress {
+            &args[..args.len().saturating_sub(1)]
+        } else {
+            args
+        };
+        if slice.len() < 3 {
+            return Err(PerlError::runtime(
+                "par_sed: need pattern, replacement, and at least one file path",
+                line,
+            ));
+        }
+        let pat_val = &slice[0];
+        let repl = slice[1].to_string();
+        let files: Vec<String> = slice[2..].iter().map(|v| v.to_string()).collect();
+
+        let re = if let Some(rx) = pat_val.as_regex() {
+            rx
+        } else {
+            let pattern = pat_val.to_string();
+            match self.compile_regex(&pattern, "g", line) {
+                Ok(r) => r,
+                Err(FlowOrError::Error(e)) => return Err(e),
+                Err(FlowOrError::Flow(f)) => {
+                    return Err(PerlError::runtime(format!("par_sed: {:?}", f), line))
+                }
+            }
+        };
+
+        let pmap = PmapProgress::new(show_progress, files.len());
+        let touched = AtomicUsize::new(0);
+        files.par_iter().try_for_each(|path| {
+            let content = std::fs::read_to_string(path).map_err(|e| {
+                PerlError::runtime(format!("par_sed {}: {}", path, e), line)
+            })?;
+            let new_s = re.replace_all(&content, &repl);
+            if new_s != content {
+                std::fs::write(path, new_s.as_bytes()).map_err(|e| {
+                    PerlError::runtime(format!("par_sed {}: {}", path, e), line)
+                })?;
+                touched.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
+            pmap.tick();
+            Ok(())
+        })?;
+        pmap.finish();
+        Ok(PerlValue::integer(
+            touched.load(std::sync::atomic::Ordering::Relaxed) as i64,
+        ))
+    }
+
     /// `pwatch GLOB, sub { }` — filesystem notify loop (also used by VM).
     pub(crate) fn eval_pwatch_expr(
         &mut self,
@@ -9278,7 +9527,12 @@ impl Interpreter {
 
         for stmt in &program.statements {
             match &stmt.kind {
-                StmtKind::SubDecl { .. } | StmtKind::Begin(_) | StmtKind::End(_) => continue,
+                StmtKind::SubDecl { .. }
+                | StmtKind::Begin(_)
+                | StmtKind::UnitCheck(_)
+                | StmtKind::Check(_)
+                | StmtKind::Init(_)
+                | StmtKind::End(_) => continue,
                 _ => match self.exec_statement(stmt) {
                     Ok(_) => {}
                     Err(FlowOrError::Error(e)) => return Err(e),
@@ -9290,6 +9544,79 @@ impl Interpreter {
         // Return current $_ for -p mode
         Ok(Some(self.scope.get_scalar("_").to_string()))
     }
+}
+
+fn par_walk_invoke_entry(
+    path: &Path,
+    sub: &Arc<PerlSub>,
+    subs: &HashMap<String, Arc<PerlSub>>,
+    scope_capture: &[(String, PerlValue)],
+    atomic_arrays: &[(String, crate::scope::AtomicArray)],
+    atomic_hashes: &[(String, crate::scope::AtomicHash)],
+    line: usize,
+) -> Result<(), FlowOrError> {
+    let s = path.to_string_lossy().into_owned();
+    let mut local_interp = Interpreter::new();
+    local_interp.subs = subs.clone();
+    local_interp.scope.restore_capture(scope_capture);
+    local_interp
+        .scope
+        .restore_atomics(atomic_arrays, atomic_hashes);
+    local_interp.enable_parallel_guard();
+    let _ = local_interp.scope.set_scalar("_", PerlValue::string(s));
+    local_interp.call_sub(sub.as_ref(), vec![], WantarrayCtx::Void, line)?;
+    Ok(())
+}
+
+fn par_walk_recursive(
+    path: &Path,
+    sub: &Arc<PerlSub>,
+    subs: &HashMap<String, Arc<PerlSub>>,
+    scope_capture: &[(String, PerlValue)],
+    atomic_arrays: &[(String, crate::scope::AtomicArray)],
+    atomic_hashes: &[(String, crate::scope::AtomicHash)],
+    line: usize,
+) -> Result<(), FlowOrError> {
+    if path.is_file() || (path.is_symlink() && !path.is_dir()) {
+        return par_walk_invoke_entry(
+            path,
+            sub,
+            subs,
+            scope_capture,
+            atomic_arrays,
+            atomic_hashes,
+            line,
+        );
+    }
+    if !path.is_dir() {
+        return Ok(());
+    }
+    par_walk_invoke_entry(
+        path,
+        sub,
+        subs,
+        scope_capture,
+        atomic_arrays,
+        atomic_hashes,
+        line,
+    )?;
+    let read = match std::fs::read_dir(path) {
+        Ok(r) => r,
+        Err(_) => return Ok(()),
+    };
+    let entries: Vec<_> = read.filter_map(|e| e.ok()).collect();
+    entries.par_iter().try_for_each(|e| {
+        par_walk_recursive(
+            &e.path(),
+            sub,
+            subs,
+            scope_capture,
+            atomic_arrays,
+            atomic_hashes,
+            line,
+        )
+    })?;
+    Ok(())
 }
 
 /// `sprintf` with pluggable `%s` formatting (stringify for overload-aware `Interpreter`).

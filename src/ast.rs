@@ -109,6 +109,12 @@ pub enum StmtKind {
     Begin(Block),
     /// `END { ... }`
     End(Block),
+    /// `UNITCHECK { ... }` — end of compilation unit (reverse order before CHECK).
+    UnitCheck(Block),
+    /// `CHECK { ... }` — end of compile phase (reverse order).
+    Check(Block),
+    /// `INIT { ... }` — before runtime main (forward order).
+    Init(Block),
     /// Empty statement (bare semicolon)
     Empty,
     /// `goto EXPR` — expression evaluates to a label name in the same block.
@@ -528,6 +534,12 @@ pub enum ExprKind {
         callback: Box<Expr>,
         progress: Option<Box<Expr>>,
     },
+    /// `par_walk PATH, sub { ... } [, progress => EXPR]` — parallel recursive directory walk; `$_` is each path.
+    ParWalkExpr {
+        path: Box<Expr>,
+        callback: Box<Expr>,
+        progress: Option<Box<Expr>>,
+    },
     /// `pwatch GLOB, sub { ... }` — notify-based watcher (tree-walker only).
     PwatchExpr {
         path: Box<Expr>,
@@ -778,6 +790,11 @@ pub enum ExprKind {
     /// Parallel recursive glob (rayon); same patterns as `glob`, different walk strategy.
     /// Optional `, progress => EXPR` — stderr progress bar (one tick per pattern).
     GlobPar {
+        args: Vec<Expr>,
+        progress: Option<Box<Expr>>,
+    },
+    /// `par_sed PATTERN, REPLACEMENT, FILES... [, progress => EXPR]` — parallel in-place regex replace per file (`g` semantics).
+    ParSed {
         args: Vec<Expr>,
         progress: Option<Box<Expr>>,
     },

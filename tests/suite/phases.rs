@@ -1,5 +1,5 @@
-//! BEGIN / END ordering and compile-time hooks. These catch regressions in the two-pass
-//! interpreter pipeline (collect subs & phases, run BEGIN, run main, run END).
+//! BEGIN / CHECK / INIT / UNITCHECK / END ordering. Catches regressions in the phase pipeline
+//! (collect subs & phase blocks, run BEGIN → UNITCHECK → CHECK → INIT → main → END).
 
 use crate::common::*;
 
@@ -30,6 +30,27 @@ fn main_return_value_not_replaced_by_empty_end_block() {
              7",
         ),
         7
+    );
+}
+
+#[test]
+fn check_init_unitcheck_run_before_main_in_perl_order() {
+    // Top-level `$s = ""` runs *after* UNITCHECK/CHECK/INIT (same as Perl), so it would wipe
+    // phase appends. Initialize the buffer in BEGIN so phases see the same stash scalar as main.
+    assert_eq!(
+        eval_string(
+            r#"no strict 'vars';
+            BEGIN { $s = "" }
+            UNITCHECK { $s .= "a" }
+            UNITCHECK { $s .= "b" }
+            CHECK { $s .= "c" }
+            CHECK { $s .= "d" }
+            INIT { $s .= "e" }
+            INIT { $s .= "f" }
+            $s .= "m";
+            $s"#,
+        ),
+        "badcefm",
     );
 }
 

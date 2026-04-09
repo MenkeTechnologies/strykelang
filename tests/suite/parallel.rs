@@ -231,6 +231,41 @@ fn par_lines_invokes_block_per_line_with_mysync_count() {
     std::fs::remove_dir_all(&dir).ok();
 }
 
+#[test]
+fn par_walk_visits_files_and_dirs_with_mysync_count() {
+    let dir = std::env::temp_dir().join(format!("perlrs_par_walk_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("a")).unwrap();
+    std::fs::write(dir.join("a/x.txt"), "1").unwrap();
+    std::fs::write(dir.join("root.txt"), "2").unwrap();
+    let path = dir.to_str().unwrap();
+    let code = format!(
+        r#"mysync $n = 0; par_walk "{path}", sub {{ $n++ }}; $n"#
+    );
+    // root dir, root.txt, subdir a, a/x.txt = 4 paths
+    assert_eq!(eval_int(&code), 4);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn par_sed_rewrites_multiple_files_in_parallel() {
+    let dir = std::env::temp_dir().join(format!("perlrs_par_sed_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let f1 = dir.join("one.txt");
+    let f2 = dir.join("two.txt");
+    std::fs::write(&f1, "foo bar").unwrap();
+    std::fs::write(&f2, "foo baz").unwrap();
+    let p1 = f1.to_str().unwrap();
+    let p2 = f2.to_str().unwrap();
+    let code = format!(
+        r#"my $k = par_sed("foo", "ZZ", "{p1}", "{p2}"); $k . ":" . slurp("{p1}") . slurp("{p2}")"#
+    );
+    let out = eval_string(&code);
+    assert_eq!(out, "2:ZZ barZZ baz");
+    std::fs::remove_dir_all(&dir).ok();
+}
+
 /// `fan { }` iterates `$_` from `0` to `rayon::current_num_threads() - 1` (same pool as `pe -j`).
 #[test]
 fn fan_default_count_matches_rayon_thread_pool() {

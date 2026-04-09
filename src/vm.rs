@@ -38,6 +38,7 @@ struct ParallelBlockVmShared {
     eval_timeout_entries: Vec<(Expr, Block)>,
     algebraic_match_entries: Vec<(Expr, Vec<MatchArm>)>,
     par_lines_entries: Vec<(Expr, Expr, Option<Expr>)>,
+    par_walk_entries: Vec<(Expr, Expr, Option<Expr>)>,
     pwatch_entries: Vec<(Expr, Expr)>,
     substr_four_arg_entries: Vec<(Expr, Expr, Option<Expr>, Expr)>,
     keys_expr_entries: Vec<Expr>,
@@ -70,6 +71,7 @@ impl ParallelBlockVmShared {
             eval_timeout_entries: vm.eval_timeout_entries.clone(),
             algebraic_match_entries: vm.algebraic_match_entries.clone(),
             par_lines_entries: vm.par_lines_entries.clone(),
+            par_walk_entries: vm.par_walk_entries.clone(),
             pwatch_entries: vm.pwatch_entries.clone(),
             substr_four_arg_entries: vm.substr_four_arg_entries.clone(),
             keys_expr_entries: vm.keys_expr_entries.clone(),
@@ -102,6 +104,7 @@ impl ParallelBlockVmShared {
             eval_timeout_entries: self.eval_timeout_entries.clone(),
             algebraic_match_entries: self.algebraic_match_entries.clone(),
             par_lines_entries: self.par_lines_entries.clone(),
+            par_walk_entries: self.par_walk_entries.clone(),
             pwatch_entries: self.pwatch_entries.clone(),
             substr_four_arg_entries: self.substr_four_arg_entries.clone(),
             keys_expr_entries: self.keys_expr_entries.clone(),
@@ -198,6 +201,7 @@ pub struct VM<'a> {
     eval_timeout_entries: Vec<(Expr, Block)>,
     algebraic_match_entries: Vec<(Expr, Vec<MatchArm>)>,
     par_lines_entries: Vec<(Expr, Expr, Option<Expr>)>,
+    par_walk_entries: Vec<(Expr, Expr, Option<Expr>)>,
     pwatch_entries: Vec<(Expr, Expr)>,
     substr_four_arg_entries: Vec<(Expr, Expr, Option<Expr>, Expr)>,
     keys_expr_entries: Vec<Expr>,
@@ -267,6 +271,7 @@ impl<'a> VM<'a> {
             eval_timeout_entries: chunk.eval_timeout_entries.clone(),
             algebraic_match_entries: chunk.algebraic_match_entries.clone(),
             par_lines_entries: chunk.par_lines_entries.clone(),
+            par_walk_entries: chunk.par_walk_entries.clone(),
             pwatch_entries: chunk.pwatch_entries.clone(),
             substr_four_arg_entries: chunk.substr_four_arg_entries.clone(),
             keys_expr_entries: chunk.keys_expr_entries.clone(),
@@ -867,10 +872,13 @@ impl<'a> VM<'a> {
                     data: RwLock::new(PerlValue::hash(map)),
                 })));
             }
-        } else if let Some(result) =
-            self.interp
-                .try_autoload_call(&full_name, all_args, self.line(), want)
-        {
+        } else if let Some(result) = self.interp.try_autoload_call(
+            &full_name,
+            all_args,
+            self.line(),
+            want,
+            Some(&class),
+        ) {
             match result {
                 Ok(v) => self.push(v),
                 Err(crate::interpreter::FlowOrError::Flow(crate::interpreter::Flow::Return(v))) => {
@@ -2363,6 +2371,7 @@ impl<'a> VM<'a> {
                                 self.interp.with_topic_default_args(args),
                                 self.line(),
                                 want,
+                                None,
                             ) {
                                 match result {
                                     Ok(v) => self.push(v),
@@ -3393,6 +3402,20 @@ impl<'a> VM<'a> {
                         let (path, callback, progress) = &self.par_lines_entries[*idx as usize];
                         let v = vm_interp_result(
                             self.interp.eval_par_lines_expr(
+                                path,
+                                callback,
+                                progress.as_ref(),
+                                self.line(),
+                            ),
+                            self.line(),
+                        )?;
+                        self.push(v);
+                        Ok(())
+                    }
+                    Op::ParWalk(idx) => {
+                        let (path, callback, progress) = &self.par_walk_entries[*idx as usize];
+                        let v = vm_interp_result(
+                            self.interp.eval_par_walk_expr(
                                 path,
                                 callback,
                                 progress.as_ref(),
@@ -5004,6 +5027,8 @@ impl<'a> VM<'a> {
                     &pats, progress,
                 ))
             }
+            Some(BuiltinId::ParSed) => self.interp.builtin_par_sed(&args, line, false),
+            Some(BuiltinId::ParSedProgress) => self.interp.builtin_par_sed(&args, line, true),
             Some(BuiltinId::Opendir) => {
                 let handle = args.first().map(|v| v.to_string()).unwrap_or_default();
                 let path = args.get(1).map(|v| v.to_string()).unwrap_or_default();

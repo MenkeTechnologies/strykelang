@@ -226,6 +226,9 @@ fn format_statement(s: &Statement) -> String {
         StmtKind::MySync(decls) => format!("mysync {};", format_var_decls(decls)),
         StmtKind::Block(b) => format!("{{\n{}\n}}", format_block(b)),
         StmtKind::Begin(b) => format!("BEGIN {{\n{}\n}}", format_block(b)),
+        StmtKind::UnitCheck(b) => format!("UNITCHECK {{\n{}\n}}", format_block(b)),
+        StmtKind::Check(b) => format!("CHECK {{\n{}\n}}", format_block(b)),
+        StmtKind::Init(b) => format!("INIT {{\n{}\n}}", format_block(b)),
         StmtKind::End(b) => format!("END {{\n{}\n}}", format_block(b)),
         StmtKind::Empty => ";".to_string(),
         StmtKind::Goto { target } => format!("goto {};", format_expr(target)),
@@ -687,6 +690,23 @@ pub fn format_expr(e: &Expr) -> String {
                 format_expr(callback)
             ),
         },
+        ExprKind::ParWalkExpr {
+            path,
+            callback,
+            progress,
+        } => match progress {
+            Some(p) => format!(
+                "par_walk({}, {}, progress => {})",
+                format_expr(path),
+                format_expr(callback),
+                format_expr(p)
+            ),
+            None => format!(
+                "par_walk({}, {})",
+                format_expr(path),
+                format_expr(callback)
+            ),
+        },
         ExprKind::PwatchExpr { path, callback } => {
             format!("pwatch({}, {})", format_expr(path), format_expr(callback))
         }
@@ -926,6 +946,13 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::Glob(_) => "/* ExprKind::Glob */".to_string(),
         ExprKind::GlobPar { args, progress } => {
             let base = format!("glob_par({})", format_expr_list(args));
+            match progress {
+                Some(p) => format!("{}, progress => {}", base, format_expr(p)),
+                None => base,
+            }
+        }
+        ExprKind::ParSed { args, progress } => {
+            let base = format!("par_sed({})", format_expr_list(args));
             match progress {
                 Some(p) => format!("{}, progress => {}", base, format_expr(p)),
                 None => base,

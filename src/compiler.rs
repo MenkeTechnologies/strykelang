@@ -211,6 +211,9 @@ struct LoopCtx {
 pub struct Compiler {
     pub chunk: Chunk,
     pub begin_blocks: Vec<Block>,
+    pub unit_check_blocks: Vec<Block>,
+    pub check_blocks: Vec<Block>,
+    pub init_blocks: Vec<Block>,
     pub end_blocks: Vec<Block>,
     /// Lexical `my` declarations per scope frame (mirrors `PushFrame` / sub bodies).
     scope_stack: Vec<ScopeLayer>,
@@ -234,6 +237,9 @@ impl Compiler {
         Self {
             chunk: Chunk::new(),
             begin_blocks: Vec::new(),
+            unit_check_blocks: Vec::new(),
+            check_blocks: Vec::new(),
+            init_blocks: Vec::new(),
             end_blocks: Vec::new(),
             scope_stack: vec![ScopeLayer::default()],
             current_package: String::new(),
@@ -576,6 +582,9 @@ impl Compiler {
         for stmt in &program.statements {
             match &stmt.kind {
                 StmtKind::Begin(block) => self.begin_blocks.push(block.clone()),
+                StmtKind::UnitCheck(block) => self.unit_check_blocks.push(block.clone()),
+                StmtKind::Check(block) => self.check_blocks.push(block.clone()),
+                StmtKind::Init(block) => self.init_blocks.push(block.clone()),
                 StmtKind::End(block) => self.end_blocks.push(block.clone()),
                 _ => {}
             }
@@ -599,7 +608,12 @@ impl Compiler {
             .filter(|s| {
                 !matches!(
                     s.kind,
-                    StmtKind::SubDecl { .. } | StmtKind::Begin(_) | StmtKind::End(_)
+                    StmtKind::SubDecl { .. }
+                        | StmtKind::Begin(_)
+                        | StmtKind::UnitCheck(_)
+                        | StmtKind::Check(_)
+                        | StmtKind::Init(_)
+                        | StmtKind::End(_)
                 )
             })
             .collect();
@@ -611,6 +625,18 @@ impl Compiler {
         // BEGIN blocks run before main (same order as [`Interpreter::execute_tree`]).
         for block in &self.begin_blocks.clone() {
             self.compile_block(block)?;
+        }
+        let unit_check_rev: Vec<Block> = self.unit_check_blocks.iter().rev().cloned().collect();
+        for block in unit_check_rev {
+            self.compile_block(&block)?;
+        }
+        let check_rev: Vec<Block> = self.check_blocks.iter().rev().cloned().collect();
+        for block in check_rev {
+            self.compile_block(&block)?;
+        }
+        let inits = self.init_blocks.clone();
+        for block in inits {
+            self.compile_block(&block)?;
         }
 
         let mut i = 0;
@@ -1524,6 +1550,9 @@ impl Compiler {
             StmtKind::Use { .. }
             | StmtKind::No { .. }
             | StmtKind::Begin(_)
+            | StmtKind::UnitCheck(_)
+            | StmtKind::Check(_)
+            | StmtKind::Init(_)
             | StmtKind::End(_)
             | StmtKind::Empty
             | StmtKind::Redo(_) => {
@@ -2867,6 +2896,29 @@ impl Compiler {
                     }
                 }
             }
+            ExprKind::ParSed { args, progress } => {
+                for a in args {
+                    self.compile_expr(a)?;
+                }
+                match progress {
+                    None => {
+                        self.chunk.emit(
+                            Op::CallBuiltin(BuiltinId::ParSed as u16, args.len() as u8),
+                            line,
+                        );
+                    }
+                    Some(p) => {
+                        self.compile_expr(p)?;
+                        self.chunk.emit(
+                            Op::CallBuiltin(
+                                BuiltinId::ParSedProgress as u16,
+                                (args.len() + 1) as u8,
+                            ),
+                            line,
+                        );
+                    }
+                }
+            }
 
             // ── OOP ──
             ExprKind::Bless { ref_expr, class } => {
@@ -3265,6 +3317,18 @@ impl Compiler {
                     progress.as_ref().map(|p| p.as_ref().clone()),
                 );
                 self.chunk.emit(Op::ParLines(idx), line);
+            }
+            ExprKind::ParWalkExpr {
+                path,
+                callback,
+                progress,
+            } => {
+                let idx = self.chunk.add_par_walk_entry(
+                    path.as_ref().clone(),
+                    callback.as_ref().clone(),
+                    progress.as_ref().map(|p| p.as_ref().clone()),
+                );
+                self.chunk.emit(Op::ParWalk(idx), line);
             }
             ExprKind::PwatchExpr { path, callback } => {
                 let idx = self
