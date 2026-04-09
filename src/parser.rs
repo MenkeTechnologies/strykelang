@@ -3537,32 +3537,14 @@ impl Parser {
             }
             "fan" => {
                 // fan COUNT { BLOCK }  |  fan { BLOCK }  (COUNT defaults to rayon thread pool size)
-                // Optional: , progress => EXPR
+                // Optional: `, progress => EXPR` or `progress => EXPR` (no comma before progress)
                 let count = if matches!(self.peek(), Token::LBrace) {
                     None
                 } else {
                     Some(Box::new(self.parse_postfix()?))
                 };
                 let block = self.parse_block()?;
-                let progress = if self.eat(&Token::Comma) {
-                    match self.peek() {
-                        Token::Ident(ref kw)
-                            if kw == "progress" && matches!(self.peek_at(1), Token::FatArrow) =>
-                        {
-                            self.advance();
-                            self.expect(&Token::FatArrow)?;
-                            Some(Box::new(self.parse_assign_expr()?))
-                        }
-                        _ => {
-                            return Err(PerlError::syntax(
-                                "fan: expected `progress => EXPR` after comma",
-                                line,
-                            ));
-                        }
-                    }
-                } else {
-                    None
-                };
+                let progress = self.parse_fan_optional_progress("fan")?;
                 Ok(Expr {
                     kind: ExprKind::FanExpr {
                         count,
@@ -3580,25 +3562,7 @@ impl Parser {
                     Some(Box::new(self.parse_postfix()?))
                 };
                 let block = self.parse_block()?;
-                let progress = if self.eat(&Token::Comma) {
-                    match self.peek() {
-                        Token::Ident(ref kw)
-                            if kw == "progress" && matches!(self.peek_at(1), Token::FatArrow) =>
-                        {
-                            self.advance();
-                            self.expect(&Token::FatArrow)?;
-                            Some(Box::new(self.parse_assign_expr()?))
-                        }
-                        _ => {
-                            return Err(PerlError::syntax(
-                                "fan_cap: expected `progress => EXPR` after comma",
-                                line,
-                            ));
-                        }
-                    }
-                } else {
-                    None
-                };
+                let progress = self.parse_fan_optional_progress("fan_cap")?;
                 Ok(Expr {
                     kind: ExprKind::FanExpr {
                         count,
@@ -4364,6 +4328,36 @@ impl Parser {
             parts.push(self.parse_assign_expr()?);
         }
         Ok((block, merge_expr_list(parts), None))
+    }
+
+    /// After `fan` / `fan_cap` `{ BLOCK }`, optional `, progress => EXPR` or `progress => EXPR` (no comma).
+    fn parse_fan_optional_progress(&mut self, which: &'static str) -> PerlResult<Option<Box<Expr>>> {
+        let line = self.peek_line();
+        if self.eat(&Token::Comma) {
+            match self.peek() {
+                Token::Ident(ref kw)
+                    if kw == "progress" && matches!(self.peek_at(1), Token::FatArrow) =>
+                {
+                    self.advance();
+                    self.expect(&Token::FatArrow)?;
+                    return Ok(Some(Box::new(self.parse_assign_expr()?)));
+                }
+                _ => {
+                    return Err(PerlError::syntax(
+                        format!("{which}: expected `progress => EXPR` after comma"),
+                        line,
+                    ));
+                }
+            }
+        }
+        if let Token::Ident(ref kw) = self.peek().clone() {
+            if kw == "progress" && matches!(self.peek_at(1), Token::FatArrow) {
+                self.advance();
+                self.expect(&Token::FatArrow)?;
+                return Ok(Some(Box::new(self.parse_assign_expr()?)));
+            }
+        }
+        Ok(None)
     }
 
     /// Comma-separated assign expressions with optional trailing `, progress => EXPR`

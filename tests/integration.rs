@@ -8,7 +8,8 @@
 //! batching—for `perlrs::parse` success, syntax errors, `Program` / `StmtKind` / `BinOp` shape, and
 //! `ErrorKind` from `eval_err_kind` / `parse_err_kind`. `runtime_extra` and `runtime_more` add broad
 //! interpreter coverage (assignment forms, builtin return values, aggregates, strings, control
-//! flow, regex, closures). Library unit tests cover `parse()`, `run`, `parse_and_run_string`,
+//! flow, regex, closures). `pack_unpack_runtime` exercises `pack`/`unpack` builtins; `semantic_edge`
+//! adds focused checks for operators and list builtins. Library unit tests cover `parse()`, `run`, `parse_and_run_string`,
 //! `try_vm_execute`, `crate_api_tests` / `run_semantics_tests` / `run_semantics_more` (crate-root `run`), `parser_shape_tests` (`StmtKind`/`ExprKind` from `parse`), `interpreter_unit_tests`
 //! (`Interpreter` defaults and `execute_tree`), lexer (`&`, `&&`/`||`/`+=`, `==`/`!=`,
 //! `**`/`..`, `q{}`, `qr//`, octal/binary, `-e` file tests, floats, `m//`, strings, `<=>`), `Scope`

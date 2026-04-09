@@ -93,6 +93,7 @@ fn accepts_fan_block_default_count() {
 fn accepts_fan_progress() {
     p("fan 2 { 1 }, progress => 1;");
     p("fan { 1 }, progress => 0;");
+    p("fan { 1 } progress => 0;");
 }
 
 #[test]
@@ -100,6 +101,7 @@ fn accepts_fan_cap_block() {
     p("fan_cap 4 { my $i = $_; };");
     p("fan_cap { $_ };");
     p("fan_cap 2 { 1 }, progress => 0;");
+    p("fan_cap { 1 } progress => 1;");
 }
 
 #[test]
