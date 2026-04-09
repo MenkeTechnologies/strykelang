@@ -411,6 +411,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 
 #### OTHER FEATURES
 - `Interpreter::execute` returns `Err(ErrorKind::Exit(code))` for `exit` (including code 0); the `perlrs` binary maps that to `process::exit`.
+- **`@INC` / `%INC` / `require` / `use`** — Pure perlrs modules: search each directory in `@INC` for a relative path (`Foo::Bar` → `Foo/Bar.pm`). Default `@INC` is `.`; the `perlrs` / `pe` driver prepends `-I` directories, then the **script’s directory** (when the program file is not `-e` / `-` / `repl`), then paths from **`PERLRS_INC`** (OS path list, same as `PATH`), then `.`. Successful loads record the relative path in **`%INC`**; repeated `require` is a no-op. **`use Module;`** is processed in **source order** before `BEGIN` blocks (and before the VM main chunk runs). Built-in pragmas (`strict`, `warnings`, `utf8`, …) do not load a file. Version-only `require` (e.g. `require 5.010`) succeeds without loading.
 - `use strict`, `use warnings` (recognized)
 - `package` declarations
 - `BEGIN`/`END` blocks

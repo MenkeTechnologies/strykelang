@@ -1,8 +1,8 @@
 use std::cmp::Ordering;
 use std::collections::{HashMap, VecDeque};
 use std::fs::File;
-use std::io::{self, BufRead, BufReader, Read, Write as IoWrite};
-use std::path::{Path, PathBuf};
+use std::io::{self, BufRead, BufReader, Cursor, Read, Write as IoWrite};
+use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Barrier};
 
@@ -18,6 +18,7 @@ use crate::ast::*;
 use crate::builtins::PerlSocket;
 use crate::crypt_util::perl_crypt;
 use crate::error::{ErrorKind, PerlError, PerlResult};
+use crate::profiler::Profiler;
 use crate::scope::Scope;
 use crate::sort_fast::{detect_sort_block_fast, sort_magic_cmp};
 use crate::value::{
@@ -138,6 +139,8 @@ pub struct Interpreter {
     pub(crate) wantarray_kind: WantarrayCtx,
     /// `struct Name { ... }` definitions (merged from VM chunks and tree-walker).
     pub struct_defs: HashMap<String, Arc<StructDef>>,
+    /// When set, tree-walker records per-statement and per-sub timings (`pe --profile`).
+    pub profiler: Option<Profiler>,
 }
 
 /// Shell command for `open(H, "-|", cmd)` / `open(H, "|-", cmd)` (list form not yet supported).
@@ -199,10 +202,7 @@ impl Interpreter {
         }
 
         let mut scope = Scope::new();
-        scope.declare_array(
-            "INC",
-            vec![PerlValue::String(".".to_string())],
-        );
+        scope.declare_array("INC", vec![PerlValue::String(".".to_string())]);
         scope.declare_hash("INC", IndexMap::new());
 
         Self {
@@ -235,7 +235,185 @@ impl Interpreter {
             pipe_children: HashMap::new(),
             socket_handles: HashMap::new(),
             wantarray_kind: WantarrayCtx::Scalar,
+            profiler: None,
         }
+    }
+
+    /// Paths from `@INC` for `require` / `use` (non-empty; defaults to `.` if unset).
+    pub(crate) fn inc_directories(&self) -> Vec<String> {
+        let mut v: Vec<String> = self
+            .scope
+            .get_array("INC")
+            .into_iter()
+            .map(|x| x.to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if v.is_empty() {
+            v.push(".".to_string());
+        }
+        v
+    }
+
+    fn looks_like_version_only(spec: &str) -> bool {
+        let t = spec.trim();
+        !t.is_empty()
+            && !t.contains('/')
+            && !t.contains('\\')
+            && !t.contains("::")
+            && t.chars()
+                .all(|c| c.is_ascii_digit() || c == '.' || c == '_' || c == 'v')
+            && t.chars().any(|c| c.is_ascii_digit())
+    }
+
+    fn module_spec_to_relpath(spec: &str) -> String {
+        let t = spec.trim();
+        if t.contains("::") {
+            format!("{}.pm", t.replace("::", "/"))
+        } else if t.ends_with(".pm") || t.ends_with(".pl") {
+            t.replace('\\', "/")
+        } else if t.contains('/') {
+            t.replace('\\', "/")
+        } else {
+            format!("{}.pm", t)
+        }
+    }
+
+    /// `require EXPR` — load once, record `%INC`, return `1` on success.
+    pub(crate) fn require_execute(&mut self, spec: &str, line: usize) -> PerlResult<PerlValue> {
+        let t = spec.trim();
+        if t.is_empty() {
+            return Err(PerlError::runtime("require: empty argument", line));
+        }
+        // Pragmas: no `.pm` load (matches `use strict` / `use warnings` behavior).
+        match t {
+            "strict" | "utf8" | "feature" | "v5" => return Ok(PerlValue::Integer(1)),
+            "warnings" => {
+                self.warnings = true;
+                return Ok(PerlValue::Integer(1));
+            }
+            "threads" | "Thread::Pool" | "Parallel::ForkManager" => {
+                return Ok(PerlValue::Integer(1));
+            }
+            _ => {}
+        }
+        let p = Path::new(t);
+        if p.is_absolute() {
+            return self.require_absolute_path(p, line);
+        }
+        if Self::looks_like_version_only(t) {
+            return Ok(PerlValue::Integer(1));
+        }
+        let relpath = Self::module_spec_to_relpath(t);
+        self.require_from_inc(&relpath, line)
+    }
+
+    fn require_absolute_path(&mut self, path: &Path, line: usize) -> PerlResult<PerlValue> {
+        let canon = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        let key = canon.to_string_lossy().into_owned();
+        if self.scope.exists_hash_element("INC", &key) {
+            return Ok(PerlValue::Integer(1));
+        }
+        let code = std::fs::read_to_string(&canon).map_err(|e| {
+            PerlError::runtime(
+                format!("Can't open {} for reading: {}", canon.display(), e),
+                line,
+            )
+        })?;
+        self.scope
+            .set_hash_element("INC", &key, PerlValue::String(key.clone()));
+        crate::parse_and_run_string(&code, self)?;
+        Ok(PerlValue::Integer(1))
+    }
+
+    fn require_from_inc(&mut self, relpath: &str, line: usize) -> PerlResult<PerlValue> {
+        if self.scope.exists_hash_element("INC", relpath) {
+            return Ok(PerlValue::Integer(1));
+        }
+        for dir in self.inc_directories() {
+            let full = Path::new(&dir).join(relpath);
+            if full.is_file() {
+                let code = std::fs::read_to_string(&full).map_err(|e| {
+                    PerlError::runtime(
+                        format!("Can't open {} for reading: {}", full.display(), e),
+                        line,
+                    )
+                })?;
+                let abs = full.canonicalize().unwrap_or(full);
+                let abs_s = abs.to_string_lossy().into_owned();
+                self.scope
+                    .set_hash_element("INC", relpath, PerlValue::String(abs_s));
+                crate::parse_and_run_string(&code, self)?;
+                return Ok(PerlValue::Integer(1));
+            }
+        }
+        Err(PerlError::runtime(
+            format!(
+                "Can't locate {} in @INC (push paths onto @INC or use -I DIR)",
+                relpath
+            ),
+            line,
+        ))
+    }
+
+    /// Pragmas (`use strict`) or load a `.pm` file (`use Foo::Bar`).
+    pub(crate) fn exec_use_stmt(
+        &mut self,
+        module: &str,
+        _imports: &[Expr],
+        line: usize,
+    ) -> PerlResult<()> {
+        match module {
+            "strict" | "utf8" | "feature" | "v5" => Ok(()),
+            "warnings" => {
+                self.warnings = true;
+                Ok(())
+            }
+            "threads" | "Thread::Pool" | "Parallel::ForkManager" => Ok(()),
+            _ => {
+                self.require_execute(module, line)?;
+                Ok(())
+            }
+        }
+    }
+
+    /// Register subs, run `use` in source order, collect `BEGIN`/`END` (before `BEGIN` execution).
+    pub(crate) fn prepare_program_top_level(&mut self, program: &Program) -> PerlResult<()> {
+        for stmt in &program.statements {
+            match &stmt.kind {
+                StmtKind::SubDecl {
+                    name,
+                    params,
+                    body,
+                    prototype,
+                } => {
+                    self.subs.insert(
+                        name.clone(),
+                        Arc::new(PerlSub {
+                            name: name.clone(),
+                            params: params.clone(),
+                            body: body.clone(),
+                            closure_env: None,
+                            prototype: prototype.clone(),
+                        }),
+                    );
+                }
+                StmtKind::Use { module, imports } => {
+                    self.exec_use_stmt(module, imports, stmt.line)?;
+                }
+                StmtKind::Begin(block) => self.begin_blocks.push(block.clone()),
+                StmtKind::End(block) => self.end_blocks.push(block.clone()),
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    /// Install the `DATA` handle from a script `__DATA__` section (bytes after the marker line).
+    pub fn install_data_handle(&mut self, data: Vec<u8>) {
+        self.input_handles.insert(
+            "DATA".to_string(),
+            BufReader::new(Box::new(Cursor::new(data)) as Box<dyn Read + Send>),
+        );
     }
 
     /// `open` and VM `BuiltinId::Open`. `file_opt` is the evaluated third argument when present.
@@ -641,6 +819,7 @@ impl Interpreter {
     }
 
     pub fn execute(&mut self, program: &Program) -> PerlResult<PerlValue> {
+        // Profiling uses the tree-walker only (see `try_vm_execute`).
         // Try bytecode VM first — falls back to tree-walker on unsupported features
         if let Some(result) = crate::try_vm_execute(program, self) {
             return result;
@@ -652,31 +831,8 @@ impl Interpreter {
 
     /// Tree-walking execution (fallback when bytecode compilation fails).
     pub fn execute_tree(&mut self, program: &Program) -> PerlResult<PerlValue> {
-        // First pass: collect subs and BEGIN/END blocks
-        for stmt in &program.statements {
-            match &stmt.kind {
-                StmtKind::SubDecl {
-                    name,
-                    params,
-                    body,
-                    prototype,
-                } => {
-                    self.subs.insert(
-                        name.clone(),
-                        Arc::new(PerlSub {
-                            name: name.clone(),
-                            params: params.clone(),
-                            body: body.clone(),
-                            closure_env: None,
-                            prototype: prototype.clone(),
-                        }),
-                    );
-                }
-                StmtKind::Begin(block) => self.begin_blocks.push(block.clone()),
-                StmtKind::End(block) => self.end_blocks.push(block.clone()),
-                _ => {}
-            }
-        }
+        // First pass: subs, `use` (source order), BEGIN/END collection
+        self.prepare_program_top_level(program)?;
 
         // Execute BEGIN blocks
         let begins = std::mem::take(&mut self.begin_blocks);
@@ -691,7 +847,10 @@ impl Interpreter {
         let mut last = PerlValue::Undef;
         for stmt in &program.statements {
             match &stmt.kind {
-                StmtKind::SubDecl { .. } | StmtKind::Begin(_) | StmtKind::End(_) => continue,
+                StmtKind::SubDecl { .. }
+                | StmtKind::Begin(_)
+                | StmtKind::End(_)
+                | StmtKind::Use { .. } => continue,
                 _ => {
                     match self.exec_statement(stmt) {
                         Ok(val) => last = val,
@@ -830,9 +989,7 @@ impl Interpreter {
             interp.argv = argv.clone();
             interp.scope.declare_array(
                 "ARGV",
-                argv.iter()
-                    .map(|s| PerlValue::String(s.clone()))
-                    .collect(),
+                argv.iter().map(|s| PerlValue::String(s.clone())).collect(),
             );
             for (k, v) in env {
                 let _ = interp.scope.set_hash_element("ENV", &k, v);
@@ -945,6 +1102,15 @@ impl Interpreter {
     }
 
     fn exec_statement(&mut self, stmt: &Statement) -> ExecResult {
+        let t0 = self.profiler.is_some().then(std::time::Instant::now);
+        let r = self.exec_statement_inner(stmt);
+        if let (Some(prof), Some(t0)) = (&mut self.profiler, t0) {
+            prof.on_line(&self.file, stmt.line, t0.elapsed());
+        }
+        r
+    }
+
+    fn exec_statement_inner(&mut self, stmt: &Statement) -> ExecResult {
         match &stmt.kind {
             StmtKind::Expression(expr) => self.eval_expr_ctx(expr, WantarrayCtx::Void),
             StmtKind::If {
@@ -1410,21 +1576,8 @@ impl Interpreter {
                     .set_scalar("__PACKAGE__", PerlValue::String(name.clone()));
                 Ok(PerlValue::Undef)
             }
-            StmtKind::Use { module, imports: _ } => {
-                match module.as_str() {
-                    "strict" | "warnings" | "utf8" | "feature" | "v5" => {
-                        if module == "warnings" {
-                            self.warnings = true;
-                        }
-                    }
-                    "threads" | "Thread::Pool" | "Parallel::ForkManager" => {
-                        // Our parallel primitives handle this
-                    }
-                    _ => {
-                        // Try to load module file
-                        // For now, silently ignore unknown modules
-                    }
-                }
+            StmtKind::Use { .. } => {
+                // Handled in `prepare_program_top_level` before BEGIN / main.
                 Ok(PerlValue::Undef)
             }
             StmtKind::No { module, .. } => {
@@ -2177,10 +2330,7 @@ impl Interpreter {
                 let (scope_capture, atomic_arrays, atomic_hashes) =
                     self.scope.capture_with_atomics();
                 let file = std::fs::File::open(std::path::Path::new(&path_s)).map_err(|e| {
-                    FlowOrError::Error(PerlError::runtime(
-                        format!("par_lines: {}", e),
-                        line,
-                    ))
+                    FlowOrError::Error(PerlError::runtime(format!("par_lines: {}", e), line))
                 })?;
                 let mmap = unsafe {
                     memmap2::Mmap::map(&file).map_err(|e| {
@@ -2213,7 +2363,9 @@ impl Interpreter {
                         local_interp
                             .scope
                             .restore_atomics(&atomic_arrays, &atomic_hashes);
-                        let _ = local_interp.scope.set_scalar("_", PerlValue::String(line_str));
+                        let _ = local_interp
+                            .scope
+                            .set_scalar("_", PerlValue::String(line_str));
                         match local_interp.call_sub(&sub, vec![], WantarrayCtx::Void, line) {
                             Ok(_) => {}
                             Err(e) => return Err(e),
@@ -3110,20 +3262,9 @@ impl Interpreter {
                 }
             }
             ExprKind::Require(expr) => {
-                let filename = self.eval_expr(expr)?.to_string();
-                let path = filename.replace("::", "/") + ".pm";
-                // Search @INC (simplified: just current dir and /usr/lib/perl5)
-                for dir in [".", "/usr/lib/perl5", "/usr/share/perl5"] {
-                    let full = format!("{}/{}", dir, path);
-                    if std::path::Path::new(&full).exists() {
-                        let code = std::fs::read_to_string(&full).map_err(|e| {
-                            PerlError::runtime(format!("Can't open {}: {}", full, e), line)
-                        })?;
-                        return crate::parse_and_run_string(&code, self)
-                            .map_err(FlowOrError::Error);
-                    }
-                }
-                Ok(PerlValue::Integer(1)) // silently succeed for now
+                let spec = self.eval_expr(expr)?.to_string();
+                self.require_execute(&spec, line)
+                    .map_err(FlowOrError::Error)
             }
             ExprKind::Exit(code) => {
                 let c = if let Some(e) = code {
@@ -3771,9 +3912,9 @@ impl Interpreter {
         line: usize,
     ) -> Option<PerlResult<PerlValue>> {
         match receiver {
-            PerlValue::SqliteConn(c) => Some(crate::native_data::sqlite_dispatch(
-                c, method, args, line,
-            )),
+            PerlValue::SqliteConn(c) => {
+                Some(crate::native_data::sqlite_dispatch(c, method, args, line))
+            }
             PerlValue::StructInst(s) => {
                 if let Some(idx) = s.def.field_index(method) {
                     if !args.is_empty() {
@@ -4132,7 +4273,14 @@ impl Interpreter {
         }
         let saved = self.wantarray_kind;
         self.wantarray_kind = want;
+        let t0 = self.profiler.is_some().then(std::time::Instant::now);
+        if let Some(p) = &mut self.profiler {
+            p.enter_sub(&sub.name);
+        }
         let result = self.exec_block_no_scope(&sub.body);
+        if let (Some(p), Some(t0)) = (&mut self.profiler, t0) {
+            p.exit_sub(t0.elapsed());
+        }
         self.wantarray_kind = saved;
         self.scope.pop_frame();
         match result {

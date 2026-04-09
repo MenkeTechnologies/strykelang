@@ -14,8 +14,8 @@ use crate::error::{ErrorKind, PerlError, PerlResult};
 use crate::interpreter::{Flow, FlowOrError, Interpreter, WantarrayCtx};
 use crate::sort_fast::{sort_magic_cmp, SortBlockFast};
 use crate::value::{PerlAsyncTask, PerlBarrier, PerlHeap, PerlValue, PipelineInner};
-use std::sync::Barrier;
 use parking_lot::Mutex;
+use std::sync::Barrier;
 
 /// Saved state when entering a function call.
 #[derive(Debug)]
@@ -207,7 +207,10 @@ impl<'a> VM<'a> {
                     let val = self.pop();
                     let n = self.name_owned(*idx);
                     let ty = PerlTypeName::from_byte(*tyb).ok_or_else(|| {
-                        PerlError::runtime(format!("invalid typed scalar type byte {}", tyb), self.line())
+                        PerlError::runtime(
+                            format!("invalid typed scalar type byte {}", tyb),
+                            self.line(),
+                        )
                     })?;
                     self.interp
                         .scope
@@ -2212,17 +2215,7 @@ impl<'a> VM<'a> {
                     .next()
                     .unwrap_or(PerlValue::Undef)
                     .to_string();
-                let path = name.replace("::", "/") + ".pm";
-                for dir in [".", "/usr/lib/perl5", "/usr/share/perl5"] {
-                    let full = format!("{}/{}", dir, path);
-                    if std::path::Path::new(&full).exists() {
-                        if let Ok(code) = std::fs::read_to_string(&full) {
-                            return crate::parse_and_run_string(&code, self.interp)
-                                .or(Ok(PerlValue::Integer(1)));
-                        }
-                    }
-                }
-                Ok(PerlValue::Integer(1))
+                self.interp.require_execute(&name, line)
             }
             Some(BuiltinId::Bless) => {
                 let ref_val = args.first().cloned().unwrap_or(PerlValue::Undef);

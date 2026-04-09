@@ -34,6 +34,14 @@ pub(crate) struct Cli {
     #[arg(long = "ast")]
     dump_ast: bool,
 
+    /// Pretty-print parsed Perl to stdout and exit (no execution)
+    #[arg(long = "fmt")]
+    format_source: bool,
+
+    /// Wall-clock profile: per-line and per-sub timings on stderr (tree-walker only)
+    #[arg(long = "profile")]
+    profile: bool,
+
     /// Run program under debugger or module Devel::MOD
     #[arg(short = 'd', value_name = "MOD")]
     debugger: Option<Option<String>>,
@@ -188,6 +196,8 @@ fn print_cyberpunk_help() {
     println!("  -E CODE                {G}//{N} Like -e, but enables all optional features");
     println!("  -c                     {G}//{N} Check syntax only (runs BEGIN and CHECK blocks)");
     println!("  --ast                  {G}//{N} Dump parsed AST as JSON and exit (no execution)");
+    println!("  --fmt                  {G}//{N} Pretty-print parsed Perl to stdout and exit");
+    println!("  --profile              {G}//{N} Wall-clock profile (stderr); tree-walker only");
     println!("  -d[t][:MOD]            {G}//{N} Run program under debugger or module Devel::MOD");
     println!("  -D[number/letters]     {G}//{N} Set debugging flags");
     println!("  -u                     {G}//{N} Dump core after parsing program");
@@ -377,6 +387,22 @@ pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut Interpreter, filenam
         .iter()
         .map(|d| perlrs::value::PerlValue::String(d.clone()))
         .collect();
+    if filename != "-e" && filename != "-" && filename != "repl" {
+        if let Some(parent) = std::path::Path::new(filename).parent() {
+            if !parent.as_os_str().is_empty() {
+                inc_dirs.push(perlrs::value::PerlValue::String(
+                    parent.to_string_lossy().into_owned(),
+                ));
+            }
+        }
+    }
+    if let Ok(extra) = std::env::var("PERLRS_INC") {
+        for p in std::env::split_paths(&extra) {
+            inc_dirs.push(perlrs::value::PerlValue::String(
+                p.to_string_lossy().into_owned(),
+            ));
+        }
+    }
     inc_dirs.push(perlrs::value::PerlValue::String(".".to_string()));
     interp.scope.declare_array("INC", inc_dirs);
 
@@ -429,6 +455,8 @@ fn main() {
         && !cli.print_mode
         && !cli.check_only
         && !cli.dump_ast
+        && !cli.format_source
+        && !cli.profile
         && !cli.dump_core
         && io::stdin().is_terminal();
 
@@ -444,8 +472,8 @@ fn main() {
             .as_ref()
             .is_some_and(|v| v.as_deref() == Some("777"));
 
-    // Build the source code
-    let (code, filename) = if !cli.execute.is_empty() {
+    // Build the source code (`__DATA__` is split out before shebang / `-x` handling)
+    let (raw_script, filename): (String, String) = if !cli.execute.is_empty() {
         (cli.execute.join("; "), "-e".to_string())
     } else if !cli.execute_features.is_empty() {
         (cli.execute_features.join("; "), "-E".to_string())
@@ -456,10 +484,7 @@ fn main() {
             script.clone()
         };
         match std::fs::read_to_string(&script_path) {
-            Ok(content) => {
-                let code = strip_shebang_and_extract(&content, cli.extract.is_some());
-                (code, script_path)
-            }
+            Ok(content) => (content, script_path),
             Err(e) => {
                 eprintln!("Can't open perl script \"{}\": {}", script_path, e);
                 process::exit(2);
@@ -468,11 +493,13 @@ fn main() {
     } else if cli.line_mode || cli.print_mode {
         (String::new(), "-".to_string())
     } else {
-        // Read from stdin
         let mut code = String::new();
         io::stdin().read_line(&mut code).ok();
         (code, "-".to_string())
     };
+
+    let (program_text, data_opt) = perlrs::data_section::split_data_section(&raw_script);
+    let code = strip_shebang_and_extract(&program_text, cli.extract.is_some());
 
     let mut full_code = module_prelude(&cli);
     full_code.push_str(&code);
@@ -497,6 +524,11 @@ fn main() {
         return;
     }
 
+    if cli.format_source {
+        println!("{}", perlrs::format_program(&program));
+        return;
+    }
+
     if cli.check_only {
         eprintln!("{} syntax OK", filename);
         return;
@@ -508,7 +540,13 @@ fn main() {
     }
 
     let mut interp = Interpreter::new();
+    if cli.profile {
+        interp.profiler = Some(perlrs::profiler::Profiler::new(filename.clone()));
+    }
     configure_interpreter(&cli, &mut interp, &filename);
+    if let Some(data) = data_opt {
+        interp.install_data_handle(data);
+    }
 
     // Line processing mode (-n / -p)
     if cli.line_mode || cli.print_mode {
@@ -518,6 +556,9 @@ fn main() {
 
         // First execute the program to register subs/BEGIN blocks
         if let Err(e) = interp.execute(&program) {
+            if let Some(p) = interp.profiler.take() {
+                p.print_report();
+            }
             if let ErrorKind::Exit(code) = e.kind {
                 process::exit(code);
             }
@@ -573,17 +614,35 @@ fn main() {
                 }
             }
         }
+        if let Some(p) = interp.profiler.take() {
+            p.print_report();
+        }
     } else {
         // Normal execution
         match interp.execute(&program) {
-            Ok(_) => {}
+            Ok(_) => {
+                if let Some(p) = interp.profiler.take() {
+                    p.print_report();
+                }
+            }
             Err(e) => match e.kind {
-                ErrorKind::Exit(code) => process::exit(code),
+                ErrorKind::Exit(code) => {
+                    if let Some(p) = interp.profiler.take() {
+                        p.print_report();
+                    }
+                    process::exit(code);
+                }
                 ErrorKind::Die => {
+                    if let Some(p) = interp.profiler.take() {
+                        p.print_report();
+                    }
                     eprint!("{}", e);
                     process::exit(255);
                 }
                 _ => {
+                    if let Some(p) = interp.profiler.take() {
+                        p.print_report();
+                    }
                     eprintln!("{}", e);
                     process::exit(255);
                 }

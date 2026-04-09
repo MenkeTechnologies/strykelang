@@ -8,19 +8,19 @@ pub mod data_section;
 pub mod error;
 pub mod fmt;
 pub mod interpreter;
-pub mod profiler;
 pub mod lexer;
+pub mod native_data;
 pub mod pack;
 pub mod par_lines;
 pub mod parallel_trace;
-pub mod pwatch;
 pub mod parser;
 pub mod pchannel;
 pub mod perl_fs;
 pub mod ppool;
+pub mod profiler;
+pub mod pwatch;
 pub mod scope;
 mod sort_fast;
-pub mod native_data;
 pub mod token;
 pub mod value;
 pub mod vm;
@@ -73,6 +73,10 @@ pub fn try_vm_execute(
         return None;
     }
 
+    if let Err(e) = interp.prepare_program_top_level(program) {
+        return Some(Err(e));
+    }
+
     let comp = compiler::Compiler::new();
     match comp.compile_program(program) {
         Ok(chunk) => {
@@ -81,28 +85,7 @@ pub fn try_vm_execute(
                     .struct_defs
                     .insert(def.name.clone(), std::sync::Arc::new(def.clone()));
             }
-            // Register sub declarations in the interpreter so they persist across
-            // multiple parse_and_run_string calls (the VM's chunk is ephemeral).
-            for stmt in &program.statements {
-                if let ast::StmtKind::SubDecl {
-                    name,
-                    params,
-                    body,
-                    prototype,
-                } = &stmt.kind
-                {
-                    interp.subs.insert(
-                        name.clone(),
-                        std::sync::Arc::new(value::PerlSub {
-                            name: name.clone(),
-                            params: params.clone(),
-                            body: body.clone(),
-                            closure_env: None,
-                            prototype: prototype.clone(),
-                        }),
-                    );
-                }
-            }
+            // Subs from `prepare_program_top_level` are already registered.
             let mut vm = vm::VM::new(&chunk, interp);
             match vm.execute() {
                 Ok(val) => Some(Ok(val)),
