@@ -622,6 +622,37 @@ fn perl_compat_use_overload_stringify() {
     );
 }
 
+/// CPAN-style single `use overload` with coderef handlers for `+` and `""`.
+/// `stringify` uses a constant return: arrow/hash on the invocant in overload subs is still limited.
+#[test]
+fn perl_compat_use_overload_combined_coderef() {
+    assert_eq!(
+        ri(r#"
+        package O;
+        use overload '+' => \&add, '""' => \&stringify;
+        sub add { my ($a, $b) = @_; $a->{n} + $b->{n} }
+        sub stringify { "v7" }
+        package main;
+        my $a = O->new(n => 2);
+        my $b = O->new(n => 3);
+        $a + $b;
+        "#),
+        5
+    );
+    assert_eq!(
+        rs(r#"
+        package O;
+        use overload '+' => \&add, '""' => \&stringify;
+        sub add { my ($a, $b) = @_; $a->{n} + $b->{n} }
+        sub stringify { "v7" }
+        package main;
+        my $o = bless { n => 7 }, "O";
+        "$o"
+        "#),
+        "v7"
+    );
+}
+
 #[test]
 fn perl_compat_tie_scalar_fetch_store() {
     assert_eq!(
