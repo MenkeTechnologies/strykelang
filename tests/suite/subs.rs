@@ -49,3 +49,11 @@ fn sub_with_prototype_two_scalars_uses_at_underscore() {
         42
     );
 }
+
+#[test]
+fn coderef_invocation_with_arrow() {
+    assert_eq!(
+        eval_int(r#"sub dbl { $_[0] * 2 } my $r = \&dbl; $r->(21)"#),
+        42,
+    );
+}

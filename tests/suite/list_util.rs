@@ -128,6 +128,17 @@ fn list_util_zip_shortest_pairs_rows_by_min_length() {
 }
 
 #[test]
+fn list_util_zip_longest_pairs_all_rows_shorter_list_pads_second_column() {
+    let mut interp = Interpreter::new();
+    let p = parse(
+        "my @z = List::Util::zip_longest([1, 2], [10]); scalar @z + $z[0]->[0] + $z[0]->[1] + $z[1]->[0] + ($z[1]->[1] + 0)",
+    )
+    .expect("parse");
+    let v = interp.execute(&p).expect("run");
+    assert_eq!(v.to_int(), 2 + 1 + 10 + 2 + 0);
+}
+
+#[test]
 fn list_util_pairs_returns_blessed_arrays() {
     let mut interp = Interpreter::new();
     let p = parse("join(\",\", List::Util::pairs(\"a\", 1, \"b\", 2))").expect("parse");
