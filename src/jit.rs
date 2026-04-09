@@ -71,12 +71,14 @@
 //! and calls [`try_run_block_ops`] with `Some(validated)` so CFG validation is not run again inside
 //! compilation. Callers may pass `None` for the last argument to [`try_run_block_ops`] to validate
 //! internally (unit tests). For buffer mode only, use [`block_jit_validate`] then [`ValidatedBlockCfg::buffer_mode`].
-//! Then the opcode dispatch loop. On each opcode step, [`crate::vm::VM`] may run [`try_run_linear_sub`]
-//! at a sub entry: [`sub_entry_segment`] stops at [`Op::Return`] (void return, empty stack) or
-//! [`Op::ReturnValue`] (value return).
+//! Then the opcode dispatch loop. At **subroutine entry IPs only** (bitset from [`Chunk::sub_entries`]),
+//! [`crate::vm::VM`] may run [`try_run_linear_sub`] / block sub-JIT. [`sub_entry_segment`] stops at the
+//! first [`Op::Return`] (void, empty stack) or [`Op::ReturnValue`]. Failed linear prefixes skip buffer
+//! allocation; failed block validation is cached ([`block_jit_validate_sub`]) and per-entry skip sets
+//! avoid rescanning bytecode on every recursive call.
 
 use std::collections::hash_map::DefaultHasher;
-use std::collections::{BTreeSet, HashMap, VecDeque};
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::hash::{Hash, Hasher};
 use std::sync::{Mutex, OnceLock};
 
@@ -1265,6 +1267,21 @@ fn cache() -> &'static Mutex<HashMap<u64, Box<LinearJit>>> {
     LINEAR_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+/// Keys for [`block_jit_validate_sub`] that returned `None` — recursive subs (e.g. `fib`) would
+/// otherwise re-run full CFG validation on every call.
+static SUB_BLOCK_VALIDATE_FAIL: OnceLock<Mutex<HashSet<u64>>> = OnceLock::new();
+
+fn sub_block_validate_fail_cache() -> &'static Mutex<HashSet<u64>> {
+    SUB_BLOCK_VALIDATE_FAIL.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+fn hash_sub_block_validate_key(ops: &[Op], constants: &[PerlValue], term: SubTerminator) -> u64 {
+    let mut h = DefaultHasher::new();
+    term.hash(&mut h);
+    hash_ops(ops, constants).hash(&mut h);
+    h.finish()
+}
+
 fn linear_needs_plain(seq: &[Op]) -> bool {
     seq.iter().any(|o| {
         matches!(
@@ -1512,7 +1529,7 @@ pub(crate) fn try_run_linear_ops(
 }
 
 /// How a compiled subroutine ends before the VM pops the call frame.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum SubTerminator {
     /// Bare `return;` — [`Op::Return`], no value on stack.
     Void,
@@ -1548,6 +1565,7 @@ pub(crate) fn sub_full_body(ops: &[Op], entry_ip: usize) -> Option<(&[Op], SubTe
     Some((&tail[..=rel], term))
 }
 
+/// `true` when this sub prefix cannot use linear Cranelift (control flow, calls, frame ops, etc.).
 pub(crate) fn segment_blocks_subroutine_linear_jit(seg: &[Op]) -> bool {
     seg.iter().any(|o| {
         matches!(
@@ -1563,6 +1581,11 @@ pub(crate) fn segment_blocks_subroutine_linear_jit(seg: &[Op]) -> bool {
                 | Op::ReturnValue
                 | Op::PushFrame
                 | Op::PopFrame
+                | Op::Call(_, _, _)
+                | Op::CallBuiltin(_, _)
+                | Op::MethodCall(_, _, _)
+                | Op::MethodCallSuper(_, _, _)
+                | Op::ArrowCall(_)
         )
     })
 }
@@ -1780,11 +1803,25 @@ pub(crate) fn block_jit_validate_sub(
     constants: &[PerlValue],
     term: SubTerminator,
 ) -> Option<ValidatedBlockCfg> {
+    let key = hash_sub_block_validate_key(ops, constants, term);
+    if let Ok(guard) = sub_block_validate_fail_cache().lock() {
+        if guard.contains(&key) {
+            return None;
+        }
+    }
     let mode = match term {
         SubTerminator::Value => BlockCfgMode::SubValue,
         SubTerminator::Void => BlockCfgMode::SubVoid,
     };
-    validate_block_cfg(ops, constants, mode)
+    let r = validate_block_cfg(ops, constants, mode);
+    if r.is_none() {
+        if let Ok(mut guard) = sub_block_validate_fail_cache().lock() {
+            if guard.len() < 512 {
+                guard.insert(key);
+            }
+        }
+    }
+    r
 }
 
 /// Restrictions so stack slots stay valid [`PerlValue`] NaN-box encodings in raw-buffer mode.

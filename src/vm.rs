@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::io::{self, Write as IoWrite};
 use std::sync::Arc;
 
@@ -46,6 +46,12 @@ pub struct VM<'a> {
     /// When `false`, [`VM::execute`] skips Cranelift JIT (linear, block, and subroutine linear) and
     /// uses only the opcode interpreter. Default `true`.
     jit_enabled: bool,
+    /// Subroutine entry IPs where linear sub-JIT cannot apply (control flow / calls): skip [`sub_entry_segment`] work.
+    sub_jit_skip_linear: HashSet<usize>,
+    /// Subroutine entry IPs where block sub-JIT cannot apply: skip [`crate::jit::sub_full_body`] each call.
+    sub_jit_skip_block: HashSet<usize>,
+    /// `sub_entry_at_ip[ip]` — faster than hashing on every opcode (recursive subs dispatch millions of ops).
+    sub_entry_at_ip: Vec<bool>,
 }
 
 impl<'a> VM<'a> {
@@ -63,6 +69,17 @@ impl<'a> VM<'a> {
             call_stack: Vec::with_capacity(32),
             interp,
             jit_enabled: true,
+            sub_jit_skip_linear: HashSet::new(),
+            sub_jit_skip_block: HashSet::new(),
+            sub_entry_at_ip: {
+                let mut v = vec![false; chunk.ops.len().saturating_add(1)];
+                for (_, e, _) in &chunk.sub_entries {
+                    if *e < v.len() {
+                        v[*e] = true;
+                    }
+                }
+                v
+            },
         }
     }
 
@@ -103,7 +120,8 @@ impl<'a> VM<'a> {
     /// Returns `Ok(true)` when the sub was executed natively and the VM should continue at `return_ip`.
     fn try_jit_subroutine_linear(&mut self) -> Result<bool, PerlError> {
         let ip = self.ip;
-        if !self.sub_entries.iter().any(|(_, e, _)| *e == ip) {
+        debug_assert!(self.sub_entry_at_ip.get(ip).copied().unwrap_or(false));
+        if self.sub_jit_skip_linear.contains(&ip) {
             return Ok(false);
         }
         let ops = &self.ops;
@@ -112,6 +130,12 @@ impl<'a> VM<'a> {
         let Some((seg, _)) = crate::jit::sub_entry_segment(ops, ip) else {
             return Ok(false);
         };
+        // `try_run_linear_sub` rejects these segments without compiling — do not allocate slot/plain/arg
+        // buffers here (recursive subs like `fib` call this on every entry; buffer churn dominated JIT-on).
+        if crate::jit::segment_blocks_subroutine_linear_jit(seg) {
+            self.sub_jit_skip_linear.insert(ip);
+            return Ok(false);
+        }
         let mut slot_buf = crate::jit::linear_slot_ops_max_index_seq(seg).and_then(|max| {
             let mut v = vec![0i64; max as usize + 1];
             for i in 0..=max {
@@ -191,7 +215,8 @@ impl<'a> VM<'a> {
     /// Cranelift block JIT for a subroutine with control flow (see [`crate::jit::block_jit_validate_sub`]).
     fn try_jit_subroutine_block(&mut self) -> Result<bool, PerlError> {
         let ip = self.ip;
-        if !self.sub_entries.iter().any(|(_, e, _)| *e == ip) {
+        debug_assert!(self.sub_entry_at_ip.get(ip).copied().unwrap_or(false));
+        if self.sub_jit_skip_block.contains(&ip) {
             return Ok(false);
         }
         let ops = &self.ops;
@@ -201,9 +226,11 @@ impl<'a> VM<'a> {
             return Ok(false);
         };
         if crate::jit::sub_body_blocks_subroutine_block_jit(full_body) {
+            self.sub_jit_skip_block.insert(ip);
             return Ok(false);
         }
         let Some(validated) = crate::jit::block_jit_validate_sub(full_body, constants, term) else {
+            self.sub_jit_skip_block.insert(ip);
             return Ok(false);
         };
         let block_buf_mode = validated.buffer_mode();
@@ -269,6 +296,7 @@ impl<'a> VM<'a> {
             constants,
             Some(validated),
         ) else {
+            self.sub_jit_skip_block.insert(ip);
             return Ok(false);
         };
 
@@ -699,11 +727,19 @@ impl<'a> VM<'a> {
 
             crate::perl_signal::poll(self.interp)?;
 
-            if self.jit_enabled && self.try_jit_subroutine_linear()? {
-                continue;
-            }
-            if self.jit_enabled && self.try_jit_subroutine_block()? {
-                continue;
+            if self.jit_enabled
+                && self
+                    .sub_entry_at_ip
+                    .get(self.ip)
+                    .copied()
+                    .unwrap_or(false)
+            {
+                if self.try_jit_subroutine_linear()? {
+                    continue;
+                }
+                if self.try_jit_subroutine_block()? {
+                    continue;
+                }
             }
 
             op_count += 1;

@@ -573,13 +573,13 @@ pe examples/parallel_demo.pl
 ```
   TEST                    perl5(ms) jit_on(ms) jit_off(ms) off/on   RATIO
   ──────────────────── ───────── ────────── ────────── ─────── ─────
-  fib(25)                    31.2ms    88.0ms     35.3ms   0.40x   2.82x
-  loop 10k                    9.4ms    10.3ms     12.4ms   1.20x   1.10x
-  string .= 10k               8.9ms    11.9ms     12.7ms   1.07x   1.34x
-  hash 1k                     9.1ms    10.1ms     12.6ms   1.25x   1.11x
-  array sort 10k              8.9ms    11.3ms     12.9ms   1.14x   1.27x
-  regex match 1k             10.2ms    12.1ms     12.7ms   1.05x   1.19x
-  map+grep 10k                8.9ms     9.6ms     11.1ms   1.16x   1.08x
+  fib(25)                    25.7ms    33.4ms     31.1ms   0.93x   1.30x
+  loop 10k                    7.4ms     9.4ms     10.8ms   1.15x   1.27x
+  string .= 10k               7.6ms    11.0ms     12.1ms   1.10x   1.45x
+  hash 1k                     7.5ms     9.1ms     10.1ms   1.11x   1.21x
+  array sort 10k              9.0ms    10.7ms     11.1ms   1.04x   1.19x
+  regex match 1k             10.1ms    10.7ms     12.8ms   1.20x   1.06x
+  map+grep 10k               10.1ms    10.9ms     13.7ms   1.26x   1.08x
 ```
 
 > Measured on macOS M-series with `perl v5.42.2` vs `perlrs` release build (LTO + O3); one representative `bash bench/run_bench.sh` run (median of 3). Times include process startup. **jit_on** / **jit_off** = bytecode VM with Cranelift on vs opcode interpreter only (`PERLRS_NO_JIT=1`). **off/on** = `jit_off ÷ jit_on` (below 1.0 means JIT-off was faster for that script). **RATIO** = `jit_on ÷ perl5` (perlrs with JIT vs perl5).
@@ -587,7 +587,7 @@ pe examples/parallel_demo.pl
 #### Analysis
 
 - **Most rows ~1.1–1.3× perl5 with JIT on** — map/grep, loop, hash, array, regex, and string stay in that band; subtracting startup noise shifts ratios slightly but the pattern holds
-- **fib** — with JIT on, Cranelift compile plus native run can lose to the interpreter on a short recursive workload (when **off/on** is below 1.0, JIT-off is faster); `GetArg` still avoids `@_` allocation. For larger hot loops, block/linear JIT wins (see `cargo bench --bench jit_compare`)
+- **fib** — recursive subs no longer pay per-call slot-buffer work or repeated `sub_full_body` scans when sub-JIT cannot apply (`VM` caches skip sets and only runs sub-JIT hooks at entry IPs via a `sub_entry_at_ip` bitset). **off/on** near 1.0 is expected; `GetArg` avoids `@_` allocation
 - **regex** — `Arc<Regex>` caching keeps the lazy DFA across calls; the `regex` crate matches at near-native Rust speed
 - **hash** — within ~1.1× perl5 on this run; perl’s HV remains extremely tuned
 - **string** — `$s .= "x"` uses `ConcatAppend` for in-place mutation where applicable
