@@ -40,6 +40,39 @@ fn rename_moves_file() {
     std::fs::remove_dir_all(&dir).ok();
 }
 
+/// IO::File-style methods on handle values (`$fh->print`, `->getline`, `->close`).
+#[test]
+fn filehandle_method_io_print_getline_close() {
+    let dir: PathBuf =
+        std::env::temp_dir().join(format!("perlrs_itest_fhmethods_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("out.txt");
+    let p = path.to_str().expect("utf-8");
+    let code = format!(
+        r#"
+        use feature 'say';
+        open(FH, '>', '{p}');
+        FH->print("a");
+        FH->say("b");
+        FH->printf("%s", "c");
+        FH->flush();
+        FH->close();
+        open(FH, '<', '{p}');
+        my $line = FH->getline();
+        FH->close();
+        $line eq "ab\n" ? 1 : 0;
+    "#
+    );
+    assert_eq!(eval_int(&code), 1);
+    let body = std::fs::read_to_string(&path).expect("read out file");
+    assert!(
+        body.contains('a') && body.contains('b') && body.contains('c'),
+        "body={body:?}"
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}
+
 /// Piped `open` plus `<FH>` readline: bytecode (`execute`) and tree-walker (`execute_tree`) must agree.
 #[cfg(unix)]
 #[test]

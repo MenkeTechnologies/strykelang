@@ -317,6 +317,7 @@ impl PerlValue {
             PerlValue::Barrier(_) => 1.0,
             PerlValue::SqliteConn(_) => 1.0,
             PerlValue::StructInst(_) => 1.0,
+            PerlValue::IOHandle(_) => 1.0,
             _ => 0.0,
         }
     }
@@ -341,6 +342,7 @@ impl PerlValue {
             PerlValue::Barrier(_) => 1,
             PerlValue::SqliteConn(_) => 1,
             PerlValue::StructInst(_) => 1,
+            PerlValue::IOHandle(_) => 1,
             _ => 0,
         }
     }
