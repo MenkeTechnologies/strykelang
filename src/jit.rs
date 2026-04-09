@@ -352,6 +352,8 @@ fn branch_stack_to_block_args(
     Some(out)
 }
 
+/// Cache key for compiled JIT functions. [`Op::LoadConst`] hashes [`PerlValue::raw_bits`]
+/// so different constant pool payloads cannot collide at the same index.
 fn hash_ops(ops: &[Op], constants: &[PerlValue]) -> u64 {
     let mut h = DefaultHasher::new();
     ops.len().hash(&mut h);
@@ -368,8 +370,8 @@ fn hash_ops(ops: &[Op], constants: &[PerlValue]) -> u64 {
             Op::LoadConst(i) => {
                 2u8.hash(&mut h);
                 i.hash(&mut h);
-                if let Some(n) = constants.get(*i as usize).and_then(|p| p.as_integer()) {
-                    n.hash(&mut h);
+                if let Some(pv) = constants.get(*i as usize) {
+                    pv.raw_bits().hash(&mut h);
                 }
             }
             Op::LoadUndef => 3u8.hash(&mut h),
@@ -1466,11 +1468,7 @@ fn validate_block_cfg(ops: &[Op], constants: &[PerlValue]) -> Option<(Vec<CfgBlo
         .enumerate()
         .map(|(i, &(s, e))| {
             let reachable = entry_stacks[i].is_some();
-            let entry_cells = if reachable {
-                entry_stacks[i].as_ref().expect("reachable implies Some").clone()
-            } else {
-                Vec::new()
-            };
+            let entry_cells = entry_stacks[i].clone().unwrap_or_default();
             CfgBlock {
                 start: s,
                 end: e,

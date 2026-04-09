@@ -280,6 +280,12 @@ impl PerlValue {
         Some(f(unsafe { self.heap_ref() }))
     }
 
+    /// Raw NaN-box bits for internal identity (e.g. [`crate::jit`] cache keys).
+    #[inline]
+    pub(crate) fn raw_bits(&self) -> u64 {
+        self.0
+    }
+
     /// `typed : Int` — inline `i32` or heap `i64`.
     #[inline]
     pub fn is_integer_like(&self) -> bool {
