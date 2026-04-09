@@ -6,6 +6,24 @@ fn regex_match() {
 }
 
 #[test]
+fn regex_named_captures_plus_hash_and_scalar_brace() {
+    assert_eq!(
+        eval_string(
+            r#"my $s = "ab"; $s =~ /(?<foo>a)(?<bar>b)/; $+{"foo"} . $+{"bar"}"#
+        ),
+        "ab"
+    );
+    assert_eq!(
+        eval_int(r#"my $s = "xy"; $s =~ /(?<n>x)/; scalar keys %+"#),
+        1
+    );
+    assert_eq!(
+        eval_string(r#"my $s = "ax"; $s =~ s/(?<x>a)/b/; $+{"x"}"#),
+        "a"
+    );
+}
+
+#[test]
 fn regex_negated_match_operator() {
     assert_eq!(eval_int(r#"my $s = "abc"; $s !~ /xyz/ ? 1 : 0"#), 1);
     assert_eq!(eval_int(r#"my $s = "abc"; $s !~ /a/ ? 1 : 0"#), 0);
