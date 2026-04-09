@@ -70,7 +70,7 @@ fpath=(/path/to/perlrs/completions $fpath)
 autoload -Uz compinit && compinit
 ```
 
-After reloading your shell, `perlrs <TAB>` and `pe <TAB>` will complete all flags, options, and script files.
+After reloading your shell, `pe <TAB>` will complete all flags, options, and script files.
 
 ---
 
@@ -80,29 +80,29 @@ After reloading your shell, `perlrs <TAB>` and `pe <TAB>` will complete all flag
 
 ```sh
 # inject a single line of perl
-perlrs -e 'print "Hello, world!\n"'
+pe -e 'print "Hello, world!\n"'
 
 # execute a script file
-perlrs script.pl arg1 arg2
+pe script.pl arg1 arg2
 
 # check syntax without executing
-perlrs -c script.pl
+pe -c script.pl
 ```
 
 #### PROCESSING DATA STREAMS // STDIN OPERATIONS
 
 ```sh
 # line-by-line processing
-echo "data" | perlrs -ne 'print uc $_'
+echo "data" | pe -ne 'print uc $_'
 
 # auto-print mode (like sed)
-cat file.txt | perlrs -pe 's/foo/bar/g'
+cat file.txt | pe -pe 's/foo/bar/g'
 
 # slurp entire input at once
-cat file.txt | perlrs -gne 'print length($_), "\n"'
+cat file.txt | pe -gne 'print length($_), "\n"'
 
 # auto-split fields
-echo "a:b:c" | perlrs -a -F: -ne 'print $F[1], "\n"'
+echo "a:b:c" | pe -a -F: -ne 'print $F[1], "\n"'
 ```
 
 #### PARALLEL EXECUTION // MULTI-CORE OPERATIONS
@@ -124,7 +124,7 @@ my @sorted = psort { $a <=> $b } @data;
 my @result = pmap { $_ ** 2 } pgrep { $_ > 100 } @data;
 
 # control thread count
-perlrs -j 8 -e 'my @r = pmap { heavy_work($_) } @data'
+pe -j 8 -e 'my @r = pmap { heavy_work($_) } @data'
 ```
 
 Each parallel block receives its own interpreter context with captured lexical scope // no data races.
@@ -282,9 +282,9 @@ All standard Perl 5 CLI flags are supported:
 ## [0x07] EXAMPLES
 
 ```sh
-perlrs examples/fibonacci.pl
-perlrs examples/text_processing.pl
-perlrs examples/parallel_demo.pl
+pe examples/fibonacci.pl
+pe examples/text_processing.pl
+pe examples/parallel_demo.pl
 ```
 
 ---
