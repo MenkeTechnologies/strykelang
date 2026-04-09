@@ -1,4 +1,4 @@
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
 use std::io::{self, Write as IoWrite};
 use std::sync::Arc;
 
@@ -46,10 +46,11 @@ pub struct VM<'a> {
     /// When `false`, [`VM::execute`] skips Cranelift JIT (linear, block, and subroutine linear) and
     /// uses only the opcode interpreter. Default `true`.
     jit_enabled: bool,
-    /// Subroutine entry IPs where linear sub-JIT cannot apply (control flow / calls): skip [`sub_entry_segment`] work.
-    sub_jit_skip_linear: HashSet<usize>,
-    /// Subroutine entry IPs where block sub-JIT cannot apply: skip [`crate::jit::sub_full_body`] each call.
-    sub_jit_skip_block: HashSet<usize>,
+    /// `sub_jit_skip_linear[ip]` — true when linear sub-JIT cannot apply (control flow / calls).
+    /// Indexed by IP for O(1) lookup instead of hashing (recursive subs like fib hit this millions of times).
+    sub_jit_skip_linear: Vec<bool>,
+    /// `sub_jit_skip_block[ip]` — true when block sub-JIT cannot apply.
+    sub_jit_skip_block: Vec<bool>,
     /// `sub_entry_at_ip[ip]` — faster than hashing on every opcode (recursive subs dispatch millions of ops).
     sub_entry_at_ip: Vec<bool>,
 }
@@ -69,8 +70,8 @@ impl<'a> VM<'a> {
             call_stack: Vec::with_capacity(32),
             interp,
             jit_enabled: true,
-            sub_jit_skip_linear: HashSet::new(),
-            sub_jit_skip_block: HashSet::new(),
+            sub_jit_skip_linear: vec![false; chunk.ops.len().saturating_add(1)],
+            sub_jit_skip_block: vec![false; chunk.ops.len().saturating_add(1)],
             sub_entry_at_ip: {
                 let mut v = vec![false; chunk.ops.len().saturating_add(1)];
                 for (_, e, _) in &chunk.sub_entries {
@@ -81,6 +82,32 @@ impl<'a> VM<'a> {
                 v
             },
         }
+    }
+
+    #[inline]
+    fn sub_jit_skip_linear_test(&self, ip: usize) -> bool {
+        self.sub_jit_skip_linear.get(ip).copied().unwrap_or(false)
+    }
+
+    #[inline]
+    fn sub_jit_skip_linear_mark(&mut self, ip: usize) {
+        if ip >= self.sub_jit_skip_linear.len() {
+            self.sub_jit_skip_linear.resize(ip + 1, false);
+        }
+        self.sub_jit_skip_linear[ip] = true;
+    }
+
+    #[inline]
+    fn sub_jit_skip_block_test(&self, ip: usize) -> bool {
+        self.sub_jit_skip_block.get(ip).copied().unwrap_or(false)
+    }
+
+    #[inline]
+    fn sub_jit_skip_block_mark(&mut self, ip: usize) {
+        if ip >= self.sub_jit_skip_block.len() {
+            self.sub_jit_skip_block.resize(ip + 1, false);
+        }
+        self.sub_jit_skip_block[ip] = true;
     }
 
     /// Enable or disable Cranelift JIT for this execution. Disabling skips compilation and buffer
@@ -121,7 +148,7 @@ impl<'a> VM<'a> {
     fn try_jit_subroutine_linear(&mut self) -> Result<bool, PerlError> {
         let ip = self.ip;
         debug_assert!(self.sub_entry_at_ip.get(ip).copied().unwrap_or(false));
-        if self.sub_jit_skip_linear.contains(&ip) {
+        if self.sub_jit_skip_linear_test(ip) {
             return Ok(false);
         }
         let ops = &self.ops;
@@ -133,7 +160,7 @@ impl<'a> VM<'a> {
         // `try_run_linear_sub` rejects these segments without compiling — do not allocate slot/plain/arg
         // buffers here (recursive subs like `fib` call this on every entry; buffer churn dominated JIT-on).
         if crate::jit::segment_blocks_subroutine_linear_jit(seg) {
-            self.sub_jit_skip_linear.insert(ip);
+            self.sub_jit_skip_linear_mark(ip);
             return Ok(false);
         }
         let mut slot_buf = crate::jit::linear_slot_ops_max_index_seq(seg).and_then(|max| {
@@ -216,7 +243,7 @@ impl<'a> VM<'a> {
     fn try_jit_subroutine_block(&mut self) -> Result<bool, PerlError> {
         let ip = self.ip;
         debug_assert!(self.sub_entry_at_ip.get(ip).copied().unwrap_or(false));
-        if self.sub_jit_skip_block.contains(&ip) {
+        if self.sub_jit_skip_block_test(ip) {
             return Ok(false);
         }
         let ops = &self.ops;
@@ -226,11 +253,11 @@ impl<'a> VM<'a> {
             return Ok(false);
         };
         if crate::jit::sub_body_blocks_subroutine_block_jit(full_body) {
-            self.sub_jit_skip_block.insert(ip);
+            self.sub_jit_skip_block_mark(ip);
             return Ok(false);
         }
         let Some(validated) = crate::jit::block_jit_validate_sub(full_body, constants, term) else {
-            self.sub_jit_skip_block.insert(ip);
+            self.sub_jit_skip_block_mark(ip);
             return Ok(false);
         };
         let block_buf_mode = validated.buffer_mode();
@@ -297,7 +324,7 @@ impl<'a> VM<'a> {
             constants,
             Some(validated),
         ) else {
-            self.sub_jit_skip_block.insert(ip);
+            self.sub_jit_skip_block_mark(ip);
             return Ok(false);
         };
 
@@ -1459,24 +1486,40 @@ impl<'a> VM<'a> {
                 Op::PostInc(idx) => {
                     let n = names[*idx as usize].as_str();
                     self.require_scalar_mutable(n)?;
-                    let old = self.interp.scope.get_scalar(n);
-                    let new_val = PerlValue::integer(old.to_int() + 1);
-                    self.interp
-                        .scope
-                        .set_scalar(n, new_val)
-                        .map_err(|e| e.at_line(self.line()))?;
-                    self.push(old);
+                    if self.ip < len && matches!(ops[self.ip], Op::Pop) {
+                        let val = self.interp.scope.get_scalar(n).to_int() + 1;
+                        self.interp
+                            .scope
+                            .set_scalar(n, PerlValue::integer(val))
+                            .map_err(|e| e.at_line(self.line()))?;
+                        self.ip += 1;
+                    } else {
+                        let old = self.interp.scope.get_scalar(n);
+                        self.interp
+                            .scope
+                            .set_scalar(n, PerlValue::integer(old.to_int() + 1))
+                            .map_err(|e| e.at_line(self.line()))?;
+                        self.push(old);
+                    }
                 }
                 Op::PostDec(idx) => {
                     let n = names[*idx as usize].as_str();
                     self.require_scalar_mutable(n)?;
-                    let old = self.interp.scope.get_scalar(n);
-                    let new_val = PerlValue::integer(old.to_int() - 1);
-                    self.interp
-                        .scope
-                        .set_scalar(n, new_val)
-                        .map_err(|e| e.at_line(self.line()))?;
-                    self.push(old);
+                    if self.ip < len && matches!(ops[self.ip], Op::Pop) {
+                        let val = self.interp.scope.get_scalar(n).to_int() - 1;
+                        self.interp
+                            .scope
+                            .set_scalar(n, PerlValue::integer(val))
+                            .map_err(|e| e.at_line(self.line()))?;
+                        self.ip += 1;
+                    } else {
+                        let old = self.interp.scope.get_scalar(n);
+                        self.interp
+                            .scope
+                            .set_scalar(n, PerlValue::integer(old.to_int() - 1))
+                            .map_err(|e| e.at_line(self.line()))?;
+                        self.push(old);
+                    }
                 }
                 Op::PreIncSlot(slot) => {
                     let val = self.interp.scope.get_scalar_slot(*slot).to_int() + 1;
@@ -1491,16 +1534,33 @@ impl<'a> VM<'a> {
                     self.push(new_val);
                 }
                 Op::PostIncSlot(slot) => {
-                    let old = self.interp.scope.get_scalar_slot(*slot);
-                    let new_val = PerlValue::integer(old.to_int() + 1);
-                    self.interp.scope.set_scalar_slot(*slot, new_val);
-                    self.push(old);
+                    // Fuse PostIncSlot+Pop: if next op discards the old value, skip stack work.
+                    if self.ip < len && matches!(ops[self.ip], Op::Pop) {
+                        let val = self.interp.scope.get_scalar_slot(*slot).to_int() + 1;
+                        self.interp
+                            .scope
+                            .set_scalar_slot(*slot, PerlValue::integer(val));
+                        self.ip += 1; // skip Pop
+                    } else {
+                        let old = self.interp.scope.get_scalar_slot(*slot);
+                        let new_val = PerlValue::integer(old.to_int() + 1);
+                        self.interp.scope.set_scalar_slot(*slot, new_val);
+                        self.push(old);
+                    }
                 }
                 Op::PostDecSlot(slot) => {
-                    let old = self.interp.scope.get_scalar_slot(*slot);
-                    let new_val = PerlValue::integer(old.to_int() - 1);
-                    self.interp.scope.set_scalar_slot(*slot, new_val);
-                    self.push(old);
+                    if self.ip < len && matches!(ops[self.ip], Op::Pop) {
+                        let val = self.interp.scope.get_scalar_slot(*slot).to_int() - 1;
+                        self.interp
+                            .scope
+                            .set_scalar_slot(*slot, PerlValue::integer(val));
+                        self.ip += 1;
+                    } else {
+                        let old = self.interp.scope.get_scalar_slot(*slot);
+                        let new_val = PerlValue::integer(old.to_int() - 1);
+                        self.interp.scope.set_scalar_slot(*slot, new_val);
+                        self.push(old);
+                    }
                 }
 
                 // ── Functions ──
