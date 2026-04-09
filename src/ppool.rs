@@ -176,7 +176,7 @@ fn worker_loop(job_rx: Receiver<PoolJob>, result_tx: Sender<(u64, PerlValue)>) {
         if let Some(env) = job.sub.closure_env.as_ref() {
             interp.scope.restore_capture(env);
         }
-        interp.scope.set_scalar("_", job.arg);
+        let _ = interp.scope.set_scalar("_", job.arg);
         let val = match interp.exec_block_no_scope(&job.sub.body) {
             Ok(v) => v,
             Err(FlowOrError::Flow(Flow::Return(v))) => v,

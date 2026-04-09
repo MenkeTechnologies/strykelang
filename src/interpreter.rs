@@ -245,8 +245,10 @@ impl Interpreter {
                 self.regex_pos.insert(key, Some(abs_end));
                 for i in 1..caps.len() {
                     if let Some(m) = caps.get(i) {
-                        self.scope
-                            .set_scalar(&i.to_string(), PerlValue::String(m.as_str().to_string()));
+                        let _ = self.scope.set_scalar(
+                            &i.to_string(),
+                            PerlValue::String(m.as_str().to_string()),
+                        );
                     }
                 }
                 Ok(PerlValue::Integer(1))
@@ -267,14 +269,72 @@ impl Interpreter {
         } else if let Some(caps) = re.captures(&s) {
             for i in 1..caps.len() {
                 if let Some(m) = caps.get(i) {
-                    self.scope
-                        .set_scalar(&i.to_string(), PerlValue::String(m.as_str().to_string()));
+                    let _ = self.scope.set_scalar(
+                        &i.to_string(),
+                        PerlValue::String(m.as_str().to_string()),
+                    );
                 }
             }
             Ok(PerlValue::Integer(1))
         } else {
             Ok(PerlValue::Integer(0))
         }
+    }
+
+    /// Shared `s///` for tree-walker and VM.
+    pub(crate) fn regex_subst_execute(
+        &mut self,
+        s: String,
+        pattern: &str,
+        replacement: &str,
+        flags: &str,
+        target: &Expr,
+        line: usize,
+    ) -> ExecResult {
+        let re = self.compile_regex(pattern, flags, line)?;
+        let (new_s, count) = if flags.contains('g') {
+            let count = re.find_iter(&s).count();
+            (
+                re.replace_all(&s, replacement).to_string(),
+                count,
+            )
+        } else {
+            let count = if re.is_match(&s) { 1 } else { 0 };
+            (re.replace(&s, replacement).to_string(), count)
+        };
+        self.assign_value(target, PerlValue::String(new_s))?;
+        Ok(PerlValue::Integer(count as i64))
+    }
+
+    /// Shared `tr///` for tree-walker and VM.
+    pub(crate) fn regex_transliterate_execute(
+        &mut self,
+        s: String,
+        from: &str,
+        to: &str,
+        flags: &str,
+        target: &Expr,
+        line: usize,
+    ) -> ExecResult {
+        let _ = line;
+        let from_chars: Vec<char> = from.chars().collect();
+        let to_chars: Vec<char> = to.chars().collect();
+        let mut count = 0i64;
+        let new_s: String = s
+            .chars()
+            .map(|c| {
+                if let Some(pos) = from_chars.iter().position(|&fc| fc == c) {
+                    count += 1;
+                    to_chars.get(pos).or(to_chars.last()).copied().unwrap_or(c)
+                } else {
+                    c
+                }
+            })
+            .collect();
+        if !flags.contains('d') || flags.contains('r') {
+            self.assign_value(target, PerlValue::String(new_s))?;
+        }
+        Ok(PerlValue::Integer(count))
     }
 
     /// Random fractional value like Perl `rand`: `[0, upper)` when `upper > 0`,
@@ -700,7 +760,9 @@ impl Interpreter {
                 self.scope.declare_scalar(var, PerlValue::Undef);
                 let mut i = 0usize;
                 'outer: while i < items.len() {
-                    self.scope.set_scalar(var, items[i].clone());
+                    self.scope
+                        .set_scalar(var, items[i].clone())
+                        .map_err(|e| FlowOrError::Error(e.at_line(stmt.line)))?;
                     'inner: loop {
                         match self.exec_block_smart(body) {
                             Ok(_) => break 'inner,
@@ -766,7 +828,12 @@ impl Interpreter {
                         match decl.sigil {
                             Sigil::Scalar => {
                                 let v = items.get(idx).cloned().unwrap_or(PerlValue::Undef);
-                                self.scope.declare_scalar(&decl.name, v);
+                                self.scope.declare_scalar_frozen(
+                                    &decl.name,
+                                    v,
+                                    decl.frozen,
+                                    decl.type_annotation,
+                                )?;
                                 idx += 1;
                             }
                             Sigil::Array => {
@@ -798,8 +865,12 @@ impl Interpreter {
                         };
                         match decl.sigil {
                             Sigil::Scalar => {
-                                self.scope
-                                    .declare_scalar_frozen(&decl.name, val, decl.frozen)
+                                self.scope.declare_scalar_frozen(
+                                    &decl.name,
+                                    val,
+                                    decl.frozen,
+                                    decl.type_annotation,
+                                )?;
                             }
                             Sigil::Array => {
                                 let items = val.to_list();
@@ -861,7 +932,8 @@ impl Interpreter {
             }
             StmtKind::Package { name } => {
                 // Minimal package support — just set a variable
-                self.scope
+                let _ = self
+                    .scope
                     .set_scalar("__PACKAGE__", PerlValue::String(name.clone()));
                 Ok(PerlValue::Undef)
             }
@@ -1464,16 +1536,14 @@ impl Interpreter {
             } => {
                 let val = self.eval_expr(expr)?;
                 let s = val.to_string();
-                let re = self.compile_regex(pattern, flags, line)?;
-                let (new_s, count) = if flags.contains('g') {
-                    let count = re.find_iter(&s).count();
-                    (re.replace_all(&s, replacement.as_str()).to_string(), count)
-                } else {
-                    let count = if re.is_match(&s) { 1 } else { 0 };
-                    (re.replace(&s, replacement.as_str()).to_string(), count)
-                };
-                self.assign_value(expr, PerlValue::String(new_s))?;
-                Ok(PerlValue::Integer(count as i64))
+                self.regex_subst_execute(
+                    s,
+                    pattern,
+                    replacement.as_str(),
+                    flags.as_str(),
+                    expr,
+                    line,
+                )
             }
             ExprKind::Transliterate {
                 expr,
@@ -1483,24 +1553,14 @@ impl Interpreter {
             } => {
                 let val = self.eval_expr(expr)?;
                 let s = val.to_string();
-                let from_chars: Vec<char> = from.chars().collect();
-                let to_chars: Vec<char> = to.chars().collect();
-                let mut count = 0i64;
-                let new_s: String = s
-                    .chars()
-                    .map(|c| {
-                        if let Some(pos) = from_chars.iter().position(|&fc| fc == c) {
-                            count += 1;
-                            to_chars.get(pos).or(to_chars.last()).copied().unwrap_or(c)
-                        } else {
-                            c
-                        }
-                    })
-                    .collect();
-                if !flags.contains('d') || flags.contains('r') {
-                    self.assign_value(expr, PerlValue::String(new_s))?;
-                }
-                Ok(PerlValue::Integer(count))
+                self.regex_transliterate_execute(
+                    s,
+                    from.as_str(),
+                    to.as_str(),
+                    flags.as_str(),
+                    expr,
+                    line,
+                )
             }
 
             // List operations
@@ -1509,7 +1569,7 @@ impl Interpreter {
                 let items = list_val.to_list();
                 let mut result = Vec::new();
                 for item in items {
-                    self.scope.set_scalar("_", item);
+                    let _ = self.scope.set_scalar("_", item);
                     let val = self.exec_block(block)?;
                     match val {
                         PerlValue::Array(a) => result.extend(a),
@@ -1523,7 +1583,7 @@ impl Interpreter {
                 let items = list_val.to_list();
                 let mut result = Vec::new();
                 for item in items {
-                    self.scope.set_scalar("_", item.clone());
+                    let _ = self.scope.set_scalar("_", item.clone());
                     let val = self.exec_block(block)?;
                     if val.is_true() {
                         result.push(item);
@@ -1538,8 +1598,8 @@ impl Interpreter {
                     // Custom comparator
                     let cmp_block = cmp_block.clone();
                     items.sort_by(|a, b| {
-                        self.scope.set_scalar("a", a.clone());
-                        self.scope.set_scalar("b", b.clone());
+                        let _ = self.scope.set_scalar("a", a.clone());
+                        let _ = self.scope.set_scalar("b", b.clone());
                         match self.exec_block(&cmp_block) {
                             Ok(v) => {
                                 let n = v.to_int();
@@ -1592,7 +1652,7 @@ impl Interpreter {
                         local_interp
                             .scope
                             .restore_atomics(&atomic_arrays, &atomic_hashes);
-                        local_interp.scope.set_scalar("_", item);
+                        let _ = local_interp.scope.set_scalar("_", item);
                         match local_interp.exec_block(&block) {
                             Ok(val) => val,
                             Err(_) => PerlValue::Undef,
@@ -1631,7 +1691,7 @@ impl Interpreter {
                             .restore_atomics(&atomic_arrays, &atomic_hashes);
                         let mut out = Vec::with_capacity(chunk.len());
                         for item in chunk {
-                            local_interp.scope.set_scalar("_", item);
+                            let _ = local_interp.scope.set_scalar("_", item);
                             match local_interp.exec_block(&block) {
                                 Ok(val) => out.push(val),
                                 Err(_) => out.push(PerlValue::Undef),
@@ -1663,7 +1723,7 @@ impl Interpreter {
                         local_interp
                             .scope
                             .restore_atomics(&atomic_arrays, &atomic_hashes);
-                        local_interp.scope.set_scalar("_", item.clone());
+                        let _ = local_interp.scope.set_scalar("_", item.clone());
                         match local_interp.exec_block(&block) {
                             Ok(val) => val.is_true(),
                             Err(_) => false,
@@ -1687,7 +1747,7 @@ impl Interpreter {
                     local_interp
                         .scope
                         .restore_atomics(&atomic_arrays, &atomic_hashes);
-                    local_interp.scope.set_scalar("_", item);
+                    let _ = local_interp.scope.set_scalar("_", item);
                     let _ = local_interp.exec_block(&block);
                 });
                 Ok(PerlValue::Undef)
@@ -1706,7 +1766,7 @@ impl Interpreter {
                     local_interp
                         .scope
                         .restore_atomics(&atomic_arrays, &atomic_hashes);
-                    local_interp
+                    let _ = local_interp
                         .scope
                         .set_scalar("_", PerlValue::Integer(i as i64));
                     crate::parallel_trace::fan_worker_set_index(Some(i as i64));
@@ -1775,8 +1835,8 @@ impl Interpreter {
                         let mut local_interp = Interpreter::new();
                         local_interp.subs = subs.clone();
                         local_interp.scope.restore_capture(&scope_capture);
-                        local_interp.scope.set_scalar("a", a.clone());
-                        local_interp.scope.set_scalar("b", b.clone());
+                        let _ = local_interp.scope.set_scalar("a", a.clone());
+                        let _ = local_interp.scope.set_scalar("b", b.clone());
                         match local_interp.exec_block(&cmp_block) {
                             Ok(v) => {
                                 let n = v.to_int();
@@ -1814,8 +1874,8 @@ impl Interpreter {
                     let mut local_interp = Interpreter::new();
                     local_interp.subs = subs.clone();
                     local_interp.scope.restore_capture(&scope_capture);
-                    local_interp.scope.set_scalar("a", acc);
-                    local_interp.scope.set_scalar("b", b);
+                    let _ = local_interp.scope.set_scalar("a", acc);
+                    let _ = local_interp.scope.set_scalar("b", b);
                     acc = match local_interp.exec_block(&block) {
                         Ok(val) => val,
                         Err(_) => PerlValue::Undef,
@@ -1841,8 +1901,8 @@ impl Interpreter {
                     let mut local_interp = Interpreter::new();
                     local_interp.subs = subs.clone();
                     local_interp.scope.restore_capture(&scope_capture);
-                    local_interp.scope.set_scalar("a", a);
-                    local_interp.scope.set_scalar("b", b);
+                    let _ = local_interp.scope.set_scalar("a", a);
+                    let _ = local_interp.scope.set_scalar("b", b);
                     match local_interp.exec_block(&block) {
                         Ok(val) => val,
                         Err(_) => PerlValue::Undef,
@@ -2723,7 +2783,7 @@ impl Interpreter {
                 let items = self.eval_expr(list)?.to_list();
                 let mut last = PerlValue::Undef;
                 for item in items {
-                    self.scope.set_scalar("_", item);
+                    let _ = self.scope.set_scalar("_", item);
                     last = self.eval_expr(expr)?;
                 }
                 Ok(last)
@@ -2953,9 +3013,11 @@ impl Interpreter {
                     || name == "!"
                     || name.starts_with(|c: char| c.is_ascii_digit())
                 {
-                    self.set_special_var(name, &val);
+                    self.set_special_var(name, &val)?;
                 } else {
-                    self.scope.set_scalar(name, val);
+                    self.scope
+                        .set_scalar(name, val)
+                        .map_err(|e| FlowOrError::Error(e.at_line(target.line)))?;
                 }
                 Ok(PerlValue::Undef)
             }
@@ -3023,14 +3085,15 @@ impl Interpreter {
         }
     }
 
-    fn set_special_var(&mut self, name: &str, val: &PerlValue) {
+    fn set_special_var(&mut self, name: &str, val: &PerlValue) -> Result<(), PerlError> {
         match name {
             "0" => self.program_name = val.to_string(),
             "/" => self.irs = val.to_string(),
             "\\" => self.ors = val.to_string(),
             "," => self.ofs = val.to_string(),
-            _ => self.scope.set_scalar(name, val.clone()),
+            _ => self.scope.set_scalar(name, val.clone())?,
         }
+        Ok(())
     }
 
     fn extract_array_name(&self, expr: &Expr) -> Result<String, FlowOrError> {
@@ -3306,7 +3369,7 @@ impl Interpreter {
                     let mut out = Vec::new();
                     for item in v {
                         self.scope.push_frame();
-                        self.scope.set_scalar("_", item.clone());
+                        let _ = self.scope.set_scalar("_", item.clone());
                         if let Some(ref env) = sub.closure_env {
                             self.scope.restore_capture(env);
                         }
@@ -3325,7 +3388,7 @@ impl Interpreter {
                     let mut out = Vec::new();
                     for item in v {
                         self.scope.push_frame();
-                        self.scope.set_scalar("_", item);
+                        let _ = self.scope.set_scalar("_", item);
                         if let Some(ref env) = sub.closure_env {
                             self.scope.restore_capture(env);
                         }
@@ -3351,8 +3414,8 @@ impl Interpreter {
 
     fn heap_compare(&mut self, cmp: &Arc<PerlSub>, a: &PerlValue, b: &PerlValue) -> Ordering {
         self.scope.push_frame();
-        self.scope.set_scalar("a", a.clone());
-        self.scope.set_scalar("b", b.clone());
+        let _ = self.scope.set_scalar("a", a.clone());
+        let _ = self.scope.set_scalar("b", b.clone());
         let ord = match self.exec_block_no_scope(&cmp.body) {
             Ok(v) => {
                 let n = v.to_int();
@@ -3553,7 +3616,8 @@ impl Interpreter {
         program: &Program,
     ) -> PerlResult<Option<String>> {
         self.line_number += 1;
-        self.scope
+        let _ = self
+            .scope
             .set_scalar("_", PerlValue::String(line_str.to_string()));
 
         if self.auto_split {

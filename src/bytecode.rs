@@ -1,4 +1,4 @@
-use crate::ast::Block;
+use crate::ast::{Block, Expr};
 use crate::value::PerlValue;
 
 /// Stack-based bytecode instruction set for the perlrs VM.
@@ -130,6 +130,12 @@ pub enum Op {
     /// Match: pattern_const_idx, flags_const_idx, scalar_g, pos_key_name_idx (`u16::MAX` = `$_`);
     /// stack: string operand → result
     RegexMatch(u16, u16, bool, u16),
+    /// Substitution `s///`: pattern, replacement, flags constant indices; lvalue index into chunk.
+    /// stack: string (subject from LHS expr) → replacement count
+    RegexSubst(u16, u16, u16, u16),
+    /// Transliterate `tr///`: from, to, flags constant indices; lvalue index into chunk.
+    /// stack: string → transliteration count
+    RegexTransliterate(u16, u16, u16, u16),
 
     // ── Assign helpers ──
     /// SetScalar that also leaves the value on the stack (for chained assignment)
@@ -339,6 +345,8 @@ pub struct Chunk {
     /// AST blocks for map/grep/sort/parallel operations.
     /// Referenced by block-based opcodes via u16 index.
     pub blocks: Vec<Block>,
+    /// Assign targets for `s///` / `tr///` bytecode (LHS expressions).
+    pub lvalues: Vec<Expr>,
 }
 
 impl Chunk {
@@ -350,6 +358,7 @@ impl Chunk {
             lines: Vec::new(),
             sub_entries: Vec::new(),
             blocks: Vec::new(),
+            lvalues: Vec::new(),
         }
     }
 
@@ -357,6 +366,13 @@ impl Chunk {
     pub fn add_block(&mut self, block: Block) -> u16 {
         let idx = self.blocks.len() as u16;
         self.blocks.push(block);
+        idx
+    }
+
+    /// Store an assignable expression (LHS of `s///` / `tr///`) and return its index.
+    pub fn add_lvalue_expr(&mut self, e: Expr) -> u16 {
+        let idx = self.lvalues.len() as u16;
+        self.lvalues.push(e);
         idx
     }
 

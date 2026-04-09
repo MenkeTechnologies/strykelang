@@ -8,7 +8,7 @@ use rayon::prelude::*;
 
 use caseless::default_case_fold_str;
 
-use crate::ast::Block;
+use crate::ast::{Block, Expr};
 use crate::bytecode::{BuiltinId, Chunk, Op};
 use crate::error::{ErrorKind, PerlError, PerlResult};
 use crate::interpreter::{Flow, FlowOrError, Interpreter};
@@ -31,6 +31,7 @@ pub struct VM<'a> {
     lines: Vec<usize>,
     sub_entries: Vec<(u16, usize)>,
     blocks: Vec<Block>,
+    lvalues: Vec<Expr>,
     ip: usize,
     stack: Vec<PerlValue>,
     call_stack: Vec<CallFrame>,
@@ -46,6 +47,7 @@ impl<'a> VM<'a> {
             lines: chunk.lines.clone(),
             sub_entries: chunk.sub_entries.clone(),
             blocks: chunk.blocks.clone(),
+            lvalues: chunk.lvalues.clone(),
             ip: 0,
             stack: Vec::with_capacity(256),
             call_stack: Vec::with_capacity(32),
@@ -168,23 +170,35 @@ impl<'a> VM<'a> {
                     let val = self.pop();
                     let n = self.name_owned(*idx);
                     self.require_scalar_mutable(&n)?;
-                    self.interp.scope.set_scalar(&n, val);
+                    self.interp
+                        .scope
+                        .set_scalar(&n, val)
+                        .map_err(|e| e.at_line(self.line()))?;
                 }
                 Op::SetScalarKeep(idx) => {
                     let val = self.peek().clone();
                     let n = self.name_owned(*idx);
                     self.require_scalar_mutable(&n)?;
-                    self.interp.scope.set_scalar(&n, val);
+                    self.interp
+                        .scope
+                        .set_scalar(&n, val)
+                        .map_err(|e| e.at_line(self.line()))?;
                 }
                 Op::DeclareScalar(idx) => {
                     let val = self.pop();
                     let n = self.name_owned(*idx);
-                    self.interp.scope.declare_scalar(&n, val);
+                    self.interp
+                        .scope
+                        .declare_scalar_frozen(&n, val, false, None)
+                        .map_err(|e| e.at_line(self.line()))?;
                 }
                 Op::DeclareScalarFrozen(idx) => {
                     let val = self.pop();
                     let n = self.name_owned(*idx);
-                    self.interp.scope.declare_scalar_frozen(&n, val, true);
+                    self.interp
+                        .scope
+                        .declare_scalar_frozen(&n, val, true, None)
+                        .map_err(|e| e.at_line(self.line()))?;
                 }
 
                 // ── Arrays ──
@@ -649,7 +663,10 @@ impl<'a> VM<'a> {
                     self.require_scalar_mutable(&n)?;
                     let val = self.interp.scope.get_scalar(&n).to_int() + 1;
                     let new_val = PerlValue::Integer(val);
-                    self.interp.scope.set_scalar(&n, new_val.clone());
+                    self.interp
+                        .scope
+                        .set_scalar(&n, new_val.clone())
+                        .map_err(|e| e.at_line(self.line()))?;
                     self.push(new_val);
                 }
                 Op::PreDec(idx) => {
@@ -657,7 +674,10 @@ impl<'a> VM<'a> {
                     self.require_scalar_mutable(&n)?;
                     let val = self.interp.scope.get_scalar(&n).to_int() - 1;
                     let new_val = PerlValue::Integer(val);
-                    self.interp.scope.set_scalar(&n, new_val.clone());
+                    self.interp
+                        .scope
+                        .set_scalar(&n, new_val.clone())
+                        .map_err(|e| e.at_line(self.line()))?;
                     self.push(new_val);
                 }
                 Op::PostInc(idx) => {
@@ -665,7 +685,10 @@ impl<'a> VM<'a> {
                     self.require_scalar_mutable(&n)?;
                     let old = self.interp.scope.get_scalar(&n);
                     let new_val = PerlValue::Integer(old.to_int() + 1);
-                    self.interp.scope.set_scalar(&n, new_val);
+                    self.interp
+                        .scope
+                        .set_scalar(&n, new_val)
+                        .map_err(|e| e.at_line(self.line()))?;
                     self.push(old);
                 }
                 Op::PostDec(idx) => {
@@ -673,7 +696,10 @@ impl<'a> VM<'a> {
                     self.require_scalar_mutable(&n)?;
                     let old = self.interp.scope.get_scalar(&n);
                     let new_val = PerlValue::Integer(old.to_int() - 1);
-                    self.interp.scope.set_scalar(&n, new_val);
+                    self.interp
+                        .scope
+                        .set_scalar(&n, new_val)
+                        .map_err(|e| e.at_line(self.line()))?;
                     self.push(old);
                 }
 
@@ -864,6 +890,50 @@ impl<'a> VM<'a> {
                         Err(FlowOrError::Error(e)) => return Err(e),
                         Err(FlowOrError::Flow(_)) => {
                             return Err(PerlError::runtime("unexpected flow in regex match", line));
+                        }
+                    }
+                }
+                Op::RegexSubst(pat_idx, repl_idx, flags_idx, lvalue_idx) => {
+                    let string = self.pop().to_string();
+                    let pattern = self.constant(*pat_idx).to_string();
+                    let replacement = self.constant(*repl_idx).to_string();
+                    let flags = self.constant(*flags_idx).to_string();
+                    let target = &self.lvalues[*lvalue_idx as usize];
+                    let line = self.line();
+                    match self.interp.regex_subst_execute(
+                        string,
+                        &pattern,
+                        &replacement,
+                        &flags,
+                        target,
+                        line,
+                    ) {
+                        Ok(v) => self.push(v),
+                        Err(FlowOrError::Error(e)) => return Err(e),
+                        Err(FlowOrError::Flow(_)) => {
+                            return Err(PerlError::runtime("unexpected flow in s///", line));
+                        }
+                    }
+                }
+                Op::RegexTransliterate(from_idx, to_idx, flags_idx, lvalue_idx) => {
+                    let string = self.pop().to_string();
+                    let from = self.constant(*from_idx).to_string();
+                    let to = self.constant(*to_idx).to_string();
+                    let flags = self.constant(*flags_idx).to_string();
+                    let target = &self.lvalues[*lvalue_idx as usize];
+                    let line = self.line();
+                    match self.interp.regex_transliterate_execute(
+                        string,
+                        &from,
+                        &to,
+                        &flags,
+                        target,
+                        line,
+                    ) {
+                        Ok(v) => self.push(v),
+                        Err(FlowOrError::Error(e)) => return Err(e),
+                        Err(FlowOrError::Flow(_)) => {
+                            return Err(PerlError::runtime("unexpected flow in tr///", line));
                         }
                     }
                 }
@@ -1077,7 +1147,7 @@ impl<'a> VM<'a> {
                     let block = self.blocks[*block_idx as usize].clone();
                     let mut result = Vec::new();
                     for item in list {
-                        self.interp.scope.set_scalar("_", item);
+                        let _ = self.interp.scope.set_scalar("_", item);
                         match self.interp.exec_block_no_scope(&block) {
                             Ok(val) => match val {
                                 PerlValue::Array(a) => result.extend(a),
@@ -1094,7 +1164,7 @@ impl<'a> VM<'a> {
                     let block = self.blocks[*block_idx as usize].clone();
                     let mut result = Vec::new();
                     for item in list {
-                        self.interp.scope.set_scalar("_", item.clone());
+                        let _ = self.interp.scope.set_scalar("_", item.clone());
                         match self.interp.exec_block_no_scope(&block) {
                             Ok(val) => {
                                 if val.is_true() {
@@ -1111,8 +1181,8 @@ impl<'a> VM<'a> {
                     let mut items = self.pop().to_list();
                     let block = self.blocks[*block_idx as usize].clone();
                     items.sort_by(|a, b| {
-                        self.interp.scope.set_scalar("a", a.clone());
-                        self.interp.scope.set_scalar("b", b.clone());
+                        let _ = self.interp.scope.set_scalar("a", a.clone());
+                        let _ = self.interp.scope.set_scalar("b", b.clone());
                         match self.interp.exec_block_no_scope(&block) {
                             Ok(v) => {
                                 let n = v.to_int();
@@ -1180,7 +1250,7 @@ impl<'a> VM<'a> {
                             let mut local_interp = Interpreter::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
-                            local_interp.scope.set_scalar("_", item);
+                            let _ = local_interp.scope.set_scalar("_", item);
                             match local_interp.exec_block_no_scope(&block) {
                                 Ok(val) => val,
                                 Err(_) => PerlValue::Undef,
@@ -1200,7 +1270,7 @@ impl<'a> VM<'a> {
                             let mut local_interp = Interpreter::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
-                            local_interp.scope.set_scalar("_", item.clone());
+                            let _ = local_interp.scope.set_scalar("_", item.clone());
                             match local_interp.exec_block_no_scope(&block) {
                                 Ok(val) => val.is_true(),
                                 Err(_) => false,
@@ -1218,7 +1288,7 @@ impl<'a> VM<'a> {
                         let mut local_interp = Interpreter::new();
                         local_interp.subs = subs.clone();
                         local_interp.scope.restore_capture(&scope_capture);
-                        local_interp.scope.set_scalar("_", item);
+                        let _ = local_interp.scope.set_scalar("_", item);
                         let _ = local_interp.exec_block_no_scope(&block);
                     });
                     self.push(PerlValue::Undef);
@@ -1232,8 +1302,8 @@ impl<'a> VM<'a> {
                         let mut local_interp = Interpreter::new();
                         local_interp.subs = subs.clone();
                         local_interp.scope.restore_capture(&scope_capture);
-                        local_interp.scope.set_scalar("a", a.clone());
-                        local_interp.scope.set_scalar("b", b.clone());
+                        let _ = local_interp.scope.set_scalar("a", a.clone());
+                        let _ = local_interp.scope.set_scalar("b", b.clone());
                         match local_interp.exec_block_no_scope(&block) {
                             Ok(v) => {
                                 let n = v.to_int();
@@ -1259,9 +1329,10 @@ impl<'a> VM<'a> {
                         let mut local_interp = Interpreter::new();
                         local_interp.subs = subs.clone();
                         local_interp.scope.restore_capture(&scope_capture);
-                        local_interp
-                            .scope
-                            .set_scalar("_", PerlValue::Integer(i as i64));
+                        let _ = local_interp.scope.set_scalar(
+                            "_",
+                            PerlValue::Integer(i as i64),
+                        );
                         let _ = local_interp.exec_block_no_scope(&block);
                     });
                     self.push(PerlValue::Undef);

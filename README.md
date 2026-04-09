@@ -424,6 +424,7 @@ pe examples/parallel_demo.pl
 - **string** is 1.6x — each `$s = $s . "x"` clones the growing string; an in-place append optimization would fix this
 - **hash** is 2.5x — hash iteration via `keys %h` + `$h{$k}` involves more indirection than perl's internal HV
 - **regex** is 4.9x — the regex itself is cached and fast (Rust `regex` crate with SIMD), but the 1000-iteration for-loop + if-block overhead dominates
+- **`s///` and `tr///`** — compile to `RegexSubst` / `RegexTransliterate` bytecode (same `regex` crate work as `m//`); previously the compiler rejected these and forced a full tree-walker run for the whole program
 - **array sort** is 30x — the sort comparator calls the tree-walker per comparison; compiling sort blocks to bytecode would fix this
 
 #### Parallel speedup

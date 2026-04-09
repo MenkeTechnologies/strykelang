@@ -46,6 +46,16 @@ impl PerlError {
         Self::new(ErrorKind::Runtime, message, line, "-e")
     }
 
+    pub fn type_error(message: impl Into<String>, line: usize) -> Self {
+        Self::new(ErrorKind::Type, message, line, "-e")
+    }
+
+    /// Replace line number (e.g. map VM op line onto an error).
+    pub fn at_line(mut self, line: usize) -> Self {
+        self.line = line;
+        self
+    }
+
     pub fn die(message: impl Into<String>, line: usize) -> Self {
         Self::new(ErrorKind::Die, message, line, "-e")
     }

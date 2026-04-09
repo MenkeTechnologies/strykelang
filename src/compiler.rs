@@ -299,6 +299,9 @@ impl Compiler {
         line: usize,
         is_my: bool,
     ) -> Result<(), CompileError> {
+        if decls.iter().any(|d| d.type_annotation.is_some()) {
+            return Err(CompileError::Unsupported("typed my".into()));
+        }
         let allow_frozen = is_my;
         // List assignment: my ($a, $b) = (10, 20) — distribute elements
         if decls.len() > 1 && decls[0].initializer.is_some() {
@@ -1883,12 +1886,35 @@ impl Compiler {
                 );
             }
 
-            // ── Substitution / Transliterate — no BuiltinId, fall back ──
-            ExprKind::Substitution { .. } => {
-                return Err(CompileError::Unsupported("s///".into()));
+            ExprKind::Substitution {
+                expr,
+                pattern,
+                replacement,
+                flags,
+            } => {
+                self.compile_expr(expr)?;
+                let pat_idx = self.chunk.add_constant(PerlValue::String(pattern.clone()));
+                let repl_idx = self.chunk.add_constant(PerlValue::String(replacement.clone()));
+                let flags_idx = self.chunk.add_constant(PerlValue::String(flags.clone()));
+                let lv_idx = self.chunk.add_lvalue_expr(expr.as_ref().clone());
+                self.chunk
+                    .emit(Op::RegexSubst(pat_idx, repl_idx, flags_idx, lv_idx), line);
             }
-            ExprKind::Transliterate { .. } => {
-                return Err(CompileError::Unsupported("tr///".into()));
+            ExprKind::Transliterate {
+                expr,
+                from,
+                to,
+                flags,
+            } => {
+                self.compile_expr(expr)?;
+                let from_idx = self.chunk.add_constant(PerlValue::String(from.clone()));
+                let to_idx = self.chunk.add_constant(PerlValue::String(to.clone()));
+                let flags_idx = self.chunk.add_constant(PerlValue::String(flags.clone()));
+                let lv_idx = self.chunk.add_lvalue_expr(expr.as_ref().clone());
+                self.chunk.emit(
+                    Op::RegexTransliterate(from_idx, to_idx, flags_idx, lv_idx),
+                    line,
+                );
             }
 
             // ── Regex literal ──
@@ -2159,6 +2185,34 @@ mod tests {
             .any(|c| { matches!(c, crate::value::PerlValue::String(s) if s == "hello") }));
         assert!(chunk.ops.iter().any(|o| matches!(o, Op::LoadConst(_))));
         assert_last_halt(&chunk);
+    }
+
+    #[test]
+    fn compile_substitution_bind_emits_regex_subst() {
+        let chunk = compile_snippet(r#"my $s = "aa"; $s =~ s/a/b/g;"#).expect("compile");
+        assert!(
+            chunk
+                .ops
+                .iter()
+                .any(|o| matches!(o, Op::RegexSubst(_, _, _, _))),
+            "expected RegexSubst in {:?}",
+            chunk.ops
+        );
+        assert!(!chunk.lvalues.is_empty());
+    }
+
+    #[test]
+    fn compile_transliterate_bind_emits_regex_transliterate() {
+        let chunk = compile_snippet(r#"my $u = "abc"; $u =~ tr/a-z/A-Z/;"#).expect("compile");
+        assert!(
+            chunk
+                .ops
+                .iter()
+                .any(|o| matches!(o, Op::RegexTransliterate(_, _, _, _))),
+            "expected RegexTransliterate in {:?}",
+            chunk.ops
+        );
+        assert!(!chunk.lvalues.is_empty());
     }
 
     #[test]

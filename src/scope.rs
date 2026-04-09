@@ -1,9 +1,11 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use indexmap::IndexMap;
 use parking_lot::Mutex;
 
+use crate::ast::PerlTypeName;
+use crate::error::PerlError;
 use crate::value::PerlValue;
 
 /// Thread-safe shared array for `mysync @a`.
@@ -33,6 +35,8 @@ struct Frame {
     frozen_scalars: HashSet<String>,
     frozen_arrays: HashSet<String>,
     frozen_hashes: HashSet<String>,
+    /// `typed my $x : Int` — runtime type checks on assignment.
+    typed_scalars: HashMap<String, PerlTypeName>,
     /// Thread-safe arrays from `mysync @a`
     atomic_arrays: Vec<(String, AtomicArray)>,
     /// Thread-safe hashes from `mysync %h`
@@ -49,6 +53,7 @@ impl Frame {
             frozen_scalars: HashSet::new(),
             frozen_arrays: HashSet::new(),
             frozen_hashes: HashSet::new(),
+            typed_scalars: HashMap::new(),
             atomic_arrays: Vec::new(),
             atomic_hashes: Vec::new(),
         }
@@ -181,17 +186,33 @@ impl Scope {
 
     #[inline]
     pub fn declare_scalar(&mut self, name: &str, val: PerlValue) {
-        self.declare_scalar_frozen(name, val, false);
+        let _ = self.declare_scalar_frozen(name, val, false, None);
     }
 
     /// Declare a lexical scalar; `frozen` means no further assignment to this binding.
-    pub fn declare_scalar_frozen(&mut self, name: &str, val: PerlValue, frozen: bool) {
+    /// `ty` is from `typed my $x : Int` — enforced on every assignment.
+    pub fn declare_scalar_frozen(
+        &mut self,
+        name: &str,
+        val: PerlValue,
+        frozen: bool,
+        ty: Option<PerlTypeName>,
+    ) -> Result<(), PerlError> {
+        if let Some(t) = ty {
+            t.check_value(&val).map_err(|msg| {
+                PerlError::type_error(format!("`${}`: {}", name, msg), 0)
+            })?;
+        }
         if let Some(frame) = self.frames.last_mut() {
             frame.set_scalar(name, val);
             if frozen {
                 frame.frozen_scalars.insert(name.to_string());
             }
+            if let Some(t) = ty {
+                frame.typed_scalars.insert(name.to_string(), t);
+            }
         }
+        Ok(())
     }
 
     /// True if the innermost lexical scalar binding for `name` is `frozen`.
@@ -299,7 +320,7 @@ impl Scope {
         // Non-atomic fallback
         let old = self.get_scalar(name);
         let new_val = f(&old);
-        self.set_scalar(name, new_val.clone());
+        let _ = self.set_scalar(name, new_val.clone());
         new_val
     }
 
@@ -321,12 +342,12 @@ impl Scope {
         }
         // Non-atomic fallback
         let old = self.get_scalar(name);
-        self.set_scalar(name, f(&old));
+        let _ = self.set_scalar(name, f(&old));
         old
     }
 
     #[inline]
-    pub fn set_scalar(&mut self, name: &str, val: PerlValue) {
+    pub fn set_scalar(&mut self, name: &str, val: PerlValue) -> Result<(), PerlError> {
         for frame in self.frames.iter_mut().rev() {
             // If the existing value is Atomic, write through the lock
             if let Some(PerlValue::Atomic(ref arc)) = frame.get_scalar(name) {
@@ -334,14 +355,20 @@ impl Scope {
                 let old = guard.clone();
                 *guard = val.clone();
                 crate::parallel_trace::emit_scalar_mutation(name, &old, &val);
-                return;
+                return Ok(());
             }
             if frame.has_scalar(name) {
+                if let Some(ty) = frame.typed_scalars.get(name).copied() {
+                    ty.check_value(&val).map_err(|msg| {
+                        PerlError::type_error(format!("`${}`: {}", name, msg), 0)
+                    })?;
+                }
                 frame.set_scalar(name, val);
-                return;
+                return Ok(());
             }
         }
         self.frames[0].set_scalar(name, val);
+        Ok(())
     }
 
     // ── Atomic array/hash declarations ──
@@ -801,7 +828,7 @@ mod tests {
         s.declare_scalar("a", PerlValue::Integer(1));
         s.push_frame();
         s.declare_scalar("a", PerlValue::Integer(2));
-        s.set_scalar("a", PerlValue::Integer(99));
+        let _ = s.set_scalar("a", PerlValue::Integer(99));
         assert_eq!(s.get_scalar("a").to_int(), 99);
         s.pop_frame();
         assert_eq!(s.get_scalar("a").to_int(), 1);

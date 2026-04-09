@@ -113,6 +113,44 @@ pub enum StmtKind {
     Continue(Block),
 }
 
+/// Optional type for `typed my $x : Int` — enforced at assignment time (runtime).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PerlTypeName {
+    Int,
+    Str,
+    Float,
+}
+
+impl PerlTypeName {
+    /// Strict runtime check: `Int` only [`PerlValue::Integer`], `Str` only string, `Float` allows int or float.
+    pub fn check_value(self, v: &crate::value::PerlValue) -> Result<(), String> {
+        use crate::value::PerlValue;
+        match self {
+            Self::Int => match v {
+                PerlValue::Integer(_) => Ok(()),
+                _ => Err(format!(
+                    "expected Int (INTEGER), got {}",
+                    v.type_name()
+                )),
+            },
+            Self::Str => match v {
+                PerlValue::String(_) => Ok(()),
+                _ => Err(format!(
+                    "expected Str (STRING), got {}",
+                    v.type_name()
+                )),
+            },
+            Self::Float => match v {
+                PerlValue::Float(_) | PerlValue::Integer(_) => Ok(()),
+                _ => Err(format!(
+                    "expected Float (INTEGER or FLOAT), got {}",
+                    v.type_name()
+                )),
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct VarDecl {
     pub sigil: Sigil,
@@ -120,6 +158,8 @@ pub struct VarDecl {
     pub initializer: Option<Expr>,
     /// Set by `frozen my ...` — reassignments are rejected at compile time (bytecode) or runtime.
     pub frozen: bool,
+    /// Set by `typed my $x : Int` (scalar only).
+    pub type_annotation: Option<PerlTypeName>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

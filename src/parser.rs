@@ -170,6 +170,24 @@ impl Parser {
                         ));
                     }
                 }
+                "typed" => {
+                    self.advance();
+                    if let Token::Ident(ref kw) = self.peek().clone() {
+                        if kw == "my" {
+                            self.parse_my_our_local("my")?
+                        } else {
+                            return Err(PerlError::syntax(
+                                "Expected 'my' after 'typed'",
+                                self.peek_line(),
+                            ));
+                        }
+                    } else {
+                        return Err(PerlError::syntax(
+                            "Expected 'my' after 'typed'",
+                            self.peek_line(),
+                        ));
+                    }
+                }
                 "our" => self.parse_my_our_local("our")?,
                 "local" => self.parse_my_our_local("local")?,
                 "package" => self.parse_package()?,
@@ -884,27 +902,62 @@ impl Parser {
     }
 
     fn parse_var_decl(&mut self) -> PerlResult<VarDecl> {
-        match self.advance() {
-            (Token::ScalarVar(name), _) => Ok(VarDecl {
+        let mut decl = match self.advance() {
+            (Token::ScalarVar(name), _) => VarDecl {
                 sigil: Sigil::Scalar,
                 name,
                 initializer: None,
                 frozen: false,
-            }),
-            (Token::ArrayVar(name), _) => Ok(VarDecl {
+                type_annotation: None,
+            },
+            (Token::ArrayVar(name), _) => VarDecl {
                 sigil: Sigil::Array,
                 name,
                 initializer: None,
                 frozen: false,
-            }),
-            (Token::HashVar(name), _) => Ok(VarDecl {
+                type_annotation: None,
+            },
+            (Token::HashVar(name), _) => VarDecl {
                 sigil: Sigil::Hash,
                 name,
                 initializer: None,
                 frozen: false,
-            }),
+                type_annotation: None,
+            },
+            (tok, line) => {
+                return Err(PerlError::syntax(
+                    format!("Expected variable in declaration, got {:?}", tok),
+                    line,
+                ));
+            }
+        };
+        if self.eat(&Token::Colon) {
+            let ty = self.parse_type_name()?;
+            if decl.sigil != Sigil::Scalar {
+                return Err(PerlError::syntax(
+                    "`: Type` is only valid for scalar declarations (typed my $name : Int)",
+                    self.peek_line(),
+                ));
+            }
+            decl.type_annotation = Some(ty);
+        }
+        Ok(decl)
+    }
+
+    fn parse_type_name(&mut self) -> PerlResult<PerlTypeName> {
+        let line = self.peek_line();
+        match self.advance() {
+            (Token::Ident(name), _) => match name.as_str() {
+                "Int" => Ok(PerlTypeName::Int),
+                "Str" => Ok(PerlTypeName::Str),
+                "Float" => Ok(PerlTypeName::Float),
+                _ => Err(PerlError::syntax(
+                    format!("unknown type `{name}` (supported: Int, Str, Float)"),
+                    line,
+                )),
+            },
             (tok, line) => Err(PerlError::syntax(
-                format!("Expected variable in declaration, got {:?}", tok),
+                format!("Expected type name after `:`, got {:?}", tok),
                 line,
             )),
         }

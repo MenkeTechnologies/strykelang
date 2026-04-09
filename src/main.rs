@@ -434,11 +434,11 @@ fn main() {
                 // -foo sets $foo = 1, -foo=bar sets $foo = "bar"
                 let switch = &arg[1..];
                 if let Some((name, val)) = switch.split_once('=') {
-                    interp
+                    let _ = interp
                         .scope
                         .set_scalar(name, perlrs::value::PerlValue::String(val.to_string()));
                 } else {
-                    interp
+                    let _ = interp
                         .scope
                         .set_scalar(switch, perlrs::value::PerlValue::Integer(1));
                 }
