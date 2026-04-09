@@ -1,5 +1,6 @@
 //! Unit tests for `Interpreter`: defaults, `set_file`, and `execute_tree` behavior.
 
+use crate::ast::StmtKind;
 use crate::interpreter::Interpreter;
 use crate::parse;
 
@@ -117,12 +118,25 @@ fn format_decl_registers_template_and_render_matches_picture() {
         r#"
 format STDOUT =
 @<<<< @>>>>
-qq(x), qq(y)
+1, 2
 .
 1;
 "#,
     )
     .expect("parse");
+    let format_lines = prog
+        .statements
+        .iter()
+        .find_map(|s| match &s.kind {
+            StmtKind::FormatDecl { lines, .. } => Some(lines.clone()),
+            _ => None,
+        })
+        .expect("format decl");
+    assert_eq!(
+        format_lines,
+        vec!["@<<<< @>>>>".to_string(), "1, 2".to_string()],
+        "format body lines should be picture then value"
+    );
     i.prepare_program_top_level(&prog).expect("prepare");
     let tmpl = i
         .format_templates
@@ -133,5 +147,5 @@ qq(x), qq(y)
         .render_format_template(tmpl.as_ref(), 1)
         .expect("render");
     // Picture `@<<<< @>>>>` is two 4-wide fields with a literal space between.
-    assert_eq!(out, "x       y\n");
+    assert_eq!(out, "1       2\n");
 }

@@ -304,6 +304,102 @@ mod tests {
     }
 
     #[test]
+    fn parse_format_value_line_rejects_extra_tokens_after_expr() {
+        let err = parse_format_value_line("42 junk").expect_err("extra tokens");
+        assert!(err.to_string().contains("Extra tokens"));
+    }
+
+    #[test]
+    fn parse_picture_numeric_field() {
+        let t = parse_format_template(&["@###".to_string(), "0".to_string()]).expect("parse");
+        let FormatRecord::Picture { segments, .. } = &t.records[0] else {
+            panic!("expected picture");
+        };
+        assert!(matches!(
+            &segments[0],
+            PictureSegment::Field {
+                width: 3,
+                align: FieldAlign::Numeric,
+                kind: FieldKind::Numeric,
+            }
+        ));
+    }
+
+    #[test]
+    fn parse_picture_right_center_multiline_and_bare_at() {
+        let t = parse_format_template(&[
+            "@>> @|| @** @".to_string(),
+            "1, 2, 3, 4".to_string(),
+        ])
+        .expect("parse");
+        let FormatRecord::Picture { segments, .. } = &t.records[0] else {
+            panic!("expected picture");
+        };
+        assert!(matches!(
+            &segments[0],
+            PictureSegment::Field {
+                width: 2,
+                align: FieldAlign::Right,
+                kind: FieldKind::Text,
+            }
+        ));
+        assert!(matches!(
+            &segments[1],
+            PictureSegment::Field {
+                width: 2,
+                align: FieldAlign::Center,
+                kind: FieldKind::Text,
+            }
+        ));
+        assert!(matches!(
+            &segments[2],
+            PictureSegment::Field {
+                width: 2,
+                align: FieldAlign::Multiline,
+                kind: FieldKind::Multiline,
+            }
+        ));
+        assert!(matches!(
+            &segments[3],
+            PictureSegment::Field {
+                width: 1,
+                align: FieldAlign::Left,
+                kind: FieldKind::Text,
+            }
+        ));
+    }
+
+    #[test]
+    fn parse_picture_literal_between_fields() {
+        let t = parse_format_template(&["a@<<b".to_string(), "qq(z)".to_string()]).expect("parse");
+        let FormatRecord::Picture { segments, .. } = &t.records[0] else {
+            panic!("expected picture");
+        };
+        assert!(matches!(&segments[0], PictureSegment::Literal(s) if s == "a"));
+        assert!(matches!(
+            &segments[1],
+            PictureSegment::Field {
+                width: 2,
+                align: FieldAlign::Left,
+                kind: FieldKind::Text,
+            }
+        ));
+        assert!(matches!(&segments[2], PictureSegment::Literal(s) if s == "b"));
+    }
+
+    #[test]
+    fn parse_format_template_literal_after_picture() {
+        let t = parse_format_template(&[
+            "@<<".to_string(),
+            "qq(x)".to_string(),
+            "footer".to_string(),
+        ])
+        .expect("parse");
+        assert_eq!(t.records.len(), 2);
+        assert!(matches!(&t.records[1], FormatRecord::Literal(s) if s == "footer"));
+    }
+
+    #[test]
     fn pad_field_left_aligns_and_pads() {
         assert_eq!(pad_field("hi", 5, FieldAlign::Left), "hi   ");
     }
@@ -321,6 +417,16 @@ mod tests {
     #[test]
     fn pad_field_numeric_right_aligns_integer() {
         assert_eq!(pad_field("42", 5, FieldAlign::Numeric), "   42");
+    }
+
+    #[test]
+    fn pad_field_numeric_float() {
+        assert_eq!(pad_field("3.5", 6, FieldAlign::Numeric), "   3.5");
+    }
+
+    #[test]
+    fn pad_field_numeric_non_numeric_fallback_like_right() {
+        assert_eq!(pad_field("n/a", 5, FieldAlign::Numeric), "  n/a");
     }
 
     #[test]
