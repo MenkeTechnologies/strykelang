@@ -71,6 +71,11 @@ fn accepts_fan_block() {
 }
 
 #[test]
+fn accepts_fan_block_default_count() {
+    p("fan { my $i = $_; };");
+}
+
+#[test]
 fn accepts_fan_zero() {
     p("fan 0 { 1 };");
 }

@@ -182,7 +182,10 @@ my @evens = pgrep { $_ % 2 == 0 } @data;
 pfor { process } @items;
 
 # fan — run a block N times in parallel (`$_` is 0..N-1)
-fan 8 { work ) }
+fan 8 { work }
+
+# fan — omit N to use the rayon thread pool size (`pe -j`; `$_` is 0..N-1)
+fan { work }
 
 # typed channels — pass messages between parallel blocks (unbounded or bounded)
 my ($tx, $rx) = pchannel();

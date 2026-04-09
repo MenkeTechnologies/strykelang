@@ -272,7 +272,7 @@ fn print_cyberpunk_help() {
         "  preduce_init EXPR, {{BLOCK}} @list  {G}//{N} Parallel fold with identity; hash accumulators merge by key"
     );
     println!(
-        "  fan N {{BLOCK}}          {G}//{N} Execute BLOCK N times across all cores ($_ = index)"
+        "  fan [N] {{BLOCK}}        {G}//{N} Execute BLOCK N times (default N = rayon thread count; $_ = index)"
     );
     println!("{C}  ── TYPING (perlrs) ───────────────────────────────────{N}");
     println!(

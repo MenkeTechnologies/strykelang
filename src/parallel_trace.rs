@@ -26,7 +26,7 @@ pub fn is_enabled() -> bool {
     TRACE_ENABLED.load(Ordering::SeqCst)
 }
 
-/// Set the current worker index for `fan N { }` (typically `$_` as integer).
+/// Set the current worker index for `fan [N] { }` (typically `$_` as integer).
 pub fn fan_worker_set_index(i: Option<i64>) {
     WORKER_INDEX.with(|c| c.set(i));
 }

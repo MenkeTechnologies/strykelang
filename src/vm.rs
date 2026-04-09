@@ -207,6 +207,45 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
+    fn run_fan_block(&mut self, block_idx: u16, n: usize, line: usize) -> PerlResult<()> {
+        let block = self.blocks[block_idx as usize].clone();
+        let subs = self.interp.subs.clone();
+        let scope_capture = self.interp.scope.capture();
+        let first_err: Arc<Mutex<Option<PerlError>>> = Arc::new(Mutex::new(None));
+        (0..n).into_par_iter().for_each(|i| {
+            if first_err.lock().is_some() {
+                return;
+            }
+            let mut local_interp = Interpreter::new();
+            local_interp.subs = subs.clone();
+            local_interp.scope.restore_capture(&scope_capture);
+            let _ = local_interp
+                .scope
+                .set_scalar("_", PerlValue::integer(i as i64));
+            match local_interp.exec_block_no_scope(&block) {
+                Ok(_) => {}
+                Err(e) => {
+                    let pe = match e {
+                        FlowOrError::Error(pe) => pe,
+                        FlowOrError::Flow(_) => PerlError::runtime(
+                            "return/last/next/redo not supported inside fan block",
+                            line,
+                        ),
+                    };
+                    let mut g = first_err.lock();
+                    if g.is_none() {
+                        *g = Some(pe);
+                    }
+                }
+            }
+        });
+        if let Some(e) = first_err.lock().take() {
+            return Err(e);
+        }
+        self.push(PerlValue::UNDEF);
+        Ok(())
+    }
+
     fn require_scalar_mutable(&self, name: &str) -> PerlResult<()> {
         if self.interp.scope.is_scalar_frozen(name) {
             return Err(PerlError::syntax(
@@ -1887,41 +1926,12 @@ impl<'a> VM<'a> {
                 Op::FanWithBlock(block_idx) => {
                     let line = self.line();
                     let n = self.pop().to_int().max(0) as usize;
-                    let block = self.blocks[*block_idx as usize].clone();
-                    let subs = self.interp.subs.clone();
-                    let scope_capture = self.interp.scope.capture();
-                    let first_err: Arc<Mutex<Option<PerlError>>> = Arc::new(Mutex::new(None));
-                    (0..n).into_par_iter().for_each(|i| {
-                        if first_err.lock().is_some() {
-                            return;
-                        }
-                        let mut local_interp = Interpreter::new();
-                        local_interp.subs = subs.clone();
-                        local_interp.scope.restore_capture(&scope_capture);
-                        let _ = local_interp
-                            .scope
-                            .set_scalar("_", PerlValue::integer(i as i64));
-                        match local_interp.exec_block_no_scope(&block) {
-                            Ok(_) => {}
-                            Err(e) => {
-                                let pe = match e {
-                                    FlowOrError::Error(pe) => pe,
-                                    FlowOrError::Flow(_) => PerlError::runtime(
-                                        "return/last/next/redo not supported inside fan block",
-                                        line,
-                                    ),
-                                };
-                                let mut g = first_err.lock();
-                                if g.is_none() {
-                                    *g = Some(pe);
-                                }
-                            }
-                        }
-                    });
-                    if let Some(e) = first_err.lock().take() {
-                        return Err(e);
-                    }
-                    self.push(PerlValue::UNDEF);
+                    self.run_fan_block(*block_idx, n, line)?;
+                }
+                Op::FanWithBlockAuto(block_idx) => {
+                    let line = self.line();
+                    let n = self.interp.parallel_thread_count();
+                    self.run_fan_block(*block_idx, n, line)?;
                 }
 
                 Op::AsyncBlock(block_idx) => {

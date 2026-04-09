@@ -159,6 +159,17 @@ fn par_lines_invokes_block_per_line_with_mysync_count() {
     std::fs::remove_dir_all(&dir).ok();
 }
 
+/// `fan { }` iterates `$_` from `0` to `rayon::current_num_threads() - 1` (same pool as `pe -j`).
+#[test]
+fn fan_default_count_matches_rayon_thread_pool() {
+    let n = rayon::current_num_threads();
+    let expected = (n * n.saturating_sub(1) / 2) as i64;
+    assert_eq!(
+        eval_int(r#"sub pr { $s += $_ } mysync $s = 0; fan { pr }; $s"#),
+        expected,
+    );
+}
+
 #[test]
 fn fan_zero_iterations_skips_block() {
     assert_eq!(eval_int(r#"fan 0 { die "should not run" }; 1"#), 1);

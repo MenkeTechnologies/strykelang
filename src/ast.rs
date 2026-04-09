@@ -574,10 +574,10 @@ pub enum ExprKind {
         receivers: Vec<Expr>,
         timeout: Option<Box<Expr>>,
     },
-    /// `fan COUNT { BLOCK }` — execute BLOCK across all cores COUNT times.
-    /// $_ is set to the iteration index (0..COUNT-1).
+    /// `fan [COUNT] { BLOCK }` — execute BLOCK COUNT times in parallel (default COUNT = rayon pool size).
+    /// `$_` is set to the iteration index (0..COUNT-1).
     FanExpr {
-        count: Box<Expr>,
+        count: Option<Box<Expr>>,
         block: Block,
     },
 

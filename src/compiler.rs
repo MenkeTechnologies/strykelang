@@ -2492,9 +2492,16 @@ impl Compiler {
                 return Err(CompileError::Unsupported("pselect".into()));
             }
             ExprKind::FanExpr { count, block } => {
-                self.compile_expr(count)?;
                 let block_idx = self.chunk.add_block(block.clone());
-                self.chunk.emit(Op::FanWithBlock(block_idx), line);
+                match count {
+                    Some(c) => {
+                        self.compile_expr(c)?;
+                        self.chunk.emit(Op::FanWithBlock(block_idx), line);
+                    }
+                    None => {
+                        self.chunk.emit(Op::FanWithBlockAuto(block_idx), line);
+                    }
+                }
             }
             ExprKind::AsyncBlock { body } => {
                 let block_idx = self.chunk.add_block(body.clone());

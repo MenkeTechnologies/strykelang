@@ -3498,14 +3498,15 @@ impl Parser {
                 })
             }
             "fan" => {
-                // fan COUNT { BLOCK }
-                let count = self.parse_postfix()?;
+                // fan COUNT { BLOCK }  |  fan { BLOCK }  (COUNT defaults to rayon thread pool size)
+                let count = if matches!(self.peek(), Token::LBrace) {
+                    None
+                } else {
+                    Some(Box::new(self.parse_postfix()?))
+                };
                 let block = self.parse_block()?;
                 Ok(Expr {
-                    kind: ExprKind::FanExpr {
-                        count: Box::new(count),
-                        block,
-                    },
+                    kind: ExprKind::FanExpr { count, block },
                     line,
                 })
             }

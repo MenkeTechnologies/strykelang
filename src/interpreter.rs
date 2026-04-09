@@ -638,6 +638,14 @@ impl Interpreter {
         interp
     }
 
+    /// Rayon pool size (`pe -j`); lazily initialized from `rayon::current_num_threads()`.
+    pub(crate) fn parallel_thread_count(&mut self) -> usize {
+        if self.num_threads == 0 {
+            self.num_threads = rayon::current_num_threads();
+        }
+        self.num_threads
+    }
+
     fn encode_exit_status(&self, s: std::process::ExitStatus) -> i64 {
         #[cfg(unix)]
         if let Some(sig) = s.signal() {
@@ -4317,7 +4325,10 @@ impl Interpreter {
                 Ok(PerlValue::UNDEF)
             }
             ExprKind::FanExpr { count, block } => {
-                let n = self.eval_expr(count)?.to_int().max(0) as usize;
+                let n = match count {
+                    Some(c) => self.eval_expr(c)?.to_int().max(0) as usize,
+                    None => self.parallel_thread_count(),
+                };
                 let block = block.clone();
                 let subs = self.subs.clone();
                 let (scope_capture, atomic_arrays, atomic_hashes) =

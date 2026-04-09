@@ -206,6 +206,8 @@ pub enum Op {
     PSortWithBlock(u16),
     /// fan N { BLOCK } — block_idx; stack: \[count\]
     FanWithBlock(u16),
+    /// fan { BLOCK } — block_idx; stack: \[\]; COUNT = rayon pool size (`pe -j`)
+    FanWithBlockAuto(u16),
     /// eval { BLOCK } — block_idx; stack: \[\] → result
     EvalBlock(u16),
     /// `async { BLOCK }` — block_idx; stack: \[\] → AsyncTask
