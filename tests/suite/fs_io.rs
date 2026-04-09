@@ -1,6 +1,7 @@
 //! Filesystem builtins with real temp paths (headless-safe, no network).
 
 use crate::common::*;
+use perlrs::interpreter::Interpreter;
 use std::path::PathBuf;
 
 #[test]
@@ -37,6 +38,25 @@ fn rename_moves_file() {
     assert_eq!(eval_int(&code), 1);
     assert!(!a.exists());
     std::fs::remove_dir_all(&dir).ok();
+}
+
+/// Piped `open` plus `<FH>` readline: bytecode (`execute`) and tree-walker (`execute_tree`) must agree.
+#[cfg(unix)]
+#[test]
+fn piped_open_readline_vm_matches_tree_walker() {
+    let code = r#"
+        open(FH, "-|", "echo hi");
+        my $x = <FH>;
+        close FH;
+        $x;
+    "#;
+    let program = perlrs::parse(code).expect("parse");
+    let mut vm_interp = Interpreter::new();
+    let v_vm = vm_interp.execute(&program).expect("execute vm");
+    let mut tree_interp = Interpreter::new();
+    let v_tree = tree_interp.execute_tree(&program).expect("execute tree");
+    assert_eq!(v_vm.to_string(), v_tree.to_string());
+    assert!(v_vm.to_string().contains("hi"));
 }
 
 #[cfg(unix)]

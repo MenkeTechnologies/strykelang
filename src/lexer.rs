@@ -491,7 +491,7 @@ impl Lexer {
                 // File test operators: -e, -f, -d, etc.
                 if !self.last_was_term {
                     if let Some(c) = self.peek() {
-                        if "efdlpSszrwxoRWXOBCTMAgu".contains(c)
+                        if "efdlpSszrwxoRWXOBCTMAgut".contains(c)
                             && self.peek_at(1).is_none_or(|n| {
                                 n.is_whitespace() || n == '$' || n == '\'' || n == '"' || n == '('
                             })

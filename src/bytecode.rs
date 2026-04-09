@@ -39,6 +39,10 @@ pub enum Op {
     SetHash(u16),
     DeclareHash(u16),
     DeclareHashFrozen(u16),
+    /// Dynamic `local $x` — save previous binding, assign TOS (same stack shape as DeclareScalar).
+    LocalDeclareScalar(u16),
+    LocalDeclareArray(u16),
+    LocalDeclareHash(u16),
     GetHashElem(u16),    // stack: [key] → value
     SetHashElem(u16),    // stack: [value, key]
     DeleteHashElem(u16), // stack: [key] → deleted value
@@ -104,8 +108,8 @@ pub enum Op {
     PostDec(u16),
 
     // ── Functions ──
-    /// Call subroutine: name index, arg count
-    Call(u16, u8),
+    /// Call subroutine: name index, arg count, [`WantarrayCtx`](crate::interpreter::WantarrayCtx) as u8
+    Call(u16, u8, u8),
     Return,
     ReturnValue,
 
@@ -136,6 +140,9 @@ pub enum Op {
     /// Transliterate `tr///`: from, to, flags constant indices; lvalue index into chunk.
     /// stack: string → transliteration count
     RegexTransliterate(u16, u16, u16, u16),
+    /// Dynamic `=~` / `!~`: pattern from RHS, subject from LHS; empty flags.
+    /// stack: `[subject, pattern]` (pattern on top) → 0/1; `true` = negate (`!~`).
+    RegexMatchDyn(bool),
 
     // ── Assign helpers ──
     /// SetScalar that also leaves the value on the stack (for chained assignment)
@@ -150,7 +157,7 @@ pub enum Op {
     SortWithBlock(u16),
     /// sort @list (no block) — stack: \[list\] → \[sorted\]
     SortNoBlock,
-    /// `{ $a <=> $b }` (0) or `{ $a cmp $b }` (1) — no block interpreter per compare
+    /// `{ $a <=> $b }` (0), `{ $a cmp $b }` (1), `{ $b <=> $a }` (2), `{ $b cmp $a }` (3)
     SortWithBlockFast(u8),
     /// Parallel sort, same fast modes as [`Op::SortWithBlockFast`].
     PSortWithBlockFast(u8),
@@ -189,9 +196,10 @@ pub enum Op {
     /// Dereference arrow: ->{} — stack: \[ref, key\] → value
     ArrowHash,
     /// Dereference arrow: ->() — stack: \[ref, args_array\] → value
-    ArrowCall,
-    /// Method call: stack: \[object, args...\] → result; name_idx, argc
-    MethodCall(u16, u8),
+    /// `$cr->(...)` — wantarray byte (see [`WantarrayCtx`](crate::interpreter::WantarrayCtx)).
+    ArrowCall(u8),
+    /// Method call: stack: \[object, args...\] → result; name_idx, argc, wantarray
+    MethodCall(u16, u8, u8),
     /// File test: -e, -f, -d, etc. — test char; stack: \[path\] → 0/1
     FileTestOp(u8),
 
@@ -610,8 +618,8 @@ mod tests {
 
     #[test]
     fn op_enum_clone_roundtrip() {
-        let o = Op::Call(42, 3);
-        assert!(matches!(o.clone(), Op::Call(42, 3)));
+        let o = Op::Call(42, 3, 0);
+        assert!(matches!(o.clone(), Op::Call(42, 3, 0)));
     }
 
     #[test]

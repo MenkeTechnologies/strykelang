@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use crate::ast::*;
 use crate::bytecode::{BuiltinId, Chunk, Op};
+use crate::interpreter::WantarrayCtx;
 use crate::sort_fast::detect_sort_block_fast;
 use crate::value::PerlValue;
 
@@ -306,7 +307,7 @@ impl Compiler {
         let allow_frozen = is_my;
         // List assignment: my ($a, $b) = (10, 20) — distribute elements
         if decls.len() > 1 && decls[0].initializer.is_some() {
-            self.compile_expr(decls[0].initializer.as_ref().unwrap())?;
+            self.compile_expr_ctx(decls[0].initializer.as_ref().unwrap(), WantarrayCtx::List)?;
             let tmp_name = self.chunk.intern_name("__list_assign_tmp__");
             self.emit_declare_array(tmp_name, line, false);
             for (i, decl) in decls.iter().enumerate() {
@@ -343,7 +344,7 @@ impl Compiler {
                     }
                     Sigil::Array => {
                         if let Some(init) = &decl.initializer {
-                            self.compile_expr(init)?;
+                            self.compile_expr_ctx(init, WantarrayCtx::List)?;
                         } else {
                             self.chunk.emit(Op::LoadUndef, line);
                         }
@@ -351,7 +352,7 @@ impl Compiler {
                     }
                     Sigil::Hash => {
                         if let Some(init) = &decl.initializer {
-                            self.compile_expr(init)?;
+                            self.compile_expr_ctx(init, WantarrayCtx::List)?;
                         } else {
                             self.chunk.emit(Op::LoadUndef, line);
                         }
@@ -363,16 +364,80 @@ impl Compiler {
         Ok(())
     }
 
+    fn compile_local_declarations(
+        &mut self,
+        decls: &[VarDecl],
+        line: usize,
+    ) -> Result<(), CompileError> {
+        if decls.iter().any(|d| d.type_annotation.is_some()) {
+            return Err(CompileError::Unsupported("typed local".into()));
+        }
+        if decls.len() > 1 && decls[0].initializer.is_some() {
+            self.compile_expr_ctx(decls[0].initializer.as_ref().unwrap(), WantarrayCtx::List)?;
+            let tmp_name = self.chunk.intern_name("__list_assign_tmp__");
+            self.emit_declare_array(tmp_name, line, false);
+            for (i, decl) in decls.iter().enumerate() {
+                let name_idx = self.chunk.intern_name(&decl.name);
+                match decl.sigil {
+                    Sigil::Scalar => {
+                        self.chunk.emit(Op::LoadInt(i as i64), line);
+                        self.chunk.emit(Op::GetArrayElem(tmp_name), line);
+                        self.chunk.emit(Op::LocalDeclareScalar(name_idx), line);
+                    }
+                    Sigil::Array => {
+                        self.chunk.emit(Op::GetArray(tmp_name), line);
+                        self.chunk.emit(Op::LocalDeclareArray(name_idx), line);
+                    }
+                    Sigil::Hash => {
+                        self.chunk.emit(Op::GetArray(tmp_name), line);
+                        self.chunk.emit(Op::LocalDeclareHash(name_idx), line);
+                    }
+                }
+            }
+        } else {
+            for decl in decls {
+                let name_idx = self.chunk.intern_name(&decl.name);
+                match decl.sigil {
+                    Sigil::Scalar => {
+                        if let Some(init) = &decl.initializer {
+                            self.compile_expr(init)?;
+                        } else {
+                            self.chunk.emit(Op::LoadUndef, line);
+                        }
+                        self.chunk.emit(Op::LocalDeclareScalar(name_idx), line);
+                    }
+                    Sigil::Array => {
+                        if let Some(init) = &decl.initializer {
+                            self.compile_expr_ctx(init, WantarrayCtx::List)?;
+                        } else {
+                            self.chunk.emit(Op::LoadUndef, line);
+                        }
+                        self.chunk.emit(Op::LocalDeclareArray(name_idx), line);
+                    }
+                    Sigil::Hash => {
+                        if let Some(init) = &decl.initializer {
+                            self.compile_expr_ctx(init, WantarrayCtx::List)?;
+                        } else {
+                            self.chunk.emit(Op::LoadUndef, line);
+                        }
+                        self.chunk.emit(Op::LocalDeclareHash(name_idx), line);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn compile_statement(&mut self, stmt: &Statement) -> Result<(), CompileError> {
         let line = stmt.line;
         match &stmt.kind {
             StmtKind::Expression(expr) => {
-                self.compile_expr(expr)?;
+                self.compile_expr_ctx(expr, WantarrayCtx::Void)?;
                 self.chunk.emit(Op::Pop, line);
             }
-            StmtKind::Local(_) | StmtKind::MySync(_) => {
-                // local and mysync need special runtime semantics; fall back to tree-walker
-                return Err(CompileError::Unsupported("local/mysync".into()));
+            StmtKind::Local(decls) => self.compile_local_declarations(decls, line)?,
+            StmtKind::MySync(_) => {
+                return Err(CompileError::Unsupported("mysync".into()));
             }
             StmtKind::My(decls) => self.compile_var_declarations(decls, line, true)?,
             StmtKind::Our(decls) => self.compile_var_declarations(decls, line, false)?,
@@ -770,6 +835,10 @@ impl Compiler {
     }
 
     fn compile_expr(&mut self, expr: &Expr) -> Result<(), CompileError> {
+        self.compile_expr_ctx(expr, WantarrayCtx::Scalar)
+    }
+
+    fn compile_expr_ctx(&mut self, expr: &Expr, ctx: WantarrayCtx) -> Result<(), CompileError> {
         let line = expr.line;
         match &expr.kind {
             ExprKind::Integer(n) => {
@@ -852,6 +921,18 @@ impl Compiler {
                         self.chunk.patch_jump_here(j);
                         return Ok(());
                     }
+                    BinOp::BindMatch => {
+                        self.compile_expr(left)?;
+                        self.compile_expr(right)?;
+                        self.chunk.emit(Op::RegexMatchDyn(false), line);
+                        return Ok(());
+                    }
+                    BinOp::BindNotMatch => {
+                        self.compile_expr(left)?;
+                        self.compile_expr(right)?;
+                        self.chunk.emit(Op::RegexMatchDyn(true), line);
+                        return Ok(());
+                    }
                     _ => {}
                 }
 
@@ -884,15 +965,14 @@ impl Compiler {
                     BinOp::BitXor => Op::BitXor,
                     BinOp::ShiftLeft => Op::Shl,
                     BinOp::ShiftRight => Op::Shr,
-                    // Short-circuit handled above
+                    // Short-circuit and regex bind handled above
                     BinOp::LogAnd
                     | BinOp::LogOr
                     | BinOp::DefinedOr
                     | BinOp::LogAndWord
-                    | BinOp::LogOrWord => unreachable!(),
-                    BinOp::BindMatch | BinOp::BindNotMatch => {
-                        return Err(CompileError::Unsupported("BindMatch in BinOp".into()));
-                    }
+                    | BinOp::LogOrWord
+                    | BinOp::BindMatch
+                    | BinOp::BindNotMatch => unreachable!(),
                 };
                 self.chunk.emit(op_code, line);
             }
@@ -1058,7 +1138,8 @@ impl Compiler {
                         self.compile_expr(arg)?;
                     }
                     let name_idx = self.chunk.intern_name(name);
-                    self.chunk.emit(Op::Call(name_idx, args.len() as u8), line);
+                    self.chunk
+                        .emit(Op::Call(name_idx, args.len() as u8, ctx.as_byte()), line);
                 }
             },
 
@@ -1073,8 +1154,10 @@ impl Compiler {
                     self.compile_expr(arg)?;
                 }
                 let name_idx = self.chunk.intern_name(method);
-                self.chunk
-                    .emit(Op::MethodCall(name_idx, args.len() as u8), line);
+                self.chunk.emit(
+                    Op::MethodCall(name_idx, args.len() as u8, ctx.as_byte()),
+                    line,
+                );
             }
 
             // ── Print / Say / Printf ──
@@ -1746,7 +1829,7 @@ impl Compiler {
                         self.chunk.emit(Op::ArrowHash, line);
                     }
                     DerefKind::Call => {
-                        self.chunk.emit(Op::ArrowCall, line);
+                        self.chunk.emit(Op::ArrowCall(ctx.as_byte()), line);
                     }
                 }
             }
@@ -1973,6 +2056,8 @@ impl Compiler {
                         let tag = match mode {
                             crate::sort_fast::SortBlockFast::Numeric => 0u8,
                             crate::sort_fast::SortBlockFast::String => 1u8,
+                            crate::sort_fast::SortBlockFast::NumericRev => 2u8,
+                            crate::sort_fast::SortBlockFast::StringRev => 3u8,
                         };
                         self.chunk.emit(Op::SortWithBlockFast(tag), line);
                     } else {
@@ -2010,6 +2095,8 @@ impl Compiler {
                         let tag = match mode {
                             crate::sort_fast::SortBlockFast::Numeric => 0u8,
                             crate::sort_fast::SortBlockFast::String => 1u8,
+                            crate::sort_fast::SortBlockFast::NumericRev => 2u8,
+                            crate::sort_fast::SortBlockFast::StringRev => 3u8,
                         };
                         self.chunk.emit(Op::PSortWithBlockFast(tag), line);
                     } else {

@@ -28,6 +28,18 @@ fn regex_negated_match_operator() {
 }
 
 #[test]
+fn regex_dynamic_bind_string_pattern() {
+    assert_eq!(
+        eval_int(r#"my $s = "hello"; my $p = "ell"; $s =~ $p ? 1 : 0"#),
+        1
+    );
+    assert_eq!(
+        eval_int(r#"my $s = "hello"; my $p = "xyz"; $s !~ $p ? 1 : 0"#),
+        1
+    );
+}
+
+#[test]
 fn regex_substitution() {
     assert_eq!(
         eval_string(r#"my $s = "foo bar"; $s =~ s/bar/baz/; $s"#),

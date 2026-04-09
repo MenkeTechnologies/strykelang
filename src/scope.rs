@@ -177,7 +177,7 @@ impl Scope {
     #[inline]
     pub fn pop_to_depth(&mut self, target_depth: usize) {
         while self.frames.len() > target_depth && self.frames.len() > 1 {
-            self.frames.pop();
+            self.pop_frame();
         }
     }
 

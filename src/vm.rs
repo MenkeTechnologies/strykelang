@@ -11,7 +11,7 @@ use caseless::default_case_fold_str;
 use crate::ast::{Block, Expr};
 use crate::bytecode::{BuiltinId, Chunk, Op};
 use crate::error::{ErrorKind, PerlError, PerlResult};
-use crate::interpreter::{Flow, FlowOrError, Interpreter};
+use crate::interpreter::{Flow, FlowOrError, Interpreter, WantarrayCtx};
 use crate::sort_fast::{sort_magic_cmp, SortBlockFast};
 use crate::value::{PerlAsyncTask, PerlHeap, PerlValue, PipelineInner};
 use parking_lot::Mutex;
@@ -22,6 +22,7 @@ struct CallFrame {
     return_ip: usize,
     stack_base: usize,
     scope_depth: usize,
+    saved_wantarray: WantarrayCtx,
 }
 
 /// Stack-based bytecode virtual machine.
@@ -312,6 +313,37 @@ impl<'a> VM<'a> {
                     }
                     let n = self.name_owned(*idx);
                     self.interp.scope.declare_hash_frozen(&n, map, true);
+                }
+                Op::LocalDeclareScalar(idx) => {
+                    let val = self.pop();
+                    let n = self.name_owned(*idx);
+                    self.interp
+                        .scope
+                        .local_set_scalar(&n, val)
+                        .map_err(|e| e.at_line(self.line()))?;
+                }
+                Op::LocalDeclareArray(idx) => {
+                    let val = self.pop();
+                    let n = self.name_owned(*idx);
+                    self.interp
+                        .scope
+                        .local_set_array(&n, val.to_list())
+                        .map_err(|e| e.at_line(self.line()))?;
+                }
+                Op::LocalDeclareHash(idx) => {
+                    let val = self.pop();
+                    let items = val.to_list();
+                    let mut map = IndexMap::new();
+                    let mut i = 0;
+                    while i + 1 < items.len() {
+                        map.insert(items[i].to_string(), items[i + 1].clone());
+                        i += 2;
+                    }
+                    let n = self.name_owned(*idx);
+                    self.interp
+                        .scope
+                        .local_set_hash(&n, map)
+                        .map_err(|e| e.at_line(self.line()))?;
                 }
                 Op::GetHashElem(idx) => {
                     let key = self.pop().to_string();
@@ -705,9 +737,10 @@ impl<'a> VM<'a> {
                 }
 
                 // ── Functions ──
-                Op::Call(name_idx, argc) => {
+                Op::Call(name_idx, argc, wa) => {
                     let name = self.name_owned(*name_idx);
                     let argc = *argc as usize;
+                    let want = WantarrayCtx::from_byte(*wa);
 
                     // Collect args from stack
                     let mut args = Vec::with_capacity(argc);
@@ -722,12 +755,15 @@ impl<'a> VM<'a> {
 
                     // Check if sub is compiled (has bytecode entry)
                     if let Some(entry_ip) = self.find_sub_entry(*name_idx) {
+                        let saved_wa = self.interp.wantarray_kind;
                         // Save call frame
                         self.call_stack.push(CallFrame {
                             return_ip: self.ip,
                             stack_base: self.stack.len(),
                             scope_depth: self.interp.scope.depth(),
+                            saved_wantarray: saved_wa,
                         });
+                        self.interp.wantarray_kind = want;
                         // Push scope frame and set @_
                         self.interp.scope.push_frame();
                         self.interp.scope.declare_array("_", args);
@@ -739,12 +775,15 @@ impl<'a> VM<'a> {
                         self.push(r?);
                     } else if let Some(sub) = self.interp.subs.get(&name).cloned() {
                         // Fall back to tree-walker for non-compiled subs
+                        let saved_wa = self.interp.wantarray_kind;
+                        self.interp.wantarray_kind = want;
                         self.interp.scope.push_frame();
                         self.interp.scope.declare_array("_", args);
                         if let Some(ref env) = sub.closure_env {
                             self.interp.scope.restore_capture(env);
                         }
                         let result = self.interp.exec_block_no_scope(&sub.body);
+                        self.interp.wantarray_kind = saved_wa;
                         self.interp.scope.pop_frame();
                         match result {
                             Ok(v) => self.push(v),
@@ -755,7 +794,8 @@ impl<'a> VM<'a> {
                             Err(_) => self.push(PerlValue::Undef),
                         }
                     } else if let Some(result) =
-                        self.interp.try_autoload_call(&name, args, self.line())
+                        self.interp
+                            .try_autoload_call(&name, args, self.line(), want)
                     {
                         match result {
                             Ok(v) => self.push(v),
@@ -774,6 +814,7 @@ impl<'a> VM<'a> {
                 }
                 Op::Return => {
                     if let Some(frame) = self.call_stack.pop() {
+                        self.interp.wantarray_kind = frame.saved_wantarray;
                         self.stack.truncate(frame.stack_base);
                         self.interp.scope.pop_to_depth(frame.scope_depth);
                         self.push(PerlValue::Undef);
@@ -785,6 +826,7 @@ impl<'a> VM<'a> {
                 Op::ReturnValue => {
                     let val = self.pop();
                     if let Some(frame) = self.call_stack.pop() {
+                        self.interp.wantarray_kind = frame.saved_wantarray;
                         self.stack.truncate(frame.stack_base);
                         self.interp.scope.pop_to_depth(frame.scope_depth);
                         self.push(val);
@@ -949,6 +991,25 @@ impl<'a> VM<'a> {
                         }
                     }
                 }
+                Op::RegexMatchDyn(negate) => {
+                    let pattern = self.pop().to_string();
+                    let s = self.pop().to_string();
+                    let line = self.line();
+                    match self
+                        .interp
+                        .regex_match_execute(s, &pattern, "", false, "_", line)
+                    {
+                        Ok(v) => {
+                            let matched = v.is_true();
+                            let out = if *negate { !matched } else { matched };
+                            self.push(PerlValue::Integer(if out { 1 } else { 0 }));
+                        }
+                        Err(FlowOrError::Error(e)) => return Err(e),
+                        Err(FlowOrError::Flow(_)) => {
+                            return Err(PerlError::runtime("unexpected flow in =~", line));
+                        }
+                    }
+                }
                 Op::ChompInPlace(lvalue_idx) => {
                     let val = self.pop();
                     let target = &self.lvalues[*lvalue_idx as usize];
@@ -1051,18 +1112,22 @@ impl<'a> VM<'a> {
                         _ => self.push(PerlValue::Undef),
                     }
                 }
-                Op::ArrowCall => {
+                Op::ArrowCall(wa) => {
+                    let want = WantarrayCtx::from_byte(*wa);
                     let args_val = self.pop();
                     let r = self.pop();
                     let args = args_val.to_list();
                     match r {
                         PerlValue::CodeRef(sub) => {
+                            let saved_wa = self.interp.wantarray_kind;
+                            self.interp.wantarray_kind = want;
                             self.interp.scope.push_frame();
                             self.interp.scope.declare_array("_", args);
                             if let Some(ref env) = sub.closure_env {
                                 self.interp.scope.restore_capture(env);
                             }
                             let result = self.interp.exec_block_no_scope(&sub.body);
+                            self.interp.wantarray_kind = saved_wa;
                             self.interp.scope.pop_frame();
                             match result {
                                 Ok(v) => self.push(v),
@@ -1078,9 +1143,10 @@ impl<'a> VM<'a> {
                 }
 
                 // ── Method call ──
-                Op::MethodCall(name_idx, argc) => {
+                Op::MethodCall(name_idx, argc, wa) => {
                     let method = self.name_owned(*name_idx);
                     let argc = *argc as usize;
+                    let want = WantarrayCtx::from_byte(*wa);
                     let mut args = Vec::with_capacity(argc);
                     for _ in 0..argc {
                         args.push(self.pop());
@@ -1114,12 +1180,15 @@ impl<'a> VM<'a> {
                     all_args.extend(args);
                     let full_name = format!("{}::{}", class, method);
                     if let Some(sub) = self.interp.subs.get(&full_name).cloned() {
+                        let saved_wa = self.interp.wantarray_kind;
+                        self.interp.wantarray_kind = want;
                         self.interp.scope.push_frame();
                         self.interp.scope.declare_array("_", all_args);
                         if let Some(ref env) = sub.closure_env {
                             self.interp.scope.restore_capture(env);
                         }
                         let result = self.interp.exec_block_no_scope(&sub.body);
+                        self.interp.wantarray_kind = saved_wa;
                         self.interp.scope.pop_frame();
                         match result {
                             Ok(v) => self.push(v),
@@ -1148,7 +1217,7 @@ impl<'a> VM<'a> {
                         }
                     } else if let Some(result) =
                         self.interp
-                            .try_autoload_call(&full_name, all_args, self.line())
+                            .try_autoload_call(&full_name, all_args, self.line(), want)
                     {
                         match result {
                             Ok(v) => self.push(v),
@@ -1249,10 +1318,12 @@ impl<'a> VM<'a> {
                 }
                 Op::SortWithBlockFast(tag) => {
                     let mut items = self.pop().to_list();
-                    let mode = if *tag == 0 {
-                        SortBlockFast::Numeric
-                    } else {
-                        SortBlockFast::String
+                    let mode = match *tag {
+                        0 => SortBlockFast::Numeric,
+                        1 => SortBlockFast::String,
+                        2 => SortBlockFast::NumericRev,
+                        3 => SortBlockFast::StringRev,
+                        _ => SortBlockFast::Numeric,
                     };
                     items.sort_by(|a, b| sort_magic_cmp(a, b, mode));
                     self.push(PerlValue::Array(items));
@@ -1380,10 +1451,12 @@ impl<'a> VM<'a> {
                 }
                 Op::PSortWithBlockFast(tag) => {
                     let mut items = self.pop().to_list();
-                    let mode = if *tag == 0 {
-                        SortBlockFast::Numeric
-                    } else {
-                        SortBlockFast::String
+                    let mode = match *tag {
+                        0 => SortBlockFast::Numeric,
+                        1 => SortBlockFast::String,
+                        2 => SortBlockFast::NumericRev,
+                        3 => SortBlockFast::StringRev,
+                        _ => SortBlockFast::Numeric,
                     };
                     items.par_sort_by(|a, b| sort_magic_cmp(a, b, mode));
                     self.push(PerlValue::Array(items));
@@ -2021,11 +2094,11 @@ impl<'a> VM<'a> {
                     .unwrap_or(1);
                 crate::ppool::create_pool(n)
             }
-            Some(BuiltinId::Wantarray) => Ok(PerlValue::Integer(if self.interp.wantarray_ctx {
-                1
-            } else {
-                0
-            })),
+            Some(BuiltinId::Wantarray) => Ok(match self.interp.wantarray_kind {
+                crate::interpreter::WantarrayCtx::Void => PerlValue::Undef,
+                crate::interpreter::WantarrayCtx::Scalar => PerlValue::Integer(0),
+                crate::interpreter::WantarrayCtx::List => PerlValue::Integer(1),
+            }),
             Some(BuiltinId::FetchUrl) => {
                 let url = args
                     .into_iter()

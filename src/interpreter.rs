@@ -18,6 +18,7 @@ use crate::builtins::PerlSocket;
 use crate::crypt_util::perl_crypt;
 use crate::error::{ErrorKind, PerlError, PerlResult};
 use crate::scope::Scope;
+use crate::sort_fast::{detect_sort_block_fast, sort_magic_cmp};
 use crate::value::{
     CaptureResult, PerlAsyncTask, PerlHeap, PerlPpool, PerlSub, PerlValue, PipelineInner,
     PipelineOp,
@@ -49,6 +50,35 @@ impl From<PerlError> for FlowOrError {
 impl From<Flow> for FlowOrError {
     fn from(f: Flow) -> Self {
         FlowOrError::Flow(f)
+    }
+}
+
+/// Context of the **current** subroutine call (`wantarray`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum WantarrayCtx {
+    #[default]
+    Scalar,
+    List,
+    Void,
+}
+
+impl WantarrayCtx {
+    #[inline]
+    pub(crate) fn from_byte(b: u8) -> Self {
+        match b {
+            1 => Self::List,
+            2 => Self::Void,
+            _ => Self::Scalar,
+        }
+    }
+
+    #[inline]
+    pub(crate) fn as_byte(self) -> u8 {
+        match self {
+            Self::Scalar => 0,
+            Self::List => 1,
+            Self::Void => 2,
+        }
     }
 }
 
@@ -103,8 +133,8 @@ pub struct Interpreter {
     pub(crate) pipe_children: HashMap<String, Child>,
     /// Sockets from `socket` / `accept` / `connect`.
     pub(crate) socket_handles: HashMap<String, PerlSocket>,
-    /// Best-effort `wantarray()` context inside subs (defaults false).
-    pub(crate) wantarray_ctx: bool,
+    /// `wantarray()` inside the current subroutine (VM and tree-walker).
+    pub(crate) wantarray_kind: WantarrayCtx,
 }
 
 /// Shell command for `open(H, "-|", cmd)` / `open(H, "|-", cmd)` (list form not yet supported).
@@ -168,7 +198,7 @@ impl Interpreter {
             io_file_slots: HashMap::new(),
             pipe_children: HashMap::new(),
             socket_handles: HashMap::new(),
-            wantarray_ctx: false,
+            wantarray_kind: WantarrayCtx::Scalar,
         }
     }
 
@@ -757,7 +787,7 @@ impl Interpreter {
 
     fn exec_statement(&mut self, stmt: &Statement) -> ExecResult {
         match &stmt.kind {
-            StmtKind::Expression(expr) => self.eval_expr(expr),
+            StmtKind::Expression(expr) => self.eval_expr_ctx(expr, WantarrayCtx::Void),
             StmtKind::If {
                 condition,
                 body,
@@ -1014,11 +1044,14 @@ impl Interpreter {
                 );
                 Ok(PerlValue::Undef)
             }
-            StmtKind::My(decls) | StmtKind::Our(decls) | StmtKind::Local(decls) => {
+            StmtKind::My(decls) | StmtKind::Our(decls) => {
                 // For list assignment my ($a, $b) = (10, 20), distribute elements.
                 // All decls share the same initializer in the AST (parser clones it).
                 if decls.len() > 1 && decls[0].initializer.is_some() {
-                    let val = self.eval_expr(decls[0].initializer.as_ref().unwrap())?;
+                    let val = self.eval_expr_ctx(
+                        decls[0].initializer.as_ref().unwrap(),
+                        WantarrayCtx::List,
+                    )?;
                     let items = val.to_list();
                     let mut idx = 0;
                     for decl in decls {
@@ -1056,7 +1089,11 @@ impl Interpreter {
                     // Single decl or no initializer
                     for decl in decls {
                         let val = if let Some(init) = &decl.initializer {
-                            self.eval_expr(init)?
+                            let ctx = match decl.sigil {
+                                Sigil::Array | Sigil::Hash => WantarrayCtx::List,
+                                Sigil::Scalar => WantarrayCtx::Scalar,
+                            };
+                            self.eval_expr_ctx(init, ctx)?
                         } else {
                             PerlValue::Undef
                         };
@@ -1085,6 +1122,74 @@ impl Interpreter {
                                     i += 2;
                                 }
                                 self.scope.declare_hash_frozen(&decl.name, map, decl.frozen);
+                            }
+                        }
+                    }
+                }
+                Ok(PerlValue::Undef)
+            }
+            StmtKind::Local(decls) => {
+                if decls.len() > 1 && decls[0].initializer.is_some() {
+                    let val = self.eval_expr_ctx(
+                        decls[0].initializer.as_ref().unwrap(),
+                        WantarrayCtx::List,
+                    )?;
+                    let items = val.to_list();
+                    let mut idx = 0;
+                    for decl in decls {
+                        match decl.sigil {
+                            Sigil::Scalar => {
+                                let v = items.get(idx).cloned().unwrap_or(PerlValue::Undef);
+                                idx += 1;
+                                self.scope.local_set_scalar(&decl.name, v)?;
+                            }
+                            Sigil::Array => {
+                                let rest: Vec<PerlValue> = items[idx..].to_vec();
+                                idx = items.len();
+                                self.scope.local_set_array(&decl.name, rest)?;
+                            }
+                            Sigil::Hash => {
+                                let rest: Vec<PerlValue> = items[idx..].to_vec();
+                                idx = items.len();
+                                let mut map = IndexMap::new();
+                                let mut i = 0;
+                                while i + 1 < rest.len() {
+                                    map.insert(rest[i].to_string(), rest[i + 1].clone());
+                                    i += 2;
+                                }
+                                self.scope.local_set_hash(&decl.name, map)?;
+                            }
+                        }
+                    }
+                } else {
+                    for decl in decls {
+                        let val = if let Some(init) = &decl.initializer {
+                            let ctx = match decl.sigil {
+                                Sigil::Array | Sigil::Hash => WantarrayCtx::List,
+                                Sigil::Scalar => WantarrayCtx::Scalar,
+                            };
+                            self.eval_expr_ctx(init, ctx)?
+                        } else {
+                            PerlValue::Undef
+                        };
+                        match decl.sigil {
+                            Sigil::Scalar => {
+                                self.scope.local_set_scalar(&decl.name, val)?;
+                            }
+                            Sigil::Array => {
+                                self.scope.local_set_array(&decl.name, val.to_list())?;
+                            }
+                            Sigil::Hash => {
+                                let items = val.to_list();
+                                let mut map = IndexMap::new();
+                                let mut i = 0;
+                                while i + 1 < items.len() {
+                                    let k = items[i].to_string();
+                                    let v = items[i + 1].clone();
+                                    map.insert(k, v);
+                                    i += 2;
+                                }
+                                self.scope.local_set_hash(&decl.name, map)?;
                             }
                         }
                     }
@@ -1180,6 +1285,10 @@ impl Interpreter {
 
     #[inline]
     fn eval_expr(&mut self, expr: &Expr) -> ExecResult {
+        self.eval_expr_ctx(expr, WantarrayCtx::Scalar)
+    }
+
+    fn eval_expr_ctx(&mut self, expr: &Expr, ctx: WantarrayCtx) -> ExecResult {
         let line = expr.line;
         match &expr.kind {
             ExprKind::Integer(n) => Ok(PerlValue::Integer(*n)),
@@ -1367,7 +1476,7 @@ impl Interpreter {
                                 args.push(self.eval_expr(a)?);
                             }
                             match val {
-                                PerlValue::CodeRef(sub) => self.call_sub(&sub, args, line),
+                                PerlValue::CodeRef(sub) => self.call_sub(&sub, args, ctx, line),
                                 _ => Err(PerlError::runtime("Not a code reference", line).into()),
                             }
                         } else {
@@ -1382,6 +1491,19 @@ impl Interpreter {
                 let lv = self.eval_expr(left)?;
                 // Short-circuit for logical operators
                 match op {
+                    BinOp::BindMatch => {
+                        let rv = self.eval_expr(right)?;
+                        let s = lv.to_string();
+                        let pat = rv.to_string();
+                        return self.regex_match_execute(s, &pat, "", false, "_", line);
+                    }
+                    BinOp::BindNotMatch => {
+                        let rv = self.eval_expr(right)?;
+                        let s = lv.to_string();
+                        let pat = rv.to_string();
+                        let m = self.regex_match_execute(s, &pat, "", false, "_", line)?;
+                        return Ok(PerlValue::Integer(if m.is_true() { 0 } else { 1 }));
+                    }
                     BinOp::LogAnd | BinOp::LogAndWord => {
                         if !lv.is_true() {
                             return Ok(lv);
@@ -1625,7 +1747,7 @@ impl Interpreter {
                 {
                     return r.map_err(Into::into);
                 }
-                self.call_named_sub(name, arg_vals, line)
+                self.call_named_sub(name, arg_vals, line, ctx)
             }
             ExprKind::MethodCall {
                 object,
@@ -1657,11 +1779,11 @@ impl Interpreter {
                 };
                 let full_name = format!("{}::{}", class, method);
                 if let Some(sub) = self.subs.get(&full_name).cloned() {
-                    self.call_sub(&sub, arg_vals, line)
+                    self.call_sub(&sub, arg_vals, ctx, line)
                 } else if method == "new" {
                     // Default constructor
                     self.builtin_new(&class, arg_vals, line)
-                } else if let Some(r) = self.try_autoload_call(&full_name, arg_vals, line) {
+                } else if let Some(r) = self.try_autoload_call(&full_name, arg_vals, line, ctx) {
                     r
                 } else {
                     Err(PerlError::runtime(
@@ -1795,25 +1917,28 @@ impl Interpreter {
                 let list_val = self.eval_expr(list)?;
                 let mut items = list_val.to_list();
                 if let Some(cmp_block) = cmp {
-                    // Custom comparator
-                    let cmp_block = cmp_block.clone();
-                    items.sort_by(|a, b| {
-                        let _ = self.scope.set_scalar("a", a.clone());
-                        let _ = self.scope.set_scalar("b", b.clone());
-                        match self.exec_block(&cmp_block) {
-                            Ok(v) => {
-                                let n = v.to_int();
-                                if n < 0 {
-                                    std::cmp::Ordering::Less
-                                } else if n > 0 {
-                                    std::cmp::Ordering::Greater
-                                } else {
-                                    std::cmp::Ordering::Equal
+                    if let Some(mode) = detect_sort_block_fast(cmp_block) {
+                        items.sort_by(|a, b| sort_magic_cmp(a, b, mode));
+                    } else {
+                        let cmp_block = cmp_block.clone();
+                        items.sort_by(|a, b| {
+                            let _ = self.scope.set_scalar("a", a.clone());
+                            let _ = self.scope.set_scalar("b", b.clone());
+                            match self.exec_block(&cmp_block) {
+                                Ok(v) => {
+                                    let n = v.to_int();
+                                    if n < 0 {
+                                        std::cmp::Ordering::Less
+                                    } else if n > 0 {
+                                        std::cmp::Ordering::Greater
+                                    } else {
+                                        std::cmp::Ordering::Equal
+                                    }
                                 }
+                                Err(_) => std::cmp::Ordering::Equal,
                             }
-                            Err(_) => std::cmp::Ordering::Equal,
-                        }
-                    });
+                        });
+                    }
                 } else {
                     items.sort_by_key(|a| a.to_string());
                 }
@@ -2028,29 +2153,33 @@ impl Interpreter {
                 let list_val = self.eval_expr(list)?;
                 let mut items = list_val.to_list();
                 if let Some(cmp_block) = cmp {
-                    let cmp_block = cmp_block.clone();
-                    let subs = self.subs.clone();
-                    let scope_capture = self.scope.capture();
-                    items.par_sort_by(|a, b| {
-                        let mut local_interp = Interpreter::new();
-                        local_interp.subs = subs.clone();
-                        local_interp.scope.restore_capture(&scope_capture);
-                        let _ = local_interp.scope.set_scalar("a", a.clone());
-                        let _ = local_interp.scope.set_scalar("b", b.clone());
-                        match local_interp.exec_block(&cmp_block) {
-                            Ok(v) => {
-                                let n = v.to_int();
-                                if n < 0 {
-                                    std::cmp::Ordering::Less
-                                } else if n > 0 {
-                                    std::cmp::Ordering::Greater
-                                } else {
-                                    std::cmp::Ordering::Equal
+                    if let Some(mode) = detect_sort_block_fast(cmp_block) {
+                        items.par_sort_by(|a, b| sort_magic_cmp(a, b, mode));
+                    } else {
+                        let cmp_block = cmp_block.clone();
+                        let subs = self.subs.clone();
+                        let scope_capture = self.scope.capture();
+                        items.par_sort_by(|a, b| {
+                            let mut local_interp = Interpreter::new();
+                            local_interp.subs = subs.clone();
+                            local_interp.scope.restore_capture(&scope_capture);
+                            let _ = local_interp.scope.set_scalar("a", a.clone());
+                            let _ = local_interp.scope.set_scalar("b", b.clone());
+                            match local_interp.exec_block(&cmp_block) {
+                                Ok(v) => {
+                                    let n = v.to_int();
+                                    if n < 0 {
+                                        std::cmp::Ordering::Less
+                                    } else if n > 0 {
+                                        std::cmp::Ordering::Greater
+                                    } else {
+                                        std::cmp::Ordering::Equal
+                                    }
                                 }
+                                Err(_) => std::cmp::Ordering::Equal,
                             }
-                            Err(_) => std::cmp::Ordering::Equal,
-                        }
-                    });
+                        });
+                    }
                 } else {
                     items.par_sort_by(|a, b| a.to_string().cmp(&b.to_string()));
                 }
@@ -2822,7 +2951,11 @@ impl Interpreter {
                     PerlValue::Integer(line as i64),
                 ]))
             }
-            ExprKind::Wantarray => Ok(PerlValue::Integer(if self.wantarray_ctx { 1 } else { 0 })),
+            ExprKind::Wantarray => Ok(match self.wantarray_kind {
+                WantarrayCtx::Void => PerlValue::Undef,
+                WantarrayCtx::Scalar => PerlValue::Integer(0),
+                WantarrayCtx::List => PerlValue::Integer(1),
+            }),
 
             ExprKind::List(exprs) => {
                 let mut vals = Vec::new();
@@ -3124,7 +3257,9 @@ impl Interpreter {
             | BinOp::DefinedOr
             | BinOp::LogAndWord
             | BinOp::LogOrWord => unreachable!(),
-            BinOp::BindMatch | BinOp::BindNotMatch => unreachable!(),
+            BinOp::BindMatch | BinOp::BindNotMatch => {
+                unreachable!("regex bind handled in eval_expr BinOp arm")
+            }
         })
     }
 
@@ -3250,7 +3385,8 @@ impl Interpreter {
         &mut self,
         missing_name: &str,
         args: Vec<PerlValue>,
-        _line: usize,
+        line: usize,
+        want: WantarrayCtx,
     ) -> Option<ExecResult> {
         let sub = self.subs.get("AUTOLOAD")?.clone();
         let pkg = self.current_package();
@@ -3262,12 +3398,18 @@ impl Interpreter {
         if let Err(e) = self.scope.set_scalar("AUTOLOAD", PerlValue::String(full)) {
             return Some(Err(e.into()));
         }
-        Some(self.call_sub(&sub, args, line))
+        Some(self.call_sub(&sub, args, want, line))
     }
 
-    fn call_named_sub(&mut self, name: &str, args: Vec<PerlValue>, line: usize) -> ExecResult {
+    fn call_named_sub(
+        &mut self,
+        name: &str,
+        args: Vec<PerlValue>,
+        line: usize,
+        want: WantarrayCtx,
+    ) -> ExecResult {
         if let Some(sub) = self.subs.get(name).cloned() {
-            return self.call_sub(&sub, args, line);
+            return self.call_sub(&sub, args, want, line);
         }
         match name {
             "deque" => {
@@ -3307,7 +3449,7 @@ impl Interpreter {
                 crate::ppool::create_pool(args[0].to_int().max(0) as usize).map_err(Into::into)
             }
             _ => {
-                if let Some(r) = self.try_autoload_call(name, args, line) {
+                if let Some(r) = self.try_autoload_call(name, args, line, want) {
                     return r;
                 }
                 Err(PerlError::runtime(format!("Undefined subroutine &{}", name), line).into())
@@ -3630,7 +3772,13 @@ impl Interpreter {
         }
     }
 
-    fn call_sub(&mut self, sub: &PerlSub, args: Vec<PerlValue>, _line: usize) -> ExecResult {
+    fn call_sub(
+        &mut self,
+        sub: &PerlSub,
+        args: Vec<PerlValue>,
+        want: WantarrayCtx,
+        _line: usize,
+    ) -> ExecResult {
         // Single frame for both @_ and the block's local variables —
         // avoids the double push_frame/pop_frame overhead per call.
         self.scope.push_frame();
@@ -3638,7 +3786,10 @@ impl Interpreter {
         if let Some(ref env) = sub.closure_env {
             self.scope.restore_capture(env);
         }
+        let saved = self.wantarray_kind;
+        self.wantarray_kind = want;
         let result = self.exec_block_no_scope(&sub.body);
+        self.wantarray_kind = saved;
         self.scope.pop_frame();
         match result {
             Ok(v) => Ok(v),

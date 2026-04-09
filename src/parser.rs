@@ -1642,29 +1642,93 @@ impl Parser {
                             Err(PerlError::syntax("Invalid regex binding", line))
                         }
                     }
-                    _ => Err(PerlError::syntax("Expected regex after =~", line)),
+                    _ => {
+                        let rhs = self.parse_range()?;
+                        Ok(Expr {
+                            kind: ExprKind::BinOp {
+                                left: Box::new(left),
+                                op: BinOp::BindMatch,
+                                right: Box::new(rhs),
+                            },
+                            line,
+                        })
+                    }
                 }
             }
             Token::BindNotMatch => {
                 let line = left.line;
                 self.advance();
-                match self.advance() {
-                    (Token::Regex(pattern, flags), _) => Ok(Expr {
-                        kind: ExprKind::UnaryOp {
-                            op: UnaryOp::LogNot,
-                            expr: Box::new(Expr {
-                                kind: ExprKind::Match {
-                                    expr: Box::new(left),
-                                    pattern,
-                                    flags,
-                                    scalar_g: false,
+                match self.peek().clone() {
+                    Token::Regex(pattern, flags) => {
+                        self.advance();
+                        Ok(Expr {
+                            kind: ExprKind::UnaryOp {
+                                op: UnaryOp::LogNot,
+                                expr: Box::new(Expr {
+                                    kind: ExprKind::Match {
+                                        expr: Box::new(left),
+                                        pattern,
+                                        flags,
+                                        scalar_g: false,
+                                    },
+                                    line,
+                                }),
+                            },
+                            line,
+                        })
+                    }
+                    Token::Ident(ref s) if s.starts_with('\x00') => {
+                        let (Token::Ident(encoded), _) = self.advance() else {
+                            unreachable!()
+                        };
+                        let parts: Vec<&str> = encoded.split('\x00').collect();
+                        if parts.len() >= 4 && parts[1] == "s" {
+                            Ok(Expr {
+                                kind: ExprKind::UnaryOp {
+                                    op: UnaryOp::LogNot,
+                                    expr: Box::new(Expr {
+                                        kind: ExprKind::Substitution {
+                                            expr: Box::new(left),
+                                            pattern: parts[2].to_string(),
+                                            replacement: parts[3].to_string(),
+                                            flags: parts.get(4).unwrap_or(&"").to_string(),
+                                        },
+                                        line,
+                                    }),
                                 },
                                 line,
-                            }),
-                        },
-                        line,
-                    }),
-                    (_, line) => Err(PerlError::syntax("Expected regex after !~", line)),
+                            })
+                        } else if parts.len() >= 4 && parts[1] == "tr" {
+                            Ok(Expr {
+                                kind: ExprKind::UnaryOp {
+                                    op: UnaryOp::LogNot,
+                                    expr: Box::new(Expr {
+                                        kind: ExprKind::Transliterate {
+                                            expr: Box::new(left),
+                                            from: parts[2].to_string(),
+                                            to: parts[3].to_string(),
+                                            flags: parts.get(4).unwrap_or(&"").to_string(),
+                                        },
+                                        line,
+                                    }),
+                                },
+                                line,
+                            })
+                        } else {
+                            Err(PerlError::syntax("Invalid regex binding after !~", line))
+                        }
+                    }
+                    _ => {
+                        let rhs = self.parse_range()?;
+                        Ok(Expr {
+                            kind: ExprKind::BinOp {
+                                left: Box::new(left),
+                                op: BinOp::BindNotMatch,
+                                right: Box::new(rhs),
+                            },
+                            line,
+                        })
+                    }
                 }
             }
             _ => Ok(left),

@@ -9,6 +9,10 @@ use crate::value::PerlValue;
 pub enum SortBlockFast {
     Numeric,
     String,
+    /// `{ $b <=> $a }` — reverse numeric order
+    NumericRev,
+    /// `{ $b cmp $a }` — reverse string order
+    StringRev,
 }
 
 fn is_magic_a(e: &Expr) -> bool {
@@ -36,9 +40,19 @@ pub fn detect_sort_block_fast(block: &Block) -> Option<SortBlockFast> {
         } if is_magic_a(left) && is_magic_b(right) => Some(SortBlockFast::Numeric),
         ExprKind::BinOp {
             left,
+            op: BinOp::Spaceship,
+            right,
+        } if is_magic_b(left) && is_magic_a(right) => Some(SortBlockFast::NumericRev),
+        ExprKind::BinOp {
+            left,
             op: BinOp::StrCmp,
             right,
         } if is_magic_a(left) && is_magic_b(right) => Some(SortBlockFast::String),
+        ExprKind::BinOp {
+            left,
+            op: BinOp::StrCmp,
+            right,
+        } if is_magic_b(left) && is_magic_a(right) => Some(SortBlockFast::StringRev),
         _ => None,
     }
 }
@@ -51,6 +65,8 @@ pub fn sort_magic_cmp(a: &PerlValue, b: &PerlValue, mode: SortBlockFast) -> Orde
             .partial_cmp(&b.to_number())
             .unwrap_or(Ordering::Equal),
         SortBlockFast::String => a.to_string().cmp(&b.to_string()),
+        SortBlockFast::NumericRev => sort_magic_cmp(b, a, SortBlockFast::Numeric),
+        SortBlockFast::StringRev => sort_magic_cmp(b, a, SortBlockFast::String),
     }
 }
 
@@ -80,5 +96,33 @@ mod tests {
             _ => panic!("expected sub"),
         };
         assert_eq!(detect_sort_block_fast(block), Some(SortBlockFast::String));
+    }
+
+    #[test]
+    fn detects_reverse_spaceship_and_cmp() {
+        let p = crate::parse("sort { $b <=> $a } (1);").expect("parse");
+        let block = match &p.statements[0].kind {
+            StmtKind::Expression(Expr {
+                kind: ExprKind::SortExpr { cmp: Some(b), .. },
+                ..
+            }) => b,
+            _ => panic!("expected sort"),
+        };
+        assert_eq!(
+            detect_sort_block_fast(block),
+            Some(SortBlockFast::NumericRev)
+        );
+        let p2 = crate::parse("sort { $b cmp $a } (1);").expect("parse");
+        let block2 = match &p2.statements[0].kind {
+            StmtKind::Expression(Expr {
+                kind: ExprKind::SortExpr { cmp: Some(b), .. },
+                ..
+            }) => b,
+            _ => panic!("expected sort"),
+        };
+        assert_eq!(
+            detect_sort_block_fast(block2),
+            Some(SortBlockFast::StringRev)
+        );
     }
 }
