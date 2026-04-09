@@ -1038,10 +1038,11 @@ impl<'a> VM<'a> {
 
             if self.jit_enabled && self.sub_entry_at_ip.get(self.ip).copied().unwrap_or(false) {
                 let sub_ip = self.ip;
-                if sub_ip < self.sub_entry_invoke_count.len() {
-                    self.sub_entry_invoke_count[sub_ip] =
-                        self.sub_entry_invoke_count[sub_ip].saturating_add(1);
+                if sub_ip >= self.sub_entry_invoke_count.len() {
+                    self.sub_entry_invoke_count.resize(sub_ip + 1, 0);
                 }
+                self.sub_entry_invoke_count[sub_ip] =
+                    self.sub_entry_invoke_count[sub_ip].saturating_add(1);
                 if self.sub_entry_invoke_count[sub_ip] > self.jit_sub_invoke_threshold {
                     if self.try_jit_subroutine_linear()? {
                         continue;

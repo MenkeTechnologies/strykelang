@@ -58,7 +58,10 @@
 //! ## Not JIT’d (linear)
 //! Inexact integer `Div`, `Mod` with unknown divisor, integer `Pow` outside `0..=63`, `BitAnd`/`BitOr`
 //! on set values, non-integer slot/plain/arg materialization where the VM would not be `i64`,
-//! calls that are not a compiled stack-args scalar `Op::Call` (see above), string ops, array/hash ops.
+//! calls that are not a compiled stack-args scalar `Op::Call` (see above), array/hash ops.
+//! String `.` and string compares are **not** JIT’d: [`simulate_one_op`] returns [`None`] for those
+//! opcodes so validation bails to the interpreter. [`perlrs_jit_concat_bits`] /
+//! [`perlrs_jit_string_cmp_bits`] remain for a future lowering.
 //! `LoadUndef` is JIT’d as full nanbox bits; the return
 //! path uses `PerlValue::from_raw_bits` when the abstract result is [`Cell::Undef`].
 //!
@@ -77,6 +80,10 @@
 //! / [`Cell::DynF`] shapes still fall back to the interpreter.
 //!
 //! ## VM integration
+//! **Tiered subroutine JIT**: [`crate::vm::VM`] counts invocations per sub-entry IP; only after
+//! **`PERLRS_JIT_SUB_INVOKES`** (default **50**) does it attempt [`try_run_linear_sub`] / block sub-JIT,
+//! so cold code avoids Cranelift compile cost.
+//!
 //! [`crate::vm::VM::execute`] tries [`try_run_linear_ops`] on the full opcode buffer, then
 //! [`block_jit_validate`]. On success it fills slot/plain/arg buffers using [`ValidatedBlockCfg::buffer_mode`]
 //! and calls [`try_run_block_ops`] with `Some(validated)` so CFG validation is not run again inside
@@ -110,6 +117,7 @@ use cranelift_module::{default_libcall_names, Linkage, Module};
 
 use crate::bytecode::Op;
 use crate::interpreter::WantarrayCtx;
+use crate::nanbox;
 use crate::value::PerlValue;
 
 type LinearFn0 = unsafe extern "C" fn() -> i64;
@@ -234,6 +242,18 @@ pub extern "C" fn perlrs_jit_fmod_f64(a: f64, b: f64) -> f64 {
     a % b
 }
 
+/// Linear JIT (`emit_data_op` with `needs_raw_bits == false`) keeps small integers as **plain** `i64`
+/// stack slots. [`PerlValue::from_raw_bits`] must not see those (e.g. `1` is valid float bits, not int `1`).
+/// Heap strings / concat results and tagged immediates pass through unchanged.
+#[inline]
+fn perl_value_bits_from_jit_string_operand(n: i64) -> u64 {
+    let u = n as u64;
+    if nanbox::is_heap(u) || nanbox::is_imm(u) {
+        return u;
+    }
+    PerlValue::integer(n).raw_bits()
+}
+
 /// `!` on a value that is interpreted as integer (`PerlValue::integer(n)`), matching `Op::LogNot` + stack.
 #[no_mangle]
 pub extern "C" fn perlrs_jit_lognot_i64(n: i64) -> i64 {
@@ -244,19 +264,23 @@ pub extern "C" fn perlrs_jit_lognot_i64(n: i64) -> i64 {
     }
 }
 
-/// String stack ops: `kind` 0=`Concat`, 1=`StrEq`, 2=`StrNe`, 3=`StrCmp`, 4–7=`StrLt`/`StrGt`/`StrLe`/`StrGe`.
-/// Operands are Perl nanbox bits in `i64` (same representation as the VM stack).
+/// String concatenation (`.`) — operands are Perl nanbox bits or linear-JIT plain integers (`a` then `b`).
 #[no_mangle]
-pub extern "C" fn perlrs_jit_string_binop_bits(a: i64, b: i64, kind: i8) -> i64 {
+pub extern "C" fn perlrs_jit_concat_bits(a: i64, b: i64) -> i64 {
+    let pa = PerlValue::from_raw_bits(perl_value_bits_from_jit_string_operand(a));
+    let pb = PerlValue::from_raw_bits(perl_value_bits_from_jit_string_operand(b));
+    let mut s = pa.into_string();
+    pb.append_to(&mut s);
+    PerlValue::string(s).raw_bits() as i64
+}
+
+/// String compares — `kind` 1=`StrEq`, 2=`StrNe`, 3=`StrCmp`, 4–7=`StrLt`/`StrGt`/`StrLe`/`StrGe`.
+#[no_mangle]
+pub extern "C" fn perlrs_jit_string_cmp_bits(a: i64, b: i64, kind: i32) -> i64 {
     use std::cmp::Ordering;
-    let pa = PerlValue::from_raw_bits(a as u64);
-    let pb = PerlValue::from_raw_bits(b as u64);
+    let pa = PerlValue::from_raw_bits(perl_value_bits_from_jit_string_operand(a));
+    let pb = PerlValue::from_raw_bits(perl_value_bits_from_jit_string_operand(b));
     match kind {
-        0 => {
-            let mut s = pa.into_string();
-            pb.append_to(&mut s);
-            PerlValue::string(s).raw_bits() as i64
-        }
         1 => PerlValue::integer(i64::from(pa.str_eq(&pb))).raw_bits() as i64,
         2 => PerlValue::integer(i64::from(!pa.str_eq(&pb))).raw_bits() as i64,
         3 => {
@@ -322,9 +346,10 @@ fn new_jit_module() -> Option<JITModule> {
         "perlrs_jit_call_sub",
         crate::vm::perlrs_jit_call_sub as *const u8,
     );
+    builder.symbol("perlrs_jit_concat_bits", perlrs_jit_concat_bits as *const u8);
     builder.symbol(
-        "perlrs_jit_string_binop_bits",
-        perlrs_jit_string_binop_bits as *const u8,
+        "perlrs_jit_string_cmp_bits",
+        perlrs_jit_string_cmp_bits as *const u8,
     );
     Some(JITModule::new(builder))
 }
@@ -446,6 +471,7 @@ fn join_cell(a: Cell, b: Cell) -> Option<Cell> {
                 }
             }
             (Cell::Dyn, Cell::Dyn) => Some(Cell::Dyn),
+            (Cell::DynStr, Cell::DynStr) => Some(Cell::DynStr),
             (Cell::DynF, Cell::DynF) => Some(Cell::DynF),
             (Cell::Undef, Cell::Undef) => Some(Cell::Undef),
             _ => None,
@@ -454,9 +480,12 @@ fn join_cell(a: Cell, b: Cell) -> Option<Cell> {
     match (a, b) {
         (Cell::Undef, Cell::Const(_)) | (Cell::Const(_), Cell::Undef) => Some(Cell::Dyn),
         (Cell::Undef, Cell::Dyn) | (Cell::Dyn, Cell::Undef) => Some(Cell::Dyn),
+        (Cell::Undef, Cell::DynStr) | (Cell::DynStr, Cell::Undef) => Some(Cell::Dyn),
         (Cell::Undef, Cell::ConstF(_)) | (Cell::ConstF(_), Cell::Undef) => Some(Cell::DynF),
         (Cell::Undef, Cell::DynF) | (Cell::DynF, Cell::Undef) => Some(Cell::DynF),
         (Cell::Const(_), Cell::Dyn) | (Cell::Dyn, Cell::Const(_)) => Some(Cell::Dyn),
+        (Cell::Const(_), Cell::DynStr) | (Cell::DynStr, Cell::Const(_)) => Some(Cell::DynStr),
+        (Cell::Dyn, Cell::DynStr) | (Cell::DynStr, Cell::Dyn) => Some(Cell::Dyn),
         (Cell::ConstF(_), Cell::DynF) | (Cell::DynF, Cell::ConstF(_)) => Some(Cell::DynF),
         (Cell::Const(_), Cell::DynF)
         | (Cell::DynF, Cell::Const(_))
@@ -465,6 +494,8 @@ fn join_cell(a: Cell, b: Cell) -> Option<Cell> {
         | (Cell::Const(_), Cell::ConstF(_))
         | (Cell::ConstF(_), Cell::Const(_)) => Some(Cell::DynF),
         (Cell::Dyn, Cell::DynF) | (Cell::DynF, Cell::Dyn) => Some(Cell::DynF),
+        (Cell::DynStr, Cell::DynF) | (Cell::DynF, Cell::DynStr) => Some(Cell::DynF),
+        (Cell::DynStr, Cell::ConstF(_)) | (Cell::ConstF(_), Cell::DynStr) => Some(Cell::DynF),
         // Unreachable for well-formed `Cell`, but required for exhaustiveness on `(Cell, Cell)`.
         _ => None,
     }
@@ -709,6 +740,8 @@ fn ops_before_halt(ops: &[Op]) -> &[Op] {
 pub(crate) enum Cell {
     Const(i64),
     Dyn,
+    /// String result from [`Op::Concat`] — return value is full nanbox bits (not `PerlValue::integer`).
+    DynStr,
     ConstF(f64),
     DynF,
     /// [`Op::LoadUndef`] — stack carries [`PerlValue::UNDEF`] nanbox bits (see [`LinearJit::ret_nanboxed`]).
@@ -721,6 +754,16 @@ impl Cell {
     }
     fn either_float(a: Cell, b: Cell) -> bool {
         a.is_float() || b.is_float()
+    }
+}
+
+/// String concat results must not feed numeric-only JIT paths (interpreter handles coercion).
+#[inline]
+fn reject_dynstr_binop(a: Cell, b: Cell) -> Option<()> {
+    if matches!(a, Cell::DynStr) || matches!(b, Cell::DynStr) {
+        None
+    } else {
+        Some(())
     }
 }
 
@@ -748,7 +791,7 @@ fn fold_arith(a: Cell, b: Cell, int_op: fn(i64, i64) -> i64, f_op: fn(f64, f64) 
 fn cell_to_jit_ty(c: Cell) -> JitTy {
     match c {
         Cell::ConstF(_) | Cell::DynF => JitTy::Float,
-        Cell::Const(_) | Cell::Dyn | Cell::Undef => JitTy::Int,
+        Cell::Const(_) | Cell::Dyn | Cell::DynStr | Cell::Undef => JitTy::Int,
     }
 }
 
@@ -841,18 +884,22 @@ fn simulate_one_op(
         Op::LoadUndef => stack.push(Cell::Undef),
         Op::Add => {
             let (a, b) = pop2_strict(stack)?;
+            reject_dynstr_binop(a, b)?;
             stack.push(fold_arith(a, b, i64::wrapping_add, |x, y| x + y));
         }
         Op::Sub => {
             let (a, b) = pop2_strict(stack)?;
+            reject_dynstr_binop(a, b)?;
             stack.push(fold_arith(a, b, i64::wrapping_sub, |x, y| x - y));
         }
         Op::Mul => {
             let (a, b) = pop2_strict(stack)?;
+            reject_dynstr_binop(a, b)?;
             stack.push(fold_arith(a, b, i64::wrapping_mul, |x, y| x * y));
         }
         Op::Div => {
             let (a, b) = pop2_strict(stack)?;
+            reject_dynstr_binop(a, b)?;
             if Cell::either_float(a, b) {
                 // Float div: always OK (produces Inf/NaN; Perl catches at runtime).
                 match (a, b) {
@@ -871,6 +918,7 @@ fn simulate_one_op(
         }
         Op::Mod => {
             let (a, b) = pop2_strict(stack)?;
+            reject_dynstr_binop(a, b)?;
             if Cell::either_float(a, b) {
                 match (a, b) {
                     (Cell::ConstF(x), Cell::ConstF(y)) => stack.push(Cell::ConstF(x % y)),
@@ -889,6 +937,7 @@ fn simulate_one_op(
         }
         Op::Pow => {
             let (a, b) = pop2_strict(stack)?;
+            reject_dynstr_binop(a, b)?;
             if Cell::either_float(a, b) {
                 match (a, b) {
                     (Cell::ConstF(x), Cell::ConstF(y)) => stack.push(Cell::ConstF(x.powf(y))),
@@ -916,6 +965,7 @@ fn simulate_one_op(
                 Cell::ConstF(f) => Cell::ConstF(-f),
                 Cell::DynF => Cell::DynF,
                 Cell::Dyn => Cell::Dyn,
+                Cell::DynStr => return None,
                 Cell::Undef => unreachable!(),
             });
         }
@@ -933,12 +983,16 @@ fn simulate_one_op(
                 if a.is_float() || matches!(a, Cell::Undef) {
                     return None;
                 }
+                if matches!(a, Cell::DynStr) {
+                    return None;
+                }
                 stack.push(match a {
                     Cell::Const(n) => Cell::Const(!n),
                     _ => Cell::Dyn,
                 });
             } else {
                 let (a, b) = pop2_strict(stack)?;
+                reject_dynstr_binop(a, b)?;
                 if Cell::either_float(a, b) {
                     return None;
                 }
@@ -977,12 +1031,14 @@ fn simulate_one_op(
         // Numeric comparisons: always produce int (0/1 or -1/0/1), even with float operands.
         Op::NumEq | Op::NumNe | Op::NumLt | Op::NumGt | Op::NumLe | Op::NumGe | Op::Spaceship => {
             let (a, b) = pop2_strict(stack)?;
+            reject_dynstr_binop(a, b)?;
             stack.push(fold_cmp_cell(op, a, b));
         }
-        Op::Concat | Op::StrEq | Op::StrNe | Op::StrCmp | Op::StrLt | Op::StrGt | Op::StrLe | Op::StrGe => {
-            let (a, b) = pop2_strict(stack)?;
-            let _ = (a, b);
-            stack.push(Cell::Dyn);
+        // String `.` / string compares: bail to the interpreter (linear stack uses plain `i64` for
+        // ints; Cranelift concat + runtime helpers still mis-handle some operand shapes — SIGBUS).
+        Op::Concat | Op::StrEq | Op::StrNe | Op::StrCmp | Op::StrLt | Op::StrGt | Op::StrLe
+        | Op::StrGe => {
+            return None;
         }
         Op::LogNot => {
             let a = stack.pop()?;
@@ -996,6 +1052,7 @@ fn simulate_one_op(
                     1
                 }),
                 Cell::ConstF(f) => Cell::Const(if f != 0.0 { 0 } else { 1 }),
+                Cell::DynStr => Cell::Dyn,
                 _ => Cell::Dyn,
             });
         }
@@ -1108,7 +1165,7 @@ fn compile_linear_ops(
         return None;
     }
     let ret_cell = linear_result_cell_seq(seq, constants, Some(sub_entries))?;
-    let ret_nanboxed = matches!(ret_cell, Cell::Undef);
+    let ret_nanboxed = matches!(ret_cell, Cell::Undef | Cell::DynStr);
     let ret_ty = cell_to_jit_ty(ret_cell);
     let need_any_table = needs_table(seq);
     let need_vm_sub = seq.iter().any(|o| call_is_jitable(o, sub_entries));
@@ -1171,28 +1228,35 @@ fn compile_linear_ops(
         None
     };
 
-    let needs_string_binop = seq.iter().any(|o| {
-        matches!(
-            o,
-            Op::Concat
-                | Op::StrEq
-                | Op::StrNe
-                | Op::StrCmp
-                | Op::StrLt
-                | Op::StrGt
-                | Op::StrLe
-                | Op::StrGe
-        )
-    });
-    let string_binop_id = if needs_string_binop {
+    let needs_concat = seq.iter().any(|o| matches!(o, Op::Concat));
+    let concat_id = if needs_concat {
         let mut ps = module.make_signature();
         ps.params.push(AbiParam::new(types::I64));
         ps.params.push(AbiParam::new(types::I64));
-        ps.params.push(AbiParam::new(types::I8));
         ps.returns.push(AbiParam::new(types::I64));
         Some(
             module
-                .declare_function("perlrs_jit_string_binop_bits", Linkage::Import, &ps)
+                .declare_function("perlrs_jit_concat_bits", Linkage::Import, &ps)
+                .ok()?,
+        )
+    } else {
+        None
+    };
+    let needs_string_cmp = seq.iter().any(|o| {
+        matches!(
+            o,
+            Op::StrEq | Op::StrNe | Op::StrCmp | Op::StrLt | Op::StrGt | Op::StrLe | Op::StrGe
+        )
+    });
+    let string_cmp_id = if needs_string_cmp {
+        let mut ps = module.make_signature();
+        ps.params.push(AbiParam::new(types::I64));
+        ps.params.push(AbiParam::new(types::I64));
+        ps.params.push(AbiParam::new(types::I32));
+        ps.returns.push(AbiParam::new(types::I64));
+        Some(
+            module
+                .declare_function("perlrs_jit_string_cmp_bits", Linkage::Import, &ps)
                 .ok()?,
         )
     } else {
@@ -1280,7 +1344,8 @@ fn compile_linear_ops(
         let pow_f64_ref = pow_f64_id.map(|pid| module.declare_func_in_func(pid, bcx.func));
         let fmod_f64_ref = fmod_f64_id.map(|pid| module.declare_func_in_func(pid, bcx.func));
         let lognot_ref = lognot_id.map(|lid| module.declare_func_in_func(lid, bcx.func));
-        let string_binop_ref = string_binop_id.map(|sid| module.declare_func_in_func(sid, bcx.func));
+        let concat_ref = concat_id.map(|cid| module.declare_func_in_func(cid, bcx.func));
+        let string_cmp_ref = string_cmp_id.map(|cid| module.declare_func_in_func(cid, bcx.func));
         let call_sub_ref = call_sub_id.map(|cid| module.declare_func_in_func(cid, bcx.func));
 
         let mut stack: Vec<(cranelift_codegen::ir::Value, JitTy)> = Vec::with_capacity(32);
@@ -1300,7 +1365,8 @@ fn compile_linear_ops(
                 pow_f64_ref,
                 fmod_f64_ref,
                 lognot_ref,
-                string_binop_ref,
+                concat_ref,
+                string_cmp_ref,
                 constants,
             )?;
         }
@@ -1486,6 +1552,7 @@ fn compile_linear_void_ops(seq: &[Op], constants: &[PerlValue]) -> Option<Linear
                 pow_f64_ref,
                 fmod_f64_ref,
                 lognot_ref,
+                None,
                 None,
                 constants,
             )?;
@@ -2320,6 +2387,13 @@ fn validate_block_cfg(
                             terminated = true;
                             break;
                         }
+                        Cell::DynStr => {
+                            jump_if_defined_kind.insert(idx, false);
+                            let ti = *addr_to_block.get(target)?;
+                            merge_stack_entry(&mut entry_stacks, &mut worklist, ti, &stack)?;
+                            terminated = true;
+                            break;
+                        }
                         Cell::DynF => {
                             return None;
                         }
@@ -2480,7 +2554,8 @@ fn emit_data_op(
     pow_f64_ref: Option<cranelift_codegen::ir::FuncRef>,
     fmod_f64_ref: Option<cranelift_codegen::ir::FuncRef>,
     lognot_ref: Option<cranelift_codegen::ir::FuncRef>,
-    string_binop_ref: Option<cranelift_codegen::ir::FuncRef>,
+    concat_ref: Option<cranelift_codegen::ir::FuncRef>,
+    string_cmp_ref: Option<cranelift_codegen::ir::FuncRef>,
     constants: &[PerlValue],
 ) -> Option<()> {
     match op {
@@ -2857,57 +2932,56 @@ fn emit_data_op(
         }
         Op::Concat => {
             let (a, b) = pop_pair_nanbox_bits(stack)?;
-            let fr = string_binop_ref?;
-            let k = bcx.ins().iconst(types::I8, 0);
-            let call = bcx.ins().call(fr, &[a, b, k]);
+            let fr = concat_ref?;
+            let call = bcx.ins().call(fr, &[a, b]);
             stack.push((*bcx.inst_results(call).first()?, JitTy::Int));
         }
         Op::StrEq => {
             let (a, b) = pop_pair_nanbox_bits(stack)?;
-            let fr = string_binop_ref?;
-            let k = bcx.ins().iconst(types::I8, 1);
+            let fr = string_cmp_ref?;
+            let k = bcx.ins().iconst(types::I32, 1);
             let call = bcx.ins().call(fr, &[a, b, k]);
             stack.push((*bcx.inst_results(call).first()?, JitTy::Int));
         }
         Op::StrNe => {
             let (a, b) = pop_pair_nanbox_bits(stack)?;
-            let fr = string_binop_ref?;
-            let k = bcx.ins().iconst(types::I8, 2);
+            let fr = string_cmp_ref?;
+            let k = bcx.ins().iconst(types::I32, 2);
             let call = bcx.ins().call(fr, &[a, b, k]);
             stack.push((*bcx.inst_results(call).first()?, JitTy::Int));
         }
         Op::StrCmp => {
             let (a, b) = pop_pair_nanbox_bits(stack)?;
-            let fr = string_binop_ref?;
-            let k = bcx.ins().iconst(types::I8, 3);
+            let fr = string_cmp_ref?;
+            let k = bcx.ins().iconst(types::I32, 3);
             let call = bcx.ins().call(fr, &[a, b, k]);
             stack.push((*bcx.inst_results(call).first()?, JitTy::Int));
         }
         Op::StrLt => {
             let (a, b) = pop_pair_nanbox_bits(stack)?;
-            let fr = string_binop_ref?;
-            let k = bcx.ins().iconst(types::I8, 4);
+            let fr = string_cmp_ref?;
+            let k = bcx.ins().iconst(types::I32, 4);
             let call = bcx.ins().call(fr, &[a, b, k]);
             stack.push((*bcx.inst_results(call).first()?, JitTy::Int));
         }
         Op::StrGt => {
             let (a, b) = pop_pair_nanbox_bits(stack)?;
-            let fr = string_binop_ref?;
-            let k = bcx.ins().iconst(types::I8, 5);
+            let fr = string_cmp_ref?;
+            let k = bcx.ins().iconst(types::I32, 5);
             let call = bcx.ins().call(fr, &[a, b, k]);
             stack.push((*bcx.inst_results(call).first()?, JitTy::Int));
         }
         Op::StrLe => {
             let (a, b) = pop_pair_nanbox_bits(stack)?;
-            let fr = string_binop_ref?;
-            let k = bcx.ins().iconst(types::I8, 6);
+            let fr = string_cmp_ref?;
+            let k = bcx.ins().iconst(types::I32, 6);
             let call = bcx.ins().call(fr, &[a, b, k]);
             stack.push((*bcx.inst_results(call).first()?, JitTy::Int));
         }
         Op::StrGe => {
             let (a, b) = pop_pair_nanbox_bits(stack)?;
-            let fr = string_binop_ref?;
-            let k = bcx.ins().iconst(types::I8, 7);
+            let fr = string_cmp_ref?;
+            let k = bcx.ins().iconst(types::I32, 7);
             let call = bcx.ins().call(fr, &[a, b, k]);
             stack.push((*bcx.inst_results(call).first()?, JitTy::Int));
         }
@@ -2963,7 +3037,7 @@ fn compile_blocks_validated(
         BlockExit::ReturnVoid => JitTy::Int,
     };
     let ret_nanboxed = match exit {
-        BlockExit::Halt(c) | BlockExit::ReturnValue(c) => matches!(c, Cell::Undef),
+        BlockExit::Halt(c) | BlockExit::ReturnValue(c) => matches!(c, Cell::Undef | Cell::DynStr),
         BlockExit::ReturnVoid => true,
     };
 
@@ -3029,28 +3103,35 @@ fn compile_blocks_validated(
         None
     };
 
-    let needs_string_binop = ops.iter().any(|o| {
-        matches!(
-            o,
-            Op::Concat
-                | Op::StrEq
-                | Op::StrNe
-                | Op::StrCmp
-                | Op::StrLt
-                | Op::StrGt
-                | Op::StrLe
-                | Op::StrGe
-        )
-    });
-    let string_binop_id = if needs_string_binop {
+    let needs_concat = ops.iter().any(|o| matches!(o, Op::Concat));
+    let concat_id = if needs_concat {
         let mut ps = module.make_signature();
         ps.params.push(AbiParam::new(types::I64));
         ps.params.push(AbiParam::new(types::I64));
-        ps.params.push(AbiParam::new(types::I8));
         ps.returns.push(AbiParam::new(types::I64));
         Some(
             module
-                .declare_function("perlrs_jit_string_binop_bits", Linkage::Import, &ps)
+                .declare_function("perlrs_jit_concat_bits", Linkage::Import, &ps)
+                .ok()?,
+        )
+    } else {
+        None
+    };
+    let needs_string_cmp = ops.iter().any(|o| {
+        matches!(
+            o,
+            Op::StrEq | Op::StrNe | Op::StrCmp | Op::StrLt | Op::StrGt | Op::StrLe | Op::StrGe
+        )
+    });
+    let string_cmp_id = if needs_string_cmp {
+        let mut ps = module.make_signature();
+        ps.params.push(AbiParam::new(types::I64));
+        ps.params.push(AbiParam::new(types::I64));
+        ps.params.push(AbiParam::new(types::I32));
+        ps.returns.push(AbiParam::new(types::I64));
+        Some(
+            module
+                .declare_function("perlrs_jit_string_cmp_bits", Linkage::Import, &ps)
                 .ok()?,
         )
     } else {
@@ -3144,7 +3225,8 @@ fn compile_blocks_validated(
         let pow_f64_ref = pow_f64_id.map(|pid| module.declare_func_in_func(pid, bcx.func));
         let fmod_f64_ref = fmod_f64_id.map(|pid| module.declare_func_in_func(pid, bcx.func));
         let lognot_ref = lognot_id.map(|lid| module.declare_func_in_func(lid, bcx.func));
-        let string_binop_ref = string_binop_id.map(|sid| module.declare_func_in_func(sid, bcx.func));
+        let concat_ref = concat_id.map(|cid| module.declare_func_in_func(cid, bcx.func));
+        let string_cmp_ref = string_cmp_id.map(|cid| module.declare_func_in_func(cid, bcx.func));
         let defined_raw_ref = defined_raw_id.map(|did| module.declare_func_in_func(did, bcx.func));
         let call_sub_ref = call_sub_id.map(|cid| module.declare_func_in_func(cid, bcx.func));
 
@@ -3217,7 +3299,8 @@ fn compile_blocks_validated(
                         pow_f64_ref,
                         fmod_f64_ref,
                         lognot_ref,
-                        string_binop_ref,
+                        concat_ref,
+                        string_cmp_ref,
                         constants,
                     )?;
                     continue;
@@ -4514,6 +4597,7 @@ mod tests {
             Cell::Const(0),
             Cell::Const(1),
             Cell::Dyn,
+            Cell::DynStr,
             Cell::ConstF(0.0),
             Cell::ConstF(1.0),
             Cell::DynF,
