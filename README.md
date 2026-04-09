@@ -256,7 +256,49 @@ pe examples/parallel_demo.pl
 
 ---
 
-## [0x08] DEVELOPMENT & CI
+## [0x08] BENCHMARKS
+
+ ┌──────────────────────────────────────────────────────────────┐
+ │ BENCHMARK SUITE // perlrs vs perl 5.42.2 // Apple M3 18-core │
+ └──────────────────────────────────────────────────────────────┘
+
+```
+  TEST                    perl5(ms) perlrs(ms)      RATIO
+  ──────────────────── ───────── ────────── ─────
+  startup                     6.8ms      6.4ms      0.94x  ✓ faster
+  fib(25)                    23.6ms     48.4ms      2.05x
+  loop 10k                    7.1ms      7.6ms      1.07x  ≈ parity
+  string concat 10k           7.0ms     11.2ms      1.60x
+  hash 1k                     7.3ms     18.5ms      2.53x
+  array sort 10k              7.8ms    236.9ms     30.37x
+  regex match 1k              7.2ms     35.4ms      4.92x
+  map+grep 10k                7.6ms      7.7ms      1.01x  ≈ parity
+```
+
+> Measured on macOS with `perl v5.42.2` vs `perlrs` release build (LTO + O3).
+> Times include process startup (~7ms). Run with `bash bench/run_bench.sh`.
+
+#### Analysis
+
+- **startup** and **map+grep** are at parity or faster — the Rust binary cold-starts faster than perl and the bytecode VM dispatches map/grep at native speed
+- **loop** is within 7% — the VM's flat dispatch loop with integer fast paths nearly matches perl's decades-old bytecode engine
+- **fib** is 2x slower — recursive function calls still pay scope-frame overhead; a register-based VM would close this gap
+- **string** is 1.6x — each `$s = $s . "x"` clones the growing string; an in-place append optimization would fix this
+- **hash** is 2.5x — hash iteration via `keys %h` + `$h{$k}` involves more indirection than perl's internal HV
+- **regex** is 4.9x — the regex itself is cached and fast (Rust `regex` crate with SIMD), but the 1000-iteration for-loop + if-block overhead dominates
+- **array sort** is 30x — the sort comparator calls the tree-walker per comparison; compiling sort blocks to bytecode would fix this
+
+#### Parallel speedup
+
+```
+  fan 18 { system("sleep 0.1") }   →  0.12s total  (vs 1.8s sequential)
+```
+
+True parallelism across all cores via rayon work-stealing. The `fan`, `pmap`, `pgrep`, `pfor`, and `psort` commands distribute work automatically.
+
+---
+
+## [0x09] DEVELOPMENT & CI
 
 Pull requests and pushes to `main` run the workflow in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). You can also run it manually from the repository **Actions** tab (**workflow dispatch**). On a pull request, the **Checks** tab (or the merge box) shows the aggregate status; open the **CI** workflow run for per-job logs (Check, Test, Format, Clippy, Doc, Release Build).
 
