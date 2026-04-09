@@ -583,7 +583,7 @@ pe examples/parallel_demo.pl
 ```
 
 > Measured on macOS M-series with `perl v5.42.2` vs `perlrs` release build (LTO + O3).
-> Times include process startup (~3.1ms perlrs, ~2.4ms perl5). Run with `bash bench/run_bench.sh`.
+> Times include process startup (~3.1ms perlrs, ~2.4ms perl5). Run with `bash bench/run_bench.sh` (prints **jit_on** / **jit_off** for each perlrs row and **off/on** ratio).
 
 #### Analysis
 
@@ -623,6 +623,8 @@ cargo test --test integration
 ```
 
 **JIT vs interpreter (Criterion)** — `cargo bench --bench jit_compare` runs the same block-JIT-eligible bytecode twice: with Cranelift enabled (default) and with `VM::set_jit_enabled(false)` so only the opcode interpreter runs. The workload is a tight numeric `for` loop using frame slots (`$i`, `$sum`); wall-clock ratios depend on machine and loop bound—run the bench locally rather than trusting a checked-in number. Library tests assert both paths return the same integer for the same bytecode.
+
+Disable JIT for the whole process: **`PERLRS_NO_JIT=1`** (also `true` / `yes`), or **`pe --no-jit`** / **`perlrs --no-jit`** (sets `Interpreter::vm_jit_enabled`). **`bash bench/run_bench.sh`** (after `cargo build --release`) prints **jit_on** and **jit_off** columns for each perlrs timing plus an **off/on** ratio (slowdown when JIT is off; values below 1.0 mean the interpreter was faster for that workload, e.g. when JIT compile cost dominates).
 
 Extended parse-only smoke coverage is in `src/parse_smoke_extended.rs` and `src/parse_smoke_batch2.rs` (built only with `cfg(test)`).
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Benchmark perlrs vs perl5
+# Benchmark perlrs vs perl5; for perlrs, compare Cranelift JIT on vs off (`PERLRS_NO_JIT`).
 # Runs each test 3 times and reports median
 
 PERLRS="$(dirname "$0")/../target/release/perlrs"
@@ -50,8 +50,8 @@ printf "  perlrs: %s\n" "$($PERLRS -v 2>&1 | head -1)"
 printf "  cores:  %s\n\n" "$(sysctl -n hw.ncpu 2>/dev/null || nproc)"
 
 printf "  ── SEQUENTIAL BENCHMARKS ─────────────────────────────────────\n"
-printf "  %-22s %10s %10s %10s\n" "TEST" "perl5(ms)" "perlrs(ms)" "RATIO"
-printf "  %-22s %10s %10s %10s\n" "────────────────────" "─────────" "──────────" "─────"
+printf "  %-18s %10s %10s %10s %10s\n" "TEST" "perl5" "jit_on" "jit_off" "off/on"
+printf "  %-18s %10s %10s %10s %10s\n" "────────────────────" "─────────" "──────────" "──────────" "──────"
 
 BENCHDIR="$(dirname "$0")"
 
@@ -59,33 +59,36 @@ for bench in startup fib loop string hash array regex map_grep; do
     file="$BENCHDIR/bench_${bench}.pl"
     if [ ! -f "$file" ]; then continue; fi
 
-    # 3 runs each
     p1=$(time_ms "$PERL $file"); p2=$(time_ms "$PERL $file"); p3=$(time_ms "$PERL $file")
-    r1=$(time_ms "$PERLRS $file"); r2=$(time_ms "$PERLRS $file"); r3=$(time_ms "$PERLRS $file")
+    rj1=$(time_ms "$PERLRS $file"); rj2=$(time_ms "$PERLRS $file"); rj3=$(time_ms "$PERLRS $file")
+    rn1=$(time_ms "env PERLRS_NO_JIT=1 $PERLRS $file"); rn2=$(time_ms "env PERLRS_NO_JIT=1 $PERLRS $file"); rn3=$(time_ms "env PERLRS_NO_JIT=1 $PERLRS $file")
 
     pm=$(median3 "$p1" "$p2" "$p3")
-    rm=$(median3 "$r1" "$r2" "$r3")
+    jm=$(median3 "$rj1" "$rj2" "$rj3")
+    nm=$(median3 "$rn1" "$rn2" "$rn3")
 
-    # Compute ratio
-    ratio=$("$PERL" -e "printf '%.2fx', $rm / $pm" 2>/dev/null)
+    ratio=$("$PERL" -e "printf '%.2fx', (\$ARGV[1] / \$ARGV[0])" "$jm" "$nm" 2>/dev/null)
 
-    printf "  %-22s %10s %10s %10s\n" "$bench" "${pm}ms" "${rm}ms" "$ratio"
+    printf "  %-18s %8sms %8sms %8sms %10s\n" "$bench" "${pm}" "${jm}" "${nm}" "$ratio"
 done
 
-printf "\n  ── PARALLEL vs SEQUENTIAL (perlrs only) ───────────────────────\n"
-printf "  %-22s %10s %10s %10s\n" "TEST" "map(ms)" "pmap(ms)" "SPEEDUP"
-printf "  %-22s %10s %10s %10s\n" "────────────────────" "────────" "────────" "───────"
+printf "\n  ── PARALLEL vs SEQUENTIAL (perlrs only, 10k) ───────────────────\n"
+printf "  %-10s %12s %12s %12s\n" "" "map(ms)" "pmap(ms)" "pmap/map"
+printf "  %-10s %12s %12s %12s\n" "──────────" "────────────" "────────────" "────────────"
 
-# Sequential map in perlrs
 s1=$(time_ms "$PERLRS $BENCHDIR/bench_pmap_perl.pl"); s2=$(time_ms "$PERLRS $BENCHDIR/bench_pmap_perl.pl"); s3=$(time_ms "$PERLRS $BENCHDIR/bench_pmap_perl.pl")
 sm=$(median3 "$s1" "$s2" "$s3")
-
-# Parallel pmap in perlrs
 p1=$(time_ms "$PERLRS $BENCHDIR/bench_pmap.pl"); p2=$(time_ms "$PERLRS $BENCHDIR/bench_pmap.pl"); p3=$(time_ms "$PERLRS $BENCHDIR/bench_pmap.pl")
 pm=$(median3 "$p1" "$p2" "$p3")
+speedup=$("$PERL" -e "printf '%.2fx', \$ARGV[0] / \$ARGV[1]" "$sm" "$pm" 2>/dev/null)
+printf "  %-10s %12sms %12sms %12s\n" "JIT on" "${sm}" "${pm}" "$speedup"
 
-speedup=$("$PERL" -e "printf '%.2fx', $sm / $pm" 2>/dev/null)
-printf "  %-22s %10s %10s %10s\n" "map vs pmap (10k)" "${sm}ms" "${pm}ms" "$speedup"
+s1o=$(time_ms "env PERLRS_NO_JIT=1 $PERLRS $BENCHDIR/bench_pmap_perl.pl"); s2o=$(time_ms "env PERLRS_NO_JIT=1 $PERLRS $BENCHDIR/bench_pmap_perl.pl"); s3o=$(time_ms "env PERLRS_NO_JIT=1 $PERLRS $BENCHDIR/bench_pmap_perl.pl")
+smo=$(median3 "$s1o" "$s2o" "$s3o")
+p1o=$(time_ms "env PERLRS_NO_JIT=1 $PERLRS $BENCHDIR/bench_pmap.pl"); p2o=$(time_ms "env PERLRS_NO_JIT=1 $PERLRS $BENCHDIR/bench_pmap.pl"); p3o=$(time_ms "env PERLRS_NO_JIT=1 $PERLRS $BENCHDIR/bench_pmap.pl")
+pmo=$(median3 "$p1o" "$p2o" "$p3o")
+speedup_o=$("$PERL" -e "printf '%.2fx', \$ARGV[0] / \$ARGV[1]" "$smo" "$pmo" 2>/dev/null)
+printf "  %-10s %12sms %12sms %12s\n" "JIT off" "${smo}" "${pmo}" "$speedup_o"
 
 printf "\n  ── SYSTEM ─────────────────────────────────────────\n"
 printf "  >>> BENCHMARK COMPLETE <<<\n"

@@ -46,6 +46,10 @@ pub(crate) struct Cli {
     #[arg(long = "profile")]
     profile: bool,
 
+    /// Disable Cranelift JIT for bytecode VM (opcode interpreter only)
+    #[arg(long = "no-jit")]
+    no_jit: bool,
+
     /// Print expanded hint for an error code (e.g. E0001) and exit
     #[arg(long = "explain", value_name = "CODE")]
     explain: Option<String>,
@@ -208,6 +212,7 @@ fn print_cyberpunk_help() {
     println!("  --ast                  {G}//{N} Dump parsed AST as JSON and exit (no execution)");
     println!("  --fmt                  {G}//{N} Pretty-print parsed Perl to stdout and exit");
     println!("  --profile              {G}//{N} Wall-clock profile (stderr); tree-walker only");
+    println!("  --no-jit               {G}//{N} Disable Cranelift JIT (bytecode interpreter only)");
     println!("  -d[t][:MOD]            {G}//{N} Run program under debugger or module Devel::MOD");
     println!("  -D[number/letters]     {G}//{N} Set debugging flags");
     println!("  -u                     {G}//{N} Dump core after parsing program");
@@ -737,6 +742,9 @@ fn main() {
     }
 
     let mut interp = Interpreter::new();
+    if cli.no_jit {
+        interp.vm_jit_enabled = false;
+    }
     if cli.profile {
         interp.profiler = Some(perlrs::profiler::Profiler::new(filename.clone()));
     }

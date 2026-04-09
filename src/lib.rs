@@ -113,7 +113,9 @@ pub fn try_vm_execute(
                     .insert(def.name.clone(), std::sync::Arc::new(def.clone()));
             }
             // Subs from `prepare_program_top_level` are already registered.
+            let vm_jit = interp.vm_jit_enabled;
             let mut vm = vm::VM::new(&chunk, interp);
+            vm.set_jit_enabled(vm_jit);
             match vm.execute() {
                 Ok(val) => Some(Ok(val)),
                 Err(ref e)

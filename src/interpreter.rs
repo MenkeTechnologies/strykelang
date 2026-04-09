@@ -371,6 +371,9 @@ pub struct Interpreter {
     pub(crate) english_enabled: bool,
     /// Lexical scalar names (`my`/`our`/`foreach`/`given`/`match`/`try` catch) per scope frame (parallel to [`Scope`] depth).
     english_lexical_scalars: Vec<HashSet<String>>,
+    /// When false, the bytecode VM runs without Cranelift (see [`crate::try_vm_execute`]). Disabled by
+    /// `PERLRS_NO_JIT=1` / `true` / `yes`, or `pe --no-jit` after [`Self::new`].
+    pub vm_jit_enabled: bool,
 }
 
 /// `Exporter`-style lists for `use Module` / `use Module qw(...)`.
@@ -635,6 +638,16 @@ impl Interpreter {
             glob_restore_frames: vec![Vec::new()],
             english_enabled: false,
             english_lexical_scalars: vec![HashSet::new()],
+            vm_jit_enabled: match std::env::var("PERLRS_NO_JIT") {
+                Ok(v)
+                    if v == "1"
+                        || v.eq_ignore_ascii_case("true")
+                        || v.eq_ignore_ascii_case("yes") =>
+                {
+                    false
+                }
+                _ => true,
+            },
         };
         crate::list_util::install_list_util(&mut interp);
         interp
