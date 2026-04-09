@@ -359,7 +359,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - Substitution: `$str =~ s/pattern/replacement/flags`
 - Transliterate: `$str =~ tr/from/to/`
 - Flags: `g`, `i`, `m`, `s`, `x`
-- Capture variables: `$1`, `$2`, …; named groups `(?<name>…)` (Rust `regex` syntax) populate `%+` and `$+{name}`
+- Capture variables: `$1`, `$2`, … (all numbered groups, not only 1–9); named groups `(?<name>…)` or `(?P<name>…)` populate **`%+`** and **`$+{name}`** (same rules as the Rust `regex` crate)
 - Literal spans: `\Q…\E` (metacharacters escaped); `quotemeta` for dynamic patterns
 - Quote-like: `m//`, `qr//`
 

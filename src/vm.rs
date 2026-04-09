@@ -74,11 +74,6 @@ impl<'a> VM<'a> {
     }
 
     #[inline]
-    fn name_owned(&self, idx: u16) -> String {
-        self.names[idx as usize].clone()
-    }
-
-    #[inline]
     fn constant(&self, idx: u16) -> &PerlValue {
         &self.constants[idx as usize]
     }
@@ -124,6 +119,9 @@ impl<'a> VM<'a> {
         let ops = &self.ops as *const Vec<Op>;
         // SAFETY: ops doesn't change during execution; pointer avoids borrow on self
         let ops = unsafe { &*ops };
+        let names = &self.names as *const Vec<String>;
+        // SAFETY: names doesn't change during execution; pointer avoids borrow on self
+        let names = unsafe { &*names };
         let len = ops.len();
         let mut last = PerlValue::Undef;
         // Safety limit: prevent infinite loops from consuming all memory.
@@ -165,13 +163,13 @@ impl<'a> VM<'a> {
 
                 // ── Scalars ──
                 Op::GetScalar(idx) => {
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     let val = self.interp.scope.get_scalar(&n);
                     self.push(val);
                 }
                 Op::SetScalar(idx) => {
                     let val = self.pop();
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.require_scalar_mutable(&n)?;
                     self.interp
                         .scope
@@ -180,7 +178,7 @@ impl<'a> VM<'a> {
                 }
                 Op::SetScalarKeep(idx) => {
                     let val = self.peek().clone();
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.require_scalar_mutable(&n)?;
                     self.interp
                         .scope
@@ -189,7 +187,7 @@ impl<'a> VM<'a> {
                 }
                 Op::DeclareScalar(idx) => {
                     let val = self.pop();
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.interp
                         .scope
                         .declare_scalar_frozen(&n, val, false, None)
@@ -197,7 +195,7 @@ impl<'a> VM<'a> {
                 }
                 Op::DeclareScalarFrozen(idx) => {
                     let val = self.pop();
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.interp
                         .scope
                         .declare_scalar_frozen(&n, val, true, None)
@@ -205,7 +203,7 @@ impl<'a> VM<'a> {
                 }
                 Op::DeclareScalarTyped(idx, tyb) => {
                     let val = self.pop();
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     let ty = PerlTypeName::from_byte(*tyb).ok_or_else(|| {
                         PerlError::runtime(
                             format!("invalid typed scalar type byte {}", tyb),
@@ -220,57 +218,57 @@ impl<'a> VM<'a> {
 
                 // ── Arrays ──
                 Op::GetArray(idx) => {
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     let arr = self.interp.scope.get_array(&n);
                     self.push(PerlValue::Array(arr));
                 }
                 Op::SetArray(idx) => {
                     let val = self.pop();
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.require_array_mutable(&n)?;
                     self.interp.scope.set_array(&n, val.to_list());
                 }
                 Op::DeclareArray(idx) => {
                     let val = self.pop();
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.interp.scope.declare_array(&n, val.to_list());
                 }
                 Op::DeclareArrayFrozen(idx) => {
                     let val = self.pop();
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.interp
                         .scope
                         .declare_array_frozen(&n, val.to_list(), true);
                 }
                 Op::GetArrayElem(idx) => {
                     let index = self.pop().to_int();
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     let val = self.interp.scope.get_array_element(&n, index);
                     self.push(val);
                 }
                 Op::SetArrayElem(idx) => {
                     let index = self.pop().to_int();
                     let val = self.pop();
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.require_array_mutable(&n)?;
                     self.interp.scope.set_array_element(&n, index, val);
                 }
                 Op::PushArray(idx) => {
                     let val = self.pop();
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.require_array_mutable(&n)?;
                     let arr = self.interp.scope.get_array_mut(&n);
                     arr.push(val);
                 }
                 Op::PopArray(idx) => {
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.require_array_mutable(&n)?;
                     let arr = self.interp.scope.get_array_mut(&n);
                     let val = arr.pop().unwrap_or(PerlValue::Undef);
                     self.push(val);
                 }
                 Op::ShiftArray(idx) => {
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.require_array_mutable(&n)?;
                     let arr = self.interp.scope.get_array_mut(&n);
                     let val = if arr.is_empty() {
@@ -281,14 +279,13 @@ impl<'a> VM<'a> {
                     self.push(val);
                 }
                 Op::ArrayLen(idx) => {
-                    let n = self.name_owned(*idx);
-                    let arr = self.interp.scope.get_array(&n);
-                    self.push(PerlValue::Integer(arr.len() as i64));
+                    let len = self.interp.scope.array_len(&self.names[*idx as usize]);
+                    self.push(PerlValue::Integer(len as i64));
                 }
 
                 // ── Hashes ──
                 Op::GetHash(idx) => {
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     let h = self.interp.scope.get_hash(&n);
                     self.push(PerlValue::Hash(h));
                 }
@@ -301,7 +298,7 @@ impl<'a> VM<'a> {
                         map.insert(items[i].to_string(), items[i + 1].clone());
                         i += 2;
                     }
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.require_hash_mutable(&n)?;
                     self.interp.scope.set_hash(&n, map);
                 }
@@ -314,7 +311,7 @@ impl<'a> VM<'a> {
                         map.insert(items[i].to_string(), items[i + 1].clone());
                         i += 2;
                     }
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.interp.scope.declare_hash(&n, map);
                 }
                 Op::DeclareHashFrozen(idx) => {
@@ -326,12 +323,12 @@ impl<'a> VM<'a> {
                         map.insert(items[i].to_string(), items[i + 1].clone());
                         i += 2;
                     }
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.interp.scope.declare_hash_frozen(&n, map, true);
                 }
                 Op::LocalDeclareScalar(idx) => {
                     let val = self.pop();
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.interp
                         .scope
                         .local_set_scalar(&n, val)
@@ -339,7 +336,7 @@ impl<'a> VM<'a> {
                 }
                 Op::LocalDeclareArray(idx) => {
                     let val = self.pop();
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.interp
                         .scope
                         .local_set_array(&n, val.to_list())
@@ -354,7 +351,7 @@ impl<'a> VM<'a> {
                         map.insert(items[i].to_string(), items[i + 1].clone());
                         i += 2;
                     }
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.interp
                         .scope
                         .local_set_hash(&n, map)
@@ -362,39 +359,39 @@ impl<'a> VM<'a> {
                 }
                 Op::GetHashElem(idx) => {
                     let key = self.pop().to_string();
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     let val = self.interp.scope.get_hash_element(&n, &key);
                     self.push(val);
                 }
                 Op::SetHashElem(idx) => {
                     let key = self.pop().to_string();
                     let val = self.pop();
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.require_hash_mutable(&n)?;
                     self.interp.scope.set_hash_element(&n, &key, val);
                 }
                 Op::DeleteHashElem(idx) => {
                     let key = self.pop().to_string();
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.require_hash_mutable(&n)?;
                     let val = self.interp.scope.delete_hash_element(&n, &key);
                     self.push(val);
                 }
                 Op::ExistsHashElem(idx) => {
                     let key = self.pop().to_string();
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     let exists = self.interp.scope.exists_hash_element(&n, &key);
                     self.push(PerlValue::Integer(if exists { 1 } else { 0 }));
                 }
                 Op::HashKeys(idx) => {
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     let h = self.interp.scope.get_hash(&n);
                     let keys: Vec<PerlValue> =
                         h.keys().map(|k| PerlValue::String(k.clone())).collect();
                     self.push(PerlValue::Array(keys));
                 }
                 Op::HashValues(idx) => {
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     let h = self.interp.scope.get_hash(&n);
                     let vals: Vec<PerlValue> = h.values().cloned().collect();
                     self.push(PerlValue::Array(vals));
@@ -707,7 +704,7 @@ impl<'a> VM<'a> {
 
                 // ── Increment / Decrement ──
                 Op::PreInc(idx) => {
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.require_scalar_mutable(&n)?;
                     let val = self.interp.scope.get_scalar(&n).to_int() + 1;
                     let new_val = PerlValue::Integer(val);
@@ -718,7 +715,7 @@ impl<'a> VM<'a> {
                     self.push(new_val);
                 }
                 Op::PreDec(idx) => {
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.require_scalar_mutable(&n)?;
                     let val = self.interp.scope.get_scalar(&n).to_int() - 1;
                     let new_val = PerlValue::Integer(val);
@@ -729,7 +726,7 @@ impl<'a> VM<'a> {
                     self.push(new_val);
                 }
                 Op::PostInc(idx) => {
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.require_scalar_mutable(&n)?;
                     let old = self.interp.scope.get_scalar(&n);
                     let new_val = PerlValue::Integer(old.to_int() + 1);
@@ -740,7 +737,7 @@ impl<'a> VM<'a> {
                     self.push(old);
                 }
                 Op::PostDec(idx) => {
-                    let n = self.name_owned(*idx);
+                    let n = names[*idx as usize].as_str();
                     self.require_scalar_mutable(&n)?;
                     let old = self.interp.scope.get_scalar(&n);
                     let new_val = PerlValue::Integer(old.to_int() - 1);
@@ -753,7 +750,7 @@ impl<'a> VM<'a> {
 
                 // ── Functions ──
                 Op::Call(name_idx, argc, wa) => {
-                    let name = self.name_owned(*name_idx);
+                    let name = names[*name_idx as usize].as_str();
                     let argc = *argc as usize;
                     let want = WantarrayCtx::from_byte(*wa);
 
@@ -959,13 +956,13 @@ impl<'a> VM<'a> {
 
                 // ── Regex ──
                 Op::RegexMatch(pat_idx, flags_idx, scalar_g, pos_key_idx) => {
-                    let string = self.pop().to_string();
-                    let pattern = self.constant(*pat_idx).to_string();
-                    let flags = self.constant(*flags_idx).to_string();
+                    let string = self.pop().into_string();
+                    let pattern = self.constant(*pat_idx).as_str_or_empty().to_string();
+                    let flags = self.constant(*flags_idx).as_str_or_empty().to_string();
                     let pos_key = if *pos_key_idx == u16::MAX {
                         "_".to_string()
                     } else {
-                        self.constant(*pos_key_idx).to_string()
+                        self.constant(*pos_key_idx).as_str_or_empty().to_string()
                     };
                     let line = self.line();
                     match self
@@ -980,10 +977,10 @@ impl<'a> VM<'a> {
                     }
                 }
                 Op::RegexSubst(pat_idx, repl_idx, flags_idx, lvalue_idx) => {
-                    let string = self.pop().to_string();
-                    let pattern = self.constant(*pat_idx).to_string();
-                    let replacement = self.constant(*repl_idx).to_string();
-                    let flags = self.constant(*flags_idx).to_string();
+                    let string = self.pop().into_string();
+                    let pattern = self.constant(*pat_idx).as_str_or_empty().to_string();
+                    let replacement = self.constant(*repl_idx).as_str_or_empty().to_string();
+                    let flags = self.constant(*flags_idx).as_str_or_empty().to_string();
                     let target = &self.lvalues[*lvalue_idx as usize];
                     let line = self.line();
                     match self.interp.regex_subst_execute(
@@ -1002,10 +999,10 @@ impl<'a> VM<'a> {
                     }
                 }
                 Op::RegexTransliterate(from_idx, to_idx, flags_idx, lvalue_idx) => {
-                    let string = self.pop().to_string();
-                    let from = self.constant(*from_idx).to_string();
-                    let to = self.constant(*to_idx).to_string();
-                    let flags = self.constant(*flags_idx).to_string();
+                    let string = self.pop().into_string();
+                    let from = self.constant(*from_idx).as_str_or_empty().to_string();
+                    let to = self.constant(*to_idx).as_str_or_empty().to_string();
+                    let flags = self.constant(*flags_idx).as_str_or_empty().to_string();
                     let target = &self.lvalues[*lvalue_idx as usize];
                     let line = self.line();
                     match self
@@ -1020,8 +1017,8 @@ impl<'a> VM<'a> {
                     }
                 }
                 Op::RegexMatchDyn(negate) => {
-                    let pattern = self.pop().to_string();
-                    let s = self.pop().to_string();
+                    let pattern = self.pop().into_string();
+                    let s = self.pop().into_string();
                     let line = self.line();
                     match self
                         .interp
@@ -1172,7 +1169,7 @@ impl<'a> VM<'a> {
 
                 // ── Method call ──
                 Op::MethodCall(name_idx, argc, wa) => {
-                    let method = self.name_owned(*name_idx);
+                    let method = names[*name_idx as usize].as_str();
                     let argc = *argc as usize;
                     let want = WantarrayCtx::from_byte(*wa);
                     let mut args = Vec::with_capacity(argc);

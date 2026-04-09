@@ -269,6 +269,32 @@ impl PerlValue {
         }
     }
 
+    // ── String coercion (zero-copy) ──
+
+    /// Move the inner `String` out of a `PerlValue::String`, avoiding the
+    /// allocation that `.to_string()` (Display) would trigger.
+    #[inline]
+    pub fn into_string(self) -> String {
+        match self {
+            PerlValue::String(s) => s,
+            PerlValue::Integer(n) => {
+                let mut buf = itoa::Buffer::new();
+                buf.format(n).to_owned()
+            }
+            other => other.to_string(),
+        }
+    }
+
+    /// Borrow the inner `&str` of a `PerlValue::String`. Returns `""` for
+    /// non-string variants (cheap default for bytecode pattern/flag constants).
+    #[inline]
+    pub fn as_str_or_empty(&self) -> &str {
+        match self {
+            PerlValue::String(s) => s.as_str(),
+            _ => "",
+        }
+    }
+
     // ── Numeric coercion ──
 
     #[inline]
@@ -825,6 +851,12 @@ mod tests {
     fn as_str_only_on_string_variant() {
         assert_eq!(PerlValue::String("x".into()).as_str(), Some("x"));
         assert_eq!(PerlValue::Integer(1).as_str(), None);
+    }
+
+    #[test]
+    fn as_str_or_empty_defaults_non_string() {
+        assert_eq!(PerlValue::String("z".into()).as_str_or_empty(), "z");
+        assert_eq!(PerlValue::Integer(1).as_str_or_empty(), "");
     }
 
     #[test]

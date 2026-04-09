@@ -11,6 +11,11 @@ fn regex_named_captures_plus_hash_and_scalar_brace() {
         eval_string(r#"my $s = "ab"; $s =~ /(?<foo>a)(?<bar>b)/; $+{"foo"} . $+{"bar"}"#),
         "ab"
     );
+    // Rust `regex` also accepts Python-style `(?P<name>…)` names.
+    assert_eq!(
+        eval_string(r#"my $s = "cd"; $s =~ /(?P<foo>c)(?P<bar>d)/; $+{"foo"} . $+{"bar"}"#),
+        "cd"
+    );
     assert_eq!(
         eval_int(r#"my $s = "xy"; $s =~ /(?<n>x)/; scalar keys %+"#),
         1
