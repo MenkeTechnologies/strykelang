@@ -214,4 +214,18 @@ mod tests {
         };
         assert_eq!(set_a, set_b);
     }
+
+    #[test]
+    fn glob_par_src_rs_matches_when_src_tree_present() {
+        if !Path::new("src").is_dir() {
+            return;
+        }
+        let PerlValue::Array(v) = glob_par_patterns(&["src/*.rs".to_string()]) else {
+            panic!("expected array");
+        };
+        assert!(
+            !v.is_empty(),
+            "glob_par src/*.rs should find at least one .rs under src/"
+        );
+    }
 }

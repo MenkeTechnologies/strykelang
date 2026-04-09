@@ -304,11 +304,13 @@ pub enum BuiltinId {
     DequeNew,
     /// `heap(sub { })` — empty heap with comparator.
     HeapNew,
+    /// `pipeline(...)` — lazy iterator (filter/map/take/collect).
+    Pipeline,
 }
 
 impl BuiltinId {
     pub fn from_u16(v: u16) -> Option<Self> {
-        if v <= Self::HeapNew as u16 {
+        if v <= Self::Pipeline as u16 {
             Some(unsafe { std::mem::transmute::<u16, BuiltinId>(v) })
         } else {
             None
@@ -559,14 +561,14 @@ mod tests {
     fn builtin_id_from_u16_first_and_last() {
         assert_eq!(BuiltinId::from_u16(0), Some(BuiltinId::Length));
         assert_eq!(
-            BuiltinId::from_u16(BuiltinId::HeapNew as u16),
-            Some(BuiltinId::HeapNew)
+            BuiltinId::from_u16(BuiltinId::Pipeline as u16),
+            Some(BuiltinId::Pipeline)
         );
     }
 
     #[test]
     fn builtin_id_from_u16_out_of_range() {
-        assert_eq!(BuiltinId::from_u16(BuiltinId::HeapNew as u16 + 1), None);
+        assert_eq!(BuiltinId::from_u16(BuiltinId::Pipeline as u16 + 1), None);
         assert_eq!(BuiltinId::from_u16(u16::MAX), None);
     }
 

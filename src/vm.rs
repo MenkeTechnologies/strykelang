@@ -12,7 +12,7 @@ use crate::ast::Block;
 use crate::bytecode::{BuiltinId, Chunk, Op};
 use crate::error::{ErrorKind, PerlError, PerlResult};
 use crate::interpreter::{Flow, FlowOrError, Interpreter};
-use crate::value::{PerlAsyncTask, PerlHeap, PerlValue};
+use crate::value::{PerlAsyncTask, PerlHeap, PerlValue, PipelineInner};
 use parking_lot::Mutex;
 
 /// Saved state when entering a function call.
@@ -1840,6 +1840,19 @@ impl<'a> VM<'a> {
                         line,
                     )),
                 }
+            }
+            Some(BuiltinId::Pipeline) => {
+                let mut items = Vec::new();
+                for v in args {
+                    match v {
+                        PerlValue::Array(a) => items.extend(a),
+                        other => items.push(other),
+                    }
+                }
+                Ok(PerlValue::Pipeline(Arc::new(Mutex::new(PipelineInner {
+                    source: items,
+                    ops: Vec::new(),
+                }))))
             }
             Some(BuiltinId::Eval) => {
                 let code = args

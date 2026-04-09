@@ -16,7 +16,9 @@ use crate::ast::*;
 use crate::crypt_util::perl_crypt;
 use crate::error::{ErrorKind, PerlError, PerlResult};
 use crate::scope::Scope;
-use crate::value::{PerlAsyncTask, PerlHeap, PerlSub, PerlValue};
+use crate::value::{
+    PerlAsyncTask, PerlHeap, PerlSub, PerlValue, PipelineInner, PipelineOp,
+};
 
 /// Flow control signals propagated via Result.
 #[derive(Debug)]
@@ -659,10 +661,10 @@ impl Interpreter {
                             PerlValue::Undef
                         };
                         match decl.sigil {
-                            Sigil::Scalar => self.scope.declare_scalar(&decl.name, val),
+                            Sigil::Scalar => self.scope.declare_scalar_frozen(&decl.name, val, decl.frozen),
                             Sigil::Array => {
                                 let items = val.to_list();
-                                self.scope.declare_array(&decl.name, items);
+                                self.scope.declare_array_frozen(&decl.name, items, decl.frozen);
                             }
                             Sigil::Hash => {
                                 let items = val.to_list();
@@ -674,7 +676,7 @@ impl Interpreter {
                                     map.insert(k, v);
                                     i += 2;
                                 }
-                                self.scope.declare_hash(&decl.name, map);
+                                self.scope.declare_hash_frozen(&decl.name, map, decl.frozen);
                             }
                         }
                     }
@@ -1675,6 +1677,12 @@ impl Interpreter {
             // Array ops
             ExprKind::Push { array, values } => {
                 let arr_name = self.extract_array_name(array)?;
+                if self.scope.is_array_frozen(&arr_name) {
+                    return Err(PerlError::runtime(
+                        format!("Modification of a frozen value: @{}", arr_name),
+                        line,
+                    ).into());
+                }
                 for v in values {
                     let val = self.eval_expr(v)?;
                     match val {
@@ -2745,6 +2753,12 @@ impl Interpreter {
     fn assign_value(&mut self, target: &Expr, val: PerlValue) -> ExecResult {
         match &target.kind {
             ExprKind::ScalarVar(name) => {
+                if self.scope.is_scalar_frozen(name) {
+                    return Err(PerlError::runtime(
+                        format!("Modification of a frozen value: ${}", name),
+                        target.line,
+                    ).into());
+                }
                 if name == "_"
                     || name == "0"
                     || name == "!"
@@ -2757,6 +2771,12 @@ impl Interpreter {
                 Ok(PerlValue::Undef)
             }
             ExprKind::ArrayVar(name) => {
+                if self.scope.is_array_frozen(name) {
+                    return Err(PerlError::runtime(
+                        format!("Modification of a frozen value: @{}", name),
+                        target.line,
+                    ).into());
+                }
                 self.scope.set_array(name, val.to_list());
                 Ok(PerlValue::Undef)
             }
@@ -2772,11 +2792,23 @@ impl Interpreter {
                 Ok(PerlValue::Undef)
             }
             ExprKind::ArrayElement { array, index } => {
+                if self.scope.is_array_frozen(array) {
+                    return Err(PerlError::runtime(
+                        format!("Modification of a frozen value: @{}", array),
+                        target.line,
+                    ).into());
+                }
                 let idx = self.eval_expr(index)?.to_int();
                 self.scope.set_array_element(array, idx, val);
                 Ok(PerlValue::Undef)
             }
             ExprKind::HashElement { hash, key } => {
+                if self.scope.is_hash_frozen(hash) {
+                    return Err(PerlError::runtime(
+                        format!("Modification of a frozen value: %%{}", hash),
+                        target.line,
+                    ).into());
+                }
                 let k = self.eval_expr(key)?.to_string();
                 self.scope.set_hash_element(hash, &k, val);
                 Ok(PerlValue::Undef)
@@ -2846,6 +2878,10 @@ impl Interpreter {
                     _ => Err(PerlError::runtime("heap() requires a code reference", line).into()),
                 }
             }
+            "pipeline" => Ok(PerlValue::Pipeline(Arc::new(Mutex::new(PipelineInner {
+                source: args,
+                ops: Vec::new(),
+            })))),
             _ => Err(PerlError::runtime(format!("Undefined subroutine &{}", name), line).into()),
         }
     }
@@ -2861,6 +2897,7 @@ impl Interpreter {
         match receiver {
             PerlValue::Deque(d) => Some(self.deque_method(Arc::clone(d), method, args, line)),
             PerlValue::Heap(h) => Some(self.heap_method(Arc::clone(h), method, args, line)),
+            PerlValue::Pipeline(p) => Some(self.pipeline_method(Arc::clone(p), method, args, line)),
             PerlValue::Atomic(arc) => match &*arc.lock() {
                 PerlValue::Deque(d) => Some(self.deque_method(Arc::clone(d), method, args, line)),
                 PerlValue::Heap(h) => Some(self.heap_method(Arc::clone(h), method, args, line)),
@@ -2948,6 +2985,127 @@ impl Interpreter {
                 line,
             )),
         }
+    }
+
+    fn pipeline_method(
+        &mut self,
+        p: Arc<Mutex<PipelineInner>>,
+        method: &str,
+        args: &[PerlValue],
+        line: usize,
+    ) -> PerlResult<PerlValue> {
+        match method {
+            "filter" => {
+                if args.len() != 1 {
+                    return Err(PerlError::runtime(
+                        "pipeline filter expects 1 argument (sub)",
+                        line,
+                    ));
+                }
+                let PerlValue::CodeRef(sub) = &args[0] else {
+                    return Err(PerlError::runtime(
+                        "pipeline filter expects a code reference",
+                        line,
+                    ));
+                };
+                p.lock().ops.push(PipelineOp::Filter(sub.clone()));
+                Ok(PerlValue::Pipeline(Arc::clone(&p)))
+            }
+            "map" => {
+                if args.len() != 1 {
+                    return Err(PerlError::runtime(
+                        "pipeline map expects 1 argument (sub)",
+                        line,
+                    ));
+                }
+                let PerlValue::CodeRef(sub) = &args[0] else {
+                    return Err(PerlError::runtime(
+                        "pipeline map expects a code reference",
+                        line,
+                    ));
+                };
+                p.lock().ops.push(PipelineOp::Map(sub.clone()));
+                Ok(PerlValue::Pipeline(Arc::clone(&p)))
+            }
+            "take" => {
+                if args.len() != 1 {
+                    return Err(PerlError::runtime(
+                        "pipeline take expects 1 argument",
+                        line,
+                    ));
+                }
+                let n = args[0].to_int();
+                p.lock().ops.push(PipelineOp::Take(n));
+                Ok(PerlValue::Pipeline(Arc::clone(&p)))
+            }
+            "collect" => {
+                if !args.is_empty() {
+                    return Err(PerlError::runtime(
+                        "pipeline collect takes no arguments",
+                        line,
+                    ));
+                }
+                self.pipeline_collect(&p)
+            }
+            _ => Err(PerlError::runtime(
+                format!("Unknown method for pipeline: {}", method),
+                line,
+            )),
+        }
+    }
+
+    fn pipeline_collect(&mut self, p: &Arc<Mutex<PipelineInner>>) -> PerlResult<PerlValue> {
+        let (mut v, ops) = {
+            let g = p.lock();
+            (g.source.clone(), g.ops.clone())
+        };
+        for op in ops {
+            match op {
+                PipelineOp::Filter(sub) => {
+                    let mut out = Vec::new();
+                    for item in v {
+                        self.scope.push_frame();
+                        self.scope.set_scalar("_", item.clone());
+                        if let Some(ref env) = sub.closure_env {
+                            self.scope.restore_capture(env);
+                        }
+                        let keep = match self.exec_block_no_scope(&sub.body) {
+                            Ok(val) => val.is_true(),
+                            Err(_) => false,
+                        };
+                        self.scope.pop_frame();
+                        if keep {
+                            out.push(item);
+                        }
+                    }
+                    v = out;
+                }
+                PipelineOp::Map(sub) => {
+                    let mut out = Vec::new();
+                    for item in v {
+                        self.scope.push_frame();
+                        self.scope.set_scalar("_", item);
+                        if let Some(ref env) = sub.closure_env {
+                            self.scope.restore_capture(env);
+                        }
+                        let mapped = match self.exec_block_no_scope(&sub.body) {
+                            Ok(val) => val,
+                            Err(_) => PerlValue::Undef,
+                        };
+                        self.scope.pop_frame();
+                        out.push(mapped);
+                    }
+                    v = out;
+                }
+                PipelineOp::Take(n) => {
+                    let n = n.max(0) as usize;
+                    if v.len() > n {
+                        v.truncate(n);
+                    }
+                }
+            }
+        }
+        Ok(PerlValue::Array(v))
     }
 
     fn heap_compare(&mut self, cmp: &Arc<PerlSub>, a: &PerlValue, b: &PerlValue) -> Ordering {

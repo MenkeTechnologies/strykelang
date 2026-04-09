@@ -224,6 +224,16 @@ impl Scope {
         false
     }
 
+    /// Returns Some(sigil) if the named variable is frozen, None if mutable.
+    pub fn check_frozen(&self, sigil: &str, name: &str) -> Option<&'static str> {
+        match sigil {
+            "$" => if self.is_scalar_frozen(name) { Some("scalar") } else { None },
+            "@" => if self.is_array_frozen(name) { Some("array") } else { None },
+            "%" => if self.is_hash_frozen(name) { Some("hash") } else { None },
+            _ => None,
+        }
+    }
+
     #[inline]
     pub fn get_scalar(&self, name: &str) -> PerlValue {
         for frame in self.frames.iter().rev() {

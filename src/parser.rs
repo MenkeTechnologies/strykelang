@@ -143,6 +143,26 @@ impl Parser {
                 "sub" => self.parse_sub_decl()?,
                 "my" => self.parse_my_our_local("my")?,
                 "mysync" => self.parse_my_our_local("mysync")?,
+                "frozen" => {
+                    // frozen my $x = val; — expect "my" keyword after "frozen"
+                    self.advance(); // consume "frozen"
+                    if let Token::Ident(ref kw) = self.peek().clone() {
+                        if kw == "my" {
+                            let mut stmt = self.parse_my_our_local("my")?;
+                            // Mark all decls as frozen
+                            if let StmtKind::My(ref mut decls) = stmt.kind {
+                                for decl in decls.iter_mut() {
+                                    decl.frozen = true;
+                                }
+                            }
+                            stmt
+                        } else {
+                            return Err(PerlError::syntax("Expected 'my' after 'frozen'", self.peek_line()));
+                        }
+                    } else {
+                        return Err(PerlError::syntax("Expected 'my' after 'frozen'", self.peek_line()));
+                    }
+                }
                 "our" => self.parse_my_our_local("our")?,
                 "local" => self.parse_my_our_local("local")?,
                 "package" => self.parse_package()?,

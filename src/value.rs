@@ -82,6 +82,8 @@ pub enum PerlValue {
     Deque(Arc<Mutex<VecDeque<PerlValue>>>),
     /// `heap(sub { $a <=> $b })` — priority queue.
     Heap(Arc<Mutex<PerlHeap>>),
+    /// Lazy iterator pipeline: `pipeline(...)->filter(...)->map(...)->collect()`.
+    Pipeline(Arc<Mutex<PipelineInner>>),
 }
 
 #[derive(Debug, Clone)]
@@ -91,6 +93,20 @@ pub struct PerlSub {
     pub body: Block,
     /// Captured lexical scope (for closures)
     pub closure_env: Option<Vec<(String, PerlValue)>>,
+}
+
+/// Operations queued on a [`PerlValue::Pipeline`] until `collect()`.
+#[derive(Debug, Clone)]
+pub enum PipelineOp {
+    Filter(Arc<PerlSub>),
+    Map(Arc<PerlSub>),
+    Take(i64),
+}
+
+#[derive(Debug)]
+pub struct PipelineInner {
+    pub source: Vec<PerlValue>,
+    pub ops: Vec<PipelineOp>,
 }
 
 #[derive(Debug)]
@@ -144,6 +160,7 @@ impl PerlValue {
             PerlValue::ChannelTx(_) => buf.push_str("PCHANNEL::Tx"),
             PerlValue::ChannelRx(_) => buf.push_str("PCHANNEL::Rx"),
             PerlValue::AsyncTask(_) => buf.push_str("AsyncTask"),
+            PerlValue::Pipeline(_) => buf.push_str("Pipeline"),
             other => buf.push_str(&other.to_string()),
         }
     }
@@ -178,6 +195,7 @@ impl PerlValue {
             PerlValue::Set(s) => !s.is_empty(),
             PerlValue::Deque(d) => !d.lock().is_empty(),
             PerlValue::Heap(h) => !h.lock().items.is_empty(),
+            PerlValue::Pipeline(_) => true,
             _ => true,
         }
     }
@@ -197,6 +215,7 @@ impl PerlValue {
             PerlValue::ChannelTx(_) | PerlValue::ChannelRx(_) | PerlValue::AsyncTask(_) => 1.0,
             PerlValue::Deque(d) => d.lock().len() as f64,
             PerlValue::Heap(h) => h.lock().items.len() as f64,
+            PerlValue::Pipeline(p) => p.lock().source.len() as f64,
             _ => 0.0,
         }
     }
@@ -214,6 +233,7 @@ impl PerlValue {
             PerlValue::ChannelTx(_) | PerlValue::ChannelRx(_) | PerlValue::AsyncTask(_) => 1,
             PerlValue::Deque(d) => d.lock().len() as i64,
             PerlValue::Heap(h) => h.lock().items.len() as i64,
+            PerlValue::Pipeline(p) => p.lock().source.len() as i64,
             _ => 0,
         }
     }
@@ -242,6 +262,7 @@ impl PerlValue {
             PerlValue::AsyncTask(_) => "ASYNCTASK",
             PerlValue::Deque(_) => "Deque",
             PerlValue::Heap(_) => "Heap",
+            PerlValue::Pipeline(_) => "Pipeline",
         }
     }
 
@@ -259,6 +280,7 @@ impl PerlValue {
             PerlValue::AsyncTask(_) => PerlValue::String("ASYNCTASK".into()),
             PerlValue::Deque(_) => PerlValue::String("Deque".into()),
             PerlValue::Heap(_) => PerlValue::String("Heap".into()),
+            PerlValue::Pipeline(_) => PerlValue::String("Pipeline".into()),
             PerlValue::Blessed(b) => PerlValue::String(b.class.clone()),
             _ => PerlValue::String(String::new()),
         }
@@ -306,6 +328,7 @@ impl PerlValue {
             PerlValue::Set(s) => PerlValue::Integer(s.len() as i64),
             PerlValue::Deque(d) => PerlValue::Integer(d.lock().len() as i64),
             PerlValue::Heap(h) => PerlValue::Integer(h.lock().items.len() as i64),
+            PerlValue::Pipeline(p) => PerlValue::Integer(p.lock().source.len() as i64),
             other => other.clone(),
         }
     }
@@ -351,6 +374,10 @@ impl fmt::Display for PerlValue {
             PerlValue::AsyncTask(_) => f.write_str("AsyncTask"),
             PerlValue::Deque(d) => write!(f, "Deque({})", d.lock().len()),
             PerlValue::Heap(h) => write!(f, "Heap({})", h.lock().items.len()),
+            PerlValue::Pipeline(p) => {
+                let g = p.lock();
+                write!(f, "Pipeline({} ops)", g.ops.len())
+            }
         }
     }
 }
@@ -409,6 +436,7 @@ pub fn set_member_key(v: &PerlValue) -> String {
         PerlValue::AsyncTask(t) => format!("async:{:p}", Arc::as_ptr(t)),
         PerlValue::Deque(d) => format!("dq:{:p}", Arc::as_ptr(d)),
         PerlValue::Heap(h) => format!("hp:{:p}", Arc::as_ptr(h)),
+        PerlValue::Pipeline(p) => format!("pl:{:p}", Arc::as_ptr(p)),
     }
 }
 

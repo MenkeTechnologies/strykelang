@@ -1018,6 +1018,15 @@ impl Compiler {
                         self.chunk
                             .emit(Op::CallBuiltin(BuiltinId::HeapNew as u16, 1), line);
                     }
+                    "pipeline" => {
+                        for arg in args {
+                            self.compile_expr(arg)?;
+                        }
+                        self.chunk.emit(
+                            Op::CallBuiltin(BuiltinId::Pipeline as u16, args.len() as u8),
+                            line,
+                        );
+                    }
                     _ => {
                         for arg in args {
                             self.compile_expr(arg)?;

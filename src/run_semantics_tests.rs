@@ -281,12 +281,75 @@ fn glob_finds_rs_sources_under_src() {
 }
 
 #[test]
+fn glob_par_plain_list_context_count() {
+    let n = ri(r#"glob_par "src/*.rs";"#);
+    assert!(n > 0, "glob_par without scalar should yield array len as to_int, got {n}");
+}
+
+#[test]
 fn glob_par_finds_rs_sources_under_src() {
     let n = ri(r#"scalar glob_par "src/*.rs";"#);
     assert!(
         n > 0,
         "glob_par src/*.rs should match at least one file, got {n}"
     );
+}
+
+#[test]
+fn glob_par_tree_walker_plain_matches_count() {
+    let program = crate::parse(r#"glob_par "src/*.rs";"#).expect("parse");
+    let mut interp = crate::interpreter::Interpreter::new();
+    let n = interp
+        .execute_tree(&program)
+        .expect("execute_tree")
+        .to_int();
+    assert!(
+        n > 0,
+        "tree-walker glob_par (plain) should match at least one file, got {n}"
+    );
+}
+
+#[test]
+fn glob_par_tree_walker_matches_count() {
+    let program = crate::parse(r#"scalar glob_par "src/*.rs";"#).expect("parse");
+    let mut interp = crate::interpreter::Interpreter::new();
+    let n = interp
+        .execute_tree(&program)
+        .expect("execute_tree")
+        .to_int();
+    assert!(
+        n > 0,
+        "tree-walker glob_par should match at least one file, got {n}"
+    );
+}
+
+#[test]
+fn debug_glob_par_ast_shape() {
+    let p = crate::parse(r#"glob_par "src/*.rs";"#).expect("parse");
+    let stmt = &p.statements[0];
+    let crate::ast::StmtKind::Expression(e) = &stmt.kind else {
+        panic!("expected expression stmt, got {:?}", stmt.kind);
+    };
+    match &e.kind {
+        crate::ast::ExprKind::GlobPar(args) => assert_eq!(args.len(), 1),
+        other => panic!("expected GlobPar, got {:?}", other),
+    }
+}
+
+#[test]
+fn debug_scalar_glob_par_ast_shape() {
+    let p = crate::parse(r#"scalar glob_par "src/*.rs";"#).expect("parse");
+    let stmt = &p.statements[0];
+    let crate::ast::StmtKind::Expression(e) = &stmt.kind else {
+        panic!("expected expression stmt, got {:?}", stmt.kind);
+    };
+    match &e.kind {
+        crate::ast::ExprKind::ScalarContext(inner) => match &inner.kind {
+            crate::ast::ExprKind::GlobPar(args) => assert_eq!(args.len(), 1),
+            other => panic!("inner expected GlobPar, got {:?}", other),
+        },
+        other => panic!("expected ScalarContext, got {:?}", other),
+    }
 }
 
 #[test]
