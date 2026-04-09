@@ -80,6 +80,14 @@ mod tests {
     }
 
     #[test]
+    fn line_count_bytes_matches_scan() {
+        assert_eq!(line_count_bytes(b""), 0);
+        assert_eq!(line_count_bytes(b"a\nb"), 2);
+        assert_eq!(line_count_bytes(b"a\nb\n"), 2);
+        assert_eq!(line_count_bytes(b"a"), 1);
+    }
+
+    #[test]
     fn scan_lines_in_slice_three_lines() {
         let data = b"one\ntwo\nthree";
         let mut lines = Vec::new();

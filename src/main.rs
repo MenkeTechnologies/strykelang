@@ -257,6 +257,12 @@ fn print_cyberpunk_help() {
         "  pmap_chunked N {{BLOCK}} @list [, progress => EXPR] {G}//{N} Parallel map in batches of N items per thread"
     );
     println!(
+        "  pcache {{BLOCK}} @list [, progress => EXPR] {G}//{N} Parallel memoize (key = stringified topic)"
+    );
+    println!(
+        "  par_lines PATH, CODE [, progress => EXPR] {G}//{N} mmap + parallel line scan (tree-walker)"
+    );
+    println!(
         "  pipeline @list ->filter/map/take/collect {G}//{N} Lazy iterator (chainable; runs on collect)"
     );
     println!(

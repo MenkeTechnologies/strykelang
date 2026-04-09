@@ -31,6 +31,11 @@ fn accepts_pmap_chunked_block() {
 }
 
 #[test]
+fn accepts_pmap_chunked_progress() {
+    p("my @r = pmap_chunked 2 { $_ * 2 } (1, 2, 3, 4), progress => 1;");
+}
+
+#[test]
 fn accepts_pmap_chunked_empty_list() {
     p("my @r = pmap_chunked 3 { $_ } ();");
 }
@@ -43,6 +48,15 @@ fn accepts_async_await() {
 #[test]
 fn accepts_pgrep_block() {
     p("my @r = pgrep { $_ > 0 } (1, -1, 2);");
+}
+
+#[test]
+fn accepts_pfor_psort_pcache_par_lines_progress() {
+    p("pfor { 1 } (1), progress => 1;");
+    p("my @s = psort { $a <=> $b } (3, 1, 2), progress => 1;");
+    p("my @t = psort (3, 1, 2), progress => 1;");
+    p("my @u = pcache { $_ } (1, 2), progress => 1;");
+    p(r#"par_lines "x.txt", sub { 1 }, progress => 1;"#);
 }
 
 #[test]
