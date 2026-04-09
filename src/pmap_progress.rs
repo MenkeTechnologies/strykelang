@@ -462,7 +462,7 @@ impl FanShared {
                 WORKER_RUNNING => {
                     let started = slot.started_ms.load(Ordering::Relaxed);
                     let elapsed = now_ms.saturating_sub(started);
-                    let bar = render_sweep(bar_w, elapsed);
+                    let bar = render_asymptotic_fill(bar_w, elapsed);
                     writeln!(
                         w,
                         "{} worker {:>width$}  [{}]  {}",
@@ -663,23 +663,17 @@ impl Drop for FanProgress {
 
 // ── FanProgress rendering helpers ───────────────────────────────────────────
 
-/// pv-style left→right sweep: a bright block travels across a dim background.
-fn render_sweep(bar_w: usize, elapsed_ms: u64) -> String {
-    const SWEEP_W: usize = 5;
-    const CYCLE_MS: u64 = 1500;
-    let total_travel = bar_w + SWEEP_W;
-    let phase = (elapsed_ms % CYCLE_MS) as f64 / CYCLE_MS as f64;
-    let sweep_start = (phase * total_travel as f64) as isize - SWEEP_W as isize;
+/// Asymptotic fill: bar fills quickly at first then slows, never reaching 100%
+/// until the worker actually finishes.  Uses `1 - e^(-t/τ)` with τ = 8 seconds
+/// so the bar is ~63% at 8 s, ~86% at 16 s, ~95% at 24 s, always creeping forward.
+fn render_asymptotic_fill(bar_w: usize, elapsed_ms: u64) -> String {
+    const TAU_MS: f64 = 8000.0;
+    // Cap at 95% so the bar never looks "done" until finish_worker is called.
+    let frac = (1.0 - (-(elapsed_ms as f64) / TAU_MS).exp()).min(0.95);
+    let filled = (frac * bar_w as f64) as usize;
 
     (0..bar_w)
-        .map(|i| {
-            let ii = i as isize;
-            if ii >= sweep_start && ii < sweep_start + SWEEP_W as isize {
-                '█'
-            } else {
-                '░'
-            }
-        })
+        .map(|i| if i < filled { '█' } else { '░' })
         .collect()
 }
 
@@ -737,11 +731,15 @@ mod tests {
     }
 
     #[test]
-    fn sweep_animation_wraps_cleanly() {
-        // Verify sweep doesn't panic or produce wrong-length strings.
-        for ms in (0..3000).step_by(100) {
-            let bar = render_sweep(30, ms);
+    fn asymptotic_fill_length_and_monotonic() {
+        let mut prev_filled = 0;
+        for ms in (0..30_000).step_by(100) {
+            let bar = render_asymptotic_fill(30, ms);
             assert_eq!(bar.chars().count(), 30);
+            let filled = bar.chars().filter(|&c| c == '█').count();
+            assert!(filled >= prev_filled, "bar must never shrink");
+            assert!(filled < 30, "bar must not reach 100% before finish");
+            prev_filled = filled;
         }
     }
 
