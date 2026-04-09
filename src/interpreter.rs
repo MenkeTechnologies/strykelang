@@ -300,6 +300,103 @@ impl Interpreter {
         }
     }
 
+    /// `sub name` in `package P` → stash key `P::name` (otherwise `name` in `main`).
+    pub(crate) fn qualify_sub_key(&self, name: &str) -> String {
+        let pkg = self.current_package();
+        if pkg.is_empty() || pkg == "main" {
+            name.to_string()
+        } else {
+            format!("{}::{}", pkg, name)
+        }
+    }
+
+    /// Where `use` imports a symbol: `main` → short name; otherwise `Pkg::sym`.
+    fn import_alias_key(&self, short: &str) -> String {
+        self.qualify_sub_key(short)
+    }
+
+    /// `use Module qw()` — explicit empty list (not the same as `use Module`).
+    fn is_explicit_empty_import_list(imports: &[Expr]) -> bool {
+        if imports.len() == 1 {
+            if let ExprKind::QW(ws) = &imports[0].kind {
+                return ws.is_empty();
+            }
+        }
+        false
+    }
+
+    /// After `require`, copy `Module::export` → caller stash per `use` list.
+    fn apply_module_import(
+        &mut self,
+        module: &str,
+        imports: &[Expr],
+        line: usize,
+    ) -> PerlResult<()> {
+        if imports.is_empty() {
+            return self.import_all_from_module(module, line);
+        }
+        if Self::is_explicit_empty_import_list(imports) {
+            return Ok(());
+        }
+        let names = Self::pragma_import_strings(imports, line)?;
+        if names.is_empty() {
+            return Ok(());
+        }
+        for name in names {
+            self.import_one_symbol(module, &name, line)?;
+        }
+        Ok(())
+    }
+
+    fn import_all_from_module(&mut self, module: &str, _line: usize) -> PerlResult<()> {
+        let prefix = format!("{}::", module);
+        let keys: Vec<String> = self
+            .subs
+            .keys()
+            .filter(|k| k.starts_with(&prefix) && !k[prefix.len()..].contains("::"))
+            .cloned()
+            .collect();
+        for k in keys {
+            let short = k[prefix.len()..].to_string();
+            if let Some(sub) = self.subs.get(&k).cloned() {
+                let alias = self.import_alias_key(&short);
+                self.subs.insert(alias, sub);
+            }
+        }
+        Ok(())
+    }
+
+    fn import_one_symbol(&mut self, module: &str, export: &str, line: usize) -> PerlResult<()> {
+        let qual = format!("{}::{}", module, export);
+        let sub = self.subs.get(&qual).cloned().ok_or_else(|| {
+            PerlError::runtime(
+                format!(
+                    "`{}` is not defined in module `{}` (expected `{}`)",
+                    export, module, qual
+                ),
+                line,
+            )
+        })?;
+        let alias = self.import_alias_key(export);
+        self.subs.insert(alias, sub);
+        Ok(())
+    }
+
+    /// Resolve `foo` or `Foo::bar` against the subroutine stash (package-aware).
+    pub(crate) fn resolve_sub_by_name(&self, name: &str) -> Option<Arc<PerlSub>> {
+        if let Some(s) = self.subs.get(name) {
+            return Some(s.clone());
+        }
+        if !name.contains("::") {
+            let pkg = self.current_package();
+            if !pkg.is_empty() && pkg != "main" {
+                let q = format!("{}::{}", pkg, name);
+                return self.subs.get(&q).cloned();
+            }
+        }
+        None
+    }
+
     /// Compile-time pragma import list (`'refs'`, `qw(refs subs)`, version integers).
     fn pragma_import_strings(imports: &[Expr], default_line: usize) -> PerlResult<Vec<String>> {
         let mut out = Vec::new();
@@ -505,7 +602,10 @@ impl Interpreter {
         })?;
         self.scope
             .set_hash_element("INC", &key, PerlValue::String(key.clone()));
-        crate::parse_and_run_string(&code, self)?;
+        let saved_pkg = self.scope.get_scalar("__PACKAGE__");
+        let r = crate::parse_and_run_string(&code, self);
+        let _ = self.scope.set_scalar("__PACKAGE__", saved_pkg);
+        r?;
         Ok(PerlValue::Integer(1))
     }
 
@@ -526,7 +626,10 @@ impl Interpreter {
                 let abs_s = abs.to_string_lossy().into_owned();
                 self.scope
                     .set_hash_element("INC", relpath, PerlValue::String(abs_s));
-                crate::parse_and_run_string(&code, self)?;
+                let saved_pkg = self.scope.get_scalar("__PACKAGE__");
+                let r = crate::parse_and_run_string(&code, self);
+                let _ = self.scope.set_scalar("__PACKAGE__", saved_pkg);
+                r?;
                 return Ok(PerlValue::Integer(1));
             }
         }
@@ -564,6 +667,7 @@ impl Interpreter {
             "threads" | "Thread::Pool" | "Parallel::ForkManager" => Ok(()),
             _ => {
                 self.require_execute(module, line)?;
+                self.apply_module_import(module, imports, line)?;
                 Ok(())
             }
         }
@@ -600,14 +704,20 @@ impl Interpreter {
     pub(crate) fn prepare_program_top_level(&mut self, program: &Program) -> PerlResult<()> {
         for stmt in &program.statements {
             match &stmt.kind {
+                StmtKind::Package { name } => {
+                    let _ = self
+                        .scope
+                        .set_scalar("__PACKAGE__", PerlValue::String(name.clone()));
+                }
                 StmtKind::SubDecl {
                     name,
                     params,
                     body,
                     prototype,
                 } => {
+                    let key = self.qualify_sub_key(name);
                     self.subs.insert(
-                        name.clone(),
+                        key,
                         Arc::new(PerlSub {
                             name: name.clone(),
                             params: params.clone(),
@@ -1581,8 +1691,9 @@ impl Interpreter {
                 body,
                 prototype,
             } => {
+                let key = self.qualify_sub_key(name);
                 self.subs.insert(
-                    name.clone(),
+                    key,
                     Arc::new(PerlSub {
                         name: name.clone(),
                         params: params.clone(),
@@ -4065,7 +4176,7 @@ impl Interpreter {
         line: usize,
         want: WantarrayCtx,
     ) -> ExecResult {
-        if let Some(sub) = self.subs.get(name).cloned() {
+        if let Some(sub) = self.resolve_sub_by_name(name) {
             return self.call_sub(&sub, args, want, line);
         }
         match name {

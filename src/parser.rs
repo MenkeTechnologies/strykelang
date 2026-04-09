@@ -2351,9 +2351,22 @@ impl Parser {
         }
     }
 
-    fn parse_named_expr(&mut self, name: String) -> PerlResult<Expr> {
+    fn parse_named_expr(&mut self, mut name: String) -> PerlResult<Expr> {
         let line = self.peek_line();
         self.advance(); // consume the ident
+        while self.eat(&Token::PackageSep) {
+            match self.advance() {
+                (Token::Ident(part), _) => {
+                    name = format!("{}::{}", name, part);
+                }
+                (tok, err_line) => {
+                    return Err(PerlError::syntax(
+                        format!("Expected identifier after `::`, got {:?}", tok),
+                        err_line,
+                    ));
+                }
+            }
+        }
 
         match name.as_str() {
             "print" => self.parse_print_like(|h, a| ExprKind::Print { handle: h, args: a }),

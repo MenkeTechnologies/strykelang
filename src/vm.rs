@@ -788,7 +788,7 @@ impl<'a> VM<'a> {
                         crate::builtins::try_builtin(self.interp, &name, &args, self.line())
                     {
                         self.push(r?);
-                    } else if let Some(sub) = self.interp.subs.get(&name).cloned() {
+                    } else if let Some(sub) = self.interp.resolve_sub_by_name(&name) {
                         // Fall back to tree-walker for non-compiled subs
                         let saved_wa = self.interp.wantarray_kind;
                         self.interp.wantarray_kind = want;
