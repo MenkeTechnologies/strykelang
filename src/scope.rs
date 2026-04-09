@@ -519,6 +519,53 @@ impl Scope {
         PerlValue::Undef
     }
 
+    /// Atomically read-modify-write a hash element. For atomic hashes, holds
+    /// the Mutex for the full cycle. Returns the new value.
+    pub fn atomic_hash_mutate(
+        &mut self,
+        name: &str,
+        key: &str,
+        f: impl FnOnce(&PerlValue) -> PerlValue,
+    ) -> PerlValue {
+        if let Some(ah) = self.find_atomic_hash(name) {
+            let mut guard = ah.0.lock();
+            let old = guard.get(key).cloned().unwrap_or(PerlValue::Undef);
+            let new_val = f(&old);
+            guard.insert(key.to_string(), new_val.clone());
+            return new_val;
+        }
+        // Non-atomic fallback
+        let old = self.get_hash_element(name, key);
+        let new_val = f(&old);
+        self.set_hash_element(name, key, new_val.clone());
+        new_val
+    }
+
+    /// Atomically read-modify-write an array element. Returns the new value.
+    pub fn atomic_array_mutate(
+        &mut self,
+        name: &str,
+        index: i64,
+        f: impl FnOnce(&PerlValue) -> PerlValue,
+    ) -> PerlValue {
+        if let Some(aa) = self.find_atomic_array(name) {
+            let mut guard = aa.0.lock();
+            let idx = if index < 0 { (guard.len() as i64 + index).max(0) as usize } else { index as usize };
+            if idx >= guard.len() {
+                guard.resize(idx + 1, PerlValue::Undef);
+            }
+            let old = guard[idx].clone();
+            let new_val = f(&old);
+            guard[idx] = new_val.clone();
+            return new_val;
+        }
+        // Non-atomic fallback
+        let old = self.get_array_element(name, index);
+        let new_val = f(&old);
+        self.set_array_element(name, index, new_val.clone());
+        new_val
+    }
+
     pub fn set_hash_element(&mut self, name: &str, key: &str, val: PerlValue) {
         if let Some(ah) = self.find_atomic_hash(name) {
             ah.0.lock().insert(key.to_string(), val);

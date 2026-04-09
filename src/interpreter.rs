@@ -879,6 +879,43 @@ impl Interpreter {
                         }
                     }));
                 }
+                // For hash element targets: $h{key} += 1
+                if let ExprKind::HashElement { hash, key } = &target.kind {
+                    let k = self.eval_expr(key)?.to_string();
+                    let op = *op;
+                    return Ok(self.scope.atomic_hash_mutate(hash, &k, |old| {
+                        match op {
+                            BinOp::Add => match (old, &rhs) {
+                                (PerlValue::Integer(a), PerlValue::Integer(b)) => PerlValue::Integer(a.wrapping_add(*b)),
+                                _ => PerlValue::Float(old.to_number() + rhs.to_number()),
+                            },
+                            BinOp::Sub => match (old, &rhs) {
+                                (PerlValue::Integer(a), PerlValue::Integer(b)) => PerlValue::Integer(a.wrapping_sub(*b)),
+                                _ => PerlValue::Float(old.to_number() - rhs.to_number()),
+                            },
+                            BinOp::Concat => {
+                                let mut s = old.to_string();
+                                rhs.append_to(&mut s);
+                                PerlValue::String(s)
+                            }
+                            _ => PerlValue::Float(old.to_number() + rhs.to_number()),
+                        }
+                    }));
+                }
+                // For array element targets: $a[i] += 1
+                if let ExprKind::ArrayElement { array, index } = &target.kind {
+                    let idx = self.eval_expr(index)?.to_int();
+                    let op = *op;
+                    return Ok(self.scope.atomic_array_mutate(array, idx, |old| {
+                        match op {
+                            BinOp::Add => match (old, &rhs) {
+                                (PerlValue::Integer(a), PerlValue::Integer(b)) => PerlValue::Integer(a.wrapping_add(*b)),
+                                _ => PerlValue::Float(old.to_number() + rhs.to_number()),
+                            },
+                            _ => PerlValue::Float(old.to_number() + rhs.to_number()),
+                        }
+                    }));
+                }
                 let old = self.eval_expr(target)?;
                 let new_val = self.eval_binop(*op, &old, &rhs, line)?;
                 self.assign_value(target, new_val.clone())?;
