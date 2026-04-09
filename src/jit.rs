@@ -1,6 +1,8 @@
 //! **Method JIT** (Cranelift): compiles linear **pure-integer** stack bytecode to native code.
 //!
 //! Eligible ops: [`Op::LoadInt`], [`Op::Add`]/[`Op::Sub`]/[`Op::Mul`], [`Op::Negate`], [`Op::LogNot`],
+//! [`Op::NumEq`] / [`Op::NumNe`] / [`Op::NumLt`] / [`Op::NumGt`] / [`Op::NumLe`] / [`Op::NumGe`],
+//! [`Op::Spaceship`],
 //! [`Op::BitXor`], [`Op::BitNot`], [`Op::Shl`]/[`Op::Shr`] (shift amount masked to 6 bits),
 //! [`Op::Div`] only when the VM would use the **exact integer quotient** (`a % b == 0`),
 //! [`Op::Mod`] when the divisor is never dynamically zero (constant non-zero or folded stack),
@@ -17,15 +19,18 @@
 //! simulation), non-integer slot/plain values, control flow, calls. [`Op::GetScalarSlot`] /
 //! [`Op::GetScalarPlain`] are JIT’d when every referenced index materializes as `i64` via
 //! [`PerlValue::as_integer`]. [`Op::LogNot`] matches [`PerlValue::integer`] truth via
-//! [`perlrs_jit_lognot_i64`]. Hot-loop tracing remains future work.
+//! [`perlrs_jit_lognot_i64`]. [`Op::NumEq`] / [`Op::NumNe`] / [`Op::NumLt`] / [`Op::NumGt`] /
+//! [`Op::NumLe`] / [`Op::NumGe`] / [`Op::Spaceship`] follow the VM integer compare path. Hot-loop
+//! tracing remains future work.
 
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::sync::{Mutex, OnceLock};
 
+use cranelift_codegen::ir::condcodes::IntCC;
 use cranelift_codegen::ir::types;
-use cranelift_codegen::ir::{AbiParam, InstBuilder, MemFlags, UserFuncName};
+use cranelift_codegen::ir::{AbiParam, InstBuilder, MemFlags, UserFuncName, Value};
 use cranelift_codegen::settings::{self, Configurable};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use cranelift_jit::{JITBuilder, JITModule};
@@ -104,6 +109,25 @@ fn new_jit_module() -> Option<JITModule> {
     Some(JITModule::new(builder))
 }
 
+/// Signed `icmp` → `0`/`1` on the stack (Perl numeric compare result).
+fn intcmp_to_01(bcx: &mut FunctionBuilder, cc: IntCC, a: Value, b: Value) -> Value {
+    let pred = bcx.ins().icmp(cc, a, b);
+    let one = bcx.ins().iconst(types::I64, 1);
+    let zero = bcx.ins().iconst(types::I64, 0);
+    bcx.ins().select(pred, one, zero)
+}
+
+/// `<=>` on two `i64` values: `-1`, `0`, or `1`.
+fn spaceship_i64(bcx: &mut FunctionBuilder, a: Value, b: Value) -> Value {
+    let lt = bcx.ins().icmp(IntCC::SignedLessThan, a, b);
+    let gt = bcx.ins().icmp(IntCC::SignedGreaterThan, a, b);
+    let m1 = bcx.ins().iconst(types::I64, -1);
+    let z = bcx.ins().iconst(types::I64, 0);
+    let p1 = bcx.ins().iconst(types::I64, 1);
+    let mid = bcx.ins().select(gt, p1, z);
+    bcx.ins().select(lt, m1, mid)
+}
+
 fn hash_ops(ops: &[Op], constants: &[PerlValue]) -> u64 {
     let mut h = DefaultHasher::new();
     ops.len().hash(&mut h);
@@ -150,6 +174,13 @@ fn hash_ops(ops: &[Op], constants: &[PerlValue]) -> u64 {
                 i.hash(&mut h);
             }
             Op::LogNot => 22u8.hash(&mut h),
+            Op::NumEq => 23u8.hash(&mut h),
+            Op::NumNe => 24u8.hash(&mut h),
+            Op::NumLt => 25u8.hash(&mut h),
+            Op::NumGt => 26u8.hash(&mut h),
+            Op::NumLe => 27u8.hash(&mut h),
+            Op::NumGe => 28u8.hash(&mut h),
+            Op::Spaceship => 29u8.hash(&mut h),
             _ => {
                 255u8.hash(&mut h);
                 format!("{op:?}").hash(&mut h);
@@ -398,6 +429,108 @@ fn validate_linear(ops: &[Op], constants: &[PerlValue]) -> bool {
             }
             Op::GetScalarSlot(_) => stack.push(Cell::Dyn),
             Op::GetScalarPlain(_) => stack.push(Cell::Dyn),
+            Op::NumEq => {
+                let b = match stack.pop() {
+                    Some(c) => c,
+                    None => return false,
+                };
+                let a = match stack.pop() {
+                    Some(c) => c,
+                    None => return false,
+                };
+                stack.push(match (a, b) {
+                    (Cell::Const(x), Cell::Const(y)) => Cell::Const(if x == y { 1 } else { 0 }),
+                    _ => Cell::Dyn,
+                });
+            }
+            Op::NumNe => {
+                let b = match stack.pop() {
+                    Some(c) => c,
+                    None => return false,
+                };
+                let a = match stack.pop() {
+                    Some(c) => c,
+                    None => return false,
+                };
+                stack.push(match (a, b) {
+                    (Cell::Const(x), Cell::Const(y)) => Cell::Const(if x != y { 1 } else { 0 }),
+                    _ => Cell::Dyn,
+                });
+            }
+            Op::NumLt => {
+                let b = match stack.pop() {
+                    Some(c) => c,
+                    None => return false,
+                };
+                let a = match stack.pop() {
+                    Some(c) => c,
+                    None => return false,
+                };
+                stack.push(match (a, b) {
+                    (Cell::Const(x), Cell::Const(y)) => Cell::Const(if x < y { 1 } else { 0 }),
+                    _ => Cell::Dyn,
+                });
+            }
+            Op::NumGt => {
+                let b = match stack.pop() {
+                    Some(c) => c,
+                    None => return false,
+                };
+                let a = match stack.pop() {
+                    Some(c) => c,
+                    None => return false,
+                };
+                stack.push(match (a, b) {
+                    (Cell::Const(x), Cell::Const(y)) => Cell::Const(if x > y { 1 } else { 0 }),
+                    _ => Cell::Dyn,
+                });
+            }
+            Op::NumLe => {
+                let b = match stack.pop() {
+                    Some(c) => c,
+                    None => return false,
+                };
+                let a = match stack.pop() {
+                    Some(c) => c,
+                    None => return false,
+                };
+                stack.push(match (a, b) {
+                    (Cell::Const(x), Cell::Const(y)) => Cell::Const(if x <= y { 1 } else { 0 }),
+                    _ => Cell::Dyn,
+                });
+            }
+            Op::NumGe => {
+                let b = match stack.pop() {
+                    Some(c) => c,
+                    None => return false,
+                };
+                let a = match stack.pop() {
+                    Some(c) => c,
+                    None => return false,
+                };
+                stack.push(match (a, b) {
+                    (Cell::Const(x), Cell::Const(y)) => Cell::Const(if x >= y { 1 } else { 0 }),
+                    _ => Cell::Dyn,
+                });
+            }
+            Op::Spaceship => {
+                let b = match stack.pop() {
+                    Some(c) => c,
+                    None => return false,
+                };
+                let a = match stack.pop() {
+                    Some(c) => c,
+                    None => return false,
+                };
+                stack.push(match (a, b) {
+                    (Cell::Const(x), Cell::Const(y)) => Cell::Const(match x.cmp(&y) {
+                        std::cmp::Ordering::Less => -1,
+                        std::cmp::Ordering::Equal => 0,
+                        std::cmp::Ordering::Greater => 1,
+                    }),
+                    _ => Cell::Dyn,
+                });
+            }
             Op::LogNot => {
                 let a = match stack.pop() {
                     Some(c) => c,
@@ -550,6 +683,51 @@ fn compile_linear(ops: &[Op], constants: &[PerlValue]) -> Option<LinearJit> {
                 Op::Negate => {
                     let a = stack.pop()?;
                     stack.push(bcx.ins().ineg(a));
+                }
+                Op::NumEq => {
+                    let b = stack.pop()?;
+                    let a = stack.pop()?;
+                    stack.push(intcmp_to_01(&mut bcx, IntCC::Equal, a, b));
+                }
+                Op::NumNe => {
+                    let b = stack.pop()?;
+                    let a = stack.pop()?;
+                    stack.push(intcmp_to_01(&mut bcx, IntCC::NotEqual, a, b));
+                }
+                Op::NumLt => {
+                    let b = stack.pop()?;
+                    let a = stack.pop()?;
+                    stack.push(intcmp_to_01(&mut bcx, IntCC::SignedLessThan, a, b));
+                }
+                Op::NumGt => {
+                    let b = stack.pop()?;
+                    let a = stack.pop()?;
+                    stack.push(intcmp_to_01(&mut bcx, IntCC::SignedGreaterThan, a, b));
+                }
+                Op::NumLe => {
+                    let b = stack.pop()?;
+                    let a = stack.pop()?;
+                    stack.push(intcmp_to_01(
+                        &mut bcx,
+                        IntCC::SignedLessThanOrEqual,
+                        a,
+                        b,
+                    ));
+                }
+                Op::NumGe => {
+                    let b = stack.pop()?;
+                    let a = stack.pop()?;
+                    stack.push(intcmp_to_01(
+                        &mut bcx,
+                        IntCC::SignedGreaterThanOrEqual,
+                        a,
+                        b,
+                    ));
+                }
+                Op::Spaceship => {
+                    let b = stack.pop()?;
+                    let a = stack.pop()?;
+                    stack.push(spaceship_i64(&mut bcx, a, b));
                 }
                 Op::LogNot => {
                     let a = stack.pop()?;
@@ -823,6 +1001,70 @@ mod tests {
     }
 
     #[test]
+    fn jit_num_cmp_and_spaceship() {
+        assert_eq!(
+            try_run_linear_ops(&[Op::LoadInt(2), Op::LoadInt(2), Op::NumEq, Op::Halt], None, None, &[])
+                .expect("jit")
+                .to_int(),
+            1
+        );
+        assert_eq!(
+            try_run_linear_ops(&[Op::LoadInt(1), Op::LoadInt(2), Op::NumEq, Op::Halt], None, None, &[])
+                .expect("jit")
+                .to_int(),
+            0
+        );
+        assert_eq!(
+            try_run_linear_ops(&[Op::LoadInt(1), Op::LoadInt(2), Op::NumNe, Op::Halt], None, None, &[])
+                .expect("jit")
+                .to_int(),
+            1
+        );
+        assert_eq!(
+            try_run_linear_ops(&[Op::LoadInt(1), Op::LoadInt(2), Op::NumLt, Op::Halt], None, None, &[])
+                .expect("jit")
+                .to_int(),
+            1
+        );
+        assert_eq!(
+            try_run_linear_ops(&[Op::LoadInt(3), Op::LoadInt(2), Op::NumGt, Op::Halt], None, None, &[])
+                .expect("jit")
+                .to_int(),
+            1
+        );
+        assert_eq!(
+            try_run_linear_ops(&[Op::LoadInt(2), Op::LoadInt(2), Op::NumLe, Op::Halt], None, None, &[])
+                .expect("jit")
+                .to_int(),
+            1
+        );
+        assert_eq!(
+            try_run_linear_ops(&[Op::LoadInt(3), Op::LoadInt(2), Op::NumGe, Op::Halt], None, None, &[])
+                .expect("jit")
+                .to_int(),
+            1
+        );
+        assert_eq!(
+            try_run_linear_ops(&[Op::LoadInt(1), Op::LoadInt(2), Op::Spaceship, Op::Halt], None, None, &[])
+                .expect("jit")
+                .to_int(),
+            -1
+        );
+        assert_eq!(
+            try_run_linear_ops(&[Op::LoadInt(2), Op::LoadInt(2), Op::Spaceship, Op::Halt], None, None, &[])
+                .expect("jit")
+                .to_int(),
+            0
+        );
+        assert_eq!(
+            try_run_linear_ops(&[Op::LoadInt(3), Op::LoadInt(2), Op::Spaceship, Op::Halt], None, None, &[])
+                .expect("jit")
+                .to_int(),
+            1
+        );
+    }
+
+    #[test]
     fn jit_rejects_inexact_div() {
         assert!(try_run_linear_ops(&[Op::LoadInt(1), Op::LoadInt(2), Op::Div, Op::Halt], None, None, &[]).is_none());
         assert!(try_run_linear_ops(&[Op::LoadInt(10), Op::LoadInt(3), Op::Div, Op::Halt], None, None, &[]).is_none());
@@ -988,6 +1230,22 @@ mod tests {
         let mut c = Chunk::new();
         c.emit(Op::LoadInt(0), 1);
         c.emit(Op::LogNot, 1);
+        c.emit(Op::Halt, 1);
+        let mut interp = Interpreter::new();
+        let mut vm = VM::new(&c, &mut interp);
+        let v = vm.execute().expect("vm");
+        assert_eq!(v.to_int(), 1);
+    }
+
+    #[test]
+    fn vm_chunk_jit_num_cmp() {
+        use crate::interpreter::Interpreter;
+        use crate::vm::VM;
+
+        let mut c = Chunk::new();
+        c.emit(Op::LoadInt(2), 1);
+        c.emit(Op::LoadInt(3), 1);
+        c.emit(Op::NumLt, 1);
         c.emit(Op::Halt, 1);
         let mut interp = Interpreter::new();
         let mut vm = VM::new(&c, &mut interp);

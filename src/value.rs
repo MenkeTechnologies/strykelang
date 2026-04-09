@@ -1672,4 +1672,27 @@ mod tests {
         let outer = PerlValue::atomic(Arc::new(Mutex::new(inner)));
         assert_eq!(outer.unwrap_atomic().to_int(), 2);
     }
+
+    #[test]
+    fn errno_dual_parts_extracts_code_and_message() {
+        let v = PerlValue::errno_dual(-2, "oops".into());
+        assert_eq!(v.errno_dual_parts(), Some((-2, "oops".into())));
+    }
+
+    #[test]
+    fn errno_dual_parts_none_for_plain_string() {
+        assert!(PerlValue::string("hi".into()).errno_dual_parts().is_none());
+    }
+
+    #[test]
+    fn errno_dual_parts_none_for_integer() {
+        assert!(PerlValue::integer(1).errno_dual_parts().is_none());
+    }
+
+    #[test]
+    fn errno_dual_numeric_context_uses_code_string_uses_msg() {
+        let v = PerlValue::errno_dual(5, "five".into());
+        assert_eq!(v.to_int(), 5);
+        assert_eq!(v.to_string(), "five");
+    }
 }

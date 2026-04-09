@@ -208,6 +208,53 @@ fn at_dualvar_roundtrip_assignment() {
 }
 
 #[test]
+fn at_clear_eval_error_zeroes_dualvar_read() {
+    let mut i = Interpreter::new();
+    i.set_eval_error("err".into());
+    i.clear_eval_error();
+    let g = i.get_special_var("@");
+    assert_eq!(g.to_int(), 0);
+    assert_eq!(g.to_string(), "");
+}
+
+#[test]
+fn set_eval_error_empty_string_clears_code() {
+    let mut i = Interpreter::new();
+    i.set_eval_error("x".into());
+    assert_eq!(i.eval_error_code, 1);
+    i.set_eval_error(String::new());
+    assert_eq!(i.eval_error_code, 0);
+    assert!(i.eval_error.is_empty());
+}
+
+#[test]
+fn at_set_special_plain_string_uses_code_one_when_nonnumeric() {
+    let mut i = Interpreter::new();
+    i.set_special_var("@", &PerlValue::string("boom".into()))
+        .expect("set $@");
+    assert_eq!(i.eval_error_code, 1);
+    assert_eq!(i.eval_error, "boom");
+}
+
+#[test]
+fn at_set_special_integer_keeps_numeric_code_and_display_string() {
+    let mut i = Interpreter::new();
+    i.set_special_var("@", &PerlValue::integer(99)).expect("set $@");
+    assert_eq!(i.eval_error_code, 99);
+    assert_eq!(i.eval_error, "99");
+}
+
+#[test]
+fn at_set_special_string_zero_still_gets_code_one() {
+    // Non-empty message with numeric parse 0 → `set_special_var` bumps code to 1.
+    let mut i = Interpreter::new();
+    i.set_special_var("@", &PerlValue::string("0".into()))
+        .expect("set $@");
+    assert_eq!(i.eval_error_code, 1);
+    assert_eq!(i.eval_error, "0");
+}
+
+#[test]
 fn capture_array_after_bind_match() {
     let mut i = Interpreter::new();
     let prog = parse(r#""foo=bar" =~ /=(.*)/; 1"#).expect("parse");
