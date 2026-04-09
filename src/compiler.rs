@@ -3,9 +3,8 @@ use std::collections::{HashMap, HashSet};
 use crate::ast::*;
 use crate::bench_fusion::{
     try_match_array_push_sort_fusion, try_match_hash_sum_fusion, try_match_map_grep_scalar_fusion,
-    try_match_regex_count_fusion, try_match_string_repeat_length_fusion,
-    ArrayPushSortFusionSpec, HashSumFusionSpec, MapGrepScalarFusionSpec, RegexCountFusionSpec,
-    StringRepeatLengthFusionSpec,
+    try_match_regex_count_fusion, try_match_string_repeat_length_fusion, ArrayPushSortFusionSpec,
+    HashSumFusionSpec, MapGrepScalarFusionSpec, RegexCountFusionSpec, StringRepeatLengthFusionSpec,
 };
 use crate::bytecode::{BuiltinId, Chunk, Op};
 use crate::interpreter::{Interpreter, WantarrayCtx};
@@ -168,8 +167,7 @@ fn try_match_triangular_for_fusion(
                 return None;
             }
             match (&args[0].kind, &args[1].kind) {
-                (ExprKind::ScalarVar(s), ExprKind::String(nl))
-                    if s == &sum_name && nl == "\n" => {}
+                (ExprKind::ScalarVar(s), ExprKind::String(nl)) if s == &sum_name && nl == "\n" => {}
                 _ => return None,
             }
         }
@@ -453,7 +451,10 @@ impl Compiler {
         self.compile_statement(my_sum_stmt)?;
         let line = for_stmt.line;
         self.chunk.emit(Op::PushFrame, line);
-        let StmtKind::For { init: Some(init), .. } = &for_stmt.kind else {
+        let StmtKind::For {
+            init: Some(init), ..
+        } = &for_stmt.kind
+        else {
             return Err(CompileError::Unsupported(
                 "triangular fusion: missing for init".into(),
             ));
@@ -489,9 +490,7 @@ impl Compiler {
         print_is_last: bool,
     ) -> Result<(), CompileError> {
         self.chunk.emit(Op::LoadInt(n), line);
-        let nl = self
-            .chunk
-            .add_constant(PerlValue::string("\n".to_string()));
+        let nl = self.chunk.add_constant(PerlValue::string("\n".to_string()));
         self.chunk.emit(Op::LoadConst(nl), line);
         self.chunk.emit(Op::Print(2), line);
         if !print_is_last {
@@ -514,9 +513,7 @@ impl Compiler {
             .add_constant(PerlValue::string(space_word.to_string()));
         self.chunk.emit(Op::LoadConst(sp), line);
         self.chunk.emit(Op::LoadInt(b), line);
-        let nl = self
-            .chunk
-            .add_constant(PerlValue::string("\n".to_string()));
+        let nl = self.chunk.add_constant(PerlValue::string("\n".to_string()));
         self.chunk.emit(Op::LoadConst(nl), line);
         self.chunk.emit(Op::Print(4), line);
         if !print_is_last {
@@ -613,11 +610,7 @@ impl Compiler {
                     main_stmts[i + 3],
                     main_stmts[i + 4],
                 ) {
-                    self.emit_hash_sum_fusion(
-                        &spec,
-                        main_stmts[i + 4].line,
-                        i + 4 == last_idx,
-                    )?;
+                    self.emit_hash_sum_fusion(&spec, main_stmts[i + 4].line, i + 4 == last_idx)?;
                     i += 5;
                     continue;
                 }
@@ -629,11 +622,7 @@ impl Compiler {
                     main_stmts[i + 2],
                     main_stmts[i + 3],
                 ) {
-                    self.emit_regex_count_fusion(
-                        &spec,
-                        main_stmts[i + 3].line,
-                        i + 3 == last_idx,
-                    )?;
+                    self.emit_regex_count_fusion(&spec, main_stmts[i + 3].line, i + 3 == last_idx)?;
                     i += 4;
                     continue;
                 }
@@ -1811,6 +1800,15 @@ impl Compiler {
                     }
                     self.chunk.emit(
                         Op::CallBuiltin(BuiltinId::Pipeline as u16, args.len() as u8),
+                        line,
+                    );
+                }
+                "par_pipeline" => {
+                    for arg in args {
+                        self.compile_expr(arg)?;
+                    }
+                    self.chunk.emit(
+                        Op::CallBuiltin(BuiltinId::ParPipeline as u16, args.len() as u8),
                         line,
                     );
                 }

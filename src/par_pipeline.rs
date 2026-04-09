@@ -1,5 +1,8 @@
-//! `par_pipeline` — parallel multi-stage pipeline with **bounded channels** between stages
-//! (backpressure when a stage is slower than its upstream).
+//! `par_pipeline` — two overloads:
+//! - **List form** `par_pipeline(@list)` — same chaining as `pipeline(@list)`, but `->filter` / `->map`
+//!   run in parallel on `collect()` (input order preserved).
+//! - **Named form** `par_pipeline(source => …, stages => …, workers => …)` — multi-stage pipeline
+//!   with **bounded channels** between stages (backpressure when a stage is slower than its upstream).
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -28,6 +31,25 @@ fn list_from_value(v: &PerlValue) -> Vec<PerlValue> {
         return r.read().clone();
     }
     v.to_list()
+}
+
+/// `true` when args are the named `source => …, stages => …, workers => …` form (even length, all three keys present).
+pub(crate) fn is_named_par_pipeline_args(args: &[PerlValue]) -> bool {
+    if args.len() < 6 || !args.len().is_multiple_of(2) {
+        return false;
+    }
+    let mut has_source = false;
+    let mut has_stages = false;
+    let mut has_workers = false;
+    for chunk in args.chunks(2) {
+        match chunk[0].to_string().as_str() {
+            "source" => has_source = true,
+            "stages" => has_stages = true,
+            "workers" => has_workers = true,
+            _ => {}
+        }
+    }
+    has_source && has_stages && has_workers
 }
 
 fn parse_args(args: &[PerlValue]) -> Result<ParPipelineSpec, PerlError> {

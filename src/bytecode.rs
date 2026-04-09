@@ -390,11 +390,13 @@ pub enum BuiltinId {
     Pselect,
     /// `barrier(N)` — thread barrier (`->wait`).
     BarrierNew,
+    /// `par_pipeline(...)` — list form: same as `pipeline` but parallel `filter`/`map` on `collect()`.
+    ParPipeline,
 }
 
 impl BuiltinId {
     pub fn from_u16(v: u16) -> Option<Self> {
-        if v <= Self::BarrierNew as u16 {
+        if v <= Self::ParPipeline as u16 {
             Some(unsafe { std::mem::transmute::<u16, BuiltinId>(v) })
         } else {
             None
@@ -667,11 +669,15 @@ mod tests {
             BuiltinId::from_u16(BuiltinId::BarrierNew as u16),
             Some(BuiltinId::BarrierNew)
         );
+        assert_eq!(
+            BuiltinId::from_u16(BuiltinId::ParPipeline as u16),
+            Some(BuiltinId::ParPipeline)
+        );
     }
 
     #[test]
     fn builtin_id_from_u16_out_of_range() {
-        assert_eq!(BuiltinId::from_u16(BuiltinId::BarrierNew as u16 + 1), None);
+        assert_eq!(BuiltinId::from_u16(BuiltinId::ParPipeline as u16 + 1), None);
         assert_eq!(BuiltinId::from_u16(u16::MAX), None);
     }
 

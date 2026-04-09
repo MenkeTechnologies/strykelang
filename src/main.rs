@@ -266,6 +266,9 @@ fn print_cyberpunk_help() {
         "  pipeline @list ->filter/map/take/collect {G}//{N} Lazy iterator (runs on collect); chain ->pmap/pgrep/pfor/pmap_chunked/psort/pcache/preduce/… like top-level p*"
     );
     println!(
+        "  par_pipeline @list same chain; filter/map parallel on collect (order kept); par_pipeline(source=>…,stages=>…,workers=>…) channel stages"
+    );
+    println!(
         "  async {{BLOCK}}           {G}//{N} Run block on a worker thread; returns a task handle"
     );
     println!("  await EXPR                {G}//{N} Join async task or pass through non-task value");

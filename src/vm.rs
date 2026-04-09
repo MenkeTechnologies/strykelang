@@ -3045,6 +3045,26 @@ impl<'a> VM<'a> {
                     source: items,
                     ops: Vec::new(),
                     has_scalar_terminal: false,
+                    par_stream: false,
+                }))))
+            }
+            Some(BuiltinId::ParPipeline) => {
+                if crate::par_pipeline::is_named_par_pipeline_args(&args) {
+                    return crate::par_pipeline::run_par_pipeline(&mut self.interp, &args, line);
+                }
+                let mut items = Vec::new();
+                for v in args {
+                    if let Some(a) = v.as_array_vec() {
+                        items.extend(a);
+                    } else {
+                        items.push(v);
+                    }
+                }
+                Ok(PerlValue::pipeline(Arc::new(Mutex::new(PipelineInner {
+                    source: items,
+                    ops: Vec::new(),
+                    has_scalar_terminal: false,
+                    par_stream: true,
                 }))))
             }
             Some(BuiltinId::Eval) => {

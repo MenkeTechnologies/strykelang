@@ -111,6 +111,23 @@ fn par_pipeline_counts_last_stage() {
     );
 }
 
+/// List form: same chaining as `pipeline`, but `filter`/`map` run in parallel on `collect()` (order preserved).
+#[test]
+fn par_pipeline_list_chain_filter_map_take() {
+    assert_eq!(
+        eval_string(
+            r#"my @r = par_pipeline((1..20))
+                ->filter({ $_ > 10 })
+                ->map({ $_ * 2 })
+                ->take(3)
+                ->collect();
+            join ",", @r"#,
+        )
+        .trim(),
+        "22,24,26"
+    );
+}
+
 /// README `par_pipeline` example: bare `{ }` blocks, `readline(STDIN)` source, bareword stage bodies.
 #[test]
 fn par_pipeline_readline_stdin_bare_blocks_bareword_stages() {

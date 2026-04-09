@@ -2533,6 +2533,24 @@ impl Parser {
                                     line,
                                 };
                             } else {
+                                let mut method_name = method;
+                                while self.eat(&Token::PackageSep) {
+                                    match self.advance() {
+                                        (Token::Ident(part), _) => {
+                                            method_name.push_str("::");
+                                            method_name.push_str(&part);
+                                        }
+                                        (tok, l) => {
+                                            return Err(PerlError::syntax(
+                                                format!(
+                                                    "Expected identifier after :: in method name, got {:?}",
+                                                    tok
+                                                ),
+                                                l,
+                                            ));
+                                        }
+                                    }
+                                }
                                 let args = if self.eat(&Token::LParen) {
                                     let a = self.parse_arg_list()?;
                                     self.expect(&Token::RParen)?;
@@ -2543,7 +2561,7 @@ impl Parser {
                                 expr = Expr {
                                     kind: ExprKind::MethodCall {
                                         object: Box::new(expr),
-                                        method,
+                                        method: method_name,
                                         args,
                                         super_call: false,
                                     },
@@ -3478,7 +3496,9 @@ impl Parser {
                 let callback = self.parse_assign_expr()?;
                 let progress = if self.eat(&Token::Comma) {
                     match self.peek() {
-                        Token::Ident(ref kw) if kw == "progress" && matches!(self.peek_at(1), Token::FatArrow) => {
+                        Token::Ident(ref kw)
+                            if kw == "progress" && matches!(self.peek_at(1), Token::FatArrow) =>
+                        {
                             self.advance();
                             self.expect(&Token::FatArrow)?;
                             Some(Box::new(self.parse_assign_expr()?))
@@ -4267,9 +4287,7 @@ impl Parser {
 
     /// Comma-separated assign expressions with optional trailing `, progress => EXPR`
     /// (for `pmap_chunked`, `psort`, etc.).
-    fn parse_assign_expr_list_optional_progress(
-        &mut self,
-    ) -> PerlResult<(Expr, Option<Expr>)> {
+    fn parse_assign_expr_list_optional_progress(&mut self) -> PerlResult<(Expr, Option<Expr>)> {
         let mut parts = vec![self.parse_assign_expr()?];
         loop {
             if !self.eat(&Token::Comma) && !self.eat(&Token::FatArrow) {

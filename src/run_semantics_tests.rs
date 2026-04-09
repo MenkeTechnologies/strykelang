@@ -535,10 +535,39 @@ fn pipeline_preduce_collect_scalar() {
 
 #[test]
 fn pipeline_chaining_rejects_ops_after_preduce() {
-    assert!(run(
-        r#"pipeline(1, 2)->preduce(sub { $a + $b })->map(sub { $_ });"#,
-    )
-    .is_err());
+    assert!(run(r#"pipeline(1, 2)->preduce(sub { $a + $b })->map(sub { $_ });"#,).is_err());
+}
+
+/// `->name` with no args resolves a package subroutine and applies it like `map` (`$_` each item).
+#[test]
+fn pipeline_user_sub_in_chain() {
+    let s = r#"
+        sub times2 { $_ * 2 }
+        my @r = pipeline(1, 2, 3)->times2->collect();
+        $r[0] + $r[1] + $r[2];
+    "#;
+    assert_eq!(ri(s), 12);
+}
+
+#[test]
+fn pipeline_grep_alias_matches_filter() {
+    let s = r#"
+        my @r = pipeline(1, 2, 3, 4)->grep(sub { $_ % 2 == 0 })->collect();
+        scalar @r;
+    "#;
+    assert_eq!(ri(s), 2);
+}
+
+#[test]
+fn pipeline_qualified_sub_chain() {
+    let s = r#"
+        package P;
+        sub triple { $_ * 3 }
+        package main;
+        my @r = pipeline(1, 2)->P::triple->collect();
+        $r[0] + $r[1];
+    "#;
+    assert_eq!(ri(s), 9);
 }
 
 #[test]

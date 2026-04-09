@@ -130,6 +130,11 @@ fn accepts_pipeline_chain() {
 }
 
 #[test]
+fn accepts_pipeline_qualified_method() {
+    p("my @r = pipeline(1)->P::triple->collect();");
+}
+
+#[test]
 fn accepts_preduce_block() {
     p("my $sum = preduce { $a + $b } (1, 2, 3);");
 }

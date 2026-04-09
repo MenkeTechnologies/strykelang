@@ -78,7 +78,13 @@ pub(crate) fn try_builtin(
         "par_fetch" => Some(builtin_par_fetch(args)),
         "par_csv_read" => Some(builtin_par_csv_read(args)),
         "dataframe" => Some(builtin_dataframe(args)),
-        "par_pipeline" => Some(crate::par_pipeline::run_par_pipeline(interp, args, line)),
+        "par_pipeline" => {
+            if crate::par_pipeline::is_named_par_pipeline_args(args) {
+                Some(crate::par_pipeline::run_par_pipeline(interp, args, line))
+            } else {
+                Some(interp.builtin_par_pipeline_stream(args, line))
+            }
+        }
         "write" => Some(interp.write_format_execute(args, line)),
         _ => None,
     }

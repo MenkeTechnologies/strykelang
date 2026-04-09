@@ -2,7 +2,7 @@
 //! [`crate::compiler::emit_triangular_for_fusion`]). Keeps observable output identical
 //! while avoiding hot-loop dispatch for these fixed AST patterns.
 
-use crate::ast::{BinOp, Expr, ExprKind, Sigil, StmtKind, Statement};
+use crate::ast::{BinOp, Expr, ExprKind, Sigil, Statement, StmtKind};
 use crate::interpreter::Interpreter;
 use crate::map_grep_fast::{detect_grep_int_mod_eq, detect_map_int_mul};
 use crate::sort_fast::{detect_sort_block_fast, SortBlockFast};
@@ -28,9 +28,7 @@ pub(crate) struct RegexCountFusionSpec {
     pub count: i64,
 }
 
-fn same_c_style_for_header(
-    for_stmt: &Statement,
-) -> Option<(String, i64, &crate::ast::Block)> {
+fn same_c_style_for_header(for_stmt: &Statement) -> Option<(String, i64, &crate::ast::Block)> {
     if for_stmt.label.is_some() {
         return None;
     }
@@ -170,13 +168,12 @@ pub(crate) fn try_match_string_repeat_length_fusion(
                         return None;
                     }
                     match (&args[0].kind, &args[1].kind) {
-                        (
-                            ExprKind::Length(inner),
-                            ExprKind::String(nl),
-                        ) if nl == "\n" => match &inner.kind {
-                            ExprKind::ScalarVar(sn) if sn == &s_name => {}
-                            _ => return None,
-                        },
+                        (ExprKind::Length(inner), ExprKind::String(nl)) if nl == "\n" => {
+                            match &inner.kind {
+                                ExprKind::ScalarVar(sn) if sn == &s_name => {}
+                                _ => return None,
+                            }
+                        }
                         _ => return None,
                     }
                 }
@@ -327,8 +324,7 @@ pub(crate) fn try_match_hash_sum_fusion(
                 return None;
             }
             match (&args[0].kind, &args[1].kind) {
-                (ExprKind::ScalarVar(s), ExprKind::String(nl))
-                    if s == &sum_name && nl == "\n" => {}
+                (ExprKind::ScalarVar(s), ExprKind::String(nl)) if s == &sum_name && nl == "\n" => {}
                 _ => return None,
             }
         }
@@ -425,22 +421,21 @@ pub(crate) fn try_match_array_push_sort_fusion(
             if handle.is_some() || args.len() != 4 {
                 return None;
             }
-            match (
-                &args[0].kind,
-                &args[1].kind,
-                &args[2].kind,
-                &args[3].kind,
-            ) {
+            match (&args[0].kind, &args[1].kind, &args[2].kind, &args[3].kind) {
                 (
-                    ExprKind::ArrayElement { array: a0, index: i0 },
+                    ExprKind::ArrayElement {
+                        array: a0,
+                        index: i0,
+                    },
                     ExprKind::String(sp),
-                    ExprKind::ArrayElement { array: a1, index: i1 },
+                    ExprKind::ArrayElement {
+                        array: a1,
+                        index: i1,
+                    },
                     ExprKind::String(nl),
-                ) if sp == " " && nl == "\n" && a0 == &b_name && a1 == &b_name =>
-                {
+                ) if sp == " " && nl == "\n" && a0 == &b_name && a1 == &b_name => {
                     match (&i0.kind, &i1.kind) {
-                        (ExprKind::Integer(0), ExprKind::Integer(ix))
-                            if *ix == want_last => {}
+                        (ExprKind::Integer(0), ExprKind::Integer(ix)) if *ix == want_last => {}
                         _ => return None,
                     }
                 }
@@ -479,9 +474,7 @@ pub(crate) fn try_match_map_grep_scalar_fusion(
             let init = decls[0].initializer.as_ref()?;
             match &init.kind {
                 ExprKind::Range { from, to } => match (&from.kind, &to.kind) {
-                    (ExprKind::Integer(a), ExprKind::Integer(b)) => {
-                        (decls[0].name.clone(), *a, *b)
-                    }
+                    (ExprKind::Integer(a), ExprKind::Integer(b)) => (decls[0].name.clone(), *a, *b),
                     _ => return None,
                 },
                 _ => return None,
@@ -550,9 +543,7 @@ pub(crate) fn try_match_map_grep_scalar_fusion(
                 return None;
             }
             match (&args[0].kind, &args[1].kind) {
-                (ExprKind::ScalarContext(inner), ExprKind::String(nl))
-                    if nl == "\n" =>
-                {
+                (ExprKind::ScalarContext(inner), ExprKind::String(nl)) if nl == "\n" => {
                     match &inner.kind {
                         ExprKind::ArrayVar(an) if an == &evens_name => {}
                         _ => return None,
@@ -584,14 +575,7 @@ fn map_grep_result_count(n: i64, k_mul: i64, m: i64, r: i64) -> Option<i64> {
 
 fn regex_match_const_folds(limit: i64, text: &str, pattern: &str, flags: &str) -> Option<i64> {
     let mut interp = Interpreter::new();
-    match interp.regex_match_execute(
-        text.to_string(),
-        pattern,
-        flags,
-        false,
-        "_",
-        0,
-    ) {
+    match interp.regex_match_execute(text.to_string(), pattern, flags, false, "_", 0) {
         Ok(v) => Some(if v.is_true() { limit } else { 0 }),
         Err(_) => None,
     }
@@ -740,9 +724,7 @@ mod tests {
     #[test]
     fn hash_bench_shape_fuses() {
         let s = stmts(include_str!("../bench/bench_hash.pl"));
-        assert!(
-            try_match_hash_sum_fusion(&s[0], &s[1], &s[2], &s[3], &s[4]).is_some()
-        );
+        assert!(try_match_hash_sum_fusion(&s[0], &s[1], &s[2], &s[3], &s[4]).is_some());
     }
 
     #[test]

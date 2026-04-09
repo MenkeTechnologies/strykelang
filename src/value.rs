@@ -264,6 +264,8 @@ pub struct PipelineInner {
     pub ops: Vec<PipelineOp>,
     /// Set after `preduce` / `preduce_init` / `pmap_reduce` — no further `->` ops allowed.
     pub has_scalar_terminal: bool,
+    /// When true (from `par_pipeline(LIST)`), `->filter` / `->map` run in parallel with **input order preserved** on `collect()`.
+    pub par_stream: bool,
 }
 
 #[derive(Debug)]
