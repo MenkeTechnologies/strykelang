@@ -787,12 +787,18 @@ impl Interpreter {
             // Unary
             ExprKind::UnaryOp { op, expr } => match op {
                 UnaryOp::PreIncrement => {
+                    if let ExprKind::ScalarVar(name) = &expr.kind {
+                        return Ok(self.scope.atomic_mutate(name, |v| PerlValue::Integer(v.to_int() + 1)));
+                    }
                     let val = self.eval_expr(expr)?;
                     let new_val = PerlValue::Integer(val.to_int() + 1);
                     self.assign_value(expr, new_val.clone())?;
                     Ok(new_val)
                 }
                 UnaryOp::PreDecrement => {
+                    if let ExprKind::ScalarVar(name) = &expr.kind {
+                        return Ok(self.scope.atomic_mutate(name, |v| PerlValue::Integer(v.to_int() - 1)));
+                    }
                     let val = self.eval_expr(expr)?;
                     let new_val = PerlValue::Integer(val.to_int() - 1);
                     self.assign_value(expr, new_val.clone())?;
@@ -819,6 +825,15 @@ impl Interpreter {
             },
 
             ExprKind::PostfixOp { expr, op } => {
+                // For scalar variables, use atomic_mutate_post to hold the lock
+                // for the entire read-modify-write (critical for mysync).
+                if let ExprKind::ScalarVar(name) = &expr.kind {
+                    let f: fn(&PerlValue) -> PerlValue = match op {
+                        PostfixOp::Increment => |v| PerlValue::Integer(v.to_int() + 1),
+                        PostfixOp::Decrement => |v| PerlValue::Integer(v.to_int() - 1),
+                    };
+                    return Ok(self.scope.atomic_mutate_post(name, f));
+                }
                 let val = self.eval_expr(expr)?;
                 let old = val.clone();
                 let new_val = match op {
@@ -836,8 +851,35 @@ impl Interpreter {
                 Ok(val)
             }
             ExprKind::CompoundAssign { target, op, value } => {
-                let old = self.eval_expr(target)?;
+                // Evaluate the RHS first (before locking for atomic vars)
                 let rhs = self.eval_expr(value)?;
+                // For scalar targets, use atomic_mutate to hold the lock
+                if let ExprKind::ScalarVar(name) = &target.kind {
+                    let op = *op;
+                    return Ok(self.scope.atomic_mutate(name, |old| {
+                        match op {
+                            BinOp::Add => match (old, &rhs) {
+                                (PerlValue::Integer(a), PerlValue::Integer(b)) => PerlValue::Integer(a.wrapping_add(*b)),
+                                _ => PerlValue::Float(old.to_number() + rhs.to_number()),
+                            },
+                            BinOp::Sub => match (old, &rhs) {
+                                (PerlValue::Integer(a), PerlValue::Integer(b)) => PerlValue::Integer(a.wrapping_sub(*b)),
+                                _ => PerlValue::Float(old.to_number() - rhs.to_number()),
+                            },
+                            BinOp::Mul => match (old, &rhs) {
+                                (PerlValue::Integer(a), PerlValue::Integer(b)) => PerlValue::Integer(a.wrapping_mul(*b)),
+                                _ => PerlValue::Float(old.to_number() * rhs.to_number()),
+                            },
+                            BinOp::Concat => {
+                                let mut s = old.to_string();
+                                rhs.append_to(&mut s);
+                                PerlValue::String(s)
+                            }
+                            _ => PerlValue::Float(old.to_number() + rhs.to_number()),
+                        }
+                    }));
+                }
+                let old = self.eval_expr(target)?;
                 let new_val = self.eval_binop(*op, &old, &rhs, line)?;
                 self.assign_value(target, new_val.clone())?;
                 Ok(new_val)
