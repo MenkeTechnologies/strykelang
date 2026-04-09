@@ -2734,6 +2734,23 @@ impl Interpreter {
         topic.to_string() == c.to_string()
     }
 
+    /// Boolean condition for postfix `if` / `unless` / `while` / `until`: bare `/.../` is `$_ =~ /.../`
+    /// (Perl), not “is the regex object truthy”.
+    fn eval_postfix_condition(&mut self, cond: &Expr) -> Result<bool, FlowOrError> {
+        match &cond.kind {
+            ExprKind::Regex(pattern, flags) => {
+                let topic = self.scope.get_scalar("_");
+                let line = cond.line;
+                let re = self.compile_regex(pattern, flags, line)?;
+                Ok(re.is_match(&topic.to_string()))
+            }
+            _ => {
+                let v = self.eval_expr(cond)?;
+                Ok(v.is_true())
+            }
+        }
+    }
+
     pub(crate) fn eval_algebraic_match(
         &mut self,
         subject: &Expr,
@@ -5798,16 +5815,14 @@ impl Interpreter {
 
             // Postfix modifiers
             ExprKind::PostfixIf { expr, condition } => {
-                let cond = self.eval_expr(condition)?;
-                if cond.is_true() {
+                if self.eval_postfix_condition(condition)? {
                     self.eval_expr(expr)
                 } else {
                     Ok(PerlValue::UNDEF)
                 }
             }
             ExprKind::PostfixUnless { expr, condition } => {
-                let cond = self.eval_expr(condition)?;
-                if !cond.is_true() {
+                if !self.eval_postfix_condition(condition)? {
                     self.eval_expr(expr)
                 } else {
                     Ok(PerlValue::UNDEF)
@@ -5824,15 +5839,13 @@ impl Interpreter {
                 if is_do_block {
                     loop {
                         last = self.eval_expr(expr)?;
-                        let cond = self.eval_expr(condition)?;
-                        if !cond.is_true() {
+                        if !self.eval_postfix_condition(condition)? {
                             break;
                         }
                     }
                 } else {
                     loop {
-                        let cond = self.eval_expr(condition)?;
-                        if !cond.is_true() {
+                        if !self.eval_postfix_condition(condition)? {
                             break;
                         }
                         last = self.eval_expr(expr)?;
@@ -5849,15 +5862,13 @@ impl Interpreter {
                 if is_do_block {
                     loop {
                         last = self.eval_expr(expr)?;
-                        let cond = self.eval_expr(condition)?;
-                        if cond.is_true() {
+                        if self.eval_postfix_condition(condition)? {
                             break;
                         }
                     }
                 } else {
                     loop {
-                        let cond = self.eval_expr(condition)?;
-                        if cond.is_true() {
+                        if self.eval_postfix_condition(condition)? {
                             break;
                         }
                         last = self.eval_expr(expr)?;

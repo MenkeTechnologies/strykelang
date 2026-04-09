@@ -19,6 +19,7 @@ This is an **ordered engineering program**, not a promise of bit-identical `perl
 
 ## Completed slices (reference)
 
+- **Typeglob assignment** — `*foo = \&bar` and `*foo = *bar` copy subroutine entries (`Interpreter::subs`) plus scalar/array/hash slots and `glob_handle_alias` (`Interpreter::copy_typeglob_slots`). Tree interpreter only until bytecode supports assigning to `ExprKind::Typeglob`. Lexer: `y` after `::` is not forced into `tr`/`y` when followed by `;`, `=`, etc., so names like `Foo::y` tokenize as identifiers.
 - **`__FILE__` / `__LINE__`** — compile-time literals; bytecode uses `Compiler::source_file` (wired from `Interpreter::file` in `try_vm_execute`). Covered by `parity/cases/006_magic_line.pl` and integration tests.
 - **`$!` (errno dualvar)** — numeric errno + string message (`PerlValue::errno_dual` / `ErrnoDual`); I/O paths set `errno` / `errno_code`; assignment to `$!` updates both (see [`SPECIAL_VARIABLES.md`](SPECIAL_VARIABLES.md)). Parity cases for errno-heavy paths still welcome.
 - **`$@` (eval dualvar)** — `eval_error` + `eval_error_code` with the same heap representation as **`$!`**; `eval` / `evalblock` use `set_eval_error` / `clear_eval_error` (see [`SPECIAL_VARIABLES.md`](SPECIAL_VARIABLES.md)).

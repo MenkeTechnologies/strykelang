@@ -2751,8 +2751,10 @@ impl Parser {
             }
             Token::Star => {
                 self.advance();
-                let name = match self.advance() {
+                // `x` tokenizes as `Token::X` (repeat op) — still a valid package/typeglob name.
+                let mut full_name = match self.advance() {
                     (Token::Ident(n), _) => n,
+                    (Token::X, _) => "x".to_string(),
                     (tok, l) => {
                         return Err(PerlError::syntax(
                             format!("Expected identifier after *, got {:?}", tok),
@@ -2760,11 +2762,13 @@ impl Parser {
                         ));
                     }
                 };
-                let mut full_name = name;
                 while self.eat(&Token::PackageSep) {
                     match self.advance() {
                         (Token::Ident(part), _) => {
                             full_name = format!("{}::{}", full_name, part);
+                        }
+                        (Token::X, _) => {
+                            full_name = format!("{}::x", full_name);
                         }
                         (tok, l) => {
                             return Err(PerlError::syntax(

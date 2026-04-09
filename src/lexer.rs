@@ -1068,6 +1068,19 @@ impl Lexer {
                         return Ok(Token::Ident(ident));
                     }
                     "tr" | "y" => {
+                        // `y` is both transliteration (y///) and a valid package/typeglob name (`Foo::y`).
+                        // If the next byte cannot start a tr/y body, treat as a plain identifier.
+                        if ident == "y" {
+                            if let Some(d) = self.peek() {
+                                if matches!(d, ';' | '=' | ',' | ')' | ']' | '}' | '>' | ':') {
+                                    self.last_was_term = true;
+                                    return Ok(Token::Ident(ident));
+                                }
+                            } else {
+                                self.last_was_term = true;
+                                return Ok(Token::Ident(ident));
+                            }
+                        }
                         // tr/from/to/flags
                         if let Some(delim) = self.peek() {
                             if !delim.is_alphanumeric() && delim != '_' && delim != ' ' {

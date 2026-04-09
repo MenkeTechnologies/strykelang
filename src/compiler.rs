@@ -304,6 +304,27 @@ impl Compiler {
         }
     }
 
+    /// Boolean condition for postfix `if` / `unless` / `while` / `until`: bare `/.../` is `$_ =~ /.../`
+    /// (Perl). Emits `$_` + pattern and [`Op::RegexMatchDyn`] so the stack has 0/1 like `=~`.
+    fn compile_postfix_boolean_condition(&mut self, cond: &Expr) -> Result<(), CompileError> {
+        let line = cond.line;
+        if let ExprKind::Regex(pattern, flags) = &cond.kind {
+            let name_idx = self.chunk.intern_name("_");
+            self.emit_get_scalar(name_idx, line);
+            let pat_idx = self
+                .chunk
+                .add_constant(PerlValue::string(pattern.clone()));
+            let flags_idx = self
+                .chunk
+                .add_constant(PerlValue::string(flags.clone()));
+            self.chunk.emit(Op::LoadRegex(pat_idx, flags_idx), line);
+            self.chunk.emit(Op::RegexMatchDyn(false), line);
+            Ok(())
+        } else {
+            self.compile_expr(cond)
+        }
+    }
+
     /// Emit SetScalar or SetScalarSlot depending on slot availability.
     fn emit_set_scalar(&mut self, name_idx: u16, line: usize) {
         let name = &self.chunk.names[name_idx as usize];
@@ -3035,7 +3056,7 @@ impl Compiler {
 
             // ── Postfix if/unless ──
             ExprKind::PostfixIf { expr, condition } => {
-                self.compile_expr(condition)?;
+                self.compile_postfix_boolean_condition(condition)?;
                 let j = self.chunk.emit(Op::JumpIfFalse(0), line);
                 self.compile_expr(expr)?;
                 let end = self.chunk.emit(Op::Jump(0), line);
@@ -3044,7 +3065,7 @@ impl Compiler {
                 self.chunk.patch_jump_here(end);
             }
             ExprKind::PostfixUnless { expr, condition } => {
-                self.compile_expr(condition)?;
+                self.compile_postfix_boolean_condition(condition)?;
                 let j = self.chunk.emit(Op::JumpIfTrue(0), line);
                 self.compile_expr(expr)?;
                 let end = self.chunk.emit(Op::Jump(0), line);
@@ -3065,13 +3086,13 @@ impl Compiler {
                     let loop_start = self.chunk.len();
                     self.compile_expr(expr)?;
                     self.chunk.emit(Op::Pop, line);
-                    self.compile_expr(condition)?;
+                    self.compile_postfix_boolean_condition(condition)?;
                     self.chunk.emit(Op::JumpIfTrue(loop_start), line);
                     self.chunk.emit(Op::LoadUndef, line);
                 } else {
                     // Regular postfix while: condition checked first
                     let loop_start = self.chunk.len();
-                    self.compile_expr(condition)?;
+                    self.compile_postfix_boolean_condition(condition)?;
                     let exit_jump = self.chunk.emit(Op::JumpIfFalse(0), line);
                     self.compile_expr(expr)?;
                     self.chunk.emit(Op::Pop, line);
@@ -3089,12 +3110,12 @@ impl Compiler {
                     let loop_start = self.chunk.len();
                     self.compile_expr(expr)?;
                     self.chunk.emit(Op::Pop, line);
-                    self.compile_expr(condition)?;
+                    self.compile_postfix_boolean_condition(condition)?;
                     self.chunk.emit(Op::JumpIfFalse(loop_start), line);
                     self.chunk.emit(Op::LoadUndef, line);
                 } else {
                     let loop_start = self.chunk.len();
-                    self.compile_expr(condition)?;
+                    self.compile_postfix_boolean_condition(condition)?;
                     let exit_jump = self.chunk.emit(Op::JumpIfTrue(0), line);
                     self.compile_expr(expr)?;
                     self.chunk.emit(Op::Pop, line);

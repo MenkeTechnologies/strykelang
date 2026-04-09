@@ -29,7 +29,19 @@ fn typeglob_assign_glob_copies_subroutine_slot() {
 }
 
 #[test]
-fn typeglob_qualified_names_parse() {
+fn typeglob_parse_simple_glob_assign_statement() {
+    let p = perlrs::parse("*a = *b;").expect("parse");
+    assert!(!p.statements.is_empty());
+}
+
+#[test]
+fn typeglob_parse_package_qualified_name() {
+    let p = perlrs::parse("*Foo::x").expect("parse");
+    assert!(!p.statements.is_empty());
+}
+
+#[test]
+fn typeglob_parse_qualified_glob_assign() {
     let p = perlrs::parse("*Foo::x = *Foo::y;").expect("parse");
     assert!(!p.statements.is_empty());
 }

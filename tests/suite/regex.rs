@@ -78,3 +78,27 @@ fn transliterate_tr() {
 fn transliterate_y_statement_on_dollar_underscore() {
     assert_eq!(eval_string(r#"$_ = "z"; y/z/Z/; $_"#), "Z");
 }
+
+#[test]
+fn postfix_if_bare_regex_matches_underscore_not_regex_truthiness() {
+    assert_eq!(
+        eval_string(r#"$_ = "foo.txt"; my $out = ""; $out .= "x" if /\.rs$/; $out"#),
+        ""
+    );
+    assert_eq!(
+        eval_string(r#"$_ = "foo.rs"; my $out = ""; $out .= "x" if /\.rs$/; $out"#),
+        "x"
+    );
+}
+
+#[test]
+fn postfix_unless_bare_regex_matches_underscore() {
+    assert_eq!(
+        eval_string(r#"$_ = "foo.rs"; my $out = ""; $out .= "x" unless /\.rs$/; $out"#),
+        ""
+    );
+    assert_eq!(
+        eval_string(r#"$_ = "foo.txt"; my $out = ""; $out .= "x" unless /\.rs$/; $out"#),
+        "x"
+    );
+}
