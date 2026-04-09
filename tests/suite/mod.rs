@@ -14,6 +14,7 @@ mod eval_errors;
 mod expressions;
 mod fs_io;
 mod lib_api;
+mod list_util;
 mod modules_inc;
 mod native_ext;
 mod parallel;

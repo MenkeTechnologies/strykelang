@@ -7,6 +7,8 @@ license = "MIT"
 authors = ["MenkeTechnologies"]
 repository = "https://github.com/MenkeTechnologies/perlrs"
 documentation = "https://docs.rs/perlrs"
+# Ensure `cargo package` / crates.io tarballs ship `vendor/perl` (e.g. `List/Util.pm`).
+include = ["src/**/*", "vendor/**/*", "tests/**/*", "Cargo.toml", "README.md", "LICENSE*"]
 
 [[bin]]
 name = "perlrs"

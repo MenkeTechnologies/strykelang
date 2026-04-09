@@ -382,8 +382,16 @@ pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut Interpreter, filenam
         interp.scope.set_hash_element("ENV", k, v.clone());
     }
 
-    // Order: `-I`, then system `perl`’s @INC, then script dir, `PERLRS_INC`, then `.` (deduped).
+    // Order: `-I`, in-tree `vendor/perl` (pure-Perl List::Util, …), system `perl`’s @INC, script
+    // dir, `PERLRS_INC`, then `.` (deduped).
     let mut inc_paths: Vec<String> = cli.include.clone();
+    let vendor = perlrs::vendor_perl_inc_path();
+    if vendor.is_dir() {
+        perlrs::perl_inc::push_unique_string_paths(
+            &mut inc_paths,
+            vec![vendor.to_string_lossy().into_owned()],
+        );
+    }
     perlrs::perl_inc::push_unique_string_paths(
         &mut inc_paths,
         perlrs::perl_inc::paths_from_system_perl(),

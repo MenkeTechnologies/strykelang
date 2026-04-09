@@ -52,6 +52,12 @@ pub fn parse_and_run_string(code: &str, interp: &mut Interpreter) -> PerlResult<
     interp.execute(&program)
 }
 
+/// Crate-root `vendor/perl` (e.g. `List/Util.pm`). The `perlrs` / `pe` driver prepends this to
+/// `@INC` when the directory exists so in-tree pure-Perl modules shadow XS-only core stubs.
+pub fn vendor_perl_inc_path() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("vendor/perl")
+}
+
 /// Parse and execute a string of Perl code with a fresh interpreter.
 pub fn run(code: &str) -> PerlResult<PerlValue> {
     let program = parse(code)?;
@@ -78,6 +84,11 @@ pub fn try_vm_execute(
 
     if let Err(e) = interp.prepare_program_top_level(program) {
         return Some(Err(e));
+    }
+
+    // `strict` pragmas are enforced in the tree-walker only (symbolic refs, undeclared globals, …).
+    if interp.strict_refs || interp.strict_subs || interp.strict_vars {
+        return None;
     }
 
     let comp = compiler::Compiler::new();
