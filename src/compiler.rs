@@ -9,8 +9,8 @@ pub enum CompileError {
 }
 
 /// Loop context for resolving `last`/`next` jumps.
-#[allow(dead_code)]
 struct LoopCtx {
+    #[allow(dead_code)]
     label: Option<String>,
     /// Positions of `last` jumps to patch (jump to after loop).
     break_jumps: Vec<usize>,
@@ -20,6 +20,8 @@ struct LoopCtx {
 
 pub struct Compiler {
     pub chunk: Chunk,
+    pub begin_blocks: Vec<Block>,
+    pub end_blocks: Vec<Block>,
 }
 
 impl Default for Compiler {
@@ -32,111 +34,22 @@ impl Compiler {
     pub fn new() -> Self {
         Self {
             chunk: Chunk::new(),
-        }
-    }
-
-    /// Quick scan: bail if the AST has features the bytecode VM can't handle yet.
-    fn check_compilable(program: &Program) -> Result<(), CompileError> {
-        for stmt in &program.statements {
-            Self::check_stmt(stmt)?;
-        }
-        Ok(())
-    }
-
-    fn check_stmt(stmt: &Statement) -> Result<(), CompileError> {
-        match &stmt.kind {
-            StmtKind::Begin(_) | StmtKind::End(_) => {
-                return Err(CompileError::Unsupported("BEGIN/END".into()));
-            }
-            StmtKind::SubDecl { body, .. } => {
-                for s in body { Self::check_stmt(s)?; }
-            }
-            StmtKind::If { body, elsifs, else_block, condition, .. } => {
-                Self::check_expr(condition)?;
-                for s in body {
-                    if matches!(s.kind, StmtKind::Return(_)) {
-                        return Err(CompileError::Unsupported("return in if body".into()));
-                    }
-                    Self::check_stmt(s)?;
-                }
-                for (c, blk) in elsifs { Self::check_expr(c)?; for s in blk { Self::check_stmt(s)?; } }
-                if let Some(eb) = else_block { for s in eb { Self::check_stmt(s)?; } }
-            }
-            StmtKind::Unless { body, else_block, condition, .. } => {
-                Self::check_expr(condition)?;
-                for s in body { Self::check_stmt(s)?; }
-                if let Some(eb) = else_block { for s in eb { Self::check_stmt(s)?; } }
-            }
-            StmtKind::While { body, condition, .. } | StmtKind::Until { body, condition, .. } => {
-                Self::check_expr(condition)?;
-                for s in body { Self::check_stmt(s)?; }
-            }
-            StmtKind::For { body, init, condition, step, .. } => {
-                if let Some(i) = init { Self::check_stmt(i)?; }
-                if let Some(c) = condition { Self::check_expr(c)?; }
-                if let Some(s) = step { Self::check_expr(s)?; }
-                for s in body { Self::check_stmt(s)?; }
-            }
-            StmtKind::Foreach { body, list, .. } => {
-                Self::check_expr(list)?;
-                for s in body { Self::check_stmt(s)?; }
-            }
-            StmtKind::Expression(expr) => Self::check_expr(expr)?,
-            StmtKind::Return(Some(e)) => Self::check_expr(e)?,
-            StmtKind::Package { .. } => return Err(CompileError::Unsupported("package".into())),
-            StmtKind::DoWhile { .. } => return Err(CompileError::Unsupported("do-while".into())),
-            StmtKind::Block(blk) => { for s in blk { Self::check_stmt(s)?; } }
-            _ => {}
-        }
-        Ok(())
-    }
-
-    fn check_expr(expr: &Expr) -> Result<(), CompileError> {
-        match &expr.kind {
-            ExprKind::Chomp(_) | ExprKind::Chop(_) => Err(CompileError::Unsupported("chomp/chop".into())),
-            ExprKind::ScalarRef(_) | ExprKind::ArrayRef(_) | ExprKind::HashRef(_) | ExprKind::CodeRef { .. } => Err(CompileError::Unsupported("refs".into())),
-            ExprKind::Deref { .. } | ExprKind::ArrowDeref { .. } => Err(CompileError::Unsupported("deref".into())),
-            ExprKind::MethodCall { .. } | ExprKind::Bless { .. } => Err(CompileError::Unsupported("OOP".into())),
-            ExprKind::Eval(_) | ExprKind::Do(_) | ExprKind::Require(_) => Err(CompileError::Unsupported("eval/do".into())),
-            ExprKind::Substitution { .. } | ExprKind::Transliterate { .. } => Err(CompileError::Unsupported("s///tr///".into())),
-            ExprKind::MapExpr { .. } | ExprKind::GrepExpr { .. } | ExprKind::SortExpr { .. } => Err(CompileError::Unsupported("map/grep/sort block".into())),
-            ExprKind::PMapExpr { .. } | ExprKind::PGrepExpr { .. } | ExprKind::PForExpr { .. } | ExprKind::PSortExpr { .. } | ExprKind::PReduceExpr { .. } | ExprKind::FanExpr { .. } => Err(CompileError::Unsupported("parallel".into())),
-            ExprKind::Open { .. } | ExprKind::Close(_) | ExprKind::ReadLine(_) | ExprKind::Eof(_) => Err(CompileError::Unsupported("I/O".into())),
-            ExprKind::FileTest { .. } => Err(CompileError::Unsupported("file test".into())),
-            ExprKind::Ref(_) => Err(CompileError::Unsupported("ref()".into())),
-            ExprKind::PostfixWhile { .. } | ExprKind::PostfixUntil { .. } | ExprKind::PostfixForeach { .. } => Err(CompileError::Unsupported("postfix loop".into())),
-            ExprKind::Caller(_) | ExprKind::Wantarray => Err(CompileError::Unsupported("caller/wantarray".into())),
-            ExprKind::Splice { .. } | ExprKind::Unshift { .. } => Err(CompileError::Unsupported("splice/unshift".into())),
-            ExprKind::Substr { .. } | ExprKind::Index { .. } | ExprKind::Rindex { .. } => Err(CompileError::Unsupported("substr/index".into())),
-            ExprKind::Exec(_) | ExprKind::Chdir(_) | ExprKind::Mkdir { .. } | ExprKind::Unlink(_) => Err(CompileError::Unsupported("exec/fs".into())),
-            ExprKind::ReverseExpr(_) => Err(CompileError::Unsupported("reverse".into())),
-            // Recurse into sub-expressions
-            ExprKind::BinOp { left, right, .. } => { Self::check_expr(left)?; Self::check_expr(right) }
-            ExprKind::UnaryOp { expr, .. } | ExprKind::PostfixOp { expr, .. } => Self::check_expr(expr),
-            ExprKind::Assign { target, value } | ExprKind::CompoundAssign { target, value, .. } => { Self::check_expr(target)?; Self::check_expr(value) }
-            ExprKind::Ternary { condition, then_expr, else_expr } => { Self::check_expr(condition)?; Self::check_expr(then_expr)?; Self::check_expr(else_expr) }
-            ExprKind::FuncCall { args, .. } | ExprKind::Print { args, .. } | ExprKind::Say { args, .. } | ExprKind::Die(args) | ExprKind::Warn(args) | ExprKind::System(args) => { for a in args { Self::check_expr(a)?; } Ok(()) }
-            ExprKind::Printf { args, .. } => { for a in args { Self::check_expr(a)?; } Ok(()) }
-            ExprKind::PostfixIf { expr, condition } | ExprKind::PostfixUnless { expr, condition } => { Self::check_expr(expr)?; Self::check_expr(condition) }
-            ExprKind::Match { expr, .. } => Self::check_expr(expr),
-            ExprKind::Range { from, to } | ExprKind::Repeat { expr: from, count: to } => { Self::check_expr(from)?; Self::check_expr(to) }
-            ExprKind::Push { array, values } => { Self::check_expr(array)?; for v in values { Self::check_expr(v)?; } Ok(()) }
-            ExprKind::Pop(e) | ExprKind::Shift(e) | ExprKind::Delete(e) | ExprKind::Exists(e) | ExprKind::Keys(e) | ExprKind::Values(e) | ExprKind::Each(e) => Self::check_expr(e),
-            ExprKind::ScalarContext(e) | ExprKind::Length(e) | ExprKind::Defined(e) | ExprKind::Abs(e) | ExprKind::Int(e) | ExprKind::Sqrt(e) => Self::check_expr(e),
-            ExprKind::Chr(e) | ExprKind::Ord(e) | ExprKind::Hex(e) | ExprKind::Oct(e) | ExprKind::Uc(e) | ExprKind::Lc(e) | ExprKind::Ucfirst(e) | ExprKind::Lcfirst(e) => Self::check_expr(e),
-            ExprKind::JoinExpr { separator, list } => { Self::check_expr(separator)?; Self::check_expr(list) }
-            ExprKind::SplitExpr { pattern, string, limit } => { Self::check_expr(pattern)?; Self::check_expr(string)?; if let Some(l) = limit { Self::check_expr(l)?; } Ok(()) }
-            ExprKind::Sprintf { format, args } => { Self::check_expr(format)?; for a in args { Self::check_expr(a)?; } Ok(()) }
-            ExprKind::Exit(Some(e)) => Self::check_expr(e),
-            ExprKind::InterpolatedString(parts) => { for p in parts { if let StringPart::Expr(e) = p { Self::check_expr(e)?; } } Ok(()) }
-            // Leaf nodes — always compilable
-            _ => Ok(()),
+            begin_blocks: Vec::new(),
+            end_blocks: Vec::new(),
         }
     }
 
     pub fn compile_program(mut self, program: &Program) -> Result<Chunk, CompileError> {
-        Self::check_compilable(program)?;
+        // Extract BEGIN/END blocks before compiling.
+        for stmt in &program.statements {
+            match &stmt.kind {
+                StmtKind::Begin(block) => self.begin_blocks.push(block.clone()),
+                StmtKind::End(block) => self.end_blocks.push(block.clone()),
+                _ => {}
+            }
+        }
 
+        // First pass: register sub names for forward calls.
         for stmt in &program.statements {
             if let StmtKind::SubDecl { name, .. } = &stmt.kind {
                 let name_idx = self.chunk.intern_name(name);
@@ -151,14 +64,24 @@ impl Compiler {
         let main_stmts: Vec<&Statement> = program
             .statements
             .iter()
-            .filter(|s| !matches!(s.kind, StmtKind::SubDecl { .. }))
+            .filter(|s| {
+                !matches!(
+                    s.kind,
+                    StmtKind::SubDecl { .. } | StmtKind::Begin(_) | StmtKind::End(_)
+                )
+            })
             .collect();
         let last_idx = main_stmts.len().saturating_sub(1);
         for (i, stmt) in main_stmts.iter().enumerate() {
             if i == last_idx {
                 match &stmt.kind {
                     StmtKind::Expression(expr) => self.compile_expr(expr)?,
-                    StmtKind::If { condition, body, elsifs, else_block } => {
+                    StmtKind::If {
+                        condition,
+                        body,
+                        elsifs,
+                        else_block,
+                    } => {
                         self.compile_expr(condition)?;
                         let j0 = self.chunk.emit(Op::JumpIfFalse(0), stmt.line);
                         Self::emit_block_value(&mut self.chunk, body, stmt.line)?;
@@ -176,14 +99,22 @@ impl Compiler {
                         } else {
                             self.chunk.emit(Op::LoadUndef, stmt.line);
                         }
-                        for j in ends { self.chunk.patch_jump_here(j); }
+                        for j in ends {
+                            self.chunk.patch_jump_here(j);
+                        }
                     }
-                    StmtKind::Unless { condition, body, else_block } => {
+                    StmtKind::Unless {
+                        condition,
+                        body,
+                        else_block,
+                    } => {
                         self.compile_expr(condition)?;
                         let j0 = self.chunk.emit(Op::JumpIfFalse(0), stmt.line);
                         if let Some(eb) = else_block {
                             Self::emit_block_value(&mut self.chunk, eb, stmt.line)?;
-                        } else { self.chunk.emit(Op::LoadUndef, stmt.line); }
+                        } else {
+                            self.chunk.emit(Op::LoadUndef, stmt.line);
+                        }
                         let end = self.chunk.emit(Op::Jump(0), stmt.line);
                         self.chunk.patch_jump_here(j0);
                         Self::emit_block_value(&mut self.chunk, body, stmt.line)?;
@@ -238,7 +169,10 @@ impl Compiler {
                 self.compile_expr(expr)?;
                 self.chunk.emit(Op::Pop, line);
             }
-            StmtKind::My(decls) | StmtKind::Our(decls) | StmtKind::Local(decls) => {
+            StmtKind::Local(_) => {
+                return Err(CompileError::Unsupported("local".into()));
+            }
+            StmtKind::My(decls) | StmtKind::Our(decls) => {
                 for decl in decls {
                     let name_idx = self.chunk.intern_name(&decl.name);
                     match decl.sigil {
@@ -372,8 +306,6 @@ impl Compiler {
                 if let Some(cond) = condition {
                     self.compile_expr(cond)?;
                     let exit = self.chunk.emit(Op::JumpIfFalse(0), line);
-                    // We need to save exit jump to patch later — use a temp vec
-                    let _step_target = self.chunk.len(); // approximate; will be after body
 
                     let mut ctx = LoopCtx {
                         label: label.clone(),
@@ -390,7 +322,6 @@ impl Compiler {
                     self.chunk.emit(Op::Jump(loop_start), line);
 
                     // Patch exit jump and break jumps
-                    let _end = self.chunk.len();
                     for j in ctx.break_jumps {
                         self.chunk.patch_jump_here(j);
                     }
@@ -421,7 +352,6 @@ impl Compiler {
                 label,
             } => {
                 // Compile list, then use GetArray + loop counter
-                // For simplicity: compile to equivalent while loop with index
                 self.compile_expr(list)?;
                 let list_name = self.chunk.intern_name("__foreach_list__");
                 self.chunk.emit(Op::DeclareArray(list_name), line);
@@ -464,6 +394,10 @@ impl Compiler {
                     self.chunk.patch_jump_here(j);
                 }
             }
+            StmtKind::DoWhile { .. } => {
+                // do-while requires parser-level changes to distinguish from do BLOCK
+                return Err(CompileError::Unsupported("do-while".into()));
+            }
             StmtKind::Return(val) => {
                 if let Some(expr) = val {
                     self.compile_expr(expr)?;
@@ -486,11 +420,18 @@ impl Compiler {
                 self.compile_block_inner(block)?;
                 self.chunk.emit(Op::PopFrame, line);
             }
+            StmtKind::Package { name } => {
+                let val_idx = self
+                    .chunk
+                    .add_constant(PerlValue::String(name.clone()));
+                let name_idx = self.chunk.intern_name("__PACKAGE__");
+                self.chunk.emit(Op::LoadConst(val_idx), line);
+                self.chunk.emit(Op::SetScalar(name_idx), line);
+            }
             StmtKind::SubDecl { .. } => {
                 // Already handled in compile_program
             }
-            StmtKind::Package { .. }
-            | StmtKind::Use { .. }
+            StmtKind::Use { .. }
             | StmtKind::No { .. }
             | StmtKind::Begin(_)
             | StmtKind::End(_)
@@ -498,20 +439,61 @@ impl Compiler {
             | StmtKind::Redo(_) => {
                 // No-ops or handled elsewhere
             }
-            _ => {
-                return Err(CompileError::Unsupported(format!(
-                    "Statement: {:?}",
-                    std::mem::discriminant(&stmt.kind)
-                )));
-            }
         }
         Ok(())
     }
 
+    /// Returns true if the block contains a Return statement (directly, not in nested subs).
+    fn block_has_return(block: &Block) -> bool {
+        for stmt in block {
+            match &stmt.kind {
+                StmtKind::Return(_) => return true,
+                StmtKind::If { body, elsifs, else_block, .. } => {
+                    if Self::block_has_return(body) { return true; }
+                    for (_, blk) in elsifs {
+                        if Self::block_has_return(blk) { return true; }
+                    }
+                    if let Some(eb) = else_block {
+                        if Self::block_has_return(eb) { return true; }
+                    }
+                }
+                StmtKind::Unless { body, else_block, .. } => {
+                    if Self::block_has_return(body) { return true; }
+                    if let Some(eb) = else_block {
+                        if Self::block_has_return(eb) { return true; }
+                    }
+                }
+                StmtKind::While { body, .. }
+                | StmtKind::Until { body, .. }
+                | StmtKind::Foreach { body, .. } => {
+                    if Self::block_has_return(body) { return true; }
+                }
+                StmtKind::For { body, .. } => {
+                    if Self::block_has_return(body) { return true; }
+                }
+                StmtKind::Block(blk) => {
+                    if Self::block_has_return(blk) { return true; }
+                }
+                StmtKind::DoWhile { body, .. } => {
+                    if Self::block_has_return(body) { return true; }
+                }
+                _ => {}
+            }
+        }
+        false
+    }
+
     fn compile_block(&mut self, block: &Block) -> Result<(), CompileError> {
-        self.chunk.emit(Op::PushFrame, 0);
-        self.compile_block_inner(block)?;
-        self.chunk.emit(Op::PopFrame, 0);
+        // If the block contains return statements, skip PushFrame/PopFrame
+        // to avoid scope frame mismatch on ReturnValue (VM only pops the
+        // call-stack frame, not intermediate scope frames).
+        if Self::block_has_return(block) {
+            self.compile_block_inner(block)?;
+        } else {
+            self.chunk.emit(Op::PushFrame, 0);
+            self.compile_block_inner(block)?;
+            self.chunk.emit(Op::PopFrame, 0);
+        }
         Ok(())
     }
 
@@ -534,20 +516,24 @@ impl Compiler {
         // For simple blocks like { 1 } or { $x }, the last statement is the expression.
         let last = &block[block.len() - 1];
         if let StmtKind::Expression(expr) = &last.kind {
-            // Compile preceding statements through a temporary compiler
-            // This is a static method so we can't call self methods. Use chunk directly.
-            // For simplicity, only handle single-expression blocks here.
+            // Single expression block — compile inline
             if block.len() == 1 {
-                // Single expression block — compile inline
-                let comp = Compiler { chunk: std::mem::take(chunk) };
-                let mut comp = comp;
+                let mut comp = Compiler {
+                    chunk: std::mem::take(chunk),
+                    begin_blocks: Vec::new(),
+                    end_blocks: Vec::new(),
+                };
                 comp.compile_expr(expr)?;
                 *chunk = comp.chunk;
                 return Ok(());
             }
         }
         // Fallback: compile all statements, push Undef as value
-        let mut comp = Compiler { chunk: std::mem::take(chunk) };
+        let mut comp = Compiler {
+            chunk: std::mem::take(chunk),
+            begin_blocks: Vec::new(),
+            end_blocks: Vec::new(),
+        };
         for stmt in block {
             comp.compile_statement(stmt)?;
         }
@@ -629,6 +615,24 @@ impl Compiler {
                 let idx = self.chunk.intern_name(hash);
                 self.compile_expr(key)?;
                 self.chunk.emit(Op::GetHashElem(idx), line);
+            }
+            ExprKind::ArraySlice { array, indices } => {
+                let arr_idx = self.chunk.intern_name(array);
+                for index_expr in indices {
+                    self.compile_expr(index_expr)?;
+                    self.chunk.emit(Op::GetArrayElem(arr_idx), line);
+                }
+                self.chunk
+                    .emit(Op::MakeArray(indices.len() as u16), line);
+            }
+            ExprKind::HashSlice { hash, keys } => {
+                let hash_idx = self.chunk.intern_name(hash);
+                for key_expr in keys {
+                    self.compile_expr(key_expr)?;
+                    self.chunk.emit(Op::GetHashElem(hash_idx), line);
+                }
+                self.chunk
+                    .emit(Op::MakeArray(keys.len() as u16), line);
             }
 
             // ── Operators ──
@@ -721,6 +725,10 @@ impl Compiler {
                         return Err(CompileError::Unsupported("PreDec on non-scalar".into()));
                     }
                 }
+                UnaryOp::Ref => {
+                    self.compile_expr(expr)?;
+                    self.chunk.emit(Op::MakeScalarRef, line);
+                }
                 _ => {
                     self.compile_expr(expr)?;
                     match op {
@@ -732,9 +740,6 @@ impl Compiler {
                         }
                         UnaryOp::BitNot => {
                             self.chunk.emit(Op::BitNot, line);
-                        }
-                        UnaryOp::Ref => {
-                            return Err(CompileError::Unsupported("Ref unary".into()));
                         }
                         _ => unreachable!(),
                     }
@@ -819,26 +824,42 @@ impl Compiler {
                 self.chunk.emit(Op::Call(name_idx, args.len() as u8), line);
             }
 
-            // ── Print / Say ──
-            ExprKind::Print { handle: None, args }
-            | ExprKind::Print {
-                handle: Some(_),
+            // ── Method calls ──
+            ExprKind::MethodCall {
+                object,
+                method,
                 args,
             } => {
+                self.compile_expr(object)?;
+                for arg in args {
+                    self.compile_expr(arg)?;
+                }
+                let name_idx = self.chunk.intern_name(method);
+                self.chunk
+                    .emit(Op::MethodCall(name_idx, args.len() as u8), line);
+            }
+
+            // ── Print / Say / Printf ──
+            ExprKind::Print { args, .. } => {
                 for arg in args {
                     self.compile_expr(arg)?;
                 }
                 self.chunk.emit(Op::Print(args.len() as u8), line);
             }
-            ExprKind::Say { handle: None, args }
-            | ExprKind::Say {
-                handle: Some(_),
-                args,
-            } => {
+            ExprKind::Say { args, .. } => {
                 for arg in args {
                     self.compile_expr(arg)?;
                 }
                 self.chunk.emit(Op::Say(args.len() as u8), line);
+            }
+            ExprKind::Printf { args, .. } => {
+                for arg in args {
+                    self.compile_expr(arg)?;
+                }
+                self.chunk.emit(
+                    Op::CallBuiltin(BuiltinId::Printf as u16, args.len() as u8),
+                    line,
+                );
             }
 
             // ── Die / Warn ──
@@ -901,6 +922,11 @@ impl Compiler {
                     return Err(CompileError::Unsupported("Shift on non-array".into()));
                 }
             }
+            ExprKind::Unshift { .. } | ExprKind::Splice { .. } => {
+                // These modify arrays in-place; needs special VM support
+                return Err(CompileError::Unsupported("unshift/splice".into()));
+            }
+            // Splice is already handled by Unsupported above
             ExprKind::ScalarContext(inner) => {
                 if let ExprKind::ArrayVar(name) = &inner.kind {
                     let idx = self.chunk.intern_name(name);
@@ -945,6 +971,9 @@ impl Compiler {
                     return Err(CompileError::Unsupported("Values on non-hash".into()));
                 }
             }
+            ExprKind::Each(_) => {
+                return Err(CompileError::Unsupported("each()".into()));
+            }
 
             // ── Builtins that map to CallBuiltin ──
             ExprKind::Length(e) => {
@@ -952,10 +981,9 @@ impl Compiler {
                 self.chunk
                     .emit(Op::CallBuiltin(BuiltinId::Length as u16, 1), line);
             }
-            ExprKind::Chomp(e) => {
-                self.compile_expr(e)?;
-                self.chunk
-                    .emit(Op::CallBuiltin(BuiltinId::Chomp as u16, 1), line);
+            ExprKind::Chomp(_) | ExprKind::Chop(_) => {
+                // chomp/chop modify variables in-place; needs special VM support
+                return Err(CompileError::Unsupported("chomp/chop".into()));
             }
             ExprKind::Defined(e) => {
                 self.compile_expr(e)?;
@@ -1007,6 +1035,16 @@ impl Compiler {
                 self.chunk
                     .emit(Op::CallBuiltin(BuiltinId::Lc as u16, 1), line);
             }
+            ExprKind::Ucfirst(e) => {
+                self.compile_expr(e)?;
+                self.chunk
+                    .emit(Op::CallBuiltin(BuiltinId::Ucfirst as u16, 1), line);
+            }
+            ExprKind::Lcfirst(e) => {
+                self.compile_expr(e)?;
+                self.chunk
+                    .emit(Op::CallBuiltin(BuiltinId::Lcfirst as u16, 1), line);
+            }
             ExprKind::Ref(e) => {
                 self.compile_expr(e)?;
                 self.chunk
@@ -1014,8 +1052,7 @@ impl Compiler {
             }
             ExprKind::ReverseExpr(e) => {
                 self.compile_expr(e)?;
-                self.chunk
-                    .emit(Op::CallBuiltin(BuiltinId::Reverse as u16, 1), line);
+                self.chunk.emit(Op::ReverseOp, line);
             }
             ExprKind::System(args) => {
                 for a in args {
@@ -1025,6 +1062,70 @@ impl Compiler {
                     Op::CallBuiltin(BuiltinId::System as u16, args.len() as u8),
                     line,
                 );
+            }
+            ExprKind::Exec(args) => {
+                for a in args {
+                    self.compile_expr(a)?;
+                }
+                self.chunk.emit(
+                    Op::CallBuiltin(BuiltinId::Exec as u16, args.len() as u8),
+                    line,
+                );
+            }
+
+            // ── String builtins ──
+            ExprKind::Substr {
+                string,
+                offset,
+                length,
+                replacement,
+            } => {
+                if replacement.is_some() {
+                    return Err(CompileError::Unsupported("4-arg substr".into()));
+                }
+                self.compile_expr(string)?;
+                self.compile_expr(offset)?;
+                let mut argc: u8 = 2;
+                if let Some(len) = length {
+                    self.compile_expr(len)?;
+                    argc = 3;
+                }
+                self.chunk.emit(
+                    Op::CallBuiltin(BuiltinId::Substr as u16, argc),
+                    line,
+                );
+            }
+            ExprKind::Index {
+                string,
+                substr,
+                position,
+            } => {
+                self.compile_expr(string)?;
+                self.compile_expr(substr)?;
+                if let Some(pos) = position {
+                    self.compile_expr(pos)?;
+                    self.chunk
+                        .emit(Op::CallBuiltin(BuiltinId::Index as u16, 3), line);
+                } else {
+                    self.chunk
+                        .emit(Op::CallBuiltin(BuiltinId::Index as u16, 2), line);
+                }
+            }
+            ExprKind::Rindex {
+                string,
+                substr,
+                position,
+            } => {
+                self.compile_expr(string)?;
+                self.compile_expr(substr)?;
+                if let Some(pos) = position {
+                    self.compile_expr(pos)?;
+                    self.chunk
+                        .emit(Op::CallBuiltin(BuiltinId::Rindex as u16, 3), line);
+                } else {
+                    self.chunk
+                        .emit(Op::CallBuiltin(BuiltinId::Rindex as u16, 2), line);
+                }
             }
 
             ExprKind::JoinExpr { separator, list } => {
@@ -1060,15 +1161,189 @@ impl Compiler {
                 );
             }
 
+            // ── I/O ──
+            ExprKind::Open { handle, mode, file } => {
+                self.compile_expr(handle)?;
+                self.compile_expr(mode)?;
+                if let Some(f) = file {
+                    self.compile_expr(f)?;
+                    self.chunk
+                        .emit(Op::CallBuiltin(BuiltinId::Open as u16, 3), line);
+                } else {
+                    self.chunk
+                        .emit(Op::CallBuiltin(BuiltinId::Open as u16, 2), line);
+                }
+            }
+            ExprKind::Close(e) => {
+                self.compile_expr(e)?;
+                self.chunk
+                    .emit(Op::CallBuiltin(BuiltinId::Close as u16, 1), line);
+            }
+            ExprKind::ReadLine(handle) => {
+                if let Some(h) = handle {
+                    let idx = self.chunk.add_constant(PerlValue::String(h.clone()));
+                    self.chunk.emit(Op::LoadConst(idx), line);
+                    self.chunk
+                        .emit(Op::CallBuiltin(BuiltinId::ReadLine as u16, 1), line);
+                } else {
+                    self.chunk
+                        .emit(Op::CallBuiltin(BuiltinId::ReadLine as u16, 0), line);
+                }
+            }
+            ExprKind::Eof(e) => {
+                if let Some(inner) = e {
+                    self.compile_expr(inner)?;
+                    self.chunk
+                        .emit(Op::CallBuiltin(BuiltinId::Eof as u16, 1), line);
+                } else {
+                    self.chunk
+                        .emit(Op::CallBuiltin(BuiltinId::Eof as u16, 0), line);
+                }
+            }
+
+            // ── File tests ──
+            ExprKind::FileTest { op, expr } => {
+                self.compile_expr(expr)?;
+                self.chunk.emit(Op::FileTestOp(*op as u8), line);
+            }
+
+            // ── Eval / Do / Require ──
+            ExprKind::Eval(e) => {
+                self.compile_expr(e)?;
+                self.chunk
+                    .emit(Op::CallBuiltin(BuiltinId::Eval as u16, 1), line);
+            }
+            ExprKind::Do(e) => {
+                // do { BLOCK } executes the block; do "file" loads a file
+                if let ExprKind::CodeRef { body, .. } = &e.kind {
+                    let block_idx = self.chunk.add_block(body.clone());
+                    self.chunk.emit(Op::EvalBlock(block_idx), line);
+                } else {
+                    self.compile_expr(e)?;
+                    self.chunk
+                        .emit(Op::CallBuiltin(BuiltinId::Do as u16, 1), line);
+                }
+            }
+            ExprKind::Require(e) => {
+                self.compile_expr(e)?;
+                self.chunk
+                    .emit(Op::CallBuiltin(BuiltinId::Require as u16, 1), line);
+            }
+
+            // ── Filesystem ──
+            ExprKind::Chdir(e) => {
+                self.compile_expr(e)?;
+                self.chunk
+                    .emit(Op::CallBuiltin(BuiltinId::Chdir as u16, 1), line);
+            }
+            ExprKind::Mkdir { path, mode } => {
+                self.compile_expr(path)?;
+                if let Some(m) = mode {
+                    self.compile_expr(m)?;
+                    self.chunk
+                        .emit(Op::CallBuiltin(BuiltinId::Mkdir as u16, 2), line);
+                } else {
+                    self.chunk
+                        .emit(Op::CallBuiltin(BuiltinId::Mkdir as u16, 1), line);
+                }
+            }
+            ExprKind::Unlink(args) => {
+                for a in args {
+                    self.compile_expr(a)?;
+                }
+                self.chunk.emit(
+                    Op::CallBuiltin(BuiltinId::Unlink as u16, args.len() as u8),
+                    line,
+                );
+            }
+
+            // ── OOP ──
+            ExprKind::Bless { ref_expr, class } => {
+                self.compile_expr(ref_expr)?;
+                if let Some(c) = class {
+                    self.compile_expr(c)?;
+                    self.chunk
+                        .emit(Op::CallBuiltin(BuiltinId::Bless as u16, 2), line);
+                } else {
+                    self.chunk
+                        .emit(Op::CallBuiltin(BuiltinId::Bless as u16, 1), line);
+                }
+            }
+            ExprKind::Caller(e) => {
+                if let Some(inner) = e {
+                    self.compile_expr(inner)?;
+                    self.chunk
+                        .emit(Op::CallBuiltin(BuiltinId::Caller as u16, 1), line);
+                } else {
+                    self.chunk
+                        .emit(Op::CallBuiltin(BuiltinId::Caller as u16, 0), line);
+                }
+            }
+            ExprKind::Wantarray => {
+                // No Wantarray BuiltinId — fall back to tree-walker
+                return Err(CompileError::Unsupported("wantarray".into()));
+            }
+
+            // ── References ──
+            ExprKind::ScalarRef(e) => {
+                self.compile_expr(e)?;
+                self.chunk.emit(Op::MakeScalarRef, line);
+            }
+            ExprKind::ArrayRef(elems) => {
+                for e in elems {
+                    self.compile_expr(e)?;
+                }
+                self.chunk
+                    .emit(Op::MakeArray(elems.len() as u16), line);
+                self.chunk.emit(Op::MakeArrayRef, line);
+            }
+            ExprKind::HashRef(pairs) => {
+                for (k, v) in pairs {
+                    self.compile_expr(k)?;
+                    self.compile_expr(v)?;
+                }
+                self.chunk
+                    .emit(Op::MakeHash((pairs.len() * 2) as u16), line);
+                self.chunk.emit(Op::MakeHashRef, line);
+            }
+            ExprKind::CodeRef { body, .. } => {
+                let block_idx = self.chunk.add_block(body.clone());
+                self.chunk.emit(Op::MakeCodeRef(block_idx), line);
+            }
+
+            // ── Derefs ──
+            ExprKind::ArrowDeref { expr, index, kind } => {
+                self.compile_expr(expr)?;
+                self.compile_expr(index)?;
+                match kind {
+                    DerefKind::Array => {
+                        self.chunk.emit(Op::ArrowArray, line);
+                    }
+                    DerefKind::Hash => {
+                        self.chunk.emit(Op::ArrowHash, line);
+                    }
+                    DerefKind::Call => {
+                        self.chunk.emit(Op::ArrowCall, line);
+                    }
+                }
+            }
+            ExprKind::Deref { expr, kind } => {
+                self.compile_expr(expr)?;
+                match kind {
+                    Sigil::Scalar | Sigil::Array | Sigil::Hash => {
+                        self.chunk
+                            .emit(Op::CallBuiltin(BuiltinId::Scalar as u16, 1), line);
+                    }
+                }
+            }
+
             // ── Interpolated strings ──
             ExprKind::InterpolatedString(parts) => {
                 if parts.is_empty() {
                     let idx = self.chunk.add_constant(PerlValue::String(String::new()));
                     self.chunk.emit(Op::LoadConst(idx), line);
                 } else {
-                    // Compile first part
                     self.compile_string_part(&parts[0], line)?;
-                    // Concat remaining parts
                     for part in &parts[1..] {
                         self.compile_string_part(part, line)?;
                         self.chunk.emit(Op::Concat, line);
@@ -1095,15 +1370,6 @@ impl Compiler {
                 self.chunk.emit(Op::MakeArray(words.len() as u16), line);
             }
 
-            // ── Array/Hash refs ──
-            ExprKind::ArrayRef(elems) => {
-                for e in elems {
-                    self.compile_expr(e)?;
-                }
-                self.chunk.emit(Op::MakeArray(elems.len() as u16), line);
-                // TODO: wrap in ArrayRef
-            }
-
             // ── Postfix if/unless ──
             ExprKind::PostfixIf { expr, condition } => {
                 self.compile_expr(condition)?;
@@ -1123,11 +1389,84 @@ impl Compiler {
                 self.chunk.emit(Op::LoadUndef, line);
                 self.chunk.patch_jump_here(end);
             }
-            ExprKind::PostfixForeach { expr: _, list } => {
-                // Compile as: for $_ (list) { expr }
+
+            // ── Postfix while/until/foreach ──
+            ExprKind::PostfixWhile { expr, condition } => {
+                // Detect `do { BLOCK } while (COND)` pattern
+                let is_do_block = matches!(
+                    &expr.kind,
+                    ExprKind::Do(inner) if matches!(inner.kind, ExprKind::CodeRef { .. })
+                );
+                if is_do_block {
+                    // do-while: body executes before first condition check
+                    let loop_start = self.chunk.len();
+                    self.compile_expr(expr)?;
+                    self.chunk.emit(Op::Pop, line);
+                    self.compile_expr(condition)?;
+                    self.chunk.emit(Op::JumpIfTrue(loop_start), line);
+                    self.chunk.emit(Op::LoadUndef, line);
+                } else {
+                    // Regular postfix while: condition checked first
+                    let loop_start = self.chunk.len();
+                    self.compile_expr(condition)?;
+                    let exit_jump = self.chunk.emit(Op::JumpIfFalse(0), line);
+                    self.compile_expr(expr)?;
+                    self.chunk.emit(Op::Pop, line);
+                    self.chunk.emit(Op::Jump(loop_start), line);
+                    self.chunk.patch_jump_here(exit_jump);
+                    self.chunk.emit(Op::LoadUndef, line);
+                }
+            }
+            ExprKind::PostfixUntil { expr, condition } => {
+                let is_do_block = matches!(
+                    &expr.kind,
+                    ExprKind::Do(inner) if matches!(inner.kind, ExprKind::CodeRef { .. })
+                );
+                if is_do_block {
+                    let loop_start = self.chunk.len();
+                    self.compile_expr(expr)?;
+                    self.chunk.emit(Op::Pop, line);
+                    self.compile_expr(condition)?;
+                    self.chunk.emit(Op::JumpIfFalse(loop_start), line);
+                    self.chunk.emit(Op::LoadUndef, line);
+                } else {
+                    let loop_start = self.chunk.len();
+                    self.compile_expr(condition)?;
+                    let exit_jump = self.chunk.emit(Op::JumpIfTrue(0), line);
+                    self.compile_expr(expr)?;
+                    self.chunk.emit(Op::Pop, line);
+                    self.chunk.emit(Op::Jump(loop_start), line);
+                    self.chunk.patch_jump_here(exit_jump);
+                    self.chunk.emit(Op::LoadUndef, line);
+                }
+            }
+            ExprKind::PostfixForeach { expr, list } => {
                 self.compile_expr(list)?;
-                // We need a loop — fall back for now
-                return Err(CompileError::Unsupported("PostfixForeach".into()));
+                let list_name = self.chunk.intern_name("__pf_foreach_list__");
+                self.chunk.emit(Op::DeclareArray(list_name), line);
+                let counter = self.chunk.intern_name("__pf_foreach_i__");
+                self.chunk.emit(Op::LoadInt(0), line);
+                self.chunk.emit(Op::DeclareScalar(counter), line);
+                let underscore = self.chunk.intern_name("_");
+
+                let loop_start = self.chunk.len();
+                self.chunk.emit(Op::GetScalar(counter), line);
+                self.chunk.emit(Op::ArrayLen(list_name), line);
+                self.chunk.emit(Op::NumLt, line);
+                let exit_jump = self.chunk.emit(Op::JumpIfFalse(0), line);
+
+                self.chunk.emit(Op::GetScalar(counter), line);
+                self.chunk.emit(Op::GetArrayElem(list_name), line);
+                self.chunk.emit(Op::SetScalar(underscore), line);
+
+                self.compile_expr(expr)?;
+                self.chunk.emit(Op::Pop, line);
+
+                self.chunk.emit(Op::PreInc(counter), line);
+                self.chunk.emit(Op::Pop, line);
+                self.chunk.emit(Op::Jump(loop_start), line);
+                self.chunk.patch_jump_here(exit_jump);
+                self.chunk.emit(Op::LoadUndef, line);
             }
 
             // ── Match (regex) ──
@@ -1142,31 +1481,73 @@ impl Compiler {
                 self.chunk.emit(Op::RegexMatch(pat_idx, flags_idx), line);
             }
 
+            // ── Substitution / Transliterate — no BuiltinId, fall back ──
+            ExprKind::Substitution { .. } => {
+                return Err(CompileError::Unsupported("s///".into()));
+            }
+            ExprKind::Transliterate { .. } => {
+                return Err(CompileError::Unsupported("tr///".into()));
+            }
+
             // ── Regex literal ──
             ExprKind::Regex(_, _) => {
-                // Regex as value — used in match context
                 return Err(CompileError::Unsupported("Regex literal as value".into()));
             }
 
-            // ── Map/Grep/Sort (block-based) — fall back ──
-            ExprKind::MapExpr { .. }
-            | ExprKind::GrepExpr { .. }
-            | ExprKind::SortExpr { .. }
-            | ExprKind::PMapExpr { .. }
-            | ExprKind::PGrepExpr { .. }
-            | ExprKind::PForExpr { .. }
-            | ExprKind::PSortExpr { .. }
-            | ExprKind::PReduceExpr { .. }
-            | ExprKind::FanExpr { .. } => {
-                return Err(CompileError::Unsupported("Block-based list op".into()));
+            // ── Map/Grep/Sort with blocks ──
+            ExprKind::MapExpr { block, list } => {
+                self.compile_expr(list)?;
+                let block_idx = self.chunk.add_block(block.clone());
+                self.chunk.emit(Op::MapWithBlock(block_idx), line);
+            }
+            ExprKind::GrepExpr { block, list } => {
+                self.compile_expr(list)?;
+                let block_idx = self.chunk.add_block(block.clone());
+                self.chunk.emit(Op::GrepWithBlock(block_idx), line);
+            }
+            ExprKind::SortExpr { cmp, list } => {
+                self.compile_expr(list)?;
+                if let Some(block) = cmp {
+                    let block_idx = self.chunk.add_block(block.clone());
+                    self.chunk.emit(Op::SortWithBlock(block_idx), line);
+                } else {
+                    self.chunk.emit(Op::SortNoBlock, line);
+                }
             }
 
-            // ── Anything else: fall back to tree-walker ──
-            _ => {
-                return Err(CompileError::Unsupported(format!(
-                    "Expr: {:?}",
-                    std::mem::discriminant(&expr.kind)
-                )));
+            // ── Parallel extensions ──
+            ExprKind::PMapExpr { block, list } => {
+                self.compile_expr(list)?;
+                let block_idx = self.chunk.add_block(block.clone());
+                self.chunk.emit(Op::PMapWithBlock(block_idx), line);
+            }
+            ExprKind::PGrepExpr { block, list } => {
+                self.compile_expr(list)?;
+                let block_idx = self.chunk.add_block(block.clone());
+                self.chunk.emit(Op::PGrepWithBlock(block_idx), line);
+            }
+            ExprKind::PForExpr { block, list } => {
+                self.compile_expr(list)?;
+                let block_idx = self.chunk.add_block(block.clone());
+                self.chunk.emit(Op::PForWithBlock(block_idx), line);
+            }
+            ExprKind::PSortExpr { cmp, list } => {
+                self.compile_expr(list)?;
+                if let Some(block) = cmp {
+                    let block_idx = self.chunk.add_block(block.clone());
+                    self.chunk.emit(Op::PSortWithBlock(block_idx), line);
+                } else {
+                    self.chunk.emit(Op::SortNoBlock, line);
+                }
+            }
+            ExprKind::PReduceExpr { .. } => {
+                // No PReduce op — fall back to tree-walker
+                return Err(CompileError::Unsupported("preduce".into()));
+            }
+            ExprKind::FanExpr { count, block } => {
+                self.compile_expr(count)?;
+                let block_idx = self.chunk.add_block(block.clone());
+                self.chunk.emit(Op::FanWithBlock(block_idx), line);
             }
         }
         Ok(())
@@ -1231,6 +1612,11 @@ impl Compiler {
                 let idx = self.chunk.intern_name(hash);
                 self.compile_expr(key)?;
                 self.chunk.emit(Op::SetHashElem(idx), line);
+            }
+            ExprKind::ArrowDeref { .. } => {
+                return Err(CompileError::Unsupported(
+                    "Assign to arrow deref".into(),
+                ));
             }
             _ => {
                 return Err(CompileError::Unsupported("Assign to complex lvalue".into()));

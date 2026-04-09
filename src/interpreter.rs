@@ -200,7 +200,7 @@ impl Interpreter {
         Ok(last)
     }
 
-    fn exec_block(&mut self, block: &Block) -> ExecResult {
+    pub(crate) fn exec_block(&mut self, block: &Block) -> ExecResult {
         self.scope.push_frame();
         let result = self.exec_block_no_scope(block);
         self.scope.pop_frame();

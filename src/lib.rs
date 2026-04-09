@@ -41,6 +41,14 @@ pub fn try_vm_execute(
     program: &ast::Program,
     interp: &mut Interpreter,
 ) -> Option<PerlResult<PerlValue>> {
+    // BEGIN/END blocks require tree-walker execution; skip VM path.
+    let has_begin_end = program.statements.iter().any(|s| {
+        matches!(s.kind, ast::StmtKind::Begin(_) | ast::StmtKind::End(_))
+    });
+    if has_begin_end {
+        return None;
+    }
+
     let comp = compiler::Compiler::new();
     match comp.compile_program(program) {
         Ok(chunk) => {
@@ -60,7 +68,16 @@ pub fn try_vm_execute(
                 }
             }
             let mut vm = vm::VM::new(&chunk, interp);
-            Some(vm.execute())
+            match vm.execute() {
+                Ok(val) => Some(Ok(val)),
+                Err(ref e)
+                    if e.message.starts_with("VM: unimplemented op")
+                        || e.message.starts_with("Unimplemented builtin") =>
+                {
+                    None
+                }
+                Err(e) => Some(Err(e)),
+            }
         }
         Err(_) => None,
     }
