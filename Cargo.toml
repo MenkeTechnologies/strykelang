@@ -1,0 +1,36 @@
+[package]
+name = "perlrs"
+version = "0.1.0"
+edition = "2021"
+description = "A highly parallel Perl 5 interpreter written in Rust"
+license = "MIT"
+authors = ["MenkeTechnologies"]
+repository = "https://github.com/MenkeTechnologies/perlrs"
+
+[[bin]]
+name = "perlrs"
+path = "src/main.rs"
+
+[[bin]]
+name = "pe"
+path = "src/main.rs"
+
+[dependencies]
+rayon = "1.10"
+regex = "1.11"
+clap = { version = "4", features = ["derive"] }
+crossbeam = "0.8"
+parking_lot = "0.12"
+dashmap = "6"
+indexmap = "2"
+thiserror = "2"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+opt-level = 1
