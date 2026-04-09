@@ -199,13 +199,12 @@ impl Interpreter {
                     self.errno = e.to_string();
                     PerlError::runtime(format!("Can't open pipe from command: {}", e), line)
                 })?;
-                let stdout = child.stdout.take().ok_or_else(|| {
-                    PerlError::runtime("pipe: child has no stdout", line)
-                })?;
-                self.input_handles.insert(
-                    handle_name.clone(),
-                    BufReader::new(Box::new(stdout)),
-                );
+                let stdout = child
+                    .stdout
+                    .take()
+                    .ok_or_else(|| PerlError::runtime("pipe: child has no stdout", line))?;
+                self.input_handles
+                    .insert(handle_name.clone(), BufReader::new(Box::new(stdout)));
                 self.pipe_children.insert(handle_name, child);
             }
             "|-" => {
@@ -215,9 +214,10 @@ impl Interpreter {
                     self.errno = e.to_string();
                     PerlError::runtime(format!("Can't open pipe to command: {}", e), line)
                 })?;
-                let stdin = child.stdin.take().ok_or_else(|| {
-                    PerlError::runtime("pipe: child has no stdin", line)
-                })?;
+                let stdin = child
+                    .stdin
+                    .take()
+                    .ok_or_else(|| PerlError::runtime("pipe: child has no stdin", line))?;
                 self.output_handles
                     .insert(handle_name.clone(), Box::new(stdin));
                 self.pipe_children.insert(handle_name, child);
@@ -388,10 +388,8 @@ impl Interpreter {
     ) -> Result<(), FlowOrError> {
         for i in 1..caps.len() {
             if let Some(m) = caps.get(i) {
-                self.scope.set_scalar(
-                    &i.to_string(),
-                    PerlValue::String(m.as_str().to_string()),
-                )?;
+                self.scope
+                    .set_scalar(&i.to_string(), PerlValue::String(m.as_str().to_string()))?;
             }
         }
         let mut named = IndexMap::new();
@@ -405,11 +403,7 @@ impl Interpreter {
     }
 
     /// Shared `chomp` for tree-walker and VM (mutates `target`).
-    pub(crate) fn chomp_inplace_execute(
-        &mut self,
-        val: PerlValue,
-        target: &Expr,
-    ) -> ExecResult {
+    pub(crate) fn chomp_inplace_execute(&mut self, val: PerlValue, target: &Expr) -> ExecResult {
         let mut s = val.to_string();
         let removed = if s.ends_with('\n') {
             s.pop();
@@ -422,11 +416,7 @@ impl Interpreter {
     }
 
     /// Shared `chop` for tree-walker and VM (mutates `target`).
-    pub(crate) fn chop_inplace_execute(
-        &mut self,
-        val: PerlValue,
-        target: &Expr,
-    ) -> ExecResult {
+    pub(crate) fn chop_inplace_execute(&mut self, val: PerlValue, target: &Expr) -> ExecResult {
         let mut s = val.to_string();
         let chopped = s
             .pop()
@@ -504,10 +494,7 @@ impl Interpreter {
         }
         let (new_s, count) = if flags.contains('g') {
             let count = re.find_iter(&s).count();
-            (
-                re.replace_all(&s, replacement).to_string(),
-                count,
-            )
+            (re.replace_all(&s, replacement).to_string(), count)
         } else {
             let count = if re.is_match(&s) { 1 } else { 0 };
             (re.replace(&s, replacement).to_string(), count)
@@ -1634,7 +1621,8 @@ impl Interpreter {
                         other => arg_vals.push(other),
                     }
                 }
-                if let Some(r) = crate::builtins::try_builtin(self, name.as_str(), &arg_vals, line) {
+                if let Some(r) = crate::builtins::try_builtin(self, name.as_str(), &arg_vals, line)
+                {
                     return r.map_err(Into::into);
                 }
                 self.call_named_sub(name, arg_vals, line)
@@ -1673,6 +1661,8 @@ impl Interpreter {
                 } else if method == "new" {
                     // Default constructor
                     self.builtin_new(&class, arg_vals, line)
+                } else if let Some(r) = self.try_autoload_call(&full_name, arg_vals, line) {
+                    r
                 } else {
                     Err(PerlError::runtime(
                         format!(
@@ -2761,7 +2751,9 @@ impl Interpreter {
                 for a in &args[1..] {
                     paths.push(self.eval_expr(a)?.to_string());
                 }
-                Ok(PerlValue::Integer(crate::perl_fs::chmod_paths(&paths, mode)))
+                Ok(PerlValue::Integer(crate::perl_fs::chmod_paths(
+                    &paths, mode,
+                )))
             }
             ExprKind::Chown(args) => {
                 let uid = self.eval_expr(&args[0])?.to_int();
@@ -2770,7 +2762,9 @@ impl Interpreter {
                 for a in &args[2..] {
                     paths.push(self.eval_expr(a)?.to_string());
                 }
-                Ok(PerlValue::Integer(crate::perl_fs::chown_paths(&paths, uid, gid)))
+                Ok(PerlValue::Integer(crate::perl_fs::chown_paths(
+                    &paths, uid, gid,
+                )))
             }
             ExprKind::Stat(e) => {
                 let path = self.eval_expr(e)?.to_string();
@@ -3240,6 +3234,37 @@ impl Interpreter {
         }
     }
 
+    /// Current package (`main` when `__PACKAGE__` is unset or empty).
+    fn current_package(&self) -> String {
+        let s = self.scope.get_scalar("__PACKAGE__").to_string();
+        if s.is_empty() {
+            "main".to_string()
+        } else {
+            s
+        }
+    }
+
+    /// If `sub AUTOLOAD` exists, set `$AUTOLOAD` to the fully qualified missing sub or method name
+    /// and invoke the handler (same argument list as the missing call).
+    pub(crate) fn try_autoload_call(
+        &mut self,
+        missing_name: &str,
+        args: Vec<PerlValue>,
+        _line: usize,
+    ) -> Option<ExecResult> {
+        let sub = self.subs.get("AUTOLOAD")?.clone();
+        let pkg = self.current_package();
+        let full = if missing_name.contains("::") {
+            missing_name.to_string()
+        } else {
+            format!("{}::{}", pkg, missing_name)
+        };
+        if let Err(e) = self.scope.set_scalar("AUTOLOAD", PerlValue::String(full)) {
+            return Some(Err(e.into()));
+        }
+        Some(self.call_sub(&sub, args, line))
+    }
+
     fn call_named_sub(&mut self, name: &str, args: Vec<PerlValue>, line: usize) -> ExecResult {
         if let Some(sub) = self.subs.get(name).cloned() {
             return self.call_sub(&sub, args, line);
@@ -3281,7 +3306,12 @@ impl Interpreter {
                 }
                 crate::ppool::create_pool(args[0].to_int().max(0) as usize).map_err(Into::into)
             }
-            _ => Err(PerlError::runtime(format!("Undefined subroutine &{}", name), line).into()),
+            _ => {
+                if let Some(r) = self.try_autoload_call(name, args, line) {
+                    return r;
+                }
+                Err(PerlError::runtime(format!("Undefined subroutine &{}", name), line).into())
+            }
         }
     }
 

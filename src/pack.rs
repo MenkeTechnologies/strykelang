@@ -112,32 +112,30 @@ fn pack_impl(template: &str, args: &mut &[PerlValue]) -> Result<Vec<u8>, String>
                 }
                 buf.extend(chunk);
             }
-            'Z' => {
-                match t.repeat {
-                    Repeat::One | Repeat::Star => {
-                        let s = take_arg(args)?.to_string();
-                        let mut b = s.into_bytes();
-                        b.push(0);
-                        buf.extend(b);
-                    }
-                    Repeat::Count(max) => {
-                        let s = take_arg(args)?.to_string();
-                        let mut b = s.into_bytes();
-                        b.push(0);
-                        if b.len() > max {
-                            b.truncate(max);
-                            if max > 0 {
-                                b[max - 1] = 0;
-                            }
-                        } else {
-                            while b.len() < max {
-                                b.push(0);
-                            }
-                        }
-                        buf.extend(b);
-                    }
+            'Z' => match t.repeat {
+                Repeat::One | Repeat::Star => {
+                    let s = take_arg(args)?.to_string();
+                    let mut b = s.into_bytes();
+                    b.push(0);
+                    buf.extend(b);
                 }
-            }
+                Repeat::Count(max) => {
+                    let s = take_arg(args)?.to_string();
+                    let mut b = s.into_bytes();
+                    b.push(0);
+                    if b.len() > max {
+                        b.truncate(max);
+                        if max > 0 {
+                            b[max - 1] = 0;
+                        }
+                    } else {
+                        while b.len() < max {
+                            b.push(0);
+                        }
+                    }
+                    buf.extend(b);
+                }
+            },
             'H' => {
                 let s = take_arg(args)?.to_string();
                 let hex: String = s.chars().filter(char::is_ascii_hexdigit).collect();
@@ -161,8 +159,7 @@ fn pack_impl(template: &str, args: &mut &[PerlValue]) -> Result<Vec<u8>, String>
                 }
                 let mut i = 0;
                 while i < hex.len() {
-                    let byte =
-                        u8::from_str_radix(&hex[i..i + 2], 16).map_err(|e| e.to_string())?;
+                    let byte = u8::from_str_radix(&hex[i..i + 2], 16).map_err(|e| e.to_string())?;
                     buf.push(byte);
                     i += 2;
                 }
@@ -462,27 +459,25 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                     out.push(PerlValue::Integer(v as i64));
                 }
             }
-            'C' => {
-                match t.repeat {
-                    Repeat::Star => {
-                        while pos < data.len() {
-                            out.push(PerlValue::Integer(data[pos] as i64));
-                            pos += 1;
-                        }
-                    }
-                    _ => {
-                        let count = repeat_fixed(t.repeat, 1)?;
-                        for _ in 0..count {
-                            if pos >= data.len() {
-                                return Err("unpack: data too short for C".into());
-                            }
-                            let v = data[pos];
-                            pos += 1;
-                            out.push(PerlValue::Integer(v as i64));
-                        }
+            'C' => match t.repeat {
+                Repeat::Star => {
+                    while pos < data.len() {
+                        out.push(PerlValue::Integer(data[pos] as i64));
+                        pos += 1;
                     }
                 }
-            }
+                _ => {
+                    let count = repeat_fixed(t.repeat, 1)?;
+                    for _ in 0..count {
+                        if pos >= data.len() {
+                            return Err("unpack: data too short for C".into());
+                        }
+                        let v = data[pos];
+                        pos += 1;
+                        out.push(PerlValue::Integer(v as i64));
+                    }
+                }
+            },
             'Q' => {
                 let count = match t.repeat {
                     Repeat::Star => (data.len().saturating_sub(pos)) / 8,
@@ -588,14 +583,7 @@ mod tests {
         let PerlValue::Bytes(b) = p else {
             panic!("expected Bytes");
         };
-        let u = perl_unpack(
-            &[
-                PerlValue::String("C*".into()),
-                PerlValue::Bytes(b),
-            ],
-            0,
-        )
-        .unwrap();
+        let u = perl_unpack(&[PerlValue::String("C*".into()), PerlValue::Bytes(b)], 0).unwrap();
         let PerlValue::Array(vals) = u else {
             panic!("expected array");
         };

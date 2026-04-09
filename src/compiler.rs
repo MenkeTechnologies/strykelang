@@ -1925,7 +1925,9 @@ impl Compiler {
             } => {
                 self.compile_expr(expr)?;
                 let pat_idx = self.chunk.add_constant(PerlValue::String(pattern.clone()));
-                let repl_idx = self.chunk.add_constant(PerlValue::String(replacement.clone()));
+                let repl_idx = self
+                    .chunk
+                    .add_constant(PerlValue::String(replacement.clone()));
                 let flags_idx = self.chunk.add_constant(PerlValue::String(flags.clone()));
                 let lv_idx = self.chunk.add_lvalue_expr(expr.as_ref().clone());
                 self.chunk
@@ -2252,10 +2254,7 @@ mod tests {
     fn compile_chomp_emits_chomp_in_place() {
         let chunk = compile_snippet(r#"my $s = "x\n"; chomp $s;"#).expect("compile");
         assert!(
-            chunk
-                .ops
-                .iter()
-                .any(|o| matches!(o, Op::ChompInPlace(_))),
+            chunk.ops.iter().any(|o| matches!(o, Op::ChompInPlace(_))),
             "expected ChompInPlace, got {:?}",
             chunk.ops
         );

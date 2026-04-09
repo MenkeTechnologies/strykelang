@@ -128,17 +128,11 @@ impl PerlTypeName {
         match self {
             Self::Int => match v {
                 PerlValue::Integer(_) => Ok(()),
-                _ => Err(format!(
-                    "expected Int (INTEGER), got {}",
-                    v.type_name()
-                )),
+                _ => Err(format!("expected Int (INTEGER), got {}", v.type_name())),
             },
             Self::Str => match v {
                 PerlValue::String(_) => Ok(()),
-                _ => Err(format!(
-                    "expected Str (STRING), got {}",
-                    v.type_name()
-                )),
+                _ => Err(format!("expected Str (STRING), got {}", v.type_name())),
             },
             Self::Float => match v {
                 PerlValue::Float(_) | PerlValue::Integer(_) => Ok(()),

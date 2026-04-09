@@ -480,15 +480,23 @@ fn pack_unpack_and_length() {
 }
 
 #[test]
-#[ignore = "piped open + readline: diagnose handle routing vs <FH> in VM (tracked)"]
 fn open_read_pipe_echo() {
-    let out = rs(
-        r#"
+    let out = rs(r#"
         open(FH, "-|", "echo hi");
         my $x = <FH>;
         close FH;
         $x;
-    "#,
-    );
+    "#);
     assert!(out.contains("hi"));
+}
+
+#[test]
+fn autoload_sets_missing_sub_name() {
+    assert_eq!(
+        rs(r#"
+        sub AUTOLOAD { $AUTOLOAD }
+        not_defined_yet();
+    "#,),
+        "main::not_defined_yet"
+    );
 }

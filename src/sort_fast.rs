@@ -29,16 +29,16 @@ pub fn detect_sort_block_fast(block: &Block) -> Option<SortBlockFast> {
         _ => return None,
     };
     match &e.kind {
-        ExprKind::BinOp { left, op: BinOp::Spaceship, right }
-            if is_magic_a(left) && is_magic_b(right) =>
-        {
-            Some(SortBlockFast::Numeric)
-        }
-        ExprKind::BinOp { left, op: BinOp::StrCmp, right }
-            if is_magic_a(left) && is_magic_b(right) =>
-        {
-            Some(SortBlockFast::String)
-        }
+        ExprKind::BinOp {
+            left,
+            op: BinOp::Spaceship,
+            right,
+        } if is_magic_a(left) && is_magic_b(right) => Some(SortBlockFast::Numeric),
+        ExprKind::BinOp {
+            left,
+            op: BinOp::StrCmp,
+            right,
+        } if is_magic_a(left) && is_magic_b(right) => Some(SortBlockFast::String),
         _ => None,
     }
 }
@@ -64,11 +64,7 @@ mod tests {
         let p = crate::parse("sort { $a <=> $b } (3, 1, 2);").expect("parse");
         let block = match &p.statements[0].kind {
             StmtKind::Expression(Expr {
-                kind:
-                    ExprKind::SortExpr {
-                        cmp: Some(b),
-                        ..
-                    },
+                kind: ExprKind::SortExpr { cmp: Some(b), .. },
                 ..
             }) => b,
             _ => panic!("expected sort"),

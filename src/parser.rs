@@ -853,7 +853,11 @@ impl Parser {
         })
     }
 
-    fn parse_my_our_local(&mut self, keyword: &str, allow_type_annotation: bool) -> PerlResult<Statement> {
+    fn parse_my_our_local(
+        &mut self,
+        keyword: &str,
+        allow_type_annotation: bool,
+    ) -> PerlResult<Statement> {
         let line = self.peek_line();
         self.advance(); // 'my'/'our'/'local'
 

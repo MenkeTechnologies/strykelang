@@ -22,6 +22,14 @@ type ScopeCaptureWithAtomics = (
     Vec<(String, AtomicHash)>,
 );
 
+/// Saved bindings for `local $x` / `local @a` / `local %h` — restored on [`Scope::pop_frame`].
+#[derive(Clone, Debug)]
+enum LocalRestore {
+    Scalar(String, PerlValue),
+    Array(String, Vec<PerlValue>),
+    Hash(String, IndexMap<String, PerlValue>),
+}
+
 /// A single lexical scope frame.
 /// Uses Vec instead of HashMap — for typical Perl code with < 10 variables per
 /// scope, linear scan is faster than hashing due to cache locality and zero
@@ -31,6 +39,8 @@ struct Frame {
     scalars: Vec<(String, PerlValue)>,
     arrays: Vec<(String, Vec<PerlValue>)>,
     hashes: Vec<(String, IndexMap<String, PerlValue>)>,
+    /// Dynamic `local` saves — applied in reverse when this frame is popped.
+    local_restores: Vec<LocalRestore>,
     /// Lexical names from `frozen my $x` / `@a` / `%h` (bare name, same as storage key).
     frozen_scalars: HashSet<String>,
     frozen_arrays: HashSet<String>,
@@ -56,6 +66,7 @@ impl Frame {
             typed_scalars: HashMap::new(),
             atomic_arrays: Vec::new(),
             atomic_hashes: Vec::new(),
+            local_restores: Vec::new(),
         }
     }
 
@@ -178,8 +189,72 @@ impl Scope {
     #[inline]
     pub fn pop_frame(&mut self) {
         if self.frames.len() > 1 {
-            self.frames.pop();
+            let frame = self.frames.pop().expect("pop_frame");
+            for entry in frame.local_restores.into_iter().rev() {
+                match entry {
+                    LocalRestore::Scalar(name, old) => {
+                        let _ = self.set_scalar(&name, old);
+                    }
+                    LocalRestore::Array(name, old) => {
+                        self.set_array(&name, old);
+                    }
+                    LocalRestore::Hash(name, old) => {
+                        let _ = self.set_hash(&name, old);
+                    }
+                }
+            }
         }
+    }
+
+    /// `local $name` — save current value, assign `val`; restore on [`pop_frame`].
+    pub fn local_set_scalar(&mut self, name: &str, val: PerlValue) -> Result<(), PerlError> {
+        let old = self.get_scalar(name);
+        if let Some(frame) = self.frames.last_mut() {
+            frame
+                .local_restores
+                .push(LocalRestore::Scalar(name.to_string(), old));
+        }
+        self.set_scalar(name, val)
+    }
+
+    /// `local @name` — not valid for `mysync` arrays.
+    pub fn local_set_array(&mut self, name: &str, val: Vec<PerlValue>) -> Result<(), PerlError> {
+        if self.find_atomic_array(name).is_some() {
+            return Err(PerlError::runtime(
+                "local cannot be used on mysync arrays",
+                0,
+            ));
+        }
+        let old = self.get_array(name);
+        if let Some(frame) = self.frames.last_mut() {
+            frame
+                .local_restores
+                .push(LocalRestore::Array(name.to_string(), old));
+        }
+        self.set_array(name, val);
+        Ok(())
+    }
+
+    /// `local %name`
+    pub fn local_set_hash(
+        &mut self,
+        name: &str,
+        val: IndexMap<String, PerlValue>,
+    ) -> Result<(), PerlError> {
+        if self.find_atomic_hash(name).is_some() {
+            return Err(PerlError::runtime(
+                "local cannot be used on mysync hashes",
+                0,
+            ));
+        }
+        let old = self.get_hash(name);
+        if let Some(frame) = self.frames.last_mut() {
+            frame
+                .local_restores
+                .push(LocalRestore::Hash(name.to_string(), old));
+        }
+        self.set_hash(name, val);
+        Ok(())
     }
 
     // ── Scalars ──
@@ -199,9 +274,8 @@ impl Scope {
         ty: Option<PerlTypeName>,
     ) -> Result<(), PerlError> {
         if let Some(t) = ty {
-            t.check_value(&val).map_err(|msg| {
-                PerlError::type_error(format!("`${}`: {}", name, msg), 0)
-            })?;
+            t.check_value(&val)
+                .map_err(|msg| PerlError::type_error(format!("`${}`: {}", name, msg), 0))?;
         }
         if let Some(frame) = self.frames.last_mut() {
             frame.set_scalar(name, val);
@@ -359,9 +433,8 @@ impl Scope {
             }
             if frame.has_scalar(name) {
                 if let Some(ty) = frame.typed_scalars.get(name).copied() {
-                    ty.check_value(&val).map_err(|msg| {
-                        PerlError::type_error(format!("`${}`: {}", name, msg), 0)
-                    })?;
+                    ty.check_value(&val)
+                        .map_err(|msg| PerlError::type_error(format!("`${}`: {}", name, msg), 0))?;
                 }
                 frame.set_scalar(name, val);
                 return Ok(());

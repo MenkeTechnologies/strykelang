@@ -8,9 +8,7 @@ fn regex_match() {
 #[test]
 fn regex_named_captures_plus_hash_and_scalar_brace() {
     assert_eq!(
-        eval_string(
-            r#"my $s = "ab"; $s =~ /(?<foo>a)(?<bar>b)/; $+{"foo"} . $+{"bar"}"#
-        ),
+        eval_string(r#"my $s = "ab"; $s =~ /(?<foo>a)(?<bar>b)/; $+{"foo"} . $+{"bar"}"#),
         "ab"
     );
     assert_eq!(

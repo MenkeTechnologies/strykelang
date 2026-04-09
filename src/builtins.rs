@@ -100,10 +100,7 @@ fn builtin_wait() -> PerlResult<PerlValue> {
 
 #[cfg(unix)]
 fn builtin_waitpid(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let pid = args
-        .first()
-        .map(|v| v.to_int())
-        .unwrap_or(-1) as libc::pid_t;
+    let pid = args.first().map(|v| v.to_int()).unwrap_or(-1) as libc::pid_t;
     let flags = args.get(1).map(|v| v.to_int()).unwrap_or(0) as libc::c_int;
     let mut status: libc::c_int = 0;
     let r = unsafe { libc::waitpid(pid, &mut status, flags) };
@@ -135,10 +132,7 @@ fn builtin_kill(_args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 fn builtin_alarm(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let sec = args
-        .first()
-        .map(|v| v.to_int().max(0) as u32)
-        .unwrap_or(0);
+    let sec = args.first().map(|v| v.to_int().max(0) as u32).unwrap_or(0);
     #[cfg(unix)]
     {
         let prev = unsafe { libc::alarm(sec) };
@@ -152,11 +146,7 @@ fn builtin_alarm(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 fn builtin_sleep(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let secs = args
-        .first()
-        .map(|v| v.to_number())
-        .unwrap_or(0.0)
-        .max(0.0);
+    let secs = args.first().map(|v| v.to_number()).unwrap_or(0.0).max(0.0);
     let start = Instant::now();
     std::thread::sleep(Duration::from_secs_f64(secs));
     Ok(PerlValue::Integer(start.elapsed().as_secs() as i64))
@@ -198,10 +188,7 @@ impl Interpreter {
     }
 
     fn builtin_fileno(&mut self, args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
-        let name = args
-            .first()
-            .map(|v| v.to_string())
-            .unwrap_or_default();
+        let name = args.first().map(|v| v.to_string()).unwrap_or_default();
         #[cfg(unix)]
         {
             if let Some(f) = self.io_file_slots.get(&name) {
@@ -224,10 +211,7 @@ impl Interpreter {
     }
 
     fn builtin_flock(&mut self, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
-        let name = args
-            .first()
-            .map(|v| v.to_string())
-            .unwrap_or_default();
+        let name = args.first().map(|v| v.to_string()).unwrap_or_default();
         let op = args.get(1).map(|v| v.to_int()).unwrap_or(0);
         #[cfg(unix)]
         {

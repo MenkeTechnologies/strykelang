@@ -9,10 +9,10 @@ use rayon::prelude::*;
 use caseless::default_case_fold_str;
 
 use crate::ast::{Block, Expr};
-use crate::sort_fast::{sort_magic_cmp, SortBlockFast};
 use crate::bytecode::{BuiltinId, Chunk, Op};
 use crate::error::{ErrorKind, PerlError, PerlResult};
 use crate::interpreter::{Flow, FlowOrError, Interpreter};
+use crate::sort_fast::{sort_magic_cmp, SortBlockFast};
 use crate::value::{PerlAsyncTask, PerlHeap, PerlValue, PipelineInner};
 use parking_lot::Mutex;
 
@@ -754,6 +754,17 @@ impl<'a> VM<'a> {
                             Err(crate::interpreter::FlowOrError::Error(e)) => return Err(e),
                             Err(_) => self.push(PerlValue::Undef),
                         }
+                    } else if let Some(result) =
+                        self.interp.try_autoload_call(&name, args, self.line())
+                    {
+                        match result {
+                            Ok(v) => self.push(v),
+                            Err(crate::interpreter::FlowOrError::Flow(
+                                crate::interpreter::Flow::Return(v),
+                            )) => self.push(v),
+                            Err(crate::interpreter::FlowOrError::Error(e)) => return Err(e),
+                            Err(_) => self.push(PerlValue::Undef),
+                        }
                     } else {
                         return Err(PerlError::runtime(
                             format!("Undefined subroutine &{}", name),
@@ -927,14 +938,10 @@ impl<'a> VM<'a> {
                     let flags = self.constant(*flags_idx).to_string();
                     let target = &self.lvalues[*lvalue_idx as usize];
                     let line = self.line();
-                    match self.interp.regex_transliterate_execute(
-                        string,
-                        &from,
-                        &to,
-                        &flags,
-                        target,
-                        line,
-                    ) {
+                    match self
+                        .interp
+                        .regex_transliterate_execute(string, &from, &to, &flags, target, line)
+                    {
                         Ok(v) => self.push(v),
                         Err(FlowOrError::Error(e)) => return Err(e),
                         Err(FlowOrError::Flow(_)) => {
@@ -1138,6 +1145,18 @@ impl<'a> VM<'a> {
                                 class,
                                 data: RwLock::new(PerlValue::Hash(map)),
                             })));
+                        }
+                    } else if let Some(result) =
+                        self.interp
+                            .try_autoload_call(&full_name, all_args, self.line())
+                    {
+                        match result {
+                            Ok(v) => self.push(v),
+                            Err(crate::interpreter::FlowOrError::Flow(
+                                crate::interpreter::Flow::Return(v),
+                            )) => self.push(v),
+                            Err(crate::interpreter::FlowOrError::Error(e)) => return Err(e),
+                            Err(_) => self.push(PerlValue::Undef),
                         }
                     } else {
                         return Err(PerlError::runtime(
@@ -1378,10 +1397,9 @@ impl<'a> VM<'a> {
                         let mut local_interp = Interpreter::new();
                         local_interp.subs = subs.clone();
                         local_interp.scope.restore_capture(&scope_capture);
-                        let _ = local_interp.scope.set_scalar(
-                            "_",
-                            PerlValue::Integer(i as i64),
-                        );
+                        let _ = local_interp
+                            .scope
+                            .set_scalar("_", PerlValue::Integer(i as i64));
                         let _ = local_interp.exec_block_no_scope(&block);
                     });
                     self.push(PerlValue::Undef);
@@ -1829,7 +1847,11 @@ impl<'a> VM<'a> {
                     .open_builtin_execute(handle_name, mode_s, file_opt, line)
             }
             Some(BuiltinId::Close) => {
-                let name = args.into_iter().next().unwrap_or(PerlValue::Undef).to_string();
+                let name = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(PerlValue::Undef)
+                    .to_string();
                 self.interp.close_builtin_execute(name)
             }
             Some(BuiltinId::Eof) => {
@@ -1903,7 +1925,9 @@ impl<'a> VM<'a> {
                 }
                 let mode = args[0].to_int();
                 let paths: Vec<String> = args.iter().skip(1).map(|v| v.to_string()).collect();
-                Ok(PerlValue::Integer(crate::perl_fs::chmod_paths(&paths, mode)))
+                Ok(PerlValue::Integer(crate::perl_fs::chmod_paths(
+                    &paths, mode,
+                )))
             }
             Some(BuiltinId::Chown) => {
                 if args.len() < 3 {
@@ -1912,7 +1936,9 @@ impl<'a> VM<'a> {
                 let uid = args[0].to_int();
                 let gid = args[1].to_int();
                 let paths: Vec<String> = args.iter().skip(2).map(|v| v.to_string()).collect();
-                Ok(PerlValue::Integer(crate::perl_fs::chown_paths(&paths, uid, gid)))
+                Ok(PerlValue::Integer(crate::perl_fs::chown_paths(
+                    &paths, uid, gid,
+                )))
             }
             Some(BuiltinId::Stat) => {
                 let path = args.first().map(|v| v.to_string()).unwrap_or_default();

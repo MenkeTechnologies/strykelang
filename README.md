@@ -302,6 +302,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - Recursive calls
 - `@_` argument passing, `shift`, `return`
 - `return EXPR if COND` (postfix modifiers on return)
+- **`AUTOLOAD`**: missing subs and methods dispatch to `sub AUTOLOAD` with `$AUTOLOAD` set to the fully qualified name (e.g. `main::foo`, `MyClass::bar`)
 
 #### BUILT-IN FUNCTIONS
 
