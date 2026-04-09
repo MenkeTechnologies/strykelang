@@ -166,3 +166,22 @@ fn caret_unicode_preseeded_undef() {
     let i = Interpreter::new();
     assert!(i.get_special_var("^UNICODE").is_undef());
 }
+
+#[test]
+fn star_multiline_prepends_dotall_in_compile_regex() {
+    let mut i = Interpreter::new();
+    i.set_special_var("*", &PerlValue::integer(1)).expect("set $*");
+    let re = i.compile_regex("a.b", "", 1).expect("compile");
+    assert!(re.is_match("a\nb"));
+    i.set_special_var("*", &PerlValue::integer(0)).expect("clear $*");
+    let re2 = i.compile_regex("a.b", "", 1).expect("compile");
+    assert!(!re2.is_match("a\nb"));
+}
+
+#[test]
+fn stash_array_caret_prefixed_stays_global() {
+    let mut i = Interpreter::new();
+    i.scope
+        .set_scalar("__PACKAGE__", PerlValue::string("Foo".into()));
+    assert_eq!(i.stash_array_name_for_package("^CAPTURE"), "^CAPTURE");
+}

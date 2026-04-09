@@ -47,6 +47,7 @@ mod unix {
             });
         });
         if SIGINT_P.swap(false, Ordering::SeqCst) {
+            interp.sigint_pending_caret.set(true);
             interp.invoke_sig_handler("INT")?;
         }
         if SIGTERM_P.swap(false, Ordering::SeqCst) {

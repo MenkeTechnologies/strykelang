@@ -398,7 +398,7 @@ impl Interpreter {
                     ))
                 }
                 Err(e) => {
-                    self.errno = e.to_string();
+                    self.apply_io_error_to_errno(&e);
                     return Ok(PerlValue::UNDEF);
                 }
             }
@@ -410,7 +410,7 @@ impl Interpreter {
                     String::from_utf8_lossy(&buf).into_owned(),
                 )),
                 Err(e) => {
-                    self.errno = e.to_string();
+                    self.apply_io_error_to_errno(&e);
                     Ok(PerlValue::UNDEF)
                 }
             }
@@ -482,7 +482,7 @@ impl Interpreter {
             match f.seek(w) {
                 Ok(p) => Ok(PerlValue::integer(p as i64)),
                 Err(e) => {
-                    self.errno = e.to_string();
+                    self.apply_io_error_to_errno(&e);
                     Ok(PerlValue::integer(-1))
                 }
             }
@@ -504,12 +504,12 @@ impl Interpreter {
             Ok(f) => match f.set_len(len) {
                 Ok(()) => Ok(PerlValue::integer(1)),
                 Err(e) => {
-                    self.errno = e.to_string();
+                    self.apply_io_error_to_errno(&e);
                     Ok(PerlValue::integer(0))
                 }
             },
             Err(e) => {
-                self.errno = e.to_string();
+                self.apply_io_error_to_errno(&e);
                 Ok(PerlValue::integer(0))
             }
         }
@@ -555,6 +555,7 @@ impl Interpreter {
             }
             Err(e) => {
                 self.errno = e;
+                self.errno_code = 0;
                 Ok(PerlValue::integer(0))
             }
         }
@@ -574,7 +575,7 @@ impl Interpreter {
                 Ok(PerlValue::integer(1))
             }
             Err(e) => {
-                self.errno = e.to_string();
+                self.apply_io_error_to_errno(&e);
                 Ok(PerlValue::integer(0))
             }
         }
@@ -607,7 +608,7 @@ impl Interpreter {
                     Ok(PerlValue::integer(1))
                 }
                 Err(e) => {
-                    self.errno = e.to_string();
+                    self.apply_io_error_to_errno(&e);
                     Ok(PerlValue::integer(0))
                 }
             }
@@ -628,7 +629,7 @@ impl Interpreter {
                 Ok(PerlValue::integer(1))
             }
             Err(e) => {
-                self.errno = e.to_string();
+                self.apply_io_error_to_errno(&e);
                 Ok(PerlValue::integer(0))
             }
         }

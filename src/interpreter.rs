@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::File;
@@ -218,6 +219,8 @@ pub struct Interpreter {
     pub irs: String,
     /// $! — last OS error
     pub errno: String,
+    /// Numeric errno for `$!` dualvar (`raw_os_error()`), `0` when unset.
+    pub errno_code: i32,
     /// $@ — last eval error
     pub eval_error: String,
     /// @ARGV
@@ -228,8 +231,14 @@ pub struct Interpreter {
     pub env_materialized: bool,
     /// $0
     pub program_name: String,
-    /// Current line number $.
+    /// Current line number $. (global increment; see `handle_line_numbers` for per-handle)
     pub line_number: i64,
+    /// Last handle key used for `$.` (e.g. `STDIN`, `FH`, `ARGV:path`).
+    pub last_readline_handle: String,
+    /// Line count per handle for `$.` when keyed (Perl-style last-read handle).
+    pub handle_line_numbers: HashMap<String, i64>,
+    /// `$^C` — set when SIGINT is pending before handler runs (cleared on read).
+    pub sigint_pending_caret: Cell<bool>,
     /// Auto-split mode (-a)
     pub auto_split: bool,
     /// Field separator for -F
@@ -292,7 +301,8 @@ pub struct Interpreter {
     /// Compiled regex cache: "flags///pattern" → Arc<Regex> (Arc preserves lazy DFA cache).
     regex_cache: HashMap<String, Arc<regex::Regex>>,
     /// Last compiled regex — fast-path to avoid format! + HashMap lookup in tight loops.
-    regex_last: Option<(String, String, Arc<regex::Regex>)>,
+    /// Third flag: `$*` multiline (prepends `(?s)` when true).
+    regex_last: Option<(String, String, bool, Arc<regex::Regex>)>,
     /// Offsets for Perl `m//g` in scalar context (`pos`), keyed by scalar name (`"_"` for `$_`).
     pub(crate) regex_pos: HashMap<String, Option<usize>>,
     /// PRNG for `rand` / `srand` (matches Perl-style seeding, not crypto).
@@ -345,7 +355,7 @@ pub struct Interpreter {
     pub last_subpattern_name: String,
     /// `$INC` — `@INC` hook iterator (Perl 5.37+).
     pub inc_hook_index: i64,
-    /// `$*` — multiline matching (deprecated in Perl; stub).
+    /// `$*` — multiline matching (deprecated in Perl); when true, `compile_regex` prepends `(?s)`.
     pub multiline_match: bool,
     /// `$^X` — path to this executable (cached).
     pub executable_path: String,
@@ -447,15 +457,44 @@ fn unix_real_effective_ids() -> (i64, i64, i64, i64) {
 }
 
 fn unix_id_for_special(name: &str) -> i64 {
-    let (r, e, rg, eg) = unix_real_effective_ids();
+    let (r, e, _, _) = unix_real_effective_ids();
     match name {
         "<" => r,
         ">" => e,
-        "(" => rg,
-        ")" => eg,
         _ => 0,
     }
 }
+
+#[cfg(unix)]
+fn unix_group_list_string(primary: libc::gid_t) -> String {
+    let mut buf = vec![0 as libc::gid_t; 256];
+    let n = unsafe { libc::getgroups(256, buf.as_mut_ptr()) };
+    if n <= 0 {
+        return format!("{}", primary);
+    }
+    let mut parts = vec![format!("{}", primary)];
+    for i in 0..n as usize {
+        parts.push(format!("{}", buf[i]));
+    }
+    parts.join(" ")
+}
+
+/// Perl `$(` / `$)` — space-separated group id list (real / effective set).
+#[cfg(unix)]
+fn unix_group_list_for_special(name: &str) -> String {
+    let (_, _, gid, egid) = unix_real_effective_ids();
+    match name {
+        "(" => unix_group_list_string(gid as libc::gid_t),
+        ")" => unix_group_list_string(egid as libc::gid_t),
+        _ => String::new(),
+    }
+}
+
+#[cfg(not(unix))]
+fn unix_group_list_for_special(_name: &str) -> String {
+    String::new()
+}
+
 
 impl Default for Interpreter {
     fn default() -> Self {
@@ -474,6 +513,7 @@ impl Interpreter {
         scope.declare_hash("SIG", IndexMap::new());
         scope.declare_array("-", vec![]);
         scope.declare_array("+", vec![]);
+        scope.declare_array("^CAPTURE", vec![]);
         scope.declare_scalar("~", PerlValue::string("STDOUT".to_string()));
 
         let script_start_time = std::time::SystemTime::now()
@@ -501,12 +541,16 @@ impl Interpreter {
             ors: String::new(),
             irs: "\n".to_string(),
             errno: String::new(),
+            errno_code: 0,
             eval_error: String::new(),
             argv: Vec::new(),
             env: IndexMap::new(),
             env_materialized: false,
             program_name: "perlrs".to_string(),
             line_number: 0,
+            last_readline_handle: String::new(),
+            handle_line_numbers: HashMap::new(),
+            sigint_pending_caret: Cell::new(false),
             auto_split: false,
             field_separator: None,
             begin_blocks: Vec::new(),
@@ -588,8 +632,26 @@ impl Interpreter {
         self.child_exit_status = self.encode_exit_status(s);
     }
 
+    /// Update `$!` / `errno_code` from a [`std::io::Error`] (dualvar numeric + string).
+    pub(crate) fn apply_io_error_to_errno(&mut self, e: &std::io::Error) {
+        self.errno = e.to_string();
+        self.errno_code = e.raw_os_error().unwrap_or(0);
+    }
+
+    /// Advance `$.` bookkeeping for the handle that produced the last `readline` line.
+    fn bump_line_for_handle(&mut self, handle_key: &str) {
+        self.last_readline_handle = handle_key.to_string();
+        *self
+            .handle_line_numbers
+            .entry(handle_key.to_string())
+            .or_insert(0) += 1;
+    }
+
     /// `@ISA` / `@EXPORT` storage uses `Pkg::NAME` outside `main`.
     pub(crate) fn stash_array_name_for_package(&self, name: &str) -> String {
+        if name.starts_with('^') {
+            return name.to_string();
+        }
         if matches!(name, "ISA" | "EXPORT" | "EXPORT_OK") {
             let pkg = self.current_package();
             if !pkg.is_empty() && pkg != "main" {
@@ -1453,7 +1515,7 @@ impl Interpreter {
                 let mut cmd = piped_shell_command(&path);
                 cmd.stdout(Stdio::piped());
                 let mut child = cmd.spawn().map_err(|e| {
-                    self.errno = e.to_string();
+                    self.apply_io_error_to_errno(&e);
                     PerlError::runtime(format!("Can't open pipe from command: {}", e), line)
                 })?;
                 let stdout = child
@@ -1468,7 +1530,7 @@ impl Interpreter {
                 let mut cmd = piped_shell_command(&path);
                 cmd.stdin(Stdio::piped());
                 let mut child = cmd.spawn().map_err(|e| {
-                    self.errno = e.to_string();
+                    self.apply_io_error_to_errno(&e);
                     PerlError::runtime(format!("Can't open pipe to command: {}", e), line)
                 })?;
                 let stdin = child
@@ -1481,7 +1543,7 @@ impl Interpreter {
             }
             "<" => {
                 let file = std::fs::File::open(&path).map_err(|e| {
-                    self.errno = e.to_string();
+                    self.apply_io_error_to_errno(&e);
                     PerlError::runtime(format!("Can't open '{}': {}", path, e), line)
                 })?;
                 if let Ok(raw) = file.try_clone() {
@@ -1492,7 +1554,7 @@ impl Interpreter {
             }
             ">" => {
                 let file = std::fs::File::create(&path).map_err(|e| {
-                    self.errno = e.to_string();
+                    self.apply_io_error_to_errno(&e);
                     PerlError::runtime(format!("Can't open '{}': {}", path, e), line)
                 })?;
                 if let Ok(raw) = file.try_clone() {
@@ -1507,7 +1569,7 @@ impl Interpreter {
                     .create(true)
                     .open(&path)
                     .map_err(|e| {
-                        self.errno = e.to_string();
+                        self.apply_io_error_to_errno(&e);
                         PerlError::runtime(format!("Can't open '{}': {}", path, e), line)
                     })?;
                 if let Ok(raw) = file.try_clone() {
@@ -1562,7 +1624,7 @@ impl Interpreter {
                                     break;
                                 }
                                 Err(e) => {
-                                    self.errno = e.to_string();
+                                    self.apply_io_error_to_errno(&e);
                                 }
                             }
                         }
@@ -1582,11 +1644,11 @@ impl Interpreter {
                             continue;
                         }
                         Ok(_) => {
-                            self.line_number += 1;
+                            self.bump_line_for_handle(&self.argv_current_file.clone());
                             return Ok(PerlValue::string(line_str));
                         }
                         Err(e) => {
-                            self.errno = e.to_string();
+                            self.apply_io_error_to_errno(&e);
                             self.diamond_reader = None;
                             continue;
                         }
@@ -1603,11 +1665,11 @@ impl Interpreter {
             match io::stdin().lock().read_line(&mut line_str) {
                 Ok(0) => Ok(PerlValue::UNDEF),
                 Ok(_) => {
-                    self.line_number += 1;
+                    self.bump_line_for_handle("STDIN");
                     Ok(PerlValue::string(line_str))
                 }
                 Err(e) => {
-                    self.errno = e.to_string();
+                    self.apply_io_error_to_errno(&e);
                     Ok(PerlValue::UNDEF)
                 }
             }
@@ -1615,11 +1677,11 @@ impl Interpreter {
             match reader.read_line(&mut line_str) {
                 Ok(0) => Ok(PerlValue::UNDEF),
                 Ok(_) => {
-                    self.line_number += 1;
+                    self.bump_line_for_handle(handle_name);
                     Ok(PerlValue::string(line_str))
                 }
                 Err(e) => {
-                    self.errno = e.to_string();
+                    self.apply_io_error_to_errno(&e);
                     Ok(PerlValue::UNDEF)
                 }
             }
@@ -1639,7 +1701,7 @@ impl Interpreter {
                 PerlValue::integer(1)
             }
             Err(e) => {
-                self.errno = e.to_string();
+                self.apply_io_error_to_errno(&e);
                 PerlValue::integer(0)
             }
         }
@@ -1753,6 +1815,15 @@ impl Interpreter {
             }
         }
         self.scope.set_hash("+", named);
+        let mut cap_flat = Vec::new();
+        for i in 1..caps.len() {
+            if let Some(m) = caps.get(i) {
+                cap_flat.push(PerlValue::string(m.as_str().to_string()));
+            } else {
+                cap_flat.push(PerlValue::UNDEF);
+            }
+        }
+        self.scope.set_array("^CAPTURE", cap_flat);
         Ok(())
     }
 
@@ -5048,7 +5119,7 @@ impl Interpreter {
                         Ok(PerlValue::integer(s.code().unwrap_or(-1) as i64))
                     }
                     Err(e) => {
-                        self.errno = e.to_string();
+                        self.apply_io_error_to_errno(&e);
                         Ok(PerlValue::integer(-1))
                     }
                 }
@@ -5068,7 +5139,7 @@ impl Interpreter {
                 match status {
                     Ok(s) => std::process::exit(s.code().unwrap_or(-1)),
                     Err(e) => {
-                        self.errno = e.to_string();
+                        self.apply_io_error_to_errno(&e);
                         Ok(PerlValue::integer(-1))
                     }
                 }
@@ -5115,12 +5186,12 @@ impl Interpreter {
                             Ok(code) => match crate::parse_and_run_string(&code, self) {
                                 Ok(v) => Ok(v),
                                 Err(e) => {
-                                    self.errno = e.to_string();
+                                    self.eval_error = e.to_string();
                                     Ok(PerlValue::UNDEF)
                                 }
                             },
                             Err(e) => {
-                                self.errno = e.to_string();
+                                self.apply_io_error_to_errno(&e);
                                 Ok(PerlValue::UNDEF)
                             }
                         }
@@ -5145,7 +5216,7 @@ impl Interpreter {
                 match std::env::set_current_dir(&path) {
                     Ok(_) => Ok(PerlValue::integer(1)),
                     Err(e) => {
-                        self.errno = e.to_string();
+                        self.apply_io_error_to_errno(&e);
                         Ok(PerlValue::integer(0))
                     }
                 }
@@ -5155,7 +5226,7 @@ impl Interpreter {
                 match std::fs::create_dir(&p) {
                     Ok(_) => Ok(PerlValue::integer(1)),
                     Err(e) => {
-                        self.errno = e.to_string();
+                        self.apply_io_error_to_errno(&e);
                         Ok(PerlValue::integer(0))
                     }
                 }
@@ -6082,6 +6153,8 @@ impl Interpreter {
                     | "|"
                     | "+"
                     | "?"
+                    | "!"
+                    | "@"
             )
     }
 
@@ -6094,12 +6167,23 @@ impl Interpreter {
             "^POSTMATCH" => PerlValue::string(self.postmatch.clone()),
             "^LAST_SUBMATCH_RESULT" => PerlValue::string(self.last_paren_match.clone()),
             "0" => PerlValue::string(self.program_name.clone()),
-            "!" => PerlValue::string(self.errno.clone()),
+            "!" => PerlValue::errno_dual(self.errno_code, self.errno.clone()),
             "@" => PerlValue::string(self.eval_error.clone()),
             "/" => PerlValue::string(self.irs.clone()),
             "\\" => PerlValue::string(self.ors.clone()),
             "," => PerlValue::string(self.ofs.clone()),
-            "." => PerlValue::integer(self.line_number),
+            "." => {
+                if self.last_readline_handle.is_empty() {
+                    PerlValue::integer(self.line_number)
+                } else {
+                    PerlValue::integer(
+                        *self
+                            .handle_line_numbers
+                            .get(&self.last_readline_handle)
+                            .unwrap_or(&0),
+                    )
+                }
+            }
             "]" => PerlValue::float(perl_bracket_version()),
             ";" => PerlValue::string(self.subscript_sep.clone()),
             "ARGV" => PerlValue::string(self.argv_current_file.clone()),
@@ -6115,7 +6199,8 @@ impl Interpreter {
             "^H" => PerlValue::integer(self.compile_hints),
             "^WARNING_BITS" => PerlValue::integer(self.warning_bits),
             "^GLOBAL_PHASE" => PerlValue::string(self.global_phase.clone()),
-            "<" | ">" | "(" | ")" => PerlValue::integer(unix_id_for_special(name)),
+            "<" | ">" => PerlValue::integer(unix_id_for_special(name)),
+            "(" | ")" => PerlValue::string(unix_group_list_for_special(name)),
             "?" => PerlValue::integer(self.child_exit_status),
             "|" => PerlValue::integer(if self.output_autoflush { 1 } else { 0 }),
             "\"" => PerlValue::string(self.list_separator.clone()),
@@ -6128,7 +6213,11 @@ impl Interpreter {
             "^" => PerlValue::string(self.format_top_name.clone()),
             "INC" => PerlValue::integer(self.inc_hook_index),
             "^A" => PerlValue::string(self.accumulator_format.clone()),
-            "^C" => PerlValue::integer(0),
+            "^C" => PerlValue::integer(if self.sigint_pending_caret.replace(false) {
+                1
+            } else {
+                0
+            }),
             "^F" => PerlValue::integer(self.max_system_fd),
             "^L" => PerlValue::string(self.formfeed_string.clone()),
             "^M" => PerlValue::string(self.emergency_memory.clone()),
@@ -6145,6 +6234,18 @@ impl Interpreter {
 
     pub(crate) fn set_special_var(&mut self, name: &str, val: &PerlValue) -> Result<(), PerlError> {
         match name {
+            "!" => {
+                let code = val.to_int() as i32;
+                self.errno_code = code;
+                self.errno = if code == 0 {
+                    String::new()
+                } else {
+                    std::io::Error::from_raw_os_error(code).to_string()
+                };
+            }
+            "@" => {
+                self.eval_error = val.to_string();
+            }
             "0" => self.program_name = val.to_string(),
             "/" => self.irs = val.to_string(),
             "\\" => self.ors = val.to_string(),
@@ -7220,15 +7321,21 @@ impl Interpreter {
     ) -> Result<Arc<regex::Regex>, FlowOrError> {
         // Fast path: same regex as last call (common in loops).
         // Arc clone is cheap (ref-count increment) AND preserves the lazy DFA cache.
-        if let Some((ref lp, ref lf, ref lr)) = self.regex_last {
-            if lp == pattern && lf == flags {
+        let multiline = self.multiline_match;
+        if let Some((ref lp, ref lf, ref lm, ref lr)) = self.regex_last {
+            if lp == pattern && lf == flags && *lm == multiline {
                 return Ok(lr.clone());
             }
         }
         // Slow path: HashMap lookup
-        let key = format!("{}\x00{}", flags, pattern);
+        let key = format!("{}\x00{}\x00{}", multiline as u8, flags, pattern);
         if let Some(cached) = self.regex_cache.get(&key) {
-            self.regex_last = Some((pattern.to_string(), flags.to_string(), cached.clone()));
+            self.regex_last = Some((
+                pattern.to_string(),
+                flags.to_string(),
+                multiline,
+                cached.clone(),
+            ));
             return Ok(cached.clone());
         }
         let expanded = expand_perl_regex_quotemeta(pattern);
@@ -7245,6 +7352,10 @@ impl Interpreter {
         if flags.contains('x') {
             re_str.push_str("(?x)");
         }
+        // Deprecated `$*` multiline: dot matches newline (same intent as `(?s)`).
+        if multiline {
+            re_str.push_str("(?s)");
+        }
         re_str.push_str(&expanded);
         let re = regex::Regex::new(&re_str).map_err(|e| {
             FlowOrError::Error(PerlError::runtime(
@@ -7253,7 +7364,7 @@ impl Interpreter {
             ))
         })?;
         let arc = Arc::new(re);
-        self.regex_last = Some((pattern.to_string(), flags.to_string(), arc.clone()));
+        self.regex_last = Some((pattern.to_string(), flags.to_string(), multiline, arc.clone()));
         self.regex_cache.insert(key, arc.clone());
         Ok(arc)
     }

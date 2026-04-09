@@ -124,6 +124,8 @@ pub(crate) enum HeapObject {
     SqliteConn(Arc<Mutex<rusqlite::Connection>>),
     StructInst(Arc<StructInstance>),
     DataFrame(Arc<Mutex<PerlDataFrame>>),
+    /// `$!` dualvar: numeric context → `code`, string context → `msg` (Perl errno + strerror).
+    ErrnoDual { code: i32, msg: String },
 }
 
 /// NaN-boxed value: one `u64` (immediates, raw float bits, or tagged heap pointer).
@@ -709,6 +711,12 @@ impl PerlValue {
         Self::from_heap(Arc::new(HeapObject::DataFrame(df)))
     }
 
+    /// OS errno dualvar (`$!`): `to_int`/`to_number` use `code`; string context uses `msg`.
+    #[inline]
+    pub fn errno_dual(code: i32, msg: String) -> Self {
+        Self::from_heap(Arc::new(HeapObject::ErrnoDual { code, msg }))
+    }
+
     /// Heap string payload, if any (allocates).
     #[inline]
     pub fn as_str(&self) -> Option<String> {
@@ -737,6 +745,7 @@ impl PerlValue {
         }
         match unsafe { self.heap_ref() } {
             HeapObject::String(s) => buf.push_str(s),
+            HeapObject::ErrnoDual { msg, .. } => buf.push_str(msg),
             HeapObject::Bytes(b) => buf.push_str(&String::from_utf8_lossy(b)),
             HeapObject::Atomic(arc) => arc.lock().append_to(buf),
             HeapObject::Set(s) => {
@@ -799,6 +808,7 @@ impl PerlValue {
             return f64::from_bits(self.0) != 0.0;
         }
         match unsafe { self.heap_ref() } {
+            HeapObject::ErrnoDual { code, msg } => *code != 0 || !msg.is_empty(),
             HeapObject::String(s) => !s.is_empty() && s != "0",
             HeapObject::Bytes(b) => !b.is_empty(),
             HeapObject::Array(a) => !a.is_empty(),
@@ -853,6 +863,7 @@ impl PerlValue {
         }
         match unsafe { self.heap_ref() } {
             HeapObject::String(s) => s.clone(),
+            HeapObject::ErrnoDual { msg, .. } => msg.clone(),
             _ => String::new(),
         }
     }
@@ -869,6 +880,7 @@ impl PerlValue {
             return f64::from_bits(self.0);
         }
         match unsafe { self.heap_ref() } {
+            HeapObject::ErrnoDual { code, .. } => *code as f64,
             HeapObject::String(s) => parse_number(s),
             HeapObject::Bytes(b) => b.len() as f64,
             HeapObject::Array(a) => a.len() as f64,
@@ -901,6 +913,7 @@ impl PerlValue {
             return f64::from_bits(self.0) as i64;
         }
         match unsafe { self.heap_ref() } {
+            HeapObject::ErrnoDual { code, .. } => *code as i64,
             HeapObject::String(s) => parse_number(s) as i64,
             HeapObject::Bytes(b) => b.len() as i64,
             HeapObject::Array(a) => a.len() as i64,
@@ -957,6 +970,7 @@ impl PerlValue {
             HeapObject::Barrier(_) => "Barrier".to_string(),
             HeapObject::SqliteConn(_) => "SqliteConn".to_string(),
             HeapObject::StructInst(s) => s.def.name.to_string(),
+            HeapObject::ErrnoDual { .. } => "Errno".to_string(),
             HeapObject::Integer(_) => "INTEGER".to_string(),
             HeapObject::Float(_) => "FLOAT".to_string(),
         }
@@ -1077,6 +1091,7 @@ impl fmt::Display for PerlValue {
             return write!(f, "{}", format_float(f64::from_bits(self.0)));
         }
         match unsafe { self.heap_ref() } {
+            HeapObject::ErrnoDual { msg, .. } => f.write_str(msg),
             HeapObject::String(s) => f.write_str(s),
             HeapObject::Bytes(b) => f.write_str(&String::from_utf8_lossy(b)),
             HeapObject::Array(a) => {
@@ -1206,6 +1221,7 @@ pub fn set_member_key(v: &PerlValue) -> String {
         HeapObject::SqliteConn(c) => format!("sql:{:p}", Arc::as_ptr(c)),
         HeapObject::StructInst(s) => format!("st:{}:{:?}", s.def.name, s.values),
         HeapObject::DataFrame(d) => format!("df:{:p}", Arc::as_ptr(d)),
+        HeapObject::ErrnoDual { code, msg } => format!("e:{code}:{msg}"),
         HeapObject::Integer(n) => format!("i:{n}"),
         HeapObject::Float(fl) => format!("f:{}", fl.to_bits()),
     }

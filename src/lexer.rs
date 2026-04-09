@@ -475,6 +475,17 @@ impl Lexer {
                     self.last_was_term = true;
                     return Ok(Token::ArrayVar("+".to_string()));
                 }
+                if self.peek() == Some('^')
+                    && self
+                        .input
+                        .get(self.pos + 1)
+                        .is_some_and(|c| c.is_alphabetic() || *c == '_')
+                {
+                    self.advance();
+                    let name = format!("^{}", self.read_package_qualified_identifier());
+                    self.last_was_term = true;
+                    return Ok(Token::ArrayVar(name));
+                }
                 if self.peek() == Some('_') || self.peek().is_some_and(|c| c.is_alphabetic()) {
                     let name = self.read_package_qualified_identifier();
                     self.last_was_term = true;
@@ -1396,6 +1407,13 @@ mod tests {
         let mut l = Lexer::new("@arr");
         let t = l.tokenize().expect("tokenize");
         assert!(matches!(t[0].0, Token::ArrayVar(ref s) if s == "arr"));
+    }
+
+    #[test]
+    fn tokenize_at_caret_capture_array() {
+        let mut l = Lexer::new("@^CAPTURE");
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[0].0, Token::ArrayVar(ref s) if s == "^CAPTURE"));
     }
 
     #[test]

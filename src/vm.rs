@@ -254,7 +254,15 @@ impl<'a> VM<'a> {
         let mut op_count: u64 = 0;
         const MAX_OPS: u64 = 100_000_000;
 
-        if let Some(v) = crate::jit::try_run_linear_ops(ops) {
+        let slot_buf = crate::jit::linear_slot_ops_max_index(ops).and_then(|max| {
+            let mut v = vec![0i64; max as usize + 1];
+            for i in 0..=max {
+                v[i as usize] = self.interp.scope.get_scalar_slot(i).as_integer()?;
+            }
+            Some(v)
+        });
+
+        if let Some(v) = crate::jit::try_run_linear_ops(ops, slot_buf.as_deref()) {
             return Ok(v);
         }
 
