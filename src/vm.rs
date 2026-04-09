@@ -1974,9 +1974,14 @@ impl<'a> VM<'a> {
                 }
                 let fmt = args[0].to_string();
                 let rest = &args[1..];
-                Ok(PerlValue::string(crate::interpreter::perl_sprintf(
-                    &fmt, rest,
-                )))
+                match self.interp.perl_sprintf_stringify(&fmt, rest, line) {
+                    Ok(s) => Ok(PerlValue::string(s)),
+                    Err(FlowOrError::Error(e)) => Err(e),
+                    Err(FlowOrError::Flow(_)) => Err(PerlError::runtime(
+                        "sprintf: unexpected control flow",
+                        line,
+                    )),
+                }
             }
             Some(BuiltinId::Reverse) => {
                 let val = args.into_iter().next().unwrap_or(PerlValue::UNDEF);
@@ -2140,7 +2145,17 @@ impl<'a> VM<'a> {
                 }
                 let fmt = args[0].to_string();
                 let rest = &args[1..];
-                print!("{}", crate::interpreter::perl_sprintf(&fmt, rest));
+                let out = match self.interp.perl_sprintf_stringify(&fmt, rest, line) {
+                    Ok(s) => s,
+                    Err(FlowOrError::Error(e)) => return Err(e),
+                    Err(FlowOrError::Flow(_)) => {
+                        return Err(PerlError::runtime(
+                            "printf: unexpected control flow",
+                            line,
+                        ));
+                    }
+                };
+                print!("{}", out);
                 if self.interp.output_autoflush {
                     let _ = io::stdout().flush();
                 }

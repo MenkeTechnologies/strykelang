@@ -4330,9 +4330,10 @@ impl Parser {
     fn expr_to_overload_sub(e: &Expr) -> PerlResult<String> {
         match &e.kind {
             ExprKind::String(s) => Ok(s.clone()),
+            ExprKind::Integer(n) => Ok(n.to_string()),
             ExprKind::SubroutineRef(s) | ExprKind::SubroutineCodeRef(s) => Ok(s.clone()),
             _ => Err(PerlError::syntax(
-                "overload handler must be a string literal or \\&subname (method in current package)",
+                "overload handler must be a string literal, number (e.g. fallback => 1), or \\&subname (method in current package)",
                 e.line,
             )),
         }

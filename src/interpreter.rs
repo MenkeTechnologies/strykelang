@@ -256,9 +256,16 @@ pub struct Interpreter {
     pub list_separator: String,
     /// Script start time (`$^T`) — seconds since Unix epoch.
     pub script_start_time: i64,
+    /// `$^H` — compile-time hints (bit flags; pragma / `BEGIN` may update).
+    pub compile_hints: i64,
+    /// `${^WARNING_BITS}` — warnings bitmask (Perl internal; surfaced for compatibility).
+    pub warning_bits: i64,
+    /// `${^GLOBAL_PHASE}` — interpreter phase (`RUN`, …).
+    pub global_phase: String,
     /// `$;` — hash subscript separator (multi-key join); Perl default `\034`.
     pub subscript_sep: String,
-    /// `$^I` — in-place edit extension (empty = off).
+    /// `$^I` — in-place edit backup suffix (empty when no backup; also unset when `-i` was not passed).
+    /// The `pe` driver sets this from `-i` / `-i.ext`.
     pub inplace_edit: String,
     /// `$^D` — debugging flags (integer; mostly ignored).
     pub debug_flags: i64,
@@ -374,6 +381,52 @@ pub(crate) struct DirHandleState {
     pub pos: usize,
 }
 
+/// Perl-style `$^O`: map Rust [`std::env::consts::OS`] to common Perl names (`linux`, `darwin`, `MSWin32`, …).
+pub(crate) fn perl_osname() -> String {
+    match std::env::consts::OS {
+        "linux" => "linux".to_string(),
+        "macos" => "darwin".to_string(),
+        "windows" => "MSWin32".to_string(),
+        other => other.to_string(),
+    }
+}
+
+fn perl_version_v_string() -> String {
+    format!("v{}", env!("CARGO_PKG_VERSION"))
+}
+
+fn extended_os_error_string() -> String {
+    std::io::Error::last_os_error().to_string()
+}
+
+#[cfg(unix)]
+fn unix_real_effective_ids() -> (i64, i64, i64, i64) {
+    unsafe {
+        (
+            libc::getuid() as i64,
+            libc::geteuid() as i64,
+            libc::getgid() as i64,
+            libc::getegid() as i64,
+        )
+    }
+}
+
+#[cfg(not(unix))]
+fn unix_real_effective_ids() -> (i64, i64, i64, i64) {
+    (0, 0, 0, 0)
+}
+
+fn unix_id_for_special(name: &str) -> i64 {
+    let (r, e, rg, eg) = unix_real_effective_ids();
+    match name {
+        "<" => r,
+        ">" => e,
+        "(" => rg,
+        ")" => eg,
+        _ => 0,
+    }
+}
+
 impl Default for Interpreter {
     fn default() -> Self {
         Self::new()
@@ -427,6 +480,9 @@ impl Interpreter {
             last_paren_match: String::new(),
             list_separator: " ".to_string(),
             script_start_time,
+            compile_hints: 0,
+            warning_bits: 0,
+            global_phase: "RUN".to_string(),
             subscript_sep: "\x1c".to_string(),
             inplace_edit: String::new(),
             debug_flags: 0,
@@ -3217,6 +3273,9 @@ impl Interpreter {
                     let val = self.eval_expr(expr)?;
                     match op {
                         UnaryOp::Negate => {
+                            if let Some(r) = self.try_overload_unary_dispatch("neg", &val, line) {
+                                return r;
+                            }
                             if let Some(n) = val.as_integer() {
                                 Ok(PerlValue::integer(-n))
                             } else {
@@ -3224,10 +3283,18 @@ impl Interpreter {
                             }
                         }
                         UnaryOp::LogNot => {
+                            if let Some(r) = self.try_overload_unary_dispatch("bool", &val, line) {
+                                let pv = r?;
+                                return Ok(PerlValue::integer(if pv.is_true() { 0 } else { 1 }));
+                            }
                             Ok(PerlValue::integer(if val.is_true() { 0 } else { 1 }))
                         }
                         UnaryOp::BitNot => Ok(PerlValue::integer(!val.to_int())),
                         UnaryOp::LogNotWord => {
+                            if let Some(r) = self.try_overload_unary_dispatch("bool", &val, line) {
+                                let pv = r?;
+                                return Ok(PerlValue::integer(if pv.is_true() { 0 } else { 1 }));
+                            }
                             Ok(PerlValue::integer(if val.is_true() { 0 } else { 1 }))
                         }
                         UnaryOp::Ref => Ok(PerlValue::scalar_ref(Arc::new(RwLock::new(val)))),
@@ -4326,6 +4393,21 @@ impl Interpreter {
                 ExprKind::HashElement { hash, key } => {
                     let k = self.eval_expr(key)?.to_string();
                     self.touch_env_hash(hash);
+                    if let Some(obj) = self.tied_hashes.get(hash).cloned() {
+                        let class = obj
+                            .as_blessed_ref()
+                            .map(|b| b.class.clone())
+                            .unwrap_or_default();
+                        let full = format!("{}::DELETE", class);
+                        if let Some(sub) = self.subs.get(&full).cloned() {
+                            return self.call_sub(
+                                &sub,
+                                vec![obj, PerlValue::string(k)],
+                                WantarrayCtx::Scalar,
+                                line,
+                            );
+                        }
+                    }
                     Ok(self.scope.delete_hash_element(hash, &k))
                 }
                 _ => Err(PerlError::runtime("delete requires hash element", line).into()),
@@ -4334,6 +4416,21 @@ impl Interpreter {
                 ExprKind::HashElement { hash, key } => {
                     let k = self.eval_expr(key)?.to_string();
                     self.touch_env_hash(hash);
+                    if let Some(obj) = self.tied_hashes.get(hash).cloned() {
+                        let class = obj
+                            .as_blessed_ref()
+                            .map(|b| b.class.clone())
+                            .unwrap_or_default();
+                        let full = format!("{}::EXISTS", class);
+                        if let Some(sub) = self.subs.get(&full).cloned() {
+                            return self.call_sub(
+                                &sub,
+                                vec![obj, PerlValue::string(k)],
+                                WantarrayCtx::Scalar,
+                                line,
+                            );
+                        }
+                    }
                     Ok(PerlValue::integer(
                         if self.scope.exists_hash_element(hash, &k) {
                             1
@@ -4464,7 +4561,8 @@ impl Interpreter {
                 for a in args {
                     arg_vals.push(self.eval_expr(a)?);
                 }
-                Ok(PerlValue::string(perl_sprintf(&fmt, &arg_vals)))
+                let s = self.perl_sprintf_stringify(&fmt, &arg_vals, line)?;
+                Ok(PerlValue::string(s))
             }
             ExprKind::JoinExpr { separator, list } => {
                 let sep = self.eval_expr(separator)?.to_string();
@@ -4522,6 +4620,9 @@ impl Interpreter {
             // Numeric
             ExprKind::Abs(expr) => {
                 let val = self.eval_expr(expr)?;
+                if let Some(r) = self.try_overload_unary_dispatch("abs", &val, line) {
+                    return r;
+                }
                 Ok(PerlValue::float(val.to_number().abs()))
             }
             ExprKind::Int(expr) => {
@@ -5130,6 +5231,16 @@ impl Interpreter {
         Ok(v.to_string())
     }
 
+    /// Like Perl `sprintf`, but `%s` uses [`stringify_value`] so `overload ""` applies.
+    pub(crate) fn perl_sprintf_stringify(
+        &mut self,
+        fmt: &str,
+        args: &[PerlValue],
+        line: usize,
+    ) -> Result<String, FlowOrError> {
+        perl_sprintf_format_with(fmt, args, |v| self.stringify_value(v.clone(), line))
+    }
+
     fn try_overload_stringify(&mut self, v: &PerlValue, line: usize) -> Option<ExecResult> {
         let br = v.as_blessed_ref()?;
         let class = br.class.clone();
@@ -5156,10 +5267,51 @@ impl Interpreter {
             return None;
         };
         let map = self.overload_table.get(&class)?;
-        let sub_short = map.get(key)?;
+        let sub_short = if let Some(s) = map.get(key) {
+            s.clone()
+        } else if let Some(nm) = map.get("nomethod") {
+            let fq = format!("{}::{}", class, nm);
+            let sub = self.subs.get(&fq)?.clone();
+            return Some(self.call_sub(
+                &sub,
+                vec![invocant, other, PerlValue::string(key.to_string())],
+                WantarrayCtx::Scalar,
+                line,
+            ));
+        } else {
+            return None;
+        };
         let fq = format!("{}::{}", class, sub_short);
         let sub = self.subs.get(&fq)?.clone();
         Some(self.call_sub(&sub, vec![invocant, other], WantarrayCtx::Scalar, line))
+    }
+
+    /// Unary overload: keys `neg`, `bool`, `abs`, `0+`, … — or `nomethod` with `(invocant, op_key)`.
+    fn try_overload_unary_dispatch(
+        &mut self,
+        op_key: &str,
+        val: &PerlValue,
+        line: usize,
+    ) -> Option<ExecResult> {
+        let br = val.as_blessed_ref()?;
+        let class = br.class.clone();
+        let map = self.overload_table.get(&class)?;
+        if let Some(s) = map.get(op_key) {
+            let fq = format!("{}::{}", class, s);
+            let sub = self.subs.get(&fq)?.clone();
+            return Some(self.call_sub(&sub, vec![val.clone()], WantarrayCtx::Scalar, line));
+        }
+        if let Some(nm) = map.get("nomethod") {
+            let fq = format!("{}::{}", class, nm);
+            let sub = self.subs.get(&fq)?.clone();
+            return Some(self.call_sub(
+                &sub,
+                vec![val.clone(), PerlValue::string(op_key.to_string())],
+                WantarrayCtx::Scalar,
+                line,
+            ));
+        }
+        None
     }
 
     #[inline]
@@ -5614,6 +5766,21 @@ impl Interpreter {
                 | "^P"
                 | "^S"
                 | "^W"
+                | "^O"
+                | "^T"
+                | "^V"
+                | "^E"
+                | "^H"
+                | "^WARNING_BITS"
+                | "^GLOBAL_PHASE"
+                | "^MATCH"
+                | "^PREMATCH"
+                | "^POSTMATCH"
+                | "^LAST_SUBMATCH_RESULT"
+                | "<"
+                | ">"
+                | "("
+                | ")"
                 | "?"
                 | "|"
         )
@@ -5631,6 +5798,8 @@ impl Interpreter {
                 | "^D"
                 | "^P"
                 | "^W"
+                | "^H"
+                | "^WARNING_BITS"
                 | "$$"
                 | "]"
                 | "^S"
@@ -5643,6 +5812,10 @@ impl Interpreter {
         match name {
             "$$" => PerlValue::integer(std::process::id() as i64),
             "_" => self.scope.get_scalar("_"),
+            "^MATCH" => PerlValue::string(self.last_match.clone()),
+            "^PREMATCH" => PerlValue::string(self.prematch.clone()),
+            "^POSTMATCH" => PerlValue::string(self.postmatch.clone()),
+            "^LAST_SUBMATCH_RESULT" => PerlValue::string(self.last_paren_match.clone()),
             "0" => PerlValue::string(self.program_name.clone()),
             "!" => PerlValue::string(self.errno.clone()),
             "@" => PerlValue::string(self.eval_error.clone()),
@@ -5658,6 +5831,14 @@ impl Interpreter {
             "^P" => PerlValue::integer(self.perl_debug_flags),
             "^S" => PerlValue::integer(if self.eval_nesting > 0 { 1 } else { 0 }),
             "^W" => PerlValue::integer(if self.warnings { 1 } else { 0 }),
+            "^O" => PerlValue::string(perl_osname()),
+            "^T" => PerlValue::integer(self.script_start_time),
+            "^V" => PerlValue::string(perl_version_v_string()),
+            "^E" => PerlValue::string(extended_os_error_string()),
+            "^H" => PerlValue::integer(self.compile_hints),
+            "^WARNING_BITS" => PerlValue::integer(self.warning_bits),
+            "^GLOBAL_PHASE" => PerlValue::string(self.global_phase.clone()),
+            "<" | ">" | "(" | ")" => PerlValue::integer(unix_id_for_special(name)),
             "?" => PerlValue::integer(self.child_exit_status),
             "|" => PerlValue::integer(if self.output_autoflush { 1 } else { 0 }),
             _ => self.scope.get_scalar(name),
@@ -5675,6 +5856,8 @@ impl Interpreter {
             "^D" => self.debug_flags = val.to_int(),
             "^P" => self.perl_debug_flags = val.to_int(),
             "^W" => self.warnings = val.to_int() != 0,
+            "^H" => self.compile_hints = val.to_int(),
+            "^WARNING_BITS" => self.warning_bits = val.to_int(),
             "|" => {
                 self.output_autoflush = val.to_int() != 0;
                 if self.output_autoflush {
@@ -5682,7 +5865,15 @@ impl Interpreter {
                 }
             }
             // Read-only or pid-backed
-            "$$" | "]" | "^S" | "ARGV" | "?" => {}
+            "$$" | "]" | "^S" | "ARGV" | "?" | "^O" | "^T" | "^V" | "^E" | "^GLOBAL_PHASE"
+            | "^MATCH"
+            | "^PREMATCH"
+            | "^POSTMATCH"
+            | "^LAST_SUBMATCH_RESULT"
+            | "<"
+            | ">"
+            | "("
+            | ")" => {}
             _ => self.scope.set_scalar(name, val.clone())?,
         }
         Ok(())
@@ -5973,7 +6164,16 @@ impl Interpreter {
             return Ok(PerlValue::integer(1));
         }
         let fmt = args[0].to_string();
-        let output = perl_sprintf(&fmt, &args[1..]);
+        let output = match self.perl_sprintf_stringify(&fmt, &args[1..], line) {
+            Ok(s) => s,
+            Err(FlowOrError::Error(e)) => return Err(e),
+            Err(FlowOrError::Flow(_)) => {
+                return Err(PerlError::runtime(
+                    "printf: unexpected control flow in sprintf",
+                    line,
+                ));
+            }
+        };
         match handle_name {
             "STDOUT" => {
                 print!("{}", output);
@@ -6661,7 +6861,7 @@ impl Interpreter {
         Ok(PerlValue::integer(1))
     }
 
-    fn exec_printf(&mut self, handle: Option<&str>, args: &[Expr], _line: usize) -> ExecResult {
+    fn exec_printf(&mut self, handle: Option<&str>, args: &[Expr], line: usize) -> ExecResult {
         if args.is_empty() {
             return Ok(PerlValue::integer(1));
         }
@@ -6670,7 +6870,7 @@ impl Interpreter {
         for a in &args[1..] {
             arg_vals.push(self.eval_expr(a)?);
         }
-        let output = perl_sprintf(&fmt, &arg_vals);
+        let output = self.perl_sprintf_stringify(&fmt, &arg_vals, line)?;
         let handle_name = self.resolve_io_handle_name(handle.unwrap_or("STDOUT"));
         match handle_name.as_str() {
             "STDOUT" => {
@@ -6778,8 +6978,15 @@ impl Interpreter {
     }
 }
 
-/// Minimal sprintf implementation for Perl.
-pub(crate) fn perl_sprintf(fmt: &str, args: &[PerlValue]) -> String {
+/// `sprintf` with pluggable `%s` formatting (stringify for overload-aware `Interpreter`).
+pub(crate) fn perl_sprintf_format_with<F>(
+    fmt: &str,
+    args: &[PerlValue],
+    mut string_for_s: F,
+) -> Result<String, FlowOrError>
+where
+    F: FnMut(&PerlValue) -> Result<String, FlowOrError>,
+{
     let mut result = String::new();
     let mut arg_idx = 0;
     let chars: Vec<char> = fmt.chars().collect();
@@ -6858,7 +7065,7 @@ pub(crate) fn perl_sprintf(fmt: &str, args: &[PerlValue]) -> String {
                     }
                 }
                 's' => {
-                    let s = arg.to_string();
+                    let s = string_for_s(&arg)?;
                     if !precision.is_empty() {
                         let truncated: String = s.chars().take(p).collect();
                         if flags.contains('-') {
@@ -6888,7 +7095,7 @@ pub(crate) fn perl_sprintf(fmt: &str, args: &[PerlValue]) -> String {
             i += 1;
         }
     }
-    result
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -6913,6 +7120,9 @@ mod special_scalar_name_tests {
         assert!(Interpreter::is_special_scalar_name_for_get("0"));
         assert!(Interpreter::is_special_scalar_name_for_get("!"));
         assert!(Interpreter::is_special_scalar_name_for_get("^W"));
+        assert!(Interpreter::is_special_scalar_name_for_get("^O"));
+        assert!(Interpreter::is_special_scalar_name_for_get("^MATCH"));
+        assert!(Interpreter::is_special_scalar_name_for_get("<"));
         assert!(Interpreter::is_special_scalar_name_for_get("?"));
         assert!(Interpreter::is_special_scalar_name_for_get("|"));
         assert!(!Interpreter::is_special_scalar_name_for_get("foo"));
@@ -6923,10 +7133,25 @@ mod special_scalar_name_tests {
     fn special_scalar_name_for_set_matches_set_special_var_arms() {
         assert!(Interpreter::is_special_scalar_name_for_set("0"));
         assert!(Interpreter::is_special_scalar_name_for_set("^D"));
+        assert!(Interpreter::is_special_scalar_name_for_set("^H"));
+        assert!(Interpreter::is_special_scalar_name_for_set("^WARNING_BITS"));
         assert!(Interpreter::is_special_scalar_name_for_set("ARGV"));
         assert!(Interpreter::is_special_scalar_name_for_set("|"));
         assert!(!Interpreter::is_special_scalar_name_for_set("?"));
         assert!(!Interpreter::is_special_scalar_name_for_set("foo"));
         assert!(!Interpreter::is_special_scalar_name_for_set("__PACKAGE__"));
+    }
+
+    #[test]
+    fn caret_and_id_specials_roundtrip_get() {
+        let i = Interpreter::new();
+        assert_eq!(i.get_special_var("^O").to_string(), super::perl_osname());
+        assert_eq!(i.get_special_var("^V").to_string(), format!("v{}", env!("CARGO_PKG_VERSION")));
+        assert_eq!(i.get_special_var("^GLOBAL_PHASE").to_string(), "RUN");
+        assert!(i.get_special_var("^T").to_int() > 0);
+        #[cfg(unix)]
+        {
+            assert!(i.get_special_var("<").to_int() >= 0);
+        }
     }
 }

@@ -20,6 +20,8 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 | `$0` | Program name | `program_name`; `"0"` in special get/set. |
 | `$$` | Process ID | `get_special_var("$$")` → `std::process::id()`. |
 | `$1`…`$n` | Capture groups | After a successful match, `apply_regex_captures` sets `scope` scalars `"1"`…`"n"` (`src/interpreter.rs`). |
+| `${^MATCH}` / `${^PREMATCH}` / `${^POSTMATCH}` | Match text / before / after | Same data as `$&`, `` $` ``, `$'` — read via `get_special_var("^MATCH")` etc. on the interpreter after `apply_regex_captures` (`src/interpreter.rs`). |
+| `${^LAST_SUBMATCH_RESULT}` | Last bracket `$+` | Same as `$+` / `last_paren_match`; exposed as `get_special_var("^LAST_SUBMATCH_RESULT")`. |
 | `@-` / `@+` | Match start/end offsets | After a successful match, `apply_regex_captures` sets arrays `"-` and `"+"` (whole match at index 0, then groups; `-1` for unused groups). |
 | `%+` | Named captures | `scope.set_hash("+", …)` from regex named groups. |
 | `@ARGV` | Script arguments | Declared in `Interpreter::new`; populated by `main` driver (`src/main.rs`). |
@@ -67,7 +69,7 @@ Single-character names after `$` are accepted (`src/lexer.rs` `read_variable_nam
 
 | Category | Examples |
 |----------|----------|
-| **Match / regexp** | `${^MATCH}` / `${^PREMATCH}` / `${^POSTMATCH}` — not implemented; `$&` / `` $` `` / `$'` / `$+` (last bracket) are set on the scalar stash from `apply_regex_captures` (not via `get_special_var`). |
+| **Match / regexp** | `$&` / `` $` `` / `$'` / `$+` are also set on the scalar stash from `apply_regex_captures`; `${^MATCH}` / `${^PREMATCH}` / `${^POSTMATCH}` / `${^LAST_SUBMATCH_RESULT}` use the same interpreter state via `get_special_var`. |
 | **Process / status** | `$^E` extended OS error, `$PROCESS_ID` aliases. (`$?` is set after `system`, `capture`, and `close` on pipe children; POSIX-style packed status.) |
 | **Ids / groups** | `$<` `$>` `$(` `$)` real/effective uid/gid. |
 | **Perlio / globs** | Many handle-related specials beyond what IO builtins use. |
@@ -79,7 +81,7 @@ Single-character names after `$` are accepted (`src/lexer.rs` `read_variable_nam
 
 ## Short list (what’s still missing)
 
-**Commonly missed Perl specials:** **`$^O`**, **`$^T`**, **`$^V`**, **`$^E`**, **`$^H`** / phase bits (**`${^WARNING_BITS}`**, **`${^GLOBAL_PHASE}`**, …), **`$<`**/**`$>`**/**`$(`**/**`$)`**, **`${^MATCH}`** / **`${^PREMATCH}`** / **`${^POSTMATCH}`**; full **`$!`**/**`$@`** dualvar; real **`%SIG`**; **`English`** (see tables below).
+**Commonly missed Perl specials:** **`$^O`**, **`$^T`**, **`$^V`**, **`$^E`**, **`$^H`** / phase bits (**`${^WARNING_BITS}`**, **`${^GLOBAL_PHASE}`**, …), **`$<`**/**`$>`**/**`$(`**/**`$)`**; full **`$!`**/**`$@`** dualvar; real **`%SIG`**; **`English`** (see tables below).
 
 If you only care about **common Perl specials** not yet covered (see **Partially implemented** for things that exist but differ):
 

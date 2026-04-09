@@ -654,6 +654,99 @@ fn perl_compat_use_overload_combined_coderef() {
 }
 
 #[test]
+fn perl_compat_sprintf_percent_s_uses_overload_stringify() {
+    assert_eq!(
+        rs(r#"
+        package O;
+        use overload '""' => 'as_string';
+        sub as_string { "Z" }
+        package main;
+        my $o = bless {}, "O";
+        sprintf "%s", $o;
+        "#),
+        "Z"
+    );
+}
+
+#[test]
+fn perl_compat_regex_caret_match_vars() {
+    assert_eq!(
+        rs(r#"
+        "abc" =~ /b/;
+        "${^MATCH}" . ":" . "${^PREMATCH}" . ":" . "${^POSTMATCH}";
+        "#),
+        "b:a:c"
+    );
+}
+
+#[test]
+fn perl_compat_tie_hash_exists_delete() {
+    assert_eq!(
+        ri(r#"
+        package T;
+        sub TIEHASH { bless { h => {} }, shift }
+        sub FETCH { $_[0]->{h}->{$_[1]} }
+        sub STORE { $_[0]->{h}->{$_[1]} = $_[2] }
+        sub EXISTS { 7 }
+        sub DELETE { 8 }
+        package main;
+        my %t;
+        tie %t, "T";
+        $t{a} = 1;
+        exists $t{a};
+        "#),
+        7
+    );
+    assert_eq!(
+        ri(r#"
+        package T;
+        sub TIEHASH { bless { h => {} }, shift }
+        sub FETCH { $_[0]->{h}->{$_[1]} }
+        sub STORE { $_[0]->{h}->{$_[1]} = $_[2] }
+        sub EXISTS { 1 }
+        sub DELETE { 8 }
+        package main;
+        my %t;
+        tie %t, "T";
+        $t{a} = 1;
+        delete $t{a};
+        "#),
+        8
+    );
+}
+
+#[test]
+fn perl_compat_use_overload_nomethod_binop() {
+    assert_eq!(
+        ri(r#"
+        package O;
+        use overload nomethod => 'catch_all', fallback => 1;
+        sub catch_all { my ($a, $b, $op) = @_; 99 }
+        package main;
+        my $a = O->new(n => 1);
+        my $b = O->new(n => 2);
+        $a + $b;
+        "#),
+        99
+    );
+}
+
+#[test]
+fn perl_compat_use_overload_unary_neg() {
+    assert_eq!(
+        ri(r#"
+        package O;
+        use overload 'neg' => 'negate';
+        sub negate { my ($x) = @_; 42 }
+        package main;
+        my $o = bless {}, "O";
+        -$o;
+        "#),
+        42
+    );
+}
+
+#[test]
 fn perl_compat_tie_scalar_fetch_store() {
     assert_eq!(
         ri(r#"
