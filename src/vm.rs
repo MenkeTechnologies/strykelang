@@ -312,7 +312,7 @@ impl<'a> VM<'a> {
             Some(v)
         });
 
-        let plain_buf = crate::jit::linear_plain_ops_max_index(ops).and_then(|max| {
+        let mut plain_buf = crate::jit::linear_plain_ops_max_index(ops).and_then(|max| {
             if max as usize >= names.len() {
                 return None;
             }
@@ -343,7 +343,7 @@ impl<'a> VM<'a> {
         if let Some(v) = crate::jit::try_run_linear_ops(
             ops,
             slot_buf.as_deref_mut(),
-            plain_buf.as_deref(),
+            plain_buf.as_deref_mut(),
             arg_buf.as_deref(),
             constants,
         ) {
@@ -353,6 +353,14 @@ impl<'a> VM<'a> {
                         idx,
                         PerlValue::integer(buf[idx as usize]),
                     );
+                }
+            }
+            if let Some(buf) = plain_buf.as_ref() {
+                for idx in crate::jit::linear_plain_ops_written_indices(ops) {
+                    let name = names[idx as usize].as_str();
+                    self.interp
+                        .scope
+                        .set_scalar(name, PerlValue::integer(buf[idx as usize]));
                 }
             }
             return Ok(v);
@@ -379,7 +387,7 @@ impl<'a> VM<'a> {
                 Some(v)
             });
 
-        let block_plain_buf =
+        let mut block_plain_buf =
             crate::jit::block_plain_ops_max_index(ops).and_then(|max| {
                 if max as usize >= names.len() {
                     return None;
@@ -408,7 +416,7 @@ impl<'a> VM<'a> {
         if let Some(v) = crate::jit::try_run_block_ops(
             ops,
             block_slot_buf.as_deref_mut(),
-            block_plain_buf.as_deref(),
+            block_plain_buf.as_deref_mut(),
             block_arg_buf.as_deref(),
             constants,
         ) {
@@ -417,6 +425,14 @@ impl<'a> VM<'a> {
                     self.interp
                         .scope
                         .set_scalar_slot(idx, PerlValue::integer(buf[idx as usize]));
+                }
+            }
+            if let Some(buf) = block_plain_buf.as_ref() {
+                for idx in crate::jit::block_plain_ops_written_indices(ops) {
+                    let name = names[idx as usize].as_str();
+                    self.interp
+                        .scope
+                        .set_scalar(name, PerlValue::integer(buf[idx as usize]));
                 }
             }
             return Ok(v);
