@@ -104,10 +104,7 @@ mod tests {
     #[test]
     fn push_unique_string_paths_appends_in_order() {
         let mut v = vec!["first".to_string()];
-        push_unique_string_paths(
-            &mut v,
-            vec!["second".to_string(), "third".to_string()],
-        );
+        push_unique_string_paths(&mut v, vec!["second".to_string(), "third".to_string()]);
         assert_eq!(v, vec!["first", "second", "third"]);
     }
 }

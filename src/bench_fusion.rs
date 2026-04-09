@@ -156,7 +156,7 @@ pub(crate) fn try_match_string_repeat_length_fusion(
                 return None;
             }
             let total_len = limit.checked_mul(chunk_len)?;
-            if &i_name == &s_name {
+            if i_name == s_name {
                 return None;
             }
             match &print_stmt.kind {
@@ -684,7 +684,7 @@ pub(crate) fn try_match_regex_count_fusion(
         },
         _ => return None,
     }
-    if &i_name == &text_name || &i_name == &count_name {
+    if i_name == text_name || i_name == count_name {
         return None;
     }
     match &print_stmt.kind {

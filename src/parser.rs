@@ -4331,7 +4331,10 @@ impl Parser {
     }
 
     /// After `fan` / `fan_cap` `{ BLOCK }`, optional `, progress => EXPR` or `progress => EXPR` (no comma).
-    fn parse_fan_optional_progress(&mut self, which: &'static str) -> PerlResult<Option<Box<Expr>>> {
+    fn parse_fan_optional_progress(
+        &mut self,
+        which: &'static str,
+    ) -> PerlResult<Option<Box<Expr>>> {
         let line = self.peek_line();
         if self.eat(&Token::Comma) {
             match self.peek() {

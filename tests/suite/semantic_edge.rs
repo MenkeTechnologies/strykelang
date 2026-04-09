@@ -59,10 +59,7 @@ fn sort_numeric_block() {
 
 #[test]
 fn grep_block_filters() {
-    assert_eq!(
-        eval_int(r#"scalar grep { $_ > 2 } (1, 2, 3, 4)"#),
-        2
-    );
+    assert_eq!(eval_int(r#"scalar grep { $_ > 2 } (1, 2, 3, 4)"#), 2);
 }
 
 #[test]
@@ -83,10 +80,7 @@ fn keys_in_scalar_context_is_count() {
 
 #[test]
 fn defined_array_element() {
-    assert_eq!(
-        eval_int(r#"my @a = (1); defined $a[0] ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#"my @a = (1); defined $a[0] ? 1 : 0"#), 1);
 }
 
 #[test]

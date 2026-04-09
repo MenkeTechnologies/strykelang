@@ -44,10 +44,7 @@ fn pack_z_null_terminated() {
 
 #[test]
 fn pack_x_inserts_nul_padding() {
-    assert_eq!(
-        eval_int(r#"ord substr pack('x2 C', 9), 2, 1"#),
-        9
-    );
+    assert_eq!(eval_int(r#"ord substr pack('x2 C', 9), 2, 1"#), 9);
 }
 
 #[test]
@@ -71,10 +68,7 @@ fn pack_n2_two_words_big_endian() {
 
 #[test]
 fn pack_q_preserves_negative() {
-    assert_eq!(
-        eval_int(r#"scalar unpack 'q', pack 'q', -999"#),
-        -999
-    );
+    assert_eq!(eval_int(r#"scalar unpack 'q', pack 'q', -999"#), -999);
 }
 
 #[test]

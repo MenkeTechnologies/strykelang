@@ -558,7 +558,7 @@ fn ops_before_halt(ops: &[Op]) -> &[Op] {
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
-enum Cell {
+pub(crate) enum Cell {
     Const(i64),
     Dyn,
     ConstF(f64),

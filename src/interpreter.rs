@@ -561,7 +561,7 @@ impl Interpreter {
             special_caret_scalars.insert(format!("^{}", name), PerlValue::UNDEF);
         }
 
-        let interp = Self {
+        Self {
             scope,
             subs: HashMap::new(),
             struct_defs: HashMap::new(),
@@ -648,18 +648,14 @@ impl Interpreter {
             glob_restore_frames: vec![Vec::new()],
             english_enabled: false,
             english_lexical_scalars: vec![HashSet::new()],
-            vm_jit_enabled: match std::env::var("PERLRS_NO_JIT") {
+            vm_jit_enabled: !matches!(
+                std::env::var("PERLRS_NO_JIT"),
                 Ok(v)
                     if v == "1"
                         || v.eq_ignore_ascii_case("true")
-                        || v.eq_ignore_ascii_case("yes") =>
-                {
-                    false
-                }
-                _ => true,
-            },
-        };
-        interp
+                        || v.eq_ignore_ascii_case("yes")
+            ),
+        }
     }
 
     /// Rayon pool size (`pe -j`); lazily initialized from `rayon::current_num_threads()`.

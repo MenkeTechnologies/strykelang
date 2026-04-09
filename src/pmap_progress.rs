@@ -63,15 +63,7 @@ fn write_bar(stderr: &mut dyn Write, done: usize, total: usize, tty: bool) {
     let filled = (done * W) / total.max(1);
     let pct = (done * 100) / total.max(1);
     // Left-to-right fill: solid block then light shade (readable on light/dark backgrounds).
-    let bar: String = (0..W)
-        .map(|i| {
-            if i < filled {
-                '█'
-            } else {
-                '░'
-            }
-        })
-        .collect();
+    let bar: String = (0..W).map(|i| if i < filled { '█' } else { '░' }).collect();
     if tty {
         // \r: same line; \x1b[K: erase to end of line (avoid leftover chars if bar shrinks).
         write!(

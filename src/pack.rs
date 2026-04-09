@@ -568,7 +568,10 @@ mod tests {
 
     #[test]
     fn pack_a_pads_with_nul_a_pads_with_space() {
-        assert_eq!(pack_bytes("a3", &[PerlValue::string("a".into())]), vec![b'a', 0, 0]);
+        assert_eq!(
+            pack_bytes("a3", &[PerlValue::string("a".into())]),
+            vec![b'a', 0, 0]
+        );
         assert_eq!(
             pack_bytes("A3", &[PerlValue::string("a".into())]),
             vec![b'a', b' ', b' ']
@@ -593,7 +596,10 @@ mod tests {
 
     #[test]
     fn pack_h_one_nibble_pair() {
-        assert_eq!(pack_bytes("H", &[PerlValue::string("ff".into())]), vec![255]);
+        assert_eq!(
+            pack_bytes("H", &[PerlValue::string("ff".into())]),
+            vec![255]
+        );
     }
 
     #[test]
@@ -638,7 +644,10 @@ mod tests {
     #[test]
     fn pack_star_rejects_a() {
         let e = perl_pack(
-            &[PerlValue::string("a*".into()), PerlValue::string("x".into())],
+            &[
+                PerlValue::string("a*".into()),
+                PerlValue::string("x".into()),
+            ],
             0,
         )
         .expect_err("a*");
@@ -721,7 +730,7 @@ mod tests {
 
     #[test]
     fn unpack_a_trims_space_padding_unpack_z_reads_c_string() {
-        let v = unpack_vals("A4", &[b'h', b'i', b' ', b' ']);
+        let v = unpack_vals("A4", b"hi  ");
         assert_eq!(v.len(), 1);
         assert_eq!(v[0].to_string(), "hi");
 
@@ -797,19 +806,16 @@ mod tests {
 
     #[test]
     fn unpack_rejects_non_string_data() {
-        let e = perl_unpack(
-            &[
-                PerlValue::string("C".into()),
-                PerlValue::integer(99),
-            ],
-            0,
-        )
-        .expect_err("type");
+        let e = perl_unpack(&[PerlValue::string("C".into()), PerlValue::integer(99)], 0)
+            .expect_err("type");
         assert!(e.message.contains("string or packed"), "{}", e.message);
     }
 
     #[test]
     fn whitespace_in_template_is_skipped() {
-        assert_eq!(pack_bytes("C  C", &[PerlValue::integer(1), PerlValue::integer(2)]), vec![1, 2]);
+        assert_eq!(
+            pack_bytes("C  C", &[PerlValue::integer(1), PerlValue::integer(2)]),
+            vec![1, 2]
+        );
     }
 }

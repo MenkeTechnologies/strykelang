@@ -3135,7 +3135,7 @@ impl<'a> VM<'a> {
             }
             Some(BuiltinId::ParPipeline) => {
                 if crate::par_pipeline::is_named_par_pipeline_args(&args) {
-                    return crate::par_pipeline::run_par_pipeline(&mut self.interp, &args, line);
+                    return crate::par_pipeline::run_par_pipeline(self.interp, &args, line);
                 }
                 let mut items = Vec::new();
                 for v in args {
