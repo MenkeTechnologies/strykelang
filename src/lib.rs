@@ -7,6 +7,7 @@ pub mod compiler;
 mod crypt_util;
 pub mod data_section;
 pub mod english;
+mod fib_like_tail;
 pub mod error;
 pub mod fmt;
 pub mod format;

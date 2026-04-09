@@ -47,6 +47,7 @@ pub fn install_list_util(interp: &mut Interpreter) {
                 body: empty.clone(),
                 prototype: None,
                 closure_env: None,
+                fib_like: None,
             }),
         );
     }
@@ -60,6 +61,7 @@ pub fn install_list_util(interp: &mut Interpreter) {
                 body: empty.clone(),
                 prototype: None,
                 closure_env: None,
+                fib_like: None,
             }),
         );
     }

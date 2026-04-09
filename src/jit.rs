@@ -82,6 +82,8 @@ use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::hash::{Hash, Hasher};
 use std::sync::{Mutex, OnceLock};
 
+use cranelift_codegen::isa::OwnedTargetIsa;
+
 use cranelift_codegen::ir::condcodes::{FloatCC, IntCC};
 use cranelift_codegen::ir::immediates::Ieee64;
 use cranelift_codegen::ir::types;
@@ -217,9 +219,21 @@ pub extern "C" fn perlrs_jit_is_defined_raw_bits(bits: i64) -> i64 {
     }
 }
 
+/// CPU ISA is fixed for the process — cache [`OwnedTargetIsa`] so each JIT cache miss does not
+/// re-run native ISA detection (see `new_jit_module`).
+static JIT_OWNED_ISA: OnceLock<Option<OwnedTargetIsa>> = OnceLock::new();
+
+fn cached_owned_isa() -> Option<&'static OwnedTargetIsa> {
+    JIT_OWNED_ISA
+        .get_or_init(|| {
+            let isa_builder = cranelift_native::builder().ok()?;
+            isa_builder.finish(isa_flags()).ok()
+        })
+        .as_ref()
+}
+
 fn new_jit_module() -> Option<JITModule> {
-    let isa_builder = cranelift_native::builder().ok()?;
-    let isa = isa_builder.finish(isa_flags()).ok()?;
+    let isa = cached_owned_isa()?.clone();
     let mut builder = JITBuilder::with_isa(isa, default_libcall_names());
     builder.symbol("perlrs_jit_pow_i64", perlrs_jit_pow_i64 as *const u8);
     builder.symbol("perlrs_jit_lognot_i64", perlrs_jit_lognot_i64 as *const u8);

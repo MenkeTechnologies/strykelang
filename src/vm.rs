@@ -53,6 +53,10 @@ pub struct VM<'a> {
     sub_jit_skip_block: Vec<bool>,
     /// `sub_entry_at_ip[ip]` — faster than hashing on every opcode (recursive subs dispatch millions of ops).
     sub_entry_at_ip: Vec<bool>,
+    /// Reused `i64` tables for sub-JIT / top-level JIT attempts (avoids `vec![0; n]` on every try).
+    jit_buf_slot: Vec<i64>,
+    jit_buf_plain: Vec<i64>,
+    jit_buf_arg: Vec<i64>,
 }
 
 impl<'a> VM<'a> {
@@ -81,6 +85,9 @@ impl<'a> VM<'a> {
                 }
                 v
             },
+            jit_buf_slot: Vec::new(),
+            jit_buf_plain: Vec::new(),
+            jit_buf_arg: Vec::new(),
         }
     }
 
@@ -157,70 +164,106 @@ impl<'a> VM<'a> {
         let Some((seg, _)) = crate::jit::sub_entry_segment(ops, ip) else {
             return Ok(false);
         };
-        // `try_run_linear_sub` rejects these segments without compiling — do not allocate slot/plain/arg
-        // buffers here (recursive subs like `fib` call this on every entry; buffer churn dominated JIT-on).
+        // `try_run_linear_sub` rejects these segments without compiling — skip expensive work before
+        // resize/fill of reusable scratch buffers (`jit_buf_*`).
         if crate::jit::segment_blocks_subroutine_linear_jit(seg) {
             self.sub_jit_skip_linear_mark(ip);
             return Ok(false);
         }
-        let mut slot_buf = crate::jit::linear_slot_ops_max_index_seq(seg).and_then(|max| {
-            let mut v = vec![0i64; max as usize + 1];
+        let mut slot_len: Option<usize> = None;
+        if let Some(max) = crate::jit::linear_slot_ops_max_index_seq(seg) {
+            let n = max as usize + 1;
+            self.jit_buf_slot.resize(n, 0);
+            let mut ok = true;
             for i in 0..=max {
                 let pv = self.interp.scope.get_scalar_slot(i);
-                v[i as usize] = match pv.as_integer() {
-                    Some(n) => n,
+                self.jit_buf_slot[i as usize] = match pv.as_integer() {
+                    Some(v) => v,
                     None if pv.is_undef() => {
                         if crate::jit::slot_undef_prefill_ok_seq(seg, i) {
                             0
                         } else {
-                            return None;
+                            ok = false;
+                            break;
                         }
                     }
-                    None => return None,
+                    None => {
+                        ok = false;
+                        break;
+                    }
                 };
             }
-            Some(v)
-        });
-        let mut plain_buf = crate::jit::linear_plain_ops_max_index_seq(seg).and_then(|max| {
-            if max as usize >= names.len() {
-                return None;
+            if ok {
+                slot_len = Some(n);
             }
-            let mut v = vec![0i64; max as usize + 1];
-            for i in 0..=max {
-                let n = names[i as usize].as_str();
-                v[i as usize] = self.interp.scope.get_scalar(n).as_integer()?;
+        }
+        let mut plain_len: Option<usize> = None;
+        if let Some(max) = crate::jit::linear_plain_ops_max_index_seq(seg) {
+            if (max as usize) < names.len() {
+                let n = max as usize + 1;
+                self.jit_buf_plain.resize(n, 0);
+                let mut ok = true;
+                for i in 0..=max {
+                    let nm = names[i as usize].as_str();
+                    match self.interp.scope.get_scalar(nm).as_integer() {
+                        Some(v) => self.jit_buf_plain[i as usize] = v,
+                        None => {
+                            ok = false;
+                            break;
+                        }
+                    }
+                }
+                if ok {
+                    plain_len = Some(n);
+                }
             }
-            Some(v)
-        });
-        let arg_buf = crate::jit::linear_arg_ops_max_index_seq(seg).and_then(|max| {
-            let frame = self.call_stack.last()?;
-            let base = frame.stack_base;
-            let mut v = vec![0i64; max as usize + 1];
-            for i in 0..=max {
-                let pos = base + i as usize;
-                let pv = self.stack.get(pos).cloned().unwrap_or(PerlValue::UNDEF);
-                v[i as usize] = pv.as_integer()?;
+        }
+        let mut arg_len: Option<usize> = None;
+        if let Some(max) = crate::jit::linear_arg_ops_max_index_seq(seg) {
+            if let Some(frame) = self.call_stack.last() {
+                let base = frame.stack_base;
+                let n = max as usize + 1;
+                self.jit_buf_arg.resize(n, 0);
+                let mut ok = true;
+                for i in 0..=max {
+                    let pos = base + i as usize;
+                    let pv = self.stack.get(pos).cloned().unwrap_or(PerlValue::UNDEF);
+                    match pv.as_integer() {
+                        Some(v) => self.jit_buf_arg[i as usize] = v,
+                        None => {
+                            ok = false;
+                            break;
+                        }
+                    }
+                }
+                if ok {
+                    arg_len = Some(n);
+                }
             }
-            Some(v)
-        });
+        }
+        let slot_buf = slot_len.map(|n| &mut self.jit_buf_slot[..n]);
+        let plain_buf = plain_len.map(|n| &mut self.jit_buf_plain[..n]);
+        let arg_buf = arg_len.map(|n| &self.jit_buf_arg[..n]);
         let Some(v) = crate::jit::try_run_linear_sub(
             ops,
             ip,
-            slot_buf.as_deref_mut(),
-            plain_buf.as_deref_mut(),
-            arg_buf.as_deref(),
+            slot_buf,
+            plain_buf,
+            arg_buf,
             constants,
         ) else {
             return Ok(false);
         };
-        if let Some(buf) = slot_buf.as_ref() {
+        if let Some(n) = slot_len {
+            let buf = &self.jit_buf_slot[..n];
             for idx in crate::jit::linear_slot_ops_written_indices_seq(seg) {
                 self.interp
                     .scope
                     .set_scalar_slot(idx, PerlValue::integer(buf[idx as usize]));
             }
         }
-        if let Some(buf) = plain_buf.as_ref() {
+        if let Some(n) = plain_len {
+            let buf = &self.jit_buf_plain[..n];
             for idx in crate::jit::linear_plain_ops_written_indices_seq(seg) {
                 let name = names[idx as usize].as_str();
                 self.interp
@@ -262,65 +305,99 @@ impl<'a> VM<'a> {
         };
         let block_buf_mode = validated.buffer_mode();
 
-        let mut block_slot_buf = crate::jit::block_slot_ops_max_index(full_body).and_then(|max| {
-            let mut v = vec![0i64; max as usize + 1];
+        let mut b_slot_len: Option<usize> = None;
+        if let Some(max) = crate::jit::block_slot_ops_max_index(full_body) {
+            let n = max as usize + 1;
+            self.jit_buf_slot.resize(n, 0);
+            let mut ok = true;
             for i in 0..=max {
                 let pv = self.interp.scope.get_scalar_slot(i);
-                v[i as usize] = match block_buf_mode {
+                self.jit_buf_slot[i as usize] = match block_buf_mode {
                     crate::jit::BlockJitBufferMode::I64AsPerlValueBits => pv.raw_bits() as i64,
                     crate::jit::BlockJitBufferMode::I64AsInteger => match pv.as_integer() {
-                        Some(n) => n,
+                        Some(v) => v,
                         None if pv.is_undef() => {
                             if crate::jit::block_slot_undef_prefill_ok(full_body, i) {
                                 0
                             } else {
-                                return None;
+                                ok = false;
+                                break;
                             }
                         }
-                        None => return None,
+                        None => {
+                            ok = false;
+                            break;
+                        }
                     },
                 };
             }
-            Some(v)
-        });
+            if ok {
+                b_slot_len = Some(n);
+            }
+        }
 
-        let mut block_plain_buf =
-            crate::jit::block_plain_ops_max_index(full_body).and_then(|max| {
-                if max as usize >= names.len() {
-                    return None;
-                }
-                let mut v = vec![0i64; max as usize + 1];
+        let mut b_plain_len: Option<usize> = None;
+        if let Some(max) = crate::jit::block_plain_ops_max_index(full_body) {
+            if (max as usize) < names.len() {
+                let n = max as usize + 1;
+                self.jit_buf_plain.resize(n, 0);
+                let mut ok = true;
                 for i in 0..=max {
-                    let n = names[i as usize].as_str();
-                    let pv = self.interp.scope.get_scalar(n);
-                    v[i as usize] = match block_buf_mode {
+                    let nm = names[i as usize].as_str();
+                    let pv = self.interp.scope.get_scalar(nm);
+                    self.jit_buf_plain[i as usize] = match block_buf_mode {
                         crate::jit::BlockJitBufferMode::I64AsPerlValueBits => pv.raw_bits() as i64,
-                        crate::jit::BlockJitBufferMode::I64AsInteger => pv.as_integer()?,
+                        crate::jit::BlockJitBufferMode::I64AsInteger => match pv.as_integer() {
+                            Some(v) => v,
+                            None => {
+                                ok = false;
+                                break;
+                            }
+                        },
                     };
                 }
-                Some(v)
-            });
-
-        let block_arg_buf = crate::jit::block_arg_ops_max_index(full_body).and_then(|max| {
-            let frame = self.call_stack.last()?;
-            let base = frame.stack_base;
-            let mut v = vec![0i64; max as usize + 1];
-            for i in 0..=max {
-                let pos = base + i as usize;
-                let pv = self.stack.get(pos).cloned().unwrap_or(PerlValue::UNDEF);
-                v[i as usize] = match block_buf_mode {
-                    crate::jit::BlockJitBufferMode::I64AsPerlValueBits => pv.raw_bits() as i64,
-                    crate::jit::BlockJitBufferMode::I64AsInteger => pv.as_integer()?,
-                };
+                if ok {
+                    b_plain_len = Some(n);
+                }
             }
-            Some(v)
-        });
+        }
+
+        let mut b_arg_len: Option<usize> = None;
+        if let Some(max) = crate::jit::block_arg_ops_max_index(full_body) {
+            if let Some(frame) = self.call_stack.last() {
+                let base = frame.stack_base;
+                let n = max as usize + 1;
+                self.jit_buf_arg.resize(n, 0);
+                let mut ok = true;
+                for i in 0..=max {
+                    let pos = base + i as usize;
+                    let pv = self.stack.get(pos).cloned().unwrap_or(PerlValue::UNDEF);
+                    self.jit_buf_arg[i as usize] = match block_buf_mode {
+                        crate::jit::BlockJitBufferMode::I64AsPerlValueBits => pv.raw_bits() as i64,
+                        crate::jit::BlockJitBufferMode::I64AsInteger => match pv.as_integer() {
+                            Some(v) => v,
+                            None => {
+                                ok = false;
+                                break;
+                            }
+                        },
+                    };
+                }
+                if ok {
+                    b_arg_len = Some(n);
+                }
+            }
+        }
+
+        let block_slot_buf = b_slot_len.map(|n| &mut self.jit_buf_slot[..n]);
+        let block_plain_buf = b_plain_len.map(|n| &mut self.jit_buf_plain[..n]);
+        let block_arg_buf = b_arg_len.map(|n| &self.jit_buf_arg[..n]);
 
         let Some((v, buf_mode)) = crate::jit::try_run_block_ops(
             full_body,
-            block_slot_buf.as_deref_mut(),
-            block_plain_buf.as_deref_mut(),
-            block_arg_buf.as_deref(),
+            block_slot_buf,
+            block_plain_buf,
+            block_arg_buf,
             constants,
             Some(validated),
         ) else {
@@ -328,7 +405,8 @@ impl<'a> VM<'a> {
             return Ok(false);
         };
 
-        if let Some(buf) = block_slot_buf.as_ref() {
+        if let Some(n) = b_slot_len {
+            let buf = &self.jit_buf_slot[..n];
             for idx in crate::jit::block_slot_ops_written_indices(full_body) {
                 let bits = buf[idx as usize] as u64;
                 let pv = match buf_mode {
@@ -342,7 +420,8 @@ impl<'a> VM<'a> {
                 self.interp.scope.set_scalar_slot(idx, pv);
             }
         }
-        if let Some(buf) = block_plain_buf.as_ref() {
+        if let Some(n) = b_plain_len {
+            let buf = &self.jit_buf_plain[..n];
             for idx in crate::jit::block_plain_ops_written_indices(full_body) {
                 let name = names[idx as usize].as_str();
                 let bits = buf[idx as usize] as u64;
@@ -639,71 +718,108 @@ impl<'a> VM<'a> {
         let len = ops.len();
         let mut last = PerlValue::UNDEF;
         // Safety limit: prevent infinite loops from consuming all memory.
-        // 100M ops is generous — fib(25) is ~1.5M ops.
+        // 1B ops allows very deep recursion / large programs without hitting the cap in normal use.
         let mut op_count: u64 = 0;
-        const MAX_OPS: u64 = 100_000_000;
+        const MAX_OPS: u64 = 1_000_000_000;
 
         // Match tree-walker `exec_statement_inner`: deliver `%SIG` and set `$^C` latch (Unix).
         crate::perl_signal::poll(self.interp)?;
         if self.jit_enabled {
-            let mut slot_buf = crate::jit::linear_slot_ops_max_index(ops).and_then(|max| {
-                let mut v = vec![0i64; max as usize + 1];
+            let mut top_slot_len: Option<usize> = None;
+            if let Some(max) = crate::jit::linear_slot_ops_max_index(ops) {
+                let n = max as usize + 1;
+                self.jit_buf_slot.resize(n, 0);
+                let mut ok = true;
                 for i in 0..=max {
                     let pv = self.interp.scope.get_scalar_slot(i);
-                    v[i as usize] = match pv.as_integer() {
-                        Some(n) => n,
+                    self.jit_buf_slot[i as usize] = match pv.as_integer() {
+                        Some(v) => v,
                         None if pv.is_undef() => {
                             if crate::jit::slot_undef_prefill_ok(ops, i) {
                                 0
                             } else {
-                                return None;
+                                ok = false;
+                                break;
                             }
                         }
-                        None => return None,
+                        None => {
+                            ok = false;
+                            break;
+                        }
                     };
                 }
-                Some(v)
-            });
+                if ok {
+                    top_slot_len = Some(n);
+                }
+            }
 
-            let mut plain_buf = crate::jit::linear_plain_ops_max_index(ops).and_then(|max| {
-                if max as usize >= names.len() {
-                    return None;
+            let mut top_plain_len: Option<usize> = None;
+            if let Some(max) = crate::jit::linear_plain_ops_max_index(ops) {
+                if (max as usize) < names.len() {
+                    let n = max as usize + 1;
+                    self.jit_buf_plain.resize(n, 0);
+                    let mut ok = true;
+                    for i in 0..=max {
+                        let nm = names[i as usize].as_str();
+                        match self.interp.scope.get_scalar(nm).as_integer() {
+                            Some(v) => self.jit_buf_plain[i as usize] = v,
+                            None => {
+                                ok = false;
+                                break;
+                            }
+                        }
+                    }
+                    if ok {
+                        top_plain_len = Some(n);
+                    }
                 }
-                let mut v = vec![0i64; max as usize + 1];
-                for i in 0..=max {
-                    let n = names[i as usize].as_str();
-                    v[i as usize] = self.interp.scope.get_scalar(n).as_integer()?;
-                }
-                Some(v)
-            });
+            }
 
-            let arg_buf = crate::jit::linear_arg_ops_max_index(ops).and_then(|max| {
-                let frame = self.call_stack.last()?;
-                let base = frame.stack_base;
-                let mut v = vec![0i64; max as usize + 1];
-                for i in 0..=max {
-                    let pos = base + i as usize;
-                    let pv = self.stack.get(pos).cloned().unwrap_or(PerlValue::UNDEF);
-                    v[i as usize] = pv.as_integer()?;
+            let mut top_arg_len: Option<usize> = None;
+            if let Some(max) = crate::jit::linear_arg_ops_max_index(ops) {
+                if let Some(frame) = self.call_stack.last() {
+                    let base = frame.stack_base;
+                    let n = max as usize + 1;
+                    self.jit_buf_arg.resize(n, 0);
+                    let mut ok = true;
+                    for i in 0..=max {
+                        let pos = base + i as usize;
+                        let pv = self.stack.get(pos).cloned().unwrap_or(PerlValue::UNDEF);
+                        match pv.as_integer() {
+                            Some(v) => self.jit_buf_arg[i as usize] = v,
+                            None => {
+                                ok = false;
+                                break;
+                            }
+                        }
+                    }
+                    if ok {
+                        top_arg_len = Some(n);
+                    }
                 }
-                Some(v)
-            });
+            }
+
+            let slot_buf = top_slot_len.map(|n| &mut self.jit_buf_slot[..n]);
+            let plain_buf = top_plain_len.map(|n| &mut self.jit_buf_plain[..n]);
+            let arg_buf = top_arg_len.map(|n| &self.jit_buf_arg[..n]);
 
             if let Some(v) = crate::jit::try_run_linear_ops(
                 ops,
-                slot_buf.as_deref_mut(),
-                plain_buf.as_deref_mut(),
-                arg_buf.as_deref(),
+                slot_buf,
+                plain_buf,
+                arg_buf,
                 constants,
             ) {
-                if let Some(buf) = slot_buf.as_ref() {
+                if let Some(n) = top_slot_len {
+                    let buf = &self.jit_buf_slot[..n];
                     for idx in crate::jit::linear_slot_ops_written_indices(ops) {
                         self.interp
                             .scope
                             .set_scalar_slot(idx, PerlValue::integer(buf[idx as usize]));
                     }
                 }
-                if let Some(buf) = plain_buf.as_ref() {
+                if let Some(n) = top_plain_len {
+                    let buf = &self.jit_buf_plain[..n];
                     for idx in crate::jit::linear_plain_ops_written_indices(ops) {
                         let name = names[idx as usize].as_str();
                         self.interp
@@ -718,78 +834,110 @@ impl<'a> VM<'a> {
             if let Some(validated) = crate::jit::block_jit_validate(ops, constants) {
                 let block_buf_mode = validated.buffer_mode();
 
-                let mut block_slot_buf =
-                    crate::jit::block_slot_ops_max_index(ops).and_then(|max| {
-                        let mut v = vec![0i64; max as usize + 1];
-                        for i in 0..=max {
-                            let pv = self.interp.scope.get_scalar_slot(i);
-                            v[i as usize] = match block_buf_mode {
-                                crate::jit::BlockJitBufferMode::I64AsPerlValueBits => {
-                                    pv.raw_bits() as i64
-                                }
-                                crate::jit::BlockJitBufferMode::I64AsInteger => {
-                                    match pv.as_integer() {
-                                        Some(n) => n,
-                                        None if pv.is_undef() => {
-                                            if crate::jit::block_slot_undef_prefill_ok(ops, i) {
-                                                0
-                                            } else {
-                                                return None;
-                                            }
-                                        }
-                                        None => return None,
-                                    }
-                                }
-                            };
-                        }
-                        Some(v)
-                    });
-
-                let mut block_plain_buf =
-                    crate::jit::block_plain_ops_max_index(ops).and_then(|max| {
-                        if max as usize >= names.len() {
-                            return None;
-                        }
-                        let mut v = vec![0i64; max as usize + 1];
-                        for i in 0..=max {
-                            let n = names[i as usize].as_str();
-                            let pv = self.interp.scope.get_scalar(n);
-                            v[i as usize] = match block_buf_mode {
-                                crate::jit::BlockJitBufferMode::I64AsPerlValueBits => {
-                                    pv.raw_bits() as i64
-                                }
-                                crate::jit::BlockJitBufferMode::I64AsInteger => pv.as_integer()?,
-                            };
-                        }
-                        Some(v)
-                    });
-
-                let block_arg_buf = crate::jit::block_arg_ops_max_index(ops).and_then(|max| {
-                    let frame = self.call_stack.last()?;
-                    let base = frame.stack_base;
-                    let mut v = vec![0i64; max as usize + 1];
+                let mut top_b_slot_len: Option<usize> = None;
+                if let Some(max) = crate::jit::block_slot_ops_max_index(ops) {
+                    let n = max as usize + 1;
+                    self.jit_buf_slot.resize(n, 0);
+                    let mut ok = true;
                     for i in 0..=max {
-                        let pos = base + i as usize;
-                        let pv = self.stack.get(pos).cloned().unwrap_or(PerlValue::UNDEF);
-                        v[i as usize] = match block_buf_mode {
+                        let pv = self.interp.scope.get_scalar_slot(i);
+                        self.jit_buf_slot[i as usize] = match block_buf_mode {
                             crate::jit::BlockJitBufferMode::I64AsPerlValueBits => {
                                 pv.raw_bits() as i64
                             }
-                            crate::jit::BlockJitBufferMode::I64AsInteger => pv.as_integer()?,
+                            crate::jit::BlockJitBufferMode::I64AsInteger => match pv.as_integer() {
+                                Some(v) => v,
+                                None if pv.is_undef() => {
+                                    if crate::jit::block_slot_undef_prefill_ok(ops, i) {
+                                        0
+                                    } else {
+                                        ok = false;
+                                        break;
+                                    }
+                                }
+                                None => {
+                                    ok = false;
+                                    break;
+                                }
+                            },
                         };
                     }
-                    Some(v)
-                });
+                    if ok {
+                        top_b_slot_len = Some(n);
+                    }
+                }
+
+                let mut top_b_plain_len: Option<usize> = None;
+                if let Some(max) = crate::jit::block_plain_ops_max_index(ops) {
+                    if (max as usize) < names.len() {
+                        let n = max as usize + 1;
+                        self.jit_buf_plain.resize(n, 0);
+                        let mut ok = true;
+                        for i in 0..=max {
+                            let nm = names[i as usize].as_str();
+                            let pv = self.interp.scope.get_scalar(nm);
+                            self.jit_buf_plain[i as usize] = match block_buf_mode {
+                                crate::jit::BlockJitBufferMode::I64AsPerlValueBits => {
+                                    pv.raw_bits() as i64
+                                }
+                                crate::jit::BlockJitBufferMode::I64AsInteger => match pv.as_integer() {
+                                    Some(v) => v,
+                                    None => {
+                                        ok = false;
+                                        break;
+                                    }
+                                },
+                            };
+                        }
+                        if ok {
+                            top_b_plain_len = Some(n);
+                        }
+                    }
+                }
+
+                let mut top_b_arg_len: Option<usize> = None;
+                if let Some(max) = crate::jit::block_arg_ops_max_index(ops) {
+                    if let Some(frame) = self.call_stack.last() {
+                        let base = frame.stack_base;
+                        let n = max as usize + 1;
+                        self.jit_buf_arg.resize(n, 0);
+                        let mut ok = true;
+                        for i in 0..=max {
+                            let pos = base + i as usize;
+                            let pv = self.stack.get(pos).cloned().unwrap_or(PerlValue::UNDEF);
+                            self.jit_buf_arg[i as usize] = match block_buf_mode {
+                                crate::jit::BlockJitBufferMode::I64AsPerlValueBits => {
+                                    pv.raw_bits() as i64
+                                }
+                                crate::jit::BlockJitBufferMode::I64AsInteger => match pv.as_integer() {
+                                    Some(v) => v,
+                                    None => {
+                                        ok = false;
+                                        break;
+                                    }
+                                },
+                            };
+                        }
+                        if ok {
+                            top_b_arg_len = Some(n);
+                        }
+                    }
+                }
+
+                let block_slot_buf = top_b_slot_len.map(|n| &mut self.jit_buf_slot[..n]);
+                let block_plain_buf = top_b_plain_len.map(|n| &mut self.jit_buf_plain[..n]);
+                let block_arg_buf = top_b_arg_len.map(|n| &self.jit_buf_arg[..n]);
 
                 if let Some((v, buf_mode)) = crate::jit::try_run_block_ops(
                     ops,
-                    block_slot_buf.as_deref_mut(),
-                    block_plain_buf.as_deref_mut(),
-                    block_arg_buf.as_deref(),
+                    block_slot_buf,
+                    block_plain_buf,
+                    block_arg_buf,
                     constants,
                     Some(validated),
                 ) {
-                    if let Some(buf) = block_slot_buf.as_ref() {
+                    if let Some(n) = top_b_slot_len {
+                        let buf = &self.jit_buf_slot[..n];
                         for idx in crate::jit::block_slot_ops_written_indices(ops) {
                             let bits = buf[idx as usize] as u64;
                             let pv = match buf_mode {
@@ -803,7 +951,8 @@ impl<'a> VM<'a> {
                             self.interp.scope.set_scalar_slot(idx, pv);
                         }
                     }
-                    if let Some(buf) = block_plain_buf.as_ref() {
+                    if let Some(n) = top_b_plain_len {
+                        let buf = &self.jit_buf_plain[..n];
                         for idx in crate::jit::block_plain_ops_written_indices(ops) {
                             let name = names[idx as usize].as_str();
                             let bits = buf[idx as usize] as u64;
@@ -2094,6 +2243,7 @@ impl<'a> VM<'a> {
                         body: block,
                         closure_env: Some(captured),
                         prototype: None,
+                        fib_like: None,
                     })));
                 }
 

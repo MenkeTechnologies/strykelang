@@ -191,6 +191,20 @@ impl fmt::Debug for PerlPpool {
     }
 }
 
+/// See [`crate::fib_like_tail::detect_fib_like_recursive_add`] — iterative fast path for
+/// `return f($p-a)+f($p-b)` with a simple integer base case.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FibLikeRecAddPattern {
+    /// Scalar from `my $p = shift` (e.g. `n`).
+    pub param: String,
+    /// `n <= base_k` ⇒ return `n`.
+    pub base_k: i64,
+    /// Left call uses `$param - left_k`.
+    pub left_k: i64,
+    /// Right call uses `$param - right_k`.
+    pub right_k: i64,
+}
+
 #[derive(Debug, Clone)]
 pub struct PerlSub {
     pub name: String,
@@ -200,6 +214,9 @@ pub struct PerlSub {
     pub closure_env: Option<Vec<(String, PerlValue)>>,
     /// Prototype string from `sub name (PROTO) { }`, or `None`.
     pub prototype: Option<String>,
+    /// When set, [`Interpreter::call_sub`](crate::interpreter::Interpreter::call_sub) may evaluate
+    /// this sub with an explicit stack instead of recursive scope frames.
+    pub fib_like: Option<FibLikeRecAddPattern>,
 }
 
 /// Operations queued on a [`PerlValue::pipeline`](crate::value::PerlValue::pipeline) value until `collect()`.
@@ -1576,6 +1593,7 @@ mod tests {
                 body: vec![],
                 closure_env: None,
                 prototype: None,
+                fib_like: None,
             }))
             .to_number(),
             0.0
@@ -1678,6 +1696,7 @@ mod tests {
             body: vec![],
             closure_env: None,
             prototype: None,
+            fib_like: None,
         }));
         assert!(c.to_string().contains("foo"));
     }

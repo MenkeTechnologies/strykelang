@@ -1560,16 +1560,16 @@ impl Interpreter {
                     prototype,
                 } => {
                     let key = self.qualify_sub_key(name);
-                    self.subs.insert(
-                        key,
-                        Arc::new(PerlSub {
-                            name: name.clone(),
-                            params: params.clone(),
-                            body: body.clone(),
-                            closure_env: None,
-                            prototype: prototype.clone(),
-                        }),
-                    );
+                    let mut sub = PerlSub {
+                        name: name.clone(),
+                        params: params.clone(),
+                        body: body.clone(),
+                        closure_env: None,
+                        prototype: prototype.clone(),
+                        fib_like: None,
+                    };
+                    sub.fib_like = crate::fib_like_tail::detect_fib_like_recursive_add(&sub);
+                    self.subs.insert(key, Arc::new(sub));
                 }
                 StmtKind::Use { module, imports } => {
                     self.exec_use_stmt(module, imports, stmt.line)?;
@@ -2866,16 +2866,16 @@ impl Interpreter {
                 prototype,
             } => {
                 let key = self.qualify_sub_key(name);
-                self.subs.insert(
-                    key,
-                    Arc::new(PerlSub {
-                        name: name.clone(),
-                        params: params.clone(),
-                        body: body.clone(),
-                        closure_env: None,
-                        prototype: prototype.clone(),
-                    }),
-                );
+                let mut sub = PerlSub {
+                    name: name.clone(),
+                    params: params.clone(),
+                    body: body.clone(),
+                    closure_env: None,
+                    prototype: prototype.clone(),
+                    fib_like: None,
+                };
+                sub.fib_like = crate::fib_like_tail::detect_fib_like_recursive_add(&sub);
+                self.subs.insert(key, Arc::new(sub));
                 Ok(PerlValue::UNDEF)
             }
             StmtKind::StructDecl { def } => {
@@ -3435,6 +3435,7 @@ impl Interpreter {
                     body: body.clone(),
                     closure_env: Some(captured),
                     prototype: None,
+                    fib_like: None,
                 })))
             }
             ExprKind::SubroutineRef(name) => self.call_named_sub(name, vec![], line, ctx),
@@ -8629,6 +8630,23 @@ impl Interpreter {
                 Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
                 Err(e) => Err(e),
             };
+        }
+        if let Some(pat) = sub.fib_like.as_ref() {
+            if sub.closure_env.is_none() && argv.len() == 1 {
+                if let Some(n0) = argv[0].as_integer() {
+                    let t0 = self.profiler.is_some().then(std::time::Instant::now);
+                    if let Some(p) = &mut self.profiler {
+                        p.enter_sub(&sub.name);
+                    }
+                    let n = crate::fib_like_tail::eval_fib_like_recursive_add(n0, pat);
+                    if let (Some(p), Some(t0)) = (&mut self.profiler, t0) {
+                        p.exit_sub(t0.elapsed());
+                    }
+                    self.wantarray_kind = saved;
+                    self.scope_pop_hook();
+                    return Ok(PerlValue::integer(n));
+                }
+            }
         }
         let t0 = self.profiler.is_some().then(std::time::Instant::now);
         if let Some(p) = &mut self.profiler {
