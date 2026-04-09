@@ -16,6 +16,12 @@ fn eval_int(code: &str) -> i64 {
     eval(code).to_int()
 }
 
+fn eval_err_kind(code: &str) -> ErrorKind {
+    let program = perlrs::parse(code).expect("parse failed");
+    let mut interp = Interpreter::new();
+    interp.execute(&program).unwrap_err().kind
+}
+
 // ── Arithmetic ──
 
 #[test]
@@ -41,9 +47,18 @@ fn comparison_operators() {
     assert_eq!(eval_int("5 != 3"), 1);
     assert_eq!(eval_int("3 < 5"), 1);
     assert_eq!(eval_int("5 > 3"), 1);
+    assert_eq!(eval_int("5 <= 3"), 0);
+    assert_eq!(eval_int("3 <= 5"), 1);
+    assert_eq!(eval_int("5 >= 5"), 1);
     assert_eq!(eval_int("5 <=> 3"), 1);
     assert_eq!(eval_int("3 <=> 5"), -1);
     assert_eq!(eval_int("5 <=> 5"), 0);
+}
+
+#[test]
+fn string_comparison_ge_le() {
+    assert_eq!(eval_int(r#""b" ge "a""#), 1);
+    assert_eq!(eval_int(r#""a" le "b""#), 1);
 }
 
 // ── Strings ──
@@ -52,9 +67,38 @@ fn comparison_operators() {
 fn string_operations() {
     assert_eq!(eval_string(r#"uc("hello")"#), "HELLO");
     assert_eq!(eval_string(r#"lc("HELLO")"#), "hello");
+    assert_eq!(eval_string(r#"ucfirst("hello")"#), "Hello");
+    assert_eq!(eval_string(r#"lcfirst("Hello")"#), "hello");
     assert_eq!(eval_int(r#"length("hello")"#), 5);
     assert_eq!(eval_string(r#"substr("hello", 1, 3)"#), "ell");
     assert_eq!(eval_int(r#"index("hello world", "world")"#), 6);
+    assert_eq!(eval_int(r#"rindex("abcbc", "bc")"#), 3);
+}
+
+#[test]
+fn qw_word_list() {
+    assert_eq!(
+        eval_string(r#"join(",", qw(a bb ccc))"#),
+        "a,bb,ccc"
+    );
+}
+
+#[test]
+fn chomp_chop() {
+    assert_eq!(eval_string(r#"my $s = "hi\n"; chomp $s; $s"#), "hi");
+    assert_eq!(eval_string(r#"my $s = "ab"; chop $s"#), "b");
+    assert_eq!(eval_string(r#"my $s = "ab"; chop $s; $s"#), "a");
+}
+
+#[test]
+fn sprintf_basic() {
+    assert_eq!(eval_string(r#"sprintf("%d", 42)"#), "42");
+    assert_eq!(eval_string(r#"sprintf("%d-%s", 7, "z")"#), "7-z");
+}
+
+#[test]
+fn sqrt_builtin() {
+    assert_eq!(eval_int("sqrt(25)"), 5);
 }
 
 #[test]
@@ -89,6 +133,16 @@ fn array_variables() {
 }
 
 #[test]
+fn array_negative_index() {
+    assert_eq!(eval_int("my @a = (10, 20, 30); $a[-1]"), 30);
+}
+
+#[test]
+fn substr_negative_offset() {
+    assert_eq!(eval_string(r#"substr("abcde", -2)"#), "de");
+}
+
+#[test]
 fn hash_variables() {
     assert_eq!(
         eval_int(r#"my %h = ("a", 1, "b", 2); $h{b}"#),
@@ -110,6 +164,14 @@ fn if_else() {
 }
 
 #[test]
+fn if_elsif_chain() {
+    assert_eq!(
+        eval_int("my $x = 2; if ($x == 0) { 0 } elsif ($x == 1) { 1 } elsif ($x == 2) { 2 } else { 9 }"),
+        2
+    );
+}
+
+#[test]
 fn unless() {
     assert_eq!(eval_int("my $x = 3; unless ($x > 5) { 1 } else { 0 }"), 1);
 }
@@ -119,6 +181,14 @@ fn while_loop() {
     assert_eq!(
         eval_int("my $i = 0; my $sum = 0; while ($i < 10) { $sum = $sum + $i; $i = $i + 1; } $sum"),
         45
+    );
+}
+
+#[test]
+fn until_loop() {
+    assert_eq!(
+        eval_int("my $i = 0; until ($i >= 4) { $i = $i + 1; } $i"),
+        4
     );
 }
 
@@ -147,6 +217,12 @@ fn postfix_if() {
 #[test]
 fn postfix_unless() {
     assert_eq!(eval_int("my $x = 0; $x = 1 unless 0; $x"), 1);
+}
+
+#[test]
+fn postfix_while_until() {
+    assert_eq!(eval_int("my $x = 0; $x++ while $x < 4; $x"), 4);
+    assert_eq!(eval_int("my $x = 0; $x++ until $x >= 4; $x"), 4);
 }
 
 #[test]
@@ -286,6 +362,11 @@ fn parallel_sort() {
     );
 }
 
+#[test]
+fn parallel_for_runs() {
+    assert_eq!(eval_int("pfor { $_ } (1,2,3); 99"), 99);
+}
+
 // ── References ──
 
 #[test]
@@ -374,4 +455,144 @@ fn string_interpolation_array_access() {
         eval_string(r#"my @a = (10, 20, 30); "$a[1]""#),
         "20"
     );
+}
+
+// ── Logical short-circuit (&&, ||, //) ──
+
+#[test]
+fn logical_and_short_circuit() {
+    assert_eq!(eval_int("1 && 5"), 5);
+    assert_eq!(eval_int("0 && 5"), 0);
+}
+
+#[test]
+fn logical_or_short_circuit() {
+    assert_eq!(eval_int("0 || 7"), 7);
+    assert_eq!(eval_int("3 || 7"), 3);
+}
+
+#[test]
+fn defined_or_operator() {
+    assert_eq!(eval_int("undef // 5"), 5);
+    assert_eq!(eval_int("0 // 5"), 0);
+}
+
+#[test]
+fn logical_words_and_or_not() {
+    assert_eq!(eval_int("1 and 2"), 2);
+    assert_eq!(eval_int("0 or 9"), 9);
+    assert_eq!(eval_int("not 0"), 1);
+    assert_eq!(eval_int("not 1"), 0);
+}
+
+// ── Bitwise ──
+
+#[test]
+fn bitwise_operators() {
+    assert_eq!(eval_int("0x0f & 0x33"), 0x03);
+    assert_eq!(eval_int("0x10 | 0x01"), 0x11);
+    assert_eq!(eval_int("0b1010 ^ 0b1100"), 0b0110);
+    // Note: `<<` is lexed as heredoc start, not shift-left; use >> only for shift coverage here.
+    assert_eq!(eval_int("32 >> 3"), 4);
+}
+
+#[test]
+fn unary_bitwise_not() {
+    assert_eq!(eval_int("~0"), -1);
+}
+
+// ── Unary numeric / logical ──
+
+#[test]
+fn unary_negate() {
+    assert_eq!(eval_int("-42"), -42);
+    assert_eq!(eval_int("0 - -1"), 1);
+}
+
+// ── Compound assignment ──
+
+#[test]
+fn compound_assignment() {
+    assert_eq!(eval_int("my $x = 10; $x += 3; $x"), 13);
+    assert_eq!(eval_int("my $x = 10; $x -= 4; $x"), 6);
+    assert_eq!(eval_int("my $x = 2; $x *= 3; $x"), 6);
+    assert_eq!(eval_int("my $x = 2; $x **= 3; $x"), 8);
+    assert_eq!(eval_int("my $x = 10; $x %= 3; $x"), 1);
+    assert_eq!(eval_string(r#"my $s = "a"; $s .= "b"; $s"#), "ab");
+}
+
+// ── Increment / decrement ──
+
+#[test]
+fn pre_post_increment() {
+    assert_eq!(eval_int("my $x = 1; ++$x"), 2);
+    assert_eq!(eval_int("my $x = 1; $x++"), 1);
+    assert_eq!(eval_int("my $x = 1; $x++; $x"), 2);
+}
+
+#[test]
+fn pre_post_decrement() {
+    assert_eq!(eval_int("my $x = 3; --$x"), 2);
+    assert_eq!(eval_int("my $x = 3; $x--"), 3);
+    assert_eq!(eval_int("my $x = 3; $x--; $x"), 2);
+}
+
+// ── Truthiness (Perl: string "0" is false) ──
+
+#[test]
+fn string_zero_is_false() {
+    assert_eq!(eval_int(r#""0" ? 1 : 0"#), 0);
+    assert_eq!(eval_int(r#""1" ? 1 : 0"#), 1);
+}
+
+// ── String cmp ──
+
+#[test]
+fn str_cmp_operator() {
+    assert_eq!(eval_int(r#""a" cmp "b""#), -1);
+    assert_eq!(eval_int(r#""b" cmp "a""#), 1);
+    assert_eq!(eval_int(r#""x" cmp "x""#), 0);
+}
+
+// ── Literals ──
+
+#[test]
+fn hex_binary_literals() {
+    assert_eq!(eval_int("0xff"), 255);
+    assert_eq!(eval_int("0b1010"), 10);
+}
+
+#[test]
+fn division_yields_float_coerced_to_int() {
+    assert_eq!(eval_int("7 / 2"), 3);
+}
+
+// ── Hash values ──
+
+#[test]
+fn hash_values_builtin() {
+    assert_eq!(
+        eval_int("my %h = (a => 1, b => 2, c => 3); my $s = 0; foreach my $v (values %h) { $s = $s + $v; } $s"),
+        6
+    );
+}
+
+// ── Parse errors ──
+
+#[test]
+fn parse_unclosed_brace_is_syntax_error() {
+    let err = perlrs::parse("sub f {").unwrap_err();
+    assert_eq!(err.kind, ErrorKind::Syntax);
+}
+
+// ── Runtime errors ──
+
+#[test]
+fn division_by_zero_is_runtime_error() {
+    assert_eq!(eval_err_kind("1 / 0"), ErrorKind::Runtime);
+}
+
+#[test]
+fn modulus_zero_is_runtime_error() {
+    assert_eq!(eval_err_kind("1 % 0"), ErrorKind::Runtime);
 }

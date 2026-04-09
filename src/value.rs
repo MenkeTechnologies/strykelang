@@ -239,3 +239,83 @@ fn format_float(f: f64) -> String {
         s
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::PerlValue;
+    use indexmap::IndexMap;
+    use std::cmp::Ordering;
+
+    #[test]
+    fn undef_is_false() {
+        assert!(!PerlValue::Undef.is_true());
+    }
+
+    #[test]
+    fn string_zero_is_false() {
+        assert!(!PerlValue::String("0".into()).is_true());
+        assert!(PerlValue::String("00".into()).is_true());
+    }
+
+    #[test]
+    fn empty_string_is_false() {
+        assert!(!PerlValue::String(String::new()).is_true());
+    }
+
+    #[test]
+    fn integer_zero_is_false_nonzero_true() {
+        assert!(!PerlValue::Integer(0).is_true());
+        assert!(PerlValue::Integer(-1).is_true());
+    }
+
+    #[test]
+    fn to_int_parses_leading_number_from_string() {
+        assert_eq!(PerlValue::String("42xyz".into()).to_int(), 42);
+        assert_eq!(PerlValue::String("  -3.7foo".into()).to_int(), -3);
+    }
+
+    #[test]
+    fn num_cmp_orders_as_numeric() {
+        assert_eq!(
+            PerlValue::Integer(2).num_cmp(&PerlValue::Integer(11)),
+            Ordering::Less
+        );
+        assert_eq!(
+            PerlValue::String("2foo".into()).num_cmp(&PerlValue::String("11".into())),
+            Ordering::Less
+        );
+    }
+
+    #[test]
+    fn str_cmp_orders_as_strings() {
+        assert_eq!(
+            PerlValue::String("2".into()).str_cmp(&PerlValue::String("11".into())),
+            Ordering::Greater
+        );
+    }
+
+    #[test]
+    fn scalar_context_array_and_hash() {
+        assert_eq!(
+            PerlValue::Array(vec![PerlValue::Integer(1), PerlValue::Integer(2)]).scalar_context(),
+            PerlValue::Integer(2)
+        );
+        let mut h = IndexMap::new();
+        h.insert("a".into(), PerlValue::Integer(1));
+        let sc = PerlValue::Hash(h).scalar_context();
+        assert!(matches!(sc, PerlValue::String(_)));
+    }
+
+    #[test]
+    fn to_list_array_hash_and_scalar() {
+        assert_eq!(
+            PerlValue::Array(vec![PerlValue::Integer(7)]).to_list().len(),
+            1
+        );
+        let mut h = IndexMap::new();
+        h.insert("k".into(), PerlValue::Integer(1));
+        let list = PerlValue::Hash(h).to_list();
+        assert_eq!(list.len(), 2);
+        assert_eq!(PerlValue::Integer(99).to_list(), vec![PerlValue::Integer(99)]);
+    }
+}
