@@ -7713,52 +7713,130 @@ impl Interpreter {
         results
     }
 
+    /// Order-preserving parallel filter for `par_pipeline(LIST)` (same capture rules as `pgrep`).
+    fn pipeline_par_stream_filter(
+        &mut self,
+        items: Vec<PerlValue>,
+        sub: &Arc<PerlSub>,
+    ) -> Vec<PerlValue> {
+        if items.is_empty() {
+            return items;
+        }
+        let subs = self.subs.clone();
+        let (scope_capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
+        let indexed: Vec<(usize, PerlValue)> = items.into_iter().enumerate().collect();
+        let mut kept: Vec<(usize, PerlValue)> = indexed
+            .into_par_iter()
+            .filter_map(|(i, item)| {
+                let mut local_interp = Interpreter::new();
+                local_interp.subs = subs.clone();
+                local_interp.scope.restore_capture(&scope_capture);
+                local_interp
+                    .scope
+                    .restore_atomics(&atomic_arrays, &atomic_hashes);
+                let _ = local_interp.scope.set_scalar("_", item.clone());
+                let keep = match local_interp.exec_block_no_scope(&sub.body) {
+                    Ok(val) => val.is_true(),
+                    Err(_) => false,
+                };
+                if keep {
+                    Some((i, item))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        kept.sort_by_key(|(i, _)| *i);
+        kept.into_iter().map(|(_, x)| x).collect()
+    }
+
+    /// Order-preserving parallel map for `par_pipeline(LIST)` (same capture rules as `pmap`).
+    fn pipeline_par_stream_map(
+        &mut self,
+        items: Vec<PerlValue>,
+        sub: &Arc<PerlSub>,
+    ) -> Vec<PerlValue> {
+        if items.is_empty() {
+            return items;
+        }
+        let subs = self.subs.clone();
+        let (scope_capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
+        let indexed: Vec<(usize, PerlValue)> = items.into_iter().enumerate().collect();
+        let mut mapped: Vec<(usize, PerlValue)> = indexed
+            .into_par_iter()
+            .map(|(i, item)| {
+                let mut local_interp = Interpreter::new();
+                local_interp.subs = subs.clone();
+                local_interp.scope.restore_capture(&scope_capture);
+                local_interp
+                    .scope
+                    .restore_atomics(&atomic_arrays, &atomic_hashes);
+                let _ = local_interp.scope.set_scalar("_", item);
+                let val = match local_interp.exec_block_no_scope(&sub.body) {
+                    Ok(val) => val,
+                    Err(_) => PerlValue::UNDEF,
+                };
+                (i, val)
+            })
+            .collect();
+        mapped.sort_by_key(|(i, _)| *i);
+        mapped.into_iter().map(|(_, x)| x).collect()
+    }
+
     fn pipeline_collect(
         &mut self,
         p: &Arc<Mutex<PipelineInner>>,
         line: usize,
     ) -> PerlResult<PerlValue> {
-        let (mut v, ops) = {
+        let (mut v, ops, par_stream) = {
             let g = p.lock();
-            (g.source.clone(), g.ops.clone())
+            (g.source.clone(), g.ops.clone(), g.par_stream)
         };
         for op in ops {
             match op {
                 PipelineOp::Filter(sub) => {
-                    let mut out = Vec::new();
-                    for item in v {
-                        self.scope_push_hook();
-                        let _ = self.scope.set_scalar("_", item.clone());
-                        if let Some(ref env) = sub.closure_env {
-                            self.scope.restore_capture(env);
+                    if par_stream {
+                        v = self.pipeline_par_stream_filter(v, &sub);
+                    } else {
+                        let mut out = Vec::new();
+                        for item in v {
+                            self.scope_push_hook();
+                            let _ = self.scope.set_scalar("_", item.clone());
+                            if let Some(ref env) = sub.closure_env {
+                                self.scope.restore_capture(env);
+                            }
+                            let keep = match self.exec_block_no_scope(&sub.body) {
+                                Ok(val) => val.is_true(),
+                                Err(_) => false,
+                            };
+                            self.scope_pop_hook();
+                            if keep {
+                                out.push(item);
+                            }
                         }
-                        let keep = match self.exec_block_no_scope(&sub.body) {
-                            Ok(val) => val.is_true(),
-                            Err(_) => false,
-                        };
-                        self.scope_pop_hook();
-                        if keep {
-                            out.push(item);
-                        }
+                        v = out;
                     }
-                    v = out;
                 }
                 PipelineOp::Map(sub) => {
-                    let mut out = Vec::new();
-                    for item in v {
-                        self.scope_push_hook();
-                        let _ = self.scope.set_scalar("_", item);
-                        if let Some(ref env) = sub.closure_env {
-                            self.scope.restore_capture(env);
+                    if par_stream {
+                        v = self.pipeline_par_stream_map(v, &sub);
+                    } else {
+                        let mut out = Vec::new();
+                        for item in v {
+                            self.scope_push_hook();
+                            let _ = self.scope.set_scalar("_", item);
+                            if let Some(ref env) = sub.closure_env {
+                                self.scope.restore_capture(env);
+                            }
+                            let mapped = match self.exec_block_no_scope(&sub.body) {
+                                Ok(val) => val,
+                                Err(_) => PerlValue::UNDEF,
+                            };
+                            self.scope_pop_hook();
+                            out.push(mapped);
                         }
-                        let mapped = match self.exec_block_no_scope(&sub.body) {
-                            Ok(val) => val,
-                            Err(_) => PerlValue::UNDEF,
-                        };
-                        self.scope_pop_hook();
-                        out.push(mapped);
+                        v = out;
                     }
-                    v = out;
                 }
                 PipelineOp::Take(n) => {
                     let n = n.max(0) as usize;
