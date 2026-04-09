@@ -490,28 +490,28 @@ pe examples/parallel_demo.pl
 ```
   TEST                    perl5(ms) perlrs(ms)      RATIO
   ──────────────────── ───────── ────────── ─────
-  fib(25)                    19.6ms     33.8ms      1.72x
-  loop 10k                    2.7ms      4.7ms      1.74x
-  string .= 10k              2.9ms      5.6ms      1.93x
-  hash 1k                     2.8ms      4.1ms      1.46x
-  array sort 10k              3.2ms      4.9ms      1.53x
-  regex match 1k              3.6ms      4.9ms      1.36x
-  map+grep 10k                3.6ms      5.3ms      1.47x
+  fib(25)                    19.4ms     22.7ms      1.17x
+  loop 10k                    2.7ms      3.9ms      1.44x
+  string .= 10k              2.6ms      4.6ms      1.77x
+  hash 1k                     2.6ms      3.5ms      1.35x
+  array sort 10k              3.1ms      4.3ms      1.39x
+  regex match 1k              3.5ms      4.5ms      1.29x
+  map+grep 10k                3.5ms      4.7ms      1.34x
 ```
 
 > Measured on macOS M-series with `perl v5.42.2` vs `perlrs` release build (LTO + O3).
-> Times include process startup (~3.5ms perlrs, ~2.5ms perl5). Run with `bash bench/run_bench.sh`.
+> Times include process startup (~3.1ms perlrs, ~2.4ms perl5). Run with `bash bench/run_bench.sh`.
 
 #### Analysis
 
-- **All benchmarks within 1.4–1.9x of perl5** — the remaining gap is dominated by fixed startup overhead (~1ms difference); subtracting startup, computation ratios approach parity
-- **regex** is 1.4x — `Arc<Regex>` caching preserves the lazy DFA across calls; the `regex` crate with SIMD matches at near-native Rust speed
-- **hash** is 1.5x — approaching parity with perl's heavily optimized HV implementation
-- **fib** is 1.7x — `my` scalars in subroutines use `GetScalarSlot`/`SetScalarSlot` bytecode ops for O(1) frame-local access (no string lookup or frame walking)
-- **string** is 1.9x — `$s .= "x"` uses the `ConcatAppend` bytecode op for zero-copy in-place mutation (no string clone)
-- **array sort** is 1.5x — `sort { $a <=> $b }` uses a native fast path with `SortWithBlockFast`; `ArrayLen` borrows without cloning
-- **`s///` and `tr///`** — compile to `RegexSubst` / `RegexTransliterate` bytecode with zero-copy constant access
-- **VM eliminates String allocations** — variable access uses raw pointer borrows instead of `name_owned()` clones; regex ops borrow constants via `as_str_or_empty()`; `@INC` paths cached to disk to avoid spawning `perl` subprocess on startup
+- **All benchmarks within 1.2–1.8x of perl5** — subtracting startup (~0.7ms difference), computation ratios approach parity on most tests
+- **fib** is 1.17x — `GetArg` op reads arguments directly from the caller's value stack (no @_ Vec allocation or string-based shift); frame pool recycles scope frames to eliminate per-call allocation
+- **regex** is 1.3x — `Arc<Regex>` caching preserves the lazy DFA across calls; the `regex` crate with SIMD matches at near-native Rust speed
+- **hash** is 1.35x — approaching parity with perl's heavily optimized HV implementation
+- **string** is 1.77x — `$s .= "x"` uses the `ConcatAppend` bytecode op for zero-copy in-place mutation (no string clone)
+- **array sort** is 1.4x — `sort { $a <=> $b }` uses a native fast path with `SortWithBlockFast`; `ArrayLen` borrows without cloning
+- **Lazy rayon init** — rayon thread pool no longer initializes on startup; spawned only when first parallel op is hit
+- **VM eliminates String allocations** — variable access uses raw pointer borrows; regex ops borrow constants via `as_str_or_empty()`; `@INC` paths cached to disk
 
 #### Parallel speedup
 

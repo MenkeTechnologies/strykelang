@@ -180,6 +180,9 @@ pub enum Op {
     SetScalarSlotKeep(u8),
     /// Declare + initialize scalar in current frame's slot array. u8 = slot index.
     DeclareScalarSlot(u8),
+    /// Read argument from caller's stack region: push stack\[call_frame.stack_base + idx\].
+    /// Avoids @_ allocation + string-based shift for compiled sub argument passing.
+    GetArg(u8),
     /// reverse — stack: \[list\] → \[reversed\]
     ReverseOp,
     /// pmap { BLOCK } @list — block_idx; stack: \[progress_flag, list\] → \[mapped\] (`progress_flag` is 0/1)
@@ -381,8 +384,10 @@ pub struct Chunk {
     pub names: Vec<String>,
     /// Source line for each op (parallel array for error reporting).
     pub lines: Vec<usize>,
-    /// Compiled subroutine entry points: name_index → op_index
-    pub sub_entries: Vec<(u16, usize)>,
+    /// Compiled subroutine entry points: (name_index, op_index, uses_stack_args).
+    /// When `uses_stack_args` is true, the Call op leaves arguments on the value
+    /// stack and the sub reads them via `GetArg(idx)` instead of `shift @_`.
+    pub sub_entries: Vec<(u16, usize, bool)>,
     /// AST blocks for map/grep/sort/parallel operations.
     /// Referenced by block-based opcodes via u16 index.
     pub blocks: Vec<Block>,

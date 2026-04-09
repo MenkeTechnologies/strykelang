@@ -33,7 +33,7 @@ pub struct VM<'a> {
     constants: Vec<PerlValue>,
     ops: Vec<Op>,
     lines: Vec<usize>,
-    sub_entries: Vec<(u16, usize)>,
+    sub_entries: Vec<(u16, usize, bool)>,
     blocks: Vec<Block>,
     lvalues: Vec<Expr>,
     ip: usize,
@@ -758,34 +758,58 @@ impl<'a> VM<'a> {
                     let argc = *argc as usize;
                     let want = WantarrayCtx::from_byte(*wa);
 
-                    // Collect args from stack
-                    let mut args = Vec::with_capacity(argc);
-                    for _ in 0..argc {
-                        let v = self.pop();
-                        match v {
-                            PerlValue::Array(items) => args.extend(items),
-                            other => args.push(other),
-                        }
-                    }
-                    args.reverse(); // stack order is reversed
-
                     // Check if sub is compiled (has bytecode entry)
-                    if let Some(entry_ip) = self.find_sub_entry(*name_idx) {
+                    if let Some((entry_ip, stack_args)) = self.find_sub_entry(*name_idx) {
                         let saved_wa = self.interp.wantarray_kind;
-                        // Save call frame
-                        self.call_stack.push(CallFrame {
-                            return_ip: self.ip,
-                            stack_base: self.stack.len(),
-                            scope_depth: self.interp.scope.depth(),
-                            saved_wantarray: saved_wa,
-                        });
-                        self.interp.wantarray_kind = want;
-                        // Push scope frame and set @_
-                        self.interp.scope.push_frame();
-                        self.interp.scope.declare_array("_", args);
-                        // Jump to sub entry
-                        self.ip = entry_ip;
-                    } else if let Some(r) =
+
+                        if stack_args {
+                            // Fast path: leave args on stack, sub reads via GetArg(idx).
+                            // stack_base points at first arg.
+                            let stack_base = self.stack.len() - argc;
+                            self.call_stack.push(CallFrame {
+                                return_ip: self.ip,
+                                stack_base,
+                                scope_depth: self.interp.scope.depth(),
+                                saved_wantarray: saved_wa,
+                            });
+                            self.interp.wantarray_kind = want;
+                            self.interp.scope.push_frame();
+                            self.ip = entry_ip;
+                        } else {
+                            // Slow path: collect args into @_
+                            let mut args = Vec::with_capacity(argc);
+                            for _ in 0..argc {
+                                let v = self.pop();
+                                match v {
+                                    PerlValue::Array(items) => args.extend(items),
+                                    other => args.push(other),
+                                }
+                            }
+                            args.reverse();
+                            self.call_stack.push(CallFrame {
+                                return_ip: self.ip,
+                                stack_base: self.stack.len(),
+                                scope_depth: self.interp.scope.depth(),
+                                saved_wantarray: saved_wa,
+                            });
+                            self.interp.wantarray_kind = want;
+                            self.interp.scope.push_frame();
+                            self.interp.scope.declare_array("_", args);
+                            self.ip = entry_ip;
+                        }
+                    } else {
+                        // Non-compiled path: collect args from stack
+                        let mut args = Vec::with_capacity(argc);
+                        for _ in 0..argc {
+                            let v = self.pop();
+                            match v {
+                                PerlValue::Array(items) => args.extend(items),
+                                other => args.push(other),
+                            }
+                        }
+                        args.reverse();
+
+                        if let Some(r) =
                         crate::builtins::try_builtin(self.interp, &name, &args, self.line())
                     {
                         self.push(r?);
@@ -834,6 +858,7 @@ impl<'a> VM<'a> {
                             self.line(),
                         ));
                     }
+                    } // close outer else (non-compiled path)
                 }
                 Op::Return => {
                     if let Some(frame) = self.call_stack.pop() {
@@ -1062,6 +1087,19 @@ impl<'a> VM<'a> {
                 Op::DeclareScalarSlot(slot) => {
                     let val = self.pop();
                     self.interp.scope.declare_scalar_slot(*slot, val);
+                }
+                Op::GetArg(idx) => {
+                    // Read argument from caller's stack region without @_ allocation.
+                    let val = if let Some(frame) = self.call_stack.last() {
+                        let arg_pos = frame.stack_base + *idx as usize;
+                        self.stack
+                            .get(arg_pos)
+                            .cloned()
+                            .unwrap_or(PerlValue::Undef)
+                    } else {
+                        PerlValue::Undef
+                    };
+                    self.push(val);
                 }
 
                 Op::ChompInPlace(lvalue_idx) => {
@@ -1595,10 +1633,10 @@ impl<'a> VM<'a> {
         Ok(last)
     }
 
-    fn find_sub_entry(&self, name_idx: u16) -> Option<usize> {
-        for (n, ip) in &self.sub_entries {
-            if *n == name_idx {
-                return Some(*ip);
+    fn find_sub_entry(&self, name_idx: u16) -> Option<(usize, bool)> {
+        for &(n, ip, stack_args) in &self.sub_entries {
+            if n == name_idx {
+                return Some((ip, stack_args));
             }
         }
         None

@@ -223,7 +223,7 @@ impl Compiler {
             if let StmtKind::SubDecl { name, .. } = &stmt.kind {
                 let name_idx = self.chunk.intern_name(name);
                 // Will be patched later
-                self.chunk.sub_entries.push((name_idx, 0));
+                self.chunk.sub_entries.push((name_idx, 0, false));
             }
         }
 
@@ -328,9 +328,77 @@ impl Compiler {
             self.chunk.emit(Op::LoadUndef, 0);
             self.chunk.emit(Op::ReturnValue, 0);
             self.pop_scope_layer();
+
+            // Peephole: convert leading `ShiftArray("_")` to `GetArg(n)` if @_ is
+            // not referenced by any other op in this sub. This eliminates Vec
+            // allocation + string-based @_ lookup on every call.
+            let underscore_idx = self.chunk.intern_name("_");
+            self.peephole_stack_args(name_idx, entry_ip, underscore_idx);
         }
 
         Ok(self.chunk)
+    }
+
+    /// Peephole optimization: if a compiled sub starts with `ShiftArray("_")`
+    /// ops and `@_` is not referenced elsewhere, convert those shifts to
+    /// `GetArg(n)` and mark the sub entry as `uses_stack_args = true`.
+    /// This eliminates Vec allocation + string-based @_ lookup per call.
+    fn peephole_stack_args(&mut self, sub_name_idx: u16, entry_ip: usize, underscore_idx: u16) {
+        let ops = &self.chunk.ops;
+        let end = ops.len();
+
+        // Count leading ShiftArray("_") ops
+        let mut shift_count: u8 = 0;
+        let mut ip = entry_ip;
+        while ip < end {
+            if ops[ip] == Op::ShiftArray(underscore_idx) {
+                shift_count += 1;
+                ip += 1;
+            } else {
+                break;
+            }
+        }
+        if shift_count == 0 {
+            return;
+        }
+
+        // Check that @_ is not referenced by any other op in this sub
+        let refs_underscore = |op: &Op| -> bool {
+            match op {
+                Op::GetArray(idx)
+                | Op::SetArray(idx)
+                | Op::DeclareArray(idx)
+                | Op::DeclareArrayFrozen(idx)
+                | Op::GetArrayElem(idx)
+                | Op::SetArrayElem(idx)
+                | Op::PushArray(idx)
+                | Op::PopArray(idx)
+                | Op::ShiftArray(idx)
+                | Op::ArrayLen(idx) => *idx == underscore_idx,
+                _ => false,
+            }
+        };
+
+        for i in (entry_ip + shift_count as usize)..end {
+            if refs_underscore(&ops[i]) {
+                return; // @_ used elsewhere, can't optimize
+            }
+            if matches!(ops[i], Op::Halt | Op::ReturnValue) {
+                break; // end of this sub's bytecode
+            }
+        }
+
+        // Safe to convert: replace ShiftArray("_") with GetArg(n)
+        for i in 0..shift_count {
+            self.chunk.ops[entry_ip + i as usize] = Op::GetArg(i);
+        }
+
+        // Mark sub entry as using stack args
+        for e in &mut self.chunk.sub_entries {
+            if e.0 == sub_name_idx {
+                e.2 = true;
+            }
+        }
     }
 
     fn emit_declare_scalar(&mut self, name_idx: u16, line: usize, frozen: bool) {
@@ -2610,7 +2678,7 @@ mod tests {
         assert!(chunk
             .sub_entries
             .iter()
-            .any(|(idx, ip)| chunk.names[*idx as usize] == "foo" && *ip > 0));
+            .any(|&(idx, ip, _)| chunk.names[idx as usize] == "foo" && ip > 0));
         assert!(chunk.ops.iter().any(|o| matches!(o, Op::Halt)));
         assert!(chunk.ops.iter().any(|o| matches!(o, Op::ReturnValue)));
     }

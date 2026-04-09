@@ -165,7 +165,9 @@ pub(crate) struct Cli {
 
 fn print_cyberpunk_help() {
     let version = env!("CARGO_PKG_VERSION");
-    let threads = rayon::current_num_threads();
+    let threads = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1);
 
     // ANSI color codes
     const C: &str = "\x1b[36m"; // cyan
@@ -440,7 +442,12 @@ fn main() {
             env!("CARGO_PKG_VERSION")
         );
         println!("Built with rayon for parallel map/grep/for/sort");
-        println!("Threads available: {}\n", rayon::current_num_threads());
+        println!(
+            "Threads available: {}\n",
+            std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(1)
+        );
         println!(
             "Copyright 2025 MenkeTechnologies. Licensed under MIT.\n\n\
              This is free software; you can redistribute it and/or modify it\n\
@@ -719,7 +726,9 @@ fn print_config(configvar: Option<&str>) {
     let version = env!("CARGO_PKG_VERSION");
     let arch = std::env::consts::ARCH;
     let os = std::env::consts::OS;
-    let threads = rayon::current_num_threads();
+    let threads = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1);
 
     if let Some(var) = configvar {
         // Print a single config variable

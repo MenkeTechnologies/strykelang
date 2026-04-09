@@ -155,6 +155,8 @@ impl Frame {
 #[derive(Debug, Clone)]
 pub struct Scope {
     frames: Vec<Frame>,
+    /// Recycled frames to avoid allocation on every push_frame/pop_frame cycle.
+    frame_pool: Vec<Frame>,
 }
 
 impl Default for Scope {
@@ -167,6 +169,7 @@ impl Scope {
     pub fn new() -> Self {
         let mut s = Self {
             frames: Vec::with_capacity(32),
+            frame_pool: Vec::with_capacity(32),
         };
         s.frames.push(Frame::new());
         s
@@ -188,7 +191,22 @@ impl Scope {
 
     #[inline]
     pub fn push_frame(&mut self) {
-        self.frames.push(Frame::new());
+        if let Some(mut frame) = self.frame_pool.pop() {
+            frame.scalars.clear();
+            frame.arrays.clear();
+            frame.hashes.clear();
+            frame.scalar_slots.clear();
+            frame.local_restores.clear();
+            frame.frozen_scalars.clear();
+            frame.frozen_arrays.clear();
+            frame.frozen_hashes.clear();
+            frame.typed_scalars.clear();
+            frame.atomic_arrays.clear();
+            frame.atomic_hashes.clear();
+            self.frames.push(frame);
+        } else {
+            self.frames.push(Frame::new());
+        }
     }
 
     // ── Frame-local scalar slots (O(1) access for compiled subs) ──
@@ -224,8 +242,8 @@ impl Scope {
     #[inline]
     pub fn pop_frame(&mut self) {
         if self.frames.len() > 1 {
-            let frame = self.frames.pop().expect("pop_frame");
-            for entry in frame.local_restores.into_iter().rev() {
+            let mut frame = self.frames.pop().expect("pop_frame");
+            for entry in frame.local_restores.drain(..).rev() {
                 match entry {
                     LocalRestore::Scalar(name, old) => {
                         let _ = self.set_scalar(&name, old);
@@ -237,6 +255,10 @@ impl Scope {
                         self.set_hash(&name, old);
                     }
                 }
+            }
+            // Return frame to pool for reuse (avoids allocation on next push_frame).
+            if self.frame_pool.len() < 64 {
+                self.frame_pool.push(frame);
             }
         }
     }

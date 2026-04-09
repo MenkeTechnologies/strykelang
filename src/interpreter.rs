@@ -127,8 +127,24 @@ pub struct Interpreter {
     begin_blocks: Vec<Block>,
     /// END blocks
     end_blocks: Vec<Block>,
-    /// -w warnings / `use warnings`
+    /// -w warnings / `use warnings` / `$^W`
     pub warnings: bool,
+    /// Output autoflush (`$|`).
+    pub output_autoflush: bool,
+    /// Child wait status (`$?`) — POSIX-style (exit code in high byte, etc.).
+    pub child_exit_status: i64,
+    /// Last successful match (`$&`, `${^MATCH}`).
+    pub last_match: String,
+    /// Before match (`` $` ``, `${^PREMATCH}`).
+    pub prematch: String,
+    /// After match (`$'`, `${^POSTMATCH}`).
+    pub postmatch: String,
+    /// Last bracket match (`$+`, `${^LAST_SUBMATCH_RESULT}`).
+    pub last_paren_match: String,
+    /// List separator for array stringification in concatenation / interpolation (`$"`).
+    pub list_separator: String,
+    /// Script start time (`$^T`) — seconds since Unix epoch.
+    pub script_start_time: i64,
     /// `use strict` / `use strict 'refs'` / `qw(refs subs vars)` (Perl names).
     pub strict_refs: bool,
     pub strict_subs: bool,
@@ -238,6 +254,12 @@ impl Interpreter {
         scope.declare_array("ARGV", vec![]);
         scope.declare_array("_", vec![]);
         scope.declare_hash("ENV", env.clone());
+        scope.declare_hash("SIG", IndexMap::new());
+
+        let script_start_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
 
         let mut interp = Self {
             scope,
@@ -260,6 +282,14 @@ impl Interpreter {
             begin_blocks: Vec::new(),
             end_blocks: Vec::new(),
             warnings: false,
+            output_autoflush: false,
+            child_exit_status: 0,
+            last_match: String::new(),
+            prematch: String::new(),
+            postmatch: String::new(),
+            last_paren_match: String::new(),
+            list_separator: " ".to_string(),
+            script_start_time,
             strict_refs: false,
             strict_subs: false,
             strict_vars: false,
@@ -303,7 +333,23 @@ impl Interpreter {
         matches!(
             name,
             "_" | "0" | "!" | "@" | "/" | "\\" | "," | "." | "__PACKAGE__" | "$$"
+                | "|" | "?" | "\"" | "&" | "`" | "'" | "+" | "<" | ">" | "(" | ")"
         ) || name.chars().all(|c| c.is_ascii_digit())
+            || name.starts_with('^')
+    }
+
+    /// Scalars that bypass strict and route through [`Self::set_special_var`].
+    #[inline]
+    fn routes_to_special_var(name: &str) -> bool {
+        name == "_"
+            || name == "0"
+            || name == "!"
+            || name.starts_with(|c: char| c.is_ascii_digit())
+            || matches!(
+                name,
+                "|" | "?" | "\"" | "&" | "`" | "'" | "+" | "<" | ">" | "(" | ")"
+            )
+            || name.starts_with('^')
     }
 
     fn check_strict_scalar_var(&self, name: &str, line: usize) -> Result<(), FlowOrError> {
@@ -1087,12 +1133,35 @@ impl Interpreter {
         }
     }
 
-    /// Set `$1`…`$n` and `%+` from a successful match (`regex` crate named groups `(?<name>…)`).
+    /// Set `$&`, `` $` ``, `$'`, `$+`, `$1`…`$n`, `%+`, and `${^MATCH}` / … fields from a successful match.
     pub(crate) fn apply_regex_captures(
         &mut self,
+        haystack: &str,
+        offset: usize,
         re: &regex::Regex,
         caps: &regex::Captures<'_>,
     ) -> Result<(), FlowOrError> {
+        let m0 = caps.get(0).expect("regex capture 0");
+        let s0 = offset + m0.start();
+        let e0 = offset + m0.end();
+        self.last_match = haystack.get(s0..e0).unwrap_or("").to_string();
+        self.prematch = haystack.get(..s0).unwrap_or("").to_string();
+        self.postmatch = haystack.get(e0..).unwrap_or("").to_string();
+        let mut last_paren = String::new();
+        for i in 1..caps.len() {
+            if let Some(m) = caps.get(i) {
+                last_paren = m.as_str().to_string();
+            }
+        }
+        self.last_paren_match = last_paren;
+        self.scope
+            .set_scalar("&", PerlValue::String(self.last_match.clone()))?;
+        self.scope
+            .set_scalar("`", PerlValue::String(self.prematch.clone()))?;
+        self.scope
+            .set_scalar("'", PerlValue::String(self.postmatch.clone()))?;
+        self.scope
+            .set_scalar("+", PerlValue::String(self.last_paren_match.clone()))?;
         for i in 1..caps.len() {
             if let Some(m) = caps.get(i) {
                 self.scope
@@ -1156,7 +1225,7 @@ impl Interpreter {
                 let overall = caps.get(0).unwrap();
                 let abs_end = start + overall.end();
                 self.regex_pos.insert(key, Some(abs_end));
-                self.apply_regex_captures(&re, &caps)?;
+                self.apply_regex_captures(&s, start, &re, &caps)?;
                 Ok(PerlValue::Integer(1))
             } else {
                 self.regex_pos.insert(key, None);
@@ -1173,7 +1242,7 @@ impl Interpreter {
                 Ok(PerlValue::Array(matches))
             }
         } else if let Some(caps) = re.captures(&s) {
-            self.apply_regex_captures(&re, &caps)?;
+            self.apply_regex_captures(&s, 0, &re, &caps)?;
             Ok(PerlValue::Integer(1))
         } else {
             Ok(PerlValue::Integer(0))
@@ -1197,7 +1266,7 @@ impl Interpreter {
             re.captures(&s)
         };
         if let Some(caps) = last_caps {
-            self.apply_regex_captures(&re, &caps)?;
+            self.apply_regex_captures(&s, 0, &re, &caps)?;
         }
         let (new_s, count) = if flags.contains('g') {
             let count = re.find_iter(&s).count();
@@ -4275,37 +4344,14 @@ impl Interpreter {
         match &target.kind {
             ExprKind::ScalarVar(name) => {
                 if self.scope.is_scalar_frozen(name) {
-                    return Err(PerlError::runtime(
+                    return Err(FlowOrError::Error(PerlError::runtime(
                         format!("Modification of a frozen value: ${}", name),
                         target.line,
-                    )
-                    .into());
+                    )));
                 }
-                if name == "_"
-                    || name == "0"
-                    || name == "!"
-                    || name.starts_with(|c: char| c.is_ascii_digit())
-                {
-                    self.set_special_var(name, &val)?;
-                } else {
-                    if self.strict_vars
-                        && !Self::strict_scalar_exempt(name)
-                        && !name.contains("::")
-                        && !self.scope.scalar_binding_exists(name)
-                    {
-                        return Err(PerlError::runtime(
-                            format!(
-                                "Global symbol \"${}\" requires explicit package name (did you forget to declare \"my ${}\"?)",
-                                name, name
-                            ),
-                            target.line,
-                        )
-                        .into());
-                    }
-                    self.scope
-                        .set_scalar(name, val)
-                        .map_err(|e| FlowOrError::Error(e.at_line(target.line)))?;
-                }
+                self.scope
+                    .set_scalar(name, val)
+                    .map_err(|e| FlowOrError::Error(e.at_line(target.line)))?;
                 Ok(PerlValue::Undef)
             }
             ExprKind::ArrayVar(name) => {
