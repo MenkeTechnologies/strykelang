@@ -264,7 +264,9 @@ fn format_float(f: f64) -> String {
 mod tests {
     use super::PerlValue;
     use indexmap::IndexMap;
+    use parking_lot::RwLock;
     use std::cmp::Ordering;
+    use std::sync::Arc;
 
     #[test]
     fn undef_is_false() {
@@ -354,5 +356,23 @@ mod tests {
         let one = PerlValue::Integer(99).to_list();
         assert_eq!(one.len(), 1);
         assert!(matches!(one[0], PerlValue::Integer(99)));
+    }
+
+    #[test]
+    fn type_name_and_ref_type_for_core_kinds() {
+        assert_eq!(PerlValue::Integer(0).type_name(), "INTEGER");
+        assert_eq!(PerlValue::Undef.ref_type().to_string(), "");
+        assert_eq!(
+            PerlValue::ArrayRef(Arc::new(RwLock::new(vec![])))
+                .ref_type()
+                .to_string(),
+            "ARRAY"
+        );
+    }
+
+    #[test]
+    fn display_undef_is_empty_integer_is_decimal() {
+        assert_eq!(PerlValue::Undef.to_string(), "");
+        assert_eq!(PerlValue::Integer(-7).to_string(), "-7");
     }
 }

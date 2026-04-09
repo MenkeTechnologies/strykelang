@@ -82,4 +82,19 @@ mod tests {
         let e = PerlError::die("halt", 1);
         assert_eq!(e.to_string(), "halt");
     }
+
+    #[test]
+    fn exit_error_display_is_empty() {
+        let e = PerlError::new(ErrorKind::Exit(0), "ignored", 1, "-e");
+        assert_eq!(e.to_string(), "");
+    }
+
+    #[test]
+    fn runtime_error_display_includes_file_and_line() {
+        let e = PerlError::runtime("boom", 3);
+        let s = e.to_string();
+        assert!(s.contains("boom"));
+        assert!(s.contains("-e"));
+        assert!(s.contains("line 3"));
+    }
 }

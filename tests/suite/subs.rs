@@ -41,3 +41,11 @@ fn return_with_postfix_if() {
         0
     );
 }
+
+#[test]
+fn sub_with_prototype_two_scalars_uses_at_underscore() {
+    assert_eq!(
+        eval_int("sub add2 ($$) { return $_[0] + $_[1]; } add2(40, 2)"),
+        42
+    );
+}

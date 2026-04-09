@@ -438,4 +438,13 @@ mod tests {
         s.pop_frame();
         assert_eq!(s.get_array_element("a", 0).to_int(), 1);
     }
+
+    #[test]
+    fn pop_frame_never_removes_global_frame() {
+        let mut s = Scope::new();
+        s.declare_scalar("x", PerlValue::Integer(1));
+        s.pop_frame();
+        s.pop_frame();
+        assert_eq!(s.get_scalar("x").to_int(), 1);
+    }
 }

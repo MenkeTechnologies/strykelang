@@ -1138,6 +1138,13 @@ mod tests {
     }
 
     #[test]
+    fn tokenize_binary_integer_literal() {
+        let mut l = Lexer::new("0b1010");
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[0].0, Token::Integer(10)));
+    }
+
+    #[test]
     fn tokenize_filetest_exists() {
         let mut l = Lexer::new("-e '.'");
         let t = l.tokenize().expect("tokenize");

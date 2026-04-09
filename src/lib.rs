@@ -154,4 +154,14 @@ mod tests {
         parse("use strict;").expect("use");
         parse("no warnings;").expect("no");
     }
+
+    #[test]
+    fn parse_sub_with_prototype() {
+        parse("sub sum ($$) { return $_[0] + $_[1]; }").expect("sub prototype");
+    }
+
+    #[test]
+    fn parse_list_expression_in_parentheses() {
+        parse("my @a = (1, 2, 3);").expect("list");
+    }
 }
