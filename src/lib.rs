@@ -29,6 +29,7 @@ pub mod scope;
 mod sort_fast;
 pub mod token;
 mod nanbox;
+mod jit;
 pub mod value;
 pub mod vm;
 

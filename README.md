@@ -527,6 +527,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - **Interpreter** // Tree-walking execution with proper lexical scoping, `Arc<RwLock>` for thread-safe reference types
 - **Parallelism** // Each parallel block gets an isolated interpreter with captured scope; rayon handles work-stealing scheduling
 - **VM** // `src/vm.rs` match-dispatch loop; compiled subs use **slot** ops for frame-local `my` scalars (`GetScalarSlot`, `PreIncSlot`, …, O(1)); non-special names use **plain** load/store ops to skip the special-variable dispatch path; string `eq` / `cmp` compare heap strings without per-op `String` allocations when both operands are heap strings; the execution budget is checked on a fixed stride through the hot loop (not once per opcode). Further speedups: op fusion, computed-goto dispatch (not implemented here)
+- **JIT (experimental)** // `src/jit.rs` — Cranelift **method JIT** for **pure integer** linear bytecode (`LoadInt`, `Add` / `Sub` / `Mul`, `Negate`, `Pop`, `Dup`, optional trailing `Halt`). Uses native `i64` wrapping arithmetic to match the VM’s integer fast path; all other opcodes still run in the interpreter. Eligible chunks are detected at VM entry and compiled regions are cached (bounded). Hot-loop tracing, type guards, and slot access from native code are not implemented yet.
 
 ---
 

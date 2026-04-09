@@ -254,6 +254,10 @@ impl<'a> VM<'a> {
         let mut op_count: u64 = 0;
         const MAX_OPS: u64 = 100_000_000;
 
+        if let Some(v) = crate::jit::try_run_linear_ops(ops) {
+            return Ok(v);
+        }
+
         loop {
             if self.ip >= len {
                 break;

@@ -775,7 +775,7 @@ fn print_config(configvar: Option<&str>) {
         println!("  Integer/Float:");
         println!("    use64bitint=define, use64bitall=define");
         println!("  Parallel extensions:");
-        println!("    rayon=define, pmap=define, pmap_chunked=define, pipeline=define, async=define, await=define, pgrep=define, pfor=define, psort=define, reduce=define, preduce=define, preduce_init=define");
+        println!("    rayon=define, pmap=define, pmap_chunked=define, pipeline=define, async=define, await=define, pgrep=define, pfor=define, psort=define, reduce=define, preduce=define, preduce_init=define, jit=define");
         println!("  Install:");
         println!("    perlpath=perlrs");
     }
