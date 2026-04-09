@@ -181,6 +181,45 @@ impl Scope {
         PerlValue::Undef
     }
 
+    /// Atomically read-modify-write a scalar. Holds the Mutex lock for
+    /// the entire cycle so `mysync` variables are race-free under `fan`/`pfor`.
+    /// Returns the NEW value.
+    pub fn atomic_mutate(&mut self, name: &str, f: impl FnOnce(&PerlValue) -> PerlValue) -> PerlValue {
+        for frame in self.frames.iter().rev() {
+            if let Some(existing) = frame.get_scalar(name) {
+                if let PerlValue::Atomic(ref arc) = existing {
+                    let mut guard = arc.lock();
+                    let new_val = f(&guard);
+                    *guard = new_val.clone();
+                    return new_val;
+                }
+            }
+        }
+        // Non-atomic fallback
+        let old = self.get_scalar(name);
+        let new_val = f(&old);
+        self.set_scalar(name, new_val.clone());
+        new_val
+    }
+
+    /// Like atomic_mutate but returns the OLD value (for postfix `$x++`).
+    pub fn atomic_mutate_post(&mut self, name: &str, f: impl FnOnce(&PerlValue) -> PerlValue) -> PerlValue {
+        for frame in self.frames.iter().rev() {
+            if let Some(existing) = frame.get_scalar(name) {
+                if let PerlValue::Atomic(ref arc) = existing {
+                    let mut guard = arc.lock();
+                    let old = guard.clone();
+                    *guard = f(&old);
+                    return old;
+                }
+            }
+        }
+        // Non-atomic fallback
+        let old = self.get_scalar(name);
+        self.set_scalar(name, f(&old));
+        old
+    }
+
     #[inline]
     pub fn set_scalar(&mut self, name: &str, val: PerlValue) {
         for frame in self.frames.iter_mut().rev() {

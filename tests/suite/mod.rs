@@ -27,6 +27,7 @@ mod phases;
 mod regex;
 mod regex_extended;
 mod runtime_extra;
+mod runtime_more;
 mod scoping;
 mod strings_text;
 mod subs;

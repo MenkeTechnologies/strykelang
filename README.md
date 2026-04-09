@@ -308,7 +308,7 @@ Library unit tests (parser smoke and per-module tests; excludes `tests/` integra
 cargo test --lib
 ```
 
-Integration tests live in `tests/integration.rs` and `tests/suite/` (grouped modules such as `runtime_extra` for assignment, builtins, aggregates, and control flow):
+Integration tests live in `tests/integration.rs` and `tests/suite/` (grouped modules such as `runtime_extra` and `runtime_more` for assignment, builtins, aggregates, control flow, and regex/subs):
 
 ```sh
 cargo test --test integration
