@@ -2481,6 +2481,20 @@ impl Parser {
                     line,
                 })
             }
+            "pmap_chunked" => {
+                let chunk_size = self.parse_assign_expr()?;
+                let block = self.parse_block()?;
+                self.eat(&Token::Comma);
+                let list = self.parse_expression()?;
+                Ok(Expr {
+                    kind: ExprKind::PMapChunkedExpr {
+                        chunk_size: Box::new(chunk_size),
+                        block,
+                        list: Box::new(list),
+                    },
+                    line,
+                })
+            }
             "pgrep" => {
                 let (block, list) = self.parse_block_list()?;
                 Ok(Expr {

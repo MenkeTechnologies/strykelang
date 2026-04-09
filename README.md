@@ -111,6 +111,9 @@ echo "a:b:c" | pe -a -F: -ne 'print $F[1], "\n"'
 # parallel map — transform elements across all cores
 my @doubled = pmap { $_ * 2 } @data;
 
+# parallel map in batches (one interpreter per chunk — amortizes spawn cost)
+my @out = pmap_chunked 1000 { $_ ** 2 } @million_items;
+
 # parallel grep — filter elements in parallel
 my @evens = pgrep { $_ % 2 == 0 } @data;
 
@@ -139,6 +142,10 @@ my @sorted = psort { $a <=> $b } @data;
 
 # chain parallel operations
 my @result = pmap { $_ ** 2 } pgrep { $_ > 100 } @data;
+
+# parallel recursive glob (rayon directory walk), then process files in parallel
+my @logs = glob_par("**/*.log");
+pfor { process($_) } @logs;
 
 # control thread count
 pe -j 8 -e 'my @r = pmap { heavy_work($_) } @data'
@@ -282,7 +289,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
  │ telldir, seekdir                                              │
  │ **File tests**: -e, -f, -d, -l, -r, -w, -s, -z             │
  │ **System**: system, exec, exit, chdir, mkdir, unlink, stat, │
- │ lstat, link, symlink, readlink, glob                          │
+ │ lstat, link, symlink, readlink, glob, glob_par                │
  │ **Type**: defined, undef, ref, bless                        │
  │ **Set**: `Set->new(…)` — native set; `|` union, `&` intersection │
  │ **Control**: die, warn, eval, do, require, caller           │

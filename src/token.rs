@@ -290,6 +290,7 @@ pub const KEYWORDS: &[&str] = &[
     "AUTOLOAD",
     "DESTROY",
     "pmap",
+    "pmap_chunked",
     "pgrep",
     "pfor",
     "psort",
@@ -379,6 +380,10 @@ mod tests {
     #[test]
     fn keyword_or_ident_parallel_primitives() {
         assert!(matches!(keyword_or_ident("pmap"), Token::Ident(s) if s == "pmap"));
+        assert!(matches!(
+            keyword_or_ident("pmap_chunked"),
+            Token::Ident(s) if s == "pmap_chunked"
+        ));
         assert!(matches!(keyword_or_ident("pgrep"), Token::Ident(s) if s == "pgrep"));
         assert!(matches!(keyword_or_ident("pfor"), Token::Ident(s) if s == "pfor"));
         assert!(matches!(keyword_or_ident("psort"), Token::Ident(s) if s == "psort"));

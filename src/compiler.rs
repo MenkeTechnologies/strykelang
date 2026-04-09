@@ -1893,6 +1893,9 @@ impl Compiler {
                 let block_idx = self.chunk.add_block(block.clone());
                 self.chunk.emit(Op::PMapWithBlock(block_idx), line);
             }
+            ExprKind::PMapChunkedExpr { .. } => {
+                return Err(CompileError::Unsupported("pmap_chunked".into()));
+            }
             ExprKind::PGrepExpr { block, list } => {
                 self.compile_expr(list)?;
                 let block_idx = self.chunk.add_block(block.clone());

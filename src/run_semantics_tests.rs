@@ -281,6 +281,15 @@ fn glob_finds_rs_sources_under_src() {
 }
 
 #[test]
+fn glob_par_finds_rs_sources_under_src() {
+    let n = ri(r#"scalar glob_par "src/*.rs";"#);
+    assert!(
+        n > 0,
+        "glob_par src/*.rs should match at least one file, got {n}"
+    );
+}
+
+#[test]
 fn opendir_readdir_returns_name() {
     assert_eq!(
         ri(r#"opendir D, "."; my $x = readdir D; closedir D; $x ne "" ? 1 : 0;"#),
@@ -346,4 +355,13 @@ fn timer_returns_elapsed_ms() {
     let ms = rf(r#"timer { my $x = 1 + 1; }"#);
     assert!(ms >= 0.0);
     assert!(ms < 60_000.0, "timer should be wall-clock ms, got {ms}");
+}
+
+#[test]
+fn pmap_chunked_preserves_order_and_values() {
+    let s = r#"
+        my @a = pmap_chunked 2 { $_ * 2 } (1, 2, 3, 4);
+        $a[0] + $a[1] + $a[2] + $a[3];
+    "#;
+    assert_eq!(ri(s), 20);
 }

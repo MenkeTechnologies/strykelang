@@ -1451,6 +1451,53 @@ impl Interpreter {
                     .collect();
                 Ok(PerlValue::Array(results))
             }
+            ExprKind::PMapChunkedExpr {
+                chunk_size,
+                block,
+                list,
+            } => {
+                let chunk_n = self.eval_expr(chunk_size)?.to_int().max(1) as usize;
+                let list_val = self.eval_expr(list)?;
+                let items = list_val.to_list();
+                let block = block.clone();
+                let subs = self.subs.clone();
+                let (scope_capture, atomic_arrays, atomic_hashes) =
+                    self.scope.capture_with_atomics();
+
+                let indexed_chunks: Vec<(usize, Vec<PerlValue>)> = items
+                    .chunks(chunk_n)
+                    .enumerate()
+                    .map(|(i, c)| (i, c.to_vec()))
+                    .collect();
+
+                let mut chunk_results: Vec<(usize, Vec<PerlValue>)> = indexed_chunks
+                    .into_par_iter()
+                    .map(|(chunk_idx, chunk)| {
+                        let mut local_interp = Interpreter::new();
+                        local_interp.subs = subs.clone();
+                        local_interp.scope.restore_capture(&scope_capture);
+                        local_interp
+                            .scope
+                            .restore_atomics(&atomic_arrays, &atomic_hashes);
+                        let mut out = Vec::with_capacity(chunk.len());
+                        for item in chunk {
+                            local_interp.scope.set_scalar("_", item);
+                            match local_interp.exec_block(&block) {
+                                Ok(val) => out.push(val),
+                                Err(_) => out.push(PerlValue::Undef),
+                            }
+                        }
+                        (chunk_idx, out)
+                    })
+                    .collect();
+
+                chunk_results.sort_by_key(|(i, _)| *i);
+                let results: Vec<PerlValue> = chunk_results
+                    .into_iter()
+                    .flat_map(|(_, v)| v)
+                    .collect();
+                Ok(PerlValue::Array(results))
+            }
             ExprKind::PGrepExpr { block, list } => {
                 let list_val = self.eval_expr(list)?;
                 let items = list_val.to_list();
@@ -2367,7 +2414,7 @@ impl Interpreter {
                 for a in args {
                     pats.push(self.eval_expr(a)?.to_string());
                 }
-                Ok(crate::perl_fs::glob_patterns(&pats))
+                Ok(crate::perl_fs::glob_par_patterns(&pats))
             }
             ExprKind::Bless { ref_expr, class } => {
                 let val = self.eval_expr(ref_expr)?;

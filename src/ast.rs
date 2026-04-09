@@ -284,6 +284,12 @@ pub enum ExprKind {
         block: Block,
         list: Box<Expr>,
     },
+    /// `pmap_chunked N { BLOCK } @list` — parallel map in batches of N (one interpreter per chunk).
+    PMapChunkedExpr {
+        chunk_size: Box<Expr>,
+        block: Block,
+        list: Box<Expr>,
+    },
     PGrepExpr {
         block: Block,
         list: Box<Expr>,

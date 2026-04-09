@@ -10,6 +10,11 @@ fn accepts_pmap_block() {
 }
 
 #[test]
+fn accepts_pmap_chunked_block() {
+    p("my @r = pmap_chunked 2 { $_ * 2 } (1, 2, 3, 4);");
+}
+
+#[test]
 fn accepts_pgrep_block() {
     p("my @r = pgrep { $_ > 0 } (1, -1, 2);");
 }

@@ -219,6 +219,9 @@ fn print_cyberpunk_help() {
     println!("{C}  ── PARALLEL EXTENSIONS (perlrs) ─────────────────────{N}");
     println!("  -j N                   {G}//{N} Set number of parallel threads (rayon)");
     println!("  pmap  {{BLOCK}} @list    {G}//{N} Parallel map across all cores");
+    println!(
+        "  pmap_chunked N {{BLOCK}} @list {G}//{N} Parallel map in batches of N items per thread"
+    );
     println!("  pgrep {{BLOCK}} @list    {G}//{N} Parallel grep across all cores");
     println!("  pfor  {{BLOCK}} @list    {G}//{N} Parallel foreach across all cores");
     println!("  psort {{BLOCK}} @list    {G}//{N} Parallel sort across all cores");
@@ -625,7 +628,7 @@ fn print_config(configvar: Option<&str>) {
         println!("  Integer/Float:");
         println!("    use64bitint=define, use64bitall=define");
         println!("  Parallel extensions:");
-        println!("    rayon=define, pmap=define, pgrep=define, pfor=define, psort=define");
+        println!("    rayon=define, pmap=define, pmap_chunked=define, pgrep=define, pfor=define, psort=define");
         println!("  Install:");
         println!("    perlpath=perlrs");
     }
