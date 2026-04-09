@@ -1,3 +1,4 @@
+use crate::ast::Block;
 use crate::value::PerlValue;
 
 /// Stack-based bytecode instruction set for the perlrs VM.
@@ -129,6 +130,48 @@ pub enum Op {
     /// SetScalar that also leaves the value on the stack (for chained assignment)
     SetScalarKeep(u16),
 
+    // ── Block-based operations (u16 = index into chunk.blocks) ──
+    /// map { BLOCK } @list — block_idx; stack: [list] → [mapped]
+    MapWithBlock(u16),
+    /// grep { BLOCK } @list — block_idx; stack: [list] → [filtered]
+    GrepWithBlock(u16),
+    /// sort { BLOCK } @list — block_idx; stack: [list] → [sorted]
+    SortWithBlock(u16),
+    /// sort @list (no block) — stack: [list] → [sorted]
+    SortNoBlock,
+    /// reverse — stack: [list] → [reversed]
+    ReverseOp,
+    /// pmap { BLOCK } @list — block_idx; stack: [list] → [mapped]
+    PMapWithBlock(u16),
+    /// pgrep { BLOCK } @list — block_idx; stack: [list] → [filtered]
+    PGrepWithBlock(u16),
+    /// pfor { BLOCK } @list — block_idx; stack: [list]
+    PForWithBlock(u16),
+    /// psort { BLOCK } @list — block_idx; stack: [list] → [sorted]
+    PSortWithBlock(u16),
+    /// fan N { BLOCK } — block_idx; stack: [count]
+    FanWithBlock(u16),
+    /// eval { BLOCK } — block_idx; stack: [] → result
+    EvalBlock(u16),
+    /// Make a scalar reference from TOS
+    MakeScalarRef,
+    /// Make an array reference from TOS (which should be an Array)
+    MakeArrayRef,
+    /// Make a hash reference from TOS (which should be a Hash)
+    MakeHashRef,
+    /// Make an anonymous sub from a block — block_idx; stack: [] → CodeRef
+    MakeCodeRef(u16),
+    /// Dereference arrow: ->[] — stack: [ref, index] → value
+    ArrowArray,
+    /// Dereference arrow: ->{} — stack: [ref, key] → value
+    ArrowHash,
+    /// Dereference arrow: ->() — stack: [ref, args_array] → value
+    ArrowCall,
+    /// Method call: stack: [object, args...] → result; name_idx, argc
+    MethodCall(u16, u8),
+    /// File test: -e, -f, -d, etc. — test char; stack: [path] → 0/1
+    FileTestOp(u8),
+
     // ── Special ──
     Halt,
 }
@@ -235,6 +278,9 @@ pub struct Chunk {
     pub lines: Vec<usize>,
     /// Compiled subroutine entry points: name_index → op_index
     pub sub_entries: Vec<(u16, usize)>,
+    /// AST blocks for map/grep/sort/parallel operations.
+    /// Referenced by block-based opcodes via u16 index.
+    pub blocks: Vec<Block>,
 }
 
 impl Chunk {
@@ -245,7 +291,15 @@ impl Chunk {
             names: Vec::new(),
             lines: Vec::new(),
             sub_entries: Vec::new(),
+            blocks: Vec::new(),
         }
+    }
+
+    /// Store an AST block and return its index.
+    pub fn add_block(&mut self, block: Block) -> u16 {
+        let idx = self.blocks.len() as u16;
+        self.blocks.push(block);
+        idx
     }
 
     /// Intern a name, returning its pool index.

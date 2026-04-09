@@ -12,6 +12,7 @@ use crate::value::PerlValue;
 struct CallFrame {
     return_ip: usize,
     stack_base: usize,
+    scope_depth: usize,
 }
 
 /// Stack-based bytecode virtual machine.

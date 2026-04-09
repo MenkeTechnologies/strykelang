@@ -121,6 +121,20 @@ impl Scope {
     }
 
     #[inline]
+    pub fn depth(&self) -> usize {
+        self.frames.len()
+    }
+
+    /// Pop frames until we're at `target_depth`. Used by VM ReturnValue
+    /// to cleanly unwind through if/while/for blocks on return.
+    #[inline]
+    pub fn pop_to_depth(&mut self, target_depth: usize) {
+        while self.frames.len() > target_depth && self.frames.len() > 1 {
+            self.frames.pop();
+        }
+    }
+
+    #[inline]
     pub fn push_frame(&mut self) {
         self.frames.push(Frame::new());
     }
