@@ -65,8 +65,9 @@
 //!
 //! ## VM integration
 //! [`crate::vm::VM::execute`] tries [`try_run_linear_ops`] on the full opcode buffer, then
-//! [`try_run_block_ops`] (which reports [`BlockJitBufferMode`] for slot/plain writeback), and only
-//! then runs the opcode dispatch loop.
+//! [`try_run_block_ops`] (which reports [`BlockJitBufferMode`] for slot/plain writeback). Block CFG
+//! validation runs once per `try_run_block_ops` attempt (VM buffer layout uses the same rules via
+//! [`block_jit_buffer_mode`]). Only then runs the opcode dispatch loop.
 
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeSet, HashMap, VecDeque};
@@ -2078,8 +2079,11 @@ fn emit_data_op(
     Some(())
 }
 
-fn compile_blocks(ops: &[Op], constants: &[PerlValue]) -> Option<LinearJit> {
-    let validated = validate_block_cfg(ops, constants)?;
+fn compile_blocks_validated(
+    validated: ValidatedBlockCfg,
+    ops: &[Op],
+    constants: &[PerlValue],
+) -> Option<LinearJit> {
     let cfg = validated.cfg;
     let halt_cell = validated.halt_cell;
     let needs_raw_bits = validated.needs_raw_value_buffers;
@@ -2517,7 +2521,12 @@ pub(crate) fn try_run_block_ops(
     arg_i64: Option<&[i64]>,
     constants: &[PerlValue],
 ) -> Option<(PerlValue, BlockJitBufferMode)> {
-    let mode = block_jit_buffer_mode(ops, constants)?;
+    let validated = validate_block_cfg(ops, constants)?;
+    let mode = if validated.needs_raw_value_buffers {
+        BlockJitBufferMode::I64AsPerlValueBits
+    } else {
+        BlockJitBufferMode::I64AsInteger
+    };
     // Slot buffer bounds.
     if let Some(max) = block_slot_ops_max_index(ops) {
         let sl = slot_i64.as_mut()?;
@@ -2558,7 +2567,7 @@ pub(crate) fn try_run_block_ops(
         }
     }
 
-    let jit = compile_blocks(ops, constants)?;
+    let jit = compile_blocks_validated(validated, ops, constants)?;
     let r = jit.invoke(slot_ptr, plain_ptr, arg_ptr);
     let pv = jit_block_result_to_perl(r, mode);
 
