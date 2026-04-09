@@ -417,29 +417,64 @@ impl Interpreter {
                 Ok(PerlValue::Undef)
             }
             StmtKind::My(decls) | StmtKind::Our(decls) | StmtKind::Local(decls) => {
-                for decl in decls {
-                    let val = if let Some(init) = &decl.initializer {
-                        self.eval_expr(init)?
-                    } else {
-                        PerlValue::Undef
-                    };
-                    match decl.sigil {
-                        Sigil::Scalar => self.scope.declare_scalar(&decl.name, val),
-                        Sigil::Array => {
-                            let items = val.to_list();
-                            self.scope.declare_array(&decl.name, items);
-                        }
-                        Sigil::Hash => {
-                            let items = val.to_list();
-                            let mut map = IndexMap::new();
-                            let mut i = 0;
-                            while i + 1 < items.len() {
-                                let k = items[i].to_string();
-                                let v = items[i + 1].clone();
-                                map.insert(k, v);
-                                i += 2;
+                // For list assignment my ($a, $b) = (10, 20), distribute elements.
+                // All decls share the same initializer in the AST (parser clones it).
+                if decls.len() > 1 && decls[0].initializer.is_some() {
+                    let val = self.eval_expr(decls[0].initializer.as_ref().unwrap())?;
+                    let items = val.to_list();
+                    let mut idx = 0;
+                    for decl in decls {
+                        match decl.sigil {
+                            Sigil::Scalar => {
+                                let v = items.get(idx).cloned().unwrap_or(PerlValue::Undef);
+                                self.scope.declare_scalar(&decl.name, v);
+                                idx += 1;
                             }
-                            self.scope.declare_hash(&decl.name, map);
+                            Sigil::Array => {
+                                // Array slurps remaining elements
+                                let rest: Vec<PerlValue> = items[idx..].to_vec();
+                                idx = items.len();
+                                self.scope.declare_array(&decl.name, rest);
+                            }
+                            Sigil::Hash => {
+                                let rest: Vec<PerlValue> = items[idx..].to_vec();
+                                idx = items.len();
+                                let mut map = IndexMap::new();
+                                let mut i = 0;
+                                while i + 1 < rest.len() {
+                                    map.insert(rest[i].to_string(), rest[i + 1].clone());
+                                    i += 2;
+                                }
+                                self.scope.declare_hash(&decl.name, map);
+                            }
+                        }
+                    }
+                } else {
+                    // Single decl or no initializer
+                    for decl in decls {
+                        let val = if let Some(init) = &decl.initializer {
+                            self.eval_expr(init)?
+                        } else {
+                            PerlValue::Undef
+                        };
+                        match decl.sigil {
+                            Sigil::Scalar => self.scope.declare_scalar(&decl.name, val),
+                            Sigil::Array => {
+                                let items = val.to_list();
+                                self.scope.declare_array(&decl.name, items);
+                            }
+                            Sigil::Hash => {
+                                let items = val.to_list();
+                                let mut map = IndexMap::new();
+                                let mut i = 0;
+                                while i + 1 < items.len() {
+                                    let k = items[i].to_string();
+                                    let v = items[i + 1].clone();
+                                    map.insert(k, v);
+                                    i += 2;
+                                }
+                                self.scope.declare_hash(&decl.name, map);
+                            }
                         }
                     }
                 }

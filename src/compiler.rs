@@ -173,32 +173,61 @@ impl Compiler {
                 return Err(CompileError::Unsupported("local".into()));
             }
             StmtKind::My(decls) | StmtKind::Our(decls) => {
-                for decl in decls {
-                    let name_idx = self.chunk.intern_name(&decl.name);
-                    match decl.sigil {
-                        Sigil::Scalar => {
-                            if let Some(init) = &decl.initializer {
-                                self.compile_expr(init)?;
-                            } else {
-                                self.chunk.emit(Op::LoadUndef, line);
+                // List assignment: my ($a, $b) = (10, 20) — distribute elements
+                if decls.len() > 1 && decls[0].initializer.is_some() {
+                    // Compile the initializer once into a temp array
+                    self.compile_expr(decls[0].initializer.as_ref().unwrap())?;
+                    let tmp_name = self.chunk.intern_name("__list_assign_tmp__");
+                    self.chunk.emit(Op::DeclareArray(tmp_name), line);
+                    // Distribute elements to each decl
+                    for (i, decl) in decls.iter().enumerate() {
+                        let name_idx = self.chunk.intern_name(&decl.name);
+                        match decl.sigil {
+                            Sigil::Scalar => {
+                                self.chunk.emit(Op::LoadInt(i as i64), line);
+                                self.chunk.emit(Op::GetArrayElem(tmp_name), line);
+                                self.chunk.emit(Op::DeclareScalar(name_idx), line);
                             }
-                            self.chunk.emit(Op::DeclareScalar(name_idx), line);
+                            Sigil::Array => {
+                                // Array slurps remaining — get full temp array
+                                self.chunk.emit(Op::GetArray(tmp_name), line);
+                                self.chunk.emit(Op::DeclareArray(name_idx), line);
+                            }
+                            Sigil::Hash => {
+                                self.chunk.emit(Op::GetArray(tmp_name), line);
+                                self.chunk.emit(Op::DeclareHash(name_idx), line);
+                            }
                         }
-                        Sigil::Array => {
-                            if let Some(init) = &decl.initializer {
-                                self.compile_expr(init)?;
-                            } else {
-                                self.chunk.emit(Op::LoadUndef, line);
+                    }
+                } else {
+                    // Single decl or no initializer
+                    for decl in decls {
+                        let name_idx = self.chunk.intern_name(&decl.name);
+                        match decl.sigil {
+                            Sigil::Scalar => {
+                                if let Some(init) = &decl.initializer {
+                                    self.compile_expr(init)?;
+                                } else {
+                                    self.chunk.emit(Op::LoadUndef, line);
+                                }
+                                self.chunk.emit(Op::DeclareScalar(name_idx), line);
                             }
-                            self.chunk.emit(Op::DeclareArray(name_idx), line);
-                        }
-                        Sigil::Hash => {
-                            if let Some(init) = &decl.initializer {
-                                self.compile_expr(init)?;
-                            } else {
-                                self.chunk.emit(Op::LoadUndef, line);
+                            Sigil::Array => {
+                                if let Some(init) = &decl.initializer {
+                                    self.compile_expr(init)?;
+                                } else {
+                                    self.chunk.emit(Op::LoadUndef, line);
+                                }
+                                self.chunk.emit(Op::DeclareArray(name_idx), line);
                             }
-                            self.chunk.emit(Op::DeclareHash(name_idx), line);
+                            Sigil::Hash => {
+                                if let Some(init) = &decl.initializer {
+                                    self.compile_expr(init)?;
+                                } else {
+                                    self.chunk.emit(Op::LoadUndef, line);
+                                }
+                                self.chunk.emit(Op::DeclareHash(name_idx), line);
+                            }
                         }
                     }
                 }
