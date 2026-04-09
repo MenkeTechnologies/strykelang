@@ -261,6 +261,10 @@ pub enum Op {
     PcacheWithBlock(u16),
     /// `pselect($rx1, ... [, timeout => SECS])` — stack: \[rx0, …, rx_{n-1}\] with optional timeout on top
     Pselect { n_rx: u8, has_timeout: bool },
+    /// `par_lines PATH, sub { } [, progress => EXPR]` — index into [`Chunk::par_lines_entries`]; stack: \[\] → `undef`
+    ParLines(u16),
+    /// `pwatch GLOB, sub { }` — index into [`Chunk::pwatch_entries`]; stack: \[\] → result
+    Pwatch(u16),
     /// fan N { BLOCK } — block_idx; stack: \[progress_flag, count\] (`progress_flag` is 0/1)
     FanWithBlock(u16),
     /// fan { BLOCK } — block_idx; stack: \[progress_flag\]; COUNT = rayon pool size (`pe -j`)
@@ -530,6 +534,10 @@ pub struct Chunk {
     pub algebraic_match_entries: Vec<(Expr, Vec<MatchArm>)>,
     /// Nested / runtime `sub` declarations (see [`Op::RuntimeSubDecl`]).
     pub runtime_sub_decls: Vec<RuntimeSubDecl>,
+    /// `par_lines PATH, sub { } [, progress => EXPR]` — evaluated by interpreter inside VM.
+    pub par_lines_entries: Vec<(Expr, Expr, Option<Expr>)>,
+    /// `pwatch GLOB, sub { }` — evaluated by interpreter inside VM.
+    pub pwatch_entries: Vec<(Expr, Expr)>,
 }
 
 impl Chunk {
@@ -548,7 +556,28 @@ impl Chunk {
             eval_timeout_entries: Vec::new(),
             algebraic_match_entries: Vec::new(),
             runtime_sub_decls: Vec::new(),
+            par_lines_entries: Vec::new(),
+            pwatch_entries: Vec::new(),
         }
+    }
+
+    /// `par_lines PATH, sub { } [, progress => EXPR]` — returns pool index for [`Op::ParLines`].
+    pub fn add_par_lines_entry(
+        &mut self,
+        path: Expr,
+        callback: Expr,
+        progress: Option<Expr>,
+    ) -> u16 {
+        let idx = self.par_lines_entries.len() as u16;
+        self.par_lines_entries.push((path, callback, progress));
+        idx
+    }
+
+    /// `pwatch GLOB, sub { }` — returns pool index for [`Op::Pwatch`].
+    pub fn add_pwatch_entry(&mut self, path: Expr, callback: Expr) -> u16 {
+        let idx = self.pwatch_entries.len() as u16;
+        self.pwatch_entries.push((path, callback));
+        idx
     }
 
     /// `given (EXPR) { ... }` — returns pool index for [`Op::Given`].

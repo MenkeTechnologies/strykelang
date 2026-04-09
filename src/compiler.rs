@@ -3227,11 +3227,23 @@ impl Compiler {
                 let block_idx = self.chunk.add_block(block.clone());
                 self.chunk.emit(Op::PForWithBlock(block_idx), line);
             }
-            ExprKind::ParLinesExpr { .. } => {
-                return Err(CompileError::Unsupported("par_lines".into()));
+            ExprKind::ParLinesExpr {
+                path,
+                callback,
+                progress,
+            } => {
+                let idx = self.chunk.add_par_lines_entry(
+                    path.as_ref().clone(),
+                    callback.as_ref().clone(),
+                    progress.as_ref().map(|p| p.as_ref().clone()),
+                );
+                self.chunk.emit(Op::ParLines(idx), line);
             }
-            ExprKind::PwatchExpr { .. } => {
-                return Err(CompileError::Unsupported("pwatch".into()));
+            ExprKind::PwatchExpr { path, callback } => {
+                let idx = self
+                    .chunk
+                    .add_pwatch_entry(path.as_ref().clone(), callback.as_ref().clone());
+                self.chunk.emit(Op::Pwatch(idx), line);
             }
             ExprKind::PSortExpr {
                 cmp,

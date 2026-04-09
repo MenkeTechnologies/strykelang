@@ -4334,109 +4334,14 @@ impl Interpreter {
                 path,
                 callback,
                 progress,
-            } => {
-                let show_progress = progress
-                    .as_ref()
-                    .map(|p| self.eval_expr(p))
-                    .transpose()?
-                    .map(|v| v.is_true())
-                    .unwrap_or(false);
-                let path_s = self.eval_expr(path)?.to_string();
-                let cb_val = self.eval_expr(callback)?;
-                let sub = if let Some(s) = cb_val.as_code_ref() {
-                    s
-                } else {
-                    return Err(PerlError::runtime(
-                        "par_lines: second argument must be a code reference",
-                        line,
-                    )
-                    .into());
-                };
-                let subs = self.subs.clone();
-                let (scope_capture, atomic_arrays, atomic_hashes) =
-                    self.scope.capture_with_atomics();
-                let file = std::fs::File::open(std::path::Path::new(&path_s)).map_err(|e| {
-                    FlowOrError::Error(PerlError::runtime(format!("par_lines: {}", e), line))
-                })?;
-                let mmap = unsafe {
-                    memmap2::Mmap::map(&file).map_err(|e| {
-                        FlowOrError::Error(PerlError::runtime(
-                            format!("par_lines: mmap: {}", e),
-                            line,
-                        ))
-                    })?
-                };
-                let data: &[u8] = &mmap;
-                if data.is_empty() {
-                    return Ok(PerlValue::UNDEF);
-                }
-                let line_total = crate::par_lines::line_count_bytes(data);
-                let pmap_progress = PmapProgress::new(show_progress, line_total);
-                if self.num_threads == 0 {
-                    self.num_threads = rayon::current_num_threads();
-                }
-                let num_chunks = self.num_threads.saturating_mul(8).max(1);
-                let chunks = crate::par_lines::line_aligned_chunks(data, num_chunks);
-                chunks.into_par_iter().try_for_each(|(start, end)| {
-                    let slice = &data[start..end];
-                    let mut s = 0usize;
-                    while s < slice.len() {
-                        let e = slice[s..]
-                            .iter()
-                            .position(|&b| b == b'\n')
-                            .map(|p| s + p)
-                            .unwrap_or(slice.len());
-                        let line_bytes = &slice[s..e];
-                        let line_str = crate::par_lines::line_to_perl_string(line_bytes);
-                        let mut local_interp = Interpreter::new();
-                        local_interp.subs = subs.clone();
-                        local_interp.scope.restore_capture(&scope_capture);
-                        local_interp
-                            .scope
-                            .restore_atomics(&atomic_arrays, &atomic_hashes);
-                        local_interp.enable_parallel_guard();
-                        let _ = local_interp
-                            .scope
-                            .set_scalar("_", PerlValue::string(line_str));
-                        match local_interp.call_sub(&sub, vec![], WantarrayCtx::Void, line) {
-                            Ok(_) => {}
-                            Err(e) => return Err(e),
-                        }
-                        pmap_progress.tick();
-                        if e >= slice.len() {
-                            break;
-                        }
-                        s = e + 1;
-                    }
-                    Ok(())
-                })?;
-                pmap_progress.finish();
-                Ok(PerlValue::UNDEF)
-            }
+            } => self.eval_par_lines_expr(
+                path.as_ref(),
+                callback.as_ref(),
+                progress.as_deref(),
+                line,
+            ),
             ExprKind::PwatchExpr { path, callback } => {
-                let pattern_s = self.eval_expr(path)?.to_string();
-                let cb_val = self.eval_expr(callback)?;
-                let sub = if let Some(s) = cb_val.as_code_ref() {
-                    s
-                } else {
-                    return Err(PerlError::runtime(
-                        "pwatch: second argument must be a code reference",
-                        line,
-                    )
-                    .into());
-                };
-                let subs = self.subs.clone();
-                let (scope_capture, atomic_arrays, atomic_hashes) =
-                    self.scope.capture_with_atomics();
-                Ok(crate::pwatch::run_pwatch(
-                    &pattern_s,
-                    sub,
-                    subs,
-                    scope_capture,
-                    atomic_arrays,
-                    atomic_hashes,
-                    line,
-                )?)
+                self.eval_pwatch_expr(path.as_ref(), callback.as_ref(), line)
             }
             ExprKind::PMapExpr {
                 block,
@@ -9086,6 +8991,123 @@ impl Interpreter {
             }
         }
         Ok(PerlValue::integer(1))
+    }
+
+    /// `par_lines PATH, sub { } [, progress => EXPR]` — mmap + parallel line iteration (also used by VM).
+    pub(crate) fn eval_par_lines_expr(
+        &mut self,
+        path: &Expr,
+        callback: &Expr,
+        progress: Option<&Expr>,
+        line: usize,
+    ) -> Result<PerlValue, FlowOrError> {
+        let show_progress = progress
+            .map(|p| self.eval_expr(p))
+            .transpose()?
+            .map(|v| v.is_true())
+            .unwrap_or(false);
+        let path_s = self.eval_expr(path)?.to_string();
+        let cb_val = self.eval_expr(callback)?;
+        let sub = if let Some(s) = cb_val.as_code_ref() {
+            s
+        } else {
+            return Err(PerlError::runtime(
+                "par_lines: second argument must be a code reference",
+                line,
+            )
+            .into());
+        };
+        let subs = self.subs.clone();
+        let (scope_capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
+        let file = std::fs::File::open(std::path::Path::new(&path_s)).map_err(|e| {
+            FlowOrError::Error(PerlError::runtime(format!("par_lines: {}", e), line))
+        })?;
+        let mmap = unsafe {
+            memmap2::Mmap::map(&file).map_err(|e| {
+                FlowOrError::Error(PerlError::runtime(
+                    format!("par_lines: mmap: {}", e),
+                    line,
+                ))
+            })?
+        };
+        let data: &[u8] = &mmap;
+        if data.is_empty() {
+            return Ok(PerlValue::UNDEF);
+        }
+        let line_total = crate::par_lines::line_count_bytes(data);
+        let pmap_progress = PmapProgress::new(show_progress, line_total);
+        if self.num_threads == 0 {
+            self.num_threads = rayon::current_num_threads();
+        }
+        let num_chunks = self.num_threads.saturating_mul(8).max(1);
+        let chunks = crate::par_lines::line_aligned_chunks(data, num_chunks);
+        chunks.into_par_iter().try_for_each(|(start, end)| {
+            let slice = &data[start..end];
+            let mut s = 0usize;
+            while s < slice.len() {
+                let e = slice[s..]
+                    .iter()
+                    .position(|&b| b == b'\n')
+                    .map(|p| s + p)
+                    .unwrap_or(slice.len());
+                let line_bytes = &slice[s..e];
+                let line_str = crate::par_lines::line_to_perl_string(line_bytes);
+                let mut local_interp = Interpreter::new();
+                local_interp.subs = subs.clone();
+                local_interp.scope.restore_capture(&scope_capture);
+                local_interp
+                    .scope
+                    .restore_atomics(&atomic_arrays, &atomic_hashes);
+                local_interp.enable_parallel_guard();
+                let _ = local_interp
+                    .scope
+                    .set_scalar("_", PerlValue::string(line_str));
+                match local_interp.call_sub(&sub, vec![], WantarrayCtx::Void, line) {
+                    Ok(_) => {}
+                    Err(e) => return Err(e),
+                }
+                pmap_progress.tick();
+                if e >= slice.len() {
+                    break;
+                }
+                s = e + 1;
+            }
+            Ok(())
+        })?;
+        pmap_progress.finish();
+        Ok(PerlValue::UNDEF)
+    }
+
+    /// `pwatch GLOB, sub { }` — filesystem notify loop (also used by VM).
+    pub(crate) fn eval_pwatch_expr(
+        &mut self,
+        path: &Expr,
+        callback: &Expr,
+        line: usize,
+    ) -> Result<PerlValue, FlowOrError> {
+        let pattern_s = self.eval_expr(path)?.to_string();
+        let cb_val = self.eval_expr(callback)?;
+        let sub = if let Some(s) = cb_val.as_code_ref() {
+            s
+        } else {
+            return Err(PerlError::runtime(
+                "pwatch: second argument must be a code reference",
+                line,
+            )
+            .into());
+        };
+        let subs = self.subs.clone();
+        let (scope_capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
+        crate::pwatch::run_pwatch(
+            &pattern_s,
+            sub,
+            subs,
+            scope_capture,
+            atomic_arrays,
+            atomic_hashes,
+            line,
+        )
+        .map_err(FlowOrError::Error)
     }
 
     pub(crate) fn compile_regex(

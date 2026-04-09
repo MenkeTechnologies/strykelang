@@ -37,6 +37,8 @@ struct ParallelBlockVmShared {
     given_entries: Vec<(Expr, Block)>,
     eval_timeout_entries: Vec<(Expr, Block)>,
     algebraic_match_entries: Vec<(Expr, Vec<MatchArm>)>,
+    par_lines_entries: Vec<(Expr, Expr, Option<Expr>)>,
+    pwatch_entries: Vec<(Expr, Expr)>,
     lvalues: Vec<Expr>,
     runtime_sub_decls: Arc<Vec<RuntimeSubDecl>>,
     jit_sub_invoke_threshold: u32,
@@ -57,6 +59,8 @@ impl ParallelBlockVmShared {
             given_entries: vm.given_entries.clone(),
             eval_timeout_entries: vm.eval_timeout_entries.clone(),
             algebraic_match_entries: vm.algebraic_match_entries.clone(),
+            par_lines_entries: vm.par_lines_entries.clone(),
+            pwatch_entries: vm.pwatch_entries.clone(),
             lvalues: vm.lvalues.clone(),
             runtime_sub_decls: Arc::clone(&vm.runtime_sub_decls),
             jit_sub_invoke_threshold: vm.jit_sub_invoke_threshold,
@@ -77,6 +81,8 @@ impl ParallelBlockVmShared {
             given_entries: self.given_entries.clone(),
             eval_timeout_entries: self.eval_timeout_entries.clone(),
             algebraic_match_entries: self.algebraic_match_entries.clone(),
+            par_lines_entries: self.par_lines_entries.clone(),
+            pwatch_entries: self.pwatch_entries.clone(),
             lvalues: self.lvalues.clone(),
             runtime_sub_decls: Arc::clone(&self.runtime_sub_decls),
             ip: 0,
@@ -161,6 +167,8 @@ pub struct VM<'a> {
     given_entries: Vec<(Expr, Block)>,
     eval_timeout_entries: Vec<(Expr, Block)>,
     algebraic_match_entries: Vec<(Expr, Vec<MatchArm>)>,
+    par_lines_entries: Vec<(Expr, Expr, Option<Expr>)>,
+    pwatch_entries: Vec<(Expr, Expr)>,
     lvalues: Vec<Expr>,
     runtime_sub_decls: Arc<Vec<RuntimeSubDecl>>,
     ip: usize,
@@ -218,6 +226,8 @@ impl<'a> VM<'a> {
             given_entries: chunk.given_entries.clone(),
             eval_timeout_entries: chunk.eval_timeout_entries.clone(),
             algebraic_match_entries: chunk.algebraic_match_entries.clone(),
+            par_lines_entries: chunk.par_lines_entries.clone(),
+            pwatch_entries: chunk.pwatch_entries.clone(),
             lvalues: chunk.lvalues.clone(),
             runtime_sub_decls: Arc::new(chunk.runtime_sub_decls.clone()),
             ip: 0,
@@ -3218,6 +3228,29 @@ impl<'a> VM<'a> {
                         let (subject, arms) = &self.algebraic_match_entries[*idx as usize];
                         let v = vm_interp_result(
                             self.interp.eval_algebraic_match(subject, arms, self.line()),
+                            self.line(),
+                        )?;
+                        self.push(v);
+                        Ok(())
+                    }
+                    Op::ParLines(idx) => {
+                        let (path, callback, progress) = &self.par_lines_entries[*idx as usize];
+                        let v = vm_interp_result(
+                            self.interp.eval_par_lines_expr(
+                                path,
+                                callback,
+                                progress.as_ref(),
+                                self.line(),
+                            ),
+                            self.line(),
+                        )?;
+                        self.push(v);
+                        Ok(())
+                    }
+                    Op::Pwatch(idx) => {
+                        let (path, callback) = &self.pwatch_entries[*idx as usize];
+                        let v = vm_interp_result(
+                            self.interp.eval_pwatch_expr(path, callback, self.line()),
                             self.line(),
                         )?;
                         self.push(v);
