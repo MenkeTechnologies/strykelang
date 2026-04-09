@@ -507,7 +507,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - Arrow dereference: `->`
 
 #### REGEX ENGINE
-- **Two-step compile:** patterns are compiled with the Rust [`regex`](https://docs.rs/regex) crate first (linear-time where possible). If that rejects the pattern (e.g. **backreferences** like `(.)\\1`), compilation falls back to [`fancy-regex`](https://docs.rs/fancy-regex) so a larger class of Perl-like patterns runs without delegating to an external Perl binary.
+- **Three-tier compile:** patterns are compiled with the Rust [`regex`](https://docs.rs/regex) crate first (linear-time where possible). If that rejects the pattern (e.g. **backreferences** like `(.)\\1`), compilation falls back to [`fancy-regex`](https://docs.rs/fancy-regex). If both reject the pattern (e.g. PCRE-only verbs like `(*SKIP)`), compilation falls back to **PCRE2** via the [`pcre2`](https://docs.rs/pcre2) crate (`src/perl_regex.rs`).
 - Match: `$str =~ /pattern/flags`
 - Dynamic pattern (string): `$str =~ $pattern` and `$str !~ $pattern` (bytecode `RegexMatchDyn`; empty flags)
 - Substitution: `$str =~ s/pattern/replacement/flags`
@@ -586,7 +586,8 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - **`glob_par PATTERN… [, progress => EXPR]`** — parallel recursive glob (rayon); same patterns as **`glob`**. Optional **`progress => 1`** — one tick per pattern (not per file).
 - **`frozen my`** — immutable bindings (reassignment rejected in the bytecode path).
 - **`typed my $x : Type`** — optional scalar types (`Int`, `Str`, `Float`) with **runtime** checks on declaration and every assignment; `typed my` runs on the tree-walker (bytecode falls back when the program uses it).
-- **`try` / `given` / `match (…) { … }` / `eval_timeout`** — implemented in the tree interpreter only; the bytecode compiler returns unsupported for these constructs, so execution falls back to `execute_tree` automatically.
+- **`try { } catch ($err) { } [finally { }]`** — bytecode VM (`Op::TryPush` / `CatchReceive` / …) and tree interpreter; `die` and most runtime errors unwind to `catch` (not `exit`, not control-flow exceptions).
+- **`given` / `when` / `match (…) { … }` / `eval_timeout`** — tree interpreter only; the bytecode compiler treats these as unsupported, so execution falls back to `execute_tree` automatically.
 
 #### OTHER FEATURES
 - `Interpreter::execute` returns `Err(ErrorKind::Exit(code))` for `exit` (including code 0); the `perlrs` binary maps that to `process::exit`.

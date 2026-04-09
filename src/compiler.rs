@@ -216,6 +216,9 @@ pub struct Compiler {
     scope_stack: Vec<ScopeLayer>,
     /// Current `package` for stash qualification (`@ISA`, `@EXPORT`, …), matching [`Interpreter::stash_array_name_for_package`].
     current_package: String,
+    /// Set while compiling the main program body when the last statement must leave its value on the
+    /// stack (implicit return). Enables `try`/`catch` blocks to match `emit_block_value` semantics.
+    program_last_stmt_takes_value: bool,
     /// Source path for `__FILE__` in bytecode (must match the interpreter's notion of current file when using the VM).
     pub source_file: String,
 }
@@ -234,6 +237,7 @@ impl Compiler {
             end_blocks: Vec::new(),
             scope_stack: vec![ScopeLayer::default()],
             current_package: String::new(),
+            program_last_stmt_takes_value: false,
             source_file: String::new(),
         }
     }
@@ -600,6 +604,10 @@ impl Compiler {
             })
             .collect();
         let last_idx = main_stmts.len().saturating_sub(1);
+        self.program_last_stmt_takes_value = main_stmts
+            .last()
+            .map(|s| matches!(s.kind, StmtKind::TryCatch { .. }))
+            .unwrap_or(false);
         let mut i = 0;
         while i < main_stmts.len() {
             if i + 5 <= main_stmts.len() {
@@ -741,6 +749,7 @@ impl Compiler {
             }
             i += 1;
         }
+        self.program_last_stmt_takes_value = false;
         self.chunk.emit(Op::Halt, 0);
 
         // Third pass: compile sub bodies after Halt
@@ -1348,7 +1357,11 @@ impl Compiler {
                     line,
                 );
                 self.chunk.emit(Op::PushFrame, line);
-                self.compile_block_inner(try_block)?;
+                if self.program_last_stmt_takes_value {
+                    self.emit_block_value(try_block, line)?;
+                } else {
+                    self.compile_block_inner(try_block)?;
+                }
                 self.chunk.emit(Op::PopFrame, line);
                 self.chunk.emit(Op::TryContinueNormal, line);
 
@@ -1356,7 +1369,11 @@ impl Compiler {
                 self.chunk.patch_try_push_catch(try_push_idx, catch_start);
 
                 self.chunk.emit(Op::CatchReceive(catch_var_idx), line);
-                self.compile_block_inner(catch_block)?;
+                if self.program_last_stmt_takes_value {
+                    self.emit_block_value(catch_block, line)?;
+                } else {
+                    self.compile_block_inner(catch_block)?;
+                }
                 self.chunk.emit(Op::PopFrame, line);
                 self.chunk.emit(Op::TryContinueNormal, line);
 

@@ -21,15 +21,11 @@ use std::sync::Barrier;
 /// Stable reference for empty-stack [`VM::peek`] (not a temporary `&PerlValue::UNDEF`).
 static PEEK_UNDEF: PerlValue = PerlValue::UNDEF;
 
-/// Saved state for `try { } catch (…) { } finally { }` (matches [`crate::bytecode::Op::TryPush`]).
+/// Saved state for `try { } catch (…) { } finally { }`.
+/// Jump targets live in [`Op::TryPush`] and are patched after emission; we only store the op index.
 #[derive(Debug, Clone)]
 pub(crate) struct TryFrame {
-    pub(crate) catch_ip: usize,
-    pub(crate) finally_ip: Option<usize>,
-    pub(crate) after_ip: usize,
-    /// Pool index for `catch ($name)` (mirrors [`crate::bytecode::Op::TryPush`]).
-    #[allow(dead_code)]
-    pub(crate) catch_var_idx: u16,
+    pub(crate) try_push_op_idx: usize,
 }
 
 /// Saved state when entering a function call.
@@ -84,6 +80,10 @@ pub struct VM<'a> {
     try_stack: Vec<TryFrame>,
     /// Error message for the next [`Op::CatchReceive`] (set before jumping to `catch_ip`).
     pub(crate) pending_catch_error: Option<String>,
+    /// [`Op::Return`] / [`Op::ReturnValue`] with no caller frame: exit the main dispatch loop (was `break`).
+    exit_main_dispatch: bool,
+    /// Top-level [`Op::ReturnValue`] with no frame: value for implicit return (was `last = val; break`).
+    exit_main_dispatch_value: Option<PerlValue>,
 }
 
 impl<'a> VM<'a> {
@@ -125,6 +125,8 @@ impl<'a> VM<'a> {
             halt: false,
             try_stack: Vec::new(),
             pending_catch_error: None,
+            exit_main_dispatch: false,
+            exit_main_dispatch_value: None,
         }
     }
 
@@ -1040,11 +1042,14 @@ impl<'a> VM<'a> {
         if matches!(e.kind, ErrorKind::Exit(_)) {
             return Ok(false);
         }
-        let Some(frame) = self.try_stack.last().cloned() else {
+        let Some(frame) = self.try_stack.last() else {
+            return Ok(false);
+        };
+        let Op::TryPush { catch_ip, .. } = &self.ops[frame.try_push_op_idx] else {
             return Ok(false);
         };
         self.pending_catch_error = Some(e.to_string());
-        self.ip = frame.catch_ip;
+        self.ip = *catch_ip;
         Ok(true)
     }
 
@@ -1054,6 +1059,8 @@ impl<'a> VM<'a> {
         op_count: &mut u64,
     ) -> PerlResult<PerlValue> {
         self.halt = false;
+        self.exit_main_dispatch = false;
+        self.exit_main_dispatch_value = None;
         let ops = &self.ops as *const Vec<Op>;
         let ops = unsafe { &*ops };
         let names = &self.names as *const Vec<String>;
@@ -1102,7 +1109,11 @@ impl<'a> VM<'a> {
 
             let op = &ops[self.ip];
             self.ip += 1;
-            let __op_res: PerlResult<()> = match op {
+            // Closure: `?` / `return Err` inside `match op` must not return from
+            // `run_main_dispatch_loop` — they must become `__op_res` so `try_recover_from_exception`
+            // can run before propagating.
+            let __op_res: PerlResult<()> = (|| -> PerlResult<()> {
+                match op {
                 // ── Constants ──
                 Op::LoadInt(n) => { self.push(PerlValue::integer(*n)); Ok(()) },
                 Op::LoadFloat(f) => { self.push(PerlValue::float(*f)); Ok(()) },
@@ -2028,7 +2039,7 @@ impl<'a> VM<'a> {
                             self.ip = frame.return_ip;
                         }
                     } else {
-                        break;
+                        self.exit_main_dispatch = true;
                     }
                     Ok(())
                 }
@@ -2045,8 +2056,8 @@ impl<'a> VM<'a> {
                             self.ip = frame.return_ip;
                         }
                     } else {
-                        last = val;
-                        break;
+                        self.exit_main_dispatch_value = Some(val);
+                        self.exit_main_dispatch = true;
                     }
                     Ok(())
                 }
@@ -2940,30 +2951,33 @@ impl<'a> VM<'a> {
                 }
 
                 // ── try / catch / finally ──
-                Op::TryPush {
-                    catch_ip,
-                    finally_ip,
-                    after_ip,
-                    catch_var_idx,
-                } => {
+                Op::TryPush { .. } => {
                     self.try_stack.push(TryFrame {
-                        catch_ip: *catch_ip,
-                        finally_ip: *finally_ip,
-                        after_ip: *after_ip,
-                        catch_var_idx: *catch_var_idx,
+                        try_push_op_idx: self.ip - 1,
                     });
                     Ok(())
                 },
                 Op::TryContinueNormal => {
-                    let frame = self.try_stack.last().cloned().ok_or_else(|| {
+                    let frame = self.try_stack.last().ok_or_else(|| {
                         PerlError::runtime("TryContinueNormal without active try", self.line())
                     })?;
-                    if let Some(fin_ip) = frame.finally_ip {
+                    let Op::TryPush {
+                        finally_ip,
+                        after_ip,
+                        ..
+                    } = &self.ops[frame.try_push_op_idx]
+                    else {
+                        return Err(PerlError::runtime(
+                            "TryContinueNormal: corrupt try frame",
+                            self.line(),
+                        ));
+                    };
+                    if let Some(fin_ip) = *finally_ip {
                         self.ip = fin_ip;
                         Ok(())
                     } else {
                         self.try_stack.pop();
-                        self.ip = frame.after_ip;
+                        self.ip = *after_ip;
                         Ok(())
                     }
                 },
@@ -2971,7 +2985,13 @@ impl<'a> VM<'a> {
                     let frame = self.try_stack.pop().ok_or_else(|| {
                         PerlError::runtime("TryFinallyEnd without active try", self.line())
                     })?;
-                    self.ip = frame.after_ip;
+                    let Op::TryPush { after_ip, .. } = &self.ops[frame.try_push_op_idx] else {
+                        return Err(PerlError::runtime(
+                            "TryFinallyEnd: corrupt try frame",
+                            self.line(),
+                        ));
+                    };
+                    self.ip = *after_ip;
                     Ok(())
                 },
                 Op::CatchReceive(idx) => {
@@ -2993,12 +3013,19 @@ impl<'a> VM<'a> {
                     self.halt = true;
                     Ok(())
                 },
-            };
+            }
+            })();
             if let Err(e) = __op_res {
                 if self.try_recover_from_exception(&e)? {
                     continue;
                 }
                 return Err(e);
+            }
+            if self.exit_main_dispatch {
+                if let Some(v) = self.exit_main_dispatch_value.take() {
+                    last = v;
+                }
+                break;
             }
             if self.halt {
                 break;
@@ -4333,5 +4360,43 @@ mod tests {
         c.emit(Op::Spaceship, 1);
         c.emit(Op::Halt, 1);
         assert_eq!(run_chunk(&c).expect("vm").to_int(), -1);
+    }
+
+    #[test]
+    fn compiled_try_catch_catches_die_via_vm() {
+        let program = crate::parse(
+            r#"
+        try {
+            die "boom";
+        } catch ($err) {
+            42;
+        }
+    "#,
+        )
+        .expect("parse");
+        let chunk = crate::compiler::Compiler::new()
+            .compile_program(&program)
+            .expect("compile");
+        let tp = chunk
+            .ops
+            .iter()
+            .position(|o| matches!(o, Op::TryPush { .. }))
+            .expect("TryPush op");
+        match &chunk.ops[tp] {
+            Op::TryPush {
+                catch_ip,
+                after_ip,
+                ..
+            } => {
+                assert_ne!(*catch_ip, 0, "catch_ip must be patched");
+                assert_ne!(*after_ip, 0, "after_ip must be patched");
+            }
+            _ => unreachable!(),
+        }
+        let mut interp = Interpreter::new();
+        let mut vm = VM::new(&chunk, &mut interp);
+        vm.set_jit_enabled(false);
+        let v = vm.execute().expect("vm should catch die");
+        assert_eq!(v.to_int(), 42);
     }
 }
