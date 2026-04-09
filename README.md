@@ -117,6 +117,9 @@ my @evens = pgrep { $_ % 2 == 0 } @data;
 # parallel foreach — execute side effects concurrently
 pfor { process($_) } @items;
 
+# fan — run a block N times in parallel (`$_` is 0..N-1)
+fan 8 { work($_) }
+
 # parallel sort — sort using all cores
 my @sorted = psort { $a <=> $b } @data;
 
@@ -264,7 +267,7 @@ All standard Perl 5 CLI flags are supported:
  │      ▼                                              │
  │  Interpreter (src/interpreter.rs)                   │
  │      ├── Sequential: map, grep, sort, foreach       │
- │      └── Parallel:   pmap, pgrep, psort, pfor       │
+ │      └── Parallel:   pmap, pgrep, psort, pfor, fan │
  │              │                                      │
  │              ▼                                      │
  │          RAYON WORK-STEALING SCHEDULER              │
