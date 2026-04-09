@@ -1055,4 +1055,13 @@ mod tests {
         assert!(matches!(t[0].0, Token::Ident(ref s) if s == "my"));
         assert!(matches!(t[1].0, Token::Semicolon));
     }
+
+    #[test]
+    fn tokenize_skips_hash_line_comment() {
+        let mut l = Lexer::new("1#comment\n2");
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[0].0, Token::Integer(1)));
+        assert!(matches!(t[1].0, Token::Integer(2)));
+        assert!(matches!(t[2].0, Token::Eof));
+    }
 }

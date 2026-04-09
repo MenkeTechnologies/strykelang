@@ -397,4 +397,34 @@ mod tests {
         t.restore_capture(&cap);
         assert_eq!(t.get_scalar("n").to_int(), 42);
     }
+
+    #[test]
+    fn hash_get_set_delete_exists() {
+        let mut s = Scope::new();
+        let mut m = IndexMap::new();
+        m.insert("k".to_string(), PerlValue::Integer(1));
+        s.declare_hash("h", m);
+        assert_eq!(s.get_hash_element("h", "k").to_int(), 1);
+        assert!(s.exists_hash_element("h", "k"));
+        s.set_hash_element("h", "k", PerlValue::Integer(99));
+        assert_eq!(s.get_hash_element("h", "k").to_int(), 99);
+        let del = s.delete_hash_element("h", "k");
+        assert_eq!(del.to_int(), 99);
+        assert!(!s.exists_hash_element("h", "k"));
+    }
+
+    #[test]
+    fn inner_frame_shadows_outer_hash_name() {
+        let mut s = Scope::new();
+        let mut outer = IndexMap::new();
+        outer.insert("k".to_string(), PerlValue::Integer(1));
+        s.declare_hash("h", outer);
+        s.push_frame();
+        let mut inner = IndexMap::new();
+        inner.insert("k".to_string(), PerlValue::Integer(2));
+        s.declare_hash("h", inner);
+        assert_eq!(s.get_hash_element("h", "k").to_int(), 2);
+        s.pop_frame();
+        assert_eq!(s.get_hash_element("h", "k").to_int(), 1);
+    }
 }

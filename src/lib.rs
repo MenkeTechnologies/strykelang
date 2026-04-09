@@ -67,4 +67,19 @@ mod tests {
     fn parse_fails_on_invalid_syntax() {
         assert!(parse("sub f {").is_err());
     }
+
+    #[test]
+    fn parse_qw_word_list() {
+        parse("my @a = qw(x y z);").expect("qw list");
+    }
+
+    #[test]
+    fn parse_c_style_for_loop() {
+        parse("for (my $i = 0; $i < 3; $i = $i + 1) { 1; }").expect("c-style for");
+    }
+
+    #[test]
+    fn parse_package_statement() {
+        parse("package Foo::Bar; 1;").expect("package");
+    }
 }

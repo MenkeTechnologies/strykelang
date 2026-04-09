@@ -213,7 +213,12 @@ impl Interpreter {
     /// Check if a block declares variables (needs its own scope frame).
     #[inline]
     fn block_needs_scope(block: &Block) -> bool {
-        block.iter().any(|s| matches!(s.kind, StmtKind::My(_) | StmtKind::Our(_) | StmtKind::Local(_)))
+        block.iter().any(|s| {
+            matches!(
+                s.kind,
+                StmtKind::My(_) | StmtKind::Our(_) | StmtKind::Local(_)
+            )
+        })
     }
 
     /// Execute block, only pushing a scope frame if needed.
@@ -1930,8 +1935,9 @@ impl Interpreter {
                 _ => PerlValue::Float(lv.to_number().powf(rv.to_number())),
             },
             BinOp::Concat => {
+                // Optimized: avoid allocating rv.to_string() by appending directly
                 let mut s = lv.to_string();
-                s.push_str(&rv.to_string());
+                rv.append_to(&mut s);
                 PerlValue::String(s)
             }
             BinOp::NumEq => match (lv, rv) {
@@ -2150,14 +2156,14 @@ impl Interpreter {
     }
 
     fn call_sub(&mut self, sub: &PerlSub, args: Vec<PerlValue>, _line: usize) -> ExecResult {
+        // Single frame for both @_ and the block's local variables —
+        // avoids the double push_frame/pop_frame overhead per call.
         self.scope.push_frame();
-        // Set @_
         self.scope.declare_array("_", args);
-        // Restore closure environment
         if let Some(ref env) = sub.closure_env {
             self.scope.restore_capture(env);
         }
-        let result = self.exec_block(&sub.body);
+        let result = self.exec_block_no_scope(&sub.body);
         self.scope.pop_frame();
         match result {
             Ok(v) => Ok(v),

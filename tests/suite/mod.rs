@@ -3,6 +3,7 @@
 mod builtins;
 mod closures;
 mod collections;
+mod comments;
 mod control_advanced;
 mod control_flow;
 mod data_structures;
