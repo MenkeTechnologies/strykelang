@@ -80,9 +80,23 @@ jobs:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc --no-deps --locked
 
+  parity:
+    name: Parity vs system perl
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked
+      - name: Compare pe output to perl on parity/cases
+        run: bash parity/run_parity.sh
+        env:
+          PE: ${{ github.workspace }}/target/release/pe
+
   release-build:
     name: Release Build
-    needs: [check, test, fmt, clippy, doc]
+    needs: [check, test, fmt, clippy, doc, parity]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:

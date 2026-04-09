@@ -618,6 +618,8 @@ cargo test --test integration
 
 Extended parse-only smoke coverage is in `src/parse_smoke_extended.rs` and `src/parse_smoke_batch2.rs` (built only with `cfg(test)`).
 
+**Perl 5 parity (incremental)** — [`PARITY_ROADMAP.md`](PARITY_ROADMAP.md) orders the work in testable phases. **`bash parity/run_parity.sh`** compares `perl` and `pe` on `parity/cases/*.pl` (exact `stdout`+`stderr` under `LC_ALL=C`); CI runs this on Ubuntu after a release build of `pe`.
+
 CI uses `cargo … --locked`; **`Cargo.lock` is committed** so dependency resolution matches CI and release builds. If you use a global gitignore that ignores `Cargo.lock`, force-add updates when dependencies change: `git add -f Cargo.lock`.
 
 ---
