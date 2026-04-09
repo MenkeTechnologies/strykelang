@@ -511,6 +511,56 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
+    fn run_fan_cap_block(
+        &mut self,
+        block_idx: u16,
+        n: usize,
+        line: usize,
+        progress: bool,
+    ) -> PerlResult<()> {
+        let block = self.blocks[block_idx as usize].clone();
+        let subs = self.interp.subs.clone();
+        let scope_capture = self.interp.scope.capture();
+        let pmap_progress = PmapProgress::new(progress, n);
+        let pairs: Vec<(usize, Result<PerlValue, FlowOrError>)> = (0..n)
+            .into_par_iter()
+            .map(|i| {
+                let mut local_interp = Interpreter::new();
+                local_interp.subs = subs.clone();
+                local_interp.scope.restore_capture(&scope_capture);
+                let _ = local_interp
+                    .scope
+                    .set_scalar("_", PerlValue::integer(i as i64));
+                crate::parallel_trace::fan_worker_set_index(Some(i as i64));
+                let res = local_interp.exec_block_no_scope(&block);
+                crate::parallel_trace::fan_worker_set_index(None);
+                pmap_progress.tick();
+                (i, res)
+            })
+            .collect();
+        pmap_progress.finish();
+        let mut pairs = pairs;
+        pairs.sort_by_key(|(i, _)| *i);
+        let mut out = Vec::with_capacity(n);
+        for (_, r) in pairs {
+            match r {
+                Ok(v) => out.push(v),
+                Err(e) => {
+                    let pe = match e {
+                        FlowOrError::Error(pe) => pe,
+                        FlowOrError::Flow(_) => PerlError::runtime(
+                            "return/last/next/redo not supported inside fan_cap block",
+                            line,
+                        ),
+                    };
+                    return Err(pe);
+                }
+            }
+        }
+        self.push(PerlValue::array(out));
+        Ok(())
+    }
+
     fn require_scalar_mutable(&self, name: &str) -> PerlResult<()> {
         if self.interp.scope.is_scalar_frozen(name) {
             return Err(PerlError::syntax(
@@ -2332,6 +2382,18 @@ impl<'a> VM<'a> {
                     let progress_flag = self.pop().is_true();
                     self.run_fan_block(*block_idx, n, line, progress_flag)?;
                 }
+                Op::FanCapWithBlock(block_idx) => {
+                    let line = self.line();
+                    let n = self.pop().to_int().max(0) as usize;
+                    let progress_flag = self.pop().is_true();
+                    self.run_fan_cap_block(*block_idx, n, line, progress_flag)?;
+                }
+                Op::FanCapWithBlockAuto(block_idx) => {
+                    let line = self.line();
+                    let n = self.interp.parallel_thread_count();
+                    let progress_flag = self.pop().is_true();
+                    self.run_fan_cap_block(*block_idx, n, line, progress_flag)?;
+                }
 
                 Op::AsyncBlock(block_idx) => {
                     let block = self.blocks[*block_idx as usize].clone();
@@ -2929,6 +2991,16 @@ impl<'a> VM<'a> {
             Some(BuiltinId::GlobPar) => {
                 let pats: Vec<String> = args.iter().map(|v| v.to_string()).collect();
                 Ok(crate::perl_fs::glob_par_patterns(&pats))
+            }
+            Some(BuiltinId::GlobParProgress) => {
+                let progress = args.last().map(|v| v.is_true()).unwrap_or(false);
+                let pats: Vec<String> = args[..args.len().saturating_sub(1)]
+                    .iter()
+                    .map(|v| v.to_string())
+                    .collect();
+                Ok(crate::perl_fs::glob_par_patterns_with_progress(
+                    &pats, progress,
+                ))
             }
             Some(BuiltinId::Opendir) => {
                 let handle = args.first().map(|v| v.to_string()).unwrap_or_default();

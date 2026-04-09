@@ -654,9 +654,10 @@ def main() -> None:
         "PReduceExpr": 'format!("preduce {{\\n{}\\n}} {}", format_block(block), format_expr(list))',
         "PReduceInitExpr": 'format!("preduce_init {}, {{\\n{}\\n}} {}", format_expr(init), format_block(block), format_expr(list))',
         "FanExpr": """{
+            let kw = if *capture { "fan_cap" } else { "fan" };
             let base = match count {
-                Some(c) => format!("fan {} {{\\n{}\\n}}", format_expr(c), format_block(block)),
-                None => format!("fan {{\\n{}\\n}}", format_block(block)),
+                Some(c) => format!("{} {} {{\\n{}\\n}}", kw, format_expr(c), format_block(block)),
+                None => format!("{} {{\\n{}\\n}}", kw, format_block(block)),
             };
             match progress {
                 Some(p) => format!("{}, progress => {}", base, format_expr(p)),
@@ -717,7 +718,10 @@ def main() -> None:
         "Link": 'format!("link({}, {})", format_expr(old), format_expr(new))',
         "Symlink": 'format!("symlink({}, {})", format_expr(old), format_expr(new))',
         "Glob": 'format!("glob({})", format_expr_list(args))',
-        "GlobPar": 'format!("glob_par({})", format_expr_list(args))',
+        "GlobPar": """match progress {
+                Some(p) => format!("glob_par({}), progress => {}", format_expr_list(args), format_expr(p)),
+                None => format!("glob_par({})", format_expr_list(args)),
+            }""",
         "Bless": """match class {
                 Some(c) => format!("bless({}, {})", format_expr(ref_expr), format_expr(c)),
                 None => format!("bless({})", format_expr(ref_expr)),

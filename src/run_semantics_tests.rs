@@ -403,6 +403,24 @@ fn fan_progress_optional_parses_and_runs() {
 }
 
 #[test]
+fn glob_par_progress_optional_runs() {
+    let n = ri(r#"scalar glob_par "src/*.rs", progress => 0;"#);
+    assert!(
+        n >= 1,
+        "glob_par src/*.rs should match at least one file, got {n}"
+    );
+}
+
+#[test]
+fn fan_cap_returns_list_in_index_order() {
+    let s = r#"
+        my $s = join ",", fan_cap 4 { $_ * 2 };
+        $s eq "0,2,4,6" ? 1 : 0;
+    "#;
+    assert_eq!(ri(s), 1);
+}
+
+#[test]
 fn pselect_multiplex_recv() {
     let s = r#"
         my ($tx1, $rx1) = pchannel();

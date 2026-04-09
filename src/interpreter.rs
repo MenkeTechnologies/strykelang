@@ -4415,6 +4415,7 @@ impl Interpreter {
                 count,
                 block,
                 progress,
+                capture,
             } => {
                 let show_progress = progress
                     .as_ref()
@@ -4432,6 +4433,41 @@ impl Interpreter {
                     self.scope.capture_with_atomics();
 
                 let pmap_progress = PmapProgress::new(show_progress, n);
+                if *capture {
+                    if n == 0 {
+                        return Ok(PerlValue::array(Vec::new()));
+                    }
+                    let pairs: Vec<(usize, ExecResult)> = (0..n)
+                        .into_par_iter()
+                        .map(|i| {
+                            let mut local_interp = Interpreter::new();
+                            local_interp.subs = subs.clone();
+                            local_interp.scope.restore_capture(&scope_capture);
+                            local_interp
+                                .scope
+                                .restore_atomics(&atomic_arrays, &atomic_hashes);
+                            let _ = local_interp
+                                .scope
+                                .set_scalar("_", PerlValue::integer(i as i64));
+                            crate::parallel_trace::fan_worker_set_index(Some(i as i64));
+                            let res = local_interp.exec_block(&block);
+                            crate::parallel_trace::fan_worker_set_index(None);
+                            pmap_progress.tick();
+                            (i, res)
+                        })
+                        .collect();
+                    pmap_progress.finish();
+                    let mut pairs = pairs;
+                    pairs.sort_by_key(|(i, _)| *i);
+                    let mut out = Vec::with_capacity(n);
+                    for (_, r) in pairs {
+                        match r {
+                            Ok(v) => out.push(v),
+                            Err(e) => return Err(e),
+                        }
+                    }
+                    return Ok(PerlValue::array(out));
+                }
                 let first_err: Arc<Mutex<Option<PerlError>>> = Arc::new(Mutex::new(None));
                 (0..n).into_par_iter().for_each(|i| {
                     if first_err.lock().is_some() {
@@ -5596,12 +5632,22 @@ impl Interpreter {
                 }
                 Ok(crate::perl_fs::glob_patterns(&pats))
             }
-            ExprKind::GlobPar(args) => {
+            ExprKind::GlobPar { args, progress } => {
                 let mut pats = Vec::new();
                 for a in args {
                     pats.push(self.eval_expr(a)?.to_string());
                 }
-                Ok(crate::perl_fs::glob_par_patterns(&pats))
+                let show_progress = progress
+                    .as_ref()
+                    .map(|p| self.eval_expr(p))
+                    .transpose()?
+                    .map(|v| v.is_true())
+                    .unwrap_or(false);
+                if show_progress {
+                    Ok(crate::perl_fs::glob_par_patterns_with_progress(&pats, true))
+                } else {
+                    Ok(crate::perl_fs::glob_par_patterns(&pats))
+                }
             }
             ExprKind::Bless { ref_expr, class } => {
                 let val = self.eval_expr(ref_expr)?;

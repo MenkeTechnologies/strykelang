@@ -318,6 +318,7 @@ pub const KEYWORDS: &[&str] = &[
     "watch",
     "tie",
     "fan",
+    "fan_cap",
     "pchannel",
     "pselect",
     "async",

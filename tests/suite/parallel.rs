@@ -176,6 +176,16 @@ fn fan_zero_iterations_skips_block() {
 }
 
 #[test]
+fn fan_cap_collects_return_values_in_index_order() {
+    assert_eq!(eval_string(r#"join ",", fan_cap 4 { $_ * 2 }"#), "0,2,4,6");
+}
+
+#[test]
+fn fan_cap_zero_iterations_yields_empty_list() {
+    assert_eq!(eval_int(r#"my @a = fan_cap 0 { die "no" }; scalar @a"#), 0);
+}
+
+#[test]
 fn pfor_empty_list_skips_block() {
     assert_eq!(eval_int(r#"pfor { die "should not run" } (); 1"#), 1);
 }

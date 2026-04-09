@@ -582,12 +582,14 @@ pub enum ExprKind {
         timeout: Option<Box<Expr>>,
     },
     /// `fan [COUNT] { BLOCK }` — execute BLOCK COUNT times in parallel (default COUNT = rayon pool size).
+    /// `fan_cap [COUNT] { BLOCK }` — same, but return value is a **list** of each block's return value (index order).
     /// `$_` is set to the iteration index (0..COUNT-1).
     /// Optional `, progress => EXPR` — stderr progress bar (like `pmap`).
     FanExpr {
         count: Option<Box<Expr>>,
         block: Block,
         progress: Option<Box<Expr>>,
+        capture: bool,
     },
 
     /// `async { BLOCK }` — run BLOCK on a worker thread; returns a task handle.
@@ -774,7 +776,11 @@ pub enum ExprKind {
     Readlink(Box<Expr>),
     Glob(Vec<Expr>),
     /// Parallel recursive glob (rayon); same patterns as `glob`, different walk strategy.
-    GlobPar(Vec<Expr>),
+    /// Optional `, progress => EXPR` — stderr progress bar (one tick per pattern).
+    GlobPar {
+        args: Vec<Expr>,
+        progress: Option<Box<Expr>>,
+    },
 
     // Bless
     Bless {

@@ -96,6 +96,18 @@ fn accepts_fan_progress() {
 }
 
 #[test]
+fn accepts_fan_cap_block() {
+    p("fan_cap 4 { my $i = $_; };");
+    p("fan_cap { $_ };");
+    p("fan_cap 2 { 1 }, progress => 0;");
+}
+
+#[test]
+fn accepts_glob_par_progress() {
+    p(r#"glob_par "src/*.rs", progress => 0;"#);
+}
+
+#[test]
 fn accepts_fan_zero() {
     p("fan 0 { 1 };");
 }
@@ -138,6 +150,13 @@ fn accepts_pipeline_chain() {
 #[test]
 fn accepts_pipeline_qualified_method() {
     p("my @r = pipeline(1)->P::triple->collect();");
+}
+
+#[test]
+fn accepts_preduce_preduce_init_pmap_reduce_progress() {
+    p("my $a = preduce { $a + $b } (1, 2, 3), progress => 1;");
+    p("my $b = preduce_init 0, { $a + $b } (1, 2), progress => 0;");
+    p("my $c = pmap_reduce { $_ * 2 } { $a + $b } (1, 2, 3), progress => 1;");
 }
 
 #[test]

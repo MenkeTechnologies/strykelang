@@ -552,6 +552,7 @@ impl Parser {
                 | "exit"
                 | "exp"
                 | "fan"
+                | "fan_cap"
                 | "fc"
                 | "fetch_url"
                 | "glob_par"
@@ -3567,6 +3568,43 @@ impl Parser {
                         count,
                         block,
                         progress,
+                        capture: false,
+                    },
+                    line,
+                })
+            }
+            "fan_cap" => {
+                let count = if matches!(self.peek(), Token::LBrace) {
+                    None
+                } else {
+                    Some(Box::new(self.parse_postfix()?))
+                };
+                let block = self.parse_block()?;
+                let progress = if self.eat(&Token::Comma) {
+                    match self.peek() {
+                        Token::Ident(ref kw)
+                            if kw == "progress" && matches!(self.peek_at(1), Token::FatArrow) =>
+                        {
+                            self.advance();
+                            self.expect(&Token::FatArrow)?;
+                            Some(Box::new(self.parse_assign_expr()?))
+                        }
+                        _ => {
+                            return Err(PerlError::syntax(
+                                "fan_cap: expected `progress => EXPR` after comma",
+                                line,
+                            ));
+                        }
+                    }
+                } else {
+                    None
+                };
+                Ok(Expr {
+                    kind: ExprKind::FanExpr {
+                        count,
+                        block,
+                        progress,
+                        capture: true,
                     },
                     line,
                 })
@@ -4081,8 +4119,27 @@ impl Parser {
             }
             "glob_par" => {
                 let args = self.parse_builtin_args()?;
+                let progress = if self.eat(&Token::Comma) {
+                    match self.peek().clone() {
+                        Token::Ident(ref kw)
+                            if kw == "progress" && matches!(self.peek_at(1), Token::FatArrow) =>
+                        {
+                            self.advance();
+                            self.expect(&Token::FatArrow)?;
+                            Some(Box::new(self.parse_assign_expr()?))
+                        }
+                        _ => {
+                            return Err(PerlError::syntax(
+                                "glob_par: expected `progress => EXPR` after comma",
+                                line,
+                            ));
+                        }
+                    }
+                } else {
+                    None
+                };
                 Ok(Expr {
-                    kind: ExprKind::GlobPar(args),
+                    kind: ExprKind::GlobPar { args, progress },
                     line,
                 })
             }

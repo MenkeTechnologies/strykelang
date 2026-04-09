@@ -221,6 +221,10 @@ pub enum Op {
     FanWithBlock(u16),
     /// fan { BLOCK } — block_idx; stack: \[progress_flag\]; COUNT = rayon pool size (`pe -j`)
     FanWithBlockAuto(u16),
+    /// fan_cap N { BLOCK } — like fan; stack: \[progress_flag, count\] → array of block return values
+    FanCapWithBlock(u16),
+    /// fan_cap { BLOCK } — like fan; stack: \[progress_flag\] → array
+    FanCapWithBlockAuto(u16),
     /// eval { BLOCK } — block_idx; stack: \[\] → result
     EvalBlock(u16),
     /// `async { BLOCK }` — block_idx; stack: \[\] → AsyncTask
@@ -392,11 +396,13 @@ pub enum BuiltinId {
     BarrierNew,
     /// `par_pipeline(...)` — list form: same as `pipeline` but parallel `filter`/`map` on `collect()`.
     ParPipeline,
+    /// `glob_par(..., progress => EXPR)` — last stack arg is truthy progress flag.
+    GlobParProgress,
 }
 
 impl BuiltinId {
     pub fn from_u16(v: u16) -> Option<Self> {
-        if v <= Self::ParPipeline as u16 {
+        if v <= Self::GlobParProgress as u16 {
             Some(unsafe { std::mem::transmute::<u16, BuiltinId>(v) })
         } else {
             None
@@ -673,11 +679,18 @@ mod tests {
             BuiltinId::from_u16(BuiltinId::ParPipeline as u16),
             Some(BuiltinId::ParPipeline)
         );
+        assert_eq!(
+            BuiltinId::from_u16(BuiltinId::GlobParProgress as u16),
+            Some(BuiltinId::GlobParProgress)
+        );
     }
 
     #[test]
     fn builtin_id_from_u16_out_of_range() {
-        assert_eq!(BuiltinId::from_u16(BuiltinId::ParPipeline as u16 + 1), None);
+        assert_eq!(
+            BuiltinId::from_u16(BuiltinId::GlobParProgress as u16 + 1),
+            None
+        );
         assert_eq!(BuiltinId::from_u16(u16::MAX), None);
     }
 

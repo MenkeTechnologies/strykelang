@@ -285,13 +285,19 @@ fn print_cyberpunk_help() {
         "  reduce {{BLOCK}} @list   {G}//{N} Sequential left fold ($a accum, $b next element)"
     );
     println!(
-        "  preduce {{BLOCK}} @list  {G}//{N} Parallel tree fold (rayon; associative ops only)"
+        "  preduce {{BLOCK}} @list [, progress => EXPR] {G}//{N} Parallel tree fold (rayon; associative ops only); optional stderr progress bar"
     );
     println!(
-        "  preduce_init EXPR, {{BLOCK}} @list  {G}//{N} Parallel fold with identity; hash accumulators merge by key"
+        "  preduce_init EXPR, {{BLOCK}} @list [, progress => EXPR] {G}//{N} Parallel fold with identity; hash accumulators merge by key"
+    );
+    println!(
+        "  pmap_reduce {{MAP}} {{REDUCE}} @list [, progress => EXPR] {G}//{N} Fused parallel map + tree reduce; optional stderr progress bar"
     );
     println!(
         "  fan [N] {{BLOCK}} [, progress => EXPR]  {G}//{N} Execute BLOCK N times (default N = rayon pool; $_ = index)"
+    );
+    println!(
+        "  fan_cap [N] {{BLOCK}} [, progress => EXPR]  {G}//{N} Like fan; returns list of block return values (index order)"
     );
     println!("{C}  ── TYPING (perlrs) ───────────────────────────────────{N}");
     println!(

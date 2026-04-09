@@ -788,10 +788,12 @@ pub fn format_expr(e: &Expr) -> String {
             count,
             block,
             progress,
+            capture,
         } => {
+            let kw = if *capture { "fan_cap" } else { "fan" };
             let base = match count {
-                Some(c) => format!("fan {} {{\n{}\n}}", format_expr(c), format_block(block)),
-                None => format!("fan {{\n{}\n}}", format_block(block)),
+                Some(c) => format!("{} {} {{\n{}\n}}", kw, format_expr(c), format_block(block)),
+                None => format!("{} {{\n{}\n}}", kw, format_block(block)),
             };
             match progress {
                 Some(p) => format!("{}, progress => {}", base, format_expr(p)),
@@ -922,7 +924,13 @@ pub fn format_expr(e: &Expr) -> String {
         }
         ExprKind::Readlink(e) => format!("readlink {}", format_expr(e)),
         ExprKind::Glob(_) => "/* ExprKind::Glob */".to_string(),
-        ExprKind::GlobPar(_) => "/* ExprKind::GlobPar */".to_string(),
+        ExprKind::GlobPar { args, progress } => {
+            let base = format!("glob_par({})", format_expr_list(args));
+            match progress {
+                Some(p) => format!("{}, progress => {}", base, format_expr(p)),
+                None => base,
+            }
+        }
         ExprKind::Bless { ref_expr, class } => match class {
             Some(c) => format!("bless({}, {})", format_expr(ref_expr), format_expr(c)),
             None => format!("bless({})", format_expr(ref_expr)),

@@ -1,5 +1,5 @@
 //! Progress reporting on stderr for parallel **`p*`** builtins when `progress => EXPR` is truthy
-//! (`pmap`, `pgrep`, `pfor`, `preduce`, `pmap_chunked`, `psort`, `pcache`, `par_lines`, …).
+//! (`pmap`, `pgrep`, `pfor`, `preduce`, `pmap_chunked`, `psort`, `pcache`, `par_lines`, `glob_par`, …).
 
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};

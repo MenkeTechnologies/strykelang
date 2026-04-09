@@ -4,6 +4,7 @@ use glob::{MatchOptions, Pattern};
 use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 
+use crate::pmap_progress::PmapProgress;
 use crate::value::PerlValue;
 
 /// Perl `-t` — true if the handle/path refers to a terminal ([`libc::isatty`] on Unix).
@@ -179,18 +180,40 @@ fn glob_par_walk(dir: &Path, pattern: &Pattern, options: &MatchOptions) -> Vec<S
 /// Parallel recursive glob: same pattern semantics as [`glob_patterns`], but walks the
 /// filesystem with rayon per directory (and parallelizes across patterns).
 pub fn glob_par_patterns(patterns: &[String]) -> PerlValue {
+    glob_par_patterns_inner(patterns, None)
+}
+
+/// Same as [`glob_par_patterns`], with a stderr progress bar (one tick per pattern) when
+/// `progress` is true.
+pub fn glob_par_patterns_with_progress(patterns: &[String], progress: bool) -> PerlValue {
+    if patterns.is_empty() {
+        return PerlValue::array(Vec::new());
+    }
+    let pmap = PmapProgress::new(progress, patterns.len());
+    let v = glob_par_patterns_inner(patterns, Some(&pmap));
+    pmap.finish();
+    v
+}
+
+fn glob_par_patterns_inner(patterns: &[String], progress: Option<&PmapProgress>) -> PerlValue {
     let options = MatchOptions::new();
     let out: Vec<String> = patterns
         .par_iter()
         .flat_map_iter(|pat| {
-            let Ok(pattern) = Pattern::new(pat) else {
-                return Vec::new();
-            };
-            let base = glob_base_path(pat);
-            if !base.exists() {
-                return Vec::new();
+            let rows = (|| {
+                let Ok(pattern) = Pattern::new(pat) else {
+                    return Vec::new();
+                };
+                let base = glob_base_path(pat);
+                if !base.exists() {
+                    return Vec::new();
+                }
+                glob_par_walk(&base, &pattern, &options)
+            })();
+            if let Some(p) = progress {
+                p.tick();
             }
-            glob_par_walk(&base, &pattern, &options)
+            rows
         })
         .collect();
     let mut paths: Vec<String> = out.into_iter().map(normalize_glob_path_display).collect();

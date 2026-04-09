@@ -196,6 +196,10 @@ pfor { process } @items, progress => 1;
 fan 8 { work }
 fan { work }, progress => 1;
 
+# fan_cap — same as fan, but return value is a list of each block's return value (index order)
+my @capture = fan_cap { work };
+my @squares = fan_cap 4 { $_ * $_ };
+
 # fan — omit N to use the rayon thread pool size (`pe -j`; `$_` is 0..N-1)
 fan { work }
 
@@ -534,6 +538,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - **`dataframe(PATH)`** — same CSV load as `csv_read`, but stored columnar; methods `->filter`, `->group_by`, `->sum`, `->nrow` / `->ncol` (see **DataFrame** under native CSV above).
 - **`sqlite(PATH)`** — embedded SQLite via `rusqlite` (bundled libsqlite). Handle methods: `->exec(SQL, ?bind…)`, `->query(SQL, ?bind…)` (array of hashrefs), `->last_insert_rowid`.
 - **`fan [N] { BLOCK } [, progress => EXPR]`** — run **`BLOCK`** **`N`** times in parallel (omit **`N`** to use the rayon pool size, `pe -j`); **`$_`** is **`0..N-1`**. Optional **`progress => 1`** (or any true expression) shows the same stderr progress bar as **`pmap`** (one tick per completed worker).
+- **`fan_cap [N] { BLOCK } [, progress => EXPR]`** — same as **`fan`**, but the expression returns a **list** of each iteration’s block return value, in **`$_`** order (**`0..N-1`**).
 - **`par_lines PATH, sub { ... } [, progress => EXPR]`** — memory-map the file, split into line-aligned byte chunks, process chunks in parallel with rayon; each line sets `$_` for the coderef (CRLF-safe; tree-walker only; use `mysync` for shared counters across workers). Optional stderr progress bar like **`pmap`**.
 - **`pipeline(@list)->…->collect()`** — lazy list processing (sequential **`->filter`** / **`->grep`**, **`->map`**, **`->take`**). Parallel chain methods mirror top-level **`pmap`**, **`pgrep`**, **`pfor`**, **`pmap_chunked`**, **`psort`**, **`pcache`** (optional second argument `1` for stderr progress where applicable). Fold methods **`->preduce`**, **`->preduce_init(INIT, sub)`**, **`->pmap_reduce(MAP, REDUCE)`** must be last before **`->collect()`**; **`collect()`** then returns a **scalar** for those. Any other **`->name`** or **`->Pkg::name`** with **no** arguments resolves a **subroutine** in the stash and applies it like **`->map`** (`$_` each element). **`par_lines`**, **`par_fetch`**, etc. are separate builtins; they are not `->` methods on **`pipeline`**.
 - **`par_pipeline(@list)->…->collect()`** — same **`->`** methods as **`pipeline`**, but plain **`->filter`** / **`->map`** use **rayon** on **`collect()`** with **input order preserved** (same capture rules as **`pgrep`** / **`pmap`**). **`->take`** still truncates after those stages. For the **multi-stage channel** builtin (bounded queues, backpressure), use the named form below.
@@ -541,8 +546,10 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - **`pwatch GLOB, sub { ... }`** — register native file/directory watches with the `notify` crate (inotify/kqueue/FSEvents); block in the event loop and dispatch each glob-matching path to the coderef on a rayon worker with `$_` set to the path (tree-walker only; use `mysync` for shared state).
 - **`barrier(N)`** — returns a handle backed by `std::sync::Barrier`; `->wait` for phased parallelism (e.g. with `fan`). Party count is clamped to at least 1 (bytecode + tree-walker).
 - **`sort` / `psort` fast path** — `{ $a <=> $b }`, `{ $a cmp $b }`, `{ $b <=> $a }`, `{ $b cmp $a }` compare without invoking the block per pair (VM + tree-walker).
-- **`reduce` / `preduce`** — list fold with `$a` (accumulator) and `$b` (next item); `reduce` is strictly left-to-right; `preduce` uses rayon (order not fixed; use only when the operation is associative).
-- **`preduce_init`** — `preduce_init EXPR, { BLOCK } @list`: parallel fold starting from **`EXPR`** (clone per chunk); empty list returns `EXPR`. **`$a` / `$b`** are the accumulator and next element; **`@_`** is `($a, $b)`. Hash (or hashref) partials are merged by **adding numeric values per key**; for other accumulators the block must combine two partial results associatively (same idea as `preduce`).
+- **`reduce` / `preduce`** — list fold with `$a` (accumulator) and `$b` (next item); `reduce` is strictly left-to-right; `preduce` uses rayon (order not fixed; use only when the operation is associative). Optional **`, progress => EXPR`** — stderr progress bar when truthy (same style as **`pmap`**).
+- **`preduce_init`** — `preduce_init EXPR, { BLOCK } @list [, progress => EXPR]`: parallel fold starting from **`EXPR`** (clone per chunk); empty list returns `EXPR`. **`$a` / `$b`** are the accumulator and next element; **`@_`** is `($a, $b)`. Hash (or hashref) partials are merged by **adding numeric values per key**; for other accumulators the block must combine two partial results associatively (same idea as `preduce`).
+- **`pmap_reduce { MAP } { REDUCE } @list [, progress => EXPR]`** — fused parallel map plus tree reduce without building the full mapped list; optional stderr progress bar like **`pmap`**.
+- **`glob_par PATTERN… [, progress => EXPR]`** — parallel recursive glob (rayon); same patterns as **`glob`**. Optional **`progress => 1`** — one tick per pattern (not per file).
 - **`frozen my`** — immutable bindings (reassignment rejected in the bytecode path).
 - **`typed my $x : Type`** — optional scalar types (`Int`, `Str`, `Float`) with **runtime** checks on declaration and every assignment; `typed my` runs on the tree-walker (bytecode falls back when the program uses it).
 - **`try` / `given` / `match (…) { … }` / `eval_timeout`** — implemented in the tree interpreter only; the bytecode compiler returns unsupported for these constructs, so execution falls back to `execute_tree` automatically.
@@ -578,7 +585,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
  │      ▼                                              │
  │  Interpreter (src/interpreter.rs)                   │
  │      ├── Sequential: map, grep, sort, foreach       │
- │      └── Parallel:   pmap, pgrep, psort, pfor, fan │
+ │      └── Parallel:   pmap, pgrep, psort, pfor, fan, fan_cap │
  │              │                                      │
  │              ▼                                      │
  │          RAYON WORK-STEALING SCHEDULER              │

@@ -2476,14 +2476,28 @@ impl Compiler {
                     line,
                 );
             }
-            ExprKind::GlobPar(args) => {
+            ExprKind::GlobPar { args, progress } => {
                 for a in args {
                     self.compile_expr(a)?;
                 }
-                self.chunk.emit(
-                    Op::CallBuiltin(BuiltinId::GlobPar as u16, args.len() as u8),
-                    line,
-                );
+                match progress {
+                    None => {
+                        self.chunk.emit(
+                            Op::CallBuiltin(BuiltinId::GlobPar as u16, args.len() as u8),
+                            line,
+                        );
+                    }
+                    Some(p) => {
+                        self.compile_expr(p)?;
+                        self.chunk.emit(
+                            Op::CallBuiltin(
+                                BuiltinId::GlobParProgress as u16,
+                                (args.len() + 1) as u8,
+                            ),
+                            line,
+                        );
+                    }
+                }
             }
 
             // ── OOP ──
@@ -2909,6 +2923,7 @@ impl Compiler {
                 count,
                 block,
                 progress,
+                capture,
             } => {
                 if let Some(p) = progress {
                     self.compile_expr(p)?;
@@ -2916,13 +2931,20 @@ impl Compiler {
                     self.chunk.emit(Op::LoadInt(0), line);
                 }
                 let block_idx = self.chunk.add_block(block.clone());
-                match count {
-                    Some(c) => {
+                match (count, capture) {
+                    (Some(c), false) => {
                         self.compile_expr(c)?;
                         self.chunk.emit(Op::FanWithBlock(block_idx), line);
                     }
-                    None => {
+                    (None, false) => {
                         self.chunk.emit(Op::FanWithBlockAuto(block_idx), line);
+                    }
+                    (Some(c), true) => {
+                        self.compile_expr(c)?;
+                        self.chunk.emit(Op::FanCapWithBlock(block_idx), line);
+                    }
+                    (None, true) => {
+                        self.chunk.emit(Op::FanCapWithBlockAuto(block_idx), line);
                     }
                 }
             }
