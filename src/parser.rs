@@ -1195,12 +1195,24 @@ impl Parser {
                 full_name = format!("{}::{}", full_name, part);
             }
         }
+        let mut imports = Vec::new();
+        if !matches!(self.peek(), Token::Semicolon | Token::Eof) {
+            loop {
+                if matches!(self.peek(), Token::Semicolon | Token::Eof) {
+                    break;
+                }
+                imports.push(self.parse_expression()?);
+                if !self.eat(&Token::Comma) {
+                    break;
+                }
+            }
+        }
         self.eat(&Token::Semicolon);
         Ok(Statement {
             label: None,
             kind: StmtKind::No {
                 module: full_name,
-                imports: vec![],
+                imports,
             },
             line,
         })

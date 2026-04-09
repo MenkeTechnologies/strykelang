@@ -27,6 +27,7 @@ mod parse_program_shape_ops;
 mod parse_syntax_errors;
 mod parse_syntax_errors_more;
 mod phases;
+mod pragmas;
 mod regex;
 mod regex_extended;
 mod runtime_extra;

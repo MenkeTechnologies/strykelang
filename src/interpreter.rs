@@ -26,6 +26,15 @@ use crate::value::{
     PipelineInner, PipelineOp,
 };
 
+/// `use feature 'say'`
+pub const FEAT_SAY: u64 = 1 << 0;
+/// `use feature 'state'`
+pub const FEAT_STATE: u64 = 1 << 1;
+/// `use feature 'switch'` (given/when when fully wired)
+pub const FEAT_SWITCH: u64 = 1 << 2;
+/// `use feature 'unicode_strings'`
+pub const FEAT_UNICODE_STRINGS: u64 = 1 << 3;
+
 /// Flow control signals propagated via Result.
 #[derive(Debug)]
 pub(crate) enum Flow {
@@ -117,8 +126,16 @@ pub struct Interpreter {
     begin_blocks: Vec<Block>,
     /// END blocks
     end_blocks: Vec<Block>,
-    /// -w warnings
+    /// -w warnings / `use warnings`
     pub warnings: bool,
+    /// `use strict` / `use strict 'refs'` / `qw(refs subs vars)` (Perl names).
+    pub strict_refs: bool,
+    pub strict_subs: bool,
+    pub strict_vars: bool,
+    /// `use utf8` — source is UTF-8 (reserved for future lexer/string semantics).
+    pub utf8_pragma: bool,
+    /// `use feature` — bit flags (`FEAT_*`).
+    pub feature_bits: u64,
     /// Number of parallel threads
     pub num_threads: usize,
     /// Compiled regex cache: "flags///pattern" → Regex
@@ -226,6 +243,11 @@ impl Interpreter {
             begin_blocks: Vec::new(),
             end_blocks: Vec::new(),
             warnings: false,
+            strict_refs: false,
+            strict_subs: false,
+            strict_vars: false,
+            utf8_pragma: false,
+            feature_bits: 0,
             num_threads: rayon::current_num_threads(),
             regex_cache: HashMap::new(),
             regex_pos: HashMap::new(),
@@ -278,15 +300,177 @@ impl Interpreter {
         }
     }
 
+    /// Compile-time pragma import list (`'refs'`, `qw(refs subs)`, version integers).
+    fn pragma_import_strings(imports: &[Expr], default_line: usize) -> PerlResult<Vec<String>> {
+        let mut out = Vec::new();
+        for e in imports {
+            match &e.kind {
+                ExprKind::String(s) => out.push(s.clone()),
+                ExprKind::QW(ws) => out.extend(ws.iter().cloned()),
+                ExprKind::Integer(n) => out.push(n.to_string()),
+                _ => {
+                    return Err(PerlError::runtime(
+                        "pragma import must be a compile-time string, qw(), or integer",
+                        e.line.max(default_line),
+                    ));
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    fn apply_use_strict(&mut self, imports: &[Expr], line: usize) -> PerlResult<()> {
+        if imports.is_empty() {
+            self.strict_refs = true;
+            self.strict_subs = true;
+            self.strict_vars = true;
+            return Ok(());
+        }
+        let names = Self::pragma_import_strings(imports, line)?;
+        for name in names {
+            match name.as_str() {
+                "refs" => self.strict_refs = true,
+                "subs" => self.strict_subs = true,
+                "vars" => self.strict_vars = true,
+                _ => {
+                    return Err(PerlError::runtime(
+                        format!("Unknown strict mode `{}`", name),
+                        line,
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn apply_no_strict(&mut self, imports: &[Expr], line: usize) -> PerlResult<()> {
+        if imports.is_empty() {
+            self.strict_refs = false;
+            self.strict_subs = false;
+            self.strict_vars = false;
+            return Ok(());
+        }
+        let names = Self::pragma_import_strings(imports, line)?;
+        for name in names {
+            match name.as_str() {
+                "refs" => self.strict_refs = false,
+                "subs" => self.strict_subs = false,
+                "vars" => self.strict_vars = false,
+                _ => {
+                    return Err(PerlError::runtime(
+                        format!("Unknown strict mode `{}`", name),
+                        line,
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn apply_use_feature(&mut self, imports: &[Expr], line: usize) -> PerlResult<()> {
+        let items = Self::pragma_import_strings(imports, line)?;
+        if items.is_empty() {
+            return Err(PerlError::runtime(
+                "use feature requires a feature name or bundle (e.g. qw(say) or :5.10)",
+                line,
+            ));
+        }
+        for item in items {
+            let s = item.trim();
+            if let Some(rest) = s.strip_prefix(':') {
+                self.apply_feature_bundle(rest, line)?;
+            } else {
+                self.apply_feature_name(s, true, line)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn apply_no_feature(&mut self, imports: &[Expr], line: usize) -> PerlResult<()> {
+        if imports.is_empty() {
+            self.feature_bits = 0;
+            return Ok(());
+        }
+        let items = Self::pragma_import_strings(imports, line)?;
+        for item in items {
+            let s = item.trim();
+            if let Some(rest) = s.strip_prefix(':') {
+                self.clear_feature_bundle(rest);
+            } else {
+                self.apply_feature_name(s, false, line)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn apply_feature_bundle(&mut self, v: &str, line: usize) -> PerlResult<()> {
+        let key = v.trim();
+        match key {
+            "5.10" | "5.010" | "5.10.0" => {
+                self.feature_bits |= FEAT_SAY | FEAT_SWITCH | FEAT_STATE | FEAT_UNICODE_STRINGS;
+            }
+            "5.12" | "5.012" | "5.12.0" => {
+                self.feature_bits |= FEAT_SAY | FEAT_SWITCH | FEAT_STATE | FEAT_UNICODE_STRINGS;
+            }
+            _ => {
+                return Err(PerlError::runtime(
+                    format!("unsupported feature bundle :{}", key),
+                    line,
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn clear_feature_bundle(&mut self, v: &str) {
+        let key = v.trim();
+        if matches!(
+            key,
+            "5.10" | "5.010" | "5.10.0" | "5.12" | "5.012" | "5.12.0"
+        ) {
+            self.feature_bits &= !(FEAT_SAY | FEAT_SWITCH | FEAT_STATE | FEAT_UNICODE_STRINGS);
+        }
+    }
+
+    fn apply_feature_name(&mut self, name: &str, enable: bool, line: usize) -> PerlResult<()> {
+        let bit = match name {
+            "say" => FEAT_SAY,
+            "state" => FEAT_STATE,
+            "switch" => FEAT_SWITCH,
+            "unicode_strings" => FEAT_UNICODE_STRINGS,
+            _ => {
+                return Err(PerlError::runtime(
+                    format!("unknown feature `{}`", name),
+                    line,
+                ));
+            }
+        };
+        if enable {
+            self.feature_bits |= bit;
+        } else {
+            self.feature_bits &= !bit;
+        }
+        Ok(())
+    }
+
     /// `require EXPR` — load once, record `%INC`, return `1` on success.
     pub(crate) fn require_execute(&mut self, spec: &str, line: usize) -> PerlResult<PerlValue> {
         let t = spec.trim();
         if t.is_empty() {
             return Err(PerlError::runtime("require: empty argument", line));
         }
-        // Pragmas: no `.pm` load (matches `use strict` / `use warnings` behavior).
         match t {
-            "strict" | "utf8" | "feature" | "v5" => return Ok(PerlValue::Integer(1)),
+            "strict" => {
+                self.apply_use_strict(&[], line)?;
+                return Ok(PerlValue::Integer(1));
+            }
+            "utf8" => {
+                self.utf8_pragma = true;
+                return Ok(PerlValue::Integer(1));
+            }
+            "feature" | "v5" => {
+                return Ok(PerlValue::Integer(1));
+            }
             "warnings" => {
                 self.warnings = true;
                 return Ok(PerlValue::Integer(1));
@@ -355,15 +539,24 @@ impl Interpreter {
         ))
     }
 
-    /// Pragmas (`use strict`) or load a `.pm` file (`use Foo::Bar`).
+    /// Pragmas (`use strict 'refs'`, `use feature`) or load a `.pm` file (`use Foo::Bar`).
     pub(crate) fn exec_use_stmt(
         &mut self,
         module: &str,
-        _imports: &[Expr],
+        imports: &[Expr],
         line: usize,
     ) -> PerlResult<()> {
         match module {
-            "strict" | "utf8" | "feature" | "v5" => Ok(()),
+            "strict" => self.apply_use_strict(imports, line),
+            "utf8" => {
+                if !imports.is_empty() {
+                    return Err(PerlError::runtime("use utf8 takes no arguments", line));
+                }
+                self.utf8_pragma = true;
+                Ok(())
+            }
+            "feature" => self.apply_use_feature(imports, line),
+            "v5" => Ok(()),
             "warnings" => {
                 self.warnings = true;
                 Ok(())
@@ -373,6 +566,33 @@ impl Interpreter {
                 self.require_execute(module, line)?;
                 Ok(())
             }
+        }
+    }
+
+    /// `no strict 'refs'`, `no warnings`, `no feature`, …
+    pub(crate) fn exec_no_stmt(
+        &mut self,
+        module: &str,
+        imports: &[Expr],
+        line: usize,
+    ) -> PerlResult<()> {
+        match module {
+            "strict" => self.apply_no_strict(imports, line),
+            "utf8" => {
+                if !imports.is_empty() {
+                    return Err(PerlError::runtime("no utf8 takes no arguments", line));
+                }
+                self.utf8_pragma = false;
+                Ok(())
+            }
+            "feature" => self.apply_no_feature(imports, line),
+            "v5" => Ok(()),
+            "warnings" => {
+                self.warnings = false;
+                Ok(())
+            }
+            "threads" | "Thread::Pool" | "Parallel::ForkManager" => Ok(()),
+            _ => Ok(()),
         }
     }
 
@@ -399,6 +619,9 @@ impl Interpreter {
                 }
                 StmtKind::Use { module, imports } => {
                     self.exec_use_stmt(module, imports, stmt.line)?;
+                }
+                StmtKind::No { module, imports } => {
+                    self.exec_no_stmt(module, imports, stmt.line)?;
                 }
                 StmtKind::Begin(block) => self.begin_blocks.push(block.clone()),
                 StmtKind::End(block) => self.end_blocks.push(block.clone()),
@@ -850,7 +1073,8 @@ impl Interpreter {
                 StmtKind::SubDecl { .. }
                 | StmtKind::Begin(_)
                 | StmtKind::End(_)
-                | StmtKind::Use { .. } => continue,
+                | StmtKind::Use { .. }
+                | StmtKind::No { .. } => continue,
                 _ => {
                     match self.exec_statement(stmt) {
                         Ok(val) => last = val,
@@ -1580,10 +1804,8 @@ impl Interpreter {
                 // Handled in `prepare_program_top_level` before BEGIN / main.
                 Ok(PerlValue::Undef)
             }
-            StmtKind::No { module, .. } => {
-                if module == "warnings" {
-                    self.warnings = false;
-                }
+            StmtKind::No { .. } => {
+                // Handled in `prepare_program_top_level` (same phase as `use`).
                 Ok(PerlValue::Undef)
             }
             StmtKind::Return(val) => {

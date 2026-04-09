@@ -25,6 +25,8 @@ pub mod token;
 pub mod value;
 pub mod vm;
 
+pub use interpreter::{FEAT_SAY, FEAT_STATE, FEAT_SWITCH, FEAT_UNICODE_STRINGS};
+
 use error::PerlResult;
 use interpreter::Interpreter;
 use value::PerlValue;
