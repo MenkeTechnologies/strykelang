@@ -17,6 +17,7 @@ mod parallel;
 mod parse_accepts;
 mod parse_accepts_extra;
 mod parse_accepts_parallel;
+mod parse_accepts_strings_ops;
 mod parse_program_shape;
 mod parse_program_shape_extra;
 mod parse_program_shape_ops;
