@@ -286,6 +286,12 @@ impl PerlValue {
         self.0
     }
 
+    /// Reconstruct from [`Self::raw_bits`] (e.g. block JIT returning a full [`PerlValue`] encoding in `i64`).
+    #[inline]
+    pub(crate) fn from_raw_bits(bits: u64) -> Self {
+        Self(bits)
+    }
+
     /// `typed : Int` — inline `i32` or heap `i64`.
     #[inline]
     pub fn is_integer_like(&self) -> bool {

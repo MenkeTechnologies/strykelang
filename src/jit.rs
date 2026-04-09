@@ -55,13 +55,18 @@
 //!
 //! ## Not JIT’d (block CFG)
 //! Unsupported opcodes, inconsistent stack height at a merge, or merge where [`join_cell`] fails.
-//! [`Op::JumpIfDefinedKeep`] is JIT’d only when the abstract top is [`Cell::Const`] or [`Cell::ConstF`]
-//! (never `undef`); [`Cell::Dyn`] / [`Cell::DynF`] tops fall back to the VM — native stack slots are
-//! plain `i64`/`f64` and cannot distinguish Perl `undef` from numeric values.
+//! [`Op::JumpIfDefinedKeep`]: constant [`Cell::Const`] / [`Cell::ConstF`] tops compile to an
+//! unconditional jump (fall-through is dead). When the abstract top is [`Cell::Dyn`] immediately after
+//! [`Op::GetScalarSlot`] / [`Op::GetScalarPlain`] / [`Op::GetArg`], the block JIT uses **raw-buffer
+//! mode**: slot/plain/arg `i64` tables carry [`PerlValue::raw_bits`] (sign reinterpretation), loads
+//! preserve `undef`, and the terminator calls [`perlrs_jit_is_defined_raw_bits`]. That mode rejects
+//! arithmetic and most other data ops so stack values stay valid NaN-box encodings. Other [`Cell::Dyn`]
+//! / [`Cell::DynF`] shapes still fall back to the interpreter.
 //!
 //! ## VM integration
 //! [`crate::vm::VM::execute`] tries [`try_run_linear_ops`] on the full opcode buffer, then
-//! [`try_run_block_ops`], and only then runs the opcode dispatch loop.
+//! [`try_run_block_ops`] (which reports [`BlockJitBufferMode`] for slot/plain writeback), and only
+//! then runs the opcode dispatch loop.
 
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeSet, HashMap, VecDeque};
@@ -118,6 +123,16 @@ fn jit_result_to_perl(j: JitResult) -> PerlValue {
     }
 }
 
+fn jit_block_result_to_perl(j: JitResult, mode: BlockJitBufferMode) -> PerlValue {
+    match (j, mode) {
+        (JitResult::Int(n), BlockJitBufferMode::I64AsPerlValueBits) => {
+            PerlValue::from_raw_bits(n as u64)
+        }
+        (JitResult::Int(n), BlockJitBufferMode::I64AsInteger) => PerlValue::integer(n),
+        (JitResult::Float(f), _) => PerlValue::float(f),
+    }
+}
+
 impl LinearJit {
     fn invoke(&self, slots: *const i64, plain: *const i64, args: *const i64) -> JitResult {
         match &self.run {
@@ -168,6 +183,16 @@ pub extern "C" fn perlrs_jit_lognot_i64(n: i64) -> i64 {
     }
 }
 
+/// `defined` for a value transported as [`PerlValue::raw_bits`] in an `i64` stack slot (block JIT raw-buffer mode).
+#[no_mangle]
+pub extern "C" fn perlrs_jit_is_defined_raw_bits(bits: i64) -> i64 {
+    if PerlValue::from_raw_bits(bits as u64).is_undef() {
+        0
+    } else {
+        1
+    }
+}
+
 fn new_jit_module() -> Option<JITModule> {
     let isa_builder = cranelift_native::builder().ok()?;
     let isa = isa_builder.finish(isa_flags()).ok()?;
@@ -187,6 +212,10 @@ fn new_jit_module() -> Option<JITModule> {
     builder.symbol(
         "perlrs_jit_fmod_f64",
         perlrs_jit_fmod_f64 as *const u8,
+    );
+    builder.symbol(
+        "perlrs_jit_is_defined_raw_bits",
+        perlrs_jit_is_defined_raw_bits as *const u8,
     );
     Some(JITModule::new(builder))
 }
@@ -981,6 +1010,7 @@ fn compile_linear(ops: &[Op], constants: &[PerlValue]) -> Option<LinearJit> {
         for op in seq {
             emit_data_op(
                 &mut bcx,
+                false,
                 op,
                 &mut stack,
                 slot_base,
@@ -1336,10 +1366,94 @@ fn is_block_data_op(op: &Op) -> bool {
     )
 }
 
+/// How to fill VM `i64` buffers for [`try_run_block_ops`].
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum BlockJitBufferMode {
+    /// `PerlValue::as_integer()`-style scalars; `undef` uses prefills where applicable.
+    I64AsInteger,
+    /// [`PerlValue::raw_bits`] as `i64` (sign reinterpretation); preserves `undef` vs defined.
+    I64AsPerlValueBits,
+}
+
+/// Validated block CFG plus metadata for compilation and VM buffer layout.
+struct ValidatedBlockCfg {
+    cfg: Vec<CfgBlock>,
+    halt_cell: Cell,
+    needs_raw_value_buffers: bool,
+    /// `JumpIfDefinedKeep` opcode index → `false` = unconditional jump (const TOS), `true` = runtime `defined`.
+    jump_if_defined_kind: HashMap<usize, bool>,
+}
+
+/// Restrictions so stack slots stay valid [`PerlValue`] NaN-box encodings in raw-buffer mode.
+fn enforce_raw_jit_program(ops: &[Op], constants: &[PerlValue]) -> Option<()> {
+    for (i, op) in ops.iter().enumerate() {
+        match op {
+            Op::GetScalarSlot(_) | Op::GetScalarPlain(_) | Op::GetArg(_) => {
+                if !matches!(ops.get(i + 1), Some(Op::JumpIfDefinedKeep(_))) {
+                    return None;
+                }
+            }
+            Op::JumpIfTrue(_)
+            | Op::JumpIfFalse(_)
+            | Op::JumpIfFalseKeep(_)
+            | Op::JumpIfTrueKeep(_) => return None,
+            Op::Add
+            | Op::Sub
+            | Op::Mul
+            | Op::Div
+            | Op::Mod
+            | Op::Pow
+            | Op::Negate
+            | Op::Pop
+            | Op::Dup
+            | Op::BitXor
+            | Op::BitAnd
+            | Op::BitOr
+            | Op::BitNot
+            | Op::Shl
+            | Op::Shr
+            | Op::NumEq
+            | Op::NumNe
+            | Op::NumLt
+            | Op::NumGt
+            | Op::NumLe
+            | Op::NumGe
+            | Op::Spaceship
+            | Op::LogNot => return None,
+            Op::LoadFloat(_) => return None,
+            Op::LoadConst(idx) => {
+                let pv = constants.get(*idx as usize)?;
+                if pv.as_integer().is_none() {
+                    return None;
+                }
+            }
+            Op::LoadInt(_) => {}
+            Op::DeclareScalarSlot(_)
+            | Op::SetScalarSlot(_)
+            | Op::SetScalarSlotKeep(_)
+            | Op::PreIncSlot(_)
+            | Op::PostIncSlot(_)
+            | Op::PreDecSlot(_)
+            | Op::PostDecSlot(_)
+            | Op::SetScalarPlain(_)
+            | Op::SetScalarKeepPlain(_)
+            | Op::PreInc(_)
+            | Op::PostInc(_)
+            | Op::PreDec(_)
+            | Op::PostDec(_) => return None,
+            Op::Jump(_)
+            | Op::JumpIfDefinedKeep(_) => {}
+            Op::Halt => {}
+            _ => return None,
+        }
+    }
+    Some(())
+}
+
 /// Validate the ops as a block-structured program and compute per-block entry abstract stacks.
 /// Uses a fixpoint over [`join_cell`] at CFG merges so float and int paths can join (promotion).
 /// Returns `None` when any op is unsupported or the CFG is inconsistent.
-fn validate_block_cfg(ops: &[Op], constants: &[PerlValue]) -> Option<(Vec<CfgBlock>, Cell)> {
+fn validate_block_cfg(ops: &[Op], constants: &[PerlValue]) -> Option<ValidatedBlockCfg> {
     if ops.is_empty() {
         return None;
     }
@@ -1381,6 +1495,8 @@ fn validate_block_cfg(ops: &[Op], constants: &[PerlValue]) -> Option<(Vec<CfgBlo
     let mut has_halt = false;
     let mut halt_top: Option<Cell> = None;
     let mut iter_count = 0usize;
+    let mut needs_raw_value_buffers = false;
+    let mut jump_if_defined_kind: HashMap<usize, bool> = HashMap::new();
 
     while let Some(bi) = worklist.pop_front() {
         iter_count += 1;
@@ -1445,13 +1561,40 @@ fn validate_block_cfg(ops: &[Op], constants: &[PerlValue]) -> Option<(Vec<CfgBlo
                 }
                 Op::JumpIfDefinedKeep(target) => {
                     let top = *stack.last()?;
-                    if matches!(top, Cell::Dyn | Cell::DynF) {
-                        return None;
+                    match top {
+                        Cell::Const(_) | Cell::ConstF(_) => {
+                            jump_if_defined_kind.insert(idx, false);
+                            let ti = *addr_to_block.get(target)?;
+                            merge_stack_entry(&mut entry_stacks, &mut worklist, ti, &stack)?;
+                            terminated = true;
+                            break;
+                        }
+                        Cell::DynF => {
+                            return None;
+                        }
+                        Cell::Dyn => {
+                            if idx == 0 {
+                                return None;
+                            }
+                            match &ops[idx - 1] {
+                                Op::GetScalarSlot(_) | Op::GetScalarPlain(_) | Op::GetArg(_) => {}
+                                _ => return None,
+                            }
+                            needs_raw_value_buffers = true;
+                            jump_if_defined_kind.insert(idx, true);
+                            let ti = *addr_to_block.get(target)?;
+                            let ni = bi + 1;
+                            if ni >= block_count {
+                                return None;
+                            }
+                            merge_stack_entry(&mut entry_stacks, &mut worklist, ti, &stack)?;
+                            let mut stack_fall = stack.clone();
+                            stack_fall.pop()?;
+                            merge_stack_entry(&mut entry_stacks, &mut worklist, ni, &stack_fall)?;
+                            terminated = true;
+                            break;
+                        }
                     }
-                    let ti = *addr_to_block.get(target)?;
-                    merge_stack_entry(&mut entry_stacks, &mut worklist, ti, &stack)?;
-                    terminated = true;
-                    break;
                 }
                 Op::Halt => {
                     if stack.len() != 1 {
@@ -1503,13 +1646,33 @@ fn validate_block_cfg(ops: &[Op], constants: &[PerlValue]) -> Option<(Vec<CfgBlo
         })
         .collect();
 
-    Some((cfg, halt_cell))
+    if needs_raw_value_buffers {
+        enforce_raw_jit_program(ops, constants)?;
+    }
+
+    Some(ValidatedBlockCfg {
+        cfg,
+        halt_cell,
+        needs_raw_value_buffers,
+        jump_if_defined_kind,
+    })
+}
+
+/// Buffer layout for [`try_run_block_ops`] when validation succeeds; [`None`] if the block JIT cannot compile this buffer.
+pub(crate) fn block_jit_buffer_mode(ops: &[Op], constants: &[PerlValue]) -> Option<BlockJitBufferMode> {
+    let v = validate_block_cfg(ops, constants)?;
+    Some(if v.needs_raw_value_buffers {
+        BlockJitBufferMode::I64AsPerlValueBits
+    } else {
+        BlockJitBufferMode::I64AsInteger
+    })
 }
 
 /// Emit a single non-control-flow op into the Cranelift `FunctionBuilder`.
 /// Stack entries are `(Value, JitTy)`; int/float promotion matches [`simulate_one_op`].
 fn emit_data_op(
     bcx: &mut FunctionBuilder,
+    needs_raw_bits: bool,
     op: &Op,
     stack: &mut Vec<(Value, JitTy)>,
     slot_base: Option<cranelift_codegen::ir::Value>,
@@ -1523,12 +1686,22 @@ fn emit_data_op(
 ) -> Option<()> {
     match op {
         Op::LoadInt(n) => {
-            stack.push((bcx.ins().iconst(types::I64, *n), JitTy::Int));
+            let bits = if needs_raw_bits {
+                PerlValue::integer(*n).raw_bits() as i64
+            } else {
+                *n
+            };
+            stack.push((bcx.ins().iconst(types::I64, bits), JitTy::Int));
         }
         Op::LoadConst(idx) => {
             let pv = constants.get(*idx as usize)?;
             if let Some(n) = pv.as_integer() {
-                stack.push((bcx.ins().iconst(types::I64, n), JitTy::Int));
+                let bits = if needs_raw_bits {
+                    PerlValue::integer(n).raw_bits() as i64
+                } else {
+                    n
+                };
+                stack.push((bcx.ins().iconst(types::I64, bits), JitTy::Int));
             } else if let Some(f) = pv.as_float() {
                 stack.push((
                     bcx.ins()
@@ -1906,7 +2079,11 @@ fn emit_data_op(
 }
 
 fn compile_blocks(ops: &[Op], constants: &[PerlValue]) -> Option<LinearJit> {
-    let (cfg, halt_cell) = validate_block_cfg(ops, constants)?;
+    let validated = validate_block_cfg(ops, constants)?;
+    let cfg = validated.cfg;
+    let halt_cell = validated.halt_cell;
+    let needs_raw_bits = validated.needs_raw_value_buffers;
+    let jump_if_defined_kind = validated.jump_if_defined_kind;
     let ret_ty = cell_to_jit_ty(halt_cell);
 
     let need_any_table = needs_table(ops);
@@ -1970,6 +2147,20 @@ fn compile_blocks(ops: &[Op], constants: &[PerlValue]) -> Option<LinearJit> {
         None
     };
 
+    let needs_defined_raw = jump_if_defined_kind.values().any(|&b| b);
+    let defined_raw_id = if needs_defined_raw {
+        let mut ps = module.make_signature();
+        ps.params.push(AbiParam::new(types::I64));
+        ps.returns.push(AbiParam::new(types::I64));
+        Some(
+            module
+                .declare_function("perlrs_jit_is_defined_raw_bits", Linkage::Import, &ps)
+                .ok()?,
+        )
+    } else {
+        None
+    };
+
     let ptr_ty = module.target_config().pointer_type();
     let mut sig = module.make_signature();
     if need_any_table {
@@ -2025,6 +2216,8 @@ fn compile_blocks(ops: &[Op], constants: &[PerlValue]) -> Option<LinearJit> {
         let fmod_f64_ref = fmod_f64_id.map(|pid| module.declare_func_in_func(pid, &mut bcx.func));
         let lognot_ref =
             lognot_id.map(|lid| module.declare_func_in_func(lid, &mut bcx.func));
+        let defined_raw_ref =
+            defined_raw_id.map(|did| module.declare_func_in_func(did, &mut bcx.func));
 
         let slot_base = if need_any_table {
             Some(bcx.block_params(cl_blocks[0])[0])
@@ -2071,6 +2264,7 @@ fn compile_blocks(ops: &[Op], constants: &[PerlValue]) -> Option<LinearJit> {
                 if is_block_data_op(op) {
                     emit_data_op(
                         &mut bcx,
+                        needs_raw_bits,
                         op,
                         &mut stack,
                         slot_base,
@@ -2143,9 +2337,45 @@ fn compile_blocks(ops: &[Op], constants: &[PerlValue]) -> Option<LinearJit> {
                     }
                     Op::JumpIfDefinedKeep(target) => {
                         let ti = *addr_to_block.get(target)?;
-                        let args =
-                            branch_stack_to_block_args(&mut bcx, &stack, &cfg[ti].entry_cells)?;
-                        bcx.ins().jump(cl_blocks[ti], &args);
+                        let ni = bi + 1;
+                        match *jump_if_defined_kind.get(&idx)? {
+                            false => {
+                                let args = branch_stack_to_block_args(
+                                    &mut bcx,
+                                    &stack,
+                                    &cfg[ti].entry_cells,
+                                )?;
+                                bcx.ins().jump(cl_blocks[ti], &args);
+                            }
+                            true => {
+                                let (v, jty) = stack.last().copied()?;
+                                if jty != JitTy::Int {
+                                    return None;
+                                }
+                                let def_fr = defined_raw_ref?;
+                                let call = bcx.ins().call(def_fr, &[v]);
+                                let is_def = *bcx.inst_results(call).first()?;
+                                let args_t = branch_stack_to_block_args(
+                                    &mut bcx,
+                                    &stack,
+                                    &cfg[ti].entry_cells,
+                                )?;
+                                let mut stack_fall = stack.clone();
+                                stack_fall.pop()?;
+                                let args_f = branch_stack_to_block_args(
+                                    &mut bcx,
+                                    &stack_fall,
+                                    &cfg[ni].entry_cells,
+                                )?;
+                                bcx.ins().brif(
+                                    is_def,
+                                    cl_blocks[ti],
+                                    &args_t,
+                                    cl_blocks[ni],
+                                    &args_f,
+                                );
+                            }
+                        }
                         terminated = true;
                     }
                     Op::Halt => {
@@ -2286,7 +2516,8 @@ pub(crate) fn try_run_block_ops(
     mut plain_i64: Option<&mut [i64]>,
     arg_i64: Option<&[i64]>,
     constants: &[PerlValue],
-) -> Option<PerlValue> {
+) -> Option<(PerlValue, BlockJitBufferMode)> {
+    let mode = block_jit_buffer_mode(ops, constants)?;
     // Slot buffer bounds.
     if let Some(max) = block_slot_ops_max_index(ops) {
         let sl = slot_i64.as_mut()?;
@@ -2323,20 +2554,20 @@ pub(crate) fn try_run_block_ops(
         let guard = block_cache().lock().ok()?;
         if let Some(j) = guard.get(&key) {
             let r = j.invoke(slot_ptr, plain_ptr, arg_ptr);
-            return Some(jit_result_to_perl(r));
+            return Some((jit_block_result_to_perl(r, mode), mode));
         }
     }
 
     let jit = compile_blocks(ops, constants)?;
     let r = jit.invoke(slot_ptr, plain_ptr, arg_ptr);
-    let pv = jit_result_to_perl(r);
+    let pv = jit_block_result_to_perl(r, mode);
 
     if let Ok(mut guard) = block_cache().lock() {
         if guard.len() < 256 {
             guard.insert(key, Box::new(jit));
         }
     }
-    Some(pv)
+    Some((pv, mode))
 }
 
 #[cfg(test)]
@@ -2915,7 +3146,7 @@ mod tests {
             Op::LoadInt(0),       // 4 (else)
             Op::Halt,             // 5
         ];
-        let v = try_run_block_ops(&ops, None, None, None, &[]).expect("block jit");
+        let (v, _) = try_run_block_ops(&ops, None, None, None, &[]).expect("block jit");
         assert_eq!(v.to_int(), 42);
     }
 
@@ -2930,7 +3161,7 @@ mod tests {
             Op::LoadInt(99),      // 4 (else)
             Op::Halt,             // 5
         ];
-        let v = try_run_block_ops(&ops, None, None, None, &[]).expect("block jit");
+        let (v, _) = try_run_block_ops(&ops, None, None, None, &[]).expect("block jit");
         assert_eq!(v.to_int(), 99);
     }
 
@@ -2945,7 +3176,7 @@ mod tests {
             Op::LoadFloat(1.5),
             Op::Halt,
         ];
-        let v = try_run_block_ops(&ops, None, None, None, &[]).expect("block jit float");
+        let (v, _) = try_run_block_ops(&ops, None, None, None, &[]).expect("block jit float");
         assert!((v.to_number() - 2.5).abs() < 1e-12);
     }
 
@@ -2966,7 +3197,7 @@ mod tests {
             Op::LoadInt(99),
             Op::Halt,
         ];
-        let v = try_run_block_ops(&ops, None, None, None, &[]).expect("block jit");
+        let (v, _) = try_run_block_ops(&ops, None, None, None, &[]).expect("block jit");
         assert_eq!(v.to_int(), 1);
     }
 
@@ -2978,19 +3209,41 @@ mod tests {
             Op::LoadFloat(99.0),
             Op::Halt,
         ];
-        let v = try_run_block_ops(&ops, None, None, None, &[]).expect("block jit");
+        let (v, _) = try_run_block_ops(&ops, None, None, None, &[]).expect("block jit");
         assert!((v.to_number() - 1.25).abs() < 1e-12);
     }
 
     #[test]
-    fn block_jit_rejects_jump_if_defined_keep_dynamic_tos() {
+    fn block_jit_rejects_jump_if_defined_keep_dynf_tos() {
         let ops = vec![
-            Op::GetScalarSlot(0),
-            Op::JumpIfDefinedKeep(2),
+            Op::LoadFloat(1.25),
+            Op::LoadFloat(2.0),
+            Op::Mul,
+            Op::JumpIfDefinedKeep(6),
+            Op::Halt,
             Op::Halt,
         ];
-        let mut slots = [0i64];
-        assert!(try_run_block_ops(&ops, Some(&mut slots), None, None, &[]).is_none());
+        assert!(try_run_block_ops(&ops, None, None, None, &[]).is_none());
+    }
+
+    #[test]
+    fn block_jit_jump_if_defined_keep_raw_scalar_slot() {
+        let ops = vec![
+            Op::GetScalarSlot(0),
+            Op::JumpIfDefinedKeep(4),
+            Op::LoadInt(0),
+            Op::Halt,
+            Op::Halt,
+        ];
+        let mut slots = [PerlValue::UNDEF.raw_bits() as i64];
+        let (v, mode) = try_run_block_ops(&ops, Some(&mut slots), None, None, &[]).expect("jit");
+        assert_eq!(mode, BlockJitBufferMode::I64AsPerlValueBits);
+        assert_eq!(v.to_int(), 0);
+
+        let mut slots = [PerlValue::integer(42).raw_bits() as i64];
+        let (v, mode) = try_run_block_ops(&ops, Some(&mut slots), None, None, &[]).expect("jit");
+        assert_eq!(mode, BlockJitBufferMode::I64AsPerlValueBits);
+        assert_eq!(v.to_int(), 42);
     }
 
     #[test]
@@ -3039,7 +3292,7 @@ mod tests {
             Op::Halt,                // 16
         ];
         let mut slots = [0i64; 2];
-        let v = try_run_block_ops(&ops, Some(&mut slots), None, None, &[]).expect("block jit");
+        let (v, _) = try_run_block_ops(&ops, Some(&mut slots), None, None, &[]).expect("block jit");
         assert_eq!(v.to_int(), 10);
         assert_eq!(slots[0], 5); // $i ended at 5
         assert_eq!(slots[1], 10); // $sum
@@ -3055,7 +3308,7 @@ mod tests {
             Op::LoadInt(42),          // 3: $b
             Op::Halt,                 // 4: result
         ];
-        let v = try_run_block_ops(&ops, None, None, None, &[]).expect("block jit");
+        let (v, _) = try_run_block_ops(&ops, None, None, None, &[]).expect("block jit");
         assert_eq!(v.to_int(), 42);
     }
 
@@ -3069,7 +3322,7 @@ mod tests {
             Op::LoadInt(42),          // 3: (skipped)
             Op::Halt,                 // 4: result = 0
         ];
-        let v = try_run_block_ops(&ops, None, None, None, &[]).expect("block jit");
+        let (v, _) = try_run_block_ops(&ops, None, None, None, &[]).expect("block jit");
         assert_eq!(v.to_int(), 0);
     }
 
@@ -3083,7 +3336,7 @@ mod tests {
             Op::LoadInt(42),          // 3: (skipped)
             Op::Halt,                 // 4: result = 5
         ];
-        let v = try_run_block_ops(&ops, None, None, None, &[]).expect("block jit");
+        let (v, _) = try_run_block_ops(&ops, None, None, None, &[]).expect("block jit");
         assert_eq!(v.to_int(), 5);
     }
 
@@ -3097,7 +3350,7 @@ mod tests {
             Op::LoadInt(42),          // 3: $b
             Op::Halt,                 // 4: result = 42
         ];
-        let v = try_run_block_ops(&ops, None, None, None, &[]).expect("block jit");
+        let (v, _) = try_run_block_ops(&ops, None, None, None, &[]).expect("block jit");
         assert_eq!(v.to_int(), 42);
     }
 
@@ -3143,7 +3396,7 @@ mod tests {
             Op::Halt,                // 23
         ];
         let mut slots = [0i64; 3];
-        let v = try_run_block_ops(&ops, Some(&mut slots), None, None, &[]).expect("block jit");
+        let (v, _) = try_run_block_ops(&ops, Some(&mut slots), None, None, &[]).expect("block jit");
         assert_eq!(v.to_int(), 6);
     }
 
@@ -3280,7 +3533,7 @@ mod tests {
             Op::GetScalarPlain(0),   // 9: exit
             Op::Halt,               // 10
         ];
-        let v = try_run_block_ops(&ops, None, Some(&mut plain), None, &[]).expect("block jit");
+        let (v, _) = try_run_block_ops(&ops, None, Some(&mut plain), None, &[]).expect("block jit");
         assert_eq!(v.to_int(), 5);
         assert_eq!(plain[0], 5);
     }

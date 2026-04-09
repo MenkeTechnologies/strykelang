@@ -276,8 +276,9 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    /// Run bytecode: first attempts Cranelift method JIT for eligible numeric fragments, then the
-    /// main opcode interpreter loop.
+    /// Run bytecode: first attempts Cranelift method JIT for eligible numeric fragments (block JIT
+    /// may use `PerlValue::raw_bits` in slot/plain/arg buffers for `defined`-style control flow),
+    /// then the main opcode interpreter loop.
     pub fn execute(&mut self) -> PerlResult<PerlValue> {
         let ops = &self.ops as *const Vec<Op>;
         // SAFETY: ops doesn't change during execution; pointer avoids borrow on self
@@ -370,21 +371,28 @@ impl<'a> VM<'a> {
         }
 
         // ── Block JIT: try to compile sequences with control flow (loops, conditionals). ──
+        let block_buf_mode = crate::jit::block_jit_buffer_mode(ops, constants);
+
         let mut block_slot_buf =
             crate::jit::block_slot_ops_max_index(ops).and_then(|max| {
                 let mut v = vec![0i64; max as usize + 1];
                 for i in 0..=max {
                     let pv = self.interp.scope.get_scalar_slot(i);
-                    v[i as usize] = match pv.as_integer() {
-                        Some(n) => n,
-                        None if pv.is_undef() => {
-                            if crate::jit::block_slot_undef_prefill_ok(ops, i) {
-                                0
-                            } else {
-                                return None;
-                            }
+                    v[i as usize] = match block_buf_mode {
+                        Some(crate::jit::BlockJitBufferMode::I64AsPerlValueBits) => {
+                            pv.raw_bits() as i64
                         }
-                        None => return None,
+                        _ => match pv.as_integer() {
+                            Some(n) => n,
+                            None if pv.is_undef() => {
+                                if crate::jit::block_slot_undef_prefill_ok(ops, i) {
+                                    0
+                                } else {
+                                    return None;
+                                }
+                            }
+                            None => return None,
+                        },
                     };
                 }
                 Some(v)
@@ -398,7 +406,13 @@ impl<'a> VM<'a> {
                 let mut v = vec![0i64; max as usize + 1];
                 for i in 0..=max {
                     let n = names[i as usize].as_str();
-                    v[i as usize] = self.interp.scope.get_scalar(n).as_integer()?;
+                    let pv = self.interp.scope.get_scalar(n);
+                    v[i as usize] = match block_buf_mode {
+                        Some(crate::jit::BlockJitBufferMode::I64AsPerlValueBits) => {
+                            pv.raw_bits() as i64
+                        }
+                        _ => pv.as_integer()?,
+                    };
                 }
                 Some(v)
             });
@@ -411,12 +425,17 @@ impl<'a> VM<'a> {
                 for i in 0..=max {
                     let pos = base + i as usize;
                     let pv = self.stack.get(pos).cloned().unwrap_or(PerlValue::UNDEF);
-                    v[i as usize] = pv.as_integer()?;
+                    v[i as usize] = match block_buf_mode {
+                        Some(crate::jit::BlockJitBufferMode::I64AsPerlValueBits) => {
+                            pv.raw_bits() as i64
+                        }
+                        _ => pv.as_integer()?,
+                    };
                 }
                 Some(v)
             });
 
-        if let Some(v) = crate::jit::try_run_block_ops(
+        if let Some((v, buf_mode)) = crate::jit::try_run_block_ops(
             ops,
             block_slot_buf.as_deref_mut(),
             block_plain_buf.as_deref_mut(),
@@ -425,18 +444,31 @@ impl<'a> VM<'a> {
         ) {
             if let Some(buf) = block_slot_buf.as_ref() {
                 for idx in crate::jit::block_slot_ops_written_indices(ops) {
-                    self.interp
-                        .scope
-                        .set_scalar_slot(idx, PerlValue::integer(buf[idx as usize]));
+                    let bits = buf[idx as usize] as u64;
+                    let pv = match buf_mode {
+                        crate::jit::BlockJitBufferMode::I64AsPerlValueBits => {
+                            PerlValue::from_raw_bits(bits)
+                        }
+                        crate::jit::BlockJitBufferMode::I64AsInteger => {
+                            PerlValue::integer(buf[idx as usize])
+                        }
+                    };
+                    self.interp.scope.set_scalar_slot(idx, pv);
                 }
             }
             if let Some(buf) = block_plain_buf.as_ref() {
                 for idx in crate::jit::block_plain_ops_written_indices(ops) {
                     let name = names[idx as usize].as_str();
-                    self.interp.scope.set_scalar(
-                        name,
-                        PerlValue::integer(buf[idx as usize]),
-                    )?;
+                    let bits = buf[idx as usize] as u64;
+                    let pv = match buf_mode {
+                        crate::jit::BlockJitBufferMode::I64AsPerlValueBits => {
+                            PerlValue::from_raw_bits(bits)
+                        }
+                        crate::jit::BlockJitBufferMode::I64AsInteger => {
+                            PerlValue::integer(buf[idx as usize])
+                        }
+                    };
+                    self.interp.scope.set_scalar(name, pv)?;
                 }
             }
             return Ok(v);
