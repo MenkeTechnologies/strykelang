@@ -43,8 +43,9 @@
 //!
 //! ## Validation
 //! Linear tier: [`validate_linear`] / [`linear_result_cell`]. Block tier: [`validate_block_cfg`]
-//! (stack merge at joins, merged [`Cell`] for the `Halt` result). Both ensure we only emit
-//! `sdiv`/`srem` when safe and only call [`perlrs_jit_pow_i64`] when the VM’s integer fast path applies.
+//! (stack merge at joins, merged [`Cell`] for the `Halt` result). Both use [`simulate_one_op`] so
+//! division/modulus/`Pow` safety matches the VM; integer `Pow` calls [`perlrs_jit_pow_i64`], and the
+//! float path uses [`perlrs_jit_pow_f64`] / [`perlrs_jit_fmod_f64`] when the abstract stack is float.
 //!
 //! ## Not JIT’d (linear)
 //! Inexact integer `Div`, `Mod` with unknown divisor, integer `Pow` outside `0..=63`, `BitAnd`/`BitOr`
@@ -55,8 +56,8 @@
 //! Any data op or control flow shape not supported by [`validate_block_cfg`] (unsupported opcode,
 //! inconsistent stack height at a merge, or merge where [`join_cell`] fails).
 //! [`Op::JumpIfDefinedKeep`] is rejected: the **defined** branch keeps the stack and the **undef**
-//! branch pops (see [`crate::vm::VM`]’s `JumpIfDefinedKeep` dispatch), so successors would not agree
-//! on stack height without a deeper CFG change.
+//! branch pops (see [`crate::vm::VM`]), so successors would not agree on stack height without a
+//! deeper CFG change.
 
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeSet, HashMap, VecDeque};
@@ -287,6 +288,7 @@ fn join_cell(a: Cell, b: Cell) -> Option<Cell> {
         | (Cell::Const(_), Cell::ConstF(_))
         | (Cell::ConstF(_), Cell::Const(_)) => Some(Cell::DynF),
         (Cell::Dyn, Cell::DynF) | (Cell::DynF, Cell::Dyn) => Some(Cell::DynF),
+        // Unreachable for well-formed `Cell`, but required for exhaustiveness on `(Cell, Cell)`.
         _ => None,
     }
 }
@@ -508,7 +510,7 @@ fn ops_before_halt(ops: &[Op]) -> &[Op] {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 enum Cell {
     Const(i64),
     Dyn,
@@ -2949,6 +2951,26 @@ mod tests {
             Op::Halt,
         ];
         assert!(try_run_block_ops(&ops, None, None, None, &[]).is_none());
+    }
+
+    #[test]
+    fn join_cell_succeeds_on_representative_pairs() {
+        let cells = [
+            Cell::Const(0),
+            Cell::Const(1),
+            Cell::Dyn,
+            Cell::ConstF(0.0),
+            Cell::ConstF(1.0),
+            Cell::DynF,
+        ];
+        for &a in &cells {
+            for &b in &cells {
+                assert!(
+                    join_cell(a, b).is_some(),
+                    "join_cell({a:?}, {b:?}) should not fail"
+                );
+            }
+        }
     }
 
     #[test]
