@@ -1171,6 +1171,14 @@ mod tests {
     }
 
     #[test]
+    fn tokenize_filetest_tty() {
+        let mut l = Lexer::new("-t 'STDIN'");
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[0].0, Token::FileTest('t')));
+        assert!(matches!(t[1].0, Token::SingleString(ref s) if s == "STDIN"));
+    }
+
+    #[test]
     fn tokenize_power_and_range_operators() {
         let mut l = Lexer::new("2 ** 3");
         let t = l.tokenize().expect("tokenize");

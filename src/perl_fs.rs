@@ -6,6 +6,37 @@ use std::path::{Path, PathBuf};
 
 use crate::value::PerlValue;
 
+/// Perl `-t` — true if the handle/path refers to a terminal ([`libc::isatty`] on Unix).
+/// Recognizes `STDIN`/`STDOUT`/`STDERR`, `/dev/stdin` (etc.), `/dev/fd/N`, small numeric fds, or opens a path and tests its fd.
+pub fn filetest_is_tty(path: &str) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::io::AsRawFd;
+        if let Some(fd) = tty_fd_literal(path) {
+            return unsafe { libc::isatty(fd) != 0 };
+        }
+        if let Ok(f) = std::fs::File::open(path) {
+            return unsafe { libc::isatty(f.as_raw_fd()) != 0 };
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+    }
+    false
+}
+
+#[cfg(unix)]
+fn tty_fd_literal(path: &str) -> Option<i32> {
+    match path {
+        "" | "STDIN" | "-" | "/dev/stdin" => Some(0),
+        "STDOUT" | "/dev/stdout" => Some(1),
+        "STDERR" | "/dev/stderr" => Some(2),
+        p if p.starts_with("/dev/fd/") => p.strip_prefix("/dev/fd/").and_then(|s| s.parse().ok()),
+        _ => path.parse::<i32>().ok().filter(|&n| (0..128).contains(&n)),
+    }
+}
+
 /// 13-element `stat` / `lstat` list (empty vector on failure).
 pub fn stat_path(path: &str, symlink: bool) -> PerlValue {
     let res = if symlink {

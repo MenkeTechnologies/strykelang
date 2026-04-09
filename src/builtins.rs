@@ -55,8 +55,14 @@ pub(crate) fn try_builtin(
         "shutdown" => Some(interp.builtin_shutdown(args, line)),
         "pack" => Some(crate::pack::perl_pack(args, line)),
         "unpack" => Some(crate::pack::perl_unpack(args, line)),
+        "quotemeta" => Some(builtin_quotemeta(args)),
         _ => None,
     }
+}
+
+fn builtin_quotemeta(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    Ok(PerlValue::String(regex::escape(&s)))
 }
 
 fn builtin_prototype(args: &[PerlValue]) -> PerlResult<PerlValue> {

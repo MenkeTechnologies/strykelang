@@ -133,7 +133,7 @@ pub struct Interpreter {
     pub(crate) pipe_children: HashMap<String, Child>,
     /// Sockets from `socket` / `accept` / `connect`.
     pub(crate) socket_handles: HashMap<String, PerlSocket>,
-    /// `wantarray()` inside the current subroutine (VM and tree-walker).
+    /// `wantarray()` inside the current subroutine (`WantarrayCtx`; VM threads it on `Call`/`MethodCall`/`ArrowCall`).
     pub(crate) wantarray_kind: WantarrayCtx,
 }
 
@@ -148,6 +148,31 @@ fn piped_shell_command(cmd: &str) -> Command {
         c.arg("-c").arg(cmd);
         c
     }
+}
+
+/// Expands Perl `\Q...\E` spans to escaped text for the Rust [`regex`] crate.
+fn expand_perl_regex_quotemeta(pat: &str) -> String {
+    let mut out = String::with_capacity(pat.len().saturating_mul(2));
+    let mut it = pat.chars().peekable();
+    let mut in_q = false;
+    while let Some(c) = it.next() {
+        if in_q {
+            if c == '\\' && it.peek() == Some(&'E') {
+                it.next();
+                in_q = false;
+                continue;
+            }
+            out.push_str(&regex::escape(&c.to_string()));
+            continue;
+        }
+        if c == '\\' && it.peek() == Some(&'Q') {
+            it.next();
+            in_q = true;
+            continue;
+        }
+        out.push(c);
+    }
+    out
 }
 
 /// Buffered directory listing for Perl `opendir` / `readdir` (Rust `ReadDir` is single-pass).
@@ -2718,6 +2743,7 @@ impl Interpreter {
                     'z' => std::fs::metadata(&path)
                         .map(|m| m.len() == 0)
                         .unwrap_or(true),
+                    't' => crate::perl_fs::filetest_is_tty(&path),
                     _ => false,
                 };
                 Ok(PerlValue::Integer(if result { 1 } else { 0 }))
@@ -3902,6 +3928,7 @@ impl Interpreter {
         if let Some(cached) = self.regex_cache.get(&key) {
             return Ok(cached.clone());
         }
+        let expanded = expand_perl_regex_quotemeta(pattern);
         let mut re_str = String::new();
         if flags.contains('i') {
             re_str.push_str("(?i)");
@@ -3915,7 +3942,7 @@ impl Interpreter {
         if flags.contains('x') {
             re_str.push_str("(?x)");
         }
-        re_str.push_str(pattern);
+        re_str.push_str(&expanded);
         let re = regex::Regex::new(&re_str).map_err(|e| {
             FlowOrError::Error(PerlError::runtime(
                 format!("Invalid regex /{}/: {}", pattern, e),
@@ -4074,4 +4101,17 @@ pub(crate) fn perl_sprintf(fmt: &str, args: &[PerlValue]) -> String {
         }
     }
     result
+}
+
+#[cfg(test)]
+mod regex_expand_tests {
+    use super::Interpreter;
+
+    #[test]
+    fn compile_regex_quotemeta_qe_matches_literal() {
+        let mut i = Interpreter::new();
+        let re = i.compile_regex(r"\Qa.c\E", "", 1).expect("regex");
+        assert!(re.is_match("a.c"));
+        assert!(!re.is_match("abc"));
+    }
 }

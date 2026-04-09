@@ -1253,6 +1253,7 @@ impl<'a> VM<'a> {
                         'z' => std::fs::metadata(&path)
                             .map(|m| m.len() == 0)
                             .unwrap_or(true),
+                        't' => crate::perl_fs::filetest_is_tty(&path),
                         _ => false,
                     };
                     self.push(PerlValue::Integer(if result { 1 } else { 0 }));

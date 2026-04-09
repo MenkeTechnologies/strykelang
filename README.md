@@ -295,6 +295,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - Transliterate: `$str =~ tr/from/to/`
 - Flags: `g`, `i`, `m`, `s`, `x`
 - Capture variables: `$1`, `$2`, …; named groups `(?<name>…)` (Rust `regex` syntax) populate `%+` and `$+{name}`
+- Literal spans: `\Q…\E` (metacharacters escaped); `quotemeta` for dynamic patterns
 - Quote-like: `m//`, `qr//`
 
 #### SUBROUTINES
@@ -313,7 +314,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
  │ **Hash**: keys, values, each, delete, exists                │
  │ **String**: chomp, chop, length, substr, index, rindex,     │
  │ split, join, sprintf, printf, uc, lc, ucfirst, lcfirst,     │
- │ chr, ord, hex, oct, crypt, fc, pos, study                     │
+ │ chr, ord, hex, oct, crypt, fc, pos, study, quotemeta          │
  │ **Binary**: pack, unpack (subset A a N n V v C Q q Z H x;   │
  │ `*` repeat; result is byte data)                              │
  │ **Numeric**: abs, int, sqrt, sin, cos, atan2, exp, log,     │
@@ -325,7 +326,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
  │ select (timeout sleep / handle no-op), truncate             │
  │ **Directory**: opendir, readdir, closedir, rewinddir,        │
  │ telldir, seekdir                                              │
- │ **File tests**: -e, -f, -d, -l, -r, -w, -s, -z             │
+ │ **File tests**: -e, -f, -d, -l, -r, -w, -s, -z, -t (TTY)   │
  │ **System**: system, exec, exit, chdir, mkdir, unlink, rename, │
  │ chmod, chown (Unix), stat, lstat, link, symlink, readlink,   │
  │ glob, glob_par, ppool,                                        │
@@ -336,7 +337,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
  │ **Type**: defined, undef, ref, bless                        │
  │ **Set**: `Set->new(…)` — native set; `|` union, `&` intersection │
  │ **Control**: die, warn, eval, do, require, caller,         │
- │ wantarray (scalar default 0; VM uses `wantarray_ctx`),      │
+ │ wantarray (void / scalar 0 / list 1; bytecode passes context), │
  │ `goto EXPR` (same-block labels), `continue { }` on loops, │
  │ `prototype` on code refs; sub prototypes parsed on `sub`     │
  └──────────────────────────────────────────────────────────────┘
