@@ -217,9 +217,9 @@ pub enum Op {
     PSortWithBlock(u16),
     /// psort @list (no block) — stack: \[progress_flag, list\] → \[sorted\]
     PSortNoBlockParallel,
-    /// fan N { BLOCK } — block_idx; stack: \[count\]
+    /// fan N { BLOCK } — block_idx; stack: \[progress_flag, count\] (`progress_flag` is 0/1)
     FanWithBlock(u16),
-    /// fan { BLOCK } — block_idx; stack: \[\]; COUNT = rayon pool size (`pe -j`)
+    /// fan { BLOCK } — block_idx; stack: \[progress_flag\]; COUNT = rayon pool size (`pe -j`)
     FanWithBlockAuto(u16),
     /// eval { BLOCK } — block_idx; stack: \[\] → result
     EvalBlock(u16),

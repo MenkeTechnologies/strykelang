@@ -395,6 +395,14 @@ fn pchannel_fan_send_recv() {
 }
 
 #[test]
+fn fan_progress_optional_parses_and_runs() {
+    let v = run(r#"fan 2 { 1 }, progress => 0;"#).expect("run");
+    assert!(v.is_undef());
+    let v2 = run(r#"fan { 1 }, progress => 0;"#).expect("run");
+    assert!(v2.is_undef());
+}
+
+#[test]
 fn pselect_multiplex_recv() {
     let s = r#"
         my ($tx1, $rx1) = pchannel();

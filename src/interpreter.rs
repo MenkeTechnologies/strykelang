@@ -4411,7 +4411,17 @@ impl Interpreter {
                 }
                 Ok(PerlValue::UNDEF)
             }
-            ExprKind::FanExpr { count, block } => {
+            ExprKind::FanExpr {
+                count,
+                block,
+                progress,
+            } => {
+                let show_progress = progress
+                    .as_ref()
+                    .map(|p| self.eval_expr(p))
+                    .transpose()?
+                    .map(|v| v.is_true())
+                    .unwrap_or(false);
                 let n = match count {
                     Some(c) => self.eval_expr(c)?.to_int().max(0) as usize,
                     None => self.parallel_thread_count(),
@@ -4421,6 +4431,7 @@ impl Interpreter {
                 let (scope_capture, atomic_arrays, atomic_hashes) =
                     self.scope.capture_with_atomics();
 
+                let pmap_progress = PmapProgress::new(show_progress, n);
                 let first_err: Arc<Mutex<Option<PerlError>>> = Arc::new(Mutex::new(None));
                 (0..n).into_par_iter().for_each(|i| {
                     if first_err.lock().is_some() {
@@ -4453,7 +4464,9 @@ impl Interpreter {
                         }
                     }
                     crate::parallel_trace::fan_worker_set_index(None);
+                    pmap_progress.tick();
                 });
+                pmap_progress.finish();
                 if let Some(e) = first_err.lock().take() {
                     return Err(FlowOrError::Error(e));
                 }

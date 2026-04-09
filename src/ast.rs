@@ -583,9 +583,11 @@ pub enum ExprKind {
     },
     /// `fan [COUNT] { BLOCK }` — execute BLOCK COUNT times in parallel (default COUNT = rayon pool size).
     /// `$_` is set to the iteration index (0..COUNT-1).
+    /// Optional `, progress => EXPR` — stderr progress bar (like `pmap`).
     FanExpr {
         count: Option<Box<Expr>>,
         block: Block,
+        progress: Option<Box<Expr>>,
     },
 
     /// `async { BLOCK }` — run BLOCK on a worker thread; returns a task handle.

@@ -192,8 +192,9 @@ my @evens = pgrep { $_ % 2 == 0 } @data, progress => 1;
 # parallel foreach — execute side effects concurrently
 pfor { process } @items, progress => 1;
 
-# fan — run a block N times in parallel (`$_` is 0..N-1)
+# fan — run a block N times in parallel (`$_` is 0..N-1); optional stderr progress bar
 fan 8 { work }
+fan { work }, progress => 1;
 
 # fan — omit N to use the rayon thread pool size (`pe -j`; `$_` is 0..N-1)
 fan { work }

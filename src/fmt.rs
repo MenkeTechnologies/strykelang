@@ -784,10 +784,20 @@ pub fn format_expr(e: &Expr) -> String {
                 None => format!("pselect({})", inner),
             }
         }
-        ExprKind::FanExpr { count, block } => match count {
-            Some(c) => format!("fan {} {{\n{}\n}}", format_expr(c), format_block(block)),
-            None => format!("fan {{\n{}\n}}", format_block(block)),
-        },
+        ExprKind::FanExpr {
+            count,
+            block,
+            progress,
+        } => {
+            let base = match count {
+                Some(c) => format!("fan {} {{\n{}\n}}", format_expr(c), format_block(block)),
+                None => format!("fan {{\n{}\n}}", format_block(block)),
+            };
+            match progress {
+                Some(p) => format!("{}, progress => {}", base, format_expr(p)),
+                None => base,
+            }
+        }
         ExprKind::AsyncBlock { body } => format!("async {{\n{}\n}}", format_block(body)),
         ExprKind::Trace { body } => format!("trace {{\n{}\n}}", format_block(body)),
         ExprKind::Timer { body } => format!("timer {{\n{}\n}}", format_block(body)),

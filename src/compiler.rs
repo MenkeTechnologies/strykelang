@@ -2905,7 +2905,16 @@ impl Compiler {
             ExprKind::PselectExpr { .. } => {
                 return Err(CompileError::Unsupported("pselect".into()));
             }
-            ExprKind::FanExpr { count, block } => {
+            ExprKind::FanExpr {
+                count,
+                block,
+                progress,
+            } => {
+                if let Some(p) = progress {
+                    self.compile_expr(p)?;
+                } else {
+                    self.chunk.emit(Op::LoadInt(0), line);
+                }
                 let block_idx = self.chunk.add_block(block.clone());
                 match count {
                     Some(c) => {

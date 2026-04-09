@@ -90,6 +90,12 @@ fn accepts_fan_block_default_count() {
 }
 
 #[test]
+fn accepts_fan_progress() {
+    p("fan 2 { 1 }, progress => 1;");
+    p("fan { 1 }, progress => 0;");
+}
+
+#[test]
 fn accepts_fan_zero() {
     p("fan 0 { 1 };");
 }

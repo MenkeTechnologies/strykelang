@@ -653,10 +653,16 @@ def main() -> None:
         "ReduceExpr": 'format!("reduce {{\\n{}\\n}} {}", format_block(block), format_expr(list))',
         "PReduceExpr": 'format!("preduce {{\\n{}\\n}} {}", format_block(block), format_expr(list))',
         "PReduceInitExpr": 'format!("preduce_init {}, {{\\n{}\\n}} {}", format_expr(init), format_block(block), format_expr(list))',
-        "FanExpr": """match count {
+        "FanExpr": """{
+            let base = match count {
                 Some(c) => format!("fan {} {{\\n{}\\n}}", format_expr(c), format_block(block)),
                 None => format!("fan {{\\n{}\\n}}", format_block(block)),
-            }""",
+            };
+            match progress {
+                Some(p) => format!("{}, progress => {}", base, format_expr(p)),
+                None => base,
+            }
+        }""",
         "AsyncBlock": 'format!("async {{\\n{}\\n}}", format_block(body))',
         "Trace": 'format!("trace {{\\n{}\\n}}", format_block(body))',
         "Timer": 'format!("timer {{\\n{}\\n}}", format_block(body))',

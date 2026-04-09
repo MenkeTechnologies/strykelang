@@ -461,10 +461,17 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn run_fan_block(&mut self, block_idx: u16, n: usize, line: usize) -> PerlResult<()> {
+    fn run_fan_block(
+        &mut self,
+        block_idx: u16,
+        n: usize,
+        line: usize,
+        progress: bool,
+    ) -> PerlResult<()> {
         let block = self.blocks[block_idx as usize].clone();
         let subs = self.interp.subs.clone();
         let scope_capture = self.interp.scope.capture();
+        let pmap_progress = PmapProgress::new(progress, n);
         let first_err: Arc<Mutex<Option<PerlError>>> = Arc::new(Mutex::new(None));
         (0..n).into_par_iter().for_each(|i| {
             if first_err.lock().is_some() {
@@ -476,6 +483,7 @@ impl<'a> VM<'a> {
             let _ = local_interp
                 .scope
                 .set_scalar("_", PerlValue::integer(i as i64));
+            crate::parallel_trace::fan_worker_set_index(Some(i as i64));
             match local_interp.exec_block_no_scope(&block) {
                 Ok(_) => {}
                 Err(e) => {
@@ -492,7 +500,10 @@ impl<'a> VM<'a> {
                     }
                 }
             }
+            crate::parallel_trace::fan_worker_set_index(None);
+            pmap_progress.tick();
         });
+        pmap_progress.finish();
         if let Some(e) = first_err.lock().take() {
             return Err(e);
         }
@@ -2312,12 +2323,14 @@ impl<'a> VM<'a> {
                 Op::FanWithBlock(block_idx) => {
                     let line = self.line();
                     let n = self.pop().to_int().max(0) as usize;
-                    self.run_fan_block(*block_idx, n, line)?;
+                    let progress_flag = self.pop().is_true();
+                    self.run_fan_block(*block_idx, n, line, progress_flag)?;
                 }
                 Op::FanWithBlockAuto(block_idx) => {
                     let line = self.line();
                     let n = self.interp.parallel_thread_count();
-                    self.run_fan_block(*block_idx, n, line)?;
+                    let progress_flag = self.pop().is_true();
+                    self.run_fan_block(*block_idx, n, line, progress_flag)?;
                 }
 
                 Op::AsyncBlock(block_idx) => {
