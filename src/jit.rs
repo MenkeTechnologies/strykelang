@@ -49,10 +49,17 @@
 //! division/modulus/`Pow` safety matches the VM; integer `Pow` calls [`perlrs_jit_pow_i64`], and the
 //! float path uses [`perlrs_jit_pow_f64`] / [`perlrs_jit_fmod_f64`] when the abstract stack is float.
 //!
+//! ## Subroutine linear JIT call-out (`Op::Call`)
+//! A compiled sub that calls another compiled sub with **stack-args** (`GetArg`) and **scalar** context
+//! can emit a Cranelift call to [`crate::vm::perlrs_jit_call_sub`] (VM pointer as the first parameter,
+//! then callee bytecode IP and up to eight `i64` args). The trampoline runs [`crate::vm::VM::jit_trampoline_run_sub`]
+//! so the callee may be interpreted or JIT’d again.
+//!
 //! ## Not JIT’d (linear)
 //! Inexact integer `Div`, `Mod` with unknown divisor, integer `Pow` outside `0..=63`, `BitAnd`/`BitOr`
 //! on set values, non-integer slot/plain/arg materialization where the VM would not be `i64`,
-//! function calls, string ops, array/hash ops. `LoadUndef` is JIT’d as full nanbox bits; the return
+//! calls that are not a compiled stack-args scalar `Op::Call` (see above), string ops, array/hash ops.
+//! `LoadUndef` is JIT’d as full nanbox bits; the return
 //! path uses `PerlValue::from_raw_bits` when the abstract result is [`Cell::Undef`].
 //!
 //! ## Not JIT’d (block CFG)
@@ -79,6 +86,7 @@
 
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
+use std::ffi::c_void;
 use std::hash::{Hash, Hasher};
 use std::sync::{Mutex, OnceLock};
 
@@ -96,6 +104,7 @@ use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{default_libcall_names, Linkage, Module};
 
 use crate::bytecode::Op;
+use crate::interpreter::WantarrayCtx;
 use crate::value::PerlValue;
 
 type LinearFn0 = unsafe extern "C" fn() -> i64;
@@ -103,12 +112,20 @@ type LinearFn0 = unsafe extern "C" fn() -> i64;
 type LinearFn3 = unsafe extern "C" fn(*const i64, *const i64, *const i64) -> i64;
 type LinearFn0F = unsafe extern "C" fn() -> f64;
 type LinearFn3F = unsafe extern "C" fn(*const i64, *const i64, *const i64) -> f64;
+type LinearFnVm0 = unsafe extern "C" fn(*mut c_void) -> i64;
+type LinearFnVm3 = unsafe extern "C" fn(*mut c_void, *const i64, *const i64, *const i64) -> i64;
+type LinearFnVm0F = unsafe extern "C" fn(*mut c_void) -> f64;
+type LinearFnVm3F = unsafe extern "C" fn(*mut c_void, *const i64, *const i64, *const i64) -> f64;
 
 enum LinearRun {
     Nullary(LinearFn0),
     Tables(LinearFn3),
     NullaryF(LinearFn0F),
     TablesF(LinearFn3F),
+    VmNullary(LinearFnVm0),
+    VmTables(LinearFnVm3),
+    VmNullaryF(LinearFnVm0F),
+    VmTablesF(LinearFnVm3F),
 }
 
 /// Whether the native function returns an integer or a float.
@@ -156,12 +173,22 @@ impl LinearJit {
         self.ret_nanboxed
     }
 
-    fn invoke(&self, slots: *const i64, plain: *const i64, args: *const i64) -> JitResult {
+    fn invoke(
+        &self,
+        vm: *mut c_void,
+        slots: *const i64,
+        plain: *const i64,
+        args: *const i64,
+    ) -> JitResult {
         match &self.run {
             LinearRun::Nullary(f) => JitResult::Int(unsafe { f() }),
             LinearRun::Tables(f) => JitResult::Int(unsafe { f(slots, plain, args) }),
             LinearRun::NullaryF(f) => JitResult::Float(unsafe { f() }),
             LinearRun::TablesF(f) => JitResult::Float(unsafe { f(slots, plain, args) }),
+            LinearRun::VmNullary(f) => JitResult::Int(unsafe { f(vm) }),
+            LinearRun::VmTables(f) => JitResult::Int(unsafe { f(vm, slots, plain, args) }),
+            LinearRun::VmNullaryF(f) => JitResult::Float(unsafe { f(vm) }),
+            LinearRun::VmTablesF(f) => JitResult::Float(unsafe { f(vm, slots, plain, args) }),
         }
     }
 
@@ -243,7 +270,39 @@ fn new_jit_module() -> Option<JITModule> {
         "perlrs_jit_is_defined_raw_bits",
         perlrs_jit_is_defined_raw_bits as *const u8,
     );
+    builder.symbol(
+        "perlrs_jit_call_sub",
+        crate::vm::perlrs_jit_call_sub as *const u8,
+    );
     Some(JITModule::new(builder))
+}
+
+fn find_sub_entry_slice(
+    sub_entries: &[(u16, usize, bool)],
+    name_idx: u16,
+) -> Option<(usize, bool)> {
+    for &(n, ip, stack_args) in sub_entries {
+        if n == name_idx {
+            return Some((ip, stack_args));
+        }
+    }
+    None
+}
+
+/// `Op::Call` that can be lowered to [`crate::vm::perlrs_jit_call_sub`] (compiled sub, stack args, scalar).
+fn call_is_jitable(op: &Op, sub_entries: &[(u16, usize, bool)]) -> bool {
+    let Op::Call(name_idx, argc, wa) = op else {
+        return false;
+    };
+    if WantarrayCtx::from_byte(*wa) != WantarrayCtx::Scalar {
+        return false;
+    }
+    if *argc == 0 || *argc > 8 {
+        return false;
+    }
+    find_sub_entry_slice(sub_entries, *name_idx)
+        .map(|(_, stack_args)| stack_args)
+        .unwrap_or(false)
 }
 
 /// Signed `icmp` → `0`/`1` on the stack (Perl numeric compare result).
@@ -671,7 +730,12 @@ fn fold_cmp_cell(op: &Op, a: Cell, b: Cell) -> Cell {
 }
 
 /// One data op for abstract stack simulation (linear + block JIT validation).
-fn simulate_one_op(op: &Op, stack: &mut Vec<Cell>, constants: &[PerlValue]) -> Option<()> {
+fn simulate_one_op(
+    op: &Op,
+    stack: &mut Vec<Cell>,
+    constants: &[PerlValue],
+    sub_entries: Option<&[(u16, usize, bool)]>,
+) -> Option<()> {
     match op {
         Op::LoadInt(n) => stack.push(Cell::Const(*n)),
         Op::LoadConst(idx) => {
@@ -855,18 +919,36 @@ fn simulate_one_op(op: &Op, stack: &mut Vec<Cell>, constants: &[PerlValue]) -> O
                 _ => Cell::Dyn,
             });
         }
+        Op::Call(_, _, _) => {
+            let se = sub_entries?;
+            if !call_is_jitable(op, se) {
+                return None;
+            }
+            let Op::Call(_, argc, _) = op else {
+                return None;
+            };
+            let argc = *argc as usize;
+            for _ in 0..argc {
+                stack.pop()?;
+            }
+            stack.push(Cell::Dyn);
+        }
         _ => return None,
     }
     Some(())
 }
 
-fn validate_linear_seq(seq: &[Op], constants: &[PerlValue]) -> bool {
+fn validate_linear_seq(
+    seq: &[Op],
+    constants: &[PerlValue],
+    sub_entries: Option<&[(u16, usize, bool)]>,
+) -> bool {
     if seq.is_empty() {
         return false;
     }
     let mut stack: Vec<Cell> = Vec::new();
     for op in seq {
-        if simulate_one_op(op, &mut stack, constants).is_none() {
+        if simulate_one_op(op, &mut stack, constants, sub_entries).is_none() {
             return false;
         }
         if stack.len() > 256 {
@@ -880,7 +962,7 @@ fn validate_linear_seq(seq: &[Op], constants: &[PerlValue]) -> bool {
 fn validate_linear_void_seq(seq: &[Op], constants: &[PerlValue]) -> bool {
     let mut stack: Vec<Cell> = Vec::new();
     for op in seq {
-        if simulate_one_op(op, &mut stack, constants).is_none() {
+        if simulate_one_op(op, &mut stack, constants, None).is_none() {
             return false;
         }
         if stack.len() > 256 {
@@ -890,10 +972,14 @@ fn validate_linear_void_seq(seq: &[Op], constants: &[PerlValue]) -> bool {
     stack.is_empty()
 }
 
-fn linear_result_cell_seq(seq: &[Op], constants: &[PerlValue]) -> Option<Cell> {
+fn linear_result_cell_seq(
+    seq: &[Op],
+    constants: &[PerlValue],
+    sub_entries: Option<&[(u16, usize, bool)]>,
+) -> Option<Cell> {
     let mut stack: Vec<Cell> = Vec::new();
     for op in seq {
-        simulate_one_op(op, &mut stack, constants)?;
+        simulate_one_op(op, &mut stack, constants, sub_entries)?;
         if stack.len() > 256 {
             return None;
         }
@@ -930,17 +1016,22 @@ fn needs_table(seq: &[Op]) -> bool {
 }
 
 fn compile_linear(ops: &[Op], constants: &[PerlValue]) -> Option<LinearJit> {
-    compile_linear_ops(ops_before_halt(ops), constants)
+    compile_linear_ops(ops_before_halt(ops), constants, &[])
 }
 
-fn compile_linear_ops(seq: &[Op], constants: &[PerlValue]) -> Option<LinearJit> {
-    if !validate_linear_seq(seq, constants) {
+fn compile_linear_ops(
+    seq: &[Op],
+    constants: &[PerlValue],
+    sub_entries: &[(u16, usize, bool)],
+) -> Option<LinearJit> {
+    if !validate_linear_seq(seq, constants, Some(sub_entries)) {
         return None;
     }
-    let ret_cell = linear_result_cell_seq(seq, constants)?;
+    let ret_cell = linear_result_cell_seq(seq, constants, Some(sub_entries))?;
     let ret_nanboxed = matches!(ret_cell, Cell::Undef);
     let ret_ty = cell_to_jit_ty(ret_cell);
     let need_any_table = needs_table(seq);
+    let need_vm_sub = seq.iter().any(|o| call_is_jitable(o, sub_entries));
     let mut module = new_jit_module()?;
 
     let needs_pow = seq.iter().any(|o| matches!(o, Op::Pow));
@@ -1001,7 +1092,29 @@ fn compile_linear_ops(seq: &[Op], constants: &[PerlValue]) -> Option<LinearJit> 
     };
 
     let ptr_ty = module.target_config().pointer_type();
+    let call_sub_id = if need_vm_sub {
+        let mut ps = module.make_signature();
+        ps.params.push(AbiParam::new(ptr_ty));
+        ps.params.push(AbiParam::new(types::I64));
+        ps.params.push(AbiParam::new(types::I64));
+        ps.params.push(AbiParam::new(types::I64));
+        for _ in 0..8 {
+            ps.params.push(AbiParam::new(types::I64));
+        }
+        ps.returns.push(AbiParam::new(types::I64));
+        Some(
+            module
+                .declare_function("perlrs_jit_call_sub", Linkage::Import, &ps)
+                .ok()?,
+        )
+    } else {
+        None
+    };
+
     let mut sig = module.make_signature();
+    if need_vm_sub {
+        sig.params.push(AbiParam::new(ptr_ty));
+    }
     if need_any_table {
         sig.params.push(AbiParam::new(ptr_ty));
         sig.params.push(AbiParam::new(ptr_ty));
@@ -1027,18 +1140,30 @@ fn compile_linear_ops(seq: &[Op], constants: &[PerlValue]) -> Option<LinearJit> 
         bcx.append_block_params_for_function_params(entry);
         bcx.switch_to_block(entry);
 
+        let mut pi = 0usize;
+        let vm_base = if need_vm_sub {
+            let v = bcx.block_params(entry)[pi];
+            pi += 1;
+            Some(v)
+        } else {
+            None
+        };
         let slot_base = if need_any_table {
-            Some(bcx.block_params(entry)[0])
+            let v = bcx.block_params(entry)[pi];
+            pi += 1;
+            Some(v)
         } else {
             None
         };
         let plain_base = if need_any_table {
-            Some(bcx.block_params(entry)[1])
+            let v = bcx.block_params(entry)[pi];
+            pi += 1;
+            Some(v)
         } else {
             None
         };
         let arg_base = if need_any_table {
-            Some(bcx.block_params(entry)[2])
+            Some(bcx.block_params(entry)[pi])
         } else {
             None
         };
@@ -1047,6 +1172,7 @@ fn compile_linear_ops(seq: &[Op], constants: &[PerlValue]) -> Option<LinearJit> 
         let pow_f64_ref = pow_f64_id.map(|pid| module.declare_func_in_func(pid, bcx.func));
         let fmod_f64_ref = fmod_f64_id.map(|pid| module.declare_func_in_func(pid, bcx.func));
         let lognot_ref = lognot_id.map(|lid| module.declare_func_in_func(lid, bcx.func));
+        let call_sub_ref = call_sub_id.map(|cid| module.declare_func_in_func(cid, bcx.func));
 
         let mut stack: Vec<(cranelift_codegen::ir::Value, JitTy)> = Vec::with_capacity(32);
         for op in seq {
@@ -1058,6 +1184,9 @@ fn compile_linear_ops(seq: &[Op], constants: &[PerlValue]) -> Option<LinearJit> 
                 slot_base,
                 plain_base,
                 arg_base,
+                vm_base,
+                sub_entries,
+                call_sub_ref,
                 pow_i64_ref,
                 pow_f64_ref,
                 fmod_f64_ref,
@@ -1081,24 +1210,36 @@ fn compile_linear_ops(seq: &[Op], constants: &[PerlValue]) -> Option<LinearJit> 
     module.clear_context(&mut ctx);
     module.finalize_definitions().ok()?;
     let ptr = module.get_finalized_function(fid);
-    let run = match (need_any_table, ret_ty) {
-        (false, JitTy::Int) => LinearRun::Nullary(unsafe {
+    let run = match (need_vm_sub, need_any_table, ret_ty) {
+        (false, false, JitTy::Int) => LinearRun::Nullary(unsafe {
             std::mem::transmute::<*const u8, unsafe extern "C" fn() -> i64>(ptr)
         }),
-        (false, JitTy::Float) => LinearRun::NullaryF(unsafe {
+        (false, false, JitTy::Float) => LinearRun::NullaryF(unsafe {
             std::mem::transmute::<*const u8, unsafe extern "C" fn() -> f64>(ptr)
         }),
-        (true, JitTy::Int) => LinearRun::Tables(unsafe {
+        (false, true, JitTy::Int) => LinearRun::Tables(unsafe {
             std::mem::transmute::<
                 *const u8,
                 unsafe extern "C" fn(*const i64, *const i64, *const i64) -> i64,
             >(ptr)
         }),
-        (true, JitTy::Float) => LinearRun::TablesF(unsafe {
+        (false, true, JitTy::Float) => LinearRun::TablesF(unsafe {
             std::mem::transmute::<
                 *const u8,
                 unsafe extern "C" fn(*const i64, *const i64, *const i64) -> f64,
             >(ptr)
+        }),
+        (true, false, JitTy::Int) => LinearRun::VmNullary(unsafe {
+            std::mem::transmute::<*const u8, LinearFnVm0>(ptr)
+        }),
+        (true, false, JitTy::Float) => LinearRun::VmNullaryF(unsafe {
+            std::mem::transmute::<*const u8, LinearFnVm0F>(ptr)
+        }),
+        (true, true, JitTy::Int) => LinearRun::VmTables(unsafe {
+            std::mem::transmute::<*const u8, LinearFnVm3>(ptr)
+        }),
+        (true, true, JitTy::Float) => LinearRun::VmTablesF(unsafe {
+            std::mem::transmute::<*const u8, LinearFnVm3F>(ptr)
         }),
     };
     Some(LinearJit {
@@ -1228,6 +1369,9 @@ fn compile_linear_void_ops(seq: &[Op], constants: &[PerlValue]) -> Option<Linear
                 slot_base,
                 plain_base,
                 arg_base,
+                None,
+                &[],
+                None,
                 pow_i64_ref,
                 pow_f64_ref,
                 fmod_f64_ref,
@@ -1525,13 +1669,13 @@ pub(crate) fn try_run_linear_ops(
     {
         let guard = cache().lock().ok()?;
         if let Some(j) = guard.get(&key) {
-            let r = j.invoke(slot_ptr, plain_ptr, arg_ptr);
+            let r = j.invoke(std::ptr::null_mut(), slot_ptr, plain_ptr, arg_ptr);
             return Some(j.result_to_perl(r));
         }
     }
 
     let jit = compile_linear(ops, constants)?;
-    let r = jit.invoke(slot_ptr, plain_ptr, arg_ptr);
+    let r = jit.invoke(std::ptr::null_mut(), slot_ptr, plain_ptr, arg_ptr);
     let pv = jit.result_to_perl(r);
 
     if let Ok(mut guard) = cache().lock() {
@@ -1580,27 +1724,31 @@ pub(crate) fn sub_full_body(ops: &[Op], entry_ip: usize) -> Option<(&[Op], SubTe
 }
 
 /// `true` when this sub prefix cannot use linear Cranelift (control flow, calls, frame ops, etc.).
-pub(crate) fn segment_blocks_subroutine_linear_jit(seg: &[Op]) -> bool {
+pub(crate) fn segment_blocks_subroutine_linear_jit(
+    seg: &[Op],
+    sub_entries: &[(u16, usize, bool)],
+) -> bool {
     seg.iter().any(|o| {
-        matches!(
-            o,
+        match o {
+            Op::Call(_, _, _) if call_is_jitable(o, sub_entries) => false,
+            Op::Call(_, _, _) => true,
             Op::Jump(_)
-                | Op::JumpIfTrue(_)
-                | Op::JumpIfFalse(_)
-                | Op::JumpIfFalseKeep(_)
-                | Op::JumpIfTrueKeep(_)
-                | Op::JumpIfDefinedKeep(_)
-                | Op::Halt
-                | Op::Return
-                | Op::ReturnValue
-                | Op::PushFrame
-                | Op::PopFrame
-                | Op::Call(_, _, _)
-                | Op::CallBuiltin(_, _)
-                | Op::MethodCall(_, _, _)
-                | Op::MethodCallSuper(_, _, _)
-                | Op::ArrowCall(_)
-        )
+            | Op::JumpIfTrue(_)
+            | Op::JumpIfFalse(_)
+            | Op::JumpIfFalseKeep(_)
+            | Op::JumpIfTrueKeep(_)
+            | Op::JumpIfDefinedKeep(_)
+            | Op::Halt
+            | Op::Return
+            | Op::ReturnValue
+            | Op::PushFrame
+            | Op::PopFrame
+            | Op::CallBuiltin(_, _)
+            | Op::MethodCall(_, _, _)
+            | Op::MethodCallSuper(_, _, _)
+            | Op::ArrowCall(_) => true,
+            _ => false,
+        }
     })
 }
 
@@ -1618,9 +1766,11 @@ pub(crate) fn try_run_linear_sub(
     mut plain_i64: Option<&mut [i64]>,
     arg_i64: Option<&[i64]>,
     constants: &[PerlValue],
+    sub_entries: &[(u16, usize, bool)],
+    vm: *mut c_void,
 ) -> Option<PerlValue> {
     let (seq, term) = sub_entry_segment(ops, entry_ip)?;
-    if segment_blocks_subroutine_linear_jit(seq) {
+    if segment_blocks_subroutine_linear_jit(seq, sub_entries) {
         return None;
     }
     if let Some(max) = max_scalar_slot_index(seq) {
@@ -1656,16 +1806,16 @@ pub(crate) fn try_run_linear_sub(
     {
         let guard = cache().lock().ok()?;
         if let Some(j) = guard.get(&key) {
-            let r = j.invoke(slot_ptr, plain_ptr, arg_ptr);
+            let r = j.invoke(vm, slot_ptr, plain_ptr, arg_ptr);
             return Some(j.result_to_perl(r));
         }
     }
 
     let jit = match term {
         SubTerminator::Void => compile_linear_void_ops(seq, constants)?,
-        SubTerminator::Value => compile_linear_ops(seq, constants)?,
+        SubTerminator::Value => compile_linear_ops(seq, constants, sub_entries)?,
     };
-    let r = jit.invoke(slot_ptr, plain_ptr, arg_ptr);
+    let r = jit.invoke(vm, slot_ptr, plain_ptr, arg_ptr);
     let pv = jit.result_to_perl(r);
 
     if let Ok(mut guard) = cache().lock() {
@@ -1977,7 +2127,7 @@ fn validate_block_cfg(
             let op = &ops[idx];
             match op {
                 _ if is_block_data_op(op) => {
-                    simulate_one_op(op, &mut stack, constants)?;
+                    simulate_one_op(op, &mut stack, constants, None)?;
                 }
 
                 // ── Control flow ──
@@ -2175,6 +2325,9 @@ fn emit_data_op(
     slot_base: Option<cranelift_codegen::ir::Value>,
     plain_base: Option<cranelift_codegen::ir::Value>,
     arg_base: Option<cranelift_codegen::ir::Value>,
+    vm_base: Option<cranelift_codegen::ir::Value>,
+    sub_entries: &[(u16, usize, bool)],
+    call_sub_ref: Option<cranelift_codegen::ir::FuncRef>,
     pow_i64_ref: Option<cranelift_codegen::ir::FuncRef>,
     pow_f64_ref: Option<cranelift_codegen::ir::FuncRef>,
     fmod_f64_ref: Option<cranelift_codegen::ir::FuncRef>,
@@ -2553,6 +2706,38 @@ fn emit_data_op(
             bcx.ins().store(MemFlags::trusted(), new, base, off);
             stack.push((old, JitTy::Int));
         }
+        Op::Call(name_idx, argc, wa) => {
+            let (entry_ip, stack_args) = find_sub_entry_slice(sub_entries, *name_idx)?;
+            if !stack_args
+                || !call_is_jitable(op, sub_entries)
+                || WantarrayCtx::from_byte(*wa) != WantarrayCtx::Scalar
+            {
+                return None;
+            }
+            let vmv = vm_base?;
+            let fr = call_sub_ref?;
+            let argc_u = *argc as usize;
+            let mut arg_vals: Vec<Value> = Vec::with_capacity(argc_u);
+            for _ in 0..argc_u {
+                let (v, ty) = stack.pop()?;
+                if ty != JitTy::Int {
+                    return None;
+                }
+                arg_vals.push(v);
+            }
+            arg_vals.reverse();
+            let mut padded = arg_vals;
+            while padded.len() < 8 {
+                padded.push(bcx.ins().iconst(types::I64, 0));
+            }
+            let sub_ip_v = bcx.ins().iconst(types::I64, entry_ip as i64);
+            let argc_v = bcx.ins().iconst(types::I64, *argc as i64);
+            let wa_v = bcx.ins().iconst(types::I64, *wa as i64);
+            let mut call_args: Vec<Value> = vec![vmv, sub_ip_v, argc_v, wa_v];
+            call_args.extend(padded);
+            let call = bcx.ins().call(fr, &call_args);
+            stack.push((*bcx.inst_results(call).first()?, JitTy::Int));
+        }
         _ => return None,
     }
     Some(())
@@ -2754,6 +2939,9 @@ fn compile_blocks_validated(
                         slot_base,
                         plain_base,
                         arg_base,
+                        None,
+                        &[],
+                        None,
                         pow_i64_ref,
                         pow_f64_ref,
                         fmod_f64_ref,
@@ -3088,7 +3276,7 @@ pub(crate) fn try_run_block_ops(
     {
         let guard = block_cache().lock().ok()?;
         if let Some(j) = guard.get(&key) {
-            let r = j.invoke(slot_ptr, plain_ptr, arg_ptr);
+            let r = j.invoke(std::ptr::null_mut(), slot_ptr, plain_ptr, arg_ptr);
             let pv = if j.ret_nanboxed() {
                 j.result_to_perl(r)
             } else {
@@ -3099,7 +3287,7 @@ pub(crate) fn try_run_block_ops(
     }
 
     let jit = compile_blocks_validated(validated, ops, constants)?;
-    let r = jit.invoke(slot_ptr, plain_ptr, arg_ptr);
+    let r = jit.invoke(std::ptr::null_mut(), slot_ptr, plain_ptr, arg_ptr);
     let pv = if jit.ret_nanboxed() {
         jit.result_to_perl(r)
     } else {
@@ -3747,7 +3935,8 @@ mod tests {
     fn try_run_linear_sub_implicit_undef_returns_undef() {
         // Mimics `sub { }` tail: LoadUndef; ReturnValue
         let ops = vec![Op::LoadUndef, Op::ReturnValue];
-        let v = try_run_linear_sub(&ops, 0, None, None, None, &[]).expect("sub jit");
+        let v = try_run_linear_sub(&ops, 0, None, None, None, &[], &[], std::ptr::null_mut())
+            .expect("sub jit");
         assert!(v.is_undef());
     }
 
@@ -3755,14 +3944,16 @@ mod tests {
     fn try_run_linear_sub_void_bare_return() {
         // `sub { return; }` — first op is Return, empty segment.
         let ops = vec![Op::Return];
-        let v = try_run_linear_sub(&ops, 0, None, None, None, &[]).expect("void sub jit");
+        let v = try_run_linear_sub(&ops, 0, None, None, None, &[], &[], std::ptr::null_mut())
+            .expect("void sub jit");
         assert!(v.is_undef());
     }
 
     #[test]
     fn try_run_linear_sub_void_after_const_pop() {
         let ops = vec![Op::LoadInt(7), Op::Pop, Op::Return];
-        let v = try_run_linear_sub(&ops, 0, None, None, None, &[]).expect("void sub jit");
+        let v = try_run_linear_sub(&ops, 0, None, None, None, &[], &[], std::ptr::null_mut())
+            .expect("void sub jit");
         assert!(v.is_undef());
     }
 

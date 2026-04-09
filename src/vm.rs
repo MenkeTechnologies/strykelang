@@ -28,6 +28,8 @@ struct CallFrame {
     stack_base: usize,
     scope_depth: usize,
     saved_wantarray: WantarrayCtx,
+    /// [`perlrs_jit_call_sub`] — no bytecode resume; result stored in [`VM::jit_trampoline_out`].
+    jit_trampoline_return: bool,
 }
 
 /// Stack-based bytecode virtual machine.
@@ -57,6 +59,10 @@ pub struct VM<'a> {
     jit_buf_slot: Vec<i64>,
     jit_buf_plain: Vec<i64>,
     jit_buf_arg: Vec<i64>,
+    /// Set when running [`VM::jit_trampoline_run_sub`]; [`Op::ReturnValue`] stores here and exits dispatch.
+    jit_trampoline_out: Option<PerlValue>,
+    /// Nesting depth for [`Self::jit_trampoline_run_sub`]; dispatch breaks on [`Self::jit_trampoline_out`] only when `> 0`.
+    jit_trampoline_depth: u32,
 }
 
 impl<'a> VM<'a> {
@@ -88,6 +94,8 @@ impl<'a> VM<'a> {
             jit_buf_slot: Vec::new(),
             jit_buf_plain: Vec::new(),
             jit_buf_arg: Vec::new(),
+            jit_trampoline_out: None,
+            jit_trampoline_depth: 0,
         }
     }
 
@@ -158,15 +166,18 @@ impl<'a> VM<'a> {
         if self.sub_jit_skip_linear_test(ip) {
             return Ok(false);
         }
-        let ops = &self.ops;
-        let constants = &self.constants;
-        let names = &self.names;
+        let ops = &self.ops as *const Vec<Op>;
+        let ops = unsafe { &*ops };
+        let constants = &self.constants as *const Vec<PerlValue>;
+        let constants = unsafe { &*constants };
+        let names = &self.names as *const Vec<String>;
+        let names = unsafe { &*names };
         let Some((seg, _)) = crate::jit::sub_entry_segment(ops, ip) else {
             return Ok(false);
         };
         // `try_run_linear_sub` rejects these segments without compiling — skip expensive work before
         // resize/fill of reusable scratch buffers (`jit_buf_*`).
-        if crate::jit::segment_blocks_subroutine_linear_jit(seg) {
+        if crate::jit::segment_blocks_subroutine_linear_jit(seg, &self.sub_entries) {
             self.sub_jit_skip_linear_mark(ip);
             return Ok(false);
         }
@@ -241,6 +252,7 @@ impl<'a> VM<'a> {
                 }
             }
         }
+        let vm_ptr = self as *mut VM<'_> as *mut std::ffi::c_void;
         let slot_buf = slot_len.map(|n| &mut self.jit_buf_slot[..n]);
         let plain_buf = plain_len.map(|n| &mut self.jit_buf_plain[..n]);
         let arg_buf = arg_len.map(|n| &self.jit_buf_arg[..n]);
@@ -251,6 +263,8 @@ impl<'a> VM<'a> {
             plain_buf,
             arg_buf,
             constants,
+            &self.sub_entries,
+            vm_ptr,
         ) else {
             return Ok(false);
         };
@@ -276,8 +290,12 @@ impl<'a> VM<'a> {
             self.interp.wantarray_kind = frame.saved_wantarray;
             self.stack.truncate(frame.stack_base);
             self.interp.pop_scope_to_depth(frame.scope_depth);
-            self.push(v);
-            self.ip = frame.return_ip;
+            if frame.jit_trampoline_return {
+                self.jit_trampoline_out = Some(v);
+            } else {
+                self.push(v);
+                self.ip = frame.return_ip;
+            }
         }
         Ok(true)
     }
@@ -443,8 +461,12 @@ impl<'a> VM<'a> {
             self.interp.wantarray_kind = frame.saved_wantarray;
             self.stack.truncate(frame.stack_base);
             self.interp.pop_scope_to_depth(frame.scope_depth);
-            self.push(v);
-            self.ip = frame.return_ip;
+            if frame.jit_trampoline_return {
+                self.jit_trampoline_out = Some(v);
+            } else {
+                self.push(v);
+                self.ip = frame.return_ip;
+            }
         }
         Ok(true)
     }
@@ -715,12 +737,9 @@ impl<'a> VM<'a> {
         let constants = &self.constants as *const Vec<PerlValue>;
         // SAFETY: constants doesn't change during execution; pointer avoids borrow on self
         let constants = unsafe { &*constants };
-        let len = ops.len();
         let mut last = PerlValue::UNDEF;
-        // Safety limit: prevent infinite loops from consuming all memory.
-        // 1B ops allows very deep recursion / large programs without hitting the cap in normal use.
+        // Safety limit: [`run_main_dispatch_loop`] counts ops (1B cap).
         let mut op_count: u64 = 0;
-        const MAX_OPS: u64 = 1_000_000_000;
 
         // Match tree-walker `exec_statement_inner`: deliver `%SIG` and set `$^C` latch (Unix).
         crate::perl_signal::poll(self.interp)?;
@@ -972,7 +991,29 @@ impl<'a> VM<'a> {
             }
         }
 
+        last = self.run_main_dispatch_loop(last, &mut op_count)?;
+
+
+        Ok(last)
+    }
+
+    fn run_main_dispatch_loop(
+        &mut self,
+        mut last: PerlValue,
+        op_count: &mut u64,
+    ) -> PerlResult<PerlValue> {
+        let ops = &self.ops as *const Vec<Op>;
+        let ops = unsafe { &*ops };
+        let names = &self.names as *const Vec<String>;
+        let names = unsafe { &*names };
+        let constants = &self.constants as *const Vec<PerlValue>;
+        let constants = unsafe { &*constants };
+        let len = ops.len();
+        const MAX_OPS: u64 = 1_000_000_000;
         loop {
+            if self.jit_trampoline_depth > 0 && self.jit_trampoline_out.is_some() {
+                break;
+            }
             if self.ip >= len {
                 break;
             }
@@ -986,12 +1027,12 @@ impl<'a> VM<'a> {
                 }
             }
 
-            op_count += 1;
+            *op_count += 1;
             // `%SIG` delivery and the execution cap: same cadence as the old per-op poll (signals
             // remain responsive; hot loops avoid a syscall/atomic path every opcode).
-            if (op_count & 0x3FF) == 0 {
+            if (*op_count & 0x3FF) == 0 {
                 crate::perl_signal::poll(self.interp)?;
-                if op_count > MAX_OPS {
+                if *op_count > MAX_OPS {
                     return Err(PerlError::runtime(
                         "VM execution limit exceeded (possible infinite loop)",
                         self.line(),
@@ -1740,6 +1781,7 @@ impl<'a> VM<'a> {
                                 stack_base,
                                 scope_depth: self.interp.scope.depth(),
                                 saved_wantarray: saved_wa,
+                                jit_trampoline_return: false,
                             });
                             self.interp.wantarray_kind = want;
                             self.interp.scope_push_hook();
@@ -1762,6 +1804,7 @@ impl<'a> VM<'a> {
                                 stack_base: self.stack.len(),
                                 scope_depth: self.interp.scope.depth(),
                                 saved_wantarray: saved_wa,
+                                jit_trampoline_return: false,
                             });
                             self.interp.wantarray_kind = want;
                             self.interp.scope_push_hook();
@@ -1840,8 +1883,12 @@ impl<'a> VM<'a> {
                         self.interp.wantarray_kind = frame.saved_wantarray;
                         self.stack.truncate(frame.stack_base);
                         self.interp.pop_scope_to_depth(frame.scope_depth);
-                        self.push(PerlValue::UNDEF);
-                        self.ip = frame.return_ip;
+                        if frame.jit_trampoline_return {
+                            self.jit_trampoline_out = Some(PerlValue::UNDEF);
+                        } else {
+                            self.push(PerlValue::UNDEF);
+                            self.ip = frame.return_ip;
+                        }
                     } else {
                         break;
                     }
@@ -1852,8 +1899,12 @@ impl<'a> VM<'a> {
                         self.interp.wantarray_kind = frame.saved_wantarray;
                         self.stack.truncate(frame.stack_base);
                         self.interp.pop_scope_to_depth(frame.scope_depth);
-                        self.push(val);
-                        self.ip = frame.return_ip;
+                        if frame.jit_trampoline_return {
+                            self.jit_trampoline_out = Some(val);
+                        } else {
+                            self.push(val);
+                            self.ip = frame.return_ip;
+                        }
                     } else {
                         last = val;
                         break;
@@ -2700,6 +2751,43 @@ impl<'a> VM<'a> {
         Ok(last)
     }
 
+    /// Called from Cranelift (`perlrs_jit_call_sub`) to run a compiled sub by bytecode IP with `i64` args.
+    pub(crate) fn jit_trampoline_run_sub(
+        &mut self,
+        entry_ip: usize,
+        want: WantarrayCtx,
+        args: &[i64],
+    ) -> PerlResult<PerlValue> {
+        let saved_wa = self.interp.wantarray_kind;
+        for a in args {
+            self.push(PerlValue::integer(*a));
+        }
+        let stack_base = self.stack.len() - args.len();
+        self.call_stack.push(CallFrame {
+            return_ip: 0,
+            stack_base,
+            scope_depth: self.interp.scope.depth(),
+            saved_wantarray: saved_wa,
+            jit_trampoline_return: true,
+        });
+        self.interp.wantarray_kind = want;
+        self.interp.scope_push_hook();
+        self.ip = entry_ip;
+        self.jit_trampoline_out = None;
+        self.jit_trampoline_depth = self.jit_trampoline_depth.saturating_add(1);
+        let mut op_count = 0u64;
+        let last = PerlValue::UNDEF;
+        let r = self.run_main_dispatch_loop(last, &mut op_count);
+        self.jit_trampoline_depth = self.jit_trampoline_depth.saturating_sub(1);
+        r?;
+        self.jit_trampoline_out.take().ok_or_else(|| {
+            PerlError::runtime(
+                "JIT trampoline: subroutine did not return",
+                self.line(),
+            )
+        })
+    }
+
     fn find_sub_entry(&self, name_idx: u16) -> Option<(usize, bool)> {
         for &(n, ip, stack_args) in &self.sub_entries {
             if n == name_idx {
@@ -3525,6 +3613,44 @@ fn int_cmp(
         } else {
             0
         })
+    }
+}
+
+/// Cranelift host hook: re-enter the VM for [`Op::Call`] to a compiled sub (stack-args, scalar `i64` args).
+/// `sub_ip`, `argc`, `wa` are passed as `i64` for a uniform Cranelift signature.
+#[no_mangle]
+pub unsafe extern "C" fn perlrs_jit_call_sub(
+    vm: *mut std::ffi::c_void,
+    sub_ip: i64,
+    argc: i64,
+    wa: i64,
+    a0: i64,
+    a1: i64,
+    a2: i64,
+    a3: i64,
+    a4: i64,
+    a5: i64,
+    a6: i64,
+    a7: i64,
+) -> i64 {
+    // SAFETY: `vm` must be a live [`VM`] for the duration of the call (JIT invokes only while executing).
+    let vm: &mut VM<'static> = unsafe { &mut *(vm as *mut VM<'static>) };
+    let want = WantarrayCtx::from_byte(wa as u8);
+    if want != WantarrayCtx::Scalar {
+        return PerlValue::UNDEF.raw_bits() as i64;
+    }
+    let argc = (argc.max(0).min(8)) as usize;
+    let args = [a0, a1, a2, a3, a4, a5, a6, a7];
+    let args = &args[..argc];
+    match vm.jit_trampoline_run_sub(sub_ip as usize, want, args) {
+        Ok(pv) => {
+            if let Some(n) = pv.as_integer() {
+                n
+            } else {
+                pv.raw_bits() as i64
+            }
+        }
+        Err(_) => PerlValue::UNDEF.raw_bits() as i64,
     }
 }
 
