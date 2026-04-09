@@ -15,6 +15,7 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 | `$/` | Input record separator | `irs` field; get/set via `get_special_var` / `set_special_var` for `"/"`. |
 | `$,` | Output field separator | `ofs` field; `","` in special get/set. |
 | `$\` | Output record separator | `ors` field; `"\\"` in special get/set. |
+| `$~` | Current format name | Ordinary scalar `~` (default `"STDOUT"` in `Interpreter::new`); `write` resolves `package::NAME` in `format_templates` (`src/interpreter.rs`). |
 | `$!` | OS error (errno string) | Reads use `Interpreter.errno` (`get_special_var("!")`). Writes go to the scalar stash and **do not** update `errno`, so they are not read back — prefer treating `$!` as read-only. |
 | `$@` | Eval error | Reads use `eval_error` (`get_special_var("@")`). Writes store a scalar `"@"` that is **not** read back — same read/write split as `$!`. |
 | `$0` | Program name | `program_name`; `"0"` in special get/set. |
@@ -62,7 +63,7 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 | `@_` | Works as the **subroutine argument array** in user subs; not fully identical to Perl’s XS calling conventions. |
 | `pos $_` | Supported with `regex_pos` map; edge cases may differ from Perl. |
 | `%SIG` | Storage only; **no** Unix signal delivery into subs. |
-| `$^I` | In-place editing is **not** implemented; the value is stored for compatibility. |
+| `$^I` | The **`pe`/`perlrs` driver** applies **`-i`** / **`-i.bak`** for **`-n`/`-p`** over **`@ARGV`**; value is stored for compatibility with other code paths. |
 | `$^V` | String form only (`v…` from crate version); not a Perl `version` object. |
 | `$^E` | Uses `std::io::Error::last_os_error()`, not Perl’s per-platform extended error. |
 | `${^GLOBAL_PHASE}` | Single string field; not full Perl phase transitions (`BEGIN`/`CHECK`/…). |
@@ -92,7 +93,7 @@ Single-character names after `$` are accepted (`src/lexer.rs` `read_variable_nam
 
 ## Short list (what’s still missing)
 
-**Still commonly missing vs stock Perl 5:** full **`$!`**/**`$@`** dualvar; real **`%SIG`** delivery; **`English`**; full **`$^V`** as a version object; **`${^GLOBAL_PHASE}`** lifecycle matching Perl; **`exists`/`delete` on non-`$hash{key}` lvalues** (e.g. `exists $ref->{k}`).
+**Still commonly missing vs stock Perl 5:** full **`$!`**/**`$@`** dualvar; real **`%SIG`** delivery; **`English`**; full **`$^V`** as a version object; **`${^GLOBAL_PHASE}`** lifecycle matching Perl. **`exists $href->{key}`** / **`delete $href->{key}`** (hash references and blessed hash-like objects) are implemented; other exotic **`exists`/`delete`** targets may still differ from Perl 5.
 
 | Area | Perl | Notes |
 |------|------|--------|

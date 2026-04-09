@@ -212,3 +212,127 @@ pub fn pad_field(s: &str, width: usize, align: FieldAlign) -> String {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_format_template_empty() {
+        let t = parse_format_template(&[]).expect("parse");
+        assert!(t.records.is_empty());
+    }
+
+    #[test]
+    fn parse_format_template_literal_only() {
+        let t = parse_format_template(&["no fields here".to_string()]).expect("parse");
+        assert_eq!(t.records.len(), 1);
+        assert!(matches!(
+            &t.records[0],
+            FormatRecord::Literal(s) if s == "no fields here"
+        ));
+    }
+
+    #[test]
+    fn parse_format_template_picture_and_value_line() {
+        let t = parse_format_template(&[
+            "@<<<<".to_string(),
+            r#"qq(ab)"#.to_string(),
+        ])
+        .expect("parse");
+        assert_eq!(t.records.len(), 1);
+        let FormatRecord::Picture { segments, exprs } = &t.records[0] else {
+            panic!("expected picture");
+        };
+        assert_eq!(exprs.len(), 1);
+        assert_eq!(segments.len(), 1);
+        assert!(matches!(
+            &segments[0],
+            PictureSegment::Field {
+                width: 4,
+                align: FieldAlign::Left,
+                kind: FieldKind::Text,
+            }
+        ));
+    }
+
+    #[test]
+    fn parse_format_template_doubled_at_is_literal_at() {
+        // Any line containing `@` is a picture line; `@@` escapes to one `@` in the picture.
+        // With zero fields, the value line must be empty.
+        let t = parse_format_template(&["@@email".to_string(), "".to_string()]).expect("parse");
+        let FormatRecord::Picture { segments, exprs } = &t.records[0] else {
+            panic!("expected picture");
+        };
+        assert!(exprs.is_empty());
+        assert!(matches!(
+            segments.as_slice(),
+            [PictureSegment::Literal(s)] if s == "@email"
+        ));
+    }
+
+    #[test]
+    fn parse_format_template_picture_requires_value_line() {
+        let err = parse_format_template(&["@<<<<".to_string()]).expect_err("missing value");
+        assert!(err.to_string().contains("value line"));
+    }
+
+    #[test]
+    fn parse_format_template_field_count_mismatch() {
+        let err = parse_format_template(&["@<<, @<<".to_string(), "1".to_string()]).expect_err("mismatch");
+        assert!(err.to_string().contains("picture field"));
+    }
+
+    #[test]
+    fn parse_format_template_two_fields_two_exprs() {
+        let t = parse_format_template(&["@<< @>>".to_string(), "1, 2".to_string()]).expect("parse");
+        assert_eq!(t.records.len(), 1);
+        let FormatRecord::Picture { exprs, .. } = &t.records[0] else {
+            panic!("expected picture");
+        };
+        assert_eq!(exprs.len(), 2);
+    }
+
+    #[test]
+    fn parse_format_value_line_qq_comma_qq_is_two_exprs() {
+        let v = parse_format_value_line("qq(x), qq(y)").expect("parse");
+        assert_eq!(
+            v.len(),
+            2,
+            "comma-separated qq() should be two value expressions"
+        );
+    }
+
+    #[test]
+    fn pad_field_left_aligns_and_pads() {
+        assert_eq!(pad_field("hi", 5, FieldAlign::Left), "hi   ");
+    }
+
+    #[test]
+    fn pad_field_right_aligns() {
+        assert_eq!(pad_field("hi", 5, FieldAlign::Right), "   hi");
+    }
+
+    #[test]
+    fn pad_field_center_aligns() {
+        assert_eq!(pad_field("hi", 5, FieldAlign::Center), " hi  ");
+    }
+
+    #[test]
+    fn pad_field_numeric_right_aligns_integer() {
+        assert_eq!(pad_field("42", 5, FieldAlign::Numeric), "   42");
+    }
+
+    #[test]
+    fn pad_field_truncates_to_width() {
+        assert_eq!(pad_field("abcdef", 3, FieldAlign::Left), "abc");
+    }
+
+    #[test]
+    fn pad_field_multiline_uses_first_line() {
+        assert_eq!(
+            pad_field("first\nsecond", 6, FieldAlign::Multiline),
+            "first "
+        );
+    }
+}

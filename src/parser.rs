@@ -4379,7 +4379,8 @@ pub fn parse_format_value_line(line: &str) -> PerlResult<Vec<Expr>> {
         if parser.at_eof() {
             break;
         }
-        exprs.push(parser.parse_expression()?);
+        // Assignment-level expressions so `a, b` yields two fields (not one comma list).
+        exprs.push(parser.parse_assign_expr()?);
         if parser.eat(&Token::Comma) {
             continue;
         }

@@ -109,3 +109,29 @@ fn subs_map_holds_declared_sub() {
     i.execute_tree(&p).expect("execute_tree");
     assert!(i.subs.contains_key("interp_named"));
 }
+
+#[test]
+fn format_decl_registers_template_and_render_matches_picture() {
+    let mut i = Interpreter::new();
+    let prog = parse(
+        r#"
+format STDOUT =
+@<<<< @>>>>
+qq(x), qq(y)
+.
+1;
+"#,
+    )
+    .expect("parse");
+    i.prepare_program_top_level(&prog).expect("prepare");
+    let tmpl = i
+        .format_templates
+        .get("main::STDOUT")
+        .cloned()
+        .expect("format registered under package::NAME");
+    let out = i
+        .render_format_template(tmpl.as_ref(), 1)
+        .expect("render");
+    // Picture `@<<<< @>>>>` is two 4-wide fields with a literal space between.
+    assert_eq!(out, "x       y\n");
+}

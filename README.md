@@ -258,7 +258,7 @@ Each parallel block receives its own interpreter context with captured lexical s
 
 **SQLite** — `query` still loads all rows; a lazy **`stream`-style** row iterator is not wired yet (use `LIMIT`/`OFFSET` or chunk in Perl for huge result sets).
 
-Perl **`format` / `write`** report generation is **not** implemented (parser focus elsewhere).
+Perl **`format` / `write`** — **partial**: `format NAME =` … `.` registers a template in the current package; picture fields `@<<<<` / `@>>>>` / `@||||` / `@####` / `@****`, literal `@@`, and comma-separated value lines are supported; **`write`** with no arguments expands the template named by **`$~`** (default **`STDOUT`**) and prints to stdout like **`print`**. Not implemented: **`write FILEHANDLE`**, top-of-page (`$^`), **`formline`**, and other full **`perlform`** details.
 
 #### EXECUTION TRACE // `trace`
 
@@ -511,7 +511,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - `qw()`, `q()`, `qq()`
 - POD documentation skipping
 - Shebang line handling
-- **Special variables** — Not full perlvar(5): see [`SPECIAL_VARIABLES.md`](SPECIAL_VARIABLES.md) for `$_`, `$/`, `$!`, `$1`…, `%+`, `@-`/`@+`, `$]`/`$;`, **`$^O`** / **`$^T`** / **`$^V`** / **`$^E`** / **`$^H`**, **`${^WARNING_BITS}`** / **`${^GLOBAL_PHASE}`**, **`$<`**/**`$>`**/**`$(`**/**`$)`** (Unix ids; non-Unix stubs), **`${^MATCH}`** / **`${^PREMATCH}`** / **`${^POSTMATCH}`** (same data as `$&` / `` $` `` / `$'` when driven by the regex engine), `$^I`/`$^D`/`$^P`/`$^S`/`$^W`, `$ARGV` with `<>`, `@ARGV`/`%ENV`/`@INC`/`%INC`, `%SIG` (hash only; OS delivery not wired), **`$?`** / **`$|`** (see Perl-compat bullets above). Still missing vs Perl 5: full **`$!`**/**`$@`** dualvar; real **`%SIG`** delivery; **`English`**; full **`$^V`** as a version object; **`${^GLOBAL_PHASE}`** transitions (perlrs keeps a string, default **`RUN`**).
+- **Special variables** — Not full perlvar(5): see [`SPECIAL_VARIABLES.md`](SPECIAL_VARIABLES.md) for `$_`, `$/`, `$!`, `$1`…, `%+`, `@-`/`@+`, `$]`/`$;`, **`$^O`** / **`$^T`** / **`$^V`** / **`$^E`** / **`$^H`**, **`${^WARNING_BITS}`** / **`${^GLOBAL_PHASE}`**, **`$<`**/**`$>`**/**`$(`**/**`$)`** (Unix ids; non-Unix stubs), **`${^MATCH}`** / **`${^PREMATCH}`** / **`${^POSTMATCH}`** (same data as `$&` / `` $` `` / `$'` when driven by the regex engine), `$^I`/`$^D`/`$^P`/`$^S`/`$^W`, `$ARGV` with `<>`, `@ARGV`/`%ENV`/`@INC`/`%INC`, `%SIG` (hash only; OS delivery not wired), **`$?`** / **`$|`** (see Perl-compat bullets above). Still missing vs Perl 5: full **`$!`**/**`$@`** dualvar; real **`%SIG`** delivery; **`English`**; full **`$^V`** as a version object; **`${^GLOBAL_PHASE}`** transitions (perlrs keeps a string, default **`RUN`**). See [`SPECIAL_VARIABLES.md`](SPECIAL_VARIABLES.md) for **`exists`/`delete`** coverage (e.g. **`$href->{k}`** is supported).
 
 ---
 
