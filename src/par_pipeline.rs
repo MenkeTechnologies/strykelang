@@ -264,6 +264,11 @@ pub(crate) fn run_par_pipeline(
                 });
             }
         }
+        // `bounded` senders/receivers are cloned into each OS thread. Keeping the originals in
+        // `txs`/`rxs` leaves extra endpoints alive, so channels never disconnect and `recv()` never
+        // finishes — only the worker-held clones should remain after spawning.
+        txs.clear();
+        rxs.clear();
     });
 
     if let Some(msg) = err.lock().take() {
@@ -323,6 +328,8 @@ mod tests {
                     }
                 });
             }
+            txs.clear();
+            rxs.clear();
         });
 
         assert_eq!(processed.load(Ordering::SeqCst), 1);
