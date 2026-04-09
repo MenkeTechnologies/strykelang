@@ -181,7 +181,18 @@ fn star_multiline_prepends_dotall_in_compile_regex() {
 #[test]
 fn stash_array_caret_prefixed_stays_global() {
     let mut i = Interpreter::new();
-    i.scope
+    let _ = i
+        .scope
         .set_scalar("__PACKAGE__", PerlValue::string("Foo".into()));
     assert_eq!(i.stash_array_name_for_package("^CAPTURE"), "^CAPTURE");
+}
+
+#[test]
+fn capture_array_after_bind_match() {
+    let mut i = Interpreter::new();
+    let prog = parse(r#""foo=bar" =~ /=(.*)/; 1"#).expect("parse");
+    i.execute_tree(&prog).expect("execute_tree");
+    let cap = i.scope.get_array("^CAPTURE");
+    assert_eq!(cap.len(), 1);
+    assert_eq!(cap[0].to_string(), "bar");
 }
