@@ -662,6 +662,100 @@ impl Interpreter {
         }
     }
 
+    /// Fork interpreter state for `-n`/`-p` over multiple `@ARGV` files in parallel (rayon).
+    /// Clears file descriptors and I/O handles (each worker only runs the line loop).
+    pub fn line_mode_worker_clone(&self) -> Interpreter {
+        Interpreter {
+            scope: self.scope.clone(),
+            subs: self.subs.clone(),
+            struct_defs: self.struct_defs.clone(),
+            file: self.file.clone(),
+            output_handles: HashMap::new(),
+            input_handles: HashMap::new(),
+            ofs: self.ofs.clone(),
+            ors: self.ors.clone(),
+            irs: self.irs.clone(),
+            errno: self.errno.clone(),
+            errno_code: self.errno_code,
+            eval_error: self.eval_error.clone(),
+            eval_error_code: self.eval_error_code,
+            argv: self.argv.clone(),
+            env: self.env.clone(),
+            env_materialized: self.env_materialized,
+            program_name: self.program_name.clone(),
+            line_number: 0,
+            last_readline_handle: String::new(),
+            handle_line_numbers: HashMap::new(),
+            sigint_pending_caret: Cell::new(false),
+            auto_split: self.auto_split,
+            field_separator: self.field_separator.clone(),
+            begin_blocks: self.begin_blocks.clone(),
+            end_blocks: self.end_blocks.clone(),
+            warnings: self.warnings,
+            output_autoflush: self.output_autoflush,
+            suppress_stdout: self.suppress_stdout,
+            child_exit_status: self.child_exit_status,
+            last_match: self.last_match.clone(),
+            prematch: self.prematch.clone(),
+            postmatch: self.postmatch.clone(),
+            last_paren_match: self.last_paren_match.clone(),
+            list_separator: self.list_separator.clone(),
+            script_start_time: self.script_start_time,
+            compile_hints: self.compile_hints,
+            warning_bits: self.warning_bits,
+            global_phase: self.global_phase.clone(),
+            subscript_sep: self.subscript_sep.clone(),
+            inplace_edit: self.inplace_edit.clone(),
+            debug_flags: self.debug_flags,
+            perl_debug_flags: self.perl_debug_flags,
+            eval_nesting: self.eval_nesting,
+            argv_current_file: String::new(),
+            diamond_next_idx: 0,
+            diamond_reader: None,
+            strict_refs: self.strict_refs,
+            strict_subs: self.strict_subs,
+            strict_vars: self.strict_vars,
+            utf8_pragma: self.utf8_pragma,
+            feature_bits: self.feature_bits,
+            num_threads: 0,
+            regex_cache: self.regex_cache.clone(),
+            regex_last: self.regex_last.clone(),
+            regex_pos: self.regex_pos.clone(),
+            rand_rng: self.rand_rng.clone(),
+            dir_handles: HashMap::new(),
+            io_file_slots: HashMap::new(),
+            pipe_children: HashMap::new(),
+            socket_handles: HashMap::new(),
+            wantarray_kind: self.wantarray_kind,
+            profiler: None,
+            module_export_lists: self.module_export_lists.clone(),
+            tied_hashes: self.tied_hashes.clone(),
+            tied_scalars: self.tied_scalars.clone(),
+            tied_arrays: self.tied_arrays.clone(),
+            overload_table: self.overload_table.clone(),
+            format_templates: self.format_templates.clone(),
+            special_caret_scalars: self.special_caret_scalars.clone(),
+            format_page_number: self.format_page_number,
+            format_lines_per_page: self.format_lines_per_page,
+            format_lines_left: self.format_lines_left,
+            format_line_break_chars: self.format_line_break_chars.clone(),
+            format_top_name: self.format_top_name.clone(),
+            accumulator_format: self.accumulator_format.clone(),
+            max_system_fd: self.max_system_fd,
+            emergency_memory: self.emergency_memory.clone(),
+            last_subpattern_name: self.last_subpattern_name.clone(),
+            inc_hook_index: self.inc_hook_index,
+            multiline_match: self.multiline_match,
+            executable_path: self.executable_path.clone(),
+            formfeed_string: self.formfeed_string.clone(),
+            glob_handle_alias: self.glob_handle_alias.clone(),
+            glob_restore_frames: self.glob_restore_frames.clone(),
+            english_enabled: self.english_enabled,
+            english_lexical_scalars: self.english_lexical_scalars.clone(),
+            vm_jit_enabled: self.vm_jit_enabled,
+        }
+    }
+
     /// Rayon pool size (`pe -j`); lazily initialized from `rayon::current_num_threads()`.
     pub(crate) fn parallel_thread_count(&mut self) -> usize {
         if self.num_threads == 0 {
@@ -787,7 +881,7 @@ impl Interpreter {
     }
 
     #[inline]
-    fn english_note_lexical_scalar(&mut self, name: &str) {
+    pub(crate) fn english_note_lexical_scalar(&mut self, name: &str) {
         if let Some(s) = self.english_lexical_scalars.last_mut() {
             s.insert(name.to_string());
         }

@@ -126,6 +126,8 @@ cat file.txt | pe -pe 's/foo/bar/g'
 
 # in-place edit on named files (`-i` / `-i.bak` like Perl; `$^I` in Perl code)
 pe -i -pe 's/foo/bar/g' file1.txt file2.txt
+# With `-i` and multiple path arguments, each file is processed in parallel (rayon; pool size from `pe -j` / defaults)
+pe -i -pe 's/\ba\b/b/g' *.zsh
 
 # slurp entire input at once
 cat file.txt | pe -gne 'print length($_), "\n"'

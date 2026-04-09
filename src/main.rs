@@ -2,9 +2,11 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader, IsTerminal, Read as IoRead, Write};
 use std::path::{Path, PathBuf};
 use std::process;
+use std::sync::Mutex;
 
 use clap::Parser;
 use rand::Rng;
+use rayon::prelude::*;
 
 use perlrs::ast::Program;
 use perlrs::error::{ErrorKind, PerlError};
@@ -224,7 +226,7 @@ fn print_cyberpunk_help() {
     println!("  -l[octnum]             {G}//{N} Enable line ending processing");
     println!("  -0[octal]              {G}//{N} Specify record separator (\\0 if no arg)");
     println!("  -g                     {G}//{N} Slurp all input at once (alias for -0777)");
-    println!("  -i[extension]          {G}//{N} Edit <> files in place (backup if ext supplied)");
+    println!("  -i[extension]          {G}//{N} Edit <> files in place (backup if ext supplied; multiple files in parallel)");
     println!("{C}  ── MODULES & PATHS ──────────────────────────────────{N}");
     println!("  -M MODULE              {G}//{N} Execute \"use module...\" before program");
     println!(
@@ -384,27 +386,58 @@ fn run_line_mode_loop(
     let use_argv_files = !interp.argv.is_empty();
     let suppressed_stdout_for_inplace = inplace && use_argv_files;
     let print_to_stdout = cli.print_mode && !suppressed_stdout_for_inplace;
+    // With `-i` and named files, per-line print is suppressed; files are independent, so rayon can
+    // process them in parallel (stock `perl` processes `@ARGV` files sequentially).
+    let parallel_argv_inplace = inplace && use_argv_files;
 
     if slurp {
         if use_argv_files {
-            for path in interp.argv.clone() {
-                interp.line_number = 0;
-                interp.argv_current_file = path.clone();
-                let content = std::fs::read_to_string(&path).map_err(|e| {
-                    PerlError::new(
-                        ErrorKind::IO,
-                        format!("Can't open {}: {}", path, e),
-                        0,
-                        "-e",
-                    )
-                })?;
-                if let Some(output) = interp.process_line(&content, program)? {
-                    if inplace {
-                        commit_in_place_edit(Path::new(&path), &interp.inplace_edit, &output)
+            if parallel_argv_inplace {
+                let template = Mutex::new(interp.line_mode_worker_clone());
+                let paths = interp.argv.clone();
+                paths.into_par_iter().try_for_each(|path| {
+                    let mut local = template
+                        .lock()
+                        .expect("line-mode template mutex poisoned")
+                        .line_mode_worker_clone();
+                    local.line_number = 0;
+                    local.argv_current_file = path.clone();
+                    let content = std::fs::read_to_string(&path).map_err(|e| {
+                        PerlError::new(
+                            ErrorKind::IO,
+                            format!("Can't open {}: {}", path, e),
+                            0,
+                            "-e",
+                        )
+                    })?;
+                    if let Some(output) = local.process_line(&content, program)? {
+                        commit_in_place_edit(Path::new(&path), &local.inplace_edit, &output)
                             .map_err(|e| PerlError::new(ErrorKind::IO, e.to_string(), 0, "-e"))?;
-                    } else if cli.print_mode {
-                        print!("{}", output);
-                        let _ = io::stdout().flush();
+                    }
+                    Ok(())
+                })?;
+            } else {
+                for path in interp.argv.clone() {
+                    interp.line_number = 0;
+                    interp.argv_current_file = path.clone();
+                    let content = std::fs::read_to_string(&path).map_err(|e| {
+                        PerlError::new(
+                            ErrorKind::IO,
+                            format!("Can't open {}: {}", path, e),
+                            0,
+                            "-e",
+                        )
+                    })?;
+                    if let Some(output) = interp.process_line(&content, program)? {
+                        if inplace {
+                            commit_in_place_edit(Path::new(&path), &interp.inplace_edit, &output)
+                                .map_err(|e| {
+                                    PerlError::new(ErrorKind::IO, e.to_string(), 0, "-e")
+                                })?;
+                        } else if cli.print_mode {
+                            print!("{}", output);
+                            let _ = io::stdout().flush();
+                        }
                     }
                 }
             }
@@ -422,42 +455,82 @@ fn run_line_mode_loop(
     }
 
     if use_argv_files {
-        for path in interp.argv.clone() {
-            interp.line_number = 0;
-            interp.argv_current_file = path.clone();
-            let file = File::open(&path).map_err(|e| {
-                PerlError::new(
-                    ErrorKind::IO,
-                    format!("Can't open {}: {}", path, e),
-                    0,
-                    "-e",
-                )
-            })?;
-            let reader = BufReader::new(file);
-            let mut accumulated = String::new();
-            for line in reader.lines() {
-                let l = line.map_err(|e| {
+        if parallel_argv_inplace {
+            let template = Mutex::new(interp.line_mode_worker_clone());
+            let paths = interp.argv.clone();
+            paths.into_par_iter().try_for_each(|path| {
+                let mut local = template
+                    .lock()
+                    .expect("line-mode template mutex poisoned")
+                    .line_mode_worker_clone();
+                local.line_number = 0;
+                local.argv_current_file = path.clone();
+                let file = File::open(&path).map_err(|e| {
                     PerlError::new(
                         ErrorKind::IO,
-                        format!("Error reading {}: {}", path, e),
+                        format!("Can't open {}: {}", path, e),
                         0,
                         "-e",
                     )
                 })?;
-                let input = format!("{}\n", l);
-                if let Some(output) = interp.process_line(&input, program)? {
-                    if print_to_stdout {
-                        print!("{}", output);
-                        let _ = io::stdout().flush();
-                    }
-                    if inplace {
+                let reader = BufReader::new(file);
+                let mut accumulated = String::new();
+                for line in reader.lines() {
+                    let l = line.map_err(|e| {
+                        PerlError::new(
+                            ErrorKind::IO,
+                            format!("Error reading {}: {}", path, e),
+                            0,
+                            "-e",
+                        )
+                    })?;
+                    let input = format!("{}\n", l);
+                    if let Some(output) = local.process_line(&input, program)? {
                         accumulated.push_str(&output);
                     }
                 }
-            }
-            if inplace {
-                commit_in_place_edit(Path::new(&path), &interp.inplace_edit, &accumulated)
+                commit_in_place_edit(Path::new(&path), &local.inplace_edit, &accumulated)
                     .map_err(|e| PerlError::new(ErrorKind::IO, e.to_string(), 0, "-e"))?;
+                Ok(())
+            })?;
+        } else {
+            for path in interp.argv.clone() {
+                interp.line_number = 0;
+                interp.argv_current_file = path.clone();
+                let file = File::open(&path).map_err(|e| {
+                    PerlError::new(
+                        ErrorKind::IO,
+                        format!("Can't open {}: {}", path, e),
+                        0,
+                        "-e",
+                    )
+                })?;
+                let reader = BufReader::new(file);
+                let mut accumulated = String::new();
+                for line in reader.lines() {
+                    let l = line.map_err(|e| {
+                        PerlError::new(
+                            ErrorKind::IO,
+                            format!("Error reading {}: {}", path, e),
+                            0,
+                            "-e",
+                        )
+                    })?;
+                    let input = format!("{}\n", l);
+                    if let Some(output) = interp.process_line(&input, program)? {
+                        if print_to_stdout {
+                            print!("{}", output);
+                            let _ = io::stdout().flush();
+                        }
+                        if inplace {
+                            accumulated.push_str(&output);
+                        }
+                    }
+                }
+                if inplace {
+                    commit_in_place_edit(Path::new(&path), &interp.inplace_edit, &accumulated)
+                        .map_err(|e| PerlError::new(ErrorKind::IO, e.to_string(), 0, "-e"))?;
+                }
             }
         }
     } else {

@@ -51,3 +51,35 @@ fn pe_i_bak_creates_backup_next_to_target() {
     assert!(backup.is_file(), "expected backup at {:?}", backup);
     assert_eq!(fs::read_to_string(&backup).unwrap(), "x\n");
 }
+
+#[test]
+fn pe_i_p_e_inplace_edits_multiple_argv_files_in_parallel() {
+    let dir = std::env::temp_dir().join(format!(
+        "perlrs_inplace_par_{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let paths: Vec<_> = (0..4)
+        .map(|i| dir.join(format!("f{i}.txt")))
+        .collect();
+    for p in &paths {
+        fs::write(p, "hello a world\n").unwrap();
+    }
+
+    let exe = env!("CARGO_BIN_EXE_pe");
+    let out = Command::new(exe)
+        .current_dir(&dir)
+        .args(["-i", "-p", "-e", "s/a/b/"])
+        .args(&paths)
+        .output()
+        .expect("spawn pe");
+
+    assert!(
+        out.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    for p in &paths {
+        assert_eq!(fs::read_to_string(p).unwrap(), "hello b world\n");
+    }
+}
