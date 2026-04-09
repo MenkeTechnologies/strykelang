@@ -1,10 +1,16 @@
+```
  ██████╗ ███████╗██████╗ ██╗     ██████╗ ███████╗
  ██╔══██╗██╔════╝██╔══██╗██║     ██╔══██╗██╔════╝
  ██████╔╝█████╗  ██████╔╝██║     ██████╔╝███████╗
  ██╔═══╝ ██╔══╝  ██╔══██╗██║     ██╔══██╗╚════██║
  ██║     ███████╗██║  ██║███████╗██║  ██║███████║
  ╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚══════╝
+```
 
+[![CI](https://github.com/MenkeTechnologies/perlrs/actions/workflows/ci.yml/badge.svg)](https://github.com/MenkeTechnologies/perlrs/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/perlrs.svg)](https://crates.io/crates/perlrs)
+[![Downloads](https://img.shields.io/crates/d/perlrs.svg)](https://crates.io/crates/perlrs)
+[![Docs.rs](https://docs.rs/perlrs/badge.svg)](https://docs.rs/perlrs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ### `[PARALLEL PERL5 INTERPRETER // RUST-POWERED EXECUTION ENGINE]`
@@ -34,7 +40,13 @@
 
 ## [0x02] INSTALLATION
 
-#### DOWNLOADING PAYLOAD FROM SOURCE
+#### DOWNLOADING PAYLOAD FROM CRATES.IO
+
+```sh
+cargo install perlrs
+```
+
+#### COMPILING FROM SOURCE
 
 ```sh
 git clone https://github.com/MenkeTechnologies/perlrs
@@ -42,13 +54,23 @@ cd perlrs
 cargo build --release
 ```
 
-#### BINARY DEPLOYMENT
+[perlrs on Crates.io](https://crates.io/crates/perlrs)
+
+#### ZSH COMPLETION // TAB-COMPLETE ALL THE THINGS
 
 ```sh
-cargo install --path .
+# copy to a directory in your fpath
+cp completions/_perlrs /usr/local/share/zsh/site-functions/_perlrs
+cp completions/_pe /usr/local/share/zsh/site-functions/_pe
+
+# or add the completions directory to fpath in your .zshrc
+fpath=(/path/to/perlrs/completions $fpath)
+
+# then reload completions
+autoload -Uz compinit && compinit
 ```
 
-Both `perlrs` and `pe` (short alias) binaries are installed.
+After reloading your shell, `perlrs <TAB>` and `pe <TAB>` will complete all flags, options, and script files.
 
 ---
 
@@ -226,31 +248,7 @@ All standard Perl 5 CLI flags are supported:
 
 ---
 
-## Testing
-
-Integration tests exercise the lexer, parser, and interpreter end-to-end. Shared helpers (`eval`, `eval_int`, `eval_string`, error helpers) live in `tests/common/mod.rs`. Cases are grouped by area under `tests/suite/` (expressions, strings, control flow, collections, regex, parallel execution, builtins, errors). The crate root test target is `tests/integration.rs`. Run the full suite with:
-
-```bash
-cargo test
-```
-
----
-
-## [0x06] ZSH COMPLETION
-
-Zsh tab completion is included for both `perlrs` and `pe` binaries.
-
-```sh
-# add to your .zshrc
-fpath=(/path/to/perlrs/completions $fpath)
-autoload -Uz compinit && compinit
-```
-
-After reloading your shell, `perlrs <TAB>` and `pe <TAB>` will complete all flags, options, and script files.
-
----
-
-## [0x07] ARCHITECTURE
+## [0x06] ARCHITECTURE
 
 ```
  ┌─────────────────────────────────────────────────────┐
@@ -281,13 +279,19 @@ After reloading your shell, `perlrs <TAB>` and `pe <TAB>` will complete all flag
 
 ---
 
-## [0x08] EXAMPLES
+## [0x07] EXAMPLES
 
 ```sh
 perlrs examples/fibonacci.pl
 perlrs examples/text_processing.pl
 perlrs examples/parallel_demo.pl
 ```
+
+---
+
+## [0x08] DEVELOPMENT & CI
+
+Pull requests and pushes to `main` run the workflow in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). You can also run it manually from the repository **Actions** tab (**workflow dispatch**). On a pull request, the **Checks** tab (or the merge box) shows the aggregate status; open the **CI** workflow run for per-job logs (Check, Test, Format, Clippy, Doc, Release Build).
 
 ---
 
