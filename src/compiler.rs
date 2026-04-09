@@ -52,6 +52,8 @@ pub struct Compiler {
     scope_stack: Vec<ScopeLayer>,
     /// Current `package` for stash qualification (`@ISA`, `@EXPORT`, …), matching [`Interpreter::stash_array_name_for_package`].
     current_package: String,
+    /// Source path for `__FILE__` in bytecode (must match [`Interpreter::file`] when using the VM).
+    pub source_file: String,
 }
 
 impl Default for Compiler {
@@ -68,7 +70,13 @@ impl Compiler {
             end_blocks: Vec::new(),
             scope_stack: vec![ScopeLayer::default()],
             current_package: String::new(),
+            source_file: String::new(),
         }
+    }
+
+    pub fn with_source_file(mut self, path: String) -> Self {
+        self.source_file = path;
+        self
     }
 
     /// `@ISA` / `@EXPORT` / `@EXPORT_OK` outside `main` → `Pkg::NAME` (see interpreter stash rules).
@@ -1120,6 +1128,18 @@ impl Compiler {
             }
             ExprKind::Undef => {
                 self.chunk.emit(Op::LoadUndef, line);
+            }
+            ExprKind::MagicConst(crate::ast::MagicConstKind::File) => {
+                let idx = self
+                    .chunk
+                    .add_constant(PerlValue::string(self.source_file.clone()));
+                self.chunk.emit(Op::LoadConst(idx), line);
+            }
+            ExprKind::MagicConst(crate::ast::MagicConstKind::Line) => {
+                let idx = self
+                    .chunk
+                    .add_constant(PerlValue::integer(expr.line as i64));
+                self.chunk.emit(Op::LoadConst(idx), line);
             }
             ExprKind::ScalarVar(name) => {
                 let idx = self.chunk.intern_name(name);

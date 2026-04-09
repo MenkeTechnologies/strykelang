@@ -84,4 +84,76 @@ mod tests {
         let m = linearize_c3("D", &parents, 0);
         assert_eq!(m, vec!["D", "B", "C", "A", "UNIVERSAL"]);
     }
+
+    #[test]
+    fn merge_c3_empty_slice() {
+        assert_eq!(merge_c3(&[]), Some(vec![]));
+    }
+
+    #[test]
+    fn merge_c3_all_empty_lists() {
+        assert_eq!(merge_c3(&[vec![], vec![]]), Some(vec![]));
+    }
+
+    #[test]
+    fn merge_c3_linear_two() {
+        assert_eq!(
+            merge_c3(&[vec!["A".into(), "B".into()], vec!["B".into()]]),
+            Some(vec!["A".into(), "B".into()])
+        );
+    }
+
+    #[test]
+    fn merge_c3_inconsistent_heads() {
+        assert_eq!(
+            merge_c3(&[vec!["A".into(), "B".into()], vec!["B".into(), "A".into()]]),
+            None
+        );
+    }
+
+    #[test]
+    fn linearize_linear_isa_chain() {
+        let parents = |c: &str| -> Vec<String> {
+            match c {
+                "Child" => vec!["Parent".into()],
+                "Parent" => vec![],
+                _ => vec![],
+            }
+        };
+        assert_eq!(
+            linearize_c3("Child", &parents, 0),
+            vec!["Child", "Parent", "UNIVERSAL"]
+        );
+    }
+
+    #[test]
+    fn linearize_universal_only() {
+        let parents = |_c: &str| -> Vec<String> { vec![] };
+        assert_eq!(
+            linearize_c3("UNIVERSAL", &parents, 0),
+            vec!["UNIVERSAL"]
+        );
+    }
+
+    #[test]
+    fn linearize_singleton_class_appends_universal() {
+        let parents = |_c: &str| -> Vec<String> { vec![] };
+        assert_eq!(
+            linearize_c3("Lonely", &parents, 0),
+            vec!["Lonely", "UNIVERSAL"]
+        );
+    }
+
+    #[test]
+    fn linearize_depth_guard_returns_class_only() {
+        let parents = |c: &str| -> Vec<String> {
+            if c == "X" {
+                vec!["X".into()]
+            } else {
+                vec![]
+            }
+        };
+        let m = linearize_c3("X", &parents, 300);
+        assert_eq!(m, vec!["X"]);
+    }
 }

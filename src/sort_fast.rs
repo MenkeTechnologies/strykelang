@@ -125,4 +125,50 @@ mod tests {
             Some(SortBlockFast::StringRev)
         );
     }
+
+    #[test]
+    fn detect_sort_block_fast_rejects_empty_block() {
+        let block: Block = vec![];
+        assert_eq!(detect_sort_block_fast(&block), None);
+    }
+
+    #[test]
+    fn detect_sort_block_fast_rejects_multi_statement_block() {
+        let p = crate::parse("sub two_stmt { $a <=> $b; 1; }").expect("parse");
+        let block = match &p.statements[0].kind {
+            StmtKind::SubDecl { body, .. } => body,
+            _ => panic!("expected sub"),
+        };
+        assert_eq!(detect_sort_block_fast(block), None);
+    }
+
+    #[test]
+    fn sort_magic_cmp_numeric_ordering() {
+        use crate::value::PerlValue;
+        let a = PerlValue::integer(1);
+        let b = PerlValue::integer(2);
+        assert_eq!(
+            sort_magic_cmp(&a, &b, SortBlockFast::Numeric),
+            std::cmp::Ordering::Less
+        );
+        assert_eq!(
+            sort_magic_cmp(&a, &b, SortBlockFast::NumericRev),
+            std::cmp::Ordering::Greater
+        );
+    }
+
+    #[test]
+    fn sort_magic_cmp_string_ordering() {
+        use crate::value::PerlValue;
+        let a = PerlValue::string("a".into());
+        let b = PerlValue::string("z".into());
+        assert_eq!(
+            sort_magic_cmp(&a, &b, SortBlockFast::String),
+            std::cmp::Ordering::Less
+        );
+        assert_eq!(
+            sort_magic_cmp(&a, &b, SortBlockFast::StringRev),
+            std::cmp::Ordering::Greater
+        );
+    }
 }

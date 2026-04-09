@@ -28,6 +28,7 @@ pub mod par_pipeline;
 pub mod profiler;
 pub mod pwatch;
 pub mod scope;
+pub mod special_vars;
 mod sort_fast;
 pub mod token;
 mod nanbox;
@@ -100,7 +101,7 @@ pub fn try_vm_execute(
         return None;
     }
 
-    let comp = compiler::Compiler::new();
+    let comp = compiler::Compiler::new().with_source_file(interp.file.clone());
     match comp.compile_program(program) {
         Ok(chunk) => {
             for def in &chunk.struct_defs {

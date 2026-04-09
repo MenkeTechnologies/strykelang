@@ -72,3 +72,55 @@ pub(crate) fn decode_heap_ptr<T>(u: u64) -> *const T {
     debug_assert!(is_heap(u));
     (u & 0x0000_FFFF_FFFF_FFFF) as *const T
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn imm_undef_tag() {
+        let u = encode_imm_undef();
+        assert!(is_imm(u));
+        assert!(is_imm_undef(u));
+        assert!(!is_heap(u));
+        assert_eq!(as_imm_int32(u), None);
+    }
+
+    #[test]
+    fn imm_int32_roundtrip() {
+        for n in [0i32, -1, 42, i32::MIN, i32::MAX] {
+            let u = encode_imm_int32(n);
+            assert!(is_imm(u));
+            assert!(!is_imm_undef(u));
+            assert_eq!(as_imm_int32(u), Some(n));
+        }
+    }
+
+    #[test]
+    fn raw_float_bits_excludes_non_finite() {
+        assert!(is_raw_float_bits(1.0f64.to_bits()));
+        assert!(!is_raw_float_bits(f64::INFINITY.to_bits()));
+        assert!(!is_raw_float_bits(f64::NAN.to_bits()));
+    }
+
+    #[test]
+    fn float_needs_box_for_non_finite() {
+        assert!(float_needs_box(f64::INFINITY));
+        assert!(float_needs_box(f64::NAN));
+        assert!(!float_needs_box(0.0));
+        assert!(!float_needs_box(-1.25e100));
+    }
+
+    #[test]
+    fn heap_ptr_roundtrip() {
+        let b = Box::new(0xDEADBEEFu32 as i32);
+        let raw = Box::into_raw(b);
+        let u = encode_heap_ptr(raw);
+        assert!(is_heap(u));
+        assert!(!is_imm(u));
+        assert_eq!(decode_heap_ptr::<i32>(u), raw as *const i32);
+        unsafe {
+            drop(Box::from_raw(raw));
+        }
+    }
+}

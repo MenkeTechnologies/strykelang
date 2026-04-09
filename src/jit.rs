@@ -1,9 +1,15 @@
-//! Experimental **method JIT** (Cranelift): compiles linear integer stack bytecode to native code.
+//! **Method JIT** (Cranelift): compiles linear **pure-integer** stack bytecode to native code.
 //!
-//! Only sequences of [`Op::LoadInt`], [`Op::Add`]/[`Op::Sub`]/[`Op::Mul`], [`Op::Negate`],
-//! [`Op::Pop`], [`Op::Dup`], and an optional trailing [`Op::Halt`] are eligible. This matches the
-//! VM’s `i64` wrapping arithmetic for [`PerlValue::integer`](crate::value::PerlValue::integer).
-//! Anything else (calls, slots, control flow) falls back to the interpreter.
+//! Eligible ops: [`Op::LoadInt`], [`Op::Add`]/[`Op::Sub`]/[`Op::Mul`], [`Op::Negate`],
+//! [`Op::BitXor`], [`Op::BitNot`], [`Op::Shl`]/[`Op::Shr`] (shift amount masked to 6 bits, matching
+//! Rust/`i64::wrapping_shl` / `wrapping_shr`), [`Op::Pop`], [`Op::Dup`], optional trailing
+//! [`Op::Halt`]. Matches the VM’s integer fast path (wrapping `i64` for `+`/`-`/`*`; bitwise ops
+//! match [`Op::BitXor`] / [`Op::BitNot`] / shift ops in `vm.rs`).
+//!
+//! Not JIT’d: [`Op::Div`]/[`Op::Mod`] (runtime divide-by-zero and Perl’s mixed int/float division),
+//! [`Op::Pow`], [`Op::BitAnd`]/[`Op::BitOr`] (set operations), slots, control flow, calls — those
+//! keep using the interpreter. Hot-loop tracing and [`Op::GetScalarSlot`] in native code remain
+//! future work.
 
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
@@ -69,6 +75,10 @@ fn hash_ops(ops: &[Op]) -> u64 {
             Op::Mul => 8u8.hash(&mut h),
             Op::Negate => 9u8.hash(&mut h),
             Op::Halt => 10u8.hash(&mut h),
+            Op::BitXor => 11u8.hash(&mut h),
+            Op::BitNot => 12u8.hash(&mut h),
+            Op::Shl => 13u8.hash(&mut h),
+            Op::Shr => 14u8.hash(&mut h),
             _ => {
                 255u8.hash(&mut h);
                 format!("{op:?}").hash(&mut h);
@@ -118,6 +128,17 @@ fn validate_linear(ops: &[Op]) -> bool {
                     return false;
                 }
                 depth += 1;
+            }
+            Op::BitXor | Op::Shl | Op::Shr => {
+                if depth < 2 {
+                    return false;
+                }
+                depth -= 1;
+            }
+            Op::BitNot => {
+                if depth < 1 {
+                    return false;
+                }
             }
             _ => return false,
         }
@@ -183,6 +204,30 @@ fn compile_linear(ops: &[Op]) -> Option<LinearJit> {
                 Op::Dup => {
                     let v = *stack.last()?;
                     stack.push(v);
+                }
+                Op::BitXor => {
+                    let b = stack.pop()?;
+                    let a = stack.pop()?;
+                    stack.push(bcx.ins().bxor(a, b));
+                }
+                Op::BitNot => {
+                    let a = stack.pop()?;
+                    let ones = bcx.ins().iconst(types::I64, -1);
+                    stack.push(bcx.ins().bxor(a, ones));
+                }
+                Op::Shl => {
+                    let b = stack.pop()?;
+                    let a = stack.pop()?;
+                    let mask = bcx.ins().iconst(types::I64, 63);
+                    let mb = bcx.ins().band(b, mask);
+                    stack.push(bcx.ins().ishl(a, mb));
+                }
+                Op::Shr => {
+                    let b = stack.pop()?;
+                    let a = stack.pop()?;
+                    let mask = bcx.ins().iconst(types::I64, 63);
+                    let mb = bcx.ins().band(b, mask);
+                    stack.push(bcx.ins().sshr(a, mb));
                 }
                 _ => return None,
             }
@@ -270,6 +315,48 @@ mod tests {
     fn jit_rejects_slot_op() {
         let ops = vec![Op::LoadInt(1), Op::GetScalarSlot(0), Op::Add, Op::Halt];
         assert!(try_run_linear_ops(&ops).is_none());
+    }
+
+    #[test]
+    fn jit_bit_xor() {
+        let ops = vec![
+            Op::LoadInt(0xF0),
+            Op::LoadInt(0x0F),
+            Op::BitXor,
+            Op::Halt,
+        ];
+        assert_eq!(try_run_linear_ops(&ops).expect("jit").to_int(), 0xFF);
+    }
+
+    #[test]
+    fn jit_shl_and_shr() {
+        let shl = vec![
+            Op::LoadInt(1),
+            Op::LoadInt(2),
+            Op::Shl,
+            Op::Halt,
+        ];
+        assert_eq!(try_run_linear_ops(&shl).expect("jit").to_int(), 4);
+        let shr = vec![
+            Op::LoadInt(-16),
+            Op::LoadInt(2),
+            Op::Shr,
+            Op::Halt,
+        ];
+        assert_eq!(try_run_linear_ops(&shr).expect("jit").to_int(), -4);
+    }
+
+    #[test]
+    fn jit_bit_not() {
+        let ops = vec![Op::LoadInt(0), Op::BitNot, Op::Halt];
+        assert_eq!(try_run_linear_ops(&ops).expect("jit").to_int(), !0i64);
+    }
+
+    #[test]
+    fn jit_rejects_div_mod_pow() {
+        assert!(try_run_linear_ops(&[Op::LoadInt(1), Op::LoadInt(2), Op::Div, Op::Halt]).is_none());
+        assert!(try_run_linear_ops(&[Op::LoadInt(5), Op::LoadInt(2), Op::Mod, Op::Halt]).is_none());
+        assert!(try_run_linear_ops(&[Op::LoadInt(2), Op::LoadInt(3), Op::Pow, Op::Halt]).is_none());
     }
 
     #[test]

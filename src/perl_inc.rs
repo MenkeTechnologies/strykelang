@@ -87,4 +87,17 @@ mod tests {
         push_unique_string_paths(&mut v, vec!["a".to_string(), "b".to_string()]);
         assert_eq!(v, vec!["a", "b"]);
     }
+
+    #[test]
+    fn parse_perl_inc_output_empty_and_whitespace_only() {
+        assert!(parse_perl_inc_output("").is_empty());
+        assert!(parse_perl_inc_output("  \n\t\n").is_empty());
+    }
+
+    #[test]
+    fn push_unique_string_paths_empty_extra_is_noop() {
+        let mut v = vec!["a".to_string()];
+        push_unique_string_paths(&mut v, vec![]);
+        assert_eq!(v, vec!["a"]);
+    }
 }

@@ -3,6 +3,7 @@
 use crate::ast::StmtKind;
 use crate::interpreter::Interpreter;
 use crate::parse;
+use crate::value::PerlValue;
 
 #[test]
 fn our_isa_stores_c_isa_for_parents_of_class() {
@@ -148,4 +149,20 @@ format STDOUT =
         .expect("render");
     // Picture `@<<<< @>>>>` is two 4-wide fields with a literal space between.
     assert_eq!(out, "1       2\n");
+}
+
+#[test]
+fn list_separator_dollar_quote_roundtrips() {
+    let mut i = Interpreter::new();
+    assert_eq!(i.list_separator, " ");
+    i.set_special_var("\"", &PerlValue::string(",".into()))
+        .expect("set $\"");
+    assert_eq!(i.get_special_var("\"").to_string(), ",");
+    assert_eq!(i.list_separator, ",");
+}
+
+#[test]
+fn caret_unicode_preseeded_undef() {
+    let i = Interpreter::new();
+    assert!(i.get_special_var("^UNICODE").is_undef());
 }

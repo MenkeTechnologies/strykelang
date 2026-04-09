@@ -774,3 +774,264 @@ fn arg_to_list(v: &PerlValue) -> Vec<PerlValue> {
         vec![v.clone()]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::interpreter::{Interpreter, WantarrayCtx};
+    use crate::value::PerlValue;
+
+    fn call_native(
+        interp: &mut Interpreter,
+        fq: &str,
+        args: &[PerlValue],
+        want: WantarrayCtx,
+    ) -> PerlValue {
+        let sub = interp
+            .subs
+            .get(fq)
+            .unwrap_or_else(|| panic!("missing sub {fq}"))
+            .clone();
+        match native_dispatch(interp, &sub, args, want) {
+            Some(Ok(v)) => v,
+            Some(Err(e)) => panic!("{:?}", e),
+            None => panic!("not a List::Util native: {fq}"),
+        }
+    }
+
+    #[test]
+    fn sum_and_product() {
+        let mut i = Interpreter::new();
+        let s = call_native(
+            &mut i,
+            "List::Util::sum",
+            &[PerlValue::integer(1), PerlValue::integer(2), PerlValue::integer(3)],
+            WantarrayCtx::Scalar,
+        );
+        assert_eq!(s.to_int(), 6);
+        let p = call_native(
+            &mut i,
+            "List::Util::product",
+            &[PerlValue::integer(2), PerlValue::integer(3)],
+            WantarrayCtx::Scalar,
+        );
+        assert_eq!(p.to_int(), 6);
+    }
+
+    #[test]
+    fn sum_empty_is_undef_sum0_empty_is_zero() {
+        let mut i = Interpreter::new();
+        let s = call_native(&mut i, "List::Util::sum", &[], WantarrayCtx::Scalar);
+        assert!(s.is_undef());
+        let z = call_native(&mut i, "List::Util::sum0", &[], WantarrayCtx::Scalar);
+        assert_eq!(z.to_int(), 0);
+    }
+
+    #[test]
+    fn product_empty_is_one() {
+        let mut i = Interpreter::new();
+        let p = call_native(&mut i, "List::Util::product", &[], WantarrayCtx::Scalar);
+        assert_eq!(p.to_int(), 1);
+    }
+
+    #[test]
+    fn min_max_minstr_maxstr() {
+        let mut i = Interpreter::new();
+        let mn = call_native(
+            &mut i,
+            "List::Util::min",
+            &[PerlValue::float(3.0), PerlValue::float(1.0)],
+            WantarrayCtx::Scalar,
+        );
+        assert_eq!(mn.to_int(), 1);
+        let mx = call_native(
+            &mut i,
+            "List::Util::max",
+            &[PerlValue::integer(3), PerlValue::integer(9)],
+            WantarrayCtx::Scalar,
+        );
+        assert_eq!(mx.to_int(), 9);
+        let ms = call_native(
+            &mut i,
+            "List::Util::minstr",
+            &[PerlValue::string("z".into()), PerlValue::string("a".into())],
+            WantarrayCtx::Scalar,
+        );
+        assert_eq!(ms.to_string(), "a");
+    }
+
+    #[test]
+    fn min_max_empty_undef() {
+        let mut i = Interpreter::new();
+        let mn = call_native(&mut i, "List::Util::min", &[], WantarrayCtx::Scalar);
+        assert!(mn.is_undef());
+    }
+
+    #[test]
+    fn uniq_adjacent_strings() {
+        let mut i = Interpreter::new();
+        let u = call_native(
+            &mut i,
+            "List::Util::uniq",
+            &[
+                PerlValue::string("a".into()),
+                PerlValue::string("a".into()),
+                PerlValue::string("b".into()),
+            ],
+            WantarrayCtx::List,
+        );
+        let v = u.as_array_vec().expect("array");
+        assert_eq!(v.len(), 2);
+        assert_eq!(v[0].to_string(), "a");
+        assert_eq!(v[1].to_string(), "b");
+    }
+
+    #[test]
+    fn uniqstr_compares_strings_not_dwim() {
+        let mut i = Interpreter::new();
+        let u = call_native(
+            &mut i,
+            "List::Util::uniqstr",
+            &[PerlValue::string("01".into()), PerlValue::integer(1)],
+            WantarrayCtx::List,
+        );
+        let v = u.as_array_vec().expect("array");
+        assert_eq!(v.len(), 2);
+    }
+
+    #[test]
+    fn uniqint_coerces_to_int() {
+        let mut i = Interpreter::new();
+        let u = call_native(
+            &mut i,
+            "List::Util::uniqint",
+            &[PerlValue::integer(2), PerlValue::integer(2), PerlValue::integer(3)],
+            WantarrayCtx::List,
+        );
+        let v = u.as_array_vec().expect("array");
+        assert_eq!(v.len(), 2);
+        assert_eq!(v[0].to_int(), 2);
+        assert_eq!(v[1].to_int(), 3);
+    }
+
+    #[test]
+    fn head_and_tail() {
+        let mut i = Interpreter::new();
+        let h = call_native(
+            &mut i,
+            "List::Util::head",
+            &[
+                PerlValue::integer(2),
+                PerlValue::integer(10),
+                PerlValue::integer(20),
+                PerlValue::integer(30),
+            ],
+            WantarrayCtx::List,
+        );
+        let hv = h.as_array_vec().unwrap();
+        assert_eq!(hv.len(), 2);
+        assert_eq!(hv[0].to_int(), 10);
+        let t = call_native(
+            &mut i,
+            "List::Util::tail",
+            &[
+                PerlValue::integer(2),
+                PerlValue::integer(10),
+                PerlValue::integer(20),
+                PerlValue::integer(30),
+            ],
+            WantarrayCtx::List,
+        );
+        let tv = t.as_array_vec().unwrap();
+        assert_eq!(tv.len(), 2);
+        assert_eq!(tv[1].to_int(), 30);
+    }
+
+    #[test]
+    fn pairkeys_and_pairvalues() {
+        let mut i = Interpreter::new();
+        let k = call_native(
+            &mut i,
+            "List::Util::pairkeys",
+            &[
+                PerlValue::string("a".into()),
+                PerlValue::integer(1),
+                PerlValue::string("b".into()),
+                PerlValue::integer(2),
+            ],
+            WantarrayCtx::List,
+        );
+        let kv = k.as_array_vec().unwrap();
+        assert_eq!(kv.len(), 2);
+        assert_eq!(kv[0].to_string(), "a");
+        assert_eq!(kv[1].to_string(), "b");
+        let vals = call_native(
+            &mut i,
+            "List::Util::pairvalues",
+            &[
+                PerlValue::string("a".into()),
+                PerlValue::integer(1),
+                PerlValue::string("b".into()),
+                PerlValue::integer(2),
+            ],
+            WantarrayCtx::List,
+        );
+        let vv = vals.as_array_vec().unwrap();
+        assert_eq!(vv[0].to_int(), 1);
+        assert_eq!(vv[1].to_int(), 2);
+    }
+
+    #[test]
+    fn zip_shortest_two_lists() {
+        let mut i = Interpreter::new();
+        let z = call_native(
+            &mut i,
+            "List::Util::zip_shortest",
+            &[
+                PerlValue::array(vec![PerlValue::integer(1), PerlValue::integer(2)]),
+                PerlValue::array(vec![PerlValue::integer(10)]),
+            ],
+            WantarrayCtx::List,
+        );
+        let rows = z.as_array_vec().unwrap();
+        assert_eq!(rows.len(), 1);
+        let row = rows[0].as_array_ref().expect("row ref");
+        let g = row.read();
+        assert_eq!(g.len(), 2);
+        assert_eq!(g[0].to_int(), 1);
+        assert_eq!(g[1].to_int(), 10);
+    }
+
+    #[test]
+    fn mesh_interleaves_rows() {
+        let mut i = Interpreter::new();
+        let m = call_native(
+            &mut i,
+            "List::Util::mesh_shortest",
+            &[
+                PerlValue::array(vec![PerlValue::integer(1), PerlValue::integer(2)]),
+                PerlValue::array(vec![PerlValue::integer(10), PerlValue::integer(20)]),
+            ],
+            WantarrayCtx::List,
+        );
+        let v = m.as_array_vec().unwrap();
+        assert_eq!(v.len(), 4);
+        assert_eq!(v[0].to_int(), 1);
+        assert_eq!(v[1].to_int(), 10);
+        assert_eq!(v[2].to_int(), 2);
+        assert_eq!(v[3].to_int(), 20);
+    }
+
+    #[test]
+    fn sample_without_pool_returns_empty() {
+        let mut i = Interpreter::new();
+        let s = call_native(
+            &mut i,
+            "List::Util::sample",
+            &[PerlValue::integer(3)],
+            WantarrayCtx::List,
+        );
+        let v = s.as_array_vec().unwrap();
+        assert!(v.is_empty());
+    }
+}

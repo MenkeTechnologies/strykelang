@@ -335,38 +335,31 @@ mod tests {
         let FormatRecord::Picture { segments, .. } = &t.records[0] else {
             panic!("expected picture");
         };
+        let fields: Vec<_> = segments
+            .iter()
+            .filter_map(|s| match s {
+                PictureSegment::Field {
+                    width,
+                    align,
+                    kind,
+                } => Some((*width, *align, *kind)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(fields.len(), 4);
         assert!(matches!(
-            &segments[0],
-            PictureSegment::Field {
-                width: 2,
-                align: FieldAlign::Right,
-                kind: FieldKind::Text,
-            }
+            fields[0],
+            (2, FieldAlign::Right, FieldKind::Text)
         ));
         assert!(matches!(
-            &segments[1],
-            PictureSegment::Field {
-                width: 2,
-                align: FieldAlign::Center,
-                kind: FieldKind::Text,
-            }
+            fields[1],
+            (2, FieldAlign::Center, FieldKind::Text)
         ));
         assert!(matches!(
-            &segments[2],
-            PictureSegment::Field {
-                width: 2,
-                align: FieldAlign::Multiline,
-                kind: FieldKind::Multiline,
-            }
+            fields[2],
+            (2, FieldAlign::Multiline, FieldKind::Multiline)
         ));
-        assert!(matches!(
-            &segments[3],
-            PictureSegment::Field {
-                width: 1,
-                align: FieldAlign::Left,
-                kind: FieldKind::Text,
-            }
-        ));
+        assert!(matches!(fields[3], (1, FieldAlign::Left, FieldKind::Text)));
     }
 
     #[test]

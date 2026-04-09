@@ -73,6 +73,12 @@ fn delete_missing_key_undef() {
 }
 
 #[test]
+fn magic_constants_file_and_line() {
+    assert_eq!(eval_int("__LINE__"), 1);
+    assert_eq!(eval_string("__FILE__"), "-e");
+}
+
+#[test]
 fn exists_delete_on_hash_reference_arrow() {
     assert_eq!(
         eval_int(r#"my $r = { a => 1, b => 2 }; (exists $r->{a}) + (exists $r->{z})"#),

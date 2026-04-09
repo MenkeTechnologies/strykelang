@@ -17,6 +17,10 @@ This is an **ordered engineering program**, not a promise of bit-identical `perl
 
 ---
 
+## Completed slices (reference)
+
+- **`__FILE__` / `__LINE__`** — compile-time literals; bytecode uses `Compiler::source_file` (wired from `Interpreter::file` in `try_vm_execute`). Covered by `parity/cases/006_magic_line.pl` and integration tests.
+
 ## Phase 1 — Documented runtime gaps (specials, I/O, signals)
 
 **Goal:** Close items in [`SPECIAL_VARIABLES.md`](SPECIAL_VARIABLES.md) and related README bullets in a **test-driven** way.

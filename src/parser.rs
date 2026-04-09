@@ -2691,6 +2691,14 @@ impl Parser {
         }
 
         match name.as_str() {
+            "__FILE__" => Ok(Expr {
+                kind: ExprKind::MagicConst(MagicConstKind::File),
+                line,
+            }),
+            "__LINE__" => Ok(Expr {
+                kind: ExprKind::MagicConst(MagicConstKind::Line),
+                line,
+            }),
             "print" => self.parse_print_like(|h, a| ExprKind::Print { handle: h, args: a }),
             "say" => self.parse_print_like(|h, a| ExprKind::Say { handle: h, args: a }),
             "printf" => self.parse_print_like(|h, a| ExprKind::Printf { handle: h, args: a }),

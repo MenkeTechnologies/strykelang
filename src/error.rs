@@ -136,4 +136,39 @@ mod tests {
         assert!(s.contains("t.pl"));
         assert!(s.contains("line 2"));
     }
+
+    #[test]
+    fn type_error_display_matches_runtime_shape() {
+        let e = PerlError::type_error("expected array", 9);
+        assert_eq!(e.kind, ErrorKind::Type);
+        let s = e.to_string();
+        assert!(s.contains("expected array"));
+        assert!(s.contains("line 9"));
+    }
+
+    #[test]
+    fn at_line_overrides_line_number() {
+        let e = PerlError::runtime("x", 1).at_line(99);
+        assert_eq!(e.line, 99);
+        assert!(e.to_string().contains("line 99"));
+    }
+
+    #[test]
+    fn explain_error_known_codes() {
+        assert!(explain_error("E0001").is_some());
+        assert!(explain_error("E0002").is_some());
+        assert!(explain_error("E0003").is_some());
+    }
+
+    #[test]
+    fn explain_error_unknown_returns_none() {
+        assert!(explain_error("E9999").is_none());
+        assert!(explain_error("").is_none());
+    }
+
+    #[test]
+    fn perl_error_implements_std_error() {
+        let e: Box<dyn std::error::Error> = Box::new(PerlError::syntax("x", 1));
+        assert!(!e.to_string().is_empty());
+    }
 }

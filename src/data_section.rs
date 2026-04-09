@@ -49,4 +49,25 @@ mod tests {
         assert_eq!(p, "say 1;");
         assert_eq!(d, Some(b"a\nb\n".to_vec()));
     }
+
+    #[test]
+    fn data_marker_only_yields_empty_program() {
+        let (p, d) = split_data_section("__DATA__\n");
+        assert_eq!(p, "");
+        assert_eq!(d, Some(Vec::new()));
+    }
+
+    #[test]
+    fn data_marker_with_trailing_spaces_on_line() {
+        let (p, d) = split_data_section("1;\n__DATA__   \nbody\n");
+        assert_eq!(p, "1;");
+        assert_eq!(d, Some(b"body\n".to_vec()));
+    }
+
+    #[test]
+    fn no_newline_after_last_program_line_before_marker() {
+        let (p, d) = split_data_section("print\n__DATA__\nx");
+        assert_eq!(p, "print");
+        assert_eq!(d, Some(b"x\n".to_vec()));
+    }
 }

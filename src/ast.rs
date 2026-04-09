@@ -304,6 +304,14 @@ pub enum MatchHashPair {
     Capture { key: Expr, name: String },
 }
 
+#[derive(Debug, Clone, Copy, Serialize)]
+pub enum MagicConstKind {
+    /// Current source path (`$0`-style script name or `-e`).
+    File,
+    /// Line number of this token (1-based, same as lexer).
+    Line,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct Expr {
     pub kind: ExprKind,
@@ -319,6 +327,8 @@ pub enum ExprKind {
     Regex(String, String),
     QW(Vec<String>),
     Undef,
+    /// `__FILE__` / `__LINE__` (Perl compile-time literals).
+    MagicConst(MagicConstKind),
 
     // Interpolated string (mix of literal and variable parts)
     InterpolatedString(Vec<StringPart>),

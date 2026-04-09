@@ -435,6 +435,8 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::Regex(p, fl) => format!("/{}/{}/", p, fl),
         ExprKind::QW(ws) => format!("qw({})", ws.join(" ")),
         ExprKind::Undef => "undef".to_string(),
+        ExprKind::MagicConst(crate::ast::MagicConstKind::File) => "__FILE__".to_string(),
+        ExprKind::MagicConst(crate::ast::MagicConstKind::Line) => "__LINE__".to_string(),
         ExprKind::InterpolatedString(parts) => {
             parts.iter().map(format_string_part).collect::<String>()
         }

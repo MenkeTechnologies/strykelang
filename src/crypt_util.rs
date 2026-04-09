@@ -33,3 +33,24 @@ pub fn perl_crypt(plaintext: &str, salt: &str) -> String {
         String::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `CString::new` rejects interior NUL; `crypt` must not be called with invalid C strings.
+    #[test]
+    fn crypt_plaintext_with_nul_returns_empty() {
+        assert!(perl_crypt("a\0b", "xx").is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn crypt_valid_inputs_yield_non_empty_hash() {
+        let h = perl_crypt("secret", "ab");
+        assert!(
+            !h.is_empty(),
+            "platform crypt(3) should hash with a two-character salt"
+        );
+    }
+}

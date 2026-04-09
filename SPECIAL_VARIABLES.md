@@ -1,6 +1,6 @@
 # Perl special variables vs perlrs
 
-This document audits **Perl 5’s “special” globals** against **perlrs** as implemented in the tree-walker / VM (`src/interpreter.rs`, `src/lexer.rs`, `src/vm.rs`, `src/scope.rs`). It is **not** an exhaustive perlvar(1) list; it groups the usual categories and states what is wired, partial, or absent.
+This document audits **Perl 5’s “special” globals** against **perlrs** as implemented in the tree-walker / VM (`src/interpreter.rs`, `src/lexer.rs`, `src/vm.rs`, `src/scope.rs`). Full stock **perlvar** parity is not claimed; this file tracks what is wired, stubbed, or absent. **Any** scalar whose name starts with `^` (including `${^NAME}` from the lexer) is routed through [`get_special_var`](src/interpreter.rs); unknown names read from `Interpreter.special_caret_scalars` (default `undef`) and can be assigned for compatibility. Documented names are pre-seeded from [`special_vars::PERL5_DOCUMENTED_CARET_NAMES`](src/special_vars.rs).
 
 Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists but semantics differ; **No** = not implemented or wrong tokenization.
 
@@ -14,6 +14,7 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 | `$.` | Input line number | `Interpreter.line_number` via `get_special_var(".")` (`src/interpreter.rs`); incremented on `readline` paths. |
 | `$/` | Input record separator | `irs` field; get/set via `get_special_var` / `set_special_var` for `"/"`. |
 | `$,` | Output field separator | `ofs` field; `","` in special get/set. |
+| `$"` | List separator (array in `"..."`) | `Interpreter.list_separator`; used when interpolating `@array` into strings (`src/interpreter.rs`). |
 | `$\` | Output record separator | `ors` field; `"\\"` in special get/set. |
 | `$~` | Current format name | Ordinary scalar `~` (default `"STDOUT"` in `Interpreter::new`); `write` resolves `package::NAME` in `format_templates` (`src/interpreter.rs`). |
 | `$!` | OS error (errno string) | Reads use `Interpreter.errno` (`get_special_var("!")`). Writes go to the scalar stash and **do not** update `errno`, so they are not read back — prefer treating `$!` as read-only. |
@@ -41,11 +42,24 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 | `$^W` | Warnings | `warnings` boolean (`true` → `1`). |
 | `$^O` | OS name | `perl_osname()` maps `std::env::consts::OS` toward Perl names (`linux`, `darwin`, `MSWin32`, …). |
 | `$^T` | Script start time | `Interpreter.script_start_time` (seconds since Unix epoch, set in `Interpreter::new`). |
-| `$^V` | Version string | `v{CARGO_PKG_VERSION}` (e.g. `v0.1.11`); not a full Perl `version` object. |
+| `$^V` | Version string | `v{CARGO_PKG_VERSION}` (e.g. `v0.1.12`); not a full Perl `version` object. |
 | `$^E` | Extended OS error | `std::io::Error::last_os_error().to_string()` (not Windows `GetLastError` semantics). |
 | `$^H` | Compile-time hints | `compile_hints` (`i64`); read/write via `get_special_var` / `set_special_var`. |
 | `${^WARNING_BITS}` | Warnings bitmask | `warning_bits` (`i64`); read/write via `get_special_var` / `set_special_var`. |
 | `${^GLOBAL_PHASE}` | Interpreter phase | `global_phase` string (default `RUN`); read-only assignment in `set_special_var`. |
+| `$+` | Last bracket match | `last_paren_match`; also `scope` `"+"` after regex; `get_special_var("+")`. |
+| `$*` | Multiline (deprecated) | `multiline_match` boolean (stub; not wired to regex). |
+| `$%` / `$=` / `$-` / `$:` | Format page / lines / remainder / break chars | `format_page_number`, `format_lines_per_page`, `format_lines_left`, `format_line_break_chars`. |
+| `$^` | Top-of-form format name | `format_top_name` (scalar name `"^"`). |
+| `$^A` | Format accumulator | `accumulator_format`. |
+| `$^C` | Signal / interrupt | Read as `0` (OS signals not wired). |
+| `$^F` | Max system FD | `max_system_fd` (default `2`). |
+| `$^L` | Form feed | `formfeed_string` (default `\f`). |
+| `$^M` | Emergency memory pool | `emergency_memory` string (no native pool in perlrs). |
+| `$^N` | Last opened named capture | `last_subpattern_name` after `apply_regex_captures`. |
+| `$^X` | Executable path | `executable_path` from `std::env::current_exe()` at interpreter init. |
+| `$INC` | `@INC` hook index | `inc_hook_index` (Perl 5.37+ hook traversal; hooks not fully implemented). |
+| Other `${^Name}` | perlvar extras | `special_caret_scalars["^Name"]` or `undef` if unset; assign stores in the map unless the name is read-only in `set_special_var`. |
 | `$<` / `$>` / `$(` / `$)` | Real/effective uid/gid | On Unix `libc::getuid` / `geteuid` / `getgid` / `getegid`; on non-Unix all `0`. |
 | `${^MATCH}` / `${^PREMATCH}` / `${^POSTMATCH}` | Regexp spellings | Same as `$&` / `` $` `` / `$'` data on `Interpreter` (`last_match`, `prematch`, `postmatch`). |
 | `__PACKAGE__` | Current package | Scalar in scope; `package` statements update it. |
@@ -70,13 +84,13 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 
 ---
 
-## Lexer may tokenize but no Perl semantics
+## Lexer vs semantics
 
-Single-character names after `$` are accepted (`src/lexer.rs` `read_variable_name`), including `&` `` ` `` `'` `+` `*` `?` `|` etc. **Only** the subset handled in `get_special_var` / `set_special_var` and regex capture logic has meaning. The rest resolve as **ordinary scalars** in scope (usually undef), **not** Perl’s `$&`, `` $` ``, `$'`, `$+`, etc. **`$?`** (child wait status) and **`$|`** (stdout autoflush after `print` / `printf` in the VM and tree interpreter) **are** implemented — see `get_special_var` / `set_special_var` and `Interpreter::record_child_exit_status`.
+Single-character names after `$` are accepted (`src/lexer.rs` `read_variable_name`), including `&` `` ` `` `'` `+` `*` `?` `|` etc. Scalars handled in `get_special_var` / `set_special_var` (including any **`^`…** name) use interpreter fields or `special_caret_scalars`; other names resolve as **ordinary scalars** in scope. Match-related scalars (`$&`, `` $` ``, `$'`, `$+`, …) are updated by `apply_regex_captures` into both dedicated fields and the scope where applicable. **`$?`** (child wait status) and **`$|`** (stdout autoflush after `print` / `printf`) use `get_special_var` / `set_special_var` and `Interpreter::record_child_exit_status`.
 
-**`$^X` (caret + letter):** The lexer reads **`^` plus one alphabetic character** as names like `^I`, `^O`, `^W` (see `read_variable_name`).
+**`$^` + letter:** The lexer reads **`^` plus one alphabetic character** as names like `^I`, `^O`, `^M` (see `read_variable_name`).
 
-**`${^NAME}` (brace form):** `{` … `}` after `$` is read as the inner name (e.g. **`^MATCH`**, **`^WARNING_BITS`**) and must match `get_special_var` arms.
+**`${^NAME}` (brace form):** `{` … `}` after `$` is read as the inner name (e.g. **`^MATCH`**, **`^UNICODE`**). Any name starting with `^` is treated as special; unknown long names use `special_caret_scalars` / `undef`.
 
 ---
 
@@ -84,7 +98,7 @@ Single-character names after `$` are accepted (`src/lexer.rs` `read_variable_nam
 
 | Category | Examples |
 |----------|----------|
-| **Match / regexp** | Other `${^…}` names beyond those listed above; stash-backed `$&` / `$1` / `` $` `` / `$'` / `$+` still differ from full Perl regexp engine. |
+| **Match / regexp** | Stash-backed `$&` / `$1` / `` $` `` / `$'` / `$+` and Rust `regex` still differ from Perl’s regexp engine; `${^…}` beyond dedicated fields are stubs in `special_caret_scalars`. |
 | **Process / status** | `$PROCESS_ID` aliases. (`$?` is set after `system`, `capture`, and `close` on pipe children; POSIX-style packed status.) |
 | **Perlio / globs** | Many handle-related specials beyond what IO builtins use. |
 | **English.pm** | No `English` module tying long names to these variables. |
@@ -105,4 +119,4 @@ Single-character names after `$` are accepted (`src/lexer.rs` `read_variable_nam
 
 ## Maintenance
 
-When adding I/O, regex, or `eval` behavior, update this file if new globals become meaningful or if `get_special_var` / `set_special_var` change.
+When adding I/O, regex, or `eval` behavior, update this file if new globals become meaningful or if `get_special_var` / `set_special_var` change. When adding documented `${^NAME}` entries from perl 5, consider extending [`special_vars::PERL5_DOCUMENTED_CARET_NAMES`](src/special_vars.rs).

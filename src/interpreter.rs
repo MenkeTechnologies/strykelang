@@ -323,6 +323,34 @@ pub struct Interpreter {
     pub(crate) overload_table: HashMap<String, HashMap<String, String>>,
     /// `format NAME =` bodies (parsed) keyed `Package::NAME`.
     pub(crate) format_templates: HashMap<String, Arc<crate::format::FormatTemplate>>,
+    /// `${^NAME}` scalars not stored in dedicated fields (default `undef`; assign may stash).
+    pub(crate) special_caret_scalars: HashMap<String, PerlValue>,
+    /// `$%` — format output page number.
+    pub format_page_number: i64,
+    /// `$=` — format lines per page.
+    pub format_lines_per_page: i64,
+    /// `$-` — lines remaining on format page.
+    pub format_lines_left: i64,
+    /// `$:` — characters to break format lines (Perl default `\n`).
+    pub format_line_break_chars: String,
+    /// `$^` — top-of-form format name.
+    pub format_top_name: String,
+    /// `$^A` — format write accumulator.
+    pub accumulator_format: String,
+    /// `$^F` — max system file descriptor (Perl default 2).
+    pub max_system_fd: i64,
+    /// `$^M` — emergency memory buffer (no-op pool in perlrs).
+    pub emergency_memory: String,
+    /// `$^N` — last opened named regexp capture name.
+    pub last_subpattern_name: String,
+    /// `$INC` — `@INC` hook iterator (Perl 5.37+).
+    pub inc_hook_index: i64,
+    /// `$*` — multiline matching (deprecated in Perl; stub).
+    pub multiline_match: bool,
+    /// `$^X` — path to this executable (cached).
+    pub executable_path: String,
+    /// `$^L` — formfeed string for formats (Perl default `\f`).
+    pub formfeed_string: String,
     /// Limited typeglob: I/O handle alias (`*FOO` → underlying handle name).
     pub(crate) glob_handle_alias: HashMap<String, String>,
     /// Parallel to [`Scope`] frames: `local *GLOB` entries to restore on [`Self::scope_pop_hook`].
@@ -453,6 +481,15 @@ impl Interpreter {
             .map(|d| d.as_secs() as i64)
             .unwrap_or(0);
 
+        let executable_path = std::env::current_exe()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|_| "perlrs".to_string());
+
+        let mut special_caret_scalars: HashMap<String, PerlValue> = HashMap::new();
+        for name in crate::special_vars::PERL5_DOCUMENTED_CARET_NAMES {
+            special_caret_scalars.insert(format!("^{}", name), PerlValue::UNDEF);
+        }
+
         let mut interp = Self {
             scope,
             subs: HashMap::new(),
@@ -517,6 +554,20 @@ impl Interpreter {
             tied_arrays: HashMap::new(),
             overload_table: HashMap::new(),
             format_templates: HashMap::new(),
+            special_caret_scalars,
+            format_page_number: 0,
+            format_lines_per_page: 60,
+            format_lines_left: 0,
+            format_line_break_chars: "\n".to_string(),
+            format_top_name: String::new(),
+            accumulator_format: String::new(),
+            max_system_fd: 2,
+            emergency_memory: String::new(),
+            last_subpattern_name: String::new(),
+            inc_hook_index: 0,
+            multiline_match: false,
+            executable_path,
+            formfeed_string: "\x0c".to_string(),
             glob_handle_alias: HashMap::new(),
             glob_restore_frames: vec![Vec::new()],
         };
@@ -784,6 +835,12 @@ impl Interpreter {
                 | "]"
                 | ";"
                 | "ARGV"
+                | "%"
+                | "="
+                | "-"
+                | ":"
+                | "*"
+                | "INC"
         ) || name.chars().all(|c| c.is_ascii_digit())
             || name.starts_with('^')
     }
@@ -1656,6 +1713,12 @@ impl Interpreter {
             }
         }
         self.last_paren_match = last_paren;
+        self.last_subpattern_name = String::new();
+        for n in re.capture_names().flatten() {
+            if caps.name(n).is_some() {
+                self.last_subpattern_name = n.to_string();
+            }
+        }
         self.scope
             .set_scalar("&", PerlValue::string(self.last_match.clone()))?;
         self.scope
@@ -2972,6 +3035,12 @@ impl Interpreter {
             ExprKind::Float(f) => Ok(PerlValue::float(*f)),
             ExprKind::String(s) => Ok(PerlValue::string(s.clone())),
             ExprKind::Undef => Ok(PerlValue::UNDEF),
+            ExprKind::MagicConst(MagicConstKind::File) => {
+                Ok(PerlValue::string(self.file.clone()))
+            }
+            ExprKind::MagicConst(MagicConstKind::Line) => {
+                Ok(PerlValue::integer(expr.line as i64))
+            }
             ExprKind::Regex(pattern, flags) => {
                 let re = self.compile_regex(pattern, flags, line)?;
                 Ok(PerlValue::regex(re, pattern.clone()))
@@ -3000,7 +3069,8 @@ impl Interpreter {
                             for v in &arr {
                                 parts.push(self.stringify_value(v.clone(), line)?);
                             }
-                            result.push_str(&parts.join(" "));
+                            let sep = self.list_separator.clone();
+                            result.push_str(&parts.join(&sep));
                         }
                         StringPart::Expr(e) => {
                             let val = self.eval_expr(e)?;
@@ -5937,63 +6007,82 @@ impl Interpreter {
 
     /// True when [`get_special_var`] must run instead of [`Scope::get_scalar`].
     pub(crate) fn is_special_scalar_name_for_get(name: &str) -> bool {
-        matches!(
-            name,
-            "$$" | "0"
-                | "!"
-                | "@"
-                | "/"
-                | "\\"
-                | ","
-                | "."
-                | "]"
-                | ";"
-                | "ARGV"
-                | "^I"
-                | "^D"
-                | "^P"
-                | "^S"
-                | "^W"
-                | "^O"
-                | "^T"
-                | "^V"
-                | "^E"
-                | "^H"
-                | "^WARNING_BITS"
-                | "^GLOBAL_PHASE"
-                | "^MATCH"
-                | "^PREMATCH"
-                | "^POSTMATCH"
-                | "^LAST_SUBMATCH_RESULT"
-                | "<"
-                | ">"
-                | "("
-                | ")"
-                | "?"
-                | "|"
-        )
+        name.starts_with('^')
+            || matches!(
+                name,
+                "$$" | "0"
+                    | "!"
+                    | "@"
+                    | "/"
+                    | "\\"
+                    | ","
+                    | "."
+                    | "]"
+                    | ";"
+                    | "ARGV"
+                    | "^I"
+                    | "^D"
+                    | "^P"
+                    | "^S"
+                    | "^W"
+                    | "^O"
+                    | "^T"
+                    | "^V"
+                    | "^E"
+                    | "^H"
+                    | "^WARNING_BITS"
+                    | "^GLOBAL_PHASE"
+                    | "^MATCH"
+                    | "^PREMATCH"
+                    | "^POSTMATCH"
+                    | "^LAST_SUBMATCH_RESULT"
+                    | "<"
+                    | ">"
+                    | "("
+                    | ")"
+                    | "?"
+                    | "|"
+                    | "\""
+                    | "+"
+                    | "%"
+                    | "="
+                    | "-"
+                    | ":"
+                    | "*"
+                    | "INC"
+            )
     }
 
     /// True when [`set_special_var`] must run instead of [`Scope::set_scalar`].
     pub(crate) fn is_special_scalar_name_for_set(name: &str) -> bool {
-        matches!(
-            name,
-            "0" | "/"
-                | "\\"
-                | ","
-                | ";"
-                | "^I"
-                | "^D"
-                | "^P"
-                | "^W"
-                | "^H"
-                | "^WARNING_BITS"
-                | "$$"
-                | "]"
-                | "^S"
-                | "ARGV"
-                | "|"
-        )
+        name.starts_with('^')
+            || matches!(
+                name,
+                "0" | "/"
+                    | "\\"
+                    | ","
+                    | ";"
+                    | "\""
+                    | "%"
+                    | "="
+                    | "-"
+                    | ":"
+                    | "*"
+                    | "INC"
+                    | "^I"
+                    | "^D"
+                    | "^P"
+                    | "^W"
+                    | "^H"
+                    | "^WARNING_BITS"
+                    | "$$"
+                    | "]"
+                    | "^S"
+                    | "ARGV"
+                    | "|"
+                    | "+"
+                    | "?"
+            )
     }
 
     pub(crate) fn get_special_var(&self, name: &str) -> PerlValue {
@@ -6029,6 +6118,27 @@ impl Interpreter {
             "<" | ">" | "(" | ")" => PerlValue::integer(unix_id_for_special(name)),
             "?" => PerlValue::integer(self.child_exit_status),
             "|" => PerlValue::integer(if self.output_autoflush { 1 } else { 0 }),
+            "\"" => PerlValue::string(self.list_separator.clone()),
+            "+" => PerlValue::string(self.last_paren_match.clone()),
+            "%" => PerlValue::integer(self.format_page_number),
+            "=" => PerlValue::integer(self.format_lines_per_page),
+            "-" => PerlValue::integer(self.format_lines_left),
+            ":" => PerlValue::string(self.format_line_break_chars.clone()),
+            "*" => PerlValue::integer(if self.multiline_match { 1 } else { 0 }),
+            "^" => PerlValue::string(self.format_top_name.clone()),
+            "INC" => PerlValue::integer(self.inc_hook_index),
+            "^A" => PerlValue::string(self.accumulator_format.clone()),
+            "^C" => PerlValue::integer(0),
+            "^F" => PerlValue::integer(self.max_system_fd),
+            "^L" => PerlValue::string(self.formfeed_string.clone()),
+            "^M" => PerlValue::string(self.emergency_memory.clone()),
+            "^N" => PerlValue::string(self.last_subpattern_name.clone()),
+            "^X" => PerlValue::string(self.executable_path.clone()),
+            _ if name.starts_with('^') && name.len() > 1 => self
+                .special_caret_scalars
+                .get(name)
+                .cloned()
+                .unwrap_or(PerlValue::UNDEF),
             _ => self.scope.get_scalar(name),
         }
     }
@@ -6040,6 +6150,18 @@ impl Interpreter {
             "\\" => self.ors = val.to_string(),
             "," => self.ofs = val.to_string(),
             ";" => self.subscript_sep = val.to_string(),
+            "\"" => self.list_separator = val.to_string(),
+            "%" => self.format_page_number = val.to_int(),
+            "=" => self.format_lines_per_page = val.to_int(),
+            "-" => self.format_lines_left = val.to_int(),
+            ":" => self.format_line_break_chars = val.to_string(),
+            "*" => self.multiline_match = val.to_int() != 0,
+            "^" => self.format_top_name = val.to_string(),
+            "INC" => self.inc_hook_index = val.to_int(),
+            "^A" => self.accumulator_format = val.to_string(),
+            "^F" => self.max_system_fd = val.to_int(),
+            "^L" => self.formfeed_string = val.to_string(),
+            "^M" => self.emergency_memory = val.to_string(),
             "^I" => self.inplace_edit = val.to_string(),
             "^D" => self.debug_flags = val.to_int(),
             "^P" => self.perl_debug_flags = val.to_int(),
@@ -6058,10 +6180,17 @@ impl Interpreter {
             | "^PREMATCH"
             | "^POSTMATCH"
             | "^LAST_SUBMATCH_RESULT"
+            | "^C"
+            | "^N"
+            | "^X"
+            | "+"
             | "<"
             | ">"
             | "("
             | ")" => {}
+            _ if name.starts_with('^') && name.len() > 1 => {
+                self.special_caret_scalars.insert(name.to_string(), val.clone());
+            }
             _ => self.scope.set_scalar(name, val.clone())?,
         }
         Ok(())
@@ -7313,6 +7442,8 @@ mod special_scalar_name_tests {
         assert!(Interpreter::is_special_scalar_name_for_get("<"));
         assert!(Interpreter::is_special_scalar_name_for_get("?"));
         assert!(Interpreter::is_special_scalar_name_for_get("|"));
+        assert!(Interpreter::is_special_scalar_name_for_get("^UNICODE"));
+        assert!(Interpreter::is_special_scalar_name_for_get("\""));
         assert!(!Interpreter::is_special_scalar_name_for_get("foo"));
         assert!(!Interpreter::is_special_scalar_name_for_get("plainvar"));
     }
@@ -7325,7 +7456,8 @@ mod special_scalar_name_tests {
         assert!(Interpreter::is_special_scalar_name_for_set("^WARNING_BITS"));
         assert!(Interpreter::is_special_scalar_name_for_set("ARGV"));
         assert!(Interpreter::is_special_scalar_name_for_set("|"));
-        assert!(!Interpreter::is_special_scalar_name_for_set("?"));
+        assert!(Interpreter::is_special_scalar_name_for_set("?"));
+        assert!(Interpreter::is_special_scalar_name_for_set("^UNICODE"));
         assert!(!Interpreter::is_special_scalar_name_for_set("foo"));
         assert!(!Interpreter::is_special_scalar_name_for_set("__PACKAGE__"));
     }

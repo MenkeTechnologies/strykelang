@@ -86,4 +86,35 @@ mod tests {
         }
         assert_eq!(lines, vec![&b"one"[..], &b"two"[..], &b"three"[..]]);
     }
+
+    #[test]
+    fn line_aligned_chunks_empty_input() {
+        assert!(line_aligned_chunks(&[], 8).is_empty());
+    }
+
+    #[test]
+    fn line_aligned_chunks_single_byte() {
+        let c = line_aligned_chunks(b"x", 4);
+        assert_eq!(c, vec![(0, 1)]);
+    }
+
+    #[test]
+    fn line_aligned_chunks_max_chunks_zero_uses_one() {
+        let data = b"a\nb\n";
+        let c = line_aligned_chunks(data, 0);
+        assert!(!c.is_empty());
+        let rebuilt: Vec<u8> = c.iter().flat_map(|(s, e)| data[*s..*e].iter().copied()).collect();
+        assert_eq!(rebuilt, data);
+    }
+
+    #[test]
+    fn line_to_perl_string_strips_cr() {
+        assert_eq!(line_to_perl_string(b"row\r"), "row");
+    }
+
+    #[test]
+    fn line_to_perl_string_utf8_lossy() {
+        let s = line_to_perl_string(&[0xff, 0xfe]);
+        assert!(!s.is_empty());
+    }
 }
