@@ -148,6 +148,10 @@ fn jit_block_result_to_perl(j: JitResult, mode: BlockJitBufferMode) -> PerlValue
 }
 
 impl LinearJit {
+    fn ret_nanboxed(&self) -> bool {
+        self.ret_nanboxed
+    }
+
     fn invoke(&self, slots: *const i64, plain: *const i64, args: *const i64) -> JitResult {
         match &self.run {
             LinearRun::Nullary(f) => JitResult::Int(unsafe { f() }),
@@ -1530,6 +1534,20 @@ pub(crate) fn sub_entry_segment(ops: &[Op], entry_ip: usize) -> Option<(&[Op], S
     Some((&tail[..rel], term))
 }
 
+/// Subroutine body from `entry_ip` through the first [`Op::Return`] or [`Op::ReturnValue`] (inclusive).
+pub(crate) fn sub_full_body(ops: &[Op], entry_ip: usize) -> Option<(&[Op], SubTerminator)> {
+    let tail = ops.get(entry_ip..)?;
+    let rel = tail
+        .iter()
+        .position(|o| matches!(o, Op::Return | Op::ReturnValue))?;
+    let term = match tail.get(rel)? {
+        Op::Return => SubTerminator::Void,
+        Op::ReturnValue => SubTerminator::Value,
+        _ => return None,
+    };
+    Some((&tail[..=rel], term))
+}
+
 pub(crate) fn segment_blocks_subroutine_linear_jit(seg: &[Op]) -> bool {
     seg.iter().any(|o| {
         matches!(
@@ -1547,6 +1565,12 @@ pub(crate) fn segment_blocks_subroutine_linear_jit(seg: &[Op]) -> bool {
                 | Op::PopFrame
         )
     })
+}
+
+/// `PushFrame` / `PopFrame` in a subroutine body — block JIT uses the same flat slot buffers as linear.
+pub(crate) fn sub_body_blocks_subroutine_block_jit(seg: &[Op]) -> bool {
+    seg.iter()
+        .any(|o| matches!(o, Op::PushFrame | Op::PopFrame))
 }
 
 /// Linear JIT for a compiled subroutine body (see [`sub_entry_segment`]).
@@ -1645,7 +1669,7 @@ fn find_block_starts(ops: &[Op]) -> BTreeSet<usize> {
                     s.insert(i + 1);
                 }
             }
-            Op::Halt => {
+            Op::Halt | Op::Return | Op::ReturnValue => {
                 if i + 1 < ops.len() {
                     s.insert(i + 1);
                 }
@@ -1663,6 +1687,7 @@ fn is_block_data_op(op: &Op) -> bool {
         Op::LoadInt(_)
             | Op::LoadConst(_)
             | Op::LoadFloat(_)
+            | Op::LoadUndef
             | Op::Add
             | Op::Sub
             | Op::Mul
@@ -1714,10 +1739,21 @@ pub(crate) enum BlockJitBufferMode {
     I64AsPerlValueBits,
 }
 
+/// How every control-flow path exits a block JIT program (main eval vs subroutine).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum BlockExit {
+    /// Main eval: [`Op::Halt`] with one value on the stack.
+    Halt(Cell),
+    /// Subroutine: [`Op::ReturnValue`] with one value on the stack.
+    ReturnValue(Cell),
+    /// Subroutine: bare [`Op::Return`], empty stack.
+    ReturnVoid,
+}
+
 /// Validated block CFG plus metadata for compilation and VM buffer layout.
 pub(crate) struct ValidatedBlockCfg {
     cfg: Vec<CfgBlock>,
-    halt_cell: Cell,
+    exit: BlockExit,
     needs_raw_value_buffers: bool,
     /// `JumpIfDefinedKeep` opcode index → `false` = unconditional jump (const TOS), `true` = runtime `defined`.
     jump_if_defined_kind: HashMap<usize, bool>,
@@ -1735,7 +1771,20 @@ impl ValidatedBlockCfg {
 
 /// [`validate_block_cfg`] exposed for [`crate::vm::VM::execute`] so slot/plain/arg buffers match compilation.
 pub(crate) fn block_jit_validate(ops: &[Op], constants: &[PerlValue]) -> Option<ValidatedBlockCfg> {
-    validate_block_cfg(ops, constants)
+    validate_block_cfg(ops, constants, BlockCfgMode::EvalMain)
+}
+
+/// Block JIT validation for a subroutine body ending in [`Op::Return`] or [`Op::ReturnValue`].
+pub(crate) fn block_jit_validate_sub(
+    ops: &[Op],
+    constants: &[PerlValue],
+    term: SubTerminator,
+) -> Option<ValidatedBlockCfg> {
+    let mode = match term {
+        SubTerminator::Value => BlockCfgMode::SubValue,
+        SubTerminator::Void => BlockCfgMode::SubVoid,
+    };
+    validate_block_cfg(ops, constants, mode)
 }
 
 /// Restrictions so stack slots stay valid [`PerlValue`] NaN-box encodings in raw-buffer mode.
@@ -1794,17 +1843,30 @@ fn enforce_raw_jit_program(ops: &[Op], constants: &[PerlValue]) -> Option<()> {
             | Op::PreDec(_)
             | Op::PostDec(_) => return None,
             Op::Jump(_) | Op::JumpIfDefinedKeep(_) => {}
-            Op::Halt => {}
+            Op::Halt | Op::Return | Op::ReturnValue => {}
+            Op::LoadUndef => {}
             _ => return None,
         }
     }
     Some(())
 }
 
+/// Main eval vs subroutine terminator for [`validate_block_cfg`].
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum BlockCfgMode {
+    EvalMain,
+    SubValue,
+    SubVoid,
+}
+
 /// Validate the ops as a block-structured program and compute per-block entry abstract stacks.
 /// Uses a fixpoint over [`join_cell`] at CFG merges so float and int paths can join (promotion).
 /// Returns `None` when any op is unsupported or the CFG is inconsistent.
-fn validate_block_cfg(ops: &[Op], constants: &[PerlValue]) -> Option<ValidatedBlockCfg> {
+fn validate_block_cfg(
+    ops: &[Op],
+    constants: &[PerlValue],
+    mode: BlockCfgMode,
+) -> Option<ValidatedBlockCfg> {
     if ops.is_empty() {
         return None;
     }
@@ -1951,6 +2013,9 @@ fn validate_block_cfg(ops: &[Op], constants: &[PerlValue]) -> Option<ValidatedBl
                     }
                 }
                 Op::Halt => {
+                    if mode != BlockCfgMode::EvalMain {
+                        return None;
+                    }
                     if stack.len() != 1 {
                         return None;
                     }
@@ -1959,6 +2024,33 @@ fn validate_block_cfg(ops: &[Op], constants: &[PerlValue]) -> Option<ValidatedBl
                         None => top,
                         Some(prev) => join_cell(prev, top)?,
                     });
+                    has_halt = true;
+                    terminated = true;
+                    break;
+                }
+                Op::ReturnValue => {
+                    if mode != BlockCfgMode::SubValue {
+                        return None;
+                    }
+                    if stack.len() != 1 {
+                        return None;
+                    }
+                    let top = stack[0];
+                    halt_top = Some(match halt_top {
+                        None => top,
+                        Some(prev) => join_cell(prev, top)?,
+                    });
+                    has_halt = true;
+                    terminated = true;
+                    break;
+                }
+                Op::Return => {
+                    if mode != BlockCfgMode::SubVoid {
+                        return None;
+                    }
+                    if !stack.is_empty() {
+                        return None;
+                    }
                     has_halt = true;
                     terminated = true;
                     break;
@@ -1983,7 +2075,16 @@ fn validate_block_cfg(ops: &[Op], constants: &[PerlValue]) -> Option<ValidatedBl
     if !has_halt {
         return None;
     }
-    let halt_cell = halt_top?;
+    let exit = match mode {
+        BlockCfgMode::EvalMain => BlockExit::Halt(halt_top?),
+        BlockCfgMode::SubValue => BlockExit::ReturnValue(halt_top?),
+        BlockCfgMode::SubVoid => {
+            if halt_top.is_some() {
+                return None;
+            }
+            BlockExit::ReturnVoid
+        }
+    };
 
     let cfg: Vec<CfgBlock> = blocks
         .iter()
@@ -2006,7 +2107,7 @@ fn validate_block_cfg(ops: &[Op], constants: &[PerlValue]) -> Option<ValidatedBl
 
     Some(ValidatedBlockCfg {
         cfg,
-        halt_cell,
+        exit,
         needs_raw_value_buffers,
         jump_if_defined_kind,
     })
@@ -2412,10 +2513,17 @@ fn compile_blocks_validated(
     constants: &[PerlValue],
 ) -> Option<LinearJit> {
     let cfg = validated.cfg;
-    let halt_cell = validated.halt_cell;
+    let exit = validated.exit;
     let needs_raw_bits = validated.needs_raw_value_buffers;
     let jump_if_defined_kind = validated.jump_if_defined_kind;
-    let ret_ty = cell_to_jit_ty(halt_cell);
+    let ret_ty = match exit {
+        BlockExit::Halt(c) | BlockExit::ReturnValue(c) => cell_to_jit_ty(c),
+        BlockExit::ReturnVoid => JitTy::Int,
+    };
+    let ret_nanboxed = match exit {
+        BlockExit::Halt(c) | BlockExit::ReturnValue(c) => matches!(c, Cell::Undef),
+        BlockExit::ReturnVoid => true,
+    };
 
     let need_any_table = needs_table(ops);
 
@@ -2704,6 +2812,9 @@ fn compile_blocks_validated(
                         terminated = true;
                     }
                     Op::Halt => {
+                        let BlockExit::Halt(_) = exit else {
+                            return None;
+                        };
                         let (v, ty) = stack.pop()?;
                         let ret_v = match (ret_ty, ty) {
                             (JitTy::Int, JitTy::Int) => v,
@@ -2712,6 +2823,29 @@ fn compile_blocks_validated(
                             (JitTy::Int, JitTy::Float) => f64_to_i64_trunc(&mut bcx, v),
                         };
                         bcx.ins().return_(&[ret_v]);
+                        terminated = true;
+                    }
+                    Op::ReturnValue => {
+                        let BlockExit::ReturnValue(_) = exit else {
+                            return None;
+                        };
+                        let (v, ty) = stack.pop()?;
+                        let ret_v = match (ret_ty, ty) {
+                            (JitTy::Int, JitTy::Int) => v,
+                            (JitTy::Float, JitTy::Float) => v,
+                            (JitTy::Float, JitTy::Int) => i64_to_f64(&mut bcx, v),
+                            (JitTy::Int, JitTy::Float) => f64_to_i64_trunc(&mut bcx, v),
+                        };
+                        bcx.ins().return_(&[ret_v]);
+                        terminated = true;
+                    }
+                    Op::Return => {
+                        let BlockExit::ReturnVoid = exit else {
+                            return None;
+                        };
+                        let bits = PerlValue::UNDEF.raw_bits() as i64;
+                        let ret = bcx.ins().iconst(types::I64, bits);
+                        bcx.ins().return_(&[ret]);
                         terminated = true;
                     }
                     _ => return None,
@@ -2760,7 +2894,7 @@ fn compile_blocks_validated(
     Some(LinearJit {
         module,
         run,
-        ret_nanboxed: false,
+        ret_nanboxed,
     })
 }
 
@@ -2865,7 +2999,7 @@ pub(crate) fn try_run_block_ops(
 ) -> Option<(PerlValue, BlockJitBufferMode)> {
     let validated = match validated_cfg {
         Some(v) => v,
-        None => validate_block_cfg(ops, constants)?,
+        None => validate_block_cfg(ops, constants, BlockCfgMode::EvalMain)?,
     };
     let mode = validated.buffer_mode();
     // Slot buffer bounds.
@@ -2904,13 +3038,22 @@ pub(crate) fn try_run_block_ops(
         let guard = block_cache().lock().ok()?;
         if let Some(j) = guard.get(&key) {
             let r = j.invoke(slot_ptr, plain_ptr, arg_ptr);
-            return Some((jit_block_result_to_perl(r, mode), mode));
+            let pv = if j.ret_nanboxed() {
+                j.result_to_perl(r)
+            } else {
+                jit_block_result_to_perl(r, mode)
+            };
+            return Some((pv, mode));
         }
     }
 
     let jit = compile_blocks_validated(validated, ops, constants)?;
     let r = jit.invoke(slot_ptr, plain_ptr, arg_ptr);
-    let pv = jit_block_result_to_perl(r, mode);
+    let pv = if jit.ret_nanboxed() {
+        jit.result_to_perl(r)
+    } else {
+        jit_block_result_to_perl(r, mode)
+    };
 
     if let Ok(mut guard) = block_cache().lock() {
         if guard.len() < 256 {
