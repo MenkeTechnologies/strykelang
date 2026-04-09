@@ -70,10 +70,7 @@ fn parallel_reduce_empty_list_returns_undef() {
 
 #[test]
 fn parallel_reduce_string_concat() {
-    assert_eq!(
-        eval_string(r#"preduce { $a . $b } ("a","b","c")"#),
-        "abc"
-    );
+    assert_eq!(eval_string(r#"preduce { $a . $b } ("a","b","c")"#), "abc");
 }
 
 #[test]

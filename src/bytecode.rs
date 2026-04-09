@@ -131,27 +131,27 @@ pub enum Op {
     SetScalarKeep(u16),
 
     // ── Block-based operations (u16 = index into chunk.blocks) ──
-    /// map { BLOCK } @list — block_idx; stack: [list] → [mapped]
+    /// map { BLOCK } @list — block_idx; stack: \[list\] → \[mapped\]
     MapWithBlock(u16),
-    /// grep { BLOCK } @list — block_idx; stack: [list] → [filtered]
+    /// grep { BLOCK } @list — block_idx; stack: \[list\] → \[filtered\]
     GrepWithBlock(u16),
-    /// sort { BLOCK } @list — block_idx; stack: [list] → [sorted]
+    /// sort { BLOCK } @list — block_idx; stack: \[list\] → \[sorted\]
     SortWithBlock(u16),
-    /// sort @list (no block) — stack: [list] → [sorted]
+    /// sort @list (no block) — stack: \[list\] → \[sorted\]
     SortNoBlock,
-    /// reverse — stack: [list] → [reversed]
+    /// reverse — stack: \[list\] → \[reversed\]
     ReverseOp,
-    /// pmap { BLOCK } @list — block_idx; stack: [list] → [mapped]
+    /// pmap { BLOCK } @list — block_idx; stack: \[list\] → \[mapped\]
     PMapWithBlock(u16),
-    /// pgrep { BLOCK } @list — block_idx; stack: [list] → [filtered]
+    /// pgrep { BLOCK } @list — block_idx; stack: \[list\] → \[filtered\]
     PGrepWithBlock(u16),
-    /// pfor { BLOCK } @list — block_idx; stack: [list]
+    /// pfor { BLOCK } @list — block_idx; stack: \[list\]
     PForWithBlock(u16),
-    /// psort { BLOCK } @list — block_idx; stack: [list] → [sorted]
+    /// psort { BLOCK } @list — block_idx; stack: \[list\] → \[sorted\]
     PSortWithBlock(u16),
-    /// fan N { BLOCK } — block_idx; stack: [count]
+    /// fan N { BLOCK } — block_idx; stack: \[count\]
     FanWithBlock(u16),
-    /// eval { BLOCK } — block_idx; stack: [] → result
+    /// eval { BLOCK } — block_idx; stack: \[\] → result
     EvalBlock(u16),
     /// Make a scalar reference from TOS
     MakeScalarRef,
@@ -159,17 +159,17 @@ pub enum Op {
     MakeArrayRef,
     /// Make a hash reference from TOS (which should be a Hash)
     MakeHashRef,
-    /// Make an anonymous sub from a block — block_idx; stack: [] → CodeRef
+    /// Make an anonymous sub from a block — block_idx; stack: \[\] → CodeRef
     MakeCodeRef(u16),
-    /// Dereference arrow: ->[] — stack: [ref, index] → value
+    /// Dereference arrow: ->\[\] — stack: \[ref, index\] → value
     ArrowArray,
-    /// Dereference arrow: ->{} — stack: [ref, key] → value
+    /// Dereference arrow: ->{} — stack: \[ref, key\] → value
     ArrowHash,
-    /// Dereference arrow: ->() — stack: [ref, args_array] → value
+    /// Dereference arrow: ->() — stack: \[ref, args_array\] → value
     ArrowCall,
-    /// Method call: stack: [object, args...] → result; name_idx, argc
+    /// Method call: stack: \[object, args...\] → result; name_idx, argc
     MethodCall(u16, u8),
-    /// File test: -e, -f, -d, etc. — test char; stack: [path] → 0/1
+    /// File test: -e, -f, -d, etc. — test char; stack: \[path\] → 0/1
     FileTestOp(u8),
 
     // ── Special ──

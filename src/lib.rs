@@ -42,9 +42,10 @@ pub fn try_vm_execute(
     interp: &mut Interpreter,
 ) -> Option<PerlResult<PerlValue>> {
     // BEGIN/END blocks require tree-walker execution; skip VM path.
-    let has_begin_end = program.statements.iter().any(|s| {
-        matches!(s.kind, ast::StmtKind::Begin(_) | ast::StmtKind::End(_))
-    });
+    let has_begin_end = program
+        .statements
+        .iter()
+        .any(|s| matches!(s.kind, ast::StmtKind::Begin(_) | ast::StmtKind::End(_)));
     if has_begin_end {
         return None;
     }

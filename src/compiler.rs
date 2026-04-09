@@ -421,9 +421,7 @@ impl Compiler {
                 self.chunk.emit(Op::PopFrame, line);
             }
             StmtKind::Package { name } => {
-                let val_idx = self
-                    .chunk
-                    .add_constant(PerlValue::String(name.clone()));
+                let val_idx = self.chunk.add_constant(PerlValue::String(name.clone()));
                 let name_idx = self.chunk.intern_name("__PACKAGE__");
                 self.chunk.emit(Op::LoadConst(val_idx), line);
                 self.chunk.emit(Op::SetScalar(name_idx), line);
@@ -448,34 +446,59 @@ impl Compiler {
         for stmt in block {
             match &stmt.kind {
                 StmtKind::Return(_) => return true,
-                StmtKind::If { body, elsifs, else_block, .. } => {
-                    if Self::block_has_return(body) { return true; }
+                StmtKind::If {
+                    body,
+                    elsifs,
+                    else_block,
+                    ..
+                } => {
+                    if Self::block_has_return(body) {
+                        return true;
+                    }
                     for (_, blk) in elsifs {
-                        if Self::block_has_return(blk) { return true; }
+                        if Self::block_has_return(blk) {
+                            return true;
+                        }
                     }
                     if let Some(eb) = else_block {
-                        if Self::block_has_return(eb) { return true; }
+                        if Self::block_has_return(eb) {
+                            return true;
+                        }
                     }
                 }
-                StmtKind::Unless { body, else_block, .. } => {
-                    if Self::block_has_return(body) { return true; }
+                StmtKind::Unless {
+                    body, else_block, ..
+                } => {
+                    if Self::block_has_return(body) {
+                        return true;
+                    }
                     if let Some(eb) = else_block {
-                        if Self::block_has_return(eb) { return true; }
+                        if Self::block_has_return(eb) {
+                            return true;
+                        }
                     }
                 }
                 StmtKind::While { body, .. }
                 | StmtKind::Until { body, .. }
                 | StmtKind::Foreach { body, .. } => {
-                    if Self::block_has_return(body) { return true; }
+                    if Self::block_has_return(body) {
+                        return true;
+                    }
                 }
                 StmtKind::For { body, .. } => {
-                    if Self::block_has_return(body) { return true; }
+                    if Self::block_has_return(body) {
+                        return true;
+                    }
                 }
                 StmtKind::Block(blk) => {
-                    if Self::block_has_return(blk) { return true; }
+                    if Self::block_has_return(blk) {
+                        return true;
+                    }
                 }
                 StmtKind::DoWhile { body, .. } => {
-                    if Self::block_has_return(body) { return true; }
+                    if Self::block_has_return(body) {
+                        return true;
+                    }
                 }
                 _ => {}
             }
@@ -622,8 +645,7 @@ impl Compiler {
                     self.compile_expr(index_expr)?;
                     self.chunk.emit(Op::GetArrayElem(arr_idx), line);
                 }
-                self.chunk
-                    .emit(Op::MakeArray(indices.len() as u16), line);
+                self.chunk.emit(Op::MakeArray(indices.len() as u16), line);
             }
             ExprKind::HashSlice { hash, keys } => {
                 let hash_idx = self.chunk.intern_name(hash);
@@ -631,8 +653,7 @@ impl Compiler {
                     self.compile_expr(key_expr)?;
                     self.chunk.emit(Op::GetHashElem(hash_idx), line);
                 }
-                self.chunk
-                    .emit(Op::MakeArray(keys.len() as u16), line);
+                self.chunk.emit(Op::MakeArray(keys.len() as u16), line);
             }
 
             // ── Operators ──
@@ -1090,10 +1111,8 @@ impl Compiler {
                     self.compile_expr(len)?;
                     argc = 3;
                 }
-                self.chunk.emit(
-                    Op::CallBuiltin(BuiltinId::Substr as u16, argc),
-                    line,
-                );
+                self.chunk
+                    .emit(Op::CallBuiltin(BuiltinId::Substr as u16, argc), line);
             }
             ExprKind::Index {
                 string,
@@ -1293,8 +1312,7 @@ impl Compiler {
                 for e in elems {
                     self.compile_expr(e)?;
                 }
-                self.chunk
-                    .emit(Op::MakeArray(elems.len() as u16), line);
+                self.chunk.emit(Op::MakeArray(elems.len() as u16), line);
                 self.chunk.emit(Op::MakeArrayRef, line);
             }
             ExprKind::HashRef(pairs) => {
@@ -1614,9 +1632,7 @@ impl Compiler {
                 self.chunk.emit(Op::SetHashElem(idx), line);
             }
             ExprKind::ArrowDeref { .. } => {
-                return Err(CompileError::Unsupported(
-                    "Assign to arrow deref".into(),
-                ));
+                return Err(CompileError::Unsupported("Assign to arrow deref".into()));
             }
             _ => {
                 return Err(CompileError::Unsupported("Assign to complex lvalue".into()));

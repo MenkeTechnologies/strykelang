@@ -840,7 +840,11 @@ impl<'a> VM<'a> {
                     match r {
                         PerlValue::ArrayRef(a) => {
                             let arr = a.read();
-                            let i = if idx < 0 { (arr.len() as i64 + idx) as usize } else { idx as usize };
+                            let i = if idx < 0 {
+                                (arr.len() as i64 + idx) as usize
+                            } else {
+                                idx as usize
+                            };
                             self.push(arr.get(i).cloned().unwrap_or(PerlValue::Undef));
                         }
                         _ => self.push(PerlValue::Undef),
@@ -903,7 +907,12 @@ impl<'a> VM<'a> {
                     let class = match &obj {
                         PerlValue::Blessed(b) => b.class.clone(),
                         PerlValue::String(s) => s.clone(),
-                        _ => return Err(PerlError::runtime("Can't call method on non-object", self.line())),
+                        _ => {
+                            return Err(PerlError::runtime(
+                                "Can't call method on non-object",
+                                self.line(),
+                            ))
+                        }
                     };
                     let mut all_args = vec![obj];
                     all_args.extend(args);
@@ -938,7 +947,10 @@ impl<'a> VM<'a> {
                         })));
                     } else {
                         return Err(PerlError::runtime(
-                            format!("Can't locate method \"{}\" in package \"{}\"", method, class),
+                            format!(
+                                "Can't locate method \"{}\" in package \"{}\"",
+                                method, class
+                            ),
                             self.line(),
                         ));
                     }
@@ -953,8 +965,12 @@ impl<'a> VM<'a> {
                         'd' => std::path::Path::new(&path).is_dir(),
                         'l' => std::path::Path::new(&path).is_symlink(),
                         'r' | 'w' => std::fs::metadata(&path).is_ok(),
-                        's' => std::fs::metadata(&path).map(|m| m.len() > 0).unwrap_or(false),
-                        'z' => std::fs::metadata(&path).map(|m| m.len() == 0).unwrap_or(true),
+                        's' => std::fs::metadata(&path)
+                            .map(|m| m.len() > 0)
+                            .unwrap_or(false),
+                        'z' => std::fs::metadata(&path)
+                            .map(|m| m.len() == 0)
+                            .unwrap_or(true),
                         _ => false,
                     };
                     self.push(PerlValue::Integer(if result { 1 } else { 0 }));
@@ -1005,9 +1021,13 @@ impl<'a> VM<'a> {
                         match self.interp.exec_block_no_scope(&block) {
                             Ok(v) => {
                                 let n = v.to_int();
-                                if n < 0 { std::cmp::Ordering::Less }
-                                else if n > 0 { std::cmp::Ordering::Greater }
-                                else { std::cmp::Ordering::Equal }
+                                if n < 0 {
+                                    std::cmp::Ordering::Less
+                                } else if n > 0 {
+                                    std::cmp::Ordering::Greater
+                                } else {
+                                    std::cmp::Ordering::Equal
+                                }
                             }
                             Err(_) => std::cmp::Ordering::Equal,
                         }
@@ -1016,15 +1036,22 @@ impl<'a> VM<'a> {
                 }
                 Op::SortNoBlock => {
                     let mut items = self.pop().to_list();
-                    items.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+                    items.sort_by_key(|a| a.to_string());
                     self.push(PerlValue::Array(items));
                 }
                 Op::ReverseOp => {
                     let val = self.pop();
                     match val {
-                        PerlValue::Array(mut a) => { a.reverse(); self.push(PerlValue::Array(a)); }
-                        PerlValue::String(s) => self.push(PerlValue::String(s.chars().rev().collect())),
-                        other => self.push(PerlValue::String(other.to_string().chars().rev().collect())),
+                        PerlValue::Array(mut a) => {
+                            a.reverse();
+                            self.push(PerlValue::Array(a));
+                        }
+                        PerlValue::String(s) => {
+                            self.push(PerlValue::String(s.chars().rev().collect()))
+                        }
+                        other => {
+                            self.push(PerlValue::String(other.to_string().chars().rev().collect()))
+                        }
                     }
                 }
 
@@ -1115,9 +1142,13 @@ impl<'a> VM<'a> {
                         match local_interp.exec_block_no_scope(&block) {
                             Ok(v) => {
                                 let n = v.to_int();
-                                if n < 0 { std::cmp::Ordering::Less }
-                                else if n > 0 { std::cmp::Ordering::Greater }
-                                else { std::cmp::Ordering::Equal }
+                                if n < 0 {
+                                    std::cmp::Ordering::Less
+                                } else if n > 0 {
+                                    std::cmp::Ordering::Greater
+                                } else {
+                                    std::cmp::Ordering::Equal
+                                }
                             }
                             Err(_) => std::cmp::Ordering::Equal,
                         }
@@ -1133,7 +1164,9 @@ impl<'a> VM<'a> {
                         let mut local_interp = Interpreter::new();
                         local_interp.subs = subs.clone();
                         local_interp.scope.restore_capture(&scope_capture);
-                        local_interp.scope.set_scalar("_", PerlValue::Integer(i as i64));
+                        local_interp
+                            .scope
+                            .set_scalar("_", PerlValue::Integer(i as i64));
                         let _ = local_interp.exec_block_no_scope(&block);
                     });
                     self.push(PerlValue::Undef);
@@ -1374,30 +1407,56 @@ impl<'a> VM<'a> {
             Some(BuiltinId::Chop) => {
                 let val = args.into_iter().next().unwrap_or(PerlValue::Undef);
                 let s = val.to_string();
-                Ok(s.chars().last().map(|c| PerlValue::String(c.to_string())).unwrap_or(PerlValue::Undef))
+                Ok(s.chars()
+                    .last()
+                    .map(|c| PerlValue::String(c.to_string()))
+                    .unwrap_or(PerlValue::Undef))
             }
             Some(BuiltinId::Substr) => {
                 let s = args.first().map(|v| v.to_string()).unwrap_or_default();
                 let off = args.get(1).map(|v| v.to_int()).unwrap_or(0);
-                let start = if off < 0 { (s.len() as i64 + off).max(0) as usize } else { off as usize };
-                let len = args.get(2).map(|v| v.to_int() as usize).unwrap_or(s.len() - start);
+                let start = if off < 0 {
+                    (s.len() as i64 + off).max(0) as usize
+                } else {
+                    off as usize
+                };
+                let len = args
+                    .get(2)
+                    .map(|v| v.to_int() as usize)
+                    .unwrap_or(s.len() - start);
                 let end = (start + len).min(s.len());
-                Ok(PerlValue::String(s.get(start..end).unwrap_or("").to_string()))
+                Ok(PerlValue::String(
+                    s.get(start..end).unwrap_or("").to_string(),
+                ))
             }
             Some(BuiltinId::Index) => {
                 let s = args.first().map(|v| v.to_string()).unwrap_or_default();
                 let sub = args.get(1).map(|v| v.to_string()).unwrap_or_default();
                 let pos = args.get(2).map(|v| v.to_int() as usize).unwrap_or(0);
-                Ok(PerlValue::Integer(s[pos..].find(&sub).map(|i| (i + pos) as i64).unwrap_or(-1)))
+                Ok(PerlValue::Integer(
+                    s[pos..].find(&sub).map(|i| (i + pos) as i64).unwrap_or(-1),
+                ))
             }
             Some(BuiltinId::Rindex) => {
                 let s = args.first().map(|v| v.to_string()).unwrap_or_default();
                 let sub = args.get(1).map(|v| v.to_string()).unwrap_or_default();
-                let end = args.get(2).map(|v| v.to_int() as usize + sub.len()).unwrap_or(s.len());
-                Ok(PerlValue::Integer(s[..end.min(s.len())].rfind(&sub).map(|i| i as i64).unwrap_or(-1)))
+                let end = args
+                    .get(2)
+                    .map(|v| v.to_int() as usize + sub.len())
+                    .unwrap_or(s.len());
+                Ok(PerlValue::Integer(
+                    s[..end.min(s.len())]
+                        .rfind(&sub)
+                        .map(|i| i as i64)
+                        .unwrap_or(-1),
+                ))
             }
             Some(BuiltinId::Ucfirst) => {
-                let s = args.into_iter().next().unwrap_or(PerlValue::Undef).to_string();
+                let s = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(PerlValue::Undef)
+                    .to_string();
                 let mut chars = s.chars();
                 let result = match chars.next() {
                     Some(c) => c.to_uppercase().to_string() + chars.as_str(),
@@ -1406,7 +1465,11 @@ impl<'a> VM<'a> {
                 Ok(PerlValue::String(result))
             }
             Some(BuiltinId::Lcfirst) => {
-                let s = args.into_iter().next().unwrap_or(PerlValue::Undef).to_string();
+                let s = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(PerlValue::Undef)
+                    .to_string();
                 let mut chars = s.chars();
                 let result = match chars.next() {
                     Some(c) => c.to_lowercase().to_string() + chars.as_str(),
@@ -1414,19 +1477,15 @@ impl<'a> VM<'a> {
                 };
                 Ok(PerlValue::String(result))
             }
-            Some(BuiltinId::Scalar) => {
-                let val = args.into_iter().next().unwrap_or(PerlValue::Undef);
-                Ok(val.scalar_context())
-            }
             Some(BuiltinId::Splice) => {
                 // Simplified — return empty array
                 Ok(PerlValue::Array(vec![]))
             }
-            Some(BuiltinId::Unshift) => {
-                Ok(PerlValue::Integer(0))
-            }
+            Some(BuiltinId::Unshift) => Ok(PerlValue::Integer(0)),
             Some(BuiltinId::Printf) => {
-                if args.is_empty() { return Ok(PerlValue::Integer(1)); }
+                if args.is_empty() {
+                    return Ok(PerlValue::Integer(1));
+                }
                 let fmt = args[0].to_string();
                 let rest = &args[1..];
                 print!("{}", crate::interpreter::perl_sprintf(&fmt, rest));
@@ -1441,47 +1500,91 @@ impl<'a> VM<'a> {
             Some(BuiltinId::Eof) => Ok(PerlValue::Integer(0)),
             Some(BuiltinId::ReadLine) => Ok(PerlValue::Undef),
             Some(BuiltinId::Exec) => {
-                let cmd = args.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(" ");
-                let status = std::process::Command::new("sh").arg("-c").arg(&cmd).status();
+                let cmd = args
+                    .iter()
+                    .map(|a| a.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let status = std::process::Command::new("sh")
+                    .arg("-c")
+                    .arg(&cmd)
+                    .status();
                 std::process::exit(status.map(|s| s.code().unwrap_or(-1)).unwrap_or(-1));
             }
             Some(BuiltinId::Chdir) => {
-                let path = args.into_iter().next().unwrap_or(PerlValue::Undef).to_string();
-                Ok(PerlValue::Integer(if std::env::set_current_dir(&path).is_ok() { 1 } else { 0 }))
+                let path = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(PerlValue::Undef)
+                    .to_string();
+                Ok(PerlValue::Integer(
+                    if std::env::set_current_dir(&path).is_ok() {
+                        1
+                    } else {
+                        0
+                    },
+                ))
             }
             Some(BuiltinId::Mkdir) => {
                 let path = args.first().map(|v| v.to_string()).unwrap_or_default();
-                Ok(PerlValue::Integer(if std::fs::create_dir(&path).is_ok() { 1 } else { 0 }))
+                Ok(PerlValue::Integer(if std::fs::create_dir(&path).is_ok() {
+                    1
+                } else {
+                    0
+                }))
             }
             Some(BuiltinId::Unlink) => {
                 let mut count = 0i64;
                 for a in &args {
-                    if std::fs::remove_file(a.to_string()).is_ok() { count += 1; }
+                    if std::fs::remove_file(a.to_string()).is_ok() {
+                        count += 1;
+                    }
                 }
                 Ok(PerlValue::Integer(count))
             }
             Some(BuiltinId::Eval) => {
-                let code = args.into_iter().next().unwrap_or(PerlValue::Undef).to_string();
+                let code = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(PerlValue::Undef)
+                    .to_string();
                 match crate::parse_and_run_string(&code, self.interp) {
-                    Ok(v) => { self.interp.eval_error = String::new(); Ok(v) }
-                    Err(e) => { self.interp.eval_error = e.to_string(); Ok(PerlValue::Undef) }
+                    Ok(v) => {
+                        self.interp.eval_error = String::new();
+                        Ok(v)
+                    }
+                    Err(e) => {
+                        self.interp.eval_error = e.to_string();
+                        Ok(PerlValue::Undef)
+                    }
                 }
             }
             Some(BuiltinId::Do) => {
-                let filename = args.into_iter().next().unwrap_or(PerlValue::Undef).to_string();
+                let filename = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(PerlValue::Undef)
+                    .to_string();
                 match std::fs::read_to_string(&filename) {
-                    Ok(code) => crate::parse_and_run_string(&code, self.interp).or(Ok(PerlValue::Undef)),
+                    Ok(code) => {
+                        crate::parse_and_run_string(&code, self.interp).or(Ok(PerlValue::Undef))
+                    }
                     Err(_) => Ok(PerlValue::Undef),
                 }
             }
             Some(BuiltinId::Require) => {
-                let name = args.into_iter().next().unwrap_or(PerlValue::Undef).to_string();
+                let name = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(PerlValue::Undef)
+                    .to_string();
                 let path = name.replace("::", "/") + ".pm";
                 for dir in [".", "/usr/lib/perl5", "/usr/share/perl5"] {
                     let full = format!("{}/{}", dir, path);
                     if std::path::Path::new(&full).exists() {
                         if let Ok(code) = std::fs::read_to_string(&full) {
-                            return crate::parse_and_run_string(&code, self.interp).or(Ok(PerlValue::Integer(1)));
+                            return crate::parse_and_run_string(&code, self.interp)
+                                .or(Ok(PerlValue::Integer(1)));
                         }
                     }
                 }
@@ -1489,28 +1592,30 @@ impl<'a> VM<'a> {
             }
             Some(BuiltinId::Bless) => {
                 let ref_val = args.first().cloned().unwrap_or(PerlValue::Undef);
-                let class = args.get(1).map(|v| v.to_string()).unwrap_or_else(|| {
-                    self.interp.scope.get_scalar("__PACKAGE__").to_string()
-                });
+                let class = args
+                    .get(1)
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| self.interp.scope.get_scalar("__PACKAGE__").to_string());
                 Ok(PerlValue::Blessed(Arc::new(crate::value::BlessedRef {
                     class,
                     data: RwLock::new(ref_val),
                 })))
             }
-            Some(BuiltinId::Caller) => {
-                Ok(PerlValue::Array(vec![
-                    PerlValue::String("main".into()),
-                    PerlValue::String(self.interp.file.clone()),
-                    PerlValue::Integer(line as i64),
-                ]))
-            }
+            Some(BuiltinId::Caller) => Ok(PerlValue::Array(vec![
+                PerlValue::String("main".into()),
+                PerlValue::String(self.interp.file.clone()),
+                PerlValue::Integer(line as i64),
+            ])),
             // Parallel ops (shouldn't reach here — handled by block ops)
-            Some(BuiltinId::PMap) | Some(BuiltinId::PGrep) | Some(BuiltinId::PFor)
-            | Some(BuiltinId::PSort) | Some(BuiltinId::Fan)
-            | Some(BuiltinId::MapBlock) | Some(BuiltinId::GrepBlock) | Some(BuiltinId::SortBlock)
-            | Some(BuiltinId::Sort) => {
-                Ok(PerlValue::Undef)
-            }
+            Some(BuiltinId::PMap)
+            | Some(BuiltinId::PGrep)
+            | Some(BuiltinId::PFor)
+            | Some(BuiltinId::PSort)
+            | Some(BuiltinId::Fan)
+            | Some(BuiltinId::MapBlock)
+            | Some(BuiltinId::GrepBlock)
+            | Some(BuiltinId::SortBlock)
+            | Some(BuiltinId::Sort) => Ok(PerlValue::Undef),
             _ => Err(PerlError::runtime(
                 format!("Unimplemented builtin {:?}", bid),
                 line,
