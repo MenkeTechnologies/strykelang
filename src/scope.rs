@@ -550,7 +550,11 @@ impl Scope {
     ) -> PerlValue {
         if let Some(aa) = self.find_atomic_array(name) {
             let mut guard = aa.0.lock();
-            let idx = if index < 0 { (guard.len() as i64 + index).max(0) as usize } else { index as usize };
+            let idx = if index < 0 {
+                (guard.len() as i64 + index).max(0) as usize
+            } else {
+                index as usize
+            };
             if idx >= guard.len() {
                 guard.resize(idx + 1, PerlValue::Undef);
             }
