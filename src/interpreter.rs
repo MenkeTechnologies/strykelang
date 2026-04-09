@@ -398,6 +398,107 @@ pub struct Interpreter {
     /// When false, the bytecode VM runs without Cranelift (see [`crate::try_vm_execute`]). Disabled by
     /// `PERLRS_NO_JIT=1` / `true` / `yes`, or `pe --no-jit` after [`Self::new`].
     pub vm_jit_enabled: bool,
+    /// When true, [`crate::try_vm_execute`] prints bytecode disassembly to stderr before running the VM.
+    pub disasm_bytecode: bool,
+}
+
+/// Snapshot of stash + `@ISA` for REPL `$obj->method` tab-completion (no `Interpreter` handle needed).
+#[derive(Debug, Clone)]
+pub struct ReplCompletionSnapshot {
+    pub subs: Vec<String>,
+    pub blessed_scalars: HashMap<String, String>,
+    pub isa_for_class: HashMap<String, Vec<String>>,
+}
+
+impl Default for ReplCompletionSnapshot {
+    fn default() -> Self {
+        Self {
+            subs: Vec::new(),
+            blessed_scalars: HashMap::new(),
+            isa_for_class: HashMap::new(),
+        }
+    }
+}
+
+impl ReplCompletionSnapshot {
+    /// Method names (short names) visible for `class->` from [`Self::subs`] and C3 MRO.
+    pub fn methods_for_class(&self, class: &str) -> Vec<String> {
+        let parents = |c: &str| self.isa_for_class.get(c).cloned().unwrap_or_default();
+        let mro = linearize_c3(class, &parents, 0);
+        let mut names = HashSet::new();
+        for pkg in &mro {
+            if pkg == "UNIVERSAL" {
+                continue;
+            }
+            let prefix = format!("{}::", pkg);
+            for k in &self.subs {
+                if k.starts_with(&prefix) {
+                    let rest = &k[prefix.len()..];
+                    if !rest.contains("::") {
+                        names.insert(rest.to_string());
+                    }
+                }
+            }
+        }
+        for k in &self.subs {
+            if let Some(rest) = k.strip_prefix("UNIVERSAL::") {
+                if !rest.contains("::") {
+                    names.insert(rest.to_string());
+                }
+            }
+        }
+        let mut v: Vec<String> = names.into_iter().collect();
+        v.sort();
+        v
+    }
+}
+
+fn repl_resolve_class_for_arrow(state: &ReplCompletionSnapshot, left: &str) -> Option<String> {
+    let left = left.trim_end();
+    if left.is_empty() {
+        return None;
+    }
+    if let Some(i) = left.rfind('$') {
+        let name = left[i + 1..].trim();
+        if name.chars().all(|c| c.is_alphanumeric() || c == '_') && !name.is_empty() {
+            return state.blessed_scalars.get(name).cloned();
+        }
+    }
+    let tok = left.split_whitespace().last()?;
+    if tok.contains("::") {
+        return Some(tok.to_string());
+    }
+    if tok.chars().all(|c| c.is_alphanumeric() || c == '_') && !tok.starts_with('$') {
+        return Some(tok.to_string());
+    }
+    None
+}
+
+/// Tab-complete method name after `->` when the invocant resolves to a class (see [`ReplCompletionSnapshot`]).
+pub fn repl_arrow_method_completions(
+    state: &ReplCompletionSnapshot,
+    line: &str,
+    pos: usize,
+) -> Option<(usize, Vec<String>)> {
+    let pos = pos.min(line.len());
+    let before = &line[..pos];
+    let arrow_idx = before.rfind("->")?;
+    let after_arrow = &before[arrow_idx + 2..];
+    let rest = after_arrow.trim_start();
+    let ws_len = after_arrow.len() - rest.len();
+    let method_start = arrow_idx + 2 + ws_len;
+    let method_prefix = &line[method_start..pos];
+    if !method_prefix
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '_')
+    {
+        return None;
+    }
+    let left = line[..arrow_idx].trim_end();
+    let class = repl_resolve_class_for_arrow(state, left)?;
+    let mut methods = state.methods_for_class(&class);
+    methods.retain(|m| m.starts_with(method_prefix));
+    Some((method_start, methods))
 }
 
 /// `Exporter`-style lists for `use Module` / `use Module qw(...)`.
@@ -671,6 +772,7 @@ impl Interpreter {
                         || v.eq_ignore_ascii_case("true")
                         || v.eq_ignore_ascii_case("yes")
             ),
+            disasm_bytecode: false,
         }
     }
 
@@ -768,6 +870,7 @@ impl Interpreter {
             english_enabled: self.english_enabled,
             english_lexical_scalars: self.english_lexical_scalars.clone(),
             vm_jit_enabled: self.vm_jit_enabled,
+            disasm_bytecode: self.disasm_bytecode,
         }
     }
 
@@ -2409,6 +2512,70 @@ impl Interpreter {
         v.sort();
         v.dedup();
         v
+    }
+
+    /// Subroutine keys, blessed scalar classes, and `@ISA` edges for REPL `$obj->` completion.
+    pub fn repl_completion_snapshot(&self) -> ReplCompletionSnapshot {
+        let mut subs: Vec<String> = self.subs.keys().cloned().collect();
+        subs.sort();
+        let mut classes: HashSet<String> = HashSet::new();
+        for k in &subs {
+            if let Some((pkg, rest)) = k.split_once("::") {
+                if !rest.contains("::") {
+                    classes.insert(pkg.to_string());
+                }
+            }
+        }
+        let mut blessed_scalars: HashMap<String, String> = HashMap::new();
+        for bn in self.scope.repl_binding_names() {
+            if let Some(r) = bn.strip_prefix('$') {
+                let v = self.scope.get_scalar(r);
+                if let Some(b) = v.as_blessed_ref() {
+                    blessed_scalars.insert(r.to_string(), b.class.clone());
+                    classes.insert(b.class.clone());
+                }
+            }
+        }
+        let mut isa_for_class: HashMap<String, Vec<String>> = HashMap::new();
+        for c in classes {
+            isa_for_class.insert(c.clone(), self.parents_of_class(&c));
+        }
+        ReplCompletionSnapshot {
+            subs,
+            blessed_scalars,
+            isa_for_class,
+        }
+    }
+
+    pub(crate) fn run_bench_block(&mut self, body: &Block, n: usize, line: usize) -> ExecResult {
+        if n == 0 {
+            return Err(FlowOrError::Error(PerlError::runtime(
+                "bench: iteration count must be positive",
+                line,
+            )));
+        }
+        let warmup = (n / 10).min(10).max(1);
+        for _ in 0..warmup {
+            self.exec_block(body)?;
+        }
+        let mut samples = Vec::with_capacity(n);
+        for _ in 0..n {
+            let start = std::time::Instant::now();
+            self.exec_block(body)?;
+            samples.push(start.elapsed().as_secs_f64() * 1000.0);
+        }
+        let mut sorted = samples.clone();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let min_ms = sorted[0];
+        let mean = samples.iter().sum::<f64>() / n as f64;
+        let p99_idx = ((n as f64 * 0.99).ceil() as usize)
+            .saturating_sub(1)
+            .min(n - 1);
+        let p99_ms = sorted[p99_idx];
+        Ok(PerlValue::string(format!(
+            "bench: n={} warmup={} min={:.6}ms mean={:.6}ms p99={:.6}ms",
+            n, warmup, min_ms, mean, p99_ms
+        )))
     }
 
     pub fn execute(&mut self, program: &Program) -> PerlResult<PerlValue> {
@@ -4803,6 +4970,17 @@ impl Interpreter {
                 self.exec_block(body)?;
                 let ms = start.elapsed().as_secs_f64() * 1000.0;
                 Ok(PerlValue::float(ms))
+            }
+            ExprKind::Bench { body, times } => {
+                let n = self.eval_expr(times)?.to_int();
+                if n < 0 {
+                    return Err(PerlError::runtime(
+                        "bench: iteration count must be non-negative",
+                        line,
+                    )
+                    .into());
+                }
+                self.run_bench_block(body, n as usize, line)
             }
             ExprKind::Await(expr) => {
                 let v = self.eval_expr(expr)?;

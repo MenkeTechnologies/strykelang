@@ -325,6 +325,7 @@ pub const KEYWORDS: &[&str] = &[
     "async",
     "trace",
     "timer",
+    "bench",
     "await",
     "slurp",
     "capture",

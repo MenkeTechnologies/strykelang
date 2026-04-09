@@ -616,6 +616,11 @@ pub enum ExprKind {
     Timer {
         body: Block,
     },
+    /// `bench { BLOCK } N` — run BLOCK `N` times (warmup + min/mean/p99 wall time, ms).
+    Bench {
+        body: Block,
+        times: Box<Expr>,
+    },
     /// `await EXPR` — join an async task, or return EXPR unchanged.
     Await(Box<Expr>),
     /// Read entire file as UTF-8 (`slurp $path`).

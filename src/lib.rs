@@ -46,7 +46,7 @@ pub use interpreter::{
     perl_bracket_version, FEAT_SAY, FEAT_STATE, FEAT_SWITCH, FEAT_UNICODE_STRINGS,
 };
 
-use error::PerlResult;
+use error::{PerlError, PerlResult};
 use interpreter::Interpreter;
 use value::PerlValue;
 
@@ -104,6 +104,9 @@ pub fn try_vm_execute(
     let comp = compiler::Compiler::new().with_source_file(interp.file.clone());
     match comp.compile_program(program) {
         Ok(chunk) => {
+            if interp.disasm_bytecode {
+                eprintln!("{}", chunk.disassemble());
+            }
             // BEGIN/END are emitted in the chunk; avoid running them again from
             // [`Interpreter::begin_blocks`] / [`Interpreter::end_blocks`] if anything used the tree path.
             interp.clear_begin_end_blocks_after_vm_compile();
@@ -128,6 +131,32 @@ pub fn try_vm_execute(
             }
         }
         Err(ref _ce) => None,
+    }
+}
+
+/// Parse + register top-level subs / `use` (same as the VM path), then compile to bytecode without running.
+/// When `strict` pragmas are enabled, bytecode compilation is skipped (same limitation as [`try_vm_execute`]).
+pub fn lint_program(program: &ast::Program, interp: &mut Interpreter) -> PerlResult<()> {
+    if let Err(e) = interp.prepare_program_top_level(program) {
+        return Err(e);
+    }
+    if interp.strict_refs || interp.strict_subs || interp.strict_vars {
+        eprintln!(
+            "perlrs: warning: bytecode compile check skipped (strict pragma is enabled)"
+        );
+        return Ok(());
+    }
+    let comp = compiler::Compiler::new().with_source_file(interp.file.clone());
+    match comp.compile_program(program) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(compile_error_to_perl(e)),
+    }
+}
+
+fn compile_error_to_perl(e: compiler::CompileError) -> PerlError {
+    match e {
+        compiler::CompileError::Unsupported(msg) => PerlError::runtime(format!("compile: {}", msg), 0),
+        compiler::CompileError::Frozen { line, detail } => PerlError::runtime(detail, line),
     }
 }
 

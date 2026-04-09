@@ -823,6 +823,11 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::AsyncBlock { body } => format!("async {{\n{}\n}}", format_block(body)),
         ExprKind::Trace { body } => format!("trace {{\n{}\n}}", format_block(body)),
         ExprKind::Timer { body } => format!("timer {{\n{}\n}}", format_block(body)),
+        ExprKind::Bench { body, times } => format!(
+            "bench {{\n{}\n}} {}",
+            format_block(body),
+            format_expr(times)
+        ),
         ExprKind::Await(e) => format!("await {}", format_expr(e)),
         ExprKind::Slurp(e) => format!("slurp {}", format_expr(e)),
         ExprKind::Capture(e) => format!("capture {}", format_expr(e)),

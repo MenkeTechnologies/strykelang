@@ -3371,6 +3371,23 @@ impl<'a> VM<'a> {
                         self.push(PerlValue::float(ms));
                         Ok(())
                     }
+                    Op::BenchBlock(block_idx) => {
+                        let n_i = self.pop().to_int();
+                        if n_i < 0 {
+                            return Err(PerlError::runtime(
+                                "bench: iteration count must be non-negative",
+                                self.line(),
+                            ));
+                        }
+                        let n = n_i as usize;
+                        let block = self.blocks[*block_idx as usize].clone();
+                        let v = vm_interp_result(
+                            self.interp.run_bench_block(&block, n, self.line()),
+                            self.line(),
+                        )?;
+                        self.push(v);
+                        Ok(())
+                    }
                     Op::Given(idx) => {
                         let (topic, body) = &self.given_entries[*idx as usize];
                         let v = vm_interp_result(self.interp.exec_given(topic, body), self.line())?;

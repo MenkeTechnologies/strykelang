@@ -1,7 +1,7 @@
 //! Unit tests for the crate root API: `parse`, `run`, `parse_and_run_string`, `try_vm_execute`.
 
 use crate::interpreter::Interpreter;
-use crate::{parse, parse_and_run_string, run, try_vm_execute};
+use crate::{lint_program, parse, parse_and_run_string, run, try_vm_execute};
 
 fn run_int(code: &str) -> i64 {
     run(code).expect("run").to_int()
@@ -129,6 +129,22 @@ fn try_vm_execute_runs_begin_block_before_main() {
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i).expect("vm path");
     assert_eq!(out.expect("vm").to_int(), 2);
+}
+
+#[test]
+fn lint_program_accepts_vm_compilable_program() {
+    let p = parse("42;").expect("parse");
+    let mut i = Interpreter::new();
+    assert!(lint_program(&p, &mut i).is_ok());
+}
+
+#[test]
+fn bench_builtin_reports_stats() {
+    let v = run("bench { 1 + 1 } 5;").expect("run");
+    let s = v.to_string();
+    assert!(s.contains("bench:"));
+    assert!(s.contains("min="));
+    assert!(s.contains("p99="));
 }
 
 #[test]

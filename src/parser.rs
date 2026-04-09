@@ -3761,6 +3761,20 @@ impl Parser {
                     line,
                 })
             }
+            "bench" => {
+                if !matches!(self.peek(), Token::LBrace) {
+                    return Err(PerlError::syntax(
+                        "bench must be followed by { BLOCK }",
+                        line,
+                    ));
+                }
+                let body = self.parse_block()?;
+                let times = Box::new(self.parse_expression()?);
+                Ok(Expr {
+                    kind: ExprKind::Bench { body, times },
+                    line,
+                })
+            }
             "await" => {
                 let a = self.parse_one_arg()?;
                 Ok(Expr {

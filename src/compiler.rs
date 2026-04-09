@@ -3511,6 +3511,11 @@ impl Compiler {
                 let block_idx = self.chunk.add_block(body.clone());
                 self.chunk.emit(Op::TimerBlock(block_idx), line);
             }
+            ExprKind::Bench { body, times } => {
+                self.compile_expr(times)?;
+                let block_idx = self.chunk.add_block(body.clone());
+                self.chunk.emit(Op::BenchBlock(block_idx), line);
+            }
             ExprKind::Await(e) => {
                 self.compile_expr(e)?;
                 self.chunk.emit(Op::Await, line);

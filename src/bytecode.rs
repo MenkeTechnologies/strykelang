@@ -301,6 +301,8 @@ pub enum Op {
     TraceBlock(u16),
     /// `timer { BLOCK }` — block_idx; stack: \[\] → elapsed ms as float
     TimerBlock(u16),
+    /// `bench { BLOCK } N` — block_idx; stack: \[iterations\] → benchmark summary string
+    BenchBlock(u16),
     /// `given (EXPR) { when ... default ... }` — index into [`Chunk::given_entries`]; stack: \[\] → topic result
     Given(u16),
     /// `eval_timeout SECS { ... }` — index into [`Chunk::eval_timeout_entries`]; stack: \[\] → block value
@@ -844,6 +846,22 @@ impl Chunk {
     pub fn is_empty(&self) -> bool {
         self.ops.is_empty()
     }
+
+    /// Human-readable listing: subroutine entry points and each op with its source line (javap / `dis`-style).
+    pub fn disassemble(&self) -> String {
+        use std::fmt::Write;
+        let mut out = String::new();
+        let _ = writeln!(out, "; sub_entries:");
+        for (ni, ip, stack_args) in &self.sub_entries {
+            let name = self.names.get(*ni as usize).map(|s| s.as_str()).unwrap_or("?");
+            let _ = writeln!(out, ";   {} @ {} stack_args={}", name, ip, stack_args);
+        }
+        for (i, op) in self.ops.iter().enumerate() {
+            let line = self.lines.get(i).copied().unwrap_or(0);
+            let _ = writeln!(out, "{:04} {:>5}  {:?}", i, line, op);
+        }
+        out
+    }
 }
 
 impl Default for Chunk {
@@ -1035,5 +1053,14 @@ mod tests {
         d.emit(Op::Pop, 2);
         assert_eq!(c.len(), 1);
         assert_eq!(d.len(), 2);
+    }
+
+    #[test]
+    fn chunk_disassemble_includes_ops() {
+        let mut c = Chunk::new();
+        c.emit(Op::LoadInt(7), 1);
+        let s = c.disassemble();
+        assert!(s.contains("0000"));
+        assert!(s.contains("LoadInt(7)"));
     }
 }

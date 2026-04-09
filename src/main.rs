@@ -32,9 +32,17 @@ pub(crate) struct Cli {
     #[arg(short = 'C', value_name = "NUMBER/LIST")]
     unicode_features: Option<Option<String>>,
 
-    /// Check syntax only (runs BEGIN and CHECK blocks)
+    /// Check syntax only (parse; does not compile or run)
     #[arg(short = 'c')]
     check_only: bool,
+
+    /// Parse and compile without executing (bytecode compile check; alias `--check`)
+    #[arg(long = "lint", alias = "check")]
+    lint: bool,
+
+    /// Print bytecode disassembly to stderr before VM execution (alias `--disassemble`)
+    #[arg(long = "disasm", alias = "disassemble")]
+    disasm: bool,
 
     /// Dump the parsed abstract syntax tree as JSON to stdout and exit (no execution)
     #[arg(long = "ast")]
@@ -210,7 +218,13 @@ fn print_cyberpunk_help() {
     println!("{C}  ── EXECUTION ──────────────────────────────────────────{N}");
     println!("  -e CODE                {G}//{N} One line of program (several -e's allowed)");
     println!("  -E CODE                {G}//{N} Like -e, but enables all optional features");
-    println!("  -c                     {G}//{N} Check syntax only (runs BEGIN and CHECK blocks)");
+    println!("  -c                     {G}//{N} Check syntax only (parse; no compile/run)");
+    println!(
+        "  --lint / --check       {G}//{N} Parse + compile bytecode without running"
+    );
+    println!(
+        "  --disasm / --disassemble {G}//{N} Print bytecode disassembly to stderr before VM run"
+    );
     println!("  --ast                  {G}//{N} Dump parsed AST as JSON and exit (no execution)");
     println!("  --fmt                  {G}//{N} Pretty-print parsed Perl to stdout and exit");
     println!("  --profile              {G}//{N} Wall-clock profile (stderr); tree-walker only");
@@ -755,6 +769,8 @@ fn main() {
         && !cli.line_mode
         && !cli.print_mode
         && !cli.check_only
+        && !cli.lint
+        && !cli.disasm
         && !cli.dump_ast
         && !cli.format_source
         && !cli.profile
@@ -831,6 +847,27 @@ fn main() {
         return;
     }
 
+    if cli.lint {
+        let mut interp = Interpreter::new();
+        if cli.no_jit {
+            interp.vm_jit_enabled = false;
+        }
+        configure_interpreter(&cli, &mut interp, &filename);
+        if let Some(data) = data_opt {
+            interp.install_data_handle(data);
+        }
+        match perlrs::lint_program(&program, &mut interp) {
+            Ok(()) => {
+                eprintln!("{} compile OK", filename);
+                return;
+            }
+            Err(e) => {
+                eprintln!("{}", e);
+                process::exit(255);
+            }
+        }
+    }
+
     if cli.check_only {
         eprintln!("{} syntax OK", filename);
         return;
@@ -844,6 +881,9 @@ fn main() {
     let mut interp = Interpreter::new();
     if cli.no_jit {
         interp.vm_jit_enabled = false;
+    }
+    if cli.disasm {
+        interp.disasm_bytecode = true;
     }
     if cli.profile {
         interp.profiler = Some(perlrs::profiler::Profiler::new(filename.clone()));

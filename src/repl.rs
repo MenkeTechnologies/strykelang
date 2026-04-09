@@ -12,11 +12,13 @@ use rustyline::{Config, Context, Editor, Helper};
 
 use crate::Cli;
 use perlrs::error::ErrorKind;
-use perlrs::interpreter::Interpreter;
+use perlrs::interpreter::{
+    repl_arrow_method_completions, Interpreter, ReplCompletionSnapshot,
+};
 use perlrs::token::KEYWORDS;
 
 /// Extra builtin names not listed in [`perlrs::token::KEYWORDS`].
-const EXTRA_KEYWORDS: &[&str] = &["deque", "heap", "ppool", "barrier"];
+const EXTRA_KEYWORDS: &[&str] = &["deque", "heap", "ppool", "barrier", "bench"];
 
 fn history_path() -> std::path::PathBuf {
     std::env::var_os("HOME")
@@ -64,6 +66,7 @@ fn completion_word_start(line: &str, pos: usize) -> (usize, &str) {
 struct ReplHelper {
     static_words: Vec<String>,
     dynamic: Arc<Mutex<Vec<String>>>,
+    snapshot: Arc<Mutex<ReplCompletionSnapshot>>,
     file: FilenameCompleter,
 }
 
@@ -99,6 +102,21 @@ impl Completer for ReplHelper {
         pos: usize,
         _ctx: &Context<'_>,
     ) -> rustyline::Result<(usize, Vec<Pair>)> {
+        if let Ok(g) = self.snapshot.lock() {
+            if let Some((start, methods)) = repl_arrow_method_completions(&g, line, pos) {
+                let mut pairs: Vec<Pair> = methods
+                    .into_iter()
+                    .map(|m| Pair {
+                        display: m.clone(),
+                        replacement: m,
+                    })
+                    .collect();
+                pairs.sort_by(|a, b| a.display.cmp(&b.display));
+                pairs.dedup_by(|a, b| a.display == b.display);
+                return Ok((start, pairs));
+            }
+        }
+
         let (start, prefix) = completion_word_start(line, pos);
         if prefix.starts_with('$') || prefix.starts_with('@') || prefix.starts_with('%') {
             return Ok((start, self.word_pairs(prefix)?));
@@ -147,10 +165,12 @@ pub fn run(cli: &Cli) {
     let prelude = crate::module_prelude(cli);
     let static_words = build_static_completions();
     let dynamic = Arc::new(Mutex::new(interp.repl_completion_names()));
+    let snapshot = Arc::new(Mutex::new(interp.repl_completion_snapshot()));
 
     let helper = ReplHelper {
         static_words,
         dynamic: Arc::clone(&dynamic),
+        snapshot: Arc::clone(&snapshot),
         file: FilenameCompleter::new(),
     };
 
@@ -173,6 +193,9 @@ pub fn run(cli: &Cli) {
     loop {
         if let Ok(mut g) = dynamic.lock() {
             *g = interp.repl_completion_names();
+        }
+        if let Ok(mut s) = snapshot.lock() {
+            *s = interp.repl_completion_snapshot();
         }
 
         let read = rl.readline("perl> ");
@@ -230,6 +253,18 @@ pub fn run(cli: &Cli) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn arrow_method_completion_uses_blessed_class_and_subs() {
+        let mut state = ReplCompletionSnapshot::default();
+        state.subs = vec!["Pkg::foo".to_string()];
+        state.blessed_scalars.insert("o".to_string(), "Pkg".to_string());
+        let line = "$o->f";
+        let (start, methods) =
+            repl_arrow_method_completions(&state, line, line.len()).expect("arrow context");
+        assert_eq!(start, 4);
+        assert!(methods.iter().any(|m| m == "foo"));
+    }
 
     #[test]
     fn completion_word_at_cursor_includes_sigil() {
