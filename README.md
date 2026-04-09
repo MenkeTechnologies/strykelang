@@ -669,37 +669,37 @@ pe examples/parallel_demo.pl
 ```
   TEST                    perl5     jit_on    jit_off   off/on   SPEEDUP
   ──────────────────── ───────── ────────── ────────── ─────── ─────────
-  startup (print hello)   6.5ms     7.0ms      8.2ms   1.17x      0.9x
-  fib(30)               188.4ms   145.2ms    141.5ms   0.97x      1.3x
-  loop 5M                93.7ms     7.6ms      8.3ms   1.09x     12.3x
-  string .= 500k         13.9ms     7.2ms      8.5ms   1.18x      1.9x
-  hash 100k              26.8ms     7.1ms      8.9ms   1.25x      3.8x
-  array sort 500k        28.4ms     7.1ms      8.7ms   1.23x      4.0x
-  regex match 100k       93.3ms     7.7ms      9.2ms   1.19x     12.1x
-  map+grep 500k          53.6ms     8.1ms     10.7ms   1.32x      6.6x
+  startup (print hello)   9.0ms    10.0ms     11.6ms   1.16x      0.9x
+  fib(30)               205.8ms   347.1ms    341.8ms   0.98x      0.6x
+  loop 5M                97.4ms     8.8ms     10.3ms   1.17x     11.1x
+  string .= 500k         15.1ms     8.8ms      9.7ms   1.10x      1.7x
+  hash 100k              36.6ms     7.9ms      8.6ms   1.09x      4.6x
+  array sort 500k        30.6ms     8.7ms      8.9ms   1.02x      3.5x
+  regex match 100k       93.3ms     9.6ms      9.7ms   1.01x      9.7x
+  map+grep 500k          58.0ms     9.7ms     11.7ms   1.21x      6.0x
 ```
 
 > Measured on macOS M-series with `perl v5.42.2` vs `perlrs` release build (LTO + O3); median of 3 via `bash bench/run_bench.sh`. Times include process startup. **jit_on** / **jit_off** = Cranelift JIT vs opcode-only (`PERLRS_NO_JIT=1`). **off/on** = `jit_off ÷ jit_on`. **SPEEDUP** = `perl5 ÷ jit_on` (higher = perlrs faster).
 
 #### Analysis
 
-- **perlrs beats perl5 on every compute benchmark.** Compile-time fusion, Cranelift JIT, and specialized opcodes combine to eliminate most runtime work. Startup is the only row where perl5 leads (~0.5ms process-init advantage).
-- **loop 12.3×** — the compiler detects `my $sum=0; for (my $i=0; $i<N; $i=$i+1) { $sum=$sum+$i }` and emits `Op::TriangularForAccum` (Gauss’s formula, O(1)); perl5 runs 5M iterations.
-- **regex 12.1×** — the compiler recognizes the static regex-count loop and folds to a constant; `Arc<Regex>` caching + the `regex` crate’s lazy DFA handle non-fused patterns at near-native speed.
-- **map+grep 6.6×** — `map { $_ * k }` / `grep { $_ % m == r }` with integer constants compile to `Op::MapIntMul` / `Op::GrepIntModEq` (native VM loops, no per-element `exec_block_no_scope`); the map-grep-scalar pattern fuses to a constant.
+- **perlrs beats perl5 on every compute benchmark except fib.** Compile-time fusion, Cranelift JIT, and specialized opcodes combine to eliminate most runtime work. Startup and fib are the rows where perl5 leads.
+- **loop 11.1×** — the compiler detects `my $sum=0; for (my $i=0; $i<N; $i=$i+1) { $sum=$sum+$i }` and emits `Op::TriangularForAccum` (Gauss’s formula, O(1)); perl5 runs 5M iterations.
+- **regex 9.7×** — the compiler recognizes the static regex-count loop and folds to a constant; `Arc<Regex>` caching + the `regex` crate’s lazy DFA handle non-fused patterns at near-native speed.
+- **map+grep 6.0×** — `map { $_ * k }` / `grep { $_ % m == r }` with integer constants compile to `Op::MapIntMul` / `Op::GrepIntModEq` (native VM loops, no per-element `exec_block_no_scope`); the map-grep-scalar pattern fuses to a constant.
 - **map/grep/sort blocks** — after subroutine bodies, blocks with no `return` whose **last** statement is an expression (`map { foo(); $_ }`, `grep { cond }`, `sort { $a <=> $b }` when not handled by the sort fast path) lower to bytecode ending in `Op::BlockReturnValue`; the VM runs that slice via nested dispatch (`run_block_region`) with one `scope_push_hook` per iteration (same as `exec_block`: `$_` / `$a` / `$b` are set in the caller, then the body runs inline — no closure capture). Parallel `pmap`/`pgrep`/`pfor`/`psort` workers use the same lowered slice when present: each rayon worker gets a fresh interpreter and a worker VM that **shares** the main chunk’s opcode/name/constant pools (`Arc`) and runs the block region with JIT disabled. Blocks whose last statement is not an expression, blocks containing `return`, `given`/`when`/`algebraic match`/`eval_timeout` bodies, regex `s///`/`tr///` assign targets, and **`fan`** (and any block the compiler cannot lower) still use stored AST or the tree interpreter where lowering is unsupported or impractical.
-- **hash 3.8×** / **array 4.0×** — whole-program fusion detects the hash-sum and array-push-sort benchmark shapes and computes results at compile time.
-- **string 1.9×** — string-repeat-length fusion detects `.= "x"` in a counted loop and computes `length` directly; `ConcatAppend` / `ConcatAppendSlot` provide in-place mutation for non-fused cases.
-- **fib 1.3×** — pure recursive sub-call overhead. Sub-JIT skip tracking uses `Vec<bool>` bitsets (O(1) indexed) instead of `HashSet` (hashing per call). `GetArg` avoids `@_` allocation; `PostIncSlot+Pop` fusion eliminates stack traffic in loop control. **Tiered sub JIT** (default 50 interpreter-only invocations per sub entry before attempting Cranelift) reduces compile tax on tiny recursive bodies; override with **`PERLRS_JIT_SUB_INVOKES`**.
-- **JIT off/on ratio** — when JIT is disabled, the opcode interpreter is typically 10–30% slower. The fib benchmark is a rare case where JIT-off can be marginally faster when compile/validation work dominates a tiny hot sub (tiering addresses the worst case).
+- **hash 4.6×** / **array 3.5×** — whole-program fusion detects the hash-sum and array-push-sort benchmark shapes and computes results at compile time.
+- **string 1.7×** — string-repeat-length fusion detects `.= "x"` in a counted loop and computes `length` directly; `ConcatAppend` / `ConcatAppendSlot` provide in-place mutation for non-fused cases.
+- **fib 0.6×** — pure recursive sub-call overhead; perl5’s XS-level call dispatch is faster for deep recursion. Sub-JIT skip tracking uses `Vec<bool>` bitsets (O(1) indexed) instead of `HashSet` (hashing per call). `GetArg` avoids `@_` allocation; `PostIncSlot+Pop` fusion eliminates stack traffic in loop control. **Tiered sub JIT** (default 50 interpreter-only invocations per sub entry before attempting Cranelift) reduces compile tax on tiny recursive bodies; override with **`PERLRS_JIT_SUB_INVOKES`**.
+- **JIT off/on ratio** — when JIT is disabled, the opcode interpreter is typically 1–20% slower. The fib benchmark is a rare case where JIT-off can be marginally faster when compile/validation work dominates a tiny hot sub (tiering addresses the worst case).
 - **VM signal poll** — `%SIG` delivery runs every 1024 opcodes, not every opcode.
 - **Lazy rayon init** — the thread pool spawns only when the first parallel op is hit.
 
 #### Parallel speedup
 
 ```
-  map  (sequential):  173.0ms
-  pmap (18 cores):     64.4ms   →  2.7× speedup
+  map  (sequential):  246.2ms
+  pmap (18 cores):    522.5ms   →  0.47× (overhead exceeds parallelism gain)
   fan { system("sleep 0.1") }   →  0.12s total (vs 1.8s sequential)
 ```
 
