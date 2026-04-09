@@ -45,7 +45,7 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 | `$^W` | Warnings | `warnings` boolean (`true` → `1`). |
 | `$^O` | OS name | `perl_osname()` maps `std::env::consts::OS` toward Perl names (`linux`, `darwin`, `MSWin32`, …). |
 | `$^T` | Script start time | `Interpreter.script_start_time` (seconds since Unix epoch, set in `Interpreter::new`). |
-| `$^V` | Version string | `v{CARGO_PKG_VERSION}` (e.g. `v0.1.13`); not a full Perl `version` object. |
+| `$^V` | Version string | `v{CARGO_PKG_VERSION}` (from `Cargo.toml` at build time); not a full Perl `version` object. |
 | `$^E` | Extended OS error | `std::io::Error::last_os_error().to_string()` (not Windows `GetLastError` semantics). |
 | `$^H` | Compile-time hints | `compile_hints` (`i64`); read/write via `get_special_var` / `set_special_var`. |
 | `${^WARNING_BITS}` | Warnings bitmask | `warning_bits` (`i64`); read/write via `get_special_var` / `set_special_var`. |
