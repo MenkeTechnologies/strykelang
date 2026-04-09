@@ -110,6 +110,8 @@ enum JitTy {
 }
 
 struct LinearJit {
+    /// Retained so the Cranelift [`JITModule`] (and finalized machine code) is not dropped while
+    /// [`LinearRun`] pointers are invoked.
     #[allow(dead_code)]
     module: JITModule,
     run: LinearRun,

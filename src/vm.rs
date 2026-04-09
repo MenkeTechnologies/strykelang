@@ -277,7 +277,7 @@ impl<'a> VM<'a> {
     }
 
     /// Run bytecode: first attempts Cranelift method JIT for eligible numeric fragments. For block
-    /// JIT, [`crate::jit::block_jit_validate`] runs once per attempt; buffers may use
+    /// JIT, `block_jit_validate` runs once per attempt; buffers may use
     /// `PerlValue::raw_bits` for `defined`-style control flow. Then the main opcode interpreter loop.
     pub fn execute(&mut self) -> PerlResult<PerlValue> {
         let ops = &self.ops as *const Vec<Op>;
