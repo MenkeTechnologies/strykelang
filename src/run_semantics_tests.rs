@@ -416,6 +416,12 @@ fn pmap_chunked_preserves_order_and_values() {
 }
 
 #[test]
+fn reduce_left_fold_sum_and_concat() {
+    assert_eq!(ri(r#"reduce { $a + $b } (1, 2, 3, 4);"#), 10);
+    assert_eq!(rs(r#"reduce { $a . $b } ("a", "b", "c");"#), "abc");
+}
+
+#[test]
 fn pipeline_filter_map_take_collect() {
     let s = r#"
         my @a = pipeline(1, 9, 10, 15)

@@ -114,6 +114,10 @@ my @doubled = pmap { $_ * 2 } @data;
 # parallel map in batches (one interpreter per chunk — amortizes spawn cost)
 my @out = pmap_chunked 1000 { $_ ** 2 } @million_items;
 
+# sequential left fold vs parallel tree fold (use preduce only for associative ops)
+my $sum = reduce { $a + $b } @numbers;
+my $psum = preduce { $a + $b } @numbers;
+
 # lazy pipeline (ops run on collect(); chain with anonymous subs)
 my @result = pipeline(@data)
     ->filter(sub { $_ > 10 })
@@ -303,7 +307,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 
  ┌──────────────────────────────────────────────────────────────┐
  │ **Array**: push, pop, shift, unshift, splice, reverse,      │
- │ sort, map, grep, scalar                                     │
+ │ sort, map, grep, reduce, preduce, scalar                    │
  │ **Hash**: keys, values, each, delete, exists                │
  │ **String**: chomp, chop, length, substr, index, rindex,     │
  │ split, join, sprintf, printf, uc, lc, ucfirst, lcfirst,     │
@@ -330,6 +334,11 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
  │ `goto EXPR` (same-block labels), `continue { }` on loops, │
  │ `prototype` on code refs; sub prototypes parsed on `sub`     │
  └──────────────────────────────────────────────────────────────┘
+
+#### EXTENSIONS BEYOND STOCK PERL 5
+- **`reduce` / `preduce`** — list fold with `$a` (accumulator) and `$b` (next item); `reduce` is strictly left-to-right; `preduce` uses rayon (order not fixed; use only when the operation is associative).
+- **`frozen my`** — immutable bindings (reassignment rejected in the bytecode path).
+- **Optional `typed` annotations** (e.g. `typed my $n : Int`) — **not implemented**; immutability today is via `frozen`.
 
 #### OTHER FEATURES
 - `Interpreter::execute` returns `Err(ErrorKind::Exit(code))` for `exit` (including code 0); the `perlrs` binary maps that to `process::exit`.

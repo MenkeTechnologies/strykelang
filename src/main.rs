@@ -233,6 +233,12 @@ fn print_cyberpunk_help() {
     println!("  pfor  {{BLOCK}} @list    {G}//{N} Parallel foreach across all cores");
     println!("  psort {{BLOCK}} @list    {G}//{N} Parallel sort across all cores");
     println!(
+        "  reduce {{BLOCK}} @list   {G}//{N} Sequential left fold ($a accum, $b next element)"
+    );
+    println!(
+        "  preduce {{BLOCK}} @list  {G}//{N} Parallel tree fold (rayon; associative ops only)"
+    );
+    println!(
         "  fan N {{BLOCK}}          {G}//{N} Execute BLOCK N times across all cores ($_ = index)"
     );
     println!("{C}  ── POSITIONAL ─────────────────────────────────────────{N}");
@@ -635,7 +641,7 @@ fn print_config(configvar: Option<&str>) {
         println!("  Integer/Float:");
         println!("    use64bitint=define, use64bitall=define");
         println!("  Parallel extensions:");
-        println!("    rayon=define, pmap=define, pmap_chunked=define, pipeline=define, async=define, await=define, pgrep=define, pfor=define, psort=define");
+        println!("    rayon=define, pmap=define, pmap_chunked=define, pipeline=define, async=define, await=define, pgrep=define, pfor=define, psort=define, reduce=define, preduce=define");
         println!("  Install:");
         println!("    perlpath=perlrs");
     }
