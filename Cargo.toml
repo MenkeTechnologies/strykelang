@@ -46,6 +46,7 @@ cranelift-codegen = "0.130"
 cranelift-frontend = "0.130"
 cranelift-native = "0.130"
 cranelift-module = "0.130"
+pcre2 = "0.2"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.3"

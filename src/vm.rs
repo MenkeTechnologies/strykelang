@@ -21,6 +21,17 @@ use std::sync::Barrier;
 /// Stable reference for empty-stack [`VM::peek`] (not a temporary `&PerlValue::UNDEF`).
 static PEEK_UNDEF: PerlValue = PerlValue::UNDEF;
 
+/// Saved state for `try { } catch (…) { } finally { }` (matches [`crate::bytecode::Op::TryPush`]).
+#[derive(Debug, Clone)]
+pub(crate) struct TryFrame {
+    pub(crate) catch_ip: usize,
+    pub(crate) finally_ip: Option<usize>,
+    pub(crate) after_ip: usize,
+    /// Pool index for `catch ($name)` (mirrors [`crate::bytecode::Op::TryPush`]).
+    #[allow(dead_code)]
+    pub(crate) catch_var_idx: u16,
+}
+
 /// Saved state when entering a function call.
 #[derive(Debug)]
 struct CallFrame {
@@ -67,6 +78,12 @@ pub struct VM<'a> {
     jit_trampoline_out: Option<PerlValue>,
     /// Nesting depth for [`Self::jit_trampoline_run_sub`]; dispatch breaks on [`Self::jit_trampoline_out`] only when `> 0`.
     jit_trampoline_depth: u32,
+    /// Set by [`Op::Halt`]; outer loop exits after handling [`Self::try_recover_from_exception`].
+    halt: bool,
+    /// Stack of active `try` regions (LIFO).
+    try_stack: Vec<TryFrame>,
+    /// Error message for the next [`Op::CatchReceive`] (set before jumping to `catch_ip`).
+    pub(crate) pending_catch_error: Option<String>,
 }
 
 impl<'a> VM<'a> {
@@ -105,6 +122,9 @@ impl<'a> VM<'a> {
             jit_buf_arg: Vec::new(),
             jit_trampoline_out: None,
             jit_trampoline_depth: 0,
+            halt: false,
+            try_stack: Vec::new(),
+            pending_catch_error: None,
         }
     }
 
@@ -1015,11 +1035,25 @@ impl<'a> VM<'a> {
         Ok(last)
     }
 
+    /// `die` / runtime errors inside `try` jump to `catch_ip` unless the error is [`ErrorKind::Exit`].
+    fn try_recover_from_exception(&mut self, e: &PerlError) -> PerlResult<bool> {
+        if matches!(e.kind, ErrorKind::Exit(_)) {
+            return Ok(false);
+        }
+        let Some(frame) = self.try_stack.last().cloned() else {
+            return Ok(false);
+        };
+        self.pending_catch_error = Some(e.to_string());
+        self.ip = frame.catch_ip;
+        Ok(true)
+    }
+
     fn run_main_dispatch_loop(
         &mut self,
         mut last: PerlValue,
         op_count: &mut u64,
     ) -> PerlResult<PerlValue> {
+        self.halt = false;
         let ops = &self.ops as *const Vec<Op>;
         let ops = unsafe { &*ops };
         let names = &self.names as *const Vec<String>;
@@ -1068,21 +1102,22 @@ impl<'a> VM<'a> {
 
             let op = &ops[self.ip];
             self.ip += 1;
-
-            match op {
+            let __op_res: PerlResult<()> = match op {
                 // ── Constants ──
-                Op::LoadInt(n) => self.push(PerlValue::integer(*n)),
-                Op::LoadFloat(f) => self.push(PerlValue::float(*f)),
-                Op::LoadConst(idx) => self.push(self.constant(*idx).clone()),
-                Op::LoadUndef => self.push(PerlValue::UNDEF),
+                Op::LoadInt(n) => { self.push(PerlValue::integer(*n)); Ok(()) },
+                Op::LoadFloat(f) => { self.push(PerlValue::float(*f)); Ok(()) },
+                Op::LoadConst(idx) => { self.push(self.constant(*idx).clone()); Ok(()) },
+                Op::LoadUndef => { self.push(PerlValue::UNDEF); Ok(()) },
 
                 // ── Stack ──
                 Op::Pop => {
                     self.pop();
+                    Ok(())
                 }
                 Op::Dup => {
                     let v = self.peek().clone();
                     self.push(v);
+                    Ok(())
                 }
 
                 // ── Scalars ──
@@ -1090,11 +1125,13 @@ impl<'a> VM<'a> {
                     let n = names[*idx as usize].as_str();
                     let val = self.interp.get_special_var(n);
                     self.push(val);
+                    Ok(())
                 }
                 Op::GetScalarPlain(idx) => {
                     let n = names[*idx as usize].as_str();
                     let val = self.interp.scope.get_scalar(n);
                     self.push(val);
+                    Ok(())
                 }
                 Op::SetScalar(idx) => {
                     let val = self.pop();
@@ -1103,6 +1140,7 @@ impl<'a> VM<'a> {
                     self.interp
                         .set_special_var(n, &val)
                         .map_err(|e| e.at_line(self.line()))?;
+                    Ok(())
                 }
                 Op::SetScalarPlain(idx) => {
                     let val = self.pop();
@@ -1112,6 +1150,7 @@ impl<'a> VM<'a> {
                         .scope
                         .set_scalar(n, val)
                         .map_err(|e| e.at_line(self.line()))?;
+                    Ok(())
                 }
                 Op::SetScalarKeep(idx) => {
                     let val = self.peek().clone();
@@ -1120,6 +1159,7 @@ impl<'a> VM<'a> {
                     self.interp
                         .set_special_var(n, &val)
                         .map_err(|e| e.at_line(self.line()))?;
+                    Ok(())
                 }
                 Op::SetScalarKeepPlain(idx) => {
                     let val = self.peek().clone();
@@ -1129,6 +1169,7 @@ impl<'a> VM<'a> {
                         .scope
                         .set_scalar(n, val)
                         .map_err(|e| e.at_line(self.line()))?;
+                    Ok(())
                 }
                 Op::DeclareScalar(idx) => {
                     let val = self.pop();
@@ -1137,6 +1178,7 @@ impl<'a> VM<'a> {
                         .scope
                         .declare_scalar_frozen(n, val, false, None)
                         .map_err(|e| e.at_line(self.line()))?;
+                    Ok(())
                 }
                 Op::DeclareScalarFrozen(idx) => {
                     let val = self.pop();
@@ -1145,6 +1187,7 @@ impl<'a> VM<'a> {
                         .scope
                         .declare_scalar_frozen(n, val, true, None)
                         .map_err(|e| e.at_line(self.line()))?;
+                    Ok(())
                 }
                 Op::DeclareScalarTyped(idx, tyb) => {
                     let val = self.pop();
@@ -1159,6 +1202,7 @@ impl<'a> VM<'a> {
                         .scope
                         .declare_scalar_frozen(n, val, false, Some(ty))
                         .map_err(|e| e.at_line(self.line()))?;
+                    Ok(())
                 }
 
                 // ── Arrays ──
@@ -1166,17 +1210,20 @@ impl<'a> VM<'a> {
                     let n = names[*idx as usize].as_str();
                     let arr = self.interp.scope.get_array(n);
                     self.push(PerlValue::array(arr));
+                    Ok(())
                 }
                 Op::SetArray(idx) => {
                     let val = self.pop();
                     let n = names[*idx as usize].as_str();
                     self.require_array_mutable(n)?;
                     self.interp.scope.set_array(n, val.to_list());
+                    Ok(())
                 }
                 Op::DeclareArray(idx) => {
                     let val = self.pop();
                     let n = names[*idx as usize].as_str();
                     self.interp.scope.declare_array(n, val.to_list());
+                    Ok(())
                 }
                 Op::DeclareArrayFrozen(idx) => {
                     let val = self.pop();
@@ -1184,12 +1231,14 @@ impl<'a> VM<'a> {
                     self.interp
                         .scope
                         .declare_array_frozen(n, val.to_list(), true);
+                        Ok(())
                 }
                 Op::GetArrayElem(idx) => {
                     let index = self.pop().to_int();
                     let n = names[*idx as usize].as_str();
                     let val = self.interp.scope.get_array_element(n, index);
                     self.push(val);
+                    Ok(())
                 }
                 Op::SetArrayElem(idx) => {
                     let index = self.pop().to_int();
@@ -1197,6 +1246,7 @@ impl<'a> VM<'a> {
                     let n = names[*idx as usize].as_str();
                     self.require_array_mutable(n)?;
                     self.interp.scope.set_array_element(n, index, val);
+                    Ok(())
                 }
                 Op::PushArray(idx) => {
                     let val = self.pop();
@@ -1204,6 +1254,7 @@ impl<'a> VM<'a> {
                     self.require_array_mutable(n)?;
                     let arr = self.interp.scope.get_array_mut(n);
                     arr.push(val);
+                    Ok(())
                 }
                 Op::PopArray(idx) => {
                     let n = names[*idx as usize].as_str();
@@ -1211,6 +1262,7 @@ impl<'a> VM<'a> {
                     let arr = self.interp.scope.get_array_mut(n);
                     let val = arr.pop().unwrap_or(PerlValue::UNDEF);
                     self.push(val);
+                    Ok(())
                 }
                 Op::ShiftArray(idx) => {
                     let n = names[*idx as usize].as_str();
@@ -1222,10 +1274,12 @@ impl<'a> VM<'a> {
                         arr.remove(0)
                     };
                     self.push(val);
+                    Ok(())
                 }
                 Op::ArrayLen(idx) => {
                     let len = self.interp.scope.array_len(&self.names[*idx as usize]);
                     self.push(PerlValue::integer(len as i64));
+                    Ok(())
                 }
 
                 // ── Hashes ──
@@ -1236,6 +1290,7 @@ impl<'a> VM<'a> {
                     }
                     let h = self.interp.scope.get_hash(n);
                     self.push(PerlValue::hash(h));
+                    Ok(())
                 }
                 Op::SetHash(idx) => {
                     let val = self.pop();
@@ -1249,6 +1304,7 @@ impl<'a> VM<'a> {
                     let n = names[*idx as usize].as_str();
                     self.require_hash_mutable(n)?;
                     self.interp.scope.set_hash(n, map);
+                    Ok(())
                 }
                 Op::DeclareHash(idx) => {
                     let val = self.pop();
@@ -1261,6 +1317,7 @@ impl<'a> VM<'a> {
                     }
                     let n = names[*idx as usize].as_str();
                     self.interp.scope.declare_hash(n, map);
+                    Ok(())
                 }
                 Op::DeclareHashFrozen(idx) => {
                     let val = self.pop();
@@ -1273,6 +1330,7 @@ impl<'a> VM<'a> {
                     }
                     let n = names[*idx as usize].as_str();
                     self.interp.scope.declare_hash_frozen(n, map, true);
+                    Ok(())
                 }
                 Op::LocalDeclareScalar(idx) => {
                     let val = self.pop();
@@ -1281,6 +1339,7 @@ impl<'a> VM<'a> {
                         .scope
                         .local_set_scalar(n, val)
                         .map_err(|e| e.at_line(self.line()))?;
+                    Ok(())
                 }
                 Op::LocalDeclareArray(idx) => {
                     let val = self.pop();
@@ -1289,6 +1348,7 @@ impl<'a> VM<'a> {
                         .scope
                         .local_set_array(n, val.to_list())
                         .map_err(|e| e.at_line(self.line()))?;
+                    Ok(())
                 }
                 Op::LocalDeclareHash(idx) => {
                     let val = self.pop();
@@ -1307,6 +1367,7 @@ impl<'a> VM<'a> {
                         .scope
                         .local_set_hash(n, map)
                         .map_err(|e| e.at_line(self.line()))?;
+                    Ok(())
                 }
                 Op::GetHashElem(idx) => {
                     let key = self.pop().to_string();
@@ -1316,6 +1377,7 @@ impl<'a> VM<'a> {
                     }
                     let val = self.interp.scope.get_hash_element(n, &key);
                     self.push(val);
+                    Ok(())
                 }
                 Op::SetHashElem(idx) => {
                     let key = self.pop().to_string();
@@ -1326,6 +1388,7 @@ impl<'a> VM<'a> {
                         self.interp.materialize_env_if_needed();
                     }
                     self.interp.scope.set_hash_element(n, &key, val);
+                    Ok(())
                 }
                 Op::DeleteHashElem(idx) => {
                     let key = self.pop().to_string();
@@ -1336,6 +1399,7 @@ impl<'a> VM<'a> {
                     }
                     let val = self.interp.scope.delete_hash_element(n, &key);
                     self.push(val);
+                    Ok(())
                 }
                 Op::ExistsHashElem(idx) => {
                     let key = self.pop().to_string();
@@ -1345,6 +1409,7 @@ impl<'a> VM<'a> {
                     }
                     let exists = self.interp.scope.exists_hash_element(n, &key);
                     self.push(PerlValue::integer(if exists { 1 } else { 0 }));
+                    Ok(())
                 }
                 Op::HashKeys(idx) => {
                     let n = names[*idx as usize].as_str();
@@ -1355,6 +1420,7 @@ impl<'a> VM<'a> {
                     let keys: Vec<PerlValue> =
                         h.keys().map(|k| PerlValue::string(k.clone())).collect();
                     self.push(PerlValue::array(keys));
+                    Ok(())
                 }
                 Op::HashValues(idx) => {
                     let n = names[*idx as usize].as_str();
@@ -1364,6 +1430,7 @@ impl<'a> VM<'a> {
                     let h = self.interp.scope.get_hash(n);
                     let vals: Vec<PerlValue> = h.values().cloned().collect();
                     self.push(PerlValue::array(vals));
+                    Ok(())
                 }
 
                 // ── Arithmetic (integer fast paths) ──
@@ -1377,6 +1444,7 @@ impl<'a> VM<'a> {
                             PerlValue::float(a.to_number() + b.to_number())
                         },
                     );
+                    Ok(())
                 }
                 Op::Sub => {
                     let b = self.pop();
@@ -1388,6 +1456,7 @@ impl<'a> VM<'a> {
                             PerlValue::float(a.to_number() - b.to_number())
                         },
                     );
+                    Ok(())
                 }
                 Op::Mul => {
                     let b = self.pop();
@@ -1399,6 +1468,7 @@ impl<'a> VM<'a> {
                             PerlValue::float(a.to_number() * b.to_number())
                         },
                     );
+                    Ok(())
                 }
                 Op::Div => {
                     let b = self.pop();
@@ -1425,6 +1495,7 @@ impl<'a> VM<'a> {
                         }
                         self.push(PerlValue::float(a.to_number() / d));
                     }
+                    Ok(())
                 }
                 Op::Mod => {
                     let b = self.pop().to_int();
@@ -1433,6 +1504,7 @@ impl<'a> VM<'a> {
                         return Err(PerlError::runtime("Illegal modulus zero", self.line()));
                     }
                     self.push(PerlValue::integer(a % b));
+                    Ok(())
                 }
                 Op::Pow => {
                     let b = self.pop();
@@ -1448,6 +1520,7 @@ impl<'a> VM<'a> {
                             PerlValue::float(a.to_number().powf(b.to_number()))
                         },
                     );
+                    Ok(())
                 }
                 Op::Negate => {
                     let a = self.pop();
@@ -1456,6 +1529,7 @@ impl<'a> VM<'a> {
                     } else {
                         PerlValue::float(-a.to_number())
                     });
+                    Ok(())
                 }
 
                 // ── String ──
@@ -1465,11 +1539,13 @@ impl<'a> VM<'a> {
                     let mut s = a.into_string();
                     b.append_to(&mut s);
                     self.push(PerlValue::string(s));
+                    Ok(())
                 }
                 Op::StringRepeat => {
                     let n = self.pop().to_int().max(0) as usize;
                     let val = self.pop();
                     self.push(PerlValue::string(val.to_string().repeat(n)));
+                    Ok(())
                 }
 
                 // ── Numeric comparison ──
@@ -1477,31 +1553,37 @@ impl<'a> VM<'a> {
                     let b = self.pop();
                     let a = self.pop();
                     self.push(int_cmp(&a, &b, |x, y| x == y, |x, y| x == y));
+                    Ok(())
                 }
                 Op::NumNe => {
                     let b = self.pop();
                     let a = self.pop();
                     self.push(int_cmp(&a, &b, |x, y| x != y, |x, y| x != y));
+                    Ok(())
                 }
                 Op::NumLt => {
                     let b = self.pop();
                     let a = self.pop();
                     self.push(int_cmp(&a, &b, |x, y| x < y, |x, y| x < y));
+                    Ok(())
                 }
                 Op::NumGt => {
                     let b = self.pop();
                     let a = self.pop();
                     self.push(int_cmp(&a, &b, |x, y| x > y, |x, y| x > y));
+                    Ok(())
                 }
                 Op::NumLe => {
                     let b = self.pop();
                     let a = self.pop();
                     self.push(int_cmp(&a, &b, |x, y| x <= y, |x, y| x <= y));
+                    Ok(())
                 }
                 Op::NumGe => {
                     let b = self.pop();
                     let a = self.pop();
                     self.push(int_cmp(&a, &b, |x, y| x >= y, |x, y| x >= y));
+                    Ok(())
                 }
                 Op::Spaceship => {
                     let b = self.pop();
@@ -1527,6 +1609,7 @@ impl<'a> VM<'a> {
                             })
                         },
                     );
+                    Ok(())
                 }
 
                 // ── String comparison ──
@@ -1534,11 +1617,13 @@ impl<'a> VM<'a> {
                     let b = self.pop();
                     let a = self.pop();
                     self.push(PerlValue::integer(if a.str_eq(&b) { 1 } else { 0 }));
+                    Ok(())
                 }
                 Op::StrNe => {
                     let b = self.pop();
                     let a = self.pop();
                     self.push(PerlValue::integer(if !a.str_eq(&b) { 1 } else { 0 }));
+                    Ok(())
                 }
                 Op::StrLt => {
                     let b = self.pop();
@@ -1550,6 +1635,7 @@ impl<'a> VM<'a> {
                             0
                         },
                     ));
+                    Ok(())
                 }
                 Op::StrGt => {
                     let b = self.pop();
@@ -1561,6 +1647,7 @@ impl<'a> VM<'a> {
                             0
                         },
                     ));
+                    Ok(())
                 }
                 Op::StrLe => {
                     let b = self.pop();
@@ -1573,6 +1660,7 @@ impl<'a> VM<'a> {
                             0
                         },
                     ));
+                    Ok(())
                 }
                 Op::StrGe => {
                     let b = self.pop();
@@ -1585,6 +1673,7 @@ impl<'a> VM<'a> {
                             0
                         },
                     ));
+                    Ok(())
                 }
                 Op::StrCmp => {
                     let b = self.pop();
@@ -1595,12 +1684,14 @@ impl<'a> VM<'a> {
                         std::cmp::Ordering::Greater => 1,
                         std::cmp::Ordering::Equal => 0,
                     }));
+                    Ok(())
                 }
 
                 // ── Logical / Bitwise ──
                 Op::LogNot => {
                     let a = self.pop();
                     self.push(PerlValue::integer(if a.is_true() { 0 } else { 1 }));
+                    Ok(())
                 }
                 Op::BitAnd => {
                     let rv = self.pop();
@@ -1610,6 +1701,7 @@ impl<'a> VM<'a> {
                     } else {
                         self.push(PerlValue::integer(lv.to_int() & rv.to_int()));
                     }
+                    Ok(())
                 }
                 Op::BitOr => {
                     let rv = self.pop();
@@ -1619,42 +1711,50 @@ impl<'a> VM<'a> {
                     } else {
                         self.push(PerlValue::integer(lv.to_int() | rv.to_int()));
                     }
+                    Ok(())
                 }
                 Op::BitXor => {
                     let b = self.pop().to_int();
                     let a = self.pop().to_int();
                     self.push(PerlValue::integer(a ^ b));
+                    Ok(())
                 }
                 Op::BitNot => {
                     let a = self.pop().to_int();
                     self.push(PerlValue::integer(!a));
+                    Ok(())
                 }
                 Op::Shl => {
                     let b = self.pop().to_int();
                     let a = self.pop().to_int();
                     self.push(PerlValue::integer(a << b));
+                    Ok(())
                 }
                 Op::Shr => {
                     let b = self.pop().to_int();
                     let a = self.pop().to_int();
                     self.push(PerlValue::integer(a >> b));
+                    Ok(())
                 }
 
                 // ── Control flow ──
                 Op::Jump(target) => {
                     self.ip = *target;
+                    Ok(())
                 }
                 Op::JumpIfTrue(target) => {
                     let val = self.pop();
                     if val.is_true() {
                         self.ip = *target;
                     }
+                    Ok(())
                 }
                 Op::JumpIfFalse(target) => {
                     let val = self.pop();
                     if !val.is_true() {
                         self.ip = *target;
                     }
+                    Ok(())
                 }
                 Op::JumpIfFalseKeep(target) => {
                     if !self.peek().is_true() {
@@ -1662,6 +1762,7 @@ impl<'a> VM<'a> {
                     } else {
                         self.pop();
                     }
+                    Ok(())
                 }
                 Op::JumpIfTrueKeep(target) => {
                     if self.peek().is_true() {
@@ -1669,6 +1770,7 @@ impl<'a> VM<'a> {
                     } else {
                         self.pop();
                     }
+                    Ok(())
                 }
                 Op::JumpIfDefinedKeep(target) => {
                     if !self.peek().is_undef() {
@@ -1676,6 +1778,7 @@ impl<'a> VM<'a> {
                     } else {
                         self.pop();
                     }
+                    Ok(())
                 }
 
                 // ── Increment / Decrement ──
@@ -1689,6 +1792,7 @@ impl<'a> VM<'a> {
                         .set_scalar(n, new_val.clone())
                         .map_err(|e| e.at_line(self.line()))?;
                     self.push(new_val);
+                    Ok(())
                 }
                 Op::PreDec(idx) => {
                     let n = names[*idx as usize].as_str();
@@ -1700,6 +1804,7 @@ impl<'a> VM<'a> {
                         .set_scalar(n, new_val.clone())
                         .map_err(|e| e.at_line(self.line()))?;
                     self.push(new_val);
+                    Ok(())
                 }
                 Op::PostInc(idx) => {
                     let n = names[*idx as usize].as_str();
@@ -1719,6 +1824,7 @@ impl<'a> VM<'a> {
                             .map_err(|e| e.at_line(self.line()))?;
                         self.push(old);
                     }
+                    Ok(())
                 }
                 Op::PostDec(idx) => {
                     let n = names[*idx as usize].as_str();
@@ -1738,18 +1844,21 @@ impl<'a> VM<'a> {
                             .map_err(|e| e.at_line(self.line()))?;
                         self.push(old);
                     }
+                    Ok(())
                 }
                 Op::PreIncSlot(slot) => {
                     let val = self.interp.scope.get_scalar_slot(*slot).to_int() + 1;
                     let new_val = PerlValue::integer(val);
                     self.interp.scope.set_scalar_slot(*slot, new_val.clone());
                     self.push(new_val);
+                    Ok(())
                 }
                 Op::PreDecSlot(slot) => {
                     let val = self.interp.scope.get_scalar_slot(*slot).to_int() - 1;
                     let new_val = PerlValue::integer(val);
                     self.interp.scope.set_scalar_slot(*slot, new_val.clone());
                     self.push(new_val);
+                    Ok(())
                 }
                 Op::PostIncSlot(slot) => {
                     // Fuse PostIncSlot+Pop: if next op discards the old value, skip stack work.
@@ -1765,6 +1874,7 @@ impl<'a> VM<'a> {
                         self.interp.scope.set_scalar_slot(*slot, new_val);
                         self.push(old);
                     }
+                    Ok(())
                 }
                 Op::PostDecSlot(slot) => {
                     if self.ip < len && matches!(ops[self.ip], Op::Pop) {
@@ -1779,6 +1889,7 @@ impl<'a> VM<'a> {
                         self.interp.scope.set_scalar_slot(*slot, new_val);
                         self.push(old);
                     }
+                    Ok(())
                 }
 
                 // ── Functions ──
@@ -1903,6 +2014,7 @@ impl<'a> VM<'a> {
                             ));
                         }
                     } // close outer else (non-compiled path)
+                    Ok(())
                 }
                 Op::Return => {
                     if let Some(frame) = self.call_stack.pop() {
@@ -1918,6 +2030,7 @@ impl<'a> VM<'a> {
                     } else {
                         break;
                     }
+                    Ok(())
                 }
                 Op::ReturnValue => {
                     let val = self.pop();
@@ -1935,11 +2048,12 @@ impl<'a> VM<'a> {
                         last = val;
                         break;
                     }
+                    Ok(())
                 }
 
                 // ── Scope ──
-                Op::PushFrame => self.interp.scope_push_hook(),
-                Op::PopFrame => self.interp.scope_pop_hook(),
+                Op::PushFrame => { self.interp.scope_push_hook(); Ok(()) },
+                Op::PopFrame => { self.interp.scope_pop_hook(); Ok(()) },
                 Op::TriangularForAccum {
                     limit,
                     sum_name_idx,
@@ -1970,6 +2084,7 @@ impl<'a> VM<'a> {
                         .scope
                         .set_scalar(i_name, PerlValue::integer(final_i))
                         .map_err(|e| e.at_line(self.line()))?;
+                    Ok(())
                 }
 
                 // ── I/O ──
@@ -2008,6 +2123,7 @@ impl<'a> VM<'a> {
                         let _ = io::stdout().flush();
                     }
                     self.push(PerlValue::integer(1));
+                    Ok(())
                 }
                 Op::Say(argc) => {
                     if (self.interp.feature_bits & crate::interpreter::FEAT_SAY) == 0 {
@@ -2050,6 +2166,7 @@ impl<'a> VM<'a> {
                         let _ = io::stdout().flush();
                     }
                     self.push(PerlValue::integer(1));
+                    Ok(())
                 }
 
                 // ── Built-in dispatch ──
@@ -2062,6 +2179,7 @@ impl<'a> VM<'a> {
                     args.reverse();
                     let result = self.exec_builtin(*id, args)?;
                     self.push(result);
+                    Ok(())
                 }
 
                 // ── List / Range ──
@@ -2078,6 +2196,7 @@ impl<'a> VM<'a> {
                     }
                     arr.reverse();
                     self.push(PerlValue::array(arr));
+                    Ok(())
                 }
                 Op::MakeHash(n) => {
                     let n = *n as usize;
@@ -2093,12 +2212,14 @@ impl<'a> VM<'a> {
                         i += 2;
                     }
                     self.push(PerlValue::hash(map));
+                    Ok(())
                 }
                 Op::Range => {
                     let to = self.pop().to_int();
                     let from = self.pop().to_int();
                     let arr: Vec<PerlValue> = (from..=to).map(PerlValue::integer).collect();
                     self.push(PerlValue::array(arr));
+                    Ok(())
                 }
 
                 // ── Regex ──
@@ -2117,7 +2238,10 @@ impl<'a> VM<'a> {
                         .interp
                         .regex_match_execute(string, &pattern, &flags, *scalar_g, pos_key, line)
                     {
-                        Ok(v) => self.push(v),
+                        Ok(v) => {
+                            self.push(v);
+                            Ok(())
+                        }
                         Err(FlowOrError::Error(e)) => return Err(e),
                         Err(FlowOrError::Flow(_)) => {
                             return Err(PerlError::runtime("unexpected flow in regex match", line));
@@ -2139,7 +2263,10 @@ impl<'a> VM<'a> {
                         target,
                         line,
                     ) {
-                        Ok(v) => self.push(v),
+                        Ok(v) => {
+                            self.push(v);
+                            Ok(())
+                        }
                         Err(FlowOrError::Error(e)) => return Err(e),
                         Err(FlowOrError::Flow(_)) => {
                             return Err(PerlError::runtime("unexpected flow in s///", line));
@@ -2157,7 +2284,10 @@ impl<'a> VM<'a> {
                         .interp
                         .regex_transliterate_execute(string, &from, &to, &flags, target, line)
                     {
-                        Ok(v) => self.push(v),
+                        Ok(v) => {
+                            self.push(v);
+                            Ok(())
+                        }
                         Err(FlowOrError::Error(e)) => return Err(e),
                         Err(FlowOrError::Flow(_)) => {
                             return Err(PerlError::runtime("unexpected flow in tr///", line));
@@ -2182,17 +2312,20 @@ impl<'a> VM<'a> {
                             return Err(PerlError::runtime("unexpected flow in =~", line));
                         }
                     }
+                    Ok(())
                 }
                 Op::ConcatAppend(idx) => {
                     let rhs = self.pop();
                     let n = names[*idx as usize].as_str();
                     let result = self.interp.scope.scalar_concat_inplace(n, &rhs);
                     self.push(result);
+                    Ok(())
                 }
                 Op::ConcatAppendSlot(slot) => {
                     let rhs = self.pop();
                     let result = self.interp.scope.scalar_slot_concat_inplace(*slot, &rhs);
                     self.push(result);
+                    Ok(())
                 }
                 Op::AddAssignSlotSlot(dst, src) => {
                     let a = self.interp.scope.get_scalar_slot(*dst);
@@ -2204,6 +2337,7 @@ impl<'a> VM<'a> {
                     };
                     self.interp.scope.set_scalar_slot(*dst, result.clone());
                     self.push(result);
+                    Ok(())
                 }
                 Op::SubAssignSlotSlot(dst, src) => {
                     let a = self.interp.scope.get_scalar_slot(*dst);
@@ -2215,6 +2349,7 @@ impl<'a> VM<'a> {
                     };
                     self.interp.scope.set_scalar_slot(*dst, result.clone());
                     self.push(result);
+                    Ok(())
                 }
                 Op::MulAssignSlotSlot(dst, src) => {
                     let a = self.interp.scope.get_scalar_slot(*dst);
@@ -2226,24 +2361,29 @@ impl<'a> VM<'a> {
                     };
                     self.interp.scope.set_scalar_slot(*dst, result.clone());
                     self.push(result);
+                    Ok(())
                 }
 
                 // ── Frame-local scalar slots (O(1), no string lookup) ──
                 Op::GetScalarSlot(slot) => {
                     let val = self.interp.scope.get_scalar_slot(*slot);
                     self.push(val);
+                    Ok(())
                 }
                 Op::SetScalarSlot(slot) => {
                     let val = self.pop();
                     self.interp.scope.set_scalar_slot(*slot, val);
+                    Ok(())
                 }
                 Op::SetScalarSlotKeep(slot) => {
                     let val = self.peek().clone();
                     self.interp.scope.set_scalar_slot(*slot, val);
+                    Ok(())
                 }
                 Op::DeclareScalarSlot(slot) => {
                     let val = self.pop();
                     self.interp.scope.declare_scalar_slot(*slot, val);
+                    Ok(())
                 }
                 Op::GetArg(idx) => {
                     // Read argument from caller's stack region without @_ allocation.
@@ -2254,6 +2394,7 @@ impl<'a> VM<'a> {
                         PerlValue::UNDEF
                     };
                     self.push(val);
+                    Ok(())
                 }
 
                 Op::ChompInPlace(lvalue_idx) => {
@@ -2267,6 +2408,7 @@ impl<'a> VM<'a> {
                             return Err(PerlError::runtime("unexpected flow in chomp", line));
                         }
                     }
+                    Ok(())
                 }
                 Op::ChopInPlace(lvalue_idx) => {
                     let val = self.pop();
@@ -2279,12 +2421,14 @@ impl<'a> VM<'a> {
                             return Err(PerlError::runtime("unexpected flow in chop", line));
                         }
                     }
+                    Ok(())
                 }
 
                 // ── References ──
                 Op::MakeScalarRef => {
                     let val = self.pop();
                     self.push(PerlValue::scalar_ref(Arc::new(RwLock::new(val))));
+                    Ok(())
                 }
                 Op::MakeArrayRef => {
                     let val = self.pop();
@@ -2294,6 +2438,7 @@ impl<'a> VM<'a> {
                         vec![val]
                     };
                     self.push(PerlValue::array_ref(Arc::new(RwLock::new(arr))));
+                    Ok(())
                 }
                 Op::MakeHashRef => {
                     let val = self.pop();
@@ -2310,6 +2455,7 @@ impl<'a> VM<'a> {
                         m
                     };
                     self.push(PerlValue::hash_ref(Arc::new(RwLock::new(map))));
+                    Ok(())
                 }
                 Op::MakeCodeRef(block_idx) => {
                     let block = self.blocks[*block_idx as usize].clone();
@@ -2322,6 +2468,7 @@ impl<'a> VM<'a> {
                         prototype: None,
                         fib_like: None,
                     })));
+                    Ok(())
                 }
 
                 // ── Arrow dereference ──
@@ -2339,6 +2486,7 @@ impl<'a> VM<'a> {
                     } else {
                         self.push(PerlValue::UNDEF);
                     }
+                    Ok(())
                 }
                 Op::ArrowHash => {
                     let key = self.pop().to_string();
@@ -2355,6 +2503,7 @@ impl<'a> VM<'a> {
                     } else {
                         self.push(PerlValue::UNDEF);
                     }
+                    Ok(())
                 }
                 Op::ArrowCall(wa) => {
                     let want = WantarrayCtx::from_byte(*wa);
@@ -2383,14 +2532,17 @@ impl<'a> VM<'a> {
                     } else {
                         return Err(PerlError::runtime("Not a code reference", self.line()));
                     }
+                    Ok(())
                 }
 
                 // ── Method call ──
                 Op::MethodCall(name_idx, argc, wa) => {
                     self.run_method_op(*name_idx, *argc, *wa, false)?;
+                    Ok(())
                 }
                 Op::MethodCallSuper(name_idx, argc, wa) => {
                     self.run_method_op(*name_idx, *argc, *wa, true)?;
+                    Ok(())
                 }
 
                 // ── File test ──
@@ -2412,6 +2564,7 @@ impl<'a> VM<'a> {
                         _ => false,
                     };
                     self.push(PerlValue::integer(if result { 1 } else { 0 }));
+                    Ok(())
                 }
 
                 // ── Map/Grep/Sort with blocks (delegate to tree-walker) ──
@@ -2423,6 +2576,7 @@ impl<'a> VM<'a> {
                         result.push(PerlValue::integer(n.wrapping_mul(*k)));
                     }
                     self.push(PerlValue::array(result));
+                    Ok(())
                 }
                 Op::GrepIntModEq(m, r) => {
                     let list = self.pop().to_list();
@@ -2434,6 +2588,7 @@ impl<'a> VM<'a> {
                         }
                     }
                     self.push(PerlValue::array(result));
+                    Ok(())
                 }
                 Op::MapWithBlock(block_idx) => {
                     let list = self.pop().to_list();
@@ -2454,6 +2609,7 @@ impl<'a> VM<'a> {
                         }
                     }
                     self.push(PerlValue::array(result));
+                    Ok(())
                 }
                 Op::GrepWithBlock(block_idx) => {
                     let list = self.pop().to_list();
@@ -2472,6 +2628,7 @@ impl<'a> VM<'a> {
                         }
                     }
                     self.push(PerlValue::array(result));
+                    Ok(())
                 }
                 Op::SortWithBlock(block_idx) => {
                     let mut items = self.pop().to_list();
@@ -2494,6 +2651,7 @@ impl<'a> VM<'a> {
                         }
                     });
                     self.push(PerlValue::array(items));
+                    Ok(())
                 }
                 Op::SortWithBlockFast(tag) => {
                     let mut items = self.pop().to_list();
@@ -2506,11 +2664,13 @@ impl<'a> VM<'a> {
                     };
                     items.sort_by(|a, b| sort_magic_cmp(a, b, mode));
                     self.push(PerlValue::array(items));
+                    Ok(())
                 }
                 Op::SortNoBlock => {
                     let mut items = self.pop().to_list();
                     items.sort_by_key(|a| a.to_string());
                     self.push(PerlValue::array(items));
+                    Ok(())
                 }
                 Op::ReverseOp => {
                     let val = self.pop();
@@ -2522,6 +2682,7 @@ impl<'a> VM<'a> {
                     } else {
                         self.push(PerlValue::string(val.to_string().chars().rev().collect()));
                     }
+                    Ok(())
                 }
 
                 // ── Eval block ──
@@ -2542,6 +2703,7 @@ impl<'a> VM<'a> {
                         Err(_) => self.push(PerlValue::UNDEF),
                     }
                     self.interp.eval_nesting -= 1;
+                    Ok(())
                 }
 
                 // ── Parallel operations (rayon) ──
@@ -2569,6 +2731,7 @@ impl<'a> VM<'a> {
                         .collect();
                     pmap_progress.finish();
                     self.push(PerlValue::array(results));
+                    Ok(())
                 }
                 Op::PGrepWithBlock(block_idx) => {
                     let list = self.pop().to_list();
@@ -2598,6 +2761,7 @@ impl<'a> VM<'a> {
                         .collect();
                     pmap_progress.finish();
                     self.push(PerlValue::array(results));
+                    Ok(())
                 }
                 Op::PForWithBlock(block_idx) => {
                     let line = self.line();
@@ -2639,6 +2803,7 @@ impl<'a> VM<'a> {
                         return Err(e);
                     }
                     self.push(PerlValue::UNDEF);
+                    Ok(())
                 }
                 Op::PSortWithBlock(block_idx) => {
                     let mut items = self.pop().to_list();
@@ -2671,6 +2836,7 @@ impl<'a> VM<'a> {
                     pmap_progress.tick();
                     pmap_progress.finish();
                     self.push(PerlValue::array(items));
+                    Ok(())
                 }
                 Op::PSortWithBlockFast(tag) => {
                     let mut items = self.pop().to_list();
@@ -2688,6 +2854,7 @@ impl<'a> VM<'a> {
                     pmap_progress.tick();
                     pmap_progress.finish();
                     self.push(PerlValue::array(items));
+                    Ok(())
                 }
                 Op::PSortNoBlockParallel => {
                     let mut items = self.pop().to_list();
@@ -2698,30 +2865,35 @@ impl<'a> VM<'a> {
                     pmap_progress.tick();
                     pmap_progress.finish();
                     self.push(PerlValue::array(items));
+                    Ok(())
                 }
                 Op::FanWithBlock(block_idx) => {
                     let line = self.line();
                     let n = self.pop().to_int().max(0) as usize;
                     let progress_flag = self.pop().is_true();
                     self.run_fan_block(*block_idx, n, line, progress_flag)?;
+                    Ok(())
                 }
                 Op::FanWithBlockAuto(block_idx) => {
                     let line = self.line();
                     let n = self.interp.parallel_thread_count();
                     let progress_flag = self.pop().is_true();
                     self.run_fan_block(*block_idx, n, line, progress_flag)?;
+                    Ok(())
                 }
                 Op::FanCapWithBlock(block_idx) => {
                     let line = self.line();
                     let n = self.pop().to_int().max(0) as usize;
                     let progress_flag = self.pop().is_true();
                     self.run_fan_cap_block(*block_idx, n, line, progress_flag)?;
+                    Ok(())
                 }
                 Op::FanCapWithBlockAuto(block_idx) => {
                     let line = self.line();
                     let n = self.interp.parallel_thread_count();
                     let progress_flag = self.pop().is_true();
                     self.run_fan_cap_block(*block_idx, n, line, progress_flag)?;
+                    Ok(())
                 }
 
                 Op::AsyncBlock(block_idx) => {
@@ -2754,6 +2926,7 @@ impl<'a> VM<'a> {
                         result: result_slot,
                         join: join_slot,
                     })));
+                    Ok(())
                 }
                 Op::Await => {
                     let v = self.pop();
@@ -2763,10 +2936,72 @@ impl<'a> VM<'a> {
                     } else {
                         self.push(v);
                     }
+                    Ok(())
                 }
 
+                // ── try / catch / finally ──
+                Op::TryPush {
+                    catch_ip,
+                    finally_ip,
+                    after_ip,
+                    catch_var_idx,
+                } => {
+                    self.try_stack.push(TryFrame {
+                        catch_ip: *catch_ip,
+                        finally_ip: *finally_ip,
+                        after_ip: *after_ip,
+                        catch_var_idx: *catch_var_idx,
+                    });
+                    Ok(())
+                },
+                Op::TryContinueNormal => {
+                    let frame = self.try_stack.last().cloned().ok_or_else(|| {
+                        PerlError::runtime("TryContinueNormal without active try", self.line())
+                    })?;
+                    if let Some(fin_ip) = frame.finally_ip {
+                        self.ip = fin_ip;
+                        Ok(())
+                    } else {
+                        self.try_stack.pop();
+                        self.ip = frame.after_ip;
+                        Ok(())
+                    }
+                },
+                Op::TryFinallyEnd => {
+                    let frame = self.try_stack.pop().ok_or_else(|| {
+                        PerlError::runtime("TryFinallyEnd without active try", self.line())
+                    })?;
+                    self.ip = frame.after_ip;
+                    Ok(())
+                },
+                Op::CatchReceive(idx) => {
+                    let msg = self.pending_catch_error.take().ok_or_else(|| {
+                        PerlError::runtime("CatchReceive without pending exception", self.line())
+                    })?;
+                    let n = names[*idx as usize].as_str();
+                    self.interp.scope_pop_hook();
+                    self.interp.scope_push_hook();
+                    self.interp
+                        .scope
+                        .declare_scalar(n, PerlValue::string(msg));
+                    self.interp.english_note_lexical_scalar(n);
+                    Ok(())
+                },
+
                 // ── Halt ──
-                Op::Halt => break,
+                Op::Halt => {
+                    self.halt = true;
+                    Ok(())
+                },
+            };
+            if let Err(e) = __op_res {
+                if self.try_recover_from_exception(&e)? {
+                    continue;
+                }
+                return Err(e);
+            }
+            if self.halt {
+                break;
             }
         }
 

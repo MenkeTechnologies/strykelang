@@ -262,6 +262,22 @@ pub enum Op {
     /// File test: -e, -f, -d, etc. — test char; stack: \[path\] → 0/1
     FileTestOp(u8),
 
+    // ── try / catch / finally (VM exception handling; see [`VM::try_recover_from_exception`]) ──
+    /// Push a [`crate::vm::TryFrame`]; `catch_ip` / `after_ip` patched via [`Chunk::patch_try_push_catch`]
+    /// / [`Chunk::patch_try_push_after`]; `finally_ip` via [`Chunk::patch_try_push_finally`].
+    TryPush {
+        catch_ip: usize,
+        finally_ip: Option<usize>,
+        after_ip: usize,
+        catch_var_idx: u16,
+    },
+    /// Normal completion from try or catch body (jump to finally or merge).
+    TryContinueNormal,
+    /// End of `finally` block: pop try frame and jump to `after_ip`.
+    TryFinallyEnd,
+    /// Enter catch: consume [`crate::vm::VM::pending_catch_error`], pop try scope, push catch scope, bind `$var`.
+    CatchReceive(u16),
+
     // ── Special ──
     Halt,
 }
@@ -519,6 +535,27 @@ impl Chunk {
             | Op::JumpIfTrueKeep(ref mut t)
             | Op::JumpIfDefinedKeep(ref mut t) => *t = target,
             _ => panic!("patch_jump_here on non-jump op at {}", idx),
+        }
+    }
+
+    pub fn patch_try_push_catch(&mut self, idx: usize, catch_ip: usize) {
+        match &mut self.ops[idx] {
+            Op::TryPush { catch_ip: c, .. } => *c = catch_ip,
+            _ => panic!("patch_try_push_catch on non-TryPush op at {}", idx),
+        }
+    }
+
+    pub fn patch_try_push_finally(&mut self, idx: usize, finally_ip: Option<usize>) {
+        match &mut self.ops[idx] {
+            Op::TryPush { finally_ip: f, .. } => *f = finally_ip,
+            _ => panic!("patch_try_push_finally on non-TryPush op at {}", idx),
+        }
+    }
+
+    pub fn patch_try_push_after(&mut self, idx: usize, after_ip: usize) {
+        match &mut self.ops[idx] {
+            Op::TryPush { after_ip: a, .. } => *a = after_ip,
+            _ => panic!("patch_try_push_after on non-TryPush op at {}", idx),
         }
     }
 

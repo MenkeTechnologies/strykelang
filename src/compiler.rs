@@ -1331,15 +1331,54 @@ impl Compiler {
                 }
                 self.chunk.struct_defs.push(def.clone());
             }
+            StmtKind::TryCatch {
+                try_block,
+                catch_var,
+                catch_block,
+                finally_block,
+            } => {
+                let catch_var_idx = self.chunk.intern_name(catch_var);
+                let try_push_idx = self.chunk.emit(
+                    Op::TryPush {
+                        catch_ip: 0,
+                        finally_ip: None,
+                        after_ip: 0,
+                        catch_var_idx,
+                    },
+                    line,
+                );
+                self.chunk.emit(Op::PushFrame, line);
+                self.compile_block_inner(try_block)?;
+                self.chunk.emit(Op::PopFrame, line);
+                self.chunk.emit(Op::TryContinueNormal, line);
+
+                let catch_start = self.chunk.len();
+                self.chunk.patch_try_push_catch(try_push_idx, catch_start);
+
+                self.chunk.emit(Op::CatchReceive(catch_var_idx), line);
+                self.compile_block_inner(catch_block)?;
+                self.chunk.emit(Op::PopFrame, line);
+                self.chunk.emit(Op::TryContinueNormal, line);
+
+                if let Some(fin) = finally_block {
+                    let finally_start = self.chunk.len();
+                    self.chunk.patch_try_push_finally(try_push_idx, Some(finally_start));
+                    self.chunk.emit(Op::PushFrame, line);
+                    self.compile_block_inner(fin)?;
+                    self.chunk.emit(Op::PopFrame, line);
+                    self.chunk.emit(Op::TryFinallyEnd, line);
+                }
+                let merge = self.chunk.len();
+                self.chunk.patch_try_push_after(try_push_idx, merge);
+            }
             StmtKind::EvalTimeout { .. }
-            | StmtKind::TryCatch { .. }
             | StmtKind::Tie { .. }
             | StmtKind::UseOverload { .. }
             | StmtKind::Given { .. }
             | StmtKind::When { .. }
             | StmtKind::DefaultCase { .. } => {
                 return Err(CompileError::Unsupported(
-                    "eval_timeout / try / catch / tie / use overload / given / when / default (use tree interpreter)"
+                    "eval_timeout / tie / use overload / given / when / default (use tree interpreter)"
                         .into(),
                 ));
             }

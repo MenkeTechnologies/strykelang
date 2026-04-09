@@ -2117,6 +2117,14 @@ impl Interpreter {
                     .filter_map(|m| m.ok())
                     .map(|m| PerlValue::string(m.as_str().to_string()))
                     .collect(),
+                PerlCompiledRegex::Pcre2(r) => r
+                    .find_iter(s.as_bytes())
+                    .filter_map(|m| m.ok())
+                    .map(|m| {
+                        let t = s.get(m.start()..m.end()).unwrap_or("");
+                        PerlValue::string(t.to_string())
+                    })
+                    .collect(),
             };
             if matches.is_empty() {
                 Ok(PerlValue::integer(0))
