@@ -321,3 +321,13 @@ fn heap_numeric_comparator_pops_sorted() {
     "#;
     assert_eq!(ri(s), 6);
 }
+
+#[test]
+fn trace_fan_mysync_runs() {
+    let s = r#"
+        mysync $counter = 0;
+        trace { fan 4 { $counter++ } };
+        $counter;
+    "#;
+    assert_eq!(ri(s), 4);
+}

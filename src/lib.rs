@@ -5,6 +5,7 @@ mod crypt_util;
 pub mod error;
 pub mod interpreter;
 pub mod lexer;
+pub mod parallel_trace;
 pub mod pchannel;
 pub mod parser;
 pub mod perl_fs;

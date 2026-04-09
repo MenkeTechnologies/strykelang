@@ -40,6 +40,11 @@ fn accepts_fan_zero() {
 }
 
 #[test]
+fn accepts_trace_block() {
+    p("trace { fan 2 { mysync $c = 0; $c++ } };");
+}
+
+#[test]
 fn accepts_preduce_block() {
     p("my $sum = preduce { $a + $b } (1, 2, 3);");
 }

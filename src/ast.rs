@@ -311,6 +311,8 @@ pub enum ExprKind {
 
     /// `async { BLOCK }` — run BLOCK on a worker thread; returns a task handle.
     AsyncBlock { body: Block },
+    /// `trace { BLOCK }` — print `mysync` scalar mutations to stderr (for parallel debugging).
+    Trace { body: Block },
     /// `await EXPR` — join an async task, or return EXPR unchanged.
     Await(Box<Expr>),
     /// Read entire file as UTF-8 (`slurp $path`).

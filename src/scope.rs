@@ -261,8 +261,10 @@ impl Scope {
         for frame in self.frames.iter().rev() {
             if let Some(PerlValue::Atomic(ref arc)) = frame.get_scalar(name) {
                 let mut guard = arc.lock();
+                let old = guard.clone();
                 let new_val = f(&guard);
                 *guard = new_val.clone();
+                crate::parallel_trace::emit_scalar_mutation(name, &old, &new_val);
                 return new_val;
             }
         }
@@ -283,7 +285,9 @@ impl Scope {
             if let Some(PerlValue::Atomic(ref arc)) = frame.get_scalar(name) {
                 let mut guard = arc.lock();
                 let old = guard.clone();
-                *guard = f(&old);
+                let new_val = f(&old);
+                *guard = new_val.clone();
+                crate::parallel_trace::emit_scalar_mutation(name, &old, &new_val);
                 return old;
             }
         }
@@ -298,7 +302,10 @@ impl Scope {
         for frame in self.frames.iter_mut().rev() {
             // If the existing value is Atomic, write through the lock
             if let Some(PerlValue::Atomic(ref arc)) = frame.get_scalar(name) {
-                *arc.lock() = val;
+                let mut guard = arc.lock();
+                let old = guard.clone();
+                *guard = val.clone();
+                crate::parallel_trace::emit_scalar_mutation(name, &old, &val);
                 return;
             }
             if frame.has_scalar(name) {
