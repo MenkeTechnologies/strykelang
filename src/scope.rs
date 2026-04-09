@@ -800,6 +800,46 @@ impl Scope {
         false
     }
 
+    /// Sigil-prefixed names (`$x`, `@a`, `%h`) from all frames, for REPL tab-completion.
+    pub fn repl_binding_names(&self) -> Vec<String> {
+        let mut seen = HashSet::new();
+        let mut out = Vec::new();
+        for frame in &self.frames {
+            for (name, _) in &frame.scalars {
+                let s = format!("${}", name);
+                if seen.insert(s.clone()) {
+                    out.push(s);
+                }
+            }
+            for (name, _) in &frame.arrays {
+                let s = format!("@{}", name);
+                if seen.insert(s.clone()) {
+                    out.push(s);
+                }
+            }
+            for (name, _) in &frame.hashes {
+                let s = format!("%{}", name);
+                if seen.insert(s.clone()) {
+                    out.push(s);
+                }
+            }
+            for (name, _) in &frame.atomic_arrays {
+                let s = format!("@{}", name);
+                if seen.insert(s.clone()) {
+                    out.push(s);
+                }
+            }
+            for (name, _) in &frame.atomic_hashes {
+                let s = format!("%{}", name);
+                if seen.insert(s.clone()) {
+                    out.push(s);
+                }
+            }
+        }
+        out.sort();
+        out
+    }
+
     pub fn capture(&self) -> Vec<(String, PerlValue)> {
         let mut captured = Vec::new();
         for frame in &self.frames {

@@ -8,7 +8,7 @@ use rayon::prelude::*;
 
 use caseless::default_case_fold_str;
 
-use crate::ast::{Block, Expr};
+use crate::ast::{Block, Expr, PerlTypeName};
 use crate::bytecode::{BuiltinId, Chunk, Op};
 use crate::error::{ErrorKind, PerlError, PerlResult};
 use crate::interpreter::{Flow, FlowOrError, Interpreter, WantarrayCtx};
@@ -201,6 +201,17 @@ impl<'a> VM<'a> {
                     self.interp
                         .scope
                         .declare_scalar_frozen(&n, val, true, None)
+                        .map_err(|e| e.at_line(self.line()))?;
+                }
+                Op::DeclareScalarTyped(idx, tyb) => {
+                    let val = self.pop();
+                    let n = self.name_owned(*idx);
+                    let ty = PerlTypeName::from_byte(*tyb).ok_or_else(|| {
+                        PerlError::runtime(format!("invalid typed scalar type byte {}", tyb), self.line())
+                    })?;
+                    self.interp
+                        .scope
+                        .declare_scalar_frozen(&n, val, false, Some(ty))
                         .map_err(|e| e.at_line(self.line()))?;
                 }
 

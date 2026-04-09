@@ -57,8 +57,52 @@ pub(crate) fn try_builtin(
         "unpack" => Some(crate::pack::perl_unpack(args, line)),
         "quotemeta" => Some(builtin_quotemeta(args)),
         "pselect" => Some(crate::pchannel::pselect_recv(args, line)),
+        "csv_read" => Some(builtin_csv_read(args)),
+        "csv_write" => Some(builtin_csv_write(args)),
+        "sqlite" => Some(builtin_sqlite(args)),
         _ => None,
     }
+}
+
+fn builtin_csv_read(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let path = args.first().map(|v| v.to_string()).unwrap_or_default();
+    crate::native_data::csv_read(&path)
+}
+
+fn builtin_csv_write(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Err(PerlError::runtime(
+            "csv_write needs path and row list",
+            0,
+        ));
+    }
+    let path = args[0].to_string();
+    if args.len() == 2 {
+        match &args[1] {
+            PerlValue::Array(a) => return crate::native_data::csv_write(&path, a),
+            PerlValue::ArrayRef(r) => {
+                let g = r.read();
+                return crate::native_data::csv_write(
+                    &path,
+                    &g.iter().cloned().collect::<Vec<_>>(),
+                );
+            }
+            PerlValue::Hash(h) => {
+                return crate::native_data::csv_write(&path, &[PerlValue::Hash(h.clone())]);
+            }
+            PerlValue::HashRef(r) => {
+                let g = r.read();
+                return crate::native_data::csv_write(&path, &[PerlValue::Hash(g.clone())]);
+            }
+            _ => {}
+        }
+    }
+    crate::native_data::csv_write(&path, &args[1..])
+}
+
+fn builtin_sqlite(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let path = args.first().map(|v| v.to_string()).unwrap_or_default();
+    crate::native_data::sqlite_open(&path)
 }
 
 fn builtin_quotemeta(args: &[PerlValue]) -> PerlResult<PerlValue> {

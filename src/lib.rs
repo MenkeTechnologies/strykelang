@@ -17,6 +17,7 @@ pub mod perl_fs;
 pub mod ppool;
 pub mod scope;
 mod sort_fast;
+pub mod native_data;
 pub mod token;
 pub mod value;
 pub mod vm;
@@ -64,6 +65,11 @@ pub fn try_vm_execute(
     let comp = compiler::Compiler::new();
     match comp.compile_program(program) {
         Ok(chunk) => {
+            for def in &chunk.struct_defs {
+                interp
+                    .struct_defs
+                    .insert(def.name.clone(), std::sync::Arc::new(def.clone()));
+            }
             // Register sub declarations in the interpreter so they persist across
             // multiple parse_and_run_string calls (the VM's chunk is ephemeral).
             for stmt in &program.statements {

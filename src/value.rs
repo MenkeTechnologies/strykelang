@@ -7,7 +7,7 @@ use std::fmt;
 use std::sync::Arc;
 use std::sync::Barrier;
 
-use crate::ast::Block;
+use crate::ast::{Block, StructDef};
 use crate::error::PerlResult;
 
 /// Handle returned by `async { ... }`; join with `await`.
@@ -111,6 +111,10 @@ pub enum PerlValue {
     Ppool(PerlPpool),
     /// `barrier(N)` — thread barrier (`->wait`).
     Barrier(PerlBarrier),
+    /// `sqlite("path")` — embedded SQLite (`rusqlite`); use `->exec`, `->query`, `->last_insert_rowid`.
+    SqliteConn(Arc<Mutex<rusqlite::Connection>>),
+    /// `struct`-defined record instance (`Point->new`, `$p->x`).
+    StructInst(Arc<StructInstance>),
 }
 
 /// Handle returned by `ppool(N)`; use `->submit(sub { ... })` and `->collect()`.
@@ -163,6 +167,22 @@ impl Clone for BlessedRef {
     }
 }
 
+/// Instance of a `struct Name { ... }` definition; field access via `$obj->name`.
+#[derive(Debug)]
+pub struct StructInstance {
+    pub def: Arc<StructDef>,
+    pub values: Vec<PerlValue>,
+}
+
+impl Clone for StructInstance {
+    fn clone(&self) -> Self {
+        Self {
+            def: Arc::clone(&self.def),
+            values: self.values.clone(),
+        }
+    }
+}
+
 impl PerlValue {
     /// Borrow the inner string without allocation if this is a String variant.
     #[inline]
@@ -204,6 +224,10 @@ impl PerlValue {
             PerlValue::Capture(_) => buf.push_str("Capture"),
             PerlValue::Ppool(_) => buf.push_str("Ppool"),
             PerlValue::Barrier(_) => buf.push_str("Barrier"),
+            PerlValue::SqliteConn(_) => buf.push_str("SqliteConn"),
+            PerlValue::StructInst(s) => {
+                buf.push_str(&s.def.name);
+            }
             other => buf.push_str(&other.to_string()),
         }
     }
@@ -265,6 +289,8 @@ impl PerlValue {
             PerlValue::Capture(_) => 1.0,
             PerlValue::Ppool(_) => 1.0,
             PerlValue::Barrier(_) => 1.0,
+            PerlValue::SqliteConn(_) => 1.0,
+            PerlValue::StructInst(_) => 1.0,
             _ => 0.0,
         }
     }
@@ -287,6 +313,8 @@ impl PerlValue {
             PerlValue::Capture(_) => 1,
             PerlValue::Ppool(_) => 1,
             PerlValue::Barrier(_) => 1,
+            PerlValue::SqliteConn(_) => 1,
+            PerlValue::StructInst(_) => 1,
             _ => 0,
         }
     }
@@ -320,6 +348,8 @@ impl PerlValue {
             PerlValue::Capture(_) => "Capture",
             PerlValue::Ppool(_) => "Ppool",
             PerlValue::Barrier(_) => "Barrier",
+            PerlValue::SqliteConn(_) => "SqliteConn",
+            PerlValue::StructInst(s) => s.def.name.as_str(),
         }
     }
 
@@ -341,6 +371,8 @@ impl PerlValue {
             PerlValue::Capture(_) => PerlValue::String("Capture".into()),
             PerlValue::Ppool(_) => PerlValue::String("Ppool".into()),
             PerlValue::Barrier(_) => PerlValue::String("Barrier".into()),
+            PerlValue::SqliteConn(_) => PerlValue::String("SqliteConn".into()),
+            PerlValue::StructInst(s) => PerlValue::String(s.def.name.clone()),
             PerlValue::Bytes(_) => PerlValue::String("BYTES".into()),
             PerlValue::Blessed(b) => PerlValue::String(b.class.clone()),
             _ => PerlValue::String(String::new()),
@@ -446,6 +478,8 @@ impl fmt::Display for PerlValue {
             PerlValue::Capture(c) => write!(f, "Capture(exit={})", c.exitcode),
             PerlValue::Ppool(_) => f.write_str("Ppool"),
             PerlValue::Barrier(_) => f.write_str("Barrier"),
+            PerlValue::SqliteConn(_) => f.write_str("SqliteConn"),
+            PerlValue::StructInst(s) => write!(f, "{}=STRUCT(...)", s.def.name),
         }
     }
 }
@@ -516,6 +550,8 @@ pub fn set_member_key(v: &PerlValue) -> String {
         PerlValue::Capture(c) => format!("cap:{:p}", Arc::as_ptr(c)),
         PerlValue::Ppool(p) => format!("pp:{:p}", Arc::as_ptr(&p.0)),
         PerlValue::Barrier(b) => format!("br:{:p}", Arc::as_ptr(&b.0)),
+        PerlValue::SqliteConn(c) => format!("sql:{:p}", Arc::as_ptr(c)),
+        PerlValue::StructInst(s) => format!("st:{}:{:?}", s.def.name, s.values),
     }
 }
 

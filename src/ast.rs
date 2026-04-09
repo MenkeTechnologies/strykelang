@@ -113,6 +113,10 @@ pub enum StmtKind {
     },
     /// Standalone `continue { BLOCK }` (normally follows a loop; parsed for acceptance).
     Continue(Block),
+    /// `struct Name { field => Type, ... }` — fixed-field records (`Name->new`, `$x->field`).
+    StructDecl {
+        def: StructDef,
+    },
 }
 
 /// Optional type for `typed my $x : Int` — enforced at assignment time (runtime).
@@ -123,7 +127,41 @@ pub enum PerlTypeName {
     Float,
 }
 
+/// Compile-time record type: `struct Name { field => Type, ... }`.
+#[derive(Debug, Clone, Serialize)]
+pub struct StructDef {
+    pub name: String,
+    pub fields: Vec<(String, PerlTypeName)>,
+}
+
+impl StructDef {
+    #[inline]
+    pub fn field_index(&self, name: &str) -> Option<usize> {
+        self.fields.iter().position(|(n, _)| n == name)
+    }
+}
+
 impl PerlTypeName {
+    /// Bytecode encoding for `DeclareScalarTyped` / VM.
+    #[inline]
+    pub fn from_byte(b: u8) -> Option<Self> {
+        match b {
+            0 => Some(Self::Int),
+            1 => Some(Self::Str),
+            2 => Some(Self::Float),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub fn as_byte(self) -> u8 {
+        match self {
+            Self::Int => 0,
+            Self::Str => 1,
+            Self::Float => 2,
+        }
+    }
+
     /// Strict runtime check: `Int` only [`PerlValue::Integer`], `Str` only string, `Float` allows int or float.
     pub fn check_value(self, v: &crate::value::PerlValue) -> Result<(), String> {
         use crate::value::PerlValue;

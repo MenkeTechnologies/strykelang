@@ -1,4 +1,4 @@
-use std::io::{self, BufRead, Read as IoRead, Write};
+use std::io::{self, BufRead, IsTerminal, Read as IoRead, Write};
 use std::process;
 
 use clap::Parser;
@@ -6,12 +6,14 @@ use clap::Parser;
 use perlrs::error::ErrorKind;
 use perlrs::interpreter::Interpreter;
 
+mod repl;
+
 /// perlrs — A highly parallel Perl 5 interpreter written in Rust
 #[derive(Parser, Debug)]
 #[command(name = "perlrs", version, about, long_about = None)]
 #[command(disable_version_flag = true, disable_help_flag = true)]
 #[command(override_usage = "perlrs [switches] [--] [programfile] [arguments]")]
-struct Cli {
+pub(crate) struct Cli {
     /// Specify record separator (\0 if no argument); -0777 for slurp mode
     #[arg(short = '0', value_name = "OCTAL")]
     input_separator: Option<Option<String>>,
@@ -262,6 +264,127 @@ fn print_cyberpunk_help() {
     println!("{C} ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░{N}");
 }
 
+/// `-M` / `-m` prelude prepended to each program line (shared with REPL).
+pub(crate) fn module_prelude(cli: &Cli) -> String {
+    let mut full_code = String::new();
+    for module in &cli.use_module {
+        if let Some((mod_name, args)) = module.split_once('=') {
+            full_code.push_str(&format!(
+                "use {} qw({});\n",
+                mod_name,
+                args.replace(',', " ")
+            ));
+        } else {
+            full_code.push_str(&format!("use {};\n", module));
+        }
+    }
+    for module in &cli.use_module_no_import {
+        if let Some(rest) = module.strip_prefix('-') {
+            full_code.push_str(&format!("no {};\n", rest));
+        } else {
+            full_code.push_str(&format!("use {} ();\n", module));
+        }
+    }
+    full_code
+}
+
+pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut Interpreter, filename: &str) {
+    interp.set_file(filename);
+    interp.warnings = (cli.warnings || cli.all_warnings) && !cli.no_warnings;
+    interp.auto_split = cli.auto_split;
+    interp.field_separator = cli.field_separator.clone();
+    interp.program_name = filename.to_string();
+
+    if let Some(ref sep) = cli.input_separator {
+        match sep.as_deref() {
+            None | Some("") => interp.irs = "\0".to_string(),
+            Some("777") => interp.irs = String::new(),
+            Some(oct_str) => {
+                if let Ok(val) = u32::from_str_radix(oct_str, 8) {
+                    if let Some(ch) = char::from_u32(val) {
+                        interp.irs = ch.to_string();
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(ref octnum) = cli.line_ending {
+        match octnum.as_deref() {
+            None | Some("") => {
+                interp.ors = "\n".to_string();
+            }
+            Some(oct_str) => {
+                if let Ok(val) = u32::from_str_radix(oct_str, 8) {
+                    if let Some(ch) = char::from_u32(val) {
+                        interp.ors = ch.to_string();
+                    }
+                }
+            }
+        }
+    }
+
+    if (cli.taint_check || cli.taint_warn) && cli.warnings {
+        eprintln!("perlrs: taint mode acknowledged but not enforced");
+    }
+
+    let mut argv: Vec<String> = if cli.script.is_some() {
+        cli.args.clone()
+    } else {
+        Vec::new()
+    };
+
+    if cli.switch_parsing {
+        let mut switches_done = false;
+        let mut remaining = Vec::new();
+        for arg in &argv {
+            if switches_done || !arg.starts_with('-') || arg == "--" {
+                if arg == "--" {
+                    switches_done = true;
+                } else {
+                    remaining.push(arg.clone());
+                }
+            } else {
+                let switch = &arg[1..];
+                if let Some((name, val)) = switch.split_once('=') {
+                    let _ = interp
+                        .scope
+                        .set_scalar(name, perlrs::value::PerlValue::String(val.to_string()));
+                } else {
+                    let _ = interp
+                        .scope
+                        .set_scalar(switch, perlrs::value::PerlValue::Integer(1));
+                }
+            }
+        }
+        argv = remaining;
+    }
+
+    interp.argv = argv.clone();
+    interp.scope.declare_array(
+        "ARGV",
+        argv.into_iter()
+            .map(perlrs::value::PerlValue::String)
+            .collect(),
+    );
+
+    for (k, v) in &interp.env.clone() {
+        interp.scope.set_hash_element("ENV", k, v.clone());
+    }
+
+    let mut inc_dirs: Vec<perlrs::value::PerlValue> = cli
+        .include
+        .iter()
+        .map(|d| perlrs::value::PerlValue::String(d.clone()))
+        .collect();
+    inc_dirs.push(perlrs::value::PerlValue::String(".".to_string()));
+    interp.scope.declare_array("INC", inc_dirs);
+
+    if cli.debugger.is_some() {
+        eprintln!("perlrs: debugger not yet implemented, running normally");
+    }
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -296,6 +419,22 @@ fn main() {
             .num_threads(n)
             .build_global()
             .ok();
+    }
+
+    let is_repl = env!("CARGO_BIN_NAME") == "pe"
+        && cli.script.is_none()
+        && cli.execute.is_empty()
+        && cli.execute_features.is_empty()
+        && !cli.line_mode
+        && !cli.print_mode
+        && !cli.check_only
+        && !cli.dump_ast
+        && !cli.dump_core
+        && io::stdin().is_terminal();
+
+    if is_repl {
+        repl::run(&cli);
+        return;
     }
 
     // Determine slurp mode
@@ -335,28 +474,7 @@ fn main() {
         (code, "-".to_string())
     };
 
-    // Prepend module loads
-    let mut full_code = String::new();
-    for module in &cli.use_module {
-        // -Mmodule=arg becomes use module split 'arg'
-        if let Some((mod_name, args)) = module.split_once('=') {
-            full_code.push_str(&format!(
-                "use {} qw({});\n",
-                mod_name,
-                args.replace(',', " ")
-            ));
-        } else {
-            full_code.push_str(&format!("use {};\n", module));
-        }
-    }
-    for module in &cli.use_module_no_import {
-        if let Some(rest) = module.strip_prefix('-') {
-            // -m-Module means "no Module"
-            full_code.push_str(&format!("no {};\n", rest));
-        } else {
-            full_code.push_str(&format!("use {} ();\n", module));
-        }
-    }
+    let mut full_code = module_prelude(&cli);
     full_code.push_str(&code);
 
     // Parse
@@ -389,110 +507,8 @@ fn main() {
         return;
     }
 
-    // Create interpreter
     let mut interp = Interpreter::new();
-    interp.set_file(&filename);
-    interp.warnings = (cli.warnings || cli.all_warnings) && !cli.no_warnings;
-    interp.auto_split = cli.auto_split;
-    interp.field_separator = cli.field_separator.clone();
-    interp.program_name = filename.clone();
-
-    // Handle -0 (input record separator)
-    if let Some(ref sep) = cli.input_separator {
-        match sep.as_deref() {
-            None | Some("") => interp.irs = "\0".to_string(),
-            Some("777") => interp.irs = String::new(), // slurp: no separator
-            Some(oct_str) => {
-                if let Ok(val) = u32::from_str_radix(oct_str, 8) {
-                    if let Some(ch) = char::from_u32(val) {
-                        interp.irs = ch.to_string();
-                    }
-                }
-            }
-        }
-    }
-
-    // Handle -l (line ending processing)
-    if let Some(ref octnum) = cli.line_ending {
-        match octnum.as_deref() {
-            None | Some("") => {
-                interp.ors = "\n".to_string();
-            }
-            Some(oct_str) => {
-                if let Ok(val) = u32::from_str_radix(oct_str, 8) {
-                    if let Some(ch) = char::from_u32(val) {
-                        interp.ors = ch.to_string();
-                    }
-                }
-            }
-        }
-    }
-
-    // Taint mode
-    if (cli.taint_check || cli.taint_warn) && cli.warnings {
-        eprintln!("perlrs: taint mode acknowledged but not enforced");
-    }
-
-    // -s: parse switches from @ARGV
-    let mut argv: Vec<String> = if cli.script.is_some() {
-        cli.args.clone()
-    } else {
-        Vec::new()
-    };
-
-    if cli.switch_parsing {
-        let mut switches_done = false;
-        let mut remaining = Vec::new();
-        for arg in &argv {
-            if switches_done || !arg.starts_with('-') || arg == "--" {
-                if arg == "--" {
-                    switches_done = true;
-                } else {
-                    remaining.push(arg.clone());
-                }
-            } else {
-                // -foo sets $foo = 1, -foo=bar sets $foo = "bar"
-                let switch = &arg[1..];
-                if let Some((name, val)) = switch.split_once('=') {
-                    let _ = interp
-                        .scope
-                        .set_scalar(name, perlrs::value::PerlValue::String(val.to_string()));
-                } else {
-                    let _ = interp
-                        .scope
-                        .set_scalar(switch, perlrs::value::PerlValue::Integer(1));
-                }
-            }
-        }
-        argv = remaining;
-    }
-
-    interp.argv = argv.clone();
-    interp.scope.declare_array(
-        "ARGV",
-        argv.into_iter()
-            .map(perlrs::value::PerlValue::String)
-            .collect(),
-    );
-
-    // Set %ENV
-    for (k, v) in &interp.env.clone() {
-        interp.scope.set_hash_element("ENV", k, v.clone());
-    }
-
-    // Set @INC
-    let mut inc_dirs: Vec<perlrs::value::PerlValue> = cli
-        .include
-        .iter()
-        .map(|d| perlrs::value::PerlValue::String(d.clone()))
-        .collect();
-    inc_dirs.push(perlrs::value::PerlValue::String(".".to_string()));
-    interp.scope.declare_array("INC", inc_dirs);
-
-    // Debugger mode
-    if cli.debugger.is_some() {
-        eprintln!("perlrs: debugger not yet implemented, running normally");
-    }
+    configure_interpreter(&cli, &mut interp, &filename);
 
     // Line processing mode (-n / -p)
     if cli.line_mode || cli.print_mode {

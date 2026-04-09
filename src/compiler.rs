@@ -301,12 +301,14 @@ impl Compiler {
         line: usize,
         is_my: bool,
     ) -> Result<(), CompileError> {
-        if decls.iter().any(|d| d.type_annotation.is_some()) {
-            return Err(CompileError::Unsupported("typed my".into()));
-        }
         let allow_frozen = is_my;
         // List assignment: my ($a, $b) = (10, 20) — distribute elements
         if decls.len() > 1 && decls[0].initializer.is_some() {
+            if decls.iter().any(|d| d.type_annotation.is_some()) {
+                return Err(CompileError::Unsupported(
+                    "typed my in list assignment".into(),
+                ));
+            }
             self.compile_expr_ctx(decls[0].initializer.as_ref().unwrap(), WantarrayCtx::List)?;
             let tmp_name = self.chunk.intern_name("__list_assign_tmp__");
             self.emit_declare_array(tmp_name, line, false);
@@ -340,7 +342,20 @@ impl Compiler {
                         } else {
                             self.chunk.emit(Op::LoadUndef, line);
                         }
-                        self.emit_declare_scalar(name_idx, line, frozen);
+                        if let Some(ty) = decl.type_annotation {
+                            if frozen {
+                                return Err(CompileError::Unsupported(
+                                    "typed frozen my — use `typed my` without frozen"
+                                        .into(),
+                                ));
+                            }
+                            let name = self.chunk.names[name_idx as usize].clone();
+                            self.register_declare(Sigil::Scalar, &name, false);
+                            self.chunk
+                                .emit(Op::DeclareScalarTyped(name_idx, ty.as_byte()), line);
+                        } else {
+                            self.emit_declare_scalar(name_idx, line, frozen);
+                        }
                     }
                     Sigil::Array => {
                         if let Some(init) = &decl.initializer {
@@ -676,6 +691,20 @@ impl Compiler {
             }
             StmtKind::SubDecl { .. } => {
                 // Already handled in compile_program
+            }
+            StmtKind::StructDecl { def } => {
+                if self
+                    .chunk
+                    .struct_defs
+                    .iter()
+                    .any(|d| d.name == def.name)
+                {
+                    return Err(CompileError::Unsupported(format!(
+                        "duplicate struct `{}`",
+                        def.name
+                    )));
+                }
+                self.chunk.struct_defs.push(def.clone());
             }
             StmtKind::Use { .. }
             | StmtKind::No { .. }

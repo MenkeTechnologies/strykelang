@@ -183,6 +183,7 @@ pub const KEYWORDS: &[&str] = &[
     "our",
     "local",
     "sub",
+    "struct",
     "return",
     "if",
     "elsif",

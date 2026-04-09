@@ -13,6 +13,7 @@ mod eval_errors;
 mod expressions;
 mod fs_io;
 mod lib_api;
+mod native_ext;
 mod parallel;
 mod parse_accepts;
 mod parse_accepts_extra;

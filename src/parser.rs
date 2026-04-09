@@ -142,6 +142,7 @@ impl Parser {
                     s
                 }
                 "sub" => self.parse_sub_decl()?,
+                "struct" => self.parse_struct_decl()?,
                 "my" => self.parse_my_our_local("my", false)?,
                 "mysync" => self.parse_my_our_local("mysync", false)?,
                 "frozen" => {
@@ -848,6 +849,49 @@ impl Parser {
                 params: vec![],
                 body,
                 prototype,
+            },
+            line,
+        })
+    }
+
+    /// `struct Name { field => Type, ... }`
+    fn parse_struct_decl(&mut self) -> PerlResult<Statement> {
+        let line = self.peek_line();
+        self.advance(); // struct
+        let name = match self.advance() {
+            (Token::Ident(n), _) => n,
+            (tok, err_line) => {
+                return Err(PerlError::syntax(
+                    format!("Expected struct name, got {:?}", tok),
+                    err_line,
+                ))
+            }
+        };
+        self.expect(&Token::LBrace)?;
+        let mut fields = Vec::new();
+        while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            let field_name = match self.advance() {
+                (Token::Ident(n), _) => n,
+                (tok, err_line) => {
+                    return Err(PerlError::syntax(
+                        format!("Expected field name, got {:?}", tok),
+                        err_line,
+                    ))
+                }
+            };
+            self.expect(&Token::FatArrow)?;
+            let ty = self.parse_type_name()?;
+            fields.push((field_name, ty));
+            if !self.eat(&Token::Comma) {
+                break;
+            }
+        }
+        self.expect(&Token::RBrace)?;
+        self.eat(&Token::Semicolon);
+        Ok(Statement {
+            label: None,
+            kind: StmtKind::StructDecl {
+                def: StructDef { name, fields },
             },
             line,
         })

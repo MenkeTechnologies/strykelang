@@ -1,4 +1,4 @@
-use crate::ast::{Block, Expr};
+use crate::ast::{Block, Expr, StructDef};
 use crate::value::PerlValue;
 
 /// Stack-based bytecode instruction set for the perlrs VM.
@@ -21,6 +21,8 @@ pub enum Op {
     DeclareScalar(u16),
     /// Like `DeclareScalar` but the binding is immutable after initialization.
     DeclareScalarFrozen(u16),
+    /// `typed my $x : Type` — u8 encodes [`crate::ast::PerlTypeName`] (0=Int,1=Str,2=Float).
+    DeclareScalarTyped(u16, u8),
 
     // ── Arrays ──
     GetArray(u16),
@@ -373,6 +375,8 @@ pub struct Chunk {
     pub blocks: Vec<Block>,
     /// Assign targets for `s///` / `tr///` bytecode (LHS expressions).
     pub lvalues: Vec<Expr>,
+    /// `struct Name { ... }` definitions in this chunk (registered on the interpreter at VM start).
+    pub struct_defs: Vec<StructDef>,
 }
 
 impl Chunk {
@@ -385,6 +389,7 @@ impl Chunk {
             sub_entries: Vec::new(),
             blocks: Vec::new(),
             lvalues: Vec::new(),
+            struct_defs: Vec::new(),
         }
     }
 

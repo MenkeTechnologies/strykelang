@@ -76,6 +76,10 @@ After reloading your shell, `pe <TAB>` will complete all flags, options, and scr
 
 ## [0x03] USAGE
 
+#### INTERACTIVE REPL // `pe` WITH NO SCRIPT
+
+When you run the **`pe`** binary **from a terminal** with **no program file**, **no `-e` / `-E`**, and not in **`-n` / `-p`** (or other batch-only modes such as **`-c`**, **`--ast`**, **`-u`**), it starts a **readline** session: line editing, history (saved to **`~/.perlrs_history`** when possible), and **Tab** completion for keywords/builtins plus current lexical variables and subroutine names. Type **`exit`** or **`quit`** or send **EOF** (Ctrl-D) to leave. If stdin is **not** a TTY (e.g. a pipe), **`pe`** reads **one line** from stdin like **`perlrs`**. The **`perlrs`** binary keeps the previous behavior for the same flags (read a single line from stdin when no script is given).
+
 #### EXECUTING INLINE CODE // DIRECT INJECTION
 
 ```sh

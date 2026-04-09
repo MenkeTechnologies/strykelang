@@ -135,6 +135,8 @@ pub struct Interpreter {
     pub(crate) socket_handles: HashMap<String, PerlSocket>,
     /// `wantarray()` inside the current subroutine (`WantarrayCtx`; VM threads it on `Call`/`MethodCall`/`ArrowCall`).
     pub(crate) wantarray_kind: WantarrayCtx,
+    /// `struct Name { ... }` definitions (merged from VM chunks and tree-walker).
+    pub struct_defs: HashMap<String, Arc<StructDef>>,
 }
 
 /// Shell command for `open(H, "-|", cmd)` / `open(H, "|-", cmd)` (list form not yet supported).
@@ -198,6 +200,7 @@ impl Interpreter {
         Self {
             scope: Scope::new(),
             subs: HashMap::new(),
+            struct_defs: HashMap::new(),
             file: "-e".to_string(),
             output_handles: HashMap::new(),
             input_handles: HashMap::new(),
@@ -618,6 +621,15 @@ impl Interpreter {
 
     pub fn set_file(&mut self, file: &str) {
         self.file = file.to_string();
+    }
+
+    /// Keywords, builtins, lexical names, and subroutine names for REPL tab-completion.
+    pub fn repl_completion_names(&self) -> Vec<String> {
+        let mut v = self.scope.repl_binding_names();
+        v.extend(self.subs.keys().cloned());
+        v.sort();
+        v.dedup();
+        v
     }
 
     pub fn execute(&mut self, program: &Program) -> PerlResult<PerlValue> {
@@ -1067,6 +1079,18 @@ impl Interpreter {
                         prototype: prototype.clone(),
                     }),
                 );
+                Ok(PerlValue::Undef)
+            }
+            StmtKind::StructDecl { def } => {
+                if self.struct_defs.contains_key(&def.name) {
+                    return Err(PerlError::runtime(
+                        format!("duplicate struct `{}`", def.name),
+                        stmt.line,
+                    )
+                    .into());
+                }
+                self.struct_defs
+                    .insert(def.name.clone(), Arc::new(def.clone()));
                 Ok(PerlValue::Undef)
             }
             StmtKind::My(decls) | StmtKind::Our(decls) => {
@@ -3596,6 +3620,22 @@ impl Interpreter {
         line: usize,
     ) -> Option<PerlResult<PerlValue>> {
         match receiver {
+            PerlValue::SqliteConn(c) => Some(crate::native_data::sqlite_dispatch(
+                c, method, args, line,
+            )),
+            PerlValue::StructInst(s) => {
+                if let Some(idx) = s.def.field_index(method) {
+                    if !args.is_empty() {
+                        return Some(Err(PerlError::runtime(
+                            format!("struct field `{}` takes no arguments", method),
+                            line,
+                        )));
+                    }
+                    Some(Ok(s.values[idx].clone()))
+                } else {
+                    None
+                }
+            }
             PerlValue::Deque(d) => Some(self.deque_method(Arc::clone(d), method, args, line)),
             PerlValue::Heap(h) => Some(self.heap_method(Arc::clone(h), method, args, line)),
             PerlValue::Pipeline(p) => Some(self.pipeline_method(Arc::clone(p), method, args, line)),
@@ -3951,9 +3991,12 @@ impl Interpreter {
         }
     }
 
-    fn builtin_new(&mut self, class: &str, args: Vec<PerlValue>, _line: usize) -> ExecResult {
+    fn builtin_new(&mut self, class: &str, args: Vec<PerlValue>, line: usize) -> ExecResult {
         if class == "Set" {
             return Ok(crate::value::set_from_elements(args.into_iter().skip(1)));
+        }
+        if let Some(def) = self.struct_defs.get(class) {
+            return Ok(crate::native_data::struct_new(def, &args, line)?);
         }
         // Default OO constructor: Class->new(%args) → bless {%args}, class
         let mut map = IndexMap::new();
