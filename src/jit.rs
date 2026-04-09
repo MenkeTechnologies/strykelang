@@ -69,7 +69,7 @@
 //! [`block_jit_validate`]. On success it fills slot/plain/arg buffers using [`ValidatedBlockCfg::buffer_mode`]
 //! and calls [`try_run_block_ops`] with `Some(validated)` so CFG validation is not run again inside
 //! compilation. Callers may pass `None` for the last argument to [`try_run_block_ops`] to validate
-//! internally (unit tests). [`block_jit_buffer_mode`] is a small helper over [`block_jit_validate`].
+//! internally (unit tests). For buffer mode only, use [`block_jit_validate`] then [`ValidatedBlockCfg::buffer_mode`].
 //! Then the opcode dispatch loop.
 
 use std::collections::hash_map::DefaultHasher;
@@ -1678,11 +1678,6 @@ fn validate_block_cfg(ops: &[Op], constants: &[PerlValue]) -> Option<ValidatedBl
         needs_raw_value_buffers,
         jump_if_defined_kind,
     })
-}
-
-/// Buffer layout when validation succeeds; [`None`] if the block JIT cannot compile this buffer.
-pub(crate) fn block_jit_buffer_mode(ops: &[Op], constants: &[PerlValue]) -> Option<BlockJitBufferMode> {
-    Some(block_jit_validate(ops, constants)?.buffer_mode())
 }
 
 /// Emit a single non-control-flow op into the Cranelift `FunctionBuilder`.
