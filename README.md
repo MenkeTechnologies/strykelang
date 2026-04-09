@@ -78,7 +78,7 @@ After reloading your shell, `pe <TAB>` will complete all flags, options, and scr
 
 #### INTERACTIVE REPL // `pe` WITH NO SCRIPT
 
-When you run the **`pe`** binary **from a terminal** with **no program file**, **no `-e` / `-E`**, and not in **`-n` / `-p`** (or other batch-only modes such as **`-c`**, **`--ast`**, **`-u`**), it starts a **readline** session: line editing, history (saved to **`~/.perlrs_history`** when possible), and **Tab** completion for keywords/builtins plus current lexical variables and subroutine names. Type **`exit`** or **`quit`** or send **EOF** (Ctrl-D) to leave. If stdin is **not** a TTY (e.g. a pipe), **`pe`** reads **one line** from stdin like **`perlrs`**. The **`perlrs`** binary keeps the previous behavior for the same flags (read a single line from stdin when no script is given).
+When you run the **`pe`** binary **from a terminal** with **no program file**, **no `-e` / `-E`**, and not in **`-n` / `-p`** (or other batch-only modes such as **`-c`**, **`--ast`**, **`--fmt`**, **`--profile`**, **`-u`**), it starts a **readline** session: line editing, history (saved to **`~/.perlrs_history`** when possible), and **Tab** completion for keywords/builtins plus current lexical variables and subroutine names. Type **`exit`** or **`quit`** or send **EOF** (Ctrl-D) to leave. If stdin is **not** a TTY (e.g. a pipe), **`pe`** reads **one line** from stdin like **`perlrs`**. The **`perlrs`** binary keeps the previous behavior for the same flags (read a single line from stdin when no script is given).
 
 #### EXECUTING INLINE CODE // DIRECT INJECTION
 
@@ -95,7 +95,18 @@ pe -c script.pl
 # dump abstract syntax tree as JSON (linting, IDE tooling, formatters, static analysis)
 pe --ast script.pl
 pe --ast -e 'sub foo { 1 }'
+
+# pretty-print parsed Perl to stdout (best-effort; tree-walker-oriented AST; no execution)
+pe --fmt script.pl
+pe --fmt -e 'my $x = 1; say $x'
+
+# wall-clock profile: per-statement and per-sub timings on stderr (tree-walker only; VM disabled)
+pe --profile script.pl
 ```
+
+#### `__DATA__` // EMBEDDED DATA HANDLE
+
+A line whose trimmed text is exactly `__DATA__` ends the program text. Everything after that line is stored as bytes on the **`DATA`** input handle, so `<DATA>` and `readline` on **`DATA`** read that trailing section (same idea as Perl). Shebang stripping and **`-x`** extraction apply only to the program portion above the marker.
 
 #### PROCESSING DATA STREAMS // STDIN OPERATIONS
 

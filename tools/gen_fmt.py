@@ -82,6 +82,31 @@ def main() -> None:
                 return '        StmtKind::End(b) => format!("END {{\\n{}\\n}}", format_block(b)),'
             if name == "Continue":
                 return '        StmtKind::Continue(b) => format!("continue {{\\n{}\\n}}", format_block(b)),'
+            if name == "Last":
+                return """        StmtKind::Last(l) => l
+                .as_ref()
+                .map(|x| format!("last {};", x))
+                .unwrap_or_else(|| "last;".to_string()),"""
+            if name == "Next":
+                return """        StmtKind::Next(l) => l
+                .as_ref()
+                .map(|x| format!("next {};", x))
+                .unwrap_or_else(|| "next;".to_string()),"""
+            if name == "Redo":
+                return """        StmtKind::Redo(l) => l
+                .as_ref()
+                .map(|x| format!("redo {};", x))
+                .unwrap_or_else(|| "redo;".to_string()),"""
+            if name == "My":
+                return '        StmtKind::My(decls) => format!("my {};", format_var_decls(decls)),'
+            if name == "Our":
+                return '        StmtKind::Our(decls) => format!("our {};", format_var_decls(decls)),'
+            if name == "Local":
+                return '        StmtKind::Local(decls) => format!("local {};", format_var_decls(decls)),'
+            if name == "MySync":
+                return '        StmtKind::MySync(decls) => format!("mysync {};", format_var_decls(decls)),'
+            if name == "Block":
+                return '        StmtKind::Block(b) => format!("{{\\n{}\\n}}", format_block(b)),'
             return f'        StmtKind::{name}(_) => format!("/* unsupported StmtKind::{name} */"),'
         if kind == "struct":
             name = data
@@ -177,7 +202,7 @@ def main() -> None:
             } => {
                 let lb = label.as_ref().map(|l| format!("{}: ", l)).unwrap_or_default();
                 let mut s = format!(
-                    "{}foreach \\${} ({}) {{\\n{}\\n}}",
+                    "{}foreach ${} ({}) {{\\n{}\\n}}",
                     lb, var, format_expr(list), format_block(body)
                 );
                 if let Some(cb) = continue_block {
@@ -261,7 +286,7 @@ def main() -> None:
                 catch_block,
             } => {
                 format!(
-                    "try {{\\n{}\\n}} catch (\\${}) {{\\n{}\\n}}",
+                    "try {{\\n{}\\n}} catch (${}) {{\\n{}\\n}}",
                     format_block(try_block),
                     catch_var,
                     format_block(catch_block)
@@ -282,6 +307,8 @@ def main() -> None:
     out: list[str] = []
     out.append("//! Pretty-print parsed Perl back to source (`pe --fmt`).")
     out.append("//! Regenerate with `python3 tools/gen_fmt.py` after `ast.rs` changes.")
+    out.append("")
+    out.append("#![allow(unused_variables)] // generated `match` arms name fields not always used")
     out.append("")
     out.append("use crate::ast::*;")
     out.append("")
@@ -393,14 +420,16 @@ def main() -> None:
         "LogNotWord": "not",
         "PreIncrement": "++",
         "PreDecrement": "--",
-        "Ref": "\\",
     }
     for line in extract_enum("UnaryOp").splitlines():
         t = line.strip().rstrip(",")
         if not t or t.startswith("//") or "(" in t:
             continue
         name = t.strip()
-        un_out.append(f'        UnaryOp::{name} => "{um.get(name, "?")}",')
+        if name == "Ref":
+            un_out.append('        UnaryOp::Ref => "\\\\",')
+        else:
+            un_out.append(f'        UnaryOp::{name} => "{um.get(name, "?")}",')
     un_out += ["    }", "}"]
     out.extend(un_out)
     out.append("")
@@ -417,22 +446,42 @@ def main() -> None:
     out.extend(po_out)
     out.append("")
 
+    # Rust format! patterns: `$` must not start a Python `{{` escape; build with chr(36) + pieces.
+    _fmt_hash_el = (
+        'format!("'
+        + chr(36)
+        + "{}"
+        + "{{"
+        + "{}"
+        + "}}"
+        + '", hash, format_expr(key))'
+    )
+    _fmt_deref_scalar = (
+        'format!("' + chr(36) + "{{" + "{}" + "}}" + '", format_expr(expr))'
+    )
+    _fmt_deref_arr = 'format!("@{{${}}}", format_expr(expr))'
+    _fmt_deref_hash = 'format!("%{{${}}}", format_expr(expr))'
+    _fmt_arrow_hash = (
+        'format!("({})->' + "{{" + "{}" + "}}" + '", format_expr(expr), format_expr(index))'
+    )
+
     out += [
         "fn format_string_part(p: &StringPart) -> String {",
         "    match p {",
         "        StringPart::Literal(s) => s.clone(),",
-        '        StringPart::ScalarVar(n) => format!("\\${{{}}}", n),',
-        '        StringPart::ArrayVar(n) => format!("\\@{{{}}}", n),',
-        '        StringPart::Expr(e) => format_expr(e),',
+        "        StringPart::ScalarVar(n) => format!(\"${{{}}}\", n),",
+        "        StringPart::ArrayVar(n) => format!(\"@{{{}}}\", n),",
+        "        StringPart::Expr(e) => format_expr(e),",
         "    }",
         "}",
         "",
         "fn format_string_literal(s: &str) -> String {",
-        '    let mut out = String::from("\\"");',
+        "    let mut out = String::new();",
+        "    out.push('\"');",
         "    for c in s.chars() {",
         "        match c {",
         "            '\\\\' => out.push_str(\"\\\\\\\\\"),",
-        '            \'\\"\' => out.push_str("\\\\\\""),',
+        "            '\"' => out.push_str(\"\\\\\\\"\"),",
         "            '\\n' => out.push_str(\"\\\\n\"),",
         "            '\\r' => out.push_str(\"\\\\r\"),",
         "            '\\t' => out.push_str(\"\\\\t\"),",
@@ -449,28 +498,24 @@ def main() -> None:
     ]
 
     struct_exprs = {
-        "InterpolatedString": "parts.iter().map(format_string_part).collect::<String>()",
-        "ScalarVar": 'format!("${}", name)',
-        "ArrayVar": 'format!("@{}", name)',
-        "HashVar": 'format!("%{}", name)',
-        "ArrayElement": 'format!("${{ {}[{}] }}", array, format_expr(index))',
-        "HashElement": 'format!("${{ {}\\{{{}\\}} }}", hash, format_expr(key))',
-        "ArraySlice": 'format!("@{{{}[{}]}}", array, indices.iter().map(format_expr).collect::<Vec<_>>().join(", "))',
-        "HashSlice": 'format!("@{{{}\\{{{}\\}}}}", hash, keys.iter().map(format_expr).collect::<Vec<_>>().join(", "))',
+        "ArrayElement": 'format!("${}[{}]", array, format_expr(index))',
+        "HashElement": _fmt_hash_el,
+        "ArraySlice": 'format!("@{}[{}]", array, indices.iter().map(format_expr).collect::<Vec<_>>().join(", "))',
+        "HashSlice": 'format!("@{}{{{}}}", hash, keys.iter().map(format_expr).collect::<Vec<_>>().join(", "))',
         "ScalarRef": 'format!("\\\\{}", format_expr(expr))',
         "ArrayRef": 'format!("[{}]", es.iter().map(format_expr).collect::<Vec<_>>().join(", "))',
         "HashRef": 'format!("({})", pairs.iter().map(|(k,v)| format!("{} => {}", format_expr(k), format_expr(v))).collect::<Vec<_>>().join(", "))',
         "CodeRef": 'format!("sub {{\\n{}\\n}}", format_block(body))',
-        "Deref": """match kind {
-                Sigil::Scalar => format!("${{${}}}", format_expr(expr)),
-                Sigil::Array => format!("@{{${}}}", format_expr(expr)),
-                Sigil::Hash => format!("%{{${}}}", format_expr(expr)),
-            }""",
-        "ArrowDeref": """match kind {
-                DerefKind::Array => format!("({})->[{}]", format_expr(expr), format_expr(index)),
-                DerefKind::Hash => format!("({})->{{}}", format_expr(expr), format_expr(index)),
-                DerefKind::Call => format!("({})->({})", format_expr(expr), format_expr(index)),
-            }""",
+        "Deref": f"""match kind {{
+                Sigil::Scalar => {_fmt_deref_scalar},
+                Sigil::Array => {_fmt_deref_arr},
+                Sigil::Hash => {_fmt_deref_hash},
+            }}""",
+        "ArrowDeref": f"""match kind {{
+                DerefKind::Array => format!("({{}})->[{{}}]", format_expr(expr), format_expr(index)),
+                DerefKind::Hash => {_fmt_arrow_hash},
+                DerefKind::Call => format!("({{}})->({{}})", format_expr(expr), format_expr(index)),
+            }}""",
         "BinOp": 'format!("({} {} {})", format_expr(left), format_binop(*op), format_expr(right))',
         "UnaryOp": 'format!("({}{})", format_unary(*op), format_expr(expr))',
         "PostfixOp": 'format!("({}{})", format_expr(expr), format_postfix(*op))',
@@ -673,6 +718,10 @@ def main() -> None:
                 "FetchUrl": '        ExprKind::FetchUrl(e) => format!("fetch_url {}", format_expr(e)),',
                 "Await": '        ExprKind::Await(e) => format!("await {}", format_expr(e)),',
                 "Study": '        ExprKind::Study(e) => format!("study {}", format_expr(e)),',
+                "ScalarVar": '        ExprKind::ScalarVar(name) => format!("${}", name),',
+                "ArrayVar": '        ExprKind::ArrayVar(name) => format!("@{}", name),',
+                "HashVar": '        ExprKind::HashVar(name) => format!("%{}", name),',
+                "InterpolatedString": "        ExprKind::InterpolatedString(parts) => parts.iter().map(format_string_part).collect::<String>(),",
             }
             if name in simple:
                 out.append(simple[name])
@@ -682,7 +731,14 @@ def main() -> None:
             name = data
             if name not in struct_exprs:
                 raise SystemExit(f"Missing struct_exprs for {name}")
-            inner = v[v.index("{") + 1 : v.rindex("}")].strip()
+            raw_inner = v[v.index("{") + 1 : v.rindex("}")].strip()
+            field_lines = []
+            for line in raw_inner.splitlines():
+                line = line.strip().rstrip(",")
+                if not line or line.startswith("//"):
+                    continue
+                field_lines.append(line.split(":")[0].strip())
+            inner = ",\n            ".join(field_lines)
             out.append(f"        ExprKind::{name} {{")
             out.append(f"            {inner}")
             out.append(f"        }} => {struct_exprs[name]},")

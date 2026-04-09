@@ -27,10 +27,7 @@ impl Profiler {
 
     pub fn on_line(&mut self, file: &str, line: usize, dt: Duration) {
         let ns = dt.as_nanos() as u64;
-        *self
-            .line_ns
-            .entry((file.to_string(), line))
-            .or_insert(0) += ns;
+        *self.line_ns.entry((file.to_string(), line)).or_insert(0) += ns;
     }
 
     pub fn enter_sub(&mut self, name: &str) {
@@ -57,21 +54,15 @@ impl Profiler {
         eprintln!("# perlrs --profile: collapsed stacks (name stack → ns); feed to flamegraph.pl");
         let mut stacks: Vec<_> = self.folded_ns.iter().collect();
         stacks.sort_by(|a, b| b.1.cmp(a.1));
-        for (k, ns) in stacks.iter().take(500) {
+        for (k, ns) in stacks.iter() {
             eprintln!("{} {}", k, ns);
-        }
-        if stacks.len() > 500 {
-            eprintln!("# … {} more stack rows omitted", stacks.len() - 500);
         }
 
         eprintln!("# perlrs --profile: lines (file:line → total ns)");
         let mut lines: Vec<_> = self.line_ns.iter().collect();
         lines.sort_by(|a, b| b.1.cmp(a.1));
-        for ((f, ln), ns) in lines.iter().take(200) {
+        for ((f, ln), ns) in lines.iter() {
             eprintln!("{}:{} {}", f, ln, ns);
-        }
-        if lines.len() > 200 {
-            eprintln!("# … {} more lines omitted", lines.len() - 200);
         }
 
         eprintln!("# perlrs --profile: subs (name → inclusive ns)");
