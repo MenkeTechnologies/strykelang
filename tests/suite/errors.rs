@@ -1,6 +1,5 @@
 use crate::common::*;
 use perlrs::error::ErrorKind;
-use perlrs::value::PerlValue;
 
 #[test]
 fn parse_unclosed_brace_is_syntax_error() {
@@ -29,12 +28,8 @@ fn die_is_die_kind() {
 }
 
 #[test]
-fn exit_zero_is_swallowed_as_success_in_execute() {
-    // `execute` treats `Exit(0)` like normal completion (break without `Err`).
-    let program = perlrs::parse("exit(0)").expect("parse");
-    let mut interp = perlrs::interpreter::Interpreter::new();
-    let v = interp.execute(&program).expect("execute");
-    assert!(matches!(v, PerlValue::Undef));
+fn exit_zero_is_exit_kind() {
+    assert_eq!(eval_err_kind("exit(0)"), ErrorKind::Exit(0));
 }
 
 #[test]
