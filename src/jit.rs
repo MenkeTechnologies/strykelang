@@ -5,13 +5,16 @@
 //! [`Op::Div`] only when the VM would use the **exact integer quotient** (`a % b == 0`),
 //! [`Op::Mod`] when the divisor is never dynamically zero (constant non-zero or folded stack),
 //! [`Op::Pow`] when both operands constant-fold and `0 ≤ exponent ≤ 63` (VM integer `wrapping_pow`),
-//! [`Op::Pop`], [`Op::Dup`], optional trailing [`Op::Halt`].
+//! [`Op::Pop`], [`Op::Dup`], optional trailing [`Op::Halt`], [`Op::LoadConst`] when the pool entry is
+//! an integer ([`PerlValue::as_integer`]), [`Op::BitAnd`]/[`Op::BitOr`] (same integer path as the VM
+//! when operands are not set values).
 //!
 //! Validation simulates a [`Cell`] stack so we only emit `sdiv`/`srem` when safe and only call
 //! [`perlrs_jit_pow_i64`] when the VM’s integer fast path applies.
 //!
-//! Not JIT’d: inexact `Div`, `Mod` with unknown divisor, `Pow` outside `0..=63`, [`Op::BitAnd`]/[`Op::BitOr`]
-//! (set ops), non-integer slot values, control flow, calls. [`Op::GetScalarSlot`] is JIT’d when every
+//! Not JIT’d: inexact `Div`, `Mod` with unknown divisor, `Pow` outside `0..=63`, non-integer
+//! [`Op::LoadConst`] pool entries, `BitAnd`/`BitOr` on set values (not expressible in this int-only
+//! simulation), non-integer slot values, control flow, calls. [`Op::GetScalarSlot`] is JIT’d when every
 //! referenced slot is materialized as `i64` via [`PerlValue::as_integer`]. Hot-loop tracing remains future work.
 
 use std::collections::hash_map::DefaultHasher;
@@ -80,7 +83,7 @@ fn new_jit_module() -> Option<JITModule> {
     Some(JITModule::new(builder))
 }
 
-fn hash_ops(ops: &[Op]) -> u64 {
+fn hash_ops(ops: &[Op], constants: &[PerlValue]) -> u64 {
     let mut h = DefaultHasher::new();
     ops.len().hash(&mut h);
     for op in ops {
@@ -96,6 +99,9 @@ fn hash_ops(ops: &[Op]) -> u64 {
             Op::LoadConst(i) => {
                 2u8.hash(&mut h);
                 i.hash(&mut h);
+                if let Some(n) = constants.get(*i as usize).and_then(|p| p.as_integer()) {
+                    n.hash(&mut h);
+                }
             }
             Op::LoadUndef => 3u8.hash(&mut h),
             Op::Pop => 4u8.hash(&mut h),
@@ -116,6 +122,8 @@ fn hash_ops(ops: &[Op]) -> u64 {
                 18u8.hash(&mut h);
                 s.hash(&mut h);
             }
+            Op::BitAnd => 19u8.hash(&mut h),
+            Op::BitOr => 20u8.hash(&mut h),
             _ => {
                 255u8.hash(&mut h);
                 format!("{op:?}").hash(&mut h);
@@ -140,7 +148,7 @@ enum Cell {
     Dyn,
 }
 
-fn validate_linear(ops: &[Op]) -> bool {
+fn validate_linear(ops: &[Op], constants: &[PerlValue]) -> bool {
     let seq = ops_before_halt(ops);
     if seq.is_empty() {
         return false;
@@ -149,6 +157,16 @@ fn validate_linear(ops: &[Op]) -> bool {
     for op in seq {
         match op {
             Op::LoadInt(n) => stack.push(Cell::Const(*n)),
+            Op::LoadConst(idx) => {
+                let n = match constants.get(*idx as usize) {
+                    Some(pv) => match pv.as_integer() {
+                        Some(n) => n,
+                        None => return false,
+                    },
+                    None => return false,
+                };
+                stack.push(Cell::Const(n));
+            }
             Op::Add => {
                 let b = match stack.pop() {
                     Some(c) => c,
@@ -280,6 +298,34 @@ fn validate_linear(ops: &[Op]) -> bool {
                     _ => Cell::Dyn,
                 });
             }
+            Op::BitAnd => {
+                let b = match stack.pop() {
+                    Some(c) => c,
+                    None => return false,
+                };
+                let a = match stack.pop() {
+                    Some(c) => c,
+                    None => return false,
+                };
+                stack.push(match (a, b) {
+                    (Cell::Const(x), Cell::Const(y)) => Cell::Const(x & y),
+                    _ => Cell::Dyn,
+                });
+            }
+            Op::BitOr => {
+                let b = match stack.pop() {
+                    Some(c) => c,
+                    None => return false,
+                };
+                let a = match stack.pop() {
+                    Some(c) => c,
+                    None => return false,
+                };
+                stack.push(match (a, b) {
+                    (Cell::Const(x), Cell::Const(y)) => Cell::Const(x | y),
+                    _ => Cell::Dyn,
+                });
+            }
             Op::BitNot => {
                 let a = match stack.pop() {
                     Some(c) => c,
@@ -334,9 +380,9 @@ fn validate_linear(ops: &[Op]) -> bool {
     stack.len() == 1
 }
 
-fn compile_linear(ops: &[Op]) -> Option<LinearJit> {
+fn compile_linear(ops: &[Op], constants: &[PerlValue]) -> Option<LinearJit> {
     let seq = ops_before_halt(ops);
-    if !validate_linear(ops) {
+    if !validate_linear(ops, constants) {
         return None;
     }
     let needs_slots = seq.iter().any(|o| matches!(o, Op::GetScalarSlot(_)));
@@ -392,6 +438,13 @@ fn compile_linear(ops: &[Op]) -> Option<LinearJit> {
                     let v = bcx.ins().iconst(types::I64, *n);
                     stack.push(v);
                 }
+                Op::LoadConst(idx) => {
+                    let n = constants
+                        .get(*idx as usize)
+                        .and_then(|pv| pv.as_integer())?;
+                    let v = bcx.ins().iconst(types::I64, n);
+                    stack.push(v);
+                }
                 Op::Add => {
                     let b = stack.pop()?;
                     let a = stack.pop()?;
@@ -441,6 +494,16 @@ fn compile_linear(ops: &[Op]) -> Option<LinearJit> {
                     let b = stack.pop()?;
                     let a = stack.pop()?;
                     stack.push(bcx.ins().bxor(a, b));
+                }
+                Op::BitAnd => {
+                    let b = stack.pop()?;
+                    let a = stack.pop()?;
+                    stack.push(bcx.ins().band(a, b));
+                }
+                Op::BitOr => {
+                    let b = stack.pop()?;
+                    let a = stack.pop()?;
+                    stack.push(bcx.ins().bor(a, b));
                 }
                 Op::BitNot => {
                     let a = stack.pop()?;
@@ -520,8 +583,15 @@ pub(crate) fn linear_slot_ops_max_index(ops: &[Op]) -> Option<u8> {
 /// When the sequence contains [`Op::GetScalarSlot`], pass `Some` slice whose length is
 /// `max(slot_index) + 1` and whose `i` entries are the slot values as `i64` (same as
 /// [`PerlValue::as_integer`]).
-pub(crate) fn try_run_linear_ops(ops: &[Op], slot_i64: Option<&[i64]>) -> Option<PerlValue> {
-    if !validate_linear(ops) {
+///
+/// `constants` must be the chunk’s constant pool: [`Op::LoadConst`] is only JIT’d when
+/// `constants[idx]` is materializable as `i64` via [`PerlValue::as_integer`].
+pub(crate) fn try_run_linear_ops(
+    ops: &[Op],
+    slot_i64: Option<&[i64]>,
+    constants: &[PerlValue],
+) -> Option<PerlValue> {
+    if !validate_linear(ops, constants) {
         return None;
     }
     let seq = ops_before_halt(ops);
@@ -533,7 +603,7 @@ pub(crate) fn try_run_linear_ops(ops: &[Op], slot_i64: Option<&[i64]>) -> Option
         }
     }
 
-    let key = hash_ops(ops);
+    let key = hash_ops(ops, constants);
     let slot_ptr = slot_i64.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     {
         let guard = cache().lock().ok()?;
@@ -543,7 +613,7 @@ pub(crate) fn try_run_linear_ops(ops: &[Op], slot_i64: Option<&[i64]>) -> Option
         }
     }
 
-    let jit = compile_linear(ops)?;
+    let jit = compile_linear(ops, constants)?;
     let n = jit.invoke(slot_ptr);
     let pv = PerlValue::integer(n);
 
@@ -559,6 +629,7 @@ pub(crate) fn try_run_linear_ops(ops: &[Op], slot_i64: Option<&[i64]>) -> Option
 mod tests {
     use super::*;
     use crate::bytecode::Chunk;
+    use crate::value::PerlValue;
 
     #[test]
     fn jit_add_mul_chain() {
@@ -570,7 +641,7 @@ mod tests {
             Op::Mul,
             Op::Halt,
         ];
-        let v = try_run_linear_ops(&ops, None).expect("jit");
+        let v = try_run_linear_ops(&ops, None, &[]).expect("jit");
         assert_eq!(v.to_int(), 9);
     }
 
@@ -583,21 +654,21 @@ mod tests {
             Op::Negate,
             Op::Halt,
         ];
-        let v = try_run_linear_ops(&ops, None).expect("jit");
+        let v = try_run_linear_ops(&ops, None, &[]).expect("jit");
         assert_eq!(v.to_int(), -7);
     }
 
     #[test]
     fn jit_rejects_slot_without_buffer() {
         let ops = vec![Op::LoadInt(1), Op::GetScalarSlot(0), Op::Add, Op::Halt];
-        assert!(try_run_linear_ops(&ops, None).is_none());
+        assert!(try_run_linear_ops(&ops, None, &[]).is_none());
     }
 
     #[test]
     fn jit_get_scalar_slot_add() {
         let ops = vec![Op::GetScalarSlot(0), Op::LoadInt(1), Op::Add, Op::Halt];
         let slots = [41i64];
-        let v = try_run_linear_ops(&ops, Some(&slots)).expect("jit");
+        let v = try_run_linear_ops(&ops, Some(&slots), &[]).expect("jit");
         assert_eq!(v.to_int(), 42);
     }
 
@@ -609,7 +680,7 @@ mod tests {
             Op::BitXor,
             Op::Halt,
         ];
-        assert_eq!(try_run_linear_ops(&ops, None).expect("jit").to_int(), 0xFF);
+        assert_eq!(try_run_linear_ops(&ops, None, &[]).expect("jit").to_int(), 0xFF);
     }
 
     #[test]
@@ -620,48 +691,81 @@ mod tests {
             Op::Shl,
             Op::Halt,
         ];
-        assert_eq!(try_run_linear_ops(&shl, None).expect("jit").to_int(), 4);
+        assert_eq!(try_run_linear_ops(&shl, None, &[]).expect("jit").to_int(), 4);
         let shr = vec![
             Op::LoadInt(-16),
             Op::LoadInt(2),
             Op::Shr,
             Op::Halt,
         ];
-        assert_eq!(try_run_linear_ops(&shr, None).expect("jit").to_int(), -4);
+        assert_eq!(try_run_linear_ops(&shr, None, &[]).expect("jit").to_int(), -4);
     }
 
     #[test]
     fn jit_bit_not() {
         let ops = vec![Op::LoadInt(0), Op::BitNot, Op::Halt];
-        assert_eq!(try_run_linear_ops(&ops, None).expect("jit").to_int(), !0i64);
+        assert_eq!(try_run_linear_ops(&ops, None, &[]).expect("jit").to_int(), !0i64);
     }
 
     #[test]
     fn jit_rejects_inexact_div() {
-        assert!(try_run_linear_ops(&[Op::LoadInt(1), Op::LoadInt(2), Op::Div, Op::Halt], None).is_none());
-        assert!(try_run_linear_ops(&[Op::LoadInt(10), Op::LoadInt(3), Op::Div, Op::Halt], None).is_none());
+        assert!(try_run_linear_ops(&[Op::LoadInt(1), Op::LoadInt(2), Op::Div, Op::Halt], None, &[]).is_none());
+        assert!(try_run_linear_ops(&[Op::LoadInt(10), Op::LoadInt(3), Op::Div, Op::Halt], None, &[]).is_none());
     }
 
     #[test]
     fn jit_exact_div_mod_and_pow() {
         assert_eq!(
-            try_run_linear_ops(&[Op::LoadInt(10), Op::LoadInt(2), Op::Div, Op::Halt], None)
+            try_run_linear_ops(&[Op::LoadInt(10), Op::LoadInt(2), Op::Div, Op::Halt], None, &[])
                 .expect("jit")
                 .to_int(),
             5
         );
         assert_eq!(
-            try_run_linear_ops(&[Op::LoadInt(10), Op::LoadInt(3), Op::Mod, Op::Halt], None)
+            try_run_linear_ops(&[Op::LoadInt(10), Op::LoadInt(3), Op::Mod, Op::Halt], None, &[])
                 .expect("jit")
                 .to_int(),
             1
         );
         assert_eq!(
-            try_run_linear_ops(&[Op::LoadInt(2), Op::LoadInt(3), Op::Pow, Op::Halt], None)
+            try_run_linear_ops(&[Op::LoadInt(2), Op::LoadInt(3), Op::Pow, Op::Halt], None, &[])
                 .expect("jit")
                 .to_int(),
             8
         );
+    }
+
+    #[test]
+    fn jit_load_const_add() {
+        let pool = [PerlValue::integer(40)];
+        let ops = vec![Op::LoadConst(0), Op::LoadInt(2), Op::Add, Op::Halt];
+        let v = try_run_linear_ops(&ops, None, &pool).expect("jit");
+        assert_eq!(v.to_int(), 42);
+    }
+
+    #[test]
+    fn jit_rejects_non_integer_load_const() {
+        let pool = [PerlValue::string("x".into())];
+        let ops = vec![Op::LoadConst(0), Op::Halt];
+        assert!(try_run_linear_ops(&ops, None, &pool).is_none());
+    }
+
+    #[test]
+    fn jit_bit_and_or() {
+        let and = vec![
+            Op::LoadInt(0b1100),
+            Op::LoadInt(0b1010),
+            Op::BitAnd,
+            Op::Halt,
+        ];
+        assert_eq!(try_run_linear_ops(&and, None, &[]).expect("jit").to_int(), 0b1000);
+        let or = vec![
+            Op::LoadInt(0b1100),
+            Op::LoadInt(0b1010),
+            Op::BitOr,
+            Op::Halt,
+        ];
+        assert_eq!(try_run_linear_ops(&or, None, &[]).expect("jit").to_int(), 0b1110);
     }
 
     #[test]
@@ -671,6 +775,23 @@ mod tests {
 
         let mut c = Chunk::new();
         c.emit(Op::LoadInt(40), 1);
+        c.emit(Op::LoadInt(2), 1);
+        c.emit(Op::Add, 1);
+        c.emit(Op::Halt, 1);
+        let mut interp = Interpreter::new();
+        let mut vm = VM::new(&c, &mut interp);
+        let v = vm.execute().expect("vm");
+        assert_eq!(v.to_int(), 42);
+    }
+
+    #[test]
+    fn vm_chunk_uses_jit_with_integer_load_const() {
+        use crate::interpreter::Interpreter;
+        use crate::vm::VM;
+
+        let mut c = Chunk::new();
+        let idx = c.add_constant(PerlValue::integer(40));
+        c.emit(Op::LoadConst(idx), 1);
         c.emit(Op::LoadInt(2), 1);
         c.emit(Op::Add, 1);
         c.emit(Op::Halt, 1);

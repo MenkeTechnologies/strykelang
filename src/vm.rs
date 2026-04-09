@@ -262,7 +262,7 @@ impl<'a> VM<'a> {
             Some(v)
         });
 
-        if let Some(v) = crate::jit::try_run_linear_ops(ops, slot_buf.as_deref()) {
+        if let Some(v) = crate::jit::try_run_linear_ops(ops, slot_buf.as_deref(), constants) {
             return Ok(v);
         }
 
@@ -1116,11 +1116,26 @@ impl<'a> VM<'a> {
                     }
                     args.reverse();
                     let mut output = String::new();
-                    for (i, arg) in args.iter().enumerate() {
-                        if i > 0 && !self.interp.ofs.is_empty() {
-                            output.push_str(&self.interp.ofs);
+                    if args.is_empty() {
+                        let topic = self.interp.scope.get_scalar("_").clone();
+                        let s = match self.interp.stringify_value(topic, self.line()) {
+                            Ok(s) => s,
+                            Err(FlowOrError::Error(e)) => return Err(e),
+                            Err(FlowOrError::Flow(_)) => {
+                                return Err(PerlError::runtime(
+                                    "print: unexpected control flow",
+                                    self.line(),
+                                ));
+                            }
+                        };
+                        output.push_str(&s);
+                    } else {
+                        for (i, arg) in args.iter().enumerate() {
+                            if i > 0 && !self.interp.ofs.is_empty() {
+                                output.push_str(&self.interp.ofs);
+                            }
+                            output.push_str(&arg.to_string());
                         }
-                        output.push_str(&arg.to_string());
                     }
                     output.push_str(&self.interp.ors);
                     print!("{}", output);
@@ -1143,11 +1158,26 @@ impl<'a> VM<'a> {
                     }
                     args.reverse();
                     let mut output = String::new();
-                    for (i, arg) in args.iter().enumerate() {
-                        if i > 0 && !self.interp.ofs.is_empty() {
-                            output.push_str(&self.interp.ofs);
+                    if args.is_empty() {
+                        let topic = self.interp.scope.get_scalar("_").clone();
+                        let s = match self.interp.stringify_value(topic, self.line()) {
+                            Ok(s) => s,
+                            Err(FlowOrError::Error(e)) => return Err(e),
+                            Err(FlowOrError::Flow(_)) => {
+                                return Err(PerlError::runtime(
+                                    "say: unexpected control flow",
+                                    self.line(),
+                                ));
+                            }
+                        };
+                        output.push_str(&s);
+                    } else {
+                        for (i, arg) in args.iter().enumerate() {
+                            if i > 0 && !self.interp.ofs.is_empty() {
+                                output.push_str(&self.interp.ofs);
+                            }
+                            output.push_str(&arg.to_string());
                         }
-                        output.push_str(&arg.to_string());
                     }
                     output.push('\n');
                     print!("{}", output);
@@ -2148,11 +2178,24 @@ impl<'a> VM<'a> {
             }
             Some(BuiltinId::Unshift) => Ok(PerlValue::integer(0)),
             Some(BuiltinId::Printf) => {
-                if args.is_empty() {
-                    return Ok(PerlValue::integer(1));
-                }
-                let fmt = args[0].to_string();
-                let rest = &args[1..];
+                let (fmt, rest): (String, &[PerlValue]) = if args.is_empty() {
+                    let s = match self
+                        .interp
+                        .stringify_value(self.interp.scope.get_scalar("_").clone(), line)
+                    {
+                        Ok(s) => s,
+                        Err(FlowOrError::Error(e)) => return Err(e),
+                        Err(FlowOrError::Flow(_)) => {
+                            return Err(PerlError::runtime(
+                                "printf: unexpected control flow",
+                                line,
+                            ));
+                        }
+                    };
+                    (s, &[])
+                } else {
+                    (args[0].to_string(), &args[1..])
+                };
                 let out = match self.interp.perl_sprintf_stringify(&fmt, rest, line) {
                     Ok(s) => s,
                     Err(FlowOrError::Error(e)) => return Err(e),
