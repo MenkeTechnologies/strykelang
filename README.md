@@ -34,7 +34,7 @@
 
 ### Runtime values
 
-`PerlValue` is a **NaN-boxed** `u64`: immediates (`undef`, inline `i32`, raw non-NaN `f64` bits) and tagged **heap** pointers (`Arc<HeapObject>`) for oversized integers, boxed floats, strings, arrays, hashes, refs, regexes, atomics, channels, etc. The public API uses constructors (`PerlValue::integer`, `::string`, …) and accessors (`as_integer`, `as_str`, `as_array_vec`, `with_heap`, `heap_arc`, …)—not `match` on constructor names, which are plain functions and cannot appear in patterns. Heap payloads use reference counting; `Clone`/`Drop`/`Display` are implemented for the boxed layout. Profile hot paths if you tune performance: dispatch and allocation still dominate many workloads.
+`PerlValue` is a **NaN-boxed** `u64`: immediates (`undef`, inline `i32`, raw non-NaN `f64` bits) and tagged **heap** pointers (`Arc<HeapObject>`) for oversized integers, boxed floats, strings, arrays, hashes, refs, regexes, atomics, channels, etc. The public API uses constructors (`PerlValue::integer`, `::string`, …) and accessors (`as_integer`, `as_str`, `as_array_vec`, `with_heap`, …)—not `match` on constructor names, which are plain functions and cannot appear in patterns. Read-only heap access uses `with_heap` / `heap_ref` (borrow through the stored `Arc::into_raw` pointer without refcount churn); `heap_arc` / `Clone` still bump the `Arc` when an owned handle is needed. `Drop` decrements via `Arc::from_raw`. Profile hot paths if you tune performance: dispatch and allocation still dominate many workloads.
 
 ---
 
