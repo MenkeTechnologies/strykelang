@@ -322,4 +322,10 @@ mod tests {
         assert!(matches!(keyword_or_ident("gt"), Token::StrGt));
         assert!(matches!(keyword_or_ident("ge"), Token::StrGe));
     }
+
+    #[test]
+    fn keyword_or_ident_string_le_ne() {
+        assert!(matches!(keyword_or_ident("le"), Token::StrLe));
+        assert!(matches!(keyword_or_ident("ne"), Token::StrNe));
+    }
 }

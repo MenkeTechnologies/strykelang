@@ -1166,4 +1166,19 @@ mod tests {
         assert!(matches!(t[1].0, Token::Range));
         assert!(matches!(t[2].0, Token::Integer(4)));
     }
+
+    #[test]
+    fn tokenize_numeric_equality_operators() {
+        let mut l = Lexer::new("1 == 2");
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[0].0, Token::Integer(1)));
+        assert!(matches!(t[1].0, Token::NumEq));
+        assert!(matches!(t[2].0, Token::Integer(2)));
+
+        let mut l = Lexer::new("3 != 4");
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[0].0, Token::Integer(3)));
+        assert!(matches!(t[1].0, Token::NumNe));
+        assert!(matches!(t[2].0, Token::Integer(4)));
+    }
 }

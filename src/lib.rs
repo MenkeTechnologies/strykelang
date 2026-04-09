@@ -174,4 +174,14 @@ mod tests {
     fn parse_do_string_eval_form() {
         parse(r#"do "foo.pl";"#).expect("do string");
     }
+
+    #[test]
+    fn parse_package_qualified_name() {
+        parse("package Foo::Bar::Baz;").expect("package ::");
+    }
+
+    #[test]
+    fn parse_my_multiple_declarations() {
+        parse("my ($a, $b, $c);").expect("my list");
+    }
 }

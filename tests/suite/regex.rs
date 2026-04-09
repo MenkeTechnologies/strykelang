@@ -6,6 +6,12 @@ fn regex_match() {
 }
 
 #[test]
+fn regex_negated_match_operator() {
+    assert_eq!(eval_int(r#"my $s = "abc"; $s !~ /xyz/ ? 1 : 0"#), 1);
+    assert_eq!(eval_int(r#"my $s = "abc"; $s !~ /a/ ? 1 : 0"#), 0);
+}
+
+#[test]
 fn regex_substitution() {
     assert_eq!(
         eval_string(r#"my $s = "foo bar"; $s =~ s/bar/baz/; $s"#),
