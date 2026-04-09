@@ -150,6 +150,14 @@ pub enum Op {
     SortWithBlock(u16),
     /// sort @list (no block) — stack: \[list\] → \[sorted\]
     SortNoBlock,
+    /// `{ $a <=> $b }` (0) or `{ $a cmp $b }` (1) — no block interpreter per compare
+    SortWithBlockFast(u8),
+    /// Parallel sort, same fast modes as [`Op::SortWithBlockFast`].
+    PSortWithBlockFast(u8),
+    /// `chomp` on assignable expr: stack has value → chomped count; uses `chunk.lvalues[idx]`.
+    ChompInPlace(u16),
+    /// `chop` on assignable expr: stack has value → chopped char; uses `chunk.lvalues[idx]`.
+    ChopInPlace(u16),
     /// reverse — stack: \[list\] → \[reversed\]
     ReverseOp,
     /// pmap { BLOCK } @list — block_idx; stack: \[list\] → \[mapped\]
@@ -318,11 +326,17 @@ pub enum BuiltinId {
     Ppool,
     /// Scalar/list context query (`wantarray`).
     Wantarray,
+    /// `rename OLD, NEW`
+    Rename,
+    /// `chmod MODE, ...`
+    Chmod,
+    /// `chown UID, GID, ...`
+    Chown,
 }
 
 impl BuiltinId {
     pub fn from_u16(v: u16) -> Option<Self> {
-        if v <= Self::Wantarray as u16 {
+        if v <= Self::Chown as u16 {
             Some(unsafe { std::mem::transmute::<u16, BuiltinId>(v) })
         } else {
             None
@@ -583,14 +597,14 @@ mod tests {
     fn builtin_id_from_u16_first_and_last() {
         assert_eq!(BuiltinId::from_u16(0), Some(BuiltinId::Length));
         assert_eq!(
-            BuiltinId::from_u16(BuiltinId::Wantarray as u16),
-            Some(BuiltinId::Wantarray)
+            BuiltinId::from_u16(BuiltinId::Chown as u16),
+            Some(BuiltinId::Chown)
         );
     }
 
     #[test]
     fn builtin_id_from_u16_out_of_range() {
-        assert_eq!(BuiltinId::from_u16(BuiltinId::Wantarray as u16 + 1), None);
+        assert_eq!(BuiltinId::from_u16(BuiltinId::Chown as u16 + 1), None);
         assert_eq!(BuiltinId::from_u16(u16::MAX), None);
     }
 

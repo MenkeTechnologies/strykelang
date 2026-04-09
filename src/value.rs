@@ -64,6 +64,8 @@ pub enum PerlValue {
     Integer(i64),
     Float(f64),
     String(String),
+    /// Raw bytes from `pack` / binary I/O (not guaranteed UTF-8).
+    Bytes(Arc<Vec<u8>>),
     Array(Vec<PerlValue>),
     Hash(IndexMap<String, PerlValue>),
     ArrayRef(Arc<RwLock<Vec<PerlValue>>>),
@@ -168,6 +170,7 @@ impl PerlValue {
                 buf.push_str(b.format(*n));
             }
             PerlValue::String(s) => buf.push_str(s),
+            PerlValue::Bytes(b) => buf.push_str(&String::from_utf8_lossy(b)),
             PerlValue::Atomic(arc) => arc.lock().append_to(buf),
             PerlValue::Set(s) => {
                 buf.push('{');
@@ -215,6 +218,7 @@ impl PerlValue {
             PerlValue::Integer(n) => *n != 0,
             PerlValue::Float(f) => *f != 0.0,
             PerlValue::String(s) => !s.is_empty() && s != "0",
+            PerlValue::Bytes(b) => !b.is_empty(),
             PerlValue::Array(a) => !a.is_empty(),
             PerlValue::Hash(h) => !h.is_empty(),
             PerlValue::Atomic(arc) => arc.lock().is_true(),
@@ -236,6 +240,7 @@ impl PerlValue {
             PerlValue::Integer(n) => *n as f64,
             PerlValue::Float(f) => *f,
             PerlValue::String(s) => parse_number(s),
+            PerlValue::Bytes(b) => b.len() as f64,
             PerlValue::Array(a) => a.len() as f64,
             PerlValue::Atomic(arc) => arc.lock().to_number(),
             PerlValue::Set(s) => s.len() as f64,
@@ -256,6 +261,7 @@ impl PerlValue {
             PerlValue::Integer(n) => *n,
             PerlValue::Float(f) => *f as i64,
             PerlValue::String(s) => parse_number(s) as i64,
+            PerlValue::Bytes(b) => b.len() as i64,
             PerlValue::Array(a) => a.len() as i64,
             PerlValue::Atomic(arc) => arc.lock().to_int(),
             PerlValue::Set(s) => s.len() as i64,
@@ -277,6 +283,7 @@ impl PerlValue {
             PerlValue::Integer(_) => "INTEGER",
             PerlValue::Float(_) => "FLOAT",
             PerlValue::String(_) => "STRING",
+            PerlValue::Bytes(_) => "BYTES",
             PerlValue::Array(_) => "ARRAY",
             PerlValue::Hash(_) => "HASH",
             PerlValue::ArrayRef(_) => "ARRAY",
@@ -316,6 +323,7 @@ impl PerlValue {
             PerlValue::Pipeline(_) => PerlValue::String("Pipeline".into()),
             PerlValue::Capture(_) => PerlValue::String("Capture".into()),
             PerlValue::Ppool(_) => PerlValue::String("Ppool".into()),
+            PerlValue::Bytes(_) => PerlValue::String("BYTES".into()),
             PerlValue::Blessed(b) => PerlValue::String(b.class.clone()),
             _ => PerlValue::String(String::new()),
         }
@@ -378,6 +386,7 @@ impl fmt::Display for PerlValue {
             PerlValue::Integer(n) => write!(f, "{n}"),
             PerlValue::Float(fl) => write!(f, "{}", format_float(*fl)),
             PerlValue::String(s) => f.write_str(s),
+            PerlValue::Bytes(b) => f.write_str(&String::from_utf8_lossy(b)),
             PerlValue::Array(a) => {
                 for v in a {
                     write!(f, "{v}")?;
@@ -428,6 +437,14 @@ pub fn set_member_key(v: &PerlValue) -> String {
         PerlValue::Integer(n) => format!("i:{n}"),
         PerlValue::Float(f) => format!("f:{}", f.to_bits()),
         PerlValue::String(s) => format!("s:{s}"),
+        PerlValue::Bytes(b) => {
+            use std::fmt::Write as _;
+            let mut h = String::with_capacity(b.len() * 2);
+            for &x in b.iter() {
+                let _ = write!(&mut h, "{:02x}", x);
+            }
+            format!("by:{h}")
+        }
         PerlValue::Array(a) => {
             let parts: Vec<_> = a.iter().map(set_member_key).collect();
             format!("a:{}", parts.join(","))
@@ -463,10 +480,10 @@ pub fn set_member_key(v: &PerlValue) -> String {
         }
         PerlValue::Blessed(b) => {
             let d = b.data.read();
-            format!("b:{}:{}", b.class, set_member_key(&*d))
+            format!("b:{}:{}", b.class, set_member_key(&d))
         }
-        PerlValue::ScalarRef(_) => format!("sr:{}", v.to_string()),
-        PerlValue::CodeRef(_) => format!("c:{}", v.to_string()),
+        PerlValue::ScalarRef(_) => format!("sr:{v}"),
+        PerlValue::CodeRef(_) => format!("c:{v}"),
         PerlValue::Regex(_, src) => format!("r:{src}"),
         PerlValue::IOHandle(s) => format!("io:{s}"),
         PerlValue::Atomic(arc) => format!("at:{}", set_member_key(&arc.lock())),

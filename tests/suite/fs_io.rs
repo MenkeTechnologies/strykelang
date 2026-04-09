@@ -21,3 +21,38 @@ fn unlink_returns_zero_for_missing_file() {
         0
     );
 }
+
+#[test]
+fn rename_moves_file() {
+    let dir: PathBuf =
+        std::env::temp_dir().join(format!("perlrs_itest_rename_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let a = dir.join("a");
+    let b = dir.join("b");
+    std::fs::write(&a, "x").unwrap();
+    let pa = a.to_str().expect("utf-8");
+    let pb = b.to_str().expect("utf-8");
+    let code = format!(r#"rename("{pa}", "{pb}"); (-e "{pb}" ? 1 : 0)"#);
+    assert_eq!(eval_int(&code), 1);
+    assert!(!a.exists());
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[cfg(unix)]
+#[test]
+fn chmod_sets_mode() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir: PathBuf =
+        std::env::temp_dir().join(format!("perlrs_itest_chmod_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let f = dir.join("f");
+    std::fs::write(&f, "x").unwrap();
+    let pf = f.to_str().expect("utf-8");
+    let code = format!(r#"chmod(0600, "{pf}")"#);
+    assert_eq!(eval_int(&code), 1);
+    let m = std::fs::metadata(&f).unwrap();
+    assert_eq!(m.permissions().mode() & 0o777, 0o600);
+    std::fs::remove_dir_all(&dir).ok();
+}

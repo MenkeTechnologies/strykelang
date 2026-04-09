@@ -178,6 +178,75 @@ fn normalize_glob_path_display(s: String) -> String {
     }
 }
 
+/// `rename OLD, NEW` — 1 on success, 0 on failure (Perl-style).
+pub fn rename_paths(old: &str, new: &str) -> PerlValue {
+    PerlValue::Integer(if std::fs::rename(old, new).is_ok() {
+        1
+    } else {
+        0
+    })
+}
+
+/// `chmod MODE, FILES...` — count of files successfully chmod'd.
+pub fn chmod_paths(paths: &[String], mode: i64) -> i64 {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut count = 0i64;
+        for path in paths {
+            if let Ok(meta) = std::fs::metadata(path) {
+                let mut perms = meta.permissions();
+                let old = perms.mode();
+                // Perl passes permission bits (e.g. 0644); preserve st_mode file-type bits.
+                perms.set_mode((old & !0o777) | (mode as u32 & 0o777));
+                if std::fs::set_permissions(path, perms).is_ok() {
+                    count += 1;
+                }
+            }
+        }
+        count
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (paths, mode);
+        0
+    }
+}
+
+/// `chown UID, GID, FILES...` — count of files successfully chown'd (Unix only; 0 on non-Unix).
+pub fn chown_paths(paths: &[String], uid: i64, gid: i64) -> i64 {
+    #[cfg(unix)]
+    {
+        use std::ffi::CString;
+        let u = if uid < 0 {
+            (!0u32) as libc::uid_t
+        } else {
+            uid as libc::uid_t
+        };
+        let g = if gid < 0 {
+            (!0u32) as libc::gid_t
+        } else {
+            gid as libc::gid_t
+        };
+        let mut count = 0i64;
+        for path in paths {
+            let Ok(c) = CString::new(path.as_str()) else {
+                continue;
+            };
+            let r = unsafe { libc::chown(c.as_ptr(), u, g) };
+            if r == 0 {
+                count += 1;
+            }
+        }
+        count
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (paths, uid, gid);
+        0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -197,8 +266,8 @@ mod tests {
 
         // Absolute patterns only — never `set_current_dir`; other tests run in parallel.
         let pat = format!("{}/**/*.log", base.display());
-        let a = glob_patterns(&[pat.clone()]);
-        let b = glob_par_patterns(&[pat]);
+        let a = glob_patterns(std::slice::from_ref(&pat));
+        let b = glob_par_patterns(std::slice::from_ref(&pat));
         let _ = std::fs::remove_dir_all(&base);
 
         let set_a: HashSet<String> = match a {

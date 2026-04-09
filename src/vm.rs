@@ -9,6 +9,7 @@ use rayon::prelude::*;
 use caseless::default_case_fold_str;
 
 use crate::ast::{Block, Expr};
+use crate::sort_fast::{sort_magic_cmp, SortBlockFast};
 use crate::bytecode::{BuiltinId, Chunk, Op};
 use crate::error::{ErrorKind, PerlError, PerlResult};
 use crate::interpreter::{Flow, FlowOrError, Interpreter};
@@ -732,6 +733,10 @@ impl<'a> VM<'a> {
                         self.interp.scope.declare_array("_", args);
                         // Jump to sub entry
                         self.ip = entry_ip;
+                    } else if let Some(r) =
+                        crate::builtins::try_builtin(self.interp, &name, &args, self.line())
+                    {
+                        self.push(r?);
                     } else if let Some(sub) = self.interp.subs.get(&name).cloned() {
                         // Fall back to tree-walker for non-compiled subs
                         self.interp.scope.push_frame();
@@ -934,6 +939,30 @@ impl<'a> VM<'a> {
                         Err(FlowOrError::Error(e)) => return Err(e),
                         Err(FlowOrError::Flow(_)) => {
                             return Err(PerlError::runtime("unexpected flow in tr///", line));
+                        }
+                    }
+                }
+                Op::ChompInPlace(lvalue_idx) => {
+                    let val = self.pop();
+                    let target = &self.lvalues[*lvalue_idx as usize];
+                    let line = self.line();
+                    match self.interp.chomp_inplace_execute(val, target) {
+                        Ok(v) => self.push(v),
+                        Err(FlowOrError::Error(e)) => return Err(e),
+                        Err(FlowOrError::Flow(_)) => {
+                            return Err(PerlError::runtime("unexpected flow in chomp", line));
+                        }
+                    }
+                }
+                Op::ChopInPlace(lvalue_idx) => {
+                    let val = self.pop();
+                    let target = &self.lvalues[*lvalue_idx as usize];
+                    let line = self.line();
+                    match self.interp.chop_inplace_execute(val, target) {
+                        Ok(v) => self.push(v),
+                        Err(FlowOrError::Error(e)) => return Err(e),
+                        Err(FlowOrError::Flow(_)) => {
+                            return Err(PerlError::runtime("unexpected flow in chop", line));
                         }
                     }
                 }
@@ -1199,6 +1228,16 @@ impl<'a> VM<'a> {
                     });
                     self.push(PerlValue::Array(items));
                 }
+                Op::SortWithBlockFast(tag) => {
+                    let mut items = self.pop().to_list();
+                    let mode = if *tag == 0 {
+                        SortBlockFast::Numeric
+                    } else {
+                        SortBlockFast::String
+                    };
+                    items.sort_by(|a, b| sort_magic_cmp(a, b, mode));
+                    self.push(PerlValue::Array(items));
+                }
                 Op::SortNoBlock => {
                     let mut items = self.pop().to_list();
                     items.sort_by_key(|a| a.to_string());
@@ -1320,6 +1359,16 @@ impl<'a> VM<'a> {
                     });
                     self.push(PerlValue::Array(items));
                 }
+                Op::PSortWithBlockFast(tag) => {
+                    let mut items = self.pop().to_list();
+                    let mode = if *tag == 0 {
+                        SortBlockFast::Numeric
+                    } else {
+                        SortBlockFast::String
+                    };
+                    items.par_sort_by(|a, b| sort_magic_cmp(a, b, mode));
+                    self.push(PerlValue::Array(items));
+                }
                 Op::FanWithBlock(block_idx) => {
                     let n = self.pop().to_int().max(0) as usize;
                     let block = self.blocks[*block_idx as usize].clone();
@@ -1410,6 +1459,7 @@ impl<'a> VM<'a> {
                 Ok(match val {
                     PerlValue::Array(a) => PerlValue::Integer(a.len() as i64),
                     PerlValue::Hash(h) => PerlValue::Integer(h.len() as i64),
+                    PerlValue::Bytes(b) => PerlValue::Integer(b.len() as i64),
                     other => PerlValue::Integer(other.to_string().len() as i64),
                 })
             }
@@ -1766,12 +1816,39 @@ impl<'a> VM<'a> {
                 Ok(PerlValue::Integer(1))
             }
             Some(BuiltinId::Open) => {
-                // Simplified — delegate to interpreter
-                Ok(PerlValue::Integer(1))
+                if args.len() < 2 {
+                    return Err(PerlError::runtime(
+                        "open requires at least 2 arguments",
+                        line,
+                    ));
+                }
+                let handle_name = args[0].to_string();
+                let mode_s = args[1].to_string();
+                let file_opt = args.get(2).map(|v| v.to_string());
+                self.interp
+                    .open_builtin_execute(handle_name, mode_s, file_opt, line)
             }
-            Some(BuiltinId::Close) => Ok(PerlValue::Integer(1)),
-            Some(BuiltinId::Eof) => Ok(PerlValue::Integer(0)),
-            Some(BuiltinId::ReadLine) => Ok(PerlValue::Undef),
+            Some(BuiltinId::Close) => {
+                let name = args.into_iter().next().unwrap_or(PerlValue::Undef).to_string();
+                self.interp.close_builtin_execute(name)
+            }
+            Some(BuiltinId::Eof) => {
+                if args.is_empty() {
+                    Ok(PerlValue::Integer(0))
+                } else {
+                    let name = args[0].to_string();
+                    let at_eof = !self.interp.has_input_handle(&name);
+                    Ok(PerlValue::Integer(if at_eof { 1 } else { 0 }))
+                }
+            }
+            Some(BuiltinId::ReadLine) => {
+                let h = if args.is_empty() {
+                    None
+                } else {
+                    Some(args[0].to_string())
+                };
+                self.interp.readline_builtin_execute(h.as_deref())
+            }
             Some(BuiltinId::Exec) => {
                 let cmd = args
                     .iter()
@@ -1814,6 +1891,28 @@ impl<'a> VM<'a> {
                     }
                 }
                 Ok(PerlValue::Integer(count))
+            }
+            Some(BuiltinId::Rename) => {
+                let old = args.first().map(|v| v.to_string()).unwrap_or_default();
+                let new = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+                Ok(crate::perl_fs::rename_paths(&old, &new))
+            }
+            Some(BuiltinId::Chmod) => {
+                if args.is_empty() {
+                    return Ok(PerlValue::Integer(0));
+                }
+                let mode = args[0].to_int();
+                let paths: Vec<String> = args.iter().skip(1).map(|v| v.to_string()).collect();
+                Ok(PerlValue::Integer(crate::perl_fs::chmod_paths(&paths, mode)))
+            }
+            Some(BuiltinId::Chown) => {
+                if args.len() < 3 {
+                    return Ok(PerlValue::Integer(0));
+                }
+                let uid = args[0].to_int();
+                let gid = args[1].to_int();
+                let paths: Vec<String> = args.iter().skip(2).map(|v| v.to_string()).collect();
+                Ok(PerlValue::Integer(crate::perl_fs::chown_paths(&paths, uid, gid)))
             }
             Some(BuiltinId::Stat) => {
                 let path = args.first().map(|v| v.to_string()).unwrap_or_default();

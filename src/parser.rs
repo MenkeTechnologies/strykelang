@@ -3022,6 +3022,45 @@ impl Parser {
                     line,
                 })
             }
+            "rename" => {
+                let args = self.parse_builtin_args()?;
+                if args.len() != 2 {
+                    return Err(PerlError::syntax("rename requires two arguments", line));
+                }
+                Ok(Expr {
+                    kind: ExprKind::Rename {
+                        old: Box::new(args[0].clone()),
+                        new: Box::new(args[1].clone()),
+                    },
+                    line,
+                })
+            }
+            "chmod" => {
+                let args = self.parse_builtin_args()?;
+                if args.len() < 2 {
+                    return Err(PerlError::syntax(
+                        "chmod requires mode and at least one file",
+                        line,
+                    ));
+                }
+                Ok(Expr {
+                    kind: ExprKind::Chmod(args),
+                    line,
+                })
+            }
+            "chown" => {
+                let args = self.parse_builtin_args()?;
+                if args.len() < 3 {
+                    return Err(PerlError::syntax(
+                        "chown requires uid, gid, and at least one file",
+                        line,
+                    ));
+                }
+                Ok(Expr {
+                    kind: ExprKind::Chown(args),
+                    line,
+                })
+            }
             "stat" => {
                 let args = self.parse_builtin_args()?;
                 if args.len() != 1 {

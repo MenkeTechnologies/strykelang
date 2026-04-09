@@ -546,6 +546,14 @@ pub enum ExprKind {
         mode: Option<Box<Expr>>,
     },
     Unlink(Vec<Expr>),
+    Rename {
+        old: Box<Expr>,
+        new: Box<Expr>,
+    },
+    /// `chmod MODE, @files` — first expr is mode, rest are paths.
+    Chmod(Vec<Expr>),
+    /// `chown UID, GID, @files` — first two are uid/gid, rest are paths.
+    Chown(Vec<Expr>),
 
     Stat(Box<Expr>),
     Lstat(Box<Expr>),

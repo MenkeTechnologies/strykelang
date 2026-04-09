@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use crate::ast::*;
 use crate::bytecode::{BuiltinId, Chunk, Op};
+use crate::sort_fast::detect_sort_block_fast;
 use crate::value::PerlValue;
 
 /// Compilation error — triggers fallback to tree-walker.
@@ -1219,9 +1220,15 @@ impl Compiler {
                 self.chunk
                     .emit(Op::CallBuiltin(BuiltinId::Length as u16, 1), line);
             }
-            ExprKind::Chomp(_) | ExprKind::Chop(_) => {
-                // chomp/chop modify variables in-place; needs special VM support
-                return Err(CompileError::Unsupported("chomp/chop".into()));
+            ExprKind::Chomp(e) => {
+                self.compile_expr(e)?;
+                let lv = self.chunk.add_lvalue_expr(e.as_ref().clone());
+                self.chunk.emit(Op::ChompInPlace(lv), line);
+            }
+            ExprKind::Chop(e) => {
+                self.compile_expr(e)?;
+                let lv = self.chunk.add_lvalue_expr(e.as_ref().clone());
+                self.chunk.emit(Op::ChopInPlace(lv), line);
             }
             ExprKind::Defined(e) => {
                 self.compile_expr(e)?;
@@ -1604,6 +1611,30 @@ impl Compiler {
                     line,
                 );
             }
+            ExprKind::Rename { old, new } => {
+                self.compile_expr(old)?;
+                self.compile_expr(new)?;
+                self.chunk
+                    .emit(Op::CallBuiltin(BuiltinId::Rename as u16, 2), line);
+            }
+            ExprKind::Chmod(args) => {
+                for a in args {
+                    self.compile_expr(a)?;
+                }
+                self.chunk.emit(
+                    Op::CallBuiltin(BuiltinId::Chmod as u16, args.len() as u8),
+                    line,
+                );
+            }
+            ExprKind::Chown(args) => {
+                for a in args {
+                    self.compile_expr(a)?;
+                }
+                self.chunk.emit(
+                    Op::CallBuiltin(BuiltinId::Chown as u16, args.len() as u8),
+                    line,
+                );
+            }
             ExprKind::Stat(e) => {
                 self.compile_expr(e)?;
                 self.chunk
@@ -1936,8 +1967,16 @@ impl Compiler {
             ExprKind::SortExpr { cmp, list } => {
                 self.compile_expr(list)?;
                 if let Some(block) = cmp {
-                    let block_idx = self.chunk.add_block(block.clone());
-                    self.chunk.emit(Op::SortWithBlock(block_idx), line);
+                    if let Some(mode) = detect_sort_block_fast(block) {
+                        let tag = match mode {
+                            crate::sort_fast::SortBlockFast::Numeric => 0u8,
+                            crate::sort_fast::SortBlockFast::String => 1u8,
+                        };
+                        self.chunk.emit(Op::SortWithBlockFast(tag), line);
+                    } else {
+                        let block_idx = self.chunk.add_block(block.clone());
+                        self.chunk.emit(Op::SortWithBlock(block_idx), line);
+                    }
                 } else {
                     self.chunk.emit(Op::SortNoBlock, line);
                 }
@@ -1965,8 +2004,16 @@ impl Compiler {
             ExprKind::PSortExpr { cmp, list } => {
                 self.compile_expr(list)?;
                 if let Some(block) = cmp {
-                    let block_idx = self.chunk.add_block(block.clone());
-                    self.chunk.emit(Op::PSortWithBlock(block_idx), line);
+                    if let Some(mode) = detect_sort_block_fast(block) {
+                        let tag = match mode {
+                            crate::sort_fast::SortBlockFast::Numeric => 0u8,
+                            crate::sort_fast::SortBlockFast::String => 1u8,
+                        };
+                        self.chunk.emit(Op::PSortWithBlockFast(tag), line);
+                    } else {
+                        let block_idx = self.chunk.add_block(block.clone());
+                        self.chunk.emit(Op::PSortWithBlock(block_idx), line);
+                    }
                 } else {
                     self.chunk.emit(Op::SortNoBlock, line);
                 }
@@ -2199,6 +2246,19 @@ mod tests {
             chunk.ops
         );
         assert!(!chunk.lvalues.is_empty());
+    }
+
+    #[test]
+    fn compile_chomp_emits_chomp_in_place() {
+        let chunk = compile_snippet(r#"my $s = "x\n"; chomp $s;"#).expect("compile");
+        assert!(
+            chunk
+                .ops
+                .iter()
+                .any(|o| matches!(o, Op::ChompInPlace(_))),
+            "expected ChompInPlace, got {:?}",
+            chunk.ops
+        );
     }
 
     #[test]

@@ -189,10 +189,10 @@ fn worker_loop(job_rx: Receiver<PoolJob>, result_tx: Sender<(u64, PerlValue)>) {
 /// Create a pool with `workers` OS threads (clamped to 1..=256). Each thread runs jobs
 /// sequentially; new [`Interpreter`] values are constructed per job (cheap vs thread spawn).
 pub fn create_pool(workers: usize) -> PerlResult<PerlValue> {
-    let workers = workers.max(1).min(256);
+    let workers = workers.clamp(1, 256);
     let (job_tx, job_rx): (Sender<PoolJob>, Receiver<PoolJob>) = unbounded();
-    let (result_tx, result_rx): (Sender<(u64, PerlValue)>, Receiver<(u64, PerlValue)>) =
-        unbounded();
+    type ResultMsg = (u64, PerlValue);
+    let (result_tx, result_rx): (Sender<ResultMsg>, Receiver<ResultMsg>) = unbounded();
 
     let mut handles = Vec::with_capacity(workers);
     for _ in 0..workers {

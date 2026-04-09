@@ -9,7 +9,7 @@ static TRACE_ENABLED: AtomicBool = AtomicBool::new(false);
 
 thread_local! {
     /// Fan / parallel worker label (`$_` index). `None` when not inside a labeled parallel block.
-    static WORKER_INDEX: Cell<Option<i64>> = Cell::new(None);
+    static WORKER_INDEX: Cell<Option<i64>> = const { Cell::new(None) };
 }
 
 /// Begin a `trace { ... }` region (all threads see the same flag).

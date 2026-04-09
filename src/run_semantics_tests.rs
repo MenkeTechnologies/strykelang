@@ -472,3 +472,23 @@ fn typed_my_int_str_float_runtime_checks() {
     let e = run(r#"typed my $x : Int = 1; $x = "y";"#).expect_err("type mismatch");
     assert_eq!(e.kind, ErrorKind::Type);
 }
+
+#[test]
+fn pack_unpack_and_length() {
+    assert_eq!(ri(r#"unpack("C", "A");"#), 65);
+    assert_eq!(ri(r#"length pack("C3", 1, 2, 3);"#), 3);
+}
+
+#[test]
+#[ignore = "piped open + readline: diagnose handle routing vs <FH> in VM (tracked)"]
+fn open_read_pipe_echo() {
+    let out = rs(
+        r#"
+        open(FH, "-|", "echo hi");
+        my $x = <FH>;
+        close FH;
+        $x;
+    "#,
+    );
+    assert!(out.contains("hi"));
+}

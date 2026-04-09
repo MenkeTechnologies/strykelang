@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, VecDeque};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write as IoWrite};
-use std::process::Command;
+use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
 
 use indexmap::IndexMap;
@@ -99,10 +99,25 @@ pub struct Interpreter {
     pub(crate) dir_handles: HashMap<String, DirHandleState>,
     /// Raw `File` per handle for `sysread` / `syswrite` / `fileno` / `flock` (parallel to buffered I/O).
     pub(crate) io_file_slots: HashMap<String, File>,
+    /// Child processes for `open(H, "-|", cmd)` / `open(H, "|-", cmd)`; waited on `close`.
+    pub(crate) pipe_children: HashMap<String, Child>,
     /// Sockets from `socket` / `accept` / `connect`.
     pub(crate) socket_handles: HashMap<String, PerlSocket>,
     /// Best-effort `wantarray()` context inside subs (defaults false).
     pub(crate) wantarray_ctx: bool,
+}
+
+/// Shell command for `open(H, "-|", cmd)` / `open(H, "|-", cmd)` (list form not yet supported).
+fn piped_shell_command(cmd: &str) -> Command {
+    if cfg!(windows) {
+        let mut c = Command::new("cmd");
+        c.arg("/C").arg(cmd);
+        c
+    } else {
+        let mut c = Command::new("sh");
+        c.arg("-c").arg(cmd);
+        c
+    }
 }
 
 /// Buffered directory listing for Perl `opendir` / `readdir` (Rust `ReadDir` is single-pass).
@@ -151,8 +166,153 @@ impl Interpreter {
             rand_rng: StdRng::from_entropy(),
             dir_handles: HashMap::new(),
             io_file_slots: HashMap::new(),
+            pipe_children: HashMap::new(),
             socket_handles: HashMap::new(),
             wantarray_ctx: false,
+        }
+    }
+
+    /// `open` and VM `BuiltinId::Open`. `file_opt` is the evaluated third argument when present.
+    pub(crate) fn open_builtin_execute(
+        &mut self,
+        handle_name: String,
+        mode_s: String,
+        file_opt: Option<String>,
+        line: usize,
+    ) -> PerlResult<PerlValue> {
+        let (actual_mode, path) = if let Some(f) = file_opt {
+            (mode_s, f)
+        } else if let Some(rest) = mode_s.strip_prefix(">>") {
+            (">>".to_string(), rest.trim().to_string())
+        } else if let Some(rest) = mode_s.strip_prefix('>') {
+            (">".to_string(), rest.trim().to_string())
+        } else if let Some(rest) = mode_s.strip_prefix('<') {
+            ("<".to_string(), rest.trim().to_string())
+        } else {
+            ("<".to_string(), mode_s)
+        };
+        match actual_mode.as_str() {
+            "-|" => {
+                let mut cmd = piped_shell_command(&path);
+                cmd.stdout(Stdio::piped());
+                let mut child = cmd.spawn().map_err(|e| {
+                    self.errno = e.to_string();
+                    PerlError::runtime(format!("Can't open pipe from command: {}", e), line)
+                })?;
+                let stdout = child.stdout.take().ok_or_else(|| {
+                    PerlError::runtime("pipe: child has no stdout", line)
+                })?;
+                self.input_handles.insert(
+                    handle_name.clone(),
+                    BufReader::new(Box::new(stdout)),
+                );
+                self.pipe_children.insert(handle_name, child);
+            }
+            "|-" => {
+                let mut cmd = piped_shell_command(&path);
+                cmd.stdin(Stdio::piped());
+                let mut child = cmd.spawn().map_err(|e| {
+                    self.errno = e.to_string();
+                    PerlError::runtime(format!("Can't open pipe to command: {}", e), line)
+                })?;
+                let stdin = child.stdin.take().ok_or_else(|| {
+                    PerlError::runtime("pipe: child has no stdin", line)
+                })?;
+                self.output_handles
+                    .insert(handle_name.clone(), Box::new(stdin));
+                self.pipe_children.insert(handle_name, child);
+            }
+            "<" => {
+                let file = std::fs::File::open(&path).map_err(|e| {
+                    self.errno = e.to_string();
+                    PerlError::runtime(format!("Can't open '{}': {}", path, e), line)
+                })?;
+                if let Ok(raw) = file.try_clone() {
+                    self.io_file_slots.insert(handle_name.clone(), raw);
+                }
+                self.input_handles
+                    .insert(handle_name, BufReader::new(Box::new(file)));
+            }
+            ">" => {
+                let file = std::fs::File::create(&path).map_err(|e| {
+                    self.errno = e.to_string();
+                    PerlError::runtime(format!("Can't open '{}': {}", path, e), line)
+                })?;
+                if let Ok(raw) = file.try_clone() {
+                    self.io_file_slots.insert(handle_name.clone(), raw);
+                }
+                self.output_handles.insert(handle_name, Box::new(file));
+            }
+            ">>" => {
+                let file = std::fs::OpenOptions::new()
+                    .append(true)
+                    .create(true)
+                    .open(&path)
+                    .map_err(|e| {
+                        self.errno = e.to_string();
+                        PerlError::runtime(format!("Can't open '{}': {}", path, e), line)
+                    })?;
+                if let Ok(raw) = file.try_clone() {
+                    self.io_file_slots.insert(handle_name.clone(), raw);
+                }
+                self.output_handles.insert(handle_name, Box::new(file));
+            }
+            _ => {
+                return Err(PerlError::runtime(
+                    format!("Unknown open mode '{}'", actual_mode),
+                    line,
+                ));
+            }
+        }
+        Ok(PerlValue::Integer(1))
+    }
+
+    pub(crate) fn close_builtin_execute(&mut self, name: String) -> PerlResult<PerlValue> {
+        self.output_handles.remove(&name);
+        self.input_handles.remove(&name);
+        self.io_file_slots.remove(&name);
+        if let Some(mut child) = self.pipe_children.remove(&name) {
+            let _ = child.wait();
+        }
+        Ok(PerlValue::Integer(1))
+    }
+
+    pub(crate) fn has_input_handle(&self, name: &str) -> bool {
+        self.input_handles.contains_key(name)
+    }
+
+    pub(crate) fn readline_builtin_execute(
+        &mut self,
+        handle: Option<&str>,
+    ) -> PerlResult<PerlValue> {
+        let handle_name = handle.unwrap_or("STDIN");
+        let mut line_str = String::new();
+        if handle_name == "STDIN" {
+            match io::stdin().lock().read_line(&mut line_str) {
+                Ok(0) => Ok(PerlValue::Undef),
+                Ok(_) => {
+                    self.line_number += 1;
+                    Ok(PerlValue::String(line_str))
+                }
+                Err(e) => {
+                    self.errno = e.to_string();
+                    Ok(PerlValue::Undef)
+                }
+            }
+        } else if let Some(reader) = self.input_handles.get_mut(handle_name) {
+            match reader.read_line(&mut line_str) {
+                Ok(0) => Ok(PerlValue::Undef),
+                Ok(_) => {
+                    self.line_number += 1;
+                    Ok(PerlValue::String(line_str))
+                }
+                Err(e) => {
+                    self.errno = e.to_string();
+                    Ok(PerlValue::Undef)
+                }
+            }
+        } else {
+            Ok(PerlValue::Undef)
         }
     }
 
@@ -242,6 +402,38 @@ impl Interpreter {
         }
         self.scope.set_hash("+", named);
         Ok(())
+    }
+
+    /// Shared `chomp` for tree-walker and VM (mutates `target`).
+    pub(crate) fn chomp_inplace_execute(
+        &mut self,
+        val: PerlValue,
+        target: &Expr,
+    ) -> ExecResult {
+        let mut s = val.to_string();
+        let removed = if s.ends_with('\n') {
+            s.pop();
+            1i64
+        } else {
+            0i64
+        };
+        self.assign_value(target, PerlValue::String(s))?;
+        Ok(PerlValue::Integer(removed))
+    }
+
+    /// Shared `chop` for tree-walker and VM (mutates `target`).
+    pub(crate) fn chop_inplace_execute(
+        &mut self,
+        val: PerlValue,
+        target: &Expr,
+    ) -> ExecResult {
+        let mut s = val.to_string();
+        let chopped = s
+            .pop()
+            .map(|c| PerlValue::String(c.to_string()))
+            .unwrap_or(PerlValue::Undef);
+        self.assign_value(target, PerlValue::String(s))?;
+        Ok(chopped)
     }
 
     /// Shared regex match for tree-walker and VM (`pos` is updated for scalar `/g`).
@@ -2058,31 +2250,18 @@ impl Interpreter {
             // String ops
             ExprKind::Chomp(expr) => {
                 let val = self.eval_expr(expr)?;
-                let mut s = val.to_string();
-                let removed = if s.ends_with('\n') {
-                    s.pop();
-                    1
-                } else {
-                    0
-                };
-                self.assign_value(expr, PerlValue::String(s))?;
-                Ok(PerlValue::Integer(removed))
+                self.chomp_inplace_execute(val, expr)
             }
             ExprKind::Chop(expr) => {
                 let val = self.eval_expr(expr)?;
-                let mut s = val.to_string();
-                let chopped = s
-                    .pop()
-                    .map(|c| PerlValue::String(c.to_string()))
-                    .unwrap_or(PerlValue::Undef);
-                self.assign_value(expr, PerlValue::String(s))?;
-                Ok(chopped)
+                self.chop_inplace_execute(val, expr)
             }
             ExprKind::Length(expr) => {
                 let val = self.eval_expr(expr)?;
                 match val {
                     PerlValue::Array(a) => Ok(PerlValue::Integer(a.len() as i64)),
                     PerlValue::Hash(h) => Ok(PerlValue::Integer(h.len() as i64)),
+                    PerlValue::Bytes(b) => Ok(PerlValue::Integer(b.len() as i64)),
                     other => Ok(PerlValue::Integer(other.to_string().len() as i64)),
                 }
             }
@@ -2352,108 +2531,25 @@ impl Interpreter {
             ExprKind::Open { handle, mode, file } => {
                 let handle_name = self.eval_expr(handle)?.to_string();
                 let mode_s = self.eval_expr(mode)?.to_string();
-                let (actual_mode, path) = if let Some(f) = file {
-                    (mode_s, self.eval_expr(f)?.to_string())
+                let file_opt = if let Some(f) = file {
+                    Some(self.eval_expr(f)?.to_string())
                 } else {
-                    // Parse mode from combined string: ">file", "<file", ">>file"
-                    if let Some(rest) = mode_s.strip_prefix(">>") {
-                        (">>".to_string(), rest.trim().to_string())
-                    } else if let Some(rest) = mode_s.strip_prefix('>') {
-                        (">".to_string(), rest.trim().to_string())
-                    } else if let Some(rest) = mode_s.strip_prefix('<') {
-                        ("<".to_string(), rest.trim().to_string())
-                    } else {
-                        ("<".to_string(), mode_s)
-                    }
+                    None
                 };
-                match actual_mode.as_str() {
-                    "<" => {
-                        let file = std::fs::File::open(&path).map_err(|e| {
-                            self.errno = e.to_string();
-                            PerlError::runtime(format!("Can't open '{}': {}", path, e), line)
-                        })?;
-                        if let Ok(raw) = file.try_clone() {
-                            self.io_file_slots.insert(handle_name.clone(), raw);
-                        }
-                        self.input_handles
-                            .insert(handle_name, BufReader::new(Box::new(file)));
-                    }
-                    ">" => {
-                        let file = std::fs::File::create(&path).map_err(|e| {
-                            self.errno = e.to_string();
-                            PerlError::runtime(format!("Can't open '{}': {}", path, e), line)
-                        })?;
-                        if let Ok(raw) = file.try_clone() {
-                            self.io_file_slots.insert(handle_name.clone(), raw);
-                        }
-                        self.output_handles.insert(handle_name, Box::new(file));
-                    }
-                    ">>" => {
-                        let file = std::fs::OpenOptions::new()
-                            .append(true)
-                            .create(true)
-                            .open(&path)
-                            .map_err(|e| {
-                                self.errno = e.to_string();
-                                PerlError::runtime(format!("Can't open '{}': {}", path, e), line)
-                            })?;
-                        if let Ok(raw) = file.try_clone() {
-                            self.io_file_slots.insert(handle_name.clone(), raw);
-                        }
-                        self.output_handles.insert(handle_name, Box::new(file));
-                    }
-                    _ => {
-                        return Err(PerlError::runtime(
-                            format!("Unknown open mode '{}'", actual_mode),
-                            line,
-                        )
-                        .into());
-                    }
-                }
-                Ok(PerlValue::Integer(1))
+                self.open_builtin_execute(handle_name, mode_s, file_opt, line)
+                    .map_err(Into::into)
             }
             ExprKind::Close(expr) => {
                 let name = self.eval_expr(expr)?.to_string();
-                self.output_handles.remove(&name);
-                self.input_handles.remove(&name);
-                self.io_file_slots.remove(&name);
-                Ok(PerlValue::Integer(1))
+                self.close_builtin_execute(name).map_err(Into::into)
             }
-            ExprKind::ReadLine(handle) => {
-                let handle_name = handle.as_deref().unwrap_or("STDIN");
-                let mut line_str = String::new();
-                if handle_name == "STDIN" {
-                    match io::stdin().lock().read_line(&mut line_str) {
-                        Ok(0) => Ok(PerlValue::Undef),
-                        Ok(_) => {
-                            self.line_number += 1;
-                            Ok(PerlValue::String(line_str))
-                        }
-                        Err(e) => {
-                            self.errno = e.to_string();
-                            Ok(PerlValue::Undef)
-                        }
-                    }
-                } else if let Some(reader) = self.input_handles.get_mut(handle_name) {
-                    match reader.read_line(&mut line_str) {
-                        Ok(0) => Ok(PerlValue::Undef),
-                        Ok(_) => {
-                            self.line_number += 1;
-                            Ok(PerlValue::String(line_str))
-                        }
-                        Err(e) => {
-                            self.errno = e.to_string();
-                            Ok(PerlValue::Undef)
-                        }
-                    }
-                } else {
-                    Ok(PerlValue::Undef)
-                }
-            }
+            ExprKind::ReadLine(handle) => self
+                .readline_builtin_execute(handle.as_deref())
+                .map_err(Into::into),
             ExprKind::Eof(expr) => {
                 if let Some(e) = expr {
                     let name = self.eval_expr(e)?.to_string();
-                    let at_eof = !self.input_handles.contains_key(&name);
+                    let at_eof = !self.has_input_handle(&name);
                     Ok(PerlValue::Integer(if at_eof { 1 } else { 0 }))
                 } else {
                     Ok(PerlValue::Integer(0))
@@ -2653,6 +2749,28 @@ impl Interpreter {
                     }
                 }
                 Ok(PerlValue::Integer(count))
+            }
+            ExprKind::Rename { old, new } => {
+                let o = self.eval_expr(old)?.to_string();
+                let n = self.eval_expr(new)?.to_string();
+                Ok(crate::perl_fs::rename_paths(&o, &n))
+            }
+            ExprKind::Chmod(args) => {
+                let mode = self.eval_expr(&args[0])?.to_int();
+                let mut paths = Vec::new();
+                for a in &args[1..] {
+                    paths.push(self.eval_expr(a)?.to_string());
+                }
+                Ok(PerlValue::Integer(crate::perl_fs::chmod_paths(&paths, mode)))
+            }
+            ExprKind::Chown(args) => {
+                let uid = self.eval_expr(&args[0])?.to_int();
+                let gid = self.eval_expr(&args[1])?.to_int();
+                let mut paths = Vec::new();
+                for a in &args[2..] {
+                    paths.push(self.eval_expr(a)?.to_string());
+                }
+                Ok(PerlValue::Integer(crate::perl_fs::chown_paths(&paths, uid, gid)))
             }
             ExprKind::Stat(e) => {
                 let path = self.eval_expr(e)?.to_string();
@@ -3451,7 +3569,7 @@ impl Interpreter {
         ord
     }
 
-    fn heap_sift_up(&mut self, items: &mut Vec<PerlValue>, cmp: &Arc<PerlSub>, mut i: usize) {
+    fn heap_sift_up(&mut self, items: &mut [PerlValue], cmp: &Arc<PerlSub>, mut i: usize) {
         while i > 0 {
             let p = (i - 1) / 2;
             if self.heap_compare(cmp, &items[i], &items[p]) != Ordering::Less {
@@ -3462,7 +3580,7 @@ impl Interpreter {
         }
     }
 
-    fn heap_sift_down(&mut self, items: &mut Vec<PerlValue>, cmp: &Arc<PerlSub>, mut i: usize) {
+    fn heap_sift_down(&mut self, items: &mut [PerlValue], cmp: &Arc<PerlSub>, mut i: usize) {
         let n = items.len();
         loop {
             let mut sm = i;

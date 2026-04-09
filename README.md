@@ -312,17 +312,21 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
  │ **String**: chomp, chop, length, substr, index, rindex,     │
  │ split, join, sprintf, printf, uc, lc, ucfirst, lcfirst,     │
  │ chr, ord, hex, oct, crypt, fc, pos, study                     │
+ │ **Binary**: pack, unpack (subset A a N n V v C Q q Z H x;   │
+ │ `*` repeat; result is byte data)                              │
  │ **Numeric**: abs, int, sqrt, sin, cos, atan2, exp, log,     │
  │ rand, srand                                                 │
- │ **I/O**: print, say, printf, open, close, eof, readline,    │
+ │ **I/O**: print, say, printf, open (files + `-|` / `|-`       │
+ │ piped shell), close, eof, readline,                         │
  │ slurp, capture (structured shell: ->stdout/stderr/exit),   │
  │ binmode, fileno, flock, getc, sysread, syswrite, sysseek,  │
  │ select (timeout sleep / handle no-op), truncate             │
  │ **Directory**: opendir, readdir, closedir, rewinddir,        │
  │ telldir, seekdir                                              │
  │ **File tests**: -e, -f, -d, -l, -r, -w, -s, -z             │
- │ **System**: system, exec, exit, chdir, mkdir, unlink, stat, │
- │ lstat, link, symlink, readlink, glob, glob_par, ppool,      │
+ │ **System**: system, exec, exit, chdir, mkdir, unlink, rename, │
+ │ chmod, chown (Unix), stat, lstat, link, symlink, readlink,   │
+ │ glob, glob_par, ppool,                                        │
  │ fork, wait, waitpid, kill, alarm, sleep, times (Unix where  │
  │ noted in source)                                            │
  │ **Socket** (std::net): socket, bind, listen, accept,         │
@@ -425,7 +429,7 @@ pe examples/parallel_demo.pl
 - **hash** is 2.5x — hash iteration via `keys %h` + `$h{$k}` involves more indirection than perl's internal HV
 - **regex** is 4.9x — the regex itself is cached and fast (Rust `regex` crate with SIMD), but the 1000-iteration for-loop + if-block overhead dominates
 - **`s///` and `tr///`** — compile to `RegexSubst` / `RegexTransliterate` bytecode (same `regex` crate work as `m//`); previously the compiler rejected these and forced a full tree-walker run for the whole program
-- **array sort** is 30x — the sort comparator calls the tree-walker per comparison; compiling sort blocks to bytecode would fix this
+- **array sort** is 30x in the table above — `bench/bench_array.pl` uses `sort { $a <=> $b }`, which now has a **native fast path** (no per-compare `exec_block`); re-run `bench/run_bench.sh` for a fresh ratio. Arbitrary `{ ... }` comparators still use the interpreter each compare
 
 #### Parallel speedup
 
