@@ -1896,14 +1896,10 @@ impl Compiler {
                     }
                 }
             }
-            ExprKind::Deref { expr, kind } => {
-                self.compile_expr(expr)?;
-                match kind {
-                    Sigil::Scalar | Sigil::Array | Sigil::Hash => {
-                        self.chunk
-                            .emit(Op::CallBuiltin(BuiltinId::Scalar as u16, 1), line);
-                    }
-                }
+            ExprKind::Deref { .. } => {
+                return Err(CompileError::Unsupported(
+                    "symbolic ref deref ($$name, @{...}) — use tree interpreter".into(),
+                ));
             }
 
             // ── Interpolated strings ──

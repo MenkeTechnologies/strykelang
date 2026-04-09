@@ -2200,6 +2200,19 @@ impl Parser {
                     line,
                 })
             }
+            Token::DerefScalarVar(name) => {
+                self.advance();
+                Ok(Expr {
+                    kind: ExprKind::Deref {
+                        expr: Box::new(Expr {
+                            kind: ExprKind::ScalarVar(name),
+                            line,
+                        }),
+                        kind: Sigil::Scalar,
+                    },
+                    line,
+                })
+            }
             Token::ScalarVar(name) => {
                 self.advance();
                 Ok(Expr {

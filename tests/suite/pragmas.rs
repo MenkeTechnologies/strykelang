@@ -1,5 +1,8 @@
 //! `use` / `no` pragmas: strict, warnings, feature.
 
+use crate::common::eval_err_kind;
+
+use perlrs::error::ErrorKind;
 use perlrs::interpreter::{Interpreter, FEAT_SAY};
 use perlrs::parse;
 
@@ -60,4 +63,48 @@ fn require_strict_enables_strict_like_use() {
     let p = parse("require strict; 1").expect("parse");
     i.execute(&p).expect("run");
     assert!(i.strict_refs && i.strict_subs && i.strict_vars);
+}
+
+#[test]
+fn strict_refs_rejects_symbolic_scalar_deref() {
+    assert_eq!(
+        eval_err_kind(r#"use strict; my $foo = "x"; my $x = 1; $$foo"#),
+        ErrorKind::Runtime
+    );
+}
+
+#[test]
+fn strict_refs_allows_symbolic_deref_when_refs_off() {
+    let mut i = Interpreter::new();
+    let p = parse(r#"my $foo = "x"; my $x = 1; $$foo"#).expect("parse");
+    let v = i.execute(&p).expect("run");
+    assert_eq!(v.to_int(), 1);
+}
+
+#[test]
+fn strict_vars_rejects_unqualified_global_read() {
+    assert_eq!(
+        eval_err_kind("use strict; use strict 'vars'; $xyzzy"),
+        ErrorKind::Runtime
+    );
+}
+
+#[test]
+fn strict_subs_hint_on_undefined_sub() {
+    let mut i = Interpreter::new();
+    let p = parse("use strict; use strict 'subs'; no_such_sub_zzzzzz()").expect("parse");
+    let e = i.execute(&p).expect_err("undefined sub");
+    assert!(
+        e.to_string().contains("strict subs"),
+        "expected strict subs hint: {}",
+        e
+    );
+}
+
+#[test]
+fn say_requires_feature_when_disabled() {
+    assert_eq!(
+        eval_err_kind("no feature 'say'; say 1"),
+        ErrorKind::Runtime
+    );
 }

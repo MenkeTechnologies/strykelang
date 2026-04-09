@@ -379,6 +379,18 @@ impl Lexer {
             // Variables
             '$' => {
                 self.advance();
+                // `$$foo` — symbolic scalar deref (Perl `${$foo}`-style lookup)
+                if self.peek() == Some('$') {
+                    self.advance();
+                    if self.peek().is_some_and(|c| c.is_alphabetic() || c == '_') {
+                        let name = self.read_identifier();
+                        self.last_was_term = true;
+                        return Ok(Token::DerefScalarVar(name));
+                    }
+                    // `$$` — process id (Perl `$$`)
+                    self.last_was_term = true;
+                    return Ok(Token::ScalarVar("$$".to_string()));
+                }
                 let name = self.read_variable_name();
                 if name.is_empty() {
                     return Err(PerlError::syntax(

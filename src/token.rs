@@ -11,6 +11,8 @@ pub enum Token {
 
     // Variables
     ScalarVar(String),
+    /// `$$foo` — symbolic scalar deref (inner name is `foo` without sigil).
+    DerefScalarVar(String),
     ArrayVar(String),
     HashVar(String),
     ArrayAt,
@@ -137,6 +139,7 @@ impl Token {
                 | Token::SingleString(_)
                 | Token::DoubleString(_)
                 | Token::ScalarVar(_)
+                | Token::DerefScalarVar(_)
                 | Token::ArrayVar(_)
                 | Token::HashVar(_)
                 | Token::Ident(_)

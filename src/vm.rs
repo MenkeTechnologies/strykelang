@@ -877,6 +877,12 @@ impl<'a> VM<'a> {
                     self.push(PerlValue::Integer(1));
                 }
                 Op::Say(argc) => {
+                    if (self.interp.feature_bits & crate::interpreter::FEAT_SAY) == 0 {
+                        return Err(PerlError::runtime(
+                            "say() is disabled (enable with use feature 'say' or use feature ':5.10')",
+                            self.line(),
+                        ));
+                    }
                     let argc = *argc as usize;
                     let mut args = Vec::with_capacity(argc);
                     for _ in 0..argc {

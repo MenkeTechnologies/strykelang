@@ -282,7 +282,10 @@ impl Interpreter {
 
     #[inline]
     fn strict_scalar_exempt(name: &str) -> bool {
-        matches!(name, "_" | "0" | "!" | "@" | "/" | "\\" | "," | "." | "__PACKAGE__")
+        matches!(
+            name,
+            "_" | "0" | "!" | "@" | "/" | "\\" | "," | "." | "__PACKAGE__" | "$$"
+        )
             || name.chars().all(|c| c.is_ascii_digit())
     }
 
@@ -4288,6 +4291,7 @@ impl Interpreter {
 
     fn get_special_var(&self, name: &str) -> PerlValue {
         match name {
+            "$$" => PerlValue::Integer(std::process::id() as i64),
             "_" => self.scope.get_scalar("_"),
             "0" => PerlValue::String(self.program_name.clone()),
             "!" => PerlValue::String(self.errno.clone()),
