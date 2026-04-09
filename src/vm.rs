@@ -1900,10 +1900,7 @@ mod tests {
     fn vm_call_builtin_defined() {
         let mut c = Chunk::new();
         c.emit(Op::LoadUndef, 1);
-        c.emit(
-            Op::CallBuiltin(BuiltinId::Defined as u16, 1),
-            1,
-        );
+        c.emit(Op::CallBuiltin(BuiltinId::Defined as u16, 1), 1);
         c.emit(Op::Halt, 1);
         assert_eq!(run_chunk(&c).expect("vm").to_int(), 0);
     }

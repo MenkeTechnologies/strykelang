@@ -1755,9 +1755,10 @@ mod tests {
     #[test]
     fn compile_string_literal_uses_constant_pool() {
         let chunk = compile_snippet(r#""hello";"#).expect("compile");
-        assert!(chunk.constants.iter().any(|c| {
-            matches!(c, crate::value::PerlValue::String(s) if s == "hello")
-        }));
+        assert!(chunk
+            .constants
+            .iter()
+            .any(|c| { matches!(c, crate::value::PerlValue::String(s) if s == "hello") }));
         assert!(chunk.ops.iter().any(|o| matches!(o, Op::LoadConst(_))));
         assert_last_halt(&chunk);
     }
@@ -1779,13 +1780,22 @@ mod tests {
     #[test]
     fn compile_scalar_fetch_and_assign() {
         let chunk = compile_snippet("my $a = 1; $a + 0;").expect("compile");
-        assert!(chunk.ops.iter().filter(|o| matches!(o, Op::GetScalar(_))).count() >= 1);
+        assert!(
+            chunk
+                .ops
+                .iter()
+                .filter(|o| matches!(o, Op::GetScalar(_)))
+                .count()
+                >= 1
+        );
         assert_last_halt(&chunk);
     }
 
     #[test]
     fn compile_comparison_ops_numeric() {
-        for src in ["1 < 2;", "1 > 2;", "1 <= 2;", "1 >= 2;", "1 == 2;", "1 != 2;"] {
+        for src in [
+            "1 < 2;", "1 > 2;", "1 <= 2;", "1 >= 2;", "1 == 2;", "1 != 2;",
+        ] {
             let chunk = compile_snippet(src).expect(src);
             assert!(
                 chunk.ops.iter().any(|o| {
@@ -1803,7 +1813,12 @@ mod tests {
 
     #[test]
     fn compile_string_compare_ops() {
-        for src in [r#"'a' lt 'b';"#, r#"'a' gt 'b';"#, r#"'a' le 'b';"#, r#"'a' ge 'b';"#] {
+        for src in [
+            r#"'a' lt 'b';"#,
+            r#"'a' gt 'b';"#,
+            r#"'a' le 'b';"#,
+            r#"'a' ge 'b';"#,
+        ] {
             let chunk = compile_snippet(src).expect(src);
             assert!(
                 chunk
