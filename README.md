@@ -1,74 +1,160 @@
-# perlrs
+ ██████╗ ███████╗██████╗ ██╗     ██████╗ ███████╗
+ ██╔══██╗██╔════╝██╔══██╗██║     ██╔══██╗██╔════╝
+ ██████╔╝█████╗  ██████╔╝██║     ██████╔╝███████╗
+ ██╔═══╝ ██╔══╝  ██╔══██╗██║     ██╔══██╗╚════██║
+ ██║     ███████╗██║  ██║███████╗██║  ██║███████║
+ ╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚══════╝
 
-A highly parallel Perl 5 interpreter written in Rust by [MenkeTechnologies](https://github.com/MenkeTechnologies).
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Overview
+### `[PARALLEL PERL5 INTERPRETER // RUST-POWERED EXECUTION ENGINE]`
 
-`perlrs` is a Perl 5 compatible interpreter that brings native parallelism to Perl scripting via rayon-powered parallel primitives. It parses and executes Perl 5 scripts with a focus on leveraging all available CPU cores for data-parallel operations.
+ ┌──────────────────────────────────────────────────────────────┐
+ │ STATUS: ONLINE &nbsp;&nbsp; CORES: ALL &nbsp;&nbsp; SIGNAL: ████████░░       │
+ └──────────────────────────────────────────────────────────────┘
 
-Built with:
-- **rayon** for work-stealing parallel execution
-- **regex** for SIMD-accelerated pattern matching
-- **clap** for full Perl 5 CLI compatibility
-- **parking_lot** and **crossbeam** for low-overhead synchronization
-- LTO + single codegen unit release builds for maximum throughput
+> *"There is more than one way to do it — in parallel."*
 
-## Installation
+---
 
-```bash
+## [0x00] OVERVIEW
+
+`perlrs` is a Perl 5 compatible interpreter written in Rust that brings native parallelism to Perl scripting. It parses and executes Perl 5 scripts with rayon-powered work-stealing parallel primitives across all available CPU cores.
+
+ ┌──────────────────────────────────────────────────────────────┐
+ │ RAYON THREADS: ALL CORES &nbsp;&nbsp; REGEX: SIMD-ACCELERATED         │
+ │ BINARY SIZE: 2MB STRIPPED &nbsp;&nbsp; BUILD: LTO + O3               │
+ └──────────────────────────────────────────────────────────────┘
+
+---
+
+## [0x01] SYSTEM REQUIREMENTS
+
+- Rust toolchain // `rustc` + `cargo`
+
+## [0x02] INSTALLATION
+
+#### DOWNLOADING PAYLOAD FROM SOURCE
+
+```sh
+git clone https://github.com/MenkeTechnologies/perlrs
+cd perlrs
+cargo build --release
+```
+
+#### BINARY DEPLOYMENT
+
+```sh
 cargo install --path .
 ```
 
-This installs two binaries: `perlrs` and `pe` (short alias).
+Both `perlrs` and `pe` (short alias) binaries are installed.
 
-## Usage
+---
 
-```bash
-# Execute inline code
+## [0x03] USAGE
+
+#### EXECUTING INLINE CODE // DIRECT INJECTION
+
+```sh
+# inject a single line of perl
 perlrs -e 'print "Hello, world!\n"'
 
-# Run a script
+# execute a script file
 perlrs script.pl arg1 arg2
 
-# Process stdin line by line
+# check syntax without executing
+perlrs -c script.pl
+```
+
+#### PROCESSING DATA STREAMS // STDIN OPERATIONS
+
+```sh
+# line-by-line processing
 echo "data" | perlrs -ne 'print uc $_'
 
-# Auto-print mode
+# auto-print mode (like sed)
 cat file.txt | perlrs -pe 's/foo/bar/g'
 
-# Check syntax without executing
-perlrs -c script.pl
+# slurp entire input at once
+cat file.txt | perlrs -gne 'print length($_), "\n"'
 
-# Set parallel thread count
+# auto-split fields
+echo "a:b:c" | perlrs -a -F: -ne 'print $F[1], "\n"'
+```
+
+#### PARALLEL EXECUTION // MULTI-CORE OPERATIONS
+
+```perl
+# parallel map — transform elements across all cores
+my @doubled = pmap { $_ * 2 } @data;
+
+# parallel grep — filter elements in parallel
+my @evens = pgrep { $_ % 2 == 0 } @data;
+
+# parallel foreach — execute side effects concurrently
+pfor { process($_) } @items;
+
+# parallel sort — sort using all cores
+my @sorted = psort { $a <=> $b } @data;
+
+# chain parallel operations
+my @result = pmap { $_ ** 2 } pgrep { $_ > 100 } @data;
+
+# control thread count
 perlrs -j 8 -e 'my @r = pmap { heavy_work($_) } @data'
 ```
 
-## Parallel Extensions
+Each parallel block receives its own interpreter context with captured lexical scope // no data races.
 
-The core differentiator: `pmap`, `pgrep`, `pfor`, and `psort` distribute work across all CPU cores automatically via rayon's work-stealing scheduler.
+---
 
-```perl
-# Parallel map — transform elements across all cores
-my @doubled = pmap { $_ * 2 } @data;
+## [0x04] CLI FLAGS
 
-# Parallel grep — filter elements in parallel
-my @evens = pgrep { $_ % 2 == 0 } @data;
+All standard Perl 5 CLI flags are supported:
 
-# Parallel foreach — execute side effects concurrently
-pfor { process($_) } @items;
+```
+  ── DATA I/O ──────────────────────────────────────────
+  -0[octal]          // Specify record separator (\0 if no arg; -0777 for slurp)
+  -a                 // Autosplit mode with -n or -p (splits $_ into @F)
+  -C[number/list]    // Enable listed Unicode features
+  -c                 // Check syntax only (runs BEGIN and CHECK blocks)
+  -d[t][:MOD]        // Run program under debugger or module Devel::MOD
+  -D[number/letters] // Set debugging flags
+  -e CODE            // One line of program (several -e's allowed)
+  -E CODE            // Like -e, but enables all optional features
+  -f                 // Don't do $sitelib/sitecustomize.pl at startup
+  -F/pattern/        // split() pattern for -a switch
+  -g                 // Read all input in one go (slurp), alias for -0777
+  -i[extension]      // Edit <> files in place (backup if extension supplied)
+  -I DIRECTORY       // Specify @INC directory (several allowed)
+  -l[octnum]         // Enable line ending processing
+  -M MODULE          // Execute "use module..." before program
+  -m MODULE          // Execute "use module ()" before program (no import)
+  -n                 // Assume "while (<>) { ... }" loop around program
+  -p                 // Like -n but print line also, like sed
+  -s                 // Enable switch parsing for programfile args
+  -S                 // Look for programfile using PATH
+  -t                 // Enable tainting warnings
+  -T                 // Enable tainting checks
+  -u                 // Dump core after parsing program
+  -U                 // Allow unsafe operations
+  -v                 // Print version, patchlevel and license
+  -V[:configvar]     // Print configuration summary
+  -w                 // Enable many useful warnings
+  -W                 // Enable all warnings
+  -x[directory]      // Ignore text before #!perl line
+  -X                 // Disable all warnings
 
-# Parallel sort — sort using all cores
-my @sorted = psort { $a <=> $b } @data;
-
-# Chain them together
-my @result = pmap { $_ ** 2 } pgrep { $_ > 100 } @data;
+  ── PARALLEL EXTENSIONS ───────────────────────────────
+  -j N               // Set number of parallel threads (rayon)
 ```
 
-Each parallel block receives its own interpreter context with captured lexical scope, so there are no data races. The sequential equivalents (`map`, `grep`, `sort`, `foreach`) work identically for correctness testing.
+---
 
-## Supported Perl Features
+## [0x05] SUPPORTED PERL FEATURES
 
-### Data Types
+#### DATA TYPES
 - Scalars (`$x`), arrays (`@a`), hashes (`%h`)
 - References: `\$x`, `\@a`, `\%h`, `\&sub`
 - Array refs `[1,2,3]`, hash refs `{a => 1}`
@@ -76,15 +162,15 @@ Each parallel block receives its own interpreter context with captured lexical s
 - Regex objects `qr/.../`
 - Blessed references (basic OOP)
 
-### Control Flow
+#### CONTROL FLOW
 - `if`/`elsif`/`else`, `unless`
 - `while`, `until`, `do...while`
 - `for` (C-style), `foreach`
 - `last`, `next`, `redo` with labels
-- Postfix modifiers: `expr if COND`, `expr unless COND`, `expr while COND`, `expr for @list`
+- Postfix: `expr if COND`, `expr unless COND`, `expr while COND`, `expr for @list`
 - Ternary `?:`
 
-### Operators
+#### OPERATORS
 - Arithmetic: `+`, `-`, `*`, `/`, `%`, `**`
 - String: `.` (concat), `x` (repeat)
 - Comparison: `==`, `!=`, `<`, `>`, `<=`, `>=`, `<=>`
@@ -94,10 +180,9 @@ Each parallel block receives its own interpreter context with captured lexical s
 - Assignment: `=`, `+=`, `-=`, `*=`, `/=`, `.=`, `//=`, etc.
 - Regex: `=~`, `!~`
 - Range: `..`
-- Increment/decrement: `++`, `--`
 - Arrow dereference: `->`
 
-### Regex
+#### REGEX ENGINE
 - Match: `$str =~ /pattern/flags`
 - Substitution: `$str =~ s/pattern/replacement/flags`
 - Transliterate: `$str =~ tr/from/to/`
@@ -105,34 +190,31 @@ Each parallel block receives its own interpreter context with captured lexical s
 - Capture variables: `$1`, `$2`, etc.
 - Quote-like: `m//`, `qr//`
 
-### Subroutines
+#### SUBROUTINES
 - Named subs with `sub name { ... }`
 - Anonymous subs / closures
 - Recursive calls
 - `@_` argument passing, `shift`, `return`
 - `return EXPR if COND` (postfix modifiers on return)
 
-### Built-in Functions
+#### BUILT-IN FUNCTIONS
 
-**Array**: `push`, `pop`, `shift`, `unshift`, `splice`, `reverse`, `sort`, `map`, `grep`, `scalar`
+ ┌──────────────────────────────────────────────────────────────┐
+ │ **Array**: push, pop, shift, unshift, splice, reverse,      │
+ │ sort, map, grep, scalar                                     │
+ │ **Hash**: keys, values, each, delete, exists                │
+ │ **String**: chomp, chop, length, substr, index, rindex,     │
+ │ split, join, sprintf, printf, uc, lc, ucfirst, lcfirst,     │
+ │ chr, ord, hex, oct                                          │
+ │ **Numeric**: abs, int, sqrt                                 │
+ │ **I/O**: print, say, printf, open, close, eof, readline     │
+ │ **File tests**: -e, -f, -d, -l, -r, -w, -s, -z             │
+ │ **System**: system, exec, exit, chdir, mkdir, unlink         │
+ │ **Type**: defined, undef, ref, bless                        │
+ │ **Control**: die, warn, eval, do, require, caller           │
+ └──────────────────────────────────────────────────────────────┘
 
-**Hash**: `keys`, `values`, `each`, `delete`, `exists`
-
-**String**: `chomp`, `chop`, `length`, `substr`, `index`, `rindex`, `split`, `join`, `sprintf`, `printf`, `uc`, `lc`, `ucfirst`, `lcfirst`, `chr`, `ord`, `hex`, `oct`
-
-**Numeric**: `abs`, `int`, `sqrt`
-
-**I/O**: `print`, `say`, `printf`, `open`, `close`, `eof`, `readline` (`<>`)
-
-**File tests**: `-e`, `-f`, `-d`, `-l`, `-r`, `-w`, `-s`, `-z`
-
-**System**: `system`, `exec`, `exit`, `chdir`, `mkdir`, `unlink`
-
-**Type**: `defined`, `undef`, `ref`, `bless`
-
-**Control**: `die`, `warn`, `eval`, `do`, `require`, `caller`
-
-### Other Features
+#### OTHER FEATURES
 - `use strict`, `use warnings` (recognized)
 - `package` declarations
 - `BEGIN`/`END` blocks
@@ -142,78 +224,72 @@ Each parallel block receives its own interpreter context with captured lexical s
 - POD documentation skipping
 - Shebang line handling
 
-## CLI Flags
+---
 
-All standard Perl 5 CLI flags are supported:
+## Testing
 
-| Flag | Description |
-|------|-------------|
-| `-0[octal]` | Specify record separator (`\0` if no argument; `-0777` for slurp) |
-| `-a` | Autosplit mode with `-n` or `-p` (splits `$_` into `@F`) |
-| `-C[number/list]` | Enables the listed Unicode features |
-| `-c` | Check syntax only (runs BEGIN and CHECK blocks) |
-| `-d[t][:MOD]` | Run program under debugger or module Devel::MOD |
-| `-D[number/letters]` | Set debugging flags |
-| `-e CODE` | One line of program (several `-e`'s allowed) |
-| `-E CODE` | Like `-e`, but enables all optional features |
-| `-f` | Don't do `$sitelib/sitecustomize.pl` at startup |
-| `-F/pattern/` | `split()` pattern for `-a` switch |
-| `-g` | Read all input in one go (slurp), alias for `-0777` |
-| `-i[extension]` | Edit `<>` files in place (backup if extension supplied) |
-| `-I DIRECTORY` | Specify `@INC`/include directory (several allowed) |
-| `-l[octnum]` | Enable line ending processing, specifies line terminator |
-| `-M MODULE` | Execute `use module...` before executing program |
-| `-m MODULE` | Execute `use module ()` before executing (no import) |
-| `-n` | Assume `while (<>) { ... }` loop around program |
-| `-p` | Assume loop like `-n` but print line also, like sed |
-| `-s` | Enable rudimentary parsing for switches after programfile |
-| `-S` | Look for programfile using PATH environment variable |
-| `-t` | Enable tainting warnings |
-| `-T` | Enable tainting checks |
-| `-u` | Dump core after parsing program |
-| `-U` | Allow unsafe operations |
-| `-v` | Print version, patchlevel and license |
-| `-V[:configvar]` | Print configuration summary (or a single Config.pm variable) |
-| `-w` | Enable many useful warnings |
-| `-W` | Enable all warnings |
-| `-x[directory]` | Ignore text before `#!perl` line (optionally cd to directory) |
-| `-X` | Disable all warnings |
-| `-j N` | Set number of parallel threads (perlrs extension) |
-
-## Architecture
-
-```
-Source Code
-    |
-    v
- Lexer (src/lexer.rs)
-    | Tokens
-    v
- Parser (src/parser.rs)
-    | AST
-    v
- Interpreter (src/interpreter.rs)
-    |--- Sequential: map, grep, sort, foreach
-    |--- Parallel:   pmap, pgrep, psort, pfor (rayon)
-    v
- Output
-```
-
-- **Lexer**: Context-sensitive tokenizer handling Perl's ambiguous syntax (regex vs division, hash vs modulo, heredocs, interpolated strings)
-- **Parser**: Recursive descent with Pratt precedence climbing for expressions
-- **Interpreter**: Tree-walking execution with proper lexical scoping, `Arc<RwLock>` for thread-safe reference types
-- **Parallelism**: Each parallel block gets an isolated interpreter with captured scope; rayon handles scheduling
-
-## Examples
-
-See the `examples/` directory:
+Integration tests exercise the lexer, parser, and interpreter end-to-end. Shared helpers (`eval`, `eval_int`, `eval_string`, error helpers) live in `tests/common/mod.rs`. Cases are grouped by area under `tests/suite/` (expressions, strings, control flow, collections, regex, parallel execution, builtins, errors). The crate root test target is `tests/integration.rs`. Run the full suite with:
 
 ```bash
+cargo test
+```
+
+---
+
+## [0x06] ARCHITECTURE
+
+```
+ ┌─────────────────────────────────────────────────────┐
+ │  Source Code                                        │
+ │      │                                              │
+ │      ▼                                              │
+ │  Lexer (src/lexer.rs)                               │
+ │      │ Tokens                                       │
+ │      ▼                                              │
+ │  Parser (src/parser.rs)                             │
+ │      │ AST                                          │
+ │      ▼                                              │
+ │  Interpreter (src/interpreter.rs)                   │
+ │      ├── Sequential: map, grep, sort, foreach       │
+ │      └── Parallel:   pmap, pgrep, psort, pfor       │
+ │              │                                      │
+ │              ▼                                      │
+ │          RAYON WORK-STEALING SCHEDULER              │
+ │          ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓               │
+ │          CORE 0 │ CORE 1 │ ... │ CORE N             │
+ └─────────────────────────────────────────────────────┘
+```
+
+- **Lexer** // Context-sensitive tokenizer handling Perl's ambiguous syntax (regex vs division, hash vs modulo, heredocs, interpolated strings)
+- **Parser** // Recursive descent with Pratt precedence climbing for expressions
+- **Interpreter** // Tree-walking execution with proper lexical scoping, `Arc<RwLock>` for thread-safe reference types
+- **Parallelism** // Each parallel block gets an isolated interpreter with captured scope; rayon handles work-stealing scheduling
+
+---
+
+## [0x07] EXAMPLES
+
+```sh
 perlrs examples/fibonacci.pl
 perlrs examples/text_processing.pl
 perlrs examples/parallel_demo.pl
 ```
 
-## License
+---
 
-MIT
+## [0xFF] LICENSE
+
+ ┌──────────────────────────────────────────────────────┐
+ │ MIT LICENSE // UNAUTHORIZED REPRODUCTION WILL BE MET │
+ │ WITH FULL ICE                                        │
+ └──────────────────────────────────────────────────────┘
+
+---
+
+```
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+░░ >>> PARSE. EXECUTE. PARALLELIZE. OWN YOUR CORES. <<< ░░
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+```
+
+##### created by [MenkeTechnologies](https://github.com/MenkeTechnologies)

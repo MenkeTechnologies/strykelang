@@ -9,19 +9,8 @@ use perlrs::interpreter::Interpreter;
 /// perlrs — A highly parallel Perl 5 interpreter written in Rust
 #[derive(Parser, Debug)]
 #[command(name = "perlrs", version, about, long_about = None)]
-#[command(disable_version_flag = true)]
-#[command(
-    after_help = "Parallel extensions:\n  \
-        pmap { BLOCK } @list    Parallel map (rayon)\n  \
-        pgrep { BLOCK } @list   Parallel grep (rayon)\n  \
-        pfor { BLOCK } @list    Parallel foreach (rayon)\n  \
-        psort { BLOCK } @list   Parallel sort (rayon)\n\n\
-        Examples:\n  \
-        perlrs -e 'print \"Hello, world!\\n\"'\n  \
-        perlrs -e 'my @r = pmap { $_ * 2 } 1..1000000; print scalar @r, \"\\n\"'\n  \
-        perlrs script.pl arg1 arg2\n  \
-        echo 'data' | perlrs -ne 'print uc $_'"
-)]
+#[command(disable_version_flag = true, disable_help_flag = true)]
+#[command(override_usage = "perlrs [switches] [--] [programfile] [arguments]")]
 struct Cli {
     /// Specify record separator (\0 if no argument); -0777 for slurp mode
     #[arg(short = '0', value_name = "OCTAL")]
@@ -143,6 +132,10 @@ struct Cli {
     #[arg(short = 'X')]
     no_warnings: bool,
 
+    /// Print help
+    #[arg(short = 'h', long = "help")]
+    help: bool,
+
     /// Number of threads for parallel operations (perlrs extension)
     #[arg(short = 'j', long = "threads", value_name = "N")]
     threads: Option<usize>,
@@ -156,8 +149,88 @@ struct Cli {
     args: Vec<String>,
 }
 
+fn print_cyberpunk_help() {
+    let version = env!("CARGO_PKG_VERSION");
+    let threads = rayon::current_num_threads();
+    println!(
+        r#" ██████╗ ███████╗██████╗ ██╗     ██████╗ ███████╗
+ ██╔══██╗██╔════╝██╔══██╗██║     ██╔══██╗██╔════╝
+ ██████╔╝█████╗  ██████╔╝██║     ██████╔╝███████╗
+ ██╔═══╝ ██╔══╝  ██╔══██╗██║     ██╔══██╗╚════██║
+ ██║     ███████╗██║  ██║███████╗██║  ██║███████║
+ ╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚══════╝
+ ┌──────────────────────────────────────────────────────┐
+ │ STATUS: ONLINE  // CORES: {threads:<2} // SIGNAL: ████████░░ │
+ └──────────────────────────────────────────────────────┘
+  >> PARALLEL PERL5 INTERPRETER // RUST-POWERED v{version} <<"#);
+    println!();
+    println!();
+    println!("A highly parallel Perl 5 interpreter written in Rust");
+    println!();
+    println!("  USAGE: perlrs [switches] [--] [programfile] [arguments]");
+    println!();
+    println!("  ── EXECUTION ──────────────────────────────────────────");
+    println!("  -e CODE                // One line of program (several -e's allowed)");
+    println!("  -E CODE                // Like -e, but enables all optional features");
+    println!("  -c                     // Check syntax only (runs BEGIN and CHECK blocks)");
+    println!("  -d[t][:MOD]            // Run program under debugger or module Devel::MOD");
+    println!("  -D[number/letters]     // Set debugging flags");
+    println!("  -u                     // Dump core after parsing program");
+    println!("  ── INPUT PROCESSING ─────────────────────────────────");
+    println!("  -n                     // Assume \"while (<>) {{...}}\" loop around program");
+    println!("  -p                     // Like -n but print line also, like sed");
+    println!("  -a                     // Autosplit mode (splits $_ into @F)");
+    println!("  -F/pattern/            // split() pattern for -a switch");
+    println!("  -l[octnum]             // Enable line ending processing");
+    println!("  -0[octal]              // Specify record separator (\\0 if no arg)");
+    println!("  -g                     // Slurp all input at once (alias for -0777)");
+    println!("  -i[extension]          // Edit <> files in place (backup if ext supplied)");
+    println!("  ── MODULES & PATHS ──────────────────────────────────");
+    println!("  -M MODULE              // Execute \"use module...\" before program");
+    println!("  -m MODULE              // Execute \"use module ()\" before program (no import)");
+    println!("  -I DIRECTORY           // Specify @INC directory (several allowed)");
+    println!("  -f                     // Don't do $sitelib/sitecustomize.pl at startup");
+    println!("  -S                     // Look for programfile using PATH");
+    println!("  -x[directory]          // Ignore text before #!perl line");
+    println!("  ── UNICODE & SAFETY ─────────────────────────────────");
+    println!("  -C[number/list]        // Enable listed Unicode features");
+    println!("  -t                     // Enable tainting warnings");
+    println!("  -T                     // Enable tainting checks");
+    println!("  -U                     // Allow unsafe operations");
+    println!("  -s                     // Enable switch parsing for programfile args");
+    println!("  ── WARNINGS ─────────────────────────────────────────");
+    println!("  -w                     // Enable many useful warnings");
+    println!("  -W                     // Enable all warnings");
+    println!("  -X                     // Disable all warnings");
+    println!("  ── INFO ─────────────────────────────────────────────");
+    println!("  -v                     // Print version, patchlevel and license");
+    println!("  -V[:configvar]         // Print configuration summary");
+    println!("  -h, --help             // Print help");
+    println!("  ── PARALLEL EXTENSIONS (perlrs) ─────────────────────");
+    println!("  -j N                   // Set number of parallel threads (rayon)");
+    println!("  pmap  {{BLOCK}} @list    // Parallel map across all cores");
+    println!("  pgrep {{BLOCK}} @list    // Parallel grep across all cores");
+    println!("  pfor  {{BLOCK}} @list    // Parallel foreach across all cores");
+    println!("  psort {{BLOCK}} @list    // Parallel sort across all cores");
+    println!("  ── POSITIONAL ─────────────────────────────────────────");
+    println!("  [programfile]          // Perl script to execute");
+    println!("  [arguments]            // Arguments passed to script (@ARGV)");
+    println!();
+    println!();
+    println!("  ── SYSTEM ─────────────────────────────────────────");
+    println!("  v{version} // (c) MenkeTechnologies");
+    println!("  There is more than one way to do it — in parallel.");
+    println!("  >>> PARSE. EXECUTE. PARALLELIZE. OWN YOUR CORES. <<<");
+    println!(" ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░");
+}
+
 fn main() {
     let cli = Cli::parse();
+
+    if cli.help {
+        print_cyberpunk_help();
+        return;
+    }
 
     if cli.show_version {
         println!(

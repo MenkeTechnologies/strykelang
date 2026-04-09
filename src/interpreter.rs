@@ -1920,9 +1920,25 @@ fn perl_sprintf(fmt: &str, args: &[PerlValue]) -> String {
             let w: usize = width.parse().unwrap_or(0);
             let p: usize = precision.parse().unwrap_or(6);
 
+            let zero_pad = flags.contains('0') && !flags.contains('-');
+            let left_align = flags.contains('-');
             let formatted = match spec {
-                'd' | 'i' => format!("{:width$}", arg.to_int(), width = w),
-                'u' => format!("{:width$}", arg.to_int() as u64, width = w),
+                'd' | 'i' => {
+                    if zero_pad {
+                        format!("{:0width$}", arg.to_int(), width = w)
+                    } else if left_align {
+                        format!("{:<width$}", arg.to_int(), width = w)
+                    } else {
+                        format!("{:width$}", arg.to_int(), width = w)
+                    }
+                }
+                'u' => {
+                    if zero_pad {
+                        format!("{:0width$}", arg.to_int() as u64, width = w)
+                    } else {
+                        format!("{:width$}", arg.to_int() as u64, width = w)
+                    }
+                }
                 'f' => format!("{:width$.prec$}", arg.to_number(), width = w, prec = p),
                 'e' => format!("{:width$.prec$e}", arg.to_number(), width = w, prec = p),
                 'g' => {
@@ -1956,12 +1972,7 @@ fn perl_sprintf(fmt: &str, args: &[PerlValue]) -> String {
                 _ => format!("{}", arg.to_string()),
             };
 
-            if flags.contains('0') && !flags.contains('-') && w > formatted.len() {
-                let padded = format!("{:0>width$}", formatted, width = w);
-                result.push_str(&padded);
-            } else {
-                result.push_str(&formatted);
-            }
+            result.push_str(&formatted);
         } else {
             result.push(chars[i]);
             i += 1;
