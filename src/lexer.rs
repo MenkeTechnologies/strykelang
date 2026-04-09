@@ -114,7 +114,7 @@ impl Lexer {
 
         // Decimal or octal
         let _int_part = self.read_while(|c| c.is_ascii_digit() || c == '_');
-        if self.peek() == Some('.') && self.peek_at(1).map_or(false, |c| c.is_ascii_digit()) {
+        if self.peek() == Some('.') && self.peek_at(1).is_some_and(|c| c.is_ascii_digit()) {
             is_float = true;
             self.advance(); // consume '.'
             let _frac = self.read_while(|c| c.is_ascii_digit() || c == '_');
@@ -167,7 +167,12 @@ impl Lexer {
                 },
                 Some('\'') => break,
                 Some(c) => s.push(c),
-                None => return Err(PerlError::syntax("Unterminated single-quoted string", self.line)),
+                None => {
+                    return Err(PerlError::syntax(
+                        "Unterminated single-quoted string",
+                        self.line,
+                    ))
+                }
             }
         }
         Ok(Token::SingleString(s))
@@ -183,33 +188,31 @@ impl Lexer {
         let mut s = String::new();
         loop {
             match self.advance() {
-                Some('\\') => {
-                    match self.advance() {
-                        Some('n') => s.push('\n'),
-                        Some('t') => s.push('\t'),
-                        Some('r') => s.push('\r'),
-                        Some('\\') => s.push('\\'),
-                        Some('0') => s.push('\0'),
-                        Some('a') => s.push('\x07'),
-                        Some('b') => s.push('\x08'),
-                        Some('f') => s.push('\x0C'),
-                        Some('e') => s.push('\x1B'),
-                        Some('x') => {
-                            let hex = self.read_while(|c| c.is_ascii_hexdigit());
-                            if let Ok(val) = u32::from_str_radix(&hex, 16) {
-                                if let Some(c) = char::from_u32(val) {
-                                    s.push(c);
-                                }
+                Some('\\') => match self.advance() {
+                    Some('n') => s.push('\n'),
+                    Some('t') => s.push('\t'),
+                    Some('r') => s.push('\r'),
+                    Some('\\') => s.push('\\'),
+                    Some('0') => s.push('\0'),
+                    Some('a') => s.push('\x07'),
+                    Some('b') => s.push('\x08'),
+                    Some('f') => s.push('\x0C'),
+                    Some('e') => s.push('\x1B'),
+                    Some('x') => {
+                        let hex = self.read_while(|c| c.is_ascii_hexdigit());
+                        if let Ok(val) = u32::from_str_radix(&hex, 16) {
+                            if let Some(c) = char::from_u32(val) {
+                                s.push(c);
                             }
                         }
-                        Some(c) if c == term => s.push(c),
-                        Some(c) => {
-                            s.push('\\');
-                            s.push(c);
-                        }
-                        None => return Err(PerlError::syntax("Unterminated string", self.line)),
                     }
-                }
+                    Some(c) if c == term => s.push(c),
+                    Some(c) => {
+                        s.push('\\');
+                        s.push(c);
+                    }
+                    None => return Err(PerlError::syntax("Unterminated string", self.line)),
+                },
                 Some(c) if c == term => break,
                 Some(c) => s.push(c),
                 None => return Err(PerlError::syntax("Unterminated string", self.line)),
@@ -241,7 +244,9 @@ impl Lexer {
     fn read_qw(&mut self) -> PerlResult<Token> {
         // Already consumed 'qw', now expect delimiter
         self.skip_whitespace_and_comments();
-        let open = self.advance().ok_or_else(|| PerlError::syntax("Expected delimiter after qw", self.line))?;
+        let open = self
+            .advance()
+            .ok_or_else(|| PerlError::syntax("Expected delimiter after qw", self.line))?;
         let close = match open {
             '(' => ')',
             '[' => ']',
@@ -376,49 +381,52 @@ impl Lexer {
                 self.advance();
                 let name = self.read_variable_name();
                 if name.is_empty() {
-                    return Err(PerlError::syntax("Expected variable name after $", self.line));
+                    return Err(PerlError::syntax(
+                        "Expected variable name after $",
+                        self.line,
+                    ));
                 }
                 self.last_was_term = true;
-                return Ok(Token::ScalarVar(name));
+                Ok(Token::ScalarVar(name))
             }
             '@' => {
                 self.advance();
-                if self.peek() == Some('_') || self.peek().map_or(false, |c| c.is_alphabetic()) {
+                if self.peek() == Some('_') || self.peek().is_some_and(|c| c.is_alphabetic()) {
                     let name = self.read_identifier();
                     self.last_was_term = true;
                     return Ok(Token::ArrayVar(name));
                 }
                 self.last_was_term = false;
-                return Ok(Token::ArrayAt);
+                Ok(Token::ArrayAt)
             }
             '%' if !self.last_was_term => {
                 self.advance();
-                if self.peek().map_or(false, |c| c.is_alphabetic() || c == '_') {
+                if self.peek().is_some_and(|c| c.is_alphabetic() || c == '_') {
                     let name = self.read_identifier();
                     self.last_was_term = true;
                     return Ok(Token::HashVar(name));
                 }
                 self.last_was_term = false;
-                return Ok(Token::HashPercent);
+                Ok(Token::HashPercent)
             }
 
             // Numbers
             '0'..='9' => {
                 let tok = self.read_number()?;
                 self.last_was_term = true;
-                return Ok(tok);
+                Ok(tok)
             }
 
             // Strings
             '\'' => {
                 let tok = self.read_single_quoted_string()?;
                 self.last_was_term = true;
-                return Ok(tok);
+                Ok(tok)
             }
             '"' => {
                 let tok = self.read_double_quoted_string()?;
                 self.last_was_term = true;
-                return Ok(tok);
+                Ok(tok)
             }
 
             // Backtick
@@ -426,7 +434,7 @@ impl Lexer {
                 self.advance();
                 let cmd = self.read_escaped_until('`')?;
                 self.last_was_term = true;
-                return Ok(Token::DoubleString(cmd)); // treated as interpolated command
+                Ok(Token::DoubleString(cmd)) // treated as interpolated command
             }
 
             // Regex or division
@@ -453,7 +461,7 @@ impl Lexer {
                     return Ok(Token::DefinedOr);
                 }
                 self.last_was_term = false;
-                return Ok(Token::Slash);
+                Ok(Token::Slash)
             }
 
             // Operators and punctuation
@@ -470,19 +478,21 @@ impl Lexer {
                     return Ok(Token::PlusAssign);
                 }
                 self.last_was_term = false;
-                return Ok(Token::Plus);
+                Ok(Token::Plus)
             }
             '-' => {
                 self.advance();
                 // File test operators: -e, -f, -d, etc.
                 if !self.last_was_term {
                     if let Some(c) = self.peek() {
-                        if "efdlpSszrwxoRWXOBCTMAgu".contains(c) {
-                            if self.peek_at(1).map_or(true, |n| n.is_whitespace() || n == '$' || n == '\'' || n == '"' || n == '(') {
-                                self.advance();
-                                self.last_was_term = false;
-                                return Ok(Token::FileTest(c));
-                            }
+                        if "efdlpSszrwxoRWXOBCTMAgu".contains(c)
+                            && self.peek_at(1).is_none_or(|n| {
+                                n.is_whitespace() || n == '$' || n == '\'' || n == '"' || n == '('
+                            })
+                        {
+                            self.advance();
+                            self.last_was_term = false;
+                            return Ok(Token::FileTest(c));
                         }
                     }
                 }
@@ -501,7 +511,7 @@ impl Lexer {
                     return Ok(Token::Arrow);
                 }
                 self.last_was_term = false;
-                return Ok(Token::Minus);
+                Ok(Token::Minus)
             }
             '*' => {
                 self.advance();
@@ -521,7 +531,7 @@ impl Lexer {
                     return Ok(Token::MulAssign);
                 }
                 self.last_was_term = false;
-                return Ok(Token::Star);
+                Ok(Token::Star)
             }
             '%' => {
                 // Only reached when last_was_term is true (hash sigil handled above)
@@ -532,7 +542,7 @@ impl Lexer {
                     return Ok(Token::ModAssign);
                 }
                 self.last_was_term = false;
-                return Ok(Token::Percent);
+                Ok(Token::Percent)
             }
             '.' => {
                 self.advance();
@@ -547,7 +557,7 @@ impl Lexer {
                     return Ok(Token::DotAssign);
                 }
                 self.last_was_term = false;
-                return Ok(Token::Dot);
+                Ok(Token::Dot)
             }
             '=' => {
                 self.advance();
@@ -567,7 +577,7 @@ impl Lexer {
                     return Ok(Token::FatArrow);
                 }
                 // POD: =head1 etc — skip until =cut
-                if self.peek().map_or(false, |c| c.is_alphabetic()) {
+                if self.peek().is_some_and(|c| c.is_alphabetic()) {
                     // Skip POD
                     loop {
                         let line = self.read_while(|c| c != '\n');
@@ -581,7 +591,7 @@ impl Lexer {
                     return self.next_token();
                 }
                 self.last_was_term = false;
-                return Ok(Token::Assign);
+                Ok(Token::Assign)
             }
             '!' => {
                 self.advance();
@@ -596,7 +606,7 @@ impl Lexer {
                     return Ok(Token::BindNotMatch);
                 }
                 self.last_was_term = false;
-                return Ok(Token::LogNot);
+                Ok(Token::LogNot)
             }
             '<' => {
                 self.advance();
@@ -606,7 +616,7 @@ impl Lexer {
                     self.last_was_term = true;
                     return Ok(Token::Diamond);
                 }
-                if self.peek().map_or(false, |c| c.is_uppercase()) {
+                if self.peek().is_some_and(|c| c.is_uppercase()) {
                     let name = self.read_identifier();
                     if self.peek() == Some('>') {
                         self.advance();
@@ -642,7 +652,7 @@ impl Lexer {
                     return Ok(Token::HereDoc(tag, body));
                 }
                 self.last_was_term = false;
-                return Ok(Token::NumLt);
+                Ok(Token::NumLt)
             }
             '>' => {
                 self.advance();
@@ -662,7 +672,7 @@ impl Lexer {
                     return Ok(Token::ShiftRight);
                 }
                 self.last_was_term = false;
-                return Ok(Token::NumGt);
+                Ok(Token::NumGt)
             }
             '&' => {
                 self.advance();
@@ -677,7 +687,7 @@ impl Lexer {
                     return Ok(Token::LogAnd);
                 }
                 self.last_was_term = false;
-                return Ok(Token::BitAnd);
+                Ok(Token::BitAnd)
             }
             '|' => {
                 self.advance();
@@ -692,7 +702,7 @@ impl Lexer {
                     return Ok(Token::LogOr);
                 }
                 self.last_was_term = false;
-                return Ok(Token::BitOr);
+                Ok(Token::BitOr)
             }
             '^' => {
                 self.advance();
@@ -702,17 +712,17 @@ impl Lexer {
                     return Ok(Token::XorAssign);
                 }
                 self.last_was_term = false;
-                return Ok(Token::BitXor);
+                Ok(Token::BitXor)
             }
             '~' => {
                 self.advance();
                 self.last_was_term = false;
-                return Ok(Token::BitNot);
+                Ok(Token::BitNot)
             }
             '?' => {
                 self.advance();
                 self.last_was_term = false;
-                return Ok(Token::Question);
+                Ok(Token::Question)
             }
             ':' => {
                 self.advance();
@@ -722,52 +732,52 @@ impl Lexer {
                     return Ok(Token::PackageSep);
                 }
                 self.last_was_term = false;
-                return Ok(Token::Colon);
+                Ok(Token::Colon)
             }
             '\\' => {
                 self.advance();
                 self.last_was_term = false;
-                return Ok(Token::Backslash);
+                Ok(Token::Backslash)
             }
             ',' => {
                 self.advance();
                 self.last_was_term = false;
-                return Ok(Token::Comma);
+                Ok(Token::Comma)
             }
             ';' => {
                 self.advance();
                 self.last_was_term = false;
-                return Ok(Token::Semicolon);
+                Ok(Token::Semicolon)
             }
             '(' => {
                 self.advance();
                 self.last_was_term = false;
-                return Ok(Token::LParen);
+                Ok(Token::LParen)
             }
             ')' => {
                 self.advance();
                 self.last_was_term = true;
-                return Ok(Token::RParen);
+                Ok(Token::RParen)
             }
             '[' => {
                 self.advance();
                 self.last_was_term = false;
-                return Ok(Token::LBracket);
+                Ok(Token::LBracket)
             }
             ']' => {
                 self.advance();
                 self.last_was_term = true;
-                return Ok(Token::RBracket);
+                Ok(Token::RBracket)
             }
             '{' => {
                 self.advance();
                 self.last_was_term = false;
-                return Ok(Token::LBrace);
+                Ok(Token::LBrace)
             }
             '}' => {
                 self.advance();
                 self.last_was_term = true;
-                return Ok(Token::RBrace);
+                Ok(Token::RBrace)
             }
 
             // Identifiers and keywords
@@ -985,22 +995,20 @@ impl Lexer {
                 self.last_was_term = match ident.as_str() {
                     "my" | "our" | "local" | "return" | "print" | "say" | "die" | "warn"
                     | "push" | "pop" | "shift" | "unshift" | "splice" | "delete" | "exists"
-                    | "chomp" | "chop" | "defined" | "keys" | "values" | "each" | "sub"
-                    | "if" | "unless" | "while" | "until" | "for" | "foreach" | "elsif"
-                    | "use" | "no" | "require" | "eval" | "do" | "map" | "grep" | "sort"
-                    | "pmap" | "pgrep" | "pfor" | "psort" | "join" | "split" | "reverse"
-                    | "not" | "ref" | "scalar" => false,
+                    | "chomp" | "chop" | "defined" | "keys" | "values" | "each" | "sub" | "if"
+                    | "unless" | "while" | "until" | "for" | "foreach" | "elsif" | "use" | "no"
+                    | "require" | "eval" | "do" | "map" | "grep" | "sort" | "pmap" | "pgrep"
+                    | "pfor" | "psort" | "join" | "split" | "reverse" | "not" | "ref"
+                    | "scalar" => false,
                     _ => matches!(tok, Token::Ident(_)),
                 };
-                return Ok(tok);
+                Ok(tok)
             }
 
-            c => {
-                Err(PerlError::syntax(
-                    format!("Unexpected character '{c}'"),
-                    self.line,
-                ))
-            }
+            c => Err(PerlError::syntax(
+                format!("Unexpected character '{c}'"),
+                self.line,
+            )),
         }
     }
 

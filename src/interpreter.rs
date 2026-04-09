@@ -80,6 +80,12 @@ pub struct Interpreter {
     pub num_threads: usize,
 }
 
+impl Default for Interpreter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Interpreter {
     pub fn new() -> Self {
         let mut env = IndexMap::new();
@@ -177,7 +183,7 @@ impl Interpreter {
         // Execute END blocks
         let ends = std::mem::take(&mut self.end_blocks);
         for block in &ends {
-            let _ = self.exec_block(&block);
+            let _ = self.exec_block(block);
         }
 
         Ok(last)
@@ -206,7 +212,12 @@ impl Interpreter {
     fn exec_statement(&mut self, stmt: &Statement) -> ExecResult {
         match &stmt.kind {
             StmtKind::Expression(expr) => self.eval_expr(expr),
-            StmtKind::If { condition, body, elsifs, else_block } => {
+            StmtKind::If {
+                condition,
+                body,
+                elsifs,
+                else_block,
+            } => {
                 let cond = self.eval_expr(condition)?;
                 if cond.is_true() {
                     return self.exec_block(body);
@@ -222,7 +233,11 @@ impl Interpreter {
                 }
                 Ok(PerlValue::Undef)
             }
-            StmtKind::Unless { condition, body, else_block } => {
+            StmtKind::Unless {
+                condition,
+                body,
+                else_block,
+            } => {
                 let cond = self.eval_expr(condition)?;
                 if !cond.is_true() {
                     return self.exec_block(body);
@@ -232,7 +247,11 @@ impl Interpreter {
                 }
                 Ok(PerlValue::Undef)
             }
-            StmtKind::While { condition, body, label } => {
+            StmtKind::While {
+                condition,
+                body,
+                label,
+            } => {
                 loop {
                     let cond = self.eval_expr(condition)?;
                     if !cond.is_true() {
@@ -240,8 +259,12 @@ impl Interpreter {
                     }
                     match self.exec_block(body) {
                         Ok(_) => {}
-                        Err(FlowOrError::Flow(Flow::Last(ref l))) if l == label || l.is_none() => break,
-                        Err(FlowOrError::Flow(Flow::Next(ref l))) if l == label || l.is_none() => continue,
+                        Err(FlowOrError::Flow(Flow::Last(ref l))) if l == label || l.is_none() => {
+                            break
+                        }
+                        Err(FlowOrError::Flow(Flow::Next(ref l))) if l == label || l.is_none() => {
+                            continue
+                        }
                         Err(FlowOrError::Flow(Flow::Redo(ref l))) if l == label || l.is_none() => {
                             // Re-execute without checking condition — but we need to loop
                             let _ = self.exec_block(body);
@@ -251,7 +274,11 @@ impl Interpreter {
                 }
                 Ok(PerlValue::Undef)
             }
-            StmtKind::Until { condition, body, label } => {
+            StmtKind::Until {
+                condition,
+                body,
+                label,
+            } => {
                 loop {
                     let cond = self.eval_expr(condition)?;
                     if cond.is_true() {
@@ -259,8 +286,12 @@ impl Interpreter {
                     }
                     match self.exec_block(body) {
                         Ok(_) => {}
-                        Err(FlowOrError::Flow(Flow::Last(ref l))) if l == label || l.is_none() => break,
-                        Err(FlowOrError::Flow(Flow::Next(ref l))) if l == label || l.is_none() => continue,
+                        Err(FlowOrError::Flow(Flow::Last(ref l))) if l == label || l.is_none() => {
+                            break
+                        }
+                        Err(FlowOrError::Flow(Flow::Next(ref l))) if l == label || l.is_none() => {
+                            continue
+                        }
                         Err(e) => return Err(e),
                     }
                 }
@@ -276,7 +307,13 @@ impl Interpreter {
                 }
                 Ok(PerlValue::Undef)
             }
-            StmtKind::For { init, condition, step, body, label } => {
+            StmtKind::For {
+                init,
+                condition,
+                step,
+                body,
+                label,
+            } => {
                 self.scope.push_frame();
                 if let Some(init) = init {
                     self.exec_statement(init)?;
@@ -290,7 +327,9 @@ impl Interpreter {
                     }
                     match self.exec_block(body) {
                         Ok(_) => {}
-                        Err(FlowOrError::Flow(Flow::Last(ref l))) if l == label || l.is_none() => break,
+                        Err(FlowOrError::Flow(Flow::Last(ref l))) if l == label || l.is_none() => {
+                            break
+                        }
                         Err(FlowOrError::Flow(Flow::Next(ref l))) if l == label || l.is_none() => {}
                         Err(e) => {
                             self.scope.pop_frame();
@@ -304,7 +343,12 @@ impl Interpreter {
                 self.scope.pop_frame();
                 Ok(PerlValue::Undef)
             }
-            StmtKind::Foreach { var, list, body, label } => {
+            StmtKind::Foreach {
+                var,
+                list,
+                body,
+                label,
+            } => {
                 let list_val = self.eval_expr(list)?;
                 let items = list_val.to_list();
                 self.scope.push_frame();
@@ -313,8 +357,12 @@ impl Interpreter {
                     self.scope.set_scalar(var, item);
                     match self.exec_block(body) {
                         Ok(_) => {}
-                        Err(FlowOrError::Flow(Flow::Last(ref l))) if l == label || l.is_none() => break,
-                        Err(FlowOrError::Flow(Flow::Next(ref l))) if l == label || l.is_none() => continue,
+                        Err(FlowOrError::Flow(Flow::Last(ref l))) if l == label || l.is_none() => {
+                            break
+                        }
+                        Err(FlowOrError::Flow(Flow::Next(ref l))) if l == label || l.is_none() => {
+                            continue
+                        }
                         Err(e) => {
                             self.scope.pop_frame();
                             return Err(e);
@@ -367,7 +415,8 @@ impl Interpreter {
             }
             StmtKind::Package { name } => {
                 // Minimal package support — just set a variable
-                self.scope.set_scalar("__PACKAGE__", PerlValue::String(name.clone()));
+                self.scope
+                    .set_scalar("__PACKAGE__", PerlValue::String(name.clone()));
                 Ok(PerlValue::Undef)
             }
             StmtKind::Use { module, imports: _ } => {
@@ -421,9 +470,9 @@ impl Interpreter {
                 let re = self.compile_regex(pattern, flags, line)?;
                 Ok(PerlValue::Regex(Arc::new(re), pattern.clone()))
             }
-            ExprKind::QW(words) => {
-                Ok(PerlValue::Array(words.iter().map(|w| PerlValue::String(w.clone())).collect()))
-            }
+            ExprKind::QW(words) => Ok(PerlValue::Array(
+                words.iter().map(|w| PerlValue::String(w.clone())).collect(),
+            )),
 
             // Interpolated strings
             ExprKind::InterpolatedString(parts) => {
@@ -437,7 +486,11 @@ impl Interpreter {
                         }
                         StringPart::ArrayVar(name) => {
                             let arr = self.scope.get_array(name);
-                            let joined = arr.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(" ");
+                            let joined = arr
+                                .iter()
+                                .map(|v| v.to_string())
+                                .collect::<Vec<_>>()
+                                .join(" ");
                             result.push_str(&joined);
                         }
                         StringPart::Expr(e) => {
@@ -513,15 +566,27 @@ impl Interpreter {
                 match kind {
                     Sigil::Scalar => match val {
                         PerlValue::ScalarRef(r) => Ok(r.read().clone()),
-                        _ => Err(PerlError::runtime("Can't dereference non-reference as scalar", line).into()),
+                        _ => Err(PerlError::runtime(
+                            "Can't dereference non-reference as scalar",
+                            line,
+                        )
+                        .into()),
                     },
                     Sigil::Array => match val {
                         PerlValue::ArrayRef(r) => Ok(PerlValue::Array(r.read().clone())),
-                        _ => Err(PerlError::runtime("Can't dereference non-reference as array", line).into()),
+                        _ => Err(PerlError::runtime(
+                            "Can't dereference non-reference as array",
+                            line,
+                        )
+                        .into()),
                     },
                     Sigil::Hash => match val {
                         PerlValue::HashRef(r) => Ok(PerlValue::Hash(r.read().clone())),
-                        _ => Err(PerlError::runtime("Can't dereference non-reference as hash", line).into()),
+                        _ => Err(PerlError::runtime(
+                            "Can't dereference non-reference as hash",
+                            line,
+                        )
+                        .into()),
                     },
                 }
             }
@@ -533,10 +598,18 @@ impl Interpreter {
                         match val {
                             PerlValue::ArrayRef(r) => {
                                 let arr = r.read();
-                                let i = if idx < 0 { (arr.len() as i64 + idx) as usize } else { idx as usize };
+                                let i = if idx < 0 {
+                                    (arr.len() as i64 + idx) as usize
+                                } else {
+                                    idx as usize
+                                };
                                 Ok(arr.get(i).cloned().unwrap_or(PerlValue::Undef))
                             }
-                            _ => Err(PerlError::runtime("Can't use arrow deref on non-array-ref", line).into()),
+                            _ => Err(PerlError::runtime(
+                                "Can't use arrow deref on non-array-ref",
+                                line,
+                            )
+                            .into()),
                         }
                     }
                     DerefKind::Hash => {
@@ -551,10 +624,18 @@ impl Interpreter {
                                 if let PerlValue::Hash(ref h) = *data {
                                     Ok(h.get(&key).cloned().unwrap_or(PerlValue::Undef))
                                 } else {
-                                    Err(PerlError::runtime("Can't access hash field on non-hash blessed ref", line).into())
+                                    Err(PerlError::runtime(
+                                        "Can't access hash field on non-hash blessed ref",
+                                        line,
+                                    )
+                                    .into())
                                 }
                             }
-                            _ => Err(PerlError::runtime("Can't use arrow deref on non-hash-ref", line).into()),
+                            _ => Err(PerlError::runtime(
+                                "Can't use arrow deref on non-hash-ref",
+                                line,
+                            )
+                            .into()),
                         }
                     }
                     DerefKind::Call => {
@@ -605,33 +686,35 @@ impl Interpreter {
             }
 
             // Unary
-            ExprKind::UnaryOp { op, expr } => {
-                match op {
-                    UnaryOp::PreIncrement => {
-                        let val = self.eval_expr(expr)?;
-                        let new_val = PerlValue::Integer(val.to_int() + 1);
-                        self.assign_value(expr, new_val.clone())?;
-                        Ok(new_val)
-                    }
-                    UnaryOp::PreDecrement => {
-                        let val = self.eval_expr(expr)?;
-                        let new_val = PerlValue::Integer(val.to_int() - 1);
-                        self.assign_value(expr, new_val.clone())?;
-                        Ok(new_val)
-                    }
-                    _ => {
-                        let val = self.eval_expr(expr)?;
-                        match op {
-                            UnaryOp::Negate => Ok(PerlValue::Float(-val.to_number())),
-                            UnaryOp::LogNot => Ok(PerlValue::Integer(if val.is_true() { 0 } else { 1 })),
-                            UnaryOp::BitNot => Ok(PerlValue::Integer(!val.to_int())),
-                            UnaryOp::LogNotWord => Ok(PerlValue::Integer(if val.is_true() { 0 } else { 1 })),
-                            UnaryOp::Ref => Ok(PerlValue::ScalarRef(Arc::new(RwLock::new(val)))),
-                            _ => unreachable!(),
+            ExprKind::UnaryOp { op, expr } => match op {
+                UnaryOp::PreIncrement => {
+                    let val = self.eval_expr(expr)?;
+                    let new_val = PerlValue::Integer(val.to_int() + 1);
+                    self.assign_value(expr, new_val.clone())?;
+                    Ok(new_val)
+                }
+                UnaryOp::PreDecrement => {
+                    let val = self.eval_expr(expr)?;
+                    let new_val = PerlValue::Integer(val.to_int() - 1);
+                    self.assign_value(expr, new_val.clone())?;
+                    Ok(new_val)
+                }
+                _ => {
+                    let val = self.eval_expr(expr)?;
+                    match op {
+                        UnaryOp::Negate => Ok(PerlValue::Float(-val.to_number())),
+                        UnaryOp::LogNot => {
+                            Ok(PerlValue::Integer(if val.is_true() { 0 } else { 1 }))
                         }
+                        UnaryOp::BitNot => Ok(PerlValue::Integer(!val.to_int())),
+                        UnaryOp::LogNotWord => {
+                            Ok(PerlValue::Integer(if val.is_true() { 0 } else { 1 }))
+                        }
+                        UnaryOp::Ref => Ok(PerlValue::ScalarRef(Arc::new(RwLock::new(val)))),
+                        _ => unreachable!(),
                     }
                 }
-            }
+            },
 
             ExprKind::PostfixOp { expr, op } => {
                 let val = self.eval_expr(expr)?;
@@ -659,7 +742,11 @@ impl Interpreter {
             }
 
             // Ternary
-            ExprKind::Ternary { condition, then_expr, else_expr } => {
+            ExprKind::Ternary {
+                condition,
+                then_expr,
+                else_expr,
+            } => {
                 let cond = self.eval_expr(condition)?;
                 if cond.is_true() {
                     self.eval_expr(then_expr)
@@ -706,7 +793,11 @@ impl Interpreter {
                 }
                 self.call_named_sub(name, arg_vals, line)
             }
-            ExprKind::MethodCall { object, method, args } => {
+            ExprKind::MethodCall {
+                object,
+                method,
+                args,
+            } => {
                 let obj = self.eval_expr(object)?;
                 let mut arg_vals = vec![obj.clone()];
                 for a in args {
@@ -716,7 +807,11 @@ impl Interpreter {
                 let class = match &obj {
                     PerlValue::Blessed(b) => b.class.clone(),
                     PerlValue::String(s) => s.clone(), // Class->method()
-                    _ => return Err(PerlError::runtime("Can't call method on non-object", line).into()),
+                    _ => {
+                        return Err(
+                            PerlError::runtime("Can't call method on non-object", line).into()
+                        )
+                    }
                 };
                 let full_name = format!("{}::{}", class, method);
                 if let Some(sub) = self.subs.get(&full_name).cloned() {
@@ -725,12 +820,21 @@ impl Interpreter {
                     // Default constructor
                     self.builtin_new(&class, arg_vals, line)
                 } else {
-                    Err(PerlError::runtime(format!("Can't locate method \"{}\" in package \"{}\"", method, class), line).into())
+                    Err(PerlError::runtime(
+                        format!(
+                            "Can't locate method \"{}\" in package \"{}\"",
+                            method, class
+                        ),
+                        line,
+                    )
+                    .into())
                 }
             }
 
             // Print/Say/Printf
-            ExprKind::Print { handle, args } => self.exec_print(handle.as_deref(), args, false, line),
+            ExprKind::Print { handle, args } => {
+                self.exec_print(handle.as_deref(), args, false, line)
+            }
             ExprKind::Say { handle, args } => self.exec_print(handle.as_deref(), args, true, line),
             ExprKind::Printf { handle, args } => self.exec_printf(handle.as_deref(), args, line),
             ExprKind::Die(args) => {
@@ -766,7 +870,11 @@ impl Interpreter {
             }
 
             // Regex
-            ExprKind::Match { expr, pattern, flags } => {
+            ExprKind::Match {
+                expr,
+                pattern,
+                flags,
+            } => {
                 let val = self.eval_expr(expr)?;
                 let s = val.to_string();
                 let re = self.compile_regex(pattern, flags, line)?;
@@ -784,7 +892,10 @@ impl Interpreter {
                     // Set capture variables $1, $2, etc.
                     for i in 1..caps.len() {
                         if let Some(m) = caps.get(i) {
-                            self.scope.set_scalar(&i.to_string(), PerlValue::String(m.as_str().to_string()));
+                            self.scope.set_scalar(
+                                &i.to_string(),
+                                PerlValue::String(m.as_str().to_string()),
+                            );
                         }
                     }
                     PerlValue::Integer(1)
@@ -793,7 +904,12 @@ impl Interpreter {
                 };
                 Ok(matched)
             }
-            ExprKind::Substitution { expr, pattern, replacement, flags } => {
+            ExprKind::Substitution {
+                expr,
+                pattern,
+                replacement,
+                flags,
+            } => {
                 let val = self.eval_expr(expr)?;
                 let s = val.to_string();
                 let re = self.compile_regex(pattern, flags, line)?;
@@ -807,20 +923,28 @@ impl Interpreter {
                 self.assign_value(expr, PerlValue::String(new_s))?;
                 Ok(PerlValue::Integer(count as i64))
             }
-            ExprKind::Transliterate { expr, from, to, flags } => {
+            ExprKind::Transliterate {
+                expr,
+                from,
+                to,
+                flags,
+            } => {
                 let val = self.eval_expr(expr)?;
                 let s = val.to_string();
                 let from_chars: Vec<char> = from.chars().collect();
                 let to_chars: Vec<char> = to.chars().collect();
                 let mut count = 0i64;
-                let new_s: String = s.chars().map(|c| {
-                    if let Some(pos) = from_chars.iter().position(|&fc| fc == c) {
-                        count += 1;
-                        to_chars.get(pos).or(to_chars.last()).copied().unwrap_or(c)
-                    } else {
-                        c
-                    }
-                }).collect();
+                let new_s: String = s
+                    .chars()
+                    .map(|c| {
+                        if let Some(pos) = from_chars.iter().position(|&fc| fc == c) {
+                            count += 1;
+                            to_chars.get(pos).or(to_chars.last()).copied().unwrap_or(c)
+                        } else {
+                            c
+                        }
+                    })
+                    .collect();
                 if !flags.contains('d') || flags.contains('r') {
                     self.assign_value(expr, PerlValue::String(new_s))?;
                 }
@@ -867,15 +991,19 @@ impl Interpreter {
                         match self.exec_block(&cmp_block) {
                             Ok(v) => {
                                 let n = v.to_int();
-                                if n < 0 { std::cmp::Ordering::Less }
-                                else if n > 0 { std::cmp::Ordering::Greater }
-                                else { std::cmp::Ordering::Equal }
+                                if n < 0 {
+                                    std::cmp::Ordering::Less
+                                } else if n > 0 {
+                                    std::cmp::Ordering::Greater
+                                } else {
+                                    std::cmp::Ordering::Equal
+                                }
                             }
                             Err(_) => std::cmp::Ordering::Equal,
                         }
                     });
                 } else {
-                    items.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+                    items.sort_by_key(|a| a.to_string());
                 }
                 Ok(PerlValue::Array(items))
             }
@@ -971,9 +1099,13 @@ impl Interpreter {
                         match local_interp.exec_block(&cmp_block) {
                             Ok(v) => {
                                 let n = v.to_int();
-                                if n < 0 { std::cmp::Ordering::Less }
-                                else if n > 0 { std::cmp::Ordering::Greater }
-                                else { std::cmp::Ordering::Equal }
+                                if n < 0 {
+                                    std::cmp::Ordering::Less
+                                } else if n > 0 {
+                                    std::cmp::Ordering::Greater
+                                } else {
+                                    std::cmp::Ordering::Equal
+                                }
                             }
                             Err(_) => std::cmp::Ordering::Equal,
                         }
@@ -1028,9 +1160,18 @@ impl Interpreter {
                 let len = arr.len();
                 Ok(PerlValue::Integer(len as i64))
             }
-            ExprKind::Splice { array, offset, length, replacement } => {
+            ExprKind::Splice {
+                array,
+                offset,
+                length,
+                replacement,
+            } => {
                 let arr_name = self.extract_array_name(array)?;
-                let off = if let Some(o) = offset { self.eval_expr(o)?.to_int() as usize } else { 0 };
+                let off = if let Some(o) = offset {
+                    self.eval_expr(o)?.to_int() as usize
+                } else {
+                    0
+                };
                 let len = if let Some(l) = length {
                     self.eval_expr(l)?.to_int() as usize
                 } else {
@@ -1049,29 +1190,38 @@ impl Interpreter {
                 }
                 Ok(PerlValue::Array(removed))
             }
-            ExprKind::Delete(expr) => {
-                match &expr.kind {
-                    ExprKind::HashElement { hash, key } => {
-                        let k = self.eval_expr(key)?.to_string();
-                        Ok(self.scope.delete_hash_element(hash, &k))
-                    }
-                    _ => Err(PerlError::runtime("delete requires hash element", line).into()),
+            ExprKind::Delete(expr) => match &expr.kind {
+                ExprKind::HashElement { hash, key } => {
+                    let k = self.eval_expr(key)?.to_string();
+                    Ok(self.scope.delete_hash_element(hash, &k))
                 }
-            }
-            ExprKind::Exists(expr) => {
-                match &expr.kind {
-                    ExprKind::HashElement { hash, key } => {
-                        let k = self.eval_expr(key)?.to_string();
-                        Ok(PerlValue::Integer(if self.scope.exists_hash_element(hash, &k) { 1 } else { 0 }))
-                    }
-                    _ => Err(PerlError::runtime("exists requires hash element", line).into()),
+                _ => Err(PerlError::runtime("delete requires hash element", line).into()),
+            },
+            ExprKind::Exists(expr) => match &expr.kind {
+                ExprKind::HashElement { hash, key } => {
+                    let k = self.eval_expr(key)?.to_string();
+                    Ok(PerlValue::Integer(
+                        if self.scope.exists_hash_element(hash, &k) {
+                            1
+                        } else {
+                            0
+                        },
+                    ))
                 }
-            }
+                _ => Err(PerlError::runtime("exists requires hash element", line).into()),
+            },
             ExprKind::Keys(expr) => {
                 let val = self.eval_expr(expr)?;
                 match val {
-                    PerlValue::Hash(h) => Ok(PerlValue::Array(h.keys().map(|k| PerlValue::String(k.clone())).collect())),
-                    PerlValue::HashRef(r) => Ok(PerlValue::Array(r.read().keys().map(|k| PerlValue::String(k.clone())).collect())),
+                    PerlValue::Hash(h) => Ok(PerlValue::Array(
+                        h.keys().map(|k| PerlValue::String(k.clone())).collect(),
+                    )),
+                    PerlValue::HashRef(r) => Ok(PerlValue::Array(
+                        r.read()
+                            .keys()
+                            .map(|k| PerlValue::String(k.clone()))
+                            .collect(),
+                    )),
                     _ => Err(PerlError::runtime("keys requires hash", line).into()),
                 }
             }
@@ -1079,7 +1229,9 @@ impl Interpreter {
                 let val = self.eval_expr(expr)?;
                 match val {
                     PerlValue::Hash(h) => Ok(PerlValue::Array(h.values().cloned().collect())),
-                    PerlValue::HashRef(r) => Ok(PerlValue::Array(r.read().values().cloned().collect())),
+                    PerlValue::HashRef(r) => {
+                        Ok(PerlValue::Array(r.read().values().cloned().collect()))
+                    }
                     _ => Err(PerlError::runtime("values requires hash", line).into()),
                 }
             }
@@ -1092,14 +1244,22 @@ impl Interpreter {
             ExprKind::Chomp(expr) => {
                 let val = self.eval_expr(expr)?;
                 let mut s = val.to_string();
-                let removed = if s.ends_with('\n') { s.pop(); 1 } else { 0 };
+                let removed = if s.ends_with('\n') {
+                    s.pop();
+                    1
+                } else {
+                    0
+                };
                 self.assign_value(expr, PerlValue::String(s))?;
                 Ok(PerlValue::Integer(removed))
             }
             ExprKind::Chop(expr) => {
                 let val = self.eval_expr(expr)?;
                 let mut s = val.to_string();
-                let chopped = s.pop().map(|c| PerlValue::String(c.to_string())).unwrap_or(PerlValue::Undef);
+                let chopped = s
+                    .pop()
+                    .map(|c| PerlValue::String(c.to_string()))
+                    .unwrap_or(PerlValue::Undef);
                 self.assign_value(expr, PerlValue::String(s))?;
                 Ok(chopped)
             }
@@ -1111,10 +1271,19 @@ impl Interpreter {
                     other => Ok(PerlValue::Integer(other.to_string().len() as i64)),
                 }
             }
-            ExprKind::Substr { string, offset, length, replacement } => {
+            ExprKind::Substr {
+                string,
+                offset,
+                length,
+                replacement,
+            } => {
                 let s = self.eval_expr(string)?.to_string();
                 let off = self.eval_expr(offset)?.to_int();
-                let start = if off < 0 { (s.len() as i64 + off).max(0) as usize } else { off as usize };
+                let start = if off < 0 {
+                    (s.len() as i64 + off).max(0) as usize
+                } else {
+                    off as usize
+                };
                 let len = if let Some(l) = length {
                     self.eval_expr(l)?.to_int() as usize
                 } else {
@@ -1132,17 +1301,33 @@ impl Interpreter {
                 }
                 Ok(PerlValue::String(result))
             }
-            ExprKind::Index { string, substr, position } => {
+            ExprKind::Index {
+                string,
+                substr,
+                position,
+            } => {
                 let s = self.eval_expr(string)?.to_string();
                 let sub = self.eval_expr(substr)?.to_string();
-                let pos = if let Some(p) = position { self.eval_expr(p)?.to_int() as usize } else { 0 };
+                let pos = if let Some(p) = position {
+                    self.eval_expr(p)?.to_int() as usize
+                } else {
+                    0
+                };
                 let result = s[pos..].find(&sub).map(|i| (i + pos) as i64).unwrap_or(-1);
                 Ok(PerlValue::Integer(result))
             }
-            ExprKind::Rindex { string, substr, position } => {
+            ExprKind::Rindex {
+                string,
+                substr,
+                position,
+            } => {
                 let s = self.eval_expr(string)?.to_string();
                 let sub = self.eval_expr(substr)?.to_string();
-                let end = if let Some(p) = position { self.eval_expr(p)?.to_int() as usize + sub.len() } else { s.len() };
+                let end = if let Some(p) = position {
+                    self.eval_expr(p)?.to_int() as usize + sub.len()
+                } else {
+                    s.len()
+                };
                 let search = &s[..end.min(s.len())];
                 let result = search.rfind(&sub).map(|i| i as i64).unwrap_or(-1);
                 Ok(PerlValue::Integer(result))
@@ -1158,18 +1343,34 @@ impl Interpreter {
             ExprKind::JoinExpr { separator, list } => {
                 let sep = self.eval_expr(separator)?.to_string();
                 let items = self.eval_expr(list)?.to_list();
-                let joined = items.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(&sep);
+                let joined = items
+                    .iter()
+                    .map(|v| v.to_string())
+                    .collect::<Vec<_>>()
+                    .join(&sep);
                 Ok(PerlValue::String(joined))
             }
-            ExprKind::SplitExpr { pattern, string, limit } => {
+            ExprKind::SplitExpr {
+                pattern,
+                string,
+                limit,
+            } => {
                 let pat = self.eval_expr(pattern)?.to_string();
                 let s = self.eval_expr(string)?.to_string();
-                let lim = if let Some(l) = limit { self.eval_expr(l)?.to_int() as usize } else { 0 };
+                let lim = if let Some(l) = limit {
+                    self.eval_expr(l)?.to_int() as usize
+                } else {
+                    0
+                };
                 let re = self.compile_regex(&pat, "", line)?;
                 let parts: Vec<PerlValue> = if lim > 0 {
-                    re.splitn(&s, lim).map(|p| PerlValue::String(p.to_string())).collect()
+                    re.splitn(&s, lim)
+                        .map(|p| PerlValue::String(p.to_string()))
+                        .collect()
                 } else {
-                    re.split(&s).map(|p| PerlValue::String(p.to_string())).collect()
+                    re.split(&s)
+                        .map(|p| PerlValue::String(p.to_string()))
+                        .collect()
                 };
                 Ok(PerlValue::Array(parts))
             }
@@ -1207,8 +1408,12 @@ impl Interpreter {
             }
 
             // Case
-            ExprKind::Lc(expr) => Ok(PerlValue::String(self.eval_expr(expr)?.to_string().to_lowercase())),
-            ExprKind::Uc(expr) => Ok(PerlValue::String(self.eval_expr(expr)?.to_string().to_uppercase())),
+            ExprKind::Lc(expr) => Ok(PerlValue::String(
+                self.eval_expr(expr)?.to_string().to_lowercase(),
+            )),
+            ExprKind::Uc(expr) => Ok(PerlValue::String(
+                self.eval_expr(expr)?.to_string().to_uppercase(),
+            )),
             ExprKind::Lcfirst(expr) => {
                 let s = self.eval_expr(expr)?.to_string();
                 let mut chars = s.chars();
@@ -1231,7 +1436,11 @@ impl Interpreter {
             // Type
             ExprKind::Defined(expr) => {
                 let val = self.eval_expr(expr)?;
-                Ok(PerlValue::Integer(if matches!(val, PerlValue::Undef) { 0 } else { 1 }))
+                Ok(PerlValue::Integer(if matches!(val, PerlValue::Undef) {
+                    0
+                } else {
+                    1
+                }))
             }
             ExprKind::Ref(expr) => {
                 let val = self.eval_expr(expr)?;
@@ -1245,11 +1454,15 @@ impl Interpreter {
             // Char
             ExprKind::Chr(expr) => {
                 let n = self.eval_expr(expr)?.to_int() as u32;
-                Ok(PerlValue::String(char::from_u32(n).map(|c| c.to_string()).unwrap_or_default()))
+                Ok(PerlValue::String(
+                    char::from_u32(n).map(|c| c.to_string()).unwrap_or_default(),
+                ))
             }
             ExprKind::Ord(expr) => {
                 let s = self.eval_expr(expr)?.to_string();
-                Ok(PerlValue::Integer(s.chars().next().map(|c| c as i64).unwrap_or(0)))
+                Ok(PerlValue::Integer(
+                    s.chars().next().map(|c| c as i64).unwrap_or(0),
+                ))
             }
 
             // I/O
@@ -1260,12 +1473,12 @@ impl Interpreter {
                     (mode_s, self.eval_expr(f)?.to_string())
                 } else {
                     // Parse mode from combined string: ">file", "<file", ">>file"
-                    if mode_s.starts_with(">>") {
-                        (">>".to_string(), mode_s[2..].trim().to_string())
-                    } else if mode_s.starts_with('>') {
-                        (">".to_string(), mode_s[1..].trim().to_string())
-                    } else if mode_s.starts_with('<') {
-                        ("<".to_string(), mode_s[1..].trim().to_string())
+                    if let Some(rest) = mode_s.strip_prefix(">>") {
+                        (">>".to_string(), rest.trim().to_string())
+                    } else if let Some(rest) = mode_s.strip_prefix('>') {
+                        (">".to_string(), rest.trim().to_string())
+                    } else if let Some(rest) = mode_s.strip_prefix('<') {
+                        ("<".to_string(), rest.trim().to_string())
                     } else {
                         ("<".to_string(), mode_s)
                     }
@@ -1276,7 +1489,8 @@ impl Interpreter {
                             self.errno = e.to_string();
                             PerlError::runtime(format!("Can't open '{}': {}", path, e), line)
                         })?;
-                        self.input_handles.insert(handle_name, BufReader::new(Box::new(file)));
+                        self.input_handles
+                            .insert(handle_name, BufReader::new(Box::new(file)));
                     }
                     ">" => {
                         let file = std::fs::File::create(&path).map_err(|e| {
@@ -1286,14 +1500,22 @@ impl Interpreter {
                         self.output_handles.insert(handle_name, Box::new(file));
                     }
                     ">>" => {
-                        let file = std::fs::OpenOptions::new().append(true).create(true).open(&path).map_err(|e| {
-                            self.errno = e.to_string();
-                            PerlError::runtime(format!("Can't open '{}': {}", path, e), line)
-                        })?;
+                        let file = std::fs::OpenOptions::new()
+                            .append(true)
+                            .create(true)
+                            .open(&path)
+                            .map_err(|e| {
+                                self.errno = e.to_string();
+                                PerlError::runtime(format!("Can't open '{}': {}", path, e), line)
+                            })?;
                         self.output_handles.insert(handle_name, Box::new(file));
                     }
                     _ => {
-                        return Err(PerlError::runtime(format!("Unknown open mode '{}'", actual_mode), line).into());
+                        return Err(PerlError::runtime(
+                            format!("Unknown open mode '{}'", actual_mode),
+                            line,
+                        )
+                        .into());
                     }
                 }
                 Ok(PerlValue::Integer(1))
@@ -1355,8 +1577,12 @@ impl Interpreter {
                     'l' => std::path::Path::new(&path).is_symlink(),
                     'r' => std::fs::metadata(&path).is_ok(), // simplified
                     'w' => std::fs::metadata(&path).is_ok(),
-                    's' => std::fs::metadata(&path).map(|m| m.len() > 0).unwrap_or(false),
-                    'z' => std::fs::metadata(&path).map(|m| m.len() == 0).unwrap_or(true),
+                    's' => std::fs::metadata(&path)
+                        .map(|m| m.len() > 0)
+                        .unwrap_or(false),
+                    'z' => std::fs::metadata(&path)
+                        .map(|m| m.len() == 0)
+                        .unwrap_or(true),
                     _ => false,
                 };
                 Ok(PerlValue::Integer(if result { 1 } else { 0 }))
@@ -1405,19 +1631,17 @@ impl Interpreter {
             }
             ExprKind::Eval(expr) => {
                 match &expr.kind {
-                    ExprKind::CodeRef { body, .. } => {
-                        match self.exec_block(body) {
-                            Ok(v) => {
-                                self.eval_error = String::new();
-                                Ok(v)
-                            }
-                            Err(FlowOrError::Error(e)) => {
-                                self.eval_error = e.to_string();
-                                Ok(PerlValue::Undef)
-                            }
-                            Err(FlowOrError::Flow(f)) => Err(FlowOrError::Flow(f)),
+                    ExprKind::CodeRef { body, .. } => match self.exec_block(body) {
+                        Ok(v) => {
+                            self.eval_error = String::new();
+                            Ok(v)
                         }
-                    }
+                        Err(FlowOrError::Error(e)) => {
+                            self.eval_error = e.to_string();
+                            Ok(PerlValue::Undef)
+                        }
+                        Err(FlowOrError::Flow(f)) => Err(FlowOrError::Flow(f)),
+                    },
                     _ => {
                         let code = self.eval_expr(expr)?.to_string();
                         // Parse and execute the string as Perl code
@@ -1437,21 +1661,17 @@ impl Interpreter {
             ExprKind::Do(expr) => {
                 let val = self.eval_expr(expr)?;
                 match &expr.kind {
-                    ExprKind::CodeRef { body, .. } => {
-                        self.exec_block(body)
-                    }
+                    ExprKind::CodeRef { body, .. } => self.exec_block(body),
                     _ => {
                         let filename = val.to_string();
                         match std::fs::read_to_string(&filename) {
-                            Ok(code) => {
-                                match crate::parse_and_run_string(&code, self) {
-                                    Ok(v) => Ok(v),
-                                    Err(e) => {
-                                        self.errno = e.to_string();
-                                        Ok(PerlValue::Undef)
-                                    }
+                            Ok(code) => match crate::parse_and_run_string(&code, self) {
+                                Ok(v) => Ok(v),
+                                Err(e) => {
+                                    self.errno = e.to_string();
+                                    Ok(PerlValue::Undef)
                                 }
-                            }
+                            },
                             Err(e) => {
                                 self.errno = e.to_string();
                                 Ok(PerlValue::Undef)
@@ -1471,13 +1691,17 @@ impl Interpreter {
                             PerlError::runtime(format!("Can't open {}: {}", full, e), line)
                         })?;
                         return crate::parse_and_run_string(&code, self)
-                            .map_err(|e| FlowOrError::Error(e));
+                            .map_err(FlowOrError::Error);
                     }
                 }
                 Ok(PerlValue::Integer(1)) // silently succeed for now
             }
             ExprKind::Exit(code) => {
-                let c = if let Some(e) = code { self.eval_expr(e)?.to_int() as i32 } else { 0 };
+                let c = if let Some(e) = code {
+                    self.eval_expr(e)?.to_int() as i32
+                } else {
+                    0
+                };
                 Err(PerlError::new(ErrorKind::Exit(c), "", line, &self.file).into())
             }
             ExprKind::Chdir(expr) => {
@@ -1551,17 +1775,27 @@ impl Interpreter {
             // Postfix modifiers
             ExprKind::PostfixIf { expr, condition } => {
                 let cond = self.eval_expr(condition)?;
-                if cond.is_true() { self.eval_expr(expr) } else { Ok(PerlValue::Undef) }
+                if cond.is_true() {
+                    self.eval_expr(expr)
+                } else {
+                    Ok(PerlValue::Undef)
+                }
             }
             ExprKind::PostfixUnless { expr, condition } => {
                 let cond = self.eval_expr(condition)?;
-                if !cond.is_true() { self.eval_expr(expr) } else { Ok(PerlValue::Undef) }
+                if !cond.is_true() {
+                    self.eval_expr(expr)
+                } else {
+                    Ok(PerlValue::Undef)
+                }
             }
             ExprKind::PostfixWhile { expr, condition } => {
                 let mut last = PerlValue::Undef;
                 loop {
                     let cond = self.eval_expr(condition)?;
-                    if !cond.is_true() { break; }
+                    if !cond.is_true() {
+                        break;
+                    }
                     last = self.eval_expr(expr)?;
                 }
                 Ok(last)
@@ -1570,7 +1804,9 @@ impl Interpreter {
                 let mut last = PerlValue::Undef;
                 loop {
                     let cond = self.eval_expr(condition)?;
-                    if cond.is_true() { break; }
+                    if cond.is_true() {
+                        break;
+                    }
                     last = self.eval_expr(expr)?;
                 }
                 Ok(last)
@@ -1609,27 +1845,85 @@ impl Interpreter {
                 PerlValue::Integer(lv.to_int() % d)
             }
             BinOp::Pow => PerlValue::Float(lv.to_number().powf(rv.to_number())),
-            BinOp::Concat => PerlValue::String(format!("{}{}", lv.to_string(), rv.to_string())),
-            BinOp::NumEq => PerlValue::Integer(if lv.to_number() == rv.to_number() { 1 } else { 0 }),
-            BinOp::NumNe => PerlValue::Integer(if lv.to_number() != rv.to_number() { 1 } else { 0 }),
-            BinOp::NumLt => PerlValue::Integer(if lv.to_number() < rv.to_number() { 1 } else { 0 }),
-            BinOp::NumGt => PerlValue::Integer(if lv.to_number() > rv.to_number() { 1 } else { 0 }),
-            BinOp::NumLe => PerlValue::Integer(if lv.to_number() <= rv.to_number() { 1 } else { 0 }),
-            BinOp::NumGe => PerlValue::Integer(if lv.to_number() >= rv.to_number() { 1 } else { 0 }),
+            BinOp::Concat => PerlValue::String(format!("{lv}{rv}")),
+            BinOp::NumEq => PerlValue::Integer(if lv.to_number() == rv.to_number() {
+                1
+            } else {
+                0
+            }),
+            BinOp::NumNe => PerlValue::Integer(if lv.to_number() != rv.to_number() {
+                1
+            } else {
+                0
+            }),
+            BinOp::NumLt => PerlValue::Integer(if lv.to_number() < rv.to_number() {
+                1
+            } else {
+                0
+            }),
+            BinOp::NumGt => PerlValue::Integer(if lv.to_number() > rv.to_number() {
+                1
+            } else {
+                0
+            }),
+            BinOp::NumLe => PerlValue::Integer(if lv.to_number() <= rv.to_number() {
+                1
+            } else {
+                0
+            }),
+            BinOp::NumGe => PerlValue::Integer(if lv.to_number() >= rv.to_number() {
+                1
+            } else {
+                0
+            }),
             BinOp::Spaceship => {
                 let a = lv.to_number();
                 let b = rv.to_number();
-                PerlValue::Integer(if a < b { -1 } else if a > b { 1 } else { 0 })
+                PerlValue::Integer(if a < b {
+                    -1
+                } else if a > b {
+                    1
+                } else {
+                    0
+                })
             }
-            BinOp::StrEq => PerlValue::Integer(if lv.to_string() == rv.to_string() { 1 } else { 0 }),
-            BinOp::StrNe => PerlValue::Integer(if lv.to_string() != rv.to_string() { 1 } else { 0 }),
-            BinOp::StrLt => PerlValue::Integer(if lv.to_string() < rv.to_string() { 1 } else { 0 }),
-            BinOp::StrGt => PerlValue::Integer(if lv.to_string() > rv.to_string() { 1 } else { 0 }),
-            BinOp::StrLe => PerlValue::Integer(if lv.to_string() <= rv.to_string() { 1 } else { 0 }),
-            BinOp::StrGe => PerlValue::Integer(if lv.to_string() >= rv.to_string() { 1 } else { 0 }),
+            BinOp::StrEq => PerlValue::Integer(if lv.to_string() == rv.to_string() {
+                1
+            } else {
+                0
+            }),
+            BinOp::StrNe => PerlValue::Integer(if lv.to_string() != rv.to_string() {
+                1
+            } else {
+                0
+            }),
+            BinOp::StrLt => PerlValue::Integer(if lv.to_string() < rv.to_string() {
+                1
+            } else {
+                0
+            }),
+            BinOp::StrGt => PerlValue::Integer(if lv.to_string() > rv.to_string() {
+                1
+            } else {
+                0
+            }),
+            BinOp::StrLe => PerlValue::Integer(if lv.to_string() <= rv.to_string() {
+                1
+            } else {
+                0
+            }),
+            BinOp::StrGe => PerlValue::Integer(if lv.to_string() >= rv.to_string() {
+                1
+            } else {
+                0
+            }),
             BinOp::StrCmp => {
                 let cmp = lv.to_string().cmp(&rv.to_string());
-                PerlValue::Integer(match cmp { std::cmp::Ordering::Less => -1, std::cmp::Ordering::Greater => 1, std::cmp::Ordering::Equal => 0 })
+                PerlValue::Integer(match cmp {
+                    std::cmp::Ordering::Less => -1,
+                    std::cmp::Ordering::Greater => 1,
+                    std::cmp::Ordering::Equal => 0,
+                })
             }
             BinOp::BitAnd => PerlValue::Integer(lv.to_int() & rv.to_int()),
             BinOp::BitOr => PerlValue::Integer(lv.to_int() | rv.to_int()),
@@ -1637,8 +1931,11 @@ impl Interpreter {
             BinOp::ShiftLeft => PerlValue::Integer(lv.to_int() << rv.to_int()),
             BinOp::ShiftRight => PerlValue::Integer(lv.to_int() >> rv.to_int()),
             // These should have been handled by short-circuit above
-            BinOp::LogAnd | BinOp::LogOr | BinOp::DefinedOr |
-            BinOp::LogAndWord | BinOp::LogOrWord => unreachable!(),
+            BinOp::LogAnd
+            | BinOp::LogOr
+            | BinOp::DefinedOr
+            | BinOp::LogAndWord
+            | BinOp::LogOrWord => unreachable!(),
             BinOp::BindMatch | BinOp::BindNotMatch => unreachable!(),
         })
     }
@@ -1646,7 +1943,11 @@ impl Interpreter {
     fn assign_value(&mut self, target: &Expr, val: PerlValue) -> ExecResult {
         match &target.kind {
             ExprKind::ScalarVar(name) => {
-                if name == "_" || name == "0" || name == "!" || name.starts_with(|c: char| c.is_ascii_digit()) {
+                if name == "_"
+                    || name == "0"
+                    || name == "!"
+                    || name.starts_with(|c: char| c.is_ascii_digit())
+                {
                     self.set_special_var(name, &val);
                 } else {
                     self.scope.set_scalar(name, val);
@@ -1718,10 +2019,7 @@ impl Interpreter {
         if let Some(sub) = self.subs.get(name).cloned() {
             return self.call_sub(&sub, args, line);
         }
-        Err(PerlError::runtime(
-            format!("Undefined subroutine &{}", name),
-            line,
-        ).into())
+        Err(PerlError::runtime(format!("Undefined subroutine &{}", name), line).into())
     }
 
     fn call_sub(&mut self, sub: &PerlSub, args: Vec<PerlValue>, _line: usize) -> ExecResult {
@@ -1757,7 +2055,13 @@ impl Interpreter {
         })))
     }
 
-    fn exec_print(&mut self, handle: Option<&str>, args: &[Expr], newline: bool, line: usize) -> ExecResult {
+    fn exec_print(
+        &mut self,
+        handle: Option<&str>,
+        args: &[Expr],
+        newline: bool,
+        line: usize,
+    ) -> ExecResult {
         let mut output = String::new();
         for (i, a) in args.iter().enumerate() {
             if i > 0 && !self.ofs.is_empty() {
@@ -1788,7 +2092,8 @@ impl Interpreter {
                     return Err(PerlError::runtime(
                         format!("print on unopened filehandle {}", name),
                         line,
-                    ).into());
+                    )
+                    .into());
                 }
             }
         }
@@ -1807,8 +2112,14 @@ impl Interpreter {
         let output = perl_sprintf(&fmt, &arg_vals);
         let handle_name = handle.unwrap_or("STDOUT");
         match handle_name {
-            "STDOUT" => { print!("{}", output); let _ = io::stdout().flush(); }
-            "STDERR" => { eprint!("{}", output); let _ = io::stderr().flush(); }
+            "STDOUT" => {
+                print!("{}", output);
+                let _ = io::stdout().flush();
+            }
+            "STDERR" => {
+                eprint!("{}", output);
+                let _ = io::stderr().flush();
+            }
             name => {
                 if let Some(writer) = self.output_handles.get_mut(name) {
                     let _ = writer.write_all(output.as_bytes());
@@ -1818,7 +2129,12 @@ impl Interpreter {
         Ok(PerlValue::Integer(1))
     }
 
-    fn compile_regex(&self, pattern: &str, flags: &str, line: usize) -> Result<regex::Regex, FlowOrError> {
+    fn compile_regex(
+        &self,
+        pattern: &str,
+        flags: &str,
+        line: usize,
+    ) -> Result<regex::Regex, FlowOrError> {
         let mut re_str = String::new();
         if flags.contains('i') {
             re_str.push_str("(?i)");
@@ -1839,14 +2155,20 @@ impl Interpreter {
     }
 
     /// Process a line in -n/-p mode.
-    pub fn process_line(&mut self, line_str: &str, program: &Program) -> PerlResult<Option<String>> {
+    pub fn process_line(
+        &mut self,
+        line_str: &str,
+        program: &Program,
+    ) -> PerlResult<Option<String>> {
         self.line_number += 1;
-        self.scope.set_scalar("_", PerlValue::String(line_str.to_string()));
+        self.scope
+            .set_scalar("_", PerlValue::String(line_str.to_string()));
 
         if self.auto_split {
             let sep = self.field_separator.as_deref().unwrap_or(" ");
             let re = regex::Regex::new(sep).unwrap_or_else(|_| regex::Regex::new(" ").unwrap());
-            let fields: Vec<PerlValue> = re.split(line_str.trim_end_matches('\n'))
+            let fields: Vec<PerlValue> = re
+                .split(line_str.trim_end_matches('\n'))
                 .map(|s| PerlValue::String(s.to_string()))
                 .collect();
             self.scope.set_array("F", fields);
@@ -1855,13 +2177,11 @@ impl Interpreter {
         for stmt in &program.statements {
             match &stmt.kind {
                 StmtKind::SubDecl { .. } | StmtKind::Begin(_) | StmtKind::End(_) => continue,
-                _ => {
-                    match self.exec_statement(stmt) {
-                        Ok(_) => {}
-                        Err(FlowOrError::Error(e)) => return Err(e),
-                        Err(FlowOrError::Flow(_)) => {}
-                    }
-                }
+                _ => match self.exec_statement(stmt) {
+                    Ok(_) => {}
+                    Err(FlowOrError::Error(e)) => return Err(e),
+                    Err(FlowOrError::Flow(_)) => {}
+                },
             }
         }
 
@@ -1968,8 +2288,10 @@ fn perl_sprintf(fmt: &str, args: &[PerlValue]) -> String {
                 'X' => format!("{:width$X}", arg.to_int(), width = w),
                 'o' => format!("{:width$o}", arg.to_int(), width = w),
                 'b' => format!("{:width$b}", arg.to_int(), width = w),
-                'c' => char::from_u32(arg.to_int() as u32).map(|c| c.to_string()).unwrap_or_default(),
-                _ => format!("{}", arg.to_string()),
+                'c' => char::from_u32(arg.to_int() as u32)
+                    .map(|c| c.to_string())
+                    .unwrap_or_default(),
+                _ => arg.to_string(),
             };
 
             result.push_str(&formatted);

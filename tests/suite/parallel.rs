@@ -22,10 +22,7 @@ fn parallel_sort() {
 
 #[test]
 fn parallel_sort_default_string_order() {
-    assert_eq!(
-        eval_string(r#"join(",", psort ("c","a","b"))"#),
-        "a,b,c"
-    );
+    assert_eq!(eval_string(r#"join(",", psort ("c","a","b"))"#), "a,b,c");
 }
 
 #[test]

@@ -162,7 +162,8 @@ fn print_cyberpunk_help() {
  ┌──────────────────────────────────────────────────────┐
  │ STATUS: ONLINE  // CORES: {threads:<2} // SIGNAL: ████████░░ │
  └──────────────────────────────────────────────────────┘
-  >> PARALLEL PERL5 INTERPRETER // RUST-POWERED v{version} <<"#);
+  >> PARALLEL PERL5 INTERPRETER // RUST-POWERED v{version} <<"#
+    );
     println!();
     println!();
     println!("A highly parallel Perl 5 interpreter written in Rust");
@@ -262,9 +263,10 @@ fn main() {
 
     // Determine slurp mode
     let slurp = cli.slurp
-        || cli.input_separator.as_ref().map_or(false, |v| {
-            v.as_deref() == Some("777")
-        });
+        || cli
+            .input_separator
+            .as_ref()
+            .is_some_and(|v| v.as_deref() == Some("777"));
 
     // Build the source code
     let (code, filename) = if !cli.execute.is_empty() {
@@ -301,15 +303,19 @@ fn main() {
     for module in &cli.use_module {
         // -Mmodule=arg becomes use module split 'arg'
         if let Some((mod_name, args)) = module.split_once('=') {
-            full_code.push_str(&format!("use {} qw({});\n", mod_name, args.replace(',', " ")));
+            full_code.push_str(&format!(
+                "use {} qw({});\n",
+                mod_name,
+                args.replace(',', " ")
+            ));
         } else {
             full_code.push_str(&format!("use {};\n", module));
         }
     }
     for module in &cli.use_module_no_import {
-        if module.starts_with('-') {
+        if let Some(rest) = module.strip_prefix('-') {
             // -m-Module means "no Module"
-            full_code.push_str(&format!("no {};\n", &module[1..]));
+            full_code.push_str(&format!("no {};\n", rest));
         } else {
             full_code.push_str(&format!("use {} ();\n", module));
         }
@@ -375,10 +381,8 @@ fn main() {
     }
 
     // Taint mode
-    if cli.taint_check || cli.taint_warn {
-        if cli.warnings {
-            eprintln!("perlrs: taint mode acknowledged but not enforced");
-        }
+    if (cli.taint_check || cli.taint_warn) && cli.warnings {
+        eprintln!("perlrs: taint mode acknowledged but not enforced");
     }
 
     // -s: parse switches from @ARGV
@@ -402,9 +406,13 @@ fn main() {
                 // -foo sets $foo = 1, -foo=bar sets $foo = "bar"
                 let switch = &arg[1..];
                 if let Some((name, val)) = switch.split_once('=') {
-                    interp.scope.set_scalar(name, perlrs::value::PerlValue::String(val.to_string()));
+                    interp
+                        .scope
+                        .set_scalar(name, perlrs::value::PerlValue::String(val.to_string()));
                 } else {
-                    interp.scope.set_scalar(switch, perlrs::value::PerlValue::Integer(1));
+                    interp
+                        .scope
+                        .set_scalar(switch, perlrs::value::PerlValue::Integer(1));
                 }
             }
         }

@@ -41,18 +41,12 @@ fn wantarray_undef() {
 
 #[test]
 fn caller_builtin() {
-    assert_eq!(
-        eval_string(r#"join(",", caller())"#),
-        "main,-e,1"
-    );
+    assert_eq!(eval_string(r#"join(",", caller())"#), "main,-e,1");
 }
 
 #[test]
 fn package_sets_package_glob() {
-    assert_eq!(
-        eval_string(r#"package Foo::Bar; $__PACKAGE__"#),
-        "Foo::Bar"
-    );
+    assert_eq!(eval_string(r#"package Foo::Bar; $__PACKAGE__"#), "Foo::Bar");
 }
 
 #[test]

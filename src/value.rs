@@ -7,8 +7,9 @@ use std::sync::Arc;
 use crate::ast::Block;
 
 /// Core Perl value type. Clone-cheap via Arc for references.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum PerlValue {
+    #[default]
     Undef,
     Integer(i64),
     Float(f64),
@@ -49,12 +50,6 @@ impl Clone for BlessedRef {
     }
 }
 
-impl Default for PerlValue {
-    fn default() -> Self {
-        PerlValue::Undef
-    }
-}
-
 impl PerlValue {
     // ── Truthiness (Perl rules) ──
 
@@ -91,26 +86,6 @@ impl PerlValue {
             PerlValue::String(s) => parse_number(s) as i64,
             PerlValue::Array(a) => a.len() as i64,
             _ => 0,
-        }
-    }
-
-    // ── String coercion ──
-
-    pub fn to_string(&self) -> String {
-        match self {
-            PerlValue::Undef => String::new(),
-            PerlValue::Integer(n) => n.to_string(),
-            PerlValue::Float(f) => format_float(*f),
-            PerlValue::String(s) => s.clone(),
-            PerlValue::Array(a) => a.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(""),
-            PerlValue::Hash(h) => format!("{}/{}", h.len(), h.capacity()),
-            PerlValue::ArrayRef(_) => "ARRAY(0x...)".to_string(),
-            PerlValue::HashRef(_) => "HASH(0x...)".to_string(),
-            PerlValue::ScalarRef(_) => "SCALAR(0x...)".to_string(),
-            PerlValue::CodeRef(sub) => format!("CODE({})", sub.name),
-            PerlValue::Regex(_, src) => format!("(?:{})", src),
-            PerlValue::Blessed(b) => format!("{}=HASH(0x...)", b.class),
-            PerlValue::IOHandle(name) => name.clone(),
         }
     }
 
@@ -189,7 +164,26 @@ impl PerlValue {
 
 impl fmt::Display for PerlValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        match self {
+            PerlValue::Undef => Ok(()),
+            PerlValue::Integer(n) => write!(f, "{n}"),
+            PerlValue::Float(fl) => write!(f, "{}", format_float(*fl)),
+            PerlValue::String(s) => f.write_str(s),
+            PerlValue::Array(a) => {
+                for v in a {
+                    write!(f, "{v}")?;
+                }
+                Ok(())
+            }
+            PerlValue::Hash(h) => write!(f, "{}/{}", h.len(), h.capacity()),
+            PerlValue::ArrayRef(_) => f.write_str("ARRAY(0x...)"),
+            PerlValue::HashRef(_) => f.write_str("HASH(0x...)"),
+            PerlValue::ScalarRef(_) => f.write_str("SCALAR(0x...)"),
+            PerlValue::CodeRef(sub) => write!(f, "CODE({})", sub.name),
+            PerlValue::Regex(_, src) => write!(f, "(?:{src})"),
+            PerlValue::Blessed(b) => write!(f, "{}=HASH(0x...)", b.class),
+            PerlValue::IOHandle(name) => f.write_str(name),
+        }
     }
 }
 
@@ -296,7 +290,8 @@ mod tests {
 
     #[test]
     fn scalar_context_array_and_hash() {
-        let a = PerlValue::Array(vec![PerlValue::Integer(1), PerlValue::Integer(2)]).scalar_context();
+        let a =
+            PerlValue::Array(vec![PerlValue::Integer(1), PerlValue::Integer(2)]).scalar_context();
         assert!(matches!(a, PerlValue::Integer(2)));
         let mut h = IndexMap::new();
         h.insert("a".into(), PerlValue::Integer(1));
@@ -307,7 +302,9 @@ mod tests {
     #[test]
     fn to_list_array_hash_and_scalar() {
         assert_eq!(
-            PerlValue::Array(vec![PerlValue::Integer(7)]).to_list().len(),
+            PerlValue::Array(vec![PerlValue::Integer(7)])
+                .to_list()
+                .len(),
             1
         );
         let mut h = IndexMap::new();

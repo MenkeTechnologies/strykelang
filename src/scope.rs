@@ -29,6 +29,12 @@ pub struct Scope {
     frames: Vec<Frame>,
 }
 
+impl Default for Scope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Scope {
     pub fn new() -> Self {
         let mut s = Self {
@@ -104,10 +110,7 @@ impl Scope {
             }
         }
         let idx = target_idx.unwrap_or(0);
-        self.frames[idx]
-            .arrays
-            .entry(name.to_string())
-            .or_insert_with(Vec::new)
+        self.frames[idx].arrays.entry(name.to_string()).or_default()
     }
 
     pub fn set_array(&mut self, name: &str, val: Vec<PerlValue>) {
@@ -170,10 +173,7 @@ impl Scope {
             }
         }
         let idx = target_idx.unwrap_or(0);
-        self.frames[idx]
-            .hashes
-            .entry(name.to_string())
-            .or_insert_with(IndexMap::new)
+        self.frames[idx].hashes.entry(name.to_string()).or_default()
     }
 
     pub fn set_hash(&mut self, name: &str, val: IndexMap<String, PerlValue>) {

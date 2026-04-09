@@ -24,8 +24,18 @@ pub enum ErrorKind {
 }
 
 impl PerlError {
-    pub fn new(kind: ErrorKind, message: impl Into<String>, line: usize, file: impl Into<String>) -> Self {
-        Self { kind, message: message.into(), line, file: file.into() }
+    pub fn new(
+        kind: ErrorKind,
+        message: impl Into<String>,
+        line: usize,
+        file: impl Into<String>,
+    ) -> Self {
+        Self {
+            kind,
+            message: message.into(),
+            line,
+            file: file.into(),
+        }
     }
 
     pub fn syntax(message: impl Into<String>, line: usize) -> Self {

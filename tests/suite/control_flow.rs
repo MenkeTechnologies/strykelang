@@ -9,7 +9,9 @@ fn if_else() {
 #[test]
 fn if_elsif_chain() {
     assert_eq!(
-        eval_int("my $x = 2; if ($x == 0) { 0 } elsif ($x == 1) { 1 } elsif ($x == 2) { 2 } else { 9 }"),
+        eval_int(
+            "my $x = 2; if ($x == 0) { 0 } elsif ($x == 1) { 1 } elsif ($x == 2) { 2 } else { 9 }"
+        ),
         2
     );
 }
@@ -61,10 +63,7 @@ fn foreach_uses_default_dollar_underscore() {
 
 #[test]
 fn postfix_foreach_statement() {
-    assert_eq!(
-        eval_int("my $sum = 0; $sum = $sum + $_ for 1,2,3; $sum"),
-        6
-    );
+    assert_eq!(eval_int("my $sum = 0; $sum = $sum + $_ for 1,2,3; $sum"), 6);
 }
 
 #[test]

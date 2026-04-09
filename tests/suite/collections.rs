@@ -19,15 +19,15 @@ fn array_negative_index() {
 
 #[test]
 fn hash_variables() {
-    assert_eq!(
-        eval_int(r#"my %h = ("a", 1, "b", 2); $h{b}"#),
-        2
-    );
+    assert_eq!(eval_int(r#"my %h = ("a", 1, "b", 2); $h{b}"#), 2);
 }
 
 #[test]
 fn hash_fat_arrow() {
-    assert_eq!(eval_int("my %h = (aa => 10, bb => 20); $h{aa} + $h{bb}"), 30);
+    assert_eq!(
+        eval_int("my %h = (aa => 10, bb => 20); $h{aa} + $h{bb}"),
+        30
+    );
 }
 
 #[test]
@@ -57,10 +57,7 @@ fn splice_remove_insert() {
 
 #[test]
 fn map_grep() {
-    assert_eq!(
-        eval_int("my @a = map { $_ * 2 } (1,2,3); $a[2]"),
-        6
-    );
+    assert_eq!(eval_int("my @a = map { $_ * 2 } (1,2,3); $a[2]"), 6);
     assert_eq!(
         eval_int("my @a = grep { $_ > 2 } (1,2,3,4,5); scalar @a"),
         3
@@ -69,10 +66,7 @@ fn map_grep() {
 
 #[test]
 fn sort_array() {
-    assert_eq!(
-        eval_string(r#"join(",", sort("c","a","b"))"#),
-        "a,b,c"
-    );
+    assert_eq!(eval_string(r#"join(",", sort("c","a","b"))"#), "a,b,c");
     assert_eq!(
         eval_string(r#"join(",", sort { $a <=> $b } (3,1,2))"#),
         "1,2,3"
@@ -81,10 +75,7 @@ fn sort_array() {
 
 #[test]
 fn reverse_array() {
-    assert_eq!(
-        eval_string(r#"join(",", reverse(1,2,3))"#),
-        "3,2,1"
-    );
+    assert_eq!(eval_string(r#"join(",", reverse(1,2,3))"#), "3,2,1");
 }
 
 #[test]
@@ -103,13 +94,22 @@ fn range_operator() {
 
 #[test]
 fn hash_delete_exists() {
-    assert_eq!(eval_int("my %h = (a => 1, b => 2); delete $h{a}; exists $h{a} ? 1 : 0"), 0);
-    assert_eq!(eval_int("my %h = (a => 1, b => 2); exists $h{b} ? 1 : 0"), 1);
+    assert_eq!(
+        eval_int("my %h = (a => 1, b => 2); delete $h{a}; exists $h{a} ? 1 : 0"),
+        0
+    );
+    assert_eq!(
+        eval_int("my %h = (a => 1, b => 2); exists $h{b} ? 1 : 0"),
+        1
+    );
 }
 
 #[test]
 fn hash_keys_values() {
-    assert_eq!(eval_int("my %h = (a => 1, b => 2, c => 3); scalar keys %h"), 3);
+    assert_eq!(
+        eval_int("my %h = (a => 1, b => 2, c => 3); scalar keys %h"),
+        3
+    );
 }
 
 #[test]

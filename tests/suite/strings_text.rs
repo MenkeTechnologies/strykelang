@@ -32,10 +32,7 @@ fn substr_replacement() {
 
 #[test]
 fn qw_word_list() {
-    assert_eq!(
-        eval_string(r#"join(",", qw(a bb ccc))"#),
-        "a,bb,ccc"
-    );
+    assert_eq!(eval_string(r#"join(",", qw(a bb ccc))"#), "a,bb,ccc");
 }
 
 #[test]
@@ -91,26 +88,17 @@ fn file_test_exists() {
 
 #[test]
 fn string_interpolation_hash_access() {
-    assert_eq!(
-        eval_string(r#"my %h = (x => 42); "$h{x}""#),
-        "42"
-    );
+    assert_eq!(eval_string(r#"my %h = (x => 42); "$h{x}""#), "42");
 }
 
 #[test]
 fn string_interpolation_array_access() {
-    assert_eq!(
-        eval_string(r#"my @a = (10, 20, 30); "$a[1]""#),
-        "20"
-    );
+    assert_eq!(eval_string(r#"my @a = (10, 20, 30); "$a[1]""#), "20");
 }
 
 #[test]
 fn split_join() {
-    assert_eq!(
-        eval_string(r#"join("-", split(",", "a,b,c"))"#),
-        "a-b-c"
-    );
+    assert_eq!(eval_string(r#"join("-", split(",", "a,b,c"))"#), "a-b-c");
 }
 
 #[test]

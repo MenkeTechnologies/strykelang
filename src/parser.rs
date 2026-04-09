@@ -24,7 +24,11 @@ impl Parser {
     }
 
     fn advance(&mut self) -> (Token, usize) {
-        let tok = self.tokens.get(self.pos).cloned().unwrap_or((Token::Eof, 0));
+        let tok = self
+            .tokens
+            .get(self.pos)
+            .cloned()
+            .unwrap_or((Token::Eof, 0));
         self.pos += 1;
         tok
     }
@@ -89,14 +93,20 @@ impl Parser {
                 "unless" => self.parse_unless()?,
                 "while" => {
                     let mut s = self.parse_while()?;
-                    if let StmtKind::While { label: ref mut lbl, .. } = s.kind {
+                    if let StmtKind::While {
+                        label: ref mut lbl, ..
+                    } = s.kind
+                    {
                         *lbl = label;
                     }
                     s
                 }
                 "until" => {
                     let mut s = self.parse_until()?;
-                    if let StmtKind::Until { label: ref mut lbl, .. } = s.kind {
+                    if let StmtKind::Until {
+                        label: ref mut lbl, ..
+                    } = s.kind
+                    {
                         *lbl = label;
                     }
                     s
@@ -104,15 +114,22 @@ impl Parser {
                 "for" => {
                     let mut s = self.parse_for_or_foreach()?;
                     match s.kind {
-                        StmtKind::For { label: ref mut lbl, .. }
-                        | StmtKind::Foreach { label: ref mut lbl, .. } => *lbl = label,
+                        StmtKind::For {
+                            label: ref mut lbl, ..
+                        }
+                        | StmtKind::Foreach {
+                            label: ref mut lbl, ..
+                        } => *lbl = label,
                         _ => {}
                     }
                     s
                 }
                 "foreach" => {
                     let mut s = self.parse_foreach()?;
-                    if let StmtKind::Foreach { label: ref mut lbl, .. } = s.kind {
+                    if let StmtKind::Foreach {
+                        label: ref mut lbl, ..
+                    } = s.kind
+                    {
                         *lbl = label;
                     }
                     s
@@ -139,7 +156,10 @@ impl Parser {
                     } else {
                         None
                     };
-                    let stmt = Statement { kind: StmtKind::Last(lbl.or(label)), line };
+                    let stmt = Statement {
+                        kind: StmtKind::Last(lbl.or(label)),
+                        line,
+                    };
                     self.parse_stmt_postfix_modifier(stmt)?
                 }
                 "next" => {
@@ -156,23 +176,35 @@ impl Parser {
                     } else {
                         None
                     };
-                    let stmt = Statement { kind: StmtKind::Next(lbl.or(label)), line };
+                    let stmt = Statement {
+                        kind: StmtKind::Next(lbl.or(label)),
+                        line,
+                    };
                     self.parse_stmt_postfix_modifier(stmt)?
                 }
                 "redo" => {
                     self.advance();
                     self.eat(&Token::Semicolon);
-                    Statement { kind: StmtKind::Redo(label), line }
+                    Statement {
+                        kind: StmtKind::Redo(label),
+                        line,
+                    }
                 }
                 "BEGIN" => {
                     self.advance();
                     let block = self.parse_block()?;
-                    Statement { kind: StmtKind::Begin(block), line }
+                    Statement {
+                        kind: StmtKind::Begin(block),
+                        line,
+                    }
                 }
                 "END" => {
                     self.advance();
                     let block = self.parse_block()?;
-                    Statement { kind: StmtKind::End(block), line }
+                    Statement {
+                        kind: StmtKind::End(block),
+                        line,
+                    }
                 }
                 _ => {
                     let expr = self.parse_expression()?;
@@ -183,7 +215,10 @@ impl Parser {
             },
             Token::LBrace => {
                 let block = self.parse_block()?;
-                Statement { kind: StmtKind::Block(block), line }
+                Statement {
+                    kind: StmtKind::Block(block),
+                    line,
+                }
             }
             _ => {
                 let expr = self.parse_expression()?;
@@ -309,9 +344,15 @@ impl Parser {
                         line,
                     })
                 }
-                _ => Ok(Statement { kind: StmtKind::Expression(expr), line }),
+                _ => Ok(Statement {
+                    kind: StmtKind::Expression(expr),
+                    line,
+                }),
             },
-            _ => Ok(Statement { kind: StmtKind::Expression(expr), line }),
+            _ => Ok(Statement {
+                kind: StmtKind::Expression(expr),
+                line,
+            }),
         }
     }
 
@@ -359,7 +400,12 @@ impl Parser {
         }
 
         Ok(Statement {
-            kind: StmtKind::If { condition: cond, body, elsifs, else_block },
+            kind: StmtKind::If {
+                condition: cond,
+                body,
+                elsifs,
+                else_block,
+            },
             line,
         })
     }
@@ -382,7 +428,11 @@ impl Parser {
             None
         };
         Ok(Statement {
-            kind: StmtKind::Unless { condition: cond, body, else_block },
+            kind: StmtKind::Unless {
+                condition: cond,
+                body,
+                else_block,
+            },
             line,
         })
     }
@@ -395,7 +445,11 @@ impl Parser {
         self.expect(&Token::RParen)?;
         let body = self.parse_block()?;
         Ok(Statement {
-            kind: StmtKind::While { condition: cond, body, label: None },
+            kind: StmtKind::While {
+                condition: cond,
+                body,
+                label: None,
+            },
             line,
         })
     }
@@ -408,7 +462,11 @@ impl Parser {
         self.expect(&Token::RParen)?;
         let body = self.parse_block()?;
         Ok(Statement {
-            kind: StmtKind::Until { condition: cond, body, label: None },
+            kind: StmtKind::Until {
+                condition: cond,
+                body,
+                label: None,
+            },
             line,
         })
     }
@@ -428,7 +486,7 @@ impl Parser {
                 // content that contains ';', it's C-style.
                 let saved = self.pos;
                 self.advance(); // consume (
-                // Look for semicolon at paren depth 0
+                                // Look for semicolon at paren depth 0
                 let mut depth = 1;
                 let mut has_semi = false;
                 let mut scan = self.pos;
@@ -478,7 +536,12 @@ impl Parser {
                 self.expect(&Token::RParen)?;
                 let body = self.parse_block()?;
                 Ok(Statement {
-                    kind: StmtKind::Foreach { var, list, body, label: None },
+                    kind: StmtKind::Foreach {
+                        var,
+                        list,
+                        body,
+                        label: None,
+                    },
                     line,
                 })
             }
@@ -489,13 +552,16 @@ impl Parser {
                 self.expect(&Token::RParen)?;
                 let body = self.parse_block()?;
                 Ok(Statement {
-                    kind: StmtKind::Foreach { var, list, body, label: None },
+                    kind: StmtKind::Foreach {
+                        var,
+                        list,
+                        body,
+                        label: None,
+                    },
                     line,
                 })
             }
-            _ => {
-                self.parse_c_style_for(line)
-            }
+            _ => self.parse_c_style_for(line),
         }
     }
 
@@ -522,7 +588,13 @@ impl Parser {
         self.expect(&Token::RParen)?;
         let body = self.parse_block()?;
         Ok(Statement {
-            kind: StmtKind::For { init, condition, step, body, label: None },
+            kind: StmtKind::For {
+                init,
+                condition,
+                step,
+                body,
+                label: None,
+            },
             line,
         })
     }
@@ -543,7 +615,12 @@ impl Parser {
         self.expect(&Token::RParen)?;
         let body = self.parse_block()?;
         Ok(Statement {
-            kind: StmtKind::Foreach { var, list, body, label: None },
+            kind: StmtKind::Foreach {
+                var,
+                list,
+                body,
+                label: None,
+            },
             line,
         })
     }
@@ -551,7 +628,10 @@ impl Parser {
     fn parse_scalar_var_name(&mut self) -> PerlResult<String> {
         match self.advance() {
             (Token::ScalarVar(name), _) => Ok(name),
-            (tok, line) => Err(PerlError::syntax(format!("Expected scalar variable, got {:?}", tok), line)),
+            (tok, line) => Err(PerlError::syntax(
+                format!("Expected scalar variable, got {:?}", tok),
+                line,
+            )),
         }
     }
 
@@ -560,7 +640,12 @@ impl Parser {
         self.advance(); // 'sub'
         let name = match self.advance() {
             (Token::Ident(n), _) => n,
-            (tok, line) => return Err(PerlError::syntax(format!("Expected sub name, got {:?}", tok), line)),
+            (tok, line) => {
+                return Err(PerlError::syntax(
+                    format!("Expected sub name, got {:?}", tok),
+                    line,
+                ))
+            }
         };
         // Optional prototype — skip it
         if matches!(self.peek(), Token::LParen) {
@@ -572,7 +657,11 @@ impl Parser {
         }
         let body = self.parse_block()?;
         Ok(Statement {
-            kind: StmtKind::SubDecl { name, params: vec![], body },
+            kind: StmtKind::SubDecl {
+                name,
+                params: vec![],
+                body,
+            },
             line,
         })
     }
@@ -649,7 +738,12 @@ impl Parser {
         self.advance(); // 'package'
         let name = match self.advance() {
             (Token::Ident(n), _) => n,
-            (tok, line) => return Err(PerlError::syntax(format!("Expected package name, got {:?}", tok), line)),
+            (tok, line) => {
+                return Err(PerlError::syntax(
+                    format!("Expected package name, got {:?}", tok),
+                    line,
+                ))
+            }
         };
         // Handle Foo::Bar
         let mut full_name = name;
@@ -659,7 +753,10 @@ impl Parser {
             }
         }
         self.eat(&Token::Semicolon);
-        Ok(Statement { kind: StmtKind::Package { name: full_name }, line })
+        Ok(Statement {
+            kind: StmtKind::Package { name: full_name },
+            line,
+        })
     }
 
     fn parse_use(&mut self) -> PerlResult<Statement> {
@@ -667,7 +764,12 @@ impl Parser {
         self.advance(); // 'use'
         let module = match self.advance() {
             (Token::Ident(n), _) => n,
-            (tok, line) => return Err(PerlError::syntax(format!("Expected module name after use, got {:?}", tok), line)),
+            (tok, line) => {
+                return Err(PerlError::syntax(
+                    format!("Expected module name after use, got {:?}", tok),
+                    line,
+                ))
+            }
         };
         let mut full_name = module;
         while self.eat(&Token::PackageSep) {
@@ -691,7 +793,10 @@ impl Parser {
         }
         self.eat(&Token::Semicolon);
         Ok(Statement {
-            kind: StmtKind::Use { module: full_name, imports },
+            kind: StmtKind::Use {
+                module: full_name,
+                imports,
+            },
             line,
         })
     }
@@ -701,7 +806,12 @@ impl Parser {
         self.advance(); // 'no'
         let module = match self.advance() {
             (Token::Ident(n), _) => n,
-            (tok, line) => return Err(PerlError::syntax(format!("Expected module name after no, got {:?}", tok), line)),
+            (tok, line) => {
+                return Err(PerlError::syntax(
+                    format!("Expected module name after no, got {:?}", tok),
+                    line,
+                ))
+            }
         };
         let mut full_name = module;
         while self.eat(&Token::PackageSep) {
@@ -711,7 +821,10 @@ impl Parser {
         }
         self.eat(&Token::Semicolon);
         Ok(Statement {
-            kind: StmtKind::No { module: full_name, imports: vec![] },
+            kind: StmtKind::No {
+                module: full_name,
+                imports: vec![],
+            },
             line,
         })
     }
@@ -726,7 +839,10 @@ impl Parser {
             Some(self.parse_assign_expr()?)
         };
         // Check for postfix modifiers on return
-        let stmt = Statement { kind: StmtKind::Return(val), line };
+        let stmt = Statement {
+            kind: StmtKind::Return(val),
+            line,
+        };
         if let Token::Ident(ref kw) = self.peek().clone() {
             match kw.as_str() {
                 "if" => {
@@ -785,7 +901,10 @@ impl Parser {
             return Ok(exprs.pop().unwrap());
         }
         let line = exprs[0].line;
-        Ok(Expr { kind: ExprKind::List(exprs), line })
+        Ok(Expr {
+            kind: ExprKind::List(exprs),
+            line,
+        })
     }
 
     fn parse_assign_expr(&mut self) -> PerlResult<Expr> {
@@ -804,14 +923,102 @@ impl Parser {
                     line,
                 })
             }
-            Token::PlusAssign => { self.advance(); let r = self.parse_assign_expr()?; Ok(Expr { kind: ExprKind::CompoundAssign { target: Box::new(expr), op: BinOp::Add, value: Box::new(r) }, line }) }
-            Token::MinusAssign => { self.advance(); let r = self.parse_assign_expr()?; Ok(Expr { kind: ExprKind::CompoundAssign { target: Box::new(expr), op: BinOp::Sub, value: Box::new(r) }, line }) }
-            Token::MulAssign => { self.advance(); let r = self.parse_assign_expr()?; Ok(Expr { kind: ExprKind::CompoundAssign { target: Box::new(expr), op: BinOp::Mul, value: Box::new(r) }, line }) }
-            Token::DivAssign => { self.advance(); let r = self.parse_assign_expr()?; Ok(Expr { kind: ExprKind::CompoundAssign { target: Box::new(expr), op: BinOp::Div, value: Box::new(r) }, line }) }
-            Token::ModAssign => { self.advance(); let r = self.parse_assign_expr()?; Ok(Expr { kind: ExprKind::CompoundAssign { target: Box::new(expr), op: BinOp::Mod, value: Box::new(r) }, line }) }
-            Token::PowAssign => { self.advance(); let r = self.parse_assign_expr()?; Ok(Expr { kind: ExprKind::CompoundAssign { target: Box::new(expr), op: BinOp::Pow, value: Box::new(r) }, line }) }
-            Token::DotAssign => { self.advance(); let r = self.parse_assign_expr()?; Ok(Expr { kind: ExprKind::CompoundAssign { target: Box::new(expr), op: BinOp::Concat, value: Box::new(r) }, line }) }
-            Token::DefinedOrAssign => { self.advance(); let r = self.parse_assign_expr()?; Ok(Expr { kind: ExprKind::CompoundAssign { target: Box::new(expr), op: BinOp::DefinedOr, value: Box::new(r) }, line }) }
+            Token::PlusAssign => {
+                self.advance();
+                let r = self.parse_assign_expr()?;
+                Ok(Expr {
+                    kind: ExprKind::CompoundAssign {
+                        target: Box::new(expr),
+                        op: BinOp::Add,
+                        value: Box::new(r),
+                    },
+                    line,
+                })
+            }
+            Token::MinusAssign => {
+                self.advance();
+                let r = self.parse_assign_expr()?;
+                Ok(Expr {
+                    kind: ExprKind::CompoundAssign {
+                        target: Box::new(expr),
+                        op: BinOp::Sub,
+                        value: Box::new(r),
+                    },
+                    line,
+                })
+            }
+            Token::MulAssign => {
+                self.advance();
+                let r = self.parse_assign_expr()?;
+                Ok(Expr {
+                    kind: ExprKind::CompoundAssign {
+                        target: Box::new(expr),
+                        op: BinOp::Mul,
+                        value: Box::new(r),
+                    },
+                    line,
+                })
+            }
+            Token::DivAssign => {
+                self.advance();
+                let r = self.parse_assign_expr()?;
+                Ok(Expr {
+                    kind: ExprKind::CompoundAssign {
+                        target: Box::new(expr),
+                        op: BinOp::Div,
+                        value: Box::new(r),
+                    },
+                    line,
+                })
+            }
+            Token::ModAssign => {
+                self.advance();
+                let r = self.parse_assign_expr()?;
+                Ok(Expr {
+                    kind: ExprKind::CompoundAssign {
+                        target: Box::new(expr),
+                        op: BinOp::Mod,
+                        value: Box::new(r),
+                    },
+                    line,
+                })
+            }
+            Token::PowAssign => {
+                self.advance();
+                let r = self.parse_assign_expr()?;
+                Ok(Expr {
+                    kind: ExprKind::CompoundAssign {
+                        target: Box::new(expr),
+                        op: BinOp::Pow,
+                        value: Box::new(r),
+                    },
+                    line,
+                })
+            }
+            Token::DotAssign => {
+                self.advance();
+                let r = self.parse_assign_expr()?;
+                Ok(Expr {
+                    kind: ExprKind::CompoundAssign {
+                        target: Box::new(expr),
+                        op: BinOp::Concat,
+                        value: Box::new(r),
+                    },
+                    line,
+                })
+            }
+            Token::DefinedOrAssign => {
+                self.advance();
+                let r = self.parse_assign_expr()?;
+                Ok(Expr {
+                    kind: ExprKind::CompoundAssign {
+                        target: Box::new(expr),
+                        op: BinOp::DefinedOr,
+                        value: Box::new(r),
+                    },
+                    line,
+                })
+            }
             _ => Ok(expr),
         }
     }
@@ -843,7 +1050,11 @@ impl Parser {
             self.advance();
             let right = self.parse_and_word()?;
             left = Expr {
-                kind: ExprKind::BinOp { left: Box::new(left), op: BinOp::LogOrWord, right: Box::new(right) },
+                kind: ExprKind::BinOp {
+                    left: Box::new(left),
+                    op: BinOp::LogOrWord,
+                    right: Box::new(right),
+                },
                 line,
             };
         }
@@ -857,7 +1068,11 @@ impl Parser {
             self.advance();
             let right = self.parse_not_word()?;
             left = Expr {
-                kind: ExprKind::BinOp { left: Box::new(left), op: BinOp::LogAndWord, right: Box::new(right) },
+                kind: ExprKind::BinOp {
+                    left: Box::new(left),
+                    op: BinOp::LogAndWord,
+                    right: Box::new(right),
+                },
                 line,
             };
         }
@@ -870,7 +1085,10 @@ impl Parser {
             self.advance();
             let expr = self.parse_not_word()?;
             return Ok(Expr {
-                kind: ExprKind::UnaryOp { op: UnaryOp::LogNotWord, expr: Box::new(expr) },
+                kind: ExprKind::UnaryOp {
+                    op: UnaryOp::LogNotWord,
+                    expr: Box::new(expr),
+                },
                 line,
             });
         }
@@ -888,7 +1106,14 @@ impl Parser {
             let line = left.line;
             self.advance();
             let right = self.parse_log_and()?;
-            left = Expr { kind: ExprKind::BinOp { left: Box::new(left), op, right: Box::new(right) }, line };
+            left = Expr {
+                kind: ExprKind::BinOp {
+                    left: Box::new(left),
+                    op,
+                    right: Box::new(right),
+                },
+                line,
+            };
         }
         Ok(left)
     }
@@ -899,7 +1124,14 @@ impl Parser {
             let line = left.line;
             self.advance();
             let right = self.parse_bit_or()?;
-            left = Expr { kind: ExprKind::BinOp { left: Box::new(left), op: BinOp::LogAnd, right: Box::new(right) }, line };
+            left = Expr {
+                kind: ExprKind::BinOp {
+                    left: Box::new(left),
+                    op: BinOp::LogAnd,
+                    right: Box::new(right),
+                },
+                line,
+            };
         }
         Ok(left)
     }
@@ -910,7 +1142,14 @@ impl Parser {
             let line = left.line;
             self.advance();
             let right = self.parse_bit_xor()?;
-            left = Expr { kind: ExprKind::BinOp { left: Box::new(left), op: BinOp::BitOr, right: Box::new(right) }, line };
+            left = Expr {
+                kind: ExprKind::BinOp {
+                    left: Box::new(left),
+                    op: BinOp::BitOr,
+                    right: Box::new(right),
+                },
+                line,
+            };
         }
         Ok(left)
     }
@@ -921,7 +1160,14 @@ impl Parser {
             let line = left.line;
             self.advance();
             let right = self.parse_bit_and()?;
-            left = Expr { kind: ExprKind::BinOp { left: Box::new(left), op: BinOp::BitXor, right: Box::new(right) }, line };
+            left = Expr {
+                kind: ExprKind::BinOp {
+                    left: Box::new(left),
+                    op: BinOp::BitXor,
+                    right: Box::new(right),
+                },
+                line,
+            };
         }
         Ok(left)
     }
@@ -932,7 +1178,14 @@ impl Parser {
             let line = left.line;
             self.advance();
             let right = self.parse_equality()?;
-            left = Expr { kind: ExprKind::BinOp { left: Box::new(left), op: BinOp::BitAnd, right: Box::new(right) }, line };
+            left = Expr {
+                kind: ExprKind::BinOp {
+                    left: Box::new(left),
+                    op: BinOp::BitAnd,
+                    right: Box::new(right),
+                },
+                line,
+            };
         }
         Ok(left)
     }
@@ -952,7 +1205,14 @@ impl Parser {
             let line = left.line;
             self.advance();
             let right = self.parse_comparison()?;
-            left = Expr { kind: ExprKind::BinOp { left: Box::new(left), op, right: Box::new(right) }, line };
+            left = Expr {
+                kind: ExprKind::BinOp {
+                    left: Box::new(left),
+                    op,
+                    right: Box::new(right),
+                },
+                line,
+            };
         }
         Ok(left)
     }
@@ -974,7 +1234,14 @@ impl Parser {
             let line = left.line;
             self.advance();
             let right = self.parse_shift()?;
-            left = Expr { kind: ExprKind::BinOp { left: Box::new(left), op, right: Box::new(right) }, line };
+            left = Expr {
+                kind: ExprKind::BinOp {
+                    left: Box::new(left),
+                    op,
+                    right: Box::new(right),
+                },
+                line,
+            };
         }
         Ok(left)
     }
@@ -990,7 +1257,14 @@ impl Parser {
             let line = left.line;
             self.advance();
             let right = self.parse_addition()?;
-            left = Expr { kind: ExprKind::BinOp { left: Box::new(left), op, right: Box::new(right) }, line };
+            left = Expr {
+                kind: ExprKind::BinOp {
+                    left: Box::new(left),
+                    op,
+                    right: Box::new(right),
+                },
+                line,
+            };
         }
         Ok(left)
     }
@@ -1007,7 +1281,14 @@ impl Parser {
             let line = left.line;
             self.advance();
             let right = self.parse_multiplication()?;
-            left = Expr { kind: ExprKind::BinOp { left: Box::new(left), op, right: Box::new(right) }, line };
+            left = Expr {
+                kind: ExprKind::BinOp {
+                    left: Box::new(left),
+                    op,
+                    right: Box::new(right),
+                },
+                line,
+            };
         }
         Ok(left)
     }
@@ -1024,7 +1305,10 @@ impl Parser {
                     self.advance();
                     let right = self.parse_regex_bind()?;
                     left = Expr {
-                        kind: ExprKind::Repeat { expr: Box::new(left), count: Box::new(right) },
+                        kind: ExprKind::Repeat {
+                            expr: Box::new(left),
+                            count: Box::new(right),
+                        },
                         line,
                     };
                     continue;
@@ -1034,7 +1318,14 @@ impl Parser {
             let line = left.line;
             self.advance();
             let right = self.parse_regex_bind()?;
-            left = Expr { kind: ExprKind::BinOp { left: Box::new(left), op, right: Box::new(right) }, line };
+            left = Expr {
+                kind: ExprKind::BinOp {
+                    left: Box::new(left),
+                    op,
+                    right: Box::new(right),
+                },
+                line,
+            };
         }
         Ok(left)
     }
@@ -1049,12 +1340,18 @@ impl Parser {
                     Token::Regex(pattern, flags) => {
                         self.advance();
                         Ok(Expr {
-                            kind: ExprKind::Match { expr: Box::new(left), pattern, flags },
+                            kind: ExprKind::Match {
+                                expr: Box::new(left),
+                                pattern,
+                                flags,
+                            },
                             line,
                         })
                     }
                     Token::Ident(ref s) if s.starts_with('\x00') => {
-                        let (Token::Ident(encoded), _) = self.advance() else { unreachable!() };
+                        let (Token::Ident(encoded), _) = self.advance() else {
+                            unreachable!()
+                        };
                         let parts: Vec<&str> = encoded.split('\x00').collect();
                         if parts.len() >= 4 && parts[1] == "s" {
                             Ok(Expr {
@@ -1091,7 +1388,11 @@ impl Parser {
                         kind: ExprKind::UnaryOp {
                             op: UnaryOp::LogNot,
                             expr: Box::new(Expr {
-                                kind: ExprKind::Match { expr: Box::new(left), pattern, flags },
+                                kind: ExprKind::Match {
+                                    expr: Box::new(left),
+                                    pattern,
+                                    flags,
+                                },
                                 line,
                             }),
                         },
@@ -1110,7 +1411,10 @@ impl Parser {
             let line = left.line;
             let right = self.parse_unary()?;
             return Ok(Expr {
-                kind: ExprKind::Range { from: Box::new(left), to: Box::new(right) },
+                kind: ExprKind::Range {
+                    from: Box::new(left),
+                    to: Box::new(right),
+                },
                 line,
             });
         }
@@ -1123,37 +1427,76 @@ impl Parser {
             Token::Minus => {
                 self.advance();
                 let expr = self.parse_power()?;
-                Ok(Expr { kind: ExprKind::UnaryOp { op: UnaryOp::Negate, expr: Box::new(expr) }, line })
+                Ok(Expr {
+                    kind: ExprKind::UnaryOp {
+                        op: UnaryOp::Negate,
+                        expr: Box::new(expr),
+                    },
+                    line,
+                })
             }
             Token::LogNot => {
                 self.advance();
                 let expr = self.parse_unary()?;
-                Ok(Expr { kind: ExprKind::UnaryOp { op: UnaryOp::LogNot, expr: Box::new(expr) }, line })
+                Ok(Expr {
+                    kind: ExprKind::UnaryOp {
+                        op: UnaryOp::LogNot,
+                        expr: Box::new(expr),
+                    },
+                    line,
+                })
             }
             Token::BitNot => {
                 self.advance();
                 let expr = self.parse_unary()?;
-                Ok(Expr { kind: ExprKind::UnaryOp { op: UnaryOp::BitNot, expr: Box::new(expr) }, line })
+                Ok(Expr {
+                    kind: ExprKind::UnaryOp {
+                        op: UnaryOp::BitNot,
+                        expr: Box::new(expr),
+                    },
+                    line,
+                })
             }
             Token::Increment => {
                 self.advance();
                 let expr = self.parse_postfix()?;
-                Ok(Expr { kind: ExprKind::UnaryOp { op: UnaryOp::PreIncrement, expr: Box::new(expr) }, line })
+                Ok(Expr {
+                    kind: ExprKind::UnaryOp {
+                        op: UnaryOp::PreIncrement,
+                        expr: Box::new(expr),
+                    },
+                    line,
+                })
             }
             Token::Decrement => {
                 self.advance();
                 let expr = self.parse_postfix()?;
-                Ok(Expr { kind: ExprKind::UnaryOp { op: UnaryOp::PreDecrement, expr: Box::new(expr) }, line })
+                Ok(Expr {
+                    kind: ExprKind::UnaryOp {
+                        op: UnaryOp::PreDecrement,
+                        expr: Box::new(expr),
+                    },
+                    line,
+                })
             }
             Token::Backslash => {
                 self.advance();
                 let expr = self.parse_unary()?;
-                Ok(Expr { kind: ExprKind::ScalarRef(Box::new(expr)), line })
+                Ok(Expr {
+                    kind: ExprKind::ScalarRef(Box::new(expr)),
+                    line,
+                })
             }
             Token::FileTest(op) => {
                 self.advance();
                 let expr = self.parse_unary()?;
-                Ok(Expr { kind: ExprKind::FileTest { op, expr: Box::new(expr) }, line })
+                Ok(Expr {
+                    kind: ExprKind::FileTest {
+                        op,
+                        expr: Box::new(expr),
+                    },
+                    line,
+                })
             }
             _ => self.parse_power(),
         }
@@ -1166,7 +1509,11 @@ impl Parser {
             self.advance();
             let right = self.parse_unary()?; // right-associative
             return Ok(Expr {
-                kind: ExprKind::BinOp { left: Box::new(left), op: BinOp::Pow, right: Box::new(right) },
+                kind: ExprKind::BinOp {
+                    left: Box::new(left),
+                    op: BinOp::Pow,
+                    right: Box::new(right),
+                },
                 line,
             });
         }
@@ -1180,12 +1527,24 @@ impl Parser {
                 Token::Increment => {
                     let line = expr.line;
                     self.advance();
-                    expr = Expr { kind: ExprKind::PostfixOp { expr: Box::new(expr), op: PostfixOp::Increment }, line };
+                    expr = Expr {
+                        kind: ExprKind::PostfixOp {
+                            expr: Box::new(expr),
+                            op: PostfixOp::Increment,
+                        },
+                        line,
+                    };
                 }
                 Token::Decrement => {
                     let line = expr.line;
                     self.advance();
-                    expr = Expr { kind: ExprKind::PostfixOp { expr: Box::new(expr), op: PostfixOp::Decrement }, line };
+                    expr = Expr {
+                        kind: ExprKind::PostfixOp {
+                            expr: Box::new(expr),
+                            op: PostfixOp::Decrement,
+                        },
+                        line,
+                    };
                 }
                 Token::Arrow => {
                     let line = expr.line;
@@ -1196,7 +1555,11 @@ impl Parser {
                             let index = self.parse_expression()?;
                             self.expect(&Token::RBracket)?;
                             expr = Expr {
-                                kind: ExprKind::ArrowDeref { expr: Box::new(expr), index: Box::new(index), kind: DerefKind::Array },
+                                kind: ExprKind::ArrowDeref {
+                                    expr: Box::new(expr),
+                                    index: Box::new(index),
+                                    kind: DerefKind::Array,
+                                },
                                 line,
                             };
                         }
@@ -1205,7 +1568,11 @@ impl Parser {
                             let key = self.parse_expression()?;
                             self.expect(&Token::RBrace)?;
                             expr = Expr {
-                                kind: ExprKind::ArrowDeref { expr: Box::new(expr), index: Box::new(key), kind: DerefKind::Hash },
+                                kind: ExprKind::ArrowDeref {
+                                    expr: Box::new(expr),
+                                    index: Box::new(key),
+                                    kind: DerefKind::Hash,
+                                },
                                 line,
                             };
                         }
@@ -1214,7 +1581,14 @@ impl Parser {
                             let args = self.parse_arg_list()?;
                             self.expect(&Token::RParen)?;
                             expr = Expr {
-                                kind: ExprKind::ArrowDeref { expr: Box::new(expr), index: Box::new(Expr { kind: ExprKind::List(args), line }), kind: DerefKind::Call },
+                                kind: ExprKind::ArrowDeref {
+                                    expr: Box::new(expr),
+                                    index: Box::new(Expr {
+                                        kind: ExprKind::List(args),
+                                        line,
+                                    }),
+                                    kind: DerefKind::Call,
+                                },
                                 line,
                             };
                         }
@@ -1228,7 +1602,11 @@ impl Parser {
                                 vec![]
                             };
                             expr = Expr {
-                                kind: ExprKind::MethodCall { object: Box::new(expr), method, args },
+                                kind: ExprKind::MethodCall {
+                                    object: Box::new(expr),
+                                    method,
+                                    args,
+                                },
                                 line,
                             };
                         }
@@ -1243,7 +1621,13 @@ impl Parser {
                         self.advance();
                         let index = self.parse_expression()?;
                         self.expect(&Token::RBracket)?;
-                        expr = Expr { kind: ExprKind::ArrayElement { array: name, index: Box::new(index) }, line };
+                        expr = Expr {
+                            kind: ExprKind::ArrayElement {
+                                array: name,
+                                index: Box::new(index),
+                            },
+                            line,
+                        };
                     }
                 }
                 Token::LBrace if matches!(expr.kind, ExprKind::ScalarVar(_)) => {
@@ -1254,7 +1638,13 @@ impl Parser {
                         self.advance();
                         let key = self.parse_expression()?;
                         self.expect(&Token::RBrace)?;
-                        expr = Expr { kind: ExprKind::HashElement { hash: name, key: Box::new(key) }, line };
+                        expr = Expr {
+                            kind: ExprKind::HashElement {
+                                hash: name,
+                                key: Box::new(key),
+                            },
+                            line,
+                        };
                     }
                 }
                 _ => break,
@@ -1266,9 +1656,27 @@ impl Parser {
     fn parse_primary(&mut self) -> PerlResult<Expr> {
         let line = self.peek_line();
         match self.peek().clone() {
-            Token::Integer(n) => { self.advance(); Ok(Expr { kind: ExprKind::Integer(n), line }) }
-            Token::Float(f) => { self.advance(); Ok(Expr { kind: ExprKind::Float(f), line }) }
-            Token::SingleString(s) => { self.advance(); Ok(Expr { kind: ExprKind::String(s), line }) }
+            Token::Integer(n) => {
+                self.advance();
+                Ok(Expr {
+                    kind: ExprKind::Integer(n),
+                    line,
+                })
+            }
+            Token::Float(f) => {
+                self.advance();
+                Ok(Expr {
+                    kind: ExprKind::Float(f),
+                    line,
+                })
+            }
+            Token::SingleString(s) => {
+                self.advance();
+                Ok(Expr {
+                    kind: ExprKind::String(s),
+                    line,
+                })
+            }
             Token::DoubleString(s) => {
                 self.advance();
                 Ok(self.parse_interpolated_string(&s, line))
@@ -1279,15 +1687,24 @@ impl Parser {
             }
             Token::Regex(pattern, flags) => {
                 self.advance();
-                Ok(Expr { kind: ExprKind::Regex(pattern, flags), line })
+                Ok(Expr {
+                    kind: ExprKind::Regex(pattern, flags),
+                    line,
+                })
             }
             Token::QW(words) => {
                 self.advance();
-                Ok(Expr { kind: ExprKind::QW(words), line })
+                Ok(Expr {
+                    kind: ExprKind::QW(words),
+                    line,
+                })
             }
             Token::ScalarVar(name) => {
                 self.advance();
-                Ok(Expr { kind: ExprKind::ScalarVar(name), line })
+                Ok(Expr {
+                    kind: ExprKind::ScalarVar(name),
+                    line,
+                })
             }
             Token::ArrayVar(name) => {
                 self.advance();
@@ -1297,20 +1714,35 @@ impl Parser {
                         self.advance();
                         let indices = self.parse_arg_list()?;
                         self.expect(&Token::RBracket)?;
-                        Ok(Expr { kind: ExprKind::ArraySlice { array: name, indices }, line })
+                        Ok(Expr {
+                            kind: ExprKind::ArraySlice {
+                                array: name,
+                                indices,
+                            },
+                            line,
+                        })
                     }
-                    _ => Ok(Expr { kind: ExprKind::ArrayVar(name), line }),
+                    _ => Ok(Expr {
+                        kind: ExprKind::ArrayVar(name),
+                        line,
+                    }),
                 }
             }
             Token::HashVar(name) => {
                 self.advance();
-                Ok(Expr { kind: ExprKind::HashVar(name), line })
+                Ok(Expr {
+                    kind: ExprKind::HashVar(name),
+                    line,
+                })
             }
             Token::LParen => {
                 self.advance();
                 if matches!(self.peek(), Token::RParen) {
                     self.advance();
-                    return Ok(Expr { kind: ExprKind::List(vec![]), line });
+                    return Ok(Expr {
+                        kind: ExprKind::List(vec![]),
+                        line,
+                    });
                 }
                 let expr = self.parse_expression()?;
                 self.expect(&Token::RParen)?;
@@ -1320,7 +1752,10 @@ impl Parser {
                 self.advance();
                 let elems = self.parse_arg_list()?;
                 self.expect(&Token::RBracket)?;
-                Ok(Expr { kind: ExprKind::ArrayRef(elems), line })
+                Ok(Expr {
+                    kind: ExprKind::ArrayRef(elems),
+                    line,
+                })
             }
             Token::LBrace => {
                 // Could be hash ref or block — disambiguate
@@ -1328,7 +1763,10 @@ impl Parser {
                 // Try to parse as hash ref: { key => val, ... }
                 let saved = self.pos;
                 match self.try_parse_hash_ref() {
-                    Ok(pairs) => Ok(Expr { kind: ExprKind::HashRef(pairs), line }),
+                    Ok(pairs) => Ok(Expr {
+                        kind: ExprKind::HashRef(pairs),
+                        line,
+                    }),
                     Err(_) => {
                         self.pos = saved;
                         // Parse as block, wrap in code ref
@@ -1340,17 +1778,29 @@ impl Parser {
                             stmts.push(self.parse_statement()?);
                         }
                         self.expect(&Token::RBrace)?;
-                        Ok(Expr { kind: ExprKind::CodeRef { params: vec![], body: stmts }, line })
+                        Ok(Expr {
+                            kind: ExprKind::CodeRef {
+                                params: vec![],
+                                body: stmts,
+                            },
+                            line,
+                        })
                     }
                 }
             }
             Token::Diamond => {
                 self.advance();
-                Ok(Expr { kind: ExprKind::ReadLine(None), line })
+                Ok(Expr {
+                    kind: ExprKind::ReadLine(None),
+                    line,
+                })
             }
             Token::ReadLine(handle) => {
                 self.advance();
-                Ok(Expr { kind: ExprKind::ReadLine(Some(handle)), line })
+                Ok(Expr {
+                    kind: ExprKind::ReadLine(Some(handle)),
+                    line,
+                })
             }
 
             // Named functions / builtins
@@ -1363,7 +1813,10 @@ impl Parser {
                     if parts.len() >= 4 && parts[1] == "s" {
                         return Ok(Expr {
                             kind: ExprKind::Substitution {
-                                expr: Box::new(Expr { kind: ExprKind::ScalarVar("_".into()), line }),
+                                expr: Box::new(Expr {
+                                    kind: ExprKind::ScalarVar("_".into()),
+                                    line,
+                                }),
                                 pattern: parts[2].to_string(),
                                 replacement: parts[3].to_string(),
                                 flags: parts.get(4).unwrap_or(&"").to_string(),
@@ -1374,7 +1827,10 @@ impl Parser {
                     if parts.len() >= 4 && parts[1] == "tr" {
                         return Ok(Expr {
                             kind: ExprKind::Transliterate {
-                                expr: Box::new(Expr { kind: ExprKind::ScalarVar("_".into()), line }),
+                                expr: Box::new(Expr {
+                                    kind: ExprKind::ScalarVar("_".into()),
+                                    line,
+                                }),
                                 from: parts[2].to_string(),
                                 to: parts[3].to_string(),
                                 flags: parts.get(4).unwrap_or(&"").to_string(),
@@ -1387,7 +1843,10 @@ impl Parser {
                 self.parse_named_expr(name)
             }
 
-            tok => Err(PerlError::syntax(format!("Unexpected token {:?}", tok), line)),
+            tok => Err(PerlError::syntax(
+                format!("Unexpected token {:?}", tok),
+                line,
+            )),
         }
     }
 
@@ -1401,62 +1860,251 @@ impl Parser {
             "printf" => self.parse_print_like(|h, a| ExprKind::Printf { handle: h, args: a }),
             "die" => {
                 let args = self.parse_list_until_terminator()?;
-                Ok(Expr { kind: ExprKind::Die(args), line })
+                Ok(Expr {
+                    kind: ExprKind::Die(args),
+                    line,
+                })
             }
             "warn" => {
                 let args = self.parse_list_until_terminator()?;
-                Ok(Expr { kind: ExprKind::Warn(args), line })
+                Ok(Expr {
+                    kind: ExprKind::Warn(args),
+                    line,
+                })
             }
-            "chomp" => { let a = self.parse_one_arg()?; Ok(Expr { kind: ExprKind::Chomp(Box::new(a)), line }) }
-            "chop" => { let a = self.parse_one_arg()?; Ok(Expr { kind: ExprKind::Chop(Box::new(a)), line }) }
-            "length" => { let a = self.parse_one_arg_or_default()?; Ok(Expr { kind: ExprKind::Length(Box::new(a)), line }) }
-            "defined" => { let a = self.parse_one_arg()?; Ok(Expr { kind: ExprKind::Defined(Box::new(a)), line }) }
-            "ref" => { let a = self.parse_one_arg()?; Ok(Expr { kind: ExprKind::Ref(Box::new(a)), line }) }
+            "chomp" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::Chomp(Box::new(a)),
+                    line,
+                })
+            }
+            "chop" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::Chop(Box::new(a)),
+                    line,
+                })
+            }
+            "length" => {
+                let a = self.parse_one_arg_or_default()?;
+                Ok(Expr {
+                    kind: ExprKind::Length(Box::new(a)),
+                    line,
+                })
+            }
+            "defined" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::Defined(Box::new(a)),
+                    line,
+                })
+            }
+            "ref" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::Ref(Box::new(a)),
+                    line,
+                })
+            }
             "undef" => {
-                if matches!(self.peek(), Token::ScalarVar(_) | Token::ArrayVar(_) | Token::HashVar(_)) {
+                if matches!(
+                    self.peek(),
+                    Token::ScalarVar(_) | Token::ArrayVar(_) | Token::HashVar(_)
+                ) {
                     let _ = self.advance();
                 }
-                Ok(Expr { kind: ExprKind::Undef, line })
+                Ok(Expr {
+                    kind: ExprKind::Undef,
+                    line,
+                })
             }
-            "scalar" => { let a = self.parse_one_arg()?; Ok(Expr { kind: ExprKind::ScalarContext(Box::new(a)), line }) }
-            "abs" => { let a = self.parse_one_arg_or_default()?; Ok(Expr { kind: ExprKind::Abs(Box::new(a)), line }) }
-            "int" => { let a = self.parse_one_arg_or_default()?; Ok(Expr { kind: ExprKind::Int(Box::new(a)), line }) }
-            "sqrt" => { let a = self.parse_one_arg()?; Ok(Expr { kind: ExprKind::Sqrt(Box::new(a)), line }) }
-            "hex" => { let a = self.parse_one_arg_or_default()?; Ok(Expr { kind: ExprKind::Hex(Box::new(a)), line }) }
-            "oct" => { let a = self.parse_one_arg_or_default()?; Ok(Expr { kind: ExprKind::Oct(Box::new(a)), line }) }
-            "chr" => { let a = self.parse_one_arg_or_default()?; Ok(Expr { kind: ExprKind::Chr(Box::new(a)), line }) }
-            "ord" => { let a = self.parse_one_arg_or_default()?; Ok(Expr { kind: ExprKind::Ord(Box::new(a)), line }) }
-            "lc" => { let a = self.parse_one_arg_or_default()?; Ok(Expr { kind: ExprKind::Lc(Box::new(a)), line }) }
-            "uc" => { let a = self.parse_one_arg_or_default()?; Ok(Expr { kind: ExprKind::Uc(Box::new(a)), line }) }
-            "lcfirst" => { let a = self.parse_one_arg_or_default()?; Ok(Expr { kind: ExprKind::Lcfirst(Box::new(a)), line }) }
-            "ucfirst" => { let a = self.parse_one_arg_or_default()?; Ok(Expr { kind: ExprKind::Ucfirst(Box::new(a)), line }) }
+            "scalar" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::ScalarContext(Box::new(a)),
+                    line,
+                })
+            }
+            "abs" => {
+                let a = self.parse_one_arg_or_default()?;
+                Ok(Expr {
+                    kind: ExprKind::Abs(Box::new(a)),
+                    line,
+                })
+            }
+            "int" => {
+                let a = self.parse_one_arg_or_default()?;
+                Ok(Expr {
+                    kind: ExprKind::Int(Box::new(a)),
+                    line,
+                })
+            }
+            "sqrt" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::Sqrt(Box::new(a)),
+                    line,
+                })
+            }
+            "hex" => {
+                let a = self.parse_one_arg_or_default()?;
+                Ok(Expr {
+                    kind: ExprKind::Hex(Box::new(a)),
+                    line,
+                })
+            }
+            "oct" => {
+                let a = self.parse_one_arg_or_default()?;
+                Ok(Expr {
+                    kind: ExprKind::Oct(Box::new(a)),
+                    line,
+                })
+            }
+            "chr" => {
+                let a = self.parse_one_arg_or_default()?;
+                Ok(Expr {
+                    kind: ExprKind::Chr(Box::new(a)),
+                    line,
+                })
+            }
+            "ord" => {
+                let a = self.parse_one_arg_or_default()?;
+                Ok(Expr {
+                    kind: ExprKind::Ord(Box::new(a)),
+                    line,
+                })
+            }
+            "lc" => {
+                let a = self.parse_one_arg_or_default()?;
+                Ok(Expr {
+                    kind: ExprKind::Lc(Box::new(a)),
+                    line,
+                })
+            }
+            "uc" => {
+                let a = self.parse_one_arg_or_default()?;
+                Ok(Expr {
+                    kind: ExprKind::Uc(Box::new(a)),
+                    line,
+                })
+            }
+            "lcfirst" => {
+                let a = self.parse_one_arg_or_default()?;
+                Ok(Expr {
+                    kind: ExprKind::Lcfirst(Box::new(a)),
+                    line,
+                })
+            }
+            "ucfirst" => {
+                let a = self.parse_one_arg_or_default()?;
+                Ok(Expr {
+                    kind: ExprKind::Ucfirst(Box::new(a)),
+                    line,
+                })
+            }
             "push" => {
                 let args = self.parse_builtin_args()?;
-                let (first, rest) = args.split_first().ok_or_else(|| PerlError::syntax("push requires arguments", line))?;
-                Ok(Expr { kind: ExprKind::Push { array: Box::new(first.clone()), values: rest.to_vec() }, line })
+                let (first, rest) = args
+                    .split_first()
+                    .ok_or_else(|| PerlError::syntax("push requires arguments", line))?;
+                Ok(Expr {
+                    kind: ExprKind::Push {
+                        array: Box::new(first.clone()),
+                        values: rest.to_vec(),
+                    },
+                    line,
+                })
             }
-            "pop" => { let a = self.parse_one_arg()?; Ok(Expr { kind: ExprKind::Pop(Box::new(a)), line }) }
-            "shift" => { let a = self.parse_one_arg_or_argv()?; Ok(Expr { kind: ExprKind::Shift(Box::new(a)), line }) }
+            "pop" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::Pop(Box::new(a)),
+                    line,
+                })
+            }
+            "shift" => {
+                let a = self.parse_one_arg_or_argv()?;
+                Ok(Expr {
+                    kind: ExprKind::Shift(Box::new(a)),
+                    line,
+                })
+            }
             "unshift" => {
                 let args = self.parse_builtin_args()?;
-                let (first, rest) = args.split_first().ok_or_else(|| PerlError::syntax("unshift requires arguments", line))?;
-                Ok(Expr { kind: ExprKind::Unshift { array: Box::new(first.clone()), values: rest.to_vec() }, line })
+                let (first, rest) = args
+                    .split_first()
+                    .ok_or_else(|| PerlError::syntax("unshift requires arguments", line))?;
+                Ok(Expr {
+                    kind: ExprKind::Unshift {
+                        array: Box::new(first.clone()),
+                        values: rest.to_vec(),
+                    },
+                    line,
+                })
             }
             "splice" => {
                 let args = self.parse_builtin_args()?;
                 let mut iter = args.into_iter();
-                let array = Box::new(iter.next().ok_or_else(|| PerlError::syntax("splice requires arguments", line))?);
+                let array = Box::new(
+                    iter.next()
+                        .ok_or_else(|| PerlError::syntax("splice requires arguments", line))?,
+                );
                 let offset = iter.next().map(Box::new);
                 let length = iter.next().map(Box::new);
                 let replacement: Vec<Expr> = iter.collect();
-                Ok(Expr { kind: ExprKind::Splice { array, offset, length, replacement }, line })
+                Ok(Expr {
+                    kind: ExprKind::Splice {
+                        array,
+                        offset,
+                        length,
+                        replacement,
+                    },
+                    line,
+                })
             }
-            "delete" => { let a = self.parse_postfix()?; Ok(Expr { kind: ExprKind::Delete(Box::new(a)), line }) }
-            "exists" => { let a = self.parse_postfix()?; Ok(Expr { kind: ExprKind::Exists(Box::new(a)), line }) }
-            "keys" => { let a = self.parse_one_arg()?; Ok(Expr { kind: ExprKind::Keys(Box::new(a)), line }) }
-            "values" => { let a = self.parse_one_arg()?; Ok(Expr { kind: ExprKind::Values(Box::new(a)), line }) }
-            "each" => { let a = self.parse_one_arg()?; Ok(Expr { kind: ExprKind::Each(Box::new(a)), line }) }
-            "reverse" => { let a = self.parse_one_arg()?; Ok(Expr { kind: ExprKind::ReverseExpr(Box::new(a)), line }) }
+            "delete" => {
+                let a = self.parse_postfix()?;
+                Ok(Expr {
+                    kind: ExprKind::Delete(Box::new(a)),
+                    line,
+                })
+            }
+            "exists" => {
+                let a = self.parse_postfix()?;
+                Ok(Expr {
+                    kind: ExprKind::Exists(Box::new(a)),
+                    line,
+                })
+            }
+            "keys" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::Keys(Box::new(a)),
+                    line,
+                })
+            }
+            "values" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::Values(Box::new(a)),
+                    line,
+                })
+            }
+            "each" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::Each(Box::new(a)),
+                    line,
+                })
+            }
+            "reverse" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::ReverseExpr(Box::new(a)),
+                    line,
+                })
+            }
             "join" => {
                 let args = self.parse_builtin_args()?;
                 if args.len() < 2 {
@@ -1465,17 +2113,33 @@ impl Parser {
                 Ok(Expr {
                     kind: ExprKind::JoinExpr {
                         separator: Box::new(args[0].clone()),
-                        list: Box::new(Expr { kind: ExprKind::List(args[1..].to_vec()), line }),
+                        list: Box::new(Expr {
+                            kind: ExprKind::List(args[1..].to_vec()),
+                            line,
+                        }),
                     },
                     line,
                 })
             }
             "split" => {
                 let args = self.parse_builtin_args()?;
-                let pattern = args.first().cloned().unwrap_or(Expr { kind: ExprKind::String(" ".into()), line });
-                let string = args.get(1).cloned().unwrap_or(Expr { kind: ExprKind::ScalarVar("_".into()), line });
+                let pattern = args.first().cloned().unwrap_or(Expr {
+                    kind: ExprKind::String(" ".into()),
+                    line,
+                });
+                let string = args.get(1).cloned().unwrap_or(Expr {
+                    kind: ExprKind::ScalarVar("_".into()),
+                    line,
+                });
                 let limit = args.get(2).cloned().map(Box::new);
-                Ok(Expr { kind: ExprKind::SplitExpr { pattern: Box::new(pattern), string: Box::new(string), limit }, line })
+                Ok(Expr {
+                    kind: ExprKind::SplitExpr {
+                        pattern: Box::new(pattern),
+                        string: Box::new(string),
+                        limit,
+                    },
+                    line,
+                })
             }
             "substr" => {
                 let args = self.parse_builtin_args()?;
@@ -1513,59 +2177,121 @@ impl Parser {
             }
             "sprintf" => {
                 let args = self.parse_builtin_args()?;
-                let (first, rest) = args.split_first().ok_or_else(|| PerlError::syntax("sprintf requires format", line))?;
-                Ok(Expr { kind: ExprKind::Sprintf { format: Box::new(first.clone()), args: rest.to_vec() }, line })
+                let (first, rest) = args
+                    .split_first()
+                    .ok_or_else(|| PerlError::syntax("sprintf requires format", line))?;
+                Ok(Expr {
+                    kind: ExprKind::Sprintf {
+                        format: Box::new(first.clone()),
+                        args: rest.to_vec(),
+                    },
+                    line,
+                })
             }
             "map" => {
                 let (block, list) = self.parse_block_list()?;
-                Ok(Expr { kind: ExprKind::MapExpr { block, list: Box::new(list) }, line })
+                Ok(Expr {
+                    kind: ExprKind::MapExpr {
+                        block,
+                        list: Box::new(list),
+                    },
+                    line,
+                })
             }
             "grep" => {
                 let (block, list) = self.parse_block_list()?;
-                Ok(Expr { kind: ExprKind::GrepExpr { block, list: Box::new(list) }, line })
+                Ok(Expr {
+                    kind: ExprKind::GrepExpr {
+                        block,
+                        list: Box::new(list),
+                    },
+                    line,
+                })
             }
             "sort" => {
                 // sort may have optional cmp block
                 if matches!(self.peek(), Token::LBrace) {
                     let block = self.parse_block()?;
-                    let list = if self.eat(&Token::Comma) {
-                        self.parse_expression()?
-                    } else {
-                        self.parse_expression()?
-                    };
-                    Ok(Expr { kind: ExprKind::SortExpr { cmp: Some(block), list: Box::new(list) }, line })
+                    let _ = self.eat(&Token::Comma);
+                    let list = self.parse_expression()?;
+                    Ok(Expr {
+                        kind: ExprKind::SortExpr {
+                            cmp: Some(block),
+                            list: Box::new(list),
+                        },
+                        line,
+                    })
                 } else {
                     let list = self.parse_expression()?;
-                    Ok(Expr { kind: ExprKind::SortExpr { cmp: None, list: Box::new(list) }, line })
+                    Ok(Expr {
+                        kind: ExprKind::SortExpr {
+                            cmp: None,
+                            list: Box::new(list),
+                        },
+                        line,
+                    })
                 }
             }
             // Parallel extensions
             "pmap" => {
                 let (block, list) = self.parse_block_list()?;
-                Ok(Expr { kind: ExprKind::PMapExpr { block, list: Box::new(list) }, line })
+                Ok(Expr {
+                    kind: ExprKind::PMapExpr {
+                        block,
+                        list: Box::new(list),
+                    },
+                    line,
+                })
             }
             "pgrep" => {
                 let (block, list) = self.parse_block_list()?;
-                Ok(Expr { kind: ExprKind::PGrepExpr { block, list: Box::new(list) }, line })
+                Ok(Expr {
+                    kind: ExprKind::PGrepExpr {
+                        block,
+                        list: Box::new(list),
+                    },
+                    line,
+                })
             }
             "pfor" => {
                 let (block, list) = self.parse_block_list()?;
-                Ok(Expr { kind: ExprKind::PForExpr { block, list: Box::new(list) }, line })
+                Ok(Expr {
+                    kind: ExprKind::PForExpr {
+                        block,
+                        list: Box::new(list),
+                    },
+                    line,
+                })
             }
             "psort" => {
                 if matches!(self.peek(), Token::LBrace) {
                     let block = self.parse_block()?;
                     let list = self.parse_expression()?;
-                    Ok(Expr { kind: ExprKind::PSortExpr { cmp: Some(block), list: Box::new(list) }, line })
+                    Ok(Expr {
+                        kind: ExprKind::PSortExpr {
+                            cmp: Some(block),
+                            list: Box::new(list),
+                        },
+                        line,
+                    })
                 } else {
                     let list = self.parse_expression()?;
-                    Ok(Expr { kind: ExprKind::PSortExpr { cmp: None, list: Box::new(list) }, line })
+                    Ok(Expr {
+                        kind: ExprKind::PSortExpr {
+                            cmp: None,
+                            list: Box::new(list),
+                        },
+                        line,
+                    })
                 }
             }
             "open" => {
                 let args = self.parse_builtin_args()?;
                 if args.len() < 2 {
-                    return Err(PerlError::syntax("open requires at least 2 arguments", line));
+                    return Err(PerlError::syntax(
+                        "open requires at least 2 arguments",
+                        line,
+                    ));
                 }
                 Ok(Expr {
                     kind: ExprKind::Open {
@@ -1576,53 +2302,104 @@ impl Parser {
                     line,
                 })
             }
-            "close" => { let a = self.parse_one_arg()?; Ok(Expr { kind: ExprKind::Close(Box::new(a)), line }) }
+            "close" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::Close(Box::new(a)),
+                    line,
+                })
+            }
             "eof" => {
                 if matches!(self.peek(), Token::LParen) {
                     self.advance();
                     if matches!(self.peek(), Token::RParen) {
                         self.advance();
-                        Ok(Expr { kind: ExprKind::Eof(None), line })
+                        Ok(Expr {
+                            kind: ExprKind::Eof(None),
+                            line,
+                        })
                     } else {
                         let a = self.parse_expression()?;
                         self.expect(&Token::RParen)?;
-                        Ok(Expr { kind: ExprKind::Eof(Some(Box::new(a))), line })
+                        Ok(Expr {
+                            kind: ExprKind::Eof(Some(Box::new(a))),
+                            line,
+                        })
                     }
                 } else {
-                    Ok(Expr { kind: ExprKind::Eof(None), line })
+                    Ok(Expr {
+                        kind: ExprKind::Eof(None),
+                        line,
+                    })
                 }
             }
             "system" => {
                 let args = self.parse_builtin_args()?;
-                Ok(Expr { kind: ExprKind::System(args), line })
+                Ok(Expr {
+                    kind: ExprKind::System(args),
+                    line,
+                })
             }
             "exec" => {
                 let args = self.parse_builtin_args()?;
-                Ok(Expr { kind: ExprKind::Exec(args), line })
+                Ok(Expr {
+                    kind: ExprKind::Exec(args),
+                    line,
+                })
             }
             "eval" => {
                 let a = if matches!(self.peek(), Token::LBrace) {
                     let block = self.parse_block()?;
-                    Expr { kind: ExprKind::CodeRef { params: vec![], body: block }, line }
+                    Expr {
+                        kind: ExprKind::CodeRef {
+                            params: vec![],
+                            body: block,
+                        },
+                        line,
+                    }
                 } else {
                     self.parse_one_arg()?
                 };
-                Ok(Expr { kind: ExprKind::Eval(Box::new(a)), line })
+                Ok(Expr {
+                    kind: ExprKind::Eval(Box::new(a)),
+                    line,
+                })
             }
             "do" => {
                 let a = self.parse_one_arg()?;
-                Ok(Expr { kind: ExprKind::Do(Box::new(a)), line })
+                Ok(Expr {
+                    kind: ExprKind::Do(Box::new(a)),
+                    line,
+                })
             }
-            "require" => { let a = self.parse_one_arg()?; Ok(Expr { kind: ExprKind::Require(Box::new(a)), line }) }
+            "require" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::Require(Box::new(a)),
+                    line,
+                })
+            }
             "exit" => {
                 if matches!(self.peek(), Token::Semicolon | Token::RBrace | Token::Eof) {
-                    Ok(Expr { kind: ExprKind::Exit(None), line })
+                    Ok(Expr {
+                        kind: ExprKind::Exit(None),
+                        line,
+                    })
                 } else {
                     let a = self.parse_one_arg()?;
-                    Ok(Expr { kind: ExprKind::Exit(Some(Box::new(a))), line })
+                    Ok(Expr {
+                        kind: ExprKind::Exit(Some(Box::new(a))),
+                        line,
+                    })
                 }
             }
-            "chdir" => { let a = self.parse_one_arg()?; Ok(Expr { kind: ExprKind::Chdir(Box::new(a)), line }) }
+            "chdir" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::Chdir(Box::new(a)),
+                    line,
+                })
+            }
             "mkdir" => {
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
@@ -1635,7 +2412,10 @@ impl Parser {
             }
             "unlink" => {
                 let args = self.parse_builtin_args()?;
-                Ok(Expr { kind: ExprKind::Unlink(args), line })
+                Ok(Expr {
+                    kind: ExprKind::Unlink(args),
+                    line,
+                })
             }
             "bless" => {
                 let args = self.parse_builtin_args()?;
@@ -1652,56 +2432,93 @@ impl Parser {
                     self.advance();
                     if matches!(self.peek(), Token::RParen) {
                         self.advance();
-                        Ok(Expr { kind: ExprKind::Caller(None), line })
+                        Ok(Expr {
+                            kind: ExprKind::Caller(None),
+                            line,
+                        })
                     } else {
                         let a = self.parse_expression()?;
                         self.expect(&Token::RParen)?;
-                        Ok(Expr { kind: ExprKind::Caller(Some(Box::new(a))), line })
+                        Ok(Expr {
+                            kind: ExprKind::Caller(Some(Box::new(a))),
+                            line,
+                        })
                     }
                 } else {
-                    Ok(Expr { kind: ExprKind::Caller(None), line })
+                    Ok(Expr {
+                        kind: ExprKind::Caller(None),
+                        line,
+                    })
                 }
             }
-            "wantarray" => Ok(Expr { kind: ExprKind::Wantarray, line }),
+            "wantarray" => Ok(Expr {
+                kind: ExprKind::Wantarray,
+                line,
+            }),
             "sub" => {
                 // Anonymous sub
                 let body = self.parse_block()?;
-                Ok(Expr { kind: ExprKind::CodeRef { params: vec![], body }, line })
+                Ok(Expr {
+                    kind: ExprKind::CodeRef {
+                        params: vec![],
+                        body,
+                    },
+                    line,
+                })
             }
             _ => {
                 // Generic function call
                 // Check for fat arrow (bareword string in hash)
                 if matches!(self.peek(), Token::FatArrow) {
-                    return Ok(Expr { kind: ExprKind::String(name), line });
+                    return Ok(Expr {
+                        kind: ExprKind::String(name),
+                        line,
+                    });
                 }
                 // Function call with optional parens
                 if matches!(self.peek(), Token::LParen) {
                     self.advance();
                     let args = self.parse_arg_list()?;
                     self.expect(&Token::RParen)?;
-                    Ok(Expr { kind: ExprKind::FuncCall { name, args }, line })
+                    Ok(Expr {
+                        kind: ExprKind::FuncCall { name, args },
+                        line,
+                    })
                 } else if self.peek().is_term_start() {
                     // Perl allows func arg without parens
                     let args = self.parse_list_until_terminator()?;
-                    Ok(Expr { kind: ExprKind::FuncCall { name, args }, line })
+                    Ok(Expr {
+                        kind: ExprKind::FuncCall { name, args },
+                        line,
+                    })
                 } else {
                     // Bareword — treat as string (like hash key)
-                    Ok(Expr { kind: ExprKind::String(name), line })
+                    Ok(Expr {
+                        kind: ExprKind::String(name),
+                        line,
+                    })
                 }
             }
         }
     }
 
-    fn parse_print_like(&mut self, make: impl FnOnce(Option<String>, Vec<Expr>) -> ExprKind) -> PerlResult<Expr> {
+    fn parse_print_like(
+        &mut self,
+        make: impl FnOnce(Option<String>, Vec<Expr>) -> ExprKind,
+    ) -> PerlResult<Expr> {
         let line = self.peek_line();
         // Check for filehandle: print STDERR "msg"
         let handle = if let Token::Ident(ref h) = self.peek().clone() {
-            if h.chars().all(|c| c.is_uppercase() || c == '_') && !matches!(self.peek(), Token::LParen) {
+            if h.chars().all(|c| c.is_uppercase() || c == '_')
+                && !matches!(self.peek(), Token::LParen)
+            {
                 let h = h.clone();
                 let saved = self.pos;
                 self.advance();
                 // Verify next token is a term start (not operator)
-                if self.peek().is_term_start() || matches!(self.peek(), Token::DoubleString(_) | Token::SingleString(_)) {
+                if self.peek().is_term_start()
+                    || matches!(self.peek(), Token::DoubleString(_) | Token::SingleString(_))
+                {
                     Some(h)
                 } else {
                     self.pos = saved;
@@ -1714,7 +2531,10 @@ impl Parser {
             None
         };
         let args = self.parse_list_until_terminator()?;
-        Ok(Expr { kind: make(handle, args), line })
+        Ok(Expr {
+            kind: make(handle, args),
+            line,
+        })
     }
 
     fn parse_block_list(&mut self) -> PerlResult<(Block, Expr)> {
@@ -1740,7 +2560,10 @@ impl Parser {
             self.peek(),
             Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof | Token::Comma
         ) {
-            Ok(Expr { kind: ExprKind::ScalarVar("_".into()), line: self.peek_line() })
+            Ok(Expr {
+                kind: ExprKind::ScalarVar("_".into()),
+                line: self.peek_line(),
+            })
         } else {
             self.parse_one_arg()
         }
@@ -1751,7 +2574,10 @@ impl Parser {
             self.peek(),
             Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof | Token::Comma
         ) {
-            Ok(Expr { kind: ExprKind::ArrayVar("_".into()), line: self.peek_line() })
+            Ok(Expr {
+                kind: ExprKind::ArrayVar("_".into()),
+                line: self.peek_line(),
+            })
         } else {
             self.parse_one_arg()
         }
@@ -1770,7 +2596,10 @@ impl Parser {
 
     fn parse_arg_list(&mut self) -> PerlResult<Vec<Expr>> {
         let mut args = Vec::new();
-        while !matches!(self.peek(), Token::RParen | Token::RBracket | Token::RBrace | Token::Eof) {
+        while !matches!(
+            self.peek(),
+            Token::RParen | Token::RBracket | Token::RBrace | Token::Eof
+        ) {
             args.push(self.parse_assign_expr()?);
             if !self.eat(&Token::Comma) && !self.eat(&Token::FatArrow) {
                 break;
@@ -1790,7 +2619,11 @@ impl Parser {
             }
             // Check for postfix modifiers
             if let Token::Ident(ref kw) = self.peek().clone() {
-                if matches!(kw.as_str(), "if" | "unless" | "while" | "until" | "for" | "foreach") && !args.is_empty() {
+                if matches!(
+                    kw.as_str(),
+                    "if" | "unless" | "while" | "until" | "for" | "foreach"
+                ) && !args.is_empty()
+                {
                     break;
                 }
             }
@@ -1857,17 +2690,31 @@ impl Parser {
                         let mut key = String::new();
                         let mut depth = 1;
                         while i < chars.len() && depth > 0 {
-                            if chars[i] == '{' { depth += 1; }
-                            else if chars[i] == '}' { depth -= 1; if depth == 0 { break; } }
+                            if chars[i] == '{' {
+                                depth += 1;
+                            } else if chars[i] == '}' {
+                                depth -= 1;
+                                if depth == 0 {
+                                    break;
+                                }
+                            }
                             key.push(chars[i]);
                             i += 1;
                         }
-                        if i < chars.len() { i += 1; } // skip }
-                        // Build a HashElement expression for the interpreter
-                        let key_expr = if key.starts_with('$') {
-                            Expr { kind: ExprKind::ScalarVar(key[1..].to_string()), line }
+                        if i < chars.len() {
+                            i += 1;
+                        } // skip }
+                          // Build a HashElement expression for the interpreter
+                        let key_expr = if let Some(rest) = key.strip_prefix('$') {
+                            Expr {
+                                kind: ExprKind::ScalarVar(rest.to_string()),
+                                line,
+                            }
                         } else {
-                            Expr { kind: ExprKind::String(key), line }
+                            Expr {
+                                kind: ExprKind::String(key),
+                                line,
+                            }
                         };
                         parts.push(StringPart::Expr(Expr {
                             kind: ExprKind::HashElement {
@@ -1884,13 +2731,24 @@ impl Parser {
                             idx_str.push(chars[i]);
                             i += 1;
                         }
-                        if i < chars.len() { i += 1; }
-                        let idx_expr = if idx_str.starts_with('$') {
-                            Expr { kind: ExprKind::ScalarVar(idx_str[1..].to_string()), line }
+                        if i < chars.len() {
+                            i += 1;
+                        }
+                        let idx_expr = if let Some(rest) = idx_str.strip_prefix('$') {
+                            Expr {
+                                kind: ExprKind::ScalarVar(rest.to_string()),
+                                line,
+                            }
                         } else if let Ok(n) = idx_str.parse::<i64>() {
-                            Expr { kind: ExprKind::Integer(n), line }
+                            Expr {
+                                kind: ExprKind::Integer(n),
+                                line,
+                            }
                         } else {
-                            Expr { kind: ExprKind::String(idx_str), line }
+                            Expr {
+                                kind: ExprKind::String(idx_str),
+                                line,
+                            }
                         };
                         parts.push(StringPart::Expr(Expr {
                             kind: ExprKind::ArrayElement {
@@ -1908,7 +2766,10 @@ impl Parser {
                     literal.push(chars[i]);
                     i += 1;
                 }
-            } else if chars[i] == '@' && i + 1 < chars.len() && (chars[i + 1].is_alphabetic() || chars[i + 1] == '_') {
+            } else if chars[i] == '@'
+                && i + 1 < chars.len()
+                && (chars[i + 1].is_alphabetic() || chars[i + 1] == '_')
+            {
                 if !literal.is_empty() {
                     parts.push(StringPart::Literal(std::mem::take(&mut literal)));
                 }
@@ -1930,13 +2791,22 @@ impl Parser {
 
         if parts.len() == 1 {
             if let StringPart::Literal(s) = &parts[0] {
-                return Expr { kind: ExprKind::String(s.clone()), line };
+                return Expr {
+                    kind: ExprKind::String(s.clone()),
+                    line,
+                };
             }
         }
         if parts.is_empty() {
-            return Expr { kind: ExprKind::String(String::new()), line };
+            return Expr {
+                kind: ExprKind::String(String::new()),
+                line,
+            };
         }
 
-        Expr { kind: ExprKind::InterpolatedString(parts), line }
+        Expr {
+            kind: ExprKind::InterpolatedString(parts),
+            line,
+        }
     }
 }

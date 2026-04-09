@@ -2,7 +2,10 @@ use crate::common::*;
 
 #[test]
 fn basic_sub() {
-    assert_eq!(eval_int("sub add { my $a = shift @_; my $b = shift @_; return $a + $b; } add(3, 4)"), 7);
+    assert_eq!(
+        eval_int("sub add { my $a = shift @_; my $b = shift @_; return $a + $b; } add(3, 4)"),
+        7
+    );
 }
 
 #[test]
