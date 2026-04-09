@@ -507,6 +507,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - `package` declarations
 - `BEGIN`/`END` blocks
 - String interpolation with `$var`, `$hash{key}`, `$array[idx]`
+- **`__FILE__`** / **`__LINE__`** — compile-time literals (`__LINE__` is the token’s line, 1-based; `__FILE__` matches `Interpreter::file`, e.g. `-e` or the script path from the `pe` driver)
 - Heredocs (`<<EOF`)
 - `qw()`, `q()`, `qq()`
 - POD documentation skipping

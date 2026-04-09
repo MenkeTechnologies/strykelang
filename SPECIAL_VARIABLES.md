@@ -10,6 +10,7 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 
 | Perl | Role | perlrs |
 |------|------|--------|
+| `__FILE__` / `__LINE__` | Compile-time literals | `ExprKind::MagicConst` — `__FILE__` → `Interpreter::file` (driver sets `-e` or script path); `__LINE__` → lexer line (1-based). VM bytecode uses `Compiler::source_file` (wired from `Interpreter::file` in `try_vm_execute`). |
 | `$_` | Default topic | Ordinary scalar `$_` in scope; set by `map`/`grep`/many iterators, `given`, `readline`, etc. |
 | `$.` | Input line number | `Interpreter.line_number` via `get_special_var(".")` (`src/interpreter.rs`); incremented on `readline` paths. |
 | `$/` | Input record separator | `irs` field; get/set via `get_special_var` / `set_special_var` for `"/"`. |
