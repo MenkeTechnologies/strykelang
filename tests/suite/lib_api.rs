@@ -10,6 +10,11 @@ fn run_returns_computed_integer() {
 }
 
 #[test]
+fn run_value_is_last_statement_result() {
+    assert_eq!(run("1; 2; 3").expect("run").to_int(), 3);
+}
+
+#[test]
 fn run_returns_err_on_invalid_syntax() {
     assert!(run("}").is_err());
 }
@@ -53,6 +58,13 @@ fn parse_and_run_string_accumulates_state_across_calls() {
     parse_and_run_string("my $x = 10;", &mut interp).expect("first");
     let v = parse_and_run_string("$x + 5", &mut interp).expect("second");
     assert_eq!(v.to_int(), 15);
+}
+
+#[test]
+fn parse_and_run_string_returns_last_statement_value() {
+    let mut interp = Interpreter::new();
+    let v = parse_and_run_string("1; 2; 7", &mut interp).expect("run");
+    assert_eq!(v.to_int(), 7);
 }
 
 #[test]

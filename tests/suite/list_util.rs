@@ -66,6 +66,38 @@ fn list_util_any_coderef() {
 }
 
 #[test]
+fn list_util_all_coderef() {
+    let mut interp = Interpreter::new();
+    let p = parse("List::Util::all(sub { $_ > 0 }, 1, 2, 3)").expect("parse");
+    let v = interp.execute(&p).expect("run");
+    assert_eq!(v.to_int(), 1);
+}
+
+#[test]
+fn list_util_none_coderef() {
+    let mut interp = Interpreter::new();
+    let p = parse("List::Util::none(sub { $_ < 0 }, 1, 2, 3)").expect("parse");
+    let v = interp.execute(&p).expect("run");
+    assert_eq!(v.to_int(), 1);
+}
+
+#[test]
+fn list_util_notall_coderef() {
+    let mut interp = Interpreter::new();
+    let p = parse("List::Util::notall(sub { $_ > 0 }, 1, -1, 2)").expect("parse");
+    let v = interp.execute(&p).expect("run");
+    assert_eq!(v.to_int(), 1);
+}
+
+#[test]
+fn list_util_product_scalar() {
+    let mut interp = Interpreter::new();
+    let p = parse("List::Util::product(2, 3, 4)").expect("parse");
+    let v = interp.execute(&p).expect("run");
+    assert_eq!(v.to_int(), 24);
+}
+
+#[test]
 fn list_util_pairs_returns_blessed_arrays() {
     let mut interp = Interpreter::new();
     let p = parse("join(\",\", List::Util::pairs(\"a\", 1, \"b\", 2))").expect("parse");

@@ -141,7 +141,7 @@ echo "a:b:c" | pe -a -F: -ne 'print $F[1], "\n"'
 my @doubled = pmap { $_ * 2 } @data;
 
 # optional progress bar on stderr (updates as items complete; uses \r, then a final newline)
-my @out = pmap { heavy($_) } @huge, progress => 1;
+my @out = pmap { heavy } @huge, progress => 1;
 
 # parallel map in batches (one interpreter per chunk — amortizes spawn cost)
 my @out = pmap_chunked 1000 { $_ ** 2 } @million_items;
@@ -233,11 +233,11 @@ my @result = pmap { $_ ** 2 } pgrep { $_ > 100 } @data;
 
 # parallel recursive glob (rayon directory walk), then process files in parallel
 my @logs = glob_par("**/*.log");
-pfor { process($_) } @logs;
+pfor { process } @logs;
 
 # persistent thread pool (reuse worker OS threads; avoids per-task thread spawn from pmap/pfor)
 my $pool = ppool(4);
-$pool->submit(sub { heavy_work($_) }, $_) for @tasks;   # optional 2nd arg binds $_
+$pool->submit(sub { heavy_work }, $_) for @tasks;   # optional 2nd arg binds $_
 my @results = $pool->collect();
 
 # control thread count
