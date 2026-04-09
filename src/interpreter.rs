@@ -14,17 +14,17 @@ use crate::value::{PerlSub, PerlValue};
 
 /// Flow control signals propagated via Result.
 #[derive(Debug)]
-enum Flow {
+pub(crate) enum Flow {
     Return(PerlValue),
     Last(Option<String>),
     Next(Option<String>),
     Redo(Option<String>),
 }
 
-type ExecResult = Result<PerlValue, FlowOrError>;
+pub(crate) type ExecResult = Result<PerlValue, FlowOrError>;
 
 #[derive(Debug)]
-enum FlowOrError {
+pub(crate) enum FlowOrError {
     Flow(Flow),
     Error(PerlError),
 }
@@ -43,8 +43,8 @@ impl From<Flow> for FlowOrError {
 
 pub struct Interpreter {
     pub scope: Scope,
-    subs: HashMap<String, Arc<PerlSub>>,
-    file: String,
+    pub(crate) subs: HashMap<String, Arc<PerlSub>>,
+    pub(crate) file: String,
     /// File handles: name → writer
     output_handles: HashMap<String, Box<dyn IoWrite + Send>>,
     input_handles: HashMap<String, BufReader<Box<dyn Read + Send>>>,
@@ -125,6 +125,17 @@ impl Interpreter {
     }
 
     pub fn execute(&mut self, program: &Program) -> PerlResult<PerlValue> {
+        // Try bytecode VM first — falls back to tree-walker on unsupported features
+        if let Some(result) = crate::try_vm_execute(program, self) {
+            return result;
+        }
+
+        // Tree-walker fallback
+        self.execute_tree(program)
+    }
+
+    /// Tree-walking execution (fallback when bytecode compilation fails).
+    pub fn execute_tree(&mut self, program: &Program) -> PerlResult<PerlValue> {
         // First pass: collect subs and BEGIN/END blocks
         for stmt in &program.statements {
             match &stmt.kind {
@@ -197,9 +208,9 @@ impl Interpreter {
     }
 
     /// Execute block statements without pushing/popping a scope frame.
-    /// Used internally by loops to avoid frame overhead per iteration.
+    /// Used internally by loops and the VM for sub calls.
     #[inline]
-    fn exec_block_no_scope(&mut self, block: &Block) -> ExecResult {
+    pub(crate) fn exec_block_no_scope(&mut self, block: &Block) -> ExecResult {
         let mut last = PerlValue::Undef;
         for stmt in block {
             match self.exec_statement(stmt) {
@@ -2279,7 +2290,7 @@ impl Interpreter {
         Ok(PerlValue::Integer(1))
     }
 
-    fn compile_regex(
+    pub(crate) fn compile_regex(
         &mut self,
         pattern: &str,
         flags: &str,
@@ -2351,7 +2362,7 @@ impl Interpreter {
 }
 
 /// Minimal sprintf implementation for Perl.
-fn perl_sprintf(fmt: &str, args: &[PerlValue]) -> String {
+pub(crate) fn perl_sprintf(fmt: &str, args: &[PerlValue]) -> String {
     let mut result = String::new();
     let mut arg_idx = 0;
     let chars: Vec<char> = fmt.chars().collect();

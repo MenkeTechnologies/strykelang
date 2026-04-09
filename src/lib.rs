@@ -1,4 +1,6 @@
 pub mod ast;
+pub mod bytecode;
+pub mod compiler;
 pub mod error;
 pub mod interpreter;
 pub mod lexer;
@@ -6,6 +8,7 @@ pub mod parser;
 pub mod scope;
 pub mod token;
 pub mod value;
+pub mod vm;
 
 use error::PerlResult;
 use interpreter::Interpreter;
@@ -20,6 +23,7 @@ pub fn parse(code: &str) -> PerlResult<ast::Program> {
 }
 
 /// Parse and execute a string of Perl code within an existing interpreter.
+/// Tries bytecode VM first, falls back to tree-walker on unsupported features.
 pub fn parse_and_run_string(code: &str, interp: &mut Interpreter) -> PerlResult<PerlValue> {
     let program = parse(code)?;
     interp.execute(&program)
@@ -30,6 +34,21 @@ pub fn run(code: &str) -> PerlResult<PerlValue> {
     let program = parse(code)?;
     let mut interp = Interpreter::new();
     interp.execute(&program)
+}
+
+/// Try to compile and run via bytecode VM. Returns None if compilation fails.
+pub fn try_vm_execute(
+    program: &ast::Program,
+    interp: &mut Interpreter,
+) -> Option<PerlResult<PerlValue>> {
+    let comp = compiler::Compiler::new();
+    match comp.compile_program(program) {
+        Ok(chunk) => {
+            let mut vm = vm::VM::new(&chunk, interp);
+            Some(vm.execute())
+        }
+        Err(_) => None,
+    }
 }
 
 #[cfg(test)]

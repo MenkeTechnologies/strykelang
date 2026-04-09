@@ -9,6 +9,7 @@ pub enum CompileError {
 }
 
 /// Loop context for resolving `last`/`next` jumps.
+#[allow(dead_code)]
 struct LoopCtx {
     label: Option<String>,
     /// Positions of `last` jumps to patch (jump to after loop).
@@ -224,7 +225,7 @@ impl Compiler {
                     self.compile_expr(cond)?;
                     let exit = self.chunk.emit(Op::JumpIfFalse(0), line);
                     // We need to save exit jump to patch later — use a temp vec
-                    let step_target = self.chunk.len(); // approximate; will be after body
+                    let _step_target = self.chunk.len(); // approximate; will be after body
 
                     let mut ctx = LoopCtx {
                         label: label.clone(),
@@ -241,7 +242,7 @@ impl Compiler {
                     self.chunk.emit(Op::Jump(loop_start), line);
 
                     // Patch exit jump and break jumps
-                    let end = self.chunk.len();
+                    let _end = self.chunk.len();
                     for j in ctx.break_jumps {
                         self.chunk.patch_jump_here(j);
                     }
@@ -750,7 +751,7 @@ impl Compiler {
             ExprKind::Uc(e) => { self.compile_expr(e)?; self.chunk.emit(Op::CallBuiltin(BuiltinId::Uc as u16, 1), line); }
             ExprKind::Lc(e) => { self.compile_expr(e)?; self.chunk.emit(Op::CallBuiltin(BuiltinId::Lc as u16, 1), line); }
             ExprKind::Ref(e) => { self.compile_expr(e)?; self.chunk.emit(Op::CallBuiltin(BuiltinId::Ref as u16, 1), line); }
-            ExprKind::Reverse(e) => { self.compile_expr(e)?; self.chunk.emit(Op::CallBuiltin(BuiltinId::Reverse as u16, 1), line); }
+            ExprKind::ReverseExpr(e) => { self.compile_expr(e)?; self.chunk.emit(Op::CallBuiltin(BuiltinId::Reverse as u16, 1), line); }
             ExprKind::System(args) => {
                 for a in args { self.compile_expr(a)?; }
                 self.chunk.emit(Op::CallBuiltin(BuiltinId::System as u16, args.len() as u8), line);
@@ -840,7 +841,7 @@ impl Compiler {
                 self.chunk.emit(Op::LoadUndef, line);
                 self.chunk.patch_jump_here(end);
             }
-            ExprKind::PostfixForeach { expr, list } => {
+            ExprKind::PostfixForeach { expr: _, list } => {
                 // Compile as: for $_ (list) { expr }
                 self.compile_expr(list)?;
                 // We need a loop — fall back for now
@@ -865,7 +866,6 @@ impl Compiler {
             ExprKind::MapExpr { .. }
             | ExprKind::GrepExpr { .. }
             | ExprKind::SortExpr { .. }
-            | ExprKind::ReverseExpr(_)
             | ExprKind::PMapExpr { .. }
             | ExprKind::PGrepExpr { .. }
             | ExprKind::PForExpr { .. }
