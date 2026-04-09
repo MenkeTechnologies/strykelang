@@ -342,7 +342,7 @@ True parallelism across all cores via rayon work-stealing. The `fan`, `pmap`, `p
 
 Pull requests and pushes to `main` run the workflow in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). You can also run it manually from the repository **Actions** tab (**workflow dispatch**). On a pull request, the **Checks** tab (or the merge box) shows the aggregate status; open the **CI** workflow run for per-job logs (Check, Test, Format, Clippy, Doc, Release Build).
 
-Library unit tests (parser smoke, lexer/token/value/error/scope, **`bytecode::Chunk`** pool/intern/jump patching, **`compiler`** compile-to-op smoke checks, **`vm`** hand-built bytecode execution, and `parse_smoke_*`; excludes `tests/` integration suite):
+Library unit tests (parser smoke, lexer/token/value/error/scope, **`crate_api_tests`** (`run` / `parse` / `try_vm_execute`), **`bytecode::Chunk`** pool/intern/jump patching, **`compiler`** compile-to-op smoke checks, **`vm`** hand-built bytecode execution, and `parse_smoke_*`; excludes `tests/` integration suite):
 
 ```sh
 cargo test --lib
