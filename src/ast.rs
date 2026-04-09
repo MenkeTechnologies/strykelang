@@ -357,6 +357,18 @@ pub enum ExprKind {
     Abs(Box<Expr>),
     Int(Box<Expr>),
     Sqrt(Box<Expr>),
+    Sin(Box<Expr>),
+    Cos(Box<Expr>),
+    Atan2 {
+        y: Box<Expr>,
+        x: Box<Expr>,
+    },
+    Exp(Box<Expr>),
+    Log(Box<Expr>),
+    /// `rand` with optional upper bound (none = Perl default 1.0).
+    Rand(Option<Box<Expr>>),
+    /// `srand` with optional seed (none = time-based).
+    Srand(Option<Box<Expr>>),
     Hex(Box<Expr>),
     Oct(Box<Expr>),
 

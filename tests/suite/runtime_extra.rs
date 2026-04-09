@@ -152,6 +152,26 @@ fn sqrt_perfect_square_and_non_integer() {
 }
 
 #[test]
+fn sin_cos_atan2_exp_log() {
+    assert_eq!(eval_string(r#"sprintf("%.1f", sin(0))"#), "0.0");
+    assert_eq!(eval_string(r#"sprintf("%.1f", cos(0))"#), "1.0");
+    assert_eq!(eval_string(r#"sprintf("%.1f", atan2(1, 1))"#), "0.8");
+    assert_eq!(
+        eval_string(r#"sprintf("%.1f", log(2.718281828459045))"#),
+        "1.0"
+    );
+    assert_eq!(eval_string(r#"sprintf("%.1f", exp(1))"#), "2.7");
+}
+
+#[test]
+fn srand_returns_abs_seed_and_rand_reproducible() {
+    assert_eq!(eval_int("srand(-9)"), 9);
+    let a = eval_string(r#"srand(12345); sprintf("%.12f", rand(1))"#);
+    let b = eval_string(r#"srand(12345); sprintf("%.12f", rand(1))"#);
+    assert_eq!(a, b);
+}
+
+#[test]
 fn or_assign_via_expansion_not_token() {
     // `||=` is not tokenized yet; spell the Perl 5 expansion.
     assert_eq!(eval_int("my $x = 0; $x = $x || 9; $x"), 9);

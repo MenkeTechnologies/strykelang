@@ -1056,6 +1056,52 @@ impl Compiler {
                 self.chunk
                     .emit(Op::CallBuiltin(BuiltinId::Sqrt as u16, 1), line);
             }
+            ExprKind::Sin(e) => {
+                self.compile_expr(e)?;
+                self.chunk
+                    .emit(Op::CallBuiltin(BuiltinId::Sin as u16, 1), line);
+            }
+            ExprKind::Cos(e) => {
+                self.compile_expr(e)?;
+                self.chunk
+                    .emit(Op::CallBuiltin(BuiltinId::Cos as u16, 1), line);
+            }
+            ExprKind::Atan2 { y, x } => {
+                self.compile_expr(y)?;
+                self.compile_expr(x)?;
+                self.chunk
+                    .emit(Op::CallBuiltin(BuiltinId::Atan2 as u16, 2), line);
+            }
+            ExprKind::Exp(e) => {
+                self.compile_expr(e)?;
+                self.chunk
+                    .emit(Op::CallBuiltin(BuiltinId::Exp as u16, 1), line);
+            }
+            ExprKind::Log(e) => {
+                self.compile_expr(e)?;
+                self.chunk
+                    .emit(Op::CallBuiltin(BuiltinId::Log as u16, 1), line);
+            }
+            ExprKind::Rand(upper) => {
+                if let Some(e) = upper {
+                    self.compile_expr(e)?;
+                    self.chunk
+                        .emit(Op::CallBuiltin(BuiltinId::Rand as u16, 1), line);
+                } else {
+                    self.chunk
+                        .emit(Op::CallBuiltin(BuiltinId::Rand as u16, 0), line);
+                }
+            }
+            ExprKind::Srand(seed) => {
+                if let Some(e) = seed {
+                    self.compile_expr(e)?;
+                    self.chunk
+                        .emit(Op::CallBuiltin(BuiltinId::Srand as u16, 1), line);
+                } else {
+                    self.chunk
+                        .emit(Op::CallBuiltin(BuiltinId::Srand as u16, 0), line);
+                }
+            }
             ExprKind::Chr(e) => {
                 self.compile_expr(e)?;
                 self.chunk

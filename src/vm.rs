@@ -1225,6 +1225,42 @@ impl<'a> VM<'a> {
                 let val = args.into_iter().next().unwrap_or(PerlValue::Undef);
                 Ok(PerlValue::Float(val.to_number().sqrt()))
             }
+            Some(BuiltinId::Sin) => {
+                let val = args.into_iter().next().unwrap_or(PerlValue::Undef);
+                Ok(PerlValue::Float(val.to_number().sin()))
+            }
+            Some(BuiltinId::Cos) => {
+                let val = args.into_iter().next().unwrap_or(PerlValue::Undef);
+                Ok(PerlValue::Float(val.to_number().cos()))
+            }
+            Some(BuiltinId::Atan2) => {
+                let mut it = args.into_iter();
+                let y = it.next().unwrap_or(PerlValue::Undef);
+                let x = it.next().unwrap_or(PerlValue::Undef);
+                Ok(PerlValue::Float(y.to_number().atan2(x.to_number())))
+            }
+            Some(BuiltinId::Exp) => {
+                let val = args.into_iter().next().unwrap_or(PerlValue::Undef);
+                Ok(PerlValue::Float(val.to_number().exp()))
+            }
+            Some(BuiltinId::Log) => {
+                let val = args.into_iter().next().unwrap_or(PerlValue::Undef);
+                Ok(PerlValue::Float(val.to_number().ln()))
+            }
+            Some(BuiltinId::Rand) => {
+                let upper = match args.len() {
+                    0 => 1.0,
+                    _ => args[0].to_number(),
+                };
+                Ok(PerlValue::Float(self.interp.perl_rand(upper)))
+            }
+            Some(BuiltinId::Srand) => {
+                let seed = match args.len() {
+                    0 => None,
+                    _ => Some(args[0].to_number()),
+                };
+                Ok(PerlValue::Integer(self.interp.perl_srand(seed)))
+            }
             Some(BuiltinId::Chr) => {
                 let n = args.into_iter().next().unwrap_or(PerlValue::Undef).to_int() as u32;
                 Ok(PerlValue::String(

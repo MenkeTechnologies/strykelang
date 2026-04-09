@@ -5,6 +5,8 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 use parking_lot::RwLock;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use rayon::prelude::*;
 
 use crate::ast::*;
@@ -80,6 +82,8 @@ pub struct Interpreter {
     pub num_threads: usize,
     /// Compiled regex cache: "flags///pattern" → Regex
     regex_cache: HashMap<String, regex::Regex>,
+    /// PRNG for `rand` / `srand` (matches Perl-style seeding, not crypto).
+    pub(crate) rand_rng: StdRng,
 }
 
 impl Default for Interpreter {
@@ -117,7 +121,35 @@ impl Interpreter {
             warnings: false,
             num_threads: rayon::current_num_threads(),
             regex_cache: HashMap::new(),
+            rand_rng: StdRng::from_entropy(),
         }
+    }
+
+    /// Random fractional value like Perl `rand`: `[0, upper)` when `upper > 0`,
+    /// `(upper, 0]` when `upper < 0`, and `[0, 1)` when `upper == 0`.
+    pub(crate) fn perl_rand(&mut self, upper: f64) -> f64 {
+        if upper == 0.0 {
+            self.rand_rng.gen_range(0.0..1.0)
+        } else if upper > 0.0 {
+            self.rand_rng.gen_range(0.0..upper)
+        } else {
+            self.rand_rng.gen_range(upper..0.0)
+        }
+    }
+
+    /// Seed the PRNG; returns the seed Perl would report (truncated integer / time).
+    pub(crate) fn perl_srand(&mut self, seed: Option<f64>) -> i64 {
+        let n = if let Some(s) = seed {
+            s as i64
+        } else {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(1)
+        };
+        let mag = n.unsigned_abs();
+        self.rand_rng = StdRng::seed_from_u64(mag);
+        n.abs()
     }
 
     pub fn set_file(&mut self, file: &str) {
@@ -1633,6 +1665,41 @@ impl Interpreter {
             ExprKind::Sqrt(expr) => {
                 let val = self.eval_expr(expr)?;
                 Ok(PerlValue::Float(val.to_number().sqrt()))
+            }
+            ExprKind::Sin(expr) => {
+                let val = self.eval_expr(expr)?;
+                Ok(PerlValue::Float(val.to_number().sin()))
+            }
+            ExprKind::Cos(expr) => {
+                let val = self.eval_expr(expr)?;
+                Ok(PerlValue::Float(val.to_number().cos()))
+            }
+            ExprKind::Atan2 { y, x } => {
+                let yv = self.eval_expr(y)?.to_number();
+                let xv = self.eval_expr(x)?.to_number();
+                Ok(PerlValue::Float(yv.atan2(xv)))
+            }
+            ExprKind::Exp(expr) => {
+                let val = self.eval_expr(expr)?;
+                Ok(PerlValue::Float(val.to_number().exp()))
+            }
+            ExprKind::Log(expr) => {
+                let val = self.eval_expr(expr)?;
+                Ok(PerlValue::Float(val.to_number().ln()))
+            }
+            ExprKind::Rand(upper) => {
+                let u = match upper {
+                    Some(e) => self.eval_expr(e)?.to_number(),
+                    None => 1.0,
+                };
+                Ok(PerlValue::Float(self.perl_rand(u)))
+            }
+            ExprKind::Srand(seed) => {
+                let s = match seed {
+                    Some(e) => Some(self.eval_expr(e)?.to_number()),
+                    None => None,
+                };
+                Ok(PerlValue::Integer(self.perl_srand(s)))
             }
             ExprKind::Hex(expr) => {
                 let val = self.eval_expr(expr)?.to_string();

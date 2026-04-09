@@ -63,7 +63,13 @@ impl Parser {
     pub fn parse_program(&mut self) -> PerlResult<Program> {
         let mut statements = Vec::new();
         while !self.at_eof() {
-            if self.eat(&Token::Semicolon) {
+            if matches!(self.peek(), Token::Semicolon) {
+                let line = self.peek_line();
+                self.advance();
+                statements.push(Statement {
+                    kind: StmtKind::Empty,
+                    line,
+                });
                 continue;
             }
             statements.push(self.parse_statement()?);
@@ -1948,6 +1954,113 @@ impl Parser {
                     kind: ExprKind::Sqrt(Box::new(a)),
                     line,
                 })
+            }
+            "sin" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::Sin(Box::new(a)),
+                    line,
+                })
+            }
+            "cos" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::Cos(Box::new(a)),
+                    line,
+                })
+            }
+            "atan2" => {
+                let args = self.parse_builtin_args()?;
+                if args.len() != 2 {
+                    return Err(PerlError::syntax("atan2 requires two arguments", line));
+                }
+                Ok(Expr {
+                    kind: ExprKind::Atan2 {
+                        y: Box::new(args[0].clone()),
+                        x: Box::new(args[1].clone()),
+                    },
+                    line,
+                })
+            }
+            "exp" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::Exp(Box::new(a)),
+                    line,
+                })
+            }
+            "log" => {
+                let a = self.parse_one_arg()?;
+                Ok(Expr {
+                    kind: ExprKind::Log(Box::new(a)),
+                    line,
+                })
+            }
+            "rand" => {
+                if matches!(
+                    self.peek(),
+                    Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof | Token::Comma
+                ) {
+                    Ok(Expr {
+                        kind: ExprKind::Rand(None),
+                        line,
+                    })
+                } else if matches!(self.peek(), Token::LParen) {
+                    self.advance();
+                    if matches!(self.peek(), Token::RParen) {
+                        self.advance();
+                        Ok(Expr {
+                            kind: ExprKind::Rand(None),
+                            line,
+                        })
+                    } else {
+                        let a = self.parse_expression()?;
+                        self.expect(&Token::RParen)?;
+                        Ok(Expr {
+                            kind: ExprKind::Rand(Some(Box::new(a))),
+                            line,
+                        })
+                    }
+                } else {
+                    let a = self.parse_one_arg()?;
+                    Ok(Expr {
+                        kind: ExprKind::Rand(Some(Box::new(a))),
+                        line,
+                    })
+                }
+            }
+            "srand" => {
+                if matches!(
+                    self.peek(),
+                    Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof | Token::Comma
+                ) {
+                    Ok(Expr {
+                        kind: ExprKind::Srand(None),
+                        line,
+                    })
+                } else if matches!(self.peek(), Token::LParen) {
+                    self.advance();
+                    if matches!(self.peek(), Token::RParen) {
+                        self.advance();
+                        Ok(Expr {
+                            kind: ExprKind::Srand(None),
+                            line,
+                        })
+                    } else {
+                        let a = self.parse_expression()?;
+                        self.expect(&Token::RParen)?;
+                        Ok(Expr {
+                            kind: ExprKind::Srand(Some(Box::new(a))),
+                            line,
+                        })
+                    }
+                } else {
+                    let a = self.parse_one_arg()?;
+                    Ok(Expr {
+                        kind: ExprKind::Srand(Some(Box::new(a))),
+                        line,
+                    })
+                }
             }
             "hex" => {
                 let a = self.parse_one_arg_or_default()?;

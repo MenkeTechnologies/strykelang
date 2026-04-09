@@ -234,7 +234,8 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
  │ **String**: chomp, chop, length, substr, index, rindex,     │
  │ split, join, sprintf, printf, uc, lc, ucfirst, lcfirst,     │
  │ chr, ord, hex, oct                                          │
- │ **Numeric**: abs, int, sqrt                                 │
+ │ **Numeric**: abs, int, sqrt, sin, cos, atan2, exp, log,     │
+ │ rand, srand                                                 │
  │ **I/O**: print, say, printf, open, close, eof, readline     │
  │ **File tests**: -e, -f, -d, -l, -r, -w, -s, -z             │
  │ **System**: system, exec, exit, chdir, mkdir, unlink         │
