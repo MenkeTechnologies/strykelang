@@ -64,3 +64,16 @@ impl fmt::Display for PerlError {
 impl std::error::Error for PerlError {}
 
 pub type PerlResult<T> = Result<T, PerlError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn syntax_error_display_includes_message_and_line() {
+        let e = PerlError::syntax("bad token", 7);
+        let s = e.to_string();
+        assert!(s.contains("bad token"));
+        assert!(s.contains("line 7"));
+    }
+}

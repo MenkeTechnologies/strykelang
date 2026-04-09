@@ -52,4 +52,19 @@ mod tests {
     fn parse_semicolon_only_statements() {
         parse(";;;").expect("semicolons only");
     }
+
+    #[test]
+    fn parse_subroutine_declaration() {
+        parse("sub foo { return 1; }").expect("sub");
+    }
+
+    #[test]
+    fn parse_if_with_block() {
+        parse("if (1) { 2 }").expect("if");
+    }
+
+    #[test]
+    fn parse_fails_on_invalid_syntax() {
+        assert!(parse("sub f {").is_err());
+    }
 }

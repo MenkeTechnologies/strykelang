@@ -330,3 +330,71 @@ impl Scope {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::value::PerlValue;
+
+    #[test]
+    fn missing_scalar_is_undef() {
+        let s = Scope::new();
+        assert!(matches!(s.get_scalar("not_declared"), PerlValue::Undef));
+    }
+
+    #[test]
+    fn inner_frame_shadows_outer_scalar() {
+        let mut s = Scope::new();
+        s.declare_scalar("a", PerlValue::Integer(1));
+        s.push_frame();
+        s.declare_scalar("a", PerlValue::Integer(2));
+        assert_eq!(s.get_scalar("a").to_int(), 2);
+        s.pop_frame();
+        assert_eq!(s.get_scalar("a").to_int(), 1);
+    }
+
+    #[test]
+    fn set_scalar_updates_innermost_binding() {
+        let mut s = Scope::new();
+        s.declare_scalar("a", PerlValue::Integer(1));
+        s.push_frame();
+        s.declare_scalar("a", PerlValue::Integer(2));
+        s.set_scalar("a", PerlValue::Integer(99));
+        assert_eq!(s.get_scalar("a").to_int(), 99);
+        s.pop_frame();
+        assert_eq!(s.get_scalar("a").to_int(), 1);
+    }
+
+    #[test]
+    fn array_negative_index_reads_from_end() {
+        let mut s = Scope::new();
+        s.declare_array(
+            "a",
+            vec![
+                PerlValue::Integer(10),
+                PerlValue::Integer(20),
+                PerlValue::Integer(30),
+            ],
+        );
+        assert_eq!(s.get_array_element("a", -1).to_int(), 30);
+    }
+
+    #[test]
+    fn set_array_element_extends_array_with_undef_gaps() {
+        let mut s = Scope::new();
+        s.declare_array("a", vec![]);
+        s.set_array_element("a", 2, PerlValue::Integer(7));
+        assert_eq!(s.get_array_element("a", 2).to_int(), 7);
+        assert!(matches!(s.get_array_element("a", 0), PerlValue::Undef));
+    }
+
+    #[test]
+    fn capture_restore_roundtrip_scalar() {
+        let mut s = Scope::new();
+        s.declare_scalar("n", PerlValue::Integer(42));
+        let cap = s.capture();
+        let mut t = Scope::new();
+        t.restore_capture(&cap);
+        assert_eq!(t.get_scalar("n").to_int(), 42);
+    }
+}

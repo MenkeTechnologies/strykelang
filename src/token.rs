@@ -288,3 +288,22 @@ pub const KEYWORDS: &[&str] = &[
     "pfor",
     "psort",
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn keyword_or_ident_maps_string_ops() {
+        assert!(matches!(keyword_or_ident("eq"), Token::StrEq));
+        assert!(matches!(keyword_or_ident("cmp"), Token::StrCmp));
+    }
+
+    #[test]
+    fn keyword_or_ident_non_keyword_is_ident() {
+        assert!(matches!(
+            keyword_or_ident("foo_bar"),
+            Token::Ident(s) if s == "foo_bar"
+        ));
+    }
+}

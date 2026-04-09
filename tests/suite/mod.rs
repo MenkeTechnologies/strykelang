@@ -14,5 +14,6 @@ mod parallel;
 mod phases;
 mod regex;
 mod regex_extended;
+mod scoping;
 mod strings_text;
 mod subs;
