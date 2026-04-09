@@ -222,6 +222,7 @@ fn print_cyberpunk_help() {
     println!("  pgrep {{BLOCK}} @list    {G}//{N} Parallel grep across all cores");
     println!("  pfor  {{BLOCK}} @list    {G}//{N} Parallel foreach across all cores");
     println!("  psort {{BLOCK}} @list    {G}//{N} Parallel sort across all cores");
+    println!("  fan N {{BLOCK}}          {G}//{N} Execute BLOCK N times across all cores ($_ = index)");
     println!("{C}  ── POSITIONAL ─────────────────────────────────────────{N}");
     println!("  [programfile]          {G}//{N} Perl script to execute");
     println!("  [arguments]            {G}//{N} Arguments passed to script (@ARGV)");
