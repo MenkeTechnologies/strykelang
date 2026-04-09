@@ -7920,7 +7920,13 @@ impl Interpreter {
             )
         };
         if streaming {
-            return self.pipeline_collect_streaming(v, &ops, streaming_workers, streaming_buffer, line);
+            return self.pipeline_collect_streaming(
+                v,
+                &ops,
+                streaming_workers,
+                streaming_buffer,
+                line,
+            );
         }
         for op in ops {
             match op {
@@ -8398,18 +8404,14 @@ impl Interpreter {
                                     let mut interp = Interpreter::new();
                                     interp.subs = subs.clone();
                                     interp.scope.restore_capture(&capture);
-                                    interp
-                                        .scope
-                                        .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                    interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
                                     let _ = interp.scope.set_scalar("_", item.clone());
                                     let keep = match interp.exec_block_no_scope(&sub.body) {
                                         Ok(val) => val.is_true(),
                                         Err(_) => false,
                                     };
-                                    if keep {
-                                        if tx.send(item).is_err() {
-                                            break;
-                                        }
+                                    if keep && tx.send(item).is_err() {
+                                        break;
                                     }
                                 }
                             });
@@ -8424,9 +8426,7 @@ impl Interpreter {
                                     let mut interp = Interpreter::new();
                                     interp.subs = subs.clone();
                                     interp.scope.restore_capture(&capture);
-                                    interp
-                                        .scope
-                                        .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                    interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
                                     let _ = interp.scope.set_scalar("_", item);
                                     let mapped = match interp.exec_block_no_scope(&sub.body) {
                                         Ok(val) => val,
@@ -8503,27 +8503,25 @@ impl Interpreter {
                                         break;
                                     }
                                     let k = crate::pcache::cache_key(&item);
-                                    let val =
-                                        if let Some(cached) = crate::pcache::GLOBAL_PCACHE.get(&k)
-                                        {
-                                            cached.clone()
-                                        } else {
-                                            let mut interp = Interpreter::new();
-                                            interp.subs = subs.clone();
-                                            interp.scope.restore_capture(&capture);
-                                            interp.scope.restore_atomics(
-                                                &atomic_arrays,
-                                                &atomic_hashes,
-                                            );
-                                            let _ = interp.scope.set_scalar("_", item);
-                                            let v =
-                                                match interp.exec_block_no_scope(&sub.body) {
-                                                    Ok(v) => v,
-                                                    Err(_) => PerlValue::UNDEF,
-                                                };
-                                            crate::pcache::GLOBAL_PCACHE.insert(k, v.clone());
-                                            v
+                                    let val = if let Some(cached) =
+                                        crate::pcache::GLOBAL_PCACHE.get(&k)
+                                    {
+                                        cached.clone()
+                                    } else {
+                                        let mut interp = Interpreter::new();
+                                        interp.subs = subs.clone();
+                                        interp.scope.restore_capture(&capture);
+                                        interp
+                                            .scope
+                                            .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                        let _ = interp.scope.set_scalar("_", item);
+                                        let v = match interp.exec_block_no_scope(&sub.body) {
+                                            Ok(v) => v,
+                                            Err(_) => PerlValue::UNDEF,
                                         };
+                                        crate::pcache::GLOBAL_PCACHE.insert(k, v.clone());
+                                        v
+                                    };
                                     if tx.send(val).is_err() {
                                         break;
                                     }

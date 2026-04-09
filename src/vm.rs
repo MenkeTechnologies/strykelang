@@ -1971,36 +1971,33 @@ impl<'a> VM<'a> {
                 Op::AddAssignSlotSlot(dst, src) => {
                     let a = self.interp.scope.get_scalar_slot(*dst);
                     let b = self.interp.scope.get_scalar_slot(*src);
-                    let result =
-                        if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
-                            PerlValue::integer(x.wrapping_add(y))
-                        } else {
-                            PerlValue::float(a.to_number() + b.to_number())
-                        };
+                    let result = if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
+                        PerlValue::integer(x.wrapping_add(y))
+                    } else {
+                        PerlValue::float(a.to_number() + b.to_number())
+                    };
                     self.interp.scope.set_scalar_slot(*dst, result.clone());
                     self.push(result);
                 }
                 Op::SubAssignSlotSlot(dst, src) => {
                     let a = self.interp.scope.get_scalar_slot(*dst);
                     let b = self.interp.scope.get_scalar_slot(*src);
-                    let result =
-                        if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
-                            PerlValue::integer(x.wrapping_sub(y))
-                        } else {
-                            PerlValue::float(a.to_number() - b.to_number())
-                        };
+                    let result = if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
+                        PerlValue::integer(x.wrapping_sub(y))
+                    } else {
+                        PerlValue::float(a.to_number() - b.to_number())
+                    };
                     self.interp.scope.set_scalar_slot(*dst, result.clone());
                     self.push(result);
                 }
                 Op::MulAssignSlotSlot(dst, src) => {
                     let a = self.interp.scope.get_scalar_slot(*dst);
                     let b = self.interp.scope.get_scalar_slot(*src);
-                    let result =
-                        if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
-                            PerlValue::integer(x.wrapping_mul(y))
-                        } else {
-                            PerlValue::float(a.to_number() * b.to_number())
-                        };
+                    let result = if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
+                        PerlValue::integer(x.wrapping_mul(y))
+                    } else {
+                        PerlValue::float(a.to_number() * b.to_number())
+                    };
                     self.interp.scope.set_scalar_slot(*dst, result.clone());
                     self.push(result);
                 }
@@ -3265,9 +3262,13 @@ impl<'a> VM<'a> {
             }
             Some(BuiltinId::ParPipelineStream) => {
                 if crate::par_pipeline::is_named_par_pipeline_args(&args) {
-                    return crate::par_pipeline::run_par_pipeline_streaming(self.interp, &args, line);
+                    return crate::par_pipeline::run_par_pipeline_streaming(
+                        self.interp,
+                        &args,
+                        line,
+                    );
                 }
-                return self.interp.builtin_par_pipeline_stream_new(&args, line);
+                self.interp.builtin_par_pipeline_stream_new(&args, line)
             }
             Some(BuiltinId::Eval) => {
                 let arg = args.into_iter().next().unwrap_or(PerlValue::UNDEF);

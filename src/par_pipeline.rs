@@ -279,9 +279,7 @@ pub(crate) fn run_par_pipeline(
                 let mut local_interp = Interpreter::new();
                 local_interp.subs = subs_w.clone();
                 local_interp.scope.restore_capture(&cap_w);
-                local_interp
-                    .scope
-                    .restore_atomics(&aa_w, &ah_w);
+                local_interp.scope.restore_atomics(&aa_w, &ah_w);
                 if let Some(env) = sub.closure_env.as_ref() {
                     local_interp.scope.restore_capture(env);
                 }

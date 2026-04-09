@@ -87,7 +87,9 @@ pub(crate) fn try_builtin(
         }
         "par_pipeline_stream" => {
             if crate::par_pipeline::is_named_par_pipeline_args(args) {
-                Some(crate::par_pipeline::run_par_pipeline_streaming(interp, args, line))
+                Some(crate::par_pipeline::run_par_pipeline_streaming(
+                    interp, args, line,
+                ))
             } else {
                 Some(interp.builtin_par_pipeline_stream_new(args, line))
             }

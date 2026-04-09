@@ -240,10 +240,9 @@ fn par_pipeline_stream_named_form() {
 /// Streaming pipeline rejects psort (requires all items).
 #[test]
 fn par_pipeline_stream_rejects_psort() {
-    let program = perlrs::parse(
-        r#"par_pipeline_stream((1..5))->psort(sub { $a <=> $b })->collect()"#,
-    )
-    .expect("parse");
+    let program =
+        perlrs::parse(r#"par_pipeline_stream((1..5))->psort(sub { $a <=> $b })->collect()"#)
+            .expect("parse");
     let mut interp = perlrs::interpreter::Interpreter::new();
     let err = interp.execute(&program).unwrap_err();
     assert!(
