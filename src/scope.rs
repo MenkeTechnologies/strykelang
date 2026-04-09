@@ -239,6 +239,20 @@ impl Scope {
         self.set_scalar_slot(slot, val);
     }
 
+    /// Slot-indexed `.=` — avoids frame walking and string comparison on every iteration.
+    #[inline]
+    pub fn scalar_slot_concat_inplace(&mut self, slot: u8, rhs: &PerlValue) -> PerlValue {
+        let frame = self.frames.last_mut().unwrap();
+        let idx = slot as usize;
+        if idx >= frame.scalar_slots.len() {
+            frame.scalar_slots.resize(idx + 1, PerlValue::UNDEF);
+        }
+        let mut s = std::mem::replace(&mut frame.scalar_slots[idx], PerlValue::UNDEF).into_string();
+        rhs.append_to(&mut s);
+        frame.scalar_slots[idx] = PerlValue::string(s);
+        frame.scalar_slots[idx].clone()
+    }
+
     #[inline]
     pub(crate) fn can_pop_frame(&self) -> bool {
         self.frames.len() > 1

@@ -507,6 +507,7 @@ impl<'a> VM<'a> {
             fan_progress.start_worker(i);
             let mut local_interp = Interpreter::new();
             local_interp.subs = subs.clone();
+            local_interp.suppress_stdout = progress;
             local_interp.scope.restore_capture(&scope_capture);
             let _ = local_interp
                 .scope
@@ -556,6 +557,7 @@ impl<'a> VM<'a> {
                 fan_progress.start_worker(i);
                 let mut local_interp = Interpreter::new();
                 local_interp.subs = subs.clone();
+                local_interp.suppress_stdout = progress;
                 local_interp.scope.restore_capture(&scope_capture);
                 let _ = local_interp
                     .scope
@@ -1961,6 +1963,47 @@ impl<'a> VM<'a> {
                     let result = self.interp.scope.scalar_concat_inplace(n, &rhs);
                     self.push(result);
                 }
+                Op::ConcatAppendSlot(slot) => {
+                    let rhs = self.pop();
+                    let result = self.interp.scope.scalar_slot_concat_inplace(*slot, &rhs);
+                    self.push(result);
+                }
+                Op::AddAssignSlotSlot(dst, src) => {
+                    let a = self.interp.scope.get_scalar_slot(*dst);
+                    let b = self.interp.scope.get_scalar_slot(*src);
+                    let result =
+                        if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
+                            PerlValue::integer(x.wrapping_add(y))
+                        } else {
+                            PerlValue::float(a.to_number() + b.to_number())
+                        };
+                    self.interp.scope.set_scalar_slot(*dst, result.clone());
+                    self.push(result);
+                }
+                Op::SubAssignSlotSlot(dst, src) => {
+                    let a = self.interp.scope.get_scalar_slot(*dst);
+                    let b = self.interp.scope.get_scalar_slot(*src);
+                    let result =
+                        if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
+                            PerlValue::integer(x.wrapping_sub(y))
+                        } else {
+                            PerlValue::float(a.to_number() - b.to_number())
+                        };
+                    self.interp.scope.set_scalar_slot(*dst, result.clone());
+                    self.push(result);
+                }
+                Op::MulAssignSlotSlot(dst, src) => {
+                    let a = self.interp.scope.get_scalar_slot(*dst);
+                    let b = self.interp.scope.get_scalar_slot(*src);
+                    let result =
+                        if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
+                            PerlValue::integer(x.wrapping_mul(y))
+                        } else {
+                            PerlValue::float(a.to_number() * b.to_number())
+                        };
+                    self.interp.scope.set_scalar_slot(*dst, result.clone());
+                    self.push(result);
+                }
 
                 // ── Frame-local scalar slots (O(1), no string lookup) ──
                 Op::GetScalarSlot(slot) => {
@@ -3193,6 +3236,9 @@ impl<'a> VM<'a> {
                     ops: Vec::new(),
                     has_scalar_terminal: false,
                     par_stream: false,
+                    streaming: false,
+                    streaming_workers: 0,
+                    streaming_buffer: 256,
                 }))))
             }
             Some(BuiltinId::ParPipeline) => {
@@ -3212,7 +3258,16 @@ impl<'a> VM<'a> {
                     ops: Vec::new(),
                     has_scalar_terminal: false,
                     par_stream: true,
+                    streaming: false,
+                    streaming_workers: 0,
+                    streaming_buffer: 256,
                 }))))
+            }
+            Some(BuiltinId::ParPipelineStream) => {
+                if crate::par_pipeline::is_named_par_pipeline_args(&args) {
+                    return crate::par_pipeline::run_par_pipeline_streaming(self.interp, &args, line);
+                }
+                return self.interp.builtin_par_pipeline_stream_new(&args, line);
             }
             Some(BuiltinId::Eval) => {
                 let arg = args.into_iter().next().unwrap_or(PerlValue::UNDEF);

@@ -266,6 +266,13 @@ pub struct PipelineInner {
     pub has_scalar_terminal: bool,
     /// When true (from `par_pipeline(LIST)`), `->filter` / `->map` run in parallel with **input order preserved** on `collect()`.
     pub par_stream: bool,
+    /// When true (from `par_pipeline_stream(LIST)`), `collect()` wires ops through bounded
+    /// channels so items stream between stages concurrently (order **not** preserved).
+    pub streaming: bool,
+    /// Per-stage worker count for streaming mode (default: available parallelism).
+    pub streaming_workers: usize,
+    /// Bounded channel capacity for streaming mode (default: 256).
+    pub streaming_buffer: usize,
 }
 
 #[derive(Debug)]

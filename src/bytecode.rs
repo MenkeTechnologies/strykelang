@@ -192,6 +192,15 @@ pub enum Op {
     /// `$var .= expr` — append to scalar string in-place without cloning.
     /// Stack: \[value_to_append\] → \[resulting_string\]. u16 = name pool index of target scalar.
     ConcatAppend(u16),
+    /// Slot-indexed `$var .= expr` — avoids frame walking and string comparison.
+    /// Stack: \[value_to_append\] → \[resulting_string\]. u8 = slot index.
+    ConcatAppendSlot(u8),
+    /// Fused `$slot_a += $slot_b` — no stack traffic. Pushes result.
+    AddAssignSlotSlot(u8, u8),
+    /// Fused `$slot_a -= $slot_b` — no stack traffic. Pushes result.
+    SubAssignSlotSlot(u8, u8),
+    /// Fused `$slot_a *= $slot_b` — no stack traffic. Pushes result.
+    MulAssignSlotSlot(u8, u8),
 
     // ── Frame-local scalar slots (O(1) access, no string lookup) ──
     /// Read scalar from current frame's slot array. u8 = slot index.
@@ -398,11 +407,13 @@ pub enum BuiltinId {
     ParPipeline,
     /// `glob_par(..., progress => EXPR)` — last stack arg is truthy progress flag.
     GlobParProgress,
+    /// `par_pipeline_stream(...)` — streaming pipeline with bounded channels between stages.
+    ParPipelineStream,
 }
 
 impl BuiltinId {
     pub fn from_u16(v: u16) -> Option<Self> {
-        if v <= Self::GlobParProgress as u16 {
+        if v <= Self::ParPipelineStream as u16 {
             Some(unsafe { std::mem::transmute::<u16, BuiltinId>(v) })
         } else {
             None
@@ -688,7 +699,7 @@ mod tests {
     #[test]
     fn builtin_id_from_u16_out_of_range() {
         assert_eq!(
-            BuiltinId::from_u16(BuiltinId::GlobParProgress as u16 + 1),
+            BuiltinId::from_u16(BuiltinId::ParPipelineStream as u16 + 1),
             None
         );
         assert_eq!(BuiltinId::from_u16(u16::MAX), None);

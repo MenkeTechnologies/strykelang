@@ -13,7 +13,7 @@
 [![Docs.rs](https://docs.rs/perlrs/badge.svg)](https://docs.rs/perlrs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-### `[PARALLEL PERL5 INTERPRETER // RUST-POWERED EXECUTION ENGINE]`
+### `[PARALLEL WORLDS FASTEST PERL5 INTERPRETER // RUST-POWERED EXECUTION ENGINE]`
 
  ┌──────────────────────────────────────────────────────────────┐
  │ STATUS: ONLINE &nbsp;&nbsp; CORES: ALL &nbsp;&nbsp; SIGNAL: ████████░░       │
@@ -211,7 +211,8 @@ fan { work }
 my ($tx, $rx) = pchannel();
 my ($t2, $r2) = pchannel(128);   # bounded capacity
 
-# multi-stage parallel pipeline (bounded queues between stages = backpressure)
+# multi-stage parallel pipeline — BATCH: source generates all items, then each
+# stage processes the entire batch via rayon before the next stage starts
 my $n = par_pipeline(
     source  => { readline(STDIN) },
     stages  => [ { parse_json }, { transform } ],
@@ -219,6 +220,30 @@ my $n = par_pipeline(
     buffer  => 256,   # optional; default 256 slots per inter-stage channel
 );
 # returns scalar: count of items processed by the last stage
+
+# multi-stage parallel pipeline — STREAMING: items flow through bounded channels
+# between stages concurrently (item 1 can be at stage 3 while item 5 is at stage 1)
+my $n = par_pipeline_stream(
+    source  => { readline(STDIN) },
+    stages  => [ { parse_json }, { transform } ],
+    workers => [4, 2],
+    buffer  => 256,
+);
+
+# streaming list pipeline — same channel-wired concurrency for list inputs
+# unlike par_pipeline(@list) which batch-collects each stage before the next,
+# par_pipeline_stream wires every op through channels so items are at different
+# stages simultaneously.  Order is NOT preserved.
+my @out = par_pipeline_stream((1..1_000))
+    ->filter(sub { $_ > 500 })
+    ->map(sub { $_ * 2 })
+    ->take(10)
+    ->collect();
+
+# optional: control workers-per-stage and channel buffer size
+my @out = par_pipeline_stream(@data, workers => 4, buffer => 128)
+    ->map({ expensive })
+    ->collect();
 
 # multiplexed recv (Go-style select via crossbeam `Select`)
 my ($tx1, $rx1) = pchannel();
@@ -546,7 +571,9 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - **`par_lines PATH, sub { ... } [, progress => EXPR]`** — memory-map the file, split into line-aligned byte chunks, process chunks in parallel with rayon; each line sets `$_` for the coderef (CRLF-safe; tree-walker only; use `mysync` for shared counters across workers). Optional stderr progress bar like **`pmap`**.
 - **`pipeline(@list)->…->collect()`** — lazy list processing (sequential **`->filter`** / **`->grep`**, **`->map`**, **`->take`**). Parallel chain methods mirror top-level **`pmap`**, **`pgrep`**, **`pfor`**, **`pmap_chunked`**, **`psort`**, **`pcache`** (optional second argument `1` for stderr progress where applicable). Fold methods **`->preduce`**, **`->preduce_init(INIT, sub)`**, **`->pmap_reduce(MAP, REDUCE)`** must be last before **`->collect()`**; **`collect()`** then returns a **scalar** for those. Any other **`->name`** or **`->Pkg::name`** with **no** arguments resolves a **subroutine** in the stash and applies it like **`->map`** (`$_` each element). **`par_lines`**, **`par_fetch`**, etc. are separate builtins; they are not `->` methods on **`pipeline`**.
 - **`par_pipeline(@list)->…->collect()`** — same **`->`** methods as **`pipeline`**, but plain **`->filter`** / **`->map`** use **rayon** on **`collect()`** with **input order preserved** (same capture rules as **`pgrep`** / **`pmap`**). **`->take`** still truncates after those stages. For the **multi-stage channel** builtin (bounded queues, backpressure), use the named form below.
-- **`par_pipeline(source => CODE, stages => [...], workers => [...], buffer => N?)`** — one **source** coderef (scalar return per call; **`undef`** ends the stream), then each **stage** runs on `$_` with `workers[i]` OS threads pulling from a **bounded** crossbeam channel from the previous stage (backpressure). Optional **`buffer`** sets queue capacity per link (default 256). Blocks until the pipeline drains; return value is the number of items handled by the **last** stage (ordering across items is not preserved when a stage has multiple workers). Source and stage bodies use the same **capture** rules as `pmap`/`ppool` (lexical scalars are shared; **arrays** are not copied into the snapshot—use scalars, package variables, or handles like `STDIN`). For stdin lines, use **`readline(HANDLE)`** (e.g. **`readline(STDIN)`**), **`<STDIN>`**, or **`readline`** with no args (diamond/`ARGV` rules apply).
+- **`par_pipeline(source => CODE, stages => [...], workers => [...], buffer => N?)`** — **batch** mode: source coderef generates all items (return **`undef`** to end), then each stage processes the **entire batch** via rayon before the next stage starts. Return value is the count of items processed by the last stage. Source and stage bodies use the same **capture** rules as `pmap`/`ppool` (lexical scalars are shared; **arrays** are not copied into the snapshot—use scalars, package variables, or handles like `STDIN`). For stdin lines, use **`readline(HANDLE)`** (e.g. **`readline(STDIN)`**), **`<STDIN>`**, or **`readline`** with no args (diamond/`ARGV` rules apply).
+- **`par_pipeline_stream(@list [, workers => N, buffer => N])->…->collect()`** — streaming variant of **`par_pipeline(@list)`**. Each **`->filter`** / **`->map`** / **`->take`** / **`->pfor`** / **`->pcache`** stage runs as a pool of OS threads connected by **bounded crossbeam channels**, so items flow between stages **concurrently** (an item can be at stage 3 while another is still at stage 1). **Order is not preserved.** Optional **`workers => N`** sets threads-per-stage (default: rayon pool size); **`buffer => N`** sets channel capacity (default 256). **`->psort`**, **`->preduce`**, **`->preduce_init`**, **`->pmap_reduce`**, **`->pmap_chunked`** are rejected at runtime (they require all items; use batch **`par_pipeline`** instead).
+- **`par_pipeline_stream(source => CODE, stages => [...], workers => [...], buffer => N?)`** — **streaming** named form: same arguments as `par_pipeline(source => ...)`, but items flow through **bounded crossbeam channels** between stages concurrently with **backpressure** (an item can be at stage 3 while another is still at stage 1). Order is **not** preserved when a stage has multiple workers.
 - **`pwatch GLOB, sub { ... }`** — register native file/directory watches with the `notify` crate (inotify/kqueue/FSEvents); block in the event loop and dispatch each glob-matching path to the coderef on a rayon worker with `$_` set to the path (tree-walker only; use `mysync` for shared state).
 - **`barrier(N)`** — returns a handle backed by `std::sync::Barrier`; `->wait` for phased parallelism (e.g. with `fan`). Party count is clamped to at least 1 (bytecode + tree-walker).
 - **`sort` / `psort` fast path** — `{ $a <=> $b }`, `{ $a cmp $b }`, `{ $b <=> $a }`, `{ $b cmp $a }` compare without invoking the block per pair (VM + tree-walker).

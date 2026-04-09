@@ -85,6 +85,13 @@ pub(crate) fn try_builtin(
                 Some(interp.builtin_par_pipeline_stream(args, line))
             }
         }
+        "par_pipeline_stream" => {
+            if crate::par_pipeline::is_named_par_pipeline_args(args) {
+                Some(crate::par_pipeline::run_par_pipeline_streaming(interp, args, line))
+            } else {
+                Some(interp.builtin_par_pipeline_stream_new(args, line))
+            }
+        }
         "write" => Some(interp.write_format_execute(args, line)),
         _ => None,
     }

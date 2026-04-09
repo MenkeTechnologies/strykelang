@@ -265,6 +265,8 @@ pub struct Interpreter {
     pub warnings: bool,
     /// Output autoflush (`$|`).
     pub output_autoflush: bool,
+    /// Suppress stdout output (fan workers with progress bars).
+    pub suppress_stdout: bool,
     /// Child wait status (`$?`) — POSIX-style (exit code in high byte, etc.).
     pub child_exit_status: i64,
     /// Last successful match (`$&`, `${^MATCH}`).
@@ -589,6 +591,7 @@ impl Interpreter {
             end_blocks: Vec::new(),
             warnings: false,
             output_autoflush: false,
+            suppress_stdout: false,
             child_exit_status: 0,
             last_match: String::new(),
             prematch: String::new(),
@@ -4439,6 +4442,7 @@ impl Interpreter {
                             fan_progress.start_worker(i);
                             let mut local_interp = Interpreter::new();
                             local_interp.subs = subs.clone();
+                            local_interp.suppress_stdout = show_progress;
                             local_interp.scope.restore_capture(&scope_capture);
                             local_interp
                                 .scope
@@ -4473,6 +4477,7 @@ impl Interpreter {
                     fan_progress.start_worker(i);
                     let mut local_interp = Interpreter::new();
                     local_interp.subs = subs.clone();
+                    local_interp.suppress_stdout = show_progress;
                     local_interp.scope.restore_capture(&scope_capture);
                     local_interp
                         .scope
@@ -6787,6 +6792,9 @@ impl Interpreter {
                     ops: Vec::new(),
                     has_scalar_terminal: false,
                     par_stream: false,
+                    streaming: false,
+                    streaming_workers: 0,
+                    streaming_buffer: 256,
                 }))))
             }
             "par_pipeline" => {
@@ -6795,6 +6803,13 @@ impl Interpreter {
                         .map_err(Into::into);
                 }
                 Ok(self.builtin_par_pipeline_stream(&args, line)?)
+            }
+            "par_pipeline_stream" => {
+                if crate::par_pipeline::is_named_par_pipeline_args(&args) {
+                    return crate::par_pipeline::run_par_pipeline_streaming(self, &args, line)
+                        .map_err(Into::into);
+                }
+                Ok(self.builtin_par_pipeline_stream_new(&args, line)?)
             }
             "ppool" => {
                 if args.len() != 1 {
@@ -6975,9 +6990,11 @@ impl Interpreter {
 
         match handle_name {
             "STDOUT" => {
-                print!("{}", output);
-                if self.output_autoflush {
-                    let _ = io::stdout().flush();
+                if !self.suppress_stdout {
+                    print!("{}", output);
+                    if self.output_autoflush {
+                        let _ = io::stdout().flush();
+                    }
                 }
             }
             "STDERR" => {
@@ -7034,9 +7051,11 @@ impl Interpreter {
         };
         match handle_name {
             "STDOUT" => {
-                print!("{}", output);
-                if self.output_autoflush {
-                    let _ = IoWrite::flush(&mut io::stdout());
+                if !self.suppress_stdout {
+                    print!("{}", output);
+                    if self.output_autoflush {
+                        let _ = IoWrite::flush(&mut io::stdout());
+                    }
                 }
             }
             "STDERR" => {
@@ -7444,6 +7463,50 @@ impl Interpreter {
             ops: Vec::new(),
             has_scalar_terminal: false,
             par_stream: true,
+            streaming: false,
+            streaming_workers: 0,
+            streaming_buffer: 256,
+        }))))
+    }
+
+    /// `par_pipeline_stream(@list, workers => N, buffer => N)` — create a streaming pipeline
+    /// that wires ops through bounded channels on `collect()`.
+    pub(crate) fn builtin_par_pipeline_stream_new(
+        &mut self,
+        args: &[PerlValue],
+        _line: usize,
+    ) -> PerlResult<PerlValue> {
+        let mut items = Vec::new();
+        let mut workers: usize = 0;
+        let mut buffer: usize = 256;
+        // Separate list items from keyword args (workers => N, buffer => N).
+        let mut i = 0;
+        while i < args.len() {
+            let s = args[i].to_string();
+            if (s == "workers" || s == "buffer") && i + 1 < args.len() {
+                let val = args[i + 1].to_int().max(1) as usize;
+                if s == "workers" {
+                    workers = val;
+                } else {
+                    buffer = val;
+                }
+                i += 2;
+            } else if let Some(a) = args[i].as_array_vec() {
+                items.extend(a);
+                i += 1;
+            } else {
+                items.push(args[i].clone());
+                i += 1;
+            }
+        }
+        Ok(PerlValue::pipeline(Arc::new(Mutex::new(PipelineInner {
+            source: items,
+            ops: Vec::new(),
+            has_scalar_terminal: false,
+            par_stream: false,
+            streaming: true,
+            streaming_workers: workers,
+            streaming_buffer: buffer,
         }))))
     }
 
@@ -7845,10 +7908,20 @@ impl Interpreter {
         p: &Arc<Mutex<PipelineInner>>,
         line: usize,
     ) -> PerlResult<PerlValue> {
-        let (mut v, ops, par_stream) = {
+        let (mut v, ops, par_stream, streaming, streaming_workers, streaming_buffer) = {
             let g = p.lock();
-            (g.source.clone(), g.ops.clone(), g.par_stream)
+            (
+                g.source.clone(),
+                g.ops.clone(),
+                g.par_stream,
+                g.streaming,
+                g.streaming_workers,
+                g.streaming_buffer,
+            )
         };
+        if streaming {
+            return self.pipeline_collect_streaming(v, &ops, streaming_workers, streaming_buffer, line);
+        }
         for op in ops {
             match op {
                 PipelineOp::Filter(sub) => {
@@ -8207,6 +8280,277 @@ impl Interpreter {
         Ok(PerlValue::array(v))
     }
 
+    /// Streaming collect: wire pipeline ops through bounded channels so items flow
+    /// between stages concurrently.  Order is **not** preserved.
+    fn pipeline_collect_streaming(
+        &mut self,
+        source: Vec<PerlValue>,
+        ops: &[PipelineOp],
+        workers_per_stage: usize,
+        buffer: usize,
+        line: usize,
+    ) -> PerlResult<PerlValue> {
+        use crossbeam::channel::{bounded, Receiver, Sender};
+
+        // Validate: reject ops that require all items (can't stream).
+        for op in ops {
+            match op {
+                PipelineOp::PSort { .. }
+                | PipelineOp::PReduce { .. }
+                | PipelineOp::PReduceInit { .. }
+                | PipelineOp::PMapReduce { .. }
+                | PipelineOp::PMapChunked { .. } => {
+                    return Err(PerlError::runtime(
+                        format!(
+                            "par_pipeline_stream: {:?} requires all items and cannot stream; use par_pipeline instead",
+                            std::mem::discriminant(op)
+                        ),
+                        line,
+                    ));
+                }
+                _ => {}
+            }
+        }
+
+        // Filter out non-streamable ops and collect streamable ones.
+        // Supported: Filter, Map, Take, PMap, PGrep, PFor, PCache.
+        let streamable_ops: Vec<&PipelineOp> = ops.iter().collect();
+        if streamable_ops.is_empty() {
+            return Ok(PerlValue::array(source));
+        }
+
+        let n_stages = streamable_ops.len();
+        let wn = if workers_per_stage > 0 {
+            workers_per_stage
+        } else {
+            self.parallel_thread_count()
+        };
+        let subs = self.subs.clone();
+        let (capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
+
+        // Build channels: one between each pair of stages, plus one for output.
+        // channel[0]: source → stage 0
+        // channel[i]: stage i-1 → stage i
+        // channel[n_stages]: stage n_stages-1 → collector
+        let mut channels: Vec<(Sender<PerlValue>, Receiver<PerlValue>)> =
+            (0..=n_stages).map(|_| bounded(buffer)).collect();
+
+        let err: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let take_done: Arc<std::sync::atomic::AtomicBool> =
+            Arc::new(std::sync::atomic::AtomicBool::new(false));
+
+        // Collect senders/receivers for each stage.
+        // Stage i reads from channels[i].1 and writes to channels[i+1].0.
+        let source_tx = channels[0].0.clone();
+        let result_rx = channels[n_stages].1.clone();
+        let results: Arc<Mutex<Vec<PerlValue>>> = Arc::new(Mutex::new(Vec::new()));
+
+        std::thread::scope(|scope| {
+            // Collector thread: drain results concurrently to avoid deadlock
+            // when bounded channels fill up.
+            let result_rx_c = result_rx.clone();
+            let results_c = Arc::clone(&results);
+            scope.spawn(move || {
+                while let Ok(item) = result_rx_c.recv() {
+                    results_c.lock().push(item);
+                }
+            });
+
+            // Source feeder thread.
+            let err_s = Arc::clone(&err);
+            let take_done_s = Arc::clone(&take_done);
+            scope.spawn(move || {
+                for item in source {
+                    if err_s.lock().is_some()
+                        || take_done_s.load(std::sync::atomic::Ordering::Relaxed)
+                    {
+                        break;
+                    }
+                    if source_tx.send(item).is_err() {
+                        break;
+                    }
+                }
+            });
+
+            // Spawn workers for each stage.
+            for (stage_idx, op) in streamable_ops.iter().enumerate() {
+                let rx = channels[stage_idx].1.clone();
+                let tx = channels[stage_idx + 1].0.clone();
+
+                for _ in 0..wn {
+                    let rx = rx.clone();
+                    let tx = tx.clone();
+                    let subs = subs.clone();
+                    let capture = capture.clone();
+                    let atomic_arrays = atomic_arrays.clone();
+                    let atomic_hashes = atomic_hashes.clone();
+                    let err_w = Arc::clone(&err);
+                    let take_done_w = Arc::clone(&take_done);
+
+                    match *op {
+                        PipelineOp::Filter(ref sub) | PipelineOp::PGrep { ref sub, .. } => {
+                            let sub = Arc::clone(sub);
+                            scope.spawn(move || {
+                                while let Ok(item) = rx.recv() {
+                                    if err_w.lock().is_some() {
+                                        break;
+                                    }
+                                    let mut interp = Interpreter::new();
+                                    interp.subs = subs.clone();
+                                    interp.scope.restore_capture(&capture);
+                                    interp
+                                        .scope
+                                        .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                    let _ = interp.scope.set_scalar("_", item.clone());
+                                    let keep = match interp.exec_block_no_scope(&sub.body) {
+                                        Ok(val) => val.is_true(),
+                                        Err(_) => false,
+                                    };
+                                    if keep {
+                                        if tx.send(item).is_err() {
+                                            break;
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                        PipelineOp::Map(ref sub) | PipelineOp::PMap { ref sub, .. } => {
+                            let sub = Arc::clone(sub);
+                            scope.spawn(move || {
+                                while let Ok(item) = rx.recv() {
+                                    if err_w.lock().is_some() {
+                                        break;
+                                    }
+                                    let mut interp = Interpreter::new();
+                                    interp.subs = subs.clone();
+                                    interp.scope.restore_capture(&capture);
+                                    interp
+                                        .scope
+                                        .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                    let _ = interp.scope.set_scalar("_", item);
+                                    let mapped = match interp.exec_block_no_scope(&sub.body) {
+                                        Ok(val) => val,
+                                        Err(_) => PerlValue::UNDEF,
+                                    };
+                                    if tx.send(mapped).is_err() {
+                                        break;
+                                    }
+                                }
+                            });
+                        }
+                        PipelineOp::Take(n) => {
+                            let limit = (*n).max(0) as usize;
+                            let count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+                            let count_w = Arc::clone(&count);
+                            scope.spawn(move || {
+                                while let Ok(item) = rx.recv() {
+                                    let prev =
+                                        count_w.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                                    if prev >= limit {
+                                        take_done_w
+                                            .store(true, std::sync::atomic::Ordering::Relaxed);
+                                        break;
+                                    }
+                                    if tx.send(item).is_err() {
+                                        break;
+                                    }
+                                }
+                            });
+                            // Take only needs 1 worker; skip remaining worker spawns.
+                            break;
+                        }
+                        PipelineOp::PFor { ref sub, .. } => {
+                            let sub = Arc::clone(sub);
+                            scope.spawn(move || {
+                                while let Ok(item) = rx.recv() {
+                                    if err_w.lock().is_some() {
+                                        break;
+                                    }
+                                    let mut interp = Interpreter::new();
+                                    interp.subs = subs.clone();
+                                    interp.scope.restore_capture(&capture);
+                                    interp
+                                        .scope
+                                        .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                    let _ = interp.scope.set_scalar("_", item.clone());
+                                    match interp.exec_block_no_scope(&sub.body) {
+                                        Ok(_) => {}
+                                        Err(e) => {
+                                            let msg = match e {
+                                                FlowOrError::Error(pe) => pe.to_string(),
+                                                FlowOrError::Flow(_) => {
+                                                    "unexpected control flow in par_pipeline_stream pfor".into()
+                                                }
+                                            };
+                                            let mut g = err_w.lock();
+                                            if g.is_none() {
+                                                *g = Some(msg);
+                                            }
+                                            break;
+                                        }
+                                    }
+                                    if tx.send(item).is_err() {
+                                        break;
+                                    }
+                                }
+                            });
+                        }
+                        PipelineOp::PCache { ref sub, .. } => {
+                            let sub = Arc::clone(sub);
+                            scope.spawn(move || {
+                                while let Ok(item) = rx.recv() {
+                                    if err_w.lock().is_some() {
+                                        break;
+                                    }
+                                    let k = crate::pcache::cache_key(&item);
+                                    let val =
+                                        if let Some(cached) = crate::pcache::GLOBAL_PCACHE.get(&k)
+                                        {
+                                            cached.clone()
+                                        } else {
+                                            let mut interp = Interpreter::new();
+                                            interp.subs = subs.clone();
+                                            interp.scope.restore_capture(&capture);
+                                            interp.scope.restore_atomics(
+                                                &atomic_arrays,
+                                                &atomic_hashes,
+                                            );
+                                            let _ = interp.scope.set_scalar("_", item);
+                                            let v =
+                                                match interp.exec_block_no_scope(&sub.body) {
+                                                    Ok(v) => v,
+                                                    Err(_) => PerlValue::UNDEF,
+                                                };
+                                            crate::pcache::GLOBAL_PCACHE.insert(k, v.clone());
+                                            v
+                                        };
+                                    if tx.send(val).is_err() {
+                                        break;
+                                    }
+                                }
+                            });
+                        }
+                        // Non-streaming ops already rejected above.
+                        _ => unreachable!(),
+                    }
+                }
+            }
+
+            // Drop our copies of intermediate senders/receivers so channels disconnect
+            // when workers finish.  Also drop result_rx so the collector thread exits
+            // once all stage workers are done.
+            channels.clear();
+            drop(result_rx);
+        });
+
+        if let Some(msg) = err.lock().take() {
+            return Err(PerlError::runtime(msg, line));
+        }
+
+        let results = std::mem::take(&mut *results.lock());
+        Ok(PerlValue::array(results))
+    }
+
     fn heap_compare(&mut self, cmp: &Arc<PerlSub>, a: &PerlValue, b: &PerlValue) -> Ordering {
         self.scope_push_hook();
         if let Some(ref env) = cmp.closure_env {
@@ -8365,9 +8709,11 @@ impl Interpreter {
         let handle_name = self.resolve_io_handle_name(handle.unwrap_or("STDOUT"));
         match handle_name.as_str() {
             "STDOUT" => {
-                print!("{}", output);
-                if self.output_autoflush {
-                    let _ = io::stdout().flush();
+                if !self.suppress_stdout {
+                    print!("{}", output);
+                    if self.output_autoflush {
+                        let _ = io::stdout().flush();
+                    }
                 }
             }
             "STDERR" => {
@@ -8408,9 +8754,11 @@ impl Interpreter {
         let handle_name = self.resolve_io_handle_name(handle.unwrap_or("STDOUT"));
         match handle_name.as_str() {
             "STDOUT" => {
-                print!("{}", output);
-                if self.output_autoflush {
-                    let _ = io::stdout().flush();
+                if !self.suppress_stdout {
+                    print!("{}", output);
+                    if self.output_autoflush {
+                        let _ = io::stdout().flush();
+                    }
                 }
             }
             "STDERR" => {

@@ -1718,8 +1718,29 @@ impl Compiler {
                     // Fast path: `.=` on scalar → in-place append (no clone)
                     if *op == BinOp::Concat {
                         self.compile_expr(value)?;
-                        self.chunk.emit(Op::ConcatAppend(idx), line);
+                        if let Some(slot) = self.scalar_slot(name) {
+                            self.chunk.emit(Op::ConcatAppendSlot(slot), line);
+                        } else {
+                            self.chunk.emit(Op::ConcatAppend(idx), line);
+                        }
                         return Ok(());
+                    }
+                    // Fused slot+slot arithmetic: $slot_a += $slot_b (no stack traffic)
+                    if let Some(dst_slot) = self.scalar_slot(name) {
+                        if let ExprKind::ScalarVar(rhs_name) = &value.kind {
+                            if let Some(src_slot) = self.scalar_slot(rhs_name) {
+                                let fused = match op {
+                                    BinOp::Add => Some(Op::AddAssignSlotSlot(dst_slot, src_slot)),
+                                    BinOp::Sub => Some(Op::SubAssignSlotSlot(dst_slot, src_slot)),
+                                    BinOp::Mul => Some(Op::MulAssignSlotSlot(dst_slot, src_slot)),
+                                    _ => None,
+                                };
+                                if let Some(fop) = fused {
+                                    self.chunk.emit(fop, line);
+                                    return Ok(());
+                                }
+                            }
+                        }
                     }
                     self.emit_get_scalar(idx, line);
                     self.compile_expr(value)?;
@@ -1809,6 +1830,15 @@ impl Compiler {
                     }
                     self.chunk.emit(
                         Op::CallBuiltin(BuiltinId::ParPipeline as u16, args.len() as u8),
+                        line,
+                    );
+                }
+                "par_pipeline_stream" => {
+                    for arg in args {
+                        self.compile_expr(arg)?;
+                    }
+                    self.chunk.emit(
+                        Op::CallBuiltin(BuiltinId::ParPipelineStream as u16, args.len() as u8),
                         line,
                     );
                 }

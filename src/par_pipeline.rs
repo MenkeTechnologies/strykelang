@@ -216,8 +216,102 @@ fn run_source(
     }
 }
 
-/// Run a parallel pipeline; returns the number of items processed by the **last** stage (scalar).
+/// Run a **batch** parallel pipeline: source generates all items, then each stage
+/// processes the full batch via rayon before the next stage starts.
+/// Returns the number of items processed by the **last** stage (scalar).
 pub(crate) fn run_par_pipeline(
+    interp: &mut Interpreter,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<PerlValue> {
+    use rayon::prelude::*;
+
+    let spec = parse_args(args)?;
+    let subs = interp.subs.clone();
+    let (capture, atomic_arrays, atomic_hashes) = interp.scope.capture_with_atomics();
+
+    // Phase 1: drain all items from source.
+    let mut items = Vec::new();
+    {
+        let mut src_interp = Interpreter::new();
+        src_interp.subs = subs.clone();
+        src_interp.scope.restore_capture(&capture);
+        src_interp
+            .scope
+            .restore_atomics(&atomic_arrays, &atomic_hashes);
+        if let Some(env) = spec.source.closure_env.as_ref() {
+            src_interp.scope.restore_capture(env);
+        }
+        loop {
+            let v = match src_interp.exec_block_no_scope(&spec.source.body) {
+                Ok(v) => v,
+                Err(FlowOrError::Flow(Flow::Return(v))) => v,
+                Err(e) => {
+                    return Err(PerlError::runtime(flow_err_msg(e), line));
+                }
+            };
+            if v.is_undef() {
+                break;
+            }
+            items.push(v);
+        }
+    }
+
+    // Phase 2: run each stage as a batch over all items.
+    let mut err_msg: Option<String> = None;
+    for stage_sub in &spec.stages {
+        if err_msg.is_some() {
+            break;
+        }
+        let first_err: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let sub = Arc::clone(stage_sub);
+        let subs_w = subs.clone();
+        let cap_w = capture.clone();
+        let aa_w = atomic_arrays.clone();
+        let ah_w = atomic_hashes.clone();
+        let err_w = Arc::clone(&first_err);
+        items = items
+            .into_par_iter()
+            .map(|item| {
+                if err_w.lock().is_some() {
+                    return PerlValue::UNDEF;
+                }
+                let mut local_interp = Interpreter::new();
+                local_interp.subs = subs_w.clone();
+                local_interp.scope.restore_capture(&cap_w);
+                local_interp
+                    .scope
+                    .restore_atomics(&aa_w, &ah_w);
+                if let Some(env) = sub.closure_env.as_ref() {
+                    local_interp.scope.restore_capture(env);
+                }
+                let _ = local_interp.scope.set_scalar("_", item);
+                match local_interp.exec_block_no_scope(&sub.body) {
+                    Ok(v) => v,
+                    Err(FlowOrError::Flow(Flow::Return(v))) => v,
+                    Err(e) => {
+                        let mut g = err_w.lock();
+                        if g.is_none() {
+                            *g = Some(flow_err_msg(e));
+                        }
+                        PerlValue::UNDEF
+                    }
+                }
+            })
+            .collect();
+        err_msg = first_err.lock().take();
+    }
+
+    if let Some(msg) = err_msg {
+        return Err(PerlError::runtime(msg, line));
+    }
+    Ok(PerlValue::integer(items.len() as i64))
+}
+
+/// Run a **streaming** parallel pipeline: items flow through bounded channels
+/// between stages concurrently (order not preserved when a stage has multiple workers).
+/// Returns the number of items processed by the **last** stage (scalar).
+pub(crate) fn run_par_pipeline_streaming(
     interp: &mut Interpreter,
     args: &[PerlValue],
     line: usize,
@@ -286,9 +380,6 @@ pub(crate) fn run_par_pipeline(
                 });
             }
         }
-        // `bounded` senders/receivers are cloned into each OS thread. Keeping the originals in
-        // `txs`/`rxs` leaves extra endpoints alive, so channels never disconnect and `recv()` never
-        // finishes — only the worker-held clones should remain after spawning.
         txs.clear();
         rxs.clear();
     });
