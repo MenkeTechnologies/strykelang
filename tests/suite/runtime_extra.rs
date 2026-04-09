@@ -80,6 +80,14 @@ fn foreach_iterates_hash_keys() {
 }
 
 #[test]
+fn values_hash_returns_all_stored_values() {
+    assert_eq!(
+        eval_int(r#"my %h = (a => 10, b => 20, c => 30); my @v = values %h; scalar @v"#),
+        3,
+    );
+}
+
+#[test]
 fn sort_default_lexical_strings() {
     assert_eq!(eval_string(r#"join(",", sort("b","a","c"))"#), "a,b,c");
 }

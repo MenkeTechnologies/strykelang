@@ -106,6 +106,17 @@ fn list_util_uniqstr_case_sensitive() {
 }
 
 #[test]
+fn list_util_mesh_interleaves_array_refs() {
+    let mut interp = Interpreter::new();
+    let p = parse(
+        r#"my @m = List::Util::mesh([1, 2], [10, 20]); join(",", @m)"#,
+    )
+    .expect("parse");
+    let v = interp.execute(&p).expect("run");
+    assert_eq!(v.to_string(), "1,10,2,20");
+}
+
+#[test]
 fn list_util_pairs_returns_blessed_arrays() {
     let mut interp = Interpreter::new();
     let p = parse("join(\",\", List::Util::pairs(\"a\", 1, \"b\", 2))").expect("parse");
