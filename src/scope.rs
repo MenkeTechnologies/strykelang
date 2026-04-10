@@ -863,10 +863,7 @@ impl Scope {
         if let Some(aa) = self.find_atomic_array(name) {
             return Ok(aa.0.lock().pop().unwrap_or(PerlValue::UNDEF));
         }
-        Ok(self
-            .get_array_mut(name)?
-            .pop()
-            .unwrap_or(PerlValue::UNDEF))
+        Ok(self.get_array_mut(name)?.pop().unwrap_or(PerlValue::UNDEF))
     }
 
     /// Shift from array — works for both regular and atomic arrays.
@@ -1343,9 +1340,7 @@ impl Scope {
             if let Some(stripped) = name.strip_prefix('$') {
                 self.declare_scalar(stripped, val.clone());
             } else if let Some(rest) = name.strip_prefix("@frozen:") {
-                let arr = val
-                    .as_array_vec()
-                    .unwrap_or_else(|| val.to_list());
+                let arr = val.as_array_vec().unwrap_or_else(|| val.to_list());
                 self.declare_array_frozen(rest, arr, true);
             } else if let Some(rest) = name.strip_prefix("%frozen:") {
                 if let Some(h) = val.as_hash_map() {
@@ -1355,9 +1350,7 @@ impl Scope {
                 if rest.starts_with("sync_") {
                     continue;
                 }
-                let arr = val
-                    .as_array_vec()
-                    .unwrap_or_else(|| val.to_list());
+                let arr = val.as_array_vec().unwrap_or_else(|| val.to_list());
                 self.declare_array(rest, arr);
             } else if let Some(rest) = name.strip_prefix('%') {
                 if rest.starts_with("sync_") {
@@ -1439,8 +1432,7 @@ mod tests {
     fn set_array_element_extends_array_with_undef_gaps() {
         let mut s = Scope::new();
         s.declare_array("a", vec![]);
-        s.set_array_element("a", 2, PerlValue::integer(7))
-            .unwrap();
+        s.set_array_element("a", 2, PerlValue::integer(7)).unwrap();
         assert_eq!(s.get_array_element("a", 2).to_int(), 7);
         assert!(s.get_array_element("a", 0).is_undef());
     }
@@ -1458,10 +1450,7 @@ mod tests {
     #[test]
     fn capture_restore_roundtrip_lexical_array_and_hash() {
         let mut s = Scope::new();
-        s.declare_array(
-            "a",
-            vec![PerlValue::integer(1), PerlValue::integer(2)],
-        );
+        s.declare_array("a", vec![PerlValue::integer(1), PerlValue::integer(2)]);
         let mut m = IndexMap::new();
         m.insert("k".to_string(), PerlValue::integer(99));
         s.declare_hash("h", m);

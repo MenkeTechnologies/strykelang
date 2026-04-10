@@ -6,11 +6,23 @@ use crate::token::Token;
 pub struct Parser {
     tokens: Vec<(Token, usize)>,
     pos: usize,
+    /// Monotonic slot id for `rate_limit(...)` sliding-window state in the interpreter.
+    next_rate_limit_slot: u32,
 }
 
 impl Parser {
     pub fn new(tokens: Vec<(Token, usize)>) -> Self {
-        Self { tokens, pos: 0 }
+        Self {
+            tokens,
+            pos: 0,
+            next_rate_limit_slot: 0,
+        }
+    }
+
+    fn alloc_rate_limit_slot(&mut self) -> u32 {
+        let s = self.next_rate_limit_slot;
+        self.next_rate_limit_slot = self.next_rate_limit_slot.saturating_add(1);
+        s
     }
 
     fn peek(&self) -> &Token {
@@ -672,12 +684,16 @@ impl Parser {
                 | "map"
                 | "match"
                 | "mkdir"
+                | "every"
+                | "gen"
                 | "oct"
                 | "open"
                 | "opendir"
                 | "ord"
                 | "par_lines"
                 | "par_walk"
+                | "rate_limit"
+                | "retry"
                 | "pcache"
                 | "pchannel"
                 | "pfor"
@@ -736,6 +752,7 @@ impl Parser {
                 | "wantarray"
                 | "warn"
                 | "watch"
+                | "yield"
                 | "sub"
         )
     }
@@ -895,10 +912,22 @@ impl Parser {
                 continue;
             }
             let pattern = self.parse_match_pattern()?;
+            let guard = if matches!(self.peek(), Token::Ident(ref s) if s == "if") {
+                self.advance();
+                // Use assign-level parsing so `=>` after the guard is not consumed as a comma/fat-comma
+                // separator (see [`Self::parse_comma_expr`]).
+                Some(Box::new(self.parse_assign_expr()?))
+            } else {
+                None
+            };
             self.expect(&Token::FatArrow)?;
             // Use assign-level parsing so commas separate arms, not `List` elements.
             let body = self.parse_assign_expr()?;
-            arms.push(MatchArm { pattern, body });
+            arms.push(MatchArm {
+                pattern,
+                guard,
+                body,
+            });
             self.eat(&Token::Comma);
         }
         self.expect(&Token::RBrace)?;
@@ -2793,11 +2822,11 @@ impl Parser {
             }
             Token::DoubleString(s) => {
                 self.advance();
-                Ok(self.parse_interpolated_string(&s, line))
+                self.parse_interpolated_string(&s, line)
             }
             Token::HereDoc(_, body) => {
                 self.advance();
-                Ok(self.parse_interpolated_string(&body, line))
+                self.parse_interpolated_string(&body, line)
             }
             Token::Regex(pattern, flags) => {
                 self.advance();
@@ -3789,6 +3818,126 @@ impl Parser {
                     line,
                 })
             }
+            "retry" => {
+                if !matches!(self.peek(), Token::LBrace) {
+                    return Err(PerlError::syntax(
+                        "retry must be followed by { BLOCK }",
+                        line,
+                    ));
+                }
+                let body = self.parse_block()?;
+                match self.peek() {
+                    Token::Ident(ref s) if s == "times" => {
+                        self.advance();
+                    }
+                    _ => {
+                        return Err(PerlError::syntax(
+                            "retry: expected `times =>` after block",
+                            line,
+                        ));
+                    }
+                }
+                self.expect(&Token::FatArrow)?;
+                let times = Box::new(self.parse_assign_expr()?);
+                let mut backoff = RetryBackoff::None;
+                if self.eat(&Token::Comma) {
+                    match self.peek() {
+                        Token::Ident(ref s) if s == "backoff" => {
+                            self.advance();
+                        }
+                        _ => {
+                            return Err(PerlError::syntax(
+                                "retry: expected `backoff =>` after comma",
+                                line,
+                            ));
+                        }
+                    }
+                    self.expect(&Token::FatArrow)?;
+                    let Token::Ident(mode) = self.peek().clone() else {
+                        return Err(PerlError::syntax(
+                            "retry: expected backoff mode (none, linear, exponential)",
+                            line,
+                        ));
+                    };
+                    backoff = match mode.as_str() {
+                        "none" => RetryBackoff::None,
+                        "linear" => RetryBackoff::Linear,
+                        "exponential" => RetryBackoff::Exponential,
+                        _ => {
+                            return Err(PerlError::syntax(
+                                format!("retry: invalid backoff `{mode}`"),
+                                line,
+                            ));
+                        }
+                    };
+                    self.advance();
+                }
+                Ok(Expr {
+                    kind: ExprKind::RetryBlock {
+                        body,
+                        times,
+                        backoff,
+                    },
+                    line,
+                })
+            }
+            "rate_limit" => {
+                self.expect(&Token::LParen)?;
+                let max = Box::new(self.parse_expression()?);
+                self.expect(&Token::Comma)?;
+                let window = Box::new(self.parse_expression()?);
+                self.expect(&Token::RParen)?;
+                if !matches!(self.peek(), Token::LBrace) {
+                    return Err(PerlError::syntax(
+                        "rate_limit must be followed by { BLOCK }",
+                        line,
+                    ));
+                }
+                let body = self.parse_block()?;
+                let slot = self.alloc_rate_limit_slot();
+                Ok(Expr {
+                    kind: ExprKind::RateLimitBlock {
+                        slot,
+                        max,
+                        window,
+                        body,
+                    },
+                    line,
+                })
+            }
+            "every" => {
+                self.expect(&Token::LParen)?;
+                let interval = Box::new(self.parse_expression()?);
+                self.expect(&Token::RParen)?;
+                if !matches!(self.peek(), Token::LBrace) {
+                    return Err(PerlError::syntax(
+                        "every must be followed by { BLOCK }",
+                        line,
+                    ));
+                }
+                let body = self.parse_block()?;
+                Ok(Expr {
+                    kind: ExprKind::EveryBlock { interval, body },
+                    line,
+                })
+            }
+            "gen" => {
+                if !matches!(self.peek(), Token::LBrace) {
+                    return Err(PerlError::syntax("gen must be followed by { BLOCK }", line));
+                }
+                let body = self.parse_block()?;
+                Ok(Expr {
+                    kind: ExprKind::GenBlock { body },
+                    line,
+                })
+            }
+            "yield" => {
+                let e = self.parse_assign_expr()?;
+                Ok(Expr {
+                    kind: ExprKind::Yield(Box::new(e)),
+                    line,
+                })
+            }
             "await" => {
                 let a = self.parse_one_arg()?;
                 Ok(Expr {
@@ -4775,7 +4924,7 @@ impl Parser {
         Ok(pairs)
     }
 
-    fn parse_interpolated_string(&self, s: &str, line: usize) -> Expr {
+    fn parse_interpolated_string(&self, s: &str, line: usize) -> PerlResult<Expr> {
         // Parse $var and @var inside double-quoted strings
         let mut parts = Vec::new();
         let mut literal = String::new();
@@ -4883,6 +5032,24 @@ impl Parser {
                     } else {
                         parts.push(StringPart::ScalarVar(name));
                     }
+                } else if chars[i].is_ascii_digit() {
+                    // $0 (program name), $1…$n (regexp captures). Perl disallows $01, $02, …
+                    if chars[i] == '0' {
+                        i += 1;
+                        if i < chars.len() && chars[i].is_ascii_digit() {
+                            return Err(PerlError::syntax(
+                                "Numeric variables with more than one digit may not start with '0'",
+                                line,
+                            ));
+                        }
+                        parts.push(StringPart::ScalarVar("0".into()));
+                    } else {
+                        let start = i;
+                        while i < chars.len() && chars[i].is_ascii_digit() {
+                            i += 1;
+                        }
+                        parts.push(StringPart::ScalarVar(chars[start..i].iter().collect()));
+                    }
                 } else {
                     // Special var like $! or literal $
                     literal.push('$');
@@ -4914,23 +5081,23 @@ impl Parser {
 
         if parts.len() == 1 {
             if let StringPart::Literal(s) = &parts[0] {
-                return Expr {
+                return Ok(Expr {
                     kind: ExprKind::String(s.clone()),
                     line,
-                };
+                });
             }
         }
         if parts.is_empty() {
-            return Expr {
+            return Ok(Expr {
                 kind: ExprKind::String(String::new()),
                 line,
-            };
+            });
         }
 
-        Expr {
+        Ok(Expr {
             kind: ExprKind::InterpolatedString(parts),
             line,
-        }
+        })
     }
 
     fn expr_to_overload_key(e: &Expr) -> PerlResult<String> {

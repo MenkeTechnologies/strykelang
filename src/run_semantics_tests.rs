@@ -611,10 +611,7 @@ fn async_await_two_tasks() {
 
 #[test]
 fn spawn_await_same_as_async() {
-    assert_eq!(
-        ri(r#"my $t = spawn { 40 + 2 }; await($t);"#),
-        42
-    );
+    assert_eq!(ri(r#"my $t = spawn { 40 + 2 }; await($t);"#), 42);
 }
 
 #[test]
@@ -673,14 +670,12 @@ fn autoload_sets_missing_sub_name() {
 #[test]
 fn autoload_method_sets_package_method_in_autoload() {
     assert_eq!(
-        rs(
-            r#"
+        rs(r#"
         package D;
         sub AUTOLOAD { $AUTOLOAD }
         package main;
         bless({}, "D")->missing_meth();
-    "#
-        ),
+    "#),
         "D::missing_meth"
     );
 }
@@ -688,16 +683,14 @@ fn autoload_method_sets_package_method_in_autoload() {
 #[test]
 fn compile_phase_blocks_run_before_main() {
     assert_eq!(
-        rs(
-            r#"
+        rs(r#"
         BEGIN { $main::order = ""; $main::order .= "B" }
         UNITCHECK { $main::order .= "U" }
         CHECK { $main::order .= "C" }
         INIT { $main::order .= "I" }
         $main::order .= "M";
         $main::order
-    "#
-        ),
+    "#),
         "BUCIM"
     );
 }
@@ -705,8 +698,7 @@ fn compile_phase_blocks_run_before_main() {
 #[test]
 fn runtime_push_isa_updates_method_resolution() {
     assert_eq!(
-        ri(
-            r#"
+        ri(r#"
         package P;
         sub ping { 42 }
         package C;
@@ -715,8 +707,7 @@ fn runtime_push_isa_updates_method_resolution() {
         package main;
         my $o = bless {}, "C";
         $o->ping()
-    "#
-        ),
+    "#),
         42
     );
 }
@@ -724,15 +715,13 @@ fn runtime_push_isa_updates_method_resolution() {
 #[test]
 fn typeglob_assign_scalar_ref_to_coderef_aliases_sub() {
     assert_eq!(
-        ri(
-            r#"
+        ri(r#"
         package P;
         sub orig { 7 }
         *alias = \&orig;
         package main;
         P::alias()
-    "#
-        ),
+    "#),
         7
     );
 }

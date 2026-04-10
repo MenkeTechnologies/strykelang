@@ -18,11 +18,12 @@ pub mod list_util;
 mod map_grep_fast;
 pub mod mro;
 mod nanbox;
+mod native_codec;
 pub mod native_data;
 pub mod pack;
 pub mod par_lines;
-pub mod par_walk;
 pub mod par_pipeline;
+pub mod par_walk;
 pub mod parallel_trace;
 pub mod parser;
 pub mod pcache;
@@ -138,9 +139,7 @@ pub fn lint_program(program: &ast::Program, interp: &mut Interpreter) -> PerlRes
         return Err(e);
     }
     if interp.strict_refs || interp.strict_subs || interp.strict_vars {
-        eprintln!(
-            "perlrs: warning: bytecode compile check skipped (strict pragma is enabled)"
-        );
+        eprintln!("perlrs: warning: bytecode compile check skipped (strict pragma is enabled)");
         return Ok(());
     }
     let comp = compiler::Compiler::new().with_source_file(interp.file.clone());
@@ -152,7 +151,9 @@ pub fn lint_program(program: &ast::Program, interp: &mut Interpreter) -> PerlRes
 
 fn compile_error_to_perl(e: compiler::CompileError) -> PerlError {
     match e {
-        compiler::CompileError::Unsupported(msg) => PerlError::runtime(format!("compile: {}", msg), 0),
+        compiler::CompileError::Unsupported(msg) => {
+            PerlError::runtime(format!("compile: {}", msg), 0)
+        }
         compiler::CompileError::Frozen { line, detail } => PerlError::runtime(detail, line),
     }
 }

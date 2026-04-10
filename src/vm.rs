@@ -875,13 +875,10 @@ impl<'a> VM<'a> {
                     data: RwLock::new(PerlValue::hash(map)),
                 })));
             }
-        } else if let Some(result) = self.interp.try_autoload_call(
-            &full_name,
-            all_args,
-            self.line(),
-            want,
-            Some(&class),
-        ) {
+        } else if let Some(result) =
+            self.interp
+                .try_autoload_call(&full_name, all_args, self.line(), want, Some(&class))
+        {
             match result {
                 Ok(v) => self.push(v),
                 Err(crate::interpreter::FlowOrError::Flow(crate::interpreter::Flow::Return(v))) => {
@@ -2263,7 +2260,8 @@ impl<'a> VM<'a> {
                         // Check if sub is compiled (has bytecode entry)
                         if let Some((entry_ip, stack_args)) = self.find_sub_entry(*name_idx) {
                             let saved_wa = self.interp.wantarray_kind;
-                            let sub_prof_t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
+                            let sub_prof_t0 =
+                                self.interp.profiler.is_some().then(std::time::Instant::now);
                             if let Some(p) = &mut self.interp.profiler {
                                 p.enter_sub(name);
                             }
@@ -2347,7 +2345,8 @@ impl<'a> VM<'a> {
                                 self.push(r?);
                             } else if let Some(sub) = self.interp.resolve_sub_by_name(name) {
                                 // Fall back to tree-walker for non-compiled subs
-                                let t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
+                                let t0 =
+                                    self.interp.profiler.is_some().then(std::time::Instant::now);
                                 if let Some(p) = &mut self.interp.profiler {
                                     p.enter_sub(name);
                                 }
@@ -2378,8 +2377,7 @@ impl<'a> VM<'a> {
                                         crate::interpreter::Flow::Return(v),
                                     )) => self.push(v),
                                     Err(crate::interpreter::FlowOrError::Error(e)) => {
-                                        if let (Some(p), Some(t0)) =
-                                            (&mut self.interp.profiler, t0)
+                                        if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0)
                                         {
                                             p.exit_sub(t0.elapsed());
                                         }
@@ -2397,7 +2395,8 @@ impl<'a> VM<'a> {
                                 want,
                                 None,
                             ) {
-                                let t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
+                                let t0 =
+                                    self.interp.profiler.is_some().then(std::time::Instant::now);
                                 if let Some(p) = &mut self.interp.profiler {
                                     p.enter_sub(name);
                                 }
@@ -2407,8 +2406,7 @@ impl<'a> VM<'a> {
                                         crate::interpreter::Flow::Return(v),
                                     )) => self.push(v),
                                     Err(crate::interpreter::FlowOrError::Error(e)) => {
-                                        if let (Some(p), Some(t0)) =
-                                            (&mut self.interp.profiler, t0)
+                                        if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0)
                                         {
                                             p.exit_sub(t0.elapsed());
                                         }
@@ -2761,13 +2759,18 @@ impl<'a> VM<'a> {
                         }
                     }
                     Op::RegexMatchDyn(negate) => {
-                        let pattern = self.pop().into_string();
+                        let rhs = self.pop();
                         let s = self.pop().into_string();
                         let line = self.line();
-                        match self
-                            .interp
-                            .regex_match_execute(s, &pattern, "", false, "_", line)
-                        {
+                        let exec = if let Some((pat, fl)) = rhs.regex_src_and_flags() {
+                            self.interp
+                                .regex_match_execute(s, &pat, &fl, false, "_", line)
+                        } else {
+                            let pattern = rhs.into_string();
+                            self.interp
+                                .regex_match_execute(s, &pattern, "", false, "_", line)
+                        };
+                        match exec {
                             Ok(v) => {
                                 let matched = v.is_true();
                                 let out = if *negate { !matched } else { matched };
@@ -2795,7 +2798,7 @@ impl<'a> VM<'a> {
                                 ));
                             }
                         };
-                        self.push(PerlValue::regex(re, pattern_owned));
+                        self.push(PerlValue::regex(re, pattern_owned, flags.to_string()));
                         Ok(())
                     }
                     Op::ConcatAppend(idx) => {
@@ -3598,11 +3601,11 @@ impl<'a> VM<'a> {
                                         let _ = local_interp.scope.set_scalar("_", item);
                                         let mut vm = shared.worker_vm(&mut local_interp);
                                         let mut op_count = 0u64;
-                                        let val = match vm.run_block_region(start, end, &mut op_count)
-                                        {
-                                            Ok(v) => v,
-                                            Err(_) => PerlValue::UNDEF,
-                                        };
+                                        let val =
+                                            match vm.run_block_region(start, end, &mut op_count) {
+                                                Ok(v) => v,
+                                                Err(_) => PerlValue::UNDEF,
+                                            };
                                         out.push(val);
                                     }
                                     pmap_progress.tick();
@@ -3857,8 +3860,11 @@ impl<'a> VM<'a> {
                                     let _ = local_interp.scope.set_scalar("_", item);
                                     let mut vm = shared.worker_vm(&mut local_interp);
                                     let mut op_count = 0u64;
-                                    let val = match vm.run_block_region(map_start, map_end, &mut op_count)
-                                    {
+                                    let val = match vm.run_block_region(
+                                        map_start,
+                                        map_end,
+                                        &mut op_count,
+                                    ) {
                                         Ok(val) => val,
                                         Err(_) => PerlValue::UNDEF,
                                     };
@@ -3873,7 +3879,11 @@ impl<'a> VM<'a> {
                                     let _ = local_interp.scope.set_scalar("b", b);
                                     let mut vm = shared.worker_vm(&mut local_interp);
                                     let mut op_count = 0u64;
-                                    match vm.run_block_region(reduce_start, reduce_end, &mut op_count) {
+                                    match vm.run_block_region(
+                                        reduce_start,
+                                        reduce_end,
+                                        &mut op_count,
+                                    ) {
                                         Ok(val) => val,
                                         Err(_) => PerlValue::UNDEF,
                                     }

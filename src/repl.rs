@@ -12,9 +12,7 @@ use rustyline::{Config, Context, Editor, Helper};
 
 use crate::Cli;
 use perlrs::error::ErrorKind;
-use perlrs::interpreter::{
-    repl_arrow_method_completions, Interpreter, ReplCompletionSnapshot,
-};
+use perlrs::interpreter::{repl_arrow_method_completions, Interpreter, ReplCompletionSnapshot};
 use perlrs::token::KEYWORDS;
 
 /// Extra builtin names not listed in [`perlrs::token::KEYWORDS`].
@@ -258,7 +256,9 @@ mod tests {
     fn arrow_method_completion_uses_blessed_class_and_subs() {
         let mut state = ReplCompletionSnapshot::default();
         state.subs = vec!["Pkg::foo".to_string()];
-        state.blessed_scalars.insert("o".to_string(), "Pkg".to_string());
+        state
+            .blessed_scalars
+            .insert("o".to_string(), "Pkg".to_string());
         let line = "$o->f";
         let (start, methods) =
             repl_arrow_method_completions(&state, line, line.len()).expect("arrow context");

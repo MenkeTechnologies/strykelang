@@ -43,6 +43,29 @@ fn match_regex_literal_arm() {
 }
 
 #[test]
+fn match_regex_arm_sets_topic_and_numbered_captures() {
+    let v = run(r#"my $r = match ("ab-12") {
+        /^(\w+)-(\d+)$/ => $1 . " " . $2,
+        _ => "no",
+    };
+    $r;
+    "#)
+    .expect("run");
+    assert_eq!(v.to_string(), "ab 12");
+}
+
+#[test]
+fn match_wildcard_arm_sets_underscore_to_subject() {
+    let v = run(r#"my $r = match ("hello") {
+        _ => $_,
+    };
+    $r;
+    "#)
+    .expect("run");
+    assert_eq!(v.to_string(), "hello");
+}
+
+#[test]
 fn match_array_prefix_and_rest() {
     let v = run(r#"my $a = [1, 2, 9];
     my $r = match ($a) {
@@ -80,4 +103,28 @@ fn match_non_exhaustive_errors() {
         "unexpected: {}",
         msg
     );
+}
+
+#[test]
+fn match_arm_guard_if_rejects_then_falls_through() {
+    let v = run(r#"my $r = match (5) {
+        _ if $_ > 10 => "big",
+        _ => "small",
+    };
+    $r;
+    "#)
+    .expect("run");
+    assert_eq!(v.to_string(), "small");
+}
+
+#[test]
+fn match_arm_guard_if_accepts() {
+    let v = run(r#"my $r = match (15) {
+        _ if $_ > 10 => "big",
+        _ => "small",
+    };
+    $r;
+    "#)
+    .expect("run");
+    assert_eq!(v.to_string(), "big");
 }

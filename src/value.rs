@@ -41,6 +41,15 @@ impl PerlAsyncTask {
     }
 }
 
+/// Lazy generator from `gen { }`; resume with `->next` on the value.
+#[derive(Debug)]
+pub struct PerlGenerator {
+    pub(crate) block: Block,
+    pub(crate) pc: Mutex<usize>,
+    pub(crate) scope_started: Mutex<bool>,
+    pub(crate) exhausted: Mutex<bool>,
+}
+
 /// `Set->new` storage: canonical key → member value (insertion order preserved).
 pub type PerlSet = IndexMap<String, PerlValue>;
 
@@ -108,7 +117,8 @@ pub(crate) enum HeapObject {
     HashRef(Arc<RwLock<IndexMap<String, PerlValue>>>),
     ScalarRef(Arc<RwLock<PerlValue>>),
     CodeRef(Arc<PerlSub>),
-    Regex(Arc<PerlCompiledRegex>, String),
+    /// Compiled regex: pattern source and flag chars (e.g. `"i"`, `"g"`) for re-match without re-parse.
+    Regex(Arc<PerlCompiledRegex>, String, String),
     Blessed(Arc<BlessedRef>),
     IOHandle(String),
     Atomic(Arc<Mutex<PerlValue>>),
@@ -116,6 +126,7 @@ pub(crate) enum HeapObject {
     ChannelTx(Arc<Sender<PerlValue>>),
     ChannelRx(Arc<Receiver<PerlValue>>),
     AsyncTask(Arc<PerlAsyncTask>),
+    Generator(Arc<PerlGenerator>),
     Deque(Arc<Mutex<VecDeque<PerlValue>>>),
     Heap(Arc<Mutex<PerlHeap>>),
     Pipeline(Arc<Mutex<PipelineInner>>),
@@ -472,7 +483,7 @@ impl PerlValue {
     #[inline]
     pub fn as_regex(&self) -> Option<Arc<PerlCompiledRegex>> {
         self.with_heap(|h| match h {
-            HeapObject::Regex(re, _) => Some(Arc::clone(re)),
+            HeapObject::Regex(re, _, _) => Some(Arc::clone(re)),
             _ => None,
         })
         .flatten()
@@ -561,6 +572,15 @@ impl PerlValue {
     pub fn as_async_task(&self) -> Option<Arc<PerlAsyncTask>> {
         self.with_heap(|h| match h {
             HeapObject::AsyncTask(t) => Some(Arc::clone(t)),
+            _ => None,
+        })
+        .flatten()
+    }
+
+    #[inline]
+    pub fn as_generator(&self) -> Option<Arc<PerlGenerator>> {
+        self.with_heap(|h| match h {
+            HeapObject::Generator(g) => Some(Arc::clone(g)),
             _ => None,
         })
         .flatten()
@@ -720,8 +740,18 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn regex(rx: Arc<PerlCompiledRegex>, src: String) -> Self {
-        Self::from_heap(Arc::new(HeapObject::Regex(rx, src)))
+    pub fn regex(rx: Arc<PerlCompiledRegex>, pattern_src: String, flags: String) -> Self {
+        Self::from_heap(Arc::new(HeapObject::Regex(rx, pattern_src, flags)))
+    }
+
+    /// Pattern and flag string stored with a compiled regex (for `=~` / [`Op::RegexMatchDyn`]).
+    #[inline]
+    pub fn regex_src_and_flags(&self) -> Option<(String, String)> {
+        self.with_heap(|h| match h {
+            HeapObject::Regex(_, pat, fl) => Some((pat.clone(), fl.clone())),
+            _ => None,
+        })
+        .flatten()
     }
 
     #[inline]
@@ -757,6 +787,11 @@ impl PerlValue {
     #[inline]
     pub fn async_task(t: Arc<PerlAsyncTask>) -> Self {
         Self::from_heap(Arc::new(HeapObject::AsyncTask(t)))
+    }
+
+    #[inline]
+    pub fn generator(g: Arc<PerlGenerator>) -> Self {
+        Self::from_heap(Arc::new(HeapObject::Generator(g)))
     }
 
     #[inline]
@@ -868,6 +903,7 @@ impl PerlValue {
             HeapObject::ChannelTx(_) => buf.push_str("PCHANNEL::Tx"),
             HeapObject::ChannelRx(_) => buf.push_str("PCHANNEL::Rx"),
             HeapObject::AsyncTask(_) => buf.push_str("AsyncTask"),
+            HeapObject::Generator(_) => buf.push_str("Generator"),
             HeapObject::Pipeline(_) => buf.push_str("Pipeline"),
             HeapObject::DataFrame(d) => {
                 let g = d.lock();
@@ -991,7 +1027,10 @@ impl PerlValue {
             HeapObject::Array(a) => a.len() as f64,
             HeapObject::Atomic(arc) => arc.lock().to_number(),
             HeapObject::Set(s) => s.len() as f64,
-            HeapObject::ChannelTx(_) | HeapObject::ChannelRx(_) | HeapObject::AsyncTask(_) => 1.0,
+            HeapObject::ChannelTx(_)
+            | HeapObject::ChannelRx(_)
+            | HeapObject::AsyncTask(_)
+            | HeapObject::Generator(_) => 1.0,
             HeapObject::Deque(d) => d.lock().len() as f64,
             HeapObject::Heap(h) => h.lock().items.len() as f64,
             HeapObject::Pipeline(p) => p.lock().source.len() as f64,
@@ -1024,7 +1063,10 @@ impl PerlValue {
             HeapObject::Array(a) => a.len() as i64,
             HeapObject::Atomic(arc) => arc.lock().to_int(),
             HeapObject::Set(s) => s.len() as i64,
-            HeapObject::ChannelTx(_) | HeapObject::ChannelRx(_) | HeapObject::AsyncTask(_) => 1,
+            HeapObject::ChannelTx(_)
+            | HeapObject::ChannelRx(_)
+            | HeapObject::AsyncTask(_)
+            | HeapObject::Generator(_) => 1,
             HeapObject::Deque(d) => d.lock().len() as i64,
             HeapObject::Heap(h) => h.lock().items.len() as i64,
             HeapObject::Pipeline(p) => p.lock().source.len() as i64,
@@ -1058,7 +1100,7 @@ impl PerlValue {
             HeapObject::HashRef(_) => "HASH".to_string(),
             HeapObject::ScalarRef(_) => "SCALAR".to_string(),
             HeapObject::CodeRef(_) => "CODE".to_string(),
-            HeapObject::Regex(_, _) => "Regexp".to_string(),
+            HeapObject::Regex(_, _, _) => "Regexp".to_string(),
             HeapObject::Blessed(b) => b.class.clone(),
             HeapObject::IOHandle(_) => "GLOB".to_string(),
             HeapObject::Atomic(_) => "ATOMIC".to_string(),
@@ -1066,6 +1108,7 @@ impl PerlValue {
             HeapObject::ChannelTx(_) => "PCHANNEL::Tx".to_string(),
             HeapObject::ChannelRx(_) => "PCHANNEL::Rx".to_string(),
             HeapObject::AsyncTask(_) => "ASYNCTASK".to_string(),
+            HeapObject::Generator(_) => "Generator".to_string(),
             HeapObject::Deque(_) => "Deque".to_string(),
             HeapObject::Heap(_) => "Heap".to_string(),
             HeapObject::Pipeline(_) => "Pipeline".to_string(),
@@ -1090,12 +1133,13 @@ impl PerlValue {
             HeapObject::HashRef(_) => PerlValue::string("HASH".into()),
             HeapObject::ScalarRef(_) => PerlValue::string("SCALAR".into()),
             HeapObject::CodeRef(_) => PerlValue::string("CODE".into()),
-            HeapObject::Regex(_, _) => PerlValue::string("Regexp".into()),
+            HeapObject::Regex(_, _, _) => PerlValue::string("Regexp".into()),
             HeapObject::Atomic(_) => PerlValue::string("ATOMIC".into()),
             HeapObject::Set(_) => PerlValue::string("Set".into()),
             HeapObject::ChannelTx(_) => PerlValue::string("PCHANNEL::Tx".into()),
             HeapObject::ChannelRx(_) => PerlValue::string("PCHANNEL::Rx".into()),
             HeapObject::AsyncTask(_) => PerlValue::string("ASYNCTASK".into()),
+            HeapObject::Generator(_) => PerlValue::string("Generator".into()),
             HeapObject::Deque(_) => PerlValue::string("Deque".into()),
             HeapObject::Heap(_) => PerlValue::string("Heap".into()),
             HeapObject::Pipeline(_) => PerlValue::string("Pipeline".into()),
@@ -1181,6 +1225,7 @@ impl PerlValue {
             HeapObject::Capture(_) | HeapObject::Ppool(_) | HeapObject::Barrier(_) => {
                 PerlValue::integer(1)
             }
+            HeapObject::Generator(_) => PerlValue::integer(1),
             _ => self.clone(),
         }
     }
@@ -1212,7 +1257,7 @@ impl fmt::Display for PerlValue {
             HeapObject::HashRef(_) => f.write_str("HASH(0x...)"),
             HeapObject::ScalarRef(_) => f.write_str("SCALAR(0x...)"),
             HeapObject::CodeRef(sub) => write!(f, "CODE({})", sub.name),
-            HeapObject::Regex(_, src) => write!(f, "(?:{src})"),
+            HeapObject::Regex(_, src, _) => write!(f, "(?:{src})"),
             HeapObject::Blessed(b) => write!(f, "{}=HASH(0x...)", b.class),
             HeapObject::IOHandle(name) => f.write_str(name),
             HeapObject::Atomic(arc) => write!(f, "{}", arc.lock()),
@@ -1232,6 +1277,7 @@ impl fmt::Display for PerlValue {
             HeapObject::ChannelTx(_) => f.write_str("PCHANNEL::Tx"),
             HeapObject::ChannelRx(_) => f.write_str("PCHANNEL::Rx"),
             HeapObject::AsyncTask(_) => f.write_str("AsyncTask"),
+            HeapObject::Generator(g) => write!(f, "Generator({} stmts)", g.block.len()),
             HeapObject::Deque(d) => write!(f, "Deque({})", d.lock().len()),
             HeapObject::Heap(h) => write!(f, "Heap({})", h.lock().items.len()),
             HeapObject::Pipeline(p) => {
@@ -1313,12 +1359,13 @@ pub fn set_member_key(v: &PerlValue) -> String {
         }
         HeapObject::ScalarRef(_) => format!("sr:{v}"),
         HeapObject::CodeRef(_) => format!("c:{v}"),
-        HeapObject::Regex(_, src) => format!("r:{src}"),
+        HeapObject::Regex(_, src, _) => format!("r:{src}"),
         HeapObject::IOHandle(s) => format!("io:{s}"),
         HeapObject::Atomic(arc) => format!("at:{}", set_member_key(&arc.lock())),
         HeapObject::ChannelTx(tx) => format!("chtx:{:p}", Arc::as_ptr(tx)),
         HeapObject::ChannelRx(rx) => format!("chrx:{:p}", Arc::as_ptr(rx)),
         HeapObject::AsyncTask(t) => format!("async:{:p}", Arc::as_ptr(t)),
+        HeapObject::Generator(g) => format!("gen:{:p}", Arc::as_ptr(g)),
         HeapObject::Deque(d) => format!("dq:{:p}", Arc::as_ptr(d)),
         HeapObject::Heap(h) => format!("hp:{:p}", Arc::as_ptr(h)),
         HeapObject::Pipeline(p) => format!("pl:{:p}", Arc::as_ptr(p)),
@@ -1705,7 +1752,11 @@ mod tests {
 
     #[test]
     fn display_regex_shows_non_capturing_prefix() {
-        let r = PerlValue::regex(PerlCompiledRegex::compile("x+").unwrap(), "x+".into());
+        let r = PerlValue::regex(
+            PerlCompiledRegex::compile("x+").unwrap(),
+            "x+".into(),
+            "".into(),
+        );
         assert_eq!(r.to_string(), "(?:x+)");
     }
 

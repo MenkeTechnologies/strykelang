@@ -304,19 +304,15 @@ impl Compiler {
         }
     }
 
-    /// Boolean condition for postfix `if` / `unless` / `while` / `until`: bare `/.../` is `$_ =~ /.../`
-    /// (Perl). Emits `$_` + pattern and [`Op::RegexMatchDyn`] so the stack has 0/1 like `=~`.
-    fn compile_postfix_boolean_condition(&mut self, cond: &Expr) -> Result<(), CompileError> {
+    /// Boolean rvalue: bare `/.../` is `$_ =~ /.../` (Perl), not “regex object is truthy”.
+    /// Emits `$_` + pattern and [`Op::RegexMatchDyn`] so match vars and truthy 0/1 match `=~`.
+    fn compile_boolean_rvalue_condition(&mut self, cond: &Expr) -> Result<(), CompileError> {
         let line = cond.line;
         if let ExprKind::Regex(pattern, flags) = &cond.kind {
             let name_idx = self.chunk.intern_name("_");
             self.emit_get_scalar(name_idx, line);
-            let pat_idx = self
-                .chunk
-                .add_constant(PerlValue::string(pattern.clone()));
-            let flags_idx = self
-                .chunk
-                .add_constant(PerlValue::string(flags.clone()));
+            let pat_idx = self.chunk.add_constant(PerlValue::string(pattern.clone()));
+            let flags_idx = self.chunk.add_constant(PerlValue::string(flags.clone()));
             self.chunk.emit(Op::LoadRegex(pat_idx, flags_idx), line);
             self.chunk.emit(Op::RegexMatchDyn(false), line);
             Ok(())
@@ -749,20 +745,27 @@ impl Compiler {
             let stmt = main_stmts[i];
             if i == last_idx {
                 match &stmt.kind {
-                    StmtKind::Expression(expr) => self.compile_expr(expr)?,
+                    StmtKind::Expression(expr) => {
+                        // Last statement of program: still not a regex *value* — bare `/pat/` matches `$_`.
+                        if matches!(&expr.kind, ExprKind::Regex(..)) {
+                            self.compile_boolean_rvalue_condition(expr)?;
+                        } else {
+                            self.compile_expr(expr)?;
+                        }
+                    }
                     StmtKind::If {
                         condition,
                         body,
                         elsifs,
                         else_block,
                     } => {
-                        self.compile_expr(condition)?;
+                        self.compile_boolean_rvalue_condition(condition)?;
                         let j0 = self.chunk.emit(Op::JumpIfFalse(0), stmt.line);
                         self.emit_block_value(body, stmt.line)?;
                         let mut ends = vec![self.chunk.emit(Op::Jump(0), stmt.line)];
                         self.chunk.patch_jump_here(j0);
                         for (c, blk) in elsifs {
-                            self.compile_expr(c)?;
+                            self.compile_boolean_rvalue_condition(c)?;
                             let j = self.chunk.emit(Op::JumpIfFalse(0), c.line);
                             self.emit_block_value(blk, c.line)?;
                             ends.push(self.chunk.emit(Op::Jump(0), c.line));
@@ -782,7 +785,7 @@ impl Compiler {
                         body,
                         else_block,
                     } => {
-                        self.compile_expr(condition)?;
+                        self.compile_boolean_rvalue_condition(condition)?;
                         let j0 = self.chunk.emit(Op::JumpIfFalse(0), stmt.line);
                         if let Some(eb) = else_block {
                             self.emit_block_value(eb, stmt.line)?;
@@ -1230,14 +1233,14 @@ impl Compiler {
                 elsifs,
                 else_block,
             } => {
-                self.compile_expr(condition)?;
+                self.compile_boolean_rvalue_condition(condition)?;
                 let jump_else = self.chunk.emit(Op::JumpIfFalse(0), line);
                 self.compile_block(body)?;
                 let mut end_jumps = vec![self.chunk.emit(Op::Jump(0), line)];
                 self.chunk.patch_jump_here(jump_else);
 
                 for (cond, blk) in elsifs {
-                    self.compile_expr(cond)?;
+                    self.compile_boolean_rvalue_condition(cond)?;
                     let j = self.chunk.emit(Op::JumpIfFalse(0), cond.line);
                     self.compile_block(blk)?;
                     end_jumps.push(self.chunk.emit(Op::Jump(0), cond.line));
@@ -1256,7 +1259,7 @@ impl Compiler {
                 body,
                 else_block,
             } => {
-                self.compile_expr(condition)?;
+                self.compile_boolean_rvalue_condition(condition)?;
                 let jump_else = self.chunk.emit(Op::JumpIfTrue(0), line);
                 self.compile_block(body)?;
                 if let Some(eb) = else_block {
@@ -1275,7 +1278,7 @@ impl Compiler {
                 continue_block: _,
             } => {
                 let loop_start = self.chunk.len();
-                self.compile_expr(condition)?;
+                self.compile_boolean_rvalue_condition(condition)?;
                 let exit_jump = self.chunk.emit(Op::JumpIfFalse(0), line);
 
                 let mut ctx = LoopCtx {
@@ -1298,7 +1301,7 @@ impl Compiler {
                 continue_block: _,
             } => {
                 let loop_start = self.chunk.len();
-                self.compile_expr(condition)?;
+                self.compile_boolean_rvalue_condition(condition)?;
                 let exit_jump = self.chunk.emit(Op::JumpIfTrue(0), line);
 
                 let mut ctx = LoopCtx {
@@ -1328,7 +1331,7 @@ impl Compiler {
                 }
                 let loop_start = self.chunk.len();
                 if let Some(cond) = condition {
-                    self.compile_expr(cond)?;
+                    self.compile_boolean_rvalue_condition(cond)?;
                     let exit = self.chunk.emit(Op::JumpIfFalse(0), line);
 
                     let mut ctx = LoopCtx {
@@ -1427,7 +1430,7 @@ impl Compiler {
                     continue_target: loop_start,
                 };
                 self.compile_block_with_loop(body, &mut ctx)?;
-                self.compile_expr(condition)?;
+                self.compile_boolean_rvalue_condition(condition)?;
                 let exit_jump = self.chunk.emit(Op::JumpIfFalse(0), line);
                 self.chunk.emit(Op::Jump(loop_start), line);
                 self.chunk.patch_jump_here(exit_jump);
@@ -1726,13 +1729,13 @@ impl Compiler {
                 for stmt in &body[..last_idx] {
                     self.compile_statement(stmt)?;
                 }
-                self.compile_expr(condition)?;
+                self.compile_boolean_rvalue_condition(condition)?;
                 let j0 = self.chunk.emit(Op::JumpIfFalse(0), last.line);
                 self.emit_block_value(if_body, last.line)?;
                 let mut ends = vec![self.chunk.emit(Op::Jump(0), last.line)];
                 self.chunk.patch_jump_here(j0);
                 for (c, blk) in elsifs {
-                    self.compile_expr(c)?;
+                    self.compile_boolean_rvalue_condition(c)?;
                     let j = self.chunk.emit(Op::JumpIfFalse(0), c.line);
                     self.emit_block_value(blk, c.line)?;
                     ends.push(self.chunk.emit(Op::Jump(0), c.line));
@@ -1756,7 +1759,7 @@ impl Compiler {
                 for stmt in &body[..last_idx] {
                     self.compile_statement(stmt)?;
                 }
-                self.compile_expr(condition)?;
+                self.compile_boolean_rvalue_condition(condition)?;
                 let j0 = self.chunk.emit(Op::JumpIfFalse(0), last.line);
                 if let Some(eb) = else_block {
                     self.emit_block_value(eb, last.line)?;
@@ -1900,18 +1903,34 @@ impl Compiler {
                 // Short-circuit operators
                 match op {
                     BinOp::LogAnd | BinOp::LogAndWord => {
-                        self.compile_expr(left)?;
+                        if matches!(left.kind, ExprKind::Regex(..)) {
+                            self.compile_boolean_rvalue_condition(left)?;
+                        } else {
+                            self.compile_expr(left)?;
+                        }
                         let j = self.chunk.emit(Op::JumpIfFalseKeep(0), line);
                         self.chunk.emit(Op::Pop, line);
-                        self.compile_expr(right)?;
+                        if matches!(right.kind, ExprKind::Regex(..)) {
+                            self.compile_boolean_rvalue_condition(right)?;
+                        } else {
+                            self.compile_expr(right)?;
+                        }
                         self.chunk.patch_jump_here(j);
                         return Ok(());
                     }
                     BinOp::LogOr | BinOp::LogOrWord => {
-                        self.compile_expr(left)?;
+                        if matches!(left.kind, ExprKind::Regex(..)) {
+                            self.compile_boolean_rvalue_condition(left)?;
+                        } else {
+                            self.compile_expr(left)?;
+                        }
                         let j = self.chunk.emit(Op::JumpIfTrueKeep(0), line);
                         self.chunk.emit(Op::Pop, line);
-                        self.compile_expr(right)?;
+                        if matches!(right.kind, ExprKind::Regex(..)) {
+                            self.compile_boolean_rvalue_condition(right)?;
+                        } else {
+                            self.compile_expr(right)?;
+                        }
                         self.chunk.patch_jump_here(j);
                         return Ok(());
                     }
@@ -2002,21 +2021,25 @@ impl Compiler {
                     self.compile_expr(expr)?;
                     self.chunk.emit(Op::MakeScalarRef, line);
                 }
-                _ => {
-                    self.compile_expr(expr)?;
-                    match op {
-                        UnaryOp::Negate => {
-                            self.chunk.emit(Op::Negate, line);
+                _ => match op {
+                    UnaryOp::LogNot | UnaryOp::LogNotWord => {
+                        if matches!(expr.kind, ExprKind::Regex(..)) {
+                            self.compile_boolean_rvalue_condition(expr)?;
+                        } else {
+                            self.compile_expr(expr)?;
                         }
-                        UnaryOp::LogNot | UnaryOp::LogNotWord => {
-                            self.chunk.emit(Op::LogNot, line);
-                        }
-                        UnaryOp::BitNot => {
-                            self.chunk.emit(Op::BitNot, line);
-                        }
-                        _ => unreachable!(),
+                        self.chunk.emit(Op::LogNot, line);
                     }
-                }
+                    UnaryOp::Negate => {
+                        self.compile_expr(expr)?;
+                        self.chunk.emit(Op::Negate, line);
+                    }
+                    UnaryOp::BitNot => {
+                        self.compile_expr(expr)?;
+                        self.chunk.emit(Op::BitNot, line);
+                    }
+                    _ => unreachable!(),
+                },
             },
             ExprKind::PostfixOp { expr, op } => {
                 if let ExprKind::ScalarVar(name) = &expr.kind {
@@ -2094,7 +2117,7 @@ impl Compiler {
                 then_expr,
                 else_expr,
             } => {
-                self.compile_expr(condition)?;
+                self.compile_boolean_rvalue_condition(condition)?;
                 let jump_else = self.chunk.emit(Op::JumpIfFalse(0), line);
                 self.compile_expr(then_expr)?;
                 let jump_end = self.chunk.emit(Op::Jump(0), line);
@@ -2296,10 +2319,9 @@ impl Compiler {
                     }
                     self.chunk.emit(Op::ArrayLen(idx), line);
                 } else {
-                    let pool = self.chunk.add_push_expr_entry(
-                        array.as_ref().clone(),
-                        values.clone(),
-                    );
+                    let pool = self
+                        .chunk
+                        .add_push_expr_entry(array.as_ref().clone(), values.clone());
                     self.chunk.emit(Op::PushExpr(pool), line);
                 }
             }
@@ -2333,10 +2355,9 @@ impl Compiler {
                     self.chunk
                         .emit(Op::CallBuiltin(BuiltinId::Unshift as u16, nargs), line);
                 } else {
-                    let pool = self.chunk.add_unshift_expr_entry(
-                        array.as_ref().clone(),
-                        values.clone(),
-                    );
+                    let pool = self
+                        .chunk
+                        .add_unshift_expr_entry(array.as_ref().clone(), values.clone());
                     self.chunk.emit(Op::UnshiftExpr(pool), line);
                 }
             }
@@ -3056,7 +3077,7 @@ impl Compiler {
 
             // ── Postfix if/unless ──
             ExprKind::PostfixIf { expr, condition } => {
-                self.compile_postfix_boolean_condition(condition)?;
+                self.compile_boolean_rvalue_condition(condition)?;
                 let j = self.chunk.emit(Op::JumpIfFalse(0), line);
                 self.compile_expr(expr)?;
                 let end = self.chunk.emit(Op::Jump(0), line);
@@ -3065,7 +3086,7 @@ impl Compiler {
                 self.chunk.patch_jump_here(end);
             }
             ExprKind::PostfixUnless { expr, condition } => {
-                self.compile_postfix_boolean_condition(condition)?;
+                self.compile_boolean_rvalue_condition(condition)?;
                 let j = self.chunk.emit(Op::JumpIfTrue(0), line);
                 self.compile_expr(expr)?;
                 let end = self.chunk.emit(Op::Jump(0), line);
@@ -3086,13 +3107,13 @@ impl Compiler {
                     let loop_start = self.chunk.len();
                     self.compile_expr(expr)?;
                     self.chunk.emit(Op::Pop, line);
-                    self.compile_postfix_boolean_condition(condition)?;
+                    self.compile_boolean_rvalue_condition(condition)?;
                     self.chunk.emit(Op::JumpIfTrue(loop_start), line);
                     self.chunk.emit(Op::LoadUndef, line);
                 } else {
                     // Regular postfix while: condition checked first
                     let loop_start = self.chunk.len();
-                    self.compile_postfix_boolean_condition(condition)?;
+                    self.compile_boolean_rvalue_condition(condition)?;
                     let exit_jump = self.chunk.emit(Op::JumpIfFalse(0), line);
                     self.compile_expr(expr)?;
                     self.chunk.emit(Op::Pop, line);
@@ -3110,12 +3131,12 @@ impl Compiler {
                     let loop_start = self.chunk.len();
                     self.compile_expr(expr)?;
                     self.chunk.emit(Op::Pop, line);
-                    self.compile_postfix_boolean_condition(condition)?;
+                    self.compile_boolean_rvalue_condition(condition)?;
                     self.chunk.emit(Op::JumpIfFalse(loop_start), line);
                     self.chunk.emit(Op::LoadUndef, line);
                 } else {
                     let loop_start = self.chunk.len();
-                    self.compile_postfix_boolean_condition(condition)?;
+                    self.compile_boolean_rvalue_condition(condition)?;
                     let exit_jump = self.chunk.emit(Op::JumpIfTrue(0), line);
                     self.compile_expr(expr)?;
                     self.chunk.emit(Op::Pop, line);
@@ -3220,13 +3241,14 @@ impl Compiler {
 
             // ── Regex literal ──
             ExprKind::Regex(pattern, flags) => {
-                let pat_idx = self
-                    .chunk
-                    .add_constant(PerlValue::string(pattern.clone()));
-                let flags_idx = self
-                    .chunk
-                    .add_constant(PerlValue::string(flags.clone()));
-                self.chunk.emit(Op::LoadRegex(pat_idx, flags_idx), line);
+                if ctx == WantarrayCtx::Void {
+                    // Statement context: bare `/pat/;` is `$_ =~ /pat/` (Perl), not a discarded regex object.
+                    self.compile_boolean_rvalue_condition(expr)?;
+                } else {
+                    let pat_idx = self.chunk.add_constant(PerlValue::string(pattern.clone()));
+                    let flags_idx = self.chunk.add_constant(PerlValue::string(flags.clone()));
+                    self.chunk.emit(Op::LoadRegex(pat_idx, flags_idx), line);
+                }
             }
 
             // ── Map/Grep/Sort with blocks ──
@@ -3434,7 +3456,8 @@ impl Compiler {
                 self.compile_expr(list)?;
                 let map_idx = self.chunk.add_block(map_block.clone());
                 let reduce_idx = self.chunk.add_block(reduce_block.clone());
-                self.chunk.emit(Op::PMapReduceWithBlocks(map_idx, reduce_idx), line);
+                self.chunk
+                    .emit(Op::PMapReduceWithBlocks(map_idx, reduce_idx), line);
             }
             ExprKind::PcacheExpr {
                 block,
@@ -3453,7 +3476,9 @@ impl Compiler {
             ExprKind::PselectExpr { receivers, timeout } => {
                 let n = receivers.len();
                 if n > u8::MAX as usize {
-                    return Err(CompileError::Unsupported("pselect: too many receivers".into()));
+                    return Err(CompileError::Unsupported(
+                        "pselect: too many receivers".into(),
+                    ));
                 }
                 for r in receivers {
                     self.compile_expr(r)?;
@@ -3544,6 +3569,15 @@ impl Compiler {
                     self.chunk
                         .emit(Op::CallBuiltin(BuiltinId::Pchannel as u16, 0), line);
                 }
+            }
+            ExprKind::RetryBlock { .. }
+            | ExprKind::RateLimitBlock { .. }
+            | ExprKind::EveryBlock { .. }
+            | ExprKind::GenBlock { .. }
+            | ExprKind::Yield(_) => {
+                return Err(CompileError::Unsupported(
+                    "retry/rate_limit/every/gen/yield (tree interpreter only)".into(),
+                ));
             }
         }
         Ok(())

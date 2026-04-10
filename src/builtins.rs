@@ -31,6 +31,7 @@ pub(crate) fn try_builtin(
     args: &[PerlValue],
     line: usize,
 ) -> Option<PerlResult<PerlValue>> {
+    let undef = PerlValue::UNDEF;
     match name {
         "prototype" => Some(builtin_prototype(args)),
         "binmode" => Some(interp.builtin_binmode(args, line)),
@@ -72,6 +73,47 @@ pub(crate) fn try_builtin(
         "fetch_json" => Some(builtin_fetch_json(args)),
         "json_encode" => Some(builtin_json_encode(args)),
         "json_decode" => Some(builtin_json_decode(args)),
+        "sha256" => Some(crate::native_codec::sha256(args.first().unwrap_or(&undef))),
+        "hmac_sha256" | "hmac" => Some({
+            let key = args.first().unwrap_or(&undef);
+            let msg = args.get(1).unwrap_or(&undef);
+            crate::native_codec::hmac_sha256(key, msg)
+        }),
+        "uuid" => Some(crate::native_codec::uuid_v4()),
+        "base64_encode" => Some(crate::native_codec::base64_encode(
+            args.first().unwrap_or(&undef),
+        )),
+        "base64_decode" => Some(crate::native_codec::base64_decode(
+            args.first().unwrap_or(&undef),
+        )),
+        "hex_encode" => Some(crate::native_codec::hex_encode(
+            args.first().unwrap_or(&undef),
+        )),
+        "hex_decode" => Some(crate::native_codec::hex_decode(
+            args.first().unwrap_or(&undef),
+        )),
+        "gzip" => Some(crate::native_codec::gzip(args.first().unwrap_or(&undef))),
+        "gunzip" => Some(crate::native_codec::gunzip(args.first().unwrap_or(&undef))),
+        "zstd" => Some(crate::native_codec::zstd_compress(
+            args.first().unwrap_or(&undef),
+        )),
+        "zstd_decode" => Some(crate::native_codec::zstd_decode(
+            args.first().unwrap_or(&undef),
+        )),
+        "datetime_utc" => Some(crate::native_codec::datetime_utc()),
+        "datetime_from_epoch" => Some(crate::native_codec::datetime_from_epoch(
+            args.first().unwrap_or(&undef),
+        )),
+        "datetime_parse_rfc3339" => Some(crate::native_codec::datetime_parse_rfc3339(
+            args.first().unwrap_or(&undef),
+        )),
+        "datetime_strftime" => Some({
+            let a = args.first().unwrap_or(&undef);
+            let b = args.get(1).unwrap_or(&undef);
+            crate::native_codec::datetime_strftime(a, b)
+        }),
+        "toml_decode" => Some(builtin_toml_decode(args)),
+        "yaml_decode" => Some(builtin_yaml_decode(args)),
         // `async_fetch` would tokenize as keyword `async` — use `fetch_async` / `fetch_async_json`.
         "fetch_async" => Some(builtin_fetch_async(args)),
         "fetch_async_json" => Some(builtin_fetch_async_json(args)),
@@ -171,6 +213,16 @@ fn builtin_json_encode(args: &[PerlValue]) -> PerlResult<PerlValue> {
 fn builtin_json_decode(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     crate::native_data::json_decode(&s)
+}
+
+fn builtin_toml_decode(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    crate::native_codec::toml_decode(&s)
+}
+
+fn builtin_yaml_decode(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    crate::native_codec::yaml_decode(&s)
 }
 
 fn builtin_fetch_async(args: &[PerlValue]) -> PerlResult<PerlValue> {

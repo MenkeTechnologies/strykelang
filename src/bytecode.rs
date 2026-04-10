@@ -280,7 +280,10 @@ pub enum Op {
     /// `pcache { BLOCK } @list` — block_idx; stack: \[progress_flag, list\] → \[array\]
     PcacheWithBlock(u16),
     /// `pselect($rx1, ... [, timeout => SECS])` — stack: \[rx0, …, rx_{n-1}\] with optional timeout on top
-    Pselect { n_rx: u8, has_timeout: bool },
+    Pselect {
+        n_rx: u8,
+        has_timeout: bool,
+    },
     /// `par_lines PATH, sub { } [, progress => EXPR]` — index into [`Chunk::par_lines_entries`]; stack: \[\] → `undef`
     ParLines(u16),
     /// `par_walk PATH, sub { } [, progress => EXPR]` — index into [`Chunk::par_walk_entries`]; stack: \[\] → `undef`
@@ -853,7 +856,11 @@ impl Chunk {
         let mut out = String::new();
         let _ = writeln!(out, "; sub_entries:");
         for (ni, ip, stack_args) in &self.sub_entries {
-            let name = self.names.get(*ni as usize).map(|s| s.as_str()).unwrap_or("?");
+            let name = self
+                .names
+                .get(*ni as usize)
+                .map(|s| s.as_str())
+                .unwrap_or("?");
             let _ = writeln!(out, ";   {} @ {} stack_args={}", name, ip, stack_args);
         }
         for (i, op) in self.ops.iter().enumerate() {
@@ -1032,10 +1039,7 @@ mod tests {
 
     #[test]
     fn builtin_id_from_u16_out_of_range() {
-        assert_eq!(
-            BuiltinId::from_u16(BuiltinId::Each as u16 + 1),
-            None
-        );
+        assert_eq!(BuiltinId::from_u16(BuiltinId::Each as u16 + 1), None);
         assert_eq!(BuiltinId::from_u16(u16::MAX), None);
     }
 

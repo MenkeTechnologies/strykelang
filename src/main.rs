@@ -219,9 +219,7 @@ fn print_cyberpunk_help() {
     println!("  -e CODE                {G}//{N} One line of program (several -e's allowed)");
     println!("  -E CODE                {G}//{N} Like -e, but enables all optional features");
     println!("  -c                     {G}//{N} Check syntax only (parse; no compile/run)");
-    println!(
-        "  --lint / --check       {G}//{N} Parse + compile bytecode without running"
-    );
+    println!("  --lint / --check       {G}//{N} Parse + compile bytecode without running");
     println!(
         "  --disasm / --disassemble {G}//{N} Print bytecode disassembly to stderr before VM run"
     );
@@ -295,9 +293,7 @@ fn print_cyberpunk_help() {
     println!(
         "  async {{BLOCK}}           {G}//{N} Run block on a worker thread; returns a task handle"
     );
-    println!(
-        "  spawn {{BLOCK}}           {G}//{N} Same as async (Rust-style); join with await"
-    );
+    println!("  spawn {{BLOCK}}           {G}//{N} Same as async (Rust-style); join with await");
     println!("  await EXPR                {G}//{N} Join async task or pass through non-task value");
     println!(
         "  pgrep {{BLOCK}} @list [, progress => EXPR] {G}//{N} Parallel grep across all cores"

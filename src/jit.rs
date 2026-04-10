@@ -4641,9 +4641,9 @@ mod tests {
     fn block_jit_for_loop_sum() {
         // for (my $i=0; $i<5; $i++) { $sum += $i }  → 0+1+2+3+4 = 10
         let ops = vec![
-            Op::LoadInt(0),           // 0: push 0
+            Op::LoadInt(0),                     // 0: push 0
             Op::DeclareScalarSlot(0, u16::MAX), // 1: $i = 0
-            Op::LoadInt(0),           // 2: push 0
+            Op::LoadInt(0),                     // 2: push 0
             Op::DeclareScalarSlot(1, u16::MAX), // 3: $sum = 0
             // loop head
             Op::GetScalarSlot(0), // 4: push $i
@@ -4757,16 +4757,16 @@ mod tests {
     fn block_jit_nested_loop() {
         // Nested: outer 0..3, inner 0..2: count = 3 * 2 = 6
         let ops = vec![
-            Op::LoadInt(0),           // 0
+            Op::LoadInt(0),                     // 0
             Op::DeclareScalarSlot(0, u16::MAX), // 1: $i = 0
-            Op::LoadInt(0),           // 2
+            Op::LoadInt(0),                     // 2
             Op::DeclareScalarSlot(1, u16::MAX), // 3: $count = 0
             // outer head
-            Op::GetScalarSlot(0),     // 4
-            Op::LoadInt(3),           // 5
-            Op::NumLt,                // 6: $i < 3
-            Op::JumpIfFalse(22),      // 7 → outer exit
-            Op::LoadInt(0),           // 8
+            Op::GetScalarSlot(0),               // 4
+            Op::LoadInt(3),                     // 5
+            Op::NumLt,                          // 6: $i < 3
+            Op::JumpIfFalse(22),                // 7 → outer exit
+            Op::LoadInt(0),                     // 8
             Op::DeclareScalarSlot(2, u16::MAX), // 9: $j = 0
             // inner head
             Op::GetScalarSlot(2), // 10
@@ -4813,7 +4813,7 @@ mod tests {
         c.emit(Op::DeclareScalarSlot(0, u16::MAX), 1); // $i
         c.emit(Op::LoadInt(0), 1);
         c.emit(Op::DeclareScalarSlot(1, u16::MAX), 1); // $sum
-                                             // loop head = ip 4
+                                                       // loop head = ip 4
         c.emit(Op::GetScalarSlot(0), 1);
         c.emit(Op::LoadInt(10), 1);
         c.emit(Op::NumLt, 1);

@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Barrier, OnceLock};
+use std::time::{Duration, Instant};
 
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
@@ -29,8 +30,8 @@ use crate::profiler::Profiler;
 use crate::scope::Scope;
 use crate::sort_fast::{detect_sort_block_fast, sort_magic_cmp};
 use crate::value::{
-    CaptureResult, PerlAsyncTask, PerlBarrier, PerlDataFrame, PerlHeap, PerlPpool, PerlSub,
-    PerlValue, PipelineInner, PipelineOp,
+    CaptureResult, PerlAsyncTask, PerlBarrier, PerlDataFrame, PerlGenerator, PerlHeap, PerlPpool,
+    PerlSub, PerlValue, PipelineInner, PipelineOp,
 };
 
 /// Merge two counting-hash accumulators (parallel `preduce_init` partials).
@@ -141,6 +142,7 @@ pub(crate) enum Flow {
     Last(Option<String>),
     Next(Option<String>),
     Redo(Option<String>),
+    Yield(PerlValue),
 }
 
 pub(crate) type ExecResult = Result<PerlValue, FlowOrError>;
@@ -403,6 +405,10 @@ pub struct Interpreter {
     pub vm_jit_enabled: bool,
     /// When true, [`crate::try_vm_execute`] prints bytecode disassembly to stderr before running the VM.
     pub disasm_bytecode: bool,
+    /// Set while stepping a `gen { }` body (`yield`).
+    pub(crate) in_generator: bool,
+    /// Sliding-window timestamps for `rate_limit(...)` (indexed by parse-time slot).
+    pub(crate) rate_limit_slots: Vec<VecDeque<Instant>>,
 }
 
 /// Snapshot of stash + `@ISA` for REPL `$obj->method` tab-completion (no `Interpreter` handle needed).
@@ -777,6 +783,8 @@ impl Interpreter {
                         || v.eq_ignore_ascii_case("yes")
             ),
             disasm_bytecode: false,
+            in_generator: false,
+            rate_limit_slots: Vec::new(),
         }
     }
 
@@ -876,6 +884,8 @@ impl Interpreter {
             english_lexical_scalars: self.english_lexical_scalars.clone(),
             vm_jit_enabled: self.vm_jit_enabled,
             disasm_bytecode: self.disasm_bytecode,
+            in_generator: false,
+            rate_limit_slots: Vec::new(),
         }
     }
 
@@ -1008,7 +1018,12 @@ impl Interpreter {
     }
 
     /// `*lhs = *rhs` — copy subroutine, scalar, array, hash, and IO-handle alias slots (Perl-style).
-    pub(crate) fn copy_typeglob_slots(&mut self, lhs: &str, rhs: &str, line: usize) -> PerlResult<()> {
+    pub(crate) fn copy_typeglob_slots(
+        &mut self,
+        lhs: &str,
+        rhs: &str,
+        line: usize,
+    ) -> PerlResult<()> {
         let lhs_sub = self.qualify_typeglob_sub_key(lhs);
         let rhs_sub = self.qualify_typeglob_sub_key(rhs);
         match self.subs.get(&rhs_sub).cloned() {
@@ -2680,7 +2695,9 @@ impl Interpreter {
         for block in ucs.iter().rev() {
             self.exec_block(block).map_err(|e| match e {
                 FlowOrError::Error(e) => e,
-                FlowOrError::Flow(_) => PerlError::runtime("Unexpected flow control in UNITCHECK", 0),
+                FlowOrError::Flow(_) => {
+                    PerlError::runtime("Unexpected flow control in UNITCHECK", 0)
+                }
             })?;
         }
 
@@ -2834,6 +2851,9 @@ impl Interpreter {
             let r = match interp.exec_block(&block) {
                 Ok(v) => Ok(v),
                 Err(FlowOrError::Error(e)) => Err(e),
+                Err(FlowOrError::Flow(Flow::Yield(_))) => {
+                    Err(PerlError::runtime("yield inside async/spawn block", 0))
+                }
                 Err(FlowOrError::Flow(_)) => Ok(PerlValue::UNDEF),
             };
             *result2.lock() = Some(r);
@@ -2884,6 +2904,9 @@ impl Interpreter {
             let out: PerlResult<PerlValue> = match interp.exec_block(&block) {
                 Ok(v) => Ok(v),
                 Err(FlowOrError::Error(e)) => Err(e),
+                Err(FlowOrError::Flow(Flow::Yield(_))) => {
+                    Err(PerlError::runtime("yield inside eval_timeout block", 0))
+                }
                 Err(FlowOrError::Flow(_)) => Ok(PerlValue::UNDEF),
             };
             let _ = tx.send(out);
@@ -2965,21 +2988,26 @@ impl Interpreter {
         topic.to_string() == c.to_string()
     }
 
-    /// Boolean condition for postfix `if` / `unless` / `while` / `until`: bare `/.../` is `$_ =~ /.../`
-    /// (Perl), not “is the regex object truthy”.
-    fn eval_postfix_condition(&mut self, cond: &Expr) -> Result<bool, FlowOrError> {
+    /// Boolean rvalue: bare `/.../` is `$_ =~ /.../` (Perl). Does not assign `$_`; sets `$1`… like `=~`.
+    fn eval_boolean_rvalue_condition(&mut self, cond: &Expr) -> Result<bool, FlowOrError> {
         match &cond.kind {
             ExprKind::Regex(pattern, flags) => {
                 let topic = self.scope.get_scalar("_");
                 let line = cond.line;
-                let re = self.compile_regex(pattern, flags, line)?;
-                Ok(re.is_match(&topic.to_string()))
+                let s = topic.to_string();
+                let v = self.regex_match_execute(s, pattern, flags, false, "_", line)?;
+                Ok(v.is_true())
             }
             _ => {
                 let v = self.eval_expr(cond)?;
                 Ok(v.is_true())
             }
         }
+    }
+
+    /// Boolean condition for postfix `if` / `unless` / `while` / `until`.
+    fn eval_postfix_condition(&mut self, cond: &Expr) -> Result<bool, FlowOrError> {
+        self.eval_boolean_rvalue_condition(cond)
     }
 
     pub(crate) fn eval_algebraic_match(
@@ -2998,6 +3026,15 @@ impl Interpreter {
                     self.scope.declare_scalar("_", val.clone());
                     self.english_note_lexical_scalar("_");
                     self.apply_regex_captures(&s, 0, re.as_ref(), &caps, CaptureAllMode::Empty)?;
+                    let guard_ok = if let Some(g) = &arm.guard {
+                        self.eval_expr(g)?.is_true()
+                    } else {
+                        true
+                    };
+                    if !guard_ok {
+                        self.scope_pop_hook();
+                        continue;
+                    }
                     let out = self.eval_expr(&arm.body);
                     self.scope_pop_hook();
                     return out;
@@ -3012,6 +3049,15 @@ impl Interpreter {
                     self.scope.declare_scalar(&name, v);
                     self.english_note_lexical_scalar(&name);
                 }
+                let guard_ok = if let Some(g) = &arm.guard {
+                    self.eval_expr(g)?.is_true()
+                } else {
+                    true
+                };
+                if !guard_ok {
+                    self.scope_pop_hook();
+                    continue;
+                }
                 let out = self.eval_expr(&arm.body);
                 self.scope_pop_hook();
                 return out;
@@ -3022,6 +3068,181 @@ impl Interpreter {
             line,
         )
         .into())
+    }
+
+    fn parse_duration_seconds(pv: &PerlValue) -> Option<f64> {
+        let s = pv.to_string();
+        let s = s.trim();
+        if let Some(rest) = s.strip_suffix("ms") {
+            return rest.trim().parse::<f64>().ok().map(|x| x / 1000.0);
+        }
+        if let Some(rest) = s.strip_suffix('s') {
+            return rest.trim().parse::<f64>().ok();
+        }
+        if let Some(rest) = s.strip_suffix('m') {
+            return rest.trim().parse::<f64>().ok().map(|x| x * 60.0);
+        }
+        s.parse::<f64>().ok()
+    }
+
+    fn eval_retry_block(
+        &mut self,
+        body: &Block,
+        times: &Expr,
+        backoff: RetryBackoff,
+        _line: usize,
+    ) -> ExecResult {
+        let max = self.eval_expr(times)?.to_int().max(1) as usize;
+        let base_ms: u64 = 10;
+        let mut attempt = 0usize;
+        loop {
+            attempt += 1;
+            match self.exec_block(body) {
+                Ok(v) => return Ok(v),
+                Err(FlowOrError::Error(e)) => {
+                    if attempt >= max {
+                        return Err(FlowOrError::Error(e));
+                    }
+                    let delay_ms = match backoff {
+                        RetryBackoff::None => 0,
+                        RetryBackoff::Linear => base_ms.saturating_mul(attempt as u64),
+                        RetryBackoff::Exponential => {
+                            base_ms.saturating_mul(1u64 << (attempt as u32 - 1).min(30))
+                        }
+                    };
+                    if delay_ms > 0 {
+                        std::thread::sleep(Duration::from_millis(delay_ms));
+                    }
+                }
+                Err(e) => return Err(e),
+            }
+        }
+    }
+
+    fn eval_rate_limit_block(
+        &mut self,
+        slot: u32,
+        max: &Expr,
+        window: &Expr,
+        body: &Block,
+        _line: usize,
+    ) -> ExecResult {
+        let max_n = self.eval_expr(max)?.to_int().max(0) as usize;
+        let window_sec = Self::parse_duration_seconds(&self.eval_expr(window)?)
+            .filter(|s| *s > 0.0)
+            .unwrap_or(1.0);
+        let window_d = Duration::from_secs_f64(window_sec);
+        let slot = slot as usize;
+        while self.rate_limit_slots.len() <= slot {
+            self.rate_limit_slots.push(VecDeque::new());
+        }
+        {
+            let dq = &mut self.rate_limit_slots[slot];
+            loop {
+                let now = Instant::now();
+                while let Some(t0) = dq.front().copied() {
+                    if now.duration_since(t0) >= window_d {
+                        dq.pop_front();
+                    } else {
+                        break;
+                    }
+                }
+                if dq.len() < max_n || max_n == 0 {
+                    break;
+                }
+                let t0 = dq.front().copied().unwrap();
+                let wait = window_d.saturating_sub(now.duration_since(t0));
+                if wait.is_zero() {
+                    dq.pop_front();
+                    continue;
+                }
+                std::thread::sleep(wait);
+            }
+            dq.push_back(Instant::now());
+        }
+        self.exec_block(body)
+    }
+
+    fn eval_every_block(&mut self, interval: &Expr, body: &Block, _line: usize) -> ExecResult {
+        let sec = Self::parse_duration_seconds(&self.eval_expr(interval)?)
+            .filter(|s| *s > 0.0)
+            .unwrap_or(1.0);
+        loop {
+            match self.exec_block(body) {
+                Ok(_) => {}
+                Err(e) => return Err(e),
+            }
+            std::thread::sleep(Duration::from_secs_f64(sec));
+        }
+    }
+
+    /// `->next` on a `gen { }` value: two-element **array ref** `(value, more)`; `more` is 0 when done.
+    pub(crate) fn generator_next(&mut self, gen: &Arc<PerlGenerator>) -> PerlResult<PerlValue> {
+        let pair = |value: PerlValue, more: i64| {
+            PerlValue::array_ref(Arc::new(RwLock::new(vec![value, PerlValue::integer(more)])))
+        };
+        let mut exhausted = gen.exhausted.lock();
+        if *exhausted {
+            return Ok(pair(PerlValue::UNDEF, 0));
+        }
+        let mut pc = gen.pc.lock();
+        let mut scope_started = gen.scope_started.lock();
+        if *pc >= gen.block.len() {
+            if *scope_started {
+                self.scope_pop_hook();
+                *scope_started = false;
+            }
+            *exhausted = true;
+            return Ok(pair(PerlValue::UNDEF, 0));
+        }
+        if !*scope_started {
+            self.scope_push_hook();
+            *scope_started = true;
+        }
+        self.in_generator = true;
+        while *pc < gen.block.len() {
+            let stmt = &gen.block[*pc];
+            match self.exec_statement(stmt) {
+                Ok(_) => {
+                    *pc += 1;
+                }
+                Err(FlowOrError::Flow(Flow::Yield(v))) => {
+                    *pc += 1;
+                    self.in_generator = false;
+                    // Suspend: pop the generator frame before returning so outer `my $x = $g->next`
+                    // binds in the caller block, not inside a frame left across yield.
+                    if *scope_started {
+                        self.scope_pop_hook();
+                        *scope_started = false;
+                    }
+                    return Ok(pair(v, 1));
+                }
+                Err(e) => {
+                    self.in_generator = false;
+                    if *scope_started {
+                        self.scope_pop_hook();
+                        *scope_started = false;
+                    }
+                    return Err(match e {
+                        FlowOrError::Error(ee) => ee,
+                        FlowOrError::Flow(Flow::Yield(_)) => {
+                            unreachable!("yield handled above")
+                        }
+                        FlowOrError::Flow(flow) => PerlError::runtime(
+                            format!("unexpected control flow in generator: {:?}", flow),
+                            0,
+                        ),
+                    });
+                }
+            }
+        }
+        self.in_generator = false;
+        if *scope_started {
+            self.scope_pop_hook();
+            *scope_started = false;
+        }
+        *exhausted = true;
+        Ok(pair(PerlValue::UNDEF, 0))
     }
 
     fn match_pattern_try(
@@ -3185,13 +3406,11 @@ impl Interpreter {
                 elsifs,
                 else_block,
             } => {
-                let cond = self.eval_expr(condition)?;
-                if cond.is_true() {
+                if self.eval_boolean_rvalue_condition(condition)? {
                     return self.exec_block(body);
                 }
                 for (c, b) in elsifs {
-                    let cv = self.eval_expr(c)?;
-                    if cv.is_true() {
+                    if self.eval_boolean_rvalue_condition(c)? {
                         return self.exec_block(b);
                     }
                 }
@@ -3205,8 +3424,7 @@ impl Interpreter {
                 body,
                 else_block,
             } => {
-                let cond = self.eval_expr(condition)?;
-                if !cond.is_true() {
+                if !self.eval_boolean_rvalue_condition(condition)? {
                     return self.exec_block(body);
                 }
                 if let Some(eb) = else_block {
@@ -3221,8 +3439,7 @@ impl Interpreter {
                 continue_block,
             } => {
                 'outer: loop {
-                    let cond = self.eval_expr(condition)?;
-                    if !cond.is_true() {
+                    if !self.eval_boolean_rvalue_condition(condition)? {
                         break;
                     }
                     'inner: loop {
@@ -3262,8 +3479,7 @@ impl Interpreter {
                 continue_block,
             } => {
                 'outer: loop {
-                    let cond = self.eval_expr(condition)?;
-                    if cond.is_true() {
+                    if self.eval_boolean_rvalue_condition(condition)? {
                         break;
                     }
                     'inner: loop {
@@ -3299,8 +3515,7 @@ impl Interpreter {
             StmtKind::DoWhile { body, condition } => {
                 loop {
                     self.exec_block(body)?;
-                    let cond = self.eval_expr(condition)?;
-                    if !cond.is_true() {
+                    if !self.eval_boolean_rvalue_condition(condition)? {
                         break;
                     }
                 }
@@ -3320,8 +3535,7 @@ impl Interpreter {
                 }
                 'outer: loop {
                     if let Some(cond) = condition {
-                        let cv = self.eval_expr(cond)?;
-                        if !cv.is_true() {
+                        if !self.eval_boolean_rvalue_condition(cond)? {
                             break;
                         }
                     }
@@ -3915,8 +4129,15 @@ impl Interpreter {
             ExprKind::MagicConst(MagicConstKind::File) => Ok(PerlValue::string(self.file.clone())),
             ExprKind::MagicConst(MagicConstKind::Line) => Ok(PerlValue::integer(expr.line as i64)),
             ExprKind::Regex(pattern, flags) => {
-                let re = self.compile_regex(pattern, flags, line)?;
-                Ok(PerlValue::regex(re, pattern.clone()))
+                if ctx == WantarrayCtx::Void {
+                    // Expression statement: bare `/pat/;` is `$_ =~ /pat/` (Perl), not a regex object.
+                    let topic = self.scope.get_scalar("_");
+                    let s = topic.to_string();
+                    self.regex_match_execute(s, pattern, flags, false, "_", line)
+                } else {
+                    let re = self.compile_regex(pattern, flags, line)?;
+                    Ok(PerlValue::regex(re, pattern.clone(), flags.clone()))
+                }
             }
             ExprKind::QW(words) => Ok(PerlValue::array(
                 words.iter().map(|w| PerlValue::string(w.clone())).collect(),
@@ -4226,16 +4447,17 @@ impl Interpreter {
 
             // Binary operators
             ExprKind::BinOp { left, op, right } => {
-                let lv = self.eval_expr(left)?;
-                // Short-circuit for logical operators
+                // Short-circuit ops: bare `/.../` in boolean context is `$_ =~`, not a regex object.
                 match op {
                     BinOp::BindMatch => {
+                        let lv = self.eval_expr(left)?;
                         let rv = self.eval_expr(right)?;
                         let s = lv.to_string();
                         let pat = rv.to_string();
                         return self.regex_match_execute(s, &pat, "", false, "_", line);
                     }
                     BinOp::BindNotMatch => {
+                        let lv = self.eval_expr(left)?;
                         let rv = self.eval_expr(right)?;
                         let s = lv.to_string();
                         let pat = rv.to_string();
@@ -4243,18 +4465,57 @@ impl Interpreter {
                         return Ok(PerlValue::integer(if m.is_true() { 0 } else { 1 }));
                     }
                     BinOp::LogAnd | BinOp::LogAndWord => {
-                        if !lv.is_true() {
-                            return Ok(lv);
+                        match &left.kind {
+                            ExprKind::Regex(_, _) => {
+                                if !self.eval_boolean_rvalue_condition(left)? {
+                                    return Ok(PerlValue::string(String::new()));
+                                }
+                            }
+                            _ => {
+                                let lv = self.eval_expr(left)?;
+                                if !lv.is_true() {
+                                    return Ok(lv);
+                                }
+                            }
                         }
-                        return self.eval_expr(right);
+                        return match &right.kind {
+                            ExprKind::Regex(_, _) => Ok(PerlValue::integer(
+                                if self.eval_boolean_rvalue_condition(right)? {
+                                    1
+                                } else {
+                                    0
+                                },
+                            )),
+                            _ => self.eval_expr(right),
+                        };
                     }
                     BinOp::LogOr | BinOp::LogOrWord => {
-                        if lv.is_true() {
-                            return Ok(lv);
+                        match &left.kind {
+                            ExprKind::Regex(_, _) => {
+                                if self.eval_boolean_rvalue_condition(left)? {
+                                    return Ok(PerlValue::integer(1));
+                                }
+                            }
+                            _ => {
+                                let lv = self.eval_expr(left)?;
+                                if lv.is_true() {
+                                    return Ok(lv);
+                                }
+                            }
                         }
-                        return self.eval_expr(right);
+                        return match &right.kind {
+                            ExprKind::Regex(_, _) => Ok(PerlValue::integer(
+                                if self.eval_boolean_rvalue_condition(right)? {
+                                    1
+                                } else {
+                                    0
+                                },
+                            )),
+                            _ => self.eval_expr(right),
+                        };
                     }
                     BinOp::DefinedOr => {
+                        let lv = self.eval_expr(left)?;
                         if !lv.is_undef() {
                             return Ok(lv);
                         }
@@ -4262,6 +4523,7 @@ impl Interpreter {
                     }
                     _ => {}
                 }
+                let lv = self.eval_expr(left)?;
                 let rv = self.eval_expr(right)?;
                 if let Some(r) = self.try_overload_binop(*op, &lv, &rv, line) {
                     return r;
@@ -4298,6 +4560,19 @@ impl Interpreter {
                     Ok(new_val)
                 }
                 _ => {
+                    match op {
+                        UnaryOp::LogNot | UnaryOp::LogNotWord => {
+                            if let ExprKind::Regex(pattern, flags) = &expr.kind {
+                                let topic = self.scope.get_scalar("_");
+                                let rl = expr.line;
+                                let s = topic.to_string();
+                                let v =
+                                    self.regex_match_execute(s, pattern, flags, false, "_", rl)?;
+                                return Ok(PerlValue::integer(if v.is_true() { 0 } else { 1 }));
+                            }
+                        }
+                        _ => {}
+                    }
                     let val = self.eval_expr(expr)?;
                     match op {
                         UnaryOp::Negate => {
@@ -4431,8 +4706,7 @@ impl Interpreter {
                 then_expr,
                 else_expr,
             } => {
-                let cond = self.eval_expr(condition)?;
-                if cond.is_true() {
+                if self.eval_boolean_rvalue_condition(condition)? {
                     self.eval_expr(then_expr)
                 } else {
                     self.eval_expr(else_expr)
@@ -4717,12 +4991,9 @@ impl Interpreter {
                 path,
                 callback,
                 progress,
-            } => self.eval_par_walk_expr(
-                path.as_ref(),
-                callback.as_ref(),
-                progress.as_deref(),
-                line,
-            ),
+            } => {
+                self.eval_par_walk_expr(path.as_ref(), callback.as_ref(), progress.as_deref(), line)
+            }
             ExprKind::PwatchExpr { path, callback } => {
                 self.eval_pwatch_expr(path.as_ref(), callback.as_ref(), line)
             }
@@ -5028,6 +5299,34 @@ impl Interpreter {
                     return Err(FlowOrError::Error(e));
                 }
                 Ok(PerlValue::UNDEF)
+            }
+            ExprKind::RetryBlock {
+                body,
+                times,
+                backoff,
+            } => self.eval_retry_block(body, times, *backoff, line),
+            ExprKind::RateLimitBlock {
+                slot,
+                max,
+                window,
+                body,
+            } => self.eval_rate_limit_block(*slot, max, window, body, line),
+            ExprKind::EveryBlock { interval, body } => self.eval_every_block(interval, body, line),
+            ExprKind::GenBlock { body } => {
+                let g = Arc::new(PerlGenerator {
+                    block: body.clone(),
+                    pc: Mutex::new(0),
+                    scope_started: Mutex::new(false),
+                    exhausted: Mutex::new(false),
+                });
+                Ok(PerlValue::generator(g))
+            }
+            ExprKind::Yield(e) => {
+                if !self.in_generator {
+                    return Err(PerlError::runtime("yield outside gen block", line).into());
+                }
+                let v = self.eval_expr(e)?;
+                Err(FlowOrError::Flow(Flow::Yield(v)))
             }
             ExprKind::AlgebraicMatch { subject, arms } => {
                 self.eval_algebraic_match(subject, arms, line)
@@ -7549,6 +7848,18 @@ impl Interpreter {
         if let Some(b) = receiver.as_barrier() {
             return Some(self.barrier_method(b, method, args, line));
         }
+        if let Some(g) = receiver.as_generator() {
+            if method == "next" {
+                if !args.is_empty() {
+                    return Some(Err(PerlError::runtime(
+                        "generator->next takes no arguments",
+                        line,
+                    )));
+                }
+                return Some(self.generator_next(&g));
+            }
+            return None;
+        }
         if let Some(arc) = receiver.as_atomic_arc() {
             let inner = arc.lock().clone();
             if let Some(d) = inner.as_deque() {
@@ -9123,6 +9434,9 @@ impl Interpreter {
         match result {
             Ok(v) => Ok(v),
             Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
+            Err(FlowOrError::Flow(Flow::Yield(_))) => {
+                Err(PerlError::runtime("yield is only valid inside gen { }", 0).into())
+            }
             Err(e) => Err(e),
         }
     }
@@ -9561,10 +9875,7 @@ impl Interpreter {
         })?;
         let mmap = unsafe {
             memmap2::Mmap::map(&file).map_err(|e| {
-                FlowOrError::Error(PerlError::runtime(
-                    format!("par_lines: mmap: {}", e),
-                    line,
-                ))
+                FlowOrError::Error(PerlError::runtime(format!("par_lines: mmap: {}", e), line))
             })?
         };
         let data: &[u8] = &mmap;
@@ -9729,14 +10040,12 @@ impl Interpreter {
         let pmap = PmapProgress::new(show_progress, files.len());
         let touched = AtomicUsize::new(0);
         files.par_iter().try_for_each(|path| {
-            let content = std::fs::read_to_string(path).map_err(|e| {
-                PerlError::runtime(format!("par_sed {}: {}", path, e), line)
-            })?;
+            let content = std::fs::read_to_string(path)
+                .map_err(|e| PerlError::runtime(format!("par_sed {}: {}", path, e), line))?;
             let new_s = re.replace_all(&content, &repl);
             if new_s != content {
-                std::fs::write(path, new_s.as_bytes()).map_err(|e| {
-                    PerlError::runtime(format!("par_sed {}: {}", path, e), line)
-                })?;
+                std::fs::write(path, new_s.as_bytes())
+                    .map_err(|e| PerlError::runtime(format!("par_sed {}: {}", path, e), line))?;
                 touched.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             }
             pmap.tick();

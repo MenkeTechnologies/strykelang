@@ -131,10 +131,7 @@ fn parallel_block_rejects_captured_lexical_assignment() {
 
 #[test]
 fn parallel_block_allows_mysync_scalar_mutation() {
-    assert_eq!(
-        eval_int(r#"mysync $c = 0; pmap { $c++ } (1, 2, 3); $c"#),
-        3
-    );
+    assert_eq!(eval_int(r#"mysync $c = 0; pmap { $c++ } (1, 2, 3); $c"#), 3);
 }
 
 /// `mysync` compound assignment in `pmap` — full RMW under the atomic lock, no parallel-guard error.
@@ -176,7 +173,9 @@ fn parallel_mysync_array_push_in_pmap() {
 #[test]
 fn parallel_mysync_hash_buckets_in_pfor() {
     assert_eq!(
-        eval_int(r#"mysync %bucket; pfor { $bucket{$_ % 2} += 1 } (0..9); $bucket{0} + $bucket{1}"#),
+        eval_int(
+            r#"mysync %bucket; pfor { $bucket{$_ % 2} += 1 } (0..9); $bucket{0} + $bucket{1}"#
+        ),
         10
     );
 }
@@ -184,10 +183,7 @@ fn parallel_mysync_hash_buckets_in_pfor() {
 /// `pfor` with `mysync` mutation succeeds (same guard rules as `pmap`, but `pfor` propagates errors).
 #[test]
 fn parallel_pfor_mysync_increment_no_error() {
-    assert_eq!(
-        eval_int(r#"mysync $c = 0; pfor { $c++ } (1, 2, 3); $c"#),
-        3
-    );
+    assert_eq!(eval_int(r#"mysync $c = 0; pfor { $c++ } (1, 2, 3); $c"#), 3);
 }
 
 #[test]
@@ -239,9 +235,7 @@ fn par_walk_visits_files_and_dirs_with_mysync_count() {
     std::fs::write(dir.join("a/x.txt"), "1").unwrap();
     std::fs::write(dir.join("root.txt"), "2").unwrap();
     let path = dir.to_str().unwrap();
-    let code = format!(
-        r#"mysync $n = 0; par_walk "{path}", sub {{ $n++ }}; $n"#
-    );
+    let code = format!(r#"mysync $n = 0; par_walk "{path}", sub {{ $n++ }}; $n"#);
     // root dir, root.txt, subdir a, a/x.txt = 4 paths
     assert_eq!(eval_int(&code), 4);
     std::fs::remove_dir_all(&dir).ok();

@@ -76,8 +76,22 @@ impl PerlValue {
     }
 
     #[inline]
-    pub fn regex(rx: Arc<crate::perl_regex::PerlCompiledRegex>, src: String) -> Self {
-        Self::from_heap(Arc::new(HeapObject::Regex(rx, src)))
+    pub fn regex(
+        rx: Arc<crate::perl_regex::PerlCompiledRegex>,
+        pattern_src: String,
+        flags: String,
+    ) -> Self {
+        Self::from_heap(Arc::new(HeapObject::Regex(rx, pattern_src, flags)))
+    }
+
+    /// Pattern and flag string stored with a compiled regex (for `=~` / [`Op::RegexMatchDyn`]).
+    #[inline]
+    pub fn regex_src_and_flags(&self) -> Option<(String, String)> {
+        self.with_heap(|h| match h {
+            HeapObject::Regex(_, pat, fl) => Some((pat.clone(), fl.clone())),
+            _ => None,
+        })
+        .flatten()
     }
 
     #[inline]
@@ -377,7 +391,7 @@ impl PerlValue {
             HeapObject::HashRef(_) => "HASH".to_string(),
             HeapObject::ScalarRef(_) => "SCALAR".to_string(),
             HeapObject::CodeRef(_) => "CODE".to_string(),
-            HeapObject::Regex(_, _) => "Regexp".to_string(),
+            HeapObject::Regex(_, _, _) => "Regexp".to_string(),
             HeapObject::Blessed(b) => b.class.clone(),
             HeapObject::IOHandle(_) => "GLOB".to_string(),
             HeapObject::Atomic(_) => "ATOMIC".to_string(),
@@ -408,7 +422,7 @@ impl PerlValue {
             HeapObject::HashRef(_) => PerlValue::string("HASH".into()),
             HeapObject::ScalarRef(_) => PerlValue::string("SCALAR".into()),
             HeapObject::CodeRef(_) => PerlValue::string("CODE".into()),
-            HeapObject::Regex(_, _) => PerlValue::string("Regexp".into()),
+            HeapObject::Regex(_, _, _) => PerlValue::string("Regexp".into()),
             HeapObject::Atomic(_) => PerlValue::string("ATOMIC".into()),
             HeapObject::Set(_) => PerlValue::string("Set".into()),
             HeapObject::ChannelTx(_) => PerlValue::string("PCHANNEL::Tx".into()),
@@ -511,7 +525,7 @@ impl fmt::Display for PerlValue {
             HeapObject::HashRef(_) => f.write_str("HASH(0x...)"),
             HeapObject::ScalarRef(_) => f.write_str("SCALAR(0x...)"),
             HeapObject::CodeRef(sub) => write!(f, "CODE({})", sub.name),
-            HeapObject::Regex(_, src) => write!(f, "(?:{src})"),
+            HeapObject::Regex(_, src, _) => write!(f, "(?:{src})"),
             HeapObject::Blessed(b) => write!(f, "{}=HASH(0x...)", b.class),
             HeapObject::IOHandle(name) => f.write_str(name),
             HeapObject::Atomic(arc) => write!(f, "{}", arc.lock()),
@@ -609,7 +623,7 @@ pub fn set_member_key(v: &PerlValue) -> String {
         }
         HeapObject::ScalarRef(_) => format!("sr:{v}"),
         HeapObject::CodeRef(_) => format!("c:{v}"),
-        HeapObject::Regex(_, src) => format!("r:{src}"),
+        HeapObject::Regex(_, src, _) => format!("r:{src}"),
         HeapObject::IOHandle(s) => format!("io:{s}"),
         HeapObject::Atomic(arc) => format!("at:{}", set_member_key(&arc.lock())),
         HeapObject::ChannelTx(tx) => format!("chtx:{:p}", Arc::as_ptr(tx)),

@@ -102,6 +102,18 @@ fn string_interpolation_array_access() {
 }
 
 #[test]
+fn string_interpolation_regexp_captures() {
+    assert_eq!(
+        eval_string(r#"my $s = "a-b"; $s =~ /(.)-(.)/; "1=$1 2=$2""#),
+        "1=a 2=b"
+    );
+    assert_eq!(
+        eval_string(r#"my $s = "abcdefghij"; $s =~ /(.)(.)(.)(.)(.)(.)(.)(.)(.)(.)/; "$10""#),
+        "j"
+    );
+}
+
+#[test]
 fn split_join() {
     assert_eq!(eval_string(r#"join("-", split(",", "a,b,c"))"#), "a-b-c");
 }

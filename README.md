@@ -392,6 +392,8 @@ Each worker gets a **clone of the interpreter’s subs** and a **captured lexica
 
 **JSON encode/decode** — **`json_encode($value)`** turns a Perl value into a JSON string (scalars, array/hash refs, blessed objects serialize the underlying value; unsupported types are errors). **`json_decode($string)`** parses JSON into Perl values with the same mapping as **`fetch_json`**. Use these for APIs, config files, and round-tripping data without an HTTP round trip.
 
+**Crypto, compression, config, UTC time** — **`sha256($data)`** (lowercase hex digest); **`hmac` / `hmac_sha256($key, $msg)`** (HMAC-SHA256 hex); **`uuid()`** (random UUID v4); **`base64_encode` / `base64_decode`**, **`hex_encode` / `hex_decode`**. **`gzip` / `gunzip`** and **`zstd` / `zstd_decode`** compress and decompress using [`flate2`](https://crates.io/crates/flate2) and [`zstd`](https://crates.io/crates/zstd); compressed values are returned as **byte strings** so binary is preserved. **`datetime_utc`**, **`datetime_from_epoch`**, **`datetime_parse_rfc3339`**, **`datetime_strftime`** use [`chrono`](https://crates.io/crates/chrono) (epoch seconds as floats; strftime patterns follow chrono). **`toml_decode`** / **`yaml_decode`** parse TOML and YAML into hashrefs and arrays (same general mapping as JSON).
+
 **CSV** — [`csv`](https://crates.io/crates/csv) backed. `csv_read(path)` returns an array of **hashrefs** (first row is the header). `csv_write(path, row, …)` or `csv_write(path, \@rows)` writes rows (each row is a hash or hashref); header columns are the union of keys in first-seen order.
 
 **DataFrame** — `dataframe(path)` loads the same CSV shape into a **columnar** value (not an array of hashrefs). Methods: `->nrow` / `->nrows`, `->ncol` / `->ncols`; `->filter(sub { … })` runs the coderef with `$_` bound to each row as a hashref; `->group_by("col")` sets the grouping column for a following `->sum("amount")`, which returns a small two-column frame (group key, sum). Without `group_by`, `->sum("col")` returns a single numeric total. JSON encoding represents a frame as an array of row objects.
@@ -494,7 +496,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - `typed my $x : Int|Str|Float` (runtime-checked assignments)
 - `struct Name { field => Type, … }` with `Name->new(…)` and `$obj->field`
 - Native CSV (`csv_read` / `csv_write`), columnar `dataframe(path)` with `->filter` / `->group_by` / `->sum`, and SQLite (`sqlite` + `->exec` / `->query`)
-- `fetch` / `fetch_json` (HTTP GET via `ureq`; JSON → Perl values); `json_encode` / `json_decode` (standalone JSON string ↔ Perl values)
+- `fetch` / `fetch_json` (HTTP GET via `ureq`; JSON → Perl values); `json_encode` / `json_decode` (standalone JSON string ↔ Perl values); `sha256`, `hmac` / `hmac_sha256`, `uuid`, `base64_*`, `hex_*`, `gzip` / `gunzip`, `zstd` / `zstd_decode`, `datetime_*`, `toml_decode`, `yaml_decode`
 
 #### CONTROL FLOW
 - `if`/`elsif`/`else`, `unless`
@@ -505,7 +507,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - Ternary `?:`
 - **`try { } catch ($err) { }` [`finally { }`]** — statement form only (not an arbitrary expression, so not `my $x = try { … }`); catches `die` and other runtime errors (not `exit`, not `last`/`next`/`return` flow); the error string is bound to the scalar in `catch`. Optional **`finally`** runs after a successful `try` or after `catch` finishes (including if `catch` propagates an error); if `finally` fails, that error is returned (Perl-style).
 - **`given (EXPR) { when (COND) { } default { } }`** — topic is **`$_`**; `when` tests in order (regex `=~` for regex literals, string equality for string/number literals, otherwise string comparison to the evaluated condition); first match wins; put **`default` last** (tree-walker only)
-- **Algebraic `match (EXPR) { PATTERN => EXPR, … }`** (perlrs) — expression form with explicit subject; arms are tested in order. Patterns: **`_`** (wildcard); **`/regex/`** (stringified subject); **literal / parenthesized expression** (smart-match against the subject); **`[1, 2, *]`** (array or array-ref: prefix elements match, optional **`*`** tail); **`{ name => $n }`** (hash or hash-ref: required keys; **`$n`** binds the value for the arm body). Bindings are scoped to that arm only. No matching arm is a runtime error (use **`_`**). Tree interpreter only (bytecode falls back).
+- **Algebraic `match (EXPR) { PATTERN [if EXPR] => EXPR, … }`** (perlrs) — expression form with explicit subject; arms are tested in order. Each arm body runs with **`$_`** set to the subject (like `given`). Optional **`if EXPR`** guard runs after the pattern matches; **`$_`** is the subject in the guard. Patterns: **`_`** (wildcard); **`/regex/`** (stringified subject; on success match variables **`$1`…`$n`**, **`$&`**, **`${^MATCH}`**, **`@-`/`@+`**, **`%+`**, etc. are set for that arm like `=~`); **literal / parenthesized expression** (smart-match against the subject); **`[1, 2, *]`** (array or array-ref: prefix elements match, optional **`*`** tail); **`{ name => $n }`** (hash or hash-ref: required keys; **`$n`** binds the value for the arm body). Bindings are scoped to that arm only. No matching arm is a runtime error (use **`_`**). Tree interpreter only (bytecode falls back).
 - **`eval_timeout SECS { }`** — runs the block on a **worker OS thread**; the main thread waits up to **`SECS`** seconds via `recv_timeout` (no Unix `alarm`); on timeout you get a runtime error (the worker may keep running in the background—avoid relying on cancellation for correctness)
 
 #### OPERATORS
@@ -523,6 +525,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 #### REGEX ENGINE
 - **Three-tier compile:** patterns are compiled with the Rust [`regex`](https://docs.rs/regex) crate first (linear-time where possible). If that rejects the pattern (e.g. **backreferences** like `(.)\\1`), compilation falls back to [`fancy-regex`](https://docs.rs/fancy-regex). If both reject the pattern (e.g. PCRE-only verbs like `(*SKIP)`), compilation falls back to **PCRE2** via the [`pcre2`](https://docs.rs/pcre2) crate (`src/perl_regex.rs`).
 - Match: `$str =~ /pattern/flags`
+- Bare `/pattern/` in **statement** or **boolean** context is **`$_ =~ /pattern/`** (match variables and truthiness), not a regex object
 - Dynamic pattern (string): `$str =~ $pattern` and `$str !~ $pattern` (bytecode `RegexMatchDyn`; empty flags)
 - Substitution: `$str =~ s/pattern/replacement/flags`
 - Transliterate: `$str =~ tr/from/to/`
@@ -606,7 +609,11 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - **`try { } catch ($err) { } [finally { }]`** — bytecode VM (`Op::TryPush` / `CatchReceive` / …) and tree interpreter; `die` and most runtime errors unwind to `catch` (not `exit`, not control-flow exceptions).
 - **`given (EXPR) { when … default … }`** — bytecode VM (`Op::Given` + AST body; `when`/`default` still run via the interpreter inside that body) and tree interpreter.
 - **`eval_timeout SECS { … }`** — bytecode VM (`Op::EvalTimeout`) and tree interpreter (worker thread + `recv_timeout`).
-- **Algebraic `match (EXPR) { PATTERN => EXPR, … }`** — bytecode VM (`Op::AlgebraicMatch`) and tree interpreter.
+- **Algebraic `match (EXPR) { PATTERN => EXPR, … }`** (optional **`if EXPR`** guards) — bytecode VM (`Op::AlgebraicMatch`) and tree interpreter.
+- **`retry { BLOCK } times => N [, backoff => none|linear|exponential]`** — re-run **`BLOCK`** on runtime error until it succeeds or **`N`** attempts are used; optional sleeps between failures (tree interpreter only; VM falls back).
+- **`rate_limit(MAX, WINDOW) { BLOCK }`** — sliding window: at most **`MAX`** runs per **`WINDOW`** (string duration: **`"1s"`**, **`"500ms"`**, **`"2m"`**, or a plain number as seconds). Tree interpreter only.
+- **`every(INTERVAL) { BLOCK }`** — run **`BLOCK`** repeatedly with sleep **`INTERVAL`** between iterations (infinite loop). Tree interpreter only.
+- **`gen { … yield EXPR … }`** — lazy generator value; **`yield`** is only valid inside **`gen`**. Method **`->next`** returns a **two-element array reference** **`[value, more]`** where **`more`** is **`1`** while more values may follow and **`0`** when finished (Perl-ish). Tree interpreter only.
 
 #### OTHER FEATURES
 - `Interpreter::execute` returns `Err(ErrorKind::Exit(code))` for `exit` (including code 0); the `perlrs` binary maps that to `process::exit`.
@@ -615,7 +622,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - `package` declarations
 - **Typeglob assignment** — `*foo = \&bar` (subroutine alias) and `*foo = *bar` (copy stash slots: `&`, `$`, `@`, `%`, and IO-handle alias map); package-qualified `*Foo::x` supported. Implemented in the tree interpreter (`assign_value` / `copy_typeglob_slots`); bytecode compilation still falls back to the tree-walker for these assignments.
 - `BEGIN` / `UNITCHECK` / `CHECK` / `INIT` / `END` blocks (Perl order; see [`SPECIAL_VARIABLES.md`](SPECIAL_VARIABLES.md) for **`${^GLOBAL_PHASE}`** in VM vs tree-walker)
-- String interpolation with `$var`, `$hash{key}`, `$array[idx]`
+- String interpolation with `$var`, `$hash{key}`, `$array[idx]`, `$0`, and regexp captures `$1`…`$n` (multi-digit runs; `$01`… is a parse error like Perl)
 - **`__FILE__`** / **`__LINE__`** — compile-time literals (`__LINE__` is the token’s line, 1-based; `__FILE__` matches `Interpreter::file`, e.g. `-e` or the script path from the `pe` driver)
 - Heredocs (`<<EOF`)
 - `qw()`, `q()`, `qq()`

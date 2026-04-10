@@ -273,11 +273,25 @@ pub type Block = Vec<Statement>;
 
 // ── Algebraic `match` expression (perlrs extension) ──
 
-/// One arm of [`ExprKind::AlgebraicMatch`]: `PATTERN => EXPR`.
+/// One arm of [`ExprKind::AlgebraicMatch`]: `PATTERN [if EXPR] => EXPR`.
 #[derive(Debug, Clone, Serialize)]
 pub struct MatchArm {
     pub pattern: MatchPattern,
+    /// Optional guard (`if EXPR`) evaluated after pattern match; `$_` is the match subject.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guard: Option<Box<Expr>>,
     pub body: Expr,
+}
+
+/// `retry { } backoff => exponential` — sleep policy between attempts (after failure).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum RetryBackoff {
+    /// No delay between attempts.
+    None,
+    /// Delay grows linearly: `base_ms * attempt` (attempt starts at 1).
+    Linear,
+    /// Delay doubles each failure: `base_ms * 2^(attempt-1)` (capped).
+    Exponential,
 }
 
 /// Pattern for algebraic `match` (distinct from the `=~` / regex [`ExprKind::Match`]).
@@ -285,7 +299,8 @@ pub struct MatchArm {
 pub enum MatchPattern {
     /// `_` — matches anything.
     Any,
-    /// `/regex/` — subject stringified, tested with `Regex::is_match`.
+    /// `/regex/` — subject stringified; on success the arm body sets `$_` to the subject and
+    /// populates match variables (`$1`…, `$&`, `${^MATCH}`, `@-`/`@+`, `%+`, …) like `=~`.
     Regex { pattern: String, flags: String },
     /// Arbitrary expression compared for equality / smart-match against the subject.
     Value(Box<Expr>),
@@ -844,6 +859,32 @@ pub enum ExprKind {
         expr: Box<Expr>,
         list: Box<Expr>,
     },
+
+    /// `retry { BLOCK } times => N [, backoff => linear|exponential|none]` — re-run block until success or attempts exhausted.
+    RetryBlock {
+        body: Block,
+        times: Box<Expr>,
+        backoff: RetryBackoff,
+    },
+    /// `rate_limit(MAX, WINDOW) { BLOCK }` — sliding window: at most MAX runs per WINDOW (e.g. `"1s"`).
+    /// `slot` is assigned at parse time for per-site state in the interpreter.
+    RateLimitBlock {
+        slot: u32,
+        max: Box<Expr>,
+        window: Box<Expr>,
+        body: Block,
+    },
+    /// `every(INTERVAL) { BLOCK }` — repeat BLOCK forever with sleep (INTERVAL like `"5s"` or seconds).
+    EveryBlock {
+        interval: Box<Expr>,
+        body: Block,
+    },
+    /// `gen { ... yield ... }` — lazy generator; call `->next` for each value.
+    GenBlock {
+        body: Block,
+    },
+    /// `yield EXPR` — only valid inside `gen { }` (and propagates through control flow).
+    Yield(Box<Expr>),
 
     /// `match (EXPR) { PATTERN => EXPR, ... }` — first matching arm; bindings scoped to the arm body.
     AlgebraicMatch {

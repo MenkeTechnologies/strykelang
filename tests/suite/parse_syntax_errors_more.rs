@@ -24,6 +24,12 @@ fn unclosed_interpolation_brace_in_string() {
 }
 
 #[test]
+fn rejects_invalid_numeric_double_quote_interpolation() {
+    // Perl: Numeric variables with more than one digit may not start with '0'
+    assert!(perlrs::parse(r##"my $x = "$01""##).is_err());
+}
+
+#[test]
 fn missing_comma_in_list() {
     assert!(perlrs::parse("(1 2)").is_err());
 }

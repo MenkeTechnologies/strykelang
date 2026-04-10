@@ -1,6 +1,7 @@
 //! Interpreter integration tests grouped by area. See `tests/integration.rs` for the harness.
 
 mod algebraic_match;
+mod bare_regex_slash;
 mod builtins;
 mod cli_inplace;
 mod cli_profile;
@@ -16,9 +17,11 @@ mod errors;
 mod eval_errors;
 mod expressions;
 mod fs_io;
+mod language_extensions;
 mod lib_api;
 mod list_util;
 mod modules_inc;
+mod native_codec;
 mod native_ext;
 mod pack_unpack_runtime;
 mod parallel;

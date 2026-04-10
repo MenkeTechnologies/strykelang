@@ -701,11 +701,7 @@ pub fn format_expr(e: &Expr) -> String {
                 format_expr(callback),
                 format_expr(p)
             ),
-            None => format!(
-                "par_walk({}, {})",
-                format_expr(path),
-                format_expr(callback)
-            ),
+            None => format!("par_walk({}, {})", format_expr(path), format_expr(callback)),
         },
         ExprKind::PwatchExpr { path, callback } => {
             format!("pwatch({}, {})", format_expr(path), format_expr(callback))
@@ -990,15 +986,61 @@ pub fn format_expr(e: &Expr) -> String {
             let arms_s = arms
                 .iter()
                 .map(|a| {
+                    let guard_s = a
+                        .guard
+                        .as_ref()
+                        .map(|g| format!(" if {}", format_expr(g)))
+                        .unwrap_or_default();
                     format!(
-                        "{} => {}",
+                        "{}{} => {}",
                         format_match_pattern(&a.pattern),
+                        guard_s,
                         format_expr(&a.body)
                     )
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
             format!("match ({}) {{ {} }}", format_expr(subject), arms_s)
+        }
+        ExprKind::RetryBlock {
+            body,
+            times,
+            backoff,
+        } => {
+            let bo = match backoff {
+                crate::ast::RetryBackoff::None => "none",
+                crate::ast::RetryBackoff::Linear => "linear",
+                crate::ast::RetryBackoff::Exponential => "exponential",
+            };
+            format!(
+                "retry {{ {} }} times => {}, backoff => {}",
+                format_block(body),
+                format_expr(times),
+                bo
+            )
+        }
+        ExprKind::RateLimitBlock {
+            max, window, body, ..
+        } => {
+            format!(
+                "rate_limit({}, {}) {{ {} }}",
+                format_expr(max),
+                format_expr(window),
+                format_block(body)
+            )
+        }
+        ExprKind::EveryBlock { interval, body } => {
+            format!(
+                "every({}) {{ {} }}",
+                format_expr(interval),
+                format_block(body)
+            )
+        }
+        ExprKind::GenBlock { body } => {
+            format!("gen {{ {} }}", format_block(body))
+        }
+        ExprKind::Yield(e) => {
+            format!("yield {}", format_expr(e))
         }
     }
 }

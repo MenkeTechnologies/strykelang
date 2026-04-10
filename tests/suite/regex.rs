@@ -102,3 +102,34 @@ fn postfix_unless_bare_regex_matches_underscore() {
         "x"
     );
 }
+
+#[test]
+fn expr_statement_bare_regex_matches_underscore_sets_numbered_captures() {
+    assert_eq!(
+        eval_string(r#"$_ = "hello world"; /(\w+) (\w+)/; "$1 $2""#),
+        "hello world"
+    );
+}
+
+#[test]
+fn expr_statement_bare_regex_bracket_captures_like_perl_minus_e() {
+    assert_eq!(
+        eval_string(r#"$_ = "hello world"; /(\w+) (\w+)/; "[$1] [$2]""#),
+        "[hello] [world]"
+    );
+}
+
+#[test]
+fn expr_statement_bare_regex_last_statement_returns_match_success_scalar() {
+    // Last top-level statement is bare `/pat/` — VM must compile like `$_ =~ /pat/`, not `LoadRegex` only.
+    assert_eq!(eval_int(r#"$_ = "ab"; /(a)(b)/"#), 1);
+    assert_eq!(eval_int(r#"$_ = "xx"; /(a)(b)/"#), 0);
+}
+
+#[test]
+fn expr_statement_bare_regex_inside_do_block_sets_captures() {
+    assert_eq!(
+        eval_string(r#"do { $_ = "hi there"; /(\w+) (\w+)/; "$1/$2" }"#),
+        "hi/there"
+    );
+}
