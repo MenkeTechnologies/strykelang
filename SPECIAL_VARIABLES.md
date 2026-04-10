@@ -14,7 +14,7 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 |------|------|--------|
 | `__FILE__` / `__LINE__` | Compile-time literals | `ExprKind::MagicConst` — `__FILE__` → `Interpreter::file` (driver sets `-e` or script path); `__LINE__` → lexer line (1-based). VM bytecode uses `Compiler::source_file` (wired from `Interpreter::file` in `try_vm_execute`). |
 | `$_` | Default topic | Ordinary scalar `$_` in scope; set by `map`/`grep`/many iterators, `given`, `readline`, etc. |
-| `$.` | Input line number | `get_special_var(".")`: after a `readline`/`<>`, the line count for `last_readline_handle` (`handle_line_numbers`); otherwise `line_number` (e.g. `-n`/`-p` `process_line`). |
+| `$.` | Input line number | `get_special_var(".")`: **undef** until the first `readline`/`<>` line (and `line_number` is still 0), matching Perl; after a read, the line count for `last_readline_handle` (`handle_line_numbers`); when no handle-specific read yet but `-n`/`-p` ran, `line_number` from `process_line`. |
 | `$/` | Input record separator | `irs` field; get/set via `get_special_var` / `set_special_var` for `"/"`. |
 | `$,` | Output field separator | `ofs` field; `","` in special get/set. |
 | `$"` | List separator (array in `"..."`) | `Interpreter.list_separator`; used when interpolating `@array` into strings (`src/interpreter.rs`). |

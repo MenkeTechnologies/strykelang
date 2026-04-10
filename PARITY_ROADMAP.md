@@ -30,6 +30,7 @@ This is an **ordered engineering program**, not a promise of bit-identical `perl
 - **Lexer `${^NAME}`** — `${…}` after **`$`** is matched before the single-character special branch so **`${^GLOBAL_PHASE}`** tokenizes as one scalar (not **`$` `{`**).
 - **String `\x{hex}`** — double-quoted / `qq` escapes: braced Unicode scalars and unbraced one- or two-digit hex (Perl-like). Parity: [`parity/cases/010_string_hex_escape.pl`](parity/cases/010_string_hex_escape.pl).
 - **`$@` (eval/die)** — `die` / `warn` append **` at FILE line N.`** (trailing period before newline) when the message does not already end with newline, matching Perl 5’s **`$@`** for `eval { die }`. Parity: [`parity/cases/008_eval_at.pl`](parity/cases/008_eval_at.pl).
+- **`$.`** — **undef** until the first successful `readline`/`<>` line when `line_number` is still 0 (matches Perl before any input); per-handle counts after reads unchanged. Parity: [`parity/cases/011_input_line_number.pl`](parity/cases/011_input_line_number.pl).
 - **Lexer `x` / parser call shapes** — `x` tokenizes as the repetition operator only after a complete term (`3 x 4`); when a term is expected (`sub x {`, leading bare `x`, …) it stays an identifier. **Parser:** comma after paren-less `->method` ends the method “arg” list so `foo($obj->meth, $y)` parses; **`$coderef(...)`** and **`&$coderef(...)`** are [`ExprKind::IndirectCall`](src/ast.rs) (tree interpreter evaluates coderefs / symbolic names); **`&$cr`** with no following **`(...)`** passes the caller’s **`@_`** ([`IndirectCall::pass_caller_arglist`](src/ast.rs)); while parsing **`sort $coderef (LIST)`**’s comparator, postfix `(` is not folded into an indirect call so **`sort $k (1)`** still treats `(1)` as the sort list. **`goto EXPR`** takes postfix **`if`/`unless`** like **`last`/`next`** (e.g. **`goto &$boots if defined &$boots;`** in **`XSLoader.pm`**). Statement labels are **`Ident:`** at statement start when the next token is a single colon (not **`::`**), including mixed-case **`boot:`** for **`XSLoader.pm`**. **`pe -c`** accepts the system core **`B.pm`** from a typical Homebrew **`perl`** install (path varies by OS/version).
 
 ## Phase 1 — Documented runtime gaps (specials, I/O, signals)
@@ -40,7 +41,7 @@ This is an **ordered engineering program**, not a promise of bit-identical `perl
 
 1. **`$@`** — extend **parity** for **`eval`** / **`die`** edge cases still diverging from Perl 5 (e.g. string-`eval` errors, `eval` in VM-only paths).
 2. **`%SIG`** — extend coverage (more signals, Windows behavior if desired); add parity cases for `SIGINT`/`SIGTERM`/`SIGALRM`/`SIGCHLD` in a controlled subprocess.
-3. **`$.` / per-handle line counters** — align with Perl where feasible; add file-reading cases.
+3. **`$.` / per-handle line counters** — **undef-before-read** matches Perl (`011_input_line_number.pl`); further cases (assignment to `$.`, `eof` interaction) still welcome.
 4. **`${^GLOBAL_PHASE}`** — extend parity cases for **`UNITCHECK` / `CHECK` / `INIT`** if needed; **`DESTRUCT`** when modeled.
 
 **Done when:** Each item has parity cases (or explicit `SKIP` in `perl` with a comment in the case file explaining why Perl differs).

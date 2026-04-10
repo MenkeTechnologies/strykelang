@@ -8446,8 +8446,13 @@ impl Interpreter {
             "\\" => PerlValue::string(self.ors.clone()),
             "," => PerlValue::string(self.ofs.clone()),
             "." => {
+                // Perl: `$.` is undefined until a line is read (or `-n`/`-p` advances `line_number`).
                 if self.last_readline_handle.is_empty() {
-                    PerlValue::integer(self.line_number)
+                    if self.line_number == 0 {
+                        PerlValue::UNDEF
+                    } else {
+                        PerlValue::integer(self.line_number)
+                    }
                 } else {
                     PerlValue::integer(
                         *self
