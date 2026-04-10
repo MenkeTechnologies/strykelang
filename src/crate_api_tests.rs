@@ -341,6 +341,26 @@ fn try_vm_execute_arrow_array_hash_pre_post_inc() {
 }
 
 #[test]
+fn try_vm_execute_symbolic_scalar_ref_pre_post_inc() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $x = 9;
+        my $r = \$x;
+        my $pre = ++$$r;
+        my $post = $$r++;
+        $pre + $post + $x;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "++/-- on $$r should compile (SymbolicDeref + SetSymbolicScalarRefKeep / SymbolicScalarRefPostfix)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 31);
+}
+
+#[test]
 fn try_vm_execute_symbolic_array_hash_ref_assign() {
     let p = parse(
         r#"no strict 'vars';

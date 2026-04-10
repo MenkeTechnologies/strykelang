@@ -2239,6 +2239,18 @@ impl Compiler {
                         self.emit_op(Op::Rot, line, Some(root));
                         self.emit_op(Op::Swap, line, Some(root));
                         self.emit_op(Op::SetArrowHashKeep, line, Some(root));
+                    } else if let ExprKind::Deref {
+                        expr,
+                        kind: Sigil::Scalar,
+                    } = &expr.kind
+                    {
+                        self.compile_expr(expr)?;
+                        self.emit_op(Op::Dup, line, Some(root));
+                        self.emit_op(Op::SymbolicDeref(0), line, Some(root));
+                        self.emit_op(Op::LoadInt(1), line, Some(root));
+                        self.emit_op(Op::Add, line, Some(root));
+                        self.emit_op(Op::Swap, line, Some(root));
+                        self.emit_op(Op::SetSymbolicScalarRefKeep, line, Some(root));
                     } else {
                         return Err(CompileError::Unsupported("PreInc on non-scalar".into()));
                     }
@@ -2317,6 +2329,18 @@ impl Compiler {
                         self.emit_op(Op::Rot, line, Some(root));
                         self.emit_op(Op::Swap, line, Some(root));
                         self.emit_op(Op::SetArrowHashKeep, line, Some(root));
+                    } else if let ExprKind::Deref {
+                        expr,
+                        kind: Sigil::Scalar,
+                    } = &expr.kind
+                    {
+                        self.compile_expr(expr)?;
+                        self.emit_op(Op::Dup, line, Some(root));
+                        self.emit_op(Op::SymbolicDeref(0), line, Some(root));
+                        self.emit_op(Op::LoadInt(1), line, Some(root));
+                        self.emit_op(Op::Sub, line, Some(root));
+                        self.emit_op(Op::Swap, line, Some(root));
+                        self.emit_op(Op::SetSymbolicScalarRefKeep, line, Some(root));
                     } else {
                         return Err(CompileError::Unsupported("PreDec on non-scalar".into()));
                     }
@@ -2430,6 +2454,17 @@ impl Compiler {
                         PostfixOp::Decrement => 1u8,
                     };
                     self.emit_op(Op::ArrowHashPostfix(b), line, Some(root));
+                } else if let ExprKind::Deref {
+                    expr,
+                    kind: Sigil::Scalar,
+                } = &expr.kind
+                {
+                    self.compile_expr(expr)?;
+                    let b = match op {
+                        PostfixOp::Increment => 0u8,
+                        PostfixOp::Decrement => 1u8,
+                    };
+                    self.emit_op(Op::SymbolicScalarRefPostfix(b), line, Some(root));
                 } else {
                     return Err(CompileError::Unsupported("PostfixOp on non-scalar".into()));
                 }

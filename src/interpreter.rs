@@ -7499,6 +7499,19 @@ impl Interpreter {
         })
     }
 
+    /// `$$r++` / `$$r--` — returns old value; shared by the VM.
+    pub(crate) fn symbolic_scalar_ref_postfix(
+        &mut self,
+        ref_val: PerlValue,
+        decrement: bool,
+        line: usize,
+    ) -> Result<PerlValue, FlowOrError> {
+        let old = self.symbolic_deref(ref_val.clone(), Sigil::Scalar, line)?;
+        let new_val = PerlValue::integer(old.to_int() + if decrement { -1 } else { 1 });
+        self.assign_scalar_ref_deref(ref_val, new_val, line)?;
+        Ok(old)
+    }
+
     /// `$$r = $val` — assign through a scalar reference (or special name ref); shared by
     /// [`Self::assign_value`] and the VM.
     pub(crate) fn assign_scalar_ref_deref(

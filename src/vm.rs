@@ -3319,6 +3319,17 @@ impl<'a> VM<'a> {
                         )?;
                         Ok(())
                     }
+                    Op::SymbolicScalarRefPostfix(b) => {
+                        let r = self.pop();
+                        let line = self.line();
+                        let old = vm_interp_result(
+                            self.interp
+                                .symbolic_scalar_ref_postfix(r, *b == 1, line),
+                            line,
+                        )?;
+                        self.push(old);
+                        Ok(())
+                    }
                     Op::ArrowCall(wa) => {
                         let want = WantarrayCtx::from_byte(*wa);
                         let args_val = self.pop();

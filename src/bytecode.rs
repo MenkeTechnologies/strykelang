@@ -374,6 +374,8 @@ pub enum Op {
     SetSymbolicArrayRef,
     /// `%{ EXPR } = LIST` — stack: \[list value, ref-or-name\]; pairs from list like `%h = (k => v, …)`.
     SetSymbolicHashRef,
+    /// Postfix `++` / `--` on symbolic scalar ref (`$$r`); stack \[ref\] → old value. Byte: `0` = increment, `1` = decrement.
+    SymbolicScalarRefPostfix(u8),
     /// Dereference arrow: ->() — stack: \[ref, args_array\] → value
     /// `$cr->(...)` — wantarray byte (see VM `WantarrayCtx` threading on `Call` / `MethodCall`).
     ArrowCall(u8),
