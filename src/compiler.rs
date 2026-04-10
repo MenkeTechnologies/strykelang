@@ -2817,6 +2817,59 @@ impl Compiler {
                             self.emit_op(Op::SetArrowArray, line, Some(root));
                         }
                     }
+                } else if let ExprKind::HashSliceDeref { container, keys } = &target.kind {
+                    // Single-key `@$href{"k"} OP= EXPR` matches `$href->{"k"} OP= EXPR` (ArrowHash).
+                    if keys.len() != 1 {
+                        return Err(CompileError::Unsupported(
+                            "CompoundAssign on multi-key hash slice (use tree interpreter)".into(),
+                        ));
+                    }
+                    let hk = &keys[0];
+                    match op {
+                        BinOp::DefinedOr | BinOp::LogOr | BinOp::LogAnd => {
+                            self.compile_expr(container)?;
+                            self.compile_expr(hk)?;
+                            self.emit_op(Op::Dup2, line, Some(root));
+                            self.emit_op(Op::ArrowHash, line, Some(root));
+                            let j = match *op {
+                                BinOp::DefinedOr => {
+                                    self.emit_op(Op::JumpIfDefinedKeep(0), line, Some(root))
+                                }
+                                BinOp::LogOr => self.emit_op(Op::JumpIfTrueKeep(0), line, Some(root)),
+                                BinOp::LogAnd => {
+                                    self.emit_op(Op::JumpIfFalseKeep(0), line, Some(root))
+                                }
+                                _ => unreachable!(),
+                            };
+                            self.compile_expr(value)?;
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::Rot, line, Some(root));
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::SetArrowHashKeep, line, Some(root));
+                            let j_end = self.emit_op(Op::Jump(0), line, Some(root));
+                            self.chunk.patch_jump_here(j);
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::Pop, line, Some(root));
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::Pop, line, Some(root));
+                            self.chunk.patch_jump_here(j_end);
+                        }
+                        _ => {
+                            let vm_op = binop_to_vm_op(*op).ok_or_else(|| {
+                                CompileError::Unsupported("CompoundAssign op".into())
+                            })?;
+                            self.compile_expr(container)?;
+                            self.compile_expr(hk)?;
+                            self.emit_op(Op::Dup2, line, Some(root));
+                            self.emit_op(Op::ArrowHash, line, Some(root));
+                            self.compile_expr(value)?;
+                            self.emit_op(vm_op, line, Some(root));
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::Rot, line, Some(root));
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::SetArrowHash, line, Some(root));
+                        }
+                    }
                 } else {
                     return Err(CompileError::Unsupported(
                         "CompoundAssign on non-scalar".into(),

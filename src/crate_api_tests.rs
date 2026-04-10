@@ -901,6 +901,64 @@ fn try_vm_execute_hash_slice_deref_assign() {
     assert_eq!(out.unwrap().expect("vm").to_string(), "10,20");
 }
 
+#[test]
+fn try_vm_execute_hash_slice_deref_compound_assign() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $h = { "a" => 10 };
+        my $r = $h;
+        @$r{"a"} += 2;
+        $r->{"a"};"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "single-key @$href{{\"k\"}} += should compile (Dup2 + ArrowHash + SetArrowHash)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 12);
+}
+
+#[test]
+fn try_vm_execute_hash_slice_deref_defined_or_assign() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $h = { "a" => undef };
+        my $r = $h;
+        @$r{"a"} //= 42;
+        $r->{"a"};"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "single-key @$href{{\"k\"}} //= should compile (JumpIfDefinedKeep + SetArrowHashKeep)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 42);
+}
+
+#[test]
+fn try_vm_execute_hash_slice_deref_defined_or_assign_short_circuit() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $h = { "a" => 1 };
+        my $r = $h;
+        my $runs = 0;
+        @$r{"a"} //= ($runs = 1);
+        $runs;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "single-key @$href{{\"k\"}} //= should skip RHS when LHS is defined"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 0);
+}
+
 /// Perl 5 rejects `++@{...}`, `%{...}++`, etc.; we must not treat them as numeric ops on length.
 #[test]
 fn symbolic_array_hash_deref_inc_dec_errors_like_perl() {
