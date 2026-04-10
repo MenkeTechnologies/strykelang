@@ -1,6 +1,6 @@
 [package]
 name = "perlrs"
-version = "0.1.23"
+version = "0.1.24"
 edition = "2021"
 description = "A highly parallel Perl 5 interpreter written in Rust"
 license = "MIT"
@@ -8,7 +8,25 @@ authors = ["MenkeTechnologies"]
 repository = "https://github.com/MenkeTechnologies/perlrs"
 documentation = "https://docs.rs/perlrs"
 # Ensure `cargo package` / crates.io tarballs ship `vendor/perl` (e.g. `List/Util.pm`).
-include = ["src/**/*", "benches/**/*", "vendor/**/*", "tests/**/*", "parity/**/*", "Cargo.toml", "README.md", "PARITY_ROADMAP.md", "LICENSE*"]
+# Omit `parity/cpan_topn/local/` (CPAN local-lib from install_deps.sh); it is gitignored and must not block `cargo publish`.
+include = [
+    "src/**/*",
+    "benches/**/*",
+    "vendor/**/*",
+    "tests/**/*",
+    "parity/cases/**/*",
+    "parity/core_pure_modules.txt",
+    "parity/run_parity.sh",
+    "parity/cpan_topn/README.md",
+    "parity/cpan_topn/MODULES.txt",
+    "parity/cpan_topn/install_deps.sh",
+    "parity/cpan_topn/run_cpan_topn.sh",
+    "parity/cpan_topn/smoke_all.pl",
+    "Cargo.toml",
+    "README.md",
+    "PARITY_ROADMAP.md",
+    "LICENSE*",
+]
 
 [[bin]]
 name = "perlrs"
