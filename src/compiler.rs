@@ -5640,7 +5640,7 @@ mod tests {
         assert_last_halt(&chunk);
     }
 
-    /// Scalar `..` in a boolean condition must be the flip-flop (`$.`), not a list range.
+    /// Scalar `..` / `...` in a boolean condition must be the flip-flop (`$.`), not a list range.
     #[test]
     fn compile_print_if_uses_scalar_flipflop_not_range_list() {
         let chunk = compile_snippet("print if 1..2;").expect("compile");
@@ -5655,6 +5655,19 @@ mod tests {
         assert!(
             !chunk.ops.iter().any(|o| matches!(o, Op::Range)),
             "did not expect list Range op in scalar if-condition:\n{}",
+            chunk.disassemble()
+        );
+    }
+
+    #[test]
+    fn compile_print_if_three_dot_scalar_flipflop_sets_exclusive_flag() {
+        let chunk = compile_snippet("print if 1...2;").expect("compile");
+        assert!(
+            chunk
+                .ops
+                .iter()
+                .any(|o| matches!(o, Op::ScalarFlipFlop(_, 1))),
+            "expected ScalarFlipFlop(..., exclusive=1), got:\n{}",
             chunk.disassemble()
         );
     }

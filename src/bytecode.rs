@@ -226,7 +226,8 @@ pub enum Op {
     MakeHash(u16), // pop N key-value pairs, push as Hash
     Range,         // stack: [from, to] → Array
     /// Scalar `..` / `...` flip-flop (numeric bounds vs `$.` — [`Interpreter::scalar_flipflop_dot_line`]).
-    /// Stack: `[from, to]` (ints); pushes `1` or `0`. `u16` indexes flip-flop slots; `u8` is `1` for `...`.
+    /// Stack: `[from, to]` (ints); pushes `1` or `0`. `u16` indexes flip-flop slots; `u8` is `1` for `...`
+    /// (exclusive: right bound only after `$.` is strictly past the line where the left bound matched).
     ScalarFlipFlop(u16, u8),
 
     // ── Regex ──
@@ -876,7 +877,7 @@ impl Chunk {
         }
     }
 
-    /// Allocate a slot index for [`Op::ScalarFlipFlop`] (scalar `..` flip-flop state).
+    /// Allocate a slot index for [`Op::ScalarFlipFlop`] (scalar `..` / `...` flip-flop state).
     pub fn alloc_flip_flop_slot(&mut self) -> u16 {
         let id = self.flip_flop_slots;
         self.flip_flop_slots = self.flip_flop_slots.saturating_add(1);

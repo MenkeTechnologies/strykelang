@@ -226,8 +226,10 @@ impl WantarrayCtx {
 #[derive(Clone, Copy, Default)]
 struct FlipFlopTreeState {
     active: bool,
-    /// Exclusive `...`: defer the right-bound test until after the line where the left bound matched.
-    exclusive_pending: bool,
+    /// Exclusive `...`: `$.` line where the left bound matched — right is only tested when `$.` is
+    /// strictly greater (Perl: do not test the right operand until the next evaluation; for numeric
+    /// `$.` that defers past the left-match line, including multiple evals on that line).
+    exclusive_left_line: Option<i64>,
 }
 
 pub struct Interpreter {
@@ -267,8 +269,9 @@ pub struct Interpreter {
     pub handle_line_numbers: HashMap<String, i64>,
     /// Scalar `..` / `...` flip-flop state for bytecode ([`crate::bytecode::Op::ScalarFlipFlop`]).
     pub(crate) flip_flop_active: Vec<bool>,
-    /// Exclusive `...`: parallel to [`Self::flip_flop_active`] — defer right-bound on first active line.
-    pub(crate) flip_flop_exclusive_pending: Vec<bool>,
+    /// Exclusive `...`: parallel to [`Self::flip_flop_active`] — `Some($. )` where the left bound
+    /// matched; right is only compared when `$.` is strictly greater (see [`FlipFlopTreeState`]).
+    pub(crate) flip_flop_exclusive_left_line: Vec<Option<i64>>,
     /// Scalar `..` / `...` flip-flop for tree-walker (key: `Expr` address).
     flip_flop_tree: HashMap<usize, FlipFlopTreeState>,
     /// `$^C` — set when SIGINT is pending before handler runs (cleared on read).
@@ -713,7 +716,7 @@ impl Interpreter {
             last_readline_handle: String::new(),
             handle_line_numbers: HashMap::new(),
             flip_flop_active: Vec::new(),
-            flip_flop_exclusive_pending: Vec::new(),
+            flip_flop_exclusive_left_line: Vec::new(),
             flip_flop_tree: HashMap::new(),
             sigint_pending_caret: Cell::new(false),
             auto_split: false,
@@ -868,7 +871,7 @@ impl Interpreter {
             last_readline_handle: String::new(),
             handle_line_numbers: HashMap::new(),
             flip_flop_active: Vec::new(),
-            flip_flop_exclusive_pending: Vec::new(),
+            flip_flop_exclusive_left_line: Vec::new(),
             flip_flop_tree: HashMap::new(),
             sigint_pending_caret: Cell::new(false),
             auto_split: self.auto_split,
@@ -2693,15 +2696,15 @@ impl Interpreter {
 
     pub(crate) fn clear_flip_flop_state(&mut self) {
         self.flip_flop_active.clear();
-        self.flip_flop_exclusive_pending.clear();
+        self.flip_flop_exclusive_left_line.clear();
         self.flip_flop_tree.clear();
     }
 
     pub(crate) fn prepare_flip_flop_vm_slots(&mut self, slots: u16) {
         self.flip_flop_active.resize(slots as usize, false);
         self.flip_flop_active.fill(false);
-        self.flip_flop_exclusive_pending.resize(slots as usize, false);
-        self.flip_flop_exclusive_pending.fill(false);
+        self.flip_flop_exclusive_left_line.resize(slots as usize, None);
+        self.flip_flop_exclusive_left_line.fill(None);
     }
 
     /// Input line number used by scalar `..` flip-flop — matches Perl `$.` (`-n`/`-p` use
@@ -2719,8 +2722,8 @@ impl Interpreter {
         }
     }
 
-    /// Scalar `..` / `...` flip-flop vs `$.` (numeric bounds). `exclusive` matches Perl `...` (defer
-    /// right-bound test until after the line where the left bound matched).
+    /// Scalar `..` / `...` flip-flop vs `$.` (numeric bounds). `exclusive` matches Perl `...` (do not
+    /// treat the right bound as satisfied on the same `$.` line as the left match; see `perlop`).
     pub(crate) fn scalar_flip_flop_eval(
         &mut self,
         left: i64,
@@ -2731,28 +2734,33 @@ impl Interpreter {
         if self.flip_flop_active.len() <= slot {
             self.flip_flop_active.resize(slot + 1, false);
         }
-        if self.flip_flop_exclusive_pending.len() <= slot {
-            self.flip_flop_exclusive_pending.resize(slot + 1, false);
+        if self.flip_flop_exclusive_left_line.len() <= slot {
+            self.flip_flop_exclusive_left_line.resize(slot + 1, None);
         }
         let dot = self.scalar_flipflop_dot_line();
         let active = &mut self.flip_flop_active[slot];
-        let pending = &mut self.flip_flop_exclusive_pending[slot];
+        let excl_left = &mut self.flip_flop_exclusive_left_line[slot];
         if !*active {
             if dot == left {
                 *active = true;
                 if exclusive {
-                    *pending = true;
-                } else if dot == right {
-                    *active = false;
+                    *excl_left = Some(dot);
+                } else {
+                    *excl_left = None;
+                    if dot == right {
+                        *active = false;
+                    }
                 }
                 return Ok(PerlValue::integer(1));
             }
             return Ok(PerlValue::integer(0));
         }
-        if exclusive && *pending {
-            *pending = false;
-        }
-        if dot == right {
+        if let Some(ll) = *excl_left {
+            if dot == right && dot > ll {
+                *active = false;
+                *excl_left = None;
+            }
+        } else if dot == right {
             *active = false;
         }
         Ok(PerlValue::integer(1))
@@ -5664,18 +5672,23 @@ impl Interpreter {
                         if dot == left {
                             st.active = true;
                             if *exclusive {
-                                st.exclusive_pending = true;
-                            } else if dot == right {
-                                st.active = false;
+                                st.exclusive_left_line = Some(dot);
+                            } else {
+                                st.exclusive_left_line = None;
+                                if dot == right {
+                                    st.active = false;
+                                }
                             }
                             return Ok(PerlValue::integer(1));
                         }
                         return Ok(PerlValue::integer(0));
                     }
-                    if *exclusive && st.exclusive_pending {
-                        st.exclusive_pending = false;
-                    }
-                    if dot == right {
+                    if let Some(ll) = st.exclusive_left_line {
+                        if dot == right && dot > ll {
+                            st.active = false;
+                            st.exclusive_left_line = None;
+                        }
+                    } else if dot == right {
                         st.active = false;
                     }
                     Ok(PerlValue::integer(1))
@@ -12003,5 +12016,39 @@ mod special_scalar_name_tests {
         {
             assert!(i.get_special_var("<").to_int() >= 0);
         }
+    }
+
+    #[test]
+    fn scalar_flip_flop_three_dot_same_dollar_dot_second_eval_stays_active() {
+        let mut i = Interpreter::new();
+        i.last_readline_handle.clear();
+        i.line_number = 3;
+        i.prepare_flip_flop_vm_slots(1);
+        assert_eq!(
+            i.scalar_flip_flop_eval(3, 3, 0, true).expect("ok").to_int(),
+            1
+        );
+        assert!(i.flip_flop_active[0]);
+        assert_eq!(i.flip_flop_exclusive_left_line[0], Some(3));
+        // Second evaluation on the same `$.` must not clear the range (Perl `...` defers the right test).
+        assert_eq!(
+            i.scalar_flip_flop_eval(3, 3, 0, true).expect("ok").to_int(),
+            1
+        );
+        assert!(i.flip_flop_active[0]);
+    }
+
+    #[test]
+    fn scalar_flip_flop_three_dot_deactivates_when_past_left_line_and_dot_matches_right() {
+        let mut i = Interpreter::new();
+        i.last_readline_handle.clear();
+        i.line_number = 2;
+        i.prepare_flip_flop_vm_slots(1);
+        i.scalar_flip_flop_eval(2, 3, 0, true).expect("ok");
+        assert!(i.flip_flop_active[0]);
+        i.line_number = 3;
+        i.scalar_flip_flop_eval(2, 3, 0, true).expect("ok");
+        assert!(!i.flip_flop_active[0]);
+        assert_eq!(i.flip_flop_exclusive_left_line[0], None);
     }
 }
