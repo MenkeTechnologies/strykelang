@@ -291,6 +291,34 @@ fn try_vm_execute_arrow_array_assign() {
 }
 
 #[test]
+fn try_vm_execute_arrow_array_pre_inc_only() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $a = [9];
+        ++$a->[0];
+        $a->[0];"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i).expect("vm path");
+    assert_eq!(out.expect("vm").to_int(), 10);
+}
+
+#[test]
+fn try_vm_execute_arrow_hash_pre_inc_only() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $h = { "x" => 9 };
+        ++$h->{"x"};
+        $h->{"x"};"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i).expect("vm path");
+    assert_eq!(out.expect("vm").to_int(), 10);
+}
+
+#[test]
 fn try_vm_execute_grep_expr_comma() {
     let p = parse(
         r#"no strict 'vars';

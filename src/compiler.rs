@@ -2203,6 +2203,42 @@ impl Compiler {
                         self.emit_op(Op::Dup, line, Some(root));
                         self.emit_op(Op::Rot, line, Some(root));
                         self.emit_op(Op::SetHashElem(hash_idx), line, Some(root));
+                    } else if let ExprKind::ArrowDeref {
+                        expr,
+                        index,
+                        kind: DerefKind::Array,
+                    } = &expr.kind
+                    {
+                        self.compile_expr(expr)?;
+                        self.compile_expr(index)?;
+                        self.emit_op(Op::Dup2, line, Some(root));
+                        self.emit_op(Op::ArrowArray, line, Some(root));
+                        self.emit_op(Op::LoadInt(1), line, Some(root));
+                        self.emit_op(Op::Add, line, Some(root));
+                        self.emit_op(Op::Dup, line, Some(root));
+                        self.emit_op(Op::Pop, line, Some(root));
+                        self.emit_op(Op::Swap, line, Some(root));
+                        self.emit_op(Op::Rot, line, Some(root));
+                        self.emit_op(Op::Swap, line, Some(root));
+                        self.emit_op(Op::SetArrowArray, line, Some(root));
+                    } else if let ExprKind::ArrowDeref {
+                        expr,
+                        index,
+                        kind: DerefKind::Hash,
+                    } = &expr.kind
+                    {
+                        self.compile_expr(expr)?;
+                        self.compile_expr(index)?;
+                        self.emit_op(Op::Dup2, line, Some(root));
+                        self.emit_op(Op::ArrowHash, line, Some(root));
+                        self.emit_op(Op::LoadInt(1), line, Some(root));
+                        self.emit_op(Op::Add, line, Some(root));
+                        self.emit_op(Op::Dup, line, Some(root));
+                        self.emit_op(Op::Pop, line, Some(root));
+                        self.emit_op(Op::Swap, line, Some(root));
+                        self.emit_op(Op::Rot, line, Some(root));
+                        self.emit_op(Op::Swap, line, Some(root));
+                        self.emit_op(Op::SetArrowHash, line, Some(root));
                     } else {
                         return Err(CompileError::Unsupported("PreInc on non-scalar".into()));
                     }
@@ -2245,6 +2281,42 @@ impl Compiler {
                         self.emit_op(Op::Dup, line, Some(root));
                         self.emit_op(Op::Rot, line, Some(root));
                         self.emit_op(Op::SetHashElem(hash_idx), line, Some(root));
+                    } else if let ExprKind::ArrowDeref {
+                        expr,
+                        index,
+                        kind: DerefKind::Array,
+                    } = &expr.kind
+                    {
+                        self.compile_expr(expr)?;
+                        self.compile_expr(index)?;
+                        self.emit_op(Op::Dup2, line, Some(root));
+                        self.emit_op(Op::ArrowArray, line, Some(root));
+                        self.emit_op(Op::LoadInt(1), line, Some(root));
+                        self.emit_op(Op::Sub, line, Some(root));
+                        self.emit_op(Op::Dup, line, Some(root));
+                        self.emit_op(Op::Pop, line, Some(root));
+                        self.emit_op(Op::Swap, line, Some(root));
+                        self.emit_op(Op::Rot, line, Some(root));
+                        self.emit_op(Op::Swap, line, Some(root));
+                        self.emit_op(Op::SetArrowArray, line, Some(root));
+                    } else if let ExprKind::ArrowDeref {
+                        expr,
+                        index,
+                        kind: DerefKind::Hash,
+                    } = &expr.kind
+                    {
+                        self.compile_expr(expr)?;
+                        self.compile_expr(index)?;
+                        self.emit_op(Op::Dup2, line, Some(root));
+                        self.emit_op(Op::ArrowHash, line, Some(root));
+                        self.emit_op(Op::LoadInt(1), line, Some(root));
+                        self.emit_op(Op::Sub, line, Some(root));
+                        self.emit_op(Op::Dup, line, Some(root));
+                        self.emit_op(Op::Pop, line, Some(root));
+                        self.emit_op(Op::Swap, line, Some(root));
+                        self.emit_op(Op::Rot, line, Some(root));
+                        self.emit_op(Op::Swap, line, Some(root));
+                        self.emit_op(Op::SetArrowHash, line, Some(root));
                     } else {
                         return Err(CompileError::Unsupported("PreDec on non-scalar".into()));
                     }
