@@ -41,3 +41,21 @@ pub fn emit_scalar_mutation(var: &str, old: &PerlValue, new: &PerlValue) {
         None => eprintln!("[main] ${}: {} → {}", var, old, new),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn emit_scalar_mutation_noops_when_trace_disabled() {
+        fan_worker_set_index(Some(0));
+        emit_scalar_mutation("x", &PerlValue::integer(1), &PerlValue::integer(2));
+        fan_worker_set_index(None);
+    }
+
+    #[test]
+    fn fan_worker_set_index_none_is_safe_after_some() {
+        fan_worker_set_index(Some(42));
+        fan_worker_set_index(None);
+    }
+}

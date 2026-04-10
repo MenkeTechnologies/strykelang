@@ -142,3 +142,108 @@ pub fn dispatch_method(
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::ErrorKind;
+
+    fn pair_elems(pair: &PerlValue) -> (PerlValue, PerlValue) {
+        let v = pair.as_array_vec().expect("pchannel pair");
+        assert_eq!(v.len(), 2);
+        (v[0].clone(), v[1].clone())
+    }
+
+    #[test]
+    fn create_pair_send_recv_roundtrip() {
+        let pair = create_pair();
+        let (tx, rx) = pair_elems(&pair);
+        let sent = dispatch_method(&tx, "send", &[PerlValue::integer(7)], 1)
+            .expect("dispatch")
+            .expect("send");
+        assert_eq!(sent.to_int(), 1);
+        let got = dispatch_method(&rx, "recv", &[], 1)
+            .expect("dispatch")
+            .expect("recv");
+        assert_eq!(got.to_int(), 7);
+    }
+
+    #[test]
+    fn create_bounded_pair_send_recv() {
+        let pair = create_bounded_pair(2);
+        let (tx, rx) = pair_elems(&pair);
+        dispatch_method(&tx, "send", &[PerlValue::integer(1)], 1)
+            .unwrap()
+            .unwrap();
+        let v = dispatch_method(&rx, "recv", &[], 1).unwrap().unwrap();
+        assert_eq!(v.to_int(), 1);
+    }
+
+    #[test]
+    fn pselect_recv_empty_args_is_runtime_error() {
+        let e = pselect_recv(&[], 1).unwrap_err();
+        assert_eq!(e.kind, ErrorKind::Runtime);
+    }
+
+    #[test]
+    fn pselect_recv_rejects_non_receiver() {
+        let e = pselect_recv(&[PerlValue::integer(0)], 1).unwrap_err();
+        assert_eq!(e.kind, ErrorKind::Runtime);
+    }
+
+    #[test]
+    fn pselect_recv_delivers_from_one_ready_channel() {
+        let p = create_pair();
+        let (tx, rx) = pair_elems(&p);
+        dispatch_method(&tx, "send", &[PerlValue::integer(99)], 1)
+            .unwrap()
+            .unwrap();
+        let out = pselect_recv(&[rx], 1).expect("pselect");
+        let row = out.as_array_vec().expect("result row");
+        assert_eq!(row.len(), 2);
+        assert_eq!(row[0].to_int(), 99);
+        assert_eq!(row[1].to_int(), 0);
+    }
+
+    #[test]
+    fn pselect_recv_with_timeout_times_out_when_empty() {
+        let p = create_pair();
+        let (_tx, rx) = pair_elems(&p);
+        let out = pselect_recv_with_optional_timeout(
+            &[rx],
+            Some(Duration::from_millis(20)),
+            1,
+        )
+        .expect("pselect");
+        let row = out.as_array_vec().expect("result row");
+        assert!(row[0].is_undef());
+        assert_eq!(row[1].to_int(), -1);
+    }
+
+    #[test]
+    fn dispatch_send_wrong_arity_is_error() {
+        let pair = create_pair();
+        let (tx, _rx) = pair_elems(&pair);
+        let e = dispatch_method(&tx, "send", &[], 1)
+            .expect("some")
+            .unwrap_err();
+        assert_eq!(e.kind, ErrorKind::Runtime);
+    }
+
+    #[test]
+    fn dispatch_recv_with_args_is_error() {
+        let pair = create_pair();
+        let (_tx, rx) = pair_elems(&pair);
+        let e = dispatch_method(&rx, "recv", &[PerlValue::integer(1)], 1)
+            .expect("some")
+            .unwrap_err();
+        assert_eq!(e.kind, ErrorKind::Runtime);
+    }
+
+    #[test]
+    fn dispatch_unknown_method_returns_none() {
+        let pair = create_pair();
+        let (tx, _rx) = pair_elems(&pair);
+        assert!(dispatch_method(&tx, "nope", &[], 1).is_none());
+    }
+}

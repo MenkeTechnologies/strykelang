@@ -11,7 +11,7 @@
 //! flow, regex, closures). `pack_unpack_runtime` exercises `pack`/`unpack` builtins; `semantic_edge`
 //! adds focused checks for operators and list builtins. Library unit tests cover `parse()`, `run`, `parse_and_run_string`,
 //! `try_vm_execute`, `crate_api_tests` / `run_semantics_tests` / `run_semantics_more` (crate-root `run`), `parser_shape_tests` (`StmtKind`/`ExprKind` from `parse`), `interpreter_unit_tests`
-//! (`Interpreter` defaults and `execute_tree`), lexer (`&`, `&&`/`||`/`+=`, `==`/`!=`,
+//! (`Interpreter` defaults and `execute_tree`), `pchannel` (`send`/`recv`/`pselect` helpers), `parallel_trace` (fan worker / trace-noop paths), lexer (`&`, `&&`/`||`/`+=`, `==`/`!=`,
 //! `**`/`..`, `q{}`, `qr//`, octal/binary, `-e` file tests, floats, `m//`, strings, `<=>`), `Scope`
 //! (arrays, hashes, atomics, `pop_frame` guard), `keyword_or_ident`, `PerlError` (including
 //! `DivisionByZero` display), `bytecode`/`Chunk`, `compiler` smoke, and `PerlValue` (`type_name`,
