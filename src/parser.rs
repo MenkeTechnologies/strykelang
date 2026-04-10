@@ -123,15 +123,18 @@ impl Parser {
     fn parse_statement(&mut self) -> PerlResult<Statement> {
         let line = self.peek_line();
 
-        // Statement label `FOO:` / `BAR_BAZ:` (not lexed as one token — `ALLCAPS:` inside
-        // `? THEN : ELSE` would be mis-tokenized as a label and break ternary parsing).
+        // Statement label `FOO:` / `boot:` / `BAR_BAZ:` (not `Foo::` — that is `Ident` + `::`).
+        // Uppercase-only was too strict: XSLoader.pm uses `boot:` before `my $xs = ...`.
         let label = match self.peek().clone() {
-            Token::Ident(ref id) if id.chars().all(|c| c.is_uppercase() || c == '_') => {
+            Token::Ident(_) => {
                 if matches!(self.peek_at(1), Token::Colon) && !matches!(self.peek_at(2), Token::Colon)
                 {
-                    let l = id.clone();
-                    self.advance();
-                    self.advance();
+                    let (tok, _) = self.advance();
+                    let l = match tok {
+                        Token::Ident(l) => l,
+                        _ => unreachable!(),
+                    };
+                    self.advance(); // ':'
                     Some(l)
                 } else {
                     None
@@ -352,14 +355,15 @@ impl Parser {
                 "goto" => {
                     self.advance();
                     let target = self.parse_expression()?;
-                    self.eat(&Token::Semicolon);
-                    Statement {
+                    let stmt = Statement {
                         label: None,
                         kind: StmtKind::Goto {
                             target: Box::new(target),
                         },
                         line,
-                    }
+                    };
+                    // `goto $l if COND;` / `goto &$cr if defined &$cr;` (XSLoader.pm)
+                    self.parse_stmt_postfix_modifier(stmt)?
                 }
                 "continue" => {
                     self.advance();
@@ -2868,14 +2872,21 @@ impl Parser {
                             target: Box::new(target),
                             args,
                             ampersand: true,
+                            pass_caller_arglist: false,
                         },
                         line,
                     });
                 }
-                Err(PerlError::syntax(
-                    "Expected subroutine name or `&$coderef(...)` after `&`",
+                // `&$coderef` / `&{expr}` with no `(...)` — call with caller's @_ (Perl `&$sub`).
+                Ok(Expr {
+                    kind: ExprKind::IndirectCall {
+                        target: Box::new(target),
+                        args: vec![],
+                        ampersand: true,
+                        pass_caller_arglist: true,
+                    },
                     line,
-                ))
+                })
             }
             Token::Backslash => {
                 self.advance();
@@ -2974,6 +2985,7 @@ impl Parser {
                             target: Box::new(expr),
                             args,
                             ampersand: false,
+                            pass_caller_arglist: false,
                         },
                         line,
                     };

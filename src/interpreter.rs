@@ -5266,12 +5266,18 @@ impl Interpreter {
                 target,
                 args,
                 ampersand: _,
+                pass_caller_arglist,
             } => {
                 let tval = self.eval_expr(target)?;
-                let mut arg_vals = Vec::with_capacity(args.len());
-                for a in args {
-                    arg_vals.push(self.eval_expr(a)?);
-                }
+                let arg_vals = if *pass_caller_arglist {
+                    self.scope.get_array("_")
+                } else {
+                    let mut v = Vec::with_capacity(args.len());
+                    for a in args {
+                        v.push(self.eval_expr(a)?);
+                    }
+                    v
+                };
                 if let Some(sub) = tval.as_code_ref() {
                     return self.call_sub(&sub, arg_vals, ctx, line);
                 }

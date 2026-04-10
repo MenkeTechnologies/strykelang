@@ -486,6 +486,9 @@ pub enum ExprKind {
         args: Vec<Expr>,
         #[serde(default)]
         ampersand: bool,
+        /// True for unary `&$cr` with no `(...)` — Perl passes the caller's `@_` to the invoked sub.
+        #[serde(default)]
+        pass_caller_arglist: bool,
     },
     /// Limited typeglob: `*FOO` → handle name `FOO` for `open` / I/O.
     Typeglob(String),

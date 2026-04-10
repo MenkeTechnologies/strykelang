@@ -92,11 +92,13 @@ fn shape_indirect_scalar_call() {
         target,
         args,
         ampersand,
+        pass_caller_arglist,
     } = k
     else {
         panic!("expected IndirectCall");
     };
     assert!(!ampersand);
+    assert!(!pass_caller_arglist);
     assert!(matches!(target.kind, ExprKind::ScalarVar(ref s) if s == "cr"));
     assert_eq!(args.len(), 1);
 }
@@ -109,13 +111,52 @@ fn shape_ampersand_indirect_call() {
         target,
         args,
         ampersand,
+        pass_caller_arglist,
     } = k
     else {
         panic!("expected IndirectCall");
     };
     assert!(ampersand);
+    assert!(!pass_caller_arglist);
     assert!(matches!(target.kind, ExprKind::ScalarVar(ref s) if s == "recurse"));
     assert_eq!(args.len(), 1);
+}
+
+/// `&$cr` with no `(...)` — passes caller's `@_` at runtime ([`ExprKind::IndirectCall::pass_caller_arglist`]).
+#[test]
+fn shape_goto_postfix_if() {
+    let p = parse("goto &$boots if defined &$boots;").expect("parse");
+    let StmtKind::If { body, .. } = &p.statements[0].kind else {
+        panic!("expected if-wrapped goto (XSLoader.pm style)");
+    };
+    assert_eq!(body.len(), 1);
+    assert!(matches!(body[0].kind, StmtKind::Goto { .. }));
+}
+
+/// Mixed-case `boot:` — system `XSLoader.pm` uses this before `my $xs = …` (not only `FOO:`).
+#[test]
+fn shape_statement_label_mixed_case_boot() {
+    let p = parse("boot: my $xs = 0;").expect("parse");
+    assert_eq!(p.statements[0].label.as_deref(), Some("boot"));
+    assert!(matches!(p.statements[0].kind, StmtKind::My(_)));
+}
+
+#[test]
+fn shape_ampersand_scalar_no_paren_passes_caller_arglist() {
+    let k = first_expr_kind(r##"&$cb;"##);
+    let ExprKind::IndirectCall {
+        target,
+        args,
+        ampersand,
+        pass_caller_arglist,
+    } = k
+    else {
+        panic!("expected IndirectCall");
+    };
+    assert!(ampersand);
+    assert!(pass_caller_arglist);
+    assert!(args.is_empty());
+    assert!(matches!(target.kind, ExprKind::ScalarVar(ref s) if s == "cb"));
 }
 
 /// Parenthesized `sort $coderef (LIST)` in a ternary then-branch (JSON::PP-style) must keep parens balanced.

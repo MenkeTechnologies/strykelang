@@ -563,16 +563,21 @@ pub fn format_expr(e: &Expr) -> String {
             target,
             args,
             ampersand,
+            pass_caller_arglist,
         } => {
-            let inner = format!(
-                "{}({})",
-                format_expr(target),
-                args.iter().map(format_expr).collect::<Vec<_>>().join(", ")
-            );
-            if *ampersand {
-                format!("&{}", inner)
+            if *pass_caller_arglist && args.is_empty() {
+                format!("&{}", format_expr(target))
             } else {
-                inner
+                let inner = format!(
+                    "{}({})",
+                    format_expr(target),
+                    args.iter().map(format_expr).collect::<Vec<_>>().join(", ")
+                );
+                if *ampersand {
+                    format!("&{}", inner)
+                } else {
+                    inner
+                }
             }
         }
         ExprKind::Print { handle, args } => {
