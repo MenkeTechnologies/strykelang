@@ -1983,6 +1983,8 @@ pub(crate) fn segment_blocks_subroutine_linear_jit(
         | Op::ArrowHashPostfix(_)
         | Op::SetSymbolicScalarRef
         | Op::SetSymbolicScalarRefKeep
+        | Op::SetSymbolicArrayRef
+        | Op::SetSymbolicHashRef
         | Op::IndirectCall(_, _, _)
         | Op::LoadDynamicSubRef
         | Op::LoadDynamicTypeglob

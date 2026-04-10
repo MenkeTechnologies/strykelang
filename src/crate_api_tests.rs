@@ -341,6 +341,31 @@ fn try_vm_execute_arrow_array_hash_pre_post_inc() {
 }
 
 #[test]
+fn try_vm_execute_symbolic_array_hash_ref_assign() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $a = [1, 2];
+        my $r = $a;
+        @{ $r } = (3, 4, 5);
+        my $h = { "a" => 1 };
+        my $hr = $h;
+        %{ $hr } = ("b", 2, "c", 3);
+        join(",", @$r) . ";" . join(",", sort keys %$hr);"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "symbolic array/hash deref assign should compile (SetSymbolicArrayRef / SetSymbolicHashRef)"
+    );
+    assert_eq!(
+        out.unwrap().expect("vm").to_string(),
+        "3,4,5;b,c"
+    );
+}
+
+#[test]
 fn try_vm_execute_grep_expr_comma() {
     let p = parse(
         r#"no strict 'vars';

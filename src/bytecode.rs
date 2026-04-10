@@ -369,6 +369,11 @@ pub enum Op {
     SetSymbolicScalarRef,
     /// Like [`Op::SetSymbolicScalarRef`] but leaves the assigned value on the stack.
     SetSymbolicScalarRefKeep,
+    /// `@{ EXPR } = LIST` — stack: \[list value, ref-or-name\] (top = ref / package name); delegates to
+    /// [`Interpreter::assign_symbolic_array_ref_deref`](crate::interpreter::Interpreter::assign_symbolic_array_ref_deref).
+    SetSymbolicArrayRef,
+    /// `%{ EXPR } = LIST` — stack: \[list value, ref-or-name\]; pairs from list like `%h = (k => v, …)`.
+    SetSymbolicHashRef,
     /// Dereference arrow: ->() — stack: \[ref, args_array\] → value
     /// `$cr->(...)` — wantarray byte (see VM `WantarrayCtx` threading on `Call` / `MethodCall`).
     ArrowCall(u8),

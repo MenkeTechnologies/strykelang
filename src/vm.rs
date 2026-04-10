@@ -3299,6 +3299,26 @@ impl<'a> VM<'a> {
                         self.push(val_keep);
                         Ok(())
                     }
+                    Op::SetSymbolicArrayRef => {
+                        let r = self.pop();
+                        let val = self.pop();
+                        let line = self.line();
+                        vm_interp_result(
+                            self.interp.assign_symbolic_array_ref_deref(r, val, line),
+                            line,
+                        )?;
+                        Ok(())
+                    }
+                    Op::SetSymbolicHashRef => {
+                        let r = self.pop();
+                        let val = self.pop();
+                        let line = self.line();
+                        vm_interp_result(
+                            self.interp.assign_symbolic_hash_ref_deref(r, val, line),
+                            line,
+                        )?;
+                        Ok(())
+                    }
                     Op::ArrowCall(wa) => {
                         let want = WantarrayCtx::from_byte(*wa);
                         let args_val = self.pop();

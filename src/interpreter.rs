@@ -7523,6 +7523,82 @@ impl Interpreter {
         .into())
     }
 
+    /// `@{ EXPR } = LIST` — array ref or package name string (mirrors [`Self::symbolic_deref`] for [`Sigil::Array`]).
+    pub(crate) fn assign_symbolic_array_ref_deref(
+        &mut self,
+        ref_val: PerlValue,
+        val: PerlValue,
+        line: usize,
+    ) -> ExecResult {
+        if let Some(a) = ref_val.as_array_ref() {
+            *a.write() = val.to_list();
+            return Ok(PerlValue::UNDEF);
+        }
+        if let Some(s) = ref_val.as_str() {
+            if self.strict_refs {
+                return Err(PerlError::runtime(
+                    format!(
+                        "Can't use string (\"{}\") as an ARRAY ref while \"strict refs\" in use",
+                        s
+                    ),
+                    line,
+                )
+                .into());
+            }
+            self.scope
+                .set_array(&s, val.to_list())
+                .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+            return Ok(PerlValue::UNDEF);
+        }
+        Err(PerlError::runtime(
+            "Can't assign to non-array reference",
+            line,
+        )
+        .into())
+    }
+
+    /// `%{ EXPR } = LIST` — hash ref or package name string (mirrors [`Self::symbolic_deref`] for [`Sigil::Hash`]).
+    pub(crate) fn assign_symbolic_hash_ref_deref(
+        &mut self,
+        ref_val: PerlValue,
+        val: PerlValue,
+        line: usize,
+    ) -> ExecResult {
+        let items = val.to_list();
+        let mut map = IndexMap::new();
+        let mut i = 0;
+        while i + 1 < items.len() {
+            map.insert(items[i].to_string(), items[i + 1].clone());
+            i += 2;
+        }
+        if let Some(h) = ref_val.as_hash_ref() {
+            *h.write() = map;
+            return Ok(PerlValue::UNDEF);
+        }
+        if let Some(s) = ref_val.as_str() {
+            if self.strict_refs {
+                return Err(PerlError::runtime(
+                    format!(
+                        "Can't use string (\"{}\") as a HASH ref while \"strict refs\" in use",
+                        s
+                    ),
+                    line,
+                )
+                .into());
+            }
+            self.touch_env_hash(&s);
+            self.scope
+                .set_hash(&s, map)
+                .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+            return Ok(PerlValue::UNDEF);
+        }
+        Err(PerlError::runtime(
+            "Can't assign to non-hash reference",
+            line,
+        )
+        .into())
+    }
+
     /// `$href->{key} = $val` and blessed hash slots — shared by [`Self::assign_value`] and the VM.
     pub(crate) fn assign_arrow_hash_deref(
         &mut self,
@@ -7887,6 +7963,20 @@ impl Interpreter {
             ExprKind::Deref { expr, kind: Sigil::Scalar } => {
                 let ref_val = self.eval_expr(expr)?;
                 self.assign_scalar_ref_deref(ref_val, val, target.line)
+            }
+            ExprKind::Deref {
+                expr,
+                kind: Sigil::Array,
+            } => {
+                let ref_val = self.eval_expr(expr)?;
+                self.assign_symbolic_array_ref_deref(ref_val, val, target.line)
+            }
+            ExprKind::Deref {
+                expr,
+                kind: Sigil::Hash,
+            } => {
+                let ref_val = self.eval_expr(expr)?;
+                self.assign_symbolic_hash_ref_deref(ref_val, val, target.line)
             }
             _ => Ok(PerlValue::UNDEF),
         }

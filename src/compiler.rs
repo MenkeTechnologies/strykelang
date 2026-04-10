@@ -4360,9 +4360,26 @@ impl Compiler {
                     self.emit_op(Op::SetSymbolicScalarRef, line, ast);
                 }
             }
-            ExprKind::Deref { .. } => {
+            ExprKind::Deref {
+                expr,
+                kind: Sigil::Array,
+            } => {
+                self.compile_expr(expr)?;
+                self.emit_op(Op::SetSymbolicArrayRef, line, ast);
+            }
+            ExprKind::Deref {
+                expr,
+                kind: Sigil::Hash,
+            } => {
+                self.compile_expr(expr)?;
+                self.emit_op(Op::SetSymbolicHashRef, line, ast);
+            }
+            ExprKind::Deref {
+                kind: Sigil::Typeglob,
+                ..
+            } => {
                 return Err(CompileError::Unsupported(
-                    "Assign to symbolic array/hash/glob deref (tree interpreter)".into(),
+                    "Assign to symbolic glob deref (tree interpreter)".into(),
                 ));
             }
             ExprKind::ArrowDeref {
