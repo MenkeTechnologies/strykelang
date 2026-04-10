@@ -35,8 +35,8 @@ fn missing_comma_in_list() {
 }
 
 #[test]
-fn sub_missing_name_before_paren() {
-    assert!(perlrs::parse("sub () { }").is_err());
+fn statement_anonymous_sub_empty_prototype_parses() {
+    assert!(perlrs::parse("sub () { }").is_ok());
 }
 
 #[test]

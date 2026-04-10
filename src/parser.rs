@@ -1499,21 +1499,8 @@ impl Parser {
         Ok(Some(s))
     }
 
-    fn parse_sub_decl(&mut self) -> PerlResult<Statement> {
-        let line = self.peek_line();
-        self.advance(); // 'sub'
-        let name = match self.advance() {
-            (Token::Ident(n), _) => n,
-            (tok, line) => {
-                return Err(PerlError::syntax(
-                    format!("Expected sub name, got {:?}", tok),
-                    line,
-                ))
-            }
-        };
-        // Optional prototype — capture text for `prototype` builtin
-        let prototype = self.parse_sub_prototype_opt()?;
-        // Optional subroutine attributes: `sub foo : lvalue { }`, `sub foo : ATTR(ARGS) { }`
+    /// Optional subroutine attributes after name/prototype: `sub foo : lvalue { }`, `sub : ATTR(ARGS) { }`.
+    fn parse_sub_attributes(&mut self) -> PerlResult<()> {
         while self.eat(&Token::Colon) {
             match self.advance() {
                 (Token::Ident(_), _) => {}
@@ -1543,17 +1530,63 @@ impl Parser {
                 }
             }
         }
-        let body = self.parse_block()?;
-        Ok(Statement {
-            label: None,
-            kind: StmtKind::SubDecl {
-                name,
-                params: vec![],
-                body,
-                prototype,
-            },
-            line,
-        })
+        Ok(())
+    }
+
+    fn parse_sub_decl(&mut self) -> PerlResult<Statement> {
+        let line = self.peek_line();
+        self.advance(); // 'sub'
+        match self.peek().clone() {
+            Token::Ident(_) => {
+                let name = match self.advance() {
+                    (Token::Ident(n), _) => n,
+                    (tok, err_line) => {
+                        return Err(PerlError::syntax(
+                            format!("Expected sub name, got {:?}", tok),
+                            err_line,
+                        ))
+                    }
+                };
+                // Optional prototype — capture text for `prototype` builtin
+                let prototype = self.parse_sub_prototype_opt()?;
+                self.parse_sub_attributes()?;
+                let body = self.parse_block()?;
+                Ok(Statement {
+                    label: None,
+                    kind: StmtKind::SubDecl {
+                        name,
+                        params: vec![],
+                        body,
+                        prototype,
+                    },
+                    line,
+                })
+            }
+            Token::LParen | Token::LBrace | Token::Colon => {
+                // Statement-level anonymous sub: `sub { }`, `sub () { }`, `sub :lvalue { }`
+                let _ = self.parse_sub_prototype_opt()?;
+                self.parse_sub_attributes()?;
+                let body = self.parse_block()?;
+                Ok(Statement {
+                    label: None,
+                    kind: StmtKind::Expression(Expr {
+                        kind: ExprKind::CodeRef {
+                            params: vec![],
+                            body,
+                        },
+                        line,
+                    }),
+                    line,
+                })
+            }
+            tok => Err(PerlError::syntax(
+                format!(
+                    "Expected sub name, `(`, `{{`, or `:`, got {:?}",
+                    tok
+                ),
+                self.peek_line(),
+            )),
+        }
     }
 
     /// `struct Name { field => Type, ... }`
