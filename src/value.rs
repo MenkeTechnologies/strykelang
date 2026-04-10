@@ -1028,6 +1028,50 @@ impl PerlValue {
         PerlValue::string(s)
     }
 
+    /// In-place `.=` fast path: when `self` is the **sole owner** of a heap
+    /// `HeapObject::String`, append `rhs` straight into the existing `String`
+    /// buffer — no `Arc` allocation, no unwrap/rewrap churn, `String::push_str`
+    /// reuses spare capacity and only reallocates on growth.
+    ///
+    /// Returns `true` if the in-place path ran (no further work for the caller),
+    /// `false` when the value was not a heap String or the `Arc` was shared —
+    /// the caller must then fall back to [`Self::concat_append_owned`] so that a
+    /// second handle to the same `Arc` never observes a torn midway write.
+    #[inline]
+    pub(crate) fn try_concat_append_inplace(&mut self, rhs: &PerlValue) -> bool {
+        if !nanbox::is_heap(self.0) {
+            return false;
+        }
+        // Peek without bumping the refcount to bail early on non-String payloads.
+        // SAFETY: nanbox::is_heap holds (checked above), so the payload is a live
+        // `Arc<HeapObject>` whose pointer we decode below.
+        unsafe {
+            if !matches!(self.heap_ref(), HeapObject::String(_)) {
+                return false;
+            }
+            // Reconstitute the Arc to consult its strong count; `Arc::get_mut`
+            // returns `Some` iff both strong and weak counts are 1.
+            let raw =
+                nanbox::decode_heap_ptr::<HeapObject>(self.0) as *mut HeapObject as *const HeapObject;
+            let mut arc: Arc<HeapObject> = Arc::from_raw(raw);
+            let did_append = if let Some(obj) = Arc::get_mut(&mut arc) {
+                if let HeapObject::String(s) = obj {
+                    rhs.append_to(s);
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+            // Either way, hand the Arc back to the nanbox slot — we only ever
+            // borrowed the single strong reference we started with.
+            let restored = Arc::into_raw(arc);
+            self.0 = nanbox::encode_heap_ptr(restored);
+            did_append
+        }
+    }
+
     #[inline]
     pub fn into_string(self) -> String {
         let bits = self.0;

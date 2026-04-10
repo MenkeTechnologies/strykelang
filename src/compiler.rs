@@ -1484,10 +1484,7 @@ impl Compiler {
                 // same runtime frame and are both accessible via O(1) slot ops.  The compiler's
                 // scope layer still tracks `my` declarations for name resolution; only the runtime
                 // frame push is elided.
-                let outer_has_slots = self
-                    .scope_stack
-                    .last()
-                    .map_or(false, |l| l.use_slots);
+                let outer_has_slots = self.scope_stack.last().is_some_and(|l| l.use_slots);
                 if !outer_has_slots {
                     self.emit_push_frame(line);
                 }
@@ -1923,7 +1920,7 @@ impl Compiler {
     fn compile_block(&mut self, block: &Block) -> Result<(), CompileError> {
         if Self::block_has_return(block) {
             self.compile_block_inner(block)?;
-        } else if self.scope_stack.last().map_or(false, |l| l.use_slots) {
+        } else if self.scope_stack.last().is_some_and(|l| l.use_slots) {
             // When scalar slots are active, skip PushFrame/PopFrame so slot indices keep
             // addressing the same runtime frame. New `my` decls still get fresh slot indices.
             self.compile_block_inner(block)?;
@@ -5410,10 +5407,10 @@ mod tests {
     fn compile_plain_scalar_read_emits_get_scalar_plain() {
         let chunk = compile_snippet("my $a = 1; $a + 0;").expect("compile");
         assert!(
-            chunk.ops.iter().any(|o| matches!(
-                o,
-                Op::GetScalarPlain(_) | Op::GetScalarSlot(_)
-            )),
+            chunk
+                .ops
+                .iter()
+                .any(|o| matches!(o, Op::GetScalarPlain(_) | Op::GetScalarSlot(_))),
             "expected GetScalarPlain or GetScalarSlot for non-special $a, ops={:?}",
             chunk.ops
         );

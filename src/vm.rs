@@ -2581,7 +2581,9 @@ impl<'a> VM<'a> {
                     }
                     Op::PreIncSlotVoid(slot) => {
                         let val = self.interp.scope.get_scalar_slot(*slot).to_int() + 1;
-                        self.interp.scope.set_scalar_slot(*slot, PerlValue::integer(val));
+                        self.interp
+                            .scope
+                            .set_scalar_slot(*slot, PerlValue::integer(val));
                         Ok(())
                     }
                     Op::PreDecSlot(slot) => {
@@ -3184,6 +3186,26 @@ impl<'a> VM<'a> {
                         };
                         if !lt {
                             self.ip = *target;
+                        }
+                        Ok(())
+                    }
+                    Op::SlotIncLtIntJumpBack(slot, limit, body_target) => {
+                        // Fused trailing `++$slot; goto top_test` for the bench_loop shape:
+                        // matches `PreIncSlotVoid` + `Jump` + top `SlotLtIntJumpIfFalse` exactly so
+                        // coercion, wrap-around, and integer-only write semantics line up byte-for-byte
+                        // with the un-fused form. Every iteration past the first skips the top check
+                        // and the unconditional jump entirely.
+                        let next_i = self
+                            .interp
+                            .scope
+                            .get_scalar_slot(*slot)
+                            .to_int()
+                            .wrapping_add(1);
+                        self.interp
+                            .scope
+                            .set_scalar_slot(*slot, PerlValue::integer(next_i));
+                        if next_i < *limit as i64 {
+                            self.ip = *body_target;
                         }
                         Ok(())
                     }

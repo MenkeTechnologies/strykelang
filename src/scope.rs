@@ -126,7 +126,11 @@ impl Frame {
 
     #[inline]
     fn has_scalar(&self, name: &str) -> bool {
-        if self.scalar_slot_names.iter().any(|sn| sn.as_deref() == Some(name)) {
+        if self
+            .scalar_slot_names
+            .iter()
+            .any(|sn| sn.as_deref() == Some(name))
+        {
             return true;
         }
         self.scalars.iter().any(|(k, _)| k == name)
@@ -499,6 +503,16 @@ impl Scope {
         if idx >= frame.scalar_slots.len() {
             frame.scalar_slots.resize(idx + 1, PerlValue::UNDEF);
         }
+        // Fast path: when the slot holds the only `Arc<HeapObject::String>` handle,
+        // extend the underlying `String` buffer in place — no Arc alloc, no full
+        // unwrap/rewrap. This turns a `$s .= "x"` loop into `String::push_str` only.
+        // The shallow_clone handle that goes back onto the VM stack briefly bumps
+        // the refcount to 2, so the NEXT iteration's fast path would fail — except
+        // the VM immediately `Pop`s that handle (or `ConcatAppendSlotVoid` never
+        // pushes it), restoring unique ownership before the next `.=`.
+        if frame.scalar_slots[idx].try_concat_append_inplace(rhs) {
+            return frame.scalar_slots[idx].shallow_clone();
+        }
         let new_val = std::mem::replace(&mut frame.scalar_slots[idx], PerlValue::UNDEF)
             .concat_append_owned(rhs);
         let handle = new_val.shallow_clone();
@@ -857,6 +871,11 @@ impl Scope {
                     let new_val = inner.concat_append_owned(rhs);
                     *guard = new_val.shallow_clone();
                     return Ok(new_val);
+                }
+                // Fast path: same `Arc::get_mut` trick as the slot variant — mutate the
+                // underlying `String` directly when the scalar is the lone handle.
+                if entry.1.try_concat_append_inplace(rhs) {
+                    return Ok(entry.1.shallow_clone());
                 }
                 // Use `into_string` + `append_to` so heap strings take the `Arc::try_unwrap`
                 // fast path instead of `Display` / heap formatting on every `.=`.

@@ -307,6 +307,14 @@ pub enum Op {
     PreIncSlotVoid(u8),
     /// Void-context `$slot .= expr` — no stack push. Replaces ConcatAppendSlot + Pop.
     ConcatAppendSlotVoid(u8),
+    /// Fused loop backedge: `$slot += 1; if $slot < limit jump body_target; else fall through`.
+    ///
+    /// Replaces the trailing `PreIncSlotVoid(s) + Jump(top)` of a C-style `for (my $i=0; $i<N; $i=$i+1)`
+    /// loop whose top op is a `SlotLtIntJumpIfFalse(s, limit, exit)`. The initial iteration still
+    /// goes through the top check; this op handles all subsequent iterations in a single dispatch,
+    /// halving the number of ops per loop trip for the `bench_loop`/`bench_string`/`bench_array` shape.
+    /// (slot, i32_limit, body_target)
+    SlotIncLtIntJumpBack(u8, i32, usize),
 
     // ── Frame-local scalar slots (O(1) access, no string lookup) ──
     /// Read scalar from current frame's slot array. u8 = slot index.
@@ -1140,7 +1148,51 @@ impl Chunk {
                 i += 1;
             }
         }
-        // Pass 3: compact — remove Nops and remap jump targets.
+        // Compact once so that pass 3 sees a Nop-free op stream and can match
+        // adjacent `PreIncSlotVoid + Jump` backedges produced by passes 1/2.
+        self.compact_nops();
+        // Pass 3: fuse loop backedge
+        //   PreIncSlotVoid(s)  + Jump(top)
+        // where ops[top] is SlotLtIntJumpIfFalse(s, limit, exit)
+        // becomes
+        //   SlotIncLtIntJumpBack(s, limit, top + 1)   // body falls through
+        //   Nop                                       // was Jump
+        // The first-iteration check at `top` is still reached from before the loop
+        // (the loop's initial entry goes through the top test), so leaving
+        // SlotLtIntJumpIfFalse in place keeps the entry path correct. All
+        // subsequent iterations now skip both the inc op and the jump.
+        let len = self.ops.len();
+        if len >= 2 {
+            let mut i = 0;
+            while i + 1 < len {
+                if let (Op::PreIncSlotVoid(s), Op::Jump(top)) = (&self.ops[i], &self.ops[i + 1]) {
+                    let slot = *s;
+                    let top = *top;
+                    // Only fuse backward branches — the C-style `for` shape where `top` is
+                    // the loop's `SlotLtIntJumpIfFalse` test and the body falls through to
+                    // this trailing increment. A forward `Jump` that happens to land on a
+                    // similar test is not the same shape and must not be rewritten.
+                    if top < i {
+                        if let Op::SlotLtIntJumpIfFalse(tslot, limit, exit) = &self.ops[top] {
+                            // Safety: the top test's exit target must equal the fused op's
+                            // fall-through (i + 2). Otherwise exiting the loop via
+                            // "condition false" would land somewhere the unfused shape never
+                            // exited to.
+                            if *tslot == slot && *exit == i + 2 {
+                                let limit = *limit;
+                                let body_target = top + 1;
+                                self.ops[i] = Op::SlotIncLtIntJumpBack(slot, limit, body_target);
+                                self.ops[i + 1] = Op::Nop;
+                                i += 2;
+                                continue;
+                            }
+                        }
+                    }
+                }
+                i += 1;
+            }
+        }
+        // Pass 4: compact again — remove the Nops introduced by pass 3.
         self.compact_nops();
     }
 
@@ -1150,8 +1202,8 @@ impl Chunk {
         // Build old→new index mapping.
         let mut remap = vec![0usize; old_len + 1];
         let mut new_idx = 0usize;
-        for old in 0..old_len {
-            remap[old] = new_idx;
+        for (old, slot) in remap[..old_len].iter_mut().enumerate() {
+            *slot = new_idx;
             if !matches!(self.ops[old], Op::Nop) {
                 new_idx += 1;
             }
@@ -1166,6 +1218,7 @@ impl Chunk {
                 Op::Jump(t) | Op::JumpIfFalse(t) | Op::JumpIfTrue(t) => *t = remap[*t],
                 Op::JumpIfTrueKeep(t) | Op::JumpIfDefinedKeep(t) => *t = remap[*t],
                 Op::SlotLtIntJumpIfFalse(_, _, t) => *t = remap[*t],
+                Op::SlotIncLtIntJumpBack(_, _, t) => *t = remap[*t],
                 _ => {}
             }
         }
@@ -1192,15 +1245,11 @@ impl Chunk {
         for old in 0..old_len {
             if !matches!(self.ops[old], Op::Nop) {
                 self.ops[j] = self.ops[old].clone();
-                if old < self.lines.len() {
-                    if j < self.lines.len() {
-                        self.lines[j] = self.lines[old];
-                    }
+                if old < self.lines.len() && j < self.lines.len() {
+                    self.lines[j] = self.lines[old];
                 }
-                if old < self.op_ast_expr.len() {
-                    if j < self.op_ast_expr.len() {
-                        self.op_ast_expr[j] = self.op_ast_expr[old];
-                    }
+                if old < self.op_ast_expr.len() && j < self.op_ast_expr.len() {
+                    self.op_ast_expr[j] = self.op_ast_expr[old];
                 }
                 j += 1;
             }
