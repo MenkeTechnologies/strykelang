@@ -1111,7 +1111,7 @@ fn simulate_one_op(
             }
             stack.push(Cell::Dyn);
         }
-        Op::HashSliceDeref(_) | Op::SetHashSliceDeref(_) => {
+        Op::HashSliceDeref(_) | Op::ArrowArraySlice(_) | Op::SetHashSliceDeref(_) => {
             return None;
         }
         _ => return None,
@@ -1997,6 +1997,7 @@ pub(crate) fn segment_blocks_subroutine_linear_jit(
         | Op::MakeScalarBindingRef(_)
         | Op::SymbolicDeref(_)
         | Op::HashSliceDeref(_)
+        | Op::ArrowArraySlice(_)
         | Op::SetHashSliceDeref(_)
         | Op::SortWithCodeComparator(_) => true,
         _ => false,

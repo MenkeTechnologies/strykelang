@@ -770,6 +770,61 @@ fn try_vm_execute_arrow_array_assign() {
 }
 
 #[test]
+fn try_vm_execute_arrow_array_slice_through_atref_read() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $a = [10, 20, 30];
+        my $r = $a;
+        join(",", @$r[1,2]);"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "@$aref[i,j] read should compile (Op::ArrowArraySlice + array ref base)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_string(), "20,30");
+}
+
+#[test]
+fn try_vm_execute_arrow_array_slice_through_atref_read_single() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $a = [10, 20];
+        my $r = $a;
+        @$r[1];"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "@$aref[i] read should use array ref base (ArrowArray), not symbolic @ expansion"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 20);
+}
+
+#[test]
+fn try_vm_execute_arrow_array_slice_through_atref_assign_list() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $a = [0, 0, 0, 0];
+        my $r = $a;
+        @$r[1,2] = (7, 8);
+        $r->[1] . "," . $r->[2];"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "@$aref[i,j] = (v1,v2) should compile (SetArrowArray per element)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_string(), "7,8");
+}
+
+#[test]
 fn try_vm_execute_arrow_array_pre_inc_only() {
     let p = parse(
         r#"no strict 'vars';

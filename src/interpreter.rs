@@ -7784,7 +7784,7 @@ impl Interpreter {
     pub(crate) fn eval_arrow_array_base(
         &mut self,
         expr: &Expr,
-        line: usize,
+        _line: usize,
     ) -> Result<PerlValue, FlowOrError> {
         match &expr.kind {
             ExprKind::Deref {

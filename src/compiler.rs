@@ -2879,9 +2879,14 @@ impl Compiler {
                     kind: DerefKind::Array,
                 } = &target.kind
                 {
+                    if matches!(index.kind, ExprKind::List(_)) {
+                        return Err(CompileError::Unsupported(
+                            "CompoundAssign on multi-index array slice (use tree interpreter)".into(),
+                        ));
+                    }
                     match op {
                         BinOp::DefinedOr | BinOp::LogOr | BinOp::LogAnd => {
-                            self.compile_expr(expr)?;
+                            self.compile_arrow_array_base_expr(expr)?;
                             self.compile_expr(index)?;
                             self.emit_op(Op::Dup2, line, Some(root));
                             self.emit_op(Op::ArrowArray, line, Some(root));
@@ -2912,7 +2917,7 @@ impl Compiler {
                             let vm_op = binop_to_vm_op(*op).ok_or_else(|| {
                                 CompileError::Unsupported("CompoundAssign op".into())
                             })?;
-                            self.compile_expr(expr)?;
+                            self.compile_arrow_array_base_expr(expr)?;
                             self.compile_expr(index)?;
                             self.emit_op(Op::Dup2, line, Some(root));
                             self.emit_op(Op::ArrowArray, line, Some(root));
