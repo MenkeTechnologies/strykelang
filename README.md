@@ -206,9 +206,14 @@ my @par = par_pipeline(@data)
 
 # parallel grep — filter elements in parallel
 my @evens = pgrep { $_ % 2 == 0 } @data, progress => 1;
+my @evens = pgrep { $_ % 2 == 0 } @data, progress => 1;
 
 # parallel foreach — execute side effects concurrently
 pfor { process } @items, progress => 1;
+{ process } pfor @items, progress => 1;
+
+pmap { process } @items, progress => 1;
+{ process } pmap @items, progress => 1;
 
 # fan — run a block N times in parallel (`$_` is 0..N-1)
 # progress => 1 shows per-worker animated bars (pv-style sweep left→right, like brew/cargo)

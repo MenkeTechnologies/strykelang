@@ -57,6 +57,11 @@ fn accepts_postfix_pfor_with_progress() {
 }
 
 #[test]
+fn accepts_postfix_pmap_with_progress() {
+    p("{ process } pmap @items, progress => 1;");
+}
+
+#[test]
 fn accepts_pfor_psort_pcache_par_lines_progress() {
     p("pfor { 1 } (1), progress => 1;");
     p("my @s = psort { $a <=> $b } (3, 1, 2), progress => 1;");

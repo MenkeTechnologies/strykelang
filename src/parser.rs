@@ -544,11 +544,79 @@ impl Parser {
                         self.peek_line(),
                     ));
                 }
+                // `{ } pmap @a` / `{ } pfor @a` / `do { } …` — same shapes as prefix `pmap { } @a`, etc.
+                "pmap" | "pgrep" | "pfor" | "preduce" | "pcache" => {
+                    let line = stmt.line;
+                    let block = self.stmt_into_parallel_block(stmt)?;
+                    let which = kw.as_str();
+                    self.advance();
+                    self.eat(&Token::Comma);
+                    let (list, progress) = self.parse_assign_expr_list_optional_progress()?;
+                    self.eat(&Token::Semicolon);
+                    let list = Box::new(list);
+                    let progress = progress.map(Box::new);
+                    let kind = match which {
+                        "pmap" => ExprKind::PMapExpr {
+                            block,
+                            list,
+                            progress,
+                        },
+                        "pgrep" => ExprKind::PGrepExpr {
+                            block,
+                            list,
+                            progress,
+                        },
+                        "pfor" => ExprKind::PForExpr {
+                            block,
+                            list,
+                            progress,
+                        },
+                        "preduce" => ExprKind::PReduceExpr {
+                            block,
+                            list,
+                            progress,
+                        },
+                        "pcache" => ExprKind::PcacheExpr {
+                            block,
+                            list,
+                            progress,
+                        },
+                        _ => unreachable!(),
+                    };
+                    return Ok(Statement {
+                        label: None,
+                        kind: StmtKind::Expression(Expr { kind, line }),
+                        line,
+                    });
+                }
                 _ => {}
             }
         }
         self.eat(&Token::Semicolon);
         Ok(stmt)
+    }
+
+    /// Block body for postfix `pmap` / `pfor` / … — bare `{ }` or `do { }` ([`ExprKind::Do`](ExprKind::Do)([`CodeRef`](ExprKind::CodeRef))).
+    fn stmt_into_parallel_block(&self, stmt: Statement) -> PerlResult<Block> {
+        let line = stmt.line;
+        match stmt.kind {
+            StmtKind::Block(block) => Ok(block),
+            StmtKind::Expression(expr) => {
+                if let ExprKind::Do(inner) = expr.kind {
+                    if let ExprKind::CodeRef { body, .. } = inner.kind {
+                        return Ok(body);
+                    }
+                }
+                Err(self.syntax_err(
+                    "postfix parallel op expects `do { }` or a bare `{ }` block",
+                    line,
+                ))
+            }
+            _ => Err(self.syntax_err(
+                "postfix parallel op expects `do { }` or a bare `{ }` block",
+                line,
+            )),
+        }
     }
 
     /// `StmtKind::Expression` or a bare block (`StmtKind::Block`) as an [`Expr`] for postfix
