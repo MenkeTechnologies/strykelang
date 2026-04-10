@@ -1,4 +1,4 @@
-use crate::error::{PerlError, PerlResult};
+use crate::error::{ErrorKind, PerlError, PerlResult};
 use crate::token::{keyword_or_ident, Token};
 
 /// Private-use character for a literal `$` inside double-quoted / `qq` strings (from `\$` in source).
@@ -12,16 +12,27 @@ pub struct Lexer {
     /// Tracks whether the last token was a term (value/variable/close-delim)
     /// to disambiguate `/` as division vs regex and `{` as hash-ref vs block.
     last_was_term: bool,
+    /// Source path for [`PerlError`] (e.g. real script or required `.pm` path).
+    error_file: String,
 }
 
 impl Lexer {
     pub fn new(input: &str) -> Self {
+        Self::new_with_file(input, "-e")
+    }
+
+    pub fn new_with_file(input: &str, file: impl Into<String>) -> Self {
         Self {
             input: input.chars().collect(),
             pos: 0,
             line: 1,
             last_was_term: false,
+            error_file: file.into(),
         }
+    }
+
+    fn syntax_err(&self, message: impl Into<String>, line: usize) -> PerlError {
+        PerlError::new(ErrorKind::Syntax, message, line, self.error_file.clone())
     }
 
     fn peek(&self) -> Option<char> {
@@ -105,14 +116,14 @@ impl Lexer {
             let digits = self.read_while(|c| c.is_ascii_hexdigit() || c == '_');
             let clean: String = digits.chars().filter(|&c| c != '_').collect();
             let val = i64::from_str_radix(&clean, 16)
-                .map_err(|_| PerlError::syntax("Invalid hex literal", self.line))?;
+                .map_err(|_| self.syntax_err("Invalid hex literal", self.line))?;
             return Ok(Token::Integer(val));
         }
         if is_bin {
             let digits = self.read_while(|c| c == '0' || c == '1' || c == '_');
             let clean: String = digits.chars().filter(|&c| c != '_').collect();
             let val = i64::from_str_radix(&clean, 2)
-                .map_err(|_| PerlError::syntax("Invalid binary literal", self.line))?;
+                .map_err(|_| self.syntax_err("Invalid binary literal", self.line))?;
             return Ok(Token::Integer(val));
         }
 
@@ -139,16 +150,16 @@ impl Lexer {
         if is_float {
             let val: f64 = clean
                 .parse()
-                .map_err(|_| PerlError::syntax("Invalid float literal", self.line))?;
+                .map_err(|_| self.syntax_err("Invalid float literal", self.line))?;
             Ok(Token::Float(val))
         } else if is_oct && clean.starts_with('0') && clean.len() > 1 {
             let val = i64::from_str_radix(&clean[1..], 8)
-                .map_err(|_| PerlError::syntax("Invalid octal literal", self.line))?;
+                .map_err(|_| self.syntax_err("Invalid octal literal", self.line))?;
             Ok(Token::Integer(val))
         } else {
             let val: i64 = clean
                 .parse()
-                .map_err(|_| PerlError::syntax("Invalid integer literal", self.line))?;
+                .map_err(|_| self.syntax_err("Invalid integer literal", self.line))?;
             Ok(Token::Integer(val))
         }
     }
@@ -172,7 +183,7 @@ impl Lexer {
                 Some('\'') => break,
                 Some(c) => s.push(c),
                 None => {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         "Unterminated single-quoted string",
                         self.line,
                     ))
@@ -208,20 +219,20 @@ impl Lexer {
                             self.advance(); // '{'
                             let hex = self.read_while(|c| c != '}');
                             if self.peek() != Some('}') {
-                                return Err(PerlError::syntax(
+                                return Err(self.syntax_err(
                                     "Unterminated \\x{...} in string",
                                     self.line,
                                 ));
                             }
                             self.advance(); // '}'
                             if hex.is_empty() {
-                                return Err(PerlError::syntax("Empty \\x{} in string", self.line));
+                                return Err(self.syntax_err("Empty \\x{} in string", self.line));
                             }
                             let val = u32::from_str_radix(&hex, 16).map_err(|_| {
-                                PerlError::syntax("Invalid hex digits in \\x{...}", self.line)
+                                self.syntax_err("Invalid hex digits in \\x{...}", self.line)
                             })?;
                             let c = char::from_u32(val).ok_or_else(|| {
-                                PerlError::syntax("Invalid Unicode scalar value in \\x{...}", self.line)
+                                self.syntax_err("Invalid Unicode scalar value in \\x{...}", self.line)
                             })?;
                             s.push(c);
                         } else {
@@ -242,7 +253,7 @@ impl Lexer {
                                 if let Some(c) = char::from_u32(val) {
                                     s.push(c);
                                 } else {
-                                    return Err(PerlError::syntax(
+                                    return Err(self.syntax_err(
                                         "Invalid code point in \\x escape",
                                         self.line,
                                     ));
@@ -255,11 +266,11 @@ impl Lexer {
                         s.push('\\');
                         s.push(c);
                     }
-                    None => return Err(PerlError::syntax("Unterminated string", self.line)),
+                    None => return Err(self.syntax_err("Unterminated string", self.line)),
                 },
                 Some(c) if c == term => break,
                 Some(c) => s.push(c),
-                None => return Err(PerlError::syntax("Unterminated string", self.line)),
+                None => return Err(self.syntax_err("Unterminated string", self.line)),
             }
         }
         Ok(s)
@@ -296,20 +307,20 @@ impl Lexer {
                                     self.advance();
                                     let hex = self.read_while(|c| c != '}');
                                     if self.peek() != Some('}') {
-                                        return Err(PerlError::syntax(
+                                        return Err(self.syntax_err(
                                             "Unterminated \\x{...} in qq string",
                                             self.line,
                                         ));
                                     }
                                     self.advance();
                                     if hex.is_empty() {
-                                        return Err(PerlError::syntax("Empty \\x{} in qq string", self.line));
+                                        return Err(self.syntax_err("Empty \\x{} in qq string", self.line));
                                     }
                                     let val = u32::from_str_radix(&hex, 16).map_err(|_| {
-                                        PerlError::syntax("Invalid hex digits in \\x{...}", self.line)
+                                        self.syntax_err("Invalid hex digits in \\x{...}", self.line)
                                     })?;
                                     let c = char::from_u32(val).ok_or_else(|| {
-                                        PerlError::syntax(
+                                        self.syntax_err(
                                             "Invalid Unicode scalar value in \\x{...}",
                                             self.line,
                                         )
@@ -331,7 +342,7 @@ impl Lexer {
                                         if let Some(c) = char::from_u32(val) {
                                             s.push(c);
                                         } else {
-                                            return Err(PerlError::syntax(
+                                            return Err(self.syntax_err(
                                                 "Invalid code point in \\x escape",
                                                 self.line,
                                             ));
@@ -345,7 +356,7 @@ impl Lexer {
                                 s.push(c);
                             }
                             None => {
-                                return Err(PerlError::syntax(
+                                return Err(self.syntax_err(
                                     "Unterminated qq(...) string",
                                     self.line,
                                 ));
@@ -359,7 +370,7 @@ impl Lexer {
                                 s.push(c);
                             }
                             None => {
-                                return Err(PerlError::syntax(
+                                return Err(self.syntax_err(
                                     "Unterminated q(...) string",
                                     self.line,
                                 ));
@@ -385,7 +396,7 @@ impl Lexer {
                     s.push(c);
                 }
                 None => {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         "Unterminated q/qq bracketed string",
                         self.line,
                     ));
@@ -408,7 +419,7 @@ impl Lexer {
                 }
                 Some('/') => break,
                 Some(c) => pattern.push(c),
-                None => return Err(PerlError::syntax("Unterminated regex", self.line)),
+                None => return Err(self.syntax_err("Unterminated regex", self.line)),
             }
         }
         let flags = self.read_while(|c| "gimsxe".contains(c));
@@ -420,7 +431,7 @@ impl Lexer {
         self.skip_whitespace_and_comments();
         let open = self
             .advance()
-            .ok_or_else(|| PerlError::syntax("Expected delimiter after qw", self.line))?;
+            .ok_or_else(|| self.syntax_err("Expected delimiter after qw", self.line))?;
         let close = match open {
             '(' => ')',
             '[' => ']',
@@ -437,7 +448,7 @@ impl Lexer {
             loop {
                 match self.peek() {
                     None => {
-                        return Err(PerlError::syntax("Unterminated qw()", self.line));
+                        return Err(self.syntax_err("Unterminated qw()", self.line));
                     }
                     Some(c) if depth == 1 && c.is_whitespace() => {
                         self.advance();
@@ -487,7 +498,7 @@ impl Lexer {
                 break;
             }
             if self.peek().is_none() {
-                return Err(PerlError::syntax("Unterminated qw()", self.line));
+                return Err(self.syntax_err("Unterminated qw()", self.line));
             }
             let word = self.read_while(|c| !c.is_whitespace() && c != close);
             if !word.is_empty() {
@@ -548,7 +559,7 @@ impl Lexer {
             if self.peek() == Some('\n') {
                 self.advance();
             } else if self.pos >= self.input.len() {
-                return Err(PerlError::syntax(
+                return Err(self.syntax_err(
                     format!("Unterminated heredoc (looking for '{tag}')"),
                     self.line,
                 ));
@@ -607,7 +618,7 @@ impl Lexer {
             }
             lines.push(line);
             if self.peek().is_none() {
-                return Err(PerlError::syntax(
+                return Err(self.syntax_err(
                     "Unterminated format (expected '.' on its own line before end of file)",
                     self.line,
                 ));
@@ -706,7 +717,7 @@ impl Lexer {
                 }
                 let name = self.read_variable_name();
                 if name.is_empty() {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         "Expected variable name after $",
                         self.line,
                     ));
@@ -1176,7 +1187,7 @@ impl Lexer {
                         let fname = self.read_package_qualified_identifier();
                         self.skip_whitespace_and_comments();
                         if self.peek() != Some('=') {
-                            return Err(PerlError::syntax(
+                            return Err(self.syntax_err(
                                 "Expected '=' after format name",
                                 self.line,
                             ));
@@ -1194,7 +1205,7 @@ impl Lexer {
                     "qq" | "q" => {
                         self.skip_whitespace_and_comments();
                         let delim = self.advance().ok_or_else(|| {
-                            PerlError::syntax("Expected delimiter after q/qq", self.line)
+                            self.syntax_err("Expected delimiter after q/qq", self.line)
                         })?;
                         let close = match delim {
                             '(' => ')',
@@ -1217,7 +1228,7 @@ impl Lexer {
                     "qx" => {
                         self.skip_whitespace_and_comments();
                         let delim = self.advance().ok_or_else(|| {
-                            PerlError::syntax("Expected delimiter after qx", self.line)
+                            self.syntax_err("Expected delimiter after qx", self.line)
                         })?;
                         let close = match delim {
                             '(' => ')',
@@ -1233,7 +1244,7 @@ impl Lexer {
                     "qr" => {
                         self.skip_whitespace_and_comments();
                         let delim = self.advance().ok_or_else(|| {
-                            PerlError::syntax("Expected delimiter after qr", self.line)
+                            self.syntax_err("Expected delimiter after qr", self.line)
                         })?;
                         let close = match delim {
                             '(' => ')',
@@ -1271,7 +1282,7 @@ impl Lexer {
                                         Some(c) if c == close => break,
                                         Some(c) => pattern.push(c),
                                         None => {
-                                            return Err(PerlError::syntax(
+                                            return Err(self.syntax_err(
                                                 "Unterminated m// pattern",
                                                 self.line,
                                             ))
@@ -1311,7 +1322,7 @@ impl Lexer {
                                         Some(c) if c == close => break,
                                         Some(c) => pattern.push(c),
                                         None => {
-                                            return Err(PerlError::syntax(
+                                            return Err(self.syntax_err(
                                                 "Unterminated s/// pattern",
                                                 self.line,
                                             ))
@@ -1538,7 +1549,7 @@ impl Lexer {
                 Ok(tok)
             }
 
-            c => Err(PerlError::syntax(
+            c => Err(self.syntax_err(
                 format!("Unexpected character '{c}'"),
                 self.line,
             )),

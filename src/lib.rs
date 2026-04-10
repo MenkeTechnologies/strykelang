@@ -58,17 +58,39 @@ pub fn format_program(p: &ast::Program) -> String {
 }
 
 pub fn parse(code: &str) -> PerlResult<ast::Program> {
-    let mut lexer = lexer::Lexer::new(code);
+    parse_with_file(code, "-e")
+}
+
+/// Parse with a **source path** for lexer/parser diagnostics (`… at FILE line N`), e.g. a script
+/// path or a required `.pm` absolute path. Use [`parse`] for snippets where `-e` is appropriate.
+pub fn parse_with_file(code: &str, file: &str) -> PerlResult<ast::Program> {
+    let mut lexer = lexer::Lexer::new_with_file(code, file);
     let tokens = lexer.tokenize()?;
-    let mut parser = parser::Parser::new(tokens);
+    let mut parser = parser::Parser::new_with_file(tokens, file);
     parser.parse_program()
 }
 
 /// Parse and execute a string of Perl code within an existing interpreter.
 /// Tries bytecode VM first, falls back to tree-walker on unsupported features.
+/// Uses [`Interpreter::file`] for both parse diagnostics and `__FILE__` during this execution.
 pub fn parse_and_run_string(code: &str, interp: &mut Interpreter) -> PerlResult<PerlValue> {
-    let program = parse(code)?;
-    interp.execute(&program)
+    let file = interp.file.clone();
+    parse_and_run_string_in_file(code, interp, &file)
+}
+
+/// Like [`parse_and_run_string`], but parse errors and `__FILE__` for this run use `file` (e.g. a
+/// required module path). Restores [`Interpreter::file`] after execution.
+pub fn parse_and_run_string_in_file(
+    code: &str,
+    interp: &mut Interpreter,
+    file: &str,
+) -> PerlResult<PerlValue> {
+    let program = parse_with_file(code, file)?;
+    let saved = interp.file.clone();
+    interp.file = file.to_string();
+    let r = interp.execute(&program);
+    interp.file = saved;
+    r
 }
 
 /// Crate-root `vendor/perl` (e.g. `List/Util.pm`). The `perlrs` / `pe` driver prepends this to

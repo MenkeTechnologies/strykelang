@@ -1,7 +1,7 @@
 //! Unit tests for the crate root API: `parse`, `run`, `parse_and_run_string`, `try_vm_execute`.
 
 use crate::interpreter::Interpreter;
-use crate::{lint_program, parse, parse_and_run_string, run, try_vm_execute};
+use crate::{lint_program, parse, parse_and_run_string, parse_with_file, run, try_vm_execute};
 
 fn run_int(code: &str) -> i64 {
     run(code).expect("run").to_int()
@@ -103,6 +103,16 @@ fn run_simple_subroutine() {
     assert_eq!(
         run_int("sub add2 { return $_[0] + $_[1]; } add2(30, 12);"),
         42
+    );
+}
+
+#[test]
+fn parse_with_file_includes_path_in_syntax_error_display() {
+    let e = parse_with_file("sub f {", "/tmp/parity_syntax_path.pm").expect_err("unclosed brace");
+    let s = e.to_string();
+    assert!(
+        s.contains("/tmp/parity_syntax_path.pm"),
+        "expected path in error, got: {s}"
     );
 }
 

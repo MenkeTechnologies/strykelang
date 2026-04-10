@@ -5400,7 +5400,8 @@ impl<'a> VM<'a> {
                     .to_string();
                 match std::fs::read_to_string(&filename) {
                     Ok(code) => {
-                        crate::parse_and_run_string(&code, self.interp).or(Ok(PerlValue::UNDEF))
+                        crate::parse_and_run_string_in_file(&code, self.interp, &filename)
+                            .or(Ok(PerlValue::UNDEF))
                     }
                     Err(_) => Ok(PerlValue::UNDEF),
                 }

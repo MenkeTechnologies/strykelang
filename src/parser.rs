@@ -1,5 +1,5 @@
 use crate::ast::*;
-use crate::error::{PerlError, PerlResult};
+use crate::error::{ErrorKind, PerlError, PerlResult};
 use crate::lexer::{Lexer, LITERAL_DOLLAR_IN_DQUOTE};
 use crate::token::Token;
 
@@ -11,16 +11,27 @@ pub struct Parser {
     /// When > 0, `expr` `(` is not parsed as [`ExprKind::IndirectCall`] — e.g. `sort $k (1)` must
     /// treat `(1)` as the sort list, not `$k(1)`.
     suppress_indirect_paren_call: u32,
+    /// Source path for [`PerlError`] (matches lexer / `parse_with_file`).
+    error_file: String,
 }
 
 impl Parser {
     pub fn new(tokens: Vec<(Token, usize)>) -> Self {
+        Self::new_with_file(tokens, "-e")
+    }
+
+    pub fn new_with_file(tokens: Vec<(Token, usize)>, file: impl Into<String>) -> Self {
         Self {
             tokens,
             pos: 0,
             next_rate_limit_slot: 0,
             suppress_indirect_paren_call: 0,
+            error_file: file.into(),
         }
+    }
+
+    fn syntax_err(&self, message: impl Into<String>, line: usize) -> PerlError {
+        PerlError::new(ErrorKind::Syntax, message, line, self.error_file.clone())
     }
 
     fn alloc_rate_limit_slot(&mut self) -> u32 {
@@ -62,7 +73,7 @@ impl Parser {
         if std::mem::discriminant(&tok) == std::mem::discriminant(expected) {
             Ok(line)
         } else {
-            Err(PerlError::syntax(
+            Err(self.syntax_err(
                 format!("Expected {:?}, got {:?}", expected, tok),
                 line,
             ))
@@ -220,13 +231,13 @@ impl Parser {
                             }
                             stmt
                         } else {
-                            return Err(PerlError::syntax(
+                            return Err(self.syntax_err(
                                 "Expected 'my' after 'frozen'",
                                 self.peek_line(),
                             ));
                         }
                     } else {
-                        return Err(PerlError::syntax(
+                        return Err(self.syntax_err(
                             "Expected 'my' after 'frozen'",
                             self.peek_line(),
                         ));
@@ -238,13 +249,13 @@ impl Parser {
                         if kw == "my" {
                             self.parse_my_our_local("my", true)?
                         } else {
-                            return Err(PerlError::syntax(
+                            return Err(self.syntax_err(
                                 "Expected 'my' after 'typed'",
                                 self.peek_line(),
                             ));
                         }
                     } else {
-                        return Err(PerlError::syntax(
+                        return Err(self.syntax_err(
                             "Expected 'my' after 'typed'",
                             self.peek_line(),
                         ));
@@ -810,7 +821,7 @@ impl Parser {
                 self.advance();
             }
             _ => {
-                return Err(PerlError::syntax(
+                return Err(self.syntax_err(
                     "expected 'catch' after try block",
                     self.peek_line(),
                 ));
@@ -858,7 +869,7 @@ impl Parser {
                 TieTarget::Scalar(s)
             }
             tok => {
-                return Err(PerlError::syntax(
+                return Err(self.syntax_err(
                     format!("tie expects $scalar, @array, or %hash, got {:?}", tok),
                     self.peek_line(),
                 ));
@@ -1007,7 +1018,7 @@ impl Parser {
                 elems.push(MatchArrayElem::Rest);
                 self.eat(&Token::Comma);
                 if !matches!(self.peek(), Token::RBracket) {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         "`*` must be the last element in an array match pattern",
                         self.peek_line(),
                     ));
@@ -1046,7 +1057,7 @@ impl Parser {
                     pairs.push(MatchHashPair::Capture { key, name });
                 }
                 tok => {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         format!(
                             "hash match pattern must bind with `=> $name` or `=> _`, got {:?}",
                             tok
@@ -1402,7 +1413,7 @@ impl Parser {
     fn parse_scalar_var_name(&mut self) -> PerlResult<String> {
         match self.advance() {
             (Token::ScalarVar(name), _) => Ok(name),
-            (tok, line) => Err(PerlError::syntax(
+            (tok, line) => Err(self.syntax_err(
                 format!("Expected scalar variable, got {:?}", tok),
                 line,
             )),
@@ -1423,7 +1434,7 @@ impl Parser {
                     break;
                 }
                 Token::Eof => {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         "Unterminated sub prototype (expected ')' before end of input)",
                         self.peek_line(),
                     ));
@@ -1497,7 +1508,7 @@ impl Parser {
                     s.push('&');
                 }
                 tok => {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         format!("Unexpected token in sub prototype: {:?}", tok),
                         self.peek_line(),
                     ));
@@ -1513,7 +1524,7 @@ impl Parser {
             match self.advance() {
                 (Token::Ident(_), _) => {}
                 (tok, line) => {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         format!("Expected attribute name after `:`, got {:?}", tok),
                         line,
                     ));
@@ -1528,7 +1539,7 @@ impl Parser {
                             depth -= 1;
                         }
                         Token::Eof => {
-                            return Err(PerlError::syntax(
+                            return Err(self.syntax_err(
                                 "Unterminated sub attribute argument list",
                                 self.peek_line(),
                             ));
@@ -1579,7 +1590,7 @@ impl Parser {
                     line,
                 })
             }
-            tok => Err(PerlError::syntax(
+            tok => Err(self.syntax_err(
                 format!(
                     "Expected sub name, `(`, `{{`, or `:`, got {:?}",
                     tok
@@ -1596,7 +1607,7 @@ impl Parser {
         let name = match self.advance() {
             (Token::Ident(n), _) => n,
             (tok, err_line) => {
-                return Err(PerlError::syntax(
+                return Err(self.syntax_err(
                     format!("Expected struct name, got {:?}", tok),
                     err_line,
                 ))
@@ -1608,7 +1619,7 @@ impl Parser {
             let field_name = match self.advance() {
                 (Token::Ident(n), _) => n,
                 (tok, err_line) => {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         format!("Expected field name, got {:?}", tok),
                         err_line,
                     ))
@@ -1681,7 +1692,7 @@ impl Parser {
                 initializer = Some(self.parse_expression()?);
             } else if matches!(self.peek(), Token::OrAssign | Token::DefinedOrAssign) {
                 if matches!(&target.kind, ExprKind::Typeglob(_)) {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         "compound assignment on typeglob declaration is not supported",
                         self.peek_line(),
                     ));
@@ -1755,7 +1766,7 @@ impl Parser {
             if let Some(op) = op {
                 let d = &decls[0];
                 if matches!(d.sigil, Sigil::Typeglob) {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         "compound assignment on typeglob declaration is not supported",
                         self.peek_line(),
                     ));
@@ -1825,7 +1836,7 @@ impl Parser {
                 let name = match self.advance() {
                     (Token::Ident(n), _) => n,
                     (tok, l) => {
-                        return Err(PerlError::syntax(
+                        return Err(self.syntax_err(
                             format!("Expected identifier after *, got {:?}", tok),
                             l,
                         ));
@@ -1840,7 +1851,7 @@ impl Parser {
                 }
             }
             (tok, line) => {
-                return Err(PerlError::syntax(
+                return Err(self.syntax_err(
                     format!("Expected variable in declaration, got {:?}", tok),
                     line,
                 ));
@@ -1849,7 +1860,7 @@ impl Parser {
         if allow_type_annotation && self.eat(&Token::Colon) {
             let ty = self.parse_type_name()?;
             if decl.sigil != Sigil::Scalar {
-                return Err(PerlError::syntax(
+                return Err(self.syntax_err(
                     "`: Type` is only valid for scalar declarations (typed my $name : Int)",
                     self.peek_line(),
                 ));
@@ -1866,12 +1877,12 @@ impl Parser {
                 "Int" => Ok(PerlTypeName::Int),
                 "Str" => Ok(PerlTypeName::Str),
                 "Float" => Ok(PerlTypeName::Float),
-                _ => Err(PerlError::syntax(
+                _ => Err(self.syntax_err(
                     format!("unknown type `{name}` (supported: Int, Str, Float)"),
                     line,
                 )),
             },
-            (tok, line) => Err(PerlError::syntax(
+            (tok, line) => Err(self.syntax_err(
                 format!("Expected type name after `:`, got {:?}", tok),
                 line,
             )),
@@ -1884,7 +1895,7 @@ impl Parser {
         let name = match self.advance() {
             (Token::Ident(n), _) => n,
             (tok, line) => {
-                return Err(PerlError::syntax(
+                return Err(self.syntax_err(
                     format!("Expected package name, got {:?}", tok),
                     line,
                 ))
@@ -1929,7 +1940,7 @@ impl Parser {
                         line,
                     })
                 } else {
-                    Err(PerlError::syntax(
+                    Err(self.syntax_err(
                         format!(
                             "Expected ';' after use VERSION (got {:?})",
                             self.peek()
@@ -1955,8 +1966,8 @@ impl Parser {
                             let key_e = this.parse_assign_expr()?;
                             this.expect(&Token::FatArrow)?;
                             let val_e = this.parse_assign_expr()?;
-                            let key = Self::expr_to_overload_key(&key_e)?;
-                            let val = Self::expr_to_overload_sub(&val_e)?;
+                            let key = this.expr_to_overload_key(&key_e)?;
+                            let val = this.expr_to_overload_sub(&val_e)?;
                             pairs.push((key, val));
                             if !this.eat(&Token::Comma) {
                                 break;
@@ -2000,7 +2011,7 @@ impl Parser {
                     line,
                 })
             }
-            other => Err(PerlError::syntax(
+            other => Err(self.syntax_err(
                 format!("Expected module name or version after use, got {:?}", other),
                 tok_line,
             )),
@@ -2013,7 +2024,7 @@ impl Parser {
         let module = match self.advance() {
             (Token::Ident(n), _) => n,
             (tok, line) => {
-                return Err(PerlError::syntax(
+                return Err(self.syntax_err(
                     format!("Expected module name after no, got {:?}", tok),
                     line,
                 ))
@@ -2633,7 +2644,7 @@ impl Parser {
                                 line,
                             })
                         } else {
-                            Err(PerlError::syntax("Invalid regex binding", line))
+                            Err(self.syntax_err("Invalid regex binding", line))
                         }
                     }
                     _ => {
@@ -2709,7 +2720,7 @@ impl Parser {
                                 line,
                             })
                         } else {
-                            Err(PerlError::syntax("Invalid regex binding after !~", line))
+                            Err(self.syntax_err("Invalid regex binding after !~", line))
                         }
                     }
                     _ => {
@@ -2750,7 +2761,7 @@ impl Parser {
         let mut name = match self.advance() {
             (Token::Ident(n), _) => n,
             (tok, l) => {
-                return Err(PerlError::syntax(
+                return Err(self.syntax_err(
                     format!("Expected identifier, got {:?}", tok),
                     l,
                 ));
@@ -2763,7 +2774,7 @@ impl Parser {
                     name.push_str(&part);
                 }
                 (tok, l) => {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         format!("Expected identifier after `::`, got {:?}", tok),
                         l,
                     ));
@@ -3043,7 +3054,7 @@ impl Parser {
                                 let real_method = match self.advance() {
                                     (Token::Ident(n), _) => n,
                                     (tok, l) => {
-                                        return Err(PerlError::syntax(
+                                        return Err(self.syntax_err(
                                             format!(
                                                 "Expected method name after SUPER::, got {:?}",
                                                 tok
@@ -3077,7 +3088,7 @@ impl Parser {
                                             method_name.push_str(&part);
                                         }
                                         (tok, l) => {
-                                            return Err(PerlError::syntax(
+                                            return Err(self.syntax_err(
                                                 format!(
                                                     "Expected identifier after :: in method name, got {:?}",
                                                     tok
@@ -3270,7 +3281,7 @@ impl Parser {
                     (Token::Ident(n), _) => n,
                     (Token::X, _) => "x".to_string(),
                     (tok, l) => {
-                        return Err(PerlError::syntax(
+                        return Err(self.syntax_err(
                             format!("Expected identifier after *, got {:?}", tok),
                             l,
                         ));
@@ -3285,7 +3296,7 @@ impl Parser {
                             full_name = format!("{}::x", full_name);
                         }
                         (tok, l) => {
-                            return Err(PerlError::syntax(
+                            return Err(self.syntax_err(
                                 format!("Expected identifier after :: in typeglob, got {:?}", tok),
                                 l,
                             ));
@@ -3390,7 +3401,7 @@ impl Parser {
                     let n = match self.advance() {
                         (Token::ScalarVar(n), _) => n,
                         (tok, l) => {
-                            return Err(PerlError::syntax(
+                            return Err(self.syntax_err(
                                 format!("Expected scalar variable after %%, got {:?}", tok),
                                 l,
                             ));
@@ -3443,7 +3454,7 @@ impl Parser {
                         }
                     }
                     _ => {
-                        return Err(PerlError::syntax(
+                        return Err(self.syntax_err(
                             "Expected `$name` or `{` after `@` (e.g. `@$aref`, `@{expr}`, or `@$href{keys}`)",
                             line,
                         ));
@@ -3572,12 +3583,12 @@ impl Parser {
                             line,
                         });
                     }
-                    return Err(PerlError::syntax("Unexpected encoded token", line));
+                    return Err(self.syntax_err("Unexpected encoded token", line));
                 }
                 self.parse_named_expr(name)
             }
 
-            tok => Err(PerlError::syntax(
+            tok => Err(self.syntax_err(
                 format!("Unexpected token {:?}", tok),
                 line,
             )),
@@ -3593,7 +3604,7 @@ impl Parser {
                     name = format!("{}::{}", name, part);
                 }
                 (tok, err_line) => {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         format!("Expected identifier after `::`, got {:?}", tok),
                         err_line,
                     ));
@@ -3719,7 +3730,7 @@ impl Parser {
             "atan2" => {
                 let args = self.parse_builtin_args()?;
                 if args.len() != 2 {
-                    return Err(PerlError::syntax("atan2 requires two arguments", line));
+                    return Err(self.syntax_err("atan2 requires two arguments", line));
                 }
                 Ok(Expr {
                     kind: ExprKind::Atan2 {
@@ -3875,7 +3886,7 @@ impl Parser {
             "crypt" => {
                 let args = self.parse_builtin_args()?;
                 if args.len() != 2 {
-                    return Err(PerlError::syntax("crypt requires two arguments", line));
+                    return Err(self.syntax_err("crypt requires two arguments", line));
                 }
                 Ok(Expr {
                     kind: ExprKind::Crypt {
@@ -3929,7 +3940,7 @@ impl Parser {
                 let args = self.parse_builtin_args()?;
                 let (first, rest) = args
                     .split_first()
-                    .ok_or_else(|| PerlError::syntax("push requires arguments", line))?;
+                    .ok_or_else(|| self.syntax_err("push requires arguments", line))?;
                 Ok(Expr {
                     kind: ExprKind::Push {
                         array: Box::new(first.clone()),
@@ -3956,7 +3967,7 @@ impl Parser {
                 let args = self.parse_builtin_args()?;
                 let (first, rest) = args
                     .split_first()
-                    .ok_or_else(|| PerlError::syntax("unshift requires arguments", line))?;
+                    .ok_or_else(|| self.syntax_err("unshift requires arguments", line))?;
                 Ok(Expr {
                     kind: ExprKind::Unshift {
                         array: Box::new(first.clone()),
@@ -3970,7 +3981,7 @@ impl Parser {
                 let mut iter = args.into_iter();
                 let array = Box::new(
                     iter.next()
-                        .ok_or_else(|| PerlError::syntax("splice requires arguments", line))?,
+                        .ok_or_else(|| self.syntax_err("splice requires arguments", line))?,
                 );
                 let offset = iter.next().map(Box::new);
                 let length = iter.next().map(Box::new);
@@ -4030,7 +4041,7 @@ impl Parser {
             "join" => {
                 let args = self.parse_builtin_args()?;
                 if args.len() < 2 {
-                    return Err(PerlError::syntax("join requires separator and list", line));
+                    return Err(self.syntax_err("join requires separator and list", line));
                 }
                 Ok(Expr {
                     kind: ExprKind::JoinExpr {
@@ -4101,7 +4112,7 @@ impl Parser {
                 let args = self.parse_builtin_args()?;
                 let (first, rest) = args
                     .split_first()
-                    .ok_or_else(|| PerlError::syntax("sprintf requires format", line))?;
+                    .ok_or_else(|| self.syntax_err("sprintf requires format", line))?;
                 Ok(Expr {
                     kind: ExprKind::Sprintf {
                         format: Box::new(first.clone()),
@@ -4272,7 +4283,7 @@ impl Parser {
                             Some(Box::new(self.parse_assign_expr()?))
                         }
                         _ => {
-                            return Err(PerlError::syntax(
+                            return Err(self.syntax_err(
                                 "par_lines: expected `progress => EXPR` after comma",
                                 line,
                             ));
@@ -4304,7 +4315,7 @@ impl Parser {
                             Some(Box::new(self.parse_assign_expr()?))
                         }
                         _ => {
-                            return Err(PerlError::syntax(
+                            return Err(self.syntax_err(
                                 "par_walk: expected `progress => EXPR` after comma",
                                 line,
                             ));
@@ -4374,7 +4385,7 @@ impl Parser {
             }
             "async" => {
                 if !matches!(self.peek(), Token::LBrace) {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         "async must be followed by { BLOCK }",
                         line,
                     ));
@@ -4387,7 +4398,7 @@ impl Parser {
             }
             "spawn" => {
                 if !matches!(self.peek(), Token::LBrace) {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         "spawn must be followed by { BLOCK }",
                         line,
                     ));
@@ -4400,7 +4411,7 @@ impl Parser {
             }
             "trace" => {
                 if !matches!(self.peek(), Token::LBrace) {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         "trace must be followed by { BLOCK }",
                         line,
                     ));
@@ -4413,7 +4424,7 @@ impl Parser {
             }
             "timer" => {
                 if !matches!(self.peek(), Token::LBrace) {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         "timer must be followed by { BLOCK }",
                         line,
                     ));
@@ -4426,7 +4437,7 @@ impl Parser {
             }
             "bench" => {
                 if !matches!(self.peek(), Token::LBrace) {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         "bench must be followed by { BLOCK }",
                         line,
                     ));
@@ -4440,7 +4451,7 @@ impl Parser {
             }
             "retry" => {
                 if !matches!(self.peek(), Token::LBrace) {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         "retry must be followed by { BLOCK }",
                         line,
                     ));
@@ -4451,7 +4462,7 @@ impl Parser {
                         self.advance();
                     }
                     _ => {
-                        return Err(PerlError::syntax(
+                        return Err(self.syntax_err(
                             "retry: expected `times =>` after block",
                             line,
                         ));
@@ -4466,7 +4477,7 @@ impl Parser {
                             self.advance();
                         }
                         _ => {
-                            return Err(PerlError::syntax(
+                            return Err(self.syntax_err(
                                 "retry: expected `backoff =>` after comma",
                                 line,
                             ));
@@ -4474,7 +4485,7 @@ impl Parser {
                     }
                     self.expect(&Token::FatArrow)?;
                     let Token::Ident(mode) = self.peek().clone() else {
-                        return Err(PerlError::syntax(
+                        return Err(self.syntax_err(
                             "retry: expected backoff mode (none, linear, exponential)",
                             line,
                         ));
@@ -4484,7 +4495,7 @@ impl Parser {
                         "linear" => RetryBackoff::Linear,
                         "exponential" => RetryBackoff::Exponential,
                         _ => {
-                            return Err(PerlError::syntax(
+                            return Err(self.syntax_err(
                                 format!("retry: invalid backoff `{mode}`"),
                                 line,
                             ));
@@ -4508,7 +4519,7 @@ impl Parser {
                 let window = Box::new(self.parse_expression()?);
                 self.expect(&Token::RParen)?;
                 if !matches!(self.peek(), Token::LBrace) {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         "rate_limit must be followed by { BLOCK }",
                         line,
                     ));
@@ -4530,7 +4541,7 @@ impl Parser {
                 let interval = Box::new(self.parse_expression()?);
                 self.expect(&Token::RParen)?;
                 if !matches!(self.peek(), Token::LBrace) {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         "every must be followed by { BLOCK }",
                         line,
                     ));
@@ -4543,7 +4554,7 @@ impl Parser {
             }
             "gen" => {
                 if !matches!(self.peek(), Token::LBrace) {
-                    return Err(PerlError::syntax("gen must be followed by { BLOCK }", line));
+                    return Err(self.syntax_err("gen must be followed by { BLOCK }", line));
                 }
                 let body = self.parse_block()?;
                 Ok(Expr {
@@ -4714,7 +4725,7 @@ impl Parser {
                     self.expect(&Token::RParen)?;
                 }
                 if receivers.is_empty() {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         "pselect needs at least one receiver",
                         line,
                     ));
@@ -4778,7 +4789,7 @@ impl Parser {
                         self.expect(&Token::RParen)?;
                     }
                     if args.len() < 2 {
-                        return Err(PerlError::syntax(
+                        return Err(self.syntax_err(
                             "open requires at least 2 arguments",
                             line,
                         ));
@@ -4803,7 +4814,7 @@ impl Parser {
             "opendir" => {
                 let args = self.parse_builtin_args()?;
                 if args.len() != 2 {
-                    return Err(PerlError::syntax("opendir requires two arguments", line));
+                    return Err(self.syntax_err("opendir requires two arguments", line));
                 }
                 Ok(Expr {
                     kind: ExprKind::Opendir {
@@ -4844,7 +4855,7 @@ impl Parser {
             "seekdir" => {
                 let args = self.parse_builtin_args()?;
                 if args.len() != 2 {
-                    return Err(PerlError::syntax("seekdir requires two arguments", line));
+                    return Err(self.syntax_err("seekdir requires two arguments", line));
                 }
                 Ok(Expr {
                     kind: ExprKind::Seekdir {
@@ -4965,7 +4976,7 @@ impl Parser {
             "rename" => {
                 let args = self.parse_builtin_args()?;
                 if args.len() != 2 {
-                    return Err(PerlError::syntax("rename requires two arguments", line));
+                    return Err(self.syntax_err("rename requires two arguments", line));
                 }
                 Ok(Expr {
                     kind: ExprKind::Rename {
@@ -4978,7 +4989,7 @@ impl Parser {
             "chmod" => {
                 let args = self.parse_builtin_args()?;
                 if args.len() < 2 {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         "chmod requires mode and at least one file",
                         line,
                     ));
@@ -4991,7 +5002,7 @@ impl Parser {
             "chown" => {
                 let args = self.parse_builtin_args()?;
                 if args.len() < 3 {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         "chown requires uid, gid, and at least one file",
                         line,
                     ));
@@ -5004,7 +5015,7 @@ impl Parser {
             "stat" => {
                 let args = self.parse_builtin_args()?;
                 if args.len() != 1 {
-                    return Err(PerlError::syntax("stat requires one argument", line));
+                    return Err(self.syntax_err("stat requires one argument", line));
                 }
                 Ok(Expr {
                     kind: ExprKind::Stat(Box::new(args[0].clone())),
@@ -5014,7 +5025,7 @@ impl Parser {
             "lstat" => {
                 let args = self.parse_builtin_args()?;
                 if args.len() != 1 {
-                    return Err(PerlError::syntax("lstat requires one argument", line));
+                    return Err(self.syntax_err("lstat requires one argument", line));
                 }
                 Ok(Expr {
                     kind: ExprKind::Lstat(Box::new(args[0].clone())),
@@ -5024,7 +5035,7 @@ impl Parser {
             "link" => {
                 let args = self.parse_builtin_args()?;
                 if args.len() != 2 {
-                    return Err(PerlError::syntax("link requires two arguments", line));
+                    return Err(self.syntax_err("link requires two arguments", line));
                 }
                 Ok(Expr {
                     kind: ExprKind::Link {
@@ -5037,7 +5048,7 @@ impl Parser {
             "symlink" => {
                 let args = self.parse_builtin_args()?;
                 if args.len() != 2 {
-                    return Err(PerlError::syntax("symlink requires two arguments", line));
+                    return Err(self.syntax_err("symlink requires two arguments", line));
                 }
                 Ok(Expr {
                     kind: ExprKind::Symlink {
@@ -5050,7 +5061,7 @@ impl Parser {
             "readlink" => {
                 let args = self.parse_builtin_args()?;
                 if args.len() != 1 {
-                    return Err(PerlError::syntax("readlink requires one argument", line));
+                    return Err(self.syntax_err("readlink requires one argument", line));
                 }
                 Ok(Expr {
                     kind: ExprKind::Readlink(Box::new(args[0].clone())),
@@ -5076,7 +5087,7 @@ impl Parser {
                             Some(Box::new(self.parse_assign_expr()?))
                         }
                         _ => {
-                            return Err(PerlError::syntax(
+                            return Err(self.syntax_err(
                                 "glob_par: expected `progress => EXPR` after comma",
                                 line,
                             ));
@@ -5102,7 +5113,7 @@ impl Parser {
                             Some(Box::new(self.parse_assign_expr()?))
                         }
                         _ => {
-                            return Err(PerlError::syntax(
+                            return Err(self.syntax_err(
                                 "par_sed: expected `progress => EXPR` after comma",
                                 line,
                             ));
@@ -5359,7 +5370,7 @@ impl Parser {
                     return Ok(Some(Box::new(self.parse_assign_expr()?)));
                 }
                 _ => {
-                    return Err(PerlError::syntax(
+                    return Err(self.syntax_err(
                         format!("{which}: expected `progress => EXPR` after comma"),
                         line,
                     ));
@@ -5600,7 +5611,7 @@ impl Parser {
                 pairs.push((key, val));
                 self.eat(&Token::Comma);
             } else {
-                return Err(PerlError::syntax("Expected => or , in hash ref", key.line));
+                return Err(self.syntax_err("Expected => or , in hash ref", key.line));
             }
         }
         self.expect(&Token::RBrace)?;
@@ -5731,7 +5742,7 @@ impl Parser {
                     if chars[i] == '0' {
                         i += 1;
                         if i < chars.len() && chars[i].is_ascii_digit() {
-                            return Err(PerlError::syntax(
+                            return Err(self.syntax_err(
                                 "Numeric variables with more than one digit may not start with '0'",
                                 line,
                             ));
@@ -5794,22 +5805,22 @@ impl Parser {
         })
     }
 
-    fn expr_to_overload_key(e: &Expr) -> PerlResult<String> {
+    fn expr_to_overload_key(&self, e: &Expr) -> PerlResult<String> {
         match &e.kind {
             ExprKind::String(s) => Ok(s.clone()),
-            _ => Err(PerlError::syntax(
+            _ => Err(self.syntax_err(
                 "overload key must be a string literal (e.g. '\"\"' or '+')",
                 e.line,
             )),
         }
     }
 
-    fn expr_to_overload_sub(e: &Expr) -> PerlResult<String> {
+    fn expr_to_overload_sub(&self, e: &Expr) -> PerlResult<String> {
         match &e.kind {
             ExprKind::String(s) => Ok(s.clone()),
             ExprKind::Integer(n) => Ok(n.to_string()),
             ExprKind::SubroutineRef(s) | ExprKind::SubroutineCodeRef(s) => Ok(s.clone()),
-            _ => Err(PerlError::syntax(
+            _ => Err(self.syntax_err(
                 "overload handler must be a string literal, number (e.g. fallback => 1), or \\&subname (method in current package)",
                 e.line,
             )),
@@ -5849,7 +5860,7 @@ pub fn parse_format_value_line(line: &str) -> PerlResult<Vec<Expr>> {
             continue;
         }
         if !parser.at_eof() {
-            return Err(PerlError::syntax(
+            return Err(parser.syntax_err(
                 "Extra tokens in format value line",
                 parser.peek_line(),
             ));

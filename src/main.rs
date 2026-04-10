@@ -825,7 +825,7 @@ fn main() {
     full_code.push_str(&code);
 
     // Parse
-    let program = match perlrs::parse(&full_code) {
+    let program = match perlrs::parse_with_file(&full_code, &filename) {
         Ok(p) => p,
         Err(e) => {
             eprintln!("{}", e);

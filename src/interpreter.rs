@@ -1849,7 +1849,7 @@ impl Interpreter {
         self.scope
             .set_hash_element("INC", &key, PerlValue::string(key.clone()))?;
         let saved_pkg = self.scope.get_scalar("__PACKAGE__");
-        let r = crate::parse_and_run_string(&code, self);
+        let r = crate::parse_and_run_string_in_file(&code, self, &key);
         let _ = self.scope.set_scalar("__PACKAGE__", saved_pkg);
         r?;
         self.invoke_require_hook("require__after", &key, line)?;
@@ -1873,9 +1873,9 @@ impl Interpreter {
                 let abs = full.canonicalize().unwrap_or(full);
                 let abs_s = abs.to_string_lossy().into_owned();
                 self.scope
-                    .set_hash_element("INC", relpath, PerlValue::string(abs_s))?;
+                    .set_hash_element("INC", relpath, PerlValue::string(abs_s.clone()))?;
                 let saved_pkg = self.scope.get_scalar("__PACKAGE__");
-                let r = crate::parse_and_run_string(&code, self);
+                let r = crate::parse_and_run_string_in_file(&code, self, &abs_s);
                 let _ = self.scope.set_scalar("__PACKAGE__", saved_pkg);
                 r?;
                 self.invoke_require_hook("require__after", relpath, line)?;
@@ -6802,7 +6802,7 @@ impl Interpreter {
                     _ => {
                         let filename = val.to_string();
                         match std::fs::read_to_string(&filename) {
-                            Ok(code) => match crate::parse_and_run_string(&code, self) {
+                            Ok(code) => match crate::parse_and_run_string_in_file(&code, self, &filename) {
                                 Ok(v) => Ok(v),
                                 Err(e) => {
                                     self.set_eval_error(e.to_string());
