@@ -767,7 +767,7 @@ Library unit tests (parser smoke batches `parse_smoke_*`, **`parser_shape_tests`
 cargo test --lib
 ```
 
-Integration tests live in `tests/integration.rs` and `tests/suite/` (grouped modules such as `runtime_extra` and `runtime_more` for assignment, builtins, aggregates, control flow, and regex/subs; **`readline_list_context`** for piped `<>` / `<STDIN>` / `<FH>` list slurp, `sort <>` / `grep { } <>` / `for (<>)`, `reverse <>` / `<STDIN>`, `my @l = <>` (zpwr-style naming), explicit `scalar(<> )`, empty stdin, `join`/`join('', <F>)`, and VM vs `execute_tree` parity on temp files; **`cli_line_mode_stdin_readline`** for `-n`/`-p` stdin plus `<>` in the body (no deadlock; EOF); **`subst_env_interpolate`** for `$ENV{…}` in `s///` pattern/replacement):
+Integration tests live in `tests/integration.rs` and `tests/suite/` (grouped modules such as `runtime_extra` and `runtime_more` for assignment, builtins, aggregates, control flow, and regex/subs; **`readline_list_context`** for piped `<>` / `<STDIN>` / `<FH>` list slurp, `sort <>` / `grep { } <>` / `for (<>)`, `reverse <>` / `<STDIN>`, `my @l = <>` (zpwr-style naming), explicit `scalar(<> )`, empty stdin, `join`/`join('', <F>)`, the zpwr `zpwrVerbsFZF` slurp-to-`zpwr <verb>; …` pipeline (`zpwr_verbs_fzf_slurp_emits_zpwr_commands`), and VM vs `execute_tree` parity on temp files; **`cli_line_mode_stdin_readline`** for `-n`/`-p` stdin plus `<>` in the body (no deadlock; EOF); **`subst_env_interpolate`** for `$ENV{…}` in `s///` pattern/replacement):
 
 ```sh
 cargo test --test integration

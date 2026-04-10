@@ -1,7 +1,7 @@
 //! `<>` / `<STDIN>` / `<FH>` in **list** context must read all lines until EOF (Perl `readline` list semantics).
 //! Scalar context (`$x = <>` / `my $x = scalar(<>)`) stays one line. Covers `sort <>` / `grep {} <>` / `for (<>)`,
 //! `reverse <>` / `reverse <STDIN>`, `my @l = <>`, **`@a = <>` (global/package, not only `my`)**,
-//! `join('', <>)`, and `join('', <F>)` VM vs tree parity.
+//! `join('', <>)`, and `join('', <F>)` VM vs tree parity, and the zpwr `zpwrVerbsFZF` `-e` one-liner.
 
 use perlrs::interpreter::Interpreter;
 use std::io::Write;
@@ -428,4 +428,34 @@ fn open_file_join_readline_list_vm_matches_tree_walker() {
     assert_eq!(v_vm.to_string(), v_tree.to_string());
     assert_eq!(v_vm.to_string(), "part1\npart2\n");
     std::fs::remove_file(&path).ok();
+}
+
+/// `zpwrVerbsFZF`: slurp fzf-selected lines and emit `zpwr <verb>; …` for `eval` (same `-e` as zpwr).
+#[test]
+fn zpwr_verbs_fzf_slurp_emits_zpwr_commands() {
+    let exe = perlrs_exe();
+    let script = r#"@a=<>;$c=$#a;for (@a){print "zpwr $1"if m{^(\S+)\s+};print ";" if $c--;print " "}"#;
+    let mut child = Command::new(exe)
+        .args(["-e", script])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("spawn perlrs");
+    // Padded column layout: verb + spaces + description (requires \s+ after first word).
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin")
+        .write_all(b"about                   list\nupdate                  sync\n")
+        .expect("write stdin");
+    let out = child.wait_with_output().expect("wait");
+    assert!(
+        out.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "zpwr about; zpwr update "
+    );
 }
