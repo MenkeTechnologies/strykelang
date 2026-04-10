@@ -2848,7 +2848,7 @@ impl Compiler {
                         }
                     }
                 }
-                self.compile_expr(value)?;
+                self.compile_expr_ctx(value, Self::assign_rhs_wantarray(target))?;
                 self.compile_assign(target, line, true, Some(root))?;
             }
             ExprKind::CompoundAssign { target, op, value } => {
@@ -5182,6 +5182,44 @@ impl Compiler {
         Ok(())
     }
 
+    /// Perl wantarray for the RHS of a plain `=` assignment (not `my`/`our`/`local`, which use
+    /// [`Self::compile_expr_ctx`] at the declaration site). Aggregate lvalues (`@a`, `%h`, slices,
+    /// symbolic `\@` / `\%` assign targets) require list context so `<>` / `readline` slurps.
+    fn assign_rhs_wantarray(target: &Expr) -> WantarrayCtx {
+        match &target.kind {
+            ExprKind::ArrayVar(_) | ExprKind::HashVar(_) => WantarrayCtx::List,
+            ExprKind::ScalarVar(_)
+            | ExprKind::ArrayElement { .. }
+            | ExprKind::HashElement { .. } => WantarrayCtx::Scalar,
+            ExprKind::Deref { kind, .. } => match kind {
+                Sigil::Scalar | Sigil::Typeglob => WantarrayCtx::Scalar,
+                Sigil::Array | Sigil::Hash => WantarrayCtx::List,
+            },
+            ExprKind::ArrowDeref {
+                index,
+                kind: DerefKind::Array,
+                ..
+            } => {
+                if matches!(&index.kind, ExprKind::List(_)) {
+                    WantarrayCtx::List
+                } else {
+                    WantarrayCtx::Scalar
+                }
+            }
+            ExprKind::ArrowDeref {
+                kind: DerefKind::Hash,
+                ..
+            }
+            | ExprKind::ArrowDeref {
+                kind: DerefKind::Call,
+                ..
+            } => WantarrayCtx::Scalar,
+            ExprKind::HashSliceDeref { .. } => WantarrayCtx::List,
+            ExprKind::Typeglob(_) | ExprKind::TypeglobExpr(_) => WantarrayCtx::Scalar,
+            _ => WantarrayCtx::Scalar,
+        }
+    }
+
     fn compile_assign(
         &mut self,
         target: &Expr,
@@ -5442,6 +5480,19 @@ mod tests {
                 .iter()
                 .any(|o| matches!(o, Op::SetHashSliceDeref(n) if *n == 2)),
             "expected SetHashSliceDeref(2), got {:?}",
+            chunk.ops
+        );
+    }
+
+    #[test]
+    fn compile_bare_array_assign_diamond_uses_readline_list() {
+        let chunk = compile_snippet("@a = <>;").expect("compile");
+        assert!(
+            chunk.ops.iter().any(|o| matches!(
+                o,
+                Op::CallBuiltin(bid, 0) if *bid == BuiltinId::ReadLineList as u16
+            )),
+            "expected ReadLineList for bare @a = <>, got {:?}",
             chunk.ops
         );
     }

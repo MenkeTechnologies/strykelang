@@ -133,7 +133,7 @@ A line whose trimmed text is exactly `__DATA__` ends the program text. Everythin
 ```sh
 # line-by-line processing
 echo "data" | pe -ne 'print uc $_'
-# list context: `@lines = <>` / `@lines = <STDIN>` reads all remaining lines until EOF (same as Perl `readline` in list context)
+# list context: `@lines = <>` / `@lines = <STDIN>` / `my @lines = <>` reads all remaining lines until EOF (same as Perl `readline` in list context); plain `@a = <>` (package/global) uses the same list context on the RHS as `my @a`
 # Do not combine `-n` with your own `while (<>)` / `for (<>)` / `for (reverse <>)` on stdin — `-n` already wraps `-e` in `while (<>) { … }` (use `perlrs -le '…'` for a single slurp loop). In `s///`, `$ENV{KEY}` in the pattern or replacement is expanded from `%ENV`; do not wrap the replacement in ASCII `"..."` unless you want literal quote characters (the lexer stores them as-is).
 # `eof` with no arguments is true on the last line of stdin or of each `@ARGV` file (same as Perl)
 # `CORE::eof()` / `builtin::eof()` use the same semantics (qualified forms parse as calls, not the `eof` AST)

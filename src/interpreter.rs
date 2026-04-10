@@ -5929,7 +5929,11 @@ impl Interpreter {
                         return self.eval_expr(value);
                     }
                 }
-                let val = self.eval_expr(value)?;
+                let rhs_ctx = match &target.kind {
+                    ExprKind::ArrayVar(_) | ExprKind::HashVar(_) => WantarrayCtx::List,
+                    _ => WantarrayCtx::Scalar,
+                };
+                let val = self.eval_expr_ctx(value, rhs_ctx)?;
                 self.assign_value(target, val.clone())?;
                 Ok(val)
             }

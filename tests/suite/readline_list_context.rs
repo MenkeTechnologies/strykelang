@@ -1,6 +1,7 @@
 //! `<>` / `<STDIN>` / `<FH>` in **list** context must read all lines until EOF (Perl `readline` list semantics).
 //! Scalar context (`$x = <>` / `my $x = scalar(<>)`) stays one line. Covers `sort <>` / `grep {} <>` / `for (<>)`,
-//! `reverse <>` / `reverse <STDIN>`, `my @l = <>`, `join('', <>)`, and `join('', <F>)` VM vs tree parity.
+//! `reverse <>` / `reverse <STDIN>`, `my @l = <>`, **`@a = <>` (global/package, not only `my`)**,
+//! `join('', <>)`, and `join('', <F>)` VM vs tree parity.
 
 use perlrs::interpreter::Interpreter;
 use std::io::Write;
@@ -8,6 +9,31 @@ use std::process::{Command, Stdio};
 
 fn perlrs_exe() -> &'static str {
     env!("CARGO_BIN_EXE_perlrs")
+}
+
+/// Package/global `@a = <>` must use list context on the RHS (same as `my @a = <>`).
+#[test]
+fn bare_package_array_diamond_list_context_slurps_piped_stdin() {
+    let exe = perlrs_exe();
+    let mut child = Command::new(exe)
+        .args(["-e", r#"@a = <>; print scalar(@a)"#])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("spawn perlrs");
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin")
+        .write_all(b"a\nb\nc\n")
+        .expect("write stdin");
+    let out = child.wait_with_output().expect("wait");
+    assert!(
+        out.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "3");
 }
 
 #[test]
@@ -162,6 +188,33 @@ fn open_file_readline_list_vm_matches_tree_walker() {
         r#"
         open F, '<', '{ps}';
         my @a = <F>;
+        close F;
+        0+@a;
+    "#
+    );
+    let program = perlrs::parse(&code).expect("parse");
+    let mut vm_interp = Interpreter::new();
+    let v_vm = vm_interp.execute(&program).expect("execute vm");
+    let mut tree_interp = Interpreter::new();
+    let v_tree = tree_interp.execute_tree(&program).expect("execute tree");
+    assert_eq!(v_vm.to_int(), v_tree.to_int(), "vm={v_vm:?} tree={v_tree:?}");
+    assert_eq!(v_vm.to_int(), 3);
+    std::fs::remove_file(&path).ok();
+}
+
+/// Global `@a = <F>`: VM vs tree-walker (must not regress to scalar readline).
+#[test]
+fn open_file_global_array_assign_readline_list_vm_matches_tree_walker() {
+    let path = std::env::temp_dir().join(format!(
+        "perlrs_global_slurp_{}.txt",
+        std::process::id()
+    ));
+    std::fs::write(&path, b"u\nv\nw\n").expect("write temp");
+    let ps = path.to_str().expect("utf-8 path");
+    let code = format!(
+        r#"
+        open F, '<', '{ps}';
+        @a = <F>;
         close F;
         0+@a;
     "#
