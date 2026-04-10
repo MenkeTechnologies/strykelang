@@ -5278,15 +5278,7 @@ impl Interpreter {
                     }
                     v
                 };
-                if let Some(sub) = tval.as_code_ref() {
-                    return self.call_sub(&sub, arg_vals, ctx, line);
-                }
-                if let Some(name) = tval.as_str() {
-                    return self.call_named_sub(&name, arg_vals, line, ctx);
-                }
-                Err(
-                    PerlError::runtime("Can't use non-code reference as a subroutine", line).into(),
-                )
+                self.dispatch_indirect_call(tval, arg_vals, ctx, line)
             }
             ExprKind::MethodCall {
                 object,
@@ -8105,6 +8097,28 @@ impl Interpreter {
         } else {
             args
         }
+    }
+
+    /// `$coderef(...)` / `&$name(...)` / `&$cr` with caller `@_` — shared by tree [`ExprKind::IndirectCall`]
+    /// and [`crate::bytecode::Op::IndirectCall`].
+    pub(crate) fn dispatch_indirect_call(
+        &mut self,
+        target: PerlValue,
+        arg_vals: Vec<PerlValue>,
+        want: WantarrayCtx,
+        line: usize,
+    ) -> ExecResult {
+        if let Some(sub) = target.as_code_ref() {
+            return self.call_sub(&sub, arg_vals, want, line);
+        }
+        if let Some(name) = target.as_str() {
+            return self.call_named_sub(&name, arg_vals, line, want);
+        }
+        Err(PerlError::runtime(
+            "Can't use non-code reference as a subroutine",
+            line,
+        )
+        .into())
     }
 
     fn call_named_sub(

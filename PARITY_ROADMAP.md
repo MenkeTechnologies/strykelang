@@ -51,7 +51,7 @@ This is an **ordered engineering program**, not a promise of bit-identical `perl
 
 **Targets:** `typed my`, `each`, complex lvalues, and any construct currently marked `Unsupported` in [`src/compiler.rs`](src/compiler.rs) where semantics are stable. **Done (VM + tree):** `try`/`catch`/`finally`; `given`/`when`/`default` via [`Op::Given`](src/bytecode.rs) (body still interpreted); [`Op::EvalTimeout`](src/bytecode.rs); algebraic `match` via [`Op::AlgebraicMatch`](src/bytecode.rs).
 
-**Progress (non-exhaustive):** `do { } while (COND)` is parsed as [`StmtKind::DoWhile`](src/ast.rs) and compiled to the bytecode VM; `splice` / `unshift` on plain `@array` compile to `CallBuiltin` with real mutating implementations (see [`Interpreter::splice_builtin_execute`](src/interpreter.rs)).
+**Progress (non-exhaustive):** `do { } while (COND)` is parsed as [`StmtKind::DoWhile`](src/ast.rs) and compiled to the bytecode VM; `splice` / `unshift` on plain `@array` compile to `CallBuiltin` with real mutating implementations (see [`Interpreter::splice_builtin_execute`](src/interpreter.rs)). [`ExprKind::IndirectCall`](src/ast.rs) (`$coderef(...)`, `&$coderef(...)`, `&$cr` with caller `@_`) compiles to [`Op::IndirectCall`](src/bytecode.rs) and uses [`Interpreter::dispatch_indirect_call`](src/interpreter.rs) in the VM.
 
 **Done when:** Compiler emits bytecode for a subset; **existing** integration tests still pass; new parity cases cover **before/after** behavior.
 

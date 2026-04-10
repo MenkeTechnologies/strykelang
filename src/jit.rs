@@ -1956,7 +1956,8 @@ pub(crate) fn segment_blocks_subroutine_linear_jit(
         | Op::CallBuiltin(_, _)
         | Op::MethodCall(_, _, _)
         | Op::MethodCallSuper(_, _, _)
-        | Op::ArrowCall(_) => true,
+        | Op::ArrowCall(_)
+        | Op::IndirectCall(_, _, _) => true,
         _ => false,
     })
 }

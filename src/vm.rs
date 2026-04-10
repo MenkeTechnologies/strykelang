@@ -3167,6 +3167,28 @@ impl<'a> VM<'a> {
                         }
                         Ok(())
                     }
+                    Op::IndirectCall(argc, wa, pass_flag) => {
+                        let want = WantarrayCtx::from_byte(*wa);
+                        let line = self.line();
+                        let arg_vals = if *pass_flag != 0 {
+                            self.interp.scope.get_array("_")
+                        } else {
+                            let n = *argc as usize;
+                            let mut args = Vec::with_capacity(n);
+                            for _ in 0..n {
+                                args.push(self.pop());
+                            }
+                            args.reverse();
+                            args
+                        };
+                        let target = self.pop();
+                        let r = self
+                            .interp
+                            .dispatch_indirect_call(target, arg_vals, want, line);
+                        let v = vm_interp_result(r, line)?;
+                        self.push(v);
+                        Ok(())
+                    }
 
                     // ── Method call ──
                     Op::MethodCall(name_idx, argc, wa) => {

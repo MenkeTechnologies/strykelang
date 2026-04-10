@@ -339,6 +339,10 @@ pub enum Op {
     /// Dereference arrow: ->() — stack: \[ref, args_array\] → value
     /// `$cr->(...)` — wantarray byte (see VM `WantarrayCtx` threading on `Call` / `MethodCall`).
     ArrowCall(u8),
+    /// Indirect call `$coderef(ARG...)` / `&$coderef(ARG...)` — stack (bottom→top): `target`, then
+    /// `argc` argument values (first arg pushed first). Third byte: `1` = ignore stack args and use
+    /// caller `@_` (`argc` must be `0`).
+    IndirectCall(u8, u8, u8),
     /// Method call: stack: \[object, args...\] → result; name_idx, argc, wantarray
     MethodCall(u16, u8, u8),
     /// Like [`Op::MethodCall`] but uses SUPER / C3 parent chain (see interpreter method resolution for `SUPER`).

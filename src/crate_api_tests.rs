@@ -134,6 +134,18 @@ fn try_vm_execute_runs_simple_literal_program() {
 }
 
 #[test]
+fn try_vm_execute_indirect_coderef_call() {
+    let p = parse("my $inc = sub { $_[0] + 1 }; $inc(41);").expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "IndirectCall should compile (Op::IndirectCall), not force tree fallback"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 42);
+}
+
+#[test]
 fn try_vm_execute_runs_begin_block_before_main() {
     let p = parse("BEGIN { 1; } 2;").expect("parse");
     let mut i = Interpreter::new();

@@ -2595,10 +2595,32 @@ impl Compiler {
                     );
                 }
             }
-            ExprKind::IndirectCall { .. } => {
-                return Err(CompileError::Unsupported(
-                    "indirect coderef call `$cr(...)` / `&$cr(...)` — use tree interpreter".into(),
-                ));
+            ExprKind::IndirectCall {
+                target,
+                args,
+                ampersand: _,
+                pass_caller_arglist,
+            } => {
+                self.compile_expr(target)?;
+                if !pass_caller_arglist {
+                    for a in args {
+                        self.compile_expr(a)?;
+                    }
+                }
+                let argc = if *pass_caller_arglist {
+                    0
+                } else {
+                    args.len() as u8
+                };
+                self.emit_op(
+                    Op::IndirectCall(
+                        argc,
+                        ctx.as_byte(),
+                        if *pass_caller_arglist { 1 } else { 0 },
+                    ),
+                    line,
+                    Some(root),
+                );
             }
 
             // ── Print / Say / Printf ──
