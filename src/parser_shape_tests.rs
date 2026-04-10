@@ -268,6 +268,10 @@ fn expr_map_grep_sort() {
         ExprKind::GrepExpr { .. }
     ));
     assert!(matches!(
+        first_expr_kind("grep -e \"x\", (1);"),
+        ExprKind::GrepExprComma { .. }
+    ));
+    assert!(matches!(
         first_expr_kind("sort (1, 2);"),
         ExprKind::SortExpr { .. }
     ));

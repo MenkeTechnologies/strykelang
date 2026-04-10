@@ -813,7 +813,8 @@ fn main() {
         (String::new(), "-".to_string())
     } else {
         let mut code = String::new();
-        io::stdin().read_line(&mut code).ok();
+        // Match `perl`: program from stdin is the full script (pipe, heredoc, or terminal until EOF).
+        io::stdin().read_to_string(&mut code).ok();
         (code, "-".to_string())
     };
 

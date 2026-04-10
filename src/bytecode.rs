@@ -1057,7 +1057,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "patch_jump_here on non-jump op")]
+    #[should_panic(expected = "patch_jump_to on non-jump op")]
     fn patch_jump_here_panics_on_non_jump() {
         let mut c = Chunk::new();
         let idx = c.emit(Op::LoadInt(1), 1);
