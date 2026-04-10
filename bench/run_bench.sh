@@ -1,95 +1,153 @@
 #!/bin/bash
-# Benchmark perlrs vs perl5; for perlrs, compare Cranelift JIT on vs off (`PERLRS_NO_JIT`).
-# Runs each test 3 times and reports median
+# Benchmark perlrs vs perl5.
+#
+# Every serial bench is run twice: once on the canonical `bench/bench_*.pl`
+# file, and once on a functionally-equivalent "perturbed" copy written to a
+# temp file. If a compile-time AST shape matcher ever short-circuits one of
+# the canonical shapes to a constant (as `bench_fusion.rs` used to do before
+# it was deleted), the two columns will diverge loudly and this harness will
+# print a **WARN** marker next to that row.
+#
+# Timing is delegated to hyperfine when available. Hyperfine warms the OS
+# page cache, drops outliers, and reports mean ± stddev over N runs, which
+# is the only sane way to measure sub-100ms programs. No hyperfine → abort
+# (we will not ship fake numbers).
 
-PERLRS="$(dirname "$0")/../target/release/perlrs"
-PERL="perl"
+set -euo pipefail
 
-if [ ! -x "$PERLRS" ]; then
-    echo "Error: release binary not found. Run: cargo build --release"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+PERLRS="$HERE/../target/release/perlrs"
+PERL="${PERL:-perl}"
+RUNS="${RUNS:-10}"
+WARMUP="${WARMUP:-3}"
+
+if ! command -v hyperfine >/dev/null 2>&1; then
+    printf 'error: hyperfine not found in PATH\n' >&2
+    printf 'install: cargo install hyperfine (or brew install hyperfine)\n' >&2
     exit 1
 fi
 
-time_cmd() {
-    # Returns time in milliseconds
-    local start end
-    start=$(date +%s%N 2>/dev/null || python3 -c 'import time; print(int(time.time()*1e9))')
-    eval "$@" > /dev/null 2>&1
-    end=$(date +%s%N 2>/dev/null || python3 -c 'import time; print(int(time.time()*1e9))')
-    echo $(( (end - start) / 1000000 ))
+if [ ! -x "$PERLRS" ]; then
+    printf 'error: %s not found. build first: cargo build --release\n' "$PERLRS" >&2
+    exit 2
+fi
+
+TMPDIR_="$(mktemp -d)"
+trap 'rm -rf "$TMPDIR_"' EXIT
+
+# Emit a functionally-equivalent perturbation of a bench file. The goal is
+# to defeat *any* AST-shape matcher that might recognize the canonical
+# file layout — renaming variables, adding a dead binding, wrapping the
+# main block in a BEGIN-less prelude — while keeping stdout byte-identical.
+perturb() {
+    local src="$1" dst="$2"
+    {
+        printf 'my $__perlrs_bench_guard = 1;\n'
+        printf '$__perlrs_bench_guard++ if 0;\n'
+        # Rename common loop-counter identifiers so any `i_name == "i"` check fails.
+        # Sed substitutions are scoped to `$i`/`my $i` and similar; aggressive enough
+        # to perturb the AST but safe for the benches in bench/*.pl, which only use
+        # `$i`, `$k`, `$x`, `$s`, `$sum`, `$count`, `$text`.
+        sed \
+            -e 's/\$i\b/\$__ii/g' \
+            -e 's/\$sum\b/\$__s_sum/g' \
+            -e 's/\$count\b/\$__c_count/g' \
+            "$src"
+    } > "$dst"
 }
 
-# macOS doesn't have date +%s%N, use perl for timing
-time_ms() {
-    local cmd="$1"
-    "$PERL" -MTime::HiRes=time -e "
-        my \$start = time();
-        system(qq{$cmd >/dev/null 2>&1});
-        my \$elapsed = (time() - \$start) * 1000;
-        printf \"%.1f\n\", \$elapsed;
-    "
+perl5_version() {
+    "$PERL" -v 2>&1 | grep -m1 -i 'version' | sed 's/^This is //'
 }
 
-median3() {
-    echo "$1 $2 $3" | tr ' ' '\n' | sort -n | sed -n '2p'
+perlrs_version() {
+    "$PERLRS" -v 2>&1 | head -1
 }
 
-printf "\n"
-printf " ██████╗ ███████╗██████╗ ██╗     ██████╗ ███████╗\n"
-printf " ██╔══██╗██╔════╝██╔══██╗██║     ██╔══██╗██╔════╝\n"
-printf " ██████╔╝█████╗  ██████╔╝██║     ██████╔╝███████╗\n"
-printf " ██╔═══╝ ██╔══╝  ██╔══██╗██║     ██╔══██╗╚════██║\n"
-printf " ██║     ███████╗██║  ██║███████╗██║  ██║███████║\n"
-printf " ╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚══════╝\n"
-printf " ┌──────────────────────────────────────────────────────┐\n"
-printf " │ BENCHMARK SUITE // perlrs vs perl5                  │\n"
-printf " └──────────────────────────────────────────────────────┘\n\n"
+printf '\n'
+printf ' perlrs benchmark harness (honest mode)\n'
+printf ' ---------------------------------------\n'
+printf '  perl5:   %s\n'   "$(perl5_version)"
+printf '  perlrs:  %s\n'   "$(perlrs_version)"
+printf '  cores:   %s\n'   "$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo ?)"
+printf '  warmup:  %s runs\n' "$WARMUP"
+printf '  measure: hyperfine (min %s runs)\n\n' "$RUNS"
 
-printf "  perl5:  %s\n" "$($PERL -v 2>&1 | grep 'version' | head -1)"
-printf "  perlrs: %s\n" "$($PERLRS -v 2>&1 | head -1)"
-printf "  cores:  %s\n\n" "$(sysctl -n hw.ncpu 2>/dev/null || nproc)"
+# Parse `mean ± stddev` from hyperfine --export-json output.
+# We use --export-json over stdout scraping because hyperfine's stdout
+# formatting changes across versions.
+measure() {
+    local label="$1" cmd="$2"
+    local json="$TMPDIR_/hf.json"
+    hyperfine --warmup "$WARMUP" --min-runs "$RUNS" --shell=none \
+        --export-json "$json" \
+        --command-name "$label" "$cmd" >/dev/null 2>&1 || return 1
+    # mean and stddev are in seconds; format as ms.
+    "$PERL" -MJSON::PP -e '
+        local $/; my $j = <STDIN>;
+        my $d = JSON::PP::decode_json($j);
+        my $r = $d->{results}[0];
+        printf "%.1f %.1f\n", $r->{mean}*1000, ($r->{stddev}//0)*1000;
+    ' < "$json"
+}
 
-printf "  ── SEQUENTIAL BENCHMARKS ─────────────────────────────────────\n"
-printf "  %-18s %10s %10s %10s %10s\n" "TEST" "perl5" "jit_on" "jit_off" "off/on"
-printf "  %-18s %10s %10s %10s %10s\n" "────────────────────" "─────────" "──────────" "──────────" "──────"
+# Print a row: label | perl5 | perlrs canonical | perlrs perturbed | ratio | warn
+#
+# `warn` fires when canonical runs >20% faster than the perturbed variant,
+# which would indicate a shape-specific fast path (the bug bench_fusion.rs
+# represented). >20% because +/- noise in small benches can get ~10%.
+row() {
+    local label="$1" canonical="$2" perturbed="$3"
 
-BENCHDIR="$(dirname "$0")"
+    read -r p5_mean p5_sd   < <(measure "perl_$label" "$PERL $canonical")
+    read -r rs_mean rs_sd   < <(measure "perlrs_$label" "$PERLRS $canonical")
+    read -r rsp_mean rsp_sd < <(measure "perlrs_${label}_perturbed" "$PERLRS $perturbed")
 
-for bench in startup fib loop string hash array regex map_grep; do
-    file="$BENCHDIR/bench_${bench}.pl"
+    local ratio
+    ratio=$("$PERL" -e 'printf "%.2fx", $ARGV[0]/$ARGV[1]' -- "$rs_mean" "$p5_mean")
+
+    local warn=""
+    # Only warn when the absolute gap is meaningful (>1ms) AND the ratio
+    # exceeds 1.25. Tiny differences in sub-ms benches are noise.
+    # `--` stops perl from reading a negative gap as a switch.
+    local gap ratio_pp
+    gap=$("$PERL" -e 'printf "%.2f", $ARGV[1]-$ARGV[0]' -- "$rs_mean" "$rsp_mean")
+    ratio_pp=$("$PERL" -e 'printf "%.3f", ($ARGV[1]==0?1:$ARGV[1]/($ARGV[0]==0?1:$ARGV[0]))' -- "$rs_mean" "$rsp_mean")
+    if "$PERL" -e 'exit !($ARGV[0] > 1.0 && $ARGV[1] > 1.25)' -- "$gap" "$ratio_pp"; then
+        warn="  WARN: shape fast-path?"
+    fi
+
+    printf '  %-12s %10.1f  %10.1f  %10.1f  %8s%s\n' \
+        "$label" "$p5_mean" "$rs_mean" "$rsp_mean" "$ratio" "$warn"
+}
+
+printf '  %-12s %10s  %10s  %10s  %8s\n' \
+    'bench' 'perl5 ms' 'perlrs ms' 'perturb ms' 'rs/perl5'
+printf '  %-12s %10s  %10s  %10s  %8s\n' \
+    '---------' '--------' '---------' '---------' '--------'
+
+for name in startup fib loop string hash array regex map_grep; do
+    file="$HERE/bench_${name}.pl"
     if [ ! -f "$file" ]; then continue; fi
-
-    p1=$(time_ms "$PERL $file"); p2=$(time_ms "$PERL $file"); p3=$(time_ms "$PERL $file")
-    rj1=$(time_ms "$PERLRS $file"); rj2=$(time_ms "$PERLRS $file"); rj3=$(time_ms "$PERLRS $file")
-    rn1=$(time_ms "env PERLRS_NO_JIT=1 $PERLRS $file"); rn2=$(time_ms "env PERLRS_NO_JIT=1 $PERLRS $file"); rn3=$(time_ms "env PERLRS_NO_JIT=1 $PERLRS $file")
-
-    pm=$(median3 "$p1" "$p2" "$p3")
-    jm=$(median3 "$rj1" "$rj2" "$rj3")
-    nm=$(median3 "$rn1" "$rn2" "$rn3")
-
-    ratio=$("$PERL" -e "printf '%.2fx', (\$ARGV[1] / \$ARGV[0])" "$jm" "$nm" 2>/dev/null)
-
-    printf "  %-18s %8sms %8sms %8sms %10s\n" "$bench" "${pm}" "${jm}" "${nm}" "$ratio"
+    perturbed="$TMPDIR_/bench_${name}_perturbed.pl"
+    perturb "$file" "$perturbed"
+    row "$name" "$file" "$perturbed"
 done
 
-printf "\n  ── PARALLEL vs SEQUENTIAL (perlrs only, 10k) ───────────────────\n"
-printf "  %-10s %12s %12s %12s\n" "" "map(ms)" "pmap(ms)" "pmap/map"
-printf "  %-10s %12s %12s %12s\n" "──────────" "────────────" "────────────" "────────────"
+printf '\n  pmap vs map (perlrs only, 50k items with per-item work)\n'
+printf '  %-12s %10s  %10s  %10s\n' 'bench' 'map ms' 'pmap ms' 'speedup'
+printf '  %-12s %10s  %10s  %10s\n' '---------' '--------' '--------' '--------'
 
-s1=$(time_ms "$PERLRS $BENCHDIR/bench_pmap_perl.pl"); s2=$(time_ms "$PERLRS $BENCHDIR/bench_pmap_perl.pl"); s3=$(time_ms "$PERLRS $BENCHDIR/bench_pmap_perl.pl")
-sm=$(median3 "$s1" "$s2" "$s3")
-p1=$(time_ms "$PERLRS $BENCHDIR/bench_pmap.pl"); p2=$(time_ms "$PERLRS $BENCHDIR/bench_pmap.pl"); p3=$(time_ms "$PERLRS $BENCHDIR/bench_pmap.pl")
-pm=$(median3 "$p1" "$p2" "$p3")
-speedup=$("$PERL" -e "printf '%.2fx', \$ARGV[0] / \$ARGV[1]" "$sm" "$pm" 2>/dev/null)
-printf "  %-10s %12sms %12sms %12s\n" "JIT on" "${sm}" "${pm}" "$speedup"
+read -r map_mean  _ < <(measure "perlrs_map"  "$PERLRS $HERE/bench_pmap_perl.pl")
+read -r pmap_mean _ < <(measure "perlrs_pmap" "$PERLRS $HERE/bench_pmap.pl")
+pmap_ratio=$("$PERL" -e 'printf "%.2fx", $ARGV[0]/$ARGV[1]' -- "$map_mean" "$pmap_mean")
+printf '  %-12s %10.1f  %10.1f  %10s\n' 'pmap' "$map_mean" "$pmap_mean" "$pmap_ratio"
 
-s1o=$(time_ms "env PERLRS_NO_JIT=1 $PERLRS $BENCHDIR/bench_pmap_perl.pl"); s2o=$(time_ms "env PERLRS_NO_JIT=1 $PERLRS $BENCHDIR/bench_pmap_perl.pl"); s3o=$(time_ms "env PERLRS_NO_JIT=1 $PERLRS $BENCHDIR/bench_pmap_perl.pl")
-smo=$(median3 "$s1o" "$s2o" "$s3o")
-p1o=$(time_ms "env PERLRS_NO_JIT=1 $PERLRS $BENCHDIR/bench_pmap.pl"); p2o=$(time_ms "env PERLRS_NO_JIT=1 $PERLRS $BENCHDIR/bench_pmap.pl"); p3o=$(time_ms "env PERLRS_NO_JIT=1 $PERLRS $BENCHDIR/bench_pmap.pl")
-pmo=$(median3 "$p1o" "$p2o" "$p3o")
-speedup_o=$("$PERL" -e "printf '%.2fx', \$ARGV[0] / \$ARGV[1]" "$smo" "$pmo" 2>/dev/null)
-printf "  %-10s %12sms %12sms %12s\n" "JIT off" "${smo}" "${pmo}" "$speedup_o"
-
-printf "\n  ── SYSTEM ─────────────────────────────────────────\n"
-printf "  >>> BENCHMARK COMPLETE <<<\n"
-printf " ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░\n"
+printf '\n  Notes:\n'
+printf '    - All timings are mean of at least %s warm runs (warmup=%s).\n' "$RUNS" "$WARMUP"
+printf '    - The "perturb ms" column runs the same workload through a\n'
+printf '      functionally-equivalent but shape-renamed copy. If it ever\n'
+printf '      diverges from the canonical column, a compile-time shape\n'
+printf '      matcher is recognizing the canonical file and cheating.\n'
+printf '    - To override: RUNS=30 WARMUP=5 bash %s\n' "$(basename "$0")"
+printf '\n'

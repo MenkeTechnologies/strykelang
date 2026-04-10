@@ -2594,39 +2594,6 @@ impl<'a> VM<'a> {
                         self.interp.scope_pop_hook();
                         Ok(())
                     }
-                    Op::TriangularForAccum {
-                        limit,
-                        sum_name_idx,
-                        i_name_idx,
-                    } => {
-                        let sum_name = names[*sum_name_idx as usize].as_str();
-                        let i_name = names[*i_name_idx as usize].as_str();
-                        self.require_scalar_mutable(sum_name)?;
-                        self.require_scalar_mutable(i_name)?;
-                        let lim = *limit;
-                        if lim < 0 {
-                            return Err(PerlError::runtime(
-                                "TriangularForAccum: negative limit",
-                                self.line(),
-                            ));
-                        }
-                        let sum = {
-                            let a = lim as i128;
-                            let b = lim as i128 - 1;
-                            (a * b / 2) as i64
-                        };
-                        let final_i = if lim == 0 { 0 } else { lim };
-                        self.interp
-                            .scope
-                            .set_scalar(sum_name, PerlValue::integer(sum))
-                            .map_err(|e| e.at_line(self.line()))?;
-                        self.interp
-                            .scope
-                            .set_scalar(i_name, PerlValue::integer(final_i))
-                            .map_err(|e| e.at_line(self.line()))?;
-                        Ok(())
-                    }
-
                     // ── I/O ──
                     Op::Print(argc) => {
                         let argc = *argc as usize;
@@ -4962,7 +4929,8 @@ impl<'a> VM<'a> {
                         let en = self.interp.english_scalar_name(n);
                         let val = self
                             .interp
-                            .scalar_compound_assign_scalar_target(en, op, rhs);
+                            .scalar_compound_assign_scalar_target(en, op, rhs)
+                            .map_err(|e| e.at_line(self.line()))?;
                         self.push(val);
                         Ok(())
                     }

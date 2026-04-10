@@ -981,6 +981,15 @@ impl PerlValue {
         }
     }
 
+    /// String concat with owned LHS: moves out a uniquely held heap string when possible
+    /// ([`Self::into_string`]), then appends `rhs`. Used for `.=` and VM concat-append ops.
+    #[inline]
+    pub(crate) fn concat_append_owned(self, rhs: &PerlValue) -> PerlValue {
+        let mut s = self.into_string();
+        rhs.append_to(&mut s);
+        PerlValue::string(s)
+    }
+
     #[inline]
     pub fn into_string(self) -> String {
         let bits = self.0;

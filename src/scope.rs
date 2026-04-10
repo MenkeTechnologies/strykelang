@@ -357,10 +357,9 @@ impl Scope {
         if idx >= frame.scalar_slots.len() {
             frame.scalar_slots.resize(idx + 1, PerlValue::UNDEF);
         }
-        let mut s = std::mem::replace(&mut frame.scalar_slots[idx], PerlValue::UNDEF).into_string();
-        rhs.append_to(&mut s);
-        frame.scalar_slots[idx] = PerlValue::string(s);
-        frame.scalar_slots[idx].clone()
+        let new_val = std::mem::replace(&mut frame.scalar_slots[idx], PerlValue::UNDEF).concat_append_owned(rhs);
+        frame.scalar_slots[idx] = new_val.clone();
+        new_val
     }
 
     #[inline]
@@ -702,18 +701,24 @@ impl Scope {
         self.check_parallel_scalar_write(name)?;
         for frame in self.frames.iter_mut().rev() {
             if let Some(entry) = frame.scalars.iter_mut().find(|(k, _)| k == name) {
+                // `mysync $x` stores `HeapObject::Atomic` — must mutate under the mutex, not
+                // `into_string()` the wrapper (that would stringify the cell, not the payload).
+                if let Some(atomic_arc) = entry.1.as_atomic_arc() {
+                    let mut guard = atomic_arc.lock();
+                    let inner = std::mem::replace(&mut *guard, PerlValue::UNDEF);
+                    let new_val = inner.concat_append_owned(rhs);
+                    *guard = new_val.clone();
+                    return Ok(new_val);
+                }
                 // Use `into_string` + `append_to` so heap strings take the `Arc::try_unwrap`
                 // fast path instead of `Display` / heap formatting on every `.=`.
-                let mut s = std::mem::replace(&mut entry.1, PerlValue::UNDEF).into_string();
-                rhs.append_to(&mut s);
-                entry.1 = PerlValue::string(s);
-                return Ok(entry.1.clone());
+                let new_val = std::mem::replace(&mut entry.1, PerlValue::UNDEF).concat_append_owned(rhs);
+                entry.1 = new_val.clone();
+                return Ok(new_val);
             }
         }
         // Variable not found — create as new string
-        let mut s = String::new();
-        rhs.append_to(&mut s);
-        let val = PerlValue::string(s);
+        let val = PerlValue::UNDEF.concat_append_owned(rhs);
         self.frames[0].set_scalar(name, val.clone());
         Ok(val)
     }

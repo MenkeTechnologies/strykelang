@@ -155,13 +155,6 @@ pub enum Op {
     // ── Scope ──
     PushFrame,
     PopFrame,
-    /// Closed-form `for (my $i=0; $i < limit; $i=$i+1) { $sum = $sum + $i }` with `limit >= 0`.
-    /// Must follow [`Op::PushFrame`] and `my $i = 0`; `sum` is outer lexical, `i` inner.
-    TriangularForAccum {
-        limit: i64,
-        sum_name_idx: u16,
-        i_name_idx: u16,
-    },
 
     // ── I/O ──
     Print(u8), // arg count

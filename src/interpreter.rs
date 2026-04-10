@@ -1214,15 +1214,23 @@ impl Interpreter {
     }
 
     /// `%SIG` hook — code refs run between statements (`perl_signal` module).
+    ///
+    /// Unset `%SIG` entries and the string **`DEFAULT`** mean **POSIX default** for that signal (not
+    /// IGNORE). That matters for `SIGINT` / `SIGTERM` / `SIGALRM`, where default is terminate — so
+    /// Ctrl+C is not “trapped” when no handler is installed (including parallel `pmap` / `progress`
+    /// workers that call `perl_signal::poll`).
     pub(crate) fn invoke_sig_handler(&mut self, sig: &str) -> PerlResult<()> {
         self.touch_env_hash("SIG");
         let v = self.scope.get_hash_element("SIG", sig);
         if v.is_undef() {
-            return Ok(());
+            return Self::default_sig_action(sig);
         }
         if let Some(s) = v.as_str() {
-            if s == "IGNORE" || s == "DEFAULT" {
+            if s == "IGNORE" {
                 return Ok(());
+            }
+            if s == "DEFAULT" {
+                return Self::default_sig_action(sig);
             }
         }
         if let Some(sub) = v.as_code_ref() {
@@ -1232,7 +1240,21 @@ impl Interpreter {
                 Err(FlowOrError::Error(e)) => Err(e),
             }
         } else {
-            Ok(())
+            Self::default_sig_action(sig)
+        }
+    }
+
+    /// POSIX default for signals we deliver via `perl_signal::poll` (Unix).
+    #[inline]
+    fn default_sig_action(sig: &str) -> PerlResult<()> {
+        match sig {
+            // 128 + signal number (common shell convention)
+            "INT" => std::process::exit(130),
+            "TERM" => std::process::exit(143),
+            "ALRM" => std::process::exit(142),
+            // Default for SIGCHLD is ignore
+            "CHLD" => Ok(()),
+            _ => Ok(()),
         }
     }
 
@@ -4593,14 +4615,18 @@ impl Interpreter {
     }
 
     /// Scalar `$x OP= $rhs` — single [`Scope::atomic_mutate`] so `mysync` is RMW-safe.
+    /// For `.=`, uses [`Scope::scalar_concat_inplace`] so the LHS is not cloned via
+    /// [`Scope::get_scalar`] and `old.to_string()` on every iteration.
     pub(crate) fn scalar_compound_assign_scalar_target(
         &mut self,
         name: &str,
         op: BinOp,
         rhs: PerlValue,
-    ) -> PerlValue {
-        self.scope
-            .atomic_mutate(name, |old| Self::compound_scalar_binop(old, op, &rhs))
+    ) -> Result<PerlValue, PerlError> {
+        if op == BinOp::Concat {
+            return self.scope.scalar_concat_inplace(name, &rhs);
+        }
+        Ok(self.scope.atomic_mutate(name, |old| Self::compound_scalar_binop(old, op, &rhs)))
     }
 
     fn compound_scalar_binop(old: &PerlValue, op: BinOp, rhs: &PerlValue) -> PerlValue {
@@ -4625,11 +4651,6 @@ impl Interpreter {
                 } else {
                     PerlValue::float(old.to_number() * rhs.to_number())
                 }
-            }
-            BinOp::Concat => {
-                let mut s = old.to_string();
-                rhs.append_to(&mut s);
-                PerlValue::string(s)
             }
             BinOp::BitAnd => {
                 if let Some(s) = crate::value::set_intersection(old, rhs) {
@@ -5304,7 +5325,7 @@ impl Interpreter {
                         }
                         _ => self.eval_expr(value)?,
                     };
-                    return Ok(self.scalar_compound_assign_scalar_target(n, op, rhs));
+                    return Ok(self.scalar_compound_assign_scalar_target(n, op, rhs)?);
                 }
                 let rhs = self.eval_expr(value)?;
                 // For hash element targets: $h{key} += 1
@@ -7490,8 +7511,8 @@ impl Interpreter {
                 }
             }
             BinOp::Concat => {
-                // Optimized: avoid allocating rv.to_string() by appending directly
-                let mut s = lv.to_string();
+                let mut s = String::new();
+                lv.append_to(&mut s);
                 rv.append_to(&mut s);
                 PerlValue::string(s)
             }

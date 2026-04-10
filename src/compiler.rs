@@ -5,6 +5,7 @@ use crate::bytecode::{
     BuiltinId, Chunk, Op, RuntimeSubDecl, GP_CHECK, GP_END, GP_INIT, GP_RUN, GP_START,
 };
 use crate::interpreter::{Interpreter, WantarrayCtx};
+use crate::sort_fast::detect_sort_block_fast;
 use crate::value::PerlValue;
 
 /// Compilation error — triggers fallback to tree-walker.
@@ -710,90 +711,6 @@ impl Compiler {
 
         let mut i = 0;
         while i < main_stmts.len() {
-            if i + 5 <= main_stmts.len() {
-                if let Some(spec) = try_match_hash_sum_fusion(
-                    main_stmts[i],
-                    main_stmts[i + 1],
-                    main_stmts[i + 2],
-                    main_stmts[i + 3],
-                    main_stmts[i + 4],
-                ) {
-                    self.emit_hash_sum_fusion(&spec, main_stmts[i + 4].line, i + 4 == last_idx)?;
-                    i += 5;
-                    continue;
-                }
-            }
-            if i + 4 <= main_stmts.len() {
-                if let Some(spec) = try_match_regex_count_fusion(
-                    main_stmts[i],
-                    main_stmts[i + 1],
-                    main_stmts[i + 2],
-                    main_stmts[i + 3],
-                ) {
-                    self.emit_regex_count_fusion(&spec, main_stmts[i + 3].line, i + 3 == last_idx)?;
-                    i += 4;
-                    continue;
-                }
-                if let Some(spec) = try_match_array_push_sort_fusion(
-                    main_stmts[i],
-                    main_stmts[i + 1],
-                    main_stmts[i + 2],
-                    main_stmts[i + 3],
-                ) {
-                    self.emit_array_push_sort_fusion(
-                        &spec,
-                        main_stmts[i + 3].line,
-                        i + 3 == last_idx,
-                    )?;
-                    i += 4;
-                    continue;
-                }
-                if let Some(spec) = try_match_map_grep_scalar_fusion(
-                    main_stmts[i],
-                    main_stmts[i + 1],
-                    main_stmts[i + 2],
-                    main_stmts[i + 3],
-                ) {
-                    self.emit_map_grep_scalar_fusion(
-                        &spec,
-                        main_stmts[i + 3].line,
-                        i + 3 == last_idx,
-                    )?;
-                    i += 4;
-                    continue;
-                }
-            }
-            if i + 3 <= main_stmts.len() {
-                if let Some(spec) = try_match_string_repeat_length_fusion(
-                    main_stmts[i],
-                    main_stmts[i + 1],
-                    main_stmts[i + 2],
-                ) {
-                    self.emit_string_repeat_length_fusion(
-                        &spec,
-                        main_stmts[i + 2].line,
-                        i + 2 == last_idx,
-                    )?;
-                    i += 3;
-                    continue;
-                }
-                if let Some(spec) = try_match_triangular_for_fusion(
-                    main_stmts[i],
-                    main_stmts[i + 1],
-                    main_stmts[i + 2],
-                ) {
-                    self.emit_triangular_for_fusion(
-                        &spec,
-                        main_stmts[i],
-                        main_stmts[i + 1],
-                        main_stmts[i + 2],
-                        i + 2 == last_idx,
-                    )?;
-                    i += 3;
-                    continue;
-                }
-            }
-
             let stmt = main_stmts[i];
             if i == last_idx {
                 // The specialized `last statement leaves its value on the stack` path bypasses
@@ -5420,25 +5337,6 @@ mod tests {
     fn compile_print_statement() {
         let chunk = compile_snippet("print 1;").expect("compile");
         assert!(chunk.ops.iter().any(|o| matches!(o, Op::Print(_))));
-        assert_last_halt(&chunk);
-    }
-
-    #[test]
-    fn bench_loop_shape_emits_triangular_for_accum() {
-        let code = "my $sum = 0;\n\
-            for (my $i = 0; $i < 10000; $i = $i + 1) {\n\
-                $sum = $sum + $i;\n\
-            }\n\
-            print $sum, \"\\n\";";
-        let chunk = compile_snippet(code).expect("compile");
-        assert!(
-            chunk
-                .ops
-                .iter()
-                .any(|o| matches!(o, Op::TriangularForAccum { .. })),
-            "expected TriangularForAccum, ops={:?}",
-            chunk.ops
-        );
         assert_last_halt(&chunk);
     }
 

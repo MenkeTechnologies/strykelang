@@ -1483,6 +1483,34 @@ fn try_vm_execute_compound_assign_on_slot_lexical_in_sub() {
     assert_eq!(out.unwrap().expect("vm").to_int(), 10);
 }
 
+/// Scalar `.=` on a slot lexical must use concat-append lowering (`ConcatAppendSlot`), not
+/// `GetScalarSlot` + `Concat` + `SetScalarSlot` (which clones the growing string each time).
+#[test]
+fn try_vm_execute_concat_compound_assign_on_slot_lexical_in_sub() {
+    let p = parse(
+        r#"no strict 'vars';
+        sub f {
+            my $s = "";
+            $s .= "ab";
+            $s .= "cd";
+            return $s;
+        }
+        f();"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "concat compound assign on sub-local lexical should compile"
+    );
+    assert_eq!(
+        out.unwrap().expect("vm").to_string(),
+        "abcd",
+        "concat append must preserve slot binding and string contents"
+    );
+}
+
 /// `goto LABEL` at the main-program top level: forward jump skips intermediate statements
 /// and resumes at the labeled statement. VM path must resolve the label at compile time.
 #[test]
