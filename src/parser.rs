@@ -1401,6 +1401,104 @@ impl Parser {
         }
     }
 
+    /// Optional `sub` prototype `(...)` — position must be at `(` if present; consumes through `)`.
+    fn parse_sub_prototype_opt(&mut self) -> PerlResult<Option<String>> {
+        if !matches!(self.peek(), Token::LParen) {
+            return Ok(None);
+        }
+        self.advance();
+        let mut s = String::new();
+        loop {
+            match self.peek().clone() {
+                Token::RParen => {
+                    self.advance();
+                    break;
+                }
+                Token::Eof => {
+                    return Err(PerlError::syntax(
+                        "Unterminated sub prototype (expected ')' before end of input)",
+                        self.peek_line(),
+                    ));
+                }
+                Token::ScalarVar(v) if v == ")" => {
+                    // Lexer merges `$` + `)` into one token (`$)`). In `sub name ($) {`, the
+                    // closing `)` of the prototype is not a separate `RParen` — next is `{`.
+                    self.advance();
+                    s.push('$');
+                    if matches!(self.peek(), Token::LBrace) {
+                        break;
+                    }
+                }
+                Token::Ident(i) => {
+                    let i = i.clone();
+                    self.advance();
+                    s.push_str(&i);
+                }
+                Token::Semicolon => {
+                    self.advance();
+                    s.push(';');
+                }
+                Token::LParen => {
+                    self.advance();
+                    s.push('(');
+                }
+                Token::LBracket => {
+                    self.advance();
+                    s.push('[');
+                }
+                Token::RBracket => {
+                    self.advance();
+                    s.push(']');
+                }
+                Token::Backslash => {
+                    self.advance();
+                    s.push('\\');
+                }
+                Token::Comma => {
+                    self.advance();
+                    s.push(',');
+                }
+                Token::ScalarVar(v) => {
+                    let v = v.clone();
+                    self.advance();
+                    s.push('$');
+                    s.push_str(&v);
+                }
+                Token::ArrayVar(v) => {
+                    let v = v.clone();
+                    self.advance();
+                    s.push('@');
+                    s.push_str(&v);
+                }
+                Token::HashVar(v) => {
+                    let v = v.clone();
+                    self.advance();
+                    s.push('%');
+                    s.push_str(&v);
+                }
+                Token::Plus => {
+                    self.advance();
+                    s.push('+');
+                }
+                Token::Minus => {
+                    self.advance();
+                    s.push('-');
+                }
+                Token::BitAnd => {
+                    self.advance();
+                    s.push('&');
+                }
+                tok => {
+                    return Err(PerlError::syntax(
+                        format!("Unexpected token in sub prototype: {:?}", tok),
+                        self.peek_line(),
+                    ));
+                }
+            }
+        }
+        Ok(Some(s))
+    }
+
     fn parse_sub_decl(&mut self) -> PerlResult<Statement> {
         let line = self.peek_line();
         self.advance(); // 'sub'
@@ -1414,101 +1512,7 @@ impl Parser {
             }
         };
         // Optional prototype — capture text for `prototype` builtin
-        let prototype = if matches!(self.peek(), Token::LParen) {
-            self.advance();
-            let mut s = String::new();
-            loop {
-                match self.peek().clone() {
-                    Token::RParen => {
-                        self.advance();
-                        break;
-                    }
-                    Token::Eof => {
-                        return Err(PerlError::syntax(
-                            "Unterminated sub prototype (expected ')' before end of input)",
-                            self.peek_line(),
-                        ));
-                    }
-                    Token::ScalarVar(v) if v == ")" => {
-                        // Lexer merges `$` + `)` into one token (`$)`). In `sub name ($) {`, the
-                        // closing `)` of the prototype is not a separate `RParen` — next is `{`.
-                        self.advance();
-                        s.push('$');
-                        if matches!(self.peek(), Token::LBrace) {
-                            break;
-                        }
-                    }
-                    Token::Ident(i) => {
-                        let i = i.clone();
-                        self.advance();
-                        s.push_str(&i);
-                    }
-                    Token::Semicolon => {
-                        self.advance();
-                        s.push(';');
-                    }
-                    Token::LParen => {
-                        self.advance();
-                        s.push('(');
-                    }
-                    Token::LBracket => {
-                        self.advance();
-                        s.push('[');
-                    }
-                    Token::RBracket => {
-                        self.advance();
-                        s.push(']');
-                    }
-                    Token::Backslash => {
-                        self.advance();
-                        s.push('\\');
-                    }
-                    Token::Comma => {
-                        self.advance();
-                        s.push(',');
-                    }
-                    Token::ScalarVar(v) => {
-                        let v = v.clone();
-                        self.advance();
-                        s.push('$');
-                        s.push_str(&v);
-                    }
-                    Token::ArrayVar(v) => {
-                        let v = v.clone();
-                        self.advance();
-                        s.push('@');
-                        s.push_str(&v);
-                    }
-                    Token::HashVar(v) => {
-                        let v = v.clone();
-                        self.advance();
-                        s.push('%');
-                        s.push_str(&v);
-                    }
-                    Token::Plus => {
-                        self.advance();
-                        s.push('+');
-                    }
-                    Token::Minus => {
-                        self.advance();
-                        s.push('-');
-                    }
-                    Token::BitAnd => {
-                        self.advance();
-                        s.push('&');
-                    }
-                    tok => {
-                        return Err(PerlError::syntax(
-                            format!("Unexpected token in sub prototype: {:?}", tok),
-                            self.peek_line(),
-                        ));
-                    }
-                }
-            }
-            Some(s)
-        } else {
-            None
-        };
+        let prototype = self.parse_sub_prototype_opt()?;
         // Optional subroutine attributes: `sub foo : lvalue { }`, `sub foo : ATTR(ARGS) { }`
         while self.eat(&Token::Colon) {
             match self.advance() {
@@ -3095,12 +3099,27 @@ impl Parser {
                     expr = if is_scalar_named_hash {
                         if let ExprKind::ScalarVar(ref name) = expr.kind {
                             let name = name.clone();
-                            Expr {
-                                kind: ExprKind::HashElement {
-                                    hash: name,
-                                    key: Box::new(key),
-                                },
-                                line,
+                            // Perl: `$_ { k }` means `$_->{k}` (implicit arrow), not the `%_` stash hash.
+                            if name == "_" {
+                                Expr {
+                                    kind: ExprKind::ArrowDeref {
+                                        expr: Box::new(Expr {
+                                            kind: ExprKind::ScalarVar("_".into()),
+                                            line,
+                                        }),
+                                        index: Box::new(key),
+                                        kind: DerefKind::Hash,
+                                    },
+                                    line,
+                                }
+                            } else {
+                                Expr {
+                                    kind: ExprKind::HashElement {
+                                        hash: name,
+                                        key: Box::new(key),
+                                    },
+                                    line,
+                                }
                             }
                         } else {
                             unreachable!("is_scalar_named_hash implies ScalarVar");
@@ -5052,7 +5071,8 @@ impl Parser {
                 line,
             }),
             "sub" => {
-                // Anonymous sub
+                // Anonymous sub — optional prototype `sub () { }` (e.g. Carp.pm `*X = sub () { 1 }`)
+                let _ = self.parse_sub_prototype_opt()?;
                 let body = self.parse_block()?;
                 Ok(Expr {
                     kind: ExprKind::CodeRef {

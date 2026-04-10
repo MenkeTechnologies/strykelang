@@ -535,8 +535,8 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - Quote-like: `m//`, `qr//`
 
 #### SUBROUTINES
-- Named subs with `sub name { ... }`
-- Anonymous subs / closures
+- Named subs with `sub name { ... }` and optional prototype `sub name (…) { … }` (stored for `prototype`)
+- Anonymous subs / closures — `sub { … }` or `sub (…) { … }` in expression position (e.g. `*foo = sub () { … }` as in core `Carp.pm`)
 - Implicit return from the last statement when it is an expression or a trailing `if` / `unless` (VM-compiled subs; matches Perl’s last-expression value)
 - Recursive calls
 - `@_` argument passing, `shift`, `return`

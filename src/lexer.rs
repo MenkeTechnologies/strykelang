@@ -440,6 +440,15 @@ impl Lexer {
     fn read_variable_name(&mut self) -> String {
         // Handle special vars like $_, $!, $0, $/, $^I, etc.
         match self.peek() {
+            // Second `$` in `$$_{` — with leading `$` already consumed, we have `$` `_` `{` → `$_` then `{`.
+            Some('$')
+                if self.input.get(self.pos + 1) == Some(&'_')
+                    && self.input.get(self.pos + 2) == Some(&'{') =>
+            {
+                self.advance(); // second $
+                self.advance(); // `_` of `$_`
+                "_".to_string()
+            }
             // `$::{$key}` / `$::Foo` — stash access (`%::`) and package names rooted at `::` (Perl `$::` ≡ main stash).
             Some(':') if self.input.get(self.pos + 1) == Some(&':') => {
                 self.advance();
@@ -501,15 +510,20 @@ impl Lexer {
                 self.advance();
                 // `$$foo` — symbolic scalar deref (Perl `${$foo}`-style lookup)
                 if self.peek() == Some('$') {
-                    self.advance();
-                    if self.peek().is_some_and(|c| c.is_alphabetic() || c == '_') {
-                        let name = self.read_identifier();
+                    // `$$_{` — Perl parses as `$_->{...}` (implicit arrow on `$_`), not `$$` PID + `_`.
+                    let is_dollar_under_brace = self.input.get(self.pos + 1) == Some(&'_')
+                        && self.input.get(self.pos + 2) == Some(&'{');
+                    if !is_dollar_under_brace {
+                        self.advance();
+                        if self.peek().is_some_and(|c| c.is_alphabetic() || c == '_') {
+                            let name = self.read_identifier();
+                            self.last_was_term = true;
+                            return Ok(Token::DerefScalarVar(name));
+                        }
+                        // `$$` — process id (Perl `$$`)
                         self.last_was_term = true;
-                        return Ok(Token::DerefScalarVar(name));
+                        return Ok(Token::ScalarVar("$$".to_string()));
                     }
-                    // `$$` — process id (Perl `$$`)
-                    self.last_was_term = true;
-                    return Ok(Token::ScalarVar("$$".to_string()));
                 }
                 let name = self.read_variable_name();
                 if name.is_empty() {
@@ -1666,6 +1680,15 @@ mod tests {
         let mut l = Lexer::new("%+");
         let t = l.tokenize().expect("tokenize");
         assert!(matches!(t[0].0, Token::HashVar(ref s) if s == "+"));
+    }
+
+    #[test]
+    fn tokenize_dollar_dollar_under_brace_is_not_pid() {
+        // `$$_{$k}` — second `$$` is not PID; tokenizes as `$_` then `{` (Perl `$_->{$k}`).
+        let mut l = Lexer::new("$$_{$k}");
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[0].0, Token::ScalarVar(ref s) if s == "_"));
+        assert!(matches!(t[1].0, Token::LBrace));
     }
 
     #[test]
