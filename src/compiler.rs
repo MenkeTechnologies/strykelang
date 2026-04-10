@@ -2558,16 +2558,53 @@ impl Compiler {
                     self.emit_op(Op::Rot, line, Some(root));
                     self.emit_op(Op::SetHashElem(hash_idx), line, Some(root));
                 } else if let ExprKind::Deref { expr, kind: Sigil::Scalar } = &target.kind {
-                    let vm_op = binop_to_vm_op(*op).ok_or_else(|| {
-                        CompileError::Unsupported("CompoundAssign op".into())
-                    })?;
-                    self.compile_expr(expr)?;
-                    self.emit_op(Op::Dup, line, Some(root));
-                    self.emit_op(Op::SymbolicDeref(0), line, Some(root));
-                    self.compile_expr(value)?;
-                    self.emit_op(vm_op, line, Some(root));
-                    self.emit_op(Op::Swap, line, Some(root));
-                    self.emit_op(Op::SetSymbolicScalarRef, line, Some(root));
+                    match op {
+                        BinOp::DefinedOr => {
+                            // `$$r //=` — unlike binary `//`, no `Pop` after `JumpIfDefinedKeep`
+                            // (the ref must stay under the deref); `Swap` before set (ref on TOS).
+                            self.compile_expr(expr)?;
+                            self.emit_op(Op::Dup, line, Some(root));
+                            self.emit_op(Op::SymbolicDeref(0), line, Some(root));
+                            let j_def =
+                                self.emit_op(Op::JumpIfDefinedKeep(0), line, Some(root));
+                            self.compile_expr(value)?;
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::SetSymbolicScalarRefKeep, line, Some(root));
+                            let j_end = self.emit_op(Op::Jump(0), line, Some(root));
+                            self.chunk.patch_jump_here(j_def);
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::Pop, line, Some(root));
+                            self.chunk.patch_jump_here(j_end);
+                        }
+                        BinOp::LogOr => {
+                            // `$$r ||=` — same idea as `//=`: no `Pop` after `JumpIfTrueKeep`.
+                            self.compile_expr(expr)?;
+                            self.emit_op(Op::Dup, line, Some(root));
+                            self.emit_op(Op::SymbolicDeref(0), line, Some(root));
+                            let j_true =
+                                self.emit_op(Op::JumpIfTrueKeep(0), line, Some(root));
+                            self.compile_expr(value)?;
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::SetSymbolicScalarRefKeep, line, Some(root));
+                            let j_end = self.emit_op(Op::Jump(0), line, Some(root));
+                            self.chunk.patch_jump_here(j_true);
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::Pop, line, Some(root));
+                            self.chunk.patch_jump_here(j_end);
+                        }
+                        _ => {
+                            let vm_op = binop_to_vm_op(*op).ok_or_else(|| {
+                                CompileError::Unsupported("CompoundAssign op".into())
+                            })?;
+                            self.compile_expr(expr)?;
+                            self.emit_op(Op::Dup, line, Some(root));
+                            self.emit_op(Op::SymbolicDeref(0), line, Some(root));
+                            self.compile_expr(value)?;
+                            self.emit_op(vm_op, line, Some(root));
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::SetSymbolicScalarRef, line, Some(root));
+                        }
+                    }
                 } else if let ExprKind::ArrowDeref {
                     expr,
                     index,

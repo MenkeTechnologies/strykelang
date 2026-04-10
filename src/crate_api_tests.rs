@@ -219,6 +219,84 @@ fn try_vm_execute_symbolic_scalar_ref_compound_assign() {
 }
 
 #[test]
+fn try_vm_execute_symbolic_scalar_ref_defined_or_assign() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $x;
+        my $r = \$x;
+        $$r //= 99;
+        $x;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "$$r //= should compile (JumpIfDefinedKeep + SetSymbolicScalarRefKeep)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 99);
+}
+
+#[test]
+fn try_vm_execute_symbolic_scalar_ref_defined_or_assign_short_circuit() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $x = 0;
+        my $r = \$x;
+        my $runs = 0;
+        $$r //= ($runs = 1);
+        $runs;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "$$r //= should skip RHS when LHS is defined"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 0);
+}
+
+#[test]
+fn try_vm_execute_symbolic_scalar_ref_log_or_assign() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $x = 0;
+        my $r = \$x;
+        $$r ||= 8;
+        $x;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "$$r ||= should compile (JumpIfTrueKeep + SetSymbolicScalarRefKeep)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 8);
+}
+
+#[test]
+fn try_vm_execute_symbolic_scalar_ref_log_or_assign_short_circuit() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $x = 5;
+        my $r = \$x;
+        my $runs = 0;
+        $$r ||= ($runs = 1);
+        $runs;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "$$r ||= should skip RHS when LHS is true"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 0);
+}
+
+#[test]
 fn try_vm_execute_arrow_hash_compound_assign() {
     let p = parse(
         r#"no strict 'vars';
