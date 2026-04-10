@@ -2729,6 +2729,24 @@ impl<'a> VM<'a> {
                         self.push(out);
                         Ok(())
                     }
+                    Op::SetHashSliceDeref(n) => {
+                        let n = *n as usize;
+                        let mut key_vals = Vec::with_capacity(n);
+                        for _ in 0..n {
+                            key_vals.push(self.pop());
+                        }
+                        key_vals.reverse();
+                        let container = self.pop();
+                        let val = self.pop();
+                        let line = self.line();
+                        vm_interp_result(
+                            self
+                                .interp
+                                .assign_hash_slice_deref(container, key_vals, val, line),
+                            line,
+                        )?;
+                        Ok(())
+                    }
                     Op::MakeHash(n) => {
                         let n = *n as usize;
                         let mut items = Vec::with_capacity(n);

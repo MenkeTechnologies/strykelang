@@ -3637,6 +3637,58 @@ impl Interpreter {
         Ok(PerlValue::array(result))
     }
 
+    /// `@$href{k1,k2} = LIST` — shared by VM [`Op::SetHashSliceDeref`](crate::bytecode::Op::SetHashSliceDeref) and [`Self::assign_value`].
+    pub(crate) fn assign_hash_slice_deref(
+        &mut self,
+        container: PerlValue,
+        key_values: Vec<PerlValue>,
+        val: PerlValue,
+        line: usize,
+    ) -> Result<PerlValue, FlowOrError> {
+        let mut ks: Vec<String> = Vec::new();
+        for kv in key_values {
+            if let Some(vv) = kv.as_array_vec() {
+                ks.extend(vv.iter().map(|x| x.to_string()));
+            } else {
+                ks.push(kv.to_string());
+            }
+        }
+        let items = val.to_list();
+        if let Some(r) = container.as_hash_ref() {
+            let mut h = r.write();
+            for (i, k) in ks.iter().enumerate() {
+                let v = items.get(i).cloned().unwrap_or(PerlValue::UNDEF);
+                h.insert(k.clone(), v);
+            }
+            return Ok(PerlValue::UNDEF);
+        }
+        if let Some(s) = container.as_str() {
+            self.touch_env_hash(&s);
+            if self.strict_refs {
+                return Err(PerlError::runtime(
+                    format!(
+                        "Can't use string (\"{}\") as a HASH ref while \"strict refs\" in use",
+                        s
+                    ),
+                    line,
+                )
+                .into());
+            }
+            for (i, k) in ks.iter().enumerate() {
+                let v = items.get(i).cloned().unwrap_or(PerlValue::UNDEF);
+                self.scope
+                    .set_hash_element(&s, k, v)
+                    .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+            }
+            return Ok(PerlValue::UNDEF);
+        }
+        Err(PerlError::runtime(
+            "Hash slice assignment needs a hash or hash reference value",
+            line,
+        )
+        .into())
+    }
+
     fn match_array_pattern_elems(
         &mut self,
         arr: &[PerlValue],
@@ -8053,6 +8105,14 @@ impl Interpreter {
                 let idx = self.eval_expr(index)?.to_int();
                 let container = self.eval_expr(expr)?;
                 self.assign_arrow_array_deref(container, idx, val, target.line)
+            }
+            ExprKind::HashSliceDeref { container, keys } => {
+                let href = self.eval_expr(container)?;
+                let mut key_vals = Vec::with_capacity(keys.len());
+                for key_expr in keys {
+                    key_vals.push(self.eval_expr(key_expr)?);
+                }
+                self.assign_hash_slice_deref(href, key_vals, val, target.line)
             }
             ExprKind::Deref { expr, kind: Sigil::Scalar } => {
                 let ref_val = self.eval_expr(expr)?;

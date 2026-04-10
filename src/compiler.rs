@@ -4654,6 +4654,17 @@ impl Compiler {
                     "Assign to arrow call deref (tree interpreter)".into(),
                 ));
             }
+            ExprKind::HashSliceDeref { container, keys } => {
+                self.compile_expr(container)?;
+                for key_expr in keys {
+                    self.compile_expr(key_expr)?;
+                }
+                self.emit_op(
+                    Op::SetHashSliceDeref(keys.len() as u16),
+                    line,
+                    ast,
+                );
+            }
             _ => {
                 return Err(CompileError::Unsupported("Assign to complex lvalue".into()));
             }
@@ -4750,6 +4761,24 @@ mod tests {
         let chunk = compile_snippet("42;").expect("compile");
         assert!(chunk.ops.iter().any(|o| matches!(o, Op::LoadInt(42))));
         assert_last_halt(&chunk);
+    }
+
+    #[test]
+    fn compile_hash_slice_deref_assign_emits_set_op() {
+        let code = r#"no strict 'vars';
+        my $h = { "a" => 1, "b" => 2 };
+        my $r = $h;
+        @$r{"a", "b"} = (10, 20);
+        $r->{"a"} . "," . $r->{"b"};"#;
+        let chunk = compile_snippet(code).expect("compile");
+        assert!(
+            chunk
+                .ops
+                .iter()
+                .any(|o| matches!(o, Op::SetHashSliceDeref(n) if *n == 2)),
+            "expected SetHashSliceDeref(2), got {:?}",
+            chunk.ops
+        );
     }
 
     #[test]

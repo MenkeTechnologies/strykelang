@@ -882,6 +882,25 @@ fn try_vm_execute_hash_slice_deref() {
     assert_eq!(out.unwrap().expect("vm").to_string(), "10,20");
 }
 
+#[test]
+fn try_vm_execute_hash_slice_deref_assign() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $h = { "a" => 1, "b" => 2 };
+        my $r = $h;
+        @$r{"a", "b"} = (10, 20);
+        $r->{"a"} . "," . $r->{"b"};"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "@$href{{keys}} = should compile (Op::SetHashSliceDeref)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_string(), "10,20");
+}
+
 /// Perl 5 rejects `++@{...}`, `%{...}++`, etc.; we must not treat them as numeric ops on length.
 #[test]
 fn symbolic_array_hash_deref_inc_dec_errors_like_perl() {
