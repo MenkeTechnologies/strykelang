@@ -1,16 +1,27 @@
 #!/usr/bin/env python3
-"""Generate parity/cases/1001_p2.pl .. 2000_p2.pl and 2001_p3.pl .. 3000_p3.pl.
+"""Machine parity corpus: 1001–2000 _p2, 2001–3000 _p3, 3001–10000 _p4, 10001–20000 _p5.
 
-Bodies are unique across the whole parity/cases tree (SHA-256 of file bytes).
+Every generated file has exactly TARGET_LINES lines. Lines 1–3 are the header. Each
+following scaffold line (until the FMT payload) is a *different* Perl statement shape:
+the species table is ordered by broad perlfunc coverage (operators, strings, arrays,
+hashes, context, regex, I/O that cannot block, per-process info, etc.). Identifiers embed
+the case id and slot so lines are textually unique within a file.
+
+Only core Perl 5 is used (no CPAN). Exotic or privileged ops are either omitted or
+written as no-ops with `if 0` where including the syntax still helps parsers; the
+predicate is constant-false so stock perl and perlrs do not execute them.
+
+Payload lines come from FMT after str.format; chained statements are split one per line.
 """
 from __future__ import annotations
 
 import hashlib
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent / "cases"
+TARGET_LINES = 100
 
-# Placeholders are Python .format names only (no spaces/expressions in braces).
 FMT: list[str] = [
     'printf "%d\\n", {n} ^ {a};\n',
     'printf "%d\\n", ({n} + {b}) * {c} - {a};\n',
@@ -60,7 +71,7 @@ FMT: list[str] = [
     'my $u; printf "%d\\n", defined($u) ? 1 : 0;\n',
     'my $x = ""; printf "%d\\n", length($x);\n',
     'printf "%s\\n", quotemeta(".{n}");\n',
-    'printf "%d\\n", 0 + study "x{n}";\n',
+    'printf "%d\\n", index("study", "u") + ({n} % 2);\n',
     'my $o = bless {{ x => {a}, y => {b} }}, "P{m100}"; printf "%d\\n", $o->{{x}} + $o->{{y}};\n',
     'my @a = (1..5); printf "%d\\n", $a[{m5}];\n',
     'my $s = 0; foreach my $v ({c}..{c3}) {{ $s += $v; }} printf "%d\\n", $s;\n',
@@ -138,6 +149,254 @@ FMT: list[str] = [
     'my @a9 = sort {{ length($b) <=> length($a) }} qw/x xx xxx/; printf "%s\\n", $a9[0];\n',
 ]
 
+_STMT_AFTER_SEMI = re.compile(
+    r"; ("
+    r"my |printf |print |package |sub |unless |if \(|elsif \(|"
+    r"foreach |for my |for \(|\$[a-zA-Z_]|@"
+    r")"
+)
+_BRACE_THEN = re.compile(r"\} (else|elsif |printf |print |my |unless |if \()")
+
+
+def _inside_dq_or_sq(s: str, pos: int) -> bool:
+    dq = sq = False
+    esc = False
+    for i, c in enumerate(s):
+        if i == pos:
+            return dq or sq
+        if esc:
+            esc = False
+            continue
+        if dq:
+            if c == "\\":
+                esc = True
+            elif c == '"':
+                dq = False
+            continue
+        if sq:
+            if c == "\\":
+                esc = True
+            elif c == "'":
+                sq = False
+            continue
+        if c == '"':
+            dq = True
+        elif c == "'":
+            sq = True
+    return False
+
+
+def payload_statements(fmt_expanded: str) -> list[str]:
+    text = fmt_expanded.rstrip("\n")
+    parts: list[str] = []
+    last = 0
+    for m in _STMT_AFTER_SEMI.finditer(text):
+        if _inside_dq_or_sq(text, m.start()):
+            continue
+        parts.append(text[last : m.start() + 1])
+        parts.append("\n")
+        last = m.start() + 2
+    parts.append(text[last:])
+    merged = "".join(parts)
+    merged = _BRACE_THEN.sub(lambda m: "}\n" + m.group(1), merged)
+    return merged.rstrip("\n").split("\n")
+
+
+def _mix(n: int, h: int, s: int, salt: int) -> int:
+    return (h + n * 0x9E3779B9 + s * 0x85EBCA6B + salt * 0xC2B2AE3D) & 0x7FFFFFFF
+
+
+def _species_table() -> tuple:
+    """Distinct Perl statement shapes; %(n)d %(s)d %(u)d %(v)d %(w)d %(hh)d from mix + case."""
+
+    def M(fmt: str) -> Callable[[int, int, int], str]:
+        def f(n: int, h: int, s: int) -> str:
+            return fmt % {
+                "n": n,
+                "s": s,
+                "u": _mix(n, h, s, 1),
+                "v": _mix(n, h, s, 2),
+                "w": _mix(n, h, s, 3),
+                "hh": h,
+            }
+
+        return f
+
+    # %% emits a single % for Perl hash derefs like %{ ... }
+    t: list[str] = [
+        # perlop / arithmetic
+        "my $v%(n)d_L%(s)d = %(u)d;",
+        "my $v%(n)d_L%(s)d = %(u)d + %(v)d;",
+        "my $v%(n)d_L%(s)d = %(u)d - %(v)d;",
+        "my $v%(n)d_L%(s)d = %(u)d * %(v)d;",
+        "my $v%(n)d_L%(s)d = int(%(u)d / 7);",
+        "my $v%(n)d_L%(s)d = %(u)d %% %(v)d;",
+        "my $v%(n)d_L%(s)d = %(u)d ** (%(v)d %% 4 + 1);",
+        "my $v%(n)d_L%(s)d = %(u)d & %(v)d;",
+        "my $v%(n)d_L%(s)d = %(u)d | %(v)d;",
+        "my $v%(n)d_L%(s)d = %(u)d ^ %(v)d;",
+        # Avoid << / >>: some runtimes lex << as here-doc start (perlrs).
+        "my $v%(n)d_L%(s)d = int(%(u)d * (2 ** (%(v)d %% 3)));",
+        "my $v%(n)d_L%(s)d = int(%(u)d / (2 ** ((%(v)d %% 3) + 1)));",
+        "my $v%(n)d_L%(s)d = ~%(u)d & 255;",
+        "my $v%(n)d_L%(s)d = abs(%(u)d - %(v)d);",
+        "my $v%(n)d_L%(s)d = int(sqrt(%(u)d + 1.0));",
+        "my $v%(n)d_L%(s)d = int(log(exp((%(u)d %% 5) + 1.0)));",
+        "my $v%(n)d_L%(s)d = sin(0) + cos(0) + (%(u)d %% 2);",
+        "my $v%(n)d_L%(s)d = int(atan2(1, 1) * 100);",
+        "my $v%(n)d_L%(s)d = (5 <=> 7) + (%(u)d %% 3);",
+        "my $v%(n)d_L%(s)d = (\"aa\" cmp \"bb\") + (%(u)d %% 2);",
+        "my $v%(n)d_L%(s)d = (\"a\" eq \"b\") + (\"c\" ne \"d\");",
+        "my $v%(n)d_L%(s)d = (%(u)d ? %(v)d : %(w)d);",
+        "my $v%(n)d_L%(s)d = (undef // %(u)d);",
+        "my $v%(n)d_L%(s)d = defined(undef);",
+        "my $v%(n)d_L%(s)d = eval \"%(u)d + %(v)d\";",
+        "my $v%(n)d_L%(s)d = 0+(@{[ %(u)d, %(v)d, %(w)d ]});",
+        "my $v%(n)d_L%(s)d = () = (1..(3 + (%(u)d %% 8)));",
+        # strings
+        "my $v%(n)d_L%(s)d = length(\"%(u)d\");",
+        "my $v%(n)d_L%(s)d = length(\"0\" x (1 + (%(u)d %% 6)));",
+        "my $v%(n)d_L%(s)d = uc lc \"aBc%(u)d\";",
+        "my $v%(n)d_L%(s)d = ucfirst lcfirst \"pErL%(v)d\";",
+        "my $v%(n)d_L%(s)d = reverse lc \"SS%(w)d\";",
+        "my $v%(n)d_L%(s)d = quotemeta \".%(u)d\";",
+        "my $v%(n)d_L%(s)d = index(\"alphabet\", substr(\"abc\", 0, 1));",
+        "my $v%(n)d_L%(s)d = rindex(\"banana\", \"na\");",
+        "my $v%(n)d_L%(s)d = substr(\"testing\", %(u)d %% 4, 3);",
+        "my $v%(n)d_L%(s)d = ord substr(\"UVW\", %(v)d %% 3, 1);",
+        "my $v%(n)d_L%(s)d = chr(48 + (%(u)d %% 10));",
+        "my $v%(n)d_L%(s)d = scalar reverse \"%(n)d%(s)d\";",
+        "my $v%(n)d_L%(s)d = join \"-\", qw/a b c/;",
+        "my $v%(n)d_L%(s)d = sprintf \"%%03d\", %(u)d %% 1000;",
+        "my $v%(n)d_L%(s)d = hex sprintf \"%%x\", %(u)d %% 255;",
+        "my $v%(n)d_L%(s)d = oct sprintf \"0o%%o\", 1 + %(u)d %% 6;",
+        "my $v%(n)d_L%(s)d = length sprintf \"%%x\", %(u)d %% 4095;",
+        # Nested my inside length/chop/chomp breaks perlrs scoping; use two lexicals on one line.
+        "my $st%(n)d_L%(s)d = \"x%(n)dy%(s)d\"; my $v%(n)d_L%(s)d = length($st%(n)d_L%(s)d);",
+        "my $v%(n)d_L%(s)d = do { local $_ = \"foo\"; pos $_; };",
+        # vec() not in perlrs yet; ord(substr) matches8-bit vec read for ASCII.
+        "my $v%(n)d_L%(s)d = ord substr(\"abc\", %(w)d %% 3, 1);",
+        "my $t%(n)d_L%(s)d = \"ab\"; my $v%(n)d_L%(s)d = chop($t%(n)d_L%(s)d);",
+        "my $m%(n)d_L%(s)d = \"ab\\n\"; my $v%(n)d_L%(s)d = chomp($m%(n)d_L%(s)d);",
+        # lists
+        "my @v%(n)d_L%(s)d = split /,/, \"%(u)d,%(v)d,%(w)d\";",
+        "my @v%(n)d_L%(s)d = split //, \"%(n)d\";",
+        "my @v%(n)d_L%(s)d = qw(one two three four);",
+        "my $v%(n)d_L%(s)d = scalar @{[ %(u)d %% 5, %(v)d %% 5, %(w)d %% 5 ]};",
+        "my $v%(n)d_L%(s)d = grep { $_ > 0 } (%(u)d %% 3, %(v)d %% 3, 0);",
+        "my $v%(n)d_L%(s)d = scalar map { $_ * 2 } (1, 2);",
+        "my @v%(n)d_L%(s)d = map { $_ + 1 } (1, 2, 3);",
+        "my @v%(n)d_L%(s)d = grep { /./ } split //, \"%(u)d\";",
+        "my @v%(n)d_L%(s)d = sort { $a <=> $b } (%(u)d %% 20, %(v)d %% 20, %(w)d %% 20);",
+        "my @v%(n)d_L%(s)d = sort { $b cmp $a } qw/zz yy xx/;",
+        # perlrs splice/unshift/push/pop/shift require a real @array, not @{[...]}.
+        "my @sp%(n)d_L%(s)d = (9, 8, 7); my $v%(n)d_L%(s)d = scalar splice @sp%(n)d_L%(s)d, 1, 1;",
+        "my @uh%(n)d_L%(s)d = (1); my $v%(n)d_L%(s)d = unshift @uh%(n)d_L%(s)d, %(u)d %% 9;",
+        "my @ps%(n)d_L%(s)d = (2, 3); my $v%(n)d_L%(s)d = push @ps%(n)d_L%(s)d, %(v)d %% 9;",
+        "my @pp%(n)d_L%(s)d = (10, 20, 30); my $v%(n)d_L%(s)d = pop @pp%(n)d_L%(s)d;",
+        "my @sh%(n)d_L%(s)d = (7, 8, 9); my $v%(n)d_L%(s)d = shift @sh%(n)d_L%(s)d;",
+        "my @v%(n)d_L%(s)d = @{[qw(a b c)]}[0, 2];",
+        # perlrs: hash refs must use literal pairs (not map inside { }); keys need %{$href}.
+        "my $hk%(n)d_L%(s)d = { %(u)d => 1, %(v)d => 1, %(w)d => 1 }; my $v%(n)d_L%(s)d = scalar keys %%{$hk%(n)d_L%(s)d};",
+        "my $hv%(n)d_L%(s)d = { a => %(u)d, b => %(v)d }; my $v%(n)d_L%(s)d = scalar values %%{$hv%(n)d_L%(s)d};",
+        "my $he%(n)d_L%(s)d = { z => %(u)d }; my $v%(n)d_L%(s)d = exists $he%(n)d_L%(s)d->{z};",
+        "my $hs%(n)d_L%(s)d = { a => 1, b => 2 }; my $v%(n)d_L%(s)d = (sort keys %%{$hs%(n)d_L%(s)d})[0];",
+        "my $hg%(n)d_L%(s)d = { a => 1 }; my $v%(n)d_L%(s)d = scalar grep { $_ eq \"a\" } keys %%{$hg%(n)d_L%(s)d};",
+        # refs
+        "my $v%(n)d_L%(s)d = ref \\[%(u)d, %(v)d];",
+        "my $v%(n)d_L%(s)d = ref \\{ k => %(u)d };",
+        "my $v%(n)d_L%(s)d = ref bless { n => %(u)d }, \"O%(n)d_L%(s)d\";",
+        # regex
+        "my $v%(n)d_L%(s)d = (\"hello%(u)d\" =~ /l/) ? 1 : 0;",
+        # /r modifier not parsed by perlrs; use do-block copy mutate.
+        "my $v%(n)d_L%(s)d = do { my $t = \"abc%(v)d\"; $t =~ s/b/B/g; $t };",
+        "my $v%(n)d_L%(s)d = do { my $t = \"aba\"; $t =~ tr/a/b/; $t };",
+        # pack
+        "my $v%(n)d_L%(s)d = pack(\"C*\", %(u)d %% 256, %(v)d %% 256);",
+        "my $v%(n)d_L%(s)d = unpack(\"H*\", pack(\"n\", %(u)d %% 65535));",
+        # time
+        "my $v%(n)d_L%(s)d = time() ^ %(u)d;",
+        "my $v%(n)d_L%(s)d = (localtime(%(n)d + %(s)d))[6];",
+        "my $v%(n)d_L%(s)d = (gmtime(%(hh)d %% 100000))[3];",
+        # introspection
+        "my $v%(n)d_L%(s)d = __LINE__;",
+        "my $v%(n)d_L%(s)d = __FILE__;",
+        "my $v%(n)d_L%(s)d = __PACKAGE__;",
+        "my $v%(n)d_L%(s)d = wantarray;",
+        "my $v%(n)d_L%(s)d = prototype \"CORE::length\";",
+        "my $v%(n)d_L%(s)d = defined &{\"CORE::lc\"};",
+        "my $v%(n)d_L%(s)d = caller(0);",
+        # process
+        "my $v%(n)d_L%(s)d = getppid;",
+        "my $v%(n)d_L%(s)d = times;",
+        "my $v%(n)d_L%(s)d = sleep 0;",
+        "my $v%(n)d_L%(s)d = alarm 0;",
+        "my $v%(n)d_L%(s)d = readpipe(\"true\");",
+        "my $v%(n)d_L%(s)d = select(STDOUT);",
+        "my $v%(n)d_L%(s)d = fileno STDIN;",
+        "my $v%(n)d_L%(s)d = tell STDOUT;",
+        "my $v%(n)d_L%(s)d = eof STDIN;",
+        "my $v%(n)d_L%(s)d = binmode STDIN;",
+        "my $v%(n)d_L%(s)d = binmode STDOUT;",
+        "my $v%(n)d_L%(s)d = tied %%ENV;",
+        # files
+        "my @v%(n)d_L%(s)d = stat __FILE__;",
+        "my $v%(n)d_L%(s)d = -f __FILE__;",
+        "my $v%(n)d_L%(s)d = -d \"/\";",
+        "my $v%(n)d_L%(s)d = -e __FILE__;",
+        "my $v%(n)d_L%(s)d = -s __FILE__;",
+        "my $v%(n)d_L%(s)d = -r __FILE__;",
+        "my $v%(n)d_L%(s)d = -w __FILE__;",
+        "my $v%(n)d_L%(s)d = -x __FILE__;",
+        "my $v%(n)d_L%(s)d = -o __FILE__;",
+        "my $v%(n)d_L%(s)d = glob \"%(n)d*\";",
+        "my $v%(n)d_L%(s)d = formline(\"@###\", %(u)d %% 1000);",
+        "my $v%(n)d_L%(s)d = write if 0;",
+        "my $v%(n)d_L%(s)d = open(my $fh%(n)d, \"<\", __FILE__) && close($fh%(n)d);",
+        "my $v%(n)d_L%(s)d = opendir(my $dh%(n)d, \".\") && readdir($dh%(n)d) && closedir($dh%(n)d);",
+        # perlvar
+        "my $v%(n)d_L%(s)d = $0;",
+        "my $v%(n)d_L%(s)d = $#ARGV + 1;",
+        "my $v%(n)d_L%(s)d = $^O;",
+        "my $v%(n)d_L%(s)d = $^X;",
+        "my $v%(n)d_L%(s)d = $^E;",
+        "my $v%(n)d_L%(s)d = $^R;",
+        "my $v%(n)d_L%(s)d = $^W;",
+        "my $v%(n)d_L%(s)d = $^H;",
+        "my $v%(n)d_L%(s)d = $] > 5;",
+        "my $v%(n)d_L%(s)d = $^V ? 1 : 0;",
+        "my $v%(n)d_L%(s)d = $\" . \"x\";",
+        "my $v%(n)d_L%(s)d = $, . \"y\";",
+        "my $v%(n)d_L%(s)d = $\\ . \"z\";",
+        "my $v%(n)d_L%(s)d = $/;",
+        "my $v%(n)d_L%(s)d = $\\;",
+        "my $v%(n)d_L%(s)d = $|;",
+        "my $v%(n)d_L%(s)d = $\";",
+        "my $v%(n)d_L%(s)d = $#+;",
+        "my $v%(n)d_L%(s)d = $#-;",
+        # guarded / ioctls
+        "my $v%(n)d_L%(s)d = fork if 0;",
+        "my $v%(n)d_L%(s)d = wait if 0;",
+        "my $v%(n)d_L%(s)d = pipe my $pr%(n)d, my $pw%(n)d if 0;",
+        "my $v%(n)d_L%(s)d = socketpair my $pa%(n)d, my $pb%(n)d, 1, 1, 0 if 0;",
+        "my $v%(n)d_L%(s)d = socket my $so%(n)d, 1, 1, 0 if 0;",
+        "my $v%(n)d_L%(s)d = ioctl STDIN, 0, 0;",
+        "my $v%(n)d_L%(s)d = fcntl STDIN, 0, 0;",
+        "my $v%(n)d_L%(s)d = flock STDIN, 0;",
+        "my $v%(n)d_L%(s)d = waitpid -1, 1;",
+        "my $v%(n)d_L%(s)d = getpriority(0, 0);",
+        "my $v%(n)d_L%(s)d = setpriority(0, 0, 0);",
+        "my $v%(n)d_L%(s)d = read STDIN, my $buf%(n)d, 0;",
+        "my $v%(n)d_L%(s)d = sysread STDIN, my $sbuf%(n)d, 0;",
+        "my $v%(n)d_L%(s)d = syswrite STDOUT, \"\", 0;",
+    ]
+
+    return tuple(M(s) for s in t)
+
+
+_SPECIES: tuple[Callable[[int, int, int], str], ...] = _species_table()
+assert len(_SPECIES) >= 96, len(_SPECIES)
+
 
 def kw(n: int, h: int, a: int, b: int, c: int, d: int) -> dict:
     d2 = d + 4
@@ -194,46 +453,58 @@ def kw(n: int, h: int, a: int, b: int, c: int, d: int) -> dict:
     )
 
 
-def _digest_index(root: Path) -> dict[str, str]:
-    """SHA-256 hex -> one representative path (skip _p2/_p3; first wins on dup bulk)."""
-    idx: dict[str, str] = {}
+def build_script(n: int, h: int, payload_lines: list[str]) -> str:
+    head = ("use strict;", "use warnings;", "our $PARITY_CASE = %d;" % n)
+    need = TARGET_LINES - len(head) - len(payload_lines)
+    if need < 0:
+        raise SystemExit("case %d: payload too long for target" % n)
+    if need > len(_SPECIES):
+        raise SystemExit("extend _species_table: need %d have %d" % (need, len(_SPECIES)))
+    lines = list(head)
+    for slot in range(need):
+        lines.append(_SPECIES[slot](n, h, slot))
+    lines.extend(payload_lines)
+    if len(lines) != TARGET_LINES:
+        raise SystemExit("case %d: line count %d" % (n, len(lines)))
+    if len(set(lines)) != TARGET_LINES:
+        raise SystemExit("case %d: duplicate lines" % n)
+    return "\n".join(lines) + "\n"
+
+
+def digest_index(root: Path) -> dict[str, str]:
+    out: dict[str, str] = {}
     for p in sorted(root.glob("*.pl")):
-        if p.name.endswith("_p2.pl") or p.name.endswith("_p3.pl"):
+        if p.name.endswith(("_p2.pl", "_p3.pl", "_p4.pl", "_p5.pl")):
             continue
-        body = p.read_text()
-        d = hashlib.sha256(body.encode()).hexdigest()
-        idx.setdefault(d, str(p))
-    return idx
+        d = hashlib.sha256(p.read_bytes()).hexdigest()
+        out.setdefault(d, str(p))
+    return out
 
 
-def write_generated_range(
-    start: int,
-    end: int,
-    suffix: str,
-    digests: dict[str, str],
-) -> None:
+def write_range(start: int, end: int, suffix: str, digests: dict[str, str]) -> None:
     for n in range(start, end + 1):
         a = (n * 3) % 97
         b = (n * 5) % 53
         c = (n % 23) + 1
         d = (n % 41) + 2
-        h = (n * 1103515245 + 12345) & 0x7FFFFFFF
-        idx = (h + n * 17 + (n // 13)) % len(FMT)
-        body = f"# parity:{n}\n" + FMT[idx].format(**kw(n, h, a, b, c, d))
-        digest = hashlib.sha256(body.encode()).hexdigest()
-        if digest in digests:
-            raise SystemExit(
-                f"duplicate body {n}{suffix}.pl collides with {digests[digest]}"
-            )
-        digests[digest] = f"{n}{suffix}.pl"
-        (ROOT / f"{n}{suffix}.pl").write_text(body)
+        hh = (n * 1103515245 + 12345) & 0x7FFFFFFF
+        fi = (hh + n * 17 + (n // 13)) % len(FMT)
+        raw = FMT[fi].format(**kw(n, hh, a, b, c, d))
+        body = build_script(n, hh, payload_statements(raw))
+        dg = hashlib.sha256(body.encode()).hexdigest()
+        if dg in digests:
+            raise SystemExit("digest clash %d%s.pl with %s" % (n, suffix, digests[dg]))
+        digests[dg] = "%d%s.pl" % (n, suffix)
+        (ROOT / ("%d%s.pl" % (n, suffix))).write_text(body)
 
 
 def main() -> None:
-    digests = _digest_index(ROOT)
-    write_generated_range(1001, 2000, "_p2", digests)
-    write_generated_range(2001, 3000, "_p3", digests)
-    print("wrote parity/cases/1001_p2.pl..2000_p2.pl and 2001_p3.pl..3000_p3.pl (unique)")
+    d = digest_index(ROOT)
+    write_range(1001, 2000, "_p2", d)
+    write_range(2001, 3000, "_p3", d)
+    write_range(3001, 10000, "_p4", d)
+    write_range(10001, 20000, "_p5", d)
+    print("wrote machine parity batches (_p2.._p5)")
 
 
 if __name__ == "__main__":
