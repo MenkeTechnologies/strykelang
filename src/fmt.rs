@@ -821,6 +821,7 @@ pub fn format_expr(e: &Expr) -> String {
             }
         }
         ExprKind::AsyncBlock { body } => format!("async {{\n{}\n}}", format_block(body)),
+        ExprKind::SpawnBlock { body } => format!("spawn {{\n{}\n}}", format_block(body)),
         ExprKind::Trace { body } => format!("trace {{\n{}\n}}", format_block(body)),
         ExprKind::Timer { body } => format!("timer {{\n{}\n}}", format_block(body)),
         ExprKind::Bench { body, times } => format!(

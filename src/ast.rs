@@ -608,6 +608,10 @@ pub enum ExprKind {
     AsyncBlock {
         body: Block,
     },
+    /// `spawn { BLOCK }` — same as [`ExprKind::AsyncBlock`] (Rust `thread::spawn`–style naming); join with `await`.
+    SpawnBlock {
+        body: Block,
+    },
     /// `trace { BLOCK }` — print `mysync` scalar mutations to stderr (for parallel debugging).
     Trace {
         body: Block,

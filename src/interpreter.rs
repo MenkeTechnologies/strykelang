@@ -347,7 +347,8 @@ pub struct Interpreter {
     pub(crate) wantarray_kind: WantarrayCtx,
     /// `struct Name { ... }` definitions (merged from VM chunks and tree-walker).
     pub struct_defs: HashMap<String, Arc<StructDef>>,
-    /// When set, tree-walker records per-statement and per-sub timings (`pe --profile`).
+    /// When set, `pe --profile` records timings: VM path uses per-opcode line samples and sub
+    /// call/return (JIT disabled); tree-walker fallback uses per-statement lines and subs.
     pub profiler: Option<Profiler>,
     /// Per-module `our @EXPORT` / `our @EXPORT_OK` (Exporter-style). Absent key → legacy import-all.
     pub(crate) module_export_lists: HashMap<String, ModuleExportLists>,
@@ -2642,7 +2643,7 @@ impl Interpreter {
     }
 
     pub fn execute(&mut self, program: &Program) -> PerlResult<PerlValue> {
-        // Profiling uses the tree-walker only (see `try_vm_execute`).
+        // With `--profile`, the VM records per-opcode line times and sub enter/return (JIT off).
         // Try bytecode VM first — falls back to tree-walker on unsupported features
         if let Some(result) = crate::try_vm_execute(program, self) {
             return result;
@@ -2814,7 +2815,7 @@ impl Interpreter {
         Ok(last)
     }
 
-    /// Spawn `block` on a worker thread; returns an [`PerlValue::AsyncTask`] handle.
+    /// Spawn `block` on a worker thread; returns an [`PerlValue::AsyncTask`] handle (`async { }` / `spawn { }`).
     pub(crate) fn spawn_async_block(&self, block: &Block) -> PerlValue {
         use parking_lot::Mutex as ParkMutex;
 
@@ -2989,8 +2990,24 @@ impl Interpreter {
     ) -> ExecResult {
         let val = self.eval_expr(subject)?;
         for arm in arms {
+            if let MatchPattern::Regex { pattern, flags } = &arm.pattern {
+                let re = self.compile_regex(pattern, flags, line)?;
+                let s = val.to_string();
+                if let Some(caps) = re.captures(&s) {
+                    self.scope_push_hook();
+                    self.scope.declare_scalar("_", val.clone());
+                    self.english_note_lexical_scalar("_");
+                    self.apply_regex_captures(&s, 0, re.as_ref(), &caps, CaptureAllMode::Empty)?;
+                    let out = self.eval_expr(&arm.body);
+                    self.scope_pop_hook();
+                    return out;
+                }
+                continue;
+            }
             if let Some(bindings) = self.match_pattern_try(&val, &arm.pattern, line)? {
                 self.scope_push_hook();
+                self.scope.declare_scalar("_", val.clone());
+                self.english_note_lexical_scalar("_");
                 for (name, v) in bindings {
                     self.scope.declare_scalar(&name, v);
                     self.english_note_lexical_scalar(&name);
@@ -3015,14 +3032,8 @@ impl Interpreter {
     ) -> Result<Option<Vec<(String, PerlValue)>>, FlowOrError> {
         match pattern {
             MatchPattern::Any => Ok(Some(vec![])),
-            MatchPattern::Regex { pattern, flags } => {
-                let re = self.compile_regex(pattern, flags, line)?;
-                let s = subject.to_string();
-                if re.is_match(&s) {
-                    Ok(Some(vec![]))
-                } else {
-                    Ok(None)
-                }
+            MatchPattern::Regex { .. } => {
+                unreachable!("regex arms are handled in eval_algebraic_match")
             }
             MatchPattern::Value(expr) => {
                 let pv = self.eval_expr(expr)?;
@@ -5021,7 +5032,9 @@ impl Interpreter {
             ExprKind::AlgebraicMatch { subject, arms } => {
                 self.eval_algebraic_match(subject, arms, line)
             }
-            ExprKind::AsyncBlock { body } => Ok(self.spawn_async_block(body)),
+            ExprKind::AsyncBlock { body } | ExprKind::SpawnBlock { body } => {
+                Ok(self.spawn_async_block(body))
+            }
             ExprKind::Trace { body } => {
                 crate::parallel_trace::trace_enter();
                 let out = self.exec_block(body);

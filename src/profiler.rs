@@ -1,4 +1,10 @@
-//! Wall-clock profiler for tree-walker execution (`pe --profile`).
+//! Wall-clock profiler for `pe --profile`.
+//!
+//! **Tree-walker**: per-statement line times and [`Profiler::enter_sub`] / [`Profiler::exit_sub`]
+//! around subroutine bodies.
+//!
+//! **Bytecode VM**: per-opcode wall time is charged to that opcode's source line; `Call` / `Return`
+//! add inclusive subroutine samples (Cranelift JIT is disabled while profiling).
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -50,7 +56,10 @@ impl Profiler {
     }
 
     /// stderr: folded stacks (flamegraph.pl) + line totals + sub totals.
-    pub fn print_report(&self) {
+    pub fn print_report(&mut self) {
+        // Incomplete enter/exit pairs (e.g. `die` before `return`) would confuse folded output.
+        self.sub_stack.clear();
+
         eprintln!("# perlrs --profile: collapsed stacks (name stack → ns); feed to flamegraph.pl");
         let mut stacks: Vec<_> = self.folded_ns.iter().collect();
         stacks.sort_by(|a, b| b.1.cmp(a.1));

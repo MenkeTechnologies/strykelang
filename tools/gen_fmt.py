@@ -680,6 +680,7 @@ def main() -> None:
             }
         }""",
         "AsyncBlock": 'format!("async {{\\n{}\\n}}", format_block(body))',
+        "SpawnBlock": 'format!("spawn {{\\n{}\\n}}", format_block(body))',
         "Trace": 'format!("trace {{\\n{}\\n}}", format_block(body))',
         "Timer": 'format!("timer {{\\n{}\\n}}", format_block(body))',
         "Push": 'format!("push({}, {})", format_expr(array), format_expr_list(values))',

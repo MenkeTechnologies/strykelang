@@ -620,6 +620,7 @@ impl Parser {
                 | "__LINE__"
                 | "abs"
                 | "async"
+                | "spawn"
                 | "atan2"
                 | "await"
                 | "barrier"
@@ -3732,6 +3733,19 @@ impl Parser {
                 let block = self.parse_block()?;
                 Ok(Expr {
                     kind: ExprKind::AsyncBlock { body: block },
+                    line,
+                })
+            }
+            "spawn" => {
+                if !matches!(self.peek(), Token::LBrace) {
+                    return Err(PerlError::syntax(
+                        "spawn must be followed by { BLOCK }",
+                        line,
+                    ));
+                }
+                let block = self.parse_block()?;
+                Ok(Expr {
+                    kind: ExprKind::SpawnBlock { body: block },
                     line,
                 })
             }

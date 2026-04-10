@@ -111,7 +111,8 @@ pe --ast -e 'sub foo { 1 }'
 pe --fmt script.pl
 pe --fmt -e 'my $x = 1; say $x'
 
-# wall-clock profile: per-statement and per-sub timings on stderr (tree-walker only; VM disabled)
+# wall-clock profile on stderr: folded stacks (flamegraph.pl), per-line ns, per-sub ns
+# VM runs with opcode-level line samples (Cranelift JIT off); tree-walker uses per-statement lines
 pe --profile script.pl
 
 # expanded hints for error codes (E0001, E0002, …)
@@ -371,19 +372,19 @@ my $elapsed = timer { heavy_work() };
 print "took ${elapsed}ms\n";
 ```
 
-#### ASYNC / AWAIT // lightweight I/O parallelism
+#### ASYNC / SPAWN / AWAIT // lightweight structured concurrency
 
-**`async { BLOCK }`** runs the block on a **worker thread** and returns a task handle immediately. **`await EXPR`** joins: if `EXPR` is that handle, it blocks until the block finishes and returns its value; otherwise `await` passes the value through.
+**`async { BLOCK }`** and **`spawn { BLOCK }`** are the same: the block runs on a **worker thread** and returns a task handle immediately (Rust **`thread::spawn`**–style naming for **`spawn`**). **`await EXPR`** joins: if `EXPR` is that handle, it blocks until the block finishes and returns its value; otherwise `await` passes the value through. Use **`spawn`** when building **ad-hoc graphs** of concurrent work (fan-in/fan-out, pipelines) that are not a single **`pmap`** / **`pfor`** / **`reduce`** pattern.
 
 Use this to overlap **`fetch_url`**, **`slurp`**, or other I/O-bound work without blocking the main interpreter until you **`await`**.
 
 ```perl
 my $data = async { fetch_url("https://example.com/") };
-my $file = async { slurp("big.csv") };
+my $file = spawn { slurp("big.csv") };
 print await($data), await($file);
 ```
 
-Each `async` worker gets a **clone of the interpreter’s subs** and a **captured lexical scope** (including **`mysync`** storage), so closures and shared state behave like other parallel primitives.
+Each worker gets a **clone of the interpreter’s subs** and a **captured lexical scope** (including **`mysync`** storage), so closures and shared state behave like other parallel primitives.
 
 #### NATIVE CSV / SQLITE / STRUCTS // data scripting
 

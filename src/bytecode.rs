@@ -309,7 +309,7 @@ pub enum Op {
     EvalTimeout(u16),
     /// Algebraic `match (SUBJECT) { ... }` — index into [`Chunk::algebraic_match_entries`]; stack: \[\] → arm value
     AlgebraicMatch(u16),
-    /// `async { BLOCK }` — block_idx; stack: \[\] → AsyncTask
+    /// `async { BLOCK }` / `spawn { BLOCK }` — block_idx; stack: \[\] → AsyncTask
     AsyncBlock(u16),
     /// `await EXPR` — stack: \[value\] → result
     Await,

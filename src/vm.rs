@@ -184,6 +184,8 @@ struct CallFrame {
     /// Synthetic frame for [`Op::BlockReturnValue`] (`map`/`grep`/`sort` block bytecode), paired with
     /// `scope_push_hook` at [`VM::run_block_region`] entry (not a sub call; no closure capture).
     block_region: bool,
+    /// Wall-clock start for [`crate::profiler::Profiler::exit_sub`] (paired with `enter_sub` on `Call`).
+    sub_profiler_start: Option<std::time::Instant>,
 }
 
 /// Stack-based bytecode virtual machine.
@@ -363,6 +365,7 @@ impl<'a> VM<'a> {
             saved_wantarray: saved_wa,
             jit_trampoline_return: false,
             block_region: true,
+            sub_profiler_start: None,
         });
         self.interp.scope_push_hook();
         self.interp.wantarray_kind = WantarrayCtx::Scalar;
@@ -1416,8 +1419,11 @@ impl<'a> VM<'a> {
                 }
             }
 
+            let ip_before = self.ip;
+            let line = self.lines.get(ip_before).copied().unwrap_or(0);
             let op = &ops[self.ip];
             self.ip += 1;
+            let op_prof_t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
             // Closure: `?` / `return Err` inside `match op` must not return from
             // `run_main_dispatch_loop` — they must become `__op_res` so `try_recover_from_exception`
             // can run before propagating.
@@ -2257,6 +2263,10 @@ impl<'a> VM<'a> {
                         // Check if sub is compiled (has bytecode entry)
                         if let Some((entry_ip, stack_args)) = self.find_sub_entry(*name_idx) {
                             let saved_wa = self.interp.wantarray_kind;
+                            let sub_prof_t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
+                            if let Some(p) = &mut self.interp.profiler {
+                                p.enter_sub(name);
+                            }
 
                             if stack_args {
                                 // Fast path: leave args on stack, sub reads via GetArg(idx).
@@ -2276,6 +2286,7 @@ impl<'a> VM<'a> {
                                     saved_wantarray: saved_wa,
                                     jit_trampoline_return: false,
                                     block_region: false,
+                                    sub_profiler_start: sub_prof_t0,
                                 });
                                 self.interp.wantarray_kind = want;
                                 self.interp.scope_push_hook();
@@ -2305,6 +2316,7 @@ impl<'a> VM<'a> {
                                     saved_wantarray: saved_wa,
                                     jit_trampoline_return: false,
                                     block_region: false,
+                                    sub_profiler_start: sub_prof_t0,
                                 });
                                 self.interp.wantarray_kind = want;
                                 self.interp.scope_push_hook();
@@ -2335,6 +2347,10 @@ impl<'a> VM<'a> {
                                 self.push(r?);
                             } else if let Some(sub) = self.interp.resolve_sub_by_name(name) {
                                 // Fall back to tree-walker for non-compiled subs
+                                let t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
+                                if let Some(p) = &mut self.interp.profiler {
+                                    p.enter_sub(name);
+                                }
                                 let args = self.interp.with_topic_default_args(args);
                                 let saved_wa = self.interp.wantarray_kind;
                                 self.interp.wantarray_kind = want;
@@ -2362,9 +2378,17 @@ impl<'a> VM<'a> {
                                         crate::interpreter::Flow::Return(v),
                                     )) => self.push(v),
                                     Err(crate::interpreter::FlowOrError::Error(e)) => {
-                                        return Err(e)
+                                        if let (Some(p), Some(t0)) =
+                                            (&mut self.interp.profiler, t0)
+                                        {
+                                            p.exit_sub(t0.elapsed());
+                                        }
+                                        return Err(e);
                                     }
                                     Err(_) => self.push(PerlValue::UNDEF),
+                                }
+                                if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
+                                    p.exit_sub(t0.elapsed());
                                 }
                             } else if let Some(result) = self.interp.try_autoload_call(
                                 name,
@@ -2373,15 +2397,27 @@ impl<'a> VM<'a> {
                                 want,
                                 None,
                             ) {
+                                let t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
+                                if let Some(p) = &mut self.interp.profiler {
+                                    p.enter_sub(name);
+                                }
                                 match result {
                                     Ok(v) => self.push(v),
                                     Err(crate::interpreter::FlowOrError::Flow(
                                         crate::interpreter::Flow::Return(v),
                                     )) => self.push(v),
                                     Err(crate::interpreter::FlowOrError::Error(e)) => {
-                                        return Err(e)
+                                        if let (Some(p), Some(t0)) =
+                                            (&mut self.interp.profiler, t0)
+                                        {
+                                            p.exit_sub(t0.elapsed());
+                                        }
+                                        return Err(e);
                                     }
                                     Err(_) => self.push(PerlValue::UNDEF),
+                                }
+                                if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
+                                    p.exit_sub(t0.elapsed());
                                 }
                             } else {
                                 return Err(PerlError::runtime(
@@ -2399,6 +2435,11 @@ impl<'a> VM<'a> {
                                     "Return in map/grep/sort block bytecode (use tree interpreter)",
                                     self.line(),
                                 ));
+                            }
+                            if let Some(t0) = frame.sub_profiler_start {
+                                if let Some(p) = &mut self.interp.profiler {
+                                    p.exit_sub(t0.elapsed());
+                                }
                             }
                             self.interp.wantarray_kind = frame.saved_wantarray;
                             self.stack.truncate(frame.stack_base);
@@ -2422,6 +2463,11 @@ impl<'a> VM<'a> {
                                     "Return in map/grep/sort block bytecode (use tree interpreter)",
                                     self.line(),
                                 ));
+                            }
+                            if let Some(t0) = frame.sub_profiler_start {
+                                if let Some(p) = &mut self.interp.profiler {
+                                    p.exit_sub(t0.elapsed());
+                                }
                             }
                             self.interp.wantarray_kind = frame.saved_wantarray;
                             self.stack.truncate(frame.stack_base);
@@ -4416,6 +4462,9 @@ impl<'a> VM<'a> {
                     }
                 }
             })();
+            if let (Some(prof), Some(t0)) = (&mut self.interp.profiler, op_prof_t0) {
+                prof.on_line(&self.interp.file, line, t0.elapsed());
+            }
             if let Err(e) = __op_res {
                 if self.try_recover_from_exception(&e)? {
                     continue;
@@ -4452,6 +4501,13 @@ impl<'a> VM<'a> {
             self.push(PerlValue::integer(*a));
         }
         let stack_base = self.stack.len() - args.len();
+        let mut sub_prof_t0 = None;
+        if let Some(nidx) = self.sub_entry_name_idx(entry_ip) {
+            sub_prof_t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
+            if let Some(p) = &mut self.interp.profiler {
+                p.enter_sub(self.names[nidx as usize].as_str());
+            }
+        }
         self.call_stack.push(CallFrame {
             return_ip: 0,
             stack_base,
@@ -4459,6 +4515,7 @@ impl<'a> VM<'a> {
             saved_wantarray: saved_wa,
             jit_trampoline_return: true,
             block_region: false,
+            sub_profiler_start: sub_prof_t0,
         });
         self.interp.wantarray_kind = want;
         self.interp.scope_push_hook();

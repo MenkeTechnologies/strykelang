@@ -323,6 +323,7 @@ pub const KEYWORDS: &[&str] = &[
     "pchannel",
     "pselect",
     "async",
+    "spawn",
     "trace",
     "timer",
     "bench",

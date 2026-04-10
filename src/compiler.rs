@@ -3499,7 +3499,7 @@ impl Compiler {
                     }
                 }
             }
-            ExprKind::AsyncBlock { body } => {
+            ExprKind::AsyncBlock { body } | ExprKind::SpawnBlock { body } => {
                 let block_idx = self.chunk.add_block(body.clone());
                 self.chunk.emit(Op::AsyncBlock(block_idx), line);
             }

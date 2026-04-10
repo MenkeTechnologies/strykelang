@@ -610,6 +610,14 @@ fn async_await_two_tasks() {
 }
 
 #[test]
+fn spawn_await_same_as_async() {
+    assert_eq!(
+        ri(r#"my $t = spawn { 40 + 2 }; await($t);"#),
+        42
+    );
+}
+
+#[test]
 fn await_passes_through_non_task() {
     assert_eq!(ri(r#"await(7);"#), 7);
 }

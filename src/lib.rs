@@ -88,10 +88,6 @@ pub fn try_vm_execute(
     program: &ast::Program,
     interp: &mut Interpreter,
 ) -> Option<PerlResult<PerlValue>> {
-    if interp.profiler.is_some() {
-        return None;
-    }
-
     if let Err(e) = interp.prepare_program_top_level(program) {
         return Some(Err(e));
     }
@@ -116,7 +112,8 @@ pub fn try_vm_execute(
                     .insert(def.name.clone(), std::sync::Arc::new(def.clone()));
             }
             // Subs from `prepare_program_top_level` are already registered.
-            let vm_jit = interp.vm_jit_enabled;
+            // Profiling attributes wall time to opcodes and call/return pairs; JIT would skip both.
+            let vm_jit = interp.vm_jit_enabled && interp.profiler.is_none();
             let mut vm = vm::VM::new(&chunk, interp);
             vm.set_jit_enabled(vm_jit);
             match vm.execute() {

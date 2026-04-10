@@ -3,6 +3,7 @@
 mod algebraic_match;
 mod builtins;
 mod cli_inplace;
+mod cli_profile;
 mod closures;
 mod collections;
 mod comments;

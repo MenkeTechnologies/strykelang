@@ -52,7 +52,7 @@ pub(crate) struct Cli {
     #[arg(long = "fmt")]
     format_source: bool,
 
-    /// Wall-clock profile: per-line and per-sub timings on stderr (tree-walker only)
+    /// Wall-clock profile: per-line + per-sub timings on stderr (VM: opcode-level lines; JIT off)
     #[arg(long = "profile")]
     profile: bool,
 
@@ -227,7 +227,9 @@ fn print_cyberpunk_help() {
     );
     println!("  --ast                  {G}//{N} Dump parsed AST as JSON and exit (no execution)");
     println!("  --fmt                  {G}//{N} Pretty-print parsed Perl to stdout and exit");
-    println!("  --profile              {G}//{N} Wall-clock profile (stderr); tree-walker only");
+    println!(
+        "  --profile              {G}//{N} Wall-clock profile stderr (VM op lines; flamegraph-ready)"
+    );
     println!("  --no-jit               {G}//{N} Disable Cranelift JIT (bytecode interpreter only)");
     println!("  -d[t][:MOD]            {G}//{N} Run program under debugger or module Devel::MOD");
     println!("  -D[number/letters]     {G}//{N} Set debugging flags");
@@ -292,6 +294,9 @@ fn print_cyberpunk_help() {
     );
     println!(
         "  async {{BLOCK}}           {G}//{N} Run block on a worker thread; returns a task handle"
+    );
+    println!(
+        "  spawn {{BLOCK}}           {G}//{N} Same as async (Rust-style); join with await"
     );
     println!("  await EXPR                {G}//{N} Join async task or pass through non-task value");
     println!(
@@ -901,7 +906,7 @@ fn main() {
 
         // First execute the program to register subs/BEGIN blocks
         if let Err(e) = interp.execute(&program) {
-            if let Some(p) = interp.profiler.take() {
+            if let Some(mut p) = interp.profiler.take() {
                 p.print_report();
             }
             if let ErrorKind::Exit(code) = e.kind {
@@ -912,7 +917,7 @@ fn main() {
         }
 
         if let Err(e) = run_line_mode_loop(&cli, &mut interp, &program, slurp) {
-            if let Some(p) = interp.profiler.take() {
+            if let Some(mut p) = interp.profiler.take() {
                 p.print_report();
             }
             if let ErrorKind::Exit(code) = e.kind {
@@ -921,33 +926,33 @@ fn main() {
             eprintln!("{}", e);
             process::exit(255);
         }
-        if let Some(p) = interp.profiler.take() {
+        if let Some(mut p) = interp.profiler.take() {
             p.print_report();
         }
     } else {
         // Normal execution
         match interp.execute(&program) {
             Ok(_) => {
-                if let Some(p) = interp.profiler.take() {
+                if let Some(mut p) = interp.profiler.take() {
                     p.print_report();
                 }
             }
             Err(e) => match e.kind {
                 ErrorKind::Exit(code) => {
-                    if let Some(p) = interp.profiler.take() {
+                    if let Some(mut p) = interp.profiler.take() {
                         p.print_report();
                     }
                     process::exit(code);
                 }
                 ErrorKind::Die => {
-                    if let Some(p) = interp.profiler.take() {
+                    if let Some(mut p) = interp.profiler.take() {
                         p.print_report();
                     }
                     eprint!("{}", e);
                     process::exit(255);
                 }
                 _ => {
-                    if let Some(p) = interp.profiler.take() {
+                    if let Some(mut p) = interp.profiler.take() {
                         p.print_report();
                     }
                     eprintln!("{}", e);

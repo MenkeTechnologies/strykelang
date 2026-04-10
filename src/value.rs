@@ -12,7 +12,7 @@ use crate::error::PerlResult;
 use crate::nanbox;
 use crate::perl_regex::PerlCompiledRegex;
 
-/// Handle returned by `async { ... }`; join with `await`.
+/// Handle returned by `async { ... }` / `spawn { ... }`; join with `await`.
 #[derive(Debug)]
 pub struct PerlAsyncTask {
     pub(crate) result: Arc<Mutex<Option<PerlResult<PerlValue>>>>,

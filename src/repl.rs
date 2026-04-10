@@ -18,7 +18,7 @@ use perlrs::interpreter::{
 use perlrs::token::KEYWORDS;
 
 /// Extra builtin names not listed in [`perlrs::token::KEYWORDS`].
-const EXTRA_KEYWORDS: &[&str] = &["deque", "heap", "ppool", "barrier", "bench"];
+const EXTRA_KEYWORDS: &[&str] = &["deque", "heap", "ppool", "barrier", "bench", "spawn"];
 
 fn history_path() -> std::path::PathBuf {
     std::env::var_os("HOME")
