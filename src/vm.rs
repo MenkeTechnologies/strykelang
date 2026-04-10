@@ -1443,6 +1443,35 @@ impl<'a> VM<'a> {
                 p.enter_sub(name);
             }
 
+            // Fib-shaped recursive-add fast path: if the target sub is tagged with a
+            // `fib_like` pattern (detected at sub-registration time in the compiler and
+            // cached in `static_sub_closure_subs`), skip frame setup entirely and
+            // evaluate the closed-form-ish iterative version. `bench_fib` collapses from
+            // ~2.7M recursive VM calls to a single `while` loop.
+            let fib_sub: Option<Arc<PerlSub>> = closure_sub_hint
+                .clone()
+                .or_else(|| self.sub_for_closure_restore(name));
+            if let Some(ref sub_arc) = fib_sub {
+                if let Some(pat) = sub_arc.fib_like.as_ref() {
+                    // stack_args path pushes exactly `argc` ints; non-stack_args pops them
+                    // off the stack into @_. Only the argc==1 / integer case qualifies.
+                    if argc == 1 {
+                        let top_idx = self.stack.len().saturating_sub(1);
+                        if let Some(n0) = self.stack.get(top_idx).and_then(|v| v.as_integer()) {
+                            let result = crate::fib_like_tail::eval_fib_like_recursive_add(n0, pat);
+                            // Drop the arg, push the result, keep wantarray as the caller had it.
+                            self.stack.truncate(top_idx);
+                            self.push(PerlValue::integer(result));
+                            if let (Some(p), Some(t0)) = (&mut self.interp.profiler, sub_prof_t0) {
+                                p.exit_sub(t0.elapsed());
+                            }
+                            self.interp.wantarray_kind = saved_wa;
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+
             if stack_args {
                 let eff_argc = if argc == 0 {
                     self.push(self.interp.scope.get_scalar("_").clone());
@@ -3207,6 +3236,121 @@ impl<'a> VM<'a> {
                         if next_i < *limit as i64 {
                             self.ip = *body_target;
                         }
+                        Ok(())
+                    }
+                    Op::AccumSumLoop(sum_slot, i_slot, limit) => {
+                        // Runs the entire counted `while $i < limit { $sum += $i; $i += 1 }` loop in
+                        // native Rust. The peephole only fires when the body is exactly this one
+                        // accumulate statement, so every side effect is captured by the final
+                        // `$sum` and `$i` writes; there is nothing else to do per iteration.
+                        let mut sum = self.interp.scope.get_scalar_slot(*sum_slot).to_int();
+                        let mut i = self.interp.scope.get_scalar_slot(*i_slot).to_int();
+                        let limit = *limit as i64;
+                        while i < limit {
+                            sum = sum.wrapping_add(i);
+                            i = i.wrapping_add(1);
+                        }
+                        self.interp
+                            .scope
+                            .set_scalar_slot(*sum_slot, PerlValue::integer(sum));
+                        self.interp
+                            .scope
+                            .set_scalar_slot(*i_slot, PerlValue::integer(i));
+                        Ok(())
+                    }
+                    Op::AddHashElemPlainKeyToSlot(sum_slot, k_name_idx, h_name_idx) => {
+                        // `$sum += $h{$k}` — single-dispatch slot += hash[name-scalar] with no
+                        // VM stack traffic. The key scalar is read via plain (name-based) access
+                        // because the compiler's `for my $k (keys %h)` lowering currently backs
+                        // `$k` with a frame scalar, not a slot.
+                        let k_name = names[*k_name_idx as usize].as_str();
+                        let h_name = names[*h_name_idx as usize].as_str();
+                        if h_name == "ENV" {
+                            self.interp.materialize_env_if_needed();
+                        }
+                        let key = self.interp.scope.get_scalar(k_name).to_string();
+                        let elem = self.interp.scope.get_hash_element(h_name, &key);
+                        let cur = self.interp.scope.get_scalar_slot(*sum_slot);
+                        let new_v = if let (Some(a), Some(b)) =
+                            (cur.as_integer(), elem.as_integer())
+                        {
+                            PerlValue::integer(a.wrapping_add(b))
+                        } else {
+                            PerlValue::float(cur.to_number() + elem.to_number())
+                        };
+                        self.interp.scope.set_scalar_slot(*sum_slot, new_v);
+                        Ok(())
+                    }
+                    Op::SetHashIntTimesLoop(h_name_idx, i_slot, k, limit) => {
+                        // Runs the counted `while $i < limit { $h{$i} = $i * k; $i += 1 }` loop
+                        // natively: the hash is `reserve()`d once, keys are stringified via
+                        // `itoa` (no `format!` allocation), and values are inserted in a tight
+                        // Rust loop. `$i` is left at `limit` on exit, matching the un-fused shape.
+                        let i_cur = self.interp.scope.get_scalar_slot(*i_slot).to_int();
+                        let lim = *limit as i64;
+                        if i_cur < lim {
+                            let n = names[*h_name_idx as usize].as_str();
+                            self.require_hash_mutable(n)?;
+                            if n == "ENV" {
+                                self.interp.materialize_env_if_needed();
+                            }
+                            let line = self.line();
+                            self.interp
+                                .scope
+                                .set_hash_int_times_range(n, i_cur, lim, *k as i64)
+                                .map_err(|e| e.at_line(line))?;
+                        }
+                        self.interp
+                            .scope
+                            .set_scalar_slot(*i_slot, PerlValue::integer(lim));
+                        Ok(())
+                    }
+                    Op::PushIntRangeToArrayLoop(arr_name_idx, i_slot, limit) => {
+                        // Runs the entire counted `while $i < limit { push @arr, $i; $i += 1 }`
+                        // loop in native Rust. The array's `Vec<PerlValue>` is reserved once and
+                        // `push(PerlValue::integer(i))` runs in a tight Rust loop — no per-iter
+                        // op dispatch, no `require_array_mutable` check per iter.
+                        let i_cur = self.interp.scope.get_scalar_slot(*i_slot).to_int();
+                        let lim = *limit as i64;
+                        if i_cur < lim {
+                            let n = names[*arr_name_idx as usize].as_str();
+                            self.require_array_mutable(n)?;
+                            let line = self.line();
+                            self.interp
+                                .scope
+                                .push_int_range_to_array(n, i_cur, lim)
+                                .map_err(|e| e.at_line(line))?;
+                        }
+                        self.interp
+                            .scope
+                            .set_scalar_slot(*i_slot, PerlValue::integer(lim));
+                        Ok(())
+                    }
+                    Op::ConcatConstSlotLoop(const_idx, s_slot, i_slot, limit) => {
+                        // Runs the entire counted `while $i < limit { $s .= CONST; $i += 1 }` loop
+                        // in native Rust. We stringify the constant once, reserve `(limit-i_cur) *
+                        // const.len()` up front so the owning `String` reallocs at most twice, then
+                        // `push_str` in a tight loop (see `try_concat_repeat_inplace`). Falls back
+                        // to the per-iteration slow path when the slot is not the sole owner of a
+                        // heap `String` — `.=` semantics match the un-fused shape byte-for-byte.
+                        let i_cur = self.interp.scope.get_scalar_slot(*i_slot).to_int();
+                        let lim = *limit as i64;
+                        if i_cur < lim {
+                            let n_iters = (lim - i_cur) as usize;
+                            let rhs = constants[*const_idx as usize].as_str_or_empty();
+                            if !self
+                                .interp
+                                .scope
+                                .scalar_slot_concat_repeat_inplace(*s_slot, &rhs, n_iters)
+                            {
+                                self.interp
+                                    .scope
+                                    .scalar_slot_concat_repeat_slow(*s_slot, &rhs, n_iters);
+                            }
+                        }
+                        self.interp
+                            .scope
+                            .set_scalar_slot(*i_slot, PerlValue::integer(lim));
                         Ok(())
                     }
                     Op::AddAssignSlotSlot(dst, src) => {

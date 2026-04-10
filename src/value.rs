@@ -1028,6 +1028,42 @@ impl PerlValue {
         PerlValue::string(s)
     }
 
+    /// In-place repeated `.=` for the fused counted-loop superinstruction:
+    /// append `rhs` exactly `n` times to the sole-owned heap `String` behind
+    /// `self`, reserving once. Returns `false` (leaving `self` untouched) when
+    /// the value is not a uniquely-held `HeapObject::String` — the VM then
+    /// falls back to the per-iteration slow path.
+    #[inline]
+    pub(crate) fn try_concat_repeat_inplace(&mut self, rhs: &str, n: usize) -> bool {
+        if !nanbox::is_heap(self.0) || n == 0 {
+            // n==0 is trivially "done" in the caller's sense — nothing to append.
+            return n == 0 && nanbox::is_heap(self.0);
+        }
+        unsafe {
+            if !matches!(self.heap_ref(), HeapObject::String(_)) {
+                return false;
+            }
+            let raw = nanbox::decode_heap_ptr::<HeapObject>(self.0)
+                as *mut HeapObject
+                as *const HeapObject;
+            let mut arc: Arc<HeapObject> = Arc::from_raw(raw);
+            let did = if let Some(HeapObject::String(s)) = Arc::get_mut(&mut arc) {
+                if !rhs.is_empty() {
+                    s.reserve(rhs.len().saturating_mul(n));
+                    for _ in 0..n {
+                        s.push_str(rhs);
+                    }
+                }
+                true
+            } else {
+                false
+            };
+            let restored = Arc::into_raw(arc);
+            self.0 = nanbox::encode_heap_ptr(restored);
+            did
+        }
+    }
+
     /// In-place `.=` fast path: when `self` is the **sole owner** of a heap
     /// `HeapObject::String`, append `rhs` straight into the existing `String`
     /// buffer — no `Arc` allocation, no unwrap/rewrap churn, `String::push_str`

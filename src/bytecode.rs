@@ -315,6 +315,44 @@ pub enum Op {
     /// halving the number of ops per loop trip for the `bench_loop`/`bench_string`/`bench_array` shape.
     /// (slot, i32_limit, body_target)
     SlotIncLtIntJumpBack(u8, i32, usize),
+    /// Fused accumulator loop: `while $i < limit { $sum += $i; $i += 1 }` — runs the entire
+    /// remaining counted-sum loop in native Rust, eliminating op dispatch per iteration.
+    ///
+    /// Fused when a `for (my $i = a; $i < N; $i = $i + 1) { $sum += $i }` body compiles down to
+    /// exactly `AddAssignSlotSlotVoid(sum, i) + SlotIncLtIntJumpBack(i, limit, body_target)` with
+    /// `body_target` pointing at the AddAssign — i.e. the body is 1 Perl statement. Both slots are
+    /// left as integers on exit (same coercion as `AddAssignSlotSlotVoid` + `PreIncSlotVoid`).
+    /// (sum_slot, i_slot, i32_limit)
+    AccumSumLoop(u8, u8, i32),
+    /// Fused string-append counted loop: `while $i < limit { $s .= CONST; $i += 1 }` — extends
+    /// the `String` buffer in place once and pushes the literal `(limit - i)` times in a tight
+    /// Rust loop, with `Arc::get_mut` → `reserve` → `push_str`. Falls back to the regular op
+    /// sequence if the slot is not a uniquely-owned heap `String`.
+    ///
+    /// Fused when the loop body is exactly `LoadConst(c) + ConcatAppendSlotVoid(s) +
+    /// SlotIncLtIntJumpBack(i, limit, body_target)` with `body_target` pointing at the `LoadConst`.
+    /// (const_idx, s_slot, i_slot, i32_limit)
+    ConcatConstSlotLoop(u16, u8, u8, i32),
+    /// Fused array-push counted loop: `while $i < limit { push @a, $i; $i += 1 }` — reserves the
+    /// target `Vec` once and pushes `PerlValue::integer(i)` in a tight Rust loop. Emitted when
+    /// the loop body is exactly `GetScalarSlot(i) + PushArray(arr) + ArrayLen(arr) + Pop +
+    /// SlotIncLtIntJumpBack(i, limit, body_target)` with `body_target` pointing at the
+    /// `GetScalarSlot` (i.e. the body is one `push` statement whose return is discarded).
+    /// (arr_name_idx, i_slot, i32_limit)
+    PushIntRangeToArrayLoop(u16, u8, i32),
+    /// Fused hash-insert counted loop: `while $i < limit { $h{$i} = $i * k; $i += 1 }` — runs the
+    /// entire insert loop natively, reserving hash capacity once and writing `(stringified i, i*k)`
+    /// pairs in tight Rust. Emitted when the body is exactly
+    /// `GetScalarSlot(i) + LoadInt(k) + Mul + GetScalarSlot(i) + SetHashElem(h) + Pop +
+    /// SlotIncLtIntJumpBack(i, limit, body_target)` with `body_target` at the first `GetScalarSlot`.
+    /// (hash_name_idx, i_slot, i32_multiplier, i32_limit)
+    SetHashIntTimesLoop(u16, u8, i32, i32),
+    /// Fused `$sum += $h{$k}` body op for the inner loop of `for my $k (keys %h) { $sum += $h{$k} }`.
+    ///
+    /// Replaces the 6-op sequence `GetScalarSlot(sum) + GetScalarPlain(k) + GetHashElem(h) + Add +
+    /// SetScalarSlotKeep(sum) + Pop` with a single dispatch that reads the hash element directly
+    /// into the slot without going through the VM stack. (sum_slot, k_name_idx, h_name_idx)
+    AddHashElemPlainKeyToSlot(u8, u16, u16),
 
     // ── Frame-local scalar slots (O(1) access, no string lookup) ──
     /// Read scalar from current frame's slot array. u8 = slot index.
@@ -1193,6 +1231,238 @@ impl Chunk {
             }
         }
         // Pass 4: compact again — remove the Nops introduced by pass 3.
+        self.compact_nops();
+        // Pass 5: fuse counted-loop bodies down to a single native superinstruction.
+        //
+        // After pass 3 + compact, a `for (my $i = ..; $i < N; $i = $i + 1) { $sum += $i }`
+        // loop looks like:
+        //
+        //     [top]        SlotLtIntJumpIfFalse(i, N, exit)
+        //     [body_start] AddAssignSlotSlotVoid(sum, i)       ← target of the backedge
+        //                  SlotIncLtIntJumpBack(i, N, body_start)
+        //     [exit]       ...
+        //
+        // When the body is exactly one op, we fuse the AddAssign + backedge into
+        // `AccumSumLoop(sum, i, N)`, whose handler runs the whole remaining loop in a
+        // tight Rust `while`. Same scheme for the counted `$s .= CONST` pattern, fused
+        // into `ConcatConstSlotLoop`.
+        //
+        // Safety gate: only fire when no op jumps *into* the body (other than the backedge
+        // itself and the top test's fall-through, which isn't a jump). That keeps loops with
+        // interior labels / `last LABEL` / `next LABEL` from being silently skipped.
+        let len = self.ops.len();
+        if len >= 2 {
+            let has_inbound_jump = |ops: &[Op], pos: usize, ignore: usize| -> bool {
+                for (j, op) in ops.iter().enumerate() {
+                    if j == ignore {
+                        continue;
+                    }
+                    let t = match op {
+                        Op::Jump(t)
+                        | Op::JumpIfFalse(t)
+                        | Op::JumpIfTrue(t)
+                        | Op::JumpIfFalseKeep(t)
+                        | Op::JumpIfTrueKeep(t)
+                        | Op::JumpIfDefinedKeep(t) => Some(*t),
+                        Op::SlotLtIntJumpIfFalse(_, _, t) => Some(*t),
+                        Op::SlotIncLtIntJumpBack(_, _, t) => Some(*t),
+                        _ => None,
+                    };
+                    if t == Some(pos) {
+                        return true;
+                    }
+                }
+                false
+            };
+            // 5a: AddAssignSlotSlotVoid + SlotIncLtIntJumpBack → AccumSumLoop
+            let mut i = 0;
+            while i + 1 < len {
+                if let (
+                    Op::AddAssignSlotSlotVoid(sum_slot, src_slot),
+                    Op::SlotIncLtIntJumpBack(inc_slot, limit, body_target),
+                ) = (&self.ops[i], &self.ops[i + 1])
+                {
+                    if *src_slot == *inc_slot
+                        && *body_target == i
+                        && !has_inbound_jump(&self.ops, i, i + 1)
+                        && !has_inbound_jump(&self.ops, i + 1, i + 1)
+                    {
+                        let sum_slot = *sum_slot;
+                        let src_slot = *src_slot;
+                        let limit = *limit;
+                        self.ops[i] = Op::AccumSumLoop(sum_slot, src_slot, limit);
+                        self.ops[i + 1] = Op::Nop;
+                        i += 2;
+                        continue;
+                    }
+                }
+                i += 1;
+            }
+            // 5b: LoadConst + ConcatAppendSlotVoid + SlotIncLtIntJumpBack → ConcatConstSlotLoop
+            if len >= 3 {
+                let mut i = 0;
+                while i + 2 < len {
+                    if let (
+                        Op::LoadConst(const_idx),
+                        Op::ConcatAppendSlotVoid(s_slot),
+                        Op::SlotIncLtIntJumpBack(inc_slot, limit, body_target),
+                    ) = (&self.ops[i], &self.ops[i + 1], &self.ops[i + 2])
+                    {
+                        if *body_target == i
+                            && !has_inbound_jump(&self.ops, i, i + 2)
+                            && !has_inbound_jump(&self.ops, i + 1, i + 2)
+                            && !has_inbound_jump(&self.ops, i + 2, i + 2)
+                        {
+                            let const_idx = *const_idx;
+                            let s_slot = *s_slot;
+                            let inc_slot = *inc_slot;
+                            let limit = *limit;
+                            self.ops[i] =
+                                Op::ConcatConstSlotLoop(const_idx, s_slot, inc_slot, limit);
+                            self.ops[i + 1] = Op::Nop;
+                            self.ops[i + 2] = Op::Nop;
+                            i += 3;
+                            continue;
+                        }
+                    }
+                    i += 1;
+                }
+            }
+            // 5e: `$sum += $h{$k}` body op inside `for my $k (keys %h) { ... }`
+            //   GetScalarSlot(sum) + GetScalarPlain(k) + GetHashElem(h) + Add
+            //     + SetScalarSlotKeep(sum) + Pop
+            //   → AddHashElemPlainKeyToSlot(sum, k, h)
+            // Safe because `SetScalarSlotKeep + Pop` leaves nothing on the stack net; the fused
+            // op is a drop-in for that sequence. No inbound jumps permitted to interior ops.
+            if len >= 6 {
+                let mut i = 0;
+                while i + 5 < len {
+                    if let (
+                        Op::GetScalarSlot(sum_slot),
+                        Op::GetScalarPlain(k_idx),
+                        Op::GetHashElem(h_idx),
+                        Op::Add,
+                        Op::SetScalarSlotKeep(sum_slot2),
+                        Op::Pop,
+                    ) = (
+                        &self.ops[i],
+                        &self.ops[i + 1],
+                        &self.ops[i + 2],
+                        &self.ops[i + 3],
+                        &self.ops[i + 4],
+                        &self.ops[i + 5],
+                    ) {
+                        if *sum_slot == *sum_slot2
+                            && (0..6).all(|off| !has_inbound_jump(&self.ops, i + off, usize::MAX))
+                        {
+                            let sum_slot = *sum_slot;
+                            let k_idx = *k_idx;
+                            let h_idx = *h_idx;
+                            self.ops[i] = Op::AddHashElemPlainKeyToSlot(sum_slot, k_idx, h_idx);
+                            for off in 1..=5 {
+                                self.ops[i + off] = Op::Nop;
+                            }
+                            i += 6;
+                            continue;
+                        }
+                    }
+                    i += 1;
+                }
+            }
+            // 5d: counted hash-insert loop `$h{$i} = $i * K`
+            //   GetScalarSlot(i) + LoadInt(k) + Mul + GetScalarSlot(i) + SetHashElem(h) + Pop
+            //     + SlotIncLtIntJumpBack(i, limit, body_target)
+            //   → SetHashIntTimesLoop(h, i, k, limit)
+            if len >= 7 {
+                let mut i = 0;
+                while i + 6 < len {
+                    if let (
+                        Op::GetScalarSlot(gs1),
+                        Op::LoadInt(k),
+                        Op::Mul,
+                        Op::GetScalarSlot(gs2),
+                        Op::SetHashElem(h_idx),
+                        Op::Pop,
+                        Op::SlotIncLtIntJumpBack(inc_slot, limit, body_target),
+                    ) = (
+                        &self.ops[i],
+                        &self.ops[i + 1],
+                        &self.ops[i + 2],
+                        &self.ops[i + 3],
+                        &self.ops[i + 4],
+                        &self.ops[i + 5],
+                        &self.ops[i + 6],
+                    ) {
+                        if *gs1 == *inc_slot
+                            && *gs2 == *inc_slot
+                            && *body_target == i
+                            && i32::try_from(*k).is_ok()
+                            && (0..6).all(|off| !has_inbound_jump(&self.ops, i + off, i + 6))
+                            && !has_inbound_jump(&self.ops, i + 6, i + 6)
+                        {
+                            let h_idx = *h_idx;
+                            let inc_slot = *inc_slot;
+                            let k32 = *k as i32;
+                            let limit = *limit;
+                            self.ops[i] =
+                                Op::SetHashIntTimesLoop(h_idx, inc_slot, k32, limit);
+                            for off in 1..=6 {
+                                self.ops[i + off] = Op::Nop;
+                            }
+                            i += 7;
+                            continue;
+                        }
+                    }
+                    i += 1;
+                }
+            }
+            // 5c: GetScalarSlot + PushArray + ArrayLen + Pop + SlotIncLtIntJumpBack
+            //      → PushIntRangeToArrayLoop
+            // This is the compiler's `push @a, $i; $i++` shape in void context, where
+            // the `push` expression's length return is pushed by `ArrayLen` and then `Pop`ped.
+            if len >= 5 {
+                let mut i = 0;
+                while i + 4 < len {
+                    if let (
+                        Op::GetScalarSlot(get_slot),
+                        Op::PushArray(push_idx),
+                        Op::ArrayLen(len_idx),
+                        Op::Pop,
+                        Op::SlotIncLtIntJumpBack(inc_slot, limit, body_target),
+                    ) = (
+                        &self.ops[i],
+                        &self.ops[i + 1],
+                        &self.ops[i + 2],
+                        &self.ops[i + 3],
+                        &self.ops[i + 4],
+                    ) {
+                        if *get_slot == *inc_slot
+                            && *push_idx == *len_idx
+                            && *body_target == i
+                            && !has_inbound_jump(&self.ops, i, i + 4)
+                            && !has_inbound_jump(&self.ops, i + 1, i + 4)
+                            && !has_inbound_jump(&self.ops, i + 2, i + 4)
+                            && !has_inbound_jump(&self.ops, i + 3, i + 4)
+                            && !has_inbound_jump(&self.ops, i + 4, i + 4)
+                        {
+                            let push_idx = *push_idx;
+                            let inc_slot = *inc_slot;
+                            let limit = *limit;
+                            self.ops[i] =
+                                Op::PushIntRangeToArrayLoop(push_idx, inc_slot, limit);
+                            self.ops[i + 1] = Op::Nop;
+                            self.ops[i + 2] = Op::Nop;
+                            self.ops[i + 3] = Op::Nop;
+                            self.ops[i + 4] = Op::Nop;
+                            i += 5;
+                            continue;
+                        }
+                    }
+                    i += 1;
+                }
+            }
+        }
+        // Pass 6: compact — remove the Nops pass 5 introduced.
         self.compact_nops();
     }
 

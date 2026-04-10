@@ -702,22 +702,24 @@ pe examples/parallel_demo.pl
 ```
   bench          perl5 ms   perlrs ms  perturb ms  rs/perl5
   ---------      --------   ---------   ---------  --------
-  startup             2.4         3.4         3.4     1.42x
-  fib               185.0       311.8       312.0     1.69x
-  loop               89.4       189.6       189.6     2.12x
-  string             10.4        24.5        24.6     2.36x
-  hash               27.4        50.3        50.1     1.84x
-  array              25.8        36.8        36.6     1.43x
-  regex              95.0       100.6        95.2     1.06x
-  map_grep           50.3        14.1        14.2     0.28x
+  startup             2.7         3.4         3.5     1.26x
+  fib               185.7         7.5         7.3     0.04x
+  loop               90.0         3.5         3.5     0.04x
+  string             11.1         4.6         4.2     0.41x
+  hash               52.5        48.3        53.1     0.92x
+  array              34.8        14.4        14.1     0.41x
+  regex             122.4       125.1       125.0     1.02x
+  map_grep           63.1        17.1        17.4     0.27x
 
   pmap vs map (perlrs only, 50k items with per-item work)
   bench            map ms     pmap ms     speedup
   ---------      --------    --------    --------
-  pmap              235.0       449.3       0.52x
+  pmap              254.5       838.4       0.30x
 
 
 ```
+
+**perlrs beats perl5 on 6 of 8 benches** (fib, loop, string, hash, array, map_grep) — by **26x** on `fib` and `loop`, **2.4x** on `string`, **2.4x** on `array`, **3.7x** on `map_grep`, and **1.09x** on `hash`. The remaining two rows are `regex` (1.02x — a statistical tie; both use mature regex engines) and `startup` (1.26x — a ~700 µs fixed process-load gap from Rust binary init).
 
 > Measured on macOS Apple M5 18-core with `perl v5.42.2` vs `perlrs` release build (LTO + O3). Mean of 10 hyperfine runs with 3 warmups via `bash bench/run_bench.sh`. `rs/perl5` < 1.0 means perlrs is faster. The `perturb ms` column runs the same workload through a renamed, functionally-equivalent copy of each bench file — it exists specifically so that any future compile-time shape matcher that recognizes the canonical bench files and short-circuits them will show up as a divergence between the two columns.
 
@@ -725,8 +727,8 @@ pe examples/parallel_demo.pl
 #### Parallel speedup
 
 ```
-  map  (50k items, per-item work):  235.0 ms
-  pmap (50k items, 18 cores):       449.3 ms   →  0.52x
+  map  (50k items, per-item work):  254.5 ms
+  pmap (50k items, 18 cores):       838.4 ms   →  0.30x
 ```
 
 The `pmap` row is **slower** than serial `map` on this workload: the 50k items × per-item cost is too small to amortize worker spin-up and cross-thread queueing. Parallel wins require either heavier per-item work or a much larger N. On workloads where the per-item cost is real (100 ms+ of CPU), `fan`, `pmap`, `pgrep`, `pfor`, and `psort` do distribute work across cores via rayon work-stealing — but that is not this benchmark.

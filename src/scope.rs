@@ -483,6 +483,51 @@ impl Scope {
     /// Returns a [`PerlValue::shallow_clone`] (Arc::clone) of the stored value
     /// rather than a full [`Clone`], which would deep-copy the entire `String`
     /// payload and turn a `$s .= "x"` loop into O(N²) memcpy.
+    /// Repeated `$slot .= rhs` fused-loop fast path: locates the slot's frame once,
+    /// tries `try_concat_repeat_inplace` (unique heap-String → single `reserve`+`push_str`
+    /// burst), and returns `true` on success. Returns `false` when the slot is not a
+    /// uniquely-held `String` so the caller can fall back to the per-iteration slow
+    /// path. Called from `Op::ConcatConstSlotLoop`.
+    #[inline]
+    pub fn scalar_slot_concat_repeat_inplace(
+        &mut self,
+        slot: u8,
+        rhs: &str,
+        n: usize,
+    ) -> bool {
+        let idx = slot as usize;
+        let len = self.frames.len();
+        let fi = {
+            let mut found = len - 1;
+            if idx >= self.frames[found].scalar_slots.len() {
+                for i in (0..len - 1).rev() {
+                    if idx < self.frames[i].scalar_slots.len() {
+                        found = i;
+                        break;
+                    }
+                }
+            }
+            found
+        };
+        let frame = &mut self.frames[fi];
+        if idx >= frame.scalar_slots.len() {
+            frame.scalar_slots.resize(idx + 1, PerlValue::UNDEF);
+        }
+        frame.scalar_slots[idx].try_concat_repeat_inplace(rhs, n)
+    }
+
+    /// Slow fallback for the fused string-append loop: clones the RHS into a new
+    /// `PerlValue::string` once and runs the existing `scalar_slot_concat_inplace`
+    /// path `n` times. Used by `Op::ConcatConstSlotLoop` when the slot is aliased
+    /// and the in-place fast path rejected the mutation.
+    #[inline]
+    pub fn scalar_slot_concat_repeat_slow(&mut self, slot: u8, rhs: &str, n: usize) {
+        let pv = PerlValue::string(rhs.to_owned());
+        for _ in 0..n {
+            let _ = self.scalar_slot_concat_inplace(slot, &pv);
+        }
+    }
+
     #[inline]
     pub fn scalar_slot_concat_inplace(&mut self, slot: u8, rhs: &PerlValue) -> PerlValue {
         let idx = slot as usize;
@@ -1092,6 +1137,35 @@ impl Scope {
         Ok(())
     }
 
+    /// Bulk `push @name, start..end-1` for the fused counted-loop superinstruction:
+    /// reserves the `Vec` once, then pushes `PerlValue::integer(i)` for `i in start..end`
+    /// in a tight Rust loop. Atomic arrays take a single `lock().push()` burst.
+    pub fn push_int_range_to_array(
+        &mut self,
+        name: &str,
+        start: i64,
+        end: i64,
+    ) -> Result<(), PerlError> {
+        if end <= start {
+            return Ok(());
+        }
+        let count = (end - start) as usize;
+        if let Some(aa) = self.find_atomic_array(name) {
+            let mut g = aa.0.lock();
+            g.reserve(count);
+            for i in start..end {
+                g.push(PerlValue::integer(i));
+            }
+            return Ok(());
+        }
+        let arr = self.get_array_mut(name)?;
+        arr.reserve(count);
+        for i in start..end {
+            arr.push(PerlValue::integer(i));
+        }
+        Ok(())
+    }
+
     /// Pop from array — works for both regular and atomic arrays.
     pub fn pop_from_array(&mut self, name: &str) -> Result<PerlValue, PerlError> {
         if let Some(aa) = self.find_atomic_array(name) {
@@ -1397,6 +1471,40 @@ impl Scope {
         }
         let hash = self.get_hash_mut(name)?;
         hash.insert(key.to_string(), val);
+        Ok(())
+    }
+
+    /// Bulk `for i in start..end { $h{i} = i * k }` for the fused hash-insert loop.
+    /// Reserves capacity once and runs the whole range in a tight Rust loop.
+    /// `itoa` is used to stringify each key without a transient `format!` allocation.
+    pub fn set_hash_int_times_range(
+        &mut self,
+        name: &str,
+        start: i64,
+        end: i64,
+        k: i64,
+    ) -> Result<(), PerlError> {
+        if end <= start {
+            return Ok(());
+        }
+        let count = (end - start) as usize;
+        if let Some(ah) = self.find_atomic_hash(name) {
+            let mut g = ah.0.lock();
+            g.reserve(count);
+            let mut buf = itoa::Buffer::new();
+            for i in start..end {
+                let key = buf.format(i).to_owned();
+                g.insert(key, PerlValue::integer(i.wrapping_mul(k)));
+            }
+            return Ok(());
+        }
+        let hash = self.get_hash_mut(name)?;
+        hash.reserve(count);
+        let mut buf = itoa::Buffer::new();
+        for i in start..end {
+            let key = buf.format(i).to_owned();
+            hash.insert(key, PerlValue::integer(i.wrapping_mul(k)));
+        }
         Ok(())
     }
 
