@@ -125,3 +125,28 @@ fn parse_and_run_string_nested_require_shares_inc() {
     let v = parse_and_run_string("Trivial::trivial_answer();", &mut interp).expect("call");
     assert_eq!(v.to_int(), 42);
 }
+
+/// Vendored `Getopt::Long` uses `keys %cfg` in `foreach`; tree-walker fallback must evaluate
+/// the hash operand in list context (scalar `%h` is not a hash value).
+#[test]
+fn vendor_getopt_long_consumes_regex_equals_form() {
+    let mut interp = Interpreter::new();
+    let vendor = format!("{}/vendor/perl", env!("CARGO_MANIFEST_DIR"));
+    interp.scope.declare_array(
+        "INC",
+        vec![
+            PerlValue::string(vendor),
+            PerlValue::string(".".to_string()),
+        ],
+    );
+    let p = parse(
+        "require Getopt::Long;\n\
+         my $r = '';\n\
+         @ARGV = ('--regex=l', 'file.pl');\n\
+         Getopt::Long::GetOptions('regex=s' => \\$r) or die 'opts';\n\
+         print $r, '|', join(',', @ARGV);",
+    )
+    .expect("parse");
+    let v = interp.execute(&p).expect("run");
+    assert_eq!(v.to_string(), "l|file.pl");
+}

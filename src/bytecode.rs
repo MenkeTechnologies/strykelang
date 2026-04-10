@@ -61,6 +61,11 @@ pub enum Op {
     PopArray(u16),   // → popped value
     ShiftArray(u16), // → shifted value
     ArrayLen(u16),   // → integer length
+    /// Pop index spec (scalar or array from [`Op::Range`]); push one `PerlValue::array` of elements
+    /// read from the named array. Used for `@name[...]` slice rvalues.
+    ArraySlicePart(u16),
+    /// Pop `b`, pop `a` (arrays); push concatenation `a` followed by `b` (Perl slice / list glue).
+    ArrayConcatTwo,
 
     // ── Hashes ──
     GetHash(u16),
@@ -95,6 +100,9 @@ pub enum Op {
 
     // ── String ──
     Concat,
+    /// Pop array (or value coerced with [`PerlValue::to_list`]), join element strings with
+    /// [`Interpreter::list_separator`] (`$"`), push one string. Used for `@a` in `"` / `qq`.
+    ArrayStringifyListSep,
     StringRepeat,
 
     // ── Comparison (numeric) ──

@@ -2140,11 +2140,17 @@ impl Compiler {
                 let arr_idx = self
                     .chunk
                     .intern_name(&self.qualify_stash_array_name(array));
-                for index_expr in indices {
-                    self.compile_expr(index_expr)?;
-                    self.emit_op(Op::GetArrayElem(arr_idx), line, Some(root));
+                if indices.is_empty() {
+                    self.emit_op(Op::MakeArray(0), line, Some(root));
+                } else {
+                    for (ix, index_expr) in indices.iter().enumerate() {
+                        self.compile_expr(index_expr)?;
+                        self.emit_op(Op::ArraySlicePart(arr_idx), line, Some(root));
+                        if ix > 0 {
+                            self.emit_op(Op::ArrayConcatTwo, line, Some(root));
+                        }
+                    }
                 }
-                self.emit_op(Op::MakeArray(indices.len() as u16), line, Some(root));
             }
             ExprKind::HashSlice { hash, keys } => {
                 let hash_idx = self.chunk.intern_name(hash);
@@ -5032,9 +5038,13 @@ impl Compiler {
             StringPart::ArrayVar(name) => {
                 let idx = self.chunk.intern_name(&self.qualify_stash_array_name(name));
                 self.emit_op(Op::GetArray(idx), line, parent);
+                self.emit_op(Op::ArrayStringifyListSep, line, parent);
             }
             StringPart::Expr(e) => {
                 self.compile_expr(e)?;
+                if matches!(&e.kind, ExprKind::ArraySlice { .. }) {
+                    self.emit_op(Op::ArrayStringifyListSep, line, parent);
+                }
             }
         }
         Ok(())

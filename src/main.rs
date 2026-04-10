@@ -532,6 +532,16 @@ fn commit_in_place_edit(path: &Path, inplace_edit: &str, new_content: &str) -> s
     Ok(())
 }
 
+/// `BufRead::lines()` strips the terminator; Perl’s `<>` leaves it in `$_` unless **`-l`** is set,
+/// in which case Perl **chomps** each record. Match that so `print` + `$\` does not double newlines.
+fn line_mode_input_record(cli: &Cli, l: String) -> String {
+    if cli.line_ending.is_some() {
+        l
+    } else {
+        format!("{}\n", l)
+    }
+}
+
 /// `-n` / `-p` input loop: `@ARGV` files when non-empty, else stdin; `-i` rewrites named files.
 fn run_line_mode_loop(
     cli: &Cli,
@@ -641,7 +651,7 @@ fn run_line_mode_loop(
                             "-e",
                         )
                     })?;
-                    let input = format!("{}\n", l);
+                    let input = line_mode_input_record(cli, l);
                     if let Some(output) = local.process_line(&input, program)? {
                         accumulated.push_str(&output);
                     }
@@ -673,7 +683,7 @@ fn run_line_mode_loop(
                             "-e",
                         )
                     })?;
-                    let input = format!("{}\n", l);
+                    let input = line_mode_input_record(cli, l);
                     if let Some(output) = interp.process_line(&input, program)? {
                         if print_to_stdout {
                             print!("{}", output);
@@ -695,7 +705,7 @@ fn run_line_mode_loop(
         for line in stdin.lock().lines() {
             match line {
                 Ok(l) => {
-                    let input = format!("{}\n", l);
+                    let input = line_mode_input_record(cli, l);
                     match interp.process_line(&input, program) {
                         Ok(Some(output)) => {
                             if print_to_stdout {
@@ -1038,8 +1048,11 @@ fn main() {
             interp.ors = "\n".to_string();
         }
 
-        // First execute the program to register subs/BEGIN blocks
+        // Prelude only: subs / `use` / BEGIN … INIT — main runs per line in `process_line`, not here
+        // (stock `perl` wraps `-e` in `while (<>) { … }`, so a bare `print` must not run before input).
+        interp.line_mode_skip_main = true;
         if let Err(e) = interp.execute(&program) {
+            interp.line_mode_skip_main = false;
             if let Some(mut p) = interp.profiler.take() {
                 p.print_report();
             }
@@ -1049,8 +1062,19 @@ fn main() {
             eprintln!("{}", e);
             process::exit(255);
         }
+        interp.line_mode_skip_main = false;
 
         if let Err(e) = run_line_mode_loop(&cli, &mut interp, &program, slurp) {
+            if let Some(mut p) = interp.profiler.take() {
+                p.print_report();
+            }
+            if let ErrorKind::Exit(code) = e.kind {
+                process::exit(code);
+            }
+            eprintln!("{}", e);
+            process::exit(255);
+        }
+        if let Err(e) = interp.run_end_blocks() {
             if let Some(mut p) = interp.profiler.take() {
                 p.print_report();
             }

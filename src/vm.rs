@@ -1970,6 +1970,33 @@ impl<'a> VM<'a> {
                         self.push(PerlValue::integer(len as i64));
                         Ok(())
                     }
+                    Op::ArraySlicePart(idx) => {
+                        let spec = self.pop();
+                        let n = names[*idx as usize].as_str();
+                        let mut out = Vec::new();
+                        if let Some(indices) = spec.as_array_vec() {
+                            for pv in indices {
+                                out.push(self.interp.scope.get_array_element(n, pv.to_int()));
+                            }
+                        } else {
+                            out.push(self.interp.scope.get_array_element(n, spec.to_int()));
+                        }
+                        self.push(PerlValue::array(out));
+                        Ok(())
+                    }
+                    Op::ArrayConcatTwo => {
+                        let b = self.pop();
+                        let a = self.pop();
+                        let mut av = a
+                            .as_array_vec()
+                            .unwrap_or_else(|| vec![a]);
+                        let bv = b
+                            .as_array_vec()
+                            .unwrap_or_else(|| vec![b]);
+                        av.extend(bv);
+                        self.push(PerlValue::array(av));
+                        Ok(())
+                    }
 
                     // ── Hashes ──
                     Op::GetHash(idx) => {
@@ -2315,6 +2342,18 @@ impl<'a> VM<'a> {
                         let mut s = a.into_string();
                         b.append_to(&mut s);
                         self.push(PerlValue::string(s));
+                        Ok(())
+                    }
+                    Op::ArrayStringifyListSep => {
+                        let v = self.pop();
+                        let sep = self.interp.list_separator.clone();
+                        let list = v.to_list();
+                        let joined = list
+                            .iter()
+                            .map(|x| x.to_string())
+                            .collect::<Vec<_>>()
+                            .join(&sep);
+                        self.push(PerlValue::string(joined));
                         Ok(())
                     }
                     Op::StringRepeat => {

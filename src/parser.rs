@@ -5461,7 +5461,7 @@ impl Parser {
         }
     }
 
-    fn parse_arg_list(&mut self) -> PerlResult<Vec<Expr>> {
+    pub(crate) fn parse_arg_list(&mut self) -> PerlResult<Vec<Expr>> {
         let mut args = Vec::new();
         while !matches!(
             self.peek(),
@@ -5607,7 +5607,7 @@ impl Parser {
         let chars: Vec<char> = s.chars().collect();
         let mut i = 0;
 
-        while i < chars.len() {
+        'istr: while i < chars.len() {
             if chars[i] == LITERAL_DOLLAR_IN_DQUOTE {
                 literal.push('$');
                 i += 1;
@@ -5630,6 +5630,27 @@ impl Parser {
                 }
                 if i >= chars.len() {
                     return Err(self.syntax_err("Final $ should be \\$ or $name", line));
+                }
+                // `$#name` — last index of `@name` (Perl `$#array`).
+                if chars[i] == '#' {
+                    i += 1;
+                    let mut sname = String::from("#");
+                    while i < chars.len()
+                        && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == ':')
+                    {
+                        sname.push(chars[i]);
+                        i += 1;
+                    }
+                    while i + 1 < chars.len() && chars[i] == ':' && chars[i + 1] == ':' {
+                        sname.push_str("::");
+                        i += 2;
+                        while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
+                            sname.push(chars[i]);
+                            i += 1;
+                        }
+                    }
+                    parts.push(StringPart::ScalarVar(sname));
+                    continue;
                 }
                 // `$$` — process id (Perl `$$`), only when the two `$` are adjacent (no whitespace
                 // between) and the second `$` is not followed by a word character or digit (`$$x`
@@ -5879,6 +5900,44 @@ impl Parser {
                             name.push(chars[i]);
                             i += 1;
                         }
+                        while i + 1 < chars.len() && chars[i] == ':' && chars[i + 1] == ':' {
+                            name.push_str("::");
+                            i += 2;
+                            while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
+                                name.push(chars[i]);
+                                i += 1;
+                            }
+                        }
+                    }
+                    if i < chars.len() && chars[i] == '[' {
+                        i += 1;
+                        let start_inner = i;
+                        let mut depth = 1usize;
+                        while i < chars.len() && depth > 0 {
+                            match chars[i] {
+                                '[' => depth += 1,
+                                ']' => depth -= 1,
+                                _ => {}
+                            }
+                            if depth == 0 {
+                                let inner: String = chars[start_inner..i].iter().collect();
+                                i += 1; // closing ]
+                                let indices = parse_slice_indices_from_str(inner.trim(), "-e")?;
+                                parts.push(StringPart::Expr(Expr {
+                                    kind: ExprKind::ArraySlice {
+                                        array: name.clone(),
+                                        indices,
+                                    },
+                                    line,
+                                }));
+                                continue 'istr;
+                            }
+                            i += 1;
+                        }
+                        return Err(self.syntax_err(
+                            "Unterminated [ in array slice inside quoted string",
+                            line,
+                        ));
                     }
                     parts.push(StringPart::ArrayVar(name));
                 }
@@ -5948,6 +6007,14 @@ fn merge_expr_list(parts: Vec<Expr>) -> Expr {
 }
 
 /// Comma-separated expressions on a `format` value line (below a picture line).
+/// Parse `[ ... ]` contents for `@a[...]` (same rules as `parse_arg_list` / comma-separated indices).
+pub fn parse_slice_indices_from_str(s: &str, file: &str) -> PerlResult<Vec<Expr>> {
+    let mut lexer = Lexer::new_with_file(s, file);
+    let tokens = lexer.tokenize()?;
+    let mut parser = Parser::new_with_file(tokens, file);
+    parser.parse_arg_list()
+}
+
 pub fn parse_format_value_line(line: &str) -> PerlResult<Vec<Expr>> {
     let trimmed = line.trim();
     if trimmed.is_empty() {

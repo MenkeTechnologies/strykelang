@@ -95,6 +95,9 @@ pe script.pl arg1 arg2
 # script arguments match stock perl: tokens such as --regex go to @ARGV (not the interpreter)
 pe script.pl --regex
 
+# bundled short switches (like stock perl): -lane is -l -a -n -e; code is the next argument
+pe -lane 'print $F[0]'
+
 # check syntax without executing (parse only)
 pe -c script.pl
 

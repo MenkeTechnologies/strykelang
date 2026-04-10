@@ -409,6 +409,8 @@ pub struct Interpreter {
     pub disasm_bytecode: bool,
     /// Set while stepping a `gen { }` body (`yield`).
     pub(crate) in_generator: bool,
+    /// `-n`/`-p` driver: prelude only in [`Self::execute_tree`]; body runs in [`Self::process_line`].
+    pub line_mode_skip_main: bool,
     /// Sliding-window timestamps for `rate_limit(...)` (indexed by parse-time slot).
     pub(crate) rate_limit_slots: Vec<VecDeque<Instant>>,
 }
@@ -777,6 +779,7 @@ impl Interpreter {
             ),
             disasm_bytecode: false,
             in_generator: false,
+            line_mode_skip_main: false,
             rate_limit_slots: Vec::new(),
         };
         s.install_overload_pragma_stubs();
@@ -921,6 +924,7 @@ impl Interpreter {
             vm_jit_enabled: self.vm_jit_enabled,
             disasm_bytecode: self.disasm_bytecode,
             in_generator: false,
+            line_mode_skip_main: false,
             rate_limit_slots: Vec::new(),
         }
     }
@@ -1380,6 +1384,7 @@ impl Interpreter {
                 | "INC"
         ) || name.chars().all(|c| c.is_ascii_digit())
             || name.starts_with('^')
+            || (name.starts_with('#') && name.len() > 1)
     }
 
     fn check_strict_scalar_var(&self, name: &str, line: usize) -> Result<(), FlowOrError> {
@@ -2997,6 +3002,11 @@ impl Interpreter {
     }
 
     pub fn execute(&mut self, program: &Program) -> PerlResult<PerlValue> {
+        // `-n`/`-p`: main must run only inside [`Self::process_line`], not as a full-program VM/tree
+        // run (would execute `print` once before any input, etc.).
+        if self.line_mode_skip_main {
+            return self.execute_tree(program);
+        }
         // With `--profile`, the VM records per-opcode line times and sub enter/return (JIT off).
         // Try bytecode VM first — falls back to tree-walker on unsupported features
         if let Some(result) = crate::try_vm_execute(program, self) {
@@ -3005,6 +3015,19 @@ impl Interpreter {
 
         // Tree-walker fallback
         self.execute_tree(program)
+    }
+
+    /// Run `END` blocks (after `-n`/`-p` line loop when prelude used [`Self::line_mode_skip_main`]).
+    pub fn run_end_blocks(&mut self) -> PerlResult<()> {
+        self.global_phase = "END".to_string();
+        let ends = std::mem::take(&mut self.end_blocks);
+        for block in &ends {
+            self.exec_block(block).map_err(|e| match e {
+                FlowOrError::Error(e) => e,
+                FlowOrError::Flow(_) => PerlError::runtime("Unexpected flow control in END", 0),
+            })?;
+        }
+        Ok(())
     }
 
     /// Tree-walking execution (fallback when bytecode compilation fails).
@@ -3063,6 +3086,12 @@ impl Interpreter {
         }
 
         self.global_phase = "RUN".to_string();
+
+        if self.line_mode_skip_main {
+            // Body runs once per input line in [`Self::process_line`]; `END` runs after the loop
+            // via [`Self::run_end_blocks`].
+            return Ok(PerlValue::UNDEF);
+        }
 
         // Execute main program
         let mut last = PerlValue::UNDEF;
@@ -4875,9 +4904,21 @@ impl Interpreter {
                             result.push_str(&parts.join(&sep));
                         }
                         StringPart::Expr(e) => {
-                            let val = self.eval_expr(e)?;
-                            let s = self.stringify_value(val, line)?;
-                            result.push_str(&s);
+                            if let ExprKind::ArraySlice { array, .. } = &e.kind {
+                                self.check_strict_array_var(array, line)?;
+                                let val = self.eval_expr(e)?;
+                                let list = val.to_list();
+                                let sep = self.list_separator.clone();
+                                let mut parts = Vec::with_capacity(list.len());
+                                for v in list {
+                                    parts.push(self.stringify_value(v, line)?);
+                                }
+                                result.push_str(&parts.join(&sep));
+                            } else {
+                                let val = self.eval_expr(e)?;
+                                let s = self.stringify_value(val, line)?;
+                                result.push_str(&s);
+                            }
                         }
                     }
                 }
@@ -4965,10 +5006,17 @@ impl Interpreter {
             }
             ExprKind::ArraySlice { array, indices } => {
                 self.check_strict_array_var(array, line)?;
+                let aname = self.stash_array_name_for_package(array);
                 let mut result = Vec::new();
                 for idx_expr in indices {
-                    let idx = self.eval_expr(idx_expr)?.to_int();
-                    result.push(self.scope.get_array_element(array, idx));
+                    let v = self.eval_expr(idx_expr)?;
+                    if let Some(list) = v.as_array_vec() {
+                        for idx in list {
+                            result.push(self.scope.get_array_element(&aname, idx.to_int()));
+                        }
+                    } else {
+                        result.push(self.scope.get_array_element(&aname, v.to_int()));
+                    }
                 }
                 Ok(PerlValue::array(result))
             }
@@ -8365,7 +8413,8 @@ impl Interpreter {
 
     /// True when [`get_special_var`] must run instead of [`Scope::get_scalar`].
     pub(crate) fn is_special_scalar_name_for_get(name: &str) -> bool {
-        name.starts_with('^')
+        (name.starts_with('#') && name.len() > 1)
+            || name.starts_with('^')
             || matches!(
                 name,
                 "$$" | "0"
@@ -8548,6 +8597,12 @@ impl Interpreter {
                 .get(name)
                 .cloned()
                 .unwrap_or(PerlValue::UNDEF),
+            _ if name.starts_with('#') && name.len() > 1 => {
+                let arr = &name[1..];
+                let aname = self.stash_array_name_for_package(arr);
+                let len = self.scope.array_len(&aname);
+                PerlValue::integer(len as i64 - 1)
+            }
             _ => self.scope.get_scalar(name),
         }
     }
@@ -11034,7 +11089,9 @@ impl Interpreter {
         expr: &Expr,
         line: usize,
     ) -> Result<PerlValue, FlowOrError> {
-        let val = self.eval_expr(expr)?;
+        // Operand must be evaluated in list context so `%h` stays a hash (scalar context would
+        // apply `scalar %h`, not a hash value — breaks `keys` / `values` / `each` fallbacks).
+        let val = self.eval_expr_ctx(expr, WantarrayCtx::List)?;
         Self::keys_from_value(val, line)
     }
 
@@ -11054,7 +11111,7 @@ impl Interpreter {
         expr: &Expr,
         line: usize,
     ) -> Result<PerlValue, FlowOrError> {
-        let val = self.eval_expr(expr)?;
+        let val = self.eval_expr_ctx(expr, WantarrayCtx::List)?;
         Self::values_from_value(val, line)
     }
 

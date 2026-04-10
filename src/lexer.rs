@@ -43,6 +43,23 @@ impl Lexer {
         self.input.get(self.pos + offset).copied()
     }
 
+    /// True when `=` at `eq_pos` is Perl POD (`=head1`, `=cut`, …): first non-whitespace on the line.
+    /// Otherwise `$_=foo` would misparse `=f` as POD and swallow the rest of the file.
+    fn at_line_start_for_pod(&self, eq_pos: usize) -> bool {
+        let mut i = eq_pos;
+        while i > 0 {
+            i -= 1;
+            let c = self.input[i];
+            if c == '\n' {
+                return true;
+            }
+            if !c.is_whitespace() {
+                return false;
+            }
+        }
+        true
+    }
+
     fn advance(&mut self) -> Option<char> {
         let ch = self.input.get(self.pos).copied();
         if let Some(c) = ch {
@@ -669,7 +686,18 @@ impl Lexer {
                 }
                 name
             }
-            Some(c) if "!@$&*+;',\"\\|?/<>.0123456789~%-#=()[]{}".contains(c) => {
+            // Perl `$#name` — last index of `@name` (scalar name stored as `#name`).
+            Some('#') => {
+                self.advance();
+                if self.peek().is_some_and(|c| c.is_alphabetic() || c == '_') {
+                    let mut name = String::from("#");
+                    name.push_str(&self.read_package_qualified_identifier());
+                    name
+                } else {
+                    "#".to_string()
+                }
+            }
+            Some(c) if "!@$&*+;',\"\\|?/<>.0123456789~%-=()[]{}".contains(c) => {
                 self.advance();
                 c.to_string()
             }
@@ -922,6 +950,7 @@ impl Lexer {
                 Ok(Token::Dot)
             }
             '=' => {
+                let eq_pos = self.pos;
                 self.advance();
                 if self.peek() == Some('=') {
                     self.advance();
@@ -938,8 +967,8 @@ impl Lexer {
                     self.last_was_term = false;
                     return Ok(Token::FatArrow);
                 }
-                // POD: =head1 etc — skip until =cut
-                if self.peek().is_some_and(|c| c.is_alphabetic()) {
+                // POD: =head1 etc — only when `=` begins the line (after optional whitespace).
+                if self.peek().is_some_and(|c| c.is_alphabetic()) && self.at_line_start_for_pod(eq_pos) {
                     // Skip POD
                     loop {
                         let line = self.read_while(|c| c != '\n');
@@ -1844,6 +1873,25 @@ mod tests {
         let mut l = Lexer::new("$foo");
         let t = l.tokenize().expect("tokenize");
         assert!(matches!(t[0].0, Token::ScalarVar(ref s) if s == "foo"));
+    }
+
+    /// `=` + letter is assignment unless `=` starts the line (POD). `$_=foo` must not skip POD.
+    #[test]
+    fn tokenize_assign_not_pod_when_eq_not_line_start() {
+        let mut l = Lexer::new("$_=foo;");
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[0].0, Token::ScalarVar(ref s) if s == "_"));
+        assert!(matches!(t[1].0, Token::Assign));
+        assert!(matches!(t[2].0, Token::Ident(ref s) if s == "foo"));
+        assert!(matches!(t[3].0, Token::Semicolon));
+    }
+
+    #[test]
+    fn tokenize_pod_equals_still_skipped_at_line_start() {
+        let mut l = Lexer::new("=head1 NAME\ncode\n=cut\n$x;");
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[0].0, Token::ScalarVar(ref s) if s == "x"));
+        assert!(matches!(t[1].0, Token::Semicolon));
     }
 
     #[test]

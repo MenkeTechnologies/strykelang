@@ -40,6 +40,27 @@ fn qq_bracket_interpolates_at_plus_after_match() {
 }
 
 #[test]
+fn double_quoted_array_interpolation_uses_list_separator_dollar_quote() {
+    assert_eq!(
+        eval_string(r#"my @a = (1,2,3); "<@a>""#),
+        "<1 2 3>"
+    );
+    assert_eq!(
+        eval_string(r#"my @a = (1,2,3); $" = ":"; "<@a>""#),
+        "<1:2:3>"
+    );
+}
+
+#[test]
+fn dollar_hash_array_last_index_reads_special_var() {
+    assert_eq!(
+        eval_string(r#"my @x = (10,20,30); "$#x""#),
+        "2"
+    );
+    assert_eq!(eval_string(r#"my @x = (); "$#x""#), "-1");
+}
+
+#[test]
 fn double_quoted_dollar_only_whitespace_before_close_quote_is_parse_error() {
     assert!(perlrs::parse(r#"my $x = "a$ ""#).is_err());
 }
@@ -152,6 +173,38 @@ fn string_interpolation_hash_access() {
 #[test]
 fn string_interpolation_array_access() {
     assert_eq!(eval_string(r#"my @a = (10, 20, 30); "$a[1]""#), "20");
+}
+
+#[test]
+fn double_quoted_at_array_joins_with_list_separator() {
+    assert_eq!(
+        eval_string(r#"my @a = qw(x y z); $" = ","; "@a""#),
+        "x,y,z"
+    );
+}
+
+#[test]
+fn double_quoted_array_slice_joins_with_list_separator() {
+    assert_eq!(
+        eval_string(r#"my @a = qw(a b c d); $" = ","; "@a[1..2]""#),
+        "b,c"
+    );
+}
+
+#[test]
+fn double_quoted_array_slice_dollar_hash_last_index() {
+    assert_eq!(
+        eval_string(r#"my @a = qw(x y z); $" = ","; "@a[1..$#a]""#),
+        "y,z"
+    );
+}
+
+#[test]
+fn double_quoted_at_f_joins_like_other_arrays() {
+    assert_eq!(
+        eval_string(r#"my @F = qw(p q r); $" = "|"; "@F""#),
+        "p|q|r"
+    );
 }
 
 #[test]
