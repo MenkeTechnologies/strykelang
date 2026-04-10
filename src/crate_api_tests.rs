@@ -57,6 +57,12 @@ fn run_logical_short_circuit() {
 }
 
 #[test]
+fn run_log_and_compound_assign() {
+    assert_eq!(run_int("my $x = 0; $x &&= 5; $x;"), 0);
+    assert_eq!(run_int("my $y = 2; $y &&= 7; $y;"), 7);
+}
+
+#[test]
 fn run_defined_or_operator() {
     assert_eq!(run_int("undef // 99;"), 99);
     assert_eq!(run_int("0 // 5;"), 0);
@@ -198,6 +204,38 @@ fn try_vm_execute_scalar_log_or_assign_short_circuit() {
 }
 
 #[test]
+fn try_vm_execute_scalar_log_and_assign() {
+    let p = parse(
+        r#"my $x = 2;
+        $x &&= 7;
+        $x;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "scalar &&= should compile (JumpIfFalseKeep + SetScalar*Keep)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 7);
+}
+
+#[test]
+fn try_vm_execute_scalar_log_and_assign_short_circuit() {
+    let p = parse(
+        r#"my $x = 0;
+        my $runs = 0;
+        $x &&= ($runs = 1);
+        $runs;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "scalar &&= should skip RHS when LHS is false");
+    assert_eq!(out.unwrap().expect("vm").to_int(), 0);
+}
+
+#[test]
 fn try_vm_execute_array_elem_defined_or_assign() {
     let p = parse(
         r#"no strict 'vars';
@@ -299,6 +337,58 @@ fn try_vm_execute_hash_elem_log_or_assign() {
         "hash element ||= should compile (SetHashElemKeep)"
     );
     assert_eq!(out.unwrap().expect("vm").to_int(), 4);
+}
+
+#[test]
+fn try_vm_execute_array_elem_log_and_assign() {
+    let p = parse(
+        r#"no strict 'vars';
+        my @a = (1);
+        $a[0] &&= 8;
+        $a[0];"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "array element &&= should compile (JumpIfFalseKeep + SetArrayElemKeep)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 8);
+}
+
+#[test]
+fn try_vm_execute_hash_elem_log_and_assign_short_circuit() {
+    let p = parse(
+        r#"no strict 'vars';
+        my %h = ("x" => 0);
+        my $runs = 0;
+        $h{"x"} &&= ($runs = 1);
+        $runs;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "hash element &&= should skip RHS when LHS is false");
+    assert_eq!(out.unwrap().expect("vm").to_int(), 0);
+}
+
+#[test]
+fn try_vm_execute_arrow_hash_log_and_assign() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $h = { "a" => 1 };
+        $h->{"a"} &&= 9;
+        $h->{"a"};"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "arrow hash &&= should compile (JumpIfFalseKeep + SetArrowHashKeep)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 9);
 }
 
 #[test]

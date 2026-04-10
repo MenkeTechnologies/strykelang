@@ -2528,6 +2528,17 @@ impl Compiler {
                         self.chunk.patch_jump_here(j_end);
                         return Ok(());
                     }
+                    if *op == BinOp::LogAnd {
+                        // `$x &&=` — short-circuit when LHS is false.
+                        self.emit_get_scalar(idx, line, Some(root));
+                        let j = self.emit_op(Op::JumpIfFalseKeep(0), line, Some(root));
+                        self.compile_expr(value)?;
+                        self.emit_set_scalar_keep(idx, line, Some(root));
+                        let j_end = self.emit_op(Op::Jump(0), line, Some(root));
+                        self.chunk.patch_jump_here(j);
+                        self.chunk.patch_jump_here(j_end);
+                        return Ok(());
+                    }
                     if let Some(op_b) = scalar_compound_op_to_byte(*op) {
                         self.compile_expr(value)?;
                         self.emit_op(
@@ -2551,14 +2562,19 @@ impl Compiler {
                     self.check_array_mutable(&q, line)?;
                     let arr_idx = self.chunk.intern_name(&q);
                     match op {
-                        BinOp::DefinedOr | BinOp::LogOr => {
+                        BinOp::DefinedOr | BinOp::LogOr | BinOp::LogAnd => {
                             self.compile_expr(index)?;
                             self.emit_op(Op::Dup, line, Some(root));
                             self.emit_op(Op::GetArrayElem(arr_idx), line, Some(root));
-                            let j = if *op == BinOp::DefinedOr {
-                                self.emit_op(Op::JumpIfDefinedKeep(0), line, Some(root))
-                            } else {
-                                self.emit_op(Op::JumpIfTrueKeep(0), line, Some(root))
+                            let j = match *op {
+                                BinOp::DefinedOr => {
+                                    self.emit_op(Op::JumpIfDefinedKeep(0), line, Some(root))
+                                }
+                                BinOp::LogOr => self.emit_op(Op::JumpIfTrueKeep(0), line, Some(root)),
+                                BinOp::LogAnd => {
+                                    self.emit_op(Op::JumpIfFalseKeep(0), line, Some(root))
+                                }
+                                _ => unreachable!(),
                             };
                             self.compile_expr(value)?;
                             self.emit_op(Op::Swap, line, Some(root));
@@ -2592,14 +2608,19 @@ impl Compiler {
                     self.check_hash_mutable(hash, line)?;
                     let hash_idx = self.chunk.intern_name(hash);
                     match op {
-                        BinOp::DefinedOr | BinOp::LogOr => {
+                        BinOp::DefinedOr | BinOp::LogOr | BinOp::LogAnd => {
                             self.compile_expr(key)?;
                             self.emit_op(Op::Dup, line, Some(root));
                             self.emit_op(Op::GetHashElem(hash_idx), line, Some(root));
-                            let j = if *op == BinOp::DefinedOr {
-                                self.emit_op(Op::JumpIfDefinedKeep(0), line, Some(root))
-                            } else {
-                                self.emit_op(Op::JumpIfTrueKeep(0), line, Some(root))
+                            let j = match *op {
+                                BinOp::DefinedOr => {
+                                    self.emit_op(Op::JumpIfDefinedKeep(0), line, Some(root))
+                                }
+                                BinOp::LogOr => self.emit_op(Op::JumpIfTrueKeep(0), line, Some(root)),
+                                BinOp::LogAnd => {
+                                    self.emit_op(Op::JumpIfFalseKeep(0), line, Some(root))
+                                }
+                                _ => unreachable!(),
                             };
                             self.compile_expr(value)?;
                             self.emit_op(Op::Swap, line, Some(root));
@@ -2659,6 +2680,21 @@ impl Compiler {
                             self.emit_op(Op::Pop, line, Some(root));
                             self.chunk.patch_jump_here(j_end);
                         }
+                        BinOp::LogAnd => {
+                            // `$$r &&=` — no `Pop` after `JumpIfFalseKeep` (ref under LHS).
+                            self.compile_expr(expr)?;
+                            self.emit_op(Op::Dup, line, Some(root));
+                            self.emit_op(Op::SymbolicDeref(0), line, Some(root));
+                            let j = self.emit_op(Op::JumpIfFalseKeep(0), line, Some(root));
+                            self.compile_expr(value)?;
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::SetSymbolicScalarRefKeep, line, Some(root));
+                            let j_end = self.emit_op(Op::Jump(0), line, Some(root));
+                            self.chunk.patch_jump_here(j);
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::Pop, line, Some(root));
+                            self.chunk.patch_jump_here(j_end);
+                        }
                         _ => {
                             let vm_op = binop_to_vm_op(*op).ok_or_else(|| {
                                 CompileError::Unsupported("CompoundAssign op".into())
@@ -2679,15 +2715,20 @@ impl Compiler {
                 } = &target.kind
                 {
                     match op {
-                        BinOp::DefinedOr | BinOp::LogOr => {
+                        BinOp::DefinedOr | BinOp::LogOr | BinOp::LogAnd => {
                             self.compile_expr(expr)?;
                             self.compile_expr(index)?;
                             self.emit_op(Op::Dup2, line, Some(root));
                             self.emit_op(Op::ArrowHash, line, Some(root));
-                            let j = if *op == BinOp::DefinedOr {
-                                self.emit_op(Op::JumpIfDefinedKeep(0), line, Some(root))
-                            } else {
-                                self.emit_op(Op::JumpIfTrueKeep(0), line, Some(root))
+                            let j = match *op {
+                                BinOp::DefinedOr => {
+                                    self.emit_op(Op::JumpIfDefinedKeep(0), line, Some(root))
+                                }
+                                BinOp::LogOr => self.emit_op(Op::JumpIfTrueKeep(0), line, Some(root)),
+                                BinOp::LogAnd => {
+                                    self.emit_op(Op::JumpIfFalseKeep(0), line, Some(root))
+                                }
+                                _ => unreachable!(),
                             };
                             self.compile_expr(value)?;
                             self.emit_op(Op::Swap, line, Some(root));
@@ -2726,15 +2767,20 @@ impl Compiler {
                 } = &target.kind
                 {
                     match op {
-                        BinOp::DefinedOr | BinOp::LogOr => {
+                        BinOp::DefinedOr | BinOp::LogOr | BinOp::LogAnd => {
                             self.compile_expr(expr)?;
                             self.compile_expr(index)?;
                             self.emit_op(Op::Dup2, line, Some(root));
                             self.emit_op(Op::ArrowArray, line, Some(root));
-                            let j = if *op == BinOp::DefinedOr {
-                                self.emit_op(Op::JumpIfDefinedKeep(0), line, Some(root))
-                            } else {
-                                self.emit_op(Op::JumpIfTrueKeep(0), line, Some(root))
+                            let j = match *op {
+                                BinOp::DefinedOr => {
+                                    self.emit_op(Op::JumpIfDefinedKeep(0), line, Some(root))
+                                }
+                                BinOp::LogOr => self.emit_op(Op::JumpIfTrueKeep(0), line, Some(root)),
+                                BinOp::LogAnd => {
+                                    self.emit_op(Op::JumpIfFalseKeep(0), line, Some(root))
+                                }
+                                _ => unreachable!(),
                             };
                             self.compile_expr(value)?;
                             self.emit_op(Op::Swap, line, Some(root));

@@ -4543,6 +4543,13 @@ impl Interpreter {
                     rhs.clone()
                 }
             }
+            BinOp::LogAnd => {
+                if old.is_true() {
+                    rhs.clone()
+                } else {
+                    old.clone()
+                }
+            }
             _ => PerlValue::float(old.to_number() + rhs.to_number()),
         }
     }
@@ -5152,6 +5159,13 @@ impl Interpreter {
                         BinOp::DefinedOr => {
                             let old = self.scope.get_scalar(n);
                             if !old.is_undef() {
+                                return Ok(old);
+                            }
+                            self.eval_expr(value)?
+                        }
+                        BinOp::LogAnd => {
+                            let old = self.scope.get_scalar(n);
+                            if !old.is_true() {
                                 return Ok(old);
                             }
                             self.eval_expr(value)?

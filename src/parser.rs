@@ -1690,7 +1690,10 @@ impl Parser {
             let mut initializer: Option<Expr> = None;
             if self.eat(&Token::Assign) {
                 initializer = Some(self.parse_expression()?);
-            } else if matches!(self.peek(), Token::OrAssign | Token::DefinedOrAssign) {
+            } else if matches!(
+                self.peek(),
+                Token::OrAssign | Token::DefinedOrAssign | Token::AndAssign
+            ) {
                 if matches!(&target.kind, ExprKind::Typeglob(_)) {
                     return Err(self.syntax_err(
                         "compound assignment on typeglob declaration is not supported",
@@ -1700,6 +1703,7 @@ impl Parser {
                 let op = match self.peek().clone() {
                     Token::OrAssign => BinOp::LogOr,
                     Token::DefinedOrAssign => BinOp::DefinedOr,
+                    Token::AndAssign => BinOp::LogAnd,
                     _ => unreachable!(),
                 };
                 self.advance();
@@ -1761,6 +1765,7 @@ impl Parser {
             let op = match self.peek().clone() {
                 Token::OrAssign => Some(BinOp::LogOr),
                 Token::DefinedOrAssign => Some(BinOp::DefinedOr),
+                Token::AndAssign => Some(BinOp::LogAnd),
                 _ => None,
             };
             if let Some(op) = op {
@@ -2283,6 +2288,18 @@ impl Parser {
                     kind: ExprKind::CompoundAssign {
                         target: Box::new(expr),
                         op: BinOp::DefinedOr,
+                        value: Box::new(r),
+                    },
+                    line,
+                })
+            }
+            Token::AndAssign => {
+                self.advance();
+                let r = self.parse_assign_expr()?;
+                Ok(Expr {
+                    kind: ExprKind::CompoundAssign {
+                        target: Box::new(expr),
+                        op: BinOp::LogAnd,
                         value: Box::new(r),
                     },
                     line,
