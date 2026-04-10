@@ -3220,6 +3220,28 @@ impl Interpreter {
         }
     }
 
+    /// Expand `$ENV{KEY}` in an `s///` pattern or replacement string (Perl treats these like
+    /// double-quoted interpolations; required for `s@$ENV{HOME}@~@` and for replacements like
+    /// `"$ENV{HOME}$2"` before the regex engine sees the pattern).
+    pub(crate) fn expand_env_braces_in_subst(&mut self, raw: &str, line: usize) -> PerlResult<String> {
+        self.materialize_env_if_needed();
+        let mut out = String::new();
+        let mut rest = raw;
+        while let Some(idx) = rest.find("$ENV{") {
+            out.push_str(&rest[..idx]);
+            let after = &rest[idx + 5..];
+            let end = after
+                .find('}')
+                .ok_or_else(|| PerlError::runtime("Unclosed $ENV{...} in s///", line))?;
+            let key = &after[..end];
+            let val = self.scope.get_hash_element("ENV", key);
+            out.push_str(&val.to_string());
+            rest = &after[end + 1..];
+        }
+        out.push_str(rest);
+        Ok(out)
+    }
+
     /// Shared `s///` for tree-walker and VM.
     pub(crate) fn regex_subst_execute(
         &mut self,
@@ -3231,10 +3253,12 @@ impl Interpreter {
         line: usize,
     ) -> ExecResult {
         let re_flags: String = flags.chars().filter(|c| *c != 'e').collect();
-        let re = self.compile_regex(pattern, &re_flags, line)?;
+        let pattern = self.expand_env_braces_in_subst(pattern, line)?;
+        let re = self.compile_regex(&pattern, &re_flags, line)?;
         if flags.contains('e') {
             return self.regex_subst_execute_eval(s, re.as_ref(), replacement, flags, target, line);
         }
+        let replacement = self.expand_env_braces_in_subst(replacement, line)?;
         let last_caps = if flags.contains('g') {
             let mut rows = Vec::new();
             let mut last = None;
@@ -3259,10 +3283,10 @@ impl Interpreter {
         }
         let (new_s, count) = if flags.contains('g') {
             let count = re.find_iter_count(&s);
-            (re.replace_all(&s, replacement), count)
+            (re.replace_all(&s, replacement.as_str()), count)
         } else {
             let count = if re.is_match(&s) { 1 } else { 0 };
-            (re.replace(&s, replacement), count)
+            (re.replace(&s, replacement.as_str()), count)
         };
         self.assign_value(target, PerlValue::string(new_s))?;
         Ok(PerlValue::integer(count as i64))

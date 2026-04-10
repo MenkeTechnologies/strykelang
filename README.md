@@ -134,6 +134,7 @@ A line whose trimmed text is exactly `__DATA__` ends the program text. Everythin
 # line-by-line processing
 echo "data" | pe -ne 'print uc $_'
 # list context: `@lines = <>` / `@lines = <STDIN>` reads all remaining lines until EOF (same as Perl `readline` in list context)
+# Do not combine `-n` with your own `while (<>)` / `for (<>)` / `for (reverse <>)` on stdin — `-n` already wraps `-e` in `while (<>) { … }` (use `perlrs -le '…'` for a single slurp loop). In `s///`, `$ENV{KEY}` in the pattern or replacement is expanded from `%ENV`; do not wrap the replacement in ASCII `"..."` unless you want literal quote characters (the lexer stores them as-is).
 # `eof` with no arguments is true on the last line of stdin or of each `@ARGV` file (same as Perl)
 # `CORE::eof()` / `builtin::eof()` use the same semantics (qualified forms parse as calls, not the `eof` AST)
 
@@ -765,7 +766,7 @@ Library unit tests (parser smoke batches `parse_smoke_*`, **`parser_shape_tests`
 cargo test --lib
 ```
 
-Integration tests live in `tests/integration.rs` and `tests/suite/` (grouped modules such as `runtime_extra` and `runtime_more` for assignment, builtins, aggregates, control flow, and regex/subs; **`readline_list_context`** for piped `<>` / `<STDIN>` / `<FH>` list slurp, `sort <>` / `grep { } <>` / `for (<>)`, `reverse <>` / `<STDIN>`, `my @l = <>` (zpwr-style naming), explicit `scalar(<> )`, empty stdin, `join`/`join('', <F>)`, and VM vs `execute_tree` parity on temp files):
+Integration tests live in `tests/integration.rs` and `tests/suite/` (grouped modules such as `runtime_extra` and `runtime_more` for assignment, builtins, aggregates, control flow, and regex/subs; **`readline_list_context`** for piped `<>` / `<STDIN>` / `<FH>` list slurp, `sort <>` / `grep { } <>` / `for (<>)`, `reverse <>` / `<STDIN>`, `my @l = <>` (zpwr-style naming), explicit `scalar(<> )`, empty stdin, `join`/`join('', <F>)`, and VM vs `execute_tree` parity on temp files; **`subst_env_interpolate`** for `$ENV{…}` in `s///` pattern/replacement):
 
 ```sh
 cargo test --test integration

@@ -46,6 +46,7 @@ mod runtime_more;
 mod scoping;
 mod semantic_edge;
 mod special_globals;
+mod subst_env_interpolate;
 mod strings_text;
 mod sub_ref_vm;
 mod subs;
