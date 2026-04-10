@@ -765,7 +765,7 @@ Library unit tests (parser smoke batches `parse_smoke_*`, **`parser_shape_tests`
 cargo test --lib
 ```
 
-Integration tests live in `tests/integration.rs` and `tests/suite/` (grouped modules such as `runtime_extra` and `runtime_more` for assignment, builtins, aggregates, control flow, and regex/subs; **`readline_list_context`** for piped `<>` / `<STDIN>` / `<FH>` list slurp, `reverse <>`, scalar-vs-list regression, and VM vs tree-walker parity on temp files):
+Integration tests live in `tests/integration.rs` and `tests/suite/` (grouped modules such as `runtime_extra` and `runtime_more` for assignment, builtins, aggregates, control flow, and regex/subs; **`readline_list_context`** for piped `<>` / `<STDIN>` / `<FH>` list slurp, `sort <>` / `grep { } <>` / `for (<>)`, `reverse <>` / `<STDIN>`, `my @l = <>` (zpwr-style naming), explicit `scalar(<> )`, empty stdin, `join`/`join('', <F>)`, and VM vs `execute_tree` parity on temp files):
 
 ```sh
 cargo test --test integration
