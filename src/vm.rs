@@ -1987,12 +1987,8 @@ impl<'a> VM<'a> {
                     Op::ArrayConcatTwo => {
                         let b = self.pop();
                         let a = self.pop();
-                        let mut av = a
-                            .as_array_vec()
-                            .unwrap_or_else(|| vec![a]);
-                        let bv = b
-                            .as_array_vec()
-                            .unwrap_or_else(|| vec![b]);
+                        let mut av = a.as_array_vec().unwrap_or_else(|| vec![a]);
+                        let bv = b.as_array_vec().unwrap_or_else(|| vec![b]);
                         av.extend(bv);
                         self.push(PerlValue::array(av));
                         Ok(())
@@ -3126,12 +3122,7 @@ impl<'a> VM<'a> {
                         let line = self.line();
                         let v = vm_interp_result(
                             self.interp
-                                .scalar_flip_flop_eval(
-                                    from,
-                                    to,
-                                    *slot as usize,
-                                    *exclusive != 0,
-                                )
+                                .scalar_flip_flop_eval(from, to, *slot as usize, *exclusive != 0)
                                 .map_err(Into::into),
                             line,
                         )?;
@@ -3374,13 +3365,12 @@ impl<'a> VM<'a> {
                         let key = self.interp.scope.get_scalar(k_name).to_string();
                         let elem = self.interp.scope.get_hash_element(h_name, &key);
                         let cur = self.interp.scope.get_scalar_slot(*sum_slot);
-                        let new_v = if let (Some(a), Some(b)) =
-                            (cur.as_integer(), elem.as_integer())
-                        {
-                            PerlValue::integer(a.wrapping_add(b))
-                        } else {
-                            PerlValue::float(cur.to_number() + elem.to_number())
-                        };
+                        let new_v =
+                            if let (Some(a), Some(b)) = (cur.as_integer(), elem.as_integer()) {
+                                PerlValue::integer(a.wrapping_add(b))
+                            } else {
+                                PerlValue::float(cur.to_number() + elem.to_number())
+                            };
                         self.interp.scope.set_scalar_slot(*sum_slot, new_v);
                         Ok(())
                     }

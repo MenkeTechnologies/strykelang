@@ -925,7 +925,8 @@ impl Compiler {
             vec![None; self.chunk.eval_timeout_entries.len()];
         for i in 0..self.chunk.eval_timeout_entries.len() {
             let timeout_expr = self.chunk.eval_timeout_entries[i].0.clone();
-            if let Ok(range) = self.try_compile_grep_expr_region(&timeout_expr, WantarrayCtx::Scalar)
+            if let Ok(range) =
+                self.try_compile_grep_expr_region(&timeout_expr, WantarrayCtx::Scalar)
             {
                 self.chunk.eval_timeout_expr_bytecode_ranges[i] = Some(range);
             }
@@ -5696,12 +5697,18 @@ mod tests {
     fn compile_regex_flipflop_two_dot_emits_regex_flipflop_op() {
         let chunk = compile_snippet(r#"print if /a/../b/;"#).expect("compile");
         assert!(
-            chunk.ops.iter().any(|o| matches!(o, Op::RegexFlipFlop(_, 0, _, _, _, _))),
+            chunk
+                .ops
+                .iter()
+                .any(|o| matches!(o, Op::RegexFlipFlop(_, 0, _, _, _, _))),
             "expected RegexFlipFlop(.., exclusive=0), got:\n{}",
             chunk.disassemble()
         );
         assert!(
-            !chunk.ops.iter().any(|o| matches!(o, Op::ScalarFlipFlop(_, _))),
+            !chunk
+                .ops
+                .iter()
+                .any(|o| matches!(o, Op::ScalarFlipFlop(_, _))),
             "regex flip-flop must not use ScalarFlipFlop:\n{}",
             chunk.disassemble()
         );

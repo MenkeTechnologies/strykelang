@@ -226,8 +226,8 @@ fn expand_perl_bundled_token(arg: &str) -> Option<Vec<String>> {
         return None;
     }
     // `-0` / `-0777` — record separator; do not split into `-0` `-7` …
-    if s.starts_with('0') {
-        let rest_ok = s[1..].chars().all(|c| matches!(c, '0'..='7'));
+    if let Some(rest) = s.strip_prefix('0') {
+        let rest_ok = rest.chars().all(|c| matches!(c, '0'..='7'));
         if rest_ok {
             return None;
         }

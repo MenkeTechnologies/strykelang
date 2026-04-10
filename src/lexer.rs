@@ -973,7 +973,9 @@ impl Lexer {
                     return Ok(Token::FatArrow);
                 }
                 // POD: =head1 etc — only when `=` begins the line (after optional whitespace).
-                if self.peek().is_some_and(|c| c.is_alphabetic()) && self.at_line_start_for_pod(eq_pos) {
+                if self.peek().is_some_and(|c| c.is_alphabetic())
+                    && self.at_line_start_for_pod(eq_pos)
+                {
                     // Skip POD
                     loop {
                         let line = self.read_while(|c| c != '\n');

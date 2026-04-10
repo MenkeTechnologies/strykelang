@@ -1445,8 +1445,7 @@ impl Chunk {
                             let inc_slot = *inc_slot;
                             let k32 = *k as i32;
                             let limit = *limit;
-                            self.ops[i] =
-                                Op::SetHashIntTimesLoop(h_idx, inc_slot, k32, limit);
+                            self.ops[i] = Op::SetHashIntTimesLoop(h_idx, inc_slot, k32, limit);
                             for off in 1..=6 {
                                 self.ops[i + off] = Op::Nop;
                             }
@@ -1489,8 +1488,7 @@ impl Chunk {
                             let push_idx = *push_idx;
                             let inc_slot = *inc_slot;
                             let limit = *limit;
-                            self.ops[i] =
-                                Op::PushIntRangeToArrayLoop(push_idx, inc_slot, limit);
+                            self.ops[i] = Op::PushIntRangeToArrayLoop(push_idx, inc_slot, limit);
                             self.ops[i + 1] = Op::Nop;
                             self.ops[i + 2] = Op::Nop;
                             self.ops[i + 3] = Op::Nop;

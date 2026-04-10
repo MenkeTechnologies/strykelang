@@ -2704,7 +2704,8 @@ impl Interpreter {
     pub(crate) fn prepare_flip_flop_vm_slots(&mut self, slots: u16) {
         self.flip_flop_active.resize(slots as usize, false);
         self.flip_flop_active.fill(false);
-        self.flip_flop_exclusive_left_line.resize(slots as usize, None);
+        self.flip_flop_exclusive_left_line
+            .resize(slots as usize, None);
         self.flip_flop_exclusive_left_line.fill(None);
     }
 
@@ -2770,6 +2771,7 @@ impl Interpreter {
     /// Scalar `..` / `...` when both operands are regex literals: match against `$_`; `$.`
     /// ([`Self::scalar_flipflop_dot_line`]) drives exclusive `...` (right not tested on the same line as
     /// left until `$.` advances), mirroring [`Self::scalar_flip_flop_eval`].
+    #[allow(clippy::too_many_arguments)] // left/right pattern + flags + VM state is inherently eight params
     pub(crate) fn regex_flip_flop_eval(
         &mut self,
         left_pat: &str,
@@ -3031,7 +3033,9 @@ impl Interpreter {
                 out.push_str(&repl_val.to_string());
                 last = m0.end;
                 count += 1;
-                rows.push(PerlValue::array(crate::perl_regex::numbered_capture_flat(&caps)));
+                rows.push(PerlValue::array(crate::perl_regex::numbered_capture_flat(
+                    &caps,
+                )));
             }
             self.scope.set_array("^CAPTURE_ALL", rows)?;
             out.push_str(&s[last..]);
@@ -5748,15 +5752,15 @@ impl Interpreter {
                                     ),
                                 },
                             )?;
-                            let right_re = self.compile_regex(right_pat, right_flags, line).map_err(
-                                |e| match e {
+                            let right_re = self
+                                .compile_regex(right_pat, right_flags, line)
+                                .map_err(|e| match e {
                                     FlowOrError::Error(err) => err,
                                     FlowOrError::Flow(_) => PerlError::runtime(
                                         "unexpected flow in regex flip-flop",
                                         line,
                                     ),
-                                },
-                            )?;
+                                })?;
                             let left_m = left_re.is_match(&subject);
                             let right_m = right_re.is_match(&subject);
                             let st = self.flip_flop_tree.entry(key).or_default();
@@ -7202,9 +7206,7 @@ impl Interpreter {
                 let val = self.eval_expr(expr)?;
                 Ok(val.ref_type())
             }
-            ExprKind::ScalarContext(expr) => {
-                self.eval_expr_ctx(expr, WantarrayCtx::Scalar)
-            }
+            ExprKind::ScalarContext(expr) => self.eval_expr_ctx(expr, WantarrayCtx::Scalar),
 
             // Char
             ExprKind::Chr(expr) => {

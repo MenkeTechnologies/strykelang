@@ -88,9 +88,7 @@ impl Frame {
     /// to an outer frame's same slot index.
     #[inline]
     fn owns_scalar_slot_index(&self, idx: usize) -> bool {
-        self.scalar_slot_names
-            .get(idx)
-            .map_or(false, |n| n.is_some())
+        self.scalar_slot_names.get(idx).is_some_and(|n| n.is_some())
     }
 
     #[inline]
@@ -396,7 +394,8 @@ impl Scope {
         let idx = slot as usize;
         let len = self.frames.len();
         for i in (0..len).rev() {
-            if idx < self.frames[i].scalar_slots.len() && self.frames[i].owns_scalar_slot_index(idx) {
+            if idx < self.frames[i].scalar_slots.len() && self.frames[i].owns_scalar_slot_index(idx)
+            {
                 self.frames[i].scalar_slots[idx] = val;
                 return;
             }
@@ -499,12 +498,7 @@ impl Scope {
     /// uniquely-held `String` so the caller can fall back to the per-iteration slow
     /// path. Called from `Op::ConcatConstSlotLoop`.
     #[inline]
-    pub fn scalar_slot_concat_repeat_inplace(
-        &mut self,
-        slot: u8,
-        rhs: &str,
-        n: usize,
-    ) -> bool {
+    pub fn scalar_slot_concat_repeat_inplace(&mut self, slot: u8, rhs: &str, n: usize) -> bool {
         let idx = slot as usize;
         let len = self.frames.len();
         let fi = {

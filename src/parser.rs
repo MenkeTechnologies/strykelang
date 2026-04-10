@@ -537,10 +537,7 @@ impl Parser {
                         return Ok(out);
                     }
                     return Err(self.syntax_err(
-                        format!(
-                            "postfix `{}` is not supported on this statement form",
-                            kw
-                        ),
+                        format!("postfix `{}` is not supported on this statement form", kw),
                         self.peek_line(),
                     ));
                 }
@@ -6046,7 +6043,8 @@ impl Parser {
                         while i + 1 < chars.len() && chars[i] == ':' && chars[i + 1] == ':' {
                             name.push_str("::");
                             i += 2;
-                            while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
+                            while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_')
+                            {
                                 name.push(chars[i]);
                                 i += 1;
                             }

@@ -1043,8 +1043,7 @@ impl PerlValue {
             if !matches!(self.heap_ref(), HeapObject::String(_)) {
                 return false;
             }
-            let raw = nanbox::decode_heap_ptr::<HeapObject>(self.0)
-                as *mut HeapObject
+            let raw = nanbox::decode_heap_ptr::<HeapObject>(self.0) as *mut HeapObject
                 as *const HeapObject;
             let mut arc: Arc<HeapObject> = Arc::from_raw(raw);
             let did = if let Some(HeapObject::String(s)) = Arc::get_mut(&mut arc) {
@@ -1087,16 +1086,12 @@ impl PerlValue {
             }
             // Reconstitute the Arc to consult its strong count; `Arc::get_mut`
             // returns `Some` iff both strong and weak counts are 1.
-            let raw =
-                nanbox::decode_heap_ptr::<HeapObject>(self.0) as *mut HeapObject as *const HeapObject;
+            let raw = nanbox::decode_heap_ptr::<HeapObject>(self.0) as *mut HeapObject
+                as *const HeapObject;
             let mut arc: Arc<HeapObject> = Arc::from_raw(raw);
-            let did_append = if let Some(obj) = Arc::get_mut(&mut arc) {
-                if let HeapObject::String(s) = obj {
-                    rhs.append_to(s);
-                    true
-                } else {
-                    false
-                }
+            let did_append = if let Some(HeapObject::String(s)) = Arc::get_mut(&mut arc) {
+                rhs.append_to(s);
+                true
             } else {
                 false
             };
