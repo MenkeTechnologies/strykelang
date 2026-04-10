@@ -35,16 +35,22 @@ struct ParallelBlockVmShared {
     static_sub_calls: Vec<(usize, bool, u16)>,
     blocks: Vec<Block>,
     block_bytecode_ranges: Vec<Option<(usize, usize)>>,
+    grep_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     given_entries: Vec<(Expr, Block)>,
+    given_topic_bytecode_ranges: Vec<Option<(usize, usize)>>,
     eval_timeout_entries: Vec<(Expr, Block)>,
+    eval_timeout_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     algebraic_match_entries: Vec<(Expr, Vec<MatchArm>)>,
+    algebraic_match_subject_bytecode_ranges: Vec<Option<(usize, usize)>>,
     par_lines_entries: Vec<(Expr, Expr, Option<Expr>)>,
     par_walk_entries: Vec<(Expr, Expr, Option<Expr>)>,
     pwatch_entries: Vec<(Expr, Expr)>,
     substr_four_arg_entries: Vec<(Expr, Expr, Option<Expr>, Expr)>,
     keys_expr_entries: Vec<Expr>,
+    keys_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     grep_expr_entries: Vec<Expr>,
     values_expr_entries: Vec<Expr>,
+    values_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     delete_expr_entries: Vec<Expr>,
     exists_expr_entries: Vec<Expr>,
     push_expr_entries: Vec<(Expr, Vec<Expr>)>,
@@ -72,16 +78,24 @@ impl ParallelBlockVmShared {
             static_sub_calls: vm.static_sub_calls.clone(),
             blocks: vm.blocks.clone(),
             block_bytecode_ranges: vm.block_bytecode_ranges.clone(),
+            grep_expr_bytecode_ranges: vm.grep_expr_bytecode_ranges.clone(),
             given_entries: vm.given_entries.clone(),
+            given_topic_bytecode_ranges: vm.given_topic_bytecode_ranges.clone(),
             eval_timeout_entries: vm.eval_timeout_entries.clone(),
+            eval_timeout_expr_bytecode_ranges: vm.eval_timeout_expr_bytecode_ranges.clone(),
             algebraic_match_entries: vm.algebraic_match_entries.clone(),
+            algebraic_match_subject_bytecode_ranges: vm
+                .algebraic_match_subject_bytecode_ranges
+                .clone(),
             par_lines_entries: vm.par_lines_entries.clone(),
             par_walk_entries: vm.par_walk_entries.clone(),
             pwatch_entries: vm.pwatch_entries.clone(),
             substr_four_arg_entries: vm.substr_four_arg_entries.clone(),
             keys_expr_entries: vm.keys_expr_entries.clone(),
+            keys_expr_bytecode_ranges: vm.keys_expr_bytecode_ranges.clone(),
             grep_expr_entries: vm.grep_expr_entries.clone(),
             values_expr_entries: vm.values_expr_entries.clone(),
+            values_expr_bytecode_ranges: vm.values_expr_bytecode_ranges.clone(),
             delete_expr_entries: vm.delete_expr_entries.clone(),
             exists_expr_entries: vm.exists_expr_entries.clone(),
             push_expr_entries: vm.push_expr_entries.clone(),
@@ -109,16 +123,24 @@ impl ParallelBlockVmShared {
             static_sub_calls: self.static_sub_calls.clone(),
             blocks: self.blocks.clone(),
             block_bytecode_ranges: self.block_bytecode_ranges.clone(),
+            grep_expr_bytecode_ranges: self.grep_expr_bytecode_ranges.clone(),
             given_entries: self.given_entries.clone(),
+            given_topic_bytecode_ranges: self.given_topic_bytecode_ranges.clone(),
             eval_timeout_entries: self.eval_timeout_entries.clone(),
+            eval_timeout_expr_bytecode_ranges: self.eval_timeout_expr_bytecode_ranges.clone(),
             algebraic_match_entries: self.algebraic_match_entries.clone(),
+            algebraic_match_subject_bytecode_ranges: self
+                .algebraic_match_subject_bytecode_ranges
+                .clone(),
             par_lines_entries: self.par_lines_entries.clone(),
             par_walk_entries: self.par_walk_entries.clone(),
             pwatch_entries: self.pwatch_entries.clone(),
             substr_four_arg_entries: self.substr_four_arg_entries.clone(),
             keys_expr_entries: self.keys_expr_entries.clone(),
+            keys_expr_bytecode_ranges: self.keys_expr_bytecode_ranges.clone(),
             grep_expr_entries: self.grep_expr_entries.clone(),
             values_expr_entries: self.values_expr_entries.clone(),
+            values_expr_bytecode_ranges: self.values_expr_bytecode_ranges.clone(),
             delete_expr_entries: self.delete_expr_entries.clone(),
             exists_expr_entries: self.exists_expr_entries.clone(),
             push_expr_entries: self.push_expr_entries.clone(),
@@ -213,16 +235,23 @@ pub struct VM<'a> {
     blocks: Vec<Block>,
     /// Optional `ops[start..end]` lowering for [`Self::blocks`] (see [`Chunk::block_bytecode_ranges`]).
     block_bytecode_ranges: Vec<Option<(usize, usize)>>,
+    /// Optional lowering for [`Chunk::grep_expr_entries`] (see [`Chunk::grep_expr_bytecode_ranges`]).
+    grep_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     given_entries: Vec<(Expr, Block)>,
+    given_topic_bytecode_ranges: Vec<Option<(usize, usize)>>,
     eval_timeout_entries: Vec<(Expr, Block)>,
+    eval_timeout_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     algebraic_match_entries: Vec<(Expr, Vec<MatchArm>)>,
+    algebraic_match_subject_bytecode_ranges: Vec<Option<(usize, usize)>>,
     par_lines_entries: Vec<(Expr, Expr, Option<Expr>)>,
     par_walk_entries: Vec<(Expr, Expr, Option<Expr>)>,
     pwatch_entries: Vec<(Expr, Expr)>,
     substr_four_arg_entries: Vec<(Expr, Expr, Option<Expr>, Expr)>,
     keys_expr_entries: Vec<Expr>,
+    keys_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     grep_expr_entries: Vec<Expr>,
     values_expr_entries: Vec<Expr>,
+    values_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     delete_expr_entries: Vec<Expr>,
     exists_expr_entries: Vec<Expr>,
     push_expr_entries: Vec<(Expr, Vec<Expr>)>,
@@ -301,16 +330,24 @@ impl<'a> VM<'a> {
             static_sub_calls: chunk.static_sub_calls.clone(),
             blocks: chunk.blocks.clone(),
             block_bytecode_ranges: chunk.block_bytecode_ranges.clone(),
+            grep_expr_bytecode_ranges: chunk.grep_expr_bytecode_ranges.clone(),
             given_entries: chunk.given_entries.clone(),
+            given_topic_bytecode_ranges: chunk.given_topic_bytecode_ranges.clone(),
             eval_timeout_entries: chunk.eval_timeout_entries.clone(),
+            eval_timeout_expr_bytecode_ranges: chunk.eval_timeout_expr_bytecode_ranges.clone(),
             algebraic_match_entries: chunk.algebraic_match_entries.clone(),
+            algebraic_match_subject_bytecode_ranges: chunk
+                .algebraic_match_subject_bytecode_ranges
+                .clone(),
             par_lines_entries: chunk.par_lines_entries.clone(),
             par_walk_entries: chunk.par_walk_entries.clone(),
             pwatch_entries: chunk.pwatch_entries.clone(),
             substr_four_arg_entries: chunk.substr_four_arg_entries.clone(),
             keys_expr_entries: chunk.keys_expr_entries.clone(),
+            keys_expr_bytecode_ranges: chunk.keys_expr_bytecode_ranges.clone(),
             grep_expr_entries: chunk.grep_expr_entries.clone(),
             values_expr_entries: chunk.values_expr_entries.clone(),
+            values_expr_bytecode_ranges: chunk.values_expr_bytecode_ranges.clone(),
             delete_expr_entries: chunk.delete_expr_entries.clone(),
             exists_expr_entries: chunk.exists_expr_entries.clone(),
             push_expr_entries: chunk.push_expr_entries.clone(),
@@ -3172,12 +3209,18 @@ impl<'a> VM<'a> {
                     }
                     Op::SetScalarSlot(slot) => {
                         let val = self.pop();
-                        self.interp.scope.set_scalar_slot(*slot, val);
+                        self.interp
+                            .scope
+                            .set_scalar_slot_checked(*slot, val, None)
+                            .map_err(|e| e.at_line(self.line()))?;
                         Ok(())
                     }
                     Op::SetScalarSlotKeep(slot) => {
                         let val = self.peek().dup_stack();
-                        self.interp.scope.set_scalar_slot(*slot, val);
+                        self.interp
+                            .scope
+                            .set_scalar_slot_checked(*slot, val, None)
+                            .map_err(|e| e.at_line(self.line()))?;
                         Ok(())
                     }
                     Op::DeclareScalarSlot(slot, name_idx) => {
@@ -3245,20 +3288,36 @@ impl<'a> VM<'a> {
                         Ok(())
                     }
                     Op::KeysExpr(idx) => {
-                        let e = &self.keys_expr_entries[*idx as usize];
-                        let v = vm_interp_result(
-                            self.interp.eval_keys_expr(e, self.line()),
-                            self.line(),
-                        )?;
+                        let i = *idx as usize;
+                        let line = self.line();
+                        let v = if let Some(&(start, end)) = self
+                            .keys_expr_bytecode_ranges
+                            .get(i)
+                            .and_then(|r| r.as_ref())
+                        {
+                            let val = self.run_block_region(start, end, op_count)?;
+                            vm_interp_result(Interpreter::keys_from_value(val, line), line)?
+                        } else {
+                            let e = &self.keys_expr_entries[i];
+                            vm_interp_result(self.interp.eval_keys_expr(e, line), line)?
+                        };
                         self.push(v);
                         Ok(())
                     }
                     Op::ValuesExpr(idx) => {
-                        let e = &self.values_expr_entries[*idx as usize];
-                        let v = vm_interp_result(
-                            self.interp.eval_values_expr(e, self.line()),
-                            self.line(),
-                        )?;
+                        let i = *idx as usize;
+                        let line = self.line();
+                        let v = if let Some(&(start, end)) = self
+                            .values_expr_bytecode_ranges
+                            .get(i)
+                            .and_then(|r| r.as_ref())
+                        {
+                            let val = self.run_block_region(start, end, op_count)?;
+                            vm_interp_result(Interpreter::values_from_value(val, line), line)?
+                        } else {
+                            let e = &self.values_expr_entries[i];
+                            vm_interp_result(self.interp.eval_values_expr(e, line), line)?
+                        };
                         self.push(v);
                         Ok(())
                     }
@@ -3414,6 +3473,46 @@ impl<'a> VM<'a> {
                         let name = self.pop().to_string();
                         let n = self.interp.resolve_io_handle_name(&name);
                         self.push(PerlValue::string(n));
+                        Ok(())
+                    }
+                    Op::CopyTypeglobSlots(lhs_i, rhs_i) => {
+                        let lhs = self.names[*lhs_i as usize].as_str();
+                        let rhs = self.names[*rhs_i as usize].as_str();
+                        let line = self.line();
+                        self.interp
+                            .copy_typeglob_slots(lhs, rhs, line)
+                            .map_err(|e| e.at_line(line))?;
+                        Ok(())
+                    }
+                    Op::TypeglobAssignFromValue(name_idx) => {
+                        let val = self.pop();
+                        let name = self.names[*name_idx as usize].as_str();
+                        let line = self.line();
+                        vm_interp_result(
+                            self.interp.assign_typeglob_value(name, val.clone(), line),
+                            line,
+                        )?;
+                        self.push(val);
+                        Ok(())
+                    }
+                    Op::TypeglobAssignFromValueDynamic => {
+                        let val = self.pop();
+                        let name = self.pop().to_string();
+                        let line = self.line();
+                        vm_interp_result(
+                            self.interp.assign_typeglob_value(&name, val.clone(), line),
+                            line,
+                        )?;
+                        self.push(val);
+                        Ok(())
+                    }
+                    Op::CopyTypeglobSlotsDynamicLhs(rhs_i) => {
+                        let lhs = self.pop().to_string();
+                        let rhs = self.names[*rhs_i as usize].as_str();
+                        let line = self.line();
+                        self.interp
+                            .copy_typeglob_slots(&lhs, rhs, line)
+                            .map_err(|e| e.at_line(line))?;
                         Ok(())
                     }
                     Op::SymbolicDeref(kind_byte) => {
@@ -3774,17 +3873,35 @@ impl<'a> VM<'a> {
                     }
                     Op::GrepWithExpr(expr_idx) => {
                         let list = self.pop().to_list();
-                        let e = &self.grep_expr_entries[*expr_idx as usize];
-                        let mut result = Vec::new();
-                        for item in list {
-                            let _ = self.interp.scope.set_scalar("_", item.clone());
-                            let val = vm_interp_result(self.interp.eval_expr(e), self.line())?;
-                            if val.is_true() {
-                                result.push(item);
+                        let idx = *expr_idx as usize;
+                        if let Some(&(start, end)) = self
+                            .grep_expr_bytecode_ranges
+                            .get(idx)
+                            .and_then(|r| r.as_ref())
+                        {
+                            let mut result = Vec::new();
+                            for item in list {
+                                let _ = self.interp.scope.set_scalar("_", item.clone());
+                                let val = self.run_block_region(start, end, op_count)?;
+                                if val.is_true() {
+                                    result.push(item);
+                                }
                             }
+                            self.push(PerlValue::array(result));
+                            Ok(())
+                        } else {
+                            let e = &self.grep_expr_entries[idx];
+                            let mut result = Vec::new();
+                            for item in list {
+                                let _ = self.interp.scope.set_scalar("_", item.clone());
+                                let val = vm_interp_result(self.interp.eval_expr(e), self.line())?;
+                                if val.is_true() {
+                                    result.push(item);
+                                }
+                            }
+                            self.push(PerlValue::array(result));
+                            Ok(())
                         }
-                        self.push(PerlValue::array(result));
-                        Ok(())
                     }
                     Op::SortWithBlock(block_idx) => {
                         let mut items = self.pop().to_list();
@@ -3985,29 +4102,72 @@ impl<'a> VM<'a> {
                         Ok(())
                     }
                     Op::Given(idx) => {
-                        let (topic, body) = &self.given_entries[*idx as usize];
-                        let v = vm_interp_result(self.interp.exec_given(topic, body), self.line())?;
+                        let i = *idx as usize;
+                        let line = self.line();
+                        let v = if let Some(&(start, end)) = self
+                            .given_topic_bytecode_ranges
+                            .get(i)
+                            .and_then(|r| r.as_ref())
+                        {
+                            let topic_val = self.run_block_region(start, end, op_count)?;
+                            let body = &self.given_entries[i].1;
+                            vm_interp_result(
+                                self.interp.exec_given_with_topic_value(topic_val, body),
+                                line,
+                            )?
+                        } else {
+                            let (topic, body) = &self.given_entries[i];
+                            vm_interp_result(self.interp.exec_given(topic, body), line)?
+                        };
                         self.push(v);
                         Ok(())
                     }
                     Op::EvalTimeout(idx) => {
-                        let (timeout_expr, body) = &self.eval_timeout_entries[*idx as usize];
-                        let secs =
+                        let i = *idx as usize;
+                        let body = self.eval_timeout_entries[i].1.clone();
+                        let secs = if let Some(&(start, end)) = self
+                            .eval_timeout_expr_bytecode_ranges
+                            .get(i)
+                            .and_then(|r| r.as_ref())
+                        {
+                            self.run_block_region(start, end, op_count)?.to_number()
+                        } else {
+                            let timeout_expr = &self.eval_timeout_entries[i].0;
                             vm_interp_result(self.interp.eval_expr(timeout_expr), self.line())?
-                                .to_number();
+                                .to_number()
+                        };
                         let v = vm_interp_result(
-                            self.interp.eval_timeout_block(body, secs, self.line()),
+                            self.interp.eval_timeout_block(&body, secs, self.line()),
                             self.line(),
                         )?;
                         self.push(v);
                         Ok(())
                     }
                     Op::AlgebraicMatch(idx) => {
-                        let (subject, arms) = &self.algebraic_match_entries[*idx as usize];
-                        let v = vm_interp_result(
-                            self.interp.eval_algebraic_match(subject, arms, self.line()),
-                            self.line(),
-                        )?;
+                        let i = *idx as usize;
+                        let line = self.line();
+                        let v = if let Some(&(start, end)) = self
+                            .algebraic_match_subject_bytecode_ranges
+                            .get(i)
+                            .and_then(|r| r.as_ref())
+                        {
+                            let subject_val = self.run_block_region(start, end, op_count)?;
+                            let arms = &self.algebraic_match_entries[i].1;
+                            vm_interp_result(
+                                self.interp.eval_algebraic_match_with_subject_value(
+                                    subject_val,
+                                    arms,
+                                    line,
+                                ),
+                                self.line(),
+                            )?
+                        } else {
+                            let (subject, arms) = &self.algebraic_match_entries[i];
+                            vm_interp_result(
+                                self.interp.eval_algebraic_match(subject, arms, line),
+                                self.line(),
+                            )?
+                        };
                         self.push(v);
                         Ok(())
                     }

@@ -194,6 +194,25 @@ impl PerlValue {
             PerlValue(self.0)
         }
     }
+
+    /// Refcount-only clone: `Arc::clone` the heap pointer (no deep copy of the payload).
+    ///
+    /// Use this when producing a *second handle* to the same value that the caller
+    /// will read-only or consume via [`Self::into_string`] / [`Arc::try_unwrap`]-style
+    /// uniqueness checks. Cheap O(1) regardless of the payload size.
+    ///
+    /// The default [`Clone`] impl deep-copies `String`/`Array`/`Hash` payloads to
+    /// preserve "clone = independent writable value" semantics for legacy callers;
+    /// in hot RMW paths (`.=`, slot stash-and-return) that deep copy is O(N) and
+    /// must be avoided — use this instead.
+    #[inline]
+    pub fn shallow_clone(&self) -> Self {
+        if nanbox::is_heap(self.0) {
+            PerlValue::from_heap(self.heap_arc())
+        } else {
+            PerlValue(self.0)
+        }
+    }
 }
 
 impl Drop for PerlValue {

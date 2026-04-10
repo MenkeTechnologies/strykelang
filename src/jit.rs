@@ -2005,6 +2005,10 @@ pub(crate) fn segment_blocks_subroutine_linear_jit(
         | Op::IndirectCall(_, _, _)
         | Op::LoadDynamicSubRef
         | Op::LoadDynamicTypeglob
+        | Op::CopyTypeglobSlots(_, _)
+        | Op::TypeglobAssignFromValue(_)
+        | Op::TypeglobAssignFromValueDynamic
+        | Op::CopyTypeglobSlotsDynamicLhs(_)
         | Op::MakeScalarBindingRef(_)
         | Op::SymbolicDeref(_)
         | Op::HashSliceDeref(_)

@@ -244,8 +244,8 @@ my $n = par_pipeline_stream(
 # par_pipeline_stream wires every op through channels so items are at different
 # stages simultaneously.  Order is NOT preserved.
 my @out = par_pipeline_stream((1..1_000))
-    ->filter(sub { $_ > 500 })
-    ->map(sub { $_ * 2 })
+    ->filter({ $_ > 500 })
+    ->map({ $_ * 2 })
     ->take(10)
     ->collect();
 
@@ -339,7 +339,7 @@ Each parallel block receives its own interpreter context with captured lexical s
 - **`$?` and `$|`** — last child exit status for `system`, `` `...` `` / `capture`, and `close` on pipe children (POSIX-style packed status); `$|` enables autoflush after `print` / `printf` to resolved handles.
 - **`print` / `say` / `printf`** — with **no** argument list, Perl uses **`$_`** as the value to output (and **`printf`** with no expressions uses **`$_`** as the format string); this applies in `map`/`grep`/`for`/`pfor`/… blocks and on **`$fh->print`** / **`$fh->printf`**.
 - **Bareword statement** — `name;` or `{ name }` (no `()`) is a subroutine call with **no explicit arguments**; **`@_`** is **`($_)`** so the topic is visible as **`shift`** / **`$_[0]`** (built-in keywords like **`undef`** / **`print`** keep their normal meaning).
-- **Typeglobs** — `*NAME` as a value; `*lhs = *rhs` copies subroutine, scalar, array, hash, and IO-handle alias slots (`copy_typeglob_slots`); `*foo = \&bar` installs a subroutine alias (including when `\&bar` is a ref-to-coderef); package-qualified `*Pkg::name` is supported. Bytecode may fall back to the tree-walker for these assignments.
+- **Typeglobs** — `*NAME` as a value; `*lhs = *rhs` copies subroutine, scalar, array, hash, and IO-handle alias slots (`copy_typeglob_slots`); `*foo = \&bar` installs a subroutine alias (including when `\&bar` is a ref-to-coderef); package-qualified `*Pkg::name` is supported. Literal and `*{EXPR}` LHS forms often compile to `Op::CopyTypeglob*` / `Op::TypeglobAssignFromValue*`; other shapes fall back to the tree-walker.
 - **`use overload`** — `use overload 'op' => 'method', …` or `'op' => \&handler` registers per-class overloads in the current package; one statement may combine several ops (e.g. `use overload '+' => \&add, '""' => \&stringify;`). Binary ops dispatch to the named method with `(invocant, other)`; missing ops may use **`nomethod`** with a third argument, the op key string (e.g. `"+"`). Unary **`neg`**, **`bool`** (for `!` / `not` after the overload result), and **`abs`** are supported on blessed values. `use overload '""' => 'as_string'` (or the key `""` / `'""'`) drives stringification for `print`, **`sprintf` `%s`**, interpolated strings, and similar contexts. **`fallback => 1`** is accepted in the pragma list (full Perl fallback coercion is not). Tree interpreter only for some forms (VM falls back when bytecode cannot represent the expression).
 
 **`%SIG` (Unix)** — `SIGINT`, `SIGTERM`, `SIGALRM`, and `SIGCHLD` can be set to a code ref; handlers run **between tree-walker statements** and **between VM opcodes** (see `perl_signal::poll`). **`IGNORE`** ignores delivery. An **unset** slot or the string **`DEFAULT`** uses the **POSIX default** for that signal (e.g. `SIGINT` / `SIGTERM` / `SIGALRM` exit the process; `SIGCHLD` default is ignore), so **`progress => 1`** and other parallel builtins do not leave Ctrl+C stuck with no default action.
@@ -625,7 +625,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - **`@INC` / `%INC` / `require` / `use`** — The `perlrs` / `pe` driver builds `@INC` by: each **`-I`** directory, then **`<crate>/vendor/perl`** when present (e.g. a stub **`List/Util.pm`** so `require List::Util` updates **`%INC`**), then the same paths **system `perl` reports for `@INC`** (via `perl -e 'print join "\n", @INC'`, so other core/site `.pm` paths match Perl’s search order), then the **script’s directory** (when the program file is not `-e` / `-` / `repl`), then **`PERLRS_INC`**, then **`.`** (duplicates removed). Set **`PERLRS_NO_PERL_INC`** to omit the `perl` query (e.g. no `perl` on `PATH`). **`List::Util`** (all **`EXPORT_OK`** names from Perl 5’s module, including **`reduce`**, **`any`**, **`pairs`**, **`zip`**, …) is implemented **natively in Rust** (`src/list_util.rs`) and registered on interpreter startup; core Perl still loads XS for these, but perlrs does not. Pure perlrs execution is still **not** full Perl 5: many other real `.pm` files (especially XS) will not run even when found. Relative paths (`Foo::Bar` → `Foo/Bar.pm`) are searched in order; successful loads record the relative path in **`%INC`**; repeated `require` is a no-op. **`use Module;`** is processed in **source order** before `BEGIN` blocks (and before the VM main chunk runs). After a successful load, **`use Module qw(a b);`** imports only those names, and each must appear in **`our @EXPORT`** or **`our @EXPORT_OK`** in the loaded module (Exporter-style). Bare **`use Module;`** imports **`@EXPORT`** only; if the module never sets **`our @EXPORT`** / **`our @EXPORT_OK`**, the legacy rule applies: import every top-level sub under that package. **`use Module qw();`** imports nothing. **Qualified calls** like **`Foo::bar()`** are valid syntax. Built-in pragmas (`strict`, `warnings`, `utf8`, …) do not load a file. Version-only `require` (e.g. `require 5.010`) succeeds without loading.
 - **Pragmas (porting)** — `use strict` enables **refs / subs / vars**; `use strict 'refs'` or `use strict qw(refs subs)` selects modes; `no strict` clears all, `no strict 'refs'` clears one. **Runtime:** **`strict refs`** rejects symbolic scalar/array/hash derefs (string used as a variable name) with a Perl-like message; **`$$foo`** is parsed as symbolic scalar deref of **`$foo`** (falls back to the tree interpreter when bytecode is compiled). **`strict vars`** requires a visible binding (`my`/`our`/prior assignment in scope) for unqualified scalars, arrays, and hashes (package-qualified names and built-in specials like `$_`, `$1`, … are exempt); **`strict subs`** appends a hint to undefined subroutine errors. **`use warnings` / `no warnings`** toggle the interpreter warnings flag (reserved for future warning surfaces). **`feature_bits`** (crate **`FEAT_*`**) are set by **`use feature`** / **`no feature`**; **`say`** is gated by **`FEAT_SAY`** (on by default like Perl 5.10+; disable with **`no feature 'say'`** or **`no feature;`**). **`use utf8` / `no utf8`** set **`utf8_pragma`**. **`use open …`** — recognizes `qw(:utf8)`, `:std`, and `:encoding(UTF-8)` (case-insensitive); enables UTF-8 **lossy** decoding for **`readline`** / diamond / named input handles (not full PerlIO stack). **`${^OPEN}`** is **`1`** when that mode is on (Perl’s real **`${^OPEN}`** is richer). **`no open`** clears the flag. **`no`** pragmas run in the same **prepare** phase as **`use`**. **`use Env qw(@PATH)`** (or **`use Env '@PATH'`**) fills **`@PATH`** from the process **`PATH`** (split like Perl’s **`Env`**), without loading **`Env.pm`**. The interpreter starts with **`@ARGV`**, **`@_`**, **`%ENV`**, and **`@INC`/`%INC`** pre-bound so **`strict vars`** matches typical Perl scripts.
 - `package` declarations
-- **Typeglob assignment** — `*foo = \&bar` (subroutine alias) and `*foo = *bar` (copy stash slots: `&`, `$`, `@`, `%`, and IO-handle alias map); package-qualified `*Foo::x` supported. Implemented in the tree interpreter (`assign_value` / `copy_typeglob_slots`); bytecode compilation still falls back to the tree-walker for these assignments.
+- **Typeglob assignment** — `*foo = \&bar` (subroutine alias) and `*foo = *bar` (copy stash slots: `&`, `$`, `@`, `%`, and IO-handle alias map); package-qualified `*Foo::x` supported. Bytecode lowering uses `Op::CopyTypeglobSlots` / `Op::TypeglobAssignFromValue` for literal `*lhs`, and `Op::CopyTypeglobSlotsDynamicLhs` / `Op::TypeglobAssignFromValueDynamic` when the LHS is `*{EXPR}` and the RHS is a literal `*name` or a coderef. Dynamic RHS glob names or other lvalue shapes still use the tree-walker. Semantics: `Interpreter::assign_typeglob_value` / `copy_typeglob_slots`.
 - `BEGIN` / `UNITCHECK` / `CHECK` / `INIT` / `END` blocks (Perl order; **`${^GLOBAL_PHASE}`** matches Perl in both the tree-walker and the bytecode VM via [`Op::SetGlobalPhase`](src/bytecode.rs); see [`SPECIAL_VARIABLES.md`](SPECIAL_VARIABLES.md))
 - String interpolation with `$var`, `$hash{key}`, `$array[idx]`, `$0`, and regexp captures `$1`…`$n` (multi-digit runs; `$01`… is a parse error like Perl); double-quoted / `qq` strings support `\x{hex}` (Unicode scalar) and unbraced `\x` (one or two hex digits, like Perl); `\$` in `""` / `qq` is a literal `$` for string `eval` / generated code (not outer-scope interpolation); `\\` + `$` is a literal backslash followed by interpolating `$var`
 - **`__FILE__`** / **`__LINE__`** — compile-time literals (`__LINE__` is the token’s line, 1-based; `__FILE__` matches `Interpreter::file`, e.g. `-e` or the script path from the `pe` driver)
@@ -697,33 +697,30 @@ pe examples/parallel_demo.pl
  │ BENCHMARK SUITE // perlrs vs perl 5.42.2 // Apple M5 18-core │
  └──────────────────────────────────────────────────────────────┘
 
-**Honest numbers.** perlrs is a young interpreter and loses to perl5 on nearly every serial microbenchmark in this suite. These measurements include process startup; they are *not* steady-state numbers inside a long-running process.
+**Honest numbers.**  These measurements include process startup; they are *not* steady-state numbers inside a long-running process.
 
 ```
   bench          perl5 ms   perlrs ms  perturb ms  rs/perl5
   ---------      --------   ---------   ---------  --------
-  startup             3.0         4.2         4.2     1.40x
-  fib(30)           187.4       327.6       325.3     1.75x
-  loop 5M            91.7       740.0       728.9     8.07x
-  string .= 500k     11.3      1521.4      1514.5   134.64x
-  hash 100k          38.9        63.2        63.4     1.62x
-  array 500k         26.4        84.5        84.2     3.20x
-  regex 100k         94.8       116.5       113.4     1.23x
-  map_grep 500k      54.4        16.3        16.5     0.30x
+  startup             3.3         4.7         4.8     1.42x
+  fib               193.2       331.9       334.9     1.72x
+  loop               93.7       772.9       779.2     8.25x
+  string             11.9        67.5        65.5     5.67x
+  hash               45.8        68.4        65.7     1.49x
+  array              27.4        69.4        68.2     2.53x
+  regex              91.8       115.5       113.2     1.26x
+  map_grep           53.5        16.1        16.1     0.30x
+
+  pmap vs map (perlrs only, 50k items with per-item work)
+  bench            map ms     pmap ms     speedup
+  ---------      --------    --------    --------
+  pmap              259.4       504.4       0.51x
+
+
 ```
 
 > Measured on macOS Apple M5 18-core with `perl v5.42.2` vs `perlrs` release build (LTO + O3). Mean of 10 hyperfine runs with 3 warmups via `bash bench/run_bench.sh`. `rs/perl5` < 1.0 means perlrs is faster. The `perturb ms` column runs the same workload through a renamed, functionally-equivalent copy of each bench file — it exists specifically so that any future compile-time shape matcher that recognizes the canonical bench files and short-circuits them will show up as a divergence between the two columns.
 
-#### Analysis
-
-- **perlrs loses to perl5 on 7 of 8 serial benchmarks.** perl5 has 38 years of tree-walker optimization; perlrs is a younger VM and is still paying the obvious costs.
-- **`map_grep` is the only serial win (0.30x).** The generic map-block / grep-block fast paths in [`src/map_grep_fast.rs`](src/map_grep_fast.rs) specialize `map { $_ * k }` and `grep { $_ % m == r }` with integer constants to native Rust loops — this fires on any user code with those shapes, not just this file. The fact that the canonical and perturbed columns are essentially equal confirms the specialization is general.
-- **`string` benchmark gap** — VM lowering already emits [`Op::ConcatAppend`](src/bytecode.rs) / [`Op::ConcatAppendSlot`](src/bytecode.rs) with [`Scope::scalar_concat_inplace`](src/scope.rs) (move + [`PerlValue::into_string`](src/value.rs) / unique-`Arc` fast path). The tree-walker path for scalar `$x .= …` was worse: it used [`Scope::atomic_mutate`](src/scope.rs) after [`Scope::get_scalar`](src/scope.rs) (which clones heap strings) and `old.to_string()` in [`compound_scalar_binop`](src/interpreter.rs). Scalar `.=` now routes through `scalar_concat_inplace` (and `mysync` scalars mutate under the mutex via [`PerlValue::concat_append_owned`](src/value.rs) instead of stringifying the `Atomic` wrapper).
-- **`loop` (5M integer adds) at 8x slower** — the main dispatch loop ([`VM::run_main_dispatch_loop`](src/vm.rs)) still pays match-dispatch vs perl5’s threaded ops; it uses a single `lines.get` per op for the profiler line stamp (no paired previous-op fetch), skips subroutine JIT probes entirely once both linear- and block-JIT skip flags are set for that entry IP, and still uses the `% 1024` signal poll / execution cap. Further wins need superinstructions or a different dispatch model.
-- **`fib(30)` call overhead** — bareword calls compile to stash-qualified [`Chunk::names`](src/bytecode.rs) keys (matching [`Interpreter::qualify_sub_key`](src/interpreter.rs)), then [`Op::CallStaticSubId`](src/bytecode.rs) after [`Compiler::patch_static_sub_calls`](src/compiler.rs) so the VM jumps to the compiled entry; [`Chunk::sub_entries`](src/bytecode.rs) is indexed in O(1) via a map in [`VM::new`](src/vm.rs), and each static call’s [`PerlSub`](src/value.rs) is resolved once at VM construction for closure restore (no per-call stash lookup). The tree walker still uses [`resolve_sub_by_name`](src/interpreter.rs) with a pre-sized string for the package-qualified fallback. **`@_` move** — [`Interpreter::call_sub`](src/interpreter.rs) and the VM tree-fallback call path use [`Scope::take_sub_underscore`](src/scope.rs) after installing args so `native_dispatch` / `fib_like` take `&[PerlValue]` without [`Scope::get_array`](src/scope.rs) cloning the argument vector; [`declare_array`](src/scope.rs) restores `@_` only before [`exec_block_no_scope`](src/interpreter.rs). **`Op::Dup` / keep-assign** — [`Op::Dup`](src/bytecode.rs) and `SetScalar*Keep` use [`PerlValue::dup_stack`](src/value.rs) (share outer heap `Arc` for arrays/hashes), not deep [`Clone`](src/value.rs).
-- **`startup` at 1.40x slower** is ~1 ms over perl5. Most of that is binary size (~11 MB with bundled cranelift, rusqlite, chrono-tz, ureq, zstd in default build) vs perl5’s 52 KB launcher. Feature-gating the optional dependencies would close most of this gap; it is not fundamental.
-- **JIT** — Cranelift only lands consistent wins on block-JIT workloads with long-running numeric loops inside subs. The `run_bench.sh` harness does not separate JIT-on from JIT-off because the difference on these serial files is within noise; measure JIT impact directly via `cargo bench --bench jit_compare`.
-- **`hash`, `array`, `regex`** — all 1.2x–3.2x slower. No single smoking gun; dispatch overhead, extra safety checks, and the lack of perl5-style inline caches all contribute. The `perturb` column matching the canonical column confirms none of these rows are being short-circuited by pattern matching.
 
 #### Parallel speedup
 

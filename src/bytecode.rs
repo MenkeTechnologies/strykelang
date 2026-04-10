@@ -242,7 +242,8 @@ pub enum Op {
     MapWithBlock(u16),
     /// grep { BLOCK } @list — block_idx; stack: \[list\] → \[filtered\]
     GrepWithBlock(u16),
-    /// grep EXPR, LIST — index into [`Chunk::grep_expr_entries`]; stack: \[list\] → \[filtered\]
+    /// grep EXPR, LIST — index into [`Chunk::grep_expr_entries`] / [`Chunk::grep_expr_bytecode_ranges`];
+    /// stack: \[list\] → \[filtered\]
     GrepWithExpr(u16),
     /// sort { BLOCK } @list — block_idx; stack: \[list\] → \[sorted\]
     SortWithBlock(u16),
@@ -264,9 +265,11 @@ pub enum Op {
     ChopInPlace(u16),
     /// Four-arg `substr LHS, OFF, LEN, REPL` — index into [`Chunk::substr_four_arg_entries`]; stack: \[\] → extracted slice string
     SubstrFourArg(u16),
-    /// `keys EXPR` when `EXPR` is not a bare `%h` — index into [`Chunk::keys_expr_entries`]
+    /// `keys EXPR` when `EXPR` is not a bare `%h` — [`Chunk::keys_expr_entries`] /
+    /// [`Chunk::keys_expr_bytecode_ranges`]
     KeysExpr(u16),
-    /// `values EXPR` when not a bare `%h` — index into [`Chunk::values_expr_entries`]
+    /// `values EXPR` when not a bare `%h` — [`Chunk::values_expr_entries`] /
+    /// [`Chunk::values_expr_bytecode_ranges`]
     ValuesExpr(u16),
     /// `delete EXPR` when not a fast `%h{...}` — index into [`Chunk::delete_expr_entries`]
     DeleteExpr(u16),
@@ -359,11 +362,14 @@ pub enum Op {
     TimerBlock(u16),
     /// `bench { BLOCK } N` — block_idx; stack: \[iterations\] → benchmark summary string
     BenchBlock(u16),
-    /// `given (EXPR) { when ... default ... }` — index into [`Chunk::given_entries`]; stack: \[\] → topic result
+    /// `given (EXPR) { when ... default ... }` — [`Chunk::given_entries`] /
+    /// [`Chunk::given_topic_bytecode_ranges`]; stack: \[\] → topic result
     Given(u16),
-    /// `eval_timeout SECS { ... }` — index into [`Chunk::eval_timeout_entries`]; stack: \[\] → block value
+    /// `eval_timeout SECS { ... }` — index into [`Chunk::eval_timeout_entries`] /
+    /// [`Chunk::eval_timeout_expr_bytecode_ranges`]; stack: \[\] → block value
     EvalTimeout(u16),
-    /// Algebraic `match (SUBJECT) { ... }` — index into [`Chunk::algebraic_match_entries`]; stack: \[\] → arm value
+    /// Algebraic `match (SUBJECT) { ... }` — [`Chunk::algebraic_match_entries`] /
+    /// [`Chunk::algebraic_match_subject_bytecode_ranges`]; stack: \[\] → arm value
     AlgebraicMatch(u16),
     /// `async { BLOCK }` / `spawn { BLOCK }` — block_idx; stack: \[\] → AsyncTask
     AsyncBlock(u16),
@@ -385,6 +391,14 @@ pub enum Op {
     LoadDynamicSubRef,
     /// `*{ EXPR }` — stack: \[stash / glob name string\] → resolved handle string (IO alias map + identity).
     LoadDynamicTypeglob,
+    /// `*lhs = *rhs` — copy stash slots (sub, scalar, array, hash, IO alias); name pool indices for both sides.
+    CopyTypeglobSlots(u16, u16),
+    /// `*name = $coderef` — stack: pop value, install subroutine in typeglob, push value back (assignment result).
+    TypeglobAssignFromValue(u16),
+    /// `*{LHS} = $coderef` — stack: pop value, pop LHS glob name string, install sub, push value back.
+    TypeglobAssignFromValueDynamic,
+    /// `*{LHS} = *rhs` — stack: pop LHS glob name string; RHS name is pool index; copies stash like [`Op::CopyTypeglobSlots`].
+    CopyTypeglobSlotsDynamicLhs(u16),
     /// Symbolic deref (`$$r`, `@{...}`, `%{...}`, `*{...}`): stack: \[ref or name value\] → result.
     /// Byte: `0` = [`crate::ast::Sigil::Scalar`], `1` = Array, `2` = Hash, `3` = Typeglob.
     SymbolicDeref(u8),
@@ -682,10 +696,19 @@ pub struct Chunk {
     pub struct_defs: Vec<StructDef>,
     /// `given (topic) { body }` — topic expression + body (when/default handled by interpreter).
     pub given_entries: Vec<(Expr, Block)>,
+    /// When `Some((start, end))`, `given_entries[i].0` (topic) is lowered to `ops[start..end]` +
+    /// [`Op::BlockReturnValue`].
+    pub given_topic_bytecode_ranges: Vec<Option<(usize, usize)>>,
     /// `eval_timeout timeout_expr { body }` — evaluated at runtime.
     pub eval_timeout_entries: Vec<(Expr, Block)>,
+    /// When `Some((start, end))`, `eval_timeout_entries[i].0` (timeout expr) is lowered to
+    /// `ops[start..end]` with trailing [`Op::BlockReturnValue`].
+    pub eval_timeout_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     /// Algebraic `match (subject) { arms }`.
     pub algebraic_match_entries: Vec<(Expr, Vec<MatchArm>)>,
+    /// When `Some((start, end))`, `algebraic_match_entries[i].0` (subject) is lowered to
+    /// `ops[start..end]` + [`Op::BlockReturnValue`].
+    pub algebraic_match_subject_bytecode_ranges: Vec<Option<(usize, usize)>>,
     /// Nested / runtime `sub` declarations (see [`Op::RuntimeSubDecl`]).
     pub runtime_sub_decls: Vec<RuntimeSubDecl>,
     /// `par_lines PATH, sub { } [, progress => EXPR]` — evaluated by interpreter inside VM.
@@ -698,8 +721,12 @@ pub struct Chunk {
     pub substr_four_arg_entries: Vec<(Expr, Expr, Option<Expr>, Expr)>,
     /// `keys EXPR` when `EXPR` is not bare `%h`.
     pub keys_expr_entries: Vec<Expr>,
+    /// When `Some((start, end))`, `keys_expr_entries[i]` is lowered to `ops[start..end]` +
+    /// [`Op::BlockReturnValue`] (operand only; [`Op::KeysExpr`] still applies `keys` to the value).
+    pub keys_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     /// `values EXPR` when not bare `%h`.
     pub values_expr_entries: Vec<Expr>,
+    pub values_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     /// `delete EXPR` when not the fast `%h{k}` lowering.
     pub delete_expr_entries: Vec<Expr>,
     /// `exists EXPR` when not the fast `%h{k}` lowering.
@@ -712,6 +739,9 @@ pub struct Chunk {
     pub splice_expr_entries: Vec<SpliceExprEntry>,
     /// `grep EXPR, LIST` — filter expression evaluated with `$_` set to each element.
     pub grep_expr_entries: Vec<Expr>,
+    /// When `Some((start, end))`, `grep_expr_entries[i]` is also lowered to `ops[start..end]`
+    /// (exclusive `end`) with trailing [`Op::BlockReturnValue`], like [`Self::block_bytecode_ranges`].
+    pub grep_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
 }
 
 impl Chunk {
@@ -738,15 +768,20 @@ impl Chunk {
             lvalues: Vec::new(),
             struct_defs: Vec::new(),
             given_entries: Vec::new(),
+            given_topic_bytecode_ranges: Vec::new(),
             eval_timeout_entries: Vec::new(),
+            eval_timeout_expr_bytecode_ranges: Vec::new(),
             algebraic_match_entries: Vec::new(),
+            algebraic_match_subject_bytecode_ranges: Vec::new(),
             runtime_sub_decls: Vec::new(),
             par_lines_entries: Vec::new(),
             par_walk_entries: Vec::new(),
             pwatch_entries: Vec::new(),
             substr_four_arg_entries: Vec::new(),
             keys_expr_entries: Vec::new(),
+            keys_expr_bytecode_ranges: Vec::new(),
             values_expr_entries: Vec::new(),
+            values_expr_bytecode_ranges: Vec::new(),
             delete_expr_entries: Vec::new(),
             exists_expr_entries: Vec::new(),
             push_expr_entries: Vec::new(),
@@ -755,6 +790,7 @@ impl Chunk {
             unshift_expr_entries: Vec::new(),
             splice_expr_entries: Vec::new(),
             grep_expr_entries: Vec::new(),
+            grep_expr_bytecode_ranges: Vec::new(),
         }
     }
 

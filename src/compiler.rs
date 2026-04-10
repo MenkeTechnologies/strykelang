@@ -126,7 +126,12 @@ impl Compiler {
             check_blocks: Vec::new(),
             init_blocks: Vec::new(),
             end_blocks: Vec::new(),
-            scope_stack: vec![ScopeLayer::default()],
+            // Main program `my $x` uses [`Op::GetScalarSlot`] / [`Op::SetScalarSlot`] like subs,
+            // so hot loops are not stuck on [`Op::GetScalarPlain`] (linear scan per access).
+            scope_stack: vec![ScopeLayer {
+                use_slots: true,
+                ..Default::default()
+            }],
             current_package: String::new(),
             program_last_stmt_takes_value: false,
             source_file: String::new(),
@@ -897,6 +902,60 @@ impl Compiler {
             }
         }
 
+        // Fifth pass: `grep EXPR, LIST` — single-expression filter bodies (same `ops` vec as blocks).
+        self.chunk.grep_expr_bytecode_ranges = vec![None; self.chunk.grep_expr_entries.len()];
+        for i in 0..self.chunk.grep_expr_entries.len() {
+            let e = self.chunk.grep_expr_entries[i].clone();
+            if let Ok(range) = self.try_compile_grep_expr_region(&e) {
+                self.chunk.grep_expr_bytecode_ranges[i] = Some(range);
+            }
+        }
+
+        // Sixth pass: `eval_timeout EXPR { ... }` — timeout expression only (body stays interpreter).
+        self.chunk.eval_timeout_expr_bytecode_ranges =
+            vec![None; self.chunk.eval_timeout_entries.len()];
+        for i in 0..self.chunk.eval_timeout_entries.len() {
+            let timeout_expr = self.chunk.eval_timeout_entries[i].0.clone();
+            if let Ok(range) = self.try_compile_grep_expr_region(&timeout_expr) {
+                self.chunk.eval_timeout_expr_bytecode_ranges[i] = Some(range);
+            }
+        }
+
+        // Seventh pass: `keys EXPR` / `values EXPR` — operand expression only.
+        self.chunk.keys_expr_bytecode_ranges = vec![None; self.chunk.keys_expr_entries.len()];
+        for i in 0..self.chunk.keys_expr_entries.len() {
+            let e = self.chunk.keys_expr_entries[i].clone();
+            if let Ok(range) = self.try_compile_grep_expr_region(&e) {
+                self.chunk.keys_expr_bytecode_ranges[i] = Some(range);
+            }
+        }
+        self.chunk.values_expr_bytecode_ranges = vec![None; self.chunk.values_expr_entries.len()];
+        for i in 0..self.chunk.values_expr_entries.len() {
+            let e = self.chunk.values_expr_entries[i].clone();
+            if let Ok(range) = self.try_compile_grep_expr_region(&e) {
+                self.chunk.values_expr_bytecode_ranges[i] = Some(range);
+            }
+        }
+
+        // Eighth pass: `given (TOPIC) { ... }` — topic expression only.
+        self.chunk.given_topic_bytecode_ranges = vec![None; self.chunk.given_entries.len()];
+        for i in 0..self.chunk.given_entries.len() {
+            let topic = self.chunk.given_entries[i].0.clone();
+            if let Ok(range) = self.try_compile_grep_expr_region(&topic) {
+                self.chunk.given_topic_bytecode_ranges[i] = Some(range);
+            }
+        }
+
+        // Ninth pass: algebraic `match (SUBJECT) { ... }` — subject expression only.
+        self.chunk.algebraic_match_subject_bytecode_ranges =
+            vec![None; self.chunk.algebraic_match_entries.len()];
+        for i in 0..self.chunk.algebraic_match_entries.len() {
+            let subject = self.chunk.algebraic_match_entries[i].0.clone();
+            if let Ok(range) = self.try_compile_grep_expr_region(&subject) {
+                self.chunk.algebraic_match_subject_bytecode_ranges[i] = Some(range);
+            }
+        }
+
         Self::patch_static_sub_calls(&mut self.chunk);
 
         Ok(self.chunk)
@@ -925,6 +984,22 @@ impl Compiler {
             self.compile_statement(stmt)?;
         }
         let line = last.line;
+        self.compile_expr(expr)?;
+        self.chunk.emit(Op::BlockReturnValue, line);
+        Ok((start, self.chunk.len()))
+    }
+
+    /// Lower a single expression to `ops` ending in [`Op::BlockReturnValue`].
+    ///
+    /// Used for `grep EXPR, LIST` (with `$_` set by the VM per item), `eval_timeout EXPR { ... }`,
+    /// `keys EXPR` / `values EXPR` operands, `given (TOPIC) { ... }` topic, algebraic `match (SUBJECT)`
+    /// subject, and similar one-shot regions matching [`Interpreter::eval_expr`].
+    fn try_compile_grep_expr_region(
+        &mut self,
+        expr: &Expr,
+    ) -> Result<(usize, usize), CompileError> {
+        let line = expr.line;
+        let start = self.chunk.len();
         self.compile_expr(expr)?;
         self.chunk.emit(Op::BlockReturnValue, line);
         Ok((start, self.chunk.len()))
@@ -1403,7 +1478,18 @@ impl Compiler {
                 label,
                 continue_block,
             } => {
-                self.emit_push_frame(line);
+                // When the enclosing scope uses scalar slots, skip PushFrame/PopFrame for the
+                // C-style `for` so loop variables (`$i`) and outer variables (`$sum`) share the
+                // same runtime frame and are both accessible via O(1) slot ops.  The compiler's
+                // scope layer still tracks `my` declarations for name resolution; only the runtime
+                // frame push is elided.
+                let outer_has_slots = self
+                    .scope_stack
+                    .last()
+                    .map_or(false, |l| l.use_slots);
+                if !outer_has_slots {
+                    self.emit_push_frame(line);
+                }
                 if let Some(init) = init {
                     self.compile_statement(init)?;
                 }
@@ -1424,8 +1510,6 @@ impl Compiler {
                 });
                 self.compile_block_no_frame(body)?;
 
-                // `continue { ... }` (rare on C-style `for`, but valid in Perl) runs after the
-                // body (both on fall-through and on `next`), before the step expression.
                 let continue_entry = self.chunk.len();
                 let cont_jumps =
                     std::mem::take(&mut self.loop_stack.last_mut().expect("loop").continue_jumps);
@@ -1445,7 +1529,9 @@ impl Compiler {
                 for j in ctx.break_jumps {
                     self.chunk.patch_jump_here(j);
                 }
-                self.emit_pop_frame(line);
+                if !outer_has_slots {
+                    self.emit_pop_frame(line);
+                }
             }
             StmtKind::Foreach {
                 var,
@@ -1454,7 +1540,8 @@ impl Compiler {
                 label,
                 continue_block,
             } => {
-                // Compile list, then use GetArray + loop counter
+                // PushFrame isolates __foreach_list__ / __foreach_i__ from outer/nested loops.
+                self.emit_push_frame(line);
                 self.compile_expr(list)?;
                 let list_name = self.chunk.intern_name("__foreach_list__");
                 self.chunk.emit(Op::DeclareArray(list_name), line);
@@ -1464,8 +1551,6 @@ impl Compiler {
                 self.chunk.emit(Op::DeclareScalar(counter_name), line);
 
                 let var_name = self.chunk.intern_name(var);
-                // Register `my $var` in the compiler's scope tracking so `use strict 'vars'` is
-                // satisfied inside the loop body.
                 self.register_declare(Sigil::Scalar, var, false);
                 self.chunk.emit(Op::LoadUndef, line);
                 self.chunk.emit(Op::DeclareScalar(var_name), line);
@@ -1512,6 +1597,7 @@ impl Compiler {
                 for j in ctx.break_jumps {
                     self.chunk.patch_jump_here(j);
                 }
+                self.emit_pop_frame(line);
             }
             StmtKind::DoWhile { body, condition } => {
                 let loop_start = self.chunk.len();
@@ -1834,10 +1920,11 @@ impl Compiler {
     }
 
     fn compile_block(&mut self, block: &Block) -> Result<(), CompileError> {
-        // If the block contains return statements, skip PushFrame/PopFrame
-        // to avoid scope frame mismatch on ReturnValue (VM only pops the
-        // call-stack frame, not intermediate scope frames).
         if Self::block_has_return(block) {
+            self.compile_block_inner(block)?;
+        } else if self.scope_stack.last().map_or(false, |l| l.use_slots) {
+            // When scalar slots are active, skip PushFrame/PopFrame so slot indices keep
+            // addressing the same runtime frame. New `my` decls still get fresh slot indices.
             self.compile_block_inner(block)?;
         } else {
             self.push_scope_layer();
@@ -2621,6 +2708,28 @@ impl Compiler {
             }
 
             ExprKind::Assign { target, value } => {
+                if let (ExprKind::Typeglob(lhs), ExprKind::Typeglob(rhs)) =
+                    (&target.kind, &value.kind)
+                {
+                    let lhs_idx = self.chunk.intern_name(lhs);
+                    let rhs_idx = self.chunk.intern_name(rhs);
+                    self.emit_op(Op::CopyTypeglobSlots(lhs_idx, rhs_idx), line, Some(root));
+                    self.compile_expr(value)?;
+                    return Ok(());
+                }
+                if let ExprKind::TypeglobExpr(expr) = &target.kind {
+                    if let ExprKind::Typeglob(rhs) = &value.kind {
+                        self.compile_expr(expr)?;
+                        let rhs_idx = self.chunk.intern_name(rhs);
+                        self.emit_op(Op::CopyTypeglobSlotsDynamicLhs(rhs_idx), line, Some(root));
+                        self.compile_expr(value)?;
+                        return Ok(());
+                    }
+                    self.compile_expr(expr)?;
+                    self.compile_expr(value)?;
+                    self.emit_op(Op::TypeglobAssignFromValueDynamic, line, Some(root));
+                    return Ok(());
+                }
                 if let ExprKind::ArrowDeref {
                     expr,
                     index,
@@ -2642,6 +2751,42 @@ impl Compiler {
                                         self.emit_op(Op::SetArrowArray, line, Some(root));
                                     }
                                     return Ok(());
+                                }
+                            }
+                        }
+                    }
+                }
+                // Fuse `$x = $x OP $y` into AddAssignSlotSlot / SubAssignSlotSlot / MulAssignSlotSlot
+                // when both LHS and RHS are slot-backed scalars.
+                if let ExprKind::ScalarVar(tgt_name) = &target.kind {
+                    if let Some(dst_slot) = self.scalar_slot(tgt_name) {
+                        if let ExprKind::BinOp { left, op, right } = &value.kind {
+                            let (lhs_var, rhs_var) = match (&left.kind, &right.kind) {
+                                (ExprKind::ScalarVar(l), ExprKind::ScalarVar(r)) => {
+                                    (Some(l.as_str()), Some(r.as_str()))
+                                }
+                                _ => (None, None),
+                            };
+                            if let (Some(lv), Some(rv)) = (lhs_var, rhs_var) {
+                                if lv == tgt_name {
+                                    if let Some(src_slot) = self.scalar_slot(rv) {
+                                        let fused = match op {
+                                            BinOp::Add => {
+                                                Some(Op::AddAssignSlotSlot(dst_slot, src_slot))
+                                            }
+                                            BinOp::Sub => {
+                                                Some(Op::SubAssignSlotSlot(dst_slot, src_slot))
+                                            }
+                                            BinOp::Mul => {
+                                                Some(Op::MulAssignSlotSlot(dst_slot, src_slot))
+                                            }
+                                            _ => None,
+                                        };
+                                        if let Some(fop) = fused {
+                                            self.emit_op(fop, line, Some(root));
+                                            return Ok(());
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -4933,6 +5078,16 @@ impl Compiler {
                     "Assign to symbolic glob deref (tree interpreter)".into(),
                 ));
             }
+            ExprKind::Typeglob(name) => {
+                let idx = self.chunk.intern_name(name);
+                if keep {
+                    self.emit_op(Op::TypeglobAssignFromValue(idx), line, ast);
+                } else {
+                    return Err(CompileError::Unsupported(
+                        "typeglob assign without keep (internal)".into(),
+                    ));
+                }
+            }
             ExprKind::ArrowDeref {
                 expr,
                 index,
@@ -5208,7 +5363,10 @@ mod tests {
     #[test]
     fn compile_my_scalar_declares() {
         let chunk = compile_snippet("my $x = 1;").expect("compile");
-        assert!(chunk.ops.iter().any(|o| matches!(o, Op::DeclareScalar(_))));
+        assert!(chunk
+            .ops
+            .iter()
+            .any(|o| matches!(o, Op::DeclareScalar(_) | Op::DeclareScalarSlot(_, _))));
         assert_last_halt(&chunk);
     }
 
@@ -5219,7 +5377,10 @@ mod tests {
             chunk
                 .ops
                 .iter()
-                .filter(|o| matches!(o, Op::GetScalar(_) | Op::GetScalarPlain(_)))
+                .filter(|o| matches!(
+                    o,
+                    Op::GetScalar(_) | Op::GetScalarPlain(_) | Op::GetScalarSlot(_)
+                ))
                 .count()
                 >= 1
         );
@@ -5230,8 +5391,11 @@ mod tests {
     fn compile_plain_scalar_read_emits_get_scalar_plain() {
         let chunk = compile_snippet("my $a = 1; $a + 0;").expect("compile");
         assert!(
-            chunk.ops.iter().any(|o| matches!(o, Op::GetScalarPlain(_))),
-            "expected GetScalarPlain for non-special $a, ops={:?}",
+            chunk.ops.iter().any(|o| matches!(
+                o,
+                Op::GetScalarPlain(_) | Op::GetScalarSlot(_)
+            )),
+            "expected GetScalarPlain or GetScalarSlot for non-special $a, ops={:?}",
             chunk.ops
         );
     }
@@ -5334,14 +5498,20 @@ mod tests {
     #[test]
     fn compile_postinc_scalar() {
         let chunk = compile_snippet("my $n = 1; $n++;").expect("compile");
-        assert!(chunk.ops.iter().any(|o| matches!(o, Op::PostInc(_))));
+        assert!(chunk
+            .ops
+            .iter()
+            .any(|o| matches!(o, Op::PostInc(_) | Op::PostIncSlot(_))));
         assert_last_halt(&chunk);
     }
 
     #[test]
     fn compile_preinc_scalar() {
         let chunk = compile_snippet("my $n = 1; ++$n;").expect("compile");
-        assert!(chunk.ops.iter().any(|o| matches!(o, Op::PreInc(_))));
+        assert!(chunk
+            .ops
+            .iter()
+            .any(|o| matches!(o, Op::PreInc(_) | Op::PreIncSlot(_))));
         assert_last_halt(&chunk);
     }
 

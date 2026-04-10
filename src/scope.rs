@@ -104,17 +104,46 @@ impl Frame {
 
     #[inline]
     fn get_scalar(&self, name: &str) -> Option<&PerlValue> {
-        // Linear scan — faster than HashMap for N < ~15
+        if let Some(v) = self.get_scalar_from_slot(name) {
+            return Some(v);
+        }
         self.scalars.iter().find(|(k, _)| k == name).map(|(_, v)| v)
+    }
+
+    /// O(N) scan over slot names — only used by `get_scalar` fallback (name-based lookup);
+    /// hot compiled paths use `get_scalar_slot(idx)` directly.
+    #[inline]
+    fn get_scalar_from_slot(&self, name: &str) -> Option<&PerlValue> {
+        for (i, sn) in self.scalar_slot_names.iter().enumerate() {
+            if let Some(ref n) = sn {
+                if n == name {
+                    return self.scalar_slots.get(i);
+                }
+            }
+        }
+        None
     }
 
     #[inline]
     fn has_scalar(&self, name: &str) -> bool {
+        if self.scalar_slot_names.iter().any(|sn| sn.as_deref() == Some(name)) {
+            return true;
+        }
         self.scalars.iter().any(|(k, _)| k == name)
     }
 
     #[inline]
     fn set_scalar(&mut self, name: &str, val: PerlValue) {
+        for (i, sn) in self.scalar_slot_names.iter().enumerate() {
+            if let Some(ref n) = sn {
+                if n == name {
+                    if i < self.scalar_slots.len() {
+                        self.scalar_slots[i] = val;
+                    }
+                    return;
+                }
+            }
+        }
         if let Some(entry) = self.scalars.iter_mut().find(|(k, _)| k == name) {
             entry.1 = val;
         } else {
@@ -334,26 +363,96 @@ impl Scope {
 
     // ── Frame-local scalar slots (O(1) access for compiled subs) ──
 
-    /// Read scalar from the current (innermost) frame's slot array.
+    /// Read scalar from slot — innermost frame first (O(1) hot path), walks parent frames
+    /// when a block-region push left the top frame without slots.
     #[inline]
     pub fn get_scalar_slot(&self, slot: u8) -> PerlValue {
-        let frame = self.frames.last().unwrap();
-        frame
-            .scalar_slots
-            .get(slot as usize)
-            .cloned()
-            .unwrap_or(PerlValue::UNDEF)
+        let idx = slot as usize;
+        let top = self.frames.last().unwrap();
+        if idx < top.scalar_slots.len() {
+            return top.scalar_slots[idx].clone();
+        }
+        for frame in self.frames[..self.frames.len() - 1].iter().rev() {
+            if idx < frame.scalar_slots.len() {
+                return frame.scalar_slots[idx].clone();
+            }
+        }
+        PerlValue::UNDEF
     }
 
-    /// Write scalar to the current frame's slot array.
+    /// Write scalar to slot — innermost frame first (O(1) hot path), walks parents as fallback.
     #[inline]
     pub fn set_scalar_slot(&mut self, slot: u8, val: PerlValue) {
-        let frame = self.frames.last_mut().unwrap();
         let idx = slot as usize;
-        if idx >= frame.scalar_slots.len() {
-            frame.scalar_slots.resize(idx + 1, PerlValue::UNDEF);
+        let len = self.frames.len();
+        let top = &mut self.frames[len - 1];
+        if idx < top.scalar_slots.len() {
+            top.scalar_slots[idx] = val;
+            return;
         }
-        frame.scalar_slots[idx] = val;
+        for i in (0..len - 1).rev() {
+            if idx < self.frames[i].scalar_slots.len() {
+                self.frames[i].scalar_slots[idx] = val;
+                return;
+            }
+        }
+        let top = self.frames.last_mut().unwrap();
+        top.scalar_slots.resize(idx + 1, PerlValue::UNDEF);
+        top.scalar_slots[idx] = val;
+    }
+
+    /// Like [`set_scalar_slot`] but respects the parallel guard — returns `Err` when assigning
+    /// to a slot that belongs to an outer frame inside a parallel block.  `slot_name` is resolved
+    /// from the bytecode's name table by the caller when available.
+    #[inline]
+    pub fn set_scalar_slot_checked(
+        &mut self,
+        slot: u8,
+        val: PerlValue,
+        slot_name: Option<&str>,
+    ) -> Result<(), PerlError> {
+        if self.parallel_guard {
+            let idx = slot as usize;
+            let len = self.frames.len();
+            let top_has = idx < self.frames[len - 1].scalar_slots.len();
+            if !top_has {
+                let name_owned: String = {
+                    let mut found = String::new();
+                    for i in (0..len).rev() {
+                        if let Some(Some(n)) = self.frames[i].scalar_slot_names.get(idx) {
+                            found = n.clone();
+                            break;
+                        }
+                    }
+                    if found.is_empty() {
+                        if let Some(sn) = slot_name {
+                            found = sn.to_string();
+                        }
+                    }
+                    found
+                };
+                let name = name_owned.as_str();
+                if !name.is_empty() && !Self::parallel_allowed_topic_scalar(name) {
+                    let inner = len.saturating_sub(1);
+                    for (fi, frame) in self.frames.iter().enumerate().rev() {
+                        if frame.has_scalar(name) || (idx < frame.scalar_slots.len()) {
+                            if fi != inner {
+                                return Err(PerlError::runtime(
+                                    format!(
+                                        "cannot assign to captured outer lexical `${}` inside a parallel block (use `mysync`)",
+                                        name
+                                    ),
+                                    0,
+                                ));
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        self.set_scalar_slot(slot, val);
+        Ok(())
     }
 
     /// Declare + initialize scalar in the current frame's slot array.
@@ -361,10 +460,13 @@ impl Scope {
     /// binding is slot-only (no duplicate `frame.scalars` row).
     #[inline]
     pub fn declare_scalar_slot(&mut self, slot: u8, val: PerlValue, name: Option<&str>) {
-        self.set_scalar_slot(slot, val);
+        let idx = slot as usize;
+        let frame = self.frames.last_mut().unwrap();
+        if idx >= frame.scalar_slots.len() {
+            frame.scalar_slots.resize(idx + 1, PerlValue::UNDEF);
+        }
+        frame.scalar_slots[idx] = val;
         if let Some(n) = name {
-            let frame = self.frames.last_mut().unwrap();
-            let idx = slot as usize;
             if idx >= frame.scalar_slot_names.len() {
                 frame.scalar_slot_names.resize(idx + 1, None);
             }
@@ -373,17 +475,35 @@ impl Scope {
     }
 
     /// Slot-indexed `.=` — avoids frame walking and string comparison on every iteration.
+    ///
+    /// Returns a [`PerlValue::shallow_clone`] (Arc::clone) of the stored value
+    /// rather than a full [`Clone`], which would deep-copy the entire `String`
+    /// payload and turn a `$s .= "x"` loop into O(N²) memcpy.
     #[inline]
     pub fn scalar_slot_concat_inplace(&mut self, slot: u8, rhs: &PerlValue) -> PerlValue {
-        let frame = self.frames.last_mut().unwrap();
         let idx = slot as usize;
+        let len = self.frames.len();
+        let fi = {
+            let mut found = len - 1;
+            if idx >= self.frames[found].scalar_slots.len() {
+                for i in (0..len - 1).rev() {
+                    if idx < self.frames[i].scalar_slots.len() {
+                        found = i;
+                        break;
+                    }
+                }
+            }
+            found
+        };
+        let frame = &mut self.frames[fi];
         if idx >= frame.scalar_slots.len() {
             frame.scalar_slots.resize(idx + 1, PerlValue::UNDEF);
         }
         let new_val = std::mem::replace(&mut frame.scalar_slots[idx], PerlValue::UNDEF)
             .concat_append_owned(rhs);
-        frame.scalar_slots[idx] = new_val.clone();
-        new_val
+        let handle = new_val.shallow_clone();
+        frame.scalar_slots[idx] = new_val;
+        handle
     }
 
     #[inline]
@@ -716,6 +836,10 @@ impl Scope {
 
     /// Append `rhs` to a scalar string in-place (no clone of the existing string).
     /// If the scalar is not yet a String, it is converted first.
+    ///
+    /// The binding and the returned [`PerlValue`] share the same heap [`Arc`] via
+    /// [`PerlValue::shallow_clone`] on the store — a full [`Clone`] would deep-copy the
+    /// entire `String` each time and make repeated `.=` O(N²) in the total length.
     #[inline]
     pub fn scalar_concat_inplace(
         &mut self,
@@ -731,20 +855,20 @@ impl Scope {
                     let mut guard = atomic_arc.lock();
                     let inner = std::mem::replace(&mut *guard, PerlValue::UNDEF);
                     let new_val = inner.concat_append_owned(rhs);
-                    *guard = new_val.clone();
+                    *guard = new_val.shallow_clone();
                     return Ok(new_val);
                 }
                 // Use `into_string` + `append_to` so heap strings take the `Arc::try_unwrap`
                 // fast path instead of `Display` / heap formatting on every `.=`.
                 let new_val =
                     std::mem::replace(&mut entry.1, PerlValue::UNDEF).concat_append_owned(rhs);
-                entry.1 = new_val.clone();
+                entry.1 = new_val.shallow_clone();
                 return Ok(new_val);
             }
         }
         // Variable not found — create as new string
         let val = PerlValue::UNDEF.concat_append_owned(rhs);
-        self.frames[0].set_scalar(name, val.clone());
+        self.frames[0].set_scalar(name, val.shallow_clone());
         Ok(val)
     }
 
@@ -1326,7 +1450,7 @@ impl Scope {
             }
             for (i, v) in frame.scalar_slots.iter().enumerate() {
                 if let Some(Some(name)) = frame.scalar_slot_names.get(i) {
-                    captured.push((format!("${}", name), v.clone()));
+                    captured.push((format!("$slot:{}:{}", i, name), v.clone()));
                 }
             }
             for (k, v) in &frame.arrays {
@@ -1349,18 +1473,11 @@ impl Scope {
                     captured.push((format!("%{}", k), PerlValue::hash(v.clone())));
                 }
             }
-            // Capture atomic arrays as special markers with the Arc
             for (k, _aa) in &frame.atomic_arrays {
-                // Store as "$__atomic_array__NAME" with the Arc wrapped in a PerlValue
-                // We use a special prefix that restore_capture will recognize
                 captured.push((
                     format!("@sync_{}", k),
                     PerlValue::atomic(Arc::new(Mutex::new(PerlValue::string(String::new())))),
                 ));
-                // Actually store the real Arc — we need a way to pass it.
-                // Use a side channel: store a PerlValue that wraps the AtomicArray's Arc.
-                // Hack: we can't put Arc<Mutex<Vec>> in PerlValue. Instead,
-                // we'll store the array name and let restore_capture re-find it.
             }
             for (k, _ah) in &frame.atomic_hashes {
                 captured.push((
@@ -1383,7 +1500,7 @@ impl Scope {
             }
             for (i, v) in frame.scalar_slots.iter().enumerate() {
                 if let Some(Some(name)) = frame.scalar_slot_names.get(i) {
-                    scalars.push((format!("${}", name), v.clone()));
+                    scalars.push((format!("$slot:{}:{}", i, name), v.clone()));
                 }
             }
             for (k, v) in &frame.arrays {
@@ -1418,7 +1535,15 @@ impl Scope {
 
     pub fn restore_capture(&mut self, captured: &[(String, PerlValue)]) {
         for (name, val) in captured {
-            if let Some(stripped) = name.strip_prefix('$') {
+            if let Some(rest) = name.strip_prefix("$slot:") {
+                // "$slot:INDEX:NAME" — restore into both scalar_slots and scalars.
+                if let Some(colon) = rest.find(':') {
+                    let idx: usize = rest[..colon].parse().unwrap_or(0);
+                    let sname = &rest[colon + 1..];
+                    self.declare_scalar_slot(idx as u8, val.clone(), Some(sname));
+                    self.declare_scalar(sname, val.clone());
+                }
+            } else if let Some(stripped) = name.strip_prefix('$') {
                 self.declare_scalar(stripped, val.clone());
             } else if let Some(rest) = name.strip_prefix("@frozen:") {
                 let arr = val.as_array_vec().unwrap_or_else(|| val.to_list());

@@ -3289,14 +3289,23 @@ impl Interpreter {
         Ok(last)
     }
 
-    pub(crate) fn exec_given(&mut self, topic: &Expr, body: &Block) -> ExecResult {
-        let t = self.eval_expr(topic)?;
+    /// `given` after the topic has been evaluated to a value (VM bytecode path or direct use).
+    pub(crate) fn exec_given_with_topic_value(
+        &mut self,
+        topic: PerlValue,
+        body: &Block,
+    ) -> ExecResult {
         self.scope_push_hook();
-        self.scope.declare_scalar("_", t);
+        self.scope.declare_scalar("_", topic);
         self.english_note_lexical_scalar("_");
         let r = self.exec_given_body(body);
         self.scope_pop_hook();
         r
+    }
+
+    pub(crate) fn exec_given(&mut self, topic: &Expr, body: &Block) -> ExecResult {
+        let t = self.eval_expr(topic)?;
+        self.exec_given_with_topic_value(t, body)
     }
 
     /// `when (COND)` — topic is `$_` (set by `given`).
@@ -3361,6 +3370,16 @@ impl Interpreter {
         line: usize,
     ) -> ExecResult {
         let val = self.eval_expr(subject)?;
+        self.eval_algebraic_match_with_subject_value(val, arms, line)
+    }
+
+    /// Algebraic `match` after the subject has been evaluated (VM bytecode path).
+    pub(crate) fn eval_algebraic_match_with_subject_value(
+        &mut self,
+        val: PerlValue,
+        arms: &[MatchArm],
+        line: usize,
+    ) -> ExecResult {
         for arm in arms {
             if let MatchPattern::Regex { pattern, flags } = &arm.pattern {
                 let re = self.compile_regex(pattern, flags, line)?;
@@ -8041,6 +8060,32 @@ impl Interpreter {
         Err(PerlError::runtime("Can't assign to arrow array deref on non-array-ref", line).into())
     }
 
+    /// `*name = $coderef` — install subroutine alias (tree [`assign_value`] and VM [`crate::bytecode::Op::TypeglobAssignFromValue`]).
+    pub(crate) fn assign_typeglob_value(
+        &mut self,
+        name: &str,
+        val: PerlValue,
+        line: usize,
+    ) -> ExecResult {
+        let sub = if let Some(c) = val.as_code_ref() {
+            Some(c)
+        } else if let Some(r) = val.as_scalar_ref() {
+            r.read().as_code_ref().map(|c| Arc::clone(&c))
+        } else {
+            None
+        };
+        if let Some(sub) = sub {
+            let lhs_sub = self.qualify_typeglob_sub_key(name);
+            self.subs.insert(lhs_sub, sub);
+            return Ok(PerlValue::UNDEF);
+        }
+        Err(PerlError::runtime(
+            "typeglob assignment requires a subroutine reference (e.g. *foo = \\&bar) or another typeglob (*foo = *bar)",
+            line,
+        )
+        .into())
+    }
+
     fn assign_value(&mut self, target: &Expr, val: PerlValue) -> ExecResult {
         match &target.kind {
             ExprKind::ScalarVar(name) => {
@@ -8209,25 +8254,7 @@ impl Interpreter {
                 self.scope.set_hash_element(hash, &k, val)?;
                 Ok(PerlValue::UNDEF)
             }
-            ExprKind::Typeglob(name) => {
-                let sub = if let Some(c) = val.as_code_ref() {
-                    Some(c)
-                } else if let Some(r) = val.as_scalar_ref() {
-                    r.read().as_code_ref().map(|c| Arc::clone(&c))
-                } else {
-                    None
-                };
-                if let Some(sub) = sub {
-                    let lhs_sub = self.qualify_typeglob_sub_key(name);
-                    self.subs.insert(lhs_sub, sub);
-                    return Ok(PerlValue::UNDEF);
-                }
-                Err(PerlError::runtime(
-                    "typeglob assignment requires a subroutine reference (e.g. *foo = \\&bar) or another typeglob (*foo = *bar)",
-                    target.line,
-                )
-                .into())
-            }
+            ExprKind::Typeglob(name) => self.assign_typeglob_value(name, val, target.line),
             ExprKind::TypeglobExpr(e) => {
                 let name = self.eval_expr(e)?.to_string();
                 let synthetic = Expr {
@@ -10928,12 +10955,8 @@ impl Interpreter {
         Ok(PerlValue::array(removed))
     }
 
-    pub(crate) fn eval_keys_expr(
-        &mut self,
-        expr: &Expr,
-        line: usize,
-    ) -> Result<PerlValue, FlowOrError> {
-        let val = self.eval_expr(expr)?;
+    /// Result of `keys EXPR` after `EXPR` has been evaluated (VM opcode path or tests).
+    pub(crate) fn keys_from_value(val: PerlValue, line: usize) -> Result<PerlValue, FlowOrError> {
         if let Some(h) = val.as_hash_map() {
             Ok(PerlValue::array(
                 h.keys().map(|k| PerlValue::string(k.clone())).collect(),
@@ -10950,12 +10973,17 @@ impl Interpreter {
         }
     }
 
-    pub(crate) fn eval_values_expr(
+    pub(crate) fn eval_keys_expr(
         &mut self,
         expr: &Expr,
         line: usize,
     ) -> Result<PerlValue, FlowOrError> {
         let val = self.eval_expr(expr)?;
+        Self::keys_from_value(val, line)
+    }
+
+    /// Result of `values EXPR` after `EXPR` has been evaluated.
+    pub(crate) fn values_from_value(val: PerlValue, line: usize) -> Result<PerlValue, FlowOrError> {
         if let Some(h) = val.as_hash_map() {
             Ok(PerlValue::array(h.values().cloned().collect()))
         } else if let Some(r) = val.as_hash_ref() {
@@ -10963,6 +10991,15 @@ impl Interpreter {
         } else {
             Err(PerlError::runtime("values requires hash", line).into())
         }
+    }
+
+    pub(crate) fn eval_values_expr(
+        &mut self,
+        expr: &Expr,
+        line: usize,
+    ) -> Result<PerlValue, FlowOrError> {
+        let val = self.eval_expr(expr)?;
+        Self::values_from_value(val, line)
     }
 
     pub(crate) fn eval_delete_operand(
