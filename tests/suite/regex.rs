@@ -133,3 +133,40 @@ fn expr_statement_bare_regex_inside_do_block_sets_captures() {
         "hi/there"
     );
 }
+
+/// Sed-style regex flip-flop: operands match `$_`; `$.` drives exclusive `...` (see `perlop`).
+#[test]
+fn regex_flipflop_two_dot_matches_lines_between_patterns() {
+    assert_eq!(
+        eval_string(
+            r#"my $acc = "";
+            my $n = 0;
+            for my $line (qw(x a m b y)) {
+              $_ = $line;
+              $n = $n + 1;
+              $. = $n;
+              $acc .= $_ if /a/../b/;
+            }
+            $acc"#
+        ),
+        "amb"
+    );
+}
+
+#[test]
+fn regex_flipflop_three_dot_matches_lines_between_patterns() {
+    assert_eq!(
+        eval_string(
+            r#"my $acc = "";
+            my $n = 0;
+            for my $line (qw(x a m b y)) {
+              $_ = $line;
+              $n = $n + 1;
+              $. = $n;
+              $acc .= $_ if /a/.../b/;
+            }
+            $acc"#
+        ),
+        "amb"
+    );
+}

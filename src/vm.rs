@@ -3138,6 +3138,29 @@ impl<'a> VM<'a> {
                         self.push(v);
                         Ok(())
                     }
+                    Op::RegexFlipFlop(slot, exclusive, lp, lf, rp, rf) => {
+                        let line = self.line();
+                        let left_pat = constants[*lp as usize].as_str_or_empty();
+                        let left_flags = constants[*lf as usize].as_str_or_empty();
+                        let right_pat = constants[*rp as usize].as_str_or_empty();
+                        let right_flags = constants[*rf as usize].as_str_or_empty();
+                        let v = vm_interp_result(
+                            self.interp
+                                .regex_flip_flop_eval(
+                                    left_pat.as_str(),
+                                    left_flags.as_str(),
+                                    right_pat.as_str(),
+                                    right_flags.as_str(),
+                                    *slot as usize,
+                                    *exclusive != 0,
+                                    line,
+                                )
+                                .map_err(Into::into),
+                            line,
+                        )?;
+                        self.push(v);
+                        Ok(())
+                    }
 
                     // ── Regex ──
                     Op::RegexMatch(pat_idx, flags_idx, scalar_g, pos_key_idx) => {

@@ -229,6 +229,10 @@ pub enum Op {
     /// Stack: `[from, to]` (ints); pushes `1` or `0`. `u16` indexes flip-flop slots; `u8` is `1` for `...`
     /// (exclusive: right bound only after `$.` is strictly past the line where the left bound matched).
     ScalarFlipFlop(u16, u8),
+    /// Regex `..` / `...` flip-flop: both bounds are pattern literals; tests use `$_` and `$.` like Perl
+    /// (`Interpreter::regex_flip_flop_eval`). Operand order: `slot`, `exclusive`, left pattern, left flags,
+    /// right pattern, right flags (constant pool indices). No stack operands; pushes `0`/`1`.
+    RegexFlipFlop(u16, u8, u16, u16, u16, u16),
 
     // ── Regex ──
     /// Match: pattern_const_idx, flags_const_idx, scalar_g, pos_key_name_idx (`u16::MAX` = `$_`);
@@ -822,7 +826,7 @@ pub struct Chunk {
     /// When `Some((start, end))`, `grep_expr_entries[i]` is also lowered to `ops[start..end]`
     /// (exclusive `end`) with trailing [`Op::BlockReturnValue`], like [`Self::block_bytecode_ranges`].
     pub grep_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
-    /// Number of [`Op::ScalarFlipFlop`] slots (scalar `..` / `...`); VM resets flip-flop vectors.
+    /// Number of flip-flop slots ([`Op::ScalarFlipFlop`] and [`Op::RegexFlipFlop`]); VM resets flip-flop vectors.
     pub flip_flop_slots: u16,
 }
 
@@ -877,7 +881,7 @@ impl Chunk {
         }
     }
 
-    /// Allocate a slot index for [`Op::ScalarFlipFlop`] (scalar `..` / `...` flip-flop state).
+    /// Allocate a slot index for [`Op::ScalarFlipFlop`] / [`Op::RegexFlipFlop`] flip-flop state.
     pub fn alloc_flip_flop_slot(&mut self) -> u16 {
         let id = self.flip_flop_slots;
         self.flip_flop_slots = self.flip_flop_slots.saturating_add(1);

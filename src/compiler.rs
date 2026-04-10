@@ -3318,6 +3318,26 @@ impl Compiler {
                     self.compile_expr_ctx(from, WantarrayCtx::Scalar)?;
                     self.compile_expr_ctx(to, WantarrayCtx::Scalar)?;
                     self.emit_op(Op::Range, line, Some(root));
+                } else if let (ExprKind::Regex(lp, lf), ExprKind::Regex(rp, rf)) =
+                    (&from.kind, &to.kind)
+                {
+                    let slot = self.chunk.alloc_flip_flop_slot();
+                    let lp_idx = self.chunk.add_constant(PerlValue::string(lp.clone()));
+                    let lf_idx = self.chunk.add_constant(PerlValue::string(lf.clone()));
+                    let rp_idx = self.chunk.add_constant(PerlValue::string(rp.clone()));
+                    let rf_idx = self.chunk.add_constant(PerlValue::string(rf.clone()));
+                    self.emit_op(
+                        Op::RegexFlipFlop(
+                            slot,
+                            u8::from(*exclusive),
+                            lp_idx,
+                            lf_idx,
+                            rp_idx,
+                            rf_idx,
+                        ),
+                        line,
+                        Some(root),
+                    );
                 } else {
                     self.compile_expr(from)?;
                     self.compile_expr(to)?;
@@ -5668,6 +5688,34 @@ mod tests {
                 .iter()
                 .any(|o| matches!(o, Op::ScalarFlipFlop(_, 1))),
             "expected ScalarFlipFlop(..., exclusive=1), got:\n{}",
+            chunk.disassemble()
+        );
+    }
+
+    #[test]
+    fn compile_regex_flipflop_two_dot_emits_regex_flipflop_op() {
+        let chunk = compile_snippet(r#"print if /a/../b/;"#).expect("compile");
+        assert!(
+            chunk.ops.iter().any(|o| matches!(o, Op::RegexFlipFlop(_, 0, _, _, _, _))),
+            "expected RegexFlipFlop(.., exclusive=0), got:\n{}",
+            chunk.disassemble()
+        );
+        assert!(
+            !chunk.ops.iter().any(|o| matches!(o, Op::ScalarFlipFlop(_, _))),
+            "regex flip-flop must not use ScalarFlipFlop:\n{}",
+            chunk.disassemble()
+        );
+    }
+
+    #[test]
+    fn compile_regex_flipflop_three_dot_sets_exclusive_flag() {
+        let chunk = compile_snippet(r#"print if /a/.../b/;"#).expect("compile");
+        assert!(
+            chunk
+                .ops
+                .iter()
+                .any(|o| matches!(o, Op::RegexFlipFlop(_, 1, _, _, _, _))),
+            "expected RegexFlipFlop(..., exclusive=1), got:\n{}",
             chunk.disassemble()
         );
     }
