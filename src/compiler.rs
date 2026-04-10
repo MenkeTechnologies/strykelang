@@ -307,6 +307,20 @@ impl Compiler {
         name.to_string()
     }
 
+    /// For `$aref->[ix]` / `@$r[ix]` arrow-array ops: the stack must hold the **array reference**
+    /// (scalar), not `@{...}` / `@$r` expansion (which would push a cloned plain array).
+    fn compile_arrow_array_base_expr(&mut self, expr: &Expr) -> Result<(), CompileError> {
+        if let ExprKind::Deref {
+            expr: inner,
+            kind: Sigil::Array,
+        } = &expr.kind
+        {
+            self.compile_expr(inner)
+        } else {
+            self.compile_expr(expr)
+        }
+    }
+
     fn push_scope_layer(&mut self) {
         self.scope_stack.push(ScopeLayer::default());
     }
@@ -2216,7 +2230,12 @@ impl Compiler {
                         kind: DerefKind::Array,
                     } = &expr.kind
                     {
-                        self.compile_expr(expr)?;
+                        if matches!(index.kind, ExprKind::List(_)) {
+                            return Err(CompileError::Unsupported(
+                                "PreInc on multi-index array slice (use tree interpreter)".into(),
+                            ));
+                        }
+                        self.compile_arrow_array_base_expr(expr)?;
                         self.compile_expr(index)?;
                         self.emit_op(Op::Dup2, line, Some(root));
                         self.emit_op(Op::ArrowArray, line, Some(root));
@@ -2236,6 +2255,25 @@ impl Compiler {
                     {
                         self.compile_expr(expr)?;
                         self.compile_expr(index)?;
+                        self.emit_op(Op::Dup2, line, Some(root));
+                        self.emit_op(Op::ArrowHash, line, Some(root));
+                        self.emit_op(Op::LoadInt(1), line, Some(root));
+                        self.emit_op(Op::Add, line, Some(root));
+                        self.emit_op(Op::Dup, line, Some(root));
+                        self.emit_op(Op::Pop, line, Some(root));
+                        self.emit_op(Op::Swap, line, Some(root));
+                        self.emit_op(Op::Rot, line, Some(root));
+                        self.emit_op(Op::Swap, line, Some(root));
+                        self.emit_op(Op::SetArrowHashKeep, line, Some(root));
+                    } else if let ExprKind::HashSliceDeref { container, keys } = &expr.kind {
+                        if keys.len() != 1 {
+                            return Err(CompileError::Unsupported(
+                                "PreInc on multi-key hash slice (use tree interpreter)".into(),
+                            ));
+                        }
+                        let hk = &keys[0];
+                        self.compile_expr(container)?;
+                        self.compile_expr(hk)?;
                         self.emit_op(Op::Dup2, line, Some(root));
                         self.emit_op(Op::ArrowHash, line, Some(root));
                         self.emit_op(Op::LoadInt(1), line, Some(root));
@@ -2306,7 +2344,12 @@ impl Compiler {
                         kind: DerefKind::Array,
                     } = &expr.kind
                     {
-                        self.compile_expr(expr)?;
+                        if matches!(index.kind, ExprKind::List(_)) {
+                            return Err(CompileError::Unsupported(
+                                "PreDec on multi-index array slice (use tree interpreter)".into(),
+                            ));
+                        }
+                        self.compile_arrow_array_base_expr(expr)?;
                         self.compile_expr(index)?;
                         self.emit_op(Op::Dup2, line, Some(root));
                         self.emit_op(Op::ArrowArray, line, Some(root));
@@ -2326,6 +2369,25 @@ impl Compiler {
                     {
                         self.compile_expr(expr)?;
                         self.compile_expr(index)?;
+                        self.emit_op(Op::Dup2, line, Some(root));
+                        self.emit_op(Op::ArrowHash, line, Some(root));
+                        self.emit_op(Op::LoadInt(1), line, Some(root));
+                        self.emit_op(Op::Sub, line, Some(root));
+                        self.emit_op(Op::Dup, line, Some(root));
+                        self.emit_op(Op::Pop, line, Some(root));
+                        self.emit_op(Op::Swap, line, Some(root));
+                        self.emit_op(Op::Rot, line, Some(root));
+                        self.emit_op(Op::Swap, line, Some(root));
+                        self.emit_op(Op::SetArrowHashKeep, line, Some(root));
+                    } else if let ExprKind::HashSliceDeref { container, keys } = &expr.kind {
+                        if keys.len() != 1 {
+                            return Err(CompileError::Unsupported(
+                                "PreDec on multi-key hash slice (use tree interpreter)".into(),
+                            ));
+                        }
+                        let hk = &keys[0];
+                        self.compile_expr(container)?;
+                        self.compile_expr(hk)?;
                         self.emit_op(Op::Dup2, line, Some(root));
                         self.emit_op(Op::ArrowHash, line, Some(root));
                         self.emit_op(Op::LoadInt(1), line, Some(root));
@@ -2441,7 +2503,12 @@ impl Compiler {
                     kind: DerefKind::Array,
                 } = &expr.kind
                 {
-                    self.compile_expr(inner)?;
+                    if matches!(index.kind, ExprKind::List(_)) {
+                        return Err(CompileError::Unsupported(
+                            "PostfixOp on multi-index array slice (use tree interpreter)".into(),
+                        ));
+                    }
+                    self.compile_arrow_array_base_expr(inner)?;
                     self.compile_expr(index)?;
                     let b = match op {
                         PostfixOp::Increment => 0u8,
@@ -2456,6 +2523,20 @@ impl Compiler {
                 {
                     self.compile_expr(inner)?;
                     self.compile_expr(index)?;
+                    let b = match op {
+                        PostfixOp::Increment => 0u8,
+                        PostfixOp::Decrement => 1u8,
+                    };
+                    self.emit_op(Op::ArrowHashPostfix(b), line, Some(root));
+                } else if let ExprKind::HashSliceDeref { container, keys } = &expr.kind {
+                    if keys.len() != 1 {
+                        return Err(CompileError::Unsupported(
+                            "PostfixOp on multi-key hash slice (use tree interpreter)".into(),
+                        ));
+                    }
+                    let hk = &keys[0];
+                    self.compile_expr(container)?;
+                    self.compile_expr(hk)?;
                     let b = match op {
                         PostfixOp::Increment => 0u8,
                         PostfixOp::Decrement => 1u8,
@@ -2478,6 +2559,32 @@ impl Compiler {
             }
 
             ExprKind::Assign { target, value } => {
+                if let ExprKind::ArrowDeref {
+                    expr,
+                    index,
+                    kind: DerefKind::Array,
+                } = &target.kind
+                {
+                    if let ExprKind::List(indices) = &index.kind {
+                        if let ExprKind::Deref {
+                            expr: inner,
+                            kind: Sigil::Array,
+                        } = &expr.kind
+                        {
+                            if let ExprKind::List(vals) = &value.kind {
+                                if !indices.is_empty() && indices.len() == vals.len() {
+                                    for (idx_e, val_e) in indices.iter().zip(vals.iter()) {
+                                        self.compile_expr(val_e)?;
+                                        self.compile_expr(inner)?;
+                                        self.compile_expr(idx_e)?;
+                                        self.emit_op(Op::SetArrowArray, line, Some(root));
+                                    }
+                                    return Ok(());
+                                }
+                            }
+                        }
+                    }
+                }
                 self.compile_expr(value)?;
                 self.compile_assign(target, line, true, Some(root))?;
             }
@@ -3961,16 +4068,31 @@ impl Compiler {
 
             // ── Derefs ──
             ExprKind::ArrowDeref { expr, index, kind } => {
-                self.compile_expr(expr)?;
-                self.compile_expr(index)?;
                 match kind {
                     DerefKind::Array => {
-                        self.emit_op(Op::ArrowArray, line, Some(root));
+                        self.compile_arrow_array_base_expr(expr)?;
+                        if let ExprKind::List(indices) = &index.kind {
+                            for ix in indices {
+                                self.compile_expr(ix)?;
+                            }
+                            self.emit_op(
+                                Op::ArrowArraySlice(indices.len() as u16),
+                                line,
+                                Some(root),
+                            );
+                        } else {
+                            self.compile_expr(index)?;
+                            self.emit_op(Op::ArrowArray, line, Some(root));
+                        }
                     }
                     DerefKind::Hash => {
+                        self.compile_expr(expr)?;
+                        self.compile_expr(index)?;
                         self.emit_op(Op::ArrowHash, line, Some(root));
                     }
                     DerefKind::Call => {
+                        self.compile_expr(expr)?;
+                        self.compile_expr(index)?;
                         self.emit_op(Op::ArrowCall(ctx.as_byte()), line, Some(root));
                     }
                 }
@@ -4695,7 +4817,12 @@ impl Compiler {
                 index,
                 kind: DerefKind::Array,
             } => {
-                self.compile_expr(expr)?;
+                if matches!(index.kind, ExprKind::List(_)) {
+                    return Err(CompileError::Unsupported(
+                        "Assign to multi-index array slice (use tree interpreter)".into(),
+                    ));
+                }
+                self.compile_arrow_array_base_expr(expr)?;
                 self.compile_expr(index)?;
                 self.emit_op(Op::SetArrowArray, line, ast);
             }

@@ -959,6 +959,41 @@ fn try_vm_execute_hash_slice_deref_defined_or_assign_short_circuit() {
     assert_eq!(out.unwrap().expect("vm").to_int(), 0);
 }
 
+#[test]
+fn try_vm_execute_hash_slice_deref_pre_inc_only() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $h = { "x" => 9 };
+        my $r = $h;
+        ++@$r{"x"};
+        $r->{"x"};"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i).expect("vm path");
+    assert_eq!(out.expect("vm").to_int(), 10);
+}
+
+#[test]
+fn try_vm_execute_hash_slice_deref_pre_post_inc() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $h = { "x" => 9 };
+        my $r = $h;
+        my $pre = ++@$r{"x"};
+        my $post = @$r{"x"}++;
+        $pre + $post + $r->{"x"};"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "pre/post ++ on single-key @$href slice should compile (ArrowHash + ArrowHashPostfix)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 31);
+}
+
 /// Perl 5 rejects `++@{...}`, `%{...}++`, etc.; we must not treat them as numeric ops on length.
 #[test]
 fn symbolic_array_hash_deref_inc_dec_errors_like_perl() {

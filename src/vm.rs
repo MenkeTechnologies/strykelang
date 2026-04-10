@@ -2729,6 +2729,26 @@ impl<'a> VM<'a> {
                         self.push(out);
                         Ok(())
                     }
+                    Op::ArrowArraySlice(n) => {
+                        let n = *n as usize;
+                        let mut idxs = Vec::with_capacity(n);
+                        for _ in 0..n {
+                            idxs.push(self.pop().to_int());
+                        }
+                        idxs.reverse();
+                        let r = self.pop();
+                        let line = self.line();
+                        let mut out = Vec::with_capacity(n);
+                        for idx in idxs {
+                            let v = vm_interp_result(
+                                self.interp.read_arrow_array_element(r.clone(), idx, line),
+                                line,
+                            )?;
+                            out.push(v);
+                        }
+                        self.push(PerlValue::array(out));
+                        Ok(())
+                    }
                     Op::SetHashSliceDeref(n) => {
                         let n = *n as usize;
                         let mut key_vals = Vec::with_capacity(n);

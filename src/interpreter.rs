@@ -4950,25 +4950,22 @@ impl Interpreter {
                 self.symbolic_deref(val, *kind, line)
             }
             ExprKind::ArrowDeref { expr, index, kind } => {
-                let val = self.eval_expr(expr)?;
                 match kind {
                     DerefKind::Array => {
-                        let idx = self.eval_expr(index)?.to_int();
-                        if let Some(r) = val.as_array_ref() {
-                            let arr = r.read();
-                            let i = if idx < 0 {
-                                (arr.len() as i64 + idx) as usize
-                            } else {
-                                idx as usize
-                            };
-                            return Ok(arr.get(i).cloned().unwrap_or(PerlValue::UNDEF));
+                        let container = self.eval_arrow_array_base(expr, line)?;
+                        if let ExprKind::List(indices) = &index.kind {
+                            let mut out = Vec::with_capacity(indices.len());
+                            for ix in indices {
+                                let idx = self.eval_expr(ix)?.to_int();
+                                out.push(self.read_arrow_array_element(container.clone(), idx, line)?);
+                            }
+                            return Ok(PerlValue::array(out));
                         }
-                        Err(
-                            PerlError::runtime("Can't use arrow deref on non-array-ref", line)
-                                .into(),
-                        )
+                        let idx = self.eval_expr(index)?.to_int();
+                        self.read_arrow_array_element(container, idx, line)
                     }
                     DerefKind::Hash => {
+                        let val = self.eval_expr(expr)?;
                         let key = self.eval_expr(index)?.to_string();
                         if let Some(r) = val.as_hash_ref() {
                             let h = r.read();
@@ -4996,6 +4993,7 @@ impl Interpreter {
                     }
                     DerefKind::Call => {
                         // $coderef->(args)
+                        let val = self.eval_expr(expr)?;
                         if let ExprKind::List(ref arg_exprs) = index.kind {
                             let mut args = Vec::new();
                             for a in arg_exprs {
@@ -7781,6 +7779,22 @@ impl Interpreter {
         .into())
     }
 
+    /// For `$aref->[ix]` / `@$r[ix]` arrow-array ops: the container must be the array **reference** (scalar),
+    /// not `@{...}` / `@$r` expansion (which yields a plain array value).
+    pub(crate) fn eval_arrow_array_base(
+        &mut self,
+        expr: &Expr,
+        line: usize,
+    ) -> Result<PerlValue, FlowOrError> {
+        match &expr.kind {
+            ExprKind::Deref {
+                expr: inner,
+                kind: Sigil::Array,
+            } => self.eval_expr(inner),
+            _ => self.eval_expr(expr),
+        }
+    }
+
     /// Read `$aref->[$i]` — same indexing as the VM [`crate::bytecode::Op::ArrowArray`].
     pub(crate) fn read_arrow_array_element(
         &self,
@@ -8102,8 +8116,22 @@ impl Interpreter {
                 index,
                 kind: DerefKind::Array,
             } => {
+                let container = self.eval_arrow_array_base(expr, target.line)?;
+                if let ExprKind::List(indices) = &index.kind {
+                    let vals = val.to_list();
+                    let n = indices.len().min(vals.len());
+                    for i in 0..n {
+                        let idx = self.eval_expr(&indices[i])?.to_int();
+                        self.assign_arrow_array_deref(
+                            container.clone(),
+                            idx,
+                            vals[i].clone(),
+                            target.line,
+                        )?;
+                    }
+                    return Ok(PerlValue::UNDEF);
+                }
                 let idx = self.eval_expr(index)?.to_int();
-                let container = self.eval_expr(expr)?;
                 self.assign_arrow_array_deref(container, idx, val, target.line)
             }
             ExprKind::HashSliceDeref { container, keys } => {
