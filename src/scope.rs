@@ -57,6 +57,9 @@ enum LocalRestore {
 struct Frame {
     scalars: Vec<(String, PerlValue)>,
     arrays: Vec<(String, Vec<PerlValue>)>,
+    /// Subroutine (or bootstrap) `@_` — stored separately so call paths can move the arg
+    /// [`Vec`] into the frame without an extra copy via [`Frame::arrays`].
+    sub_underscore: Option<Vec<PerlValue>>,
     hashes: Vec<(String, IndexMap<String, PerlValue>)>,
     /// Slot-indexed scalars for O(1) access from compiled subroutines.
     /// Compiler assigns `my $x` declarations a u8 slot index; the VM accesses
@@ -85,6 +88,7 @@ impl Frame {
         Self {
             scalars: Vec::new(),
             arrays: Vec::new(),
+            sub_underscore: None,
             hashes: Vec::new(),
             scalar_slots: Vec::new(),
             scalar_slot_names: Vec::new(),
@@ -120,16 +124,29 @@ impl Frame {
 
     #[inline]
     fn get_array(&self, name: &str) -> Option<&Vec<PerlValue>> {
+        if name == "_" {
+            if let Some(ref v) = self.sub_underscore {
+                return Some(v);
+            }
+        }
         self.arrays.iter().find(|(k, _)| k == name).map(|(_, v)| v)
     }
 
     #[inline]
     fn has_array(&self, name: &str) -> bool {
+        if name == "_" {
+            if self.sub_underscore.is_some() {
+                return true;
+            }
+        }
         self.arrays.iter().any(|(k, _)| k == name)
     }
 
     #[inline]
     fn get_array_mut(&mut self, name: &str) -> Option<&mut Vec<PerlValue>> {
+        if name == "_" {
+            return self.sub_underscore.as_mut();
+        }
         self.arrays
             .iter_mut()
             .find(|(k, _)| k == name)
@@ -138,6 +155,13 @@ impl Frame {
 
     #[inline]
     fn set_array(&mut self, name: &str, val: Vec<PerlValue>) {
+        if name == "_" {
+            if let Some(pos) = self.arrays.iter().position(|(k, _)| k == name) {
+                self.arrays.swap_remove(pos);
+            }
+            self.sub_underscore = Some(val);
+            return;
+        }
         if let Some(entry) = self.arrays.iter_mut().find(|(k, _)| k == name) {
             entry.1 = val;
         } else {
@@ -293,6 +317,7 @@ impl Scope {
         if let Some(mut frame) = self.frame_pool.pop() {
             frame.scalars.clear();
             frame.arrays.clear();
+            frame.sub_underscore = None;
             frame.hashes.clear();
             frame.scalar_slots.clear();
             frame.scalar_slot_names.clear();
@@ -357,7 +382,8 @@ impl Scope {
         if idx >= frame.scalar_slots.len() {
             frame.scalar_slots.resize(idx + 1, PerlValue::UNDEF);
         }
-        let new_val = std::mem::replace(&mut frame.scalar_slots[idx], PerlValue::UNDEF).concat_append_owned(rhs);
+        let new_val = std::mem::replace(&mut frame.scalar_slots[idx], PerlValue::UNDEF)
+            .concat_append_owned(rhs);
         frame.scalar_slots[idx] = new_val.clone();
         new_val
     }
@@ -712,7 +738,8 @@ impl Scope {
                 }
                 // Use `into_string` + `append_to` so heap strings take the `Arc::try_unwrap`
                 // fast path instead of `Display` / heap formatting on every `.=`.
-                let new_val = std::mem::replace(&mut entry.1, PerlValue::UNDEF).concat_append_owned(rhs);
+                let new_val =
+                    std::mem::replace(&mut entry.1, PerlValue::UNDEF).concat_append_owned(rhs);
                 entry.1 = new_val.clone();
                 return Ok(new_val);
             }

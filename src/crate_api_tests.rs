@@ -1221,7 +1221,10 @@ fn try_vm_execute_multi_index_array_slice_assign() {
     .expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
-    assert!(out.is_some(), "multi-index array slice assign should compile");
+    assert!(
+        out.is_some(),
+        "multi-index array slice assign should compile"
+    );
     assert_eq!(out.unwrap().expect("vm").to_string(), "10,200,30,400,50");
 }
 

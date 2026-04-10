@@ -369,18 +369,20 @@ fn find_sub_entry_slice(
     None
 }
 
-/// `Op::Call` that can be lowered to [`crate::vm::perlrs_jit_call_sub`] (compiled sub, stack args, scalar).
+/// `Op::Call` / [`Op::CallStaticSubId`] that can be lowered to [`crate::vm::perlrs_jit_call_sub`].
 fn call_is_jitable(op: &Op, sub_entries: &[(u16, usize, bool)]) -> bool {
-    let Op::Call(name_idx, argc, wa) = op else {
-        return false;
+    let (name_idx, argc, wa) = match op {
+        Op::Call(ni, a, w) => (*ni, *a, *w),
+        Op::CallStaticSubId(_, ni, a, w) => (*ni, *a, *w),
+        _ => return false,
     };
-    if WantarrayCtx::from_byte(*wa) != WantarrayCtx::Scalar {
+    if WantarrayCtx::from_byte(wa) != WantarrayCtx::Scalar {
         return false;
     }
-    if *argc == 0 || *argc > 8 {
+    if argc == 0 || argc > 8 {
         return false;
     }
-    find_sub_entry_slice(sub_entries, *name_idx)
+    find_sub_entry_slice(sub_entries, name_idx)
         .map(|(_, stack_args)| stack_args)
         .unwrap_or(false)
 }
@@ -1097,15 +1099,15 @@ fn simulate_one_op(
                 _ => Cell::Dyn,
             });
         }
-        Op::Call(_, _, _) => {
+        Op::Call(_, _, _) | Op::CallStaticSubId(_, _, _, _) => {
             let se = sub_entries?;
             if !call_is_jitable(op, se) {
                 return None;
             }
-            let Op::Call(_, argc, _) = op else {
-                return None;
+            let argc = match op {
+                Op::Call(_, a, _) | Op::CallStaticSubId(_, _, a, _) => *a as usize,
+                _ => return None,
             };
-            let argc = *argc as usize;
             for _ in 0..argc {
                 stack.pop()?;
             }
@@ -1967,8 +1969,10 @@ pub(crate) fn segment_blocks_subroutine_linear_jit(
     sub_entries: &[(u16, usize, bool)],
 ) -> bool {
     seg.iter().any(|o| match o {
-        Op::Call(_, _, _) if call_is_jitable(o, sub_entries) => false,
-        Op::Call(_, _, _) => true,
+        Op::Call(_, _, _) | Op::CallStaticSubId(_, _, _, _) if call_is_jitable(o, sub_entries) => {
+            false
+        }
+        Op::Call(_, _, _) | Op::CallStaticSubId(_, _, _, _) => true,
         Op::Jump(_)
         | Op::JumpIfTrue(_)
         | Op::JumpIfFalse(_)
@@ -2134,7 +2138,7 @@ fn find_block_starts(ops: &[Op]) -> BTreeSet<usize> {
 
 /// Returns `true` when `op` is a supported data (non-control-flow) operation for the block JIT.
 fn is_block_data_op(op: &Op, sub_entries: &[(u16, usize, bool)]) -> bool {
-    if matches!(op, Op::Call(..)) {
+    if matches!(op, Op::Call(..) | Op::CallStaticSubId(..)) {
         return call_is_jitable(op, sub_entries);
     }
     matches!(
@@ -3091,7 +3095,7 @@ fn emit_data_op(
             let call = bcx.ins().call(fr, &[a, b, k]);
             stack.push((*bcx.inst_results(call).first()?, JitTy::Int));
         }
-        Op::Call(name_idx, argc, wa) => {
+        Op::Call(name_idx, argc, wa) | Op::CallStaticSubId(_, name_idx, argc, wa) => {
             let (entry_ip, stack_args) = find_sub_entry_slice(sub_entries, *name_idx)?;
             if !stack_args
                 || !call_is_jitable(op, sub_entries)

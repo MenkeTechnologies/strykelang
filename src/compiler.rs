@@ -247,6 +247,50 @@ impl Compiler {
         name.to_string()
     }
 
+    /// Stash key for a subroutine name in the current package (matches [`Interpreter::qualify_sub_key`]).
+    fn qualify_sub_key(&self, name: &str) -> String {
+        if name.contains("::") {
+            return name.to_string();
+        }
+        let pkg = &self.current_package;
+        if pkg.is_empty() || pkg == "main" {
+            name.to_string()
+        } else {
+            format!("{}::{}", pkg, name)
+        }
+    }
+
+    /// First-pass sub registration: walk `package` statements like [`Self::compile_program`] does for
+    /// sub bodies so forward `sub` entries use the same stash key as runtime registration.
+    fn qualify_sub_decl_pass1(name: &str, pending_pkg: &str) -> String {
+        if name.contains("::") {
+            return name.to_string();
+        }
+        if pending_pkg.is_empty() || pending_pkg == "main" {
+            name.to_string()
+        } else {
+            format!("{}::{}", pending_pkg, name)
+        }
+    }
+
+    /// After all `sub` bodies are lowered, replace [`Op::Call`] with [`Op::CallStaticSubId`] when the
+    /// callee has a compiled entry (avoids linear `sub_entries` scan + extra stash work per call).
+    fn patch_static_sub_calls(chunk: &mut Chunk) {
+        for i in 0..chunk.ops.len() {
+            if let Op::Call(name_idx, argc, wa) = chunk.ops[i] {
+                if let Some((entry_ip, stack_args)) = chunk.find_sub_entry(name_idx) {
+                    if entry_ip > 0 && chunk.static_sub_calls.len() < u16::MAX as usize {
+                        let sid = chunk.static_sub_calls.len() as u16;
+                        chunk
+                            .static_sub_calls
+                            .push((entry_ip, stack_args, name_idx));
+                        chunk.ops[i] = Op::CallStaticSubId(sid, name_idx, argc, wa);
+                    }
+                }
+            }
+        }
+    }
+
     /// For `$aref->[ix]` / `@$r[ix]` arrow-array ops: the stack must hold the **array reference**
     /// (scalar), not `@{...}` / `@$r` expansion (which would push a cloned plain array).
     fn compile_arrow_array_base_expr(&mut self, expr: &Expr) -> Result<(), CompileError> {
@@ -644,12 +688,17 @@ impl Compiler {
             }
         }
 
-        // First pass: register sub names for forward calls.
+        // First pass: register sub names for forward calls (qualified stash keys, same as runtime).
+        let mut pending_pkg = String::new();
         for stmt in &program.statements {
-            if let StmtKind::SubDecl { name, .. } = &stmt.kind {
-                let name_idx = self.chunk.intern_name(name);
-                // Will be patched later
-                self.chunk.sub_entries.push((name_idx, 0, false));
+            match &stmt.kind {
+                StmtKind::Package { name } => pending_pkg = name.clone(),
+                StmtKind::SubDecl { name, .. } => {
+                    let q = Self::qualify_sub_decl_pass1(name, &pending_pkg);
+                    let name_idx = self.chunk.intern_name(&q);
+                    self.chunk.sub_entries.push((name_idx, 0, false));
+                }
+                _ => {}
             }
         }
 
@@ -812,7 +861,8 @@ impl Compiler {
             self.current_package = sub_pkg.clone();
             self.push_scope_layer_with_slots();
             let entry_ip = self.chunk.len();
-            let name_idx = self.chunk.intern_name(name);
+            let q = self.qualify_sub_key(name);
+            let name_idx = self.chunk.intern_name(&q);
             // Patch the entry point
             for e in &mut self.chunk.sub_entries {
                 if e.0 == name_idx {
@@ -846,6 +896,8 @@ impl Compiler {
                 self.chunk.block_bytecode_ranges[i] = Some(range);
             }
         }
+
+        Self::patch_static_sub_calls(&mut self.chunk);
 
         Ok(self.chunk)
     }
@@ -3193,7 +3245,8 @@ impl Compiler {
                     for arg in args {
                         self.compile_expr(arg)?;
                     }
-                    let name_idx = self.chunk.intern_name(name);
+                    let q = self.qualify_sub_key(name);
+                    let name_idx = self.chunk.intern_name(&q);
                     self.emit_op(
                         Op::Call(name_idx, args.len() as u8, ctx.as_byte()),
                         line,
@@ -4134,7 +4187,8 @@ impl Compiler {
             }
             ExprKind::SubroutineRef(name) => {
                 // Unary `&name` — invoke subroutine with no explicit args (same as tree `call_named_sub`).
-                let name_idx = self.chunk.intern_name(name);
+                let q = self.qualify_sub_key(name);
+                let name_idx = self.chunk.intern_name(&q);
                 self.emit_op(Op::Call(name_idx, 0, ctx.as_byte()), line, Some(root));
             }
             ExprKind::SubroutineCodeRef(name) => {

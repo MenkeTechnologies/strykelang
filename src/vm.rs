@@ -32,6 +32,7 @@ struct ParallelBlockVmShared {
     constants: Arc<Vec<PerlValue>>,
     lines: Arc<Vec<usize>>,
     sub_entries: Vec<(u16, usize, bool)>,
+    static_sub_calls: Vec<(usize, bool, u16)>,
     blocks: Vec<Block>,
     block_bytecode_ranges: Vec<Option<(usize, usize)>>,
     given_entries: Vec<(Expr, Block)>,
@@ -66,6 +67,7 @@ impl ParallelBlockVmShared {
             constants: Arc::clone(&vm.constants),
             lines: Arc::clone(&vm.lines),
             sub_entries: vm.sub_entries.clone(),
+            static_sub_calls: vm.static_sub_calls.clone(),
             blocks: vm.blocks.clone(),
             block_bytecode_ranges: vm.block_bytecode_ranges.clone(),
             given_entries: vm.given_entries.clone(),
@@ -100,6 +102,7 @@ impl ParallelBlockVmShared {
             ops: Arc::clone(&self.ops),
             lines: Arc::clone(&self.lines),
             sub_entries: self.sub_entries.clone(),
+            static_sub_calls: self.static_sub_calls.clone(),
             blocks: self.blocks.clone(),
             block_bytecode_ranges: self.block_bytecode_ranges.clone(),
             given_entries: self.given_entries.clone(),
@@ -149,6 +152,7 @@ impl ParallelBlockVmShared {
             pending_catch_error: None,
             exit_main_dispatch: false,
             exit_main_dispatch_value: None,
+            dispatch_cached_line: 0,
             block_region_mode: false,
             block_region_end: 0,
             block_region_return: None,
@@ -199,6 +203,8 @@ pub struct VM<'a> {
     ops: Arc<Vec<Op>>,
     lines: Arc<Vec<usize>>,
     sub_entries: Vec<(u16, usize, bool)>,
+    /// See [`Chunk::static_sub_calls`] (`Op::CallStaticSubId`).
+    static_sub_calls: Vec<(usize, bool, u16)>,
     blocks: Vec<Block>,
     /// Optional `ops[start..end]` lowering for [`Self::blocks`] (see [`Chunk::block_bytecode_ranges`]).
     block_bytecode_ranges: Vec<Option<(usize, usize)>>,
@@ -257,6 +263,8 @@ pub struct VM<'a> {
     exit_main_dispatch: bool,
     /// Top-level [`Op::ReturnValue`] with no frame: value for implicit return (was `last = val; break`).
     exit_main_dispatch_value: Option<PerlValue>,
+    /// Last line number used for `self.line()` in the main dispatch loop (skip `lines.get` when same as prior op).
+    dispatch_cached_line: usize,
     /// When executing [`Chunk::block_bytecode_ranges`] via [`Self::run_block_region`].
     block_region_mode: bool,
     block_region_end: usize,
@@ -271,6 +279,7 @@ impl<'a> VM<'a> {
             ops: Arc::new(chunk.ops.clone()),
             lines: Arc::new(chunk.lines.clone()),
             sub_entries: chunk.sub_entries.clone(),
+            static_sub_calls: chunk.static_sub_calls.clone(),
             blocks: chunk.blocks.clone(),
             block_bytecode_ranges: chunk.block_bytecode_ranges.clone(),
             given_entries: chunk.given_entries.clone(),
@@ -323,6 +332,7 @@ impl<'a> VM<'a> {
             pending_catch_error: None,
             exit_main_dispatch: false,
             exit_main_dispatch_value: None,
+            dispatch_cached_line: 0,
             block_region_mode: false,
             block_region_end: 0,
             block_region_return: None,
@@ -1349,6 +1359,177 @@ impl<'a> VM<'a> {
         Ok(true)
     }
 
+    /// Stash lookup only (qualified key from compiler); avoids `resolve_sub_by_name`'s package fallback on hot calls.
+    #[inline]
+    fn sub_for_closure_restore(&self, name: &str) -> Option<Arc<PerlSub>> {
+        self.interp.subs.get(name).cloned()
+    }
+
+    fn vm_dispatch_user_call(
+        &mut self,
+        name_idx: u16,
+        entry_opt: Option<(usize, bool)>,
+        argc_u8: u8,
+        wa_byte: u8,
+    ) -> PerlResult<()> {
+        let name_owned = self.names[name_idx as usize].clone();
+        let name = name_owned.as_str();
+        let argc = argc_u8 as usize;
+        let want = WantarrayCtx::from_byte(wa_byte);
+
+        if let Some((entry_ip, stack_args)) = entry_opt {
+            let saved_wa = self.interp.wantarray_kind;
+            let sub_prof_t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
+            if let Some(p) = &mut self.interp.profiler {
+                p.enter_sub(name);
+            }
+
+            if stack_args {
+                let eff_argc = if argc == 0 {
+                    self.push(self.interp.scope.get_scalar("_").clone());
+                    1
+                } else {
+                    argc
+                };
+                let stack_base = self.stack.len() - eff_argc;
+                self.call_stack.push(CallFrame {
+                    return_ip: self.ip,
+                    stack_base,
+                    scope_depth: self.interp.scope.depth(),
+                    saved_wantarray: saved_wa,
+                    jit_trampoline_return: false,
+                    block_region: false,
+                    sub_profiler_start: sub_prof_t0,
+                });
+                self.interp.wantarray_kind = want;
+                self.interp.scope_push_hook();
+                if let Some(sub) = self.sub_for_closure_restore(name) {
+                    if let Some(ref env) = sub.closure_env {
+                        self.interp.scope.restore_capture(env);
+                    }
+                }
+                self.ip = entry_ip;
+            } else {
+                let mut args = Vec::with_capacity(argc);
+                for _ in 0..argc {
+                    let v = self.pop();
+                    if let Some(items) = v.as_array_vec() {
+                        args.extend(items);
+                    } else {
+                        args.push(v);
+                    }
+                }
+                args.reverse();
+                let args = self.interp.with_topic_default_args(args);
+                self.call_stack.push(CallFrame {
+                    return_ip: self.ip,
+                    stack_base: self.stack.len(),
+                    scope_depth: self.interp.scope.depth(),
+                    saved_wantarray: saved_wa,
+                    jit_trampoline_return: false,
+                    block_region: false,
+                    sub_profiler_start: sub_prof_t0,
+                });
+                self.interp.wantarray_kind = want;
+                self.interp.scope_push_hook();
+                self.interp.scope.declare_array("_", args);
+                if let Some(sub) = self.sub_for_closure_restore(name) {
+                    if let Some(ref env) = sub.closure_env {
+                        self.interp.scope.restore_capture(env);
+                    }
+                }
+                self.ip = entry_ip;
+            }
+        } else {
+            let mut args = Vec::with_capacity(argc);
+            for _ in 0..argc {
+                let v = self.pop();
+                if let Some(items) = v.as_array_vec() {
+                    args.extend(items);
+                } else {
+                    args.push(v);
+                }
+            }
+            args.reverse();
+
+            if let Some(r) = crate::builtins::try_builtin(self.interp, name, &args, self.line()) {
+                self.push(r?);
+            } else if let Some(sub) = self.interp.resolve_sub_by_name(name) {
+                let t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
+                if let Some(p) = &mut self.interp.profiler {
+                    p.enter_sub(name);
+                }
+                let args = self.interp.with_topic_default_args(args);
+                let saved_wa = self.interp.wantarray_kind;
+                self.interp.wantarray_kind = want;
+                self.interp.scope_push_hook();
+                let argv = args.clone();
+                self.interp.scope.declare_array("_", args);
+                if let Some(ref env) = sub.closure_env {
+                    self.interp.scope.restore_capture(env);
+                }
+                let result = if let Some(r) =
+                    crate::list_util::native_dispatch(self.interp, &sub, &argv, want)
+                {
+                    r
+                } else {
+                    self.interp.exec_block_no_scope(&sub.body)
+                };
+                self.interp.wantarray_kind = saved_wa;
+                self.interp.scope_pop_hook();
+                match result {
+                    Ok(v) => self.push(v),
+                    Err(crate::interpreter::FlowOrError::Flow(
+                        crate::interpreter::Flow::Return(v),
+                    )) => self.push(v),
+                    Err(crate::interpreter::FlowOrError::Error(e)) => {
+                        if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
+                            p.exit_sub(t0.elapsed());
+                        }
+                        return Err(e);
+                    }
+                    Err(_) => self.push(PerlValue::UNDEF),
+                }
+                if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
+                    p.exit_sub(t0.elapsed());
+                }
+            } else if let Some(result) = self.interp.try_autoload_call(
+                name,
+                self.interp.with_topic_default_args(args),
+                self.line(),
+                want,
+                None,
+            ) {
+                let t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
+                if let Some(p) = &mut self.interp.profiler {
+                    p.enter_sub(name);
+                }
+                match result {
+                    Ok(v) => self.push(v),
+                    Err(crate::interpreter::FlowOrError::Flow(
+                        crate::interpreter::Flow::Return(v),
+                    )) => self.push(v),
+                    Err(crate::interpreter::FlowOrError::Error(e)) => {
+                        if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
+                            p.exit_sub(t0.elapsed());
+                        }
+                        return Err(e);
+                    }
+                    Err(_) => self.push(PerlValue::UNDEF),
+                }
+                if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
+                    p.exit_sub(t0.elapsed());
+                }
+            } else {
+                return Err(PerlError::runtime(
+                    format!("Undefined subroutine &{}", name),
+                    self.line(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
     fn run_main_dispatch_loop(
         &mut self,
         mut last: PerlValue,
@@ -1396,9 +1577,11 @@ impl<'a> VM<'a> {
                 if sub_ip >= self.sub_entry_invoke_count.len() {
                     self.sub_entry_invoke_count.resize(sub_ip + 1, 0);
                 }
-                self.sub_entry_invoke_count[sub_ip] =
-                    self.sub_entry_invoke_count[sub_ip].saturating_add(1);
-                if self.sub_entry_invoke_count[sub_ip] > self.jit_sub_invoke_threshold {
+                let c = &mut self.sub_entry_invoke_count[sub_ip];
+                if *c <= self.jit_sub_invoke_threshold {
+                    *c = c.saturating_add(1);
+                }
+                if *c > self.jit_sub_invoke_threshold {
                     if self.try_jit_subroutine_linear()? {
                         continue;
                     }
@@ -1422,7 +1605,23 @@ impl<'a> VM<'a> {
             }
 
             let ip_before = self.ip;
-            let line = self.lines.get(ip_before).copied().unwrap_or(0);
+            let line = if ip_before == 0 {
+                let l = self.lines.get(0).copied().unwrap_or(0);
+                self.dispatch_cached_line = l;
+                l
+            } else {
+                match (self.lines.get(ip_before), self.lines.get(ip_before - 1)) {
+                    (Some(&a), Some(&b)) if a == b => self.dispatch_cached_line,
+                    (Some(&a), _) => {
+                        self.dispatch_cached_line = a;
+                        a
+                    }
+                    _ => {
+                        self.dispatch_cached_line = 0;
+                        0
+                    }
+                }
+            };
             let op = &ops[self.ip];
             self.ip += 1;
             let op_prof_t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
@@ -2329,177 +2528,16 @@ impl<'a> VM<'a> {
 
                     // ── Functions ──
                     Op::Call(name_idx, argc, wa) => {
-                        let name = names[*name_idx as usize].as_str();
-                        let argc = *argc as usize;
-                        let want = WantarrayCtx::from_byte(*wa);
-
-                        // Check if sub is compiled (has bytecode entry)
-                        if let Some((entry_ip, stack_args)) = self.find_sub_entry(*name_idx) {
-                            let saved_wa = self.interp.wantarray_kind;
-                            let sub_prof_t0 =
-                                self.interp.profiler.is_some().then(std::time::Instant::now);
-                            if let Some(p) = &mut self.interp.profiler {
-                                p.enter_sub(name);
-                            }
-
-                            if stack_args {
-                                // Fast path: leave args on stack, sub reads via GetArg(idx).
-                                // stack_base points at first arg.
-                                let eff_argc = if argc == 0 {
-                                    // Zero-arg call passes `$_` (same as tree `call_named_sub`).
-                                    self.push(self.interp.scope.get_scalar("_").clone());
-                                    1
-                                } else {
-                                    argc
-                                };
-                                let stack_base = self.stack.len() - eff_argc;
-                                self.call_stack.push(CallFrame {
-                                    return_ip: self.ip,
-                                    stack_base,
-                                    scope_depth: self.interp.scope.depth(),
-                                    saved_wantarray: saved_wa,
-                                    jit_trampoline_return: false,
-                                    block_region: false,
-                                    sub_profiler_start: sub_prof_t0,
-                                });
-                                self.interp.wantarray_kind = want;
-                                self.interp.scope_push_hook();
-                                if let Some(sub) = self.interp.resolve_sub_by_name(name) {
-                                    if let Some(ref env) = sub.closure_env {
-                                        self.interp.scope.restore_capture(env);
-                                    }
-                                }
-                                self.ip = entry_ip;
-                            } else {
-                                // Slow path: collect args into @_
-                                let mut args = Vec::with_capacity(argc);
-                                for _ in 0..argc {
-                                    let v = self.pop();
-                                    if let Some(items) = v.as_array_vec() {
-                                        args.extend(items);
-                                    } else {
-                                        args.push(v);
-                                    }
-                                }
-                                args.reverse();
-                                let args = self.interp.with_topic_default_args(args);
-                                self.call_stack.push(CallFrame {
-                                    return_ip: self.ip,
-                                    stack_base: self.stack.len(),
-                                    scope_depth: self.interp.scope.depth(),
-                                    saved_wantarray: saved_wa,
-                                    jit_trampoline_return: false,
-                                    block_region: false,
-                                    sub_profiler_start: sub_prof_t0,
-                                });
-                                self.interp.wantarray_kind = want;
-                                self.interp.scope_push_hook();
-                                self.interp.scope.declare_array("_", args);
-                                if let Some(sub) = self.interp.resolve_sub_by_name(name) {
-                                    if let Some(ref env) = sub.closure_env {
-                                        self.interp.scope.restore_capture(env);
-                                    }
-                                }
-                                self.ip = entry_ip;
-                            }
-                        } else {
-                            // Non-compiled path: collect args from stack
-                            let mut args = Vec::with_capacity(argc);
-                            for _ in 0..argc {
-                                let v = self.pop();
-                                if let Some(items) = v.as_array_vec() {
-                                    args.extend(items);
-                                } else {
-                                    args.push(v);
-                                }
-                            }
-                            args.reverse();
-
-                            if let Some(r) =
-                                crate::builtins::try_builtin(self.interp, name, &args, self.line())
-                            {
-                                self.push(r?);
-                            } else if let Some(sub) = self.interp.resolve_sub_by_name(name) {
-                                // Fall back to tree-walker for non-compiled subs
-                                let t0 =
-                                    self.interp.profiler.is_some().then(std::time::Instant::now);
-                                if let Some(p) = &mut self.interp.profiler {
-                                    p.enter_sub(name);
-                                }
-                                let args = self.interp.with_topic_default_args(args);
-                                let saved_wa = self.interp.wantarray_kind;
-                                self.interp.wantarray_kind = want;
-                                self.interp.scope_push_hook();
-                                let argv = args.clone();
-                                self.interp.scope.declare_array("_", args);
-                                if let Some(ref env) = sub.closure_env {
-                                    self.interp.scope.restore_capture(env);
-                                }
-                                let result = if let Some(r) = crate::list_util::native_dispatch(
-                                    self.interp,
-                                    &sub,
-                                    &argv,
-                                    want,
-                                ) {
-                                    r
-                                } else {
-                                    self.interp.exec_block_no_scope(&sub.body)
-                                };
-                                self.interp.wantarray_kind = saved_wa;
-                                self.interp.scope_pop_hook();
-                                match result {
-                                    Ok(v) => self.push(v),
-                                    Err(crate::interpreter::FlowOrError::Flow(
-                                        crate::interpreter::Flow::Return(v),
-                                    )) => self.push(v),
-                                    Err(crate::interpreter::FlowOrError::Error(e)) => {
-                                        if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0)
-                                        {
-                                            p.exit_sub(t0.elapsed());
-                                        }
-                                        return Err(e);
-                                    }
-                                    Err(_) => self.push(PerlValue::UNDEF),
-                                }
-                                if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
-                                    p.exit_sub(t0.elapsed());
-                                }
-                            } else if let Some(result) = self.interp.try_autoload_call(
-                                name,
-                                self.interp.with_topic_default_args(args),
-                                self.line(),
-                                want,
-                                None,
-                            ) {
-                                let t0 =
-                                    self.interp.profiler.is_some().then(std::time::Instant::now);
-                                if let Some(p) = &mut self.interp.profiler {
-                                    p.enter_sub(name);
-                                }
-                                match result {
-                                    Ok(v) => self.push(v),
-                                    Err(crate::interpreter::FlowOrError::Flow(
-                                        crate::interpreter::Flow::Return(v),
-                                    )) => self.push(v),
-                                    Err(crate::interpreter::FlowOrError::Error(e)) => {
-                                        if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0)
-                                        {
-                                            p.exit_sub(t0.elapsed());
-                                        }
-                                        return Err(e);
-                                    }
-                                    Err(_) => self.push(PerlValue::UNDEF),
-                                }
-                                if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
-                                    p.exit_sub(t0.elapsed());
-                                }
-                            } else {
-                                return Err(PerlError::runtime(
-                                    format!("Undefined subroutine &{}", name),
-                                    self.line(),
-                                ));
-                            }
-                        } // close outer else (non-compiled path)
+                        let entry_opt = self.find_sub_entry(*name_idx);
+                        self.vm_dispatch_user_call(*name_idx, entry_opt, *argc, *wa)?;
+                        Ok(())
+                    }
+                    Op::CallStaticSubId(sid, name_idx, argc, wa) => {
+                        let t = self.static_sub_calls.get(*sid as usize).ok_or_else(|| {
+                            PerlError::runtime("VM: invalid CallStaticSubId", self.line())
+                        })?;
+                        debug_assert_eq!(t.2, *name_idx);
+                        self.vm_dispatch_user_call(*name_idx, Some((t.0, t.1)), *argc, *wa)?;
                         Ok(())
                     }
                     Op::Return => {

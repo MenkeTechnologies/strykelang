@@ -4626,7 +4626,9 @@ impl Interpreter {
         if op == BinOp::Concat {
             return self.scope.scalar_concat_inplace(name, &rhs);
         }
-        Ok(self.scope.atomic_mutate(name, |old| Self::compound_scalar_binop(old, op, &rhs)))
+        Ok(self
+            .scope
+            .atomic_mutate(name, |old| Self::compound_scalar_binop(old, op, &rhs)))
     }
 
     fn compound_scalar_binop(old: &PerlValue, op: BinOp, rhs: &PerlValue) -> PerlValue {

@@ -141,6 +141,10 @@ pub enum Op {
     // ── Functions ──
     /// Call subroutine: name index, arg count, `WantarrayCtx` discriminant as `u8`
     Call(u16, u8, u8),
+    /// Like [`Op::Call`] but with a compile-time-resolved entry: `sid` indexes [`Chunk::static_sub_calls`]
+    /// (entry IP + stack-args); `name_idx` duplicates the stash pool index for closure restore / JIT
+    /// (same as in the table; kept in the opcode so JIT does not need the side table).
+    CallStaticSubId(u16, u16, u8, u8),
     Return,
     ReturnValue,
     /// End of a compiled `map` / `grep` / `sort` block body (empty block or last statement an expression).
@@ -666,6 +670,9 @@ pub struct Chunk {
     /// When `Some((start, end))`, `blocks[i]` is also lowered to `ops[start..end]` (exclusive `end`)
     /// with trailing [`Op::BlockReturnValue`]. VM uses opcodes; otherwise the AST in `blocks[i]`.
     pub block_bytecode_ranges: Vec<Option<(usize, usize)>>,
+    /// Resolved [`Op::CallStaticSubId`] targets: subroutine entry IP, stack-args calling convention,
+    /// and stash name pool index (qualified key matching [`Interpreter::subs`]).
+    pub static_sub_calls: Vec<(usize, bool, u16)>,
     /// Assign targets for `s///` / `tr///` bytecode (LHS expressions).
     pub lvalues: Vec<Expr>,
     /// `struct Name { ... }` definitions in this chunk (registered on the interpreter at VM start).
@@ -705,6 +712,14 @@ pub struct Chunk {
 }
 
 impl Chunk {
+    /// Look up a compiled subroutine entry by stash name pool index.
+    pub fn find_sub_entry(&self, name_idx: u16) -> Option<(usize, bool)> {
+        self.sub_entries
+            .iter()
+            .find(|(n, _, _)| *n == name_idx)
+            .map(|(_, ip, stack_args)| (*ip, *stack_args))
+    }
+
     pub fn new() -> Self {
         Self {
             ops: Vec::with_capacity(256),
@@ -716,6 +731,7 @@ impl Chunk {
             sub_entries: Vec::new(),
             blocks: Vec::new(),
             block_bytecode_ranges: Vec::new(),
+            static_sub_calls: Vec::new(),
             lvalues: Vec::new(),
             struct_defs: Vec::new(),
             given_entries: Vec::new(),
