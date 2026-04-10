@@ -91,7 +91,11 @@ measure() {
     ' < "$json"
 }
 
-# Print a row: label | perl5 | perlrs canonical | perlrs perturbed | ratio | warn
+# Print a row: label | perl5 | perlrs JIT | perlrs noJIT | perlrs perturbed | rs/perl5 | jit speedup | warn
+#
+# `noJit` runs the same canonical file under `PERLRS_NO_JIT=1` so the
+# Cranelift block-JIT is disabled and only the bytecode interpreter runs.
+# `jit/noJit` is `noJit_mean / jit_mean` — values >1.0 mean JIT helped.
 #
 # `warn` fires when canonical runs >20% faster than the perturbed variant,
 # which would indicate a shape-specific fast path (the bug bench_fusion.rs
@@ -99,12 +103,14 @@ measure() {
 row() {
     local label="$1" canonical="$2" perturbed="$3"
 
-    read -r p5_mean p5_sd   < <(measure "perl_$label" "$PERL $canonical")
-    read -r rs_mean rs_sd   < <(measure "perlrs_$label" "$PERLRS $canonical")
-    read -r rsp_mean rsp_sd < <(measure "perlrs_${label}_perturbed" "$PERLRS $perturbed")
+    read -r p5_mean p5_sd     < <(measure "perl_$label"               "$PERL $canonical")
+    read -r rs_mean rs_sd     < <(measure "perlrs_$label"             "$PERLRS $canonical")
+    read -r rsnj_mean rsnj_sd < <(measure "perlrs_${label}_nojit"     "$PERLRS --no-jit $canonical")
+    read -r rsp_mean rsp_sd   < <(measure "perlrs_${label}_perturbed" "$PERLRS $perturbed")
 
-    local ratio
+    local ratio jit_speedup
     ratio=$("$PERL" -e 'printf "%.2fx", $ARGV[0]/$ARGV[1]' -- "$rs_mean" "$p5_mean")
+    jit_speedup=$("$PERL" -e 'printf "%.2fx", ($ARGV[1]==0?1:$ARGV[0]/$ARGV[1])' -- "$rsnj_mean" "$rs_mean")
 
     local warn=""
     # Only warn when the absolute gap is meaningful (>1ms) AND the ratio
@@ -117,14 +123,14 @@ row() {
         warn="  WARN: shape fast-path?"
     fi
 
-    printf '  %-12s %10.1f  %10.1f  %10.1f  %8s%s\n' \
-        "$label" "$p5_mean" "$rs_mean" "$rsp_mean" "$ratio" "$warn"
+    printf '  %-12s %10.1f  %10.1f  %10.1f  %10.1f  %8s  %8s%s\n' \
+        "$label" "$p5_mean" "$rs_mean" "$rsnj_mean" "$rsp_mean" "$ratio" "$jit_speedup" "$warn"
 }
 
-printf '  %-12s %10s  %10s  %10s  %8s\n' \
-    'bench' 'perl5 ms' 'perlrs ms' 'perturb ms' 'rs/perl5'
-printf '  %-12s %10s  %10s  %10s  %8s\n' \
-    '---------' '--------' '---------' '---------' '--------'
+printf '  %-12s %10s  %10s  %10s  %10s  %8s  %8s\n' \
+    'bench' 'perl5 ms' 'perlrs ms' 'noJit ms' 'perturb ms' 'rs/perl5' 'jit/noJit'
+printf '  %-12s %10s  %10s  %10s  %10s  %8s  %8s\n' \
+    '---------' '--------' '---------' '--------' '---------' '--------' '---------'
 
 for name in startup fib loop string hash array regex map_grep; do
     file="$HERE/bench_${name}.pl"
@@ -145,6 +151,10 @@ printf '  %-12s %10.1f  %10.1f  %10s\n' 'pmap' "$map_mean" "$pmap_mean" "$pmap_r
 
 printf '\n  Notes:\n'
 printf '    - All timings are mean of at least %s warm runs (warmup=%s).\n' "$RUNS" "$WARMUP"
+printf '    - The "perlrs ms" column has Cranelift block-JIT enabled (default).\n'
+printf '    - The "noJit ms" column runs the same canonical file with\n'
+printf '      "--no-jit" so only the bytecode interpreter executes — the\n'
+printf '      "jit/noJit" ratio is noJit_mean / jit_mean (>1.0 = JIT helped).\n'
 printf '    - The "perturb ms" column runs the same workload through a\n'
 printf '      functionally-equivalent but shape-renamed copy. If it ever\n'
 printf '      diverges from the canonical column, a compile-time shape\n'
