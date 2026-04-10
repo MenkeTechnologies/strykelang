@@ -5,6 +5,7 @@ mod bare_regex_slash;
 mod builtins;
 mod cli_inplace;
 mod cli_profile;
+mod cli_stdin;
 mod closures;
 mod collections;
 mod comments;
