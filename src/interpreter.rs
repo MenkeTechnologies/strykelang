@@ -4192,7 +4192,34 @@ impl Interpreter {
             BinOp::Div => PerlValue::float(old.to_number() / rhs.to_number()),
             BinOp::Mod => PerlValue::float(old.to_number() % rhs.to_number()),
             BinOp::Pow => PerlValue::float(old.to_number().powf(rhs.to_number())),
+            BinOp::LogOr => {
+                if old.is_true() {
+                    old.clone()
+                } else {
+                    rhs.clone()
+                }
+            }
+            BinOp::DefinedOr => {
+                if !old.is_undef() {
+                    old.clone()
+                } else {
+                    rhs.clone()
+                }
+            }
             _ => PerlValue::float(old.to_number() + rhs.to_number()),
+        }
+    }
+
+    /// One `{ ... }` entry in `@h{k1,k2}` may expand to several keys (`qw/a b/` → two keys).
+    fn eval_hash_slice_key_components(
+        &mut self,
+        key_expr: &Expr,
+    ) -> Result<Vec<String>, FlowOrError> {
+        let v = self.eval_expr(key_expr)?;
+        if let Some(vv) = v.as_array_vec() {
+            Ok(vv.iter().map(|x| x.to_string()).collect())
+        } else {
+            Ok(vec![v.to_string()])
         }
     }
 
@@ -4282,6 +4309,11 @@ impl Interpreter {
                 let n = self.resolve_io_handle_name(name);
                 Ok(PerlValue::string(n))
             }
+            ExprKind::TypeglobExpr(e) => {
+                let name = self.eval_expr(e)?.to_string();
+                let n = self.resolve_io_handle_name(&name);
+                Ok(PerlValue::string(n))
+            }
             ExprKind::ArrayElement { array, index } => {
                 self.check_strict_array_var(array, line)?;
                 let idx = self.eval_expr(index)?.to_int();
@@ -4330,8 +4362,25 @@ impl Interpreter {
                 self.touch_env_hash(hash);
                 let mut result = Vec::new();
                 for key_expr in keys {
-                    let k = self.eval_expr(key_expr)?.to_string();
-                    result.push(self.scope.get_hash_element(hash, &k));
+                    for k in self.eval_hash_slice_key_components(key_expr)? {
+                        result.push(self.scope.get_hash_element(hash, &k));
+                    }
+                }
+                Ok(PerlValue::array(result))
+            }
+            ExprKind::HashSliceDeref { container, keys } => {
+                let hv = self.eval_expr(container)?;
+                let h = Self::match_value_as_hash(&hv).ok_or_else(|| {
+                    PerlError::runtime(
+                        "Hash slice dereference needs a hash or hash reference value",
+                        line,
+                    )
+                })?;
+                let mut result = Vec::new();
+                for key_expr in keys {
+                    for k in self.eval_hash_slice_key_components(key_expr)? {
+                        result.push(h.get(&k).cloned().unwrap_or(PerlValue::UNDEF));
+                    }
                 }
                 Ok(PerlValue::array(result))
             }
@@ -4376,6 +4425,16 @@ impl Interpreter {
                 let sub = self.resolve_sub_by_name(name).ok_or_else(|| {
                     PerlError::runtime(
                         format!("Undefined subroutine {}", self.qualify_sub_key(name)),
+                        line,
+                    )
+                })?;
+                Ok(PerlValue::code_ref(sub))
+            }
+            ExprKind::DynamicSubCodeRef(expr) => {
+                let name = self.eval_expr(expr)?.to_string();
+                let sub = self.resolve_sub_by_name(&name).ok_or_else(|| {
+                    PerlError::runtime(
+                        format!("Undefined subroutine {}", self.qualify_sub_key(&name)),
                         line,
                     )
                 })?;
@@ -4729,15 +4788,32 @@ impl Interpreter {
                 Ok(val)
             }
             ExprKind::CompoundAssign { target, op, value } => {
-                // Evaluate the RHS first (before locking for atomic vars)
-                let rhs = self.eval_expr(value)?;
-                // For scalar targets, use atomic_mutate to hold the lock
+                // For scalar targets, use atomic_mutate to hold the lock.
+                // `||=` / `//=` short-circuit: do not evaluate RHS if LHS is already true / defined.
                 if let ExprKind::ScalarVar(name) = &target.kind {
                     self.check_strict_scalar_var(name, line)?;
                     let n = self.english_scalar_name(name);
                     let op = *op;
+                    let rhs = match op {
+                        BinOp::LogOr => {
+                            let old = self.scope.get_scalar(n);
+                            if old.is_true() {
+                                return Ok(old);
+                            }
+                            self.eval_expr(value)?
+                        }
+                        BinOp::DefinedOr => {
+                            let old = self.scope.get_scalar(n);
+                            if !old.is_undef() {
+                                return Ok(old);
+                            }
+                            self.eval_expr(value)?
+                        }
+                        _ => self.eval_expr(value)?,
+                    };
                     return Ok(self.scalar_compound_assign_scalar_target(n, op, rhs));
                 }
+                let rhs = self.eval_expr(value)?;
                 // For hash element targets: $h{key} += 1
                 if let ExprKind::HashElement { hash, key } = &target.kind {
                     self.check_strict_hash_var(hash, line)?;
@@ -5044,31 +5120,61 @@ impl Interpreter {
             ExprKind::SortExpr { cmp, list } => {
                 let list_val = self.eval_expr(list)?;
                 let mut items = list_val.to_list();
-                if let Some(cmp_block) = cmp {
-                    if let Some(mode) = detect_sort_block_fast(cmp_block) {
-                        items.sort_by(|a, b| sort_magic_cmp(a, b, mode));
-                    } else {
-                        let cmp_block = cmp_block.clone();
+                match cmp {
+                    Some(SortComparator::Code(code_expr)) => {
+                        let sub = self.eval_expr(code_expr)?;
+                        let Some(sub) = sub.as_code_ref() else {
+                            return Err(
+                                PerlError::runtime("sort: comparator must be a code reference", line)
+                                    .into(),
+                            );
+                        };
+                        let sub = sub.clone();
                         items.sort_by(|a, b| {
                             let _ = self.scope.set_scalar("a", a.clone());
                             let _ = self.scope.set_scalar("b", b.clone());
-                            match self.exec_block(&cmp_block) {
+                            match self.call_sub(&sub, vec![], ctx, line) {
                                 Ok(v) => {
                                     let n = v.to_int();
                                     if n < 0 {
-                                        std::cmp::Ordering::Less
+                                        Ordering::Less
                                     } else if n > 0 {
-                                        std::cmp::Ordering::Greater
+                                        Ordering::Greater
                                     } else {
-                                        std::cmp::Ordering::Equal
+                                        Ordering::Equal
                                     }
                                 }
-                                Err(_) => std::cmp::Ordering::Equal,
+                                Err(_) => Ordering::Equal,
                             }
                         });
                     }
-                } else {
-                    items.sort_by_key(|a| a.to_string());
+                    Some(SortComparator::Block(cmp_block)) => {
+                        if let Some(mode) = detect_sort_block_fast(cmp_block) {
+                            items.sort_by(|a, b| sort_magic_cmp(a, b, mode));
+                        } else {
+                            let cmp_block = cmp_block.clone();
+                            items.sort_by(|a, b| {
+                                let _ = self.scope.set_scalar("a", a.clone());
+                                let _ = self.scope.set_scalar("b", b.clone());
+                                match self.exec_block(&cmp_block) {
+                                    Ok(v) => {
+                                        let n = v.to_int();
+                                        if n < 0 {
+                                            Ordering::Less
+                                        } else if n > 0 {
+                                            Ordering::Greater
+                                        } else {
+                                            Ordering::Equal
+                                        }
+                                    }
+                                    Err(_) => Ordering::Equal,
+                                }
+                            });
+                        }
+                    }
+                    None => {
+                        items.sort_by_key(|a| a.to_string());
+                    }
                 }
                 Ok(PerlValue::array(items))
             }
@@ -7214,6 +7320,14 @@ impl Interpreter {
                     target.line,
                 )
                 .into())
+            }
+            ExprKind::TypeglobExpr(e) => {
+                let name = self.eval_expr(e)?.to_string();
+                let synthetic = Expr {
+                    kind: ExprKind::Typeglob(name),
+                    line: target.line,
+                };
+                self.assign_value(&synthetic, val)
             }
             ExprKind::ArrowDeref {
                 expr,

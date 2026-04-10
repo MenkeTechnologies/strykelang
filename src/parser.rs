@@ -119,15 +119,21 @@ impl Parser {
     fn parse_statement(&mut self) -> PerlResult<Statement> {
         let line = self.peek_line();
 
-        // Check for label
-        let label = if let Token::Label(_) = self.peek() {
-            if let (Token::Label(l), _) = self.advance() {
-                Some(l)
-            } else {
-                None
+        // Statement label `FOO:` / `BAR_BAZ:` (not lexed as one token — `ALLCAPS:` inside
+        // `? THEN : ELSE` would be mis-tokenized as a label and break ternary parsing).
+        let label = match self.peek().clone() {
+            Token::Ident(ref id) if id.chars().all(|c| c.is_uppercase() || c == '_') => {
+                if matches!(self.peek_at(1), Token::Colon) && !matches!(self.peek_at(2), Token::Colon)
+                {
+                    let l = id.clone();
+                    self.advance();
+                    self.advance();
+                    Some(l)
+                } else {
+                    None
+                }
             }
-        } else {
-            None
+            _ => None,
         };
 
         let mut stmt = match self.peek().clone() {
@@ -1411,38 +1417,124 @@ impl Parser {
         let prototype = if matches!(self.peek(), Token::LParen) {
             self.advance();
             let mut s = String::new();
-            while !matches!(self.peek(), Token::RParen | Token::Eof) {
-                let (tok, _) = self.advance();
-                match tok {
-                    Token::Ident(i) => s.push_str(&i),
-                    Token::Semicolon => s.push(';'),
-                    Token::LParen => s.push('('),
-                    Token::LBracket => s.push('['),
-                    Token::RBracket => s.push(']'),
-                    Token::Backslash => s.push('\\'),
-                    Token::Comma => s.push(','),
+            loop {
+                match self.peek().clone() {
+                    Token::RParen => {
+                        self.advance();
+                        break;
+                    }
+                    Token::Eof => {
+                        return Err(PerlError::syntax(
+                            "Unterminated sub prototype (expected ')' before end of input)",
+                            self.peek_line(),
+                        ));
+                    }
+                    Token::ScalarVar(v) if v == ")" => {
+                        // Lexer merges `$` + `)` into one token (`$)`). In `sub name ($) {`, the
+                        // closing `)` of the prototype is not a separate `RParen` — next is `{`.
+                        self.advance();
+                        s.push('$');
+                        if matches!(self.peek(), Token::LBrace) {
+                            break;
+                        }
+                    }
+                    Token::Ident(i) => {
+                        let i = i.clone();
+                        self.advance();
+                        s.push_str(&i);
+                    }
+                    Token::Semicolon => {
+                        self.advance();
+                        s.push(';');
+                    }
+                    Token::LParen => {
+                        self.advance();
+                        s.push('(');
+                    }
+                    Token::LBracket => {
+                        self.advance();
+                        s.push('[');
+                    }
+                    Token::RBracket => {
+                        self.advance();
+                        s.push(']');
+                    }
+                    Token::Backslash => {
+                        self.advance();
+                        s.push('\\');
+                    }
+                    Token::Comma => {
+                        self.advance();
+                        s.push(',');
+                    }
                     Token::ScalarVar(v) => {
+                        let v = v.clone();
+                        self.advance();
                         s.push('$');
                         s.push_str(&v);
                     }
                     Token::ArrayVar(v) => {
+                        let v = v.clone();
+                        self.advance();
                         s.push('@');
                         s.push_str(&v);
                     }
                     Token::HashVar(v) => {
+                        let v = v.clone();
+                        self.advance();
                         s.push('%');
                         s.push_str(&v);
                     }
-                    Token::Plus => s.push('+'),
-                    Token::Minus => s.push('-'),
-                    _ => {}
+                    Token::Plus => {
+                        self.advance();
+                        s.push('+');
+                    }
+                    Token::Minus => {
+                        self.advance();
+                        s.push('-');
+                    }
+                    tok => {
+                        return Err(PerlError::syntax(
+                            format!("Unexpected token in sub prototype: {:?}", tok),
+                            self.peek_line(),
+                        ));
+                    }
                 }
             }
-            self.expect(&Token::RParen)?;
             Some(s)
         } else {
             None
         };
+        // Optional subroutine attributes: `sub foo : lvalue { }`, `sub foo : ATTR(ARGS) { }`
+        while self.eat(&Token::Colon) {
+            match self.advance() {
+                (Token::Ident(_), _) => {}
+                (tok, line) => {
+                    return Err(PerlError::syntax(
+                        format!("Expected attribute name after `:`, got {:?}", tok),
+                        line,
+                    ));
+                }
+            }
+            if self.eat(&Token::LParen) {
+                let mut depth = 1usize;
+                while depth > 0 {
+                    match self.advance().0 {
+                        Token::LParen => depth += 1,
+                        Token::RParen => {
+                            depth -= 1;
+                        }
+                        Token::Eof => {
+                            return Err(PerlError::syntax(
+                                "Unterminated sub attribute argument list",
+                                self.peek_line(),
+                            ));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
         let body = self.parse_block()?;
         Ok(Statement {
             label: None,
@@ -1534,9 +1626,43 @@ impl Parser {
                     decl.initializer = Some(val.clone());
                 }
             }
+        } else if decls.len() == 1 {
+            // `our $Verbose ||= 0` (Exporter.pm) — compound assign on a single decl
+            let op = match self.peek().clone() {
+                Token::OrAssign => Some(BinOp::LogOr),
+                Token::DefinedOrAssign => Some(BinOp::DefinedOr),
+                _ => None,
+            };
+            if let Some(op) = op {
+                let d = &decls[0];
+                if matches!(d.sigil, Sigil::Typeglob) {
+                    return Err(PerlError::syntax(
+                        "compound assignment on typeglob declaration is not supported",
+                        self.peek_line(),
+                    ));
+                }
+                self.advance();
+                let rhs = self.parse_assign_expr()?;
+                let target = Expr {
+                    kind: match d.sigil {
+                        Sigil::Scalar => ExprKind::ScalarVar(d.name.clone()),
+                        Sigil::Array => ExprKind::ArrayVar(d.name.clone()),
+                        Sigil::Hash => ExprKind::HashVar(d.name.clone()),
+                        Sigil::Typeglob => unreachable!(),
+                    },
+                    line,
+                };
+                decls[0].initializer = Some(Expr {
+                    kind: ExprKind::CompoundAssign {
+                        target: Box::new(target),
+                        op,
+                        value: Box::new(rhs),
+                    },
+                    line,
+                });
+            }
         }
 
-        self.eat(&Token::Semicolon);
         let kind = match keyword {
             "my" => StmtKind::My(decls),
             "mysync" => StmtKind::MySync(decls),
@@ -1544,11 +1670,13 @@ impl Parser {
             "local" => StmtKind::Local(decls),
             _ => unreachable!(),
         };
-        Ok(Statement {
+        let stmt = Statement {
             label: None,
             kind,
             line,
-        })
+        };
+        // `my $x = 1 if $y;` — statement modifier applies to the whole declaration (Perl).
+        self.parse_stmt_postfix_modifier(stmt)
     }
 
     fn parse_var_decl(&mut self, allow_type_annotation: bool) -> PerlResult<VarDecl> {
@@ -2001,6 +2129,18 @@ impl Parser {
                     kind: ExprKind::CompoundAssign {
                         target: Box::new(expr),
                         op: BinOp::BitOr,
+                        value: Box::new(r),
+                    },
+                    line,
+                })
+            }
+            Token::OrAssign => {
+                self.advance();
+                let r = self.parse_assign_expr()?;
+                Ok(Expr {
+                    kind: ExprKind::CompoundAssign {
+                        target: Box::new(expr),
+                        op: BinOp::LogOr,
                         value: Box::new(r),
                     },
                     line,
@@ -2578,6 +2718,15 @@ impl Parser {
             Token::BitAnd => {
                 // Unary `&name` / `&Pkg::name` (call / coderef); binary `&` is in `parse_bit_and`.
                 self.advance();
+                if matches!(self.peek(), Token::LBrace) {
+                    self.advance();
+                    let inner = self.parse_expression()?;
+                    self.expect(&Token::RBrace)?;
+                    return Ok(Expr {
+                        kind: ExprKind::DynamicSubCodeRef(Box::new(inner)),
+                        line,
+                    });
+                }
                 let name = self.parse_qualified_subroutine_name()?;
                 Ok(Expr {
                     kind: ExprKind::SubroutineRef(name),
@@ -2592,6 +2741,9 @@ impl Parser {
                         kind: ExprKind::SubroutineCodeRef(name),
                         line,
                     });
+                }
+                if matches!(expr.kind, ExprKind::DynamicSubCodeRef(_)) {
+                    return Ok(expr);
                 }
                 Ok(Expr {
                     kind: ExprKind::ScalarRef(Box::new(expr)),
@@ -2803,39 +2955,78 @@ impl Parser {
                         _ => break,
                     }
                 }
-                Token::LBracket if matches!(expr.kind, ExprKind::ScalarVar(_)) => {
-                    // $array[index]
+                Token::LBracket => {
+                    // $array[index] — or $obj->{k}[i] / $aref[$i] after any postfix expression
                     let line = expr.line;
-                    if let ExprKind::ScalarVar(ref name) = expr.kind {
-                        let name = name.clone();
+                    if matches!(expr.kind, ExprKind::ScalarVar(_)) {
+                        if let ExprKind::ScalarVar(ref name) = expr.kind {
+                            let name = name.clone();
+                            self.advance();
+                            let index = self.parse_expression()?;
+                            self.expect(&Token::RBracket)?;
+                            expr = Expr {
+                                kind: ExprKind::ArrayElement {
+                                    array: name,
+                                    index: Box::new(index),
+                                },
+                                line,
+                            };
+                        }
+                    } else {
                         self.advance();
                         let index = self.parse_expression()?;
                         self.expect(&Token::RBracket)?;
                         expr = Expr {
-                            kind: ExprKind::ArrayElement {
-                                array: name,
+                            kind: ExprKind::ArrowDeref {
+                                expr: Box::new(expr),
                                 index: Box::new(index),
+                                kind: DerefKind::Array,
                             },
                             line,
                         };
                     }
                 }
-                Token::LBrace if matches!(expr.kind, ExprKind::ScalarVar(_)) => {
-                    // $hash{key}
+                Token::LBrace => {
+                    // `$h{k}`, or chained `$h{k2}{k3}` / `$r->{a}{b}` / `$a[0]{k}` — second+ `{…}` is
+                    // hash subscript on the scalar value (same as `-> { … }` without extra `->`).
                     let line = expr.line;
-                    if let ExprKind::ScalarVar(ref name) = expr.kind {
-                        let name = name.clone();
-                        self.advance();
-                        let key = self.parse_expression()?;
-                        self.expect(&Token::RBrace)?;
-                        expr = Expr {
-                            kind: ExprKind::HashElement {
-                                hash: name,
-                                key: Box::new(key),
+                    let is_scalar_named_hash = matches!(expr.kind, ExprKind::ScalarVar(_));
+                    let is_chainable_hash_subscript = is_scalar_named_hash
+                        || matches!(
+                            expr.kind,
+                            ExprKind::HashElement { .. }
+                                | ExprKind::ArrayElement { .. }
+                                | ExprKind::ArrowDeref { .. }
+                        );
+                    if !is_chainable_hash_subscript {
+                        break;
+                    }
+                    self.advance();
+                    let key = self.parse_expression()?;
+                    self.expect(&Token::RBrace)?;
+                    expr = if is_scalar_named_hash {
+                        if let ExprKind::ScalarVar(ref name) = expr.kind {
+                            let name = name.clone();
+                            Expr {
+                                kind: ExprKind::HashElement {
+                                    hash: name,
+                                    key: Box::new(key),
+                                },
+                                line,
+                            }
+                        } else {
+                            unreachable!("is_scalar_named_hash implies ScalarVar");
+                        }
+                    } else {
+                        Expr {
+                            kind: ExprKind::ArrowDeref {
+                                expr: Box::new(expr),
+                                index: Box::new(key),
+                                kind: DerefKind::Hash,
                             },
                             line,
-                        };
-                    }
+                        }
+                    };
                 }
                 _ => break,
             }
@@ -2862,6 +3053,15 @@ impl Parser {
             }
             Token::Star => {
                 self.advance();
+                if matches!(self.peek(), Token::LBrace) {
+                    self.advance();
+                    let inner = self.parse_expression()?;
+                    self.expect(&Token::RBrace)?;
+                    return Ok(Expr {
+                        kind: ExprKind::TypeglobExpr(Box::new(inner)),
+                        line,
+                    });
+                }
                 // `x` tokenizes as `Token::X` (repeat op) — still a valid package/typeglob name.
                 let mut full_name = match self.advance() {
                     (Token::Ident(n), _) => n,
@@ -2977,6 +3177,58 @@ impl Parser {
                 self.advance();
                 Ok(Expr {
                     kind: ExprKind::HashVar(name),
+                    line,
+                })
+            }
+            Token::HashPercent => {
+                // `%{ $href }` — hash dereference (scalar `%hash` / `%{$ref}` tests emptiness, etc.)
+                self.advance();
+                self.expect(&Token::LBrace)?;
+                let inner = self.parse_expression()?;
+                self.expect(&Token::RBrace)?;
+                Ok(Expr {
+                    kind: ExprKind::Deref {
+                        expr: Box::new(inner),
+                        kind: Sigil::Hash,
+                    },
+                    line,
+                })
+            }
+            Token::ArrayAt => {
+                self.advance();
+                // `@$arr` — array dereference; `@$h{k1,k2}` — hash slice via hashref
+                let container = match self.peek().clone() {
+                    Token::ScalarVar(n) => {
+                        self.advance();
+                        Expr {
+                            kind: ExprKind::ScalarVar(n),
+                            line,
+                        }
+                    }
+                    _ => {
+                        return Err(PerlError::syntax(
+                            "Expected `$name` after `@` (e.g. `@$aref` or `@$href{keys}`)",
+                            line,
+                        ));
+                    }
+                };
+                if matches!(self.peek(), Token::LBrace) {
+                    self.advance();
+                    let keys = self.parse_arg_list()?;
+                    self.expect(&Token::RBrace)?;
+                    return Ok(Expr {
+                        kind: ExprKind::HashSliceDeref {
+                            container: Box::new(container),
+                            keys,
+                        },
+                        line,
+                    });
+                }
+                Ok(Expr {
+                    kind: ExprKind::Deref {
+                        expr: Box::new(container),
+                        kind: Sigil::Array,
+                    },
                     line,
                 })
             }
@@ -3664,14 +3916,32 @@ impl Parser {
                 }
             }
             "sort" => {
-                // sort may have optional cmp block
+                use crate::ast::SortComparator;
                 if matches!(self.peek(), Token::LBrace) {
                     let block = self.parse_block()?;
                     let _ = self.eat(&Token::Comma);
                     let list = self.parse_expression()?;
                     Ok(Expr {
                         kind: ExprKind::SortExpr {
-                            cmp: Some(block),
+                            cmp: Some(SortComparator::Block(block)),
+                            list: Box::new(list),
+                        },
+                        line,
+                    })
+                } else if matches!(self.peek(), Token::ScalarVar(_)) {
+                    // `sort $coderef (LIST)` — comparator is first; list often parenthesized
+                    let code = self.parse_assign_expr()?;
+                    let list = if matches!(self.peek(), Token::LParen) {
+                        self.advance();
+                        let e = self.parse_expression()?;
+                        self.expect(&Token::RParen)?;
+                        e
+                    } else {
+                        self.parse_expression()?
+                    };
+                    Ok(Expr {
+                        kind: ExprKind::SortExpr {
+                            cmp: Some(SortComparator::Code(Box::new(code))),
                             list: Box::new(list),
                         },
                         line,

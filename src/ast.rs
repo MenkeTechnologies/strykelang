@@ -275,6 +275,13 @@ pub enum Sigil {
 
 pub type Block = Vec<Statement>;
 
+/// Comparator for `sort` — `{ $a <=> $b }`, or a code ref / expression (Perl `sort $cmp LIST`).
+#[derive(Debug, Clone, Serialize)]
+pub enum SortComparator {
+    Block(Block),
+    Code(Box<Expr>),
+}
+
 // ── Algebraic `match` expression (perlrs extension) ──
 
 /// One arm of [`ExprKind::AlgebraicMatch`]: `PATTERN [if EXPR] => EXPR`.
@@ -378,6 +385,11 @@ pub enum ExprKind {
         hash: String,
         keys: Vec<Expr>,
     },
+    /// `@$container{keys}` — hash slice when the hash is reached via a scalar ref (Perl `@$href{k1,k2}`).
+    HashSliceDeref {
+        container: Box<Expr>,
+        keys: Vec<Expr>,
+    },
 
     // References
     ScalarRef(Box<Expr>),
@@ -391,6 +403,8 @@ pub enum ExprKind {
     SubroutineRef(String),
     /// `\&name` — coderef to an existing named subroutine (Perl `\&foo`).
     SubroutineCodeRef(String),
+    /// `\&{ EXPR }` — coderef to a subroutine whose name is given by `EXPR` (string or expression).
+    DynamicSubCodeRef(Box<Expr>),
     Deref {
         expr: Box<Expr>,
         kind: Sigil,
@@ -459,6 +473,8 @@ pub enum ExprKind {
     },
     /// Limited typeglob: `*FOO` → handle name `FOO` for `open` / I/O.
     Typeglob(String),
+    /// `*{ EXPR }` — typeglob slot by dynamic name (e.g. `*{$pkg . '::import'}`).
+    TypeglobExpr(Box<Expr>),
 
     // Special forms
     Print {
@@ -511,8 +527,9 @@ pub enum ExprKind {
         expr: Box<Expr>,
         list: Box<Expr>,
     },
+    /// `sort BLOCK LIST`, `sort SUB LIST`, or `sort $coderef LIST` (Perl uses `$a`/`$b` in the comparator).
     SortExpr {
-        cmp: Option<Block>,
+        cmp: Option<SortComparator>,
         list: Box<Expr>,
     },
     ReverseExpr(Box<Expr>),

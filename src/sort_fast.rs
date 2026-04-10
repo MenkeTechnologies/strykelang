@@ -73,14 +73,18 @@ pub fn sort_magic_cmp(a: &PerlValue, b: &PerlValue, mode: SortBlockFast) -> Orde
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{Expr, ExprKind, StmtKind};
+    use crate::ast::{Expr, ExprKind, SortComparator, StmtKind};
 
     #[test]
     fn detects_spaceship_ab_from_sort_expr() {
         let p = crate::parse("sort { $a <=> $b } (3, 1, 2);").expect("parse");
         let block = match &p.statements[0].kind {
             StmtKind::Expression(Expr {
-                kind: ExprKind::SortExpr { cmp: Some(b), .. },
+                kind:
+                    ExprKind::SortExpr {
+                        cmp: Some(SortComparator::Block(b)),
+                        ..
+                    },
                 ..
             }) => b,
             _ => panic!("expected sort"),
@@ -103,7 +107,11 @@ mod tests {
         let p = crate::parse("sort { $b <=> $a } (1);").expect("parse");
         let block = match &p.statements[0].kind {
             StmtKind::Expression(Expr {
-                kind: ExprKind::SortExpr { cmp: Some(b), .. },
+                kind:
+                    ExprKind::SortExpr {
+                        cmp: Some(SortComparator::Block(b)),
+                        ..
+                    },
                 ..
             }) => b,
             _ => panic!("expected sort"),
@@ -115,7 +123,11 @@ mod tests {
         let p2 = crate::parse("sort { $b cmp $a } (1);").expect("parse");
         let block2 = match &p2.statements[0].kind {
             StmtKind::Expression(Expr {
-                kind: ExprKind::SortExpr { cmp: Some(b), .. },
+                kind:
+                    ExprKind::SortExpr {
+                        cmp: Some(SortComparator::Block(b)),
+                        ..
+                    },
                 ..
             }) => b,
             _ => panic!("expected sort"),

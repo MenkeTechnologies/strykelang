@@ -400,7 +400,9 @@ pub(crate) fn try_match_array_push_sort_fusion(
                         ExprKind::ArrayVar(an) if an == &a_name => {}
                         _ => return None,
                     }
-                    let block = cmp.as_ref()?;
+                    let crate::ast::SortComparator::Block(block) = cmp.as_ref()? else {
+                        return None;
+                    };
                     let mode = detect_sort_block_fast(block)?;
                     (decls[0].name.clone(), mode)
                 }

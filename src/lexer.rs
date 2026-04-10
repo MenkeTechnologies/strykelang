@@ -1180,22 +1180,6 @@ impl Lexer {
                     _ => {}
                 }
 
-                // Check for label: IDENT followed by ':'
-                // But not 'eq:', 'ne:', etc. — those are operators
-                let saved_pos = self.pos;
-                self.skip_whitespace_and_comments();
-                if self.peek() == Some(':') && self.peek_at(1) != Some(':') {
-                    // Could be a label or a ternary else
-                    // Labels are uppercase by convention but not required
-                    // We'll treat ALLCAPS: as labels
-                    if ident.chars().all(|c| c.is_uppercase() || c == '_') {
-                        self.advance(); // consume ':'
-                        self.last_was_term = false;
-                        return Ok(Token::Label(ident));
-                    }
-                }
-                self.pos = saved_pos;
-
                 // Fat arrow lookahead: ident followed by => is a string
                 let saved_pos2 = self.pos;
                 self.skip_whitespace_and_comments();

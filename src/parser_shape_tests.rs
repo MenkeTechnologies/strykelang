@@ -18,6 +18,28 @@ fn first_expr_kind(code: &str) -> ExprKind {
     }
 }
 
+/// Dynamic coderef and typeglob slot syntax (Exporter.pm loads).
+#[test]
+fn shape_dynamic_subref_and_typeglob_expr() {
+    let k = first_expr_kind(r##"\&{"Foo::bar"}"##);
+    assert!(matches!(k, ExprKind::DynamicSubCodeRef(_)));
+    let t = first_expr_kind(r##"*{"Foo::bar"}"##);
+    assert!(matches!(t, ExprKind::TypeglobExpr(_)));
+}
+
+/// Parenthesized `sort $coderef (LIST)` in a ternary then-branch (JSON::PP-style) must keep parens balanced.
+#[test]
+fn shape_sort_coderef_paren_list_inside_ternary_then() {
+    let k = first_expr_kind("1 ? (sort $k (1)) : 0");
+    let ExprKind::Ternary { then_expr, .. } = k else {
+        panic!("expected ternary");
+    };
+    let ExprKind::SortExpr { cmp, .. } = then_expr.kind else {
+        panic!("expected sort in then branch");
+    };
+    assert!(cmp.is_some(), "sort with coderef comparator must keep cmp");
+}
+
 #[test]
 fn shape_if_block() {
     assert!(matches!(first_stmt("if (1) { 2; }"), StmtKind::If { .. }));

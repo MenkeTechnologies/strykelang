@@ -71,6 +71,7 @@ This is an **ordered engineering program**, not a promise of bit-identical `perl
 **Goal:** Run more **pure-Perl** modules from `@INC` without silent wrong behavior.
 
 **Progress:** `require` / `use` / `%INC` / Exporter-style import are implemented; [`src/perl_inc.rs`](src/perl_inc.rs) can merge system `@INC` from a real `perl`. The **Top-N CPAN smoke** harness lives under [`parity/cpan_topn/`](parity/cpan_topn/README.md): list in [`parity/cpan_topn/MODULES.txt`](parity/cpan_topn/MODULES.txt), install via `install_deps.sh`, run via `run_cpan_topn.sh` under **`pe`** with **`pe -I …/local/lib/perl5`**. `use VERSION` (e.g. `use 5.008;`) is accepted as a no-op so common CPAN headers parse.
+**Recent parser/runtime for `require` chains:** chained hash subscripts on deref results (`$x->{a}{b}` / `$h{k}{k2}`); `my`/`our` declaration with postfix `if`/`unless`; `sub name : attr { }` attribute skipping; statement labels as `LABEL:` at statement start only (not lexer `ALLCAPS:` inside `?:`); `our $x ||= 0` / `//=`; `\&{ EXPR }` (dynamic subroutine coderef) and `*{ EXPR }` (dynamic typeglob slot) for **Exporter.pm**-style code.
 
 **Done when:** `parity/cpan_topn` smoke is green in CI; **XS** modules either work via a bridge (Phase 6) or fail with a **clear** error.
 

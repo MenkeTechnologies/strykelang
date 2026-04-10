@@ -2010,6 +2010,11 @@ impl Compiler {
                 let idx = self.chunk.add_constant(PerlValue::string(name.clone()));
                 self.emit_op(Op::LoadConst(idx), line, Some(root));
             }
+            ExprKind::TypeglobExpr(_) => {
+                return Err(CompileError::Unsupported(
+                    "dynamic typeglob `*{ ... }` — use tree interpreter".into(),
+                ));
+            }
             ExprKind::ArrayElement { array, index } => {
                 let idx = self
                     .chunk
@@ -2039,6 +2044,11 @@ impl Compiler {
                     self.emit_op(Op::GetHashElem(hash_idx), line, Some(root));
                 }
                 self.emit_op(Op::MakeArray(keys.len() as u16), line, Some(root));
+            }
+            ExprKind::HashSliceDeref { .. } => {
+                return Err(CompileError::Unsupported(
+                    "hash slice through scalar ref (@$h{...})".into(),
+                ));
             }
 
             // ── Operators ──
@@ -3457,6 +3467,11 @@ impl Compiler {
                 let name_idx = self.chunk.intern_name(name);
                 self.emit_op(Op::LoadNamedSubRef(name_idx), line, Some(root));
             }
+            ExprKind::DynamicSubCodeRef(_) => {
+                return Err(CompileError::Unsupported(
+                    "dynamic subroutine coderef `\\&{ ... }` — use tree interpreter".into(),
+                ));
+            }
 
             // ── Derefs ──
             ExprKind::ArrowDeref { expr, index, kind } => {
@@ -3720,21 +3735,29 @@ impl Compiler {
             }
             ExprKind::SortExpr { cmp, list } => {
                 self.compile_expr(list)?;
-                if let Some(block) = cmp {
-                    if let Some(mode) = detect_sort_block_fast(block) {
-                        let tag = match mode {
-                            crate::sort_fast::SortBlockFast::Numeric => 0u8,
-                            crate::sort_fast::SortBlockFast::String => 1u8,
-                            crate::sort_fast::SortBlockFast::NumericRev => 2u8,
-                            crate::sort_fast::SortBlockFast::StringRev => 3u8,
-                        };
-                        self.emit_op(Op::SortWithBlockFast(tag), line, Some(root));
-                    } else {
-                        let block_idx = self.chunk.add_block(block.clone());
-                        self.emit_op(Op::SortWithBlock(block_idx), line, Some(root));
+                match cmp {
+                    Some(crate::ast::SortComparator::Block(block)) => {
+                        if let Some(mode) = detect_sort_block_fast(block) {
+                            let tag = match mode {
+                                crate::sort_fast::SortBlockFast::Numeric => 0u8,
+                                crate::sort_fast::SortBlockFast::String => 1u8,
+                                crate::sort_fast::SortBlockFast::NumericRev => 2u8,
+                                crate::sort_fast::SortBlockFast::StringRev => 3u8,
+                            };
+                            self.emit_op(Op::SortWithBlockFast(tag), line, Some(root));
+                        } else {
+                            let block_idx = self.chunk.add_block(block.clone());
+                            self.emit_op(Op::SortWithBlock(block_idx), line, Some(root));
+                        }
                     }
-                } else {
-                    self.emit_op(Op::SortNoBlock, line, Some(root));
+                    Some(crate::ast::SortComparator::Code(_)) => {
+                        return Err(CompileError::Unsupported(
+                            "sort with code-reference comparator".into(),
+                        ));
+                    }
+                    None => {
+                        self.emit_op(Op::SortNoBlock, line, Some(root));
+                    }
                 }
             }
 

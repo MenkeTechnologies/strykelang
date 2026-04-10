@@ -454,6 +454,7 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::ArrayVar(name) => format!("@{}", name),
         ExprKind::HashVar(name) => format!("%{}", name),
         ExprKind::Typeglob(name) => format!("*{}", name),
+        ExprKind::TypeglobExpr(e) => format!("*{{ {} }}", format_expr(e)),
         ExprKind::ArrayElement { array, index } => format!("${}[{}]", array, format_expr(index)),
         ExprKind::HashElement { hash, key } => format!("${}{{{}}}", hash, format_expr(key)),
         ExprKind::ArraySlice { array, indices } => format!(
@@ -470,12 +471,18 @@ pub fn format_expr(e: &Expr) -> String {
             hash,
             keys.iter().map(format_expr).collect::<Vec<_>>().join(", ")
         ),
+        ExprKind::HashSliceDeref { container, keys } => format!(
+            "@{}{{{}}}",
+            format_expr(container),
+            keys.iter().map(format_expr).collect::<Vec<_>>().join(", ")
+        ),
         ExprKind::ScalarRef(_) => "/* ExprKind::ScalarRef */".to_string(),
         ExprKind::ArrayRef(_) => "/* ExprKind::ArrayRef */".to_string(),
         ExprKind::HashRef(_) => "/* ExprKind::HashRef */".to_string(),
         ExprKind::CodeRef { params, body } => format!("sub {{\n{}\n}}", format_block(body)),
         ExprKind::SubroutineRef(name) => format!("&{}", name),
         ExprKind::SubroutineCodeRef(name) => format!("\\&{}", name),
+        ExprKind::DynamicSubCodeRef(e) => format!("\\&{{ {} }}", format_expr(e)),
         ExprKind::Deref { expr, kind } => match kind {
             Sigil::Scalar => format!("${{{}}}", format_expr(expr)),
             Sigil::Array => format!("@{{${}}}", format_expr(expr)),
@@ -609,7 +616,12 @@ pub fn format_expr(e: &Expr) -> String {
             format!("grep {}, {}", format_expr(expr), format_expr(list))
         }
         ExprKind::SortExpr { cmp, list } => match cmp {
-            Some(b) => format!("sort {{\n{}\n}} {}", format_block(b), format_expr(list)),
+            Some(crate::ast::SortComparator::Block(b)) => {
+                format!("sort {{\n{}\n}} {}", format_block(b), format_expr(list))
+            }
+            Some(crate::ast::SortComparator::Code(e)) => {
+                format!("sort {} {}", format_expr(e), format_expr(list))
+            }
             None => format!("sort {}", format_expr(list)),
         },
         ExprKind::ReverseExpr(e) => format!("reverse {}", format_expr(e)),
