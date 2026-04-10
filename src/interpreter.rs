@@ -6106,6 +6106,11 @@ impl Interpreter {
 
             // Type
             ExprKind::Defined(expr) => {
+                // Perl: `defined &foo` / `defined &Pkg::name` — true iff the subroutine exists (no call).
+                if let ExprKind::SubroutineRef(name) = &expr.kind {
+                    let exists = self.resolve_sub_by_name(name).is_some();
+                    return Ok(PerlValue::integer(if exists { 1 } else { 0 }));
+                }
                 let val = self.eval_expr(expr)?;
                 Ok(PerlValue::integer(if val.is_undef() { 0 } else { 1 }))
             }

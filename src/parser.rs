@@ -2486,6 +2486,37 @@ impl Parser {
         Ok(left)
     }
 
+    /// After consuming unary `&`: `name` or `Foo::Bar::baz` (Perl `&foo` / `&Foo::bar`).
+    fn parse_qualified_subroutine_name(&mut self) -> PerlResult<String> {
+        let mut name = match self.advance() {
+            (Token::Ident(n), _) => n,
+            (tok, l) => {
+                return Err(PerlError::syntax(
+                    format!("Expected subroutine name after &, got {:?}", tok),
+                    l,
+                ));
+            }
+        };
+        while self.eat(&Token::PackageSep) {
+            match self.advance() {
+                (Token::Ident(part), _) => {
+                    name.push_str("::");
+                    name.push_str(&part);
+                }
+                (tok, l) => {
+                    return Err(PerlError::syntax(
+                        format!(
+                            "Expected identifier after :: in subroutine name, got {:?}",
+                            tok
+                        ),
+                        l,
+                    ));
+                }
+            }
+        }
+        Ok(name)
+    }
+
     fn parse_unary(&mut self) -> PerlResult<Expr> {
         let line = self.peek_line();
         match self.peek().clone() {
@@ -2545,17 +2576,9 @@ impl Parser {
                 })
             }
             Token::BitAnd => {
-                // Unary `&name` (subroutine invocation / coderef); binary `&` is handled in `parse_bit_and`.
+                // Unary `&name` / `&Pkg::name` (call / coderef); binary `&` is in `parse_bit_and`.
                 self.advance();
-                let name = match self.advance() {
-                    (Token::Ident(n), _) => n,
-                    (tok, l) => {
-                        return Err(PerlError::syntax(
-                            format!("Expected subroutine name after &, got {:?}", tok),
-                            l,
-                        ));
-                    }
-                };
+                let name = self.parse_qualified_subroutine_name()?;
                 Ok(Expr {
                     kind: ExprKind::SubroutineRef(name),
                     line,

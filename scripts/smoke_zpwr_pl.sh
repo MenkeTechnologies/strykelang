@@ -65,9 +65,10 @@ run "c.pl (no argv)" timeout 8 "$PE" "$SCRIPTS/c.pl"
 # 7: stdin + less (bounded)
 run "stdinSdiffColorizer.pl" timeout 8 "$PE" "$SCRIPTS/stdinSdiffColorizer.pl" 72 <<<"left | right"
 
-# 8: Two-arg `open $fh, "sdiff … |"` — pipe-from-command (sh -c).
-run "sdiffColorizer.pl" timeout 10 "$PE" "$SCRIPTS/sdiffColorizer.pl" "$TMP/sd1" "$TMP/sd2" \
-  >/dev/null
+# 8: Two-arg `open $fh, "sdiff … |"` — pipe-from-command (sh -c). Discard script output only
+# (not the run() label/OK lines).
+run "sdiffColorizer.pl" bash -c 'timeout 10 "$@" >/dev/null' _ "$PE" "$SCRIPTS/sdiffColorizer.pl" \
+  "$TMP/sd1" "$TMP/sd2"
 
 # 9: Opens `git difftool … |` (may block or exit non-zero without a clean tree); syntax + start only.
 run "gitSdiffColorizer.pl (-c)" timeout 5 "$PE" -c "$SCRIPTS/gitSdiffColorizer.pl"

@@ -5,6 +5,11 @@ fn p(src: &str) {
 }
 
 #[test]
+fn accepts_ampersand_qualified_subroutine_ref() {
+    p("&foo::bar;");
+}
+
+#[test]
 fn accepts_integer_literal_statement() {
     p("42;");
 }
