@@ -414,21 +414,11 @@ pub struct Interpreter {
 }
 
 /// Snapshot of stash + `@ISA` for REPL `$obj->method` tab-completion (no `Interpreter` handle needed).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ReplCompletionSnapshot {
     pub subs: Vec<String>,
     pub blessed_scalars: HashMap<String, String>,
     pub isa_for_class: HashMap<String, Vec<String>>,
-}
-
-impl Default for ReplCompletionSnapshot {
-    fn default() -> Self {
-        Self {
-            subs: Vec::new(),
-            blessed_scalars: HashMap::new(),
-            isa_for_class: HashMap::new(),
-        }
-    }
 }
 
 impl ReplCompletionSnapshot {
@@ -1474,6 +1464,28 @@ impl Interpreter {
         }
     }
 
+    /// `Undefined subroutine &name` (bare calls) with optional `strict subs` hint.
+    pub(crate) fn undefined_subroutine_call_message(&self, name: &str) -> String {
+        let mut msg = format!("Undefined subroutine &{}", name);
+        if self.strict_subs {
+            msg.push_str(
+                " (strict subs: declare the sub or use a fully qualified name before calling)",
+            );
+        }
+        msg
+    }
+
+    /// `Undefined subroutine pkg::name` (coderef resolution) with optional `strict subs` hint.
+    pub(crate) fn undefined_subroutine_resolve_message(&self, name: &str) -> String {
+        let mut msg = format!("Undefined subroutine {}", self.qualify_sub_key(name));
+        if self.strict_subs {
+            msg.push_str(
+                " (strict subs: declare the sub or use a fully qualified name before calling)",
+            );
+        }
+        msg
+    }
+
     /// Where `use` imports a symbol: `main` → short name; otherwise `Pkg::sym`.
     fn import_alias_key(&self, short: &str) -> String {
         self.qualify_sub_key(short)
@@ -2285,8 +2297,8 @@ impl Interpreter {
             (mode_s, f)
         } else {
             let trimmed = mode_s.trim();
-            if trimmed.starts_with('|') {
-                ("|-".to_string(), trimmed[1..].trim_start().to_string())
+            if let Some(rest) = trimmed.strip_prefix('|') {
+                ("|-".to_string(), rest.trim_start().to_string())
             } else if trimmed.ends_with('|') {
                 let mut cmd = trimmed.to_string();
                 cmd.pop(); // trailing `|` that selects pipe-from-command
@@ -2429,11 +2441,10 @@ impl Interpreter {
                         if let Some(reader) = self.diamond_reader.as_mut() {
                             if self.open_pragma_utf8 {
                                 let mut buf = Vec::new();
-                                reader.read_until(b'\n', &mut buf).map(|n| {
-                                    if n > 0 {
+                                reader.read_until(b'\n', &mut buf).inspect(|n| {
+                                    if *n > 0 {
                                         line_str = String::from_utf8_lossy(&buf).into_owned();
                                     }
-                                    n
                                 })
                             } else {
                                 reader.read_line(&mut line_str)
@@ -2467,11 +2478,10 @@ impl Interpreter {
         if handle_name == "STDIN" {
             let r: Result<usize, io::Error> = if self.open_pragma_utf8 {
                 let mut buf = Vec::new();
-                io::stdin().lock().read_until(b'\n', &mut buf).map(|n| {
-                    if n > 0 {
+                io::stdin().lock().read_until(b'\n', &mut buf).inspect(|n| {
+                    if *n > 0 {
                         line_str = String::from_utf8_lossy(&buf).into_owned();
                     }
-                    n
                 })
             } else {
                 io::stdin().lock().read_line(&mut line_str)
@@ -2490,11 +2500,10 @@ impl Interpreter {
         } else if let Some(reader) = self.input_handles.get_mut(handle_name) {
             let r: Result<usize, io::Error> = if self.open_pragma_utf8 {
                 let mut buf = Vec::new();
-                reader.read_until(b'\n', &mut buf).map(|n| {
-                    if n > 0 {
+                reader.read_until(b'\n', &mut buf).inspect(|n| {
+                    if *n > 0 {
                         line_str = String::from_utf8_lossy(&buf).into_owned();
                     }
-                    n
                 })
             } else {
                 reader.read_line(&mut line_str)
@@ -2963,7 +2972,7 @@ impl Interpreter {
                 line,
             )));
         }
-        let warmup = (n / 10).min(10).max(1);
+        let warmup = (n / 10).clamp(1, 10);
         for _ in 0..warmup {
             self.exec_block(body)?;
         }
@@ -4991,20 +5000,14 @@ impl Interpreter {
             ExprKind::SubroutineRef(name) => self.call_named_sub(name, vec![], line, ctx),
             ExprKind::SubroutineCodeRef(name) => {
                 let sub = self.resolve_sub_by_name(name).ok_or_else(|| {
-                    PerlError::runtime(
-                        format!("Undefined subroutine {}", self.qualify_sub_key(name)),
-                        line,
-                    )
+                    PerlError::runtime(self.undefined_subroutine_resolve_message(name), line)
                 })?;
                 Ok(PerlValue::code_ref(sub))
             }
             ExprKind::DynamicSubCodeRef(expr) => {
                 let name = self.eval_expr(expr)?.to_string();
                 let sub = self.resolve_sub_by_name(&name).ok_or_else(|| {
-                    PerlError::runtime(
-                        format!("Undefined subroutine {}", self.qualify_sub_key(&name)),
-                        line,
-                    )
+                    PerlError::runtime(self.undefined_subroutine_resolve_message(&name), line)
                 })?;
                 Ok(PerlValue::code_ref(sub))
             }
@@ -8762,13 +8765,7 @@ impl Interpreter {
                 if let Some(r) = self.try_autoload_call(name, args, line, want, None) {
                     return r;
                 }
-                let mut msg = format!("Undefined subroutine &{}", name);
-                if self.strict_subs {
-                    msg.push_str(
-                        " (strict subs: declare the sub or use a fully qualified name before calling)",
-                    );
-                }
-                Err(PerlError::runtime(msg, line).into())
+                Err(PerlError::runtime(self.undefined_subroutine_call_message(name), line).into())
             }
         }
     }
@@ -10600,8 +10597,8 @@ impl Interpreter {
         if let Some(ref env) = sub.closure_env {
             self.scope.restore_capture(env);
         }
-        // One clone for native dispatch (`&mut self` vs `&[PerlValue]` from scope); `fib_like` reuses `argv`.
-        let argv = self.scope.get_array("_");
+        // Move `@_` out so `native_dispatch` / `fib_like` take `&[PerlValue]` without `get_array` cloning.
+        let argv = self.scope.take_sub_underscore().unwrap_or_default();
         let saved = self.wantarray_kind;
         self.wantarray_kind = want;
         if let Some(r) = crate::list_util::native_dispatch(self, sub, &argv, want) {
@@ -10615,7 +10612,7 @@ impl Interpreter {
         }
         if let Some(pat) = sub.fib_like.as_ref() {
             if argv.len() == 1 {
-                if let Some(n0) = argv.get(0).and_then(|v| v.as_integer()) {
+                if let Some(n0) = argv.first().and_then(|v| v.as_integer()) {
                     let t0 = self.profiler.is_some().then(std::time::Instant::now);
                     if let Some(p) = &mut self.profiler {
                         p.enter_sub(&sub.name);
@@ -10630,6 +10627,7 @@ impl Interpreter {
                 }
             }
         }
+        self.scope.declare_array("_", argv);
         let t0 = self.profiler.is_some().then(std::time::Instant::now);
         if let Some(p) = &mut self.profiler {
             p.enter_sub(&sub.name);
@@ -10707,8 +10705,8 @@ impl Interpreter {
         }
         output.push_str(&self.ors);
 
-        let handle_name = self
-            .resolve_io_handle_name(handle.unwrap_or_else(|| self.default_print_handle.as_str()));
+        let handle_name =
+            self.resolve_io_handle_name(handle.unwrap_or(self.default_print_handle.as_str()));
         match handle_name.as_str() {
             "STDOUT" => {
                 if !self.suppress_stdout {
@@ -10753,8 +10751,8 @@ impl Interpreter {
             arg_vals.push(self.eval_expr(a)?);
         }
         let output = self.perl_sprintf_stringify(&fmt, &arg_vals, line)?;
-        let handle_name = self
-            .resolve_io_handle_name(handle.unwrap_or_else(|| self.default_print_handle.as_str()));
+        let handle_name =
+            self.resolve_io_handle_name(handle.unwrap_or(self.default_print_handle.as_str()));
         match handle_name.as_str() {
             "STDOUT" => {
                 if !self.suppress_stdout {

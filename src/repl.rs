@@ -251,14 +251,15 @@ pub fn run(cli: &Cli) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn arrow_method_completion_uses_blessed_class_and_subs() {
-        let mut state = ReplCompletionSnapshot::default();
-        state.subs = vec!["Pkg::foo".to_string()];
-        state
-            .blessed_scalars
-            .insert("o".to_string(), "Pkg".to_string());
+        let state = ReplCompletionSnapshot {
+            subs: vec!["Pkg::foo".to_string()],
+            blessed_scalars: HashMap::from([("o".to_string(), "Pkg".to_string())]),
+            ..Default::default()
+        };
         let line = "$o->f";
         let (start, methods) =
             repl_arrow_method_completions(&state, line, line.len()).expect("arrow context");

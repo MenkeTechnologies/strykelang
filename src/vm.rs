@@ -9,7 +9,7 @@ use rayon::prelude::*;
 use caseless::default_case_fold_str;
 
 use crate::ast::{Block, Expr, MatchArm, PerlTypeName, Sigil};
-use crate::bytecode::{BuiltinId, Chunk, Op, RuntimeSubDecl};
+use crate::bytecode::{BuiltinId, Chunk, Op, RuntimeSubDecl, SpliceExprEntry};
 use crate::compiler::scalar_compound_op_from_byte;
 use crate::error::{ErrorKind, PerlError, PerlResult};
 use crate::interpreter::{
@@ -51,7 +51,7 @@ struct ParallelBlockVmShared {
     pop_expr_entries: Vec<Expr>,
     shift_expr_entries: Vec<Expr>,
     unshift_expr_entries: Vec<(Expr, Vec<Expr>)>,
-    splice_expr_entries: Vec<(Expr, Option<Expr>, Option<Expr>, Vec<Expr>)>,
+    splice_expr_entries: Vec<SpliceExprEntry>,
     lvalues: Vec<Expr>,
     runtime_sub_decls: Arc<Vec<RuntimeSubDecl>>,
     jit_sub_invoke_threshold: u32,
@@ -229,7 +229,7 @@ pub struct VM<'a> {
     pop_expr_entries: Vec<Expr>,
     shift_expr_entries: Vec<Expr>,
     unshift_expr_entries: Vec<(Expr, Vec<Expr>)>,
-    splice_expr_entries: Vec<(Expr, Option<Expr>, Option<Expr>, Vec<Expr>)>,
+    splice_expr_entries: Vec<SpliceExprEntry>,
     lvalues: Vec<Expr>,
     runtime_sub_decls: Arc<Vec<RuntimeSubDecl>>,
     ip: usize,
@@ -1491,12 +1491,13 @@ impl<'a> VM<'a> {
                 if let Some(ref env) = sub.closure_env {
                     self.interp.scope.restore_capture(env);
                 }
-                let argv = self.interp.scope.get_array("_");
+                let argv = self.interp.scope.take_sub_underscore().unwrap_or_default();
                 let result = if let Some(r) =
                     crate::list_util::native_dispatch(self.interp, &sub, &argv, want)
                 {
                     r
                 } else {
+                    self.interp.scope.declare_array("_", argv);
                     self.interp.exec_block_no_scope(&sub.body)
                 };
                 self.interp.wantarray_kind = saved_wa;
@@ -1546,7 +1547,7 @@ impl<'a> VM<'a> {
                 }
             } else {
                 return Err(PerlError::runtime(
-                    format!("Undefined subroutine &{}", name),
+                    self.interp.undefined_subroutine_call_message(name),
                     self.line(),
                 ));
             }
@@ -3390,10 +3391,7 @@ impl<'a> VM<'a> {
                         let line = self.line();
                         let sub = self.interp.resolve_sub_by_name(name).ok_or_else(|| {
                             PerlError::runtime(
-                                format!(
-                                    "Undefined subroutine {}",
-                                    self.interp.qualify_sub_key(name)
-                                ),
+                                self.interp.undefined_subroutine_resolve_message(name),
                                 line,
                             )
                         })?;
@@ -3405,10 +3403,7 @@ impl<'a> VM<'a> {
                         let line = self.line();
                         let sub = self.interp.resolve_sub_by_name(&name).ok_or_else(|| {
                             PerlError::runtime(
-                                format!(
-                                    "Undefined subroutine {}",
-                                    self.interp.qualify_sub_key(&name)
-                                ),
+                                self.interp.undefined_subroutine_resolve_message(&name),
                                 line,
                             )
                         })?;

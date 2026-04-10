@@ -185,7 +185,9 @@ impl PerlValue {
         if nanbox::is_heap(self.0) {
             let arc = self.heap_arc();
             match &*arc {
-                HeapObject::Array(_) | HeapObject::Hash(_) => PerlValue::from_heap(Arc::clone(&arc)),
+                HeapObject::Array(_) | HeapObject::Hash(_) => {
+                    PerlValue::from_heap(Arc::clone(&arc))
+                }
                 _ => self.clone(),
             }
         } else {

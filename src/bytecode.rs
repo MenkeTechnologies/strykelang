@@ -1,6 +1,9 @@
 use crate::ast::{Block, Expr, MatchArm, StructDef};
 use crate::value::PerlValue;
 
+/// `splice` operand tuple: array expr, offset, length, replacement list (see [`Chunk::splice_expr_entries`]).
+pub(crate) type SpliceExprEntry = (Expr, Option<Expr>, Option<Expr>, Vec<Expr>);
+
 /// `sub` body registered at run time (e.g. `BEGIN { sub f { ... } }`), mirrored from
 /// [`crate::interpreter::Interpreter::exec_statement`] `StmtKind::SubDecl`.
 #[derive(Debug, Clone)]
@@ -706,7 +709,7 @@ pub struct Chunk {
     pub pop_expr_entries: Vec<Expr>,
     pub shift_expr_entries: Vec<Expr>,
     pub unshift_expr_entries: Vec<(Expr, Vec<Expr>)>,
-    pub splice_expr_entries: Vec<(Expr, Option<Expr>, Option<Expr>, Vec<Expr>)>,
+    pub splice_expr_entries: Vec<SpliceExprEntry>,
     /// `grep EXPR, LIST` — filter expression evaluated with `$_` set to each element.
     pub grep_expr_entries: Vec<Expr>,
 }

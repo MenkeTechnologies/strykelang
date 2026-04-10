@@ -134,10 +134,8 @@ impl Frame {
 
     #[inline]
     fn has_array(&self, name: &str) -> bool {
-        if name == "_" {
-            if self.sub_underscore.is_some() {
-                return true;
-            }
+        if name == "_" && self.sub_underscore.is_some() {
+            return true;
         }
         self.arrays.iter().any(|(k, _)| k == name)
     }
@@ -818,6 +816,13 @@ impl Scope {
     // ── Arrays ──
 
     #[inline]
+    /// Remove `@_` from the innermost frame without cloning (move out of [`Frame::sub_underscore`]).
+    /// Call sites restore with [`Self::declare_array`] before running a body that uses `shift` / `@_`.
+    #[inline]
+    pub fn take_sub_underscore(&mut self) -> Option<Vec<PerlValue>> {
+        self.frames.last_mut()?.sub_underscore.take()
+    }
+
     pub fn declare_array(&mut self, name: &str, val: Vec<PerlValue>) {
         self.declare_array_frozen(name, val, false);
     }
@@ -885,12 +890,9 @@ impl Scope {
         if name.contains("::") {
             return Some(0);
         }
-        for i in (0..self.frames.len()).rev() {
-            if self.frames[i].has_array(name) {
-                return Some(i);
-            }
-        }
-        None
+        (0..self.frames.len())
+            .rev()
+            .find(|&i| self.frames[i].has_array(name))
     }
 
     fn check_parallel_array_write(&self, name: &str) -> Result<(), PerlError> {
@@ -930,10 +932,7 @@ impl Scope {
             ));
         }
         self.check_parallel_array_write(name)?;
-        let idx = match self.resolve_array_frame_idx(name) {
-            Some(i) => i,
-            None => 0,
-        };
+        let idx = self.resolve_array_frame_idx(name).unwrap_or_default();
         let frame = &mut self.frames[idx];
         if frame.get_array_mut(name).is_none() {
             frame.arrays.push((name.to_string(), Vec::new()));
@@ -1109,12 +1108,9 @@ impl Scope {
         if name.contains("::") {
             return Some(0);
         }
-        for i in (0..self.frames.len()).rev() {
-            if self.frames[i].has_hash(name) {
-                return Some(i);
-            }
-        }
-        None
+        (0..self.frames.len())
+            .rev()
+            .find(|&i| self.frames[i].has_hash(name))
     }
 
     fn check_parallel_hash_write(&self, name: &str) -> Result<(), PerlError> {
@@ -1155,10 +1151,7 @@ impl Scope {
             ));
         }
         self.check_parallel_hash_write(name)?;
-        let idx = match self.resolve_hash_frame_idx(name) {
-            Some(i) => i,
-            None => 0,
-        };
+        let idx = self.resolve_hash_frame_idx(name).unwrap_or_default();
         let frame = &mut self.frames[idx];
         if frame.get_hash_mut(name).is_none() {
             frame.hashes.push((name.to_string(), IndexMap::new()));
@@ -1333,10 +1326,8 @@ impl Scope {
                 captured.push((format!("${}", k), v.clone()));
             }
             for (i, v) in frame.scalar_slots.iter().enumerate() {
-                if let Some(opt) = frame.scalar_slot_names.get(i) {
-                    if let Some(name) = opt {
-                        captured.push((format!("${}", name), v.clone()));
-                    }
+                if let Some(Some(name)) = frame.scalar_slot_names.get(i) {
+                    captured.push((format!("${}", name), v.clone()));
                 }
             }
             for (k, v) in &frame.arrays {
@@ -1392,10 +1383,8 @@ impl Scope {
                 scalars.push((format!("${}", k), v.clone()));
             }
             for (i, v) in frame.scalar_slots.iter().enumerate() {
-                if let Some(opt) = frame.scalar_slot_names.get(i) {
-                    if let Some(name) = opt {
-                        scalars.push((format!("${}", name), v.clone()));
-                    }
+                if let Some(Some(name)) = frame.scalar_slot_names.get(i) {
+                    scalars.push((format!("${}", name), v.clone()));
                 }
             }
             for (k, v) in &frame.arrays {

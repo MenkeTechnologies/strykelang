@@ -167,9 +167,7 @@ pub fn try_vm_execute(
 /// Parse + register top-level subs / `use` (same as the VM path), then compile to bytecode without running.
 /// When `strict` pragmas are enabled, bytecode compilation is skipped (same limitation as [`try_vm_execute`]).
 pub fn lint_program(program: &ast::Program, interp: &mut Interpreter) -> PerlResult<()> {
-    if let Err(e) = interp.prepare_program_top_level(program) {
-        return Err(e);
-    }
+    interp.prepare_program_top_level(program)?;
     if interp.strict_refs || interp.strict_subs || interp.strict_vars {
         eprintln!("perlrs: warning: bytecode compile check skipped (strict pragma is enabled)");
         return Ok(());
