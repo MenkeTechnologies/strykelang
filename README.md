@@ -13,7 +13,7 @@
 [![Docs.rs](https://docs.rs/perlrs/badge.svg)](https://docs.rs/perlrs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-### `[PARALLEL WORLDS FASTEST PERL5 INTERPRETER // RUST-POWERED EXECUTION ENGINE]`
+### `[PARALLEL PERL5 INTERPRETER // RUST-POWERED EXECUTION ENGINE]`
 
  ┌──────────────────────────────────────────────────────────────┐
  │ STATUS: ONLINE &nbsp;&nbsp; CORES: ALL &nbsp;&nbsp; SIGNAL: ████████░░       │

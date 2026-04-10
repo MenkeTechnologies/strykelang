@@ -1,16 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::*;
-use crate::bench_fusion::{
-    try_match_array_push_sort_fusion, try_match_hash_sum_fusion, try_match_map_grep_scalar_fusion,
-    try_match_regex_count_fusion, try_match_string_repeat_length_fusion, ArrayPushSortFusionSpec,
-    HashSumFusionSpec, MapGrepScalarFusionSpec, RegexCountFusionSpec, StringRepeatLengthFusionSpec,
-};
 use crate::bytecode::{
     BuiltinId, Chunk, Op, RuntimeSubDecl, GP_CHECK, GP_END, GP_INIT, GP_RUN, GP_START,
 };
 use crate::interpreter::{Interpreter, WantarrayCtx};
-use crate::sort_fast::detect_sort_block_fast;
 use crate::value::PerlValue;
 
 /// Compilation error — triggers fallback to tree-walker.
@@ -22,165 +16,6 @@ pub enum CompileError {
         line: usize,
         detail: String,
     },
-}
-
-/// Closed-form fusion for `my $sum = 0; for (my $i = 0; $i < L; $i = $i + 1) { $sum = $sum + $i } print $sum, "\n"`.
-struct TriangularForFusionSpec {
-    limit: i64,
-    sum_name: String,
-    i_name: String,
-}
-
-fn try_match_triangular_for_fusion(
-    sum_stmt: &Statement,
-    for_stmt: &Statement,
-    print_stmt: &Statement,
-) -> Option<TriangularForFusionSpec> {
-    if sum_stmt.label.is_some() || for_stmt.label.is_some() || print_stmt.label.is_some() {
-        return None;
-    }
-    let sum_name = match &sum_stmt.kind {
-        StmtKind::My(decls)
-            if decls.len() == 1
-                && decls[0].sigil == Sigil::Scalar
-                && !decls[0].frozen
-                && decls[0].type_annotation.is_none() =>
-        {
-            match &decls[0].initializer {
-                Some(Expr {
-                    kind: ExprKind::Integer(0),
-                    ..
-                }) => decls[0].name.clone(),
-                _ => return None,
-            }
-        }
-        _ => return None,
-    };
-
-    let StmtKind::For {
-        init,
-        condition,
-        step,
-        body,
-        label,
-        continue_block,
-        ..
-    } = &for_stmt.kind
-    else {
-        return None;
-    };
-    if label.is_some() || continue_block.is_some() {
-        return None;
-    }
-    let init = init.as_ref()?;
-    let i_name = match &init.kind {
-        StmtKind::My(decls)
-            if decls.len() == 1
-                && decls[0].sigil == Sigil::Scalar
-                && !decls[0].frozen
-                && decls[0].type_annotation.is_none() =>
-        {
-            match &decls[0].initializer {
-                Some(Expr {
-                    kind: ExprKind::Integer(0),
-                    ..
-                }) => decls[0].name.clone(),
-                _ => return None,
-            }
-        }
-        _ => return None,
-    };
-
-    let condition = condition.as_ref()?;
-    let limit = match &condition.kind {
-        ExprKind::BinOp {
-            left,
-            op: BinOp::NumLt,
-            right,
-        } => match (&left.kind, &right.kind) {
-            (ExprKind::ScalarVar(n), ExprKind::Integer(lim)) if n == &i_name => *lim,
-            _ => return None,
-        },
-        _ => return None,
-    };
-    if limit < 0 {
-        return None;
-    }
-
-    let step = step.as_ref()?;
-    match &step.kind {
-        ExprKind::Assign { target, value } => {
-            match &target.kind {
-                ExprKind::ScalarVar(n) if n == &i_name => {}
-                _ => return None,
-            }
-            match &value.kind {
-                ExprKind::BinOp {
-                    left,
-                    op: BinOp::Add,
-                    right,
-                } => match (&left.kind, &right.kind) {
-                    (ExprKind::ScalarVar(n), ExprKind::Integer(1)) if n == &i_name => {}
-                    _ => return None,
-                },
-                _ => return None,
-            }
-        }
-        _ => return None,
-    }
-
-    if body.len() != 1 {
-        return None;
-    }
-    let body_stmt = &body[0];
-    if body_stmt.label.is_some() {
-        return None;
-    }
-    let (target, value) = match &body_stmt.kind {
-        StmtKind::Expression(expr) => match &expr.kind {
-            ExprKind::Assign { target, value } => (target.as_ref(), value.as_ref()),
-            _ => return None,
-        },
-        _ => return None,
-    };
-    match &target.kind {
-        ExprKind::ScalarVar(n) if n == &sum_name => {}
-        _ => return None,
-    }
-    match &value.kind {
-        ExprKind::BinOp {
-            left,
-            op: BinOp::Add,
-            right,
-        } => match (&left.kind, &right.kind) {
-            (ExprKind::ScalarVar(s), ExprKind::ScalarVar(iv))
-                if s == &sum_name && iv == &i_name => {}
-            _ => return None,
-        },
-        _ => return None,
-    }
-
-    match &print_stmt.kind {
-        StmtKind::Expression(Expr {
-            kind: ExprKind::Print { args, handle },
-            ..
-        }) => {
-            if handle.is_some() || args.len() != 2 {
-                return None;
-            }
-            match (&args[0].kind, &args[1].kind) {
-                (ExprKind::ScalarVar(s), ExprKind::String(nl)) if s == &sum_name && nl == "\n" => {}
-                _ => return None,
-            }
-        }
-        _ => return None,
-    }
-
-    Some(TriangularForFusionSpec {
-        limit,
-        sum_name,
-        i_name,
-    })
 }
 
 #[derive(Default)]
@@ -793,133 +628,6 @@ impl Compiler {
             .iter()
             .rev()
             .any(|l| l.mysync_hashes.contains(hash_name))
-    }
-
-    fn emit_triangular_for_fusion(
-        &mut self,
-        spec: &TriangularForFusionSpec,
-        my_sum_stmt: &Statement,
-        for_stmt: &Statement,
-        print_stmt: &Statement,
-        print_is_last: bool,
-    ) -> Result<(), CompileError> {
-        self.compile_statement(my_sum_stmt)?;
-        let line = for_stmt.line;
-        self.emit_push_frame(line);
-        let StmtKind::For {
-            init: Some(init), ..
-        } = &for_stmt.kind
-        else {
-            return Err(CompileError::Unsupported(
-                "triangular fusion: missing for init".into(),
-            ));
-        };
-        self.compile_statement(init.as_ref())?;
-        let sum_idx = self.chunk.intern_name(&spec.sum_name);
-        let i_idx = self.chunk.intern_name(&spec.i_name);
-        self.chunk.emit(
-            Op::TriangularForAccum {
-                limit: spec.limit,
-                sum_name_idx: sum_idx,
-                i_name_idx: i_idx,
-            },
-            line,
-        );
-        self.emit_pop_frame(line);
-        if print_is_last {
-            if let StmtKind::Expression(expr) = &print_stmt.kind {
-                self.compile_expr(expr)?;
-            } else {
-                self.compile_statement(print_stmt)?;
-            }
-        } else {
-            self.compile_statement(print_stmt)?;
-        }
-        Ok(())
-    }
-
-    fn emit_fused_print_int_newline(
-        &mut self,
-        n: i64,
-        line: usize,
-        print_is_last: bool,
-    ) -> Result<(), CompileError> {
-        self.chunk.emit(Op::LoadInt(n), line);
-        let nl = self.chunk.add_constant(PerlValue::string("\n".to_string()));
-        self.chunk.emit(Op::LoadConst(nl), line);
-        self.chunk.emit(Op::Print(2), line);
-        if !print_is_last {
-            self.chunk.emit(Op::Pop, line);
-        }
-        Ok(())
-    }
-
-    fn emit_fused_print_four_words(
-        &mut self,
-        a: i64,
-        space_word: &str,
-        b: i64,
-        line: usize,
-        print_is_last: bool,
-    ) -> Result<(), CompileError> {
-        self.chunk.emit(Op::LoadInt(a), line);
-        let sp = self
-            .chunk
-            .add_constant(PerlValue::string(space_word.to_string()));
-        self.chunk.emit(Op::LoadConst(sp), line);
-        self.chunk.emit(Op::LoadInt(b), line);
-        let nl = self.chunk.add_constant(PerlValue::string("\n".to_string()));
-        self.chunk.emit(Op::LoadConst(nl), line);
-        self.chunk.emit(Op::Print(4), line);
-        if !print_is_last {
-            self.chunk.emit(Op::Pop, line);
-        }
-        Ok(())
-    }
-
-    fn emit_string_repeat_length_fusion(
-        &mut self,
-        spec: &StringRepeatLengthFusionSpec,
-        line: usize,
-        print_is_last: bool,
-    ) -> Result<(), CompileError> {
-        self.emit_fused_print_int_newline(spec.total_len, line, print_is_last)
-    }
-
-    fn emit_hash_sum_fusion(
-        &mut self,
-        spec: &HashSumFusionSpec,
-        line: usize,
-        print_is_last: bool,
-    ) -> Result<(), CompileError> {
-        self.emit_fused_print_int_newline(spec.sum, line, print_is_last)
-    }
-
-    fn emit_array_push_sort_fusion(
-        &mut self,
-        spec: &ArrayPushSortFusionSpec,
-        line: usize,
-        print_is_last: bool,
-    ) -> Result<(), CompileError> {
-        self.emit_fused_print_four_words(spec.first, " ", spec.last, line, print_is_last)
-    }
-
-    fn emit_map_grep_scalar_fusion(
-        &mut self,
-        spec: &MapGrepScalarFusionSpec,
-        line: usize,
-        print_is_last: bool,
-    ) -> Result<(), CompileError> {
-        self.emit_fused_print_int_newline(spec.scalar, line, print_is_last)
-    }
-
-    fn emit_regex_count_fusion(
-        &mut self,
-        spec: &RegexCountFusionSpec,
-        line: usize,
-        print_is_last: bool,
-    ) -> Result<(), CompileError> {
-        self.emit_fused_print_int_newline(spec.count, line, print_is_last)
     }
 
     pub fn compile_program(mut self, program: &Program) -> Result<Chunk, CompileError> {
@@ -2315,10 +2023,12 @@ impl Compiler {
                 let idx = self.chunk.add_constant(PerlValue::string(s.clone()));
                 self.emit_op(Op::LoadConst(idx), line, Some(root));
             }
-            ExprKind::Bareword(_) => {
-                return Err(CompileError::Unsupported(
-                    "bareword rvalue (resolve subroutine vs string) — use tree interpreter".into(),
-                ));
+            ExprKind::Bareword(name) => {
+                // `BAREWORD` as an rvalue: run-time lookup via `Op::BarewordRvalue` — if a sub
+                // with this name exists at run time, call it nullary; otherwise push the name
+                // as a string. Mirrors the tree-walker's `ExprKind::Bareword` eval path.
+                let idx = self.chunk.intern_name(name);
+                self.emit_op(Op::BarewordRvalue(idx), line, Some(root));
             }
             ExprKind::Undef => {
                 self.emit_op(Op::LoadUndef, line, Some(root));

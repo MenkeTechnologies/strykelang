@@ -1,5 +1,4 @@
 pub mod ast;
-mod bench_fusion;
 pub mod builtins;
 pub mod bytecode;
 pub mod capture;

@@ -1453,6 +1453,20 @@ impl<'a> VM<'a> {
                         let line = self.line();
                         Err(crate::error::PerlError::runtime(msg, line))
                     }
+                    Op::BarewordRvalue(name_idx) => {
+                        let name = names[*name_idx as usize].clone();
+                        let line = self.line();
+                        let out = vm_interp_result(
+                            self.interp.resolve_bareword_rvalue(
+                                &name,
+                                crate::interpreter::WantarrayCtx::Scalar,
+                                line,
+                            ),
+                            line,
+                        )?;
+                        self.push(out);
+                        Ok(())
+                    }
 
                     // ── Stack ──
                     Op::Pop => {

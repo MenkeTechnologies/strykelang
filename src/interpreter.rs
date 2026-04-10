@@ -7896,6 +7896,25 @@ impl Interpreter {
         Ok(old)
     }
 
+    /// `BAREWORD` as an rvalue — matches `ExprKind::Bareword` in the tree walker. If a nullary
+    /// subroutine by that name is defined, call it; otherwise stringify (bareword-as-string).
+    /// `strict subs` is enforced transitively: if the bareword is used where a sub is called
+    /// explicitly (`&foo` / `foo()`) and the sub is undefined, `call_named_sub` emits the
+    /// `strict subs` error — bare rvalue position is lenient (matches tree semantics, which
+    /// diverges slightly from Perl 5's compile-time `Bareword "..." not allowed while "strict
+    /// subs" in use`).
+    pub(crate) fn resolve_bareword_rvalue(
+        &mut self,
+        name: &str,
+        want: WantarrayCtx,
+        line: usize,
+    ) -> Result<PerlValue, FlowOrError> {
+        if let Some(sub) = self.resolve_sub_by_name(name) {
+            return self.call_sub(&sub, vec![], want, line);
+        }
+        Ok(PerlValue::string(name.to_string()))
+    }
+
     /// `@$aref[i1,i2,...]` rvalue — read a slice through an array reference as a list.
     /// Shared by the VM [`crate::bytecode::Op::ArrowArraySlice`] path already, and by the new
     /// compound / inc-dec / assign helpers below.

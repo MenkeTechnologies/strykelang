@@ -201,6 +201,11 @@ pub enum Op {
     /// [`Op::HashSliceDerefIncDec`]. Delegates to
     /// [`crate::interpreter::Interpreter::arrow_array_slice_inc_dec`].
     ArrowArraySliceIncDec(u8, u16),
+    /// `BAREWORD` as an rvalue — at run time, look up a subroutine with this name; if found,
+    /// call it with no args (nullary), otherwise push the name as a string (Perl's bareword-as-
+    /// stringifies behavior). `u16` is a name-pool index. Delegates to
+    /// [`crate::interpreter::Interpreter::resolve_bareword_rvalue`].
+    BarewordRvalue(u16),
     /// Throw `PerlError::runtime` with the message at constant pool index `u16`. Used by the compiler
     /// to hard-reject constructs whose only valid response is the same runtime error that the
     /// tree-walker produces (e.g. `++@$r`, `%{...}--`) without falling back to the tree path.
