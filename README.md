@@ -628,7 +628,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - `package` declarations
 - **Typeglob assignment** — `*foo = \&bar` (subroutine alias) and `*foo = *bar` (copy stash slots: `&`, `$`, `@`, `%`, and IO-handle alias map); package-qualified `*Foo::x` supported. Implemented in the tree interpreter (`assign_value` / `copy_typeglob_slots`); bytecode compilation still falls back to the tree-walker for these assignments.
 - `BEGIN` / `UNITCHECK` / `CHECK` / `INIT` / `END` blocks (Perl order; **`${^GLOBAL_PHASE}`** matches Perl in both the tree-walker and the bytecode VM via [`Op::SetGlobalPhase`](src/bytecode.rs); see [`SPECIAL_VARIABLES.md`](SPECIAL_VARIABLES.md))
-- String interpolation with `$var`, `$hash{key}`, `$array[idx]`, `$0`, and regexp captures `$1`…`$n` (multi-digit runs; `$01`… is a parse error like Perl); double-quoted / `qq` strings support `\x{hex}` (Unicode scalar) and unbraced `\x` (one or two hex digits, like Perl)
+- String interpolation with `$var`, `$hash{key}`, `$array[idx]`, `$0`, and regexp captures `$1`…`$n` (multi-digit runs; `$01`… is a parse error like Perl); double-quoted / `qq` strings support `\x{hex}` (Unicode scalar) and unbraced `\x` (one or two hex digits, like Perl); `\$` in `""` / `qq` is a literal `$` for string `eval` / generated code (not outer-scope interpolation); `\\` + `$` is a literal backslash followed by interpolating `$var`
 - **`__FILE__`** / **`__LINE__`** — compile-time literals (`__LINE__` is the token’s line, 1-based; `__FILE__` matches `Interpreter::file`, e.g. `-e` or the script path from the `pe` driver)
 - Heredocs (`<<EOF`)
 - `qw()`, `q()`, `qq()`

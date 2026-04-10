@@ -1,6 +1,15 @@
 use crate::common::*;
 
 #[test]
+fn qq_backslash_dollar_in_eval_string_is_literal_sigil() {
+    // CPAN JSON::PP-style: `eval qq/my \$x = 42/` must compile as `my $x`, not outer `$x`.
+    assert_eq!(
+        eval_int(r#"no strict 'vars'; eval qq/my \$x = 42/; $x"#),
+        42
+    );
+}
+
+#[test]
 fn string_operations() {
     assert_eq!(eval_string(r#"uc("hello")"#), "HELLO");
     assert_eq!(eval_string(r#"lc("HELLO")"#), "hello");

@@ -1,6 +1,10 @@
 use crate::error::{PerlError, PerlResult};
 use crate::token::{keyword_or_ident, Token};
 
+/// Private-use character for a literal `$` inside double-quoted / `qq` strings (from `\$` in source).
+/// The parser maps this to `$` without variable interpolation (CPAN `eval qq/…/` code generators).
+pub const LITERAL_DOLLAR_IN_DQUOTE: char = '\u{E000}';
+
 pub struct Lexer {
     input: Vec<char>,
     pos: usize,
@@ -198,6 +202,7 @@ impl Lexer {
                     Some('b') => s.push('\x08'),
                     Some('f') => s.push('\x0C'),
                     Some('e') => s.push('\x1B'),
+                    Some('$') => s.push(LITERAL_DOLLAR_IN_DQUOTE),
                     Some('x') => {
                         if self.peek() == Some('{') {
                             self.advance(); // '{'
@@ -255,6 +260,136 @@ impl Lexer {
                 Some(c) if c == term => break,
                 Some(c) => s.push(c),
                 None => return Err(PerlError::syntax("Unterminated string", self.line)),
+            }
+        }
+        Ok(s)
+    }
+
+    /// `q(...)` / `qq(...)` with pairing delimiters — Perl balances nested `()`, `[]`, `{}`, `<>`
+    /// so `q(sub ($) { 1 })` does not end at the `)` in `($)` (core `Carp.pm` uses `eval(q(...))`).
+    fn read_q_qq_balanced_body(
+        &mut self,
+        open: char,
+        close: char,
+        is_qq: bool,
+    ) -> PerlResult<String> {
+        let mut s = String::new();
+        let mut depth: usize = 1;
+        loop {
+            match self.peek() {
+                Some('\\') => {
+                    self.advance();
+                    if is_qq {
+                        match self.advance() {
+                            Some('n') => s.push('\n'),
+                            Some('t') => s.push('\t'),
+                            Some('r') => s.push('\r'),
+                            Some('\\') => s.push('\\'),
+                            Some('0') => s.push('\0'),
+                            Some('a') => s.push('\x07'),
+                            Some('b') => s.push('\x08'),
+                            Some('f') => s.push('\x0C'),
+                            Some('e') => s.push('\x1B'),
+                            Some('$') => s.push(LITERAL_DOLLAR_IN_DQUOTE),
+                            Some('x') => {
+                                if self.peek() == Some('{') {
+                                    self.advance();
+                                    let hex = self.read_while(|c| c != '}');
+                                    if self.peek() != Some('}') {
+                                        return Err(PerlError::syntax(
+                                            "Unterminated \\x{...} in qq string",
+                                            self.line,
+                                        ));
+                                    }
+                                    self.advance();
+                                    if hex.is_empty() {
+                                        return Err(PerlError::syntax("Empty \\x{} in qq string", self.line));
+                                    }
+                                    let val = u32::from_str_radix(&hex, 16).map_err(|_| {
+                                        PerlError::syntax("Invalid hex digits in \\x{...}", self.line)
+                                    })?;
+                                    let c = char::from_u32(val).ok_or_else(|| {
+                                        PerlError::syntax(
+                                            "Invalid Unicode scalar value in \\x{...}",
+                                            self.line,
+                                        )
+                                    })?;
+                                    s.push(c);
+                                } else {
+                                    let mut hex = String::new();
+                                    for _ in 0..2 {
+                                        match self.peek() {
+                                            Some(c) if c.is_ascii_hexdigit() => {
+                                                hex.push(self.advance().unwrap());
+                                            }
+                                            _ => break,
+                                        }
+                                    }
+                                    if hex.is_empty() {
+                                        s.push('\0');
+                                    } else if let Ok(val) = u32::from_str_radix(&hex, 16) {
+                                        if let Some(c) = char::from_u32(val) {
+                                            s.push(c);
+                                        } else {
+                                            return Err(PerlError::syntax(
+                                                "Invalid code point in \\x escape",
+                                                self.line,
+                                            ));
+                                        }
+                                    }
+                                }
+                            }
+                            Some(c) if c == close && depth == 1 => s.push(close),
+                            Some(c) => {
+                                s.push('\\');
+                                s.push(c);
+                            }
+                            None => {
+                                return Err(PerlError::syntax(
+                                    "Unterminated qq(...) string",
+                                    self.line,
+                                ));
+                            }
+                        }
+                    } else {
+                        match self.advance() {
+                            Some(c) if c == close && depth == 1 => s.push(close),
+                            Some(c) => {
+                                s.push('\\');
+                                s.push(c);
+                            }
+                            None => {
+                                return Err(PerlError::syntax(
+                                    "Unterminated q(...) string",
+                                    self.line,
+                                ));
+                            }
+                        }
+                    }
+                }
+                Some(c) if c == open => {
+                    self.advance();
+                    depth += 1;
+                    s.push(open);
+                }
+                Some(c) if c == close => {
+                    self.advance();
+                    if depth == 1 {
+                        break;
+                    }
+                    depth -= 1;
+                    s.push(close);
+                }
+                Some(c) => {
+                    self.advance();
+                    s.push(c);
+                }
+                None => {
+                    return Err(PerlError::syntax(
+                        "Unterminated q/qq bracketed string",
+                        self.line,
+                    ));
+                }
             }
         }
         Ok(s)
@@ -1024,7 +1159,11 @@ impl Lexer {
                             '<' => '>',
                             c => c,
                         };
-                        let s = self.read_escaped_until(close)?;
+                        let s = if matches!(delim, '(' | '[' | '{' | '<') {
+                            self.read_q_qq_balanced_body(delim, close, ident == "qq")?
+                        } else {
+                            self.read_escaped_until(close)?
+                        };
                         self.last_was_term = true;
                         if ident == "qq" {
                             return Ok(Token::DoubleString(s));
@@ -1416,6 +1555,15 @@ mod tests {
     }
 
     #[test]
+    fn tokenize_double_string_escaped_sigils_are_literal() {
+        // `\$` in source becomes a sentinel + parser emits literal `$` (not outer interpolation).
+        let mut l = Lexer::new(r#""my \$x""#);
+        let t = l.tokenize().expect("tokenize");
+        let want = format!("my {}x", LITERAL_DOLLAR_IN_DQUOTE);
+        assert!(matches!(t[0].0, Token::DoubleString(ref s) if *s == want));
+    }
+
+    #[test]
     fn tokenize_double_string_braced_hex_unicode_escape() {
         let mut l = Lexer::new(r#""\x{1215}""#);
         let t = l.tokenize().expect("tokenize");
@@ -1714,6 +1862,14 @@ mod tests {
         let mut l = Lexer::new("qq(x y)");
         let t = l.tokenize().expect("tokenize");
         assert!(matches!(t[0].0, Token::DoubleString(ref s) if s == "x y"));
+    }
+
+    #[test]
+    fn tokenize_qq_slash_escaped_dollar_is_literal() {
+        let mut l = Lexer::new(r#"qq/my \$y/"#);
+        let t = l.tokenize().expect("tokenize");
+        let want = format!("my {}y", LITERAL_DOLLAR_IN_DQUOTE);
+        assert!(matches!(t[0].0, Token::DoubleString(ref s) if *s == want));
     }
 
     #[test]

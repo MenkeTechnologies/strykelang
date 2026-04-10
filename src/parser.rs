@@ -1,6 +1,6 @@
 use crate::ast::*;
 use crate::error::{PerlError, PerlResult};
-use crate::lexer::Lexer;
+use crate::lexer::{Lexer, LITERAL_DOLLAR_IN_DQUOTE};
 use crate::token::Token;
 
 pub struct Parser {
@@ -5542,6 +5542,17 @@ impl Parser {
         let mut i = 0;
 
         while i < chars.len() {
+            if chars[i] == LITERAL_DOLLAR_IN_DQUOTE {
+                literal.push('$');
+                i += 1;
+                continue;
+            }
+            // "\\$x" in source: one backslash in the string, then interpolate $x (Perl double-quoted string).
+            if chars[i] == '\\' && i + 1 < chars.len() && chars[i + 1] == '$' {
+                literal.push('\\');
+                i += 1;
+                // i now points at '$' — fall through to $ handling below
+            }
             if chars[i] == '$' && i + 1 < chars.len() {
                 if !literal.is_empty() {
                     parts.push(StringPart::Literal(std::mem::take(&mut literal)));

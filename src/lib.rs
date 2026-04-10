@@ -67,7 +67,20 @@ pub fn parse(code: &str) -> PerlResult<ast::Program> {
 /// Parse and execute a string of Perl code within an existing interpreter.
 /// Tries bytecode VM first, falls back to tree-walker on unsupported features.
 pub fn parse_and_run_string(code: &str, interp: &mut Interpreter) -> PerlResult<PerlValue> {
-    let program = parse(code)?;
+    let program = match parse(code) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!(
+                "parse_and_run_string: parse failed: {} ({} lines, {} bytes)",
+                e,
+                code.lines().count(),
+                code.len()
+            );
+            let preview: String = code.chars().take(400).collect();
+            eprintln!("--- preview ---\n{preview}");
+            return Err(e);
+        }
+    };
     interp.execute(&program)
 }
 
