@@ -42,6 +42,9 @@ pub(crate) fn try_builtin(
             let handle = args.first().map(|v| v.to_string());
             interp.readline_builtin_execute(handle.as_deref())
         }),
+        // Qualified names (`CORE::eof`, `builtin::eof`) parse as [`ExprKind::FuncCall`], not
+        // [`ExprKind::Eof`]; must still see `-n`/`-p` line-mode EOF state.
+        "CORE::eof" | "builtin::eof" => Some(interp.eof_builtin_execute(args, line)),
         "sysread" => Some(interp.builtin_sysread(args, line)),
         "syswrite" => Some(interp.builtin_syswrite(args, line)),
         "sysseek" => Some(interp.builtin_sysseek(args, line)),

@@ -268,7 +268,8 @@ pub struct Interpreter {
     /// Line count per handle for `$.` when keyed (Perl-style last-read handle).
     pub handle_line_numbers: HashMap<String, i64>,
     /// Scalar and regex `..` / `...` flip-flop state for bytecode ([`crate::bytecode::Op::ScalarFlipFlop`],
-    /// [`crate::bytecode::Op::RegexFlipFlop`], [`crate::bytecode::Op::RegexEofFlipFlop`]).
+    /// [`crate::bytecode::Op::RegexFlipFlop`], [`crate::bytecode::Op::RegexEofFlipFlop`],
+    /// [`crate::bytecode::Op::RegexFlipFlopExprRhs`]).
     pub(crate) flip_flop_active: Vec<bool>,
     /// Exclusive `...`: parallel to [`Self::flip_flop_active`] — `Some($. )` where the left bound
     /// matched; right is only compared when `$.` is strictly greater (see [`FlipFlopTreeState`]).
@@ -2541,6 +2542,29 @@ impl Interpreter {
         self.line_mode_eof_pending
     }
 
+    /// `eof` / `eof()` / `eof FH` — shared by the tree walker, [`crate::vm::VM`], and
+    /// [`crate::builtins::try_builtin`] (`CORE::eof`, `builtin::eof`, which parse as [`ExprKind::FuncCall`],
+    /// not [`ExprKind::Eof`]).
+    pub(crate) fn eof_builtin_execute(
+        &self,
+        args: &[PerlValue],
+        line: usize,
+    ) -> PerlResult<PerlValue> {
+        match args.len() {
+            0 => Ok(PerlValue::integer(if self.eof_without_arg_is_true() {
+                1
+            } else {
+                0
+            })),
+            1 => {
+                let name = args[0].to_string();
+                let at_eof = !self.has_input_handle(&name);
+                Ok(PerlValue::integer(if at_eof { 1 } else { 0 }))
+            }
+            _ => Err(PerlError::runtime("eof: too many arguments", line)),
+        }
+    }
+
     pub(crate) fn readline_builtin_execute(
         &mut self,
         handle: Option<&str>,
@@ -2872,6 +2896,40 @@ impl Interpreter {
         Ok(PerlValue::integer(1))
     }
 
+    fn regex_flip_flop_transition(
+        active: &mut bool,
+        excl_left: &mut Option<i64>,
+        exclusive: bool,
+        dot: i64,
+        left_m: bool,
+        right_m: bool,
+    ) -> i64 {
+        if !*active {
+            if left_m {
+                *active = true;
+                if exclusive {
+                    *excl_left = Some(dot);
+                } else {
+                    *excl_left = None;
+                    if right_m {
+                        *active = false;
+                    }
+                }
+                return 1;
+            }
+            return 0;
+        }
+        if let Some(ll) = *excl_left {
+            if right_m && dot > ll {
+                *active = false;
+                *excl_left = None;
+            }
+        } else if right_m {
+            *active = false;
+        }
+        1
+    }
+
     /// Scalar `..` / `...` when both operands are regex literals: match against `$_`; `$.`
     /// ([`Self::scalar_flipflop_dot_line`]) drives exclusive `...` (right not tested on the same line as
     /// left until `$.` advances), mirroring [`Self::scalar_flip_flop_eval`].
@@ -2886,12 +2944,6 @@ impl Interpreter {
         exclusive: bool,
         line: usize,
     ) -> PerlResult<PerlValue> {
-        if self.flip_flop_active.len() <= slot {
-            self.flip_flop_active.resize(slot + 1, false);
-        }
-        if self.flip_flop_exclusive_left_line.len() <= slot {
-            self.flip_flop_exclusive_left_line.resize(slot + 1, None);
-        }
         let dot = self.scalar_flipflop_dot_line();
         let subject = self.scope.get_scalar("_").to_string();
         let left_re = self
@@ -2912,32 +2964,61 @@ impl Interpreter {
             })?;
         let left_m = left_re.is_match(&subject);
         let right_m = right_re.is_match(&subject);
+        if self.flip_flop_active.len() <= slot {
+            self.flip_flop_active.resize(slot + 1, false);
+        }
+        if self.flip_flop_exclusive_left_line.len() <= slot {
+            self.flip_flop_exclusive_left_line.resize(slot + 1, None);
+        }
         let active = &mut self.flip_flop_active[slot];
         let excl_left = &mut self.flip_flop_exclusive_left_line[slot];
-        if !*active {
-            if left_m {
-                *active = true;
-                if exclusive {
-                    *excl_left = Some(dot);
-                } else {
-                    *excl_left = None;
-                    if right_m {
-                        *active = false;
-                    }
+        Ok(PerlValue::integer(Self::regex_flip_flop_transition(
+            active,
+            excl_left,
+            exclusive,
+            dot,
+            left_m,
+            right_m,
+        )))
+    }
+
+    /// Regex `..` / `...` with a dynamic right operand (evaluated in boolean context vs `$_` / `eof` / etc.).
+    pub(crate) fn regex_flip_flop_eval_dynamic_right(
+        &mut self,
+        left_pat: &str,
+        left_flags: &str,
+        slot: usize,
+        exclusive: bool,
+        line: usize,
+        right_m: bool,
+    ) -> PerlResult<PerlValue> {
+        let dot = self.scalar_flipflop_dot_line();
+        let subject = self.scope.get_scalar("_").to_string();
+        let left_re = self
+            .compile_regex(left_pat, left_flags, line)
+            .map_err(|e| match e {
+                FlowOrError::Error(err) => err,
+                FlowOrError::Flow(_) => {
+                    PerlError::runtime("unexpected flow in regex flip-flop", line)
                 }
-                return Ok(PerlValue::integer(1));
-            }
-            return Ok(PerlValue::integer(0));
+            })?;
+        let left_m = left_re.is_match(&subject);
+        if self.flip_flop_active.len() <= slot {
+            self.flip_flop_active.resize(slot + 1, false);
         }
-        if let Some(ll) = *excl_left {
-            if right_m && dot > ll {
-                *active = false;
-                *excl_left = None;
-            }
-        } else if right_m {
-            *active = false;
+        if self.flip_flop_exclusive_left_line.len() <= slot {
+            self.flip_flop_exclusive_left_line.resize(slot + 1, None);
         }
-        Ok(PerlValue::integer(1))
+        let active = &mut self.flip_flop_active[slot];
+        let excl_left = &mut self.flip_flop_exclusive_left_line[slot];
+        Ok(PerlValue::integer(Self::regex_flip_flop_transition(
+            active,
+            excl_left,
+            exclusive,
+            dot,
+            left_m,
+            right_m,
+        )))
     }
 
     /// Regex `..` / `...` flip-flop when the right operand is bare `eof` (Perl: right side is `eof`, not a
@@ -2952,12 +3033,6 @@ impl Interpreter {
         exclusive: bool,
         line: usize,
     ) -> PerlResult<PerlValue> {
-        if self.flip_flop_active.len() <= slot {
-            self.flip_flop_active.resize(slot + 1, false);
-        }
-        if self.flip_flop_exclusive_left_line.len() <= slot {
-            self.flip_flop_exclusive_left_line.resize(slot + 1, None);
-        }
         let dot = self.scalar_flipflop_dot_line();
         let subject = self.scope.get_scalar("_").to_string();
         let left_re = self
@@ -2970,32 +3045,22 @@ impl Interpreter {
             })?;
         let left_m = left_re.is_match(&subject);
         let right_m = self.eof_without_arg_is_true();
+        if self.flip_flop_active.len() <= slot {
+            self.flip_flop_active.resize(slot + 1, false);
+        }
+        if self.flip_flop_exclusive_left_line.len() <= slot {
+            self.flip_flop_exclusive_left_line.resize(slot + 1, None);
+        }
         let active = &mut self.flip_flop_active[slot];
         let excl_left = &mut self.flip_flop_exclusive_left_line[slot];
-        if !*active {
-            if left_m {
-                *active = true;
-                if exclusive {
-                    *excl_left = Some(dot);
-                } else {
-                    *excl_left = None;
-                    if right_m {
-                        *active = false;
-                    }
-                }
-                return Ok(PerlValue::integer(1));
-            }
-            return Ok(PerlValue::integer(0));
-        }
-        if let Some(ll) = *excl_left {
-            if right_m && dot > ll {
-                *active = false;
-                *excl_left = None;
-            }
-        } else if right_m {
-            *active = false;
-        }
-        Ok(PerlValue::integer(1))
+        Ok(PerlValue::integer(Self::regex_flip_flop_transition(
+            active,
+            excl_left,
+            exclusive,
+            dot,
+            left_m,
+            right_m,
+        )))
     }
 
     /// Shared `chomp` for tree-walker and VM (mutates `target`).
@@ -3769,7 +3834,7 @@ impl Interpreter {
     }
 
     /// Boolean rvalue: bare `/.../` is `$_ =~ /.../` (Perl). Does not assign `$_`; sets `$1`… like `=~`.
-    fn eval_boolean_rvalue_condition(&mut self, cond: &Expr) -> Result<bool, FlowOrError> {
+    pub(crate) fn eval_boolean_rvalue_condition(&mut self, cond: &Expr) -> Result<bool, FlowOrError> {
         match &cond.kind {
             ExprKind::Regex(pattern, flags) => {
                 let topic = self.scope.get_scalar("_");
@@ -5926,30 +5991,14 @@ impl Interpreter {
                             let left_m = left_re.is_match(&subject);
                             let right_m = right_re.is_match(&subject);
                             let st = self.flip_flop_tree.entry(key).or_default();
-                            if !st.active {
-                                if left_m {
-                                    st.active = true;
-                                    if *exclusive {
-                                        st.exclusive_left_line = Some(dot);
-                                    } else {
-                                        st.exclusive_left_line = None;
-                                        if right_m {
-                                            st.active = false;
-                                        }
-                                    }
-                                    return Ok(PerlValue::integer(1));
-                                }
-                                return Ok(PerlValue::integer(0));
-                            }
-                            if let Some(ll) = st.exclusive_left_line {
-                                if right_m && dot > ll {
-                                    st.active = false;
-                                    st.exclusive_left_line = None;
-                                }
-                            } else if right_m {
-                                st.active = false;
-                            }
-                            Ok(PerlValue::integer(1))
+                            Ok(PerlValue::integer(Self::regex_flip_flop_transition(
+                                &mut st.active,
+                                &mut st.exclusive_left_line,
+                                *exclusive,
+                                dot,
+                                left_m,
+                                right_m,
+                            )))
                         }
                         (ExprKind::Regex(left_pat, left_flags), ExprKind::Eof(None)) => {
                             let dot = self.scalar_flipflop_dot_line();
@@ -5966,37 +6015,73 @@ impl Interpreter {
                             let left_m = left_re.is_match(&subject);
                             let right_m = self.eof_without_arg_is_true();
                             let st = self.flip_flop_tree.entry(key).or_default();
-                            if !st.active {
-                                if left_m {
-                                    st.active = true;
-                                    if *exclusive {
-                                        st.exclusive_left_line = Some(dot);
-                                    } else {
-                                        st.exclusive_left_line = None;
-                                        if right_m {
-                                            st.active = false;
-                                        }
-                                    }
-                                    return Ok(PerlValue::integer(1));
-                                }
-                                return Ok(PerlValue::integer(0));
-                            }
-                            if let Some(ll) = st.exclusive_left_line {
-                                if right_m && dot > ll {
-                                    st.active = false;
-                                    st.exclusive_left_line = None;
-                                }
-                            } else if right_m {
-                                st.active = false;
-                            }
-                            Ok(PerlValue::integer(1))
+                            Ok(PerlValue::integer(Self::regex_flip_flop_transition(
+                                &mut st.active,
+                                &mut st.exclusive_left_line,
+                                *exclusive,
+                                dot,
+                                left_m,
+                                right_m,
+                            )))
                         }
-                        (ExprKind::Regex(_, _), ExprKind::Eof(Some(_))) => Err(
-                            FlowOrError::Error(PerlError::runtime(
-                                "regex flip-flop with eof(HANDLE) is not supported",
-                                line,
-                            )),
-                        ),
+                        (
+                            ExprKind::Regex(left_pat, left_flags),
+                            ExprKind::Integer(_) | ExprKind::Float(_),
+                        ) => {
+                            let dot = self.scalar_flipflop_dot_line();
+                            let right = self.eval_expr(to)?.to_int();
+                            let subject = self.scope.get_scalar("_").to_string();
+                            let left_re = self.compile_regex(left_pat, left_flags, line).map_err(
+                                |e| match e {
+                                    FlowOrError::Error(err) => err,
+                                    FlowOrError::Flow(_) => PerlError::runtime(
+                                        "unexpected flow in regex flip-flop",
+                                        line,
+                                    ),
+                                },
+                            )?;
+                            let left_m = left_re.is_match(&subject);
+                            let right_m = dot == right;
+                            let st = self.flip_flop_tree.entry(key).or_default();
+                            Ok(PerlValue::integer(Self::regex_flip_flop_transition(
+                                &mut st.active,
+                                &mut st.exclusive_left_line,
+                                *exclusive,
+                                dot,
+                                left_m,
+                                right_m,
+                            )))
+                        }
+                        (ExprKind::Regex(left_pat, left_flags), _) => {
+                            if let ExprKind::Eof(Some(_)) = &to.kind {
+                                return Err(FlowOrError::Error(PerlError::runtime(
+                                    "regex flip-flop with eof(HANDLE) is not supported",
+                                    line,
+                                )));
+                            }
+                            let dot = self.scalar_flipflop_dot_line();
+                            let subject = self.scope.get_scalar("_").to_string();
+                            let left_re = self.compile_regex(left_pat, left_flags, line).map_err(
+                                |e| match e {
+                                    FlowOrError::Error(err) => err,
+                                    FlowOrError::Flow(_) => PerlError::runtime(
+                                        "unexpected flow in regex flip-flop",
+                                        line,
+                                    ),
+                                },
+                            )?;
+                            let left_m = left_re.is_match(&subject);
+                            let right_m = self.eval_boolean_rvalue_condition(to)?;
+                            let st = self.flip_flop_tree.entry(key).or_default();
+                            Ok(PerlValue::integer(Self::regex_flip_flop_transition(
+                                &mut st.active,
+                                &mut st.exclusive_left_line,
+                                *exclusive,
+                                dot,
+                                left_m,
+                                right_m,
+                            )))
+                        }
                         _ => {
                             let left = self.eval_expr(from)?.to_int();
                             let right = self.eval_expr(to)?.to_int();
@@ -7470,19 +7555,13 @@ impl Interpreter {
             ExprKind::ReadLine(handle) => self
                 .readline_builtin_execute(handle.as_deref())
                 .map_err(Into::into),
-            ExprKind::Eof(expr) => {
-                if let Some(e) = expr {
-                    let name = self.eval_expr(e)?.to_string();
-                    let at_eof = !self.has_input_handle(&name);
-                    Ok(PerlValue::integer(if at_eof { 1 } else { 0 }))
-                } else {
-                    Ok(PerlValue::integer(if self.eof_without_arg_is_true() {
-                        1
-                    } else {
-                        0
-                    }))
+            ExprKind::Eof(expr) => match expr {
+                None => self.eof_builtin_execute(&[], line).map_err(Into::into),
+                Some(e) => {
+                    let name = self.eval_expr(e)?;
+                    self.eof_builtin_execute(&[name], line).map_err(Into::into)
                 }
-            }
+            },
 
             ExprKind::Opendir { handle, path } => {
                 let h = self.eval_expr(handle)?.to_string();
@@ -12077,8 +12156,7 @@ impl Interpreter {
 
             if self.auto_split {
                 let sep = self.field_separator.as_deref().unwrap_or(" ");
-                let re =
-                    regex::Regex::new(sep).unwrap_or_else(|_| regex::Regex::new(" ").unwrap());
+                let re = regex::Regex::new(sep).unwrap_or_else(|_| regex::Regex::new(" ").unwrap());
                 let fields: Vec<PerlValue> = re
                     .split(line_str.trim_end_matches('\n'))
                     .map(|s| PerlValue::string(s.to_string()))

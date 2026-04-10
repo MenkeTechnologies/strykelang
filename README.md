@@ -134,6 +134,7 @@ A line whose trimmed text is exactly `__DATA__` ends the program text. Everythin
 # line-by-line processing
 echo "data" | pe -ne 'print uc $_'
 # `eof` with no arguments is true on the last line of stdin or of each `@ARGV` file (same as Perl)
+# `CORE::eof()` / `builtin::eof()` use the same semantics (qualified forms parse as calls, not the `eof` AST)
 
 # auto-print mode (like sed)
 cat file.txt | pe -pe 's/foo/bar/g'

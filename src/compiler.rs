@@ -920,6 +920,16 @@ impl Compiler {
             }
         }
 
+        // Fifth pass (b): regex flip-flop compound RHS — boolean context (same `ops` vec).
+        self.chunk.regex_flip_flop_rhs_expr_bytecode_ranges =
+            vec![None; self.chunk.regex_flip_flop_rhs_expr_entries.len()];
+        for i in 0..self.chunk.regex_flip_flop_rhs_expr_entries.len() {
+            let e = self.chunk.regex_flip_flop_rhs_expr_entries[i].clone();
+            if let Ok(range) = self.try_compile_flip_flop_rhs_expr_region(&e) {
+                self.chunk.regex_flip_flop_rhs_expr_bytecode_ranges[i] = Some(range);
+            }
+        }
+
         // Sixth pass: `eval_timeout EXPR { ... }` — timeout expression only (body stays interpreter).
         self.chunk.eval_timeout_expr_bytecode_ranges =
             vec![None; self.chunk.eval_timeout_entries.len()];
@@ -1014,6 +1024,18 @@ impl Compiler {
         let line = expr.line;
         let start = self.chunk.len();
         self.compile_expr_ctx(expr, ctx)?;
+        self.chunk.emit(Op::BlockReturnValue, line);
+        Ok((start, self.chunk.len()))
+    }
+
+    /// Regex flip-flop right operand: boolean rvalue (bare `m//` is `$_ =~ m//`), like `if` / `grep EXPR`.
+    fn try_compile_flip_flop_rhs_expr_region(
+        &mut self,
+        expr: &Expr,
+    ) -> Result<(usize, usize), CompileError> {
+        let line = expr.line;
+        let start = self.chunk.len();
+        self.compile_boolean_rvalue_condition(expr)?;
         self.chunk.emit(Op::BlockReturnValue, line);
         Ok((start, self.chunk.len()))
     }
@@ -3339,7 +3361,8 @@ impl Compiler {
                         line,
                         Some(root),
                     );
-                } else if let (ExprKind::Regex(lp, lf), ExprKind::Eof(None)) = (&from.kind, &to.kind)
+                } else if let (ExprKind::Regex(lp, lf), ExprKind::Eof(None)) =
+                    (&from.kind, &to.kind)
                 {
                     let slot = self.chunk.alloc_flip_flop_slot();
                     let lp_idx = self.chunk.add_constant(PerlValue::string(lp.clone()));
@@ -3356,6 +3379,46 @@ impl Compiler {
                     return Err(CompileError::Unsupported(
                         "regex flip-flop with eof(HANDLE) is not supported".into(),
                     ));
+                } else if let ExprKind::Regex(lp, lf) = &from.kind {
+                    let slot = self.chunk.alloc_flip_flop_slot();
+                    let lp_idx = self.chunk.add_constant(PerlValue::string(lp.clone()));
+                    let lf_idx = self.chunk.add_constant(PerlValue::string(lf.clone()));
+                    if matches!(to.kind, ExprKind::Integer(_) | ExprKind::Float(_)) {
+                        let line_target = match &to.kind {
+                            ExprKind::Integer(n) => *n,
+                            ExprKind::Float(f) => *f as i64,
+                            _ => unreachable!(),
+                        };
+                        let line_cidx = self
+                            .chunk
+                            .add_constant(PerlValue::integer(line_target));
+                        self.emit_op(
+                            Op::RegexFlipFlopDotLineRhs(
+                                slot,
+                                u8::from(*exclusive),
+                                lp_idx,
+                                lf_idx,
+                                line_cidx,
+                            ),
+                            line,
+                            Some(root),
+                        );
+                    } else {
+                        let rhs_idx = self
+                            .chunk
+                            .add_regex_flip_flop_rhs_expr_entry((**to).clone());
+                        self.emit_op(
+                            Op::RegexFlipFlopExprRhs(
+                                slot,
+                                u8::from(*exclusive),
+                                lp_idx,
+                                lf_idx,
+                                rhs_idx,
+                            ),
+                            line,
+                            Some(root),
+                        );
+                    }
                 } else {
                     self.compile_expr(from)?;
                     self.compile_expr(to)?;
@@ -5774,6 +5837,27 @@ mod tests {
                 .iter()
                 .any(|o| matches!(o, Op::RegexEofFlipFlop(_, 1, _, _))),
             "expected RegexEofFlipFlop(..., exclusive=1), got:\n{}",
+            chunk.disassemble()
+        );
+    }
+
+    #[test]
+    fn compile_regex_flipflop_compound_rhs_emits_regex_flip_flop_expr_rhs() {
+        let chunk = compile_snippet(r#"print if /a/...(/b/ or /c/);"#).expect("compile");
+        assert!(
+            chunk.ops.iter().any(|o| matches!(
+                o,
+                Op::RegexFlipFlopExprRhs(_, _, _, _, _)
+            )),
+            "expected RegexFlipFlopExprRhs for compound RHS, got:\n{}",
+            chunk.disassemble()
+        );
+        assert!(
+            !chunk
+                .ops
+                .iter()
+                .any(|o| matches!(o, Op::ScalarFlipFlop(_, _))),
+            "compound regex flip-flop must not use ScalarFlipFlop:\n{}",
             chunk.disassemble()
         );
     }

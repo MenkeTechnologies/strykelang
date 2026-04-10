@@ -36,6 +36,7 @@ struct ParallelBlockVmShared {
     blocks: Vec<Block>,
     block_bytecode_ranges: Vec<Option<(usize, usize)>>,
     grep_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
+    regex_flip_flop_rhs_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     given_entries: Vec<(Expr, Block)>,
     given_topic_bytecode_ranges: Vec<Option<(usize, usize)>>,
     eval_timeout_entries: Vec<(Expr, Block)>,
@@ -49,6 +50,7 @@ struct ParallelBlockVmShared {
     keys_expr_entries: Vec<Expr>,
     keys_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     grep_expr_entries: Vec<Expr>,
+    regex_flip_flop_rhs_expr_entries: Vec<Expr>,
     values_expr_entries: Vec<Expr>,
     values_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     delete_expr_entries: Vec<Expr>,
@@ -79,6 +81,9 @@ impl ParallelBlockVmShared {
             blocks: vm.blocks.clone(),
             block_bytecode_ranges: vm.block_bytecode_ranges.clone(),
             grep_expr_bytecode_ranges: vm.grep_expr_bytecode_ranges.clone(),
+            regex_flip_flop_rhs_expr_bytecode_ranges: vm
+                .regex_flip_flop_rhs_expr_bytecode_ranges
+                .clone(),
             given_entries: vm.given_entries.clone(),
             given_topic_bytecode_ranges: vm.given_topic_bytecode_ranges.clone(),
             eval_timeout_entries: vm.eval_timeout_entries.clone(),
@@ -94,6 +99,7 @@ impl ParallelBlockVmShared {
             keys_expr_entries: vm.keys_expr_entries.clone(),
             keys_expr_bytecode_ranges: vm.keys_expr_bytecode_ranges.clone(),
             grep_expr_entries: vm.grep_expr_entries.clone(),
+            regex_flip_flop_rhs_expr_entries: vm.regex_flip_flop_rhs_expr_entries.clone(),
             values_expr_entries: vm.values_expr_entries.clone(),
             values_expr_bytecode_ranges: vm.values_expr_bytecode_ranges.clone(),
             delete_expr_entries: vm.delete_expr_entries.clone(),
@@ -124,6 +130,9 @@ impl ParallelBlockVmShared {
             blocks: self.blocks.clone(),
             block_bytecode_ranges: self.block_bytecode_ranges.clone(),
             grep_expr_bytecode_ranges: self.grep_expr_bytecode_ranges.clone(),
+            regex_flip_flop_rhs_expr_bytecode_ranges: self
+                .regex_flip_flop_rhs_expr_bytecode_ranges
+                .clone(),
             given_entries: self.given_entries.clone(),
             given_topic_bytecode_ranges: self.given_topic_bytecode_ranges.clone(),
             eval_timeout_entries: self.eval_timeout_entries.clone(),
@@ -139,6 +148,7 @@ impl ParallelBlockVmShared {
             keys_expr_entries: self.keys_expr_entries.clone(),
             keys_expr_bytecode_ranges: self.keys_expr_bytecode_ranges.clone(),
             grep_expr_entries: self.grep_expr_entries.clone(),
+            regex_flip_flop_rhs_expr_entries: self.regex_flip_flop_rhs_expr_entries.clone(),
             values_expr_entries: self.values_expr_entries.clone(),
             values_expr_bytecode_ranges: self.values_expr_bytecode_ranges.clone(),
             delete_expr_entries: self.delete_expr_entries.clone(),
@@ -250,6 +260,8 @@ pub struct VM<'a> {
     keys_expr_entries: Vec<Expr>,
     keys_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     grep_expr_entries: Vec<Expr>,
+    regex_flip_flop_rhs_expr_entries: Vec<Expr>,
+    regex_flip_flop_rhs_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     values_expr_entries: Vec<Expr>,
     values_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     delete_expr_entries: Vec<Expr>,
@@ -331,6 +343,9 @@ impl<'a> VM<'a> {
             blocks: chunk.blocks.clone(),
             block_bytecode_ranges: chunk.block_bytecode_ranges.clone(),
             grep_expr_bytecode_ranges: chunk.grep_expr_bytecode_ranges.clone(),
+            regex_flip_flop_rhs_expr_bytecode_ranges: chunk
+                .regex_flip_flop_rhs_expr_bytecode_ranges
+                .clone(),
             given_entries: chunk.given_entries.clone(),
             given_topic_bytecode_ranges: chunk.given_topic_bytecode_ranges.clone(),
             eval_timeout_entries: chunk.eval_timeout_entries.clone(),
@@ -346,6 +361,7 @@ impl<'a> VM<'a> {
             keys_expr_entries: chunk.keys_expr_entries.clone(),
             keys_expr_bytecode_ranges: chunk.keys_expr_bytecode_ranges.clone(),
             grep_expr_entries: chunk.grep_expr_entries.clone(),
+            regex_flip_flop_rhs_expr_entries: chunk.regex_flip_flop_rhs_expr_entries.clone(),
             values_expr_entries: chunk.values_expr_entries.clone(),
             values_expr_bytecode_ranges: chunk.values_expr_bytecode_ranges.clone(),
             delete_expr_entries: chunk.delete_expr_entries.clone(),
@@ -3164,6 +3180,47 @@ impl<'a> VM<'a> {
                                     *slot as usize,
                                     *exclusive != 0,
                                     line,
+                                )
+                                .map_err(Into::into),
+                            line,
+                        )?;
+                        self.push(v);
+                        Ok(())
+                    }
+                    Op::RegexFlipFlopExprRhs(slot, exclusive, lp, lf, rhs_idx) => {
+                        let idx = *rhs_idx as usize;
+                        let line = self.line();
+                        let right_m = if let Some(&(start, end)) = self
+                            .regex_flip_flop_rhs_expr_bytecode_ranges
+                            .get(idx)
+                            .and_then(|r| r.as_ref())
+                        {
+                            let val = self.run_block_region(start, end, op_count)?;
+                            val.is_true()
+                        } else {
+                            let e = &self.regex_flip_flop_rhs_expr_entries[idx];
+                            match self.interp.eval_boolean_rvalue_condition(e) {
+                                Ok(b) => b,
+                                Err(FlowOrError::Error(err)) => return Err(err),
+                                Err(FlowOrError::Flow(_)) => {
+                                    return Err(PerlError::runtime(
+                                        "unexpected flow in regex flip-flop RHS",
+                                        line,
+                                    ))
+                                }
+                            }
+                        };
+                        let left_pat = constants[*lp as usize].as_str_or_empty();
+                        let left_flags = constants[*lf as usize].as_str_or_empty();
+                        let v = vm_interp_result(
+                            self.interp
+                                .regex_flip_flop_eval_dynamic_right(
+                                    left_pat.as_str(),
+                                    left_flags.as_str(),
+                                    *slot as usize,
+                                    *exclusive != 0,
+                                    line,
+                                    right_m,
                                 )
                                 .map_err(Into::into),
                             line,
@@ -6081,19 +6138,7 @@ impl<'a> VM<'a> {
                     .to_string();
                 self.interp.close_builtin_execute(name)
             }
-            Some(BuiltinId::Eof) => {
-                if args.is_empty() {
-                    Ok(PerlValue::integer(if self.interp.eof_without_arg_is_true() {
-                        1
-                    } else {
-                        0
-                    }))
-                } else {
-                    let name = args[0].to_string();
-                    let at_eof = !self.interp.has_input_handle(&name);
-                    Ok(PerlValue::integer(if at_eof { 1 } else { 0 }))
-                }
-            }
+            Some(BuiltinId::Eof) => self.interp.eof_builtin_execute(&args, line),
             Some(BuiltinId::ReadLine) => {
                 let h = if args.is_empty() {
                     None

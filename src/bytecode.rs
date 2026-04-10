@@ -237,6 +237,15 @@ pub enum Op {
     /// right bound is [`Interpreter::eof_without_arg_is_true`] (Perl `eof` in `-n`/`-p`). Operand order:
     /// `slot`, `exclusive`, left pattern, left flags.
     RegexEofFlipFlop(u16, u8, u16, u16),
+    /// Regex `..` / `...` with a non-literal right operand (e.g. `m/a/ ... (m/b/ or m/c/)`). Left bound is
+    /// pattern + flags; right is evaluated in boolean context each line (pool index into
+    /// [`Chunk::regex_flip_flop_rhs_expr_entries`] / bytecode ranges). Operand order: `slot`, `exclusive`,
+    /// left pattern, left flags, rhs expr index.
+    RegexFlipFlopExprRhs(u16, u8, u16, u16, u16),
+    /// Regex `..` / `...` with a numeric right operand (Perl: right bound is [`Interpreter::scalar_flipflop_dot_line`]
+    /// vs literal line). Constant pool index holds the RHS line as [`PerlValue::integer`]. Operand order:
+    /// `slot`, `exclusive`, left pattern, left flags, rhs line constant index.
+    RegexFlipFlopDotLineRhs(u16, u8, u16, u16, u16),
 
     // ── Regex ──
     /// Match: pattern_const_idx, flags_const_idx, scalar_g, pos_key_name_idx (`u16::MAX` = `$_`);
@@ -830,8 +839,13 @@ pub struct Chunk {
     /// When `Some((start, end))`, `grep_expr_entries[i]` is also lowered to `ops[start..end]`
     /// (exclusive `end`) with trailing [`Op::BlockReturnValue`], like [`Self::block_bytecode_ranges`].
     pub grep_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
-    /// Number of flip-flop slots ([`Op::ScalarFlipFlop`], [`Op::RegexFlipFlop`], [`Op::RegexEofFlipFlop`]);
-    /// VM resets flip-flop vectors.
+    /// Right-hand expression for [`Op::RegexFlipFlopExprRhs`] — boolean context (bare `m//` is `$_ =~ m//`).
+    pub regex_flip_flop_rhs_expr_entries: Vec<Expr>,
+    /// When `Some((start, end))`, `regex_flip_flop_rhs_expr_entries[i]` is lowered to `ops[start..end]` +
+    /// [`Op::BlockReturnValue`].
+    pub regex_flip_flop_rhs_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
+    /// Number of flip-flop slots ([`Op::ScalarFlipFlop`], [`Op::RegexFlipFlop`], [`Op::RegexEofFlipFlop`],
+    /// [`Op::RegexFlipFlopExprRhs`], [`Op::RegexFlipFlopDotLineRhs`]); VM resets flip-flop vectors.
     pub flip_flop_slots: u16,
 }
 
@@ -882,12 +896,14 @@ impl Chunk {
             splice_expr_entries: Vec::new(),
             grep_expr_entries: Vec::new(),
             grep_expr_bytecode_ranges: Vec::new(),
+            regex_flip_flop_rhs_expr_entries: Vec::new(),
+            regex_flip_flop_rhs_expr_bytecode_ranges: Vec::new(),
             flip_flop_slots: 0,
         }
     }
 
-    /// Allocate a slot index for [`Op::ScalarFlipFlop`] / [`Op::RegexFlipFlop`] / [`Op::RegexEofFlipFlop`]
-    /// flip-flop state.
+    /// Allocate a slot index for [`Op::ScalarFlipFlop`] / [`Op::RegexFlipFlop`] / [`Op::RegexEofFlipFlop`] /
+    /// [`Op::RegexFlipFlopExprRhs`] / [`Op::RegexFlipFlopDotLineRhs`] flip-flop state.
     pub fn alloc_flip_flop_slot(&mut self) -> u16 {
         let id = self.flip_flop_slots;
         self.flip_flop_slots = self.flip_flop_slots.saturating_add(1);
@@ -898,6 +914,13 @@ impl Chunk {
     pub fn add_grep_expr_entry(&mut self, expr: Expr) -> u16 {
         let idx = self.grep_expr_entries.len() as u16;
         self.grep_expr_entries.push(expr);
+        idx
+    }
+
+    /// Regex flip-flop with compound RHS — pool index for [`Op::RegexFlipFlopExprRhs`].
+    pub fn add_regex_flip_flop_rhs_expr_entry(&mut self, expr: Expr) -> u16 {
+        let idx = self.regex_flip_flop_rhs_expr_entries.len() as u16;
+        self.regex_flip_flop_rhs_expr_entries.push(expr);
         idx
     }
 
@@ -1555,6 +1578,7 @@ impl Chunk {
         remap_ranges(&mut self.eval_timeout_expr_bytecode_ranges, &remap);
         remap_ranges(&mut self.given_topic_bytecode_ranges, &remap);
         remap_ranges(&mut self.algebraic_match_subject_bytecode_ranges, &remap);
+        remap_ranges(&mut self.regex_flip_flop_rhs_expr_bytecode_ranges, &remap);
         // Compact ops, lines, op_ast_expr.
         let mut j = 0;
         for old in 0..old_len {

@@ -30,6 +30,34 @@ fn ne_eof_no_args_true_on_last_stdin_line() {
     );
 }
 
+/// `CORE::eof()` is a qualified call (not the dedicated `eof` AST); parity with bare `eof` in `-n`.
+#[test]
+fn ne_core_eof_no_args_true_on_last_stdin_line() {
+    let exe = env!("CARGO_BIN_EXE_perlrs");
+    let mut child = Command::new(exe)
+        .args(["-ne", r#"print "eof:", CORE::eof() ? "Y" : "N", "\n""#])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("spawn perlrs");
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin")
+        .write_all(b"a\nb\nc\n")
+        .expect("write stdin");
+    let out = child.wait_with_output().expect("wait");
+    assert!(
+        out.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "eof:N\neof:N\neof:Y\n"
+    );
+}
+
 #[test]
 fn ne_eof_no_args_per_argv_file_last_line() {
     let dir = std::env::temp_dir().join(format!("perlrs_eof_argv_{}", std::process::id()));
@@ -81,10 +109,7 @@ fn ne_regex_flipflop_two_dot_eof_prints_from_match_through_eof() {
         "stderr={}",
         String::from_utf8_lossy(&out.stderr)
     );
-    assert_eq!(
-        String::from_utf8_lossy(&out.stdout),
-        "export FOO=1\nmid\n"
-    );
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "export FOO=1\nmid\n");
 }
 
 #[test]
@@ -108,8 +133,5 @@ fn ne_regex_flipflop_three_dot_eof_exclusive_right_bound() {
         "stderr={}",
         String::from_utf8_lossy(&out.stderr)
     );
-    assert_eq!(
-        String::from_utf8_lossy(&out.stdout),
-        "export FOO=1\nmid\n"
-    );
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "export FOO=1\nmid\n");
 }
