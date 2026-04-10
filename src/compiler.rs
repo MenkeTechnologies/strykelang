@@ -2505,6 +2505,28 @@ impl Compiler {
                             }
                         }
                     }
+                    if *op == BinOp::DefinedOr {
+                        // `$x //=` — short-circuit when LHS is defined (see `ExprKind::CompoundAssign` in interpreter).
+                        self.emit_get_scalar(idx, line, Some(root));
+                        let j_def = self.emit_op(Op::JumpIfDefinedKeep(0), line, Some(root));
+                        self.compile_expr(value)?;
+                        self.emit_set_scalar_keep(idx, line, Some(root));
+                        let j_end = self.emit_op(Op::Jump(0), line, Some(root));
+                        self.chunk.patch_jump_here(j_def);
+                        self.chunk.patch_jump_here(j_end);
+                        return Ok(());
+                    }
+                    if *op == BinOp::LogOr {
+                        // `$x ||=` — short-circuit when LHS is true.
+                        self.emit_get_scalar(idx, line, Some(root));
+                        let j_true = self.emit_op(Op::JumpIfTrueKeep(0), line, Some(root));
+                        self.compile_expr(value)?;
+                        self.emit_set_scalar_keep(idx, line, Some(root));
+                        let j_end = self.emit_op(Op::Jump(0), line, Some(root));
+                        self.chunk.patch_jump_here(j_true);
+                        self.chunk.patch_jump_here(j_end);
+                        return Ok(());
+                    }
                     if let Some(op_b) = scalar_compound_op_to_byte(*op) {
                         self.compile_expr(value)?;
                         self.emit_op(
@@ -2611,38 +2633,93 @@ impl Compiler {
                     kind: DerefKind::Hash,
                 } = &target.kind
                 {
-                    let vm_op = binop_to_vm_op(*op).ok_or_else(|| {
-                        CompileError::Unsupported("CompoundAssign op".into())
-                    })?;
-                    self.compile_expr(expr)?;
-                    self.compile_expr(index)?;
-                    self.emit_op(Op::Dup2, line, Some(root));
-                    self.emit_op(Op::ArrowHash, line, Some(root));
-                    self.compile_expr(value)?;
-                    self.emit_op(vm_op, line, Some(root));
-                    self.emit_op(Op::Swap, line, Some(root));
-                    self.emit_op(Op::Rot, line, Some(root));
-                    self.emit_op(Op::Swap, line, Some(root));
-                    self.emit_op(Op::SetArrowHash, line, Some(root));
+                    match op {
+                        BinOp::DefinedOr | BinOp::LogOr => {
+                            self.compile_expr(expr)?;
+                            self.compile_expr(index)?;
+                            self.emit_op(Op::Dup2, line, Some(root));
+                            self.emit_op(Op::ArrowHash, line, Some(root));
+                            let j = if *op == BinOp::DefinedOr {
+                                self.emit_op(Op::JumpIfDefinedKeep(0), line, Some(root))
+                            } else {
+                                self.emit_op(Op::JumpIfTrueKeep(0), line, Some(root))
+                            };
+                            self.compile_expr(value)?;
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::Rot, line, Some(root));
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::SetArrowHashKeep, line, Some(root));
+                            let j_end = self.emit_op(Op::Jump(0), line, Some(root));
+                            self.chunk.patch_jump_here(j);
+                            // Stack: ref, key, cur — leave `cur` as the expression value.
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::Pop, line, Some(root));
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::Pop, line, Some(root));
+                            self.chunk.patch_jump_here(j_end);
+                        }
+                        _ => {
+                            let vm_op = binop_to_vm_op(*op).ok_or_else(|| {
+                                CompileError::Unsupported("CompoundAssign op".into())
+                            })?;
+                            self.compile_expr(expr)?;
+                            self.compile_expr(index)?;
+                            self.emit_op(Op::Dup2, line, Some(root));
+                            self.emit_op(Op::ArrowHash, line, Some(root));
+                            self.compile_expr(value)?;
+                            self.emit_op(vm_op, line, Some(root));
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::Rot, line, Some(root));
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::SetArrowHash, line, Some(root));
+                        }
+                    }
                 } else if let ExprKind::ArrowDeref {
                     expr,
                     index,
                     kind: DerefKind::Array,
                 } = &target.kind
                 {
-                    let vm_op = binop_to_vm_op(*op).ok_or_else(|| {
-                        CompileError::Unsupported("CompoundAssign op".into())
-                    })?;
-                    self.compile_expr(expr)?;
-                    self.compile_expr(index)?;
-                    self.emit_op(Op::Dup2, line, Some(root));
-                    self.emit_op(Op::ArrowArray, line, Some(root));
-                    self.compile_expr(value)?;
-                    self.emit_op(vm_op, line, Some(root));
-                    self.emit_op(Op::Swap, line, Some(root));
-                    self.emit_op(Op::Rot, line, Some(root));
-                    self.emit_op(Op::Swap, line, Some(root));
-                    self.emit_op(Op::SetArrowArray, line, Some(root));
+                    match op {
+                        BinOp::DefinedOr | BinOp::LogOr => {
+                            self.compile_expr(expr)?;
+                            self.compile_expr(index)?;
+                            self.emit_op(Op::Dup2, line, Some(root));
+                            self.emit_op(Op::ArrowArray, line, Some(root));
+                            let j = if *op == BinOp::DefinedOr {
+                                self.emit_op(Op::JumpIfDefinedKeep(0), line, Some(root))
+                            } else {
+                                self.emit_op(Op::JumpIfTrueKeep(0), line, Some(root))
+                            };
+                            self.compile_expr(value)?;
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::Rot, line, Some(root));
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::SetArrowArrayKeep, line, Some(root));
+                            let j_end = self.emit_op(Op::Jump(0), line, Some(root));
+                            self.chunk.patch_jump_here(j);
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::Pop, line, Some(root));
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::Pop, line, Some(root));
+                            self.chunk.patch_jump_here(j_end);
+                        }
+                        _ => {
+                            let vm_op = binop_to_vm_op(*op).ok_or_else(|| {
+                                CompileError::Unsupported("CompoundAssign op".into())
+                            })?;
+                            self.compile_expr(expr)?;
+                            self.compile_expr(index)?;
+                            self.emit_op(Op::Dup2, line, Some(root));
+                            self.emit_op(Op::ArrowArray, line, Some(root));
+                            self.compile_expr(value)?;
+                            self.emit_op(vm_op, line, Some(root));
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::Rot, line, Some(root));
+                            self.emit_op(Op::Swap, line, Some(root));
+                            self.emit_op(Op::SetArrowArray, line, Some(root));
+                        }
+                    }
                 } else {
                     return Err(CompileError::Unsupported(
                         "CompoundAssign on non-scalar".into(),

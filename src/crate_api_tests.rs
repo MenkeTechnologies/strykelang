@@ -134,6 +134,70 @@ fn try_vm_execute_runs_simple_literal_program() {
 }
 
 #[test]
+fn try_vm_execute_scalar_defined_or_assign() {
+    let p = parse(
+        r#"my $x;
+        $x //= 99;
+        $x;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "$x //= should compile (GetScalar + JumpIfDefinedKeep + SetScalar*Keep)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 99);
+}
+
+#[test]
+fn try_vm_execute_scalar_defined_or_assign_short_circuit() {
+    let p = parse(
+        r#"my $x = 0;
+        my $runs = 0;
+        $x //= ($runs = 1);
+        $runs;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "$x //= should skip RHS when LHS is defined");
+    assert_eq!(out.unwrap().expect("vm").to_int(), 0);
+}
+
+#[test]
+fn try_vm_execute_scalar_log_or_assign() {
+    let p = parse(
+        r#"my $x = 0;
+        $x ||= 8;
+        $x;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "$x ||= should compile (GetScalar + JumpIfTrueKeep + SetScalar*Keep)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 8);
+}
+
+#[test]
+fn try_vm_execute_scalar_log_or_assign_short_circuit() {
+    let p = parse(
+        r#"my $x = 5;
+        my $runs = 0;
+        $x ||= ($runs = 1);
+        $runs;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "$x ||= should skip RHS when LHS is true");
+    assert_eq!(out.unwrap().expect("vm").to_int(), 0);
+}
+
+#[test]
 fn try_vm_execute_indirect_coderef_call() {
     let p = parse("my $inc = sub { $_[0] + 1 }; $inc(41);").expect("parse");
     let mut i = Interpreter::new();
@@ -315,6 +379,74 @@ fn try_vm_execute_arrow_hash_compound_assign() {
 }
 
 #[test]
+fn try_vm_execute_arrow_hash_defined_or_assign() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $h = { "a" => undef };
+        $h->{"a"} //= 42;
+        $h->{"a"};"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "arrow hash //= should compile (JumpIfDefinedKeep + SetArrowHashKeep)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 42);
+}
+
+#[test]
+fn try_vm_execute_arrow_hash_defined_or_assign_short_circuit() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $h = { "a" => 1 };
+        my $runs = 0;
+        $h->{"a"} //= ($runs = 1);
+        $runs;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "arrow hash //= should skip RHS when LHS is defined");
+    assert_eq!(out.unwrap().expect("vm").to_int(), 0);
+}
+
+#[test]
+fn try_vm_execute_arrow_hash_log_or_assign() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $h = { "a" => 0 };
+        $h->{"a"} ||= 9;
+        $h->{"a"};"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "arrow hash ||= should compile (JumpIfTrueKeep + SetArrowHashKeep)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 9);
+}
+
+#[test]
+fn try_vm_execute_arrow_hash_log_or_assign_short_circuit() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $h = { "a" => 2 };
+        my $runs = 0;
+        $h->{"a"} ||= ($runs = 1);
+        $runs;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "arrow hash ||= should skip RHS when LHS is true");
+    assert_eq!(out.unwrap().expect("vm").to_int(), 0);
+}
+
+#[test]
 fn try_vm_execute_arrow_hash_assign() {
     let p = parse(
         r#"no strict 'vars';
@@ -348,6 +480,74 @@ fn try_vm_execute_arrow_array_compound_assign() {
         "arrow array compound assign should compile (Dup2 + ArrowArray + SetArrowArray)"
     );
     assert_eq!(out.unwrap().expect("vm").to_int(), 12);
+}
+
+#[test]
+fn try_vm_execute_arrow_array_defined_or_assign() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $a = [undef];
+        $a->[0] //= 7;
+        $a->[0];"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "arrow array //= should compile (JumpIfDefinedKeep + SetArrowArrayKeep)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 7);
+}
+
+#[test]
+fn try_vm_execute_arrow_array_defined_or_assign_short_circuit() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $a = [99];
+        my $runs = 0;
+        $a->[0] //= ($runs = 1);
+        $runs;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "arrow array //= should skip RHS when LHS is defined");
+    assert_eq!(out.unwrap().expect("vm").to_int(), 0);
+}
+
+#[test]
+fn try_vm_execute_arrow_array_log_or_assign() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $a = [0];
+        $a->[0] ||= 5;
+        $a->[0];"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "arrow array ||= should compile (JumpIfTrueKeep + SetArrowArrayKeep)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 5);
+}
+
+#[test]
+fn try_vm_execute_arrow_array_log_or_assign_short_circuit() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $a = [3];
+        my $runs = 0;
+        $a->[0] ||= ($runs = 1);
+        $runs;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "arrow array ||= should skip RHS when LHS is true");
+    assert_eq!(out.unwrap().expect("vm").to_int(), 0);
 }
 
 #[test]
