@@ -344,6 +344,8 @@ pub enum Op {
     ArrowArray,
     /// Dereference arrow: ->{} — stack: \[ref, key\] → value
     ArrowHash,
+    /// Assign to `->{}`: stack: \[value, ref, key\] (key on top) — consumes three values.
+    SetArrowHash,
     /// Dereference arrow: ->() — stack: \[ref, args_array\] → value
     /// `$cr->(...)` — wantarray byte (see VM `WantarrayCtx` threading on `Call` / `MethodCall`).
     ArrowCall(u8),

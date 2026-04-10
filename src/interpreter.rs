@@ -7495,6 +7495,42 @@ impl Interpreter {
         })
     }
 
+    /// `$href->{key} = $val` and blessed hash slots — shared by [`Self::assign_value`] and the VM.
+    pub(crate) fn assign_arrow_hash_deref(
+        &mut self,
+        container: PerlValue,
+        key: String,
+        val: PerlValue,
+        line: usize,
+    ) -> ExecResult {
+        if let Some(b) = container.as_blessed_ref() {
+            let mut data = b.data.write();
+            if let Some(r) = data.as_hash_ref() {
+                r.write().insert(key, val);
+                return Ok(PerlValue::UNDEF);
+            }
+            if let Some(mut map) = data.as_hash_map() {
+                map.insert(key, val);
+                *data = PerlValue::hash(map);
+                return Ok(PerlValue::UNDEF);
+            }
+            return Err(PerlError::runtime(
+                "Can't assign into non-hash blessed ref",
+                line,
+            )
+            .into());
+        }
+        if let Some(r) = container.as_hash_ref() {
+            r.write().insert(key, val);
+            return Ok(PerlValue::UNDEF);
+        }
+        Err(PerlError::runtime(
+            "Can't assign to arrow hash deref on non-hash(-ref)",
+            line,
+        )
+        .into())
+    }
+
     fn assign_value(&mut self, target: &Expr, val: PerlValue) -> ExecResult {
         match &target.kind {
             ExprKind::ScalarVar(name) => {
@@ -7697,32 +7733,7 @@ impl Interpreter {
             } => {
                 let key = self.eval_expr(index)?.to_string();
                 let container = self.eval_expr(expr)?;
-                if let Some(b) = container.as_blessed_ref() {
-                    let mut data = b.data.write();
-                    if let Some(r) = data.as_hash_ref() {
-                        r.write().insert(key, val);
-                        return Ok(PerlValue::UNDEF);
-                    }
-                    if let Some(mut map) = data.as_hash_map() {
-                        map.insert(key, val);
-                        *data = PerlValue::hash(map);
-                        return Ok(PerlValue::UNDEF);
-                    }
-                    return Err(PerlError::runtime(
-                        "Can't assign into non-hash blessed ref",
-                        target.line,
-                    )
-                    .into());
-                }
-                if let Some(r) = container.as_hash_ref() {
-                    r.write().insert(key, val);
-                    return Ok(PerlValue::UNDEF);
-                }
-                Err(PerlError::runtime(
-                    "Can't assign to arrow hash deref on non-hash(-ref)",
-                    target.line,
-                )
-                .into())
+                self.assign_arrow_hash_deref(container, key, val, target.line)
             }
             ExprKind::Deref { expr, kind: Sigil::Scalar } => {
                 let ref_val = self.eval_expr(expr)?;

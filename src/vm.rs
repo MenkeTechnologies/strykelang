@@ -3164,6 +3164,19 @@ impl<'a> VM<'a> {
                         }
                         Ok(())
                     }
+                    Op::SetArrowHash => {
+                        let key = self.pop().to_string();
+                        let r = self.pop();
+                        let val = self.pop();
+                        let line = self.line();
+                        vm_interp_result(
+                            self
+                                .interp
+                                .assign_arrow_hash_deref(r, key, val, line),
+                            line,
+                        )?;
+                        Ok(())
+                    }
                     Op::ArrowCall(wa) => {
                         let want = WantarrayCtx::from_byte(*wa);
                         let args_val = self.pop();

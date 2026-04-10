@@ -4192,8 +4192,19 @@ impl Compiler {
                 self.compile_expr(key)?;
                 self.emit_op(Op::SetHashElem(idx), line, ast);
             }
+            ExprKind::ArrowDeref {
+                expr,
+                index,
+                kind: DerefKind::Hash,
+            } => {
+                self.compile_expr(expr)?;
+                self.compile_expr(index)?;
+                self.emit_op(Op::SetArrowHash, line, ast);
+            }
             ExprKind::ArrowDeref { .. } => {
-                return Err(CompileError::Unsupported("Assign to arrow deref".into()));
+                return Err(CompileError::Unsupported(
+                    "Assign to arrow array/call deref (tree interpreter)".into(),
+                ));
             }
             _ => {
                 return Err(CompileError::Unsupported("Assign to complex lvalue".into()));

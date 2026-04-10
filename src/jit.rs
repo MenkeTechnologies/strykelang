@@ -1957,6 +1957,7 @@ pub(crate) fn segment_blocks_subroutine_linear_jit(
         | Op::MethodCall(_, _, _)
         | Op::MethodCallSuper(_, _, _)
         | Op::ArrowCall(_)
+        | Op::SetArrowHash
         | Op::IndirectCall(_, _, _)
         | Op::LoadDynamicSubRef
         | Op::LoadDynamicTypeglob

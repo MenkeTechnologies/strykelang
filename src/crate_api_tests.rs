@@ -163,6 +163,24 @@ fn try_vm_execute_sort_with_coderef_comparator() {
 }
 
 #[test]
+fn try_vm_execute_arrow_hash_assign() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $h = { "a" => 1 };
+        $h->{"b"} = 2;
+        $h->{"a"} + $h->{"b"};"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "arrow hash assign should compile (Op::SetArrowHash), not force tree fallback"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 3);
+}
+
+#[test]
 fn try_vm_execute_grep_expr_comma() {
     let p = parse(
         r#"no strict 'vars';
