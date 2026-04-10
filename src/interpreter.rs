@@ -2660,6 +2660,16 @@ impl Interpreter {
         }
     }
 
+    /// `study EXPR` — Perl returns `1` for non-empty strings and a defined empty value (numifies to
+    /// `0`, stringifies to `""`) for `""`.
+    pub(crate) fn study_return_value(s: &str) -> PerlValue {
+        if s.is_empty() {
+            PerlValue::string(String::new())
+        } else {
+            PerlValue::integer(1)
+        }
+    }
+
     pub(crate) fn readline_builtin_execute(
         &mut self,
         handle: Option<&str>,
@@ -3621,7 +3631,13 @@ impl Interpreter {
         for (i, v) in rep_vals.into_iter().enumerate() {
             arr.insert(off + i, v);
         }
-        Ok(PerlValue::array(removed))
+        Ok(match self.wantarray_kind {
+            WantarrayCtx::Scalar => removed
+                .last()
+                .cloned()
+                .unwrap_or(PerlValue::UNDEF),
+            WantarrayCtx::List | WantarrayCtx::Void => PerlValue::array(removed),
+        })
     }
 
     /// `unshift @array, LIST` — VM `CallBuiltin(Unshift)`.
@@ -7681,6 +7697,7 @@ impl Interpreter {
                 offset.as_deref(),
                 length.as_deref(),
                 replacement.as_slice(),
+                ctx,
                 line,
             ),
             ExprKind::Delete(expr) => self.eval_delete_operand(expr.as_ref(), line),
@@ -7959,7 +7976,7 @@ impl Interpreter {
             }
             ExprKind::Study(expr) => {
                 let s = self.eval_expr(expr)?.to_string();
-                Ok(PerlValue::integer(s.len() as i64))
+                Ok(Self::study_return_value(&s))
             }
 
             // Type
@@ -12146,6 +12163,7 @@ impl Interpreter {
         offset: Option<&Expr>,
         length: Option<&Expr>,
         replacement: &[Expr],
+        ctx: WantarrayCtx,
         line: usize,
     ) -> Result<PerlValue, FlowOrError> {
         let arr_name = self.extract_array_name(array)?;
@@ -12176,7 +12194,13 @@ impl Interpreter {
         for (i, v) in rep_vals.into_iter().enumerate() {
             arr.insert(off + i, v);
         }
-        Ok(PerlValue::array(removed))
+        Ok(match ctx {
+            WantarrayCtx::Scalar => removed
+                .last()
+                .cloned()
+                .unwrap_or(PerlValue::UNDEF),
+            WantarrayCtx::List | WantarrayCtx::Void => PerlValue::array(removed),
+        })
     }
 
     /// Result of `keys EXPR` after `EXPR` has been evaluated (VM opcode path or tests).

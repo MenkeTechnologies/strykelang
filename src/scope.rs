@@ -1477,6 +1477,11 @@ impl Scope {
         key: &str,
         val: PerlValue,
     ) -> Result<(), PerlError> {
+        // `$SIG{INT} = \&h` — lazily install the matching signal hook. Until Perl code touches
+        // `%SIG`, the POSIX default stays in place so Ctrl-C terminates immediately.
+        if name == "SIG" {
+            crate::perl_signal::install(key);
+        }
         if let Some(ah) = self.find_atomic_hash(name) {
             ah.0.lock().insert(key.to_string(), val);
             return Ok(());

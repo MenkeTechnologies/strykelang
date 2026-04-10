@@ -185,9 +185,11 @@ fn fc_case_folds_ascii() {
 }
 
 #[test]
-fn study_returns_utf8_byte_length() {
-    assert_eq!(eval_int(r#"study "hello""#), 5);
-    assert_eq!(eval_int(r#"study "café""#), 5);
+fn study_matches_perl5_return_value() {
+    // Perl: non-empty → `1`; empty string → defined value that numifies to `0`.
+    assert_eq!(eval_int(r#"study "hello""#), 1);
+    assert_eq!(eval_int(r#"study "café""#), 1);
+    assert_eq!(eval_int(r#"study """#), 0);
 }
 
 #[test]

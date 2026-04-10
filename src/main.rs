@@ -1205,6 +1205,7 @@ fn main() {
         // Normal execution
         match interp.execute(&program) {
             Ok(_) => {
+                let _ = io::stdout().flush();
                 if let Some(mut p) = interp.profiler.take() {
                     p.print_report();
                 }

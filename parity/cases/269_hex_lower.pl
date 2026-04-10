@@ -1,0 +1,1 @@
+print hex("ff"), "\n";

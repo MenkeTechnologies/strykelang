@@ -389,9 +389,23 @@ fn builtin_alarm(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 fn builtin_sleep(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    // Stock Perl's `sleep` is signal-interruptible and returns the actual seconds slept. We
+    // mirror that by sleeping in short chunks and bailing as soon as `SIGINT`/`SIGTERM`/`SIGALRM`
+    // are pending — otherwise a `pfor { sleep N }` worker would ignore Ctrl-C for the full `N`.
     let secs = args.first().map(|v| v.to_number()).unwrap_or(0.0).max(0.0);
+    let total = Duration::from_secs_f64(secs);
     let start = Instant::now();
-    std::thread::sleep(Duration::from_secs_f64(secs));
+    let chunk = Duration::from_millis(100);
+    while start.elapsed() < total {
+        if crate::perl_signal::pending("INT")
+            || crate::perl_signal::pending("TERM")
+            || crate::perl_signal::pending("ALRM")
+        {
+            break;
+        }
+        let remaining = total - start.elapsed();
+        std::thread::sleep(remaining.min(chunk));
+    }
     Ok(PerlValue::integer(start.elapsed().as_secs() as i64))
 }
 

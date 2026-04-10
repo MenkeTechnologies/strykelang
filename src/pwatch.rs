@@ -90,8 +90,17 @@ pub fn run_pwatch(
         })?;
     }
 
+    // Poll the channel with a timeout so Ctrl-C (and any other `%SIG` hook) can break out of
+    // the watch loop — a naked `rx.recv()` would sit forever and force the user to `kill -9`.
+    use std::sync::mpsc::RecvTimeoutError;
+    use std::time::Duration;
     loop {
-        match rx.recv() {
+        if crate::perl_signal::pending("INT")
+            || crate::perl_signal::pending("TERM")
+        {
+            return Err(PerlError::runtime("pwatch: interrupted", line));
+        }
+        match rx.recv_timeout(Duration::from_millis(100)) {
             Ok(Ok(event)) => {
                 for path in event.paths {
                     let path_string = path.to_string_lossy().into_owned();
@@ -119,7 +128,8 @@ pub fn run_pwatch(
             Ok(Err(e)) => {
                 return Err(PerlError::runtime(format!("pwatch: {}", e), line));
             }
-            Err(_) => {
+            Err(RecvTimeoutError::Timeout) => continue,
+            Err(RecvTimeoutError::Disconnected) => {
                 return Err(PerlError::runtime("pwatch: watcher channel closed", line));
             }
         }

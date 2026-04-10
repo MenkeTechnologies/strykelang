@@ -1,0 +1,1 @@
+print study("xy"), "\n";

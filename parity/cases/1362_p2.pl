@@ -1,0 +1,2 @@
+# parity:1362
+my $u; printf "%d\n", defined($u) ? 1 : 0;

@@ -164,6 +164,7 @@ impl ParallelBlockVmShared {
             ip: 0,
             stack: Vec::with_capacity(256),
             call_stack: Vec::with_capacity(32),
+            wantarray_stack: Vec::with_capacity(8),
             interp,
             jit_enabled: false,
             sub_jit_skip_linear: vec![false; n],
@@ -277,6 +278,8 @@ pub struct VM<'a> {
     ip: usize,
     stack: Vec<PerlValue>,
     call_stack: Vec<CallFrame>,
+    /// Paired with [`Op::WantarrayPush`] / [`Op::WantarrayPop`] (e.g. `splice` list vs scalar return).
+    wantarray_stack: Vec<WantarrayCtx>,
     interp: &'a mut Interpreter,
     /// When `false`, [`VM::execute`] skips Cranelift JIT (linear, block, and subroutine linear) and
     /// uses only the opcode interpreter. Default `true`.
@@ -377,6 +380,7 @@ impl<'a> VM<'a> {
             ip: 0,
             stack: Vec::with_capacity(256),
             call_stack: Vec::with_capacity(32),
+            wantarray_stack: Vec::with_capacity(8),
             interp,
             jit_enabled: true,
             sub_jit_skip_linear: vec![false; chunk.ops.len().saturating_add(1)],
@@ -2871,7 +2875,19 @@ impl<'a> VM<'a> {
                                 if i > 0 && !self.interp.ofs.is_empty() {
                                     output.push_str(&self.interp.ofs);
                                 }
-                                output.push_str(&arg.to_string());
+                                for item in arg.to_list() {
+                                    let s = match self.interp.stringify_value(item, self.line()) {
+                                        Ok(s) => s,
+                                        Err(FlowOrError::Error(e)) => return Err(e),
+                                        Err(FlowOrError::Flow(_)) => {
+                                            return Err(PerlError::runtime(
+                                                "print: unexpected control flow",
+                                                self.line(),
+                                            ));
+                                        }
+                                    };
+                                    output.push_str(&s);
+                                }
                             }
                         }
                         output.push_str(&self.interp.ors);
@@ -2914,7 +2930,19 @@ impl<'a> VM<'a> {
                                 if i > 0 && !self.interp.ofs.is_empty() {
                                     output.push_str(&self.interp.ofs);
                                 }
-                                output.push_str(&arg.to_string());
+                                for item in arg.to_list() {
+                                    let s = match self.interp.stringify_value(item, self.line()) {
+                                        Ok(s) => s,
+                                        Err(FlowOrError::Error(e)) => return Err(e),
+                                        Err(FlowOrError::Flow(_)) => {
+                                            return Err(PerlError::runtime(
+                                                "say: unexpected control flow",
+                                                self.line(),
+                                            ));
+                                        }
+                                    };
+                                    output.push_str(&s);
+                                }
                             }
                         }
                         output.push('\n');
@@ -2936,6 +2964,18 @@ impl<'a> VM<'a> {
                         args.reverse();
                         let result = self.exec_builtin(*id, args)?;
                         self.push(result);
+                        Ok(())
+                    }
+                    Op::WantarrayPush(wa) => {
+                        self.wantarray_stack.push(self.interp.wantarray_kind);
+                        self.interp.wantarray_kind = WantarrayCtx::from_byte(*wa);
+                        Ok(())
+                    }
+                    Op::WantarrayPop => {
+                        self.interp.wantarray_kind = self
+                            .wantarray_stack
+                            .pop()
+                            .unwrap_or(WantarrayCtx::Scalar);
                         Ok(())
                     }
 
@@ -3872,6 +3912,7 @@ impl<'a> VM<'a> {
                                 offset.as_ref(),
                                 length.as_ref(),
                                 replacement.as_slice(),
+                                self.interp.wantarray_kind,
                                 self.line(),
                             ),
                             self.line(),
@@ -4042,18 +4083,12 @@ impl<'a> VM<'a> {
                     Op::ArrowHash => {
                         let key = self.pop().to_string();
                         let r = self.pop();
-                        if let Some(h) = r.as_hash_ref() {
-                            self.push(h.read().get(&key).cloned().unwrap_or(PerlValue::UNDEF));
-                        } else if let Some(b) = r.as_blessed_ref() {
-                            let data = b.data.read();
-                            if let Some(v) = data.hash_get(&key) {
-                                self.push(v);
-                            } else {
-                                self.push(PerlValue::UNDEF);
-                            }
-                        } else {
-                            self.push(PerlValue::UNDEF);
-                        }
+                        let line = self.line();
+                        let v = vm_interp_result(
+                            self.interp.read_arrow_hash_element(r, key.as_str(), line),
+                            line,
+                        )?;
+                        self.push(v);
                         Ok(())
                     }
                     Op::SetArrowHash => {
@@ -5899,7 +5934,7 @@ impl<'a> VM<'a> {
             }
             Some(BuiltinId::Study) => {
                 let s = args.into_iter().next().unwrap_or(PerlValue::UNDEF);
-                Ok(PerlValue::integer(s.to_string().len() as i64))
+                Ok(Interpreter::study_return_value(&s.to_string()))
             }
             Some(BuiltinId::Chr) => {
                 let n = args.into_iter().next().unwrap_or(PerlValue::UNDEF).to_int() as u32;

@@ -1,0 +1,1 @@
+print lcfirst("HELLO"), "\n";

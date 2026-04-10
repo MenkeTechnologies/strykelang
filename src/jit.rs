@@ -1986,6 +1986,8 @@ pub(crate) fn segment_blocks_subroutine_linear_jit(
         | Op::PushFrame
         | Op::PopFrame
         | Op::CallBuiltin(_, _)
+        | Op::WantarrayPush(_)
+        | Op::WantarrayPop
         | Op::MethodCall(_, _, _)
         | Op::MethodCallSuper(_, _, _)
         | Op::ArrowCall(_)

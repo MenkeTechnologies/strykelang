@@ -1,0 +1,1 @@
+print lc("AbC"), "\n";

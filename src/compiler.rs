@@ -3767,6 +3767,7 @@ impl Compiler {
                 length,
                 replacement,
             } => {
+                self.emit_op(Op::WantarrayPush(ctx.as_byte()), line, Some(root));
                 if let ExprKind::ArrayVar(name) = &array.kind {
                     let q = self.qualify_stash_array_name(name);
                     let name_const = self.chunk.add_constant(PerlValue::string(q));
@@ -3799,6 +3800,7 @@ impl Compiler {
                     );
                     self.emit_op(Op::SpliceExpr(pool), line, Some(root));
                 }
+                self.emit_op(Op::WantarrayPop, line, Some(root));
             }
             ExprKind::ScalarContext(inner) => {
                 // `scalar EXPR` forces scalar context on EXPR regardless of the outer context

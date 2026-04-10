@@ -183,6 +183,12 @@ pub enum Op {
     // ── Built-in function calls ──
     /// Calls a registered built-in: (builtin_id, arg_count)
     CallBuiltin(u16, u8),
+    /// Save [`crate::interpreter::Interpreter::wantarray_kind`] and set from `u8`
+    /// ([`crate::interpreter::WantarrayCtx::as_byte`]). Used for `splice` / similar where the
+    /// dynamic context must match the expression's compile-time [`WantarrayCtx`] (e.g. `print splice…`).
+    WantarrayPush(u8),
+    /// Restore after [`Op::WantarrayPush`].
+    WantarrayPop,
 
     // ── List / Range ──
     MakeArray(u16), // pop N values, push as Array
