@@ -24,6 +24,13 @@ fn run_power_and_precedence() {
 }
 
 #[test]
+fn run_compound_assign_xor_shift() {
+    assert_eq!(run_int(r#"my $x = 4; $x <<= 2; $x;"#), 16);
+    assert_eq!(run_int(r#"my $x = 16; $x >>= 2; $x;"#), 4);
+    assert_eq!(run_int(r#"my $x = 5; $x ^= 3; $x;"#), 6);
+}
+
+#[test]
 fn run_numeric_comparisons_yield_perl_truth() {
     assert_eq!(run_int("5 == 5;"), 1);
     assert_eq!(run_int("5 != 3;"), 1);

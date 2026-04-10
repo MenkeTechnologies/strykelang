@@ -19,6 +19,8 @@ This is an **ordered engineering program**, not a promise of bit-identical `perl
 
 ## Completed slices (reference)
 
+- **`^=` / `<<=` / `>>=`** — lexer already emitted [`Token::XorAssign`](src/token.rs) / [`ShiftLeftAssign`](src/token.rs) / [`ShiftRightAssign`](src/token.rs); [`parse_assign_expr`](src/parser.rs) now parses them as [`ExprKind::CompoundAssign`](src/ast.rs) with [`BinOp::BitXor`](src/ast.rs) / [`ShiftLeft`](src/ast.rs) / [`ShiftRight`](src/ast.rs). Scalar bytecode uses existing [`Op::ScalarCompoundAssign`](src/bytecode.rs) (same op table as `+=` / `|=`). Covered by [`crate_api_tests::run_compound_assign_xor_shift`](src/crate_api_tests.rs) and [`parser_shape_tests::shape_compound_assign_xor_shift`](src/parser_shape_tests.rs).
+
 - **Typeglob assignment** — `*foo = \&bar` and `*foo = *bar` copy subroutine entries (`Interpreter::subs`) plus scalar/array/hash slots and `glob_handle_alias` (`Interpreter::copy_typeglob_slots`). Tree interpreter only until bytecode supports assigning to `ExprKind::Typeglob`. Lexer: `y` after `::` is not forced into `tr`/`y` when followed by `;`, `=`, etc., so names like `Foo::y` tokenize as identifiers.
 - **`__FILE__` / `__LINE__`** — compile-time literals; bytecode uses `Compiler::source_file` (wired from `Interpreter::file` in `try_vm_execute`). Covered by `parity/cases/006_magic_line.pl` and integration tests.
 - **`$!` (errno dualvar)** — numeric errno + string message (`PerlValue::errno_dual` / `ErrnoDual`); I/O paths set `errno` / `errno_code`; assignment to `$!` updates both (see [`SPECIAL_VARIABLES.md`](SPECIAL_VARIABLES.md)). Parity cases for errno-heavy paths still welcome.

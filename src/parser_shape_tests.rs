@@ -44,6 +44,23 @@ fn shape_bareword_vs_quoted_in_if() {
     }
 }
 
+/// `^=` / `<<=` / `>>=` compound assignment (lexer had tokens; parser must accept them).
+#[test]
+fn shape_compound_assign_xor_shift() {
+    match first_expr_kind("$x ^= 3;") {
+        ExprKind::CompoundAssign { op, .. } => assert_eq!(op, BinOp::BitXor),
+        _ => panic!("expected compound assign"),
+    }
+    match first_expr_kind("$x <<= 2;") {
+        ExprKind::CompoundAssign { op, .. } => assert_eq!(op, BinOp::ShiftLeft),
+        _ => panic!("expected compound assign"),
+    }
+    match first_expr_kind("$x >>= 2;") {
+        ExprKind::CompoundAssign { op, .. } => assert_eq!(op, BinOp::ShiftRight),
+        _ => panic!("expected compound assign"),
+    }
+}
+
 /// `%$href` hash dereference (Exporter `not %$export_cache`).
 #[test]
 fn shape_percent_scalar_hash_deref() {

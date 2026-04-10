@@ -2269,6 +2269,42 @@ impl Parser {
                     line,
                 })
             }
+            Token::XorAssign => {
+                self.advance();
+                let r = self.parse_assign_expr()?;
+                Ok(Expr {
+                    kind: ExprKind::CompoundAssign {
+                        target: Box::new(expr),
+                        op: BinOp::BitXor,
+                        value: Box::new(r),
+                    },
+                    line,
+                })
+            }
+            Token::ShiftLeftAssign => {
+                self.advance();
+                let r = self.parse_assign_expr()?;
+                Ok(Expr {
+                    kind: ExprKind::CompoundAssign {
+                        target: Box::new(expr),
+                        op: BinOp::ShiftLeft,
+                        value: Box::new(r),
+                    },
+                    line,
+                })
+            }
+            Token::ShiftRightAssign => {
+                self.advance();
+                let r = self.parse_assign_expr()?;
+                Ok(Expr {
+                    kind: ExprKind::CompoundAssign {
+                        target: Box::new(expr),
+                        op: BinOp::ShiftRight,
+                        value: Box::new(r),
+                    },
+                    line,
+                })
+            }
             Token::OrAssign => {
                 self.advance();
                 let r = self.parse_assign_expr()?;
