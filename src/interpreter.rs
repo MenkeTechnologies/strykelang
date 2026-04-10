@@ -222,6 +222,43 @@ impl WantarrayCtx {
     }
 }
 
+/// Wantarray for the RHS of a plain `=` assignment — must match [`crate::compiler::Compiler`] lowering
+/// so `<>` / `readline` list-slurp matches Perl for `@a = <>` (not only `my`/`our`/`local` initializers).
+pub(crate) fn assign_rhs_wantarray(target: &Expr) -> WantarrayCtx {
+    match &target.kind {
+        ExprKind::ArrayVar(_) | ExprKind::HashVar(_) => WantarrayCtx::List,
+        ExprKind::ScalarVar(_)
+        | ExprKind::ArrayElement { .. }
+        | ExprKind::HashElement { .. } => WantarrayCtx::Scalar,
+        ExprKind::Deref { kind, .. } => match kind {
+            Sigil::Scalar | Sigil::Typeglob => WantarrayCtx::Scalar,
+            Sigil::Array | Sigil::Hash => WantarrayCtx::List,
+        },
+        ExprKind::ArrowDeref {
+            index,
+            kind: DerefKind::Array,
+            ..
+        } => {
+            if matches!(&index.kind, ExprKind::List(_)) {
+                WantarrayCtx::List
+            } else {
+                WantarrayCtx::Scalar
+            }
+        }
+        ExprKind::ArrowDeref {
+            kind: DerefKind::Hash,
+            ..
+        }
+        | ExprKind::ArrowDeref {
+            kind: DerefKind::Call,
+            ..
+        } => WantarrayCtx::Scalar,
+        ExprKind::HashSliceDeref { .. } => WantarrayCtx::List,
+        ExprKind::Typeglob(_) | ExprKind::TypeglobExpr(_) => WantarrayCtx::Scalar,
+        _ => WantarrayCtx::Scalar,
+    }
+}
+
 /// Tree-walker state for scalar `..` / `...` (key: `Expr` address).
 #[derive(Clone, Copy, Default)]
 struct FlipFlopTreeState {
@@ -5929,11 +5966,7 @@ impl Interpreter {
                         return self.eval_expr(value);
                     }
                 }
-                let rhs_ctx = match &target.kind {
-                    ExprKind::ArrayVar(_) | ExprKind::HashVar(_) => WantarrayCtx::List,
-                    _ => WantarrayCtx::Scalar,
-                };
-                let val = self.eval_expr_ctx(value, rhs_ctx)?;
+                let val = self.eval_expr_ctx(value, assign_rhs_wantarray(target))?;
                 self.assign_value(target, val.clone())?;
                 Ok(val)
             }
