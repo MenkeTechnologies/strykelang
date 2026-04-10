@@ -1961,6 +1961,7 @@ pub(crate) fn segment_blocks_subroutine_linear_jit(
         | Op::IndirectCall(_, _, _)
         | Op::LoadDynamicSubRef
         | Op::LoadDynamicTypeglob
+        | Op::SymbolicDeref(_)
         | Op::SortWithCodeComparator(_) => true,
         _ => false,
     })

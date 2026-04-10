@@ -163,6 +163,24 @@ fn try_vm_execute_sort_with_coderef_comparator() {
 }
 
 #[test]
+fn try_vm_execute_symbolic_scalar_deref() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $x = 42;
+        my $r = \$x;
+        $$r;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "symbolic scalar deref should compile (Op::SymbolicDeref), not force tree fallback"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 42);
+}
+
+#[test]
 fn try_vm_execute_arrow_hash_assign() {
     let p = parse(
         r#"no strict 'vars';

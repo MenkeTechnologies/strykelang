@@ -3524,10 +3524,15 @@ impl Compiler {
                     }
                 }
             }
-            ExprKind::Deref { .. } => {
-                return Err(CompileError::Unsupported(
-                    "symbolic ref deref ($$name, @{...}) — use tree interpreter".into(),
-                ));
+            ExprKind::Deref { expr, kind } => {
+                self.compile_expr(expr)?;
+                let b = match kind {
+                    Sigil::Scalar => 0u8,
+                    Sigil::Array => 1,
+                    Sigil::Hash => 2,
+                    Sigil::Typeglob => 3,
+                };
+                self.emit_op(Op::SymbolicDeref(b), line, Some(root));
             }
 
             // ── Interpolated strings ──

@@ -4560,6 +4560,90 @@ impl Interpreter {
         }
     }
 
+    /// Symbolic ref deref (`$$r`, `@{...}`, `%{...}`, `*{...}`) — shared by [`Self::eval_expr_ctx`] and the VM.
+    pub(crate) fn symbolic_deref(
+        &mut self,
+        val: PerlValue,
+        kind: Sigil,
+        line: usize,
+    ) -> ExecResult {
+        match kind {
+            Sigil::Scalar => {
+                if let Some(name) = val.as_scalar_binding_name() {
+                    return Ok(self.get_special_var(&name));
+                }
+                if let Some(r) = val.as_scalar_ref() {
+                    return Ok(r.read().clone());
+                }
+                if let Some(s) = val.as_str() {
+                    if self.strict_refs {
+                        return Err(PerlError::runtime(
+                            format!(
+                                "Can't use string (\"{}\") as a SCALAR ref while \"strict refs\" in use",
+                                s
+                            ),
+                            line,
+                        )
+                        .into());
+                    }
+                    return Ok(self.get_special_var(&s));
+                }
+                Err(
+                    PerlError::runtime("Can't dereference non-reference as scalar", line).into(),
+                )
+            }
+            Sigil::Array => {
+                if let Some(r) = val.as_array_ref() {
+                    return Ok(PerlValue::array(r.read().clone()));
+                }
+                if let Some(s) = val.as_str() {
+                    if self.strict_refs {
+                        return Err(PerlError::runtime(
+                            format!(
+                                "Can't use string (\"{}\") as an ARRAY ref while \"strict refs\" in use",
+                                s
+                            ),
+                            line,
+                        )
+                        .into());
+                    }
+                    return Ok(PerlValue::array(self.scope.get_array(&s)));
+                }
+                Err(
+                    PerlError::runtime("Can't dereference non-reference as array", line).into(),
+                )
+            }
+            Sigil::Hash => {
+                if let Some(r) = val.as_hash_ref() {
+                    return Ok(PerlValue::hash(r.read().clone()));
+                }
+                if let Some(s) = val.as_str() {
+                    if self.strict_refs {
+                        return Err(PerlError::runtime(
+                            format!(
+                                "Can't use string (\"{}\") as a HASH ref while \"strict refs\" in use",
+                                s
+                            ),
+                            line,
+                        )
+                        .into());
+                    }
+                    self.touch_env_hash(&s);
+                    return Ok(PerlValue::hash(self.scope.get_hash(&s)));
+                }
+                Err(PerlError::runtime("Can't dereference non-reference as hash", line).into())
+            }
+            Sigil::Typeglob => {
+                if let Some(s) = val.as_str() {
+                    return Ok(PerlValue::string(self.resolve_io_handle_name(&s)));
+                }
+                Err(
+                    PerlError::runtime("Can't dereference non-reference as typeglob", line).into(),
+                )
+            }
+        }
+    }
+
     fn eval_expr_ctx(&mut self, expr: &Expr, ctx: WantarrayCtx) -> ExecResult {
         let line = expr.line;
         match &expr.kind {
@@ -4785,87 +4869,7 @@ impl Interpreter {
             }
             ExprKind::Deref { expr, kind } => {
                 let val = self.eval_expr(expr)?;
-                match kind {
-                    Sigil::Scalar => {
-                        if let Some(name) = val.as_scalar_binding_name() {
-                            return Ok(self.get_special_var(&name));
-                        }
-                        if let Some(r) = val.as_scalar_ref() {
-                            return Ok(r.read().clone());
-                        }
-                        if let Some(s) = val.as_str() {
-                            if self.strict_refs {
-                                return Err(PerlError::runtime(
-                                    format!(
-                                        "Can't use string (\"{}\") as a SCALAR ref while \"strict refs\" in use",
-                                        s
-                                    ),
-                                    line,
-                                )
-                                .into());
-                            }
-                            return Ok(self.get_special_var(&s));
-                        }
-                        Err(
-                            PerlError::runtime("Can't dereference non-reference as scalar", line)
-                                .into(),
-                        )
-                    }
-                    Sigil::Array => {
-                        if let Some(r) = val.as_array_ref() {
-                            return Ok(PerlValue::array(r.read().clone()));
-                        }
-                        if let Some(s) = val.as_str() {
-                            if self.strict_refs {
-                                return Err(PerlError::runtime(
-                                    format!(
-                                        "Can't use string (\"{}\") as an ARRAY ref while \"strict refs\" in use",
-                                        s
-                                    ),
-                                    line,
-                                )
-                                .into());
-                            }
-                            return Ok(PerlValue::array(self.scope.get_array(&s)));
-                        }
-                        Err(
-                            PerlError::runtime("Can't dereference non-reference as array", line)
-                                .into(),
-                        )
-                    }
-                    Sigil::Hash => {
-                        if let Some(r) = val.as_hash_ref() {
-                            return Ok(PerlValue::hash(r.read().clone()));
-                        }
-                        if let Some(s) = val.as_str() {
-                            if self.strict_refs {
-                                return Err(PerlError::runtime(
-                                    format!(
-                                        "Can't use string (\"{}\") as a HASH ref while \"strict refs\" in use",
-                                        s
-                                    ),
-                                    line,
-                                )
-                                .into());
-                            }
-                            self.touch_env_hash(&s);
-                            return Ok(PerlValue::hash(self.scope.get_hash(&s)));
-                        }
-                        Err(
-                            PerlError::runtime("Can't dereference non-reference as hash", line)
-                                .into(),
-                        )
-                    }
-                    Sigil::Typeglob => {
-                        if let Some(s) = val.as_str() {
-                            return Ok(PerlValue::string(self.resolve_io_handle_name(&s)));
-                        }
-                        Err(
-                            PerlError::runtime("Can't dereference non-reference as typeglob", line)
-                                .into(),
-                        )
-                    }
-                }
+                self.symbolic_deref(val, *kind, line)
             }
             ExprKind::ArrowDeref { expr, index, kind } => {
                 let val = self.eval_expr(expr)?;

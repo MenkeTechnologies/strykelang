@@ -340,6 +340,9 @@ pub enum Op {
     LoadDynamicSubRef,
     /// `*{ EXPR }` — stack: \[stash / glob name string\] → resolved handle string (IO alias map + identity).
     LoadDynamicTypeglob,
+    /// Symbolic deref (`$$r`, `@{...}`, `%{...}`, `*{...}`): stack: \[ref or name value\] → result.
+    /// Byte: `0` = [`crate::ast::Sigil::Scalar`], `1` = Array, `2` = Hash, `3` = Typeglob.
+    SymbolicDeref(u8),
     /// Dereference arrow: ->\[\] — stack: \[ref, index\] → value
     ArrowArray,
     /// Dereference arrow: ->{} — stack: \[ref, key\] → value

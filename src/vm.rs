@@ -8,7 +8,7 @@ use rayon::prelude::*;
 
 use caseless::default_case_fold_str;
 
-use crate::ast::{Block, Expr, MatchArm, PerlTypeName};
+use crate::ast::{Block, Expr, MatchArm, PerlTypeName, Sigil};
 use crate::bytecode::{BuiltinId, Chunk, Op, RuntimeSubDecl};
 use crate::compiler::scalar_compound_op_from_byte;
 use crate::error::{ErrorKind, PerlError, PerlResult};
@@ -3127,6 +3127,25 @@ impl<'a> VM<'a> {
                         let name = self.pop().to_string();
                         let n = self.interp.resolve_io_handle_name(&name);
                         self.push(PerlValue::string(n));
+                        Ok(())
+                    }
+                    Op::SymbolicDeref(kind_byte) => {
+                        let v = self.pop();
+                        let kind = match *kind_byte {
+                            0 => Sigil::Scalar,
+                            1 => Sigil::Array,
+                            2 => Sigil::Hash,
+                            3 => Sigil::Typeglob,
+                            _ => {
+                                return Err(PerlError::runtime(
+                                    "VM: bad SymbolicDeref kind byte",
+                                    self.line(),
+                                ));
+                            }
+                        };
+                        let line = self.line();
+                        let out = vm_interp_result(self.interp.symbolic_deref(v, kind, line), line)?;
+                        self.push(out);
                         Ok(())
                     }
 
