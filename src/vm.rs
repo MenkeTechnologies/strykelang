@@ -3210,6 +3210,19 @@ impl<'a> VM<'a> {
                         )?;
                         Ok(())
                     }
+                    Op::SetArrowArray => {
+                        let idx = self.pop().to_int();
+                        let r = self.pop();
+                        let val = self.pop();
+                        let line = self.line();
+                        vm_interp_result(
+                            self
+                                .interp
+                                .assign_arrow_array_deref(r, idx, val, line),
+                            line,
+                        )?;
+                        Ok(())
+                    }
                     Op::SetSymbolicScalarRef => {
                         let r = self.pop();
                         let val = self.pop();

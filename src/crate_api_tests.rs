@@ -255,6 +255,42 @@ fn try_vm_execute_arrow_hash_assign() {
 }
 
 #[test]
+fn try_vm_execute_arrow_array_compound_assign() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $a = [10, 20];
+        $a->[0] += 2;
+        $a->[0];"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "arrow array compound assign should compile (Dup2 + ArrowArray + SetArrowArray)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 12);
+}
+
+#[test]
+fn try_vm_execute_arrow_array_assign() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $a = [1, 2];
+        $a->[2] = 3;
+        $a->[0] + $a->[1] + $a->[2];"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "arrow array assign should compile (Op::SetArrowArray), not force tree fallback"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 6);
+}
+
+#[test]
 fn try_vm_execute_grep_expr_comma() {
     let p = parse(
         r#"no strict 'vars';

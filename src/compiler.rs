@@ -2454,6 +2454,25 @@ impl Compiler {
                     self.emit_op(Op::Rot, line, Some(root));
                     self.emit_op(Op::Swap, line, Some(root));
                     self.emit_op(Op::SetArrowHash, line, Some(root));
+                } else if let ExprKind::ArrowDeref {
+                    expr,
+                    index,
+                    kind: DerefKind::Array,
+                } = &target.kind
+                {
+                    let vm_op = binop_to_vm_op(*op).ok_or_else(|| {
+                        CompileError::Unsupported("CompoundAssign op".into())
+                    })?;
+                    self.compile_expr(expr)?;
+                    self.compile_expr(index)?;
+                    self.emit_op(Op::Dup2, line, Some(root));
+                    self.emit_op(Op::ArrowArray, line, Some(root));
+                    self.compile_expr(value)?;
+                    self.emit_op(vm_op, line, Some(root));
+                    self.emit_op(Op::Swap, line, Some(root));
+                    self.emit_op(Op::Rot, line, Some(root));
+                    self.emit_op(Op::Swap, line, Some(root));
+                    self.emit_op(Op::SetArrowArray, line, Some(root));
                 } else {
                     return Err(CompileError::Unsupported(
                         "CompoundAssign on non-scalar".into(),
@@ -4257,9 +4276,21 @@ impl Compiler {
                 self.compile_expr(index)?;
                 self.emit_op(Op::SetArrowHash, line, ast);
             }
-            ExprKind::ArrowDeref { .. } => {
+            ExprKind::ArrowDeref {
+                expr,
+                index,
+                kind: DerefKind::Array,
+            } => {
+                self.compile_expr(expr)?;
+                self.compile_expr(index)?;
+                self.emit_op(Op::SetArrowArray, line, ast);
+            }
+            ExprKind::ArrowDeref {
+                kind: DerefKind::Call,
+                ..
+            } => {
                 return Err(CompileError::Unsupported(
-                    "Assign to arrow array/call deref (tree interpreter)".into(),
+                    "Assign to arrow call deref (tree interpreter)".into(),
                 ));
             }
             _ => {

@@ -7559,6 +7559,34 @@ impl Interpreter {
         .into())
     }
 
+    /// `$aref->[$i] = $val` — shared by [`Self::assign_value`] and the VM.
+    pub(crate) fn assign_arrow_array_deref(
+        &mut self,
+        container: PerlValue,
+        idx: i64,
+        val: PerlValue,
+        line: usize,
+    ) -> ExecResult {
+        if let Some(a) = container.as_array_ref() {
+            let mut arr = a.write();
+            let i = if idx < 0 {
+                (arr.len() as i64 + idx) as usize
+            } else {
+                idx as usize
+            };
+            if i >= arr.len() {
+                arr.resize(i + 1, PerlValue::UNDEF);
+            }
+            arr[i] = val;
+            return Ok(PerlValue::UNDEF);
+        }
+        Err(PerlError::runtime(
+            "Can't assign to arrow array deref on non-array-ref",
+            line,
+        )
+        .into())
+    }
+
     fn assign_value(&mut self, target: &Expr, val: PerlValue) -> ExecResult {
         match &target.kind {
             ExprKind::ScalarVar(name) => {
@@ -7762,6 +7790,15 @@ impl Interpreter {
                 let key = self.eval_expr(index)?.to_string();
                 let container = self.eval_expr(expr)?;
                 self.assign_arrow_hash_deref(container, key, val, target.line)
+            }
+            ExprKind::ArrowDeref {
+                expr,
+                index,
+                kind: DerefKind::Array,
+            } => {
+                let idx = self.eval_expr(index)?.to_int();
+                let container = self.eval_expr(expr)?;
+                self.assign_arrow_array_deref(container, idx, val, target.line)
             }
             ExprKind::Deref { expr, kind: Sigil::Scalar } => {
                 let ref_val = self.eval_expr(expr)?;

@@ -353,6 +353,8 @@ pub enum Op {
     ArrowHash,
     /// Assign to `->{}`: stack: \[value, ref, key\] (key on top) — consumes three values.
     SetArrowHash,
+    /// Assign to `->[]`: stack: \[value, ref, index\] (index on top) — consumes three values.
+    SetArrowArray,
     /// `$$r = $val` — stack: \[value, ref\] (ref on top).
     SetSymbolicScalarRef,
     /// Like [`Op::SetSymbolicScalarRef`] but leaves the assigned value on the stack.
