@@ -140,6 +140,7 @@ echo "data" | pe -ne 'print uc $_'
 
 # auto-print mode (like sed)
 cat file.txt | pe -pe 's/foo/bar/g'
+# `-l` chomps each input record and sets `$\` (output record separator); `-p`’s implicit print appends `$\` like `print $_`, so multi-line pipelines keep one terminator per line (e.g. `printf 'a\nb\n' | pe -lpe '$_=uc'` → `A`/`B`/`C` each on its own line).
 
 # in-place edit on named files (`-i` / `-i.bak` like Perl; `$^I` in Perl code)
 pe -i -pe 's/foo/bar/g' file1.txt file2.txt

@@ -3718,23 +3718,29 @@ impl Interpreter {
     }
 
     pub(crate) fn exec_block(&mut self, block: &Block) -> ExecResult {
+        self.exec_block_with_tail(block, WantarrayCtx::Void)
+    }
+
+    /// Run a block; the **last** statement is evaluated in `tail` wantarray (Perl `do { }` / `eval { }` value).
+    /// Non-final statements stay void context.
+    pub(crate) fn exec_block_with_tail(&mut self, block: &Block, tail: WantarrayCtx) -> ExecResult {
         let uses_goto = block
             .iter()
             .any(|s| matches!(s.kind, StmtKind::Goto { .. }));
         if uses_goto {
             self.scope_push_hook();
-            let r = self.exec_block_with_goto(block);
+            let r = self.exec_block_with_goto_tail(block, tail);
             self.scope_pop_hook();
             r
         } else {
             self.scope_push_hook();
-            let result = self.exec_block_no_scope(block);
+            let result = self.exec_block_no_scope_with_tail(block, tail);
             self.scope_pop_hook();
             result
         }
     }
 
-    fn exec_block_with_goto(&mut self, block: &Block) -> ExecResult {
+    fn exec_block_with_goto_tail(&mut self, block: &Block, tail: WantarrayCtx) -> ExecResult {
         let mut map: HashMap<String, usize> = HashMap::new();
         for (i, s) in block.iter().enumerate() {
             if let Some(l) = &s.label {
@@ -3743,6 +3749,7 @@ impl Interpreter {
         }
         let mut pc = 0usize;
         let mut last = PerlValue::UNDEF;
+        let last_idx = block.len().saturating_sub(1);
         while pc < block.len() {
             if let StmtKind::Goto { target } = &block[pc].kind {
                 let line = block[pc].line;
@@ -3755,10 +3762,15 @@ impl Interpreter {
                 })?;
                 continue;
             }
-            match self.exec_statement(&block[pc]) {
-                Ok(v) => last = v,
-                Err(e) => return Err(e),
-            }
+            let v = if pc == last_idx {
+                match &block[pc].kind {
+                    StmtKind::Expression(expr) => self.eval_expr_ctx(expr, tail)?,
+                    _ => self.exec_statement(&block[pc])?,
+                }
+            } else {
+                self.exec_statement(&block[pc])?
+            };
+            last = v;
             pc += 1;
         }
         Ok(last)
@@ -3768,14 +3780,29 @@ impl Interpreter {
     /// Used internally by loops and the VM for sub calls.
     #[inline]
     pub(crate) fn exec_block_no_scope(&mut self, block: &Block) -> ExecResult {
-        let mut last = PerlValue::UNDEF;
-        for stmt in block {
-            match self.exec_statement(stmt) {
-                Ok(v) => last = v,
-                Err(e) => return Err(e),
+        self.exec_block_no_scope_with_tail(block, WantarrayCtx::Void)
+    }
+
+    pub(crate) fn exec_block_no_scope_with_tail(
+        &mut self,
+        block: &Block,
+        tail: WantarrayCtx,
+    ) -> ExecResult {
+        if block.is_empty() {
+            return Ok(PerlValue::UNDEF);
+        }
+        let last_i = block.len() - 1;
+        for (i, stmt) in block.iter().enumerate() {
+            if i < last_i {
+                self.exec_statement(stmt)?;
+            } else {
+                return match &stmt.kind {
+                    StmtKind::Expression(expr) => self.eval_expr_ctx(expr, tail),
+                    _ => self.exec_statement(stmt),
+                };
             }
         }
-        Ok(last)
+        Ok(PerlValue::UNDEF)
     }
 
     /// Spawn `block` on a worker thread; returns an [`PerlValue::AsyncTask`] handle (`async { }` / `spawn { }`).
@@ -7784,7 +7811,7 @@ impl Interpreter {
             ExprKind::Eval(expr) => {
                 self.eval_nesting += 1;
                 let out = match &expr.kind {
-                    ExprKind::CodeRef { body, .. } => match self.exec_block(body) {
+                    ExprKind::CodeRef { body, .. } => match self.exec_block_with_tail(body, ctx) {
                         Ok(v) => {
                             self.clear_eval_error();
                             Ok(v)
@@ -7814,10 +7841,10 @@ impl Interpreter {
                 out
             }
             ExprKind::Do(expr) => {
-                let val = self.eval_expr(expr)?;
                 match &expr.kind {
-                    ExprKind::CodeRef { body, .. } => self.exec_block(body),
+                    ExprKind::CodeRef { body, .. } => self.exec_block_with_tail(body, ctx),
                     _ => {
+                        let val = self.eval_expr(expr)?;
                         let filename = val.to_string();
                         match std::fs::read_to_string(&filename) {
                             Ok(code) => {
@@ -12296,8 +12323,10 @@ impl Interpreter {
                 }
             }
 
-            // Return current $_ for -p mode
-            Ok(Some(self.scope.get_scalar("_").to_string()))
+            // `-p` implicit print matches `print $_` (appends `$\` / [`Self::ors`] — set by `-l`).
+            let mut out = self.scope.get_scalar("_").to_string();
+            out.push_str(&self.ors);
+            Ok(Some(out))
         })();
         self.line_mode_eof_pending = false;
         result

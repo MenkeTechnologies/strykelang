@@ -45,3 +45,14 @@ fn labeled_last_breaks_outer_while() {
 fn do_block_returns_last_expression() {
     assert_eq!(eval_int("do { 1; 2; 3 }"), 3);
 }
+
+/// Last statement in `do { }` inherits outer wantarray (`grep` must see list context).
+#[test]
+fn do_block_propagates_list_context_to_last_expression() {
+    assert_eq!(
+        eval_int(
+            r#"my @l=(1,2,3,2,1); my @u = do { my %seen; grep { !$seen{$_}++ } @l }; scalar @u"#,
+        ),
+        3
+    );
+}

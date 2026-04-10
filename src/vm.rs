@@ -4459,12 +4459,13 @@ impl<'a> VM<'a> {
                     }
 
                     // ── Eval block ──
-                    Op::EvalBlock(block_idx) => {
+                    Op::EvalBlock(block_idx, want) => {
                         let block = self.blocks[*block_idx as usize].clone();
+                        let tail = crate::interpreter::WantarrayCtx::from_byte(*want);
                         self.interp.eval_nesting += 1;
                         // Use exec_block (with scope frame) so local/my declarations
                         // inside the block are properly scoped.
-                        match self.interp.exec_block(&block) {
+                        match self.interp.exec_block_with_tail(&block, tail) {
                             Ok(v) => {
                                 self.interp.clear_eval_error();
                                 self.push(v);

@@ -51,3 +51,25 @@ fn line_mode_n_stdin_body_readline_after_eof_returns_undef_without_hang() {
     );
     assert_eq!(String::from_utf8_lossy(&out.stdout), "");
 }
+
+/// `-l` + `-p`: chomped `$_` is printed with `$\` (default newline) after each line — multi-line must not concatenate.
+#[test]
+fn line_mode_lpe_implicit_print_appends_ors_each_line() {
+    let exe = perlrs_exe();
+    let mut child = Command::new(exe)
+        .args(["-lpe", r#"$_=uc"#])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("spawn perlrs");
+    let mut stdin = child.stdin.take().expect("stdin");
+    stdin.write_all(b"a\nb\nc\n").expect("write stdin");
+    drop(stdin);
+    let out = child.wait_with_output().expect("wait");
+    assert!(
+        out.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "A\nB\nC\n");
+}

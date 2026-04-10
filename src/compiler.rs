@@ -4250,7 +4250,11 @@ impl Compiler {
                 // do { BLOCK } executes the block; do "file" loads a file
                 if let ExprKind::CodeRef { body, .. } = &e.kind {
                     let block_idx = self.chunk.add_block(body.clone());
-                    self.emit_op(Op::EvalBlock(block_idx), line, Some(root));
+                    self.emit_op(
+                        Op::EvalBlock(block_idx, ctx.as_byte()),
+                        line,
+                        Some(root),
+                    );
                 } else {
                     self.compile_expr(e)?;
                     self.emit_op(Op::CallBuiltin(BuiltinId::Do as u16, 1), line, Some(root));

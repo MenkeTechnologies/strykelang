@@ -451,8 +451,9 @@ pub enum Op {
     FanCapWithBlock(u16),
     /// fan_cap { BLOCK } — like fan; stack: \[progress_flag\] → array
     FanCapWithBlockAuto(u16),
-    /// eval { BLOCK } — block_idx; stack: \[\] → result
-    EvalBlock(u16),
+    /// `do { BLOCK }` — block_idx + wantarray byte ([`crate::interpreter::WantarrayCtx::as_byte`]);
+    /// stack: \[\] → result
+    EvalBlock(u16, u8),
     /// `trace { BLOCK }` — block_idx; stack: \[\] → block value (stderr tracing for mysync mutations)
     TraceBlock(u16),
     /// `timer { BLOCK }` — block_idx; stack: \[\] → elapsed ms as float
