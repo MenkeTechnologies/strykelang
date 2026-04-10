@@ -7559,6 +7559,90 @@ impl Interpreter {
         .into())
     }
 
+    /// Read `$aref->[$i]` — same indexing as the VM [`crate::bytecode::Op::ArrowArray`].
+    pub(crate) fn read_arrow_array_element(
+        &self,
+        container: PerlValue,
+        idx: i64,
+        line: usize,
+    ) -> Result<PerlValue, FlowOrError> {
+        if let Some(a) = container.as_array_ref() {
+            let arr = a.read();
+            let i = if idx < 0 {
+                (arr.len() as i64 + idx) as usize
+            } else {
+                idx as usize
+            };
+            return Ok(arr.get(i).cloned().unwrap_or(PerlValue::UNDEF));
+        }
+        Err(PerlError::runtime(
+            "Can't use arrow deref on non-array-ref",
+            line,
+        )
+        .into())
+    }
+
+    /// Read `$href->{key}` — same as the VM [`crate::bytecode::Op::ArrowHash`].
+    pub(crate) fn read_arrow_hash_element(
+        &self,
+        container: PerlValue,
+        key: &str,
+        line: usize,
+    ) -> Result<PerlValue, FlowOrError> {
+        if let Some(r) = container.as_hash_ref() {
+            let h = r.read();
+            return Ok(h.get(key).cloned().unwrap_or(PerlValue::UNDEF));
+        }
+        if let Some(b) = container.as_blessed_ref() {
+            let data = b.data.read();
+            if let Some(v) = data.hash_get(key) {
+                return Ok(v);
+            }
+            if let Some(r) = data.as_hash_ref() {
+                let h = r.read();
+                return Ok(h.get(key).cloned().unwrap_or(PerlValue::UNDEF));
+            }
+            return Err(PerlError::runtime(
+                "Can't access hash field on non-hash blessed ref",
+                line,
+            )
+            .into());
+        }
+        Err(PerlError::runtime(
+            "Can't use arrow deref on non-hash-ref",
+            line,
+        )
+        .into())
+    }
+
+    /// `$aref->[$i]++` / `$aref->[$i]--` — returns old value; shared by the VM.
+    pub(crate) fn arrow_array_postfix(
+        &mut self,
+        container: PerlValue,
+        idx: i64,
+        decrement: bool,
+        line: usize,
+    ) -> Result<PerlValue, FlowOrError> {
+        let old = self.read_arrow_array_element(container.clone(), idx, line)?;
+        let new_val = PerlValue::integer(old.to_int() + if decrement { -1 } else { 1 });
+        self.assign_arrow_array_deref(container, idx, new_val, line)?;
+        Ok(old)
+    }
+
+    /// `$href->{k}++` / `$href->{k}--` — returns old value; shared by the VM.
+    pub(crate) fn arrow_hash_postfix(
+        &mut self,
+        container: PerlValue,
+        key: String,
+        decrement: bool,
+        line: usize,
+    ) -> Result<PerlValue, FlowOrError> {
+        let old = self.read_arrow_hash_element(container.clone(), key.as_str(), line)?;
+        let new_val = PerlValue::integer(old.to_int() + if decrement { -1 } else { 1 });
+        self.assign_arrow_hash_deref(container, key, new_val, line)?;
+        Ok(old)
+    }
+
     /// `$aref->[$i] = $val` — shared by [`Self::assign_value`] and the VM.
     pub(crate) fn assign_arrow_array_deref(
         &mut self,

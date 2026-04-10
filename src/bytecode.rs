@@ -355,6 +355,16 @@ pub enum Op {
     SetArrowHash,
     /// Assign to `->[]`: stack: \[value, ref, index\] (index on top) — consumes three values.
     SetArrowArray,
+    /// Like [`Op::SetArrowArray`] but leaves the assigned value on the stack (for `++$aref->[$i]` value).
+    SetArrowArrayKeep,
+    /// Like [`Op::SetArrowHash`] but leaves the assigned value on the stack (for `++$href->{k}` value).
+    SetArrowHashKeep,
+    /// Postfix `++` / `--` on `->[]`: stack \[ref, index\] (index on top) → old value; mutates slot.
+    /// Byte: `0` = increment, `1` = decrement.
+    ArrowArrayPostfix(u8),
+    /// Postfix `++` / `--` on `->{}`: stack \[ref, key\] (key on top) → old value; mutates slot.
+    /// Byte: `0` = increment, `1` = decrement.
+    ArrowHashPostfix(u8),
     /// `$$r = $val` — stack: \[value, ref\] (ref on top).
     SetSymbolicScalarRef,
     /// Like [`Op::SetSymbolicScalarRef`] but leaves the assigned value on the stack.

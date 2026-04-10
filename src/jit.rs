@@ -1977,6 +1977,10 @@ pub(crate) fn segment_blocks_subroutine_linear_jit(
         | Op::ArrowCall(_)
         | Op::SetArrowHash
         | Op::SetArrowArray
+        | Op::SetArrowHashKeep
+        | Op::SetArrowArrayKeep
+        | Op::ArrowArrayPostfix(_)
+        | Op::ArrowHashPostfix(_)
         | Op::SetSymbolicScalarRef
         | Op::SetSymbolicScalarRefKeep
         | Op::IndirectCall(_, _, _)

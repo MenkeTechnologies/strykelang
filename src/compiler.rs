@@ -2220,7 +2220,7 @@ impl Compiler {
                         self.emit_op(Op::Swap, line, Some(root));
                         self.emit_op(Op::Rot, line, Some(root));
                         self.emit_op(Op::Swap, line, Some(root));
-                        self.emit_op(Op::SetArrowArray, line, Some(root));
+                        self.emit_op(Op::SetArrowArrayKeep, line, Some(root));
                     } else if let ExprKind::ArrowDeref {
                         expr,
                         index,
@@ -2238,7 +2238,7 @@ impl Compiler {
                         self.emit_op(Op::Swap, line, Some(root));
                         self.emit_op(Op::Rot, line, Some(root));
                         self.emit_op(Op::Swap, line, Some(root));
-                        self.emit_op(Op::SetArrowHash, line, Some(root));
+                        self.emit_op(Op::SetArrowHashKeep, line, Some(root));
                     } else {
                         return Err(CompileError::Unsupported("PreInc on non-scalar".into()));
                     }
@@ -2298,7 +2298,7 @@ impl Compiler {
                         self.emit_op(Op::Swap, line, Some(root));
                         self.emit_op(Op::Rot, line, Some(root));
                         self.emit_op(Op::Swap, line, Some(root));
-                        self.emit_op(Op::SetArrowArray, line, Some(root));
+                        self.emit_op(Op::SetArrowArrayKeep, line, Some(root));
                     } else if let ExprKind::ArrowDeref {
                         expr,
                         index,
@@ -2316,7 +2316,7 @@ impl Compiler {
                         self.emit_op(Op::Swap, line, Some(root));
                         self.emit_op(Op::Rot, line, Some(root));
                         self.emit_op(Op::Swap, line, Some(root));
-                        self.emit_op(Op::SetArrowHash, line, Some(root));
+                        self.emit_op(Op::SetArrowHashKeep, line, Some(root));
                     } else {
                         return Err(CompileError::Unsupported("PreDec on non-scalar".into()));
                     }
@@ -2404,6 +2404,32 @@ impl Compiler {
                     }
                     self.emit_op(Op::Rot, line, Some(root));
                     self.emit_op(Op::SetHashElem(hash_idx), line, Some(root));
+                } else if let ExprKind::ArrowDeref {
+                    expr: inner,
+                    index,
+                    kind: DerefKind::Array,
+                } = &expr.kind
+                {
+                    self.compile_expr(inner)?;
+                    self.compile_expr(index)?;
+                    let b = match op {
+                        PostfixOp::Increment => 0u8,
+                        PostfixOp::Decrement => 1u8,
+                    };
+                    self.emit_op(Op::ArrowArrayPostfix(b), line, Some(root));
+                } else if let ExprKind::ArrowDeref {
+                    expr: inner,
+                    index,
+                    kind: DerefKind::Hash,
+                } = &expr.kind
+                {
+                    self.compile_expr(inner)?;
+                    self.compile_expr(index)?;
+                    let b = match op {
+                        PostfixOp::Increment => 0u8,
+                        PostfixOp::Decrement => 1u8,
+                    };
+                    self.emit_op(Op::ArrowHashPostfix(b), line, Some(root));
                 } else {
                     return Err(CompileError::Unsupported("PostfixOp on non-scalar".into()));
                 }

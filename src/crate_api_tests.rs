@@ -319,6 +319,28 @@ fn try_vm_execute_arrow_hash_pre_inc_only() {
 }
 
 #[test]
+fn try_vm_execute_arrow_array_hash_pre_post_inc() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $a = [9];
+        my $h = { "x" => 9 };
+        my $pre_a = ++$a->[0];
+        my $post_a = $a->[0]++;
+        my $pre_h = ++$h->{"x"};
+        my $post_h = $h->{"x"}++;
+        $pre_a + $post_a + $a->[0] + $pre_h + $post_h + $h->{"x"};"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "pre/post ++ on arrow array+hash should compile (SetArrow* + Arrow*Postfix)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 62);
+}
+
+#[test]
 fn try_vm_execute_grep_expr_comma() {
     let p = parse(
         r#"no strict 'vars';

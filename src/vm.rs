@@ -3223,6 +3223,60 @@ impl<'a> VM<'a> {
                         )?;
                         Ok(())
                     }
+                    Op::SetArrowArrayKeep => {
+                        let idx = self.pop().to_int();
+                        let r = self.pop();
+                        let val = self.pop();
+                        let val_keep = val.clone();
+                        let line = self.line();
+                        vm_interp_result(
+                            self
+                                .interp
+                                .assign_arrow_array_deref(r, idx, val, line),
+                            line,
+                        )?;
+                        self.push(val_keep);
+                        Ok(())
+                    }
+                    Op::SetArrowHashKeep => {
+                        let key = self.pop().to_string();
+                        let r = self.pop();
+                        let val = self.pop();
+                        let val_keep = val.clone();
+                        let line = self.line();
+                        vm_interp_result(
+                            self
+                                .interp
+                                .assign_arrow_hash_deref(r, key, val, line),
+                            line,
+                        )?;
+                        self.push(val_keep);
+                        Ok(())
+                    }
+                    Op::ArrowArrayPostfix(b) => {
+                        let idx = self.pop().to_int();
+                        let r = self.pop();
+                        let line = self.line();
+                        let old = vm_interp_result(
+                            self.interp
+                                .arrow_array_postfix(r, idx, *b == 1, line),
+                            line,
+                        )?;
+                        self.push(old);
+                        Ok(())
+                    }
+                    Op::ArrowHashPostfix(b) => {
+                        let key = self.pop().to_string();
+                        let r = self.pop();
+                        let line = self.line();
+                        let old = vm_interp_result(
+                            self.interp
+                                .arrow_hash_postfix(r, key, *b == 1, line),
+                            line,
+                        )?;
+                        self.push(old);
+                        Ok(())
+                    }
                     Op::SetSymbolicScalarRef => {
                         let r = self.pop();
                         let val = self.pop();
