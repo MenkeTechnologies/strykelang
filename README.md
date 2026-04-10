@@ -15,694 +15,364 @@
 
 ### `[PARALLEL PERL5 INTERPRETER // RUST-POWERED EXECUTION ENGINE]`
 
- ┌──────────────────────────────────────────────────────────────┐
- │ STATUS: ONLINE &nbsp;&nbsp; CORES: ALL &nbsp;&nbsp; SIGNAL: ████████░░       │
- └──────────────────────────────────────────────────────────────┘
-
 > *"There is more than one way to do it — in parallel."*
+
+A Perl 5 compatible interpreter in Rust with native parallel primitives, NaN-boxed values, three-tier regex, bytecode VM + Cranelift JIT, and rayon work-stealing across all cores.
+
+---
+
+## Table of Contents
+
+- [\[0x00\] Overview](#0x00-overview)
+- [\[0x01\] Install](#0x01-install)
+- [\[0x02\] Usage](#0x02-usage)
+- [\[0x03\] Parallel Primitives](#0x03-parallel-primitives)
+- [\[0x04\] Shared State (`mysync`)](#0x04-shared-state-mysync)
+- [\[0x05\] Native Data Scripting](#0x05-native-data-scripting)
+- [\[0x06\] Async / Trace / Timer](#0x06-async--trace--timer)
+- [\[0x07\] CLI Flags](#0x07-cli-flags)
+- [\[0x08\] Supported Perl Features](#0x08-supported-perl-features)
+- [\[0x09\] Architecture](#0x09-architecture)
+- [\[0x0A\] Examples](#0x0a-examples)
+- [\[0x0B\] Benchmarks](#0x0b-benchmarks)
+- [\[0x0C\] Development & CI](#0x0c-development--ci)
+- [\[0xFF\] License](#0xff-license)
 
 ---
 
 ## [0x00] OVERVIEW
 
-`perlrs` is a Perl 5 compatible interpreter written in Rust that brings native parallelism to Perl scripting. It parses and executes Perl 5 scripts with rayon-powered work-stealing parallel primitives across all available CPU cores.
+`perlrs` parses and executes Perl 5 scripts with rayon-powered work-stealing primitives across every CPU core. Highlights:
 
- ┌──────────────────────────────────────────────────────────────┐
- │ RAYON THREADS: ALL CORES &nbsp;&nbsp; REGEX: SIMD-ACCELERATED         │
- │ BINARY SIZE: ~10MB STRIPPED &nbsp; BUILD: LTO + O3                │
- └──────────────────────────────────────────────────────────────┘
-
-### Runtime values
-
-`PerlValue` is a **NaN-boxed** `u64`: immediates (`undef`, inline `i32`, raw non-NaN `f64` bits) and tagged **heap** pointers (`Arc<HeapObject>`) for oversized integers, boxed floats, strings, arrays, hashes, refs, regexes, atomics, channels, etc. The public API uses constructors (`PerlValue::integer`, `::string`, …) and accessors (`as_integer`, `as_str`, `as_array_vec`, `with_heap`, …)—not `match` on constructor names, which are plain functions and cannot appear in patterns. Read-only heap access uses `with_heap` / `heap_ref` (borrow through the stored `Arc::into_raw` pointer without refcount churn); `heap_arc` / `Clone` still bump the `Arc` when an owned handle is needed. `Drop` decrements via `Arc::from_raw`. Profile hot paths if you tune performance: dispatch and allocation still dominate many workloads.
+- **Runtime values** — `PerlValue` is a NaN-boxed `u64`: immediates (`undef`, `i32`, raw `f64` bits) and tagged `Arc<HeapObject>` pointers for big ints, strings, arrays, hashes, refs, regexes, atomics, channels.
+- **Three-tier regex** — Rust [`regex`](https://docs.rs/regex) → [`fancy-regex`](https://docs.rs/fancy-regex) (backrefs) → [`pcre2`](https://docs.rs/pcre2) (PCRE-only verbs).
+- **Bytecode VM + JIT** — match-dispatch interpreter with Cranelift block + linear-sub JIT (`src/vm.rs`, `src/jit.rs`).
+- **Rayon parallelism** — every parallel builtin uses work-stealing across all cores.
+- **Binary size** ~10 MB stripped (LTO + O3).
 
 ---
 
-## [0x01] SYSTEM REQUIREMENTS
-
-- Rust toolchain // `rustc` + `cargo`
-
-## [0x02] INSTALLATION
-
-#### DOWNLOADING PAYLOAD FROM CRATES.IO
+## [0x01] INSTALL
 
 ```sh
 cargo install perlrs
+# or from source
+git clone https://github.com/MenkeTechnologies/perlrs && cd perlrs && cargo build --release
 ```
 
-#### COMPILING FROM SOURCE
+#### Zsh tab completion
 
 ```sh
-git clone https://github.com/MenkeTechnologies/perlrs
-cd perlrs
-cargo build --release
-```
-
-[perlrs on Crates.io](https://crates.io/crates/perlrs)
-
-#### ZSH COMPLETION // TAB-COMPLETE ALL THE THINGS
-
-```sh
-# copy to a directory in your fpath
 cp completions/_perlrs /usr/local/share/zsh/site-functions/_perlrs
-
-# or add the completions directory to fpath in your .zshrc
-fpath=(/path/to/perlrs/completions $fpath)
-
-# then reload completions
+# or: fpath=(/path/to/perlrs/completions $fpath) in .zshrc
 autoload -Uz compinit && compinit
 ```
 
-After reloading your shell, `pe <TAB>` will complete all flags, options, and script files.
+`pe <TAB>` then completes flags, options, and script files.
 
 ---
 
-## [0x03] USAGE
-
-#### INTERACTIVE REPL // `pe` WITH NO SCRIPT
-
-When you run the **`pe`** binary **from a terminal** with **no program file**, **no `-e` / `-E`**, and not in **`-n` / `-p`** (or other batch-only modes such as **`-c`**, **`--lint`**, **`--disasm`**, **`--ast`**, **`--fmt`**, **`--profile`**, **`--explain`**, **`-u`**), it starts a **readline** session: line editing, history (saved to **`~/.perlrs_history`** when possible), and **Tab** completion for keywords/builtins, **`$scalar` / `@array` / `%hash`** names in scope, subroutine names, **method names after `->`** when the invocant resolves to a blessed object or a package name (from registered subs and `@ISA`), and **file paths** (merged with the word list when both apply — e.g. `./` or a partial filename in the current directory). Type **`exit`** or **`quit`** or send **EOF** (Ctrl-D) to leave. If stdin is **not** a TTY (e.g. a pipe or redirection), **`pe`** reads the **entire program** from stdin and runs it (same idea as **`perl`** reading a script from stdin). The **`perlrs`** binary does the same when no script path is given.
-
-**Script files and text reads:** The driver, **`require`**, **`do`**, **`slurp`**, **`par_sed`**, **`-n` / `-p`**, **`readline`** / **`<>`** (when not using **`use open`** UTF-8 layer), **`getc`**, **`recv`**, **`capture`** / backticks, **`par_lines`**, and stringification of byte buffers use the same rule: UTF-8 when valid, else Latin-1 octets per line or per read chunk (see **`perl_decode`** in the crate), matching stock **`perl`** tolerance instead of **`std::io`** UTF-8 errors or U+FFFD replacement. With **`use open`** for UTF-8 (e.g. **`:encoding(UTF-8)`** or **`:utf8`**), **`readline`** uses UTF-8 with replacement characters for invalid bytes (Perl-like layered I/O).
-
-#### EXECUTING INLINE CODE // DIRECT INJECTION
+## [0x02] USAGE
 
 ```sh
-# inject a single line of perl
-pe -e 'print "Hello, world!\n"'
-
-# execute a script file
-pe script.pl arg1 arg2
-
-# script arguments match stock perl: tokens such as --regex go to @ARGV (not the interpreter)
-pe script.pl --regex
-
-# bundled short switches (like stock perl): -lane is -l -a -n -e; code is the next argument
-pe -lane 'print $F[0]'
-
-# check syntax without executing (parse only)
-pe -c script.pl
-
-# parse + compile to bytecode without running (fails on compile errors; skipped if `strict` forces tree-walker)
-pe --lint script.pl
-pe --check -e 'sub f { 1 }'
-
-# print bytecode disassembly to stderr, then run (VM path only; no output if execution falls back to tree-walker)
-pe --disasm script.pl
-
-# dump abstract syntax tree as JSON (linting, IDE tooling, formatters, static analysis)
-pe --ast script.pl
-pe --ast -e 'sub foo { 1 }'
-
-# pretty-print parsed Perl to stdout (best-effort; tree-walker-oriented AST; no execution)
-pe --fmt script.pl
-pe --fmt -e 'my $x = 1; say $x'
-
-# wall-clock profile on stderr: folded stacks (flamegraph.pl), per-line ns, per-sub ns
-# VM runs with opcode-level line samples (Cranelift JIT off); tree-walker uses per-statement lines
-pe --profile script.pl
-
-# expanded hints for error codes (E0001, E0002, …)
-pe --explain E0001
+pe -e 'print "Hello, world!\n"'         # inline code
+pe script.pl arg1 arg2                  # script + args
+pe -lane 'print $F[0]'                  # bundled short switches
+pe -c script.pl                         # syntax check
+pe --lint script.pl                     # parse + compile (no run)
+pe --disasm script.pl                   # bytecode listing on stderr
+pe --ast script.pl                      # AST as JSON
+pe --fmt script.pl                      # pretty-print parsed source
+pe --profile script.pl                  # folded stacks + per-line/per-sub ns
+pe --explain E0001                      # expanded hint for an error code
 ```
 
-#### `__DATA__` // EMBEDDED DATA HANDLE
+#### Interactive REPL
 
-A line whose trimmed text is exactly `__DATA__` ends the program text. Everything after that line is stored as bytes on the **`DATA`** input handle, so `<DATA>` and `readline` on **`DATA`** read that trailing section (same idea as Perl). Shebang stripping and **`-x`** extraction apply only to the program portion above the marker.
+Run `pe` in a terminal with no script and no `-e`/`-n`/`-p`/etc. to enter a readline session: line editing, history (`~/.perlrs_history`), tab completion for keywords, lexicals in scope, sub names, methods after `->` on blessed objects, and file paths. `exit`/`quit`/Ctrl-D leaves. Non-TTY stdin is read as a complete program.
 
-#### PROCESSING DATA STREAMS // STDIN OPERATIONS
+#### `__DATA__`
+
+A line whose trimmed text is exactly `__DATA__` ends the program; the trailing bytes are exposed via the `DATA` filehandle.
+
+#### Stdin / `-n` / `-p` / `-i`
 
 ```sh
-# line-by-line processing
-echo "data" | pe -ne 'print uc $_'
-# list context: `@lines = <>` / `@lines = <STDIN>` / `my @lines = <>` reads all remaining lines until EOF (same as Perl `readline` in list context); plain `@a = <>` (package/global) uses the same list context on the RHS as `my @a`
-# Do not nest another `while (<>)` / `for (<>)` / `for (reverse <>)` around `-n`/`-p` on stdin — the driver already wraps `-e` in `while (<>) { … }` (use `perlrs -le '…'` for a single slurp loop). `<>` / `readline` **inside** the `-e` body is supported: the stdin mutex is not held across `process_line`, and lines peek-read for `eof` are queued on `Interpreter::line_mode_stdin_pending` so inner reads match Perl’s single-fd semantics (no deadlock; EOF returns undef without blocking). In `s///`, `$ENV{KEY}` in the pattern or replacement is expanded from `%ENV`; do not wrap the replacement in ASCII `"..."` unless you want literal quote characters (the lexer stores them as-is).
-# `eof` with no arguments is true on the last line of stdin or of each `@ARGV` file (same as Perl)
-# `CORE::eof()` / `builtin::eof()` use the same semantics (qualified forms parse as calls, not the `eof` AST)
-
-# auto-print mode (like sed)
-cat file.txt | pe -pe 's/foo/bar/g'
-# `-l` chomps each input record and sets `$\` (output record separator); `-p`’s implicit print appends `$\` like `print $_`, so multi-line pipelines keep one terminator per line (e.g. `printf 'a\nb\n' | pe -lpe '$_=uc'` → `A`/`B`/`C` each on its own line).
-
-# in-place edit on named files (`-i` / `-i.bak` like Perl; `$^I` in Perl code)
-pe -i -pe 's/foo/bar/g' file1.txt file2.txt
-# With `-i` and multiple path arguments, each file is processed in parallel (rayon; pool size from `pe -j` / defaults)
-pe -i -pe 's/\ba\b/b/g' *.zsh
-
-# slurp entire input at once
-cat file.txt | pe -gne 'print length($_), "\n"'
-
-# auto-split fields
-echo "a:b:c" | pe -a -F: -ne 'print $F[1], "\n"'
+echo data | pe -ne 'print uc $_'        # line loop
+cat f.txt | pe -pe 's/foo/bar/g'        # auto-print like sed
+pe -i -pe 's/foo/bar/g' file1 file2     # in-place edit (parallel across files)
+pe -i.bak -pe 's/x/y/g' *.txt           # with backup suffix
+echo a:b:c | pe -aF: -ne 'print $F[1]'  # auto-split
 ```
 
-#### PARALLEL EXECUTION // MULTI-CORE OPERATIONS
+`-l` chomps each record and sets `$\`. `eof` with no args is true on the last line of stdin or each `@ARGV` file (Perl-compat).
+
+**Text decoding** — script reads, `require`, `do`, `slurp`, `<>`, backticks, `par_lines`, etc. all use UTF-8 when valid, else Latin-1 octets per line/chunk (matches stock `perl` tolerance). `use open ':encoding(UTF-8)'` switches `<>` to UTF-8 with `U+FFFD` replacement.
+
+---
+
+## [0x03] PARALLEL PRIMITIVES
+
+Each parallel block runs in its own interpreter context with **captured lexical scope** — no data races. Use `mysync` for shared counters. Optional `progress => 1` enables an animated stderr bar (TTY) or per-item log lines (non-TTY).
 
 ```perl
-# parallel map — transform elements across all cores
-my @doubled = pmap { $_ * 2 } @data, progress => 1;
+# map / grep / sort / fold / for in parallel
+my @doubled = pmap   { $_ * 2     } @data,    progress => 1;
+my @evens   = pgrep  { $_ % 2 == 0 } @data;
+my @sorted  = psort  { $a <=> $b  } @data;
+my $sum     = preduce{ $a + $b    } @numbers;
+pfor                 { process }    @items;
 
-# optional progress: on a TTY, an animated bar with spinner and elapsed time redraws every 80 ms
-# (like brew/cargo) on stderr (or stdout if only stdout is a TTY). Set PERLRS_PROGRESS_FULLSCREEN=1
-# for alternate-screen fullscreen animation. PERLRS_PROGRESS_PLAIN=1 forces one line per tick (logs).
-# Non-TTY: one log line per completed item.
-my @out = pmap { heavy } @huge, progress => 1;
+# fused map+reduce, chunked map, memoized map, init fold
+my $sum2     = pmap_reduce  { $_ * 2 } { $a + $b } @nums;
+my @squared  = pmap_chunked 1000 { $_ ** 2 } @million;
+my @once     = pcache       { expensive } @inputs;
+my $hist     = preduce_init {}, { my ($acc, $x) = @_; $acc->{$x}++; $acc } @words;
 
-# parallel map in batches (one interpreter per chunk — amortizes spawn cost)
-my @out = pmap_chunked 1000 { $_ ** 2 } @million_items, progress => 1;
+# fan — run a block N times in parallel ($_ = 0..N-1)
+fan 8           { work };
+fan             { work };                # uses rayon pool size (`pe -j`)
+my @r = fan_cap { $_ * $_ };             # capture results in $_ order
 
-# sequential left fold vs parallel tree fold (use preduce only for associative ops)
-my $sum = reduce { $a + $b } @numbers;
-my $psum = preduce { $a + $b } @numbers, progress => 1;
+# pipelines — sequential or rayon-backed; same chain methods
+my @r = pipeline(@data)->filter({ $_ > 10 })->map({ $_ * 2 })->take(100)->collect();
+my @r = par_pipeline(@data)->filter({ $_ > 10 })->map({ $_ * 2 })->collect();
 
-# parallel fold with explicit identity — each chunk starts from a clone of `EXPR`; hash
-# accumulators merge by adding counts per key; other types use the same block to combine partials
-my $histogram = preduce_init {}, {
-    my ($acc, $item) = @_;
-    $acc->{$item}++;
-    $acc
-} @words, progress => 1;
-
-# fused parallel map + reduce — no full intermediate array (associative reduce only)
-my $psum2 = pmap_reduce { $_ * 2 } { $a + $b } @numbers, progress => 1;
-
-# optional progress for pgrep / preduce (stderr bar, same as pmap)
-my @g = pgrep { $_ > 0 } @nums, progress => 1;
-my $x = preduce { $a + $b } @nums, progress => 1;
-
-# thread-safe memoization for parallel blocks (key = stringified $_)
-my @once = pcache { expensive } @inputs, progress => 1;
-
-# lazy pipeline (ops run on collect(); `sub { }` or bare `{ }` blocks)
-# Sequential: ->filter ->map ->take. Parallel (same semantics as top-level p*): ->pmap ->pgrep
-# ->pfor ->pmap_chunked ->psort ->pcache; optional progress: ->pmap(sub { }, 1).
-# Folds (collect() returns a scalar): ->preduce ->preduce_init($init, sub { }) ->pmap_reduce($m, $r)
-# User/package subs: ->mysub or ->Pkg::name (no args) — same as ->map with `$_` per element; `grep` aliases `filter`
-my @result = pipeline(@data)
-    ->filter({ $_ > 10 })
-    ->map({ $_ * 2 })
-    ->take(100)
-    ->collect();
-
-# same chain as `pipeline`, but `->filter` / `->map` run in parallel on `collect()` (input order preserved)
-my @par = par_pipeline(@data)
-    ->filter({ $_ > 10 })
-    ->map({ $_ * 2 })
-    ->take(100)
-    ->collect();
-
-# parallel grep — filter elements in parallel
-my @evens = pgrep { $_ % 2 == 0 } @data, progress => 1;
-my @evens = pgrep { $_ % 2 == 0 } @data, progress => 1;
-
-# parallel foreach — execute side effects concurrently
-pfor { process } @items, progress => 1;
-{ process } pfor @items, progress => 1;
-
-pmap { process } @items, progress => 1;
-{ process } pmap @items, progress => 1;
-
-# fan — run a block N times in parallel (`$_` is 0..N-1)
-# progress => 1 shows per-worker animated bars (pv-style sweep left→right, like brew/cargo)
-fan 8 { work }
-fan { work }, progress => 1;
-
-# fan_cap — same as fan, but return value is a list of each block's return value (index order)
-my @capture = fan_cap { work };
-my @squares = fan_cap 4 { $_ * $_ };
-
-# fan — omit N to use the rayon thread pool size (`pe -j`; `$_` is 0..N-1)
-fan { work }
-
-# typed channels — pass messages between parallel blocks (unbounded or bounded)
-my ($tx, $rx) = pchannel();
-my ($t2, $r2) = pchannel(128);   # bounded capacity
-
-# multi-stage parallel pipeline — BATCH: source generates all items, then each
-# stage processes the entire batch via rayon before the next stage starts
+# multi-stage: batch (each stage drains list before next)
 my $n = par_pipeline(
-    source  => { readline(STDIN) },
-    stages  => [ { parse_json }, { transform } ],
-    workers => [4, 2],
-    buffer  => 256,   # optional; default 256 slots per inter-stage channel
-);
-# returns scalar: count of items processed by the last stage
-
-# multi-stage parallel pipeline — STREAMING: items flow through bounded channels
-# between stages concurrently (item 1 can be at stage 3 while item 5 is at stage 1)
-my $n = par_pipeline_stream(
     source  => { readline(STDIN) },
     stages  => [ { parse_json }, { transform } ],
     workers => [4, 2],
     buffer  => 256,
 );
 
-# streaming list pipeline — same channel-wired concurrency for list inputs
-# unlike par_pipeline(@list) which batch-collects each stage before the next,
-# par_pipeline_stream wires every op through channels so items are at different
-# stages simultaneously.  Order is NOT preserved.
-my @out = par_pipeline_stream((1..1_000))
-    ->filter({ $_ > 500 })
-    ->map({ $_ * 2 })
-    ->take(10)
-    ->collect();
+# multi-stage: streaming (bounded crossbeam channels, concurrent stages, order NOT preserved)
+my @r = par_pipeline_stream((1..1_000))->filter({ $_ > 500 })->map({ $_ * 2 })->collect();
 
-# optional: control workers-per-stage and channel buffer size
-my @out = par_pipeline_stream(@data, workers => 4, buffer => 128)
-    ->map({ expensive })
-    ->collect();
+# channels + Go-style select
+my ($tx, $rx) = pchannel(128);           # bounded; pchannel() is unbounded
+my ($val, $idx) = pselect($rx1, $rx2);
+my ($v, $i)     = pselect($rx1, $rx2, timeout => 0.5);   # $i == -1 on timeout
 
-# multiplexed recv (Go-style select via crossbeam `Select`)
-my ($tx1, $rx1) = pchannel();
-my ($tx2, $rx2) = pchannel();
-$tx1->send("first");
-my ($val, $idx) = pselect($rx1, $rx2);  # $idx is 0-based (first arg = 0)
-my ($v2, $i2) = pselect($rx1, $rx2, timeout => 0.5);  # $i2 is -1 on timeout
+# barrier — N workers rendezvous
+my $sync = barrier(3);
+fan 3 { $sync->wait; say "all arrived" };
 
-# single-path file watcher (same engine as pwatch; one path + callback)
-# If the path has no glob wildcards and does not exist yet, the parent directory is watched until it appears.
-watch "/tmp/x", { say };
-
-# HTTP: blocking fetch vs async task handle vs parallel batch GET
-my $body = fetch("https://example.com/");
-my $task = fetch_async("https://example.com/");   # not `async_fetch` (lexer: keyword `async`)
-my $json = await fetch_async_json("https://api.example.com/x");
-my @bodies = par_fetch(@urls);
-
-# parallel CSV → array of hashrefs (CPU-parallel row conversion after parse)
-my @rows = par_csv_read("data.csv");
-
-# deque — double-ended queue (not in stock Perl)
-my $q = deque();
-$q->push_back(1); $q->push_front(0);
-# pop_front / pop_back / size (or len)
-
-# heap — priority queue with a Perl comparator (`$a` / `$b`, like `sort`)
-my $pq = heap({ $a <=> $b });
-$pq->push(3); my $min = $pq->pop();
-
-# parallel sort — sort using all cores
-my @sorted = psort { $a <=> $b } @data, progress => 1;
-
-# chain parallel operations
-my @result = pmap { $_ ** 2 } pgrep { $_ > 100 } @data, progress => 1;
-
-# parallel recursive glob (rayon directory walk), then process files in parallel
-my @logs = glob_par("**/*.log");
-pfor { process } @logs, progress => 1;
-
-# parallel directory tree — $_ is each path (file or directory); optional progress => 1 pre-collects paths for a bar
-par_walk ".", { say if /\.rs$/ }, progress => 1;
-
-# parallel in-place sed (global replace per file); returns count of files modified
-par_sed(qr/\bfoo\b/, "bar", @paths);
-
-# persistent thread pool (reuse worker OS threads; avoids per-task thread spawn from pmap/pfor)
+# persistent thread pool (avoids per-task spawn from pmap/pfor)
 my $pool = ppool(4);
-$pool->submit({ heavy_work }) for @tasks;   # worker `$_`: caller's `$_` here, or pass `submit(CODE, $x)`
+$pool->submit({ heavy_work }) for @tasks;
 my @results = $pool->collect();
 
+# parallel file IO
+my @logs = glob_par("**/*.log");                # rayon recursive glob
+par_lines "./big.log", sub { say if /ERROR/ };  # mmap + chunked line scan
+par_walk  ".", { say if /\.rs$/ };              # parallel directory walk
+par_sed qr/\bfoo\b/, "bar", @paths;             # parallel in-place sed (returns # changed)
+
+# native file watcher (notify crate: inotify/kqueue/FSEvents)
+watch  "/tmp/x", { say };
+pwatch "logs/*", sub { ... };
+
 # control thread count
-pe -j 8 -e 'my @r = pmap { heavy_work } @data, progress => 1'
+pe -j 8 -e 'pmap { heavy } @data'
 ```
 
-More parallel examples (same rules as above: each worker is a fresh interpreter with captured lexicals; use `mysync` for shared counters):
+**Parallel capture safety** — workers set `Scope::parallel_guard` after restoring captured lexicals. Assignments to captured non-`mysync` aggregates are rejected at runtime; `mysync`, package-qualified names, and topics (`$_`/`$a`/`$b`) are allowed. `pmap`/`pgrep` treat block failures as `undef`/false; use `pfor` when failures must abort.
 
-```perl
-# mmap + scan lines in parallel — $_ is each line (CRLF-safe); optional stderr progress bar
-par_lines "./README.md", sub { say length($_) if /parallel/i }, progress => 1;
+---
 
-# psort with no block — parallel lexical string sort (all cores)
-my @alpha = psort qw(zebra apple mango);
+## [0x04] SHARED STATE (`mysync`)
 
-# pcache — memoize by stringified $_; repeated values skip the block body
-my @out = pcache { $_ * 10 } (1, 1, 2, 2, 3), progress => 1;
-
-# barrier — N workers rendezvous before continuing (party count clamped ≥ 1)
-my $sync = barrier(3);
-fan 3 { $sync->wait; say "all arrived" }
-
-# ppool — submit jobs; optional second arg binds $_ in the worker; collect preserves order
-my $pool = ppool(4);
-$pool->submit({ $_ * 2 }) for 1..10;
-my @doubled = $pool->collect();
-```
-
-Each parallel block receives its own interpreter context with captured lexical scope // no data races. Use `mysync` to share state.
-
-**Perl-compat (partial)** — not a full `perl` replacement, but these areas follow Perl 5 more closely than before:
-
-- **Inheritance / `SUPER::` / C3 MRO** — `@ISA` in the package stash (including `our @ISA` outside `main`), C3 method resolution order, and `$obj->SUPER::method` to invoke the next class in the linearized chain. **MRO is not cached:** each lookup reads the live `@Pkg::ISA` array, so `push @ISA`, assignment, or `splice` at runtime affects the next method resolution. The bytecode compiler tracks the current `package` so VM execution stores and reads `Pkg::ISA` like the tree interpreter.
-- **`tie`** — `tie $scalar`, `tie @array`, `tie %hash` with `TIESCALAR` / `TIEARRAY` / `TIEHASH`; `FETCH` / `STORE` on the blessed object for reads and writes; tied hashes also dispatch **`exists $h{k}`** → `EXISTS` and **`delete $h{k}`** → `DELETE` when those subs exist (not every other `tie` method yet).
-- **`$?` and `$|`** — last child exit status for `system`, `` `...` `` / `capture`, and `close` on pipe children (POSIX-style packed status); `$|` enables autoflush after `print` / `printf` to resolved handles.
-- **`$.`** — **undef** until the first successful `readline`/`<>` line (when `line_number` is still 0); thereafter the line count for the last-read handle (`-n`/`-p` also advances `line_number` per `process_line`).
-- **`print` / `say` / `printf`** — with **no** argument list, Perl uses **`$_`** as the value to output (and **`printf`** with no expressions uses **`$_`** as the format string); this applies in `map`/`grep`/`for`/`pfor`/… blocks and on **`$fh->print`** / **`$fh->printf`**.
-- **Bareword statement** — `name;` or `{ name }` (no `()`) is a subroutine call with **no explicit arguments**; **`@_`** is **`($_)`** so the topic is visible as **`shift`** / **`$_[0]`** (built-in keywords like **`undef`** / **`print`** keep their normal meaning).
-- **Typeglobs** — `*NAME` as a value; `*lhs = *rhs` copies subroutine, scalar, array, hash, and IO-handle alias slots (`copy_typeglob_slots`); `*foo = \&bar` installs a subroutine alias (including when `\&bar` is a ref-to-coderef); package-qualified `*Pkg::name` is supported. Literal and `*{EXPR}` LHS forms often compile to `Op::CopyTypeglob*` / `Op::TypeglobAssignFromValue*`; other shapes fall back to the tree-walker.
-- **`use overload`** — `use overload 'op' => 'method', …` or `'op' => \&handler` registers per-class overloads in the current package; one statement may combine several ops (e.g. `use overload '+' => \&add, '""' => \&stringify;`). Binary ops dispatch to the named method with `(invocant, other)`; missing ops may use **`nomethod`** with a third argument, the op key string (e.g. `"+"`). Unary **`neg`**, **`bool`** (for `!` / `not` after the overload result), and **`abs`** are supported on blessed values. `use overload '""' => 'as_string'` (or the key `""` / `'""'`) drives stringification for `print`, **`sprintf` `%s`**, interpolated strings, and similar contexts. **`fallback => 1`** is accepted in the pragma list (full Perl fallback coercion is not). Tree interpreter only for some forms (VM falls back when bytecode cannot represent the expression).
-
-**`%SIG` (Unix)** — `SIGINT`, `SIGTERM`, `SIGALRM`, and `SIGCHLD` can be set to a code ref; handlers run **between tree-walker statements** and **between VM opcodes** (see `perl_signal::poll`). **`IGNORE`** ignores delivery. An **unset** slot or the string **`DEFAULT`** uses the **POSIX default** for that signal (e.g. `SIGINT` / `SIGTERM` / `SIGALRM` exit the process; `SIGCHLD` default is ignore), so **`progress => 1`** and other parallel builtins do not leave Ctrl+C stuck with no default action.
-
-**SQLite** — `query` still loads all rows; a lazy **`stream`-style** row iterator is not wired yet (use `LIMIT`/`OFFSET` or chunk in Perl for huge result sets).
-
-Perl **`format` / `write`** — **partial**: `format NAME =` … `.` registers a template in the current package; picture fields `@<<<<` / `@>>>>` / `@||||` / `@####` / `@****`, literal `@@`, and comma-separated value lines are supported; **`write`** with no arguments expands the template named by **`$~`** (default **`STDOUT`**) and prints to stdout like **`print`**. Not implemented: **`write FILEHANDLE`**, top-of-page (`$^`), **`formline`**, and other full **`perlform`** details.
-
-#### EXECUTION TRACE // `trace`
-
-Wrap parallel (or any) code to print **`mysync` scalar** mutations to **stderr** — useful when debugging races or ordering. Under `fan N { }`, lines are tagged with the worker index (same as `$_`).
+`mysync` declares variables backed by `Arc<Mutex>` shared across parallel blocks. Compound ops (`++`, `+=`, `.=`, `|=`, `&=`) hold the lock for the full read-modify-write cycle — fully atomic.
 
 ```perl
 mysync $counter = 0;
-trace { fan 10 { $counter++ } };
-# stderr: [thread 0] $counter: 0 → 1
-# stderr: [thread 3] $counter: 1 → 2
-# ... (order varies)
+fan 10000 { $counter++ };               # always exactly 10000
+print $counter;
+
+mysync @results;
+pfor { push @results, $_ * $_ } (1..100);
+
+mysync %histogram;
+pfor { $histogram{$_ % 10} += 1 } (0..999);
+
+# deque() and heap(...) already use Arc<Mutex<...>> internally
+mysync $q  = deque();
+mysync $pq = heap({ $a <=> $b });
 ```
 
-Outside `fan`, mutations are labeled `[main]`.
+For `mysync` scalars holding a `Set`, `|`/`&` are union/intersection. Without `mysync`, each thread gets an independent copy.
 
-#### TIMER // `timer`
+---
 
-Wall-clock timing: **`timer { BLOCK }`** returns elapsed time as a **float** in **milliseconds** (sub-ms resolution). Microbenchmark harness: **`bench { BLOCK } N`** runs a **warmup** (`min(10, N/10)`, at least one iteration), then **`N`** timed iterations and returns a string with **min / mean / p99** wall times in milliseconds (VM and tree-walker).
+## [0x05] NATIVE DATA SCRIPTING
 
-```perl
-my $elapsed = timer { heavy_work() };
-print "took ${elapsed}ms\n";
-```
-
-#### ASYNC / SPAWN / AWAIT // lightweight structured concurrency
-
-**`async { BLOCK }`** and **`spawn { BLOCK }`** are the same: the block runs on a **worker thread** and returns a task handle immediately (Rust **`thread::spawn`**–style naming for **`spawn`**). **`await EXPR`** joins: if `EXPR` is that handle, it blocks until the block finishes and returns its value; otherwise `await` passes the value through. Use **`spawn`** when building **ad-hoc graphs** of concurrent work (fan-in/fan-out, pipelines) that are not a single **`pmap`** / **`pfor`** / **`reduce`** pattern.
-
-Use this to overlap **`fetch_url`**, **`slurp`**, or other I/O-bound work without blocking the main interpreter until you **`await`**.
-
-```perl
-my $data = async { fetch_url("https://example.com/") };
-my $file = spawn { slurp("big.csv") };
-print await($data), await($file);
-```
-
-Each worker gets a **clone of the interpreter’s subs** and a **captured lexical scope** (including **`mysync`** storage), so closures and shared state behave like other parallel primitives.
-
-#### NATIVE CSV / SQLITE / STRUCTS // data scripting
-
-**HTTP** — [`ureq`](https://crates.io/crates/ureq) blocking GET. **`fetch(url)`** returns the response body as a string. **`fetch_json(url)`** parses JSON with [`serde_json`](https://crates.io/crates/serde_json): JSON objects become **hashrefs**, arrays become **arrays**, `null` → `undef`, numbers → integers or floats. (Lower-level **`fetch_url $url`** is still available as an expression form.)
-
-**JSON encode/decode** — **`json_encode($value)`** turns a Perl value into a JSON string (scalars, array/hash refs, blessed objects serialize the underlying value; unsupported types are errors). **`json_decode($string)`** parses JSON into Perl values with the same mapping as **`fetch_json`**. Use these for APIs, config files, and round-tripping data without an HTTP round trip.
-
-**Crypto, compression, config, time** — **`sha256($data)`** (lowercase hex digest); **`hmac` / `hmac_sha256($key, $msg)`** (HMAC-SHA256 hex); **`uuid()`** (random UUID v4); **`base64_encode` / `base64_decode`**, **`hex_encode` / `hex_decode`**. **`gzip` / `gunzip`** and **`zstd` / `zstd_decode`** compress and decompress using [`flate2`](https://crates.io/crates/flate2) and [`zstd`](https://crates.io/crates/zstd); compressed values are returned as **byte strings** so binary is preserved. **UTC / epoch** — **`datetime_utc`**, **`datetime_from_epoch`**, **`datetime_parse_rfc3339`**, **`datetime_strftime`** use [`chrono`](https://crates.io/crates/chrono) (epoch seconds as floats; strftime patterns follow chrono). **IANA timezones** ([`chrono-tz`](https://crates.io/crates/chrono-tz)): **`datetime_now_tz($tz)`** (RFC 3339 in zone), **`datetime_format_tz($epoch, $tz, $fmt)`**, **`datetime_parse_local($str, $tz)`** (naive `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS` / `T` as wall time in that zone → UTC epoch float), **`datetime_add_seconds($epoch, $delta)`**. **`toml_decode`** / **`yaml_decode`** parse TOML and YAML into hashrefs and arrays (same general mapping as JSON).
-
-**CSV** — [`csv`](https://crates.io/crates/csv) backed. `csv_read(path)` returns an array of **hashrefs** (first row is the header). `csv_write(path, row, …)` or `csv_write(path, \@rows)` writes rows (each row is a hash or hashref); header columns are the union of keys in first-seen order.
-
-**DataFrame** — `dataframe(path)` loads the same CSV shape into a **columnar** value (not an array of hashrefs). Methods: `->nrow` / `->nrows`, `->ncol` / `->ncols`; `->filter(sub { … })` runs the coderef with `$_` bound to each row as a hashref; `->group_by("col")` sets the grouping column for a following `->sum("amount")`, which returns a small two-column frame (group key, sum). Without `group_by`, `->sum("col")` returns a single numeric total. JSON encoding represents a frame as an array of row objects.
-
-**SQLite** — embedded database via [`rusqlite`](https://crates.io/crates/rusqlite) with **bundled** libsqlite (no system SQLite required). `sqlite(path)` returns a handle: `->exec(sql, ?…)`, `->query(sql, ?…)` (rows as hashrefs), `->last_insert_rowid`.
-
-**Structs** — `struct Name { field => Type, … }` with `Type` one of `Int`, `Str`, `Float`. Constructor: `Name->new(field => value, …)`. Field read: `$obj->fieldname` (same as a method call). The VM builds native struct instances (not plain blessed hashes) when the struct is declared in the same program.
-
-**Typed `my`** — `typed my $x : Int` (or `Str` / `Float`): assignments are checked at runtime; mismatches are type errors.
+| Area | Builtins |
+| --- | --- |
+| **HTTP** ([`ureq`](https://crates.io/crates/ureq)) | `fetch`, `fetch_json`, `fetch_async`, `await fetch_async_json`, `par_fetch` |
+| **JSON** ([`serde_json`](https://crates.io/crates/serde_json)) | `json_encode`, `json_decode` |
+| **CSV** ([`csv`](https://crates.io/crates/csv)) | `csv_read` (AoH), `csv_write`, `par_csv_read` |
+| **DataFrame** | `dataframe(path)` → columnar; `->filter`, `->group_by`, `->sum`, `->nrow`, `->ncol` |
+| **SQLite** ([`rusqlite`](https://crates.io/crates/rusqlite), bundled) | `sqlite(path)` → `->exec`, `->query`, `->last_insert_rowid` |
+| **TOML / YAML** | `toml_decode`, `yaml_decode` |
+| **Crypto** | `sha256`, `hmac`, `hmac_sha256`, `uuid`, `base64_encode/decode`, `hex_encode/decode` |
+| **Compression** ([`flate2`](https://crates.io/crates/flate2), [`zstd`](https://crates.io/crates/zstd)) | `gzip`, `gunzip`, `zstd`, `zstd_decode` |
+| **Time** ([`chrono`](https://crates.io/crates/chrono), [`chrono-tz`](https://crates.io/crates/chrono-tz)) | `datetime_utc`, `datetime_from_epoch`, `datetime_parse_rfc3339`, `datetime_strftime`, `datetime_now_tz`, `datetime_format_tz`, `datetime_parse_local`, `datetime_add_seconds` |
+| **Structs / Types** | `struct Name { x => Float, y => Int }; Name->new(...)`; `typed my $x : Int\|Str\|Float` |
 
 ```perl
 my $data = fetch_json("https://api.example.com/users/1");
 say $data->{name};
 
-my $payload = json_encode({ ok => 1, n => 42 });
-my $roundtrip = json_decode($payload);
-
-my $raw = fetch("https://example.com/");
-
 my @rows = csv_read("data.csv");
-csv_write("out.csv", { name => "a", id => "1" });
-
-# columnar frame — filter rows, then sum one numeric column (see prose above for API)
-my $df = dataframe("data.csv");
-my $n = $df->nrow;
-
-my $db = sqlite("app.db");
+my $df   = dataframe("data.csv");
+my $db   = sqlite("app.db");
 $db->exec("CREATE TABLE t (id INTEGER, name TEXT)");
-my @r = $db->query("SELECT * FROM t WHERE id > ?", 0);
-
-typed my $n : Int;
-$n = 42;
 
 struct Point { x => Float, y => Float };
 my $p = Point->new(x => 1.5, y => 2.0);
-say $p->x;
+typed my $n : Int;
+$n = 42;
 ```
-
-#### THREAD-SAFE SHARED STATE // `mysync`
-
-`mysync` declares variables backed by `Arc<Mutex>` that are shared across parallel blocks. All reads/writes go through the lock automatically. Compound operations (`++`, `+=`, `.=`, and `|=`, `&=` on scalars holding a native `Set`) are fully atomic — the lock is held for the entire read-modify-write cycle.
-
-For **`mysync` scalars that hold a `Set`** (from `mysync $s = Set->new(...)`), union (`|`) and intersection (`&`) treat the stored value as a set even when the underlying storage is the mutex-wrapped scalar; bitwise `|` / `&` on plain integers is unchanged.
-
-**`deque()` and `heap(...)`**: `mysync $q = deque()` (and `mysync $pq = heap(sub { $a <=> $b })`) stores the value without an extra `Atomic` shell — they already use `Arc<Mutex<…>>`. Use them like any other `mysync` scalar in `fan` / `pmap` / `pfor` so all workers share one queue or heap.
-
-```perl
-# shared scalar — atomic increment
-mysync $counter = 0;
-fan 10000 { $counter++ };
-print $counter;  # always exactly 10000
-
-# shared array — thread-safe push/pop/shift
-mysync @results;
-pfor { push @results, $_ * $_ } (1..100), progress => 1;
-print scalar @results;  # always exactly 100
-
-# shared hash — atomic element access
-mysync %histogram;
-pfor { $histogram{$_ % 10} += 1 } (0..999), progress => 1;
-# each bucket is exactly 100
-
-# mix all three
-mysync $total = 0;
-mysync @items;
-mysync %stats;
-fan 1000 {
-    $total++;
-    push @items, $_;
-    $stats{$_ % 5} += 1;
-};
-# $total == 1000, @items == 1000, sum(%stats) == 1000
-```
-
-Without `mysync`, each parallel thread gets an independent copy — changes are not visible to other threads or the parent. With `mysync`, all threads share the same underlying storage via `Arc<Mutex>`.
-
- ┌──────────────────────────────────────────────────────────────┐
- │ ATOMIC OPS: $x++ &nbsp;&nbsp; ++$x &nbsp;&nbsp; $x += N &nbsp;&nbsp; $x .= "s" &nbsp;&nbsp; $s |= $t (Set) │
- │ ATOMIC OPS: $h{k} += N &nbsp;&nbsp; $a[i] += N &nbsp;&nbsp; push @a, $v      │
- │ LOCK SCOPE: held for full read-modify-write // zero races   │
- └──────────────────────────────────────────────────────────────┘
 
 ---
 
-## [0x04] CLI FLAGS
+## [0x06] ASYNC / TRACE / TIMER
+
+```perl
+# async / spawn / await — lightweight structured concurrency
+my $data = async { fetch_url("https://example.com/") };
+my $file = spawn { slurp("big.csv") };
+print await($data), await($file);
+
+# trace mysync mutations to stderr (under fan, lines tagged with worker index)
+mysync $counter = 0;
+trace { fan 10 { $counter++ } };
+
+# timer / bench — wall-clock millis; bench returns "min/mean/p99"
+my $ms     = timer { heavy_work() };
+my $report = bench { heavy_work() } 1000;
+
+# eval_timeout — runs block on a worker thread; recv_timeout on main
+eval_timeout 5 { slow };
+
+# retry / rate_limit / every (tree interpreter only)
+retry { http_call() } times => 3, backoff => "exponential";
+rate_limit(10, "1s") { hit_api() };
+every("500ms") { tick() };
+
+# generators — lazy `yield` values
+my $g = gen { yield $_ for 1..5 };
+my $next = $g->next;                    # [value, more]
+```
+
+---
+
+## [0x07] CLI FLAGS
 
 ![pe -h](img/pe-help.png)
 
 ---
 
-## [0x05] SUPPORTED PERL FEATURES
+## [0x08] SUPPORTED PERL FEATURES
 
-#### DATA TYPES
-- Scalars (`$x`), arrays (`@a`), hashes (`%h`)
-- References: `\$x`, `\@a`, `\%h`, `\&sub`
-- Array refs `[1,2,3]`, hash refs `{a => 1}`
-- Code refs / closures `sub { ... }` — capture enclosing lexicals (`my $x`, `my @a`, `my %h`, …); bootstrap handles (`@_`, `%ENV`, …) are not snapshotted into closures
-- Regex objects `qr/.../`
-- Blessed references (basic OOP)
-- `typed my $x : Int|Str|Float` (runtime-checked assignments)
-- `struct Name { field => Type, … }` with `Name->new(…)` and `$obj->field`
-- Native CSV (`csv_read` / `csv_write`), columnar `dataframe(path)` with `->filter` / `->group_by` / `->sum`, and SQLite (`sqlite` + `->exec` / `->query`)
-- `fetch` / `fetch_json` (HTTP GET via `ureq`; JSON → Perl values); `json_encode` / `json_decode` (standalone JSON string ↔ Perl values); `sha256`, `hmac` / `hmac_sha256`, `uuid`, `base64_*`, `hex_*`, `gzip` / `gunzip`, `zstd` / `zstd_decode`, `datetime_*` (UTC + IANA `datetime_now_tz` / `datetime_format_tz` / `datetime_parse_local` / `datetime_add_seconds`), `toml_decode`, `yaml_decode`
+#### Data
+Scalars `$x`, arrays `@a`, hashes `%h`, refs `\$x`/`\@a`/`\%h`/`\&sub`, anon `[...]`/`{...}`, code refs / closures (capture enclosing lexicals), `qr//` regex objects, blessed references, native `Set->new(...)`, `deque()`, `heap()`.
 
-#### CONTROL FLOW
-- `if`/`elsif`/`else`, `unless`
-- `while`, `until`, `do { } while/until` (block runs before the first condition check)
-- `for` (C-style), `foreach`
-- `last`, `next`, `redo` with labels
-- Postfix: `expr if COND`, `expr unless COND`, `expr while COND`, `expr until COND`, `expr for @list`; same modifiers after `do { }` or a bare `{ }` block statement; parallel helpers (`pmap`, `pfor`, `pgrep`, `pmap_chunked`, …) parse their list before the modifier so `pmap { } @x for @y` is postfix `foreach` on the whole `pmap` expression
-- Ternary `?:`
-- **`try { } catch ($err) { }` [`finally { }`]** — statement form only (not an arbitrary expression, so not `my $x = try { … }`); catches `die` and other runtime errors (not `exit`, not `last`/`next`/`return` flow); the error string is bound to the scalar in `catch`. Optional **`finally`** runs after a successful `try` or after `catch` finishes (including if `catch` propagates an error); if `finally` fails, that error is returned (Perl-style).
-- **`given (EXPR) { when (COND) { } default { } }`** — topic is **`$_`**; `when` tests in order (regex `=~` for regex literals, string equality for string/number literals, otherwise string comparison to the evaluated condition); first match wins; put **`default` last** (tree-walker only)
-- **Algebraic `match (EXPR) { PATTERN [if EXPR] => EXPR, … }`** (perlrs) — expression form with explicit subject; arms are tested in order. Each arm body runs with **`$_`** set to the subject (like `given`). Optional **`if EXPR`** guard runs after the pattern matches; **`$_`** is the subject in the guard. Patterns: **`_`** (wildcard); **`/regex/`** (stringified subject; on success match variables **`$1`…`$n`**, **`$&`**, **`${^MATCH}`**, **`@-`/`@+`**, **`%+`**, etc. are set for that arm like `=~`); **literal / parenthesized expression** (smart-match against the subject); **`[1, 2, *]`** (array or array-ref: prefix elements match, optional **`*`** tail); **`{ name => $n }`** (hash or hash-ref: required keys; **`$n`** binds the value for the arm body). Bindings are scoped to that arm only. No matching arm is a runtime error (use **`_`**). Tree interpreter only (bytecode falls back).
-- **`eval_timeout SECS { }`** — runs the block on a **worker OS thread**; the main thread waits up to **`SECS`** seconds via `recv_timeout` (no Unix `alarm`); on timeout you get a runtime error (the worker may keep running in the background—avoid relying on cancellation for correctness)
+#### Control flow
+`if`/`elsif`/`else`/`unless`, `while`/`until`, `do { } while/until`, C-style `for`, `foreach`, `last`/`next`/`redo` with labels, postfix `if`/`unless`/`while`/`until`/`for`, ternary, `try { } catch ($err) { } finally { }`, `given`/`when`/`default`, algebraic `match (EXPR) { PATTERN [if EXPR] => EXPR, ... }` (regex, array, hash, wildcard, literal patterns; bindings scoped per arm), `eval_timeout SECS { ... }`.
 
-#### OPERATORS
-- Arithmetic: `+`, `-`, `*`, `/`, `%`, `**`
-- String: `.` (concat), `x` (repeat)
-- Comparison: `==`, `!=`, `<`, `>`, `<=`, `>=`, `<=>`
-- String comparison: `eq`, `ne`, `lt`, `gt`, `le`, `ge`, `cmp`
-- Logical: `&&`, `||`, `//`, `!`, `and`, `or`, `not`
-- Bitwise: `&`, `|`, `^`, `~`, `<<`, `>>` (for native `Set` values, `|` / `&` are union / intersection instead of integer bitwise ops)
-- Assignment: `=`, `+=`, `-=`, `*=`, `/=`, `.=`, `|=`, `&=`, `//=`, etc.
-- Regex: `=~`, `!~`
-- Range: `..` / `...` (list in list context both expand like `..`; scalar context: flip-flop — numeric bounds compare to `$.`, regex bounds `/left/../right/` and `/left/.../right/` match `$_`, and `/left/../eof` / `/left/.../eof` use bare `eof` like Perl (true on the last line of the current `-n`/`-p` input in this implementation); a **compound** right operand (e.g. `/left/...(/a/ or /b/)` or `/left/...(/a/ or eof)`) is evaluated in **boolean** context each line, like Perl; `m/left/...N` uses a numeric right bound vs `$.`; `...` does not treat the right bound as satisfied on the same `$.` line as the left match, Perl sed-style; same line counter as `-n`/`-p` or the last `readline` handle in `while (<>) { … }`)
-- Arrow dereference: `->`
+#### Operators
+Arithmetic, string `.`/`x`, comparison, `eq`/`ne`/`lt`/`gt`/`cmp`, logical `&&`/`||`/`//`/`!`/`and`/`or`/`not`, bitwise (`|`/`&` are set ops on native `Set`), assignment + compound (`+=`, `.=`, `//=`, …), regex `=~`/`!~`, range `..` / `...` (incl. flip-flop with `eof`), arrow `->`.
 
-#### REGEX ENGINE
-- **Three-tier compile:** patterns are compiled with the Rust [`regex`](https://docs.rs/regex) crate first (linear-time where possible). If that rejects the pattern (e.g. **backreferences** like `(.)\\1`), compilation falls back to [`fancy-regex`](https://docs.rs/fancy-regex). If both reject the pattern (e.g. PCRE-only verbs like `(*SKIP)`), compilation falls back to **PCRE2** via the [`pcre2`](https://docs.rs/pcre2) crate (`src/perl_regex.rs`).
-- **Perl `$` end anchor (no `/m`):** before compilation, bare `$` outside character classes and `\Q…\E` (and not `\$`, `$1`, `${…}`, `$name`) is rewritten to `(?:\n?\z)` so a line like `foo` still matches when `$_` ends with a newline (matches Perl). With `/m`, Rust’s `(?m)$` already tracks line ends; no rewrite.
-- **Character-class boundaries for that rewrite:** a leading `]` after `[` / `[^` is treated as a literal class member when a later unescaped `]` closes the class (Perl idiom `[]\[^$.*/]`). Otherwise the first `]` closes an empty `[]` / `[^]`.
-- Match: `$str =~ /pattern/flags`
-- Bare `/pattern/` in **statement** or **boolean** context is **`$_ =~ /pattern/`** (match variables and truthiness), not a regex object
-- Dynamic pattern (string): `$str =~ $pattern` and `$str !~ $pattern` (bytecode `RegexMatchDyn`; empty flags)
-- Substitution: `$str =~ s/pattern/replacement/flags`
-- Transliterate: `$str =~ tr/from/to/`
-- Flags: `g`, `i`, `m`, `s`, `x`
-- Capture variables: `$1`, `$2`, … (all numbered groups, not only 1–9); named groups `(?<name>…)` or `(?P<name>…)` populate **`%+`** and **`$+{name}`** (named rules follow whichever engine compiled the pattern)
-- Literal spans: `\Q…\E` (metacharacters escaped); `quotemeta` for dynamic patterns
-- Quote-like: `m//`, `qr//`
+#### Regex engine
+Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anchor (no `/m`) is rewritten to `(?:\n?\z)`. Match `=~`, dynamic `$str =~ $pat`, substitution `s///`, transliteration `tr///`, flags `g`/`i`/`m`/`s`/`x`, captures `$1`…`$n`, named groups → `%+`/`$+{name}`, `\Q...\E`, `quotemeta`, `m//`/`qr//`. Bare `/pat/` in statement/boolean context is `$_ =~ /pat/`.
 
-#### SUBROUTINES
-- Named subs with `sub name { ... }` and optional prototype `sub name (…) { … }` (stored for `prototype`)
-- Anonymous subs / closures — `sub { … }` or `sub (…) { … }` as statements (void-context coderef) or in expression position (e.g. `*foo = sub () { … }` as in core `Carp.pm`)
-- Implicit return from the last statement when it is an expression or a trailing `if` / `unless` (VM-compiled subs; matches Perl’s last-expression value)
-- Recursive calls
-- `@_` argument passing, `shift`, `return`
-- `return EXPR if COND` (postfix modifiers on return)
-- **`AUTOLOAD`**: missing subs and methods dispatch to `sub AUTOLOAD` with `$AUTOLOAD` set to the fully qualified name (e.g. `main::foo`, `MyClass::bar`)
+#### Subroutines
+`sub name { }` with optional prototype, anon subs/closures, implicit return of last expression (VM), `@_`/`shift`/`return`, postfix `return ... if COND`, `AUTOLOAD` with `$AUTOLOAD` set to the FQN.
 
-#### BUILT-IN FUNCTIONS
+#### Built-ins (selected)
 
- ┌──────────────────────────────────────────────────────────────┐
- │ **Array**: push, pop, shift, unshift, splice, reverse,      │
- │ sort, map, grep { } / grep EXPR, LIST, reduce, preduce,   │
- │ scalar                                                      │
- │ **Hash**: keys, values, each, delete, exists                │
- │ **String**: chomp, chop, length, substr, index, rindex,     │
- │ split, join, sprintf, printf, uc, lc, ucfirst, lcfirst,     │
- │ chr, ord, hex, oct, crypt, fc, pos, study, quotemeta          │
- │ **Binary**: pack, unpack (subset A a N n V v C Q q Z H x;   │
- │ `*` repeat; result is byte data)                              │
- │ **Numeric**: abs, int, sqrt, sin, cos, atan2, exp, log,     │
- │ rand, srand                                                 │
- │ **I/O**: print, say, printf, open (incl. `open my $fh`,      │
- │ files + `-|` / `|-` piped shell, two-arg `"cmd |"` /        │
- │ `"| cmd"` pipe forms; returns a handle value),              │
- │ close, eof, readline,                                       │
- │ handle methods `->print` / `->say` / `->printf` / `->getline` │
- │ / `->readline` / `->close` / `->eof` / `->getc` / `->flush` …, │
- │ slurp, `` `cmd` `` / `qx{…}` (stdout string; `$?`), capture   │
- │ (structured shell: ->stdout/stderr/exit),                  │
- │ binmode, fileno, flock, getc, sysread, syswrite, sysseek,  │
- │ select (4-arg: sleep; 1-arg: default print handle),         │
- │ truncate                                                    │
- │ **Directory**: opendir, readdir, closedir, rewinddir,        │
- │ telldir, seekdir                                              │
- │ **File tests**: -e, -f, -d, -l, -r, -w, -s, -z, -x (Unix),   │
- │ -t (TTY); operand may omit for `$_` (e.g. `-d` in `for`)     │
- │ **System**: system, exec, exit, chdir, mkdir, unlink, rename, │
- │ chmod, chown (Unix), stat, lstat, link, symlink, readlink,   │
- │ glob, glob_par, par_sed, ppool, barrier,                      │
- │ **Data**: csv_read, csv_write (header row → AoH), dataframe, │
- │ sqlite                                                        │
- │ fork, wait, waitpid, kill, alarm, sleep, times (Unix where  │
- │ noted in source)                                            │
- │ **Socket** (std::net): socket, bind, listen, accept,         │
- │ connect, send, recv, shutdown                               │
- │ **Type**: defined, undef, ref, bless                        │
- │ **Set**: `Set->new(…)` — native set; `|` union, `&` intersection │
- │ **Control**: die, warn, eval, do, require, caller,         │
- │ wantarray (void / scalar 0 / list 1; bytecode passes context), │
- │ `goto EXPR` (same-block labels), `continue { }` on loops, │
- │ `prototype` on code refs; sub prototypes parsed on `sub`     │
- └──────────────────────────────────────────────────────────────┘
+| Category | Functions |
+| --- | --- |
+| Array | `push`, `pop`, `shift`, `unshift`, `splice`, `reverse`, `sort`, `map`, `grep`, `reduce`, `preduce`, `scalar` |
+| Hash | `keys`, `values`, `each`, `delete`, `exists` |
+| String | `chomp`, `chop`, `length`, `substr`, `index`, `rindex`, `split`, `join`, `sprintf`, `printf`, `uc`/`lc`/`ucfirst`/`lcfirst`, `chr`, `ord`, `hex`, `oct`, `crypt`, `fc`, `pos`, `study`, `quotemeta` |
+| Binary | `pack`, `unpack` (subset `A a N n V v C Q q Z H x` + `*`) |
+| Numeric | `abs`, `int`, `sqrt`, `sin`, `cos`, `atan2`, `exp`, `log`, `rand`, `srand` |
+| I/O | `print`, `say`, `printf`, `open` (incl. `open my $fh`, files, `-\|` / `\|-` pipes), `close`, `eof`, `readline`, handle methods `->print/->say/->printf/->getline/->close/->eof/->getc/->flush`, `slurp`, backticks/`qx{}`, `capture` (structured: `->stdout/->stderr/->exit`), `binmode`, `fileno`, `flock`, `getc`, `sysread/syswrite/sysseek`, `select`, `truncate` |
+| Directory | `opendir`, `readdir`, `closedir`, `rewinddir`, `telldir`, `seekdir` |
+| File tests | `-e`, `-f`, `-d`, `-l`, `-r`, `-w`, `-s`, `-z`, `-x`, `-t` (defaults to `$_`) |
+| System | `system`, `exec`, `exit`, `chdir`, `mkdir`, `unlink`, `rename`, `chmod`, `chown`, `stat`, `lstat`, `link`, `symlink`, `readlink`, `glob`, `glob_par`, `par_sed`, `ppool`, `barrier`, `fork`, `wait`, `waitpid`, `kill`, `alarm`, `sleep`, `times` |
+| Sockets | `socket`, `bind`, `listen`, `accept`, `connect`, `send`, `recv`, `shutdown` |
+| Type | `defined`, `undef`, `ref`, `bless` |
+| Control | `die`, `warn`, `eval`, `do`, `require`, `caller`, `wantarray`, `goto LABEL`, `continue { }` on loops, `prototype` |
 
-#### EXTENSIONS BEYOND STOCK PERL 5
-- **`csv_read PATH` / `csv_write PATH, \@rows`** — native CSV via the Rust `csv` crate. The first row is column headers; each data row is a hashref (string cells). `csv_write` uses the first row’s key order for columns.
-- **`dataframe(PATH)`** — same CSV load as `csv_read`, but stored columnar; methods `->filter`, `->group_by`, `->sum`, `->nrow` / `->ncol` (see **DataFrame** under native CSV above).
-- **`sqlite(PATH)`** — embedded SQLite via `rusqlite` (bundled libsqlite). Handle methods: `->exec(SQL, ?bind…)`, `->query(SQL, ?bind…)` (array of hashrefs), `->last_insert_rowid`.
-- **`fan [N] { BLOCK } [, progress => EXPR]`** — run **`BLOCK`** **`N`** times in parallel (omit **`N`** to use the rayon pool size, `pe -j`); **`$_`** is **`0..N-1`**. Optional **`progress => 1`** shows **per-worker animated bars** (pv-style sweep left→right with spinner and elapsed time, like `brew`/`cargo`). You may write **`progress => EXPR`** immediately after **`}`** with **no comma** (same as **`pmap`** / **`pgrep`**).
-- **`fan_cap [N] { BLOCK } [, progress => EXPR]`** — same as **`fan`**, but the expression returns a **list** of each iteration’s block return value, in **`$_`** order (**`0..N-1`**). Same optional **`progress`** forms and per-worker bars as **`fan`** (comma or not before **`progress`**).
-- **`par_lines PATH, sub { ... } [, progress => EXPR]`** — memory-map the file, split into line-aligned byte chunks, process chunks in parallel with rayon; each line sets `$_` for the coderef (CRLF-safe; bytecode VM via `Op::ParLines` or tree-walker; use `mysync` for shared counters across workers). Optional stderr progress bar like **`pmap`**.
-- **`par_walk PATH, sub { ... } [, progress => EXPR]`** — parallel recursive directory walk (rayon per directory, like **`glob_par`**’s strategy); **`$_`** is the full path of each visited file or directory. **`PATH`** may be a list (array) of roots. With **`progress => 1`**, paths are collected first so the bar has a total; without it, the walk runs in one pass. Bytecode VM via **`Op::ParWalk`** + **`Chunk::par_walk_entries`**.
-- **`par_sed PATTERN, REPLACEMENT, FILES... [, progress => EXPR]`** — read each file as text (UTF-8 when valid, else Latin-1 octets per line), apply **`PATTERN`** with global substitution semantics (same as **`s///g`**: pass a string pattern or **`qr/.../`** with embedded flags), write back only when the content changes; returns the number of files modified. **`PATTERN`** string uses the same compilation path as regex literals (e.g. **`(?i)`** via **`qr`** for case fold). Optional stderr progress (**`BuiltinId::ParSed`** / **`ParSedProgress`**).
-- **`pipeline(@list)->…->collect()`** — lazy list processing (sequential **`->filter`** / **`->grep`**, **`->map`**, **`->take`**). Parallel chain methods mirror top-level **`pmap`**, **`pgrep`**, **`pfor`**, **`pmap_chunked`**, **`psort`**, **`pcache`** (optional second argument `1` for stderr progress where applicable). Fold methods **`->preduce`**, **`->preduce_init(INIT, sub)`**, **`->pmap_reduce(MAP, REDUCE)`** must be last before **`->collect()`**; **`collect()`** then returns a **scalar** for those. Any other **`->name`** or **`->Pkg::name`** with **no** arguments resolves a **subroutine** in the stash and applies it like **`->map`** (`$_` each element). **`par_lines`**, **`par_fetch`**, etc. are separate builtins; they are not `->` methods on **`pipeline`**.
-- **`par_pipeline(@list)->…->collect()`** — same **`->`** methods as **`pipeline`**, but plain **`->filter`** / **`->map`** use **rayon** on **`collect()`** with **input order preserved** (same capture rules as **`pgrep`** / **`pmap`**). **`->take`** still truncates after those stages. For the **multi-stage channel** builtin (bounded queues, backpressure), use the named form below.
-- **`par_pipeline(source => CODE, stages => [...], workers => [...], buffer => N?)`** — **batch** mode: source coderef generates all items (return **`undef`** to end), then each stage processes the **entire batch** via rayon before the next stage starts. Return value is the count of items processed by the last stage. Source and stage bodies use the same **capture** rules as `pmap`/`ppool` (lexical scalars are shared; **arrays** are not copied into the snapshot—use scalars, package variables, or handles like `STDIN`). For stdin lines, use **`readline(HANDLE)`** (e.g. **`readline(STDIN)`**), **`<STDIN>`**, or **`readline`** with no args (diamond/`ARGV` rules apply).
-- **`par_pipeline_stream(@list [, workers => N, buffer => N])->…->collect()`** — streaming variant of **`par_pipeline(@list)`**. Each **`->filter`** / **`->map`** / **`->take`** / **`->pfor`** / **`->pcache`** stage runs as a pool of OS threads connected by **bounded crossbeam channels**, so items flow between stages **concurrently** (an item can be at stage 3 while another is still at stage 1). **Order is not preserved.** Optional **`workers => N`** sets threads-per-stage (default: rayon pool size); **`buffer => N`** sets channel capacity (default 256). **`->psort`**, **`->preduce`**, **`->preduce_init`**, **`->pmap_reduce`**, **`->pmap_chunked`** are rejected at runtime (they require all items; use batch **`par_pipeline`** instead).
-- **`par_pipeline_stream(source => CODE, stages => [...], workers => [...], buffer => N?)`** — **streaming** named form: same arguments as `par_pipeline(source => ...)`, but items flow through **bounded crossbeam channels** between stages concurrently with **backpressure** (an item can be at stage 3 while another is still at stage 1). Order is **not** preserved when a stage has multiple workers.
-- **`pwatch GLOB, sub { ... }`** — register native file/directory watches with the `notify` crate (inotify/kqueue/FSEvents); block in the event loop and dispatch each glob-matching path to the coderef on a rayon worker with `$_` set to the path (bytecode VM via `Op::Pwatch` or tree-walker; use `mysync` for shared state).
-- **`barrier(N)`** — returns a handle backed by `std::sync::Barrier`; `->wait` for phased parallelism (e.g. with `fan`). Party count is clamped to at least 1 (bytecode + tree-walker).
-- **`sort` / `psort` fast path** — `{ $a <=> $b }`, `{ $a cmp $b }`, `{ $b <=> $a }`, `{ $b cmp $a }` compare without invoking the block per pair (VM + tree-walker).
-- **`reduce` / `preduce`** — list fold with `$a` (accumulator) and `$b` (next item); `reduce` is strictly left-to-right; `preduce` uses rayon (order not fixed; use only when the operation is associative). Optional **`, progress => EXPR`** — stderr progress bar when truthy (same style as **`pmap`**).
-- **`preduce_init`** — `preduce_init EXPR, { BLOCK } @list [, progress => EXPR]`: parallel fold starting from **`EXPR`** (clone per chunk); empty list returns `EXPR`. **`$a` / `$b`** are the accumulator and next element; **`@_`** is `($a, $b)`. Hash (or hashref) partials are merged by **adding numeric values per key**; for other accumulators the block must combine two partial results associatively (same idea as `preduce`).
-- **`pmap_reduce { MAP } { REDUCE } @list [, progress => EXPR]`** — fused parallel map plus tree reduce without building the full mapped list; optional stderr progress bar like **`pmap`**.
-- **`glob_par PATTERN… [, progress => EXPR]`** — parallel recursive glob (rayon); same patterns as **`glob`**. Optional **`progress => 1`** — one tick per pattern (not per file).
-- **`frozen my`** — immutable bindings (reassignment rejected in the bytecode path).
-- **`typed my $x : Type`** — optional scalar types (`Int`, `Str`, `Float`) with **runtime** checks on declaration and every assignment; `typed my` runs on the tree-walker (bytecode falls back when the program uses it).
-- **`try { } catch ($err) { } [finally { }]`** — bytecode VM (`Op::TryPush` / `CatchReceive` / …) and tree interpreter; `die` and most runtime errors unwind to `catch` (not `exit`, not control-flow exceptions).
-- **`given (EXPR) { when … default … }`** — bytecode VM (`Op::Given` + AST body; `when`/`default` still run via the interpreter inside that body) and tree interpreter.
-- **`eval_timeout SECS { … }`** — bytecode VM (`Op::EvalTimeout`) and tree interpreter (worker thread + `recv_timeout`).
-- **Algebraic `match (EXPR) { PATTERN => EXPR, … }`** (optional **`if EXPR`** guards) — bytecode VM (`Op::AlgebraicMatch`) and tree interpreter.
-- **`retry { BLOCK } times => N [, backoff => none|linear|exponential]`** — re-run **`BLOCK`** on runtime error until it succeeds or **`N`** attempts are used; optional sleeps between failures (tree interpreter only; VM falls back).
-- **`rate_limit(MAX, WINDOW) { BLOCK }`** — sliding window: at most **`MAX`** runs per **`WINDOW`** (string duration: **`"1s"`**, **`"500ms"`**, **`"2m"`**, or a plain number as seconds). Tree interpreter only.
-- **`every(INTERVAL) { BLOCK }`** — run **`BLOCK`** repeatedly with sleep **`INTERVAL`** between iterations (infinite loop). Tree interpreter only.
-- **`gen { … yield EXPR … }`** — lazy generator value; **`yield`** is only valid inside **`gen`**. Method **`->next`** returns a **two-element array reference** **`[value, more]`** where **`more`** is **`1`** while more values may follow and **`0`** when finished (Perl-ish). Tree interpreter only.
+#### Perl-compat highlights
 
-#### OTHER FEATURES
-- `Interpreter::execute` returns `Err(ErrorKind::Exit(code))` for `exit` (including code 0); the `perlrs` binary maps that to `process::exit`.
-- **`@INC` / `%INC` / `require` / `use`** — The `perlrs` / `pe` driver builds `@INC` by: each **`-I`** directory, then **`<crate>/vendor/perl`** when present (e.g. a stub **`List/Util.pm`** so `require List::Util` updates **`%INC`**), then the same paths **system `perl` reports for `@INC`** (via `perl -e 'print join "\n", @INC'`, so other core/site `.pm` paths match Perl’s search order), then the **script’s directory** (when the program file is not `-e` / `-` / `repl`), then **`PERLRS_INC`**, then **`.`** (duplicates removed). Set **`PERLRS_NO_PERL_INC`** to omit the `perl` query (e.g. no `perl` on `PATH`). **`List::Util`** (all **`EXPORT_OK`** names from Perl 5’s module, including **`reduce`**, **`any`**, **`pairs`**, **`zip`**, …) is implemented **natively in Rust** (`src/list_util.rs`) and registered on interpreter startup; core Perl still loads XS for these, but perlrs does not. Pure perlrs execution is still **not** full Perl 5: many other real `.pm` files (especially XS) will not run even when found. Relative paths (`Foo::Bar` → `Foo/Bar.pm`) are searched in order; successful loads record the relative path in **`%INC`**; repeated `require` is a no-op. **`use Module;`** is processed in **source order** before `BEGIN` blocks (and before the VM main chunk runs). After a successful load, **`use Module qw(a b);`** imports only those names, and each must appear in **`our @EXPORT`** or **`our @EXPORT_OK`** in the loaded module (Exporter-style). Bare **`use Module;`** imports **`@EXPORT`** only; if the module never sets **`our @EXPORT`** / **`our @EXPORT_OK`**, the legacy rule applies: import every top-level sub under that package. **`use Module qw();`** imports nothing. **Qualified calls** like **`Foo::bar()`** are valid syntax. Built-in pragmas (`strict`, `warnings`, `utf8`, …) do not load a file. Version-only `require` (e.g. `require 5.010`) succeeds without loading.
-- **Pragmas (porting)** — `use strict` enables **refs / subs / vars**; `use strict 'refs'` or `use strict qw(refs subs)` selects modes; `no strict` clears all, `no strict 'refs'` clears one. **Runtime:** **`strict refs`** rejects symbolic scalar/array/hash derefs (string used as a variable name) with a Perl-like message; **`$$foo`** is parsed as symbolic scalar deref of **`$foo`** (falls back to the tree interpreter when bytecode is compiled). **`strict vars`** requires a visible binding (`my`/`our`/prior assignment in scope) for unqualified scalars, arrays, and hashes (package-qualified names and built-in specials like `$_`, `$1`, … are exempt); **`strict subs`** appends a hint to undefined subroutine errors. **`use warnings` / `no warnings`** toggle the interpreter warnings flag (reserved for future warning surfaces). **`feature_bits`** (crate **`FEAT_*`**) are set by **`use feature`** / **`no feature`**; **`say`** is gated by **`FEAT_SAY`** (on by default like Perl 5.10+; disable with **`no feature 'say'`** or **`no feature;`**). **`use utf8` / `no utf8`** set **`utf8_pragma`**. **`use open …`** — recognizes `qw(:utf8)`, `:std`, and `:encoding(UTF-8)` (case-insensitive); enables UTF-8 **lossy** decoding for **`readline`** / diamond / named input handles (not full PerlIO stack). **`${^OPEN}`** is **`1`** when that mode is on (Perl’s real **`${^OPEN}`** is richer). **`no open`** clears the flag. **`no`** pragmas run in the same **prepare** phase as **`use`**. **`use Env qw(@PATH)`** (or **`use Env '@PATH'`**) fills **`@PATH`** from the process **`PATH`** (split like Perl’s **`Env`**), without loading **`Env.pm`**. The interpreter starts with **`@ARGV`**, **`@_`**, **`%ENV`**, and **`@INC`/`%INC`** pre-bound so **`strict vars`** matches typical Perl scripts.
-- `package` declarations
-- **Typeglob assignment** — `*foo = \&bar` (subroutine alias) and `*foo = *bar` (copy stash slots: `&`, `$`, `@`, `%`, and IO-handle alias map); package-qualified `*Foo::x` supported. Bytecode lowering uses `Op::CopyTypeglobSlots` / `Op::TypeglobAssignFromValue` for literal `*lhs`, and `Op::CopyTypeglobSlotsDynamicLhs` / `Op::TypeglobAssignFromValueDynamic` when the LHS is `*{EXPR}` and the RHS is a literal `*name` or a coderef. Dynamic RHS glob names or other lvalue shapes still use the tree-walker. Semantics: `Interpreter::assign_typeglob_value` / `copy_typeglob_slots`.
-- `BEGIN` / `UNITCHECK` / `CHECK` / `INIT` / `END` blocks (Perl order; **`${^GLOBAL_PHASE}`** matches Perl in both the tree-walker and the bytecode VM via [`Op::SetGlobalPhase`](src/bytecode.rs); see [`SPECIAL_VARIABLES.md`](SPECIAL_VARIABLES.md))
-- String interpolation with `$var`, `$hash{key}`, `$array[idx]`, `@array` / `@array[slice]` (elements joined with `$"`), `$#array` in slice indices, `$0`, and regexp captures `$1`…`$n` (multi-digit runs; `$01`… is a parse error like Perl); double-quoted / `qq` strings support `\x{hex}` (Unicode scalar) and unbraced `\x` (one or two hex digits, like Perl); `\$` in `""` / `qq` is a literal `$` for string `eval` / generated code (not outer-scope interpolation); `\\` + `$` is a literal backslash followed by interpolating `$var`
-- **`__FILE__`** / **`__LINE__`** — compile-time literals (`__LINE__` is the token’s line, 1-based; `__FILE__` matches `Interpreter::file`, e.g. `-e` or the script path from the `pe` driver)
-- Heredocs (`<<EOF`)
-- `qw()`, `q()`, `qq()` — with pairing delimiters `()[]{}<>`, nested open/close pairs are balanced to the outer closing delimiter (Perl semantics), e.g. `q(sub ($) { 1 })` (core `Carp.pm`) and `qw( (SV*)pWARN_ALL )` (core `B.pm`).
-- **Syntax check** — `pe -c` accepts the full core **`B.pm`** shipped with a typical Homebrew **`perl`** (exact path varies by OS/version); lexer/parser details (`x` repeat vs identifier, `->method` + comma, **`$cr(...)`** / **`&$cr(...)`**) are summarized in [`PARITY_ROADMAP.md`](PARITY_ROADMAP.md).
-- POD documentation skipping
-- Shebang line handling
-- **Special variables** — Not full perlvar(5); see [`SPECIAL_VARIABLES.md`](SPECIAL_VARIABLES.md). A large set of **`${^NAME}`** scalars from **`perlvar`** is pre-seeded (see [`special_vars.rs`](src/special_vars.rs)); **`@^…`** / **`%^…`** tokenize (e.g. **`@{^CAPTURE}`**, **`%{^HOOK}`**). **`$"`** is the list separator for **`@array`** inside double-quoted strings; any scalar name starting with **`^`** (including **`${^NAME}`**) goes through **`get_special_var`** (unknown names read **`undef`** from a stash; many are stubs). Covered: `$_`, `$/`, **`$!`** / **`$@`** (numeric/string dualvars), `$1`…, `%+`, `@-`/`@+`, **`@{^CAPTURE}`** / **`@{^CAPTURE_ALL}`**, **`$*`** (multiline → `(?s)` in **`compile_regex`**), **`$^C`** (SIGINT latch on Unix), `$]`/`$;`, **`$^O`** / **`$^T`** / **`$^V`** / **`$^E`** / **`$^H`**, **`${^WARNING_BITS}`** / **`${^GLOBAL_PHASE}`**, **`$<`**/**`$>`** (uid), **`$(`**/**`$)`** (gid lists on Unix), **`${^MATCH}`** / **`${^PREMATCH}`** / **`${^POSTMATCH}`** (same data as `$&` / `` $` `` / `$'` when driven by the regex engine), **`$+`**, format-related **`$%`**/**`$=`**/**`$-`**/**`$:`**/**`$^`** (top-of-form), **`$^A`**/**`$^F`**/**`$^L`**/**`$^M`**/**`$^N`**/**`$^X`**, **`$INC`** (iterator stub), `$^I`/`$^D`/`$^P`/`$^S`/`$^W`, `$ARGV` with `<>`, `@ARGV`/`%ENV`/`@INC`/`%INC`, **`%SIG`** (on Unix see the Perl-compat **`%SIG`** bullet above; non-Unix no delivery), **`$?`** / **`$|`** (see Perl-compat bullets above). Still missing vs Perl 5: **`English`**; full **`$^V`** as a version object. See [`SPECIAL_VARIABLES.md`](SPECIAL_VARIABLES.md) for **`exists`/`delete`** coverage (e.g. **`$href->{k}`** is supported).
+- **OOP** — `@ISA` (incl. `our @ISA` outside `main`), C3 MRO (live, not cached), `$obj->SUPER::method`. `tie` for scalars/arrays/hashes with `TIESCALAR/TIEARRAY/TIEHASH`, `FETCH`/`STORE`, plus `EXISTS`/`DELETE` on tied hashes.
+- **`use overload`** — `'op' => 'method'` or `\&handler`; binary dispatch with `(invocant, other)`, `nomethod`, unary `neg`/`bool`/`abs`, `""` for stringification, `fallback => 1`.
+- **`$?` / `$|`** — packed POSIX status from `system`/backticks/pipe close; autoflush on print/printf.
+- **`$.`** — undef until first successful read, then last-read line count.
+- **`print`/`say`/`printf` with no args** — uses `$_` (and `printf`'s format defaults to `$_`).
+- **Bareword statement** — `name;` calls a sub with `@_ = ($_)`.
+- **Typeglobs** — `*foo = \&bar`, `*lhs = *rhs` copies sub/scalar/array/hash/IO slots; package-qualified `*Pkg::name` supported.
+- **`%SIG` (Unix)** — `SIGINT`/`SIGTERM`/`SIGALRM`/`SIGCHLD` as code refs; handlers run between statements/opcodes via `perl_signal::poll`. `IGNORE` and `DEFAULT` honored.
+- **`format` / `write`** — partial: `format NAME = ... .` registers a template; pictures `@<<<<`, `@>>>>`, `@||||`, `@####`, `@****`, literal `@@`. `write` (no args) uses `$~` to stdout. Not yet: `write FILEHANDLE`, `$^`, `formline`.
+- **`@INC` / `%INC` / `require` / `use`** — `@INC` is built from `-I`, `vendor/perl`, system `perl`'s `@INC` (set `PERLRS_NO_PERL_INC` to skip), the script dir, `PERLRS_INC`, then `.`. `List::Util` is implemented natively in Rust (`src/list_util.rs`). `use Module qw(a b);` honors `@EXPORT_OK`/`@EXPORT`. Built-in pragmas (`strict`, `warnings`, `utf8`, `feature`, `open`, `Env`) do not load files.
+- **`use strict`** — refs/subs/vars modes (per-mode `use strict 'refs'` etc.). `strict refs` rejects symbolic derefs at runtime; `strict vars` requires a visible binding.
+- **`BEGIN` / `UNITCHECK` / `CHECK` / `INIT` / `END`** — Perl order; `${^GLOBAL_PHASE}` matches Perl in tree-walker and VM.
+- **String interpolation** — `$var`, `$h{k}`, `$a[i]`, `@a`, `@a[slice]` (joined with `$"`), `$#a` in slice indices, `$0`, `$1..$n`. `\x{hex}` and unbraced `\x`.
+- **`__FILE__` / `__LINE__`** — compile-time literals.
+- Heredocs `<<EOF`, POD skipping, shebang handling, `qw()/q()/qq()` with paired delimiters.
+- **Special variables** — large set of `${^NAME}` scalars pre-seeded; see [`SPECIAL_VARIABLES.md`](SPECIAL_VARIABLES.md). Still missing vs Perl 5: `English`, full `$^V` as a version object.
+
+#### Extensions beyond stock Perl 5
+
+- Native CSV (`csv_read`/`csv_write`), columnar `dataframe`, embedded `sqlite`.
+- HTTP (`fetch`/`fetch_json`/`fetch_async`/`par_fetch`), JSON (`json_encode`/`json_decode`).
+- Crypto, compression, time, TOML, YAML helpers (see [\[0x05\]](#0x05-native-data-scripting)).
+- All parallel primitives in [\[0x03\]](#0x03-parallel-primitives) (`pmap`, `fan`, `pipeline`, `par_pipeline_stream`, `pchannel`, `pselect`, `barrier`, `ppool`, `glob_par`, `par_walk`, `par_lines`, `par_sed`, `pwatch`, `watch`).
+- `mysync` shared state ([\[0x04\]](#0x04-shared-state-mysync)).
+- `frozen my`, `typed my`, `struct`, algebraic `match`, `try/catch/finally`, `eval_timeout`, `retry`, `rate_limit`, `every`, `gen { ... yield }`.
+
+`perlrs` is **not** a full `perl` replacement: many real `.pm` files (especially XS modules) will not run. See [`PARITY_ROADMAP.md`](PARITY_ROADMAP.md).
 
 ---
 
-## [0x06] ARCHITECTURE
+## [0x09] ARCHITECTURE
 
 ```
  ┌─────────────────────────────────────────────────────┐
- │  Source Code                                        │
- │      │                                              │
- │      ▼                                              │
- │  Lexer (src/lexer.rs)                               │
- │      │ Tokens                                       │
- │      ▼                                              │
- │  Parser (src/parser.rs)                             │
- │      │ AST                                          │
- │      ▼                                              │
- │  Interpreter (src/interpreter.rs)                   │
- │      ├── Sequential: map, grep, sort, foreach       │
- │      └── Parallel:   pmap, pgrep, psort, pfor, fan, fan_cap │
- │              │                                      │
- │              ▼                                      │
- │          RAYON WORK-STEALING SCHEDULER              │
- │          ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓               │
- │          CORE 0 │ CORE 1 │ ... │ CORE N             │
+ │  Source ──▶ Lexer ──▶ Parser ──▶ AST                │
+ │                                    │                │
+ │                                    ▼                │
+ │                            Compiler (compiler.rs)   │
+ │                                    │                │
+ │                                    ▼                │
+ │                            Bytecode (bytecode.rs)   │
+ │                                    │                │
+ │            ┌───────────────────────┼───────────┐    │
+ │            ▼                       ▼           ▼    │
+ │   Tree-walker fallback     VM (vm.rs)   Cranelift   │
+ │   (interpreter.rs)            │            JIT       │
+ │                               ▼                      │
+ │                  Rayon work-stealing scheduler       │
+ │                  CORE 0 │ CORE 1 │ ... │ CORE N      │
  └─────────────────────────────────────────────────────┘
 ```
 
-- **Lexer** // Context-sensitive tokenizer handling Perl's ambiguous syntax (regex vs division, hash vs modulo, heredocs, interpolated strings)
-- **Parser** // Recursive descent with Pratt precedence climbing for expressions
-- **Feature work (policy)** // Prefer **new VM opcodes** (`Op` in [`bytecode.rs`](src/bytecode.rs)), lowering in [`compiler.rs`](src/compiler.rs), and implementation in [`vm.rs`](src/vm.rs). Do **not** add new **`ExprKind`** / **`StmtKind`** variants (or AST-only enums) for new behavior; extend the compiler/VM path instead. Lexer/parser edits are fine when needed to **recognize** syntax, as long as the feature lands as **bytecode**, not as a wider AST vocabulary.
-- **Interpreter** // Tree-walking execution with proper lexical scoping, `Arc<RwLock>` for thread-safe reference types; matching `return f(...)+f(...)` to the same sub with a simple integer base case (`return $n if $n <= K`) is specialized in `call_sub` via an explicit evaluation stack (`src/fib_like_tail.rs`) to avoid nested scope frames
-- **Parallelism** // Each parallel block gets an isolated interpreter with captured scope; rayon handles work-stealing scheduling
-- **VM** // `src/vm.rs` match-dispatch loop; `try_vm_execute` runs bytecode first (then tree-walker on compile failure or unsupported ops). Ops emitted from expression lowering carry an optional index into `Chunk::ast_expr_pool` (`Chunk::op_ast_expr`, resolved with `Chunk::ast_expr_at`); `pe --disasm` prints that index in the listing’s third column (`-` when absent). **Lowering** includes `BEGIN`, then `UNITCHECK` / `CHECK` / `INIT` (Perl order), then main, then `END`, with **`Op::SetGlobalPhase`** so **`${^GLOBAL_PHASE}`** matches Perl during each segment, `mysync` (`Op::DeclareMySync*`), nested `sub` from `BEGIN` (`Op::RuntimeSubDecl`), **`tie`** (`Op::Tie` via [`Interpreter::tie_execute`](src/interpreter.rs)), scalar compound assigns via `Scope::atomic_mutate` (`Op::ScalarCompoundAssign`, so `mysync $x += …` is correct under threads); `++`/`--` and compound assignment on **`$a[$i]`** / **`$h{$k}`** use `Op::Dup` / `Op::Rot` stack shuffles with `Get*Elem` / `Set*Elem` (not emitted for **`mysync` aggregates** — those stay on the tree-walker so `atomic_*_mutate` keeps parallel correctness); single-key **`@$href{"k"} OP=`** / **`++`/`--`** on **`@$href{"k"}`** mirror **`$href->{"k"}`** (`Dup2` + `ArrowHash` + `SetArrowHash` / `SetArrowHashKeep` / `ArrowHashPostfix`); multi-key **`@$href{k1,k2} OP= EXPR`** uses dedicated `Op::HashSliceDerefCompound` and multi-key **`++`/`--`** (pre/post) uses `Op::HashSliceDerefIncDec` (both delegate to `Interpreter::compound_assign_hash_slice_deref` / `hash_slice_deref_inc_dec`, matching the tree-walker generic fallback); **`@$aref[i,j,…]`** reads use **`Op::ArrowArraySlice`** (compiler peels **`@$r`** to the array ref scalar, not `SymbolicDeref` expansion); literal **`@$r[i,j] = (u,v)`** lowers to multiple **`SetArrowArray`**, `push`/`pop`/`shift` on arrays through the atomic array path, `pmap_chunked` (`Op::PMapChunkedWithBlock`), `trace` / `timer` / `bench` (`Op::TraceBlock` / `Op::TimerBlock` / `Op::BenchBlock`), regex values `qr/.../` (`Op::LoadRegex`), bare `m//` in `&&` / `||` scalar results (`Op::RegexBoolToScalar`, failed match `""` like Perl), named sub coderef `\&foo` (`Op::LoadNamedSubRef`) and unary `&foo` invocation (`Op::Call`), folds `reduce` / `preduce` / `preduce_init` / `pmap_reduce` (`Op::ReduceWithBlock`, `Op::PReduceWithBlock`, `Op::PReduceInitWithBlock`, `Op::PMapReduceWithBlocks`), `pcache` (`Op::PcacheWithBlock`), `pselect` (`Op::Pselect`), `par_lines` (`Op::ParLines` + `Chunk::par_lines_entries`), `par_walk` (`Op::ParWalk` + `Chunk::par_walk_entries`), `par_sed` (`BuiltinId::ParSed` / `ParSedProgress`), and `pwatch` (`Op::Pwatch` + `Chunk::pwatch_entries`), `each` (`BuiltinId::Each`), and four-argument `substr` mutating assign (`Op::SubstrFourArg` + `Chunk::substr_four_arg_entries`, shared `eval_substr_expr` with the tree path), and dynamic `keys`/`values`/`delete`/`exists` when the operand is not a bare `%h` or `%h{k}` fast path (`Op::KeysExpr`, `Op::ValuesExpr`, `Op::DeleteExpr`, `Op::ExistsExpr`, shared eval helpers with the tree path). **Still tree-only** in many cases: `CompileError::Unsupported` in `src/compiler.rs` covers `format`, many complex lvalues, and numerous builtins/expressions — see `compile_statement` / `compile_expr` there. Compiled subs use **slot** ops for frame-local `my` scalars (`GetScalarSlot`, `PreIncSlot`, …, O(1)); non-special names use **plain** load/store ops to skip the special-variable dispatch path; string `eq` / `cmp` compare heap strings without per-op `String` allocations when both operands are heap strings; the execution budget is a **1B-op** cap checked on a fixed stride through the hot loop (not once per opcode). Potential future speedups include computed-goto dispatch, call-site sub interning to skip per-call name lookups, and gating the JIT hot-sub probe out of the per-op path (none implemented here).
-- **JIT** // `src/jit.rs` — Cranelift **method JIT** with two tiers; **`new_jit_module` caches the native `OwnedTargetIsa`** so ISA detection runs once per process. Cranelift codegen tuning (`isa_flags()`):
-
-```
- ┌──────────────────────────┬──────────┬──────────────────────────┐
- │ opt_level = "speed"      │ 1 line   │ ~5–15% on JIT'd code *   │
- └──────────────────────────┴──────────┴──────────────────────────┘
- * vs default `opt_level = "none"` for this ISA; run `cargo bench --bench jit_compare` locally.
-```
-
-**Linear JIT**: straight-line sequences in one basic block (including `LoadUndef` as full nanbox bits). String `.` and string compares (`eq`, `ne`, `cmp`, `lt`, …) are **not** JIT’d (opcode interpreter); Cranelift helpers `perlrs_jit_concat_bits` / `perlrs_jit_string_cmp_bits` exist for a future lowering once operand encoding is fully aligned with the linear stack. **Subroutine linear JIT**: at each compiled sub entry (`Chunk::sub_entries`), the VM tries `try_run_linear_sub` on the opcode slice up to the first `Return` or `ReturnValue` — including bare `return;` (empty stack → `undef`) and value returns — when the slice has no control-flow or frame ops **except** `Op::Call` to another compiled sub (stack-args, scalar context) — those emit a native call to `perlrs_jit_call_sub` (`src/vm.rs`), passing the VM pointer and up to eight `i64` args; the trampoline runs `VM::jit_trampoline_run_sub` so the callee can be interpreted or JIT’d again. **Tiered sub JIT**: the first **`PERLRS_JIT_SUB_INVOKES`** (default **50**) invocations at each sub-entry IP run only the opcode interpreter so cold/tiny subs avoid Cranelift compile tax; after that, subroutine linear then block JIT are attempted. **Block JIT**: control flow — `Jump`, `JumpIfTrue` / `JumpIfFalse`, short-circuit `JumpIfFalseKeep` / `JumpIfTrueKeep`, `JumpIfDefinedKeep` (constant TOS or `GetScalarSlot` / `GetScalarPlain` / `GetArg` immediately before, with raw NaN-box buffers in that mode) — with a CFG; stack slots at merges are joined in abstract interpretation (`Cell` + `join_cell`), and block parameters are typed `i64`/`f64` per slot. Jitable `Op::Call` to another compiled sub (stack-args, scalar) uses the same `perlrs_jit_call_sub` path as linear JIT when the CFG validates. The VM runs block CFG validation once (`block_jit_validate`) before filling buffers; then `try_run_block_ops` compiles without re-validating. Both tiers support integer/float stack values (promotion matches the VM), returning `i64` or `f64`. Slot/plain/arg tables are dense `i64` in native code; **the VM reuses three `i64` scratch `Vec`s** for those tables across JIT attempts instead of allocating fresh buffers each time. Not JIT’d: `JumpIfDefinedKeep` with other dynamic TOS shapes (e.g. `Cell::Undef`), unsupported ops; see `jit.rs` module docs.
+- **Lexer** ([`src/lexer.rs`](src/lexer.rs)) — context-sensitive tokenizer for Perl's ambiguous syntax (regex vs division, hash vs modulo, heredocs, interpolation).
+- **Parser** ([`src/parser.rs`](src/parser.rs)) — recursive descent + Pratt precedence climbing.
+- **Compiler / VM** ([`src/compiler.rs`](src/compiler.rs), [`src/vm.rs`](src/vm.rs)) — match-dispatch interpreter; `try_vm_execute` runs bytecode first then falls back to tree-walker on `CompileError::Unsupported` or unsupported ops. Compiled subs use slot ops for frame-local `my` scalars (O(1)). Lowering covers `BEGIN`/`UNITCHECK`/`CHECK`/`INIT`/`END` with `Op::SetGlobalPhase`, `mysync`, `tie`, scalar compound assigns via `Scope::atomic_mutate`, regex values, named-sub coderefs, folds, `pcache`, `pselect`, `par_lines`, `par_walk`, `par_sed`, `pwatch`, `each`, four-arg `substr`, dynamic `keys`/`values`/`delete`/`exists`, etc.
+- **JIT** ([`src/jit.rs`](src/jit.rs)) — Cranelift two-tier JIT (linear-sub + block) with cached `OwnedTargetIsa`, tiered after `PERLRS_JIT_SUB_INVOKES` (default 50) interpreter invocations. Block JIT validates a CFG, joins typed `i64`/`f64` slots at merges, and compiles straight-line numeric hot loops. Disable with `--no-jit` / `PERLRS_NO_JIT=1`.
+- **Feature work policy** — prefer **new VM opcodes** in [`bytecode.rs`](src/bytecode.rs), lowering in [`compiler.rs`](src/compiler.rs), implementation in [`vm.rs`](src/vm.rs). Do **not** add new `ExprKind`/`StmtKind` variants for new behavior.
+- **Tree-walker** ([`src/interpreter.rs`](src/interpreter.rs)) — fallback execution with `Arc<RwLock>` for thread-safe ref types; `fib_like_tail.rs` specializes simple integer-base-case recursive `f(n-1)+f(n-2)` patterns to avoid nested scope frames.
+- **Parallelism** — each parallel block spawns an isolated interpreter with captured scope; rayon does work-stealing.
 
 ---
 
-## [0x07] EXAMPLES
+## [0x0A] EXAMPLES
 
 ```sh
 pe examples/fibonacci.pl
@@ -712,13 +382,9 @@ pe examples/parallel_demo.pl
 
 ---
 
-## [0x08] BENCHMARKS
+## [0x0B] BENCHMARKS
 
- ┌──────────────────────────────────────────────────────────────┐
- │ BENCHMARK SUITE // perlrs vs perl 5.42.2 // Apple M5 18-core │
- └──────────────────────────────────────────────────────────────┘
-
-**Honest numbers.**  These measurements include process startup; they are *not* steady-state numbers inside a long-running process.
+`bash bench/run_bench.sh` — perlrs vs perl 5.42.2 on Apple M5 18-core. Mean of 10 hyperfine runs with 3 warmups; **includes process startup** (not steady-state).
 
 ```
   bench          perl5 ms   perlrs ms    noJit ms  perturb ms  rs/perl5  jit/noJit
@@ -731,21 +397,13 @@ pe examples/parallel_demo.pl
   array              25.1        10.3         9.9        10.2     0.41x      0.96x
   regex              91.3        98.8        97.4        95.0     1.08x      0.99x
   map_grep           50.3        14.3        14.5        14.4     0.28x      1.01x
-
-  pmap vs map (perlrs only, 50k items with per-item work)
-  bench            map ms     pmap ms     speedup
-  ---------      --------    --------    --------
-  pmap              236.1       465.1       0.51x
-
-
 ```
 
-**perlrs beats perl5 on 5 of 8 benches** (`fib`, `loop`, `string`, `array`, `map_grep`) — by **~26x** on `fib` and `loop`, **2.6x** on `string`, **2.4x** on `array`, and **3.5x** on `map_grep`. The other three rows lose: `hash` (1.46x — Perl 5 optimizes hash access particularly aggressively, and this was a win in earlier snapshots before Perl 5.42 improvements), `regex` (1.08x — effectively a tie; both use mature regex engines), and `startup` (1.36x — a ~900 µs fixed process-load gap from Rust binary init).
+**perlrs beats perl5 on 5 of 8 benches** — `fib` and `loop` ~26x, `string` 2.6x, `array` 2.4x, `map_grep` 3.5x. Losses: `hash` 1.46x (Perl 5 hash access is heavily tuned), `regex` 1.08x (effectively a tie), `startup` 1.36x (~900 µs Rust binary load).
 
-**JIT impact is essentially zero on this suite.** The `jit/noJit` column is the ratio of the `--no-jit` bytecode-only mean to the default JIT mean; values >1.0 mean JIT helped, <1.0 mean JIT hurt. Every row is within ±6% of parity, and two rows (`loop`, `array`) show the JIT being *slightly slower* than the pure bytecode interpreter. This is an honest finding — the current Cranelift block-JIT only covers a narrow band of frame-slot numeric hot loops, and most of these benches either do not hit that band or are already bottlenecked on allocation / hash / regex work the JIT does not touch. The big wins over Perl 5 (`fib`, `loop`, `map_grep`) come from the **bytecode interpreter**, not the JIT.
+**JIT impact is essentially zero on this suite** (`jit/noJit` within ±6%). The wins over Perl 5 come from the **bytecode interpreter**, not the JIT — the current Cranelift block JIT only covers a narrow band of frame-slot numeric hot loops.
 
-> Measured on macOS Apple M5 18-core with `perl v5.42.2` vs `perlrs` release build (LTO + O3). Mean of 10 hyperfine runs with 3 warmups via `bash bench/run_bench.sh`. `rs/perl5` < 1.0 means perlrs is faster. The `noJit ms` column runs the exact same canonical file under `perlrs --no-jit` (equivalent to `PERLRS_NO_JIT=1`) so only the bytecode interpreter executes. The `perturb ms` column runs the same workload through a renamed, functionally-equivalent copy of each bench file — it exists specifically so that any future compile-time shape matcher that recognizes the canonical bench files and short-circuits them will show up as a divergence between the two columns.
-
+The `noJit` column is `perlrs --no-jit`. The `perturb` column re-runs each bench through a renamed but functionally-equivalent file so any future shape-matcher that short-circuits the canonical bench files would show a divergence.
 
 #### Parallel speedup
 
@@ -754,46 +412,31 @@ pe examples/parallel_demo.pl
   pmap (50k items, 18 cores):       465.1 ms   →  0.51x
 ```
 
-The `pmap` row is **slower** than serial `map` on this workload: the 50k items × per-item cost is too small to amortize worker spin-up and cross-thread queueing. Parallel wins require either heavier per-item work or a much larger N. On workloads where the per-item cost is real (100 ms+ of CPU), `fan`, `pmap`, `pgrep`, `pfor`, and `psort` do distribute work across cores via rayon work-stealing — but that is not this benchmark.
-
-**Parallel capture safety** — worker interpreters set `Scope::parallel_guard` after restoring the caller’s captured lexicals. Assignments to captured non-`mysync` scalars/arrays/hashes (and undeclared names) in a parallel block are rejected at runtime; `mysync` bindings, package-qualified names (`::`), and loop topics (`$_`, `$a`, `$b`) remain allowed, matching the intended sharing model. `pmap` / `pgrep` treat block failures as `undef` / false per element, so those violations do not fail the whole op; use `pfor` when the run must abort on a parallel-guard error.
+`pmap` is **slower** on this workload — 50k items × per-item cost is too small to amortize worker spin-up. Parallel wins require heavier per-item work (~100 ms+) or much larger N.
 
 ---
 
-## [0x09] DEVELOPMENT & CI
+## [0x0C] DEVELOPMENT & CI
 
-Pull requests and pushes to `main` run the workflow in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). You can also run it manually from the repository **Actions** tab (**workflow dispatch**). On a pull request, the **Checks** tab (or the merge box) shows the aggregate status; open the **CI** workflow run for per-job logs (Check, Test, Format, Clippy, Doc, Release Build).
-
-Library unit tests (parser smoke batches `parse_smoke_*`, **`parser_shape_tests`**, lexer/token/value/error/scope/`ast`, **`interpreter_unit_tests`**, **`crate_api_tests`**, **`run_semantics_tests`** / **`run_semantics_more`** (`run` coverage), **`bytecode::Chunk`** pool/intern/jump patching, **`compiler`** compile-to-op smoke checks, **`vm`** hand-built bytecode execution, `parse` / `try_vm_execute`); excludes `tests/` integration suite):
+Pull requests and pushes to `main` run [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (Check, Test, Format, Clippy, Doc, Release Build).
 
 ```sh
-cargo test --lib
+cargo test --lib                # parser smoke, lexer/value/error/scope, interpreter, vm, jit
+cargo test --test integration   # tests/suite/* (runtime, readline list context, line-mode stdin, …)
+cargo bench --bench jit_compare # JIT vs interpreter on the same bytecode
+bash bench/run_bench.sh         # full perl5 vs perlrs suite (needs hyperfine)
+bash parity/run_parity.sh       # exact stdout/stderr parity vs system perl
 ```
 
-Integration tests live in `tests/integration.rs` and `tests/suite/` (grouped modules such as `runtime_extra` and `runtime_more` for assignment, builtins, aggregates, control flow, and regex/subs; **`readline_list_context`** for piped `<>` / `<STDIN>` / `<FH>` list slurp, `sort <>` / `grep { } <>` / `for (<>)`, `reverse <>` / `<STDIN>`, `my @l = <>` (zpwr-style naming), explicit `scalar(<> )`, empty stdin, `join`/`join('', <F>)`, the zpwr `zpwrVerbsFZF` slurp-to-`zpwr <verb>; …` pipeline (`zpwr_verbs_fzf_slurp_emits_zpwr_commands`), and VM vs `execute_tree` parity on temp files; **`cli_line_mode_stdin_readline`** for `-n`/`-p` stdin plus `<>` in the body (no deadlock; EOF); **`subst_env_interpolate`** for `$ENV{…}` in `s///` pattern/replacement):
-
-```sh
-cargo test --test integration
-```
-
-**JIT vs interpreter (Criterion)** — `cargo bench --bench jit_compare` runs the same block-JIT-eligible bytecode twice: with Cranelift enabled (default) and with `VM::set_jit_enabled(false)` so only the opcode interpreter runs. The workload is a tight numeric `for` loop using frame slots (`$i`, `$sum`); wall-clock ratios depend on machine and loop bound—run the bench locally rather than trusting a checked-in number. Library tests assert both paths return the same integer for the same bytecode.
-
-Disable JIT for the whole process: **`PERLRS_NO_JIT=1`** (also `true` / `yes`), or **`pe --no-jit`** / **`perlrs --no-jit`** (sets `Interpreter::vm_jit_enabled`). **`bash bench/run_bench.sh`** (after `cargo build --release` and `cargo install hyperfine` / `brew install hyperfine`) runs each bench against perl5 and against a shape-renamed copy of the same file, reporting mean ± stddev. To isolate JIT impact specifically, use `cargo bench --bench jit_compare`, which measures the same bytecode with Cranelift on vs off.
-
-Extended parse-only smoke coverage is in `src/parse_smoke_extended.rs` and `src/parse_smoke_batch2.rs` (built only with `cfg(test)`).
-
-**Perl 5 parity (incremental)** — [`PARITY_ROADMAP.md`](PARITY_ROADMAP.md) orders the work in testable phases. **`bash parity/run_parity.sh`** compares `perl` and `pe` on `parity/cases/*.pl` (exact `stdout`+`stderr` under `LC_ALL=C`); CI runs this on Ubuntu after a release build of `pe`.
-
-CI uses `cargo … --locked`; **`Cargo.lock` is committed** so dependency resolution matches CI and release builds. If you use a global gitignore that ignores `Cargo.lock`, force-add updates when dependencies change: `git add -f Cargo.lock`.
+- `Cargo.lock` is committed (CI uses `--locked`). If your global gitignore strips it, force-add updates: `git add -f Cargo.lock`.
+- Disable JIT: `PERLRS_NO_JIT=1` or `pe --no-jit`.
+- Parity work is tracked in [`PARITY_ROADMAP.md`](PARITY_ROADMAP.md).
 
 ---
 
 ## [0xFF] LICENSE
 
- ┌──────────────────────────────────────────────────────┐
- │ MIT LICENSE // UNAUTHORIZED REPRODUCTION WILL BE MET │
- │ WITH FULL ICE                                        │
- └──────────────────────────────────────────────────────┘
+MIT — see [`LICENSE`](LICENSE).
 
 ---
 
