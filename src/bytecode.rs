@@ -179,6 +179,10 @@ pub enum Op {
     ArrowArraySlice(u16),
     /// `@$href{k1,k2} = VALUE` — stack: `[value, container, key1, …, keyN]` (TOS = last key); pops `N+2` values.
     SetHashSliceDeref(u16),
+    /// `@$href{k1,k2} OP= VALUE` — stack: `[rhs, container, key1, …, keyN]` (TOS = last key); pops `N+2`, pushes the new slice value.
+    /// `u8` = [`crate::compiler::scalar_compound_op_to_byte`] encoding of the binop.
+    /// Matches tree-walker semantics: reads slice, folds into scalar via `eval_binop`, writes back.
+    HashSliceDerefCompound(u8, u16),
     MakeHash(u16),  // pop N key-value pairs, push as Hash
     Range,          // stack: [from, to] → Array
 

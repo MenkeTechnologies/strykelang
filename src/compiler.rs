@@ -2931,10 +2931,30 @@ impl Compiler {
                     }
                 } else if let ExprKind::HashSliceDeref { container, keys } = &target.kind {
                     // Single-key `@$href{"k"} OP= EXPR` matches `$href->{"k"} OP= EXPR` (ArrowHash).
+                    // Multi-key `@$href{k1,k2} OP= EXPR` uses a dedicated read-modify-write op
+                    // that mirrors the tree-walker `CompoundAssign` fallback for slice targets
+                    // (scalar-context on the slice, then assign the scalar back — first slot gets
+                    // the new value, rest become undef, per Perl's generic `assign_value`).
                     if keys.len() != 1 {
-                        return Err(CompileError::Unsupported(
-                            "CompoundAssign on multi-key hash slice (use tree interpreter)".into(),
-                        ));
+                        // Logical short-circuit ops on a multi-key slice are weird; tree-walker
+                        // doesn't special-case them either (the generic fallback calls eval_binop
+                        // which panics on LogOr/LogAnd/DefinedOr). Keep those Unsupported.
+                        let op_byte = scalar_compound_op_to_byte(*op).ok_or_else(|| {
+                            CompileError::Unsupported(
+                                "CompoundAssign op on multi-key hash slice".into(),
+                            )
+                        })?;
+                        self.compile_expr(value)?;
+                        self.compile_expr(container)?;
+                        for hk in keys {
+                            self.compile_expr(hk)?;
+                        }
+                        self.emit_op(
+                            Op::HashSliceDerefCompound(op_byte, keys.len() as u16),
+                            line,
+                            Some(root),
+                        );
+                        return Ok(());
                     }
                     let hk = &keys[0];
                     match op {

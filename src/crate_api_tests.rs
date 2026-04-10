@@ -975,6 +975,51 @@ fn try_vm_execute_hash_slice_deref_compound_assign() {
     assert_eq!(out.unwrap().expect("vm").to_int(), 12);
 }
 
+/// Multi-key `@$href{k1,k2} += EXPR` goes through [`Op::HashSliceDerefCompound`] and must match the
+/// tree-walker `CompoundAssign` generic fallback: read slice as list, fold via `eval_binop` (scalar
+/// context — `@slice + 5 = length + 5`), then re-assign via `assign_hash_slice_deref` (first slot
+/// gets the new scalar, rest become undef). This tracks tree semantics — Perl 5's per-last-element
+/// `+=` on slices is a separate parity divergence noted in PARITY_ROADMAP Phase 2.
+#[test]
+fn try_vm_execute_hash_slice_deref_compound_assign_multi_key() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $h = { "a" => 10, "b" => 20 };
+        my $r = $h;
+        @$r{"a","b"} += 5;
+        # length(2) + 5 = 7 goes into first slot; second becomes undef
+        my $first = $r->{"a"};
+        my $second = defined($r->{"b"}) ? 1 : 0;
+        $first * 10 + $second;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "multi-key @$href{{k1,k2}} += should compile (HashSliceDerefCompound)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 70);
+}
+
+/// Ensure the multi-key compound assign emits [`Op::HashSliceDerefCompound`], not a tree fallback.
+#[test]
+fn compile_hash_slice_deref_multi_key_compound_emits_dedicated_op() {
+    use crate::bytecode::Op;
+    use crate::compiler::Compiler;
+    let chunk = Compiler::new()
+        .compile_program(&parse("my %h = (); my $r = \\%h; @$r{\"a\",\"b\"} += 1;").expect("parse"))
+        .expect("compile");
+    assert!(
+        chunk
+            .ops
+            .iter()
+            .any(|o| matches!(o, Op::HashSliceDerefCompound(_, n) if *n == 2)),
+        "expected HashSliceDerefCompound(_, 2), got {:?}",
+        chunk.ops
+    );
+}
+
 #[test]
 fn try_vm_execute_hash_slice_deref_defined_or_assign() {
     let p = parse(

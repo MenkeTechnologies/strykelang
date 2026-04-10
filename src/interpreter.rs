@@ -3689,6 +3689,24 @@ impl Interpreter {
         .into())
     }
 
+    /// `@$href{k1,k2} OP= rhs` — shared by VM [`Op::HashSliceDerefCompound`](crate::bytecode::Op::HashSliceDerefCompound).
+    /// Matches the tree-walker generic `CompoundAssign` fallback: reads the slice as a list, folds
+    /// `eval_binop(op, list, rhs)` (scalar-context for the list — Perl's `@slice` in numeric
+    /// context is length), writes the resulting scalar back through `assign_hash_slice_deref`.
+    pub(crate) fn compound_assign_hash_slice_deref(
+        &mut self,
+        container: PerlValue,
+        key_values: Vec<PerlValue>,
+        op: BinOp,
+        rhs: PerlValue,
+        line: usize,
+    ) -> Result<PerlValue, FlowOrError> {
+        let old = Self::hash_slice_deref_values(&container, &key_values, line)?;
+        let new_val = self.eval_binop(op, &old, &rhs, line)?;
+        self.assign_hash_slice_deref(container, key_values, new_val.clone(), line)?;
+        Ok(new_val)
+    }
+
     fn match_array_pattern_elems(
         &mut self,
         arr: &[PerlValue],

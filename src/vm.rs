@@ -2767,6 +2767,32 @@ impl<'a> VM<'a> {
                         )?;
                         Ok(())
                     }
+                    Op::HashSliceDerefCompound(op_byte, n) => {
+                        let n = *n as usize;
+                        let mut key_vals = Vec::with_capacity(n);
+                        for _ in 0..n {
+                            key_vals.push(self.pop());
+                        }
+                        key_vals.reverse();
+                        let container = self.pop();
+                        let rhs = self.pop();
+                        let line = self.line();
+                        let op = crate::compiler::scalar_compound_op_from_byte(*op_byte)
+                            .ok_or_else(|| {
+                                crate::error::PerlError::runtime(
+                                    "VM: HashSliceDerefCompound: bad op byte",
+                                    line,
+                                )
+                            })?;
+                        let new_val = vm_interp_result(
+                            self.interp.compound_assign_hash_slice_deref(
+                                container, key_vals, op, rhs, line,
+                            ),
+                            line,
+                        )?;
+                        self.push(new_val);
+                        Ok(())
+                    }
                     Op::MakeHash(n) => {
                         let n = *n as usize;
                         let mut items = Vec::with_capacity(n);
