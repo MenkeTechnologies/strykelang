@@ -440,6 +440,25 @@ impl Lexer {
     fn read_variable_name(&mut self) -> String {
         // Handle special vars like $_, $!, $0, $/, $^I, etc.
         match self.peek() {
+            // `$::{$key}` / `$::Foo` — stash access (`%::`) and package names rooted at `::` (Perl `$::` ≡ main stash).
+            Some(':') if self.input.get(self.pos + 1) == Some(&':') => {
+                self.advance();
+                self.advance();
+                let mut s = "::".to_string();
+                if self
+                    .peek()
+                    .is_some_and(|c| c.is_alphabetic() || c == '_')
+                {
+                    s.push_str(&self.read_identifier());
+                }
+                while self.peek() == Some(':') && self.input.get(self.pos + 1) == Some(&':') {
+                    self.advance();
+                    self.advance();
+                    s.push_str("::");
+                    s.push_str(&self.read_identifier());
+                }
+                s
+            }
             Some(c) if c.is_alphabetic() || c == '_' => self.read_package_qualified_identifier(),
             Some('^') => {
                 self.advance();

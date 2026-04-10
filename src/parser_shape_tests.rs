@@ -25,6 +25,25 @@ fn shape_local_hash_element() {
     assert!(matches!(k, StmtKind::LocalExpr { .. }));
 }
 
+/// Bareword `FOO` in `if (FOO)` vs quoted `'FOO'` — distinct [`ExprKind`](crate::ast::ExprKind) for sub/constant resolution.
+#[test]
+fn shape_bareword_vs_quoted_in_if() {
+    let p = parse("if (FOO) { }").expect("parse");
+    match &p.statements[0].kind {
+        StmtKind::If { condition, .. } => {
+            assert!(matches!(condition.kind, ExprKind::Bareword(_)));
+        }
+        _ => panic!("expected if"),
+    }
+    let p2 = parse("if ('FOO') { }").expect("parse");
+    match &p2.statements[0].kind {
+        StmtKind::If { condition, .. } => {
+            assert!(matches!(condition.kind, ExprKind::String(_)));
+        }
+        _ => panic!("expected if"),
+    }
+}
+
 /// `%$href` hash dereference (Exporter `not %$export_cache`).
 #[test]
 fn shape_percent_scalar_hash_deref() {

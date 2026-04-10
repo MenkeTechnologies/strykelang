@@ -450,6 +450,7 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::Integer(n) => n.to_string(),
         ExprKind::Float(f) => format!("{}", f),
         ExprKind::String(s) => format_string_literal(s),
+        ExprKind::Bareword(s) => s.clone(),
         ExprKind::Regex(p, fl) => format!("/{}/{}/", p, fl),
         ExprKind::QW(ws) => format!("qw({})", ws.join(" ")),
         ExprKind::Undef => "undef".to_string(),

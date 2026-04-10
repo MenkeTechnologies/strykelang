@@ -1984,6 +1984,11 @@ impl Compiler {
                 let idx = self.chunk.add_constant(PerlValue::string(s.clone()));
                 self.emit_op(Op::LoadConst(idx), line, Some(root));
             }
+            ExprKind::Bareword(_) => {
+                return Err(CompileError::Unsupported(
+                    "bareword rvalue (resolve subroutine vs string) — use tree interpreter".into(),
+                ));
+            }
             ExprKind::Undef => {
                 self.emit_op(Op::LoadUndef, line, Some(root));
             }

@@ -1915,6 +1915,7 @@ impl Interpreter {
             }
             "Env" => self.apply_use_env(imports, line),
             "open" => self.apply_use_open(imports, line),
+            "constant" => self.apply_use_constant(imports, line),
             "threads" | "Thread::Pool" | "Parallel::ForkManager" => Ok(()),
             _ => {
                 self.require_execute(module, line)?;
@@ -1994,6 +1995,174 @@ impl Interpreter {
             }
         }
         Ok(())
+    }
+
+    /// `use constant NAME => EXPR` / `use constant 1.03` — do not load core `constant.pm` (it uses syntax we do not parse yet).
+    fn apply_use_constant(&mut self, imports: &[Expr], line: usize) -> PerlResult<()> {
+        if imports.is_empty() {
+            return Ok(());
+        }
+        // `use constant 1.03;` — version check only (ignored here).
+        if imports.len() == 1 {
+            match &imports[0].kind {
+                ExprKind::Float(_) | ExprKind::Integer(_) => return Ok(()),
+                _ => {}
+            }
+        }
+        for imp in imports {
+            match &imp.kind {
+                ExprKind::List(items) => {
+                    if items.len() % 2 != 0 {
+                        return Err(PerlError::runtime(
+                            format!(
+                                "use constant: expected even-length list of NAME => VALUE pairs, got {}",
+                                items.len()
+                            ),
+                            line,
+                        ));
+                    }
+                    let mut i = 0;
+                    while i < items.len() {
+                        let name = match &items[i].kind {
+                            ExprKind::String(s) => s.clone(),
+                            _ => {
+                                return Err(PerlError::runtime(
+                                    "use constant: constant name must be a string literal",
+                                    line,
+                                ));
+                            }
+                        };
+                        let val = match self.eval_expr(&items[i + 1]) {
+                            Ok(v) => v,
+                            Err(FlowOrError::Error(e)) => return Err(e),
+                            Err(FlowOrError::Flow(_)) => {
+                                return Err(PerlError::runtime(
+                                    "use constant: unexpected control flow in initializer",
+                                    line,
+                                ));
+                            }
+                        };
+                        self.install_constant_sub(&name, &val, line)?;
+                        i += 2;
+                    }
+                }
+                _ => {
+                    return Err(PerlError::runtime(
+                        "use constant: expected list of NAME => VALUE pairs",
+                        line,
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn install_constant_sub(&mut self, name: &str, val: &PerlValue, line: usize) -> PerlResult<()> {
+        let key = self.qualify_sub_key(name);
+        let ret_expr = self.perl_value_to_const_literal_expr(val, line)?;
+        let body = vec![Statement {
+            label: None,
+            kind: StmtKind::Return(Some(ret_expr)),
+            line,
+        }];
+        self.subs.insert(
+            key.clone(),
+            Arc::new(PerlSub {
+                name: key,
+                params: vec![],
+                body,
+                prototype: None,
+                closure_env: None,
+                fib_like: None,
+            }),
+        );
+        Ok(())
+    }
+
+    /// Build a literal expression for `return EXPR` in a constant sub (scalar/aggregate only).
+    fn perl_value_to_const_literal_expr(&self, v: &PerlValue, line: usize) -> PerlResult<Expr> {
+        if v.is_undef() {
+            return Ok(Expr {
+                kind: ExprKind::Undef,
+                line,
+            });
+        }
+        if let Some(n) = v.as_integer() {
+            return Ok(Expr {
+                kind: ExprKind::Integer(n),
+                line,
+            });
+        }
+        if let Some(f) = v.as_float() {
+            return Ok(Expr {
+                kind: ExprKind::Float(f),
+                line,
+            });
+        }
+        if let Some(s) = v.as_str() {
+            return Ok(Expr {
+                kind: ExprKind::String(s),
+                line,
+            });
+        }
+        if let Some(arr) = v.as_array_vec() {
+            let mut elems = Vec::with_capacity(arr.len());
+            for e in &arr {
+                elems.push(self.perl_value_to_const_literal_expr(e, line)?);
+            }
+            return Ok(Expr {
+                kind: ExprKind::ArrayRef(elems),
+                line,
+            });
+        }
+        if let Some(h) = v.as_hash_map() {
+            let mut pairs = Vec::with_capacity(h.len());
+            for (k, vv) in h.iter() {
+                pairs.push((
+                    Expr {
+                        kind: ExprKind::String(k.clone()),
+                        line,
+                    },
+                    self.perl_value_to_const_literal_expr(vv, line)?,
+                ));
+            }
+            return Ok(Expr {
+                kind: ExprKind::HashRef(pairs),
+                line,
+            });
+        }
+        if let Some(aref) = v.as_array_ref() {
+            let arr = aref.read();
+            let mut elems = Vec::with_capacity(arr.len());
+            for e in arr.iter() {
+                elems.push(self.perl_value_to_const_literal_expr(e, line)?);
+            }
+            return Ok(Expr {
+                kind: ExprKind::ArrayRef(elems),
+                line,
+            });
+        }
+        if let Some(href) = v.as_hash_ref() {
+            let h = href.read();
+            let mut pairs = Vec::with_capacity(h.len());
+            for (k, vv) in h.iter() {
+                pairs.push((
+                    Expr {
+                        kind: ExprKind::String(k.clone()),
+                        line,
+                    },
+                    self.perl_value_to_const_literal_expr(vv, line)?,
+                ));
+            }
+            return Ok(Expr {
+                kind: ExprKind::HashRef(pairs),
+                line,
+            });
+        }
+        Err(PerlError::runtime(
+            format!("use constant: unsupported value type ({v:?})"),
+            line,
+        ))
     }
 
     /// Register subs, run `use` in source order, collect `BEGIN`/`END` (before `BEGIN` execution).
@@ -4393,6 +4562,12 @@ impl Interpreter {
             ExprKind::Integer(n) => Ok(PerlValue::integer(*n)),
             ExprKind::Float(f) => Ok(PerlValue::float(*f)),
             ExprKind::String(s) => Ok(PerlValue::string(s.clone())),
+            ExprKind::Bareword(s) => {
+                if let Some(sub) = self.resolve_sub_by_name(s) {
+                    return self.call_sub(&sub, vec![], ctx, line);
+                }
+                Ok(PerlValue::string(s.clone()))
+            }
             ExprKind::Undef => Ok(PerlValue::UNDEF),
             ExprKind::MagicConst(MagicConstKind::File) => Ok(PerlValue::string(self.file.clone())),
             ExprKind::MagicConst(MagicConstKind::Line) => Ok(PerlValue::integer(expr.line as i64)),
@@ -6204,7 +6379,7 @@ impl Interpreter {
                     self.wantarray_kind = WantarrayCtx::List;
                     let mut vals = Vec::new();
                     for e in exprs {
-                        let v = self.eval_expr(e)?;
+                        let v = self.eval_expr_ctx(e, self.wantarray_kind)?;
                         if let Some(items) = v.as_array_vec() {
                             vals.extend(items);
                         } else {

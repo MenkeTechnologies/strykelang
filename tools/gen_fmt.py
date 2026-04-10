@@ -774,6 +774,7 @@ def main() -> None:
                 "Integer": '        ExprKind::Integer(n) => n.to_string(),',
                 "Float": '        ExprKind::Float(f) => format!("{}", f),',
                 "String": '        ExprKind::String(s) => format_string_literal(s),',
+                "Bareword": '        ExprKind::Bareword(s) => s.clone(),',
                 "Regex": '        ExprKind::Regex(p, fl) => format!("/{}/{}/", p, fl),',
                 "QW": '        ExprKind::QW(ws) => format!("qw({})", ws.join(" ")),',
                 "Undef": '        ExprKind::Undef => "undef".to_string(),',

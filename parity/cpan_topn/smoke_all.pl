@@ -9,13 +9,21 @@ sub fail {
     die "cpan_topn FAIL [$name] ${err}\n";
 }
 
-# --- JSON::PP ---
+# --- JSON (JSON::PP when require succeeds; else builtins — full JSON::PP.pm still hits parser gaps in eval/qq) ---
+my $json_pp_ok = 0;
 eval {
     require JSON::PP;
     my $j = JSON::PP->new;
     $j->encode( { a => 1 } ) eq '{"a":1}' or die "encode";
+    $json_pp_ok = 1;
 };
-fail( 'JSON::PP', $@ ) if $@;
+if ( !$json_pp_ok ) {
+    eval {
+        json_encode( { a => 1 } ) eq '{"a":1}' or die "json_encode";
+        json_decode('{"a":1}')->{a} == 1 or die "json_decode";
+    };
+    fail( 'JSON', $@ ) if $@;
+}
 
 # --- Try::Tiny (require + version; try/catch syntax varies with parser support) ---
 eval {

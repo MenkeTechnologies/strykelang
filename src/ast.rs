@@ -361,6 +361,9 @@ pub enum ExprKind {
     Integer(i64),
     Float(f64),
     String(String),
+    /// Unquoted identifier used as an expression term (`if (FOO)`), distinct from quoted `'FOO'` / `"FOO"`.
+    /// Resolved at runtime: nullary subroutine if defined, otherwise stringifies like Perl barewords.
+    Bareword(String),
     Regex(String, String),
     QW(Vec<String>),
     Undef,

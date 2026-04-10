@@ -1493,6 +1493,10 @@ impl Parser {
                         self.advance();
                         s.push('-');
                     }
+                    Token::BitAnd => {
+                        self.advance();
+                        s.push('&');
+                    }
                     tok => {
                         return Err(PerlError::syntax(
                             format!("Unexpected token in sub prototype: {:?}", tok),
@@ -2748,6 +2752,12 @@ impl Parser {
                     },
                     line,
                 })
+            }
+            // Unary `+EXPR` — Perl uses this to disambiguate barewords in hash subscripts (`$h{+Foo}`)
+            // and for scalar context; treat as a no-op on the parsed operand.
+            Token::Plus => {
+                self.advance();
+                self.parse_unary()
             }
             Token::LogNot => {
                 self.advance();
@@ -5063,9 +5073,9 @@ impl Parser {
                         line,
                     })
                 } else {
-                    // Bareword — treat as string (like hash key)
+                    // Bareword — distinct from quoted strings (see `ExprKind::Bareword`).
                     Ok(Expr {
-                        kind: ExprKind::String(name),
+                        kind: ExprKind::Bareword(name),
                         line,
                     })
                 }
