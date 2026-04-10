@@ -387,16 +387,29 @@ pe examples/parallel_demo.pl
 `bash bench/run_bench.sh` — perlrs vs perl 5.42.2 on Apple M5 18-core. Mean of 10 hyperfine runs with 3 warmups; **includes process startup** (not steady-state).
 
 ```
+ ---------------------------------------
+  perl5:   perl 5, version 42, subversion 2 (v5.42.2) built for darwin-thread-multi-2level
+  perlrs:  This is perlrs v0.1.29 — A highly parallel Perl 5 interpreter (Rust)
+  cores:   18
+  warmup:  3 runs
+  measure: hyperfine (min 10 runs)
+
   bench          perl5 ms   perlrs ms    noJit ms  perturb ms  rs/perl5  jit/noJit
   ---------      --------   ---------    --------   ---------  --------  ---------
-  startup             2.5         3.4         3.6         4.0     1.36x      1.06x
-  fib               200.2         7.6         7.8         7.5     0.04x      1.03x
-  loop               94.8         3.6         3.4         3.4     0.04x      0.94x
-  string             10.9         4.2         4.2         4.1     0.39x      1.00x
-  hash               27.7        40.5        40.3        39.8     1.46x      1.00x
-  array              25.1        10.3         9.9        10.2     0.41x      0.96x
-  regex              91.3        98.8        97.4        95.0     1.08x      0.99x
-  map_grep           50.3        14.3        14.5        14.4     0.28x      1.01x
+  startup             2.6         3.5         3.6         3.7     1.35x     1.03x
+  fib               196.4         7.7         7.8         7.8     0.04x     1.01x
+  loop               95.6         4.0         4.3         3.9     0.04x     1.07x
+  string             11.6         4.8         4.9         4.6     0.41x     1.02x
+  hash               35.0         7.9         8.4         7.5     0.23x     1.06x
+  array              27.2        10.7        12.5        11.9     0.39x     1.17x
+  regex              98.2        14.0        14.2        14.4     0.14x     1.01x
+  map_grep           57.1        17.1        16.6        17.7     0.30x     0.97x
+
+  pmap vs map (perlrs only, 50k items with per-item work)
+  bench            map ms     pmap ms     speedup
+  ---------      --------    --------    --------
+  pmap              272.7       684.8       0.40x
+
 ```
 
 **perlrs beats perl5 on 5 of 8 benches** — `fib` and `loop` ~26x, `string` 2.6x, `array` 2.4x, `map_grep` 3.5x. Losses: `hash` 1.46x (Perl 5 hash access is heavily tuned), `regex` 1.08x (effectively a tie), `startup` 1.36x (~900 µs Rust binary load).

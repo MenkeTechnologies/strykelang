@@ -1,6 +1,6 @@
 [package]
 name = "perlrs"
-version = "0.1.29"
+version = "0.1.31"
 edition = "2021"
 description = "A highly parallel Perl 5 interpreter written in Rust"
 license = "MIT"
@@ -40,7 +40,7 @@ path = "src/main.rs"
 rayon = "1.10"
 regex = "1.11"
 fancy-regex = "0.14"
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4", default-features = false, features = ["derive", "std", "help"] }
 crossbeam = "0.8"
 parking_lot = "0.12"
 dashmap = "6"

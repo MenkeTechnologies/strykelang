@@ -1742,6 +1742,15 @@ impl Chunk {
         for e in &mut self.sub_entries {
             e.1 = remap[e.1];
         }
+        // Remap `CallStaticSubId` resolved entry IPs — they were recorded by
+        // `patch_static_sub_calls` before peephole fusion ran, so any Nop
+        // removal in front of a sub body shifts its entry and must be
+        // reflected here; otherwise `vm_dispatch_user_call` jumps one (or
+        // more) ops past the real sub start and silently skips the first
+        // instruction(s) of the body.
+        for c in &mut self.static_sub_calls {
+            c.0 = remap[c.0];
+        }
         // Remap block/grep/sort/etc bytecode ranges.
         fn remap_ranges(ranges: &mut [Option<(usize, usize)>], remap: &[usize]) {
             for r in ranges.iter_mut().flatten() {

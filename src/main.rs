@@ -19,7 +19,7 @@ use perlrs::perl_fs::{
 mod repl;
 
 /// perlrs — A highly parallel Perl 5 interpreter written in Rust
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Default)]
 #[command(name = "perlrs", version, about, long_about = None)]
 #[command(disable_version_flag = true, disable_help_flag = true)]
 #[command(override_usage = "perlrs [switches] [--] [programfile] [arguments]")]
@@ -954,7 +954,24 @@ pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut Interpreter, filenam
 
 fn main() {
     let args = expand_perl_bundled_argv(std::env::args().collect());
-    let mut cli = parse_cli_prelude(&args).unwrap_or_else(|| Cli::parse_from(&args));
+    // Fast path: `perlrs SCRIPT [ARGS...]` with no dashes anywhere — the common case, and
+    // clap parsing is the dominant term on `print "hello\n"` (it knocks ~1ms off the
+    // startup bench). We can't bypass clap when any flag is present, so fall through to the
+    // full parser in that case.
+    let mut cli = if args.len() >= 2
+        && !args[1].starts_with('-')
+        && !args[1].is_empty()
+        && args[2..].iter().all(|a| !a.starts_with('-'))
+    {
+        let mut c = Cli::default();
+        c.script = Some(args[1].clone());
+        if args.len() > 2 {
+            c.args = args[2..].to_vec();
+        }
+        c
+    } else {
+        parse_cli_prelude(&args).unwrap_or_else(|| Cli::parse_from(&args))
+    };
     normalize_argv_after_dash_e(&mut cli);
 
     if cli.help {

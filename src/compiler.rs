@@ -1609,7 +1609,14 @@ impl Compiler {
                 let var_name = self.chunk.intern_name(var);
                 self.register_declare(Sigil::Scalar, var, false);
                 self.chunk.emit(Op::LoadUndef, line);
-                let var_slot_opt = self.assign_scalar_slot(var);
+                // `$_` is the global topic — keep it in the frame scalars so bareword calls
+                // and `print`/`printf` arg-defaulting still see it via the usual special-var
+                // path. Slotting it breaks callees that read `$_` across the call boundary.
+                let var_slot_opt = if var == "_" {
+                    None
+                } else {
+                    self.assign_scalar_slot(var)
+                };
                 if let Some(slot) = var_slot_opt {
                     self.chunk.emit(Op::DeclareScalarSlot(slot, var_name), line);
                 } else {
