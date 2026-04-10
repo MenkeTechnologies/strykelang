@@ -532,7 +532,7 @@ Without `mysync`, each parallel thread gets an independent copy — changes are 
 - Bitwise: `&`, `|`, `^`, `~`, `<<`, `>>` (for native `Set` values, `|` / `&` are union / intersection instead of integer bitwise ops)
 - Assignment: `=`, `+=`, `-=`, `*=`, `/=`, `.=`, `|=`, `&=`, `//=`, etc.
 - Regex: `=~`, `!~`
-- Range: `..` / `...` (list in list context both expand like `..`; scalar context: flip-flop — numeric bounds compare to `$.`, regex bounds `/left/../right/` and `/left/.../right/` match `$_`, and `/left/../eof` / `/left/.../eof` use bare `eof` like Perl (true on the last line of the current `-n`/`-p` input in this implementation); `...` does not treat the right bound as satisfied on the same `$.` line as the left match, Perl sed-style; same line counter as `-n`/`-p` or the last `readline` handle in `while (<>) { … }`)
+- Range: `..` / `...` (list in list context both expand like `..`; scalar context: flip-flop — numeric bounds compare to `$.`, regex bounds `/left/../right/` and `/left/.../right/` match `$_`, and `/left/../eof` / `/left/.../eof` use bare `eof` like Perl (true on the last line of the current `-n`/`-p` input in this implementation); a **compound** right operand (e.g. `/left/...(/a/ or /b/)` or `/left/...(/a/ or eof)`) is evaluated in **boolean** context each line, like Perl; `m/left/...N` uses a numeric right bound vs `$.`; `...` does not treat the right bound as satisfied on the same `$.` line as the left match, Perl sed-style; same line counter as `-n`/`-p` or the last `readline` handle in `while (<>) { … }`)
 - Arrow dereference: `->`
 
 #### REGEX ENGINE

@@ -3021,6 +3021,46 @@ impl Interpreter {
         )))
     }
 
+    /// Regex left bound vs `$_`; right bound is a fixed `$.` line (Perl `m/a/...N`).
+    pub(crate) fn regex_flip_flop_eval_dot_line_rhs(
+        &mut self,
+        left_pat: &str,
+        left_flags: &str,
+        slot: usize,
+        exclusive: bool,
+        line: usize,
+        rhs_line: i64,
+    ) -> PerlResult<PerlValue> {
+        let dot = self.scalar_flipflop_dot_line();
+        let subject = self.scope.get_scalar("_").to_string();
+        let left_re = self
+            .compile_regex(left_pat, left_flags, line)
+            .map_err(|e| match e {
+                FlowOrError::Error(err) => err,
+                FlowOrError::Flow(_) => {
+                    PerlError::runtime("unexpected flow in regex flip-flop", line)
+                }
+            })?;
+        let left_m = left_re.is_match(&subject);
+        let right_m = dot == rhs_line;
+        if self.flip_flop_active.len() <= slot {
+            self.flip_flop_active.resize(slot + 1, false);
+        }
+        if self.flip_flop_exclusive_left_line.len() <= slot {
+            self.flip_flop_exclusive_left_line.resize(slot + 1, None);
+        }
+        let active = &mut self.flip_flop_active[slot];
+        let excl_left = &mut self.flip_flop_exclusive_left_line[slot];
+        Ok(PerlValue::integer(Self::regex_flip_flop_transition(
+            active,
+            excl_left,
+            exclusive,
+            dot,
+            left_m,
+            right_m,
+        )))
+    }
+
     /// Regex `..` / `...` flip-flop when the right operand is bare `eof` (Perl: right side is `eof`, not a
     /// pattern). Uses [`Self::eof_without_arg_is_true`] like `eof` in `-n`/`-p`; exclusive `...` defers the
     /// right test until `$.` is strictly past the line where the left regex matched (same as

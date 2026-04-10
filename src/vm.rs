@@ -3228,6 +3228,27 @@ impl<'a> VM<'a> {
                         self.push(v);
                         Ok(())
                     }
+                    Op::RegexFlipFlopDotLineRhs(slot, exclusive, lp, lf, line_cidx) => {
+                        let line = self.line();
+                        let rhs_line = constants[*line_cidx as usize].to_int();
+                        let left_pat = constants[*lp as usize].as_str_or_empty();
+                        let left_flags = constants[*lf as usize].as_str_or_empty();
+                        let v = vm_interp_result(
+                            self.interp
+                                .regex_flip_flop_eval_dot_line_rhs(
+                                    left_pat.as_str(),
+                                    left_flags.as_str(),
+                                    *slot as usize,
+                                    *exclusive != 0,
+                                    line,
+                                    rhs_line,
+                                )
+                                .map_err(Into::into),
+                            line,
+                        )?;
+                        self.push(v);
+                        Ok(())
+                    }
 
                     // ── Regex ──
                     Op::RegexMatch(pat_idx, flags_idx, scalar_g, pos_key_idx) => {

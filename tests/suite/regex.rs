@@ -170,3 +170,22 @@ fn regex_flipflop_three_dot_matches_lines_between_patterns() {
         "amb"
     );
 }
+
+/// Compound right bound (`m/a/ ... (m/b/ or m/c/)`) — boolean RHS, not two regex literals.
+#[test]
+fn regex_flipflop_compound_rhs_or_matches_either_bound() {
+    assert_eq!(
+        eval_string(
+            r#"my $acc = "";
+            my $n = 0;
+            for my $line (qw(x START mid END y)) {
+              $_ = $line;
+              $n = $n + 1;
+              $. = $n;
+              $acc .= $_ if /START/...(/END/ or /FIN/);
+            }
+            $acc"#
+        ),
+        "STARTmidEND"
+    );
+}
