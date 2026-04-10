@@ -1541,6 +1541,29 @@ impl Scope {
         false
     }
 
+    /// Walk all values of the named hash with a visitor. Used by the fused
+    /// `for my $k (keys %h) { $sum += $h{$k} }` op so the hot loop runs without
+    /// cloning the entire map into a keys array (vs the un-fused shape, which
+    /// allocates one `PerlValue::string` per key).
+    #[inline]
+    pub fn for_each_hash_value(&self, name: &str, mut visit: impl FnMut(&PerlValue)) {
+        if let Some(ah) = self.find_atomic_hash(name) {
+            let g = ah.0.lock();
+            for v in g.values() {
+                visit(v);
+            }
+            return;
+        }
+        for frame in self.frames.iter().rev() {
+            if let Some(hash) = frame.get_hash(name) {
+                for v in hash.values() {
+                    visit(v);
+                }
+                return;
+            }
+        }
+    }
+
     /// Sigil-prefixed names (`$x`, `@a`, `%h`) from all frames, for REPL tab-completion.
     pub fn repl_binding_names(&self) -> Vec<String> {
         let mut seen = HashSet::new();

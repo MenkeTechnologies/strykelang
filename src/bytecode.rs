@@ -388,6 +388,16 @@ pub enum Op {
     /// SetScalarSlotKeep(sum) + Pop` with a single dispatch that reads the hash element directly
     /// into the slot without going through the VM stack. (sum_slot, k_name_idx, h_name_idx)
     AddHashElemPlainKeyToSlot(u8, u16, u16),
+    /// Like [`Op::AddHashElemPlainKeyToSlot`] but the key variable lives in a slot (`for my $k`
+    /// in slot-mode foreach). Pure slot read + hash lookup + slot write with zero VM stack traffic.
+    /// (sum_slot, k_slot, h_name_idx)
+    AddHashElemSlotKeyToSlot(u8, u8, u16),
+    /// Fused `for my $k (keys %h) { $sum += $h{$k} }` — walks `hash.values()` in a tight native
+    /// loop, accumulating integer or float sums directly into `sum_slot`. Emitted by the
+    /// bytecode-level peephole when the foreach shape + `AddHashElemSlotKeyToSlot` body + slot
+    /// counter/var declarations are detected. `h_name_idx` is the source hash's name pool index.
+    /// (sum_slot, h_name_idx)
+    SumHashValuesToSlot(u8, u16),
 
     // ── Frame-local scalar slots (O(1) access, no string lookup) ──
     /// Read scalar from current frame's slot array. u8 = slot index.
@@ -1440,6 +1450,47 @@ impl Chunk {
                     i += 1;
                 }
             }
+            // 5e-slot: slot-key variant of 5e, emitted when the compiler lowers `$k` (the foreach
+            // loop variable) into a slot rather than a frame scalar.
+            //   GetScalarSlot(sum) + GetScalarSlot(k) + GetHashElem(h) + Add
+            //     + SetScalarSlotKeep(sum) + Pop
+            //   → AddHashElemSlotKeyToSlot(sum, k, h)
+            if len >= 6 {
+                let mut i = 0;
+                while i + 5 < len {
+                    if let (
+                        Op::GetScalarSlot(sum_slot),
+                        Op::GetScalarSlot(k_slot),
+                        Op::GetHashElem(h_idx),
+                        Op::Add,
+                        Op::SetScalarSlotKeep(sum_slot2),
+                        Op::Pop,
+                    ) = (
+                        &self.ops[i],
+                        &self.ops[i + 1],
+                        &self.ops[i + 2],
+                        &self.ops[i + 3],
+                        &self.ops[i + 4],
+                        &self.ops[i + 5],
+                    ) {
+                        if *sum_slot == *sum_slot2
+                            && *sum_slot != *k_slot
+                            && (0..6).all(|off| !has_inbound_jump(&self.ops, i + off, usize::MAX))
+                        {
+                            let sum_slot = *sum_slot;
+                            let k_slot = *k_slot;
+                            let h_idx = *h_idx;
+                            self.ops[i] = Op::AddHashElemSlotKeyToSlot(sum_slot, k_slot, h_idx);
+                            for off in 1..=5 {
+                                self.ops[i + off] = Op::Nop;
+                            }
+                            i += 6;
+                            continue;
+                        }
+                    }
+                    i += 1;
+                }
+            }
             // 5d: counted hash-insert loop `$h{$i} = $i * K`
             //   GetScalarSlot(i) + LoadInt(k) + Mul + GetScalarSlot(i) + SetHashElem(h) + Pop
             //     + SlotIncLtIntJumpBack(i, limit, body_target)
@@ -1532,6 +1583,132 @@ impl Chunk {
             }
         }
         // Pass 6: compact — remove the Nops pass 5 introduced.
+        self.compact_nops();
+        // Pass 7: fuse the entire `for my $k (keys %h) { $sum += $h{$k} }` loop into a single
+        // `SumHashValuesToSlot` op that walks the hash's values in a tight native loop.
+        //
+        // After prior passes and compaction the shape is a 15-op block:
+        //
+        //     HashKeys(h)
+        //     DeclareArray(list)
+        //     LoadInt(0)
+        //     DeclareScalarSlot(c, cname)
+        //     LoadUndef
+        //     DeclareScalarSlot(v, vname)
+        //     [top]  GetScalarSlot(c)
+        //            ArrayLen(list)
+        //            NumLt
+        //            JumpIfFalse(end)
+        //            GetScalarSlot(c)
+        //            GetArrayElem(list)
+        //            SetScalarSlot(v)
+        //            AddHashElemSlotKeyToSlot(sum, v, h)     ← fused body (pass 5e-slot)
+        //            PreIncSlotVoid(c)
+        //            Jump(top)
+        //     [end]
+        //
+        // The counter (`__foreach_i__`), list (`__foreach_list__`), and loop var (`$k`) live
+        // inside a `PushFrame`-isolated scope and are invisible after the loop — it is safe to
+        // elide all of them. The fused op accumulates directly into `sum` without creating the
+        // keys array at all.
+        //
+        // Safety gates:
+        //   - `h` in HashKeys must match `h` in AddHashElemSlotKeyToSlot.
+        //   - `list` in DeclareArray must match the loop `ArrayLen` / `GetArrayElem`.
+        //   - `c` / `v` slots must be consistent throughout.
+        //   - No inbound jump lands inside the 15-op window from the outside.
+        //   - JumpIfFalse target must be i+15 (just past the Jump back-edge).
+        //   - Jump back-edge target must be i+6 (the GetScalarSlot(c) at loop top).
+        let len = self.ops.len();
+        if len >= 15 {
+            let has_inbound_jump = |ops: &[Op], pos: usize, ignore_from: usize, ignore_to: usize| -> bool {
+                for (j, op) in ops.iter().enumerate() {
+                    if j >= ignore_from && j <= ignore_to {
+                        continue;
+                    }
+                    let t = match op {
+                        Op::Jump(t)
+                        | Op::JumpIfFalse(t)
+                        | Op::JumpIfTrue(t)
+                        | Op::JumpIfFalseKeep(t)
+                        | Op::JumpIfTrueKeep(t)
+                        | Op::JumpIfDefinedKeep(t) => *t,
+                        Op::SlotLtIntJumpIfFalse(_, _, t) => *t,
+                        Op::SlotIncLtIntJumpBack(_, _, t) => *t,
+                        _ => continue,
+                    };
+                    if t == pos {
+                        return true;
+                    }
+                }
+                false
+            };
+            let mut i = 0;
+            while i + 15 < len {
+                if let (
+                    Op::HashKeys(h_idx),
+                    Op::DeclareArray(list_idx),
+                    Op::LoadInt(0),
+                    Op::DeclareScalarSlot(c_slot, _c_name),
+                    Op::LoadUndef,
+                    Op::DeclareScalarSlot(v_slot, _v_name),
+                    Op::GetScalarSlot(c_get1),
+                    Op::ArrayLen(len_idx),
+                    Op::NumLt,
+                    Op::JumpIfFalse(end_tgt),
+                    Op::GetScalarSlot(c_get2),
+                    Op::GetArrayElem(elem_idx),
+                    Op::SetScalarSlot(v_set),
+                    Op::AddHashElemSlotKeyToSlot(sum_slot, v_in_body, h_in_body),
+                    Op::PreIncSlotVoid(c_inc),
+                    Op::Jump(top_tgt),
+                ) = (
+                    &self.ops[i],
+                    &self.ops[i + 1],
+                    &self.ops[i + 2],
+                    &self.ops[i + 3],
+                    &self.ops[i + 4],
+                    &self.ops[i + 5],
+                    &self.ops[i + 6],
+                    &self.ops[i + 7],
+                    &self.ops[i + 8],
+                    &self.ops[i + 9],
+                    &self.ops[i + 10],
+                    &self.ops[i + 11],
+                    &self.ops[i + 12],
+                    &self.ops[i + 13],
+                    &self.ops[i + 14],
+                    &self.ops[i + 15],
+                ) {
+                    let full_end = i + 15;
+                    if *list_idx == *len_idx
+                        && *list_idx == *elem_idx
+                        && *c_slot == *c_get1
+                        && *c_slot == *c_get2
+                        && *c_slot == *c_inc
+                        && *v_slot == *v_set
+                        && *v_slot == *v_in_body
+                        && *h_idx == *h_in_body
+                        && *top_tgt == i + 6
+                        && *end_tgt == i + 16
+                        && *sum_slot != *c_slot
+                        && *sum_slot != *v_slot
+                        && !(i..=full_end).any(|k| has_inbound_jump(&self.ops, k, i, full_end))
+                    {
+                        let sum_slot = *sum_slot;
+                        let h_idx = *h_idx;
+                        self.ops[i] = Op::SumHashValuesToSlot(sum_slot, h_idx);
+                        for off in 1..=15 {
+                            self.ops[i + off] = Op::Nop;
+                        }
+                        i += 16;
+                        continue;
+                    }
+                }
+                i += 1;
+            }
+        }
+        // Pass 8: compact pass 7's Nops.
         self.compact_nops();
     }
 

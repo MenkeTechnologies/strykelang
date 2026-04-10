@@ -261,6 +261,19 @@ pub(crate) fn assign_rhs_wantarray(target: &Expr) -> WantarrayCtx {
     }
 }
 
+/// Memoized inputs + result for a non-`g` `regex_match_execute` call. Populated on every
+/// successful match and consulted at the top of the next call; on exact-match (same pattern,
+/// flags, multiline, and haystack content) we skip regex execution + capture-var scope population
+/// entirely, replaying the stored `PerlValue` result. See [`Interpreter::regex_match_memo`].
+#[derive(Clone)]
+pub(crate) struct RegexMatchMemo {
+    pub pattern: String,
+    pub flags: String,
+    pub multiline: bool,
+    pub haystack: String,
+    pub result: PerlValue,
+}
+
 /// Tree-walker state for scalar `..` / `...` (key: `Expr` address).
 #[derive(Clone, Copy, Default)]
 struct FlipFlopTreeState {
@@ -393,6 +406,19 @@ pub struct Interpreter {
     /// Last compiled regex — fast-path to avoid format! + HashMap lookup in tight loops.
     /// Third flag: `$*` multiline (prepends `(?s)` when true).
     regex_last: Option<(String, String, bool, Arc<PerlCompiledRegex>)>,
+    /// Memo of the most-recent match's inputs and result for `regex_match_execute` (non-`g`,
+    /// non-`scalar_g` path). Hot loops that re-match the same text against the same pattern
+    /// (e.g. `while (...) { $text =~ /p/ }`) skip the regex execution AND the capture-variable
+    /// scope population entirely on cache hit.
+    ///
+    /// Invalidation: any VM write to a capture variable (`$&`, `` $` ``, `$'`, `$+`, `$1`..`$9`,
+    /// `@-`, `@+`, `%+`) clears the "scope still in sync" flag. The memo survives; only the
+    /// capture-var side-effect replay is forced on the next hit.
+    regex_match_memo: Option<RegexMatchMemo>,
+    /// False when the user (or some non-regex code path) has written to one of the capture
+    /// variables since the last `apply_regex_captures` call. The memoized match result is still
+    /// valid, but the scope side effects need to be reapplied on the next hit.
+    regex_capture_scope_fresh: bool,
     /// Offsets for Perl `m//g` in scalar context (`pos`), keyed by scalar name (`"_"` for `$_`).
     pub(crate) regex_pos: HashMap<String, Option<usize>>,
     /// PRNG for `rand` / `srand` (matches Perl-style seeding, not crypto).
@@ -918,6 +944,8 @@ impl Interpreter {
             num_threads: 0, // lazily read from rayon on first parallel op
             regex_cache: HashMap::new(),
             regex_last: None,
+            regex_match_memo: None,
+            regex_capture_scope_fresh: false,
             regex_pos: HashMap::new(),
             rand_rng: StdRng::seed_from_u64(fast_rng_seed()),
             dir_handles: HashMap::new(),
@@ -1074,6 +1102,8 @@ impl Interpreter {
             num_threads: 0,
             regex_cache: self.regex_cache.clone(),
             regex_last: self.regex_last.clone(),
+            regex_match_memo: self.regex_match_memo.clone(),
+            regex_capture_scope_fresh: false,
             regex_pos: self.regex_pos.clone(),
             rand_rng: self.rand_rng.clone(),
             dir_handles: HashMap::new(),
@@ -2863,6 +2893,27 @@ impl Interpreter {
     }
 
     /// Set `$&`, `` $` ``, `$'`, `$+`, `$1`…`$n`, `@-`, `@+`, `%+`, and `${^MATCH}` / … fields from a successful match.
+    /// Scalar name names a regex capture variable (`$&`, `` $` ``, `$'`, `$+`, `$-`, `$1`..`$N`).
+    /// Writing to any of these from non-regex code must invalidate [`Self::regex_capture_scope_fresh`]
+    /// so the [`Self::regex_match_memo`] fast path re-applies `apply_regex_captures` on the next hit.
+    #[inline]
+    pub(crate) fn is_regex_capture_scope_var(name: &str) -> bool {
+        match name {
+            "&" | "'" | "`" | "+" | "-" => true,
+            _ => !name.is_empty() && name.bytes().all(|b| b.is_ascii_digit()),
+        }
+    }
+
+    /// Invalidate the capture-variable side of [`Self::regex_match_memo`]. Call from name-based
+    /// scope writes (e.g. `Op::SetScalar`) so the next memoized regex match replays
+    /// `apply_regex_captures` instead of short-circuiting.
+    #[inline]
+    pub(crate) fn maybe_invalidate_regex_capture_memo(&mut self, name: &str) {
+        if self.regex_capture_scope_fresh && Self::is_regex_capture_scope_var(name) {
+            self.regex_capture_scope_fresh = false;
+        }
+    }
+
     pub(crate) fn apply_regex_captures(
         &mut self,
         haystack: &str,
@@ -3234,6 +3285,47 @@ impl Interpreter {
         pos_key: &str,
         line: usize,
     ) -> ExecResult {
+        // Fast path: identical inputs to the previous non-`g` match → reuse the cached result.
+        // Only safe for the non-`g`/non-`scalar_g` branch; `g` matches mutate `$&`/`@+`/etc. and
+        // also keep per-pattern `pos()` state that the memo doesn't track.
+        //
+        // On hit AND `regex_capture_scope_fresh == true`, skip `apply_regex_captures` entirely:
+        // the scope's `$&`/`$1`/... still reflect the memoized match. `regex_capture_scope_fresh`
+        // is cleared by any scope write to a capture variable (see `invalidate_regex_capture_scope`).
+        if !flags.contains('g') && !scalar_g {
+            let memo_hit = {
+                if let Some(ref mem) = self.regex_match_memo {
+                    mem.pattern == pattern
+                        && mem.flags == flags
+                        && mem.multiline == self.multiline_match
+                        && mem.haystack == s
+                } else {
+                    false
+                }
+            };
+            if memo_hit {
+                if self.regex_capture_scope_fresh {
+                    return Ok(self
+                        .regex_match_memo
+                        .as_ref()
+                        .expect("memo")
+                        .result
+                        .clone());
+                }
+                // Memo hit but scope side effects were invalidated. Re-apply captures
+                // from the memoized haystack + a fresh compiled regex.
+                let (memo_s, memo_result) = {
+                    let mem = self.regex_match_memo.as_ref().expect("memo");
+                    (mem.haystack.clone(), mem.result.clone())
+                };
+                let re = self.compile_regex(pattern, flags, line)?;
+                if let Some(caps) = re.captures(&memo_s) {
+                    self.apply_regex_captures(&memo_s, 0, &re, &caps, CaptureAllMode::Empty)?;
+                }
+                self.regex_capture_scope_fresh = true;
+                return Ok(memo_result);
+            }
+        }
         let re = self.compile_regex(pattern, flags, line)?;
         if flags.contains('g') && scalar_g {
             let key = pos_key.to_string();
@@ -3295,9 +3387,29 @@ impl Interpreter {
             }
         } else if let Some(caps) = re.captures(&s) {
             self.apply_regex_captures(&s, 0, &re, &caps, CaptureAllMode::Empty)?;
-            Ok(PerlValue::integer(1))
+            let result = PerlValue::integer(1);
+            self.regex_match_memo = Some(RegexMatchMemo {
+                pattern: pattern.to_string(),
+                flags: flags.to_string(),
+                multiline: self.multiline_match,
+                haystack: s,
+                result: result.clone(),
+            });
+            self.regex_capture_scope_fresh = true;
+            Ok(result)
         } else {
-            Ok(PerlValue::integer(0))
+            let result = PerlValue::integer(0);
+            // Memoize negative results too — they don't set capture vars, so scope_fresh stays true.
+            self.regex_match_memo = Some(RegexMatchMemo {
+                pattern: pattern.to_string(),
+                flags: flags.to_string(),
+                multiline: self.multiline_match,
+                haystack: s,
+                result: result.clone(),
+            });
+            // A no-match leaves `$&` / `$1` as they were, which is still "fresh" from whatever
+            // the last successful match (if any) set them to. Don't flip the flag.
+            Ok(result)
         }
     }
 

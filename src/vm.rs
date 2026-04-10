@@ -1816,6 +1816,7 @@ impl<'a> VM<'a> {
                         let val = self.pop();
                         let n = names[*idx as usize].as_str();
                         self.require_scalar_mutable(n)?;
+                        self.interp.maybe_invalidate_regex_capture_memo(n);
                         self.interp
                             .set_special_var(n, &val)
                             .map_err(|e| e.at_line(self.line()))?;
@@ -1825,6 +1826,7 @@ impl<'a> VM<'a> {
                         let val = self.pop();
                         let n = names[*idx as usize].as_str();
                         self.require_scalar_mutable(n)?;
+                        self.interp.maybe_invalidate_regex_capture_memo(n);
                         self.interp
                             .scope
                             .set_scalar(n, val)
@@ -1835,6 +1837,7 @@ impl<'a> VM<'a> {
                         let val = self.peek().dup_stack();
                         let n = names[*idx as usize].as_str();
                         self.require_scalar_mutable(n)?;
+                        self.interp.maybe_invalidate_regex_capture_memo(n);
                         self.interp
                             .set_special_var(n, &val)
                             .map_err(|e| e.at_line(self.line()))?;
@@ -1844,6 +1847,7 @@ impl<'a> VM<'a> {
                         let val = self.peek().dup_stack();
                         let n = names[*idx as usize].as_str();
                         self.require_scalar_mutable(n)?;
+                        self.interp.maybe_invalidate_regex_capture_memo(n);
                         self.interp
                             .scope
                             .set_scalar(n, val)
@@ -3465,6 +3469,65 @@ impl<'a> VM<'a> {
                             } else {
                                 PerlValue::float(cur.to_number() + elem.to_number())
                             };
+                        self.interp.scope.set_scalar_slot(*sum_slot, new_v);
+                        Ok(())
+                    }
+                    Op::AddHashElemSlotKeyToSlot(sum_slot, k_slot, h_name_idx) => {
+                        // `$sum += $h{$k}` — slot counter, slot key, slot sum. Zero name lookups
+                        // for `$sum` and `$k`; one frame-walk for `%h` (same as the non-slot form).
+                        let h_name = names[*h_name_idx as usize].as_str();
+                        if h_name == "ENV" {
+                            self.interp.materialize_env_if_needed();
+                        }
+                        let key_val = self.interp.scope.get_scalar_slot(*k_slot);
+                        let key = key_val.to_string();
+                        let elem = self.interp.scope.get_hash_element(h_name, &key);
+                        let cur = self.interp.scope.get_scalar_slot(*sum_slot);
+                        let new_v =
+                            if let (Some(a), Some(b)) = (cur.as_integer(), elem.as_integer()) {
+                                PerlValue::integer(a.wrapping_add(b))
+                            } else {
+                                PerlValue::float(cur.to_number() + elem.to_number())
+                            };
+                        self.interp.scope.set_scalar_slot(*sum_slot, new_v);
+                        Ok(())
+                    }
+                    Op::SumHashValuesToSlot(sum_slot, h_name_idx) => {
+                        // `for my $k (keys %h) { $sum += $h{$k} }` fused to a single op that walks
+                        // `hash.values()` in a tight native loop. No key stringification, no stack
+                        // traffic, no per-iter dispatch. The foreach body reduced to
+                        // `AddHashElemSlotKeyToSlot`, so this fusion is correct regardless of `$k`
+                        // slot assignment — we never read `$k`.
+                        let h_name = names[*h_name_idx as usize].as_str();
+                        if h_name == "ENV" {
+                            self.interp.materialize_env_if_needed();
+                        }
+                        let cur = self.interp.scope.get_scalar_slot(*sum_slot);
+                        let mut int_acc: i64 = cur.as_integer().unwrap_or(0);
+                        let mut float_acc: f64 = 0.0;
+                        let mut is_int = cur.as_integer().is_some();
+                        if !is_int {
+                            float_acc = cur.to_number();
+                        }
+                        // Walk the hash via the scope's borrow path without cloning the whole
+                        // IndexMap. `for_each_hash_value` takes a visitor so the lock (if any) is
+                        // held once rather than per-element.
+                        self.interp.scope.for_each_hash_value(h_name, |v| {
+                            if is_int {
+                                if let Some(x) = v.as_integer() {
+                                    int_acc = int_acc.wrapping_add(x);
+                                    return;
+                                }
+                                float_acc = int_acc as f64;
+                                is_int = false;
+                            }
+                            float_acc += v.to_number();
+                        });
+                        let new_v = if is_int {
+                            PerlValue::integer(int_acc)
+                        } else {
+                            PerlValue::float(float_acc)
+                        };
                         self.interp.scope.set_scalar_slot(*sum_slot, new_v);
                         Ok(())
                     }
