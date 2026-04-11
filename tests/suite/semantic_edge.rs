@@ -108,3 +108,29 @@ fn shift_right_integer() {
     assert_eq!(eval_int("32 >> 3"), 4);
     assert_eq!(eval_int("-8 >> 1"), -4);
 }
+
+#[test]
+fn chr_ord_roundtrip_ascii() {
+    assert_eq!(eval_int(r#"ord("A")"#), 65);
+    assert_eq!(eval_string(r#"chr(65)"#), "A");
+}
+
+#[test]
+fn sprintf_percent_d_integer() {
+    assert_eq!(eval_string(r#"sprintf("%d", 42)"#), "42");
+}
+
+#[test]
+fn bitwise_xor_integer() {
+    assert_eq!(eval_int("0b101 ^ 0b011"), 6);
+}
+
+#[test]
+fn hex_literal_integer() {
+    assert_eq!(eval_int("0xFF"), 255);
+}
+
+#[test]
+fn octal_literal_integer() {
+    assert_eq!(eval_int("0377"), 255);
+}

@@ -47,3 +47,16 @@ fn exit_nonzero_is_exit_kind() {
 fn exit_negative_is_exit_kind() {
     assert_eq!(eval_err_kind("exit(-1)"), ErrorKind::Exit(-1));
 }
+
+#[test]
+fn bare_exit_statement_is_exit_zero_kind() {
+    assert_eq!(eval_err_kind("exit;"), ErrorKind::Exit(0));
+}
+
+#[test]
+fn undefined_bare_subroutine_call_is_runtime_kind() {
+    assert_eq!(
+        eval_err_kind("lib_api_undefined_sub_xyz999();"),
+        ErrorKind::Runtime
+    );
+}
