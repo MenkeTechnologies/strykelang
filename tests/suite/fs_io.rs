@@ -212,3 +212,161 @@ fn pipe_builtin_rw_roundtrip_vm_matches_tree() {
     assert_eq!(v_vm.to_int(), v_tree.to_int());
     assert_eq!(v_vm.to_int(), 1);
 }
+
+#[test]
+fn realpath_resolves_existing_file() {
+    let dir: PathBuf =
+        std::env::temp_dir().join(format!("perlrs_itest_realpath_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let f = dir.join("f.txt");
+    std::fs::write(&f, "x").unwrap();
+    let pf = f.to_str().expect("utf-8");
+    let code = format!(r#"my $r = realpath("{pf}"); ($r ne "" && -e $r) ? 1 : 0"#);
+    assert_eq!(eval_int(&code), 1);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn realpath_missing_returns_undef() {
+    let p = format!("/nonexistent_perlrs_realpath_{}", std::process::id());
+    let code = format!(r#"defined(realpath("{p}")) ? 1 : 0"#);
+    assert_eq!(eval_int(&code), 0);
+}
+
+#[test]
+fn canonpath_collapses_dot_dot() {
+    assert_eq!(eval_string(r#"canonpath("foo/../bar//baz")"#), "bar/baz");
+}
+
+#[test]
+fn spurt_writes_bytes_round_trip_with_slurp() {
+    let dir: PathBuf =
+        std::env::temp_dir().join(format!("perlrs_itest_spurt_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let f = dir.join("out.txt");
+    let pf = f.to_str().expect("utf-8");
+    let code = format!(r#"spurt("{pf}", "hello\n"); (slurp("{pf}") eq "hello\n") ? 1 : 0"#);
+    assert_eq!(eval_int(&code), 1);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn spurt_write_file_alias_mkdir_option() {
+    let dir: PathBuf =
+        std::env::temp_dir().join(format!("perlrs_itest_spurt_mkdir_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let nested = dir.join("a/b/c.txt");
+    let pn = nested.to_str().expect("utf-8");
+    let code = format!(r#"write_file("{pn}", "z", {{ mkdir => 1 }}); (-e "{pn}" ? 1 : 0)"#);
+    assert_eq!(eval_int(&code), 1);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn copy_file_creates_destination() {
+    let dir: PathBuf =
+        std::env::temp_dir().join(format!("perlrs_itest_copy_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let a = dir.join("src.txt");
+    let b = dir.join("dst.txt");
+    std::fs::write(&a, "payload").unwrap();
+    let pa = a.to_str().expect("utf-8");
+    let pb = b.to_str().expect("utf-8");
+    let code = format!(r#"copy("{pa}", "{pb}") && (slurp("{pb}") eq "payload") ? 1 : 0"#);
+    assert_eq!(eval_int(&code), 1);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[cfg(unix)]
+#[test]
+fn copy_preserve_updates_mtime() {
+    use std::os::unix::fs::MetadataExt;
+    let dir: PathBuf =
+        std::env::temp_dir().join(format!("perlrs_itest_copy_preserve_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let a = dir.join("src.txt");
+    let b = dir.join("dst.txt");
+    std::fs::write(&a, "x").unwrap();
+    let pa = a.to_str().expect("utf-8");
+    let pb = b.to_str().expect("utf-8");
+    assert_eq!(
+        eval_int(&format!(r#"utime(1_234_000, 5_555_000, "{pa}")"#)),
+        1
+    );
+    let code = format!(r#"copy("{pa}", "{pb}", {{ preserve => 1 }})"#);
+    assert_eq!(eval_int(&code), 1);
+    let m = std::fs::metadata(&b).unwrap();
+    assert_eq!(m.atime(), 1_234_000);
+    assert_eq!(m.mtime(), 5_555_000);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn basename_dirname_fileparse() {
+    assert_eq!(eval_string(r#"basename("/foo/bar/baz.txt")"#), "baz.txt");
+    assert_eq!(eval_string(r#"dirname("/foo/bar/baz.txt")"#), "/foo/bar");
+    assert_eq!(
+        eval_string(r#"scalar fileparse("/foo/bar/baz.pl", ".pl")"#),
+        "baz"
+    );
+    assert_eq!(
+        eval_string(r#"my @f = fileparse("/foo/bar/baz.pl", ".pl"); join "|", @f"#),
+        "baz|/foo/bar|.pl"
+    );
+}
+
+#[test]
+fn gethostname_returns_non_empty() {
+    let h = eval_string(r#"gethostname()"#);
+    assert!(!h.is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn uname_sysname_nonempty() {
+    let s = eval_string(r#"uname()->{"sysname"}"#);
+    assert!(!s.is_empty());
+}
+
+#[test]
+fn read_bytes_preserves_raw_octets() {
+    let dir: PathBuf =
+        std::env::temp_dir().join(format!("perlrs_itest_rbytes_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let f = dir.join("b.bin");
+    std::fs::write(&f, [0xffu8, 0, 9, 10]).unwrap();
+    let pf = f.to_str().expect("utf-8");
+    let code = format!(r#"length(slurp_raw("{pf}"))"#);
+    assert_eq!(eval_int(&code), 4);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn move_renames_file_like_rename() {
+    let dir: PathBuf =
+        std::env::temp_dir().join(format!("perlrs_itest_move_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let a = dir.join("a");
+    let b = dir.join("b");
+    std::fs::write(&a, "m").unwrap();
+    let pa = a.to_str().expect("utf-8");
+    let pb = b.to_str().expect("utf-8");
+    let code = format!(r#"move("{pa}", "{pb}") && (slurp("{pb}") eq "m") ? 1 : 0"#);
+    assert_eq!(eval_int(&code), 1);
+    assert!(!a.exists());
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[cfg(unix)]
+#[test]
+fn which_finds_sh_on_path() {
+    let p = eval_string(r#"which("sh")"#);
+    assert!(!p.is_empty());
+    assert!(p.contains("sh"), "path={p:?}");
+}

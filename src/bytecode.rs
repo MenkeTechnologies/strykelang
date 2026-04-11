@@ -381,14 +381,24 @@ pub enum Op {
     // ── Block-based operations (u16 = index into chunk.blocks) ──
     /// map { BLOCK } @list — block_idx; stack: \[list\] → \[mapped\]
     MapWithBlock(u16),
+    /// flat_map { BLOCK } @list — like [`Op::MapWithBlock`] but peels one ARRAY ref per iteration ([`PerlValue::map_flatten_outputs`])
+    FlatMapWithBlock(u16),
     /// grep { BLOCK } @list — block_idx; stack: \[list\] → \[filtered\]
     GrepWithBlock(u16),
     /// map EXPR, LIST — index into [`Chunk::map_expr_entries`] / [`Chunk::map_expr_bytecode_ranges`];
     /// stack: \[list\] → \[mapped\]
     MapWithExpr(u16),
+    /// flat_map EXPR, LIST — same pools as [`Op::MapWithExpr`]; stack: \[list\] → \[mapped\]
+    FlatMapWithExpr(u16),
     /// grep EXPR, LIST — index into [`Chunk::grep_expr_entries`] / [`Chunk::grep_expr_bytecode_ranges`];
     /// stack: \[list\] → \[filtered\]
     GrepWithExpr(u16),
+    /// `group_by { BLOCK } LIST` / `chunk_by { BLOCK } LIST` — consecutive runs where the block’s
+    /// return value stringifies the same as the previous (`str_eq`); stack: \[list\] → \[arrayrefs\]
+    ChunkByWithBlock(u16),
+    /// `group_by EXPR, LIST` / `chunk_by EXPR, LIST` — same as [`Op::ChunkByWithBlock`] but key from
+    /// `EXPR` with `$_` set each iteration; uses [`Chunk::map_expr_entries`].
+    ChunkByWithExpr(u16),
     /// sort { BLOCK } @list — block_idx; stack: \[list\] → \[sorted\]
     SortWithBlock(u16),
     /// sort @list (no block) — stack: \[list\] → \[sorted\]
@@ -534,6 +544,14 @@ pub enum Op {
     ListSliceToScalar,
     /// pmap { BLOCK } @list — block_idx; stack: \[progress_flag, list\] → \[mapped\] (`progress_flag` is 0/1)
     PMapWithBlock(u16),
+    /// pflat_map { BLOCK } @list — flatten array results; output in **input order**; stack same as [`Op::PMapWithBlock`]
+    PFlatMapWithBlock(u16),
+    /// puniq LIST — hash-partition parallel distinct (first occurrence order); stack: \[progress_flag, list\] → \[array\]
+    Puniq,
+    /// pfirst { BLOCK } LIST — short-circuit parallel; stack: \[progress_flag, list\] → value or undef
+    PFirstWithBlock(u16),
+    /// pany { BLOCK } LIST — short-circuit parallel; stack: \[progress_flag, list\] → 0/1
+    PAnyWithBlock(u16),
     /// pmap_chunked N { BLOCK } @list — block_idx; stack: \[progress_flag, chunk_n, list\] → \[mapped\]
     PMapChunkedWithBlock(u16),
     /// pgrep { BLOCK } @list — block_idx; stack: \[progress_flag, list\] → \[filtered\]

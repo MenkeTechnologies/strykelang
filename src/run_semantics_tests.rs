@@ -1385,8 +1385,8 @@ fn pmap_chunked_preserves_order_and_values() {
 
 #[test]
 fn reduce_left_fold_sum_and_concat() {
-    assert_eq!(ri(r#"reduce { $a + $b } (1, 2, 3, 4);"#), 10);
-    assert_eq!(rs(r#"reduce { $a . $b } ("a", "b", "c");"#), "abc");
+    assert_eq!(ri(r#"(1, 2, 3, 4) |> reduce { $a + $b };"#), 10);
+    assert_eq!(rs(r#"("a", "b", "c") |> reduce { $a . $b };"#), "abc");
 }
 
 #[test]

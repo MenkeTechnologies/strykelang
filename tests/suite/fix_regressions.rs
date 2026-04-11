@@ -1542,12 +1542,20 @@ fn return_short_circuits_sub_rest() {
 #[test]
 fn list_util_head_and_tail_take_slice_ends() {
     assert_eq!(
-        eval_string(r#"join "-", List::Util::head(2, 10, 20, 30, 40)"#),
+        eval_string(r#"join "-", List::Util::head(10, 20, 30, 40, 2)"#),
         "10-20"
     );
     assert_eq!(
-        eval_string(r#"join "-", List::Util::tail(2, 10, 20, 30, 40)"#),
+        eval_string(r#"join "-", List::Util::tail(10, 20, 30, 40, 2)"#),
         "30-40"
+    );
+    assert_eq!(
+        eval_string(r#"scalar List::Util::head(qw(a b c d), 2)"#),
+        "b"
+    );
+    assert_eq!(
+        eval_string(r#"scalar List::Util::tail(qw(a b c d), 2)"#),
+        "d"
     );
 }
 
@@ -2880,7 +2888,15 @@ fn ref_anon_subroutine_is_code() {
 #[test]
 fn list_util_reduce_concatenates_list_left_to_right() {
     assert_eq!(
-        eval_string(r#"List::Util::reduce { $a . $b } qw(x y z)"#),
+        eval_string(r#"qw(x y z) |> List::Util::reduce { $a . $b }"#),
+        "xyz"
+    );
+}
+
+#[test]
+fn list_util_fold_alias_concatenates_like_reduce() {
+    assert_eq!(
+        eval_string(r#"qw(x y z) |> List::Util::fold { $a . $b }"#),
         "xyz"
     );
 }

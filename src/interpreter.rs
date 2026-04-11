@@ -253,6 +253,39 @@ impl WantarrayCtx {
     }
 }
 
+/// Minimum log level filter for `log_*` / `log_json` (trace = most verbose).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum LogLevelFilter {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+impl LogLevelFilter {
+    pub(crate) fn parse(s: &str) -> Option<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "trace" => Some(Self::Trace),
+            "debug" => Some(Self::Debug),
+            "info" => Some(Self::Info),
+            "warn" | "warning" => Some(Self::Warn),
+            "error" => Some(Self::Error),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Trace => "trace",
+            Self::Debug => "debug",
+            Self::Info => "info",
+            Self::Warn => "warn",
+            Self::Error => "error",
+        }
+    }
+}
+
 /// True when `@$aref->[IX]` / `IX` needs **list** context on the RHS of `=` (multi-slot slice).
 fn arrow_deref_array_assign_rhs_list_ctx(index: &Expr) -> bool {
     match &index.kind {
@@ -601,6 +634,8 @@ pub struct Interpreter {
     pub line_mode_stdin_pending: VecDeque<String>,
     /// Sliding-window timestamps for `rate_limit(...)` (indexed by parse-time slot).
     pub(crate) rate_limit_slots: Vec<VecDeque<Instant>>,
+    /// `log_level('…')` override; when `None`, use `%ENV{LOG_LEVEL}` (default `info`).
+    pub(crate) log_level_override: Option<LogLevelFilter>,
 }
 
 /// Snapshot of stash + `@ISA` for REPL `$obj->method` tab-completion (no `Interpreter` handle needed).
@@ -936,9 +971,9 @@ fn unix_group_list_for_special(_name: &str) -> String {
 /// `~/.ssh/config` and keys).
 #[cfg(unix)]
 fn pw_home_dir_for_current_uid() -> Option<std::ffi::OsString> {
+    use libc::{getpwuid_r, getuid};
     use std::ffi::CStr;
     use std::os::unix::ffi::OsStringExt;
-    use libc::{getpwuid_r, getuid};
     let uid = unsafe { getuid() };
     let mut pw: libc::passwd = unsafe { std::mem::zeroed() };
     let mut result: *mut libc::passwd = std::ptr::null_mut();
@@ -965,9 +1000,9 @@ fn pw_home_dir_for_current_uid() -> Option<std::ffi::OsString> {
 /// Passwd home for a login name (e.g. **`SUDO_USER`** when `pe` runs under `sudo`).
 #[cfg(unix)]
 fn pw_home_dir_for_login_name(login: &std::ffi::OsStr) -> Option<std::ffi::OsString> {
+    use libc::getpwnam_r;
     use std::ffi::{CStr, CString};
     use std::os::unix::ffi::{OsStrExt, OsStringExt};
-    use libc::getpwnam_r;
     let bytes = login.as_bytes();
     if bytes.is_empty() || bytes.contains(&0) {
         return None;
@@ -1152,6 +1187,7 @@ impl Interpreter {
             line_mode_eof_pending: false,
             line_mode_stdin_pending: VecDeque::new(),
             rate_limit_slots: Vec::new(),
+            log_level_override: None,
         };
         s.install_overload_pragma_stubs();
         crate::list_util::install_scalar_util(&mut s);
@@ -1306,6 +1342,7 @@ impl Interpreter {
             line_mode_eof_pending: false,
             line_mode_stdin_pending: VecDeque::new(),
             rate_limit_slots: Vec::new(),
+            log_level_override: self.log_level_override,
         }
     }
 
@@ -1315,6 +1352,128 @@ impl Interpreter {
             self.num_threads = rayon::current_num_threads();
         }
         self.num_threads
+    }
+
+    /// `puniq` / `pfirst` / `pany` — parallel list builtins ([`crate::par_list`]).
+    pub(crate) fn eval_par_list_call(
+        &mut self,
+        name: &str,
+        args: &[PerlValue],
+        ctx: WantarrayCtx,
+        line: usize,
+    ) -> PerlResult<PerlValue> {
+        match name {
+            "puniq" => {
+                let (list_src, show_prog) = match args.len() {
+                    0 => return Err(PerlError::runtime("puniq: expected LIST", line)),
+                    1 => (&args[0], false),
+                    2 => (&args[0], args[1].is_true()),
+                    _ => {
+                        return Err(PerlError::runtime(
+                            "puniq: expected LIST [, progress => EXPR]",
+                            line,
+                        ));
+                    }
+                };
+                let list = list_src.to_list();
+                let n_threads = self.parallel_thread_count();
+                let pmap_progress = PmapProgress::new(show_prog, list.len());
+                let out = crate::par_list::puniq_run(list, n_threads, &pmap_progress);
+                pmap_progress.finish();
+                if ctx == WantarrayCtx::List {
+                    Ok(PerlValue::array(out))
+                } else {
+                    Ok(PerlValue::integer(out.len() as i64))
+                }
+            }
+            "pfirst" => {
+                let (code_val, list_src, show_prog) = match args.len() {
+                    2 => (&args[0], &args[1], false),
+                    3 => (&args[0], &args[1], args[2].is_true()),
+                    _ => {
+                        return Err(PerlError::runtime(
+                            "pfirst: expected BLOCK, LIST [, progress => EXPR]",
+                            line,
+                        ));
+                    }
+                };
+                let Some(sub) = code_val.as_code_ref() else {
+                    return Err(PerlError::runtime(
+                        "pfirst: first argument must be a code reference",
+                        line,
+                    ));
+                };
+                let sub = sub.clone();
+                let list = list_src.to_list();
+                if list.is_empty() {
+                    return Ok(PerlValue::UNDEF);
+                }
+                let pmap_progress = PmapProgress::new(show_prog, list.len());
+                let subs = self.subs.clone();
+                let (scope_capture, atomic_arrays, atomic_hashes) =
+                    self.scope.capture_with_atomics();
+                let out = crate::par_list::pfirst_run(list, &pmap_progress, |item| {
+                    let mut local_interp = Interpreter::new();
+                    local_interp.subs = subs.clone();
+                    local_interp.scope.restore_capture(&scope_capture);
+                    local_interp
+                        .scope
+                        .restore_atomics(&atomic_arrays, &atomic_hashes);
+                    local_interp.enable_parallel_guard();
+                    let _ = local_interp.scope.set_scalar("_", item);
+                    match local_interp.call_sub(sub.as_ref(), vec![], WantarrayCtx::Scalar, line) {
+                        Ok(v) => v.is_true(),
+                        Err(_) => false,
+                    }
+                });
+                pmap_progress.finish();
+                Ok(out.unwrap_or(PerlValue::UNDEF))
+            }
+            "pany" => {
+                let (code_val, list_src, show_prog) = match args.len() {
+                    2 => (&args[0], &args[1], false),
+                    3 => (&args[0], &args[1], args[2].is_true()),
+                    _ => {
+                        return Err(PerlError::runtime(
+                            "pany: expected BLOCK, LIST [, progress => EXPR]",
+                            line,
+                        ));
+                    }
+                };
+                let Some(sub) = code_val.as_code_ref() else {
+                    return Err(PerlError::runtime(
+                        "pany: first argument must be a code reference",
+                        line,
+                    ));
+                };
+                let sub = sub.clone();
+                let list = list_src.to_list();
+                let pmap_progress = PmapProgress::new(show_prog, list.len());
+                let subs = self.subs.clone();
+                let (scope_capture, atomic_arrays, atomic_hashes) =
+                    self.scope.capture_with_atomics();
+                let b = crate::par_list::pany_run(list, &pmap_progress, |item| {
+                    let mut local_interp = Interpreter::new();
+                    local_interp.subs = subs.clone();
+                    local_interp.scope.restore_capture(&scope_capture);
+                    local_interp
+                        .scope
+                        .restore_atomics(&atomic_arrays, &atomic_hashes);
+                    local_interp.enable_parallel_guard();
+                    let _ = local_interp.scope.set_scalar("_", item);
+                    match local_interp.call_sub(sub.as_ref(), vec![], WantarrayCtx::Scalar, line) {
+                        Ok(v) => v.is_true(),
+                        Err(_) => false,
+                    }
+                });
+                pmap_progress.finish();
+                Ok(PerlValue::integer(if b { 1 } else { 0 }))
+            }
+            _ => Err(PerlError::runtime(
+                format!("internal: unknown par_list builtin {name}"),
+                line,
+            )),
+        }
     }
 
     fn encode_exit_status(&self, s: std::process::ExitStatus) -> i64 {
@@ -1735,6 +1894,26 @@ impl Interpreter {
             .set_hash("ENV", self.env.clone())
             .expect("set %ENV");
         self.env_materialized = true;
+    }
+
+    /// Effective minimum log level (`log_level()` override, else `$ENV{LOG_LEVEL}`, else `info`).
+    pub(crate) fn log_filter_effective(&mut self) -> LogLevelFilter {
+        self.materialize_env_if_needed();
+        if let Some(x) = self.log_level_override {
+            return x;
+        }
+        let s = self.scope.get_hash_element("ENV", "LOG_LEVEL").to_string();
+        LogLevelFilter::parse(&s).unwrap_or(LogLevelFilter::Info)
+    }
+
+    /// <https://no-color.org/> — non-empty `$ENV{NO_COLOR}` disables ANSI in `log_*`.
+    pub(crate) fn no_color_effective(&mut self) -> bool {
+        self.materialize_env_if_needed();
+        let v = self.scope.get_hash_element("ENV", "NO_COLOR");
+        if v.is_undef() {
+            return false;
+        }
+        !v.to_string().is_empty()
     }
 
     #[inline]
@@ -2929,6 +3108,181 @@ impl Interpreter {
         Ok(PerlValue::io_handle(handle_return))
     }
 
+    /// `group_by` / `chunk_by` — consecutive runs where the key (block or `EXPR` with `$_`)
+    /// matches the previous key under [`PerlValue::str_eq`]. Returns a list of arrayrefs
+    /// (same outer shape as `chunked`).
+    pub(crate) fn eval_chunk_by_builtin(
+        &mut self,
+        key_spec: &Expr,
+        list_expr: &Expr,
+        ctx: WantarrayCtx,
+        line: usize,
+    ) -> ExecResult {
+        let list = self.eval_expr_ctx(list_expr, WantarrayCtx::List)?.to_list();
+        let chunks = match &key_spec.kind {
+            ExprKind::CodeRef { .. } => {
+                let cr = self.eval_expr(key_spec)?;
+                let Some(sub) = cr.as_code_ref() else {
+                    return Err(PerlError::runtime(
+                        "group_by/chunk_by: first argument must be { BLOCK }",
+                        line,
+                    )
+                    .into());
+                };
+                let sub = sub.clone();
+                let mut chunks: Vec<PerlValue> = Vec::new();
+                let mut run: Vec<PerlValue> = Vec::new();
+                let mut prev_key: Option<PerlValue> = None;
+                for item in list {
+                    let _ = self.scope.set_scalar("_", item.clone());
+                    let key = match self.call_sub(&sub, vec![], WantarrayCtx::Scalar, line) {
+                        Ok(k) => k,
+                        Err(FlowOrError::Error(e)) => return Err(FlowOrError::Error(e)),
+                        Err(FlowOrError::Flow(Flow::Return(v))) => v,
+                        Err(_) => PerlValue::UNDEF,
+                    };
+                    match &prev_key {
+                        None => {
+                            run.push(item);
+                            prev_key = Some(key);
+                        }
+                        Some(pk) => {
+                            if key.str_eq(pk) {
+                                run.push(item);
+                            } else {
+                                chunks.push(PerlValue::array_ref(Arc::new(RwLock::new(
+                                    std::mem::take(&mut run),
+                                ))));
+                                run.push(item);
+                                prev_key = Some(key);
+                            }
+                        }
+                    }
+                }
+                if !run.is_empty() {
+                    chunks.push(PerlValue::array_ref(Arc::new(RwLock::new(run))));
+                }
+                chunks
+            }
+            _ => {
+                let mut chunks: Vec<PerlValue> = Vec::new();
+                let mut run: Vec<PerlValue> = Vec::new();
+                let mut prev_key: Option<PerlValue> = None;
+                for item in list {
+                    let _ = self.scope.set_scalar("_", item.clone());
+                    let key = self.eval_expr_ctx(key_spec, WantarrayCtx::Scalar)?;
+                    match &prev_key {
+                        None => {
+                            run.push(item);
+                            prev_key = Some(key);
+                        }
+                        Some(pk) => {
+                            if key.str_eq(pk) {
+                                run.push(item);
+                            } else {
+                                chunks.push(PerlValue::array_ref(Arc::new(RwLock::new(
+                                    std::mem::take(&mut run),
+                                ))));
+                                run.push(item);
+                                prev_key = Some(key);
+                            }
+                        }
+                    }
+                }
+                if !run.is_empty() {
+                    chunks.push(PerlValue::array_ref(Arc::new(RwLock::new(run))));
+                }
+                chunks
+            }
+        };
+        Ok(match ctx {
+            WantarrayCtx::List => PerlValue::array(chunks),
+            WantarrayCtx::Scalar => PerlValue::integer(chunks.len() as i64),
+            WantarrayCtx::Void => PerlValue::UNDEF,
+        })
+    }
+
+    /// `take_while` / `drop_while` — block + list as [`ExprKind::FuncCall`].
+    pub(crate) fn list_higher_order_block_builtin(
+        &mut self,
+        name: &str,
+        args: &[PerlValue],
+        line: usize,
+    ) -> PerlResult<PerlValue> {
+        match self.list_higher_order_block_builtin_exec(name, args, line) {
+            Ok(v) => Ok(v),
+            Err(FlowOrError::Error(e)) => Err(e),
+            Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
+            Err(FlowOrError::Flow(_)) => Err(PerlError::runtime(
+                format!("{name}: unsupported control flow in block"),
+                line,
+            )),
+        }
+    }
+
+    fn list_higher_order_block_builtin_exec(
+        &mut self,
+        name: &str,
+        args: &[PerlValue],
+        line: usize,
+    ) -> ExecResult {
+        if args.len() < 2 {
+            return Err(
+                PerlError::runtime(format!("{name}: expected {{ BLOCK }}, LIST"), line).into(),
+            );
+        }
+        let Some(sub) = args[0].as_code_ref() else {
+            return Err(PerlError::runtime(
+                format!("{name}: first argument must be {{ BLOCK }}"),
+                line,
+            )
+            .into());
+        };
+        let sub = sub.clone();
+        let items: Vec<PerlValue> = args[1..].to_vec();
+        let wa = self.wantarray_kind;
+        match name {
+            "take_while" => {
+                let mut out = Vec::new();
+                for item in items {
+                    let _ = self.scope.set_scalar("_", item.clone());
+                    let pred = self.call_sub(&sub, vec![], WantarrayCtx::Scalar, line)?;
+                    if !pred.is_true() {
+                        break;
+                    }
+                    out.push(item);
+                }
+                Ok(match wa {
+                    WantarrayCtx::List => PerlValue::array(out),
+                    WantarrayCtx::Scalar => PerlValue::integer(out.len() as i64),
+                    WantarrayCtx::Void => PerlValue::UNDEF,
+                })
+            }
+            "drop_while" => {
+                let mut i = 0usize;
+                while i < items.len() {
+                    let _ = self.scope.set_scalar("_", items[i].clone());
+                    let pred = self.call_sub(&sub, vec![], WantarrayCtx::Scalar, line)?;
+                    if !pred.is_true() {
+                        break;
+                    }
+                    i += 1;
+                }
+                let rest = items[i..].to_vec();
+                Ok(match wa {
+                    WantarrayCtx::List => PerlValue::array(rest),
+                    WantarrayCtx::Scalar => PerlValue::integer(rest.len() as i64),
+                    WantarrayCtx::Void => PerlValue::UNDEF,
+                })
+            }
+            _ => Err(PerlError::runtime(
+                format!("internal: unknown list block builtin `{name}`"),
+                line,
+            )
+            .into()),
+        }
+    }
+
     /// `rmdir LIST` — remove empty directories; returns count removed.
     pub(crate) fn builtin_rmdir_execute(
         &mut self,
@@ -3020,6 +3374,28 @@ impl Interpreter {
         }
     }
 
+    /// `realpath PATH` — [`std::fs::canonicalize`]; sets `$!` / errno on failure, returns undef.
+    pub(crate) fn builtin_realpath_execute(
+        &mut self,
+        args: &[PerlValue],
+        line: usize,
+    ) -> PerlResult<PerlValue> {
+        let path = args
+            .first()
+            .ok_or_else(|| PerlError::runtime("realpath: need path", line))?
+            .to_string();
+        if path.is_empty() {
+            return Err(PerlError::runtime("realpath: need path", line));
+        }
+        match crate::perl_fs::realpath_resolved(&path) {
+            Ok(s) => Ok(PerlValue::string(s)),
+            Err(e) => {
+                self.apply_io_error_to_errno(&e);
+                Ok(PerlValue::UNDEF)
+            }
+        }
+    }
+
     /// `pipe READHANDLE, WRITEHANDLE` — install OS pipe ends as buffered read / write handles (Unix).
     pub(crate) fn builtin_pipe_execute(
         &mut self,
@@ -3066,10 +3442,8 @@ impl Interpreter {
 
             self.io_file_slots
                 .insert(write_name.clone(), Arc::clone(&write_shared));
-            self.output_handles.insert(
-                write_name,
-                Box::new(IoSharedFileWrite(write_shared)),
-            );
+            self.output_handles
+                .insert(write_name, Box::new(IoSharedFileWrite(write_shared)));
 
             Ok(PerlValue::integer(1))
         }
@@ -3401,10 +3775,7 @@ impl Interpreter {
     /// so the [`Self::regex_match_memo`] fast path re-applies `apply_regex_captures` on the next hit.
     #[inline]
     pub(crate) fn is_regex_capture_scope_var(name: &str) -> bool {
-        match name {
-            "&" | "'" | "`" | "+" | "-" => true,
-            _ => !name.is_empty() && name.bytes().all(|b| b.is_ascii_digit()),
-        }
+        crate::special_vars::is_regex_match_scalar_name(name)
     }
 
     /// Invalidate the capture-variable side of [`Self::regex_match_memo`]. Call from name-based
@@ -7434,19 +7805,179 @@ impl Interpreter {
 
             // Function calls
             ExprKind::FuncCall { name, args } => {
-                let mut arg_vals = Vec::with_capacity(args.len());
-                for a in args {
-                    let v = self.eval_expr(a)?;
-                    if let Some(items) = v.as_array_vec() {
-                        arg_vals.extend(items);
-                    } else {
-                        arg_vals.push(v);
+                if matches!(name.as_str(), "group_by" | "chunk_by") {
+                    if args.len() != 2 {
+                        return Err(PerlError::runtime(
+                            "group_by/chunk_by: expected { BLOCK } or EXPR, LIST",
+                            line,
+                        )
+                        .into());
                     }
+                    return self.eval_chunk_by_builtin(&args[0], &args[1], ctx, line);
+                }
+                if matches!(name.as_str(), "puniq" | "pfirst" | "pany") {
+                    let mut arg_vals = Vec::with_capacity(args.len());
+                    for a in args {
+                        arg_vals.push(self.eval_expr(a)?);
+                    }
+                    let saved_wa = self.wantarray_kind;
+                    self.wantarray_kind = ctx;
+                    let r = self.eval_par_list_call(name.as_str(), &arg_vals, ctx, line);
+                    self.wantarray_kind = saved_wa;
+                    return r.map_err(Into::into);
+                }
+                let arg_vals = if matches!(name.as_str(), "any" | "all" | "none")
+                    || matches!(name.as_str(), "take_while" | "drop_while")
+                {
+                    if args.len() != 2 {
+                        return Err(PerlError::runtime(
+                            format!("{}: expected BLOCK, LIST", name),
+                            line,
+                        )
+                        .into());
+                    }
+                    let cr = self.eval_expr(&args[0])?;
+                    let list_src = self.eval_expr_ctx(&args[1], WantarrayCtx::List)?;
+                    let mut v = vec![cr];
+                    v.extend(list_src.to_list());
+                    v
+                } else if matches!(
+                    name.as_str(),
+                    "zip" | "List::Util::zip" | "List::Util::zip_longest"
+                ) {
+                    let mut v = Vec::with_capacity(args.len());
+                    for a in args {
+                        v.push(self.eval_expr_ctx(a, WantarrayCtx::List)?);
+                    }
+                    v
+                } else if matches!(
+                    name.as_str(),
+                    "uniq"
+                        | "distinct"
+                        | "flatten"
+                        | "list_count"
+                        | "list_size"
+                        | "with_index"
+                        | "List::Util::uniq"
+                        | "shuffle"
+                        | "List::Util::shuffle"
+                        | "sum"
+                        | "sum0"
+                        | "product"
+                        | "min"
+                        | "max"
+                        | "mean"
+                        | "median"
+                        | "mode"
+                        | "stddev"
+                        | "variance"
+                        | "List::Util::sum"
+                        | "List::Util::sum0"
+                        | "List::Util::product"
+                        | "List::Util::min"
+                        | "List::Util::max"
+                        | "List::Util::minstr"
+                        | "List::Util::maxstr"
+                        | "List::Util::mean"
+                        | "List::Util::median"
+                        | "List::Util::mode"
+                        | "List::Util::stddev"
+                        | "List::Util::variance"
+                ) {
+                    // Perl prototype `(@)`: one slurpy list — either one list expr (`uniq @x`) or
+                    // multiple actuals (`List::Util::uniq(1, 1, 2)`). Each actual is evaluated in
+                    // list context so `@a, @b` flattens like Perl.
+                    let mut list_out = Vec::new();
+                    if args.len() == 1 {
+                        list_out = self.eval_expr_ctx(&args[0], WantarrayCtx::List)?.to_list();
+                    } else {
+                        for a in args {
+                            list_out.extend(self.eval_expr_ctx(a, WantarrayCtx::List)?.to_list());
+                        }
+                    }
+                    list_out
+                } else if matches!(
+                    name.as_str(),
+                    "take" | "head" | "tail" | "drop" | "List::Util::head" | "List::Util::tail"
+                ) {
+                    if args.is_empty() {
+                        return Err(
+                            PerlError::runtime(
+                                "take/head/tail/drop/List::Util::head|tail: need LIST..., N or unary N",
+                                line,
+                            )
+                            .into(),
+                        );
+                    }
+                    let mut arg_vals = Vec::with_capacity(args.len());
+                    if args.len() == 1 {
+                        arg_vals.push(self.eval_expr(&args[0])?);
+                    } else {
+                        for a in &args[..args.len() - 1] {
+                            arg_vals.push(self.eval_expr_ctx(a, WantarrayCtx::List)?);
+                        }
+                        arg_vals.push(self.eval_expr(&args[args.len() - 1])?);
+                    }
+                    arg_vals
+                } else if matches!(
+                    name.as_str(),
+                    "chunked" | "List::Util::chunked" | "windowed" | "List::Util::windowed"
+                ) {
+                    let mut list_out = Vec::new();
+                    match args.len() {
+                        0 => {
+                            return Err(PerlError::runtime(
+                                format!("{name}: expected (LIST, N) or unary N after |>"),
+                                line,
+                            )
+                            .into());
+                        }
+                        1 => {
+                            list_out.push(self.eval_expr(&args[0])?);
+                        }
+                        2 => {
+                            list_out.extend(
+                                self.eval_expr_ctx(&args[0], WantarrayCtx::List)?.to_list(),
+                            );
+                            list_out.push(self.eval_expr(&args[1])?);
+                        }
+                        _ => {
+                            return Err(PerlError::runtime(
+                                format!(
+                                    "{name}: expected exactly (LIST, N); use one list expression then size"
+                                ),
+                                line,
+                            )
+                            .into());
+                        }
+                    }
+                    list_out
+                } else {
+                    let mut arg_vals = Vec::with_capacity(args.len());
+                    for a in args {
+                        let v = self.eval_expr(a)?;
+                        if let Some(items) = v.as_array_vec() {
+                            arg_vals.extend(items);
+                        } else {
+                            arg_vals.push(v);
+                        }
+                    }
+                    arg_vals
+                };
+                // Builtins read [`Self::wantarray_kind`] (VM sets it too); thread `ctx` through.
+                let saved_wa = self.wantarray_kind;
+                self.wantarray_kind = ctx;
+                if matches!(name.as_str(), "take_while" | "drop_while") {
+                    let r = self.list_higher_order_block_builtin(name.as_str(), &arg_vals, line);
+                    self.wantarray_kind = saved_wa;
+                    return r.map_err(Into::into);
                 }
                 if let Some(r) = crate::builtins::try_builtin(self, name.as_str(), &arg_vals, line)
                 {
+                    self.wantarray_kind = saved_wa;
                     return r.map_err(Into::into);
                 }
+                self.wantarray_kind = saved_wa;
                 self.call_named_sub(name, arg_vals, line, ctx)
             }
             ExprKind::IndirectCall {
@@ -7620,18 +8151,32 @@ impl Interpreter {
             }
 
             // List operations
-            ExprKind::MapExpr { block, list } => {
+            ExprKind::MapExpr {
+                block,
+                list,
+                flatten_array_refs,
+            } => {
                 let list_val = self.eval_expr_ctx(list, WantarrayCtx::List)?;
                 let items = list_val.to_list();
+                if items.len() == 1 {
+                    if let Some(p) = items[0].as_pipeline() {
+                        if *flatten_array_refs {
+                            return Err(PerlError::runtime(
+                                "flat_map onto a pipeline value is not supported in this form — use a pipeline ->map stage",
+                                line,
+                            )
+                            .into());
+                        }
+                        let sub = self.anon_coderef_from_block(block);
+                        self.pipeline_push(&p, PipelineOp::Map(sub), line)?;
+                        return Ok(PerlValue::pipeline(Arc::clone(&p)));
+                    }
+                }
                 let mut result = Vec::new();
                 for item in items {
                     let _ = self.scope.set_scalar("_", item);
                     let val = self.exec_block(block)?;
-                    if let Some(a) = val.as_array_vec() {
-                        result.extend(a);
-                    } else {
-                        result.push(val);
-                    }
+                    result.extend(val.map_flatten_outputs(*flatten_array_refs));
                 }
                 if ctx == WantarrayCtx::List {
                     Ok(PerlValue::array(result))
@@ -7639,18 +8184,18 @@ impl Interpreter {
                     Ok(PerlValue::integer(result.len() as i64))
                 }
             }
-            ExprKind::MapExprComma { expr, list } => {
+            ExprKind::MapExprComma {
+                expr,
+                list,
+                flatten_array_refs,
+            } => {
                 let list_val = self.eval_expr_ctx(list, WantarrayCtx::List)?;
                 let items = list_val.to_list();
                 let mut result = Vec::new();
                 for item in items {
                     let _ = self.scope.set_scalar("_", item.clone());
                     let val = self.eval_expr_ctx(expr, WantarrayCtx::List)?;
-                    if let Some(a) = val.as_array_vec() {
-                        result.extend(a);
-                    } else {
-                        result.push(val);
-                    }
+                    result.extend(val.map_flatten_outputs(*flatten_array_refs));
                 }
                 if ctx == WantarrayCtx::List {
                     Ok(PerlValue::array(result))
@@ -7661,6 +8206,13 @@ impl Interpreter {
             ExprKind::GrepExpr { block, list } => {
                 let list_val = self.eval_expr_ctx(list, WantarrayCtx::List)?;
                 let items = list_val.to_list();
+                if items.len() == 1 {
+                    if let Some(p) = items[0].as_pipeline() {
+                        let sub = self.anon_coderef_from_block(block);
+                        self.pipeline_push(&p, PipelineOp::Filter(sub), line)?;
+                        return Ok(PerlValue::pipeline(Arc::clone(&p)));
+                    }
+                }
                 let mut result = Vec::new();
                 for item in items {
                     let _ = self.scope.set_scalar("_", item.clone());
@@ -7795,6 +8347,7 @@ impl Interpreter {
                 block,
                 list,
                 progress,
+                flat_outputs,
             } => {
                 let show_progress = progress
                     .as_ref()
@@ -7810,27 +8363,56 @@ impl Interpreter {
                     self.scope.capture_with_atomics();
                 let pmap_progress = PmapProgress::new(show_progress, items.len());
 
-                let results: Vec<PerlValue> = items
-                    .into_par_iter()
-                    .map(|item| {
-                        let mut local_interp = Interpreter::new();
-                        local_interp.subs = subs.clone();
-                        local_interp.scope.restore_capture(&scope_capture);
-                        local_interp
-                            .scope
-                            .restore_atomics(&atomic_arrays, &atomic_hashes);
-                        local_interp.enable_parallel_guard();
-                        let _ = local_interp.scope.set_scalar("_", item);
-                        let val = match local_interp.exec_block(&block) {
-                            Ok(val) => val,
-                            Err(_) => PerlValue::UNDEF,
-                        };
-                        pmap_progress.tick();
-                        val
-                    })
-                    .collect();
-                pmap_progress.finish();
-                Ok(PerlValue::array(results))
+                if *flat_outputs {
+                    let mut indexed: Vec<(usize, Vec<PerlValue>)> = items
+                        .into_par_iter()
+                        .enumerate()
+                        .map(|(i, item)| {
+                            let mut local_interp = Interpreter::new();
+                            local_interp.subs = subs.clone();
+                            local_interp.scope.restore_capture(&scope_capture);
+                            local_interp
+                                .scope
+                                .restore_atomics(&atomic_arrays, &atomic_hashes);
+                            local_interp.enable_parallel_guard();
+                            let _ = local_interp.scope.set_scalar("_", item);
+                            let val = match local_interp.exec_block(&block) {
+                                Ok(val) => val,
+                                Err(_) => PerlValue::UNDEF,
+                            };
+                            let chunk = val.map_flatten_outputs(true);
+                            pmap_progress.tick();
+                            (i, chunk)
+                        })
+                        .collect();
+                    pmap_progress.finish();
+                    indexed.sort_by_key(|(i, _)| *i);
+                    let results: Vec<PerlValue> =
+                        indexed.into_iter().flat_map(|(_, v)| v).collect();
+                    Ok(PerlValue::array(results))
+                } else {
+                    let results: Vec<PerlValue> = items
+                        .into_par_iter()
+                        .map(|item| {
+                            let mut local_interp = Interpreter::new();
+                            local_interp.subs = subs.clone();
+                            local_interp.scope.restore_capture(&scope_capture);
+                            local_interp
+                                .scope
+                                .restore_atomics(&atomic_arrays, &atomic_hashes);
+                            local_interp.enable_parallel_guard();
+                            let _ = local_interp.scope.set_scalar("_", item);
+                            let val = match local_interp.exec_block(&block) {
+                                Ok(val) => val,
+                                Err(_) => PerlValue::UNDEF,
+                            };
+                            pmap_progress.tick();
+                            val
+                        })
+                        .collect();
+                    pmap_progress.finish();
+                    Ok(PerlValue::array(results))
+                }
             }
             ExprKind::PMapChunkedExpr {
                 chunk_size,
@@ -8632,7 +9214,8 @@ impl Interpreter {
             ExprKind::JoinExpr { separator, list } => {
                 let sep = self.eval_expr(separator)?.to_string();
                 // Like Perl 5, arguments after the separator are evaluated in list context so
-                // `join(",", uniq @x)` passes list context into `uniq`.
+                // `join(",", uniq @x)` passes list context into `uniq`, and `join(",", localtime())`
+                // expands `localtime` to nine fields.
                 let items = if let ExprKind::List(exprs) = &list.kind {
                     let saved = self.wantarray_kind;
                     self.wantarray_kind = WantarrayCtx::List;
@@ -8648,7 +9231,15 @@ impl Interpreter {
                     self.wantarray_kind = saved;
                     vals
                 } else {
-                    self.eval_expr(list)?.to_list()
+                    let saved = self.wantarray_kind;
+                    self.wantarray_kind = WantarrayCtx::List;
+                    let v = self.eval_expr_ctx(list, WantarrayCtx::List)?;
+                    self.wantarray_kind = saved;
+                    if let Some(items) = v.as_array_vec() {
+                        items
+                    } else {
+                        vec![v]
+                    }
                 };
                 let mut strs = Vec::with_capacity(items.len());
                 for v in &items {
@@ -11101,6 +11692,57 @@ impl Interpreter {
         Err(PerlError::runtime("Can't use non-code reference as a subroutine", line).into())
     }
 
+    /// Bare `uniq` / `distinct` (alias of `uniq`) / `shuffle` / `chunked` / `windowed` / `zip` /
+    /// `sum` / `sum0` /
+    /// `product` / `min` / `max` / `mean` / `median` / `mode` / `stddev` / `variance` /
+    /// `any` / `all` / `none` (same as `List::Util` after
+    /// [`crate::list_util::ensure_list_util`]).
+    pub(crate) fn call_bare_list_util(
+        &mut self,
+        name: &str,
+        args: Vec<PerlValue>,
+        line: usize,
+        want: WantarrayCtx,
+    ) -> ExecResult {
+        crate::list_util::ensure_list_util(self);
+        let fq = match name {
+            "uniq" | "distinct" => "List::Util::uniq",
+            "shuffle" => "List::Util::shuffle",
+            "chunked" => "List::Util::chunked",
+            "windowed" => "List::Util::windowed",
+            "zip" => "List::Util::zip",
+            "any" => "List::Util::any",
+            "all" => "List::Util::all",
+            "none" => "List::Util::none",
+            "sum" => "List::Util::sum",
+            "sum0" => "List::Util::sum0",
+            "product" => "List::Util::product",
+            "min" => "List::Util::min",
+            "max" => "List::Util::max",
+            "mean" => "List::Util::mean",
+            "median" => "List::Util::median",
+            "mode" => "List::Util::mode",
+            "stddev" => "List::Util::stddev",
+            "variance" => "List::Util::variance",
+            _ => {
+                return Err(PerlError::runtime(
+                    format!("internal: not a bare list-util alias: {name}"),
+                    line,
+                )
+                .into());
+            }
+        };
+        let Some(sub) = self.subs.get(fq).cloned() else {
+            return Err(PerlError::runtime(
+                format!("internal: missing native stub for {fq}"),
+                line,
+            )
+            .into());
+        };
+        let args = self.with_topic_default_args(args);
+        self.call_sub(&sub, args, want, line)
+    }
+
     fn call_named_sub(
         &mut self,
         name: &str,
@@ -11113,6 +11755,9 @@ impl Interpreter {
             return self.call_sub(&sub, args, want, line);
         }
         match name {
+            "uniq" | "distinct" | "shuffle" | "chunked" | "windowed" | "zip" | "any" | "all"
+            | "none" | "sum" | "sum0" | "product" | "min" | "max" | "mean" | "median" | "mode"
+            | "stddev" | "variance" => self.call_bare_list_util(name, args, line, want),
             "deque" => {
                 if !args.is_empty() {
                     return Err(PerlError::runtime("deque() takes no arguments", line).into());
@@ -11884,7 +12529,70 @@ impl Interpreter {
         }))))
     }
 
-    fn pipeline_push(
+    /// `sub { $_ * k }` used when a map stage is lowered to [`crate::bytecode::Op::MapIntMul`].
+    pub(crate) fn pipeline_int_mul_sub(k: i64) -> Arc<PerlSub> {
+        let line = 1usize;
+        let body = vec![Statement {
+            label: None,
+            kind: StmtKind::Expression(Expr {
+                kind: ExprKind::BinOp {
+                    left: Box::new(Expr {
+                        kind: ExprKind::ScalarVar("_".into()),
+                        line,
+                    }),
+                    op: BinOp::Mul,
+                    right: Box::new(Expr {
+                        kind: ExprKind::Integer(k),
+                        line,
+                    }),
+                },
+                line,
+            }),
+            line,
+        }];
+        Arc::new(PerlSub {
+            name: "__pipeline_int_mul__".into(),
+            params: vec![],
+            body,
+            closure_env: None,
+            prototype: None,
+            fib_like: None,
+        })
+    }
+
+    pub(crate) fn anon_coderef_from_block(&self, block: &Block) -> Arc<PerlSub> {
+        let captured = self.scope.capture();
+        Arc::new(PerlSub {
+            name: "__ANON__".into(),
+            params: vec![],
+            body: block.clone(),
+            closure_env: Some(captured),
+            prototype: None,
+            fib_like: None,
+        })
+    }
+
+    pub(crate) fn builtin_collect_execute(
+        &mut self,
+        args: &[PerlValue],
+        line: usize,
+    ) -> PerlResult<PerlValue> {
+        if args.len() != 1 {
+            return Err(PerlError::runtime(
+                "collect() expects one argument (a pipeline object)",
+                line,
+            ));
+        }
+        let Some(p) = args[0].as_pipeline() else {
+            return Err(PerlError::runtime(
+                "collect(): argument must be a pipeline object",
+                line,
+            ));
+        };
+        self.pipeline_collect(&p, line)
+    }
+
+    pub(crate) fn pipeline_push(
         &self,
         p: &Arc<Mutex<PipelineInner>>,
         op: PipelineOp,
@@ -11939,7 +12647,7 @@ impl Interpreter {
         Ok((sub, progress))
     }
 
-    fn pipeline_method(
+    pub(crate) fn pipeline_method(
         &mut self,
         p: Arc<Mutex<PipelineInner>>,
         method: &str,

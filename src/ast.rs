@@ -543,11 +543,14 @@ pub enum ExprKind {
     MapExpr {
         block: Block,
         list: Box<Expr>,
+        /// `flat_map { }` — peel one ARRAY ref from each iteration (perlrs extension).
+        flatten_array_refs: bool,
     },
     /// `map EXPR, LIST` — EXPR is evaluated in list context with `$_` set to each element.
     MapExprComma {
         expr: Box<Expr>,
         list: Box<Expr>,
+        flatten_array_refs: bool,
     },
     GrepExpr {
         block: Block,
@@ -580,6 +583,9 @@ pub enum ExprKind {
         list: Box<Expr>,
         /// `pmap { } @list, progress => EXPR` — when truthy, print a progress bar on stderr.
         progress: Option<Box<Expr>>,
+        /// `pflat_map { }` — flatten each block result like [`ExprKind::MapExpr`] (arrays expand);
+        /// parallel output is stitched in **input order** (unlike plain `pmap`, which is unordered).
+        flat_outputs: bool,
     },
     /// `pmap_chunked N { BLOCK } @list [, progress => EXPR]` — parallel map in batches of N.
     PMapChunkedExpr {

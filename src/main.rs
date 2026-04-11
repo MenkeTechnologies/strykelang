@@ -423,16 +423,16 @@ fn print_cyberpunk_help() {
         "  psort {{BLOCK}} @list [, progress => EXPR] {G}//{N} Parallel sort across all cores"
     );
     println!(
-        "  reduce {{BLOCK}} @list   {G}//{N} Sequential left fold ($a accum, $b next element)"
+        "  @list |> reduce {{BLOCK}}   {G}//{N} Sequential left fold ($a accum, $b next element); also reduce {{BLOCK}} @list"
     );
     println!(
-        "  preduce {{BLOCK}} @list [, progress => EXPR] {G}//{N} Parallel tree fold (rayon; associative ops only); optional stderr progress bar"
+        "  @list |> preduce {{BLOCK}} [, progress => EXPR] {G}//{N} Parallel tree fold (rayon; associative ops only); also preduce {{BLOCK}} @list"
     );
     println!(
-        "  preduce_init EXPR, {{BLOCK}} @list [, progress => EXPR] {G}//{N} Parallel fold with identity; hash accumulators merge by key"
+        "  @list |> preduce_init EXPR, {{BLOCK}} [, progress => EXPR] {G}//{N} Parallel fold with identity; also preduce_init EXPR, {{BLOCK}} @list"
     );
     println!(
-        "  pmap_reduce {{MAP}} {{REDUCE}} @list [, progress => EXPR] {G}//{N} Fused parallel map + tree reduce; optional stderr progress bar"
+        "  @list |> pmap_reduce {{MAP}} {{REDUCE}} [, progress => EXPR] {G}//{N} Fused parallel map + tree reduce; also pmap_reduce {{MAP}} {{REDUCE}} @list"
     );
     println!(
         "  fan [N] {{BLOCK}} [, progress => EXPR]  {G}//{N} Execute BLOCK N times (default N = rayon pool; $_ = index); progress may follow }} without a comma"

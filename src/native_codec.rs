@@ -58,6 +58,43 @@ pub(crate) fn hmac_sha256(key: &PerlValue, msg: &PerlValue) -> PerlResult<PerlVa
     Ok(PerlValue::string(hex::encode(out)))
 }
 
+/// Raw HMAC-SHA256 bytes (for JWT and other binary signatures).
+pub(crate) fn hmac_sha256_raw(key: &PerlValue, msg: &PerlValue) -> PerlResult<Vec<u8>> {
+    let mut mac = HmacSha256::new_from_slice(&bytes_from_value(key))
+        .map_err(|e| PerlError::runtime(format!("hmac_sha256: {}", e), 0))?;
+    mac.update(&bytes_from_value(msg));
+    Ok(mac.finalize().into_bytes().to_vec())
+}
+
+/// Constant-time HMAC verification (rejects forged or truncated tags).
+pub(crate) fn hmac_sha256_verify_raw(
+    key: &PerlValue,
+    msg: &PerlValue,
+    tag: &[u8],
+) -> PerlResult<()> {
+    let mut mac = HmacSha256::new_from_slice(&bytes_from_value(key))
+        .map_err(|e| PerlError::runtime(format!("hmac_sha256: {}", e), 0))?;
+    mac.update(&bytes_from_value(msg));
+    mac.verify_slice(tag)
+        .map_err(|_| PerlError::runtime("HMAC verification failed", 0))
+}
+
+/// JWT / RFC 4648 URL-safe base64 **without** padding.
+pub(crate) fn base64url_encode(data: &[u8]) -> String {
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(data)
+}
+
+/// Decode URL-safe base64 (adds `=` padding as needed).
+pub(crate) fn base64url_decode(s: &str) -> Result<Vec<u8>, PerlError> {
+    let s = s.trim().replace(' ', "");
+    let pad = (4 - (s.len() % 4)) % 4;
+    let mut padded = s;
+    padded.push_str(&"=".repeat(pad));
+    base64::engine::general_purpose::URL_SAFE
+        .decode(padded.as_bytes())
+        .map_err(|e| PerlError::runtime(format!("base64url_decode: {}", e), 0))
+}
+
 /// Random UUID (v4) as hyphenated lowercase string.
 pub(crate) fn uuid_v4() -> PerlResult<PerlValue> {
     Ok(PerlValue::string(
@@ -275,6 +312,237 @@ pub(crate) fn datetime_add_seconds(epoch: &PerlValue, secs: &PerlValue) -> PerlR
     Ok(PerlValue::float(a + b))
 }
 
+// ── XML (subset: elements, attributes, text, repeated child tags) ──
+
+/// Decode XML to a single-root hashref: `{ root_tag => { ... } }`.
+/// Attributes become keys `@name` (match XML local names). Text content uses `#text`. Repeated child
+/// elements become an array.
+///
+/// When building hashes in Perl for [`xml_encode`], use **single-quoted** keys for attributes (e.g.
+/// `'@id'`) so `@` is not interpolated inside double quotes.
+pub(crate) fn xml_decode(s: &str) -> PerlResult<PerlValue> {
+    let doc = roxmltree::Document::parse(s.trim())
+        .map_err(|e| PerlError::runtime(format!("xml_decode: {}", e), 0))?;
+    let root = doc.root_element();
+    let name = root.tag_name().name().to_string();
+    let inner = xml_element_to_perl(root)?;
+    let mut m = IndexMap::new();
+    m.insert(name, inner);
+    Ok(PerlValue::hash_ref(Arc::new(RwLock::new(m))))
+}
+
+fn xml_element_to_perl(node: roxmltree::Node<'_, '_>) -> PerlResult<PerlValue> {
+    let mut map = IndexMap::new();
+    for a in node.attributes() {
+        let an = a.name();
+        map.insert(format!("@{an}"), PerlValue::string(a.value().to_string()));
+    }
+    let mut text_buf = String::new();
+    for c in node.children() {
+        if c.is_text() {
+            text_buf.push_str(c.text().unwrap_or(""));
+        }
+    }
+    let t = text_buf.trim();
+    if !t.is_empty() {
+        map.insert("#text".into(), PerlValue::string(t.to_string()));
+    }
+    let mut groups: IndexMap<String, Vec<PerlValue>> = IndexMap::new();
+    for c in node.children() {
+        if c.is_element() {
+            let tag = c.tag_name().name().to_string();
+            groups.entry(tag).or_default().push(xml_element_to_perl(c)?);
+        }
+    }
+    for (tag, mut vals) in groups {
+        let v = if vals.len() == 1 {
+            vals.pop().expect("one")
+        } else {
+            PerlValue::array(vals)
+        };
+        map.insert(tag, v);
+    }
+    Ok(PerlValue::hash_ref(Arc::new(RwLock::new(map))))
+}
+
+fn is_valid_xml_element_name(name: &str) -> bool {
+    let mut ch = name.chars();
+    let Some(first) = ch.next() else {
+        return false;
+    };
+    if !(first.is_ascii_alphabetic() || first == '_' || first == ':') {
+        return false;
+    }
+    ch.all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.' | ':'))
+}
+
+fn escape_xml_text(s: &str, out: &mut String) {
+    for c in s.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            _ => out.push(c),
+        }
+    }
+}
+
+fn escape_xml_attr_value(s: &str, out: &mut String) {
+    for c in s.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '"' => out.push_str("&quot;"),
+            _ => out.push(c),
+        }
+    }
+}
+
+fn xml_write_element(out: &mut String, tag: &str, v: &PerlValue) -> PerlResult<()> {
+    if !is_valid_xml_element_name(tag) {
+        return Err(PerlError::runtime(
+            format!("xml_encode: invalid element name `{tag}`"),
+            0,
+        ));
+    }
+    if let Some(s) = v.as_str() {
+        out.push('<');
+        out.push_str(tag);
+        out.push('>');
+        escape_xml_text(&s, out);
+        out.push_str("</");
+        out.push_str(tag);
+        out.push('>');
+        return Ok(());
+    }
+    if let Some(n) = v.as_integer() {
+        out.push('<');
+        out.push_str(tag);
+        out.push('>');
+        out.push_str(&itoa::Buffer::new().format(n));
+        out.push_str("</");
+        out.push_str(tag);
+        out.push('>');
+        return Ok(());
+    }
+    if v.as_float().is_some() {
+        out.push('<');
+        out.push_str(tag);
+        out.push('>');
+        out.push_str(&v.to_string());
+        out.push_str("</");
+        out.push_str(tag);
+        out.push('>');
+        return Ok(());
+    }
+    let map = if let Some(m) = v.as_hash_map() {
+        m.clone()
+    } else if let Some(r) = v.as_hash_ref() {
+        r.read().clone()
+    } else {
+        return Err(PerlError::runtime(
+            "xml_encode: element value must be hash(ref), string, or number",
+            0,
+        ));
+    };
+    if map.is_empty() {
+        out.push('<');
+        out.push_str(tag);
+        out.push_str("/>");
+        return Ok(());
+    }
+    let mut attrs: Vec<(String, String)> = Vec::new();
+    let mut text: Option<String> = None;
+    let mut children: Vec<(String, PerlValue)> = Vec::new();
+    for (k, val) in map {
+        if k.starts_with('@') && k.len() > 1 {
+            let an = &k[1..];
+            if !is_valid_xml_element_name(an) {
+                return Err(PerlError::runtime(
+                    format!("xml_encode: invalid attribute name `{an}`"),
+                    0,
+                ));
+            }
+            attrs.push((an.to_string(), val.to_string()));
+        } else if k == "#text" || k == "_" {
+            text = Some(val.to_string());
+        } else {
+            if !is_valid_xml_element_name(&k) {
+                return Err(PerlError::runtime(
+                    format!("xml_encode: invalid child element name `{k}`"),
+                    0,
+                ));
+            }
+            children.push((k, val));
+        }
+    }
+    out.push('<');
+    out.push_str(tag);
+    for (a, aval) in &attrs {
+        out.push(' ');
+        out.push_str(a);
+        out.push_str("=\"");
+        escape_xml_attr_value(aval, out);
+        out.push('"');
+    }
+    let has_body = text.is_some() || !children.is_empty();
+    if !has_body {
+        out.push_str("/>");
+        return Ok(());
+    }
+    out.push('>');
+    if let Some(ref t) = text {
+        escape_xml_text(t, out);
+    }
+    for (cn, cv) in children {
+        if let Some(a) = cv.as_array_vec() {
+            for item in a {
+                xml_write_element(out, &cn, &item)?;
+            }
+        } else {
+            xml_write_element(out, &cn, &cv)?;
+        }
+    }
+    out.push_str("</");
+    out.push_str(tag);
+    out.push('>');
+    Ok(())
+}
+
+/// Encode `v` as XML: `v` must be a hash(ref) with **exactly one** top-level key (the root element name).
+///
+/// Attribute keys use a leading `@` in Perl (`'@href' => '...'`); the `@` is stripped in the XML output.
+pub(crate) fn xml_encode(v: &PerlValue) -> PerlResult<PerlValue> {
+    let map = if let Some(m) = v.as_hash_map() {
+        m.clone()
+    } else if let Some(r) = v.as_hash_ref() {
+        r.read().clone()
+    } else {
+        return Err(PerlError::runtime(
+            "xml_encode: need hash or hashref with one root element key",
+            0,
+        ));
+    };
+    if map.len() != 1 {
+        return Err(PerlError::runtime(
+            "xml_encode: top-level hash must have exactly one key (root element name)",
+            0,
+        ));
+    }
+    let (root_name, inner) = map.iter().next().expect("one");
+    if !is_valid_xml_element_name(root_name) {
+        return Err(PerlError::runtime(
+            format!("xml_encode: invalid root element name `{root_name}`"),
+            0,
+        ));
+    }
+    let mut out = String::new();
+    out.push_str(r#"<?xml version="1.0" encoding="UTF-8"?>"#);
+    out.push('\n');
+    xml_write_element(&mut out, root_name, inner)?;
+    Ok(PerlValue::string(out))
+}
+
 // ── TOML / YAML → PerlValue (same spirit as JSON) ──
 
 pub(crate) fn toml_decode(s: &str) -> PerlResult<PerlValue> {
@@ -389,7 +657,9 @@ mod tests {
     #[test]
     fn md5_and_sha1_vectors() {
         assert_eq!(
-            md5_digest(&PerlValue::string("".into())).unwrap().to_string(),
+            md5_digest(&PerlValue::string("".into()))
+                .unwrap()
+                .to_string(),
             "d41d8cd98f00b204e9800998ecf8427e"
         );
         assert_eq!(
@@ -425,11 +695,25 @@ mod tests {
         })));
         let t = toml_encode(&h).unwrap().to_string();
         let back = toml_decode(&t).unwrap();
-        assert_eq!(back.as_hash_ref().unwrap().read().get("x").unwrap().to_int(), 7);
+        assert_eq!(
+            back.as_hash_ref()
+                .unwrap()
+                .read()
+                .get("x")
+                .unwrap()
+                .to_int(),
+            7
+        );
         let y = yaml_encode(&h).unwrap().to_string();
         let yback = yaml_decode(&y).unwrap();
         assert_eq!(
-            yback.as_hash_ref().unwrap().read().get("k").unwrap().to_string(),
+            yback
+                .as_hash_ref()
+                .unwrap()
+                .read()
+                .get("k")
+                .unwrap()
+                .to_string(),
             "v"
         );
     }
@@ -456,6 +740,51 @@ mod tests {
         let h = p.as_hash_ref().expect("hash");
         let g = h.read();
         assert_eq!(g.get("a").unwrap().to_int(), 1);
+    }
+
+    #[test]
+    fn xml_decode_attrs_and_repeated_children() {
+        let x = r#"<root k="1"><item>a</item><item>b</item></root>"#;
+        let p = xml_decode(x).expect("xml_decode");
+        let h = p.as_hash_ref().expect("root hash");
+        let g = h.read();
+        let root = g.get("root").expect("root");
+        let root_h = root.as_hash_ref().expect("inner");
+        let rh = root_h.read();
+        assert_eq!(rh.get("@k").unwrap().to_string(), "1");
+        let items = rh.get("item").unwrap().as_array_vec().expect("items");
+        assert_eq!(items.len(), 2);
+        assert_eq!(
+            items[0]
+                .as_hash_ref()
+                .unwrap()
+                .read()
+                .get("#text")
+                .unwrap()
+                .to_string(),
+            "a"
+        );
+    }
+
+    #[test]
+    fn xml_encode_decode_roundtrip() {
+        let mut inner = IndexMap::new();
+        inner.insert("@id".into(), PerlValue::string("9".into()));
+        inner.insert("#text".into(), PerlValue::string("hi".into()));
+        let mut root = IndexMap::new();
+        root.insert(
+            "msg".into(),
+            PerlValue::hash_ref(Arc::new(RwLock::new(inner))),
+        );
+        let v = PerlValue::hash_ref(Arc::new(RwLock::new(root)));
+        let s = xml_encode(&v).unwrap().to_string();
+        let back = xml_decode(&s).unwrap();
+        let back_h = back.as_hash_ref().unwrap();
+        let h = back_h.read();
+        let msg_h = h.get("msg").unwrap().as_hash_ref().unwrap();
+        let msg = msg_h.read();
+        assert_eq!(msg.get("@id").unwrap().to_string(), "9");
+        assert_eq!(msg.get("#text").unwrap().to_string(), "hi");
     }
 
     #[test]

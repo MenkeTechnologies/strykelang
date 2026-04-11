@@ -19,7 +19,7 @@ use crate::interpreter::{
 use crate::perl_fs::read_file_text_perl_compat;
 use crate::pmap_progress::{FanProgress, PmapProgress};
 use crate::sort_fast::{sort_magic_cmp, SortBlockFast};
-use crate::value::{PerlAsyncTask, PerlBarrier, PerlHeap, PerlSub, PerlValue, PipelineInner};
+use crate::value::{PerlAsyncTask, PerlBarrier, PerlHeap, PerlSub, PerlValue, PipelineInner, PipelineOp};
 use parking_lot::Mutex;
 use std::sync::Barrier;
 
@@ -516,6 +516,210 @@ impl<'a> VM<'a> {
     }
 
     #[inline]
+    fn extend_map_outputs(dst: &mut Vec<PerlValue>, val: PerlValue, peel_array_ref: bool) {
+        dst.extend(val.map_flatten_outputs(peel_array_ref));
+    }
+
+    fn map_with_block_common(
+        &mut self,
+        list: Vec<PerlValue>,
+        block_idx: u16,
+        peel_array_ref: bool,
+        op_count: &mut u64,
+    ) -> PerlResult<()> {
+        if list.len() == 1 {
+            if let Some(p) = list[0].as_pipeline() {
+                if peel_array_ref {
+                    return Err(PerlError::runtime(
+                        "flat_map onto a pipeline value is not supported in this form — use a pipeline ->map stage",
+                        self.line(),
+                    ));
+                }
+                let idx = block_idx as usize;
+                let sub = self.interp.anon_coderef_from_block(&self.blocks[idx]);
+                let line = self.line();
+                self.interp.pipeline_push(&p, PipelineOp::Map(sub), line)?;
+                self.push(PerlValue::pipeline(Arc::clone(&p)));
+                return Ok(());
+            }
+        }
+        let idx = block_idx as usize;
+        if let Some(&(start, end)) = self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref()) {
+            let mut result = Vec::new();
+            for item in list {
+                let _ = self.interp.scope.set_scalar("_", item);
+                let val = self.run_block_region(start, end, op_count)?;
+                Self::extend_map_outputs(&mut result, val, peel_array_ref);
+            }
+            self.push(PerlValue::array(result));
+        } else {
+            let block = self.blocks[idx].clone();
+            let mut result = Vec::new();
+            for item in list {
+                let _ = self.interp.scope.set_scalar("_", item);
+                match self.interp.exec_block(&block) {
+                    Ok(val) => Self::extend_map_outputs(&mut result, val, peel_array_ref),
+                    Err(FlowOrError::Error(e)) => return Err(e),
+                    Err(_) => {}
+                }
+            }
+            self.push(PerlValue::array(result));
+        }
+        Ok(())
+    }
+
+       fn map_with_expr_common(
+        &mut self,
+        list: Vec<PerlValue>,
+        expr_idx: u16,
+        peel_array_ref: bool,
+        op_count: &mut u64,
+    ) -> PerlResult<()> {
+        let idx = expr_idx as usize;
+        if let Some(&(start, end)) = self
+            .map_expr_bytecode_ranges
+            .get(idx)
+            .and_then(|r| r.as_ref())
+        {
+            let mut result = Vec::new();
+            for item in list {
+                let _ = self.interp.scope.set_scalar("_", item);
+                let val = self.run_block_region(start, end, op_count)?;
+                Self::extend_map_outputs(&mut result, val, peel_array_ref);
+            }
+            self.push(PerlValue::array(result));
+        } else {
+            let e = &self.map_expr_entries[idx];
+            let mut result = Vec::new();
+            for item in list {
+                let _ = self.interp.scope.set_scalar("_", item);
+                let val = vm_interp_result(
+                    self.interp.eval_expr_ctx(e, WantarrayCtx::List),
+                    self.line(),
+                )?;
+                Self::extend_map_outputs(&mut result, val, peel_array_ref);
+            }
+            self.push(PerlValue::array(result));
+        }
+        Ok(())
+    }
+
+    /// Consecutive groups: key from block with `$_`; keys compared with [`PerlValue::str_eq`].
+    fn chunk_by_with_block_common(
+        &mut self,
+        list: Vec<PerlValue>,
+        block_idx: u16,
+        op_count: &mut u64,
+    ) -> PerlResult<()> {
+        if list.is_empty() {
+            self.push(PerlValue::array(vec![]));
+            return Ok(());
+        }
+        let idx = block_idx as usize;
+        let mut chunks: Vec<PerlValue> = Vec::new();
+        let mut run: Vec<PerlValue> = Vec::new();
+        let mut prev_key: Option<PerlValue> = None;
+
+        let eval_key =
+            |vm: &mut VM, item: PerlValue, op_count: &mut u64| -> PerlResult<PerlValue> {
+                let _ = vm.interp.scope.set_scalar("_", item);
+                if let Some(&(start, end)) =
+                    vm.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
+                {
+                    vm.run_block_region(start, end, op_count)
+                } else {
+                    let block = vm.blocks[idx].clone();
+                    match vm.interp.exec_block(&block) {
+                        Ok(val) => Ok(val),
+                        Err(FlowOrError::Error(e)) => Err(e),
+                        Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
+                        Err(_) => Ok(PerlValue::UNDEF),
+                    }
+                }
+            };
+
+        for item in list {
+            let key = eval_key(self, item.clone(), op_count)?;
+            match &prev_key {
+                None => {
+                    run.push(item);
+                    prev_key = Some(key);
+                }
+                Some(pk) => {
+                    if key.str_eq(pk) {
+                        run.push(item);
+                    } else {
+                        chunks.push(PerlValue::array_ref(Arc::new(RwLock::new(
+                            std::mem::take(&mut run),
+                        ))));
+                        run.push(item);
+                        prev_key = Some(key);
+                    }
+                }
+            }
+        }
+        if !run.is_empty() {
+            chunks.push(PerlValue::array_ref(Arc::new(RwLock::new(run))));
+        }
+        self.push(PerlValue::array(chunks));
+        Ok(())
+    }
+
+    fn chunk_by_with_expr_common(
+        &mut self,
+        list: Vec<PerlValue>,
+        expr_idx: u16,
+        op_count: &mut u64,
+    ) -> PerlResult<()> {
+        if list.is_empty() {
+            self.push(PerlValue::array(vec![]));
+            return Ok(());
+        }
+        let idx = expr_idx as usize;
+        let mut chunks: Vec<PerlValue> = Vec::new();
+        let mut run: Vec<PerlValue> = Vec::new();
+        let mut prev_key: Option<PerlValue> = None;
+        for item in list {
+            let _ = self.interp.scope.set_scalar("_", item.clone());
+            let key = if let Some(&(start, end)) = self
+                .map_expr_bytecode_ranges
+                .get(idx)
+                .and_then(|r| r.as_ref())
+            {
+                self.run_block_region(start, end, op_count)?
+            } else {
+                let e = &self.map_expr_entries[idx];
+                vm_interp_result(
+                    self.interp.eval_expr_ctx(e, WantarrayCtx::Scalar),
+                    self.line(),
+                )?
+            };
+            match &prev_key {
+                None => {
+                    run.push(item);
+                    prev_key = Some(key);
+                }
+                Some(pk) => {
+                    if key.str_eq(pk) {
+                        run.push(item);
+                    } else {
+                        chunks.push(PerlValue::array_ref(Arc::new(RwLock::new(
+                            std::mem::take(&mut run),
+                        ))));
+                        run.push(item);
+                        prev_key = Some(key);
+                    }
+                }
+            }
+        }
+        if !run.is_empty() {
+            chunks.push(PerlValue::array_ref(Arc::new(RwLock::new(run))));
+        }
+        self.push(PerlValue::array(chunks));
+        Ok(())
+    }
+
+    #[inline]
     fn sub_jit_skip_linear_test(&self, ip: usize) -> bool {
         self.sub_jit_skip_linear.get(ip).copied().unwrap_or(false)
     }
@@ -577,6 +781,58 @@ impl<'a> VM<'a> {
         }
         chunks.reverse();
         chunks.into_iter().flatten().collect()
+    }
+
+    /// Call operands are pushed so the rightmost syntactic argument is on top. Restore
+    /// left-to-right order, then flatten list-valued operands (`qw/.../`, list literals) into
+    /// successive scalars — matching Perl's argument list for simple calls. Reversing after
+    /// flattening would incorrectly reverse elements inside expanded lists.
+    fn pop_call_operands_flattened(&mut self, argc: usize) -> Vec<PerlValue> {
+        let mut slots = Vec::with_capacity(argc);
+        for _ in 0..argc {
+            slots.push(self.pop());
+        }
+        slots.reverse();
+        let mut out = Vec::new();
+        for v in slots {
+            if let Some(items) = v.as_array_vec() {
+                out.extend(items);
+            } else {
+                out.push(v);
+            }
+        }
+        out
+    }
+
+    /// Like [`Self::pop_call_operands_flattened`], but each syntactic argument stays one
+    /// [`PerlValue`] (`zip` / `mesh` need full lists per operand, not Perl's flattened `@_`).
+    fn pop_call_operands_preserved(&mut self, argc: usize) -> Vec<PerlValue> {
+        let mut slots = Vec::with_capacity(argc);
+        for _ in 0..argc {
+            slots.push(self.pop());
+        }
+        slots.reverse();
+        slots
+    }
+
+    #[inline]
+    fn call_preserve_operand_arrays(name: &str) -> bool {
+        matches!(
+            name,
+            "zip"
+                | "List::Util::zip"
+                | "List::Util::zip_longest"
+                | "List::Util::zip_shortest"
+                | "List::Util::mesh"
+                | "List::Util::mesh_longest"
+                | "List::Util::mesh_shortest"
+                | "take"
+                | "head"
+                | "tail"
+                | "drop"
+                | "List::Util::head"
+                | "List::Util::tail"
+        )
     }
 
     fn flatten_array_slice_specs_ordered_values(
@@ -1599,16 +1855,11 @@ impl<'a> VM<'a> {
                 }
                 self.ip = entry_ip;
             } else {
-                let mut args = Vec::with_capacity(argc);
-                for _ in 0..argc {
-                    let v = self.pop();
-                    if let Some(items) = v.as_array_vec() {
-                        args.extend(items);
-                    } else {
-                        args.push(v);
-                    }
-                }
-                args.reverse();
+                let args = if Self::call_preserve_operand_arrays(name) {
+                    self.pop_call_operands_preserved(argc)
+                } else {
+                    self.pop_call_operands_flattened(argc)
+                };
                 let args = self.interp.with_topic_default_args(args);
                 self.call_stack.push(CallFrame {
                     return_ip: self.ip,
@@ -1631,91 +1882,142 @@ impl<'a> VM<'a> {
                 self.ip = entry_ip;
             }
         } else {
-            let mut args = Vec::with_capacity(argc);
-            for _ in 0..argc {
-                let v = self.pop();
-                if let Some(items) = v.as_array_vec() {
-                    args.extend(items);
-                } else {
-                    args.push(v);
-                }
-            }
-            args.reverse();
-
-            if let Some(r) = crate::builtins::try_builtin(self.interp, name, &args, self.line()) {
-                self.push(r?);
-            } else if let Some(sub) = self.interp.resolve_sub_by_name(name) {
-                let t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
-                if let Some(p) = &mut self.interp.profiler {
-                    p.enter_sub(name);
-                }
-                let args = self.interp.with_topic_default_args(args);
-                let saved_wa = self.interp.wantarray_kind;
-                self.interp.wantarray_kind = want;
-                self.interp.scope_push_hook();
-                self.interp.scope.declare_array("_", args);
-                if let Some(ref env) = sub.closure_env {
-                    self.interp.scope.restore_capture(env);
-                }
-                let argv = self.interp.scope.take_sub_underscore().unwrap_or_default();
-                let result = if let Some(r) =
-                    crate::list_util::native_dispatch(self.interp, &sub, &argv, want)
-                {
-                    r
-                } else {
-                    self.interp.scope.declare_array("_", argv);
-                    self.interp.exec_block_no_scope(&sub.body)
-                };
-                self.interp.wantarray_kind = saved_wa;
-                self.interp.scope_pop_hook();
-                match result {
-                    Ok(v) => self.push(v),
-                    Err(crate::interpreter::FlowOrError::Flow(
-                        crate::interpreter::Flow::Return(v),
-                    )) => self.push(v),
-                    Err(crate::interpreter::FlowOrError::Error(e)) => {
-                        if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
-                            p.exit_sub(t0.elapsed());
-                        }
-                        return Err(e);
-                    }
-                    Err(_) => self.push(PerlValue::UNDEF),
-                }
-                if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
-                    p.exit_sub(t0.elapsed());
-                }
-            } else if let Some(result) = self.interp.try_autoload_call(
-                name,
-                self.interp.with_topic_default_args(args),
-                self.line(),
-                want,
-                None,
-            ) {
-                let t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
-                if let Some(p) = &mut self.interp.profiler {
-                    p.enter_sub(name);
-                }
-                match result {
-                    Ok(v) => self.push(v),
-                    Err(crate::interpreter::FlowOrError::Flow(
-                        crate::interpreter::Flow::Return(v),
-                    )) => self.push(v),
-                    Err(crate::interpreter::FlowOrError::Error(e)) => {
-                        if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
-                            p.exit_sub(t0.elapsed());
-                        }
-                        return Err(e);
-                    }
-                    Err(_) => self.push(PerlValue::UNDEF),
-                }
-                if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
-                    p.exit_sub(t0.elapsed());
-                }
+            let args = if Self::call_preserve_operand_arrays(name) {
+                self.pop_call_operands_preserved(argc)
             } else {
-                return Err(PerlError::runtime(
-                    self.interp.undefined_subroutine_call_message(name),
+                self.pop_call_operands_flattened(argc)
+            };
+
+            let saved_wa_call = self.interp.wantarray_kind;
+            self.interp.wantarray_kind = want;
+            if let Some(r) = crate::builtins::try_builtin(self.interp, name, &args, self.line()) {
+                self.interp.wantarray_kind = saved_wa_call;
+                self.push(r?);
+            } else {
+                self.interp.wantarray_kind = saved_wa_call;
+                if let Some(sub) = self.interp.resolve_sub_by_name(name) {
+                    let t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
+                    if let Some(p) = &mut self.interp.profiler {
+                        p.enter_sub(name);
+                    }
+                    let args = self.interp.with_topic_default_args(args);
+                    let saved_wa = self.interp.wantarray_kind;
+                    self.interp.wantarray_kind = want;
+                    self.interp.scope_push_hook();
+                    self.interp.scope.declare_array("_", args);
+                    if let Some(ref env) = sub.closure_env {
+                        self.interp.scope.restore_capture(env);
+                    }
+                    let argv = self.interp.scope.take_sub_underscore().unwrap_or_default();
+                    let result = if let Some(r) =
+                        crate::list_util::native_dispatch(self.interp, &sub, &argv, want)
+                    {
+                        r
+                    } else {
+                        self.interp.scope.declare_array("_", argv);
+                        self.interp.exec_block_no_scope(&sub.body)
+                    };
+                    self.interp.wantarray_kind = saved_wa;
+                    self.interp.scope_pop_hook();
+                    match result {
+                        Ok(v) => self.push(v),
+                        Err(crate::interpreter::FlowOrError::Flow(
+                            crate::interpreter::Flow::Return(v),
+                        )) => self.push(v),
+                        Err(crate::interpreter::FlowOrError::Error(e)) => {
+                            if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
+                                p.exit_sub(t0.elapsed());
+                            }
+                            return Err(e);
+                        }
+                        Err(_) => self.push(PerlValue::UNDEF),
+                    }
+                    if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
+                        p.exit_sub(t0.elapsed());
+                    }
+                } else if !name.contains("::")
+                    && matches!(
+                        name,
+                        "uniq"
+                            | "distinct"
+                            | "shuffle"
+                            | "chunked"
+                            | "windowed"
+                            | "zip"
+                            | "any"
+                            | "all"
+                            | "none"
+                            | "sum"
+                            | "sum0"
+                            | "product"
+                            | "min"
+                            | "max"
+                            | "mean"
+                            | "median"
+                            | "mode"
+                            | "stddev"
+                            | "variance"
+                    )
+                {
+                    let t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
+                    if let Some(p) = &mut self.interp.profiler {
+                        p.enter_sub(name);
+                    }
+                    let saved_wa = self.interp.wantarray_kind;
+                    self.interp.wantarray_kind = want;
+                    let out = self
+                        .interp
+                        .call_bare_list_util(name, args, self.line(), want);
+                    self.interp.wantarray_kind = saved_wa;
+                    match out {
+                        Ok(v) => self.push(v),
+                        Err(crate::interpreter::FlowOrError::Flow(
+                            crate::interpreter::Flow::Return(v),
+                        )) => self.push(v),
+                        Err(crate::interpreter::FlowOrError::Error(e)) => {
+                            if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
+                                p.exit_sub(t0.elapsed());
+                            }
+                            return Err(e);
+                        }
+                        Err(_) => self.push(PerlValue::UNDEF),
+                    }
+                    if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
+                        p.exit_sub(t0.elapsed());
+                    }
+                } else if let Some(result) = self.interp.try_autoload_call(
+                    name,
+                    self.interp.with_topic_default_args(args),
                     self.line(),
-                ));
+                    want,
+                    None,
+                ) {
+                    let t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
+                    if let Some(p) = &mut self.interp.profiler {
+                        p.enter_sub(name);
+                    }
+                    match result {
+                        Ok(v) => self.push(v),
+                        Err(crate::interpreter::FlowOrError::Flow(
+                            crate::interpreter::Flow::Return(v),
+                        )) => self.push(v),
+                        Err(crate::interpreter::FlowOrError::Error(e)) => {
+                            if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
+                                p.exit_sub(t0.elapsed());
+                            }
+                            return Err(e);
+                        }
+                        Err(_) => self.push(PerlValue::UNDEF),
+                    }
+                    if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
+                        p.exit_sub(t0.elapsed());
+                    }
+                } else {
+                    return Err(PerlError::runtime(
+                        self.interp.undefined_subroutine_call_message(name),
+                        self.line(),
+                    ));
+                }
             }
         }
         Ok(())
@@ -5160,6 +5462,15 @@ impl<'a> VM<'a> {
                     // ── Map/Grep/Sort with blocks (opcodes when lowered; else tree-walker) ──
                     Op::MapIntMul(k) => {
                         let list = self.pop().to_list();
+                        if list.len() == 1 {
+                            if let Some(p) = list[0].as_pipeline() {
+                                let line = self.line();
+                                let sub = Interpreter::pipeline_int_mul_sub(*k);
+                                self.interp.pipeline_push(&p, PipelineOp::Map(sub), line)?;
+                                self.push(PerlValue::pipeline(Arc::clone(&p)));
+                                return Ok(());
+                            }
+                        }
                         let mut result = Vec::with_capacity(list.len());
                         for item in list {
                             let n = item.to_int();
@@ -5182,86 +5493,40 @@ impl<'a> VM<'a> {
                     }
                     Op::MapWithBlock(block_idx) => {
                         let list = self.pop().to_list();
-                        let idx = *block_idx as usize;
-                        if let Some(&(start, end)) =
-                            self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
-                        {
-                            let mut result = Vec::new();
-                            for item in list {
-                                let _ = self.interp.scope.set_scalar("_", item);
-                                let val = self.run_block_region(start, end, op_count)?;
-                                if let Some(a) = val.as_array_vec() {
-                                    result.extend(a);
-                                } else {
-                                    result.push(val);
-                                }
-                            }
-                            self.push(PerlValue::array(result));
-                            Ok(())
-                        } else {
-                            let block = self.blocks[idx].clone();
-                            let mut result = Vec::new();
-                            for item in list {
-                                let _ = self.interp.scope.set_scalar("_", item);
-                                match self.interp.exec_block(&block) {
-                                    Ok(val) => {
-                                        if let Some(a) = val.as_array_vec() {
-                                            result.extend(a);
-                                        } else {
-                                            result.push(val);
-                                        }
-                                    }
-                                    Err(crate::interpreter::FlowOrError::Error(e)) => {
-                                        return Err(e)
-                                    }
-                                    Err(_) => {}
-                                }
-                            }
-                            self.push(PerlValue::array(result));
-                            Ok(())
-                        }
+                        self.map_with_block_common(list, *block_idx, false, op_count)
+                    }
+                    Op::FlatMapWithBlock(block_idx) => {
+                        let list = self.pop().to_list();
+                        self.map_with_block_common(list, *block_idx, true, op_count)
                     }
                     Op::MapWithExpr(expr_idx) => {
                         let list = self.pop().to_list();
-                        let idx = *expr_idx as usize;
-                        if let Some(&(start, end)) = self
-                            .map_expr_bytecode_ranges
-                            .get(idx)
-                            .and_then(|r| r.as_ref())
-                        {
-                            let mut result = Vec::new();
-                            for item in list {
-                                let _ = self.interp.scope.set_scalar("_", item);
-                                let val = self.run_block_region(start, end, op_count)?;
-                                if let Some(a) = val.as_array_vec() {
-                                    result.extend(a);
-                                } else {
-                                    result.push(val);
-                                }
-                            }
-                            self.push(PerlValue::array(result));
-                            Ok(())
-                        } else {
-                            let e = &self.map_expr_entries[idx];
-                            let mut result = Vec::new();
-                            for item in list {
-                                let _ = self.interp.scope.set_scalar("_", item);
-                                let val = vm_interp_result(
-                                    self.interp.eval_expr_ctx(e, WantarrayCtx::List),
-                                    self.line(),
-                                )?;
-                                if let Some(a) = val.as_array_vec() {
-                                    result.extend(a);
-                                } else {
-                                    result.push(val);
-                                }
-                            }
-                            self.push(PerlValue::array(result));
-                            Ok(())
-                        }
+                        self.map_with_expr_common(list, *expr_idx, false, op_count)
+                    }
+                    Op::FlatMapWithExpr(expr_idx) => {
+                        let list = self.pop().to_list();
+                        self.map_with_expr_common(list, *expr_idx, true, op_count)
+                    }
+                    Op::ChunkByWithBlock(block_idx) => {
+                        let list = self.pop().to_list();
+                        self.chunk_by_with_block_common(list, *block_idx, op_count)
+                    }
+                    Op::ChunkByWithExpr(expr_idx) => {
+                        let list = self.pop().to_list();
+                        self.chunk_by_with_expr_common(list, *expr_idx, op_count)
                     }
                     Op::GrepWithBlock(block_idx) => {
                         let list = self.pop().to_list();
+                        if list.len() == 1 {
+                            if let Some(p) = list[0].as_pipeline() {
+                                let idx = *block_idx as usize;
+                                let sub = self.interp.anon_coderef_from_block(&self.blocks[idx]);
+                                let line = self.line();
+                                self.interp.pipeline_push(&p, PipelineOp::Filter(sub), line)?;
+                                self.push(PerlValue::pipeline(Arc::clone(&p)));
+                                return Ok(());
+                            }
+                        }
                         let idx = *block_idx as usize;
                         if let Some(&(start, end)) =
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
@@ -5713,6 +5978,194 @@ impl<'a> VM<'a> {
                             self.push(PerlValue::array(results));
                             Ok(())
                         }
+                    }
+                    Op::PFlatMapWithBlock(block_idx) => {
+                        let list = self.pop().to_list();
+                        let progress_flag = self.pop().is_true();
+                        let idx = *block_idx as usize;
+                        let subs = self.interp.subs.clone();
+                        let (scope_capture, atomic_arrays, atomic_hashes) =
+                            self.interp.scope.capture_with_atomics();
+                        let pmap_progress = PmapProgress::new(progress_flag, list.len());
+                        if let Some(&(start, end)) =
+                            self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
+                        {
+                            let shared = Arc::new(ParallelBlockVmShared::from_vm(self));
+                            let mut indexed: Vec<(usize, Vec<PerlValue>)> = list
+                                .into_par_iter()
+                                .enumerate()
+                                .map(|(i, item)| {
+                                    let mut local_interp = Interpreter::new();
+                                    local_interp.subs = subs.clone();
+                                    local_interp.scope.restore_capture(&scope_capture);
+                                    local_interp
+                                        .scope
+                                        .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                    local_interp.enable_parallel_guard();
+                                    let _ = local_interp.scope.set_scalar("_", item);
+                                    let mut vm = shared.worker_vm(&mut local_interp);
+                                    let mut op_count = 0u64;
+                                    let val = match vm.run_block_region(start, end, &mut op_count) {
+                                        Ok(v) => v,
+                                        Err(_) => PerlValue::UNDEF,
+                                    };
+                                    let out = val.map_flatten_outputs(true);
+                                    pmap_progress.tick();
+                                    (i, out)
+                                })
+                                .collect();
+                            pmap_progress.finish();
+                            indexed.sort_by_key(|(i, _)| *i);
+                            let results: Vec<PerlValue> =
+                                indexed.into_iter().flat_map(|(_, v)| v).collect();
+                            self.push(PerlValue::array(results));
+                            Ok(())
+                        } else {
+                            let block = self.blocks[idx].clone();
+                            let mut indexed: Vec<(usize, Vec<PerlValue>)> = list
+                                .into_par_iter()
+                                .enumerate()
+                                .map(|(i, item)| {
+                                    let mut local_interp = Interpreter::new();
+                                    local_interp.subs = subs.clone();
+                                    local_interp.scope.restore_capture(&scope_capture);
+                                    local_interp
+                                        .scope
+                                        .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                    local_interp.enable_parallel_guard();
+                                    let _ = local_interp.scope.set_scalar("_", item);
+                                    local_interp.scope_push_hook();
+                                    let val = match local_interp.exec_block_no_scope(&block) {
+                                        Ok(val) => val,
+                                        Err(_) => PerlValue::UNDEF,
+                                    };
+                                    local_interp.scope_pop_hook();
+                                    let out = val.map_flatten_outputs(true);
+                                    pmap_progress.tick();
+                                    (i, out)
+                                })
+                                .collect();
+                            pmap_progress.finish();
+                            indexed.sort_by_key(|(i, _)| *i);
+                            let results: Vec<PerlValue> =
+                                indexed.into_iter().flat_map(|(_, v)| v).collect();
+                            self.push(PerlValue::array(results));
+                            Ok(())
+                        }
+                    }
+                    Op::Puniq => {
+                        let list = self.pop().to_list();
+                        let progress_flag = self.pop().is_true();
+                        let n_threads = self.interp.parallel_thread_count();
+                        let pmap_progress = PmapProgress::new(progress_flag, list.len());
+                        let out = crate::par_list::puniq_run(list, n_threads, &pmap_progress);
+                        pmap_progress.finish();
+                        self.push(PerlValue::array(out));
+                        Ok(())
+                    }
+                    Op::PFirstWithBlock(block_idx) => {
+                        let list = self.pop().to_list();
+                        let progress_flag = self.pop().is_true();
+                        let idx = *block_idx as usize;
+                        let pmap_progress = PmapProgress::new(progress_flag, list.len());
+                        let subs = self.interp.subs.clone();
+                        let (scope_capture, atomic_arrays, atomic_hashes) =
+                            self.interp.scope.capture_with_atomics();
+                        let out = if let Some(&(start, end)) =
+                            self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
+                        {
+                            let shared = Arc::new(ParallelBlockVmShared::from_vm(self));
+                            crate::par_list::pfirst_run(list, &pmap_progress, |item| {
+                                let mut local_interp = Interpreter::new();
+                                local_interp.subs = subs.clone();
+                                local_interp.scope.restore_capture(&scope_capture);
+                                local_interp
+                                    .scope
+                                    .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                local_interp.enable_parallel_guard();
+                                let _ = local_interp.scope.set_scalar("_", item);
+                                let mut vm = shared.worker_vm(&mut local_interp);
+                                let mut op_count = 0u64;
+                                match vm.run_block_region(start, end, &mut op_count) {
+                                    Ok(v) => v.is_true(),
+                                    Err(_) => false,
+                                }
+                            })
+                        } else {
+                            let block = self.blocks[idx].clone();
+                            crate::par_list::pfirst_run(list, &pmap_progress, |item| {
+                                let mut local_interp = Interpreter::new();
+                                local_interp.subs = subs.clone();
+                                local_interp.scope.restore_capture(&scope_capture);
+                                local_interp
+                                    .scope
+                                    .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                local_interp.enable_parallel_guard();
+                                let _ = local_interp.scope.set_scalar("_", item);
+                                local_interp.scope_push_hook();
+                                let ok = match local_interp.exec_block_no_scope(&block) {
+                                    Ok(v) => v.is_true(),
+                                    Err(_) => false,
+                                };
+                                local_interp.scope_pop_hook();
+                                ok
+                            })
+                        };
+                        pmap_progress.finish();
+                        self.push(out.unwrap_or(PerlValue::UNDEF));
+                        Ok(())
+                    }
+                    Op::PAnyWithBlock(block_idx) => {
+                        let list = self.pop().to_list();
+                        let progress_flag = self.pop().is_true();
+                        let idx = *block_idx as usize;
+                        let pmap_progress = PmapProgress::new(progress_flag, list.len());
+                        let subs = self.interp.subs.clone();
+                        let (scope_capture, atomic_arrays, atomic_hashes) =
+                            self.interp.scope.capture_with_atomics();
+                        let b = if let Some(&(start, end)) =
+                            self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
+                        {
+                            let shared = Arc::new(ParallelBlockVmShared::from_vm(self));
+                            crate::par_list::pany_run(list, &pmap_progress, |item| {
+                                let mut local_interp = Interpreter::new();
+                                local_interp.subs = subs.clone();
+                                local_interp.scope.restore_capture(&scope_capture);
+                                local_interp
+                                    .scope
+                                    .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                local_interp.enable_parallel_guard();
+                                let _ = local_interp.scope.set_scalar("_", item);
+                                let mut vm = shared.worker_vm(&mut local_interp);
+                                let mut op_count = 0u64;
+                                match vm.run_block_region(start, end, &mut op_count) {
+                                    Ok(v) => v.is_true(),
+                                    Err(_) => false,
+                                }
+                            })
+                        } else {
+                            let block = self.blocks[idx].clone();
+                            crate::par_list::pany_run(list, &pmap_progress, |item| {
+                                let mut local_interp = Interpreter::new();
+                                local_interp.subs = subs.clone();
+                                local_interp.scope.restore_capture(&scope_capture);
+                                local_interp
+                                    .scope
+                                    .restore_atomics(&atomic_arrays, &atomic_hashes);
+                                local_interp.enable_parallel_guard();
+                                let _ = local_interp.scope.set_scalar("_", item);
+                                local_interp.scope_push_hook();
+                                let ok = match local_interp.exec_block_no_scope(&block) {
+                                    Ok(v) => v.is_true(),
+                                    Err(_) => false,
+                                };
+                                local_interp.scope_pop_hook();
+                                ok
+                            })
+                        };
+                        pmap_progress.finish();
+                        self.push(PerlValue::integer(if b { 1 } else { 0 }));
+                        Ok(())
                     }
                     Op::PMapChunkedWithBlock(block_idx) => {
                         let list = self.pop().to_list();

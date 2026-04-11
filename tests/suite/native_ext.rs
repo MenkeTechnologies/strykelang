@@ -1,6 +1,7 @@
 //! Native `csv_*`, `sqlite`, `struct`, and `typed my`.
 
 use crate::common::*;
+use perlrs::error::ErrorKind;
 use std::fs;
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -108,6 +109,71 @@ fn par_pipeline_counts_last_stage() {
         )
         .trim(),
         "3"
+    );
+}
+
+/// Pipe forward: `|>` desugars to sub calls; `filter`/`map`/`take`/`collect` must extend pipeline, not list-`map`/`grep`.
+#[test]
+fn pipeline_pipe_forward_filter_map_take_collect() {
+    let expected = (11..=30)
+        .map(|n| (n * 2).to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    assert_eq!(
+        eval_string(
+            r#"my @data = (1..30);
+            my @r = @data |> pipeline |> filter { $_ > 10 } |> map { $_ * 2 } |> take(100) |> collect;
+            join ",", @r"#,
+        )
+        .trim(),
+        expected
+    );
+    // Bare `take N` after newline (same desugar as `take(N)` → `take(LIST, N)`).
+    assert_eq!(
+        eval_string(
+            r#"my @data = (1..30);
+            my @r = @data |> pipeline |> filter { $_ > 10 } |> map { $_ * 2 } |>
+              take 100  |> collect;
+            join ",", @r"#,
+        )
+        .trim(),
+        expected
+    );
+}
+
+/// `collect()` argument must compile in list context so `|> map { } |> collect` keeps the pipeline (no `StackArrayLen`).
+#[test]
+fn pipeline_pipe_forward_filter_map_collect() {
+    let expected = (11..=30)
+        .map(|n| (n * 2).to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    assert_eq!(
+        eval_string(
+            r#"my @data = (1..30);
+            my @r = @data |> pipeline |> filter { $_ > 10 } |> map { $_ * 2 } |> collect;
+            join ",", @r"#,
+        )
+        .trim(),
+        expected
+    );
+}
+
+/// Pipe form with `par_pipeline` (list overload): same chain as `pipeline`, parallel stages on `collect()`.
+#[test]
+fn par_pipeline_pipe_forward_filter_map_collect() {
+    let expected = (11..=30)
+        .map(|n| (n * 2).to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    assert_eq!(
+        eval_string(
+            r#"my @data = (1..30);
+            my @r = @data |> par_pipeline |> filter { $_ > 10 } |> map { $_ * 2 } |> collect;
+            join ",", @r"#,
+        )
+        .trim(),
+        expected
     );
 }
 
@@ -234,6 +300,25 @@ fn par_pipeline_stream_named_form() {
         )
         .trim(),
         "5"
+    );
+}
+
+#[test]
+fn xml_encode_decode_roundtrip_nested() {
+    assert_eq!(
+        eval_string(
+            r##"my $x = xml_encode({ doc => { '@v' => "2", line => { '#text' => "ok" } } });
+xml_decode($x)->{doc}->{'@v'}"##
+        ),
+        "2"
+    );
+}
+
+#[test]
+fn fetch_second_arg_must_be_options_hash() {
+    assert_eq!(
+        eval_err_kind(r#"fetch("http://127.0.0.1/", 1)"#),
+        ErrorKind::Runtime
     );
 }
 

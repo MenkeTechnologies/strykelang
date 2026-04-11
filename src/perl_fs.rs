@@ -1,9 +1,13 @@
 //! Perl-style filesystem helpers (`stat`, `glob`, etc.).
 
 use glob::{MatchOptions, Pattern};
+use rand::Rng;
 use rayon::prelude::*;
-use std::io::{self, BufRead};
+use std::env;
+use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::UNIX_EPOCH;
 
 use crate::pmap_progress::PmapProgress;
 use crate::value::PerlValue;
@@ -161,6 +165,61 @@ pub fn read_link(path: &str) -> PerlValue {
     }
 }
 
+/// Absolute path with symlinks resolved (`std::fs::canonicalize`); all path components must exist.
+pub fn realpath_resolved(path: &str) -> io::Result<String> {
+    std::fs::canonicalize(path).map(|p| p.to_string_lossy().into_owned())
+}
+
+/// Normalize `.` / `..` and redundant separators without touching the disk (Perl
+/// `File::Spec->canonpath`-like). Unlike [`std::path::Path::components`] alone, this collapses
+/// `foo/..` in relative paths instead of preserving `..` for symlink safety.
+pub fn canonpath_logical(path: &str) -> String {
+    use std::path::Component;
+    if path.is_empty() {
+        return String::new();
+    }
+    let mut stack: Vec<String> = Vec::new();
+    let mut anchored = false;
+    for c in Path::new(path).components() {
+        match c {
+            Component::Prefix(p) => {
+                stack.push(p.as_os_str().to_string_lossy().into_owned());
+            }
+            Component::RootDir => {
+                anchored = true;
+                stack.clear();
+            }
+            Component::CurDir => {}
+            Component::Normal(s) => {
+                stack.push(s.to_string_lossy().into_owned());
+            }
+            Component::ParentDir => {
+                if anchored {
+                    if !stack.is_empty() {
+                        stack.pop();
+                    }
+                } else if stack.is_empty() || stack.last().is_some_and(|t| t == "..") {
+                    stack.push("..".to_string());
+                } else {
+                    stack.pop();
+                }
+            }
+        }
+    }
+    let body = stack.join("/");
+    if anchored {
+        if body.is_empty() {
+            "/".to_string()
+        } else {
+            format!("/{body}")
+        }
+    } else if body.is_empty() {
+        ".".to_string()
+    } else {
+        body
+    }
+}
+
 pub fn glob_patterns(patterns: &[String]) -> PerlValue {
     let mut paths: Vec<String> = Vec::new();
     for pat in patterns {
@@ -280,6 +339,252 @@ pub fn rename_paths(old: &str, new: &str) -> PerlValue {
     } else {
         0
     })
+}
+
+#[inline]
+fn is_cross_device_rename(e: &io::Error) -> bool {
+    if e.kind() == io::ErrorKind::CrossesDevices {
+        return true;
+    }
+    #[cfg(unix)]
+    {
+        if e.raw_os_error() == Some(libc::EXDEV) {
+            return true;
+        }
+    }
+    false
+}
+
+fn try_move_path(from: &str, to: &str) -> io::Result<()> {
+    match std::fs::rename(from, to) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            if !is_cross_device_rename(&e) {
+                return Err(e);
+            }
+            let meta = std::fs::symlink_metadata(from)?;
+            if meta.is_dir() {
+                return Err(io::Error::new(
+                    io::ErrorKind::Unsupported,
+                    "move: cross-device directory move is not supported",
+                ));
+            }
+            if !meta.is_file() && !meta.is_symlink() {
+                return Err(io::Error::new(
+                    io::ErrorKind::Unsupported,
+                    "move: cross-device move supports files and symlinks only",
+                ));
+            }
+            std::fs::copy(from, to)?;
+            std::fs::remove_file(from)?;
+            Ok(())
+        }
+    }
+}
+
+/// `move OLD, NEW` / `mv` — like `rename`, but on cross-device failure copies the file then removes
+/// the source (directories not supported for cross-device).
+pub fn move_path(from: &str, to: &str) -> PerlValue {
+    PerlValue::integer(if try_move_path(from, to).is_ok() {
+        1
+    } else {
+        0
+    })
+}
+
+#[cfg(unix)]
+fn unix_path_executable(path: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::metadata(path)
+        .ok()
+        .filter(|m| m.is_file())
+        .is_some_and(|m| m.permissions().mode() & 0o111 != 0)
+}
+
+#[cfg(not(unix))]
+fn unix_path_executable(path: &Path) -> bool {
+    path.is_file()
+}
+
+fn display_executable_path(path: &Path) -> Option<String> {
+    if !unix_path_executable(path) {
+        return None;
+    }
+    path.canonicalize()
+        .ok()
+        .map(|p| p.to_string_lossy().into_owned())
+        .or_else(|| Some(path.to_string_lossy().into_owned()))
+}
+
+#[cfg(windows)]
+fn pathext_suffixes() -> Vec<String> {
+    env::var_os("PATHEXT")
+        .map(|s| {
+            env::split_paths(&s)
+                .filter_map(|p| p.to_str().map(str::to_ascii_lowercase))
+                .collect()
+        })
+        .unwrap_or_else(|| vec![".exe".into(), ".cmd".into(), ".bat".into(), ".com".into()])
+}
+
+#[cfg(windows)]
+fn which_in_dir(dir: &Path, program: &str) -> Option<String> {
+    let plain = dir.join(program);
+    if let Some(s) = display_executable_path(&plain) {
+        return Some(s);
+    }
+    if !program.contains('.') {
+        for ext in pathext_suffixes() {
+            let cand = dir.join(format!("{program}{ext}"));
+            if let Some(s) = display_executable_path(&cand) {
+                return Some(s);
+            }
+        }
+    }
+    None
+}
+
+#[cfg(not(windows))]
+fn which_in_dir(dir: &Path, program: &str) -> Option<String> {
+    display_executable_path(&dir.join(program))
+}
+
+/// Resolve `program` using `PATH` (and optional current directory when `include_dot`).
+/// Returns a path string or `None` if not found.
+pub fn which_executable(program: &str, include_dot: bool) -> Option<String> {
+    if program.is_empty() {
+        return None;
+    }
+    if program.contains('/') || (cfg!(windows) && program.contains('\\')) {
+        return display_executable_path(Path::new(program));
+    }
+    let path_os = env::var_os("PATH")?;
+    for dir in env::split_paths(&path_os) {
+        if let Some(s) = which_in_dir(&dir, program) {
+            return Some(s);
+        }
+    }
+    if include_dot {
+        return which_in_dir(Path::new("."), program);
+    }
+    None
+}
+
+/// Read entire file as raw bytes (no text decoding).
+pub fn read_file_bytes(path: &str) -> io::Result<Arc<Vec<u8>>> {
+    Ok(Arc::new(std::fs::read(path)?))
+}
+
+/// Temp file adjacent to `target` for atomic replace (`rename` into place).
+fn adjacent_temp_path(target: &Path) -> PathBuf {
+    let dir = target.parent().unwrap_or_else(|| Path::new("."));
+    let name = target
+        .file_name()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "file".to_string());
+    let rnd: u32 = rand::thread_rng().gen();
+    dir.join(format!("{name}.spurt-tmp-{rnd}"))
+}
+
+/// Write bytes to `path`. When `mkdir_parents`, creates parent directories. When `atomic`, writes
+/// to a unique temp file in the same directory then `rename`s into place (best-effort crash safety).
+pub fn spurt_path(path: &str, data: &[u8], mkdir_parents: bool, atomic: bool) -> io::Result<()> {
+    let path = Path::new(path);
+    if mkdir_parents {
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() {
+                std::fs::create_dir_all(parent)?;
+            }
+        }
+    }
+    if !atomic {
+        return std::fs::write(path, data);
+    }
+    let tmp = adjacent_temp_path(path);
+    {
+        let mut f = std::fs::File::create(&tmp)?;
+        f.write_all(data)?;
+        f.sync_all().ok();
+    }
+    std::fs::rename(&tmp, path)?;
+    Ok(())
+}
+
+/// `copy FROM, TO` — 1 on success, 0 on failure. When `preserve_metadata`, best-effort copy of
+/// access/modification times from the source (after a successful byte copy).
+pub fn copy_file(from: &str, to: &str, preserve_metadata: bool) -> PerlValue {
+    if std::fs::copy(from, to).is_err() {
+        return PerlValue::integer(0);
+    }
+    if preserve_metadata {
+        if let Ok(src_meta) = std::fs::metadata(from) {
+            let at = src_meta
+                .accessed()
+                .ok()
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+            let mt = src_meta
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+            let _ = utime_paths(at, mt, &[to.to_string()]);
+        }
+    }
+    PerlValue::integer(1)
+}
+
+/// [`std::path::Path::file_name`] as a string (empty if none).
+pub fn path_basename(path: &str) -> String {
+    Path::new(path)
+        .file_name()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+/// Parent directory string; `"."` when absent; `"/"` for POSIX root-ish paths.
+pub fn path_dirname(path: &str) -> String {
+    if path.is_empty() {
+        return String::new();
+    }
+    let p = Path::new(path);
+    if path == "/" {
+        return "/".to_string();
+    }
+    match p.parent() {
+        None => ".".to_string(),
+        Some(parent) => {
+            let s = parent.to_string_lossy();
+            if s.is_empty() {
+                "/".to_string()
+            } else {
+                s.into_owned()
+            }
+        }
+    }
+}
+
+/// `(base, dir, suffix)` like Perl `File::Basename::fileparse` with a single optional suffix.
+/// When `suffix` is `Some` and `full_base` ends with it, `base` has the suffix removed and `suffix`
+/// is the matched suffix; otherwise `suffix` in the return is empty.
+pub fn fileparse_path(path: &str, suffix: Option<&str>) -> (String, String, String) {
+    let dir = path_dirname(path);
+    let full_base = path_basename(path);
+    let (base, sfx) = if let Some(suf) = suffix.filter(|s| !s.is_empty()) {
+        if full_base.ends_with(suf) && full_base.len() > suf.len() {
+            (
+                full_base[..full_base.len() - suf.len()].to_string(),
+                suf.to_string(),
+            )
+        } else {
+            (full_base.clone(), String::new())
+        }
+    } else {
+        (full_base.clone(), String::new())
+    };
+    (base, dir, sfx)
 }
 
 /// `chmod MODE, FILES...` — count of files successfully chmod'd.

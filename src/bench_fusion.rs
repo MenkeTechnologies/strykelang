@@ -508,7 +508,7 @@ pub(crate) fn try_match_map_grep_scalar_fusion(
         {
             let init = decls[0].initializer.as_ref()?;
             match &init.kind {
-                ExprKind::MapExpr { block, list } => {
+                ExprKind::MapExpr { block, list, .. } => {
                     match &list.kind {
                         ExprKind::ArrayVar(an) if an == &data_name => {}
                         _ => return None,

@@ -10,7 +10,7 @@ fn parallel_map() {
 #[test]
 fn parallel_map_preserves_input_order_in_results() {
     assert_eq!(
-        eval_string(r#"join(",", pmap { $_ * 2 } (1,2,3,4))"#),
+        eval_string(r#"(1,2,3,4) |> pmap { $_ * 2 } |> join ','"#),
         "2,4,6,8"
     );
 }
@@ -18,7 +18,7 @@ fn parallel_map_preserves_input_order_in_results() {
 #[test]
 fn parallel_map_progress_flag_runs() {
     assert_eq!(
-        eval_string(r#"join(",", pmap { $_ * 2 } (1,2,3,4), progress => 0)"#),
+        eval_string(r#"((1,2,3,4) |> pmap { $_ * 2 }, progress => 0) |> join ','"#),
         "2,4,6,8"
     );
 }
@@ -27,7 +27,7 @@ fn parallel_map_progress_flag_runs() {
 #[test]
 fn parallel_map_mixed_undef_slots_preserve_positions() {
     assert_eq!(
-        eval_string(r#"join(",", pmap { $_ == 1 ? 1/0 : $_ * 2 } (1, 2, 3))"#),
+        eval_string(r#"(1, 2, 3) |> pmap { $_ == 1 ? 1/0 : $_ * 2 } |> join ','"#),
         ",4,6",
     );
 }
@@ -35,7 +35,7 @@ fn parallel_map_mixed_undef_slots_preserve_positions() {
 #[test]
 fn pmap_chunked_preserves_input_order() {
     assert_eq!(
-        eval_string(r#"join(",", pmap_chunked 2 { $_ * 2 } (1, 2, 3, 4))"#),
+        eval_string(r#"(1, 2, 3, 4) |> pmap_chunked 2 { $_ * 2 } |> join ','"#),
         "2,4,6,8",
     );
 }
@@ -44,7 +44,7 @@ fn pmap_chunked_preserves_input_order() {
 #[test]
 fn pmap_chunked_large_chunk_small_list() {
     assert_eq!(
-        eval_string(r#"join(",", pmap_chunked 99 { $_ * 2 } (1, 2))"#),
+        eval_string(r#"(1, 2) |> pmap_chunked 99 { $_ * 2 } |> join ','"#),
         "2,4",
     );
 }
@@ -53,7 +53,7 @@ fn pmap_chunked_large_chunk_small_list() {
 #[test]
 fn parallel_grep_preserves_input_order() {
     assert_eq!(
-        eval_string(r#"join(",", pgrep { $_ > 1 } (3, 1, 4))"#),
+        eval_string(r#"(3, 1, 4) |> pgrep { $_ > 1 } |> join ','"#),
         "3,4",
     );
 }
@@ -67,7 +67,7 @@ fn parallel_grep() {
 #[test]
 fn parallel_grep_progress_flag_runs() {
     assert_eq!(
-        eval_string(r#"join(",", pgrep { $_ % 2 == 0 } (1, 2, 3, 4), progress => 0)"#),
+        eval_string(r#"((1, 2, 3, 4) |> pgrep { $_ % 2 == 0 }, progress => 0) |> join ','"#),
         "2,4",
     );
 }
@@ -115,7 +115,7 @@ fn parallel_grep_mixed_errors_and_successes() {
 
 #[test]
 fn parallel_map_single_element() {
-    assert_eq!(eval_string(r#"join(",", pmap { $_ * 2 } (21))"#), "42");
+    assert_eq!(eval_string(r#"(21) |> pmap { $_ * 2 } |> join ','"#), "42");
 }
 
 /// Captured non-`mysync` lexicals cannot be assigned from parallel workers (`Scope::parallel_guard`).
@@ -193,20 +193,20 @@ fn parallel_grep_single_element() {
 
 #[test]
 fn parallel_sort_single_element_unchanged() {
-    assert_eq!(eval_string(r#"join(",", psort { $a <=> $b } (99))"#), "99");
+    assert_eq!(eval_string(r#"(99) |> psort { $a <=> $b } |> join ','"#), "99");
 }
 
 #[test]
 fn parallel_sort() {
     assert_eq!(
-        eval_string(r#"join(",", psort { $a <=> $b } (5,3,1,4,2))"#),
+        eval_string(r#"(5,3,1,4,2) |> psort { $a <=> $b } |> join ','"#),
         "1,2,3,4,5"
     );
 }
 
 #[test]
 fn parallel_sort_default_string_order() {
-    assert_eq!(eval_string(r#"join(",", psort ("c","a","b"))"#), "a,b,c");
+    assert_eq!(eval_string(r#"("c","a","b") |> psort |> join ','"#), "a,b,c");
 }
 
 #[test]
@@ -224,6 +224,22 @@ fn par_lines_invokes_block_per_line_with_mysync_count() {
     let path = p.to_str().unwrap();
     let code = format!(r#"mysync $n = 0; par_lines "{path}", sub {{ $n++ }}; $n"#);
     assert_eq!(eval_int(&code), 2);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+/// Bare block + `if /re/` must not trip the parallel guard on regex capture scalars (`$&`, …).
+#[test]
+fn par_lines_bare_block_say_if_regex() {
+    let dir = std::env::temp_dir().join(format!("perlrs_par_lines_re_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let p = dir.join("big.log");
+    std::fs::write(&p, "ok\nERR x\n").unwrap();
+    let path = p.to_str().unwrap();
+    let code = format!(
+        r#"mysync $o = ""; par_lines "{path}", {{ $o .= $_ if /ERR/ }}; $o"#
+    );
+    assert_eq!(eval_string(&code), "ERR x");
     std::fs::remove_dir_all(&dir).ok();
 }
 
@@ -343,65 +359,68 @@ fn pfor_bareword_sub_passes_list_item_as_topic() {
 
 #[test]
 fn parallel_reduce_sum() {
-    assert_eq!(eval_int("preduce { $a + $b } (1,2,3,4,5)"), 15);
+    assert_eq!(eval_int("(1,2,3,4,5) |> preduce { $a + $b }"), 15);
 }
 
 #[test]
 fn parallel_reduce_product() {
-    assert_eq!(eval_int("preduce { $a * $b } (1,2,3,4,5)"), 120);
+    assert_eq!(eval_int("(1,2,3,4,5) |> preduce { $a * $b }"), 120);
 }
 
 #[test]
 fn parallel_reduce_max() {
-    assert_eq!(eval_int("preduce { $a > $b ? $a : $b } (3,7,1,9,2)"), 9);
+    assert_eq!(eval_int("(3,7,1,9,2) |> preduce { $a > $b ? $a : $b }"), 9);
 }
 
 #[test]
 fn parallel_reduce_single_element() {
-    assert_eq!(eval_int("preduce { $a + $b } (42)"), 42);
+    assert_eq!(eval_int("(42) |> preduce { $a + $b }"), 42);
 }
 
 #[test]
 fn parallel_reduce_empty_list_returns_undef() {
-    assert_eq!(eval_int("defined(preduce { $a + $b } ()) ? 1 : 0"), 0);
+    assert_eq!(eval_int("defined((() |> preduce { $a + $b })) ? 1 : 0"), 0);
 }
 
 #[test]
 fn parallel_reduce_string_concat() {
-    assert_eq!(eval_string(r#"preduce { $a . $b } ("a","b","c")"#), "abc");
+    assert_eq!(
+        eval_string(r#"("a","b","c") |> preduce { $a . $b }"#),
+        "abc"
+    );
 }
 
 #[test]
 fn parallel_reduce_with_array_variable() {
     assert_eq!(
-        eval_int("my @nums = (10, 20, 30); preduce { $a + $b } @nums"),
+        eval_int("my @nums = (10, 20, 30); @nums |> preduce { $a + $b }"),
         60
     );
 }
 
 #[test]
 fn preduce_init_empty_returns_identity() {
-    assert_eq!(eval_int("preduce_init 0, { $a + $b } ()"), 0);
+    assert_eq!(eval_int("() |> preduce_init 0, { $a + $b }"), 0);
 }
 
 #[test]
 fn preduce_init_single_element_folds_from_identity() {
-    assert_eq!(eval_int("preduce_init 0, { $a + $b } (9)"), 9);
+    assert_eq!(eval_int("(9) |> preduce_init 0, { $a + $b }"), 9);
 }
 
 #[test]
 fn preduce_init_histogram_merges_partials() {
     assert_eq!(
-        eval_int(r#"my $h = preduce_init {}, { $a->{$b}++; $a } ("a","b","a"); $h->{a}"#),
+        eval_int(r#"my $h = ("a","b","a") |> preduce_init {}, { $a->{$b}++; $a }; $h->{a}"#),
         2
     );
     assert_eq!(
-        eval_int(r#"my $h = preduce_init {}, { $a->{$b}++; $a } ("a","b","a"); $h->{b}"#),
+        eval_int(r#"my $h = ("a","b","a") |> preduce_init {}, { $a->{$b}++; $a }; $h->{b}"#),
         1
     );
     assert_eq!(
         eval_int(
-            r#"my $h = preduce_init {}, { my ($acc, $item) = @_; $acc->{$item}++; $acc } ("x","y","x"); $h->{"x"}"#
+            r#"my $h = ("x","y","x") |> preduce_init {}, { my ($acc, $item) = @_; $acc->{$item}++; $acc }; $h->{"x"}"#
         ),
         2
     );
@@ -419,7 +438,7 @@ fn barrier_wait_returns_truthy_scalar() {
 
 #[test]
 fn preduce_two_elements_folds_pair() {
-    assert_eq!(eval_int(r#"preduce { $a + $b } (3, 5)"#), 8);
+    assert_eq!(eval_int(r#"(3, 5) |> preduce { $a + $b }"#), 8);
 }
 
 #[test]

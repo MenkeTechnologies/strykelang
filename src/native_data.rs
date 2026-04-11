@@ -1,13 +1,15 @@
 //! Native CSV (`csv` crate), SQLite (`rusqlite`), and HTTP JSON (`ureq` + `serde_json`) helpers.
 
+use std::io::Read;
 use std::sync::Arc;
+use std::time::Duration;
 
 use indexmap::IndexMap;
+use jaq_core::data::JustLut;
+use num_traits::cast::ToPrimitive;
 use parking_lot::{Mutex, RwLock};
 use rayon::prelude::*;
 use rusqlite::{types::Value, Connection};
-use jaq_core::data::JustLut;
-use num_traits::cast::ToPrimitive;
 use serde_json::Value as JsonValue;
 
 use crate::ast::StructDef;
@@ -324,6 +326,167 @@ fn http_get_body(url: &str) -> PerlResult<String> {
         .map_err(|e| PerlError::runtime(format!("fetch: {}", e), 0))
 }
 
+fn perl_hash_lookup(v: &PerlValue, key: &str) -> Option<PerlValue> {
+    v.hash_get(key)
+        .or_else(|| v.as_hash_ref().and_then(|r| r.read().get(key).cloned()))
+}
+
+fn perl_opt_lookup(opts: Option<&PerlValue>, key: &str) -> Option<PerlValue> {
+    let o = opts?;
+    perl_hash_lookup(o, key)
+}
+
+fn perl_opt_bool(opts: Option<&PerlValue>, key: &str) -> bool {
+    perl_opt_lookup(opts, key).is_some_and(|v| v.is_true())
+}
+
+fn perl_opt_u64(opts: Option<&PerlValue>, key: &str) -> Option<u64> {
+    perl_opt_lookup(opts, key).map(|v| v.to_int().max(0) as u64)
+}
+
+fn body_bytes_from_perl(v: &PerlValue) -> Vec<u8> {
+    if let Some(b) = v.as_bytes_arc() {
+        return b.as_ref().clone();
+    }
+    v.to_string().into_bytes()
+}
+
+fn headers_map_has_content_type(headers_val: &PerlValue) -> bool {
+    if let Some(m) = headers_val.as_hash_map() {
+        return m.keys().any(|k| k.eq_ignore_ascii_case("content-type"));
+    }
+    if let Some(r) = headers_val.as_hash_ref() {
+        return r
+            .read()
+            .keys()
+            .any(|k| k.eq_ignore_ascii_case("content-type"));
+    }
+    false
+}
+
+fn apply_request_headers(
+    mut req: ureq::Request,
+    headers_val: &PerlValue,
+) -> PerlResult<ureq::Request> {
+    let pairs: Vec<(String, String)> = if let Some(m) = headers_val.as_hash_map() {
+        m.iter().map(|(k, v)| (k.clone(), v.to_string())).collect()
+    } else if let Some(r) = headers_val.as_hash_ref() {
+        r.read()
+            .iter()
+            .map(|(k, v)| (k.clone(), v.to_string()))
+            .collect()
+    } else {
+        return Err(PerlError::runtime(
+            "http_request: headers must be a hash or hashref",
+            0,
+        ));
+    };
+    for (k, v) in pairs {
+        req = req.set(&k, &v);
+    }
+    Ok(req)
+}
+
+/// Full HTTP request: `opts` hash(ref) keys: `method` (default GET), `headers`, `body`, `json`
+/// (encodes body, sets `Content-Type` unless already in `headers`), `timeout` / `timeout_secs`
+/// (omit for 30s; `0` disables client timeout), `binary_response` (body as `BYTES` instead of decoded string).
+///
+/// Returns a hashref: `status`, `status_text`, `headers` (hashref, lowercased names), `body`.
+pub(crate) fn http_request(url: &str, opts: Option<&PerlValue>) -> PerlResult<PerlValue> {
+    let method = perl_opt_lookup(opts, "method")
+        .map(|v| v.to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "GET".to_string());
+    let method_uc = method.to_ascii_uppercase();
+    let timeout_secs = perl_opt_u64(opts, "timeout_secs").or_else(|| perl_opt_u64(opts, "timeout"));
+    let binary_response = perl_opt_bool(opts, "binary_response");
+
+    let mut req = ureq::request(method_uc.as_str(), url);
+    match timeout_secs {
+        None => {
+            req = req.timeout(Duration::from_secs(30));
+        }
+        Some(0) => {}
+        Some(n) => {
+            req = req.timeout(Duration::from_secs(n));
+        }
+    }
+
+    if let Some(hv) = opts.and_then(|o| perl_hash_lookup(o, "headers")) {
+        req = apply_request_headers(req, &hv)?;
+    }
+
+    let mut body: Vec<u8> = Vec::new();
+    if let Some(o) = opts {
+        if let Some(jv) = perl_hash_lookup(o, "json") {
+            let jstr = json_encode(&jv)?;
+            if let Some(hv) = perl_hash_lookup(o, "headers") {
+                if !headers_map_has_content_type(&hv) {
+                    req = req.set("Content-Type", "application/json; charset=utf-8");
+                }
+            } else {
+                req = req.set("Content-Type", "application/json; charset=utf-8");
+            }
+            body = jstr.into_bytes();
+        } else if let Some(bv) = perl_hash_lookup(o, "body") {
+            body = body_bytes_from_perl(&bv);
+        }
+    }
+
+    let resp = if body.is_empty() {
+        req.call()
+    } else {
+        req.send_bytes(&body)
+    }
+    .map_err(|e| PerlError::runtime(format!("http_request: {}", e), 0))?;
+
+    let status = resp.status();
+    let status_text = resp.status_text().to_string();
+    let mut hdr_map = IndexMap::new();
+    let mut names = resp.headers_names();
+    names.sort();
+    names.dedup();
+    for n in names {
+        let vals: Vec<&str> = resp.all(&n);
+        if !vals.is_empty() {
+            hdr_map.insert(n, PerlValue::string(vals.join(", ")));
+        }
+    }
+    let headers_ref = PerlValue::hash_ref(Arc::new(RwLock::new(hdr_map)));
+
+    let body_val = if binary_response {
+        let mut buf = Vec::new();
+        resp.into_reader()
+            .read_to_end(&mut buf)
+            .map_err(|e| PerlError::runtime(format!("http_request: body read: {}", e), 0))?;
+        PerlValue::bytes(Arc::new(buf))
+    } else {
+        let s = resp
+            .into_string()
+            .map_err(|e| PerlError::runtime(format!("http_request: body: {}", e), 0))?;
+        PerlValue::string(s)
+    };
+
+    let mut out = IndexMap::new();
+    out.insert("status".into(), PerlValue::integer(status as i64));
+    out.insert("status_text".into(), PerlValue::string(status_text));
+    out.insert("headers".into(), headers_ref);
+    out.insert("body".into(), body_val);
+    Ok(PerlValue::hash_ref(Arc::new(RwLock::new(out))))
+}
+
+/// Parse JSON from the `body` field of an [`http_request`] result hashref.
+pub(crate) fn http_response_json_body(res: &PerlValue) -> PerlResult<PerlValue> {
+    let body = perl_hash_lookup(res, "body")
+        .ok_or_else(|| PerlError::runtime("fetch_json: http response missing body", 0))?;
+    let s = if let Some(b) = body.as_bytes_arc() {
+        String::from_utf8_lossy(b.as_ref()).into_owned()
+    } else {
+        body.to_string()
+    };
+    json_decode(&s)
+}
+
 /// Serialize a [`PerlValue`] to a JSON string (arrays, hashes, refs, structs, scalars; not code/refs/IO).
 pub(crate) fn json_encode(v: &PerlValue) -> PerlResult<String> {
     let j = perl_to_json_value(v)?;
@@ -344,9 +507,8 @@ pub(crate) fn json_decode(s: &str) -> PerlResult<PerlValue> {
 /// or an array of values if it yields more than one (e.g. `.items[]`).
 pub(crate) fn json_jq(data: &PerlValue, filter_src: &str) -> PerlResult<PerlValue> {
     let j = perl_to_json_value(data)?;
-    let input: jaq_json::Val = serde_json::from_value(j).map_err(|e| {
-        PerlError::runtime(format!("json_jq: could not convert input: {}", e), 0)
-    })?;
+    let input: jaq_json::Val = serde_json::from_value(j)
+        .map_err(|e| PerlError::runtime(format!("json_jq: could not convert input: {}", e), 0))?;
 
     let arena = jaq_core::load::Arena::default();
     let defs = jaq_core::defs()
@@ -357,9 +519,9 @@ pub(crate) fn json_jq(data: &PerlValue, filter_src: &str) -> PerlResult<PerlValu
         code: filter_src,
         path: (),
     };
-    let modules = loader.load(&arena, file).map_err(|e| {
-        PerlError::runtime(format!("json_jq: parse/load: {:?}", e), 0)
-    })?;
+    let modules = loader
+        .load(&arena, file)
+        .map_err(|e| PerlError::runtime(format!("json_jq: parse/load: {:?}", e), 0))?;
 
     type JData = JustLut<jaq_json::Val>;
     let filter = jaq_core::Compiler::default()

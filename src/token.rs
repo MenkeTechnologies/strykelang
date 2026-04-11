@@ -227,6 +227,9 @@ pub const KEYWORDS: &[&str] = &[
     "push",
     "pop",
     "shift",
+    "shuffle",
+    "chunked",
+    "windowed",
     "unshift",
     "splice",
     "split",
@@ -234,6 +237,16 @@ pub const KEYWORDS: &[&str] = &[
     "json_decode",
     "json_encode",
     "json_jq",
+    "jwt_decode",
+    "jwt_decode_unsafe",
+    "jwt_encode",
+    "log_debug",
+    "log_error",
+    "log_info",
+    "log_json",
+    "log_level",
+    "log_trace",
+    "log_warn",
     "sha256",
     "sha1",
     "md5",
@@ -262,7 +275,12 @@ pub const KEYWORDS: &[&str] = &[
     "uri_unescape",
     "sort",
     "reverse",
+    "reversed",
     "map",
+    "flat_map",
+    "flatten",
+    "list_count",
+    "list_size",
     "match",
     "grep",
     "keys",
@@ -337,7 +355,17 @@ pub const KEYWORDS: &[&str] = &[
     "UNITCHECK",
     "AUTOLOAD",
     "DESTROY",
+    "all",
+    "any",
+    "none",
+    "take_while",
+    "drop_while",
+    "with_index",
     "pmap",
+    "pflat_map",
+    "puniq",
+    "pfirst",
+    "pany",
     "pmap_chunked",
     "pipeline",
     "pgrep",
@@ -347,6 +375,7 @@ pub const KEYWORDS: &[&str] = &[
     "pwatch",
     "psort",
     "reduce",
+    "fold",
     "preduce",
     "preduce_init",
     "pmap_reduce",
@@ -357,6 +386,8 @@ pub const KEYWORDS: &[&str] = &[
     "fan_cap",
     "pchannel",
     "pselect",
+    "uniq",
+    "distinct",
     "async",
     "spawn",
     "trace",
@@ -456,6 +487,14 @@ mod tests {
         assert!(matches!(keyword_or_ident("join"), Token::Ident(s) if s == "join"));
         assert!(matches!(keyword_or_ident("split"), Token::Ident(s) if s == "split"));
         assert!(matches!(
+            keyword_or_ident("list_count"),
+            Token::Ident(s) if s == "list_count"
+        ));
+        assert!(matches!(
+            keyword_or_ident("list_size"),
+            Token::Ident(s) if s == "list_size"
+        ));
+        assert!(matches!(
             keyword_or_ident("capture"),
             Token::Ident(s) if s == "capture"
         ));
@@ -476,6 +515,7 @@ mod tests {
         assert!(matches!(keyword_or_ident("pfor"), Token::Ident(s) if s == "pfor"));
         assert!(matches!(keyword_or_ident("psort"), Token::Ident(s) if s == "psort"));
         assert!(matches!(keyword_or_ident("reduce"), Token::Ident(s) if s == "reduce"));
+        assert!(matches!(keyword_or_ident("fold"), Token::Ident(s) if s == "fold"));
         assert!(matches!(keyword_or_ident("preduce"), Token::Ident(s) if s == "preduce"));
         assert!(matches!(keyword_or_ident("fan"), Token::Ident(s) if s == "fan"));
         assert!(matches!(keyword_or_ident("trace"), Token::Ident(s) if s == "trace"));

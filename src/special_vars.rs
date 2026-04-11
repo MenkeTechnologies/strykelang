@@ -4,6 +4,16 @@
 //! `Interpreter::special_caret_scalars` (default `undef`). Reads use that map; unknown names still
 //! return `undef` without a pre-inserted key.
 
+/// Scalar slot names populated by the regex engine on a successful match (`$&`, `` $` ``, `$'`,
+/// `$+`, `$-`, `$1`…). Used by parallel-block write checks: each worker may update its own captures.
+#[inline]
+pub fn is_regex_match_scalar_name(name: &str) -> bool {
+    match name {
+        "&" | "'" | "`" | "+" | "-" => true,
+        _ => !name.is_empty() && name.bytes().all(|b| b.is_ascii_digit()),
+    }
+}
+
 /// Documented `${^NAME}` scalars from Perl 5 `perlvar` (and closely related names), pre-seeded as
 /// `undef` so `defined ${^NAME}` / iteration over known names works without assigning first.
 ///

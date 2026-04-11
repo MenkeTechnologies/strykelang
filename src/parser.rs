@@ -29,10 +29,18 @@ pub struct Parser {
     suppress_indirect_paren_call: u32,
     /// When > 0, the current expression is being parsed as the RHS of `|>`
     /// (pipe-forward). Builtins that normally require a list/string/second arg
-    /// (`map`, `grep`, `sort`, `join`, `reverse`, `split`, …) may accept a
+    /// (`map`, `grep`, `sort`, `join`, `reverse` / `reversed`, `split`, …) may accept a
     /// placeholder when this flag is set, because [`Self::pipe_forward_apply`]
     /// will substitute the piped value in afterwards.
     pipe_rhs_depth: u32,
+    /// When > 0, [`Self::parse_pipe_forward`] will **not** consume a trailing `|>`
+    /// and leaves it for an outer parser instead. Bumped while parsing paren-less
+    /// arg lists (`parse_list_until_terminator`, paren-less method args, `map`/`grep`
+    /// LIST, …) so `@a |> head 2 |> join "-"` chains left-associatively as
+    /// `(@a |> head 2) |> join "-"` instead of `head` swallowing the outer `|>`
+    /// as part of its first arg. Reset to 0 on entry to any parenthesized
+    /// arg list (`parse_arg_list`) so `head(2 |> foo, 3)` still works.
+    no_pipe_forward_depth: u32,
     /// Source path for [`PerlError`] (matches lexer / `parse_with_file`).
     error_file: String,
 }
@@ -49,6 +57,7 @@ impl Parser {
             next_rate_limit_slot: 0,
             suppress_indirect_paren_call: 0,
             pipe_rhs_depth: 0,
+            no_pipe_forward_depth: 0,
             error_file: file.into(),
         }
     }
@@ -59,6 +68,20 @@ impl Parser {
     #[inline]
     fn in_pipe_rhs(&self) -> bool {
         self.pipe_rhs_depth > 0
+    }
+
+    /// List-slurping builtin: the operand is entirely the LHS of `|>` (no following list tokens).
+    fn pipe_supplies_slurped_list_operand(&self) -> bool {
+        self.in_pipe_rhs()
+            && matches!(
+                self.peek(),
+                Token::Semicolon
+                    | Token::RBrace
+                    | Token::RParen
+                    | Token::Eof
+                    | Token::Comma
+                    | Token::PipeForward
+            )
     }
 
     /// Empty placeholder list used as a stand-in for the list operand of
@@ -578,8 +601,8 @@ impl Parser {
                         self.peek_line(),
                     ));
                 }
-                // `{ } pmap @a` / `{ } pfor @a` / `do { } …` — same shapes as prefix `pmap { } @a`, etc.
-                "pmap" | "pgrep" | "pfor" | "preduce" | "pcache" => {
+                // `{ } pmap @a` / `{ } pflat_map @a` / `{ } pfor @a` / `do { } …` — same shapes as prefix forms.
+                "pmap" | "pflat_map" | "pgrep" | "pfor" | "preduce" | "pcache" => {
                     let line = stmt.line;
                     let block = self.stmt_into_parallel_block(stmt)?;
                     let which = kw.as_str();
@@ -594,6 +617,13 @@ impl Parser {
                             block,
                             list,
                             progress,
+                            flat_outputs: false,
+                        },
+                        "pflat_map" => ExprKind::PMapExpr {
+                            block,
+                            list,
+                            progress,
+                            flat_outputs: true,
                         },
                         "pgrep" => ExprKind::PGrepExpr {
                             block,
@@ -843,6 +873,7 @@ impl Parser {
                 | "chown"
                 | "closedir"
                 | "close"
+                | "collect"
                 | "cos"
                 | "crypt"
                 | "defined"
@@ -861,6 +892,7 @@ impl Parser {
                 | "fan_cap"
                 | "fc"
                 | "fetch_url"
+                | "filter"
                 | "getcwd"
                 | "glob_par"
                 | "par_sed"
@@ -879,6 +911,26 @@ impl Parser {
                 | "log"
                 | "lstat"
                 | "map"
+                | "flat_map"
+                | "flatten"
+                | "list_count"
+                | "list_size"
+                | "all"
+                | "any"
+                | "none"
+                | "take_while"
+                | "drop_while"
+                | "group_by"
+                | "chunk_by"
+                | "with_index"
+                | "puniq"
+                | "pfirst"
+                | "pany"
+                | "uniq"
+                | "distinct"
+                | "shuffle"
+                | "chunked"
+                | "windowed"
                 | "match"
                 | "mkdir"
                 | "every"
@@ -900,6 +952,7 @@ impl Parser {
                 | "pmap_chunked"
                 | "pmap_reduce"
                 | "pmap"
+                | "pflat_map"
                 | "pop"
                 | "pos"
                 | "ppool"
@@ -915,10 +968,12 @@ impl Parser {
                 | "readdir"
                 | "readlink"
                 | "reduce"
+                | "fold"
                 | "ref"
                 | "rename"
                 | "require"
                 | "reverse"
+                | "reversed"
                 | "rewinddir"
                 | "rindex"
                 | "rmdir"
@@ -2535,6 +2590,14 @@ impl Parser {
     /// `x + 1 |> f || y` parses as `f(x + 1) || y`.
     fn parse_pipe_forward(&mut self) -> PerlResult<Expr> {
         let mut left = self.parse_or_word()?;
+        // Inside a paren-less arg list, `|>` is a hard terminator for the
+        // enclosing call — leave it for the outer `parse_pipe_forward` loop
+        // so `qw(…) |> head 2 |> join "-"` chains left-to-right as
+        // `(qw(…) |> head 2) |> join "-"` instead of `head` swallowing the
+        // outer `|>` via its first-arg `parse_assign_expr`.
+        if self.no_pipe_forward_depth > 0 {
+            return Ok(left);
+        }
         while matches!(self.peek(), Token::PipeForward) {
             let line = left.line;
             self.advance();
@@ -2562,8 +2625,8 @@ impl Parser {
     ///   `Keys`, `Values`, `Pop`, `Shift`, …) — **replace** the sole operand with
     ///   `lhs` (these parse a single default `$_` when called without an arg, so
     ///   piping overrides that default; first-arg and last-arg are identical).
-    /// - List-taking higher-order forms (`map`, `grep`, `sort`, `join`, `reduce`,
-    ///   `pmap`, `pgrep`, `pfor`, …) — **replace** the `list` field with `lhs`, so
+    /// - List-taking higher-order forms (`map`, `flat_map`, `grep`, `sort`, `join`, `reduce`, `fold`,
+    ///   `pmap`, `pflat_map`, `pgrep`, `pfor`, …) — **replace** the `list` field with `lhs`, so
     ///   `@arr |> map { $_ * 2 }` becomes `map { $_ * 2 } @arr`.
     /// - `Bareword("f")` — lift to `FuncCall { f, [lhs] }`.
     /// - Scalar / deref / coderef expressions — wrap in `IndirectCall` with `lhs`
@@ -2575,7 +2638,53 @@ impl Parser {
         let new_kind = match kind {
             // ── Generic / user-defined calls ───────────────────────────────────
             ExprKind::FuncCall { name, mut args } => {
-                args.insert(0, lhs);
+                match name.as_str() {
+                    "puniq" | "uniq" | "distinct" | "flatten" | "list_count" | "list_size"
+                    | "with_index" | "shuffle" => {
+                        if args.is_empty() {
+                            args.push(lhs);
+                        } else {
+                            args[0] = lhs;
+                        }
+                    }
+                    "chunked" | "windowed" => {
+                        if args.is_empty() {
+                            return Err(self.syntax_err(
+                                "|>: chunked(N) / windowed(N) needs size — e.g. `@a |> windowed(2)`",
+                                line,
+                            ));
+                        }
+                        args.insert(0, lhs);
+                    }
+                    "List::Util::reduce" | "List::Util::fold" => {
+                        args.push(lhs);
+                    }
+                    "pfirst" | "pany" | "any" | "all" | "none" | "take_while" | "drop_while"
+                    | "group_by" | "chunk_by" => {
+                        if args.len() < 2 {
+                            return Err(self.syntax_err(
+                                format!(
+                                    "|>: `{name}` needs {{ BLOCK }}, LIST so the list can receive the pipe"
+                                ),
+                                line,
+                            ));
+                        }
+                        args[1] = lhs;
+                    }
+                    "take" | "head" | "tail" | "drop" | "List::Util::head" | "List::Util::tail" => {
+                        if args.is_empty() {
+                            return Err(self.syntax_err(
+                                "|>: `{name}` needs N last — e.g. `@a |> take(3)` for `take(@a, 3)`",
+                                line,
+                            ));
+                        }
+                        // `LIST |> take N` → `take(LIST, N)` (prepend piped list before trailing count)
+                        args.insert(0, lhs);
+                    }
+                    _ => {
+                        args.insert(0, lhs);
+                    }
+                }
                 ExprKind::FuncCall { name, args }
             }
             ExprKind::MethodCall {
@@ -2724,13 +2833,23 @@ impl Parser {
             ExprKind::Eval(_) => ExprKind::Eval(Box::new(lhs)),
 
             // ── Higher-order / list-taking forms: replace the `list` slot ──────
-            ExprKind::MapExpr { block, list: _ } => ExprKind::MapExpr {
+            ExprKind::MapExpr {
+                block,
+                list: _,
+                flatten_array_refs,
+            } => ExprKind::MapExpr {
                 block,
                 list: Box::new(lhs),
+                flatten_array_refs,
             },
-            ExprKind::MapExprComma { expr, list: _ } => ExprKind::MapExprComma {
+            ExprKind::MapExprComma {
+                expr,
+                list: _,
+                flatten_array_refs,
+            } => ExprKind::MapExprComma {
                 expr,
                 list: Box::new(lhs),
+                flatten_array_refs,
             },
             ExprKind::GrepExpr { block, list: _ } => ExprKind::GrepExpr {
                 block,
@@ -2756,10 +2875,12 @@ impl Parser {
                 block,
                 list: _,
                 progress,
+                flat_outputs,
             } => ExprKind::PMapExpr {
                 block,
                 list: Box::new(lhs),
                 progress,
+                flat_outputs,
             },
             ExprKind::PMapChunkedExpr {
                 chunk_size,
@@ -2814,6 +2935,28 @@ impl Parser {
                 progress,
             } => ExprKind::PcacheExpr {
                 block,
+                list: Box::new(lhs),
+                progress,
+            },
+            ExprKind::PReduceInitExpr {
+                init,
+                block,
+                list: _,
+                progress,
+            } => ExprKind::PReduceInitExpr {
+                init,
+                block,
+                list: Box::new(lhs),
+                progress,
+            },
+            ExprKind::PMapReduceExpr {
+                map_block,
+                reduce_block,
+                list: _,
+                progress,
+            } => ExprKind::PMapReduceExpr {
+                map_block,
+                reduce_block,
                 list: Box::new(lhs),
                 progress,
             },
@@ -4677,7 +4820,7 @@ impl Parser {
                     line,
                 })
             }
-            "reverse" => {
+            "reverse" | "reversed" => {
                 // On the RHS of `|>`, the operand is supplied by the piped LHS.
                 let a = if self.in_pipe_rhs()
                     && matches!(
@@ -4784,13 +4927,15 @@ impl Parser {
                     line,
                 })
             }
-            "map" => {
+            "map" | "flat_map" => {
+                let flatten_array_refs = name == "flat_map";
                 if matches!(self.peek(), Token::LBrace) {
                     let (block, list) = self.parse_block_list()?;
                     Ok(Expr {
                         kind: ExprKind::MapExpr {
                             block,
                             list: Box::new(list),
+                            flatten_array_refs,
                         },
                         line,
                     })
@@ -4810,13 +4955,14 @@ impl Parser {
                         kind: ExprKind::MapExprComma {
                             expr: Box::new(expr),
                             list: Box::new(list_expr),
+                            flatten_array_refs,
                         },
                         line,
                     })
                 }
             }
             "match" => self.parse_algebraic_match_expr(line),
-            "grep" => {
+            "grep" | "filter" => {
                 if matches!(self.peek(), Token::LBrace) {
                     let (block, list) = self.parse_block_list()?;
                     Ok(Expr {
@@ -4919,7 +5065,7 @@ impl Parser {
                     })
                 }
             }
-            "reduce" => {
+            "reduce" | "fold" => {
                 let (block, list) = self.parse_block_list()?;
                 Ok(Expr {
                     kind: ExprKind::ReduceExpr {
@@ -4937,6 +5083,19 @@ impl Parser {
                         block,
                         list: Box::new(list),
                         progress: progress.map(Box::new),
+                        flat_outputs: false,
+                    },
+                    line,
+                })
+            }
+            "pflat_map" => {
+                let (block, list, progress) = self.parse_block_then_list_optional_progress()?;
+                Ok(Expr {
+                    kind: ExprKind::PMapExpr {
+                        block,
+                        list: Box::new(list),
+                        progress: progress.map(Box::new),
+                        flat_outputs: true,
                     },
                     line,
                 })
@@ -5350,6 +5509,43 @@ impl Parser {
                 let map_block = self.parse_block()?;
                 let reduce_block = self.parse_block()?;
                 self.eat(&Token::Comma);
+                let line = self.peek_line();
+                if let Token::Ident(ref kw) = self.peek().clone() {
+                    if kw == "progress" && matches!(self.peek_at(1), Token::FatArrow) {
+                        self.advance();
+                        self.expect(&Token::FatArrow)?;
+                        let prog = self.parse_assign_expr()?;
+                        return Ok(Expr {
+                            kind: ExprKind::PMapReduceExpr {
+                                map_block,
+                                reduce_block,
+                                list: Box::new(Expr {
+                                    kind: ExprKind::List(vec![]),
+                                    line,
+                                }),
+                                progress: Some(Box::new(prog)),
+                            },
+                            line,
+                        });
+                    }
+                }
+                if matches!(
+                    self.peek(),
+                    Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof
+                ) {
+                    return Ok(Expr {
+                        kind: ExprKind::PMapReduceExpr {
+                            map_block,
+                            reduce_block,
+                            list: Box::new(Expr {
+                                kind: ExprKind::List(vec![]),
+                                line,
+                            }),
+                            progress: None,
+                        },
+                        line,
+                    });
+                }
                 let mut parts = vec![self.parse_assign_expr()?];
                 loop {
                     if !self.eat(&Token::Comma) && !self.eat(&Token::FatArrow) {
@@ -5385,6 +5581,405 @@ impl Parser {
                         reduce_block,
                         list: Box::new(merge_expr_list(parts)),
                         progress: None,
+                    },
+                    line,
+                })
+            }
+            "puniq" => {
+                if self.pipe_supplies_slurped_list_operand() {
+                    return Ok(Expr {
+                        kind: ExprKind::FuncCall {
+                            name: "puniq".to_string(),
+                            args: vec![],
+                        },
+                        line,
+                    });
+                }
+                let (list, progress) = self.parse_assign_expr_list_optional_progress()?;
+                let mut args = vec![list];
+                if let Some(p) = progress {
+                    args.push(p);
+                }
+                Ok(Expr {
+                    kind: ExprKind::FuncCall {
+                        name: "puniq".to_string(),
+                        args,
+                    },
+                    line,
+                })
+            }
+            "pfirst" => {
+                let (block, list, progress) = self.parse_block_then_list_optional_progress()?;
+                let cr = Expr {
+                    kind: ExprKind::CodeRef {
+                        params: vec![],
+                        body: block,
+                    },
+                    line,
+                };
+                let mut args = vec![cr, list];
+                if let Some(p) = progress {
+                    args.push(p);
+                }
+                Ok(Expr {
+                    kind: ExprKind::FuncCall {
+                        name: "pfirst".to_string(),
+                        args,
+                    },
+                    line,
+                })
+            }
+            "pany" => {
+                let (block, list, progress) = self.parse_block_then_list_optional_progress()?;
+                let cr = Expr {
+                    kind: ExprKind::CodeRef {
+                        params: vec![],
+                        body: block,
+                    },
+                    line,
+                };
+                let mut args = vec![cr, list];
+                if let Some(p) = progress {
+                    args.push(p);
+                }
+                Ok(Expr {
+                    kind: ExprKind::FuncCall {
+                        name: "pany".to_string(),
+                        args,
+                    },
+                    line,
+                })
+            }
+            "uniq" | "distinct" => {
+                if self.pipe_supplies_slurped_list_operand() {
+                    return Ok(Expr {
+                        kind: ExprKind::FuncCall {
+                            name: name.clone(),
+                            args: vec![],
+                        },
+                        line,
+                    });
+                }
+                let (list, progress) = self.parse_assign_expr_list_optional_progress()?;
+                if progress.is_some() {
+                    return Err(self.syntax_err(
+                        "`progress =>` is not supported for uniq (use puniq for parallel + progress)",
+                        line,
+                    ));
+                }
+                Ok(Expr {
+                    kind: ExprKind::FuncCall {
+                        name: name.clone(),
+                        args: vec![list],
+                    },
+                    line,
+                })
+            }
+            "flatten" => {
+                if self.pipe_supplies_slurped_list_operand() {
+                    return Ok(Expr {
+                        kind: ExprKind::FuncCall {
+                            name: "flatten".to_string(),
+                            args: vec![],
+                        },
+                        line,
+                    });
+                }
+                let (list, progress) = self.parse_assign_expr_list_optional_progress()?;
+                if progress.is_some() {
+                    return Err(self.syntax_err("`progress =>` is not supported for flatten", line));
+                }
+                Ok(Expr {
+                    kind: ExprKind::FuncCall {
+                        name: "flatten".to_string(),
+                        args: vec![list],
+                    },
+                    line,
+                })
+            }
+            "list_count" | "list_size" => {
+                if self.pipe_supplies_slurped_list_operand() {
+                    return Ok(Expr {
+                        kind: ExprKind::FuncCall {
+                            name: name.clone(),
+                            args: vec![],
+                        },
+                        line,
+                    });
+                }
+                let (list, progress) = self.parse_assign_expr_list_optional_progress()?;
+                if progress.is_some() {
+                    return Err(self.syntax_err(
+                        "`progress =>` is not supported for list_count / list_size",
+                        line,
+                    ));
+                }
+                Ok(Expr {
+                    kind: ExprKind::FuncCall {
+                        name: name.clone(),
+                        args: vec![list],
+                    },
+                    line,
+                })
+            }
+            "shuffle" => {
+                if self.pipe_supplies_slurped_list_operand() {
+                    return Ok(Expr {
+                        kind: ExprKind::FuncCall {
+                            name: "shuffle".to_string(),
+                            args: vec![],
+                        },
+                        line,
+                    });
+                }
+                let (list, progress) = self.parse_assign_expr_list_optional_progress()?;
+                if progress.is_some() {
+                    return Err(self.syntax_err("`progress =>` is not supported for shuffle", line));
+                }
+                Ok(Expr {
+                    kind: ExprKind::FuncCall {
+                        name: "shuffle".to_string(),
+                        args: vec![list],
+                    },
+                    line,
+                })
+            }
+            "chunked" => {
+                let mut parts = Vec::new();
+                if self.eat(&Token::LParen) {
+                    if !matches!(self.peek(), Token::RParen) {
+                        parts.push(self.parse_assign_expr()?);
+                        while self.eat(&Token::Comma) {
+                            if matches!(self.peek(), Token::RParen) {
+                                break;
+                            }
+                            parts.push(self.parse_assign_expr()?);
+                        }
+                    }
+                    self.expect(&Token::RParen)?;
+                } else {
+                    parts.push(self.parse_assign_expr()?);
+                    loop {
+                        if !self.eat(&Token::Comma) && !self.eat(&Token::FatArrow) {
+                            break;
+                        }
+                        if matches!(
+                            self.peek(),
+                            Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof
+                        ) {
+                            break;
+                        }
+                        if self.peek_is_postfix_stmt_modifier_keyword() {
+                            break;
+                        }
+                        parts.push(self.parse_assign_expr()?);
+                    }
+                }
+                if parts.len() == 1 {
+                    let n = parts.pop().unwrap();
+                    return Ok(Expr {
+                        kind: ExprKind::FuncCall {
+                            name: "chunked".to_string(),
+                            args: vec![n],
+                        },
+                        line,
+                    });
+                }
+                if parts.is_empty() {
+                    return Ok(Expr {
+                        kind: ExprKind::FuncCall {
+                            name: "chunked".to_string(),
+                            args: parts,
+                        },
+                        line,
+                    });
+                }
+                if parts.len() == 2 {
+                    let n = parts.pop().unwrap();
+                    let list = parts.pop().unwrap();
+                    return Ok(Expr {
+                        kind: ExprKind::FuncCall {
+                            name: "chunked".to_string(),
+                            args: vec![list, n],
+                        },
+                        line,
+                    });
+                }
+                Err(self.syntax_err(
+                    "chunked: use LIST |> chunked(N) or chunked((1,2,3), 2)",
+                    line,
+                ))
+            }
+            "windowed" => {
+                let mut parts = Vec::new();
+                if self.eat(&Token::LParen) {
+                    if !matches!(self.peek(), Token::RParen) {
+                        parts.push(self.parse_assign_expr()?);
+                        while self.eat(&Token::Comma) {
+                            if matches!(self.peek(), Token::RParen) {
+                                break;
+                            }
+                            parts.push(self.parse_assign_expr()?);
+                        }
+                    }
+                    self.expect(&Token::RParen)?;
+                } else {
+                    parts.push(self.parse_assign_expr()?);
+                    loop {
+                        if !self.eat(&Token::Comma) && !self.eat(&Token::FatArrow) {
+                            break;
+                        }
+                        if matches!(
+                            self.peek(),
+                            Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof
+                        ) {
+                            break;
+                        }
+                        if self.peek_is_postfix_stmt_modifier_keyword() {
+                            break;
+                        }
+                        parts.push(self.parse_assign_expr()?);
+                    }
+                }
+                if parts.len() == 1 {
+                    let n = parts.pop().unwrap();
+                    return Ok(Expr {
+                        kind: ExprKind::FuncCall {
+                            name: "windowed".to_string(),
+                            args: vec![n],
+                        },
+                        line,
+                    });
+                }
+                if parts.is_empty() {
+                    return Ok(Expr {
+                        kind: ExprKind::FuncCall {
+                            name: "windowed".to_string(),
+                            args: parts,
+                        },
+                        line,
+                    });
+                }
+                if parts.len() == 2 {
+                    let n = parts.pop().unwrap();
+                    let list = parts.pop().unwrap();
+                    return Ok(Expr {
+                        kind: ExprKind::FuncCall {
+                            name: "windowed".to_string(),
+                            args: vec![list, n],
+                        },
+                        line,
+                    });
+                }
+                Err(self.syntax_err(
+                    "windowed: use LIST |> windowed(N) or windowed((1,2,3), 2)",
+                    line,
+                ))
+            }
+            "any" | "all" | "none" => {
+                let (block, list, progress) = self.parse_block_then_list_optional_progress()?;
+                if progress.is_some() {
+                    return Err(self.syntax_err(
+                        "`progress =>` is not supported for any/all/none (use pany for parallel + progress)",
+                        line,
+                    ));
+                }
+                let cr = Expr {
+                    kind: ExprKind::CodeRef {
+                        params: vec![],
+                        body: block,
+                    },
+                    line,
+                };
+                Ok(Expr {
+                    kind: ExprKind::FuncCall {
+                        name: name.clone(),
+                        args: vec![cr, list],
+                    },
+                    line,
+                })
+            }
+            "take_while" | "drop_while" => {
+                let (block, list, progress) = self.parse_block_then_list_optional_progress()?;
+                if progress.is_some() {
+                    return Err(self.syntax_err(
+                        "`progress =>` is not supported for take_while/drop_while",
+                        line,
+                    ));
+                }
+                let cr = Expr {
+                    kind: ExprKind::CodeRef {
+                        params: vec![],
+                        body: block,
+                    },
+                    line,
+                };
+                Ok(Expr {
+                    kind: ExprKind::FuncCall {
+                        name: name.to_string(),
+                        args: vec![cr, list],
+                    },
+                    line,
+                })
+            }
+            "group_by" | "chunk_by" => {
+                if matches!(self.peek(), Token::LBrace) {
+                    let (block, list) = self.parse_block_list()?;
+                    let cr = Expr {
+                        kind: ExprKind::CodeRef {
+                            params: vec![],
+                            body: block,
+                        },
+                        line,
+                    };
+                    Ok(Expr {
+                        kind: ExprKind::FuncCall {
+                            name: name.to_string(),
+                            args: vec![cr, list],
+                        },
+                        line,
+                    })
+                } else {
+                    let key_expr = self.parse_assign_expr()?;
+                    self.expect(&Token::Comma)?;
+                    let list_parts = self.parse_list_until_terminator()?;
+                    let list_expr = if list_parts.len() == 1 {
+                        list_parts.into_iter().next().unwrap()
+                    } else {
+                        Expr {
+                            kind: ExprKind::List(list_parts),
+                            line,
+                        }
+                    };
+                    Ok(Expr {
+                        kind: ExprKind::FuncCall {
+                            name: name.to_string(),
+                            args: vec![key_expr, list_expr],
+                        },
+                        line,
+                    })
+                }
+            }
+            "with_index" => {
+                if self.pipe_supplies_slurped_list_operand() {
+                    return Ok(Expr {
+                        kind: ExprKind::FuncCall {
+                            name: "with_index".to_string(),
+                            args: vec![],
+                        },
+                        line,
+                    });
+                }
+                let (list, progress) = self.parse_assign_expr_list_optional_progress()?;
+                if progress.is_some() {
+                    return Err(
+                        self.syntax_err("`progress =>` is not supported for with_index", line)
+                    );
+                }
+                Ok(Expr {
+                    kind: ExprKind::FuncCall {
+                        name: "with_index".to_string(),
+                        args: vec![list],
                     },
                     line,
                 })
@@ -5894,11 +6489,7 @@ impl Parser {
         if self.in_pipe_rhs()
             && matches!(
                 self.peek(),
-                Token::Semicolon
-                    | Token::RBrace
-                    | Token::RParen
-                    | Token::Eof
-                    | Token::PipeForward
+                Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof | Token::PipeForward
             )
         {
             let line = self.peek_line();
@@ -5952,6 +6543,37 @@ impl Parser {
         self.expect(&Token::Comma)?;
         let block = self.parse_block()?;
         self.eat(&Token::Comma);
+        let line = self.peek_line();
+        if let Token::Ident(ref kw) = self.peek().clone() {
+            if kw == "progress" && matches!(self.peek_at(1), Token::FatArrow) {
+                self.advance();
+                self.expect(&Token::FatArrow)?;
+                let prog = self.parse_assign_expr()?;
+                return Ok((
+                    init,
+                    block,
+                    Expr {
+                        kind: ExprKind::List(vec![]),
+                        line,
+                    },
+                    Some(prog),
+                ));
+            }
+        }
+        if matches!(
+            self.peek(),
+            Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof
+        ) {
+            return Ok((
+                init,
+                block,
+                Expr {
+                    kind: ExprKind::List(vec![]),
+                    line,
+                },
+                None,
+            ));
+        }
         let mut parts = vec![self.parse_assign_expr()?];
         loop {
             if !self.eat(&Token::Comma) && !self.eat(&Token::FatArrow) {
@@ -5986,6 +6608,40 @@ impl Parser {
     ) -> PerlResult<(Block, Expr, Option<Expr>)> {
         let block = self.parse_block()?;
         self.eat(&Token::Comma);
+        let line = self.peek_line();
+        if let Token::Ident(ref kw) = self.peek().clone() {
+            if kw == "progress" && matches!(self.peek_at(1), Token::FatArrow) {
+                self.advance();
+                self.expect(&Token::FatArrow)?;
+                let prog = self.parse_assign_expr()?;
+                return Ok((
+                    block,
+                    Expr {
+                        kind: ExprKind::List(vec![]),
+                        line,
+                    },
+                    Some(prog),
+                ));
+            }
+        }
+        // An empty list operand is allowed when the next token terminates the
+        // enclosing context. Inside a pipe-forward RHS, a trailing `,` also
+        // counts — `foo(bar, @a |> pmap { $_ * 2 }, baz)`.
+        let empty_list_ok = matches!(
+            self.peek(),
+            Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof
+        ) || (self.in_pipe_rhs()
+            && matches!(self.peek(), Token::Comma | Token::PipeForward));
+        if empty_list_ok {
+            return Ok((
+                block,
+                Expr {
+                    kind: ExprKind::List(vec![]),
+                    line,
+                },
+                None,
+            ));
+        }
         let mut parts = vec![self.parse_assign_expr()?];
         loop {
             if !self.eat(&Token::Comma) && !self.eat(&Token::FatArrow) {
@@ -6049,6 +6705,24 @@ impl Parser {
     /// Comma-separated assign expressions with optional trailing `, progress => EXPR`
     /// (for `pmap_chunked`, `psort`, etc.).
     fn parse_assign_expr_list_optional_progress(&mut self) -> PerlResult<(Expr, Option<Expr>)> {
+        // On the RHS of `|>`, list-taking builtins may be written bare with no
+        // operand — `@a |> uniq`, `@a |> flatten`, `foo(bar, @a |> psort)`, etc.
+        // When the next token is a list-terminator, yield an empty placeholder
+        // list; [`Self::pipe_forward_apply`] substitutes the piped LHS at
+        // desugar time, so the placeholder is never evaluated.
+        if self.in_pipe_rhs()
+            && matches!(
+                self.peek(),
+                Token::Semicolon
+                    | Token::RBrace
+                    | Token::RParen
+                    | Token::Eof
+                    | Token::PipeForward
+                    | Token::Comma
+            )
+        {
+            return Ok((self.pipe_placeholder_list(self.peek_line()), None));
+        }
         let mut parts = vec![self.parse_assign_expr()?];
         loop {
             if !self.eat(&Token::Comma) && !self.eat(&Token::FatArrow) {
@@ -6247,15 +6921,28 @@ impl Parser {
 
     pub(crate) fn parse_arg_list(&mut self) -> PerlResult<Vec<Expr>> {
         let mut args = Vec::new();
+        // Inside `(...)`, `|>` is a normal operator again (e.g. `f(2 |> g, 3)`),
+        // so shadow any outer paren-less-arg suppression from
+        // `no_pipe_forward_depth`. Saturating so nested mixes are safe.
+        let saved_no_pf = self.no_pipe_forward_depth;
+        self.no_pipe_forward_depth = 0;
         while !matches!(
             self.peek(),
             Token::RParen | Token::RBracket | Token::RBrace | Token::Eof
         ) {
-            args.push(self.parse_assign_expr()?);
+            let arg = match self.parse_assign_expr() {
+                Ok(e) => e,
+                Err(err) => {
+                    self.no_pipe_forward_depth = saved_no_pf;
+                    return Err(err);
+                }
+            };
+            args.push(arg);
             if !self.eat(&Token::Comma) && !self.eat(&Token::FatArrow) {
                 break;
             }
         }
+        self.no_pipe_forward_depth = saved_no_pf;
         Ok(args)
     }
 
@@ -6344,14 +7031,14 @@ impl Parser {
 
     fn parse_list_until_terminator(&mut self) -> PerlResult<Vec<Expr>> {
         let mut args = Vec::new();
+        // Paren-less builtin args: `|>` terminates the whole call list, so
+        // individual args must not absorb a following `|>` via their own
+        // `parse_pipe_forward` recursion. See `no_pipe_forward_depth` docs.
+        self.no_pipe_forward_depth = self.no_pipe_forward_depth.saturating_add(1);
         loop {
             if matches!(
                 self.peek(),
-                Token::Semicolon
-                    | Token::RBrace
-                    | Token::RParen
-                    | Token::Eof
-                    | Token::PipeForward
+                Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof | Token::PipeForward
             ) {
                 break;
             }
@@ -6364,11 +7051,19 @@ impl Parser {
                     break;
                 }
             }
-            args.push(self.parse_assign_expr()?);
+            let arg = match self.parse_assign_expr() {
+                Ok(e) => e,
+                Err(err) => {
+                    self.no_pipe_forward_depth = self.no_pipe_forward_depth.saturating_sub(1);
+                    return Err(err);
+                }
+            };
+            args.push(arg);
             if !self.eat(&Token::Comma) {
                 break;
             }
         }
+        self.no_pipe_forward_depth = self.no_pipe_forward_depth.saturating_sub(1);
         Ok(args)
     }
 

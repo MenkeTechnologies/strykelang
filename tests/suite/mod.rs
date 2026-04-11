@@ -21,6 +21,7 @@ mod eval_errors;
 mod expressions;
 mod fix_regressions;
 mod fs_io;
+mod jwt_and_log;
 mod language_extensions;
 mod lib_api;
 mod list_util;

@@ -610,6 +610,21 @@ impl PerlValue {
         .flatten()
     }
 
+    /// Expand a `map` / `flat_map` / `pflat_map` block result into list elements. Plain arrays
+    /// expand; when `peel_array_ref`, a single ARRAY ref is dereferenced one level (perlrs
+    /// `flat_map` / `pflat_map`; stock `map` uses `peel_array_ref == false`).
+    pub fn map_flatten_outputs(&self, peel_array_ref: bool) -> Vec<PerlValue> {
+        if let Some(a) = self.as_array_vec() {
+            return a;
+        }
+        if peel_array_ref {
+            if let Some(r) = self.as_array_ref() {
+                return r.read().clone();
+            }
+        }
+        vec![self.clone()]
+    }
+
     #[inline]
     pub fn as_hash_map(&self) -> Option<IndexMap<String, PerlValue>> {
         self.with_heap(|h| match h {

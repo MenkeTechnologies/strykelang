@@ -676,10 +676,10 @@ fn pipe_bareword_rhs_becomes_funccall() {
     }
 }
 
-/// `x |> f(a)` — LHS is prepended as the **first** argument (Elixir-style).
+/// `x |> f a, b` — LHS is prepended as the **first** argument (Elixir-style).
 #[test]
 fn pipe_prepends_lhs_as_first_arg() {
-    match first_expr_kind("10 |> f(20, 30);") {
+    match first_expr_kind("10 |> f 20, 30;") {
         ExprKind::FuncCall { name, args } => {
             assert_eq!(name, "f");
             assert_eq!(args.len(), 3);
@@ -735,7 +735,7 @@ fn pipe_into_unary_builtin_replaces_operand() {
 #[test]
 fn pipe_into_map_fills_list_slot() {
     match first_expr_kind("(1,2,3) |> map { $_ * 2 };") {
-        ExprKind::MapExpr { block, list } => {
+        ExprKind::MapExpr { block, list, .. } => {
             assert!(!block.is_empty());
             assert!(matches!(list.kind, ExprKind::List(ref v) if v.len() == 3));
         }
@@ -743,10 +743,10 @@ fn pipe_into_map_fills_list_slot() {
     }
 }
 
-/// `@arr |> join(",")` — join accepts the otherwise-missing list when piped.
+/// `@arr |> join ","` — join accepts the otherwise-missing list when piped.
 #[test]
 fn pipe_into_join_fills_missing_list() {
-    match first_expr_kind("(1,2) |> join(\",\");") {
+    match first_expr_kind("(1,2) |> join \",\";") {
         ExprKind::JoinExpr { separator, list } => {
             assert!(matches!(separator.kind, ExprKind::String(ref s) if s == ","));
             // LHS `(1, 2)` is a List expr now sitting in the list slot.
@@ -756,11 +756,112 @@ fn pipe_into_join_fills_missing_list() {
     }
 }
 
-/// Mixed chain `(1..3) |> map { $_*$_ } |> join(",")` — should end up as a
+/// Regression: `@a |> head 2 |> join "-"` must chain left-associatively as
+/// `(@a |> head 2) |> join "-"`, not `@a |> (head(2) |> join("-"))`.
+/// Before the `no_pipe_forward_depth` fix, `head`'s paren-less arg parser
+/// reached `parse_pipe_forward` via `parse_assign_expr` and swallowed the
+/// outer `|>` as part of its first argument, producing the wrong tree.
+#[test]
+fn pipe_chain_parenless_arg_does_not_swallow_outer_pipe() {
+    // `qw(a b c d) |> head 2 |> join "-"` should parse as a `JoinExpr` whose
+    // `list` slot is a `FuncCall { name: "head", args: [qw(...), 2] }`, not
+    // as a `FuncCall { name: "head", args: [qw(...), <something containing |>>] }`.
+    match first_expr_kind("qw(a b c d) |> head 2 |> join \"-\";") {
+        ExprKind::JoinExpr { separator, list } => {
+            assert!(
+                matches!(separator.kind, ExprKind::String(ref s) if s == "-"),
+                "join separator should be \"-\""
+            );
+            match &list.kind {
+                ExprKind::FuncCall {
+                    name: head_name,
+                    args: head_args,
+                } => {
+                    assert_eq!(head_name, "head");
+                    // head( qw(a b c d), 2 ) — exactly two args, the second
+                    // being the integer literal `2` (not an expression that
+                    // absorbed the outer `|> join "-"`).
+                    assert_eq!(
+                        head_args.len(),
+                        2,
+                        "head should receive exactly the piped LIST and the count `2`"
+                    );
+                    assert!(
+                        matches!(head_args[1].kind, ExprKind::Integer(2)),
+                        "head's second arg should be the integer 2, got {:?}",
+                        head_args[1].kind
+                    );
+                }
+                k => panic!("expected inner `head` FuncCall, got {k:?}"),
+            }
+        }
+        k => panic!("expected outer JoinExpr, got {k:?}"),
+    }
+}
+
+/// Regression companion: three-stage paren-less chain also left-associates.
+/// `qw(a..e) |> head 3 |> tail 2 |> join "-"` → Join(Tail(Head(qw, 3), 2), "-").
+#[test]
+fn pipe_chain_three_parenless_stages_left_associative() {
+    match first_expr_kind("qw(a b c d e) |> head 3 |> tail 2 |> join \"-\";") {
+        ExprKind::JoinExpr { list, .. } => match &list.kind {
+            ExprKind::FuncCall {
+                name: tail_name,
+                args: tail_args,
+            } => {
+                assert_eq!(tail_name, "tail");
+                assert_eq!(tail_args.len(), 2);
+                assert!(matches!(tail_args[1].kind, ExprKind::Integer(2)));
+                match &tail_args[0].kind {
+                    ExprKind::FuncCall {
+                        name: head_name,
+                        args: head_args,
+                    } => {
+                        assert_eq!(head_name, "head");
+                        assert_eq!(head_args.len(), 2);
+                        assert!(matches!(head_args[1].kind, ExprKind::Integer(3)));
+                    }
+                    k => panic!("expected inner `head` FuncCall, got {k:?}"),
+                }
+            }
+            k => panic!("expected middle `tail` FuncCall, got {k:?}"),
+        },
+        k => panic!("expected outer JoinExpr, got {k:?}"),
+    }
+}
+
+/// Parens must still re-enable pipe-forward inside a paren-less outer call:
+/// `head((1,2,3) |> tail 2)` — the inner `|>` is inside `(...)` so it binds
+/// normally, even though `head`'s arg parsing otherwise suppresses `|>`.
+#[test]
+fn parens_reenable_pipe_forward_inside_parenless_call() {
+    match first_expr_kind("head((1, 2, 3) |> tail 2);") {
+        ExprKind::FuncCall { name, args } => {
+            assert_eq!(name, "head");
+            assert_eq!(args.len(), 1);
+            // The single arg to `head` should be a `tail` FuncCall produced
+            // by the inner pipe-forward desugar — *not* a raw list.
+            match &args[0].kind {
+                ExprKind::FuncCall {
+                    name: tail_name,
+                    args: tail_args,
+                } => {
+                    assert_eq!(tail_name, "tail");
+                    assert_eq!(tail_args.len(), 2);
+                    assert!(matches!(tail_args[1].kind, ExprKind::Integer(2)));
+                }
+                k => panic!("expected inner `tail` FuncCall from pipe, got {k:?}"),
+            }
+        }
+        k => panic!("expected outer `head` FuncCall, got {k:?}"),
+    }
+}
+
+/// Mixed chain `(1..3) |> map { $_*$_ } |> join ","` — should end up as a
 /// JoinExpr whose list is a MapExpr whose list is the original range.
 #[test]
 fn pipe_chain_map_into_join() {
-    match first_expr_kind("(1..3) |> map { $_ * $_ } |> join(\",\");") {
+    match first_expr_kind("(1..3) |> map { $_ * $_ } |> join \",\";") {
         ExprKind::JoinExpr { list, .. } => match &list.kind {
             ExprKind::MapExpr { list: inner, .. } => {
                 assert!(matches!(inner.kind, ExprKind::Range { .. }));
@@ -814,10 +915,7 @@ fn pipe_binds_looser_than_addition() {
             assert_eq!(args.len(), 1);
             assert!(matches!(
                 args[0].kind,
-                ExprKind::BinOp {
-                    op: BinOp::Add,
-                    ..
-                }
+                ExprKind::BinOp { op: BinOp::Add, .. }
             ));
         }
         k => panic!("expected FuncCall wrapping 1+2, got {k:?}"),

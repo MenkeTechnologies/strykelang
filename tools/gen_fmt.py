@@ -573,10 +573,22 @@ def main() -> None:
         "Match": 'format!("({} =~ /{}/{})", format_expr(expr), pattern, flags)',
         "Substitution": 'format!("({} =~ s/{}/{}/{})", format_expr(expr), pattern, replacement, flags)',
         "Transliterate": 'format!("({} =~ tr/{}/{}/{})", format_expr(expr), from, to, flags)',
-        "MapExpr": 'format!("map {{\\n{}\\n}} {}", format_block(block), format_expr(list))',
+        "MapExpr": """{
+            let kw = if *flatten_array_refs { "flat_map" } else { "map" };
+            format!("{} {{\\n{}\\n}} {}", kw, format_block(block), format_expr(list))
+        }""",
+        "MapExprComma": """{
+            let kw = if *flatten_array_refs { "flat_map" } else { "map" };
+            format!("{}, {}, {}", kw, format_expr(expr), format_expr(list))
+        }""",
         "GrepExpr": 'format!("grep {{\\n{}\\n}} {}", format_block(block), format_expr(list))',
         "SortExpr": """match cmp {
-                Some(b) => format!("sort {{\\n{}\\n}} {}", format_block(b), format_expr(list)),
+                Some(crate::ast::SortComparator::Block(b)) => {
+                    format!("sort {{\\n{}\\n}} {}", format_block(b), format_expr(list))
+                }
+                Some(crate::ast::SortComparator::Code(e)) => {
+                    format!("sort {} {}", format_expr(e), format_expr(list))
+                }
                 None => format!("sort {}", format_expr(list)),
             }""",
         "JoinExpr": 'format!("join({}, {})", format_expr(separator), format_expr(list))',
@@ -584,14 +596,18 @@ def main() -> None:
                 Some(l) => format!("split({}, {}, {})", format_expr(pattern), format_expr(string), format_expr(l)),
                 None => format!("split({}, {})", format_expr(pattern), format_expr(string)),
             }""",
-        "PMapExpr": """match progress {
-                Some(p) => format!(
-                    "pmap {{\\n{}\\n}} {}, progress => {}",
+        "PMapExpr": """{
+                let kw = if *flat_outputs { "pflat_map" } else { "pmap" };
+                let base = format!(
+                    "{}{{\\n{{}}\\n}} {{}}",
+                    kw,
                     format_block(block),
-                    format_expr(list),
-                    format_expr(p)
-                ),
-                None => format!("pmap {{\\n{}\\n}} {}", format_block(block), format_expr(list)),
+                    format_expr(list)
+                );
+                match progress {
+                    Some(p) => format!("{}, progress => {}", base, format_expr(p)),
+                    None => base,
+                }
             }""",
         "PMapChunkedExpr": """match progress {
                 Some(p) => format!(

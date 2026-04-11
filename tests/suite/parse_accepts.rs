@@ -470,6 +470,7 @@ fn accepts_join_split_reverse_sort_block() {
     p("join ',', (1,2);");
     p("split /,/, 'a,b';");
     p("reverse (1,2);");
+    p("reversed (1,2);");
     p("sort { $a <=> $b } (2,1);");
 }
 
@@ -667,4 +668,40 @@ fn accepts_for_last_next() {
 #[test]
 fn accepts_wantarray() {
     p("wantarray;");
+}
+
+#[test]
+fn accepts_join_puniq_call() {
+    p(r#"(1, 2, 2, 1, 3, 1) |> puniq |> join ',';"#);
+    p(r#"(1, 2, 2, 1, 3, 1) |> puniq |> join ','"#);
+}
+
+#[test]
+fn accepts_bare_uniq_any_all_none() {
+    p(r#"(1, [2, 3]) |> flatten |> join ',';"#);
+    p(r#"list_count(1, 2, 3);"#);
+    p(r#"list_size();"#);
+    p(r#"(1, 1, 2, 3) |> distinct |> join ',';"#);
+    p(r#"(1, 1, 2, 3) |> uniq |> join ',';"#);
+    p(r#"(1, 2, 3) |> shuffle |> join '-';"#);
+    p(r#"scalar (1, 2, 3, 4) |> chunked 2;"#);
+    p(r#"scalar (1, 2, 3) |> windowed 2;"#);
+    p(r#"windowed(2);"#);
+    p(r#"chunked(2);"#);
+    p(r#"(1, 2) |> chunked 2;"#);
+    p(r#"(9, 8) |> windowed 2;"#);
+    p(r#"(1, 2) |> fold { $a + $b };"#);
+    p(r#"(1, 2, 3) |> fold { $a + $b };"#);
+    p(r#"qw(x y) |> List::Util::fold { $a . $b };"#);
+    p(r#"(1, 2) |> take_while { $_ < 9 } |> join ',';"#);
+    p(r#"(1, 2) |> drop_while { 0 } |> join ',';"#);
+    p(r#"scalar with_index((1, 2));"#);
+    p(r#"(1, 2, 3) |> with_index;"#);
+    p(r#"any { $_ > 1 } (1, 2, 3);"#);
+    p(r#"all { $_ > 0 } (1, 2);"#);
+    p(r#"none { $_ < 0 } (1, 2);"#);
+    p(r#"chunk_by { $_ % 2 } (1, 3, 2);"#);
+    p(r#"group_by { 0 } (9);"#);
+    p(r#"group_by $_ % 2, (1, 2);"#);
+    p(r#"(1, 2, 3) |> chunk_by { $_ };"#);
 }

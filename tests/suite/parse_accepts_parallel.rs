@@ -169,24 +169,24 @@ fn accepts_pipeline_qualified_method() {
 
 #[test]
 fn accepts_preduce_preduce_init_pmap_reduce_progress() {
-    p("my $a = preduce { $a + $b } (1, 2, 3), progress => 1;");
-    p("my $b = preduce_init 0, { $a + $b } (1, 2), progress => 0;");
-    p("my $c = pmap_reduce { $_ * 2 } { $a + $b } (1, 2, 3), progress => 1;");
+    p("my $a = (1, 2, 3) |> preduce { $a + $b }, progress => 1;");
+    p("my $b = (1, 2) |> preduce_init 0, { $a + $b }, progress => 0;");
+    p("my $c = (1, 2, 3) |> pmap_reduce { $_ * 2 } { $a + $b }, progress => 1;");
 }
 
 #[test]
 fn accepts_preduce_block() {
-    p("my $sum = preduce { $a + $b } (1, 2, 3);");
+    p("my $sum = (1, 2, 3) |> preduce { $a + $b };");
 }
 
 #[test]
 fn accepts_preduce_with_array() {
-    p("my @nums = (1, 2, 3); preduce { $a + $b } @nums;");
+    p("my @nums = (1, 2, 3); @nums |> preduce { $a + $b };");
 }
 
 #[test]
 fn accepts_preduce_init() {
-    p("my @words = qw(a b a); my $h = preduce_init {}, { $a->{$b}++; $a } @words;");
+    p("my @words = qw(a b a); my $h = @words |> preduce_init {}, { $a->{$b}++; $a };");
 }
 
 #[test]

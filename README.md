@@ -116,18 +116,18 @@ echo a:b:c | pe -aF: -ne 'print $F[1]'  # auto-split
 Each parallel block runs in its own interpreter context with **captured lexical scope** — no data races. Use `mysync` for shared counters. Optional `progress => 1` enables an animated stderr bar (TTY) or per-item log lines (non-TTY).
 
 ```perl
-# map / grep / sort / fold / for in parallel
-my @doubled = pmap   { $_ * 2     } @data,    progress => 1;
-my @evens   = pgrep  { $_ % 2 == 0 } @data;
-my @sorted  = psort  { $a <=> $b  } @data;
-my $sum     = preduce{ $a + $b    } @numbers;
-pfor                 { process }    @items;
+# map / grep / sort / fold / for in parallel (list can be piped in)
+my @doubled = @data |> pmap   { $_ * 2     },    progress => 1;
+my @evens   = @data |> pgrep  { $_ % 2 == 0 };
+my @sorted  = @data |> psort  { $a <=> $b  };
+my $sum     = @numbers |> preduce { $a + $b };
+@items |> pfor { process };
 
 # fused map+reduce, chunked map, memoized map, init fold
-my $sum2     = pmap_reduce  { $_ * 2 } { $a + $b } @nums;
-my @squared  = pmap_chunked 1000 { $_ ** 2 } @million;
-my @once     = pcache       { expensive } @inputs;
-my $hist     = preduce_init {}, { my ($acc, $x) = @_; $acc->{$x}++; $acc } @words;
+my $sum2     = @nums |> pmap_reduce  { $_ * 2 } { $a + $b };
+my @squared  = @million |> pmap_chunked 1000 { $_ ** 2 };
+my @once     = @inputs |> pcache       { expensive };
+my $hist     = @words |> preduce_init {}, { my ($acc, $x) = @_; $acc->{$x}++; $acc };
 
 # fan — run a block N times in parallel ($_ = 0..N-1)
 fan 8           { work };
@@ -135,8 +135,10 @@ fan             { work };                # uses rayon pool size (`pe -j`)
 my @r = fan_cap { $_ * $_ };             # capture results in $_ order
 
 # pipelines — sequential or rayon-backed; same chain methods
-my @r = pipeline(@data)->filter({ $_ > 10 })->map({ $_ * 2 })->take(100)->collect();
-my @r = par_pipeline(@data)->filter({ $_ > 10 })->map({ $_ * 2 })->collect();
+my @r = (@data |> pipeline)->filter({ $_ > 10 })->map({ $_ * 2 })->take(100)->collect;
+### or 
+my @r = @data |> pipeline |> filter { $_ > 10 } |> map { $_ * 2 } |> take 100 |> collect;
+my @r = @data |> par_pipeline |> filter { $_ > 10 } |> map { $_ * 2 } |> collect;
 
 # multi-stage: batch (each stage drains list before next)
 my $n = par_pipeline(
@@ -147,7 +149,7 @@ my $n = par_pipeline(
 );
 
 # multi-stage: streaming (bounded crossbeam channels, concurrent stages, order NOT preserved)
-my @r = par_pipeline_stream((1..1_000))->filter({ $_ > 500 })->map({ $_ * 2 })->collect();
+my @r = ((1..1_000) |> par_pipeline_stream)->filter({ $_ > 500 })->map({ $_ * 2 })->collect();
 
 # channels + Go-style select
 my ($tx, $rx) = pchannel(128);           # bounded; pchannel() is unbounded
@@ -164,17 +166,17 @@ $pool->submit({ heavy_work }) for @tasks;
 my @results = $pool->collect();
 
 # parallel file IO
-my @logs = glob_par("**/*.log");                # rayon recursive glob
-par_lines "./big.log", sub { say if /ERROR/ };  # mmap + chunked line scan
+my @logs = "**/*.log" |> glob_par;              # rayon recursive glob
+par_lines "./big.log", { say if /ERROR/ };  # mmap + chunked line scan
 par_walk  ".", { say if /\.rs$/ };              # parallel directory walk
 par_sed qr/\bfoo\b/, "bar", @paths;             # parallel in-place sed (returns # changed)
 
 # native file watcher (notify crate: inotify/kqueue/FSEvents)
 watch  "/tmp/x", { say };
-pwatch "logs/*", sub { ... };
+pwatch "logs/*", { ... };
 
 # control thread count
-pe -j 8 -e 'pmap { heavy } @data'
+pe -j 8 -e '@data |> pmap { heavy }'
 ```
 
 **Parallel capture safety** — workers set `Scope::parallel_guard` after restoring captured lexicals. Assignments to captured non-`mysync` aggregates are rejected at runtime; `mysync`, package-qualified names, and topics (`$_`/`$a`/`$b`) are allowed. `pmap`/`pgrep` treat block failures as `undef`/false; use `pfor` when failures must abort.
@@ -191,10 +193,10 @@ fan 10000 { $counter++ };               # always exactly 10000
 print $counter;
 
 mysync @results;
-pfor { push @results, $_ * $_ } (1..100);
+(1..100) |> pfor { push @results, $_ * $_ };
 
 mysync %histogram;
-pfor { $histogram{$_ % 10} += 1 } (0..999);
+(0..999) |> pfor { $histogram{$_ % 10} += 1 };
 
 # deque() and heap(...) already use Arc<Mutex<...>> internally
 mysync $q  = deque();
@@ -221,12 +223,12 @@ For `mysync` scalars holding a `Set`, `|`/`&` are union/intersection. Without `m
 | **Structs / Types** | `struct Name { x => Float, y => Int }; Name->new(...)`; `typed my $x : Int\|Str\|Float` |
 
 ```perl
-my $data = fetch_json("https://api.example.com/users/1");
+my $data = "https://api.example.com/users/1" |> fetch_json;
 say $data->{name};
 
-my @rows = csv_read("data.csv");
-my $df   = dataframe("data.csv");
-my $db   = sqlite("app.db");
+my @rows = "data.csv" |> csv_read;
+my $df   = "data.csv" |> dataframe;
+my $db   = "app.db" |> sqlite;
 $db->exec("CREATE TABLE t (id INTEGER, name TEXT)");
 
 struct Point { x => Float, y => Float };
@@ -241,8 +243,8 @@ $n = 42;
 
 ```perl
 # async / spawn / await — lightweight structured concurrency
-my $data = async { fetch_url("https://example.com/") };
-my $file = spawn { slurp("big.csv") };
+my $data = async { "https://example.com/" |> fetch };
+my $file = spawn { "big.csv" |> \&slurp };
 print await($data), await($file);
 
 # trace mysync mutations to stderr (under fan, lines tagged with worker index)
@@ -295,7 +297,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
 | Category | Functions |
 | --- | --- |
-| Array | `push`, `pop`, `shift`, `unshift`, `splice`, `reverse`, `sort`, `map`, `grep`, `reduce`, `preduce`, `scalar` |
+| Array | `push`, `pop`, `shift`, `unshift`, `splice`, `reverse`, `sort`, `map`, `grep`, `reduce`, `fold`, `preduce`, `scalar` |
 | Hash | `keys`, `values`, `each`, `delete`, `exists` |
 | String | `chomp`, `chop`, `length`, `substr`, `index`, `rindex`, `split`, `join`, `sprintf`, `printf`, `uc`/`lc`/`ucfirst`/`lcfirst`, `chr`, `ord`, `hex`, `oct`, `crypt`, `fc`, `pos`, `study`, `quotemeta` |
 | Binary | `pack`, `unpack` (subset `A a N n V v C Q q Z H x` + `*`) |
@@ -320,6 +322,15 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **`%SIG` (Unix)** — `SIGINT`/`SIGTERM`/`SIGALRM`/`SIGCHLD` as code refs; handlers run between statements/opcodes via `perl_signal::poll`. `IGNORE` and `DEFAULT` honored.
 - **`format` / `write`** — partial: `format NAME = ... .` registers a template; pictures `@<<<<`, `@>>>>`, `@||||`, `@####`, `@****`, literal `@@`. `write` (no args) uses `$~` to stdout. Not yet: `write FILEHANDLE`, `$^`, `formline`.
 - **`@INC` / `%INC` / `require` / `use`** — `@INC` is built from `-I`, `vendor/perl`, system `perl`'s `@INC` (set `PERLRS_NO_PERL_INC` to skip), the script dir, `PERLRS_INC`, then `.`. `List::Util` is implemented natively in Rust (`src/list_util.rs`). `use Module qw(a b);` honors `@EXPORT_OK`/`@EXPORT`. Built-in pragmas (`strict`, `warnings`, `utf8`, `feature`, `open`, `Env`) do not load files.
+- **`chunked` / `windowed` / `fold`** — Use **pipe-forward**: **`LIST |> chunked(N)`**, **`LIST |> windowed(N)`**, **`LIST |> fold { BLOCK }`** (same for **`reduce`**). `List::Util::fold` / **`qw(...) |> List::Util::fold { }`** alias **`List::Util::reduce`**. List context → arrayrefs per chunk/window or the folded value; scalar context → chunk/window count where applicable.
+
+  ```perl
+  my @pairs = (1, 2, 3, 4) |> chunked(2);           # ([1,2], [3,4])
+  my @slide = (1, 2, 3) |> windowed(2);             # ([1,2], [2,3])
+  my @pipe  = (10, 20, 30) |> chunked(2);           # ([10,20], [30])
+  my $sum   = (1, 2, 3, 4) |> fold { $a + $b };     # same as reduce
+  my $cat   = qw(a b c) |> List::Util::fold { $a . $b };
+  ```
 - **`use strict`** — refs/subs/vars modes (per-mode `use strict 'refs'` etc.). `strict refs` rejects symbolic derefs at runtime; `strict vars` requires a visible binding.
 - **`BEGIN` / `UNITCHECK` / `CHECK` / `INIT` / `END`** — Perl order; `${^GLOBAL_PHASE}` matches Perl in tree-walker and VM.
 - **String interpolation** — `$var`, `$h{k}`, `$a[i]`, `@a`, `@a[slice]` (joined with `$"`), `$#a` in slice indices, `$0`, `$1..$n`. `\x{hex}` and unbraced `\x`.
@@ -347,10 +358,12 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   # unary builtins — `x |> length`, `x |> uc`, etc.
   "hello" |> length |> say;                            # 5
+  # builtins parsed as `name(ARG)` only (no bare `name` RHS): use `x |> \&slurp` or `slurp("x")`
 
   # bareword on RHS becomes a unary call: `x |> f` → `f(x)`
   # call on RHS prepends: `x |> f(a, b)` → `f(x, a, b)`
-  # map/grep/sort/join/reduce — LHS fills the list slot
+  # map/grep/sort/join/reduce/fold — LHS fills the list slot
+  # chunked/windowed — `LIST |> chunked(N)` prepends the list before the size
   # scalar on RHS: `x |> $cr` → `$cr->(x)`
   ```
 

@@ -14,7 +14,11 @@ use crate::value::{BlessedRef, HeapObject, PerlSub, PerlValue};
 /// True if the program may reference `List::Util` (`use`, `require`, or qualified calls).
 /// Used to skip installing [`install_list_util`] for tiny programs (benchmark startup).
 pub fn program_needs_list_util(program: &Program) -> bool {
-    format!("{program:?}").contains("List::Util")
+    let s = format!("{program:?}");
+    s.contains("List::Util")
+        || s.contains("chunked")
+        || s.contains("windowed")
+        || s.contains("fold")
 }
 
 /// Ensure [`install_list_util`] ran (cheap `contains_key` after the first program prepare).
@@ -145,13 +149,19 @@ const LIST_UTIL_ROOT: &[&str] = &[
     "max",
     "minstr",
     "maxstr",
+    "mean",
+    "median",
+    "mode",
     "none",
     "notall",
     "product",
     "reduce",
+    "fold",
     "reductions",
     "sum",
     "sum0",
+    "stddev",
+    "variance",
     "sample",
     "shuffle",
     "uniq",
@@ -164,6 +174,8 @@ const LIST_UTIL_ROOT: &[&str] = &[
     "mesh",
     "mesh_longest",
     "mesh_shortest",
+    "chunked",
+    "windowed",
     "head",
     "tail",
     "pairs",
@@ -189,18 +201,53 @@ pub(crate) fn native_dispatch(
         "List::Util::uniqstr" => Some(dispatch_ok(uniqstr_with_want(args, want))),
         "List::Util::uniqint" => Some(dispatch_ok(uniqint_with_want(args, want))),
         "List::Util::uniqnum" => Some(dispatch_ok(uniqnum_with_want(args, want))),
-        "List::Util::sum" => Some(dispatch_ok(sum(args))),
-        "List::Util::sum0" => Some(dispatch_ok(sum0(args))),
-        "List::Util::product" => Some(dispatch_ok(product(args))),
-        "List::Util::min" => Some(dispatch_ok(minmax(args, MinMax::MinNum))),
-        "List::Util::max" => Some(dispatch_ok(minmax(args, MinMax::MaxNum))),
-        "List::Util::minstr" => Some(dispatch_ok(minmax(args, MinMax::MinStr))),
-        "List::Util::maxstr" => Some(dispatch_ok(minmax(args, MinMax::MaxStr))),
+        "List::Util::sum" => Some(dispatch_ok(sum(args).map(|v| aggregate_wantarray(v, want)))),
+        "List::Util::sum0" => Some(dispatch_ok(
+            sum0(args).map(|v| aggregate_wantarray(v, want)),
+        )),
+        "List::Util::product" => Some(dispatch_ok(
+            product(args).map(|v| aggregate_wantarray(v, want)),
+        )),
+        "List::Util::mean" => Some(dispatch_ok(
+            mean(args).map(|v| aggregate_wantarray(v, want)),
+        )),
+        "List::Util::median" => Some(dispatch_ok(
+            median(args).map(|v| aggregate_wantarray(v, want)),
+        )),
+        "List::Util::mode" => Some(dispatch_ok(mode_with_want(args, want))),
+        "List::Util::variance" => Some(dispatch_ok(
+            variance(args).map(|v| aggregate_wantarray(v, want)),
+        )),
+        "List::Util::stddev" => Some(dispatch_ok(
+            stddev(args).map(|v| aggregate_wantarray(v, want)),
+        )),
+        "List::Util::min" => Some(dispatch_ok(
+            minmax(args, MinMax::MinNum).map(|v| aggregate_wantarray(v, want)),
+        )),
+        "List::Util::max" => Some(dispatch_ok(
+            minmax(args, MinMax::MaxNum).map(|v| aggregate_wantarray(v, want)),
+        )),
+        "List::Util::minstr" => Some(dispatch_ok(
+            minmax(args, MinMax::MinStr).map(|v| aggregate_wantarray(v, want)),
+        )),
+        "List::Util::maxstr" => Some(dispatch_ok(
+            minmax(args, MinMax::MaxStr).map(|v| aggregate_wantarray(v, want)),
+        )),
         "List::Util::shuffle" => Some(dispatch_ok(shuffle_native(interp, args))),
+        "List::Util::chunked" => Some(dispatch_ok(chunked_with_want(args, want))),
+        "List::Util::windowed" => Some(dispatch_ok(windowed_with_want(args, want))),
         "List::Util::sample" => Some(dispatch_ok(sample_native(interp, args))),
-        "List::Util::head" => Some(dispatch_ok(head_tail(args, HeadTail::Head))),
-        "List::Util::tail" => Some(dispatch_ok(head_tail(args, HeadTail::Tail))),
-        "List::Util::reduce" => Some(reduce_like(interp, args, want, false)),
+        "List::Util::head" => Some(dispatch_ok(head_tail_take_impl(
+            args,
+            HeadTailTake::ListUtilHead,
+            want,
+        ))),
+        "List::Util::tail" => Some(dispatch_ok(head_tail_take_impl(
+            args,
+            HeadTailTake::ListUtilTail,
+            want,
+        ))),
+        "List::Util::reduce" | "List::Util::fold" => Some(reduce_like(interp, args, want, false)),
         "List::Util::reductions" => Some(reduce_like(interp, args, want, true)),
         "List::Util::any" => Some(any_all_none(interp, args, want, AnyMode::Any)),
         "List::Util::all" => Some(any_all_none(interp, args, want, AnyMode::All)),
@@ -307,6 +354,16 @@ fn dispatch_ok(r: crate::error::PerlResult<PerlValue>) -> ExecResult {
     match r {
         Ok(v) => Ok(v),
         Err(e) => Err(e.into()),
+    }
+}
+
+/// Perl list context for these subs is a return **list** of one scalar (possibly `undef`).
+#[inline]
+fn aggregate_wantarray(v: PerlValue, want: WantarrayCtx) -> PerlValue {
+    if want == WantarrayCtx::List {
+        PerlValue::array(vec![v])
+    } else {
+        v
     }
 }
 
@@ -511,6 +568,96 @@ fn product(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
     Ok(PerlValue::float(p))
 }
 
+/// Arithmetic mean; empty list → `undef`.
+fn mean(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Ok(PerlValue::UNDEF);
+    }
+    let n = args.len() as f64;
+    let s: f64 = args.iter().map(|x| x.to_number()).sum();
+    Ok(PerlValue::float(s / n))
+}
+
+/// Median (linear interpolation for even length). Empty list → `undef`.
+fn median(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Ok(PerlValue::UNDEF);
+    }
+    let mut v: Vec<f64> = args.iter().map(|x| x.to_number()).collect();
+    v.sort_by(|a, b| a.total_cmp(b));
+    let n = v.len();
+    let mid = if n % 2 == 1 {
+        v[n / 2]
+    } else {
+        (v[n / 2 - 1] + v[n / 2]) / 2.0
+    };
+    Ok(PerlValue::float(mid))
+}
+
+/// Values with highest frequency (ties all returned in list context). Empty list → `undef` / empty list.
+fn mode_with_want(args: &[PerlValue], want: WantarrayCtx) -> crate::error::PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Ok(match want {
+            WantarrayCtx::List => PerlValue::array(vec![]),
+            WantarrayCtx::Scalar | WantarrayCtx::Void => PerlValue::UNDEF,
+        });
+    }
+    let nums: Vec<f64> = args.iter().map(|x| x.to_number()).collect();
+    let mut idx: Vec<usize> = (0..args.len()).collect();
+    idx.sort_by(|&i, &j| nums[i].total_cmp(&nums[j]));
+    let mut best_len = 0usize;
+    let mut mode_starts: Vec<usize> = Vec::new();
+    let mut i = 0;
+    while i < idx.len() {
+        let mut j = i + 1;
+        while j < idx.len() && num_eq(nums[idx[i]], nums[idx[j]]) {
+            j += 1;
+        }
+        let run_len = j - i;
+        if run_len > best_len {
+            best_len = run_len;
+            mode_starts.clear();
+            mode_starts.push(idx[i]);
+        } else if run_len == best_len {
+            mode_starts.push(idx[i]);
+        }
+        i = j;
+    }
+    let modes: Vec<PerlValue> = mode_starts.into_iter().map(|ix| args[ix].clone()).collect();
+    let first = modes.first().cloned().unwrap_or(PerlValue::UNDEF);
+    Ok(match want {
+        WantarrayCtx::List => PerlValue::array(modes),
+        WantarrayCtx::Scalar => first,
+        WantarrayCtx::Void => PerlValue::UNDEF,
+    })
+}
+
+/// Population variance (divide by N). Empty → `undef`; one element → `0`.
+fn variance(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Ok(PerlValue::UNDEF);
+    }
+    let n = args.len() as f64;
+    let mean_v: f64 = args.iter().map(|x| x.to_number()).sum::<f64>() / n;
+    let var: f64 = args
+        .iter()
+        .map(|x| {
+            let d = x.to_number() - mean_v;
+            d * d
+        })
+        .sum::<f64>()
+        / n;
+    Ok(PerlValue::float(var))
+}
+
+fn stddev(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Ok(PerlValue::UNDEF);
+    }
+    let var = variance(args)?;
+    Ok(PerlValue::float(var.to_number().sqrt()))
+}
+
 fn shuffle_native(
     interp: &mut Interpreter,
     args: &[PerlValue],
@@ -518,6 +665,78 @@ fn shuffle_native(
     let mut v: Vec<PerlValue> = args.to_vec();
     v.shuffle(&mut interp.rand_rng);
     Ok(PerlValue::array(v))
+}
+
+/// `chunked LIST, N` — last argument is chunk size; preceding values are the list. Returns a list of
+/// arrayrefs (same shape as `zip` rows). Scalar context: number of chunks.
+fn chunked_with_want(
+    args: &[PerlValue],
+    want: WantarrayCtx,
+) -> crate::error::PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Err(crate::error::PerlError::runtime(
+            "List::Util::chunked: expected LIST, N",
+            0,
+        ));
+    }
+    let n = args[args.len() - 1].to_int().max(0) as usize;
+    let items: Vec<PerlValue> = args[..args.len().saturating_sub(1)].to_vec();
+    if n == 0 {
+        return Ok(match want {
+            WantarrayCtx::Scalar => PerlValue::integer(0),
+            _ => PerlValue::array(vec![]),
+        });
+    }
+    let mut chunk_refs = Vec::new();
+    let mut i = 0;
+    while i < items.len() {
+        let end = (i + n).min(items.len());
+        chunk_refs.push(PerlValue::array_ref(Arc::new(RwLock::new(
+            items[i..end].to_vec(),
+        ))));
+        i = end;
+    }
+    let n_chunks = chunk_refs.len() as i64;
+    let out = PerlValue::array(chunk_refs);
+    Ok(match want {
+        WantarrayCtx::Scalar => PerlValue::integer(n_chunks),
+        _ => out,
+    })
+}
+
+/// `windowed LIST, N` — last argument is window size; preceding values are the list. Overlapping
+/// sliding windows (step 1), each window an arrayref like [`chunked_with_want`]. No partial trailing
+/// windows. Scalar context: window count.
+fn windowed_with_want(
+    args: &[PerlValue],
+    want: WantarrayCtx,
+) -> crate::error::PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Err(crate::error::PerlError::runtime(
+            "List::Util::windowed: expected LIST, N",
+            0,
+        ));
+    }
+    let n = args[args.len() - 1].to_int().max(0) as usize;
+    let items: Vec<PerlValue> = args[..args.len().saturating_sub(1)].to_vec();
+    if n == 0 || items.len() < n {
+        return Ok(match want {
+            WantarrayCtx::Scalar => PerlValue::integer(0),
+            _ => PerlValue::array(vec![]),
+        });
+    }
+    let mut windows = Vec::new();
+    for i in 0..=(items.len() - n) {
+        windows.push(PerlValue::array_ref(Arc::new(RwLock::new(
+            items[i..i + n].to_vec(),
+        ))));
+    }
+    let nw = windows.len() as i64;
+    let out = PerlValue::array(windows);
+    Ok(match want {
+        WantarrayCtx::Scalar => PerlValue::integer(nw),
+        _ => out,
+    })
 }
 
 fn sample_native(
@@ -540,28 +759,49 @@ fn sample_native(
     Ok(PerlValue::array(out))
 }
 
-enum HeadTail {
-    Head,
-    Tail,
+#[derive(Clone, Copy)]
+pub(crate) enum HeadTailTake {
+    /// Builtin `take` / bare `head` — negative count is treated as zero (`max(0)`).
+    Take,
+    /// `List::Util::head` — negative count means “all but last |k|”.
+    ListUtilHead,
+    /// `List::Util::tail` — same size rules as Perl `tail`.
+    ListUtilTail,
 }
 
-fn head_tail(args: &[PerlValue], mode: HeadTail) -> crate::error::PerlResult<PerlValue> {
+/// Shared by [`crate::builtins::builtin_take`], bare `head`, and `List::Util::head` / `tail`.
+/// **Argument order:** list operands first, **count last** — `take(@l, N)`, `List::Util::head(10,20,30,2)`.
+/// A single argument is treated as **N** with an empty list (`take(3)` → empty).
+/// List context: array slice; scalar context: last element of that slice, or `undef` if empty.
+pub(crate) fn head_tail_take_impl(
+    args: &[PerlValue],
+    kind: HeadTailTake,
+    want: WantarrayCtx,
+) -> crate::error::PerlResult<PerlValue> {
     if args.is_empty() {
-        return Ok(PerlValue::array(vec![]));
+        return Ok(match want {
+            WantarrayCtx::Scalar => PerlValue::UNDEF,
+            _ => PerlValue::array(vec![]),
+        });
     }
-    let size = args[0].to_int();
-    let list: Vec<PerlValue> = args[1..].to_vec();
-    let n = list.len() as i64;
-    let take = match mode {
-        HeadTail::Head => {
-            if size >= 0 {
-                size.min(n).max(0) as usize
-            } else {
-                let k = (-size).min(n);
-                (n - k) as usize
-            }
+    let (raw, list) = if args.len() == 1 {
+        (args[0].to_int(), Vec::new())
+    } else {
+        let raw = args[args.len() - 1].to_int();
+        let mut list = Vec::new();
+        for a in &args[..args.len() - 1] {
+            list.extend(a.to_list());
         }
-        HeadTail::Tail => {
+        (raw, list)
+    };
+    let n = list.len() as i64;
+    let take_n = match kind {
+        HeadTailTake::Take => {
+            let size = raw.max(0);
+            size.min(n).max(0) as usize
+        }
+        HeadTailTake::ListUtilHead | HeadTailTake::ListUtilTail => {
+            let size = raw;
             if size >= 0 {
                 size.min(n).max(0) as usize
             } else {
@@ -570,15 +810,110 @@ fn head_tail(args: &[PerlValue], mode: HeadTail) -> crate::error::PerlResult<Per
             }
         }
     };
-    let len = list.len();
-    let out = match mode {
-        HeadTail::Head => list.into_iter().take(take).collect(),
-        HeadTail::Tail => {
-            let skip = len.saturating_sub(take);
+    let out: Vec<PerlValue> = match kind {
+        HeadTailTake::Take | HeadTailTake::ListUtilHead => list.into_iter().take(take_n).collect(),
+        HeadTailTake::ListUtilTail => {
+            let len = list.len();
+            let skip = len.saturating_sub(take_n);
             list.into_iter().skip(skip).collect()
         }
     };
-    Ok(PerlValue::array(out))
+    Ok(match want {
+        WantarrayCtx::Scalar => out.last().cloned().unwrap_or(PerlValue::UNDEF),
+        _ => PerlValue::array(out),
+    })
+}
+
+/// Builtin `tail` — last `$n` items; negative `$n` clamps to zero (empty). Operands are
+/// **list values then count**: `tail(@l, N)`. One argument is **N** only (empty list).
+/// When the list is a single string containing newlines, split into lines first (Rust [`str::lines`] rules).
+pub(crate) fn extension_tail_impl(
+    args: &[PerlValue],
+    want: WantarrayCtx,
+) -> crate::error::PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Ok(match want {
+            WantarrayCtx::Scalar => PerlValue::UNDEF,
+            _ => PerlValue::array(vec![]),
+        });
+    }
+    let raw = if args.len() == 1 {
+        args[0].to_int()
+    } else {
+        args[args.len() - 1].to_int()
+    };
+    let mut list: Vec<PerlValue> = if args.len() == 1 {
+        Vec::new()
+    } else {
+        let mut list = Vec::new();
+        for a in &args[..args.len() - 1] {
+            list.extend(a.to_list());
+        }
+        list
+    };
+    if list.len() == 1 && list[0].is_string_like() {
+        let s = list[0].to_string();
+        if s.contains('\n') || s.contains('\r') {
+            list = s
+                .lines()
+                .map(|ln| PerlValue::string(ln.to_string()))
+                .collect();
+        }
+    }
+    let n = list.len() as i64;
+    let take_n = raw.max(0).min(n).max(0) as usize;
+    let len = list.len();
+    let skip = len.saturating_sub(take_n);
+    let out: Vec<PerlValue> = list.into_iter().skip(skip).collect();
+    Ok(match want {
+        WantarrayCtx::Scalar => out.last().cloned().unwrap_or(PerlValue::UNDEF),
+        _ => PerlValue::array(out),
+    })
+}
+
+/// Builtin `drop` — skip the first `$n` items; negative `$n` clamps to zero. Operands are
+/// **list values then count**: `drop(@l, N)`. One argument is **N** only (empty list).
+/// Same multiline-string line split as [`extension_tail_impl`].
+pub(crate) fn extension_drop_impl(
+    args: &[PerlValue],
+    want: WantarrayCtx,
+) -> crate::error::PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Ok(match want {
+            WantarrayCtx::Scalar => PerlValue::UNDEF,
+            _ => PerlValue::array(vec![]),
+        });
+    }
+    let raw = if args.len() == 1 {
+        args[0].to_int()
+    } else {
+        args[args.len() - 1].to_int()
+    };
+    let mut list: Vec<PerlValue> = if args.len() == 1 {
+        Vec::new()
+    } else {
+        let mut list = Vec::new();
+        for a in &args[..args.len() - 1] {
+            list.extend(a.to_list());
+        }
+        list
+    };
+    if list.len() == 1 && list[0].is_string_like() {
+        let s = list[0].to_string();
+        if s.contains('\n') || s.contains('\r') {
+            list = s
+                .lines()
+                .map(|ln| PerlValue::string(ln.to_string()))
+                .collect();
+        }
+    }
+    let n = list.len();
+    let skip_n = raw.max(0).min(n as i64) as usize;
+    let out: Vec<PerlValue> = list.into_iter().skip(skip_n).collect();
+    Ok(match want {
+        WantarrayCtx::Scalar => out.last().cloned().unwrap_or(PerlValue::UNDEF),
+        _ => PerlValue::array(out),
+    })
 }
 
 fn reduce_like(
@@ -1027,6 +1362,145 @@ mod tests {
     }
 
     #[test]
+    fn mean_median_mode_variance_stddev() {
+        let mut i = Interpreter::new();
+        assert!(call_native(&mut i, "List::Util::mean", &[], WantarrayCtx::Scalar).is_undef());
+        let m = call_native(
+            &mut i,
+            "List::Util::mean",
+            &[
+                PerlValue::integer(2),
+                PerlValue::integer(4),
+                PerlValue::integer(10),
+            ],
+            WantarrayCtx::Scalar,
+        );
+        assert!((m.to_number() - 16.0 / 3.0).abs() < 1e-9);
+
+        let med_odd = call_native(
+            &mut i,
+            "List::Util::median",
+            &[
+                PerlValue::integer(3),
+                PerlValue::integer(1),
+                PerlValue::integer(2),
+            ],
+            WantarrayCtx::Scalar,
+        );
+        assert_eq!(med_odd.to_int(), 2);
+
+        let med_even = call_native(
+            &mut i,
+            "List::Util::median",
+            &[
+                PerlValue::integer(10),
+                PerlValue::integer(20),
+                PerlValue::integer(30),
+                PerlValue::integer(40),
+            ],
+            WantarrayCtx::Scalar,
+        );
+        assert!((med_even.to_number() - 25.0).abs() < 1e-9);
+
+        let mode_sc = call_native(
+            &mut i,
+            "List::Util::mode",
+            &[
+                PerlValue::integer(1),
+                PerlValue::integer(2),
+                PerlValue::integer(2),
+                PerlValue::integer(3),
+            ],
+            WantarrayCtx::Scalar,
+        );
+        assert_eq!(mode_sc.to_int(), 2);
+
+        let mode_li = call_native(
+            &mut i,
+            "List::Util::mode",
+            &[
+                PerlValue::integer(1),
+                PerlValue::integer(2),
+                PerlValue::integer(2),
+                PerlValue::integer(3),
+                PerlValue::integer(3),
+            ],
+            WantarrayCtx::List,
+        );
+        let mv = mode_li.as_array_vec().expect("mode list");
+        assert_eq!(mv.len(), 2);
+        assert_eq!(mv[0].to_int(), 2);
+        assert_eq!(mv[1].to_int(), 3);
+
+        let var_one = call_native(
+            &mut i,
+            "List::Util::variance",
+            &[PerlValue::integer(5)],
+            WantarrayCtx::Scalar,
+        );
+        assert_eq!(var_one.to_number(), 0.0);
+
+        let var_pop = call_native(
+            &mut i,
+            "List::Util::variance",
+            &[
+                PerlValue::integer(2),
+                PerlValue::integer(4),
+                PerlValue::integer(6),
+            ],
+            WantarrayCtx::Scalar,
+        );
+        assert!((var_pop.to_number() - 8.0 / 3.0).abs() < 1e-9);
+
+        let sd = call_native(
+            &mut i,
+            "List::Util::stddev",
+            &[PerlValue::integer(0), PerlValue::integer(0)],
+            WantarrayCtx::Scalar,
+        );
+        assert_eq!(sd.to_number(), 0.0);
+    }
+
+    #[test]
+    fn sum_product_min_max_list_context_returns_one_element_array() {
+        let mut i = Interpreter::new();
+        let args_sum = [
+            PerlValue::integer(1),
+            PerlValue::integer(2),
+            PerlValue::integer(3),
+        ];
+        let ls = call_native(&mut i, "List::Util::sum", &args_sum, WantarrayCtx::List);
+        let asum = ls.as_array_vec().expect("sum list");
+        assert_eq!(asum.len(), 1);
+        assert_eq!(asum[0].to_int(), 6);
+
+        let lp = call_native(
+            &mut i,
+            "List::Util::product",
+            &[PerlValue::integer(2), PerlValue::integer(4)],
+            WantarrayCtx::List,
+        );
+        let ap = lp.as_array_vec().expect("product list");
+        assert_eq!(ap.len(), 1);
+        assert_eq!(ap[0].to_int(), 8);
+
+        let lmn = call_native(
+            &mut i,
+            "List::Util::min",
+            &[PerlValue::integer(9), PerlValue::integer(2)],
+            WantarrayCtx::List,
+        );
+        assert_eq!(lmn.as_array_vec().unwrap()[0].to_int(), 2);
+        let lmx = call_native(
+            &mut i,
+            "List::Util::max",
+            &[PerlValue::integer(9), PerlValue::integer(2)],
+            WantarrayCtx::List,
+        );
+        assert_eq!(lmx.as_array_vec().unwrap()[0].to_int(), 9);
+    }
+
+    #[test]
     fn min_max_empty_undef() {
         let mut i = Interpreter::new();
         let mn = call_native(&mut i, "List::Util::min", &[], WantarrayCtx::Scalar);
@@ -1085,36 +1559,256 @@ mod tests {
     }
 
     #[test]
+    fn chunked_splits_list_last_arg_is_size() {
+        let mut i = Interpreter::new();
+        let c = call_native(
+            &mut i,
+            "List::Util::chunked",
+            &[
+                PerlValue::integer(1),
+                PerlValue::integer(2),
+                PerlValue::integer(3),
+                PerlValue::integer(4),
+                PerlValue::integer(2),
+            ],
+            WantarrayCtx::List,
+        );
+        let rows = c.as_array_vec().expect("chunked list");
+        assert_eq!(rows.len(), 2);
+        let ar0 = rows[0].as_array_ref().expect("chunk");
+        let r0 = ar0.read();
+        assert_eq!(r0.len(), 2);
+        assert_eq!(r0[0].to_int(), 1);
+        assert_eq!(r0[1].to_int(), 2);
+        let ar1 = rows[1].as_array_ref().expect("chunk");
+        let r1 = ar1.read();
+        assert_eq!(r1.len(), 2);
+        assert_eq!(r1[0].to_int(), 3);
+        assert_eq!(r1[1].to_int(), 4);
+
+        let ns = call_native(
+            &mut i,
+            "List::Util::chunked",
+            &[
+                PerlValue::integer(1),
+                PerlValue::integer(2),
+                PerlValue::integer(3),
+                PerlValue::integer(2),
+            ],
+            WantarrayCtx::Scalar,
+        );
+        assert_eq!(ns.to_int(), 2);
+    }
+
+    #[test]
+    fn chunked_native_n_zero_and_empty_list() {
+        let mut i = Interpreter::new();
+        let z = call_native(
+            &mut i,
+            "List::Util::chunked",
+            &[
+                PerlValue::integer(1),
+                PerlValue::integer(2),
+                PerlValue::integer(0),
+            ],
+            WantarrayCtx::Scalar,
+        );
+        assert_eq!(z.to_int(), 0);
+        let zl = call_native(
+            &mut i,
+            "List::Util::chunked",
+            &[
+                PerlValue::integer(1),
+                PerlValue::integer(2),
+                PerlValue::integer(0),
+            ],
+            WantarrayCtx::List,
+        );
+        assert!(zl.as_array_vec().is_some_and(|v| v.is_empty()));
+
+        let only_n = call_native(
+            &mut i,
+            "List::Util::chunked",
+            &[PerlValue::integer(5)],
+            WantarrayCtx::Scalar,
+        );
+        assert_eq!(only_n.to_int(), 0);
+    }
+
+    #[test]
+    fn chunked_native_chunk_size_exceeds_length() {
+        let mut i = Interpreter::new();
+        let c = call_native(
+            &mut i,
+            "List::Util::chunked",
+            &[
+                PerlValue::integer(1),
+                PerlValue::integer(2),
+                PerlValue::integer(99),
+            ],
+            WantarrayCtx::List,
+        );
+        let rows = c.as_array_vec().expect("chunks");
+        assert_eq!(rows.len(), 1);
+        let ar = rows[0].as_array_ref().expect("chunk");
+        let r = ar.read();
+        assert_eq!(r.len(), 2);
+        assert_eq!(r[0].to_int(), 1);
+        assert_eq!(r[1].to_int(), 2);
+    }
+
+    #[test]
+    fn windowed_overlapping_windows() {
+        let mut i = Interpreter::new();
+        let w = call_native(
+            &mut i,
+            "List::Util::windowed",
+            &[
+                PerlValue::integer(1),
+                PerlValue::integer(2),
+                PerlValue::integer(3),
+                PerlValue::integer(2),
+            ],
+            WantarrayCtx::List,
+        );
+        let rows = w.as_array_vec().expect("windowed list");
+        assert_eq!(rows.len(), 2);
+        let ar0 = rows[0].as_array_ref().expect("win");
+        let r0 = ar0.read();
+        assert_eq!(r0.len(), 2);
+        assert_eq!(r0[0].to_int(), 1);
+        assert_eq!(r0[1].to_int(), 2);
+        let ar1 = rows[1].as_array_ref().expect("win");
+        let r1 = ar1.read();
+        assert_eq!(r1[0].to_int(), 2);
+        assert_eq!(r1[1].to_int(), 3);
+    }
+
+    #[test]
+    fn windowed_zero_n_empty() {
+        let mut i = Interpreter::new();
+        let w = call_native(
+            &mut i,
+            "List::Util::windowed",
+            &[
+                PerlValue::integer(1),
+                PerlValue::integer(2),
+                PerlValue::integer(0),
+            ],
+            WantarrayCtx::List,
+        );
+        assert!(w.as_array_vec().unwrap().is_empty());
+    }
+
+    #[test]
+    fn windowed_n_larger_than_list_empty() {
+        let mut i = Interpreter::new();
+        let w = call_native(
+            &mut i,
+            "List::Util::windowed",
+            &[
+                PerlValue::integer(1),
+                PerlValue::integer(2),
+                PerlValue::integer(5),
+            ],
+            WantarrayCtx::Scalar,
+        );
+        assert_eq!(w.to_int(), 0);
+    }
+
+    #[test]
+    fn windowed_single_full_width_window() {
+        let mut i = Interpreter::new();
+        let w = call_native(
+            &mut i,
+            "List::Util::windowed",
+            &[
+                PerlValue::integer(10),
+                PerlValue::integer(20),
+                PerlValue::integer(30),
+                PerlValue::integer(3),
+            ],
+            WantarrayCtx::List,
+        );
+        let rows = w.as_array_vec().expect("one row");
+        assert_eq!(rows.len(), 1);
+        let ar = rows[0].as_array_ref().expect("win");
+        let r = ar.read();
+        assert_eq!(r.len(), 3);
+        assert_eq!(r[0].to_int(), 10);
+        assert_eq!(r[2].to_int(), 30);
+    }
+
+    #[test]
     fn head_and_tail() {
         let mut i = Interpreter::new();
         let h = call_native(
             &mut i,
             "List::Util::head",
             &[
-                PerlValue::integer(2),
                 PerlValue::integer(10),
                 PerlValue::integer(20),
                 PerlValue::integer(30),
+                PerlValue::integer(2),
             ],
             WantarrayCtx::List,
         );
         let hv = h.as_array_vec().unwrap();
         assert_eq!(hv.len(), 2);
         assert_eq!(hv[0].to_int(), 10);
+        let hs = call_native(
+            &mut i,
+            "List::Util::head",
+            &[
+                PerlValue::integer(10),
+                PerlValue::integer(20),
+                PerlValue::integer(30),
+                PerlValue::integer(2),
+            ],
+            WantarrayCtx::Scalar,
+        );
+        assert_eq!(hs.to_int(), 20);
+        let hn = call_native(
+            &mut i,
+            "List::Util::head",
+            &[
+                PerlValue::integer(1),
+                PerlValue::integer(2),
+                PerlValue::integer(3),
+                PerlValue::integer(-1),
+            ],
+            WantarrayCtx::List,
+        );
+        let hnv = hn.as_array_vec().unwrap();
+        assert_eq!(hnv.len(), 2);
+        assert_eq!(hnv[0].to_int(), 1);
+        assert_eq!(hnv[1].to_int(), 2);
         let t = call_native(
             &mut i,
             "List::Util::tail",
             &[
-                PerlValue::integer(2),
                 PerlValue::integer(10),
                 PerlValue::integer(20),
                 PerlValue::integer(30),
+                PerlValue::integer(2),
             ],
             WantarrayCtx::List,
         );
         let tv = t.as_array_vec().unwrap();
         assert_eq!(tv.len(), 2);
         assert_eq!(tv[1].to_int(), 30);
+        let ts = call_native(
+            &mut i,
+            "List::Util::tail",
+            &[
+                PerlValue::integer(10),
+                PerlValue::integer(20),
+                PerlValue::integer(30),
+                PerlValue::integer(2),
+            ],
+            WantarrayCtx::Scalar,
+        );
+        assert_eq!(ts.to_int(), 30);
     }
 
     #[test]

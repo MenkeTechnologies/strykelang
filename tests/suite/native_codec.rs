@@ -12,7 +12,10 @@ fn sha256_builtin_matches_vector() {
 
 #[test]
 fn md5_sha1_builtins_match_vectors() {
-    assert_eq!(eval_string(r#"md5("")"#), "d41d8cd98f00b204e9800998ecf8427e");
+    assert_eq!(
+        eval_string(r#"md5("")"#),
+        "d41d8cd98f00b204e9800998ecf8427e"
+    );
     assert_eq!(
         eval_string(r#"sha1("abc")"#),
         "a9993e364706816aba3e25717850c26c9cd0d89d"
@@ -100,12 +103,6 @@ fn toml_yaml_encode_roundtrip() {
 
 #[test]
 fn url_escape_aliases_and_roundtrip() {
-    assert_eq!(
-        eval_string(r#"url_decode(url_encode("a b"))"#),
-        "a b"
-    );
-    assert_eq!(
-        eval_string(r#"uri_unescape(uri_escape("c+d"))"#),
-        "c+d"
-    );
+    assert_eq!(eval_string(r#"url_decode(url_encode("a b"))"#), "a b");
+    assert_eq!(eval_string(r#"uri_unescape(uri_escape("c+d"))"#), "c+d");
 }

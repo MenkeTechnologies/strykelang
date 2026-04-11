@@ -310,6 +310,9 @@ impl Scope {
         if Self::parallel_allowed_topic_scalar(name) {
             return Ok(());
         }
+        if crate::special_vars::is_regex_match_scalar_name(name) {
+            return Ok(());
+        }
         let inner = self.frames.len().saturating_sub(1);
         for (i, frame) in self.frames.iter().enumerate().rev() {
             if frame.has_scalar(name) {

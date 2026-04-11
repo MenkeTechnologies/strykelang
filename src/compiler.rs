@@ -4367,6 +4367,23 @@ impl Compiler {
                         Some(root),
                     );
                 }
+                // `collect(PIPELINE)` — compile the argument in list context so nested
+                // `map { }` / `grep { }` keep a pipeline handle (scalar context adds
+                // `StackArrayLen`, which turns a pipeline into `1`).
+                "collect" => {
+                    if args.len() != 1 {
+                        return Err(CompileError::Unsupported(
+                            "collect() expects one argument (a pipeline value)".into(),
+                        ));
+                    }
+                    self.compile_expr_ctx(&args[0], WantarrayCtx::List)?;
+                    let name_idx = self.chunk.intern_name(&self.qualify_sub_key(name));
+                    self.emit_op(
+                        Op::Call(name_idx, 1, ctx.as_byte()),
+                        line,
+                        Some(root),
+                    );
+                }
                 "ppool" => {
                     if args.len() != 1 {
                         return Err(CompileError::Unsupported(
@@ -4467,11 +4484,206 @@ impl Compiler {
                     for arg in args {
                         self.compile_expr(arg)?;
                     }
+                    self.emit_op(Op::CallBuiltin(BuiltinId::Pipe as u16, 2), line, Some(root));
+                }
+                "uniq"
+                | "distinct"
+                | "flatten"
+                | "with_index"
+                | "list_count"
+                | "list_size"
+                | "List::Util::uniq"
+                | "sum"
+                | "sum0"
+                | "product"
+                | "min"
+                | "max"
+                | "mean"
+                | "median"
+                | "mode"
+                | "stddev"
+                | "variance"
+                | "List::Util::sum"
+                | "List::Util::sum0"
+                | "List::Util::product"
+                | "List::Util::min"
+                | "List::Util::max"
+                | "List::Util::minstr"
+                | "List::Util::maxstr"
+                | "List::Util::mean"
+                | "List::Util::median"
+                | "List::Util::mode"
+                | "List::Util::stddev"
+                | "List::Util::variance" => {
+                    for arg in args {
+                        self.compile_expr_ctx(arg, WantarrayCtx::List)?;
+                    }
+                    let name_idx = self.chunk.intern_name(&self.qualify_sub_key(name));
                     self.emit_op(
-                        Op::CallBuiltin(BuiltinId::Pipe as u16, 2),
+                        Op::Call(name_idx, args.len() as u8, ctx.as_byte()),
                         line,
                         Some(root),
                     );
+                }
+                "shuffle" | "List::Util::shuffle" => {
+                    for arg in args {
+                        self.compile_expr_ctx(arg, WantarrayCtx::List)?;
+                    }
+                    let name_idx = self.chunk.intern_name(&self.qualify_sub_key(name));
+                    self.emit_op(
+                        Op::Call(name_idx, args.len() as u8, ctx.as_byte()),
+                        line,
+                        Some(root),
+                    );
+                }
+                "chunked" | "List::Util::chunked" | "windowed" | "List::Util::windowed" => {
+                    match args.len() {
+                        0 => {
+                            return Err(CompileError::Unsupported(
+                                "chunked/windowed need (LIST, N) or unary N (e.g. `|> chunked(2)`)"
+                                    .into(),
+                            ));
+                        }
+                        1 => {
+                            self.compile_expr(&args[0])?;
+                        }
+                        2 => {
+                            self.compile_expr_ctx(&args[0], WantarrayCtx::List)?;
+                            self.compile_expr(&args[1])?;
+                        }
+                        _ => {
+                            return Err(CompileError::Unsupported(
+                                "chunked/windowed expect exactly two arguments (LIST, N); use a single list expression for the first operand".into(),
+                            ));
+                        }
+                    }
+                    let name_idx = self.chunk.intern_name(&self.qualify_sub_key(name));
+                    self.emit_op(
+                        Op::Call(name_idx, args.len() as u8, ctx.as_byte()),
+                        line,
+                        Some(root),
+                    );
+                }
+                "take" | "head" | "tail" | "drop" | "List::Util::head" | "List::Util::tail" => {
+                    if args.is_empty() {
+                        return Err(CompileError::Unsupported(
+                            "take/head/tail/drop/List::Util::head|tail expect LIST..., N or unary N"
+                                .into(),
+                        ));
+                    }
+                    if args.len() == 1 {
+                        self.compile_expr(&args[0])?;
+                    } else {
+                        for a in &args[..args.len() - 1] {
+                            self.compile_expr_ctx(a, WantarrayCtx::List)?;
+                        }
+                        self.compile_expr(&args[args.len() - 1])?;
+                    }
+                    let name_idx = self.chunk.intern_name(&self.qualify_sub_key(name));
+                    self.emit_op(
+                        Op::Call(name_idx, args.len() as u8, ctx.as_byte()),
+                        line,
+                        Some(root),
+                    );
+                }
+                "any" | "all" | "none" | "take_while" | "drop_while" => {
+                    if args.len() != 2 {
+                        return Err(CompileError::Unsupported(
+                            "any/all/none/take_while/drop_while expect BLOCK, LIST".into(),
+                        ));
+                    }
+                    if !matches!(&args[0].kind, ExprKind::CodeRef { .. }) {
+                        return Err(CompileError::Unsupported(
+                            "any/all/none/take_while/drop_while: first argument must be a { BLOCK }"
+                                .into(),
+                        ));
+                    }
+                    self.compile_expr(&args[0])?;
+                    self.compile_expr_ctx(&args[1], WantarrayCtx::List)?;
+                    let name_idx = self.chunk.intern_name(&self.qualify_sub_key(name));
+                    self.emit_op(Op::Call(name_idx, 2, ctx.as_byte()), line, Some(root));
+                }
+                "group_by" | "chunk_by" => {
+                    if args.len() != 2 {
+                        return Err(CompileError::Unsupported(
+                            "group_by/chunk_by expect { BLOCK } or EXPR, LIST".into(),
+                        ));
+                    }
+                    self.compile_expr_ctx(&args[1], WantarrayCtx::List)?;
+                    match &args[0].kind {
+                        ExprKind::CodeRef { body, .. } => {
+                            let block_idx = self.chunk.add_block(body.clone());
+                            self.emit_op(Op::ChunkByWithBlock(block_idx), line, Some(root));
+                        }
+                        _ => {
+                            let idx = self.chunk.add_map_expr_entry(args[0].clone());
+                            self.emit_op(Op::ChunkByWithExpr(idx), line, Some(root));
+                        }
+                    }
+                    if ctx != WantarrayCtx::List {
+                        self.emit_op(Op::StackArrayLen, line, Some(root));
+                    }
+                }
+                "zip" | "List::Util::zip" | "List::Util::zip_longest" => {
+                    for arg in args {
+                        self.compile_expr_ctx(arg, WantarrayCtx::List)?;
+                    }
+                    let fq = match name.as_str() {
+                        "List::Util::zip_longest" => "List::Util::zip_longest",
+                        "List::Util::zip" => "List::Util::zip",
+                        _ => "zip",
+                    };
+                    let name_idx = self.chunk.intern_name(&self.qualify_sub_key(fq));
+                    self.emit_op(
+                        Op::Call(name_idx, args.len() as u8, ctx.as_byte()),
+                        line,
+                        Some(root),
+                    );
+                }
+                "puniq" => {
+                    if args.is_empty() || args.len() > 2 {
+                        return Err(CompileError::Unsupported(
+                            "puniq expects LIST [, progress => EXPR]".into(),
+                        ));
+                    }
+                    if args.len() == 2 {
+                        self.compile_expr(&args[1])?;
+                    } else {
+                        self.emit_op(Op::LoadInt(0), line, Some(root));
+                    }
+                    self.compile_expr_ctx(&args[0], WantarrayCtx::List)?;
+                    self.emit_op(Op::Puniq, line, Some(root));
+                    if ctx != WantarrayCtx::List {
+                        self.emit_op(Op::StackArrayLen, line, Some(root));
+                    }
+                }
+                "pfirst" | "pany" => {
+                    if args.len() < 2 || args.len() > 3 {
+                        return Err(CompileError::Unsupported(
+                            "pfirst/pany expect BLOCK, LIST [, progress => EXPR]".into(),
+                        ));
+                    }
+                    let body = match &args[0].kind {
+                        ExprKind::CodeRef { body, .. } => body,
+                        _ => {
+                            return Err(CompileError::Unsupported(
+                                "pfirst/pany: first argument must be a { BLOCK }".into(),
+                            ));
+                        }
+                    };
+                    if args.len() == 3 {
+                        self.compile_expr(&args[2])?;
+                    } else {
+                        self.emit_op(Op::LoadInt(0), line, Some(root));
+                    }
+                    self.compile_expr_ctx(&args[1], WantarrayCtx::List)?;
+                    let block_idx = self.chunk.add_block(body.clone());
+                    let op = if name == "pfirst" {
+                        Op::PFirstWithBlock(block_idx)
+                    } else {
+                        Op::PAnyWithBlock(block_idx)
+                    };
+                    self.emit_op(op, line, Some(root));
                 }
                 _ => {
                     for arg in args {
@@ -5923,22 +6135,38 @@ impl Compiler {
             }
 
             // ── Map/Grep/Sort with blocks ──
-            ExprKind::MapExpr { block, list } => {
+            ExprKind::MapExpr {
+                block,
+                list,
+                flatten_array_refs,
+            } => {
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
                 if let Some(k) = crate::map_grep_fast::detect_map_int_mul(block) {
                     self.emit_op(Op::MapIntMul(k), line, Some(root));
                 } else {
                     let block_idx = self.chunk.add_block(block.clone());
-                    self.emit_op(Op::MapWithBlock(block_idx), line, Some(root));
+                    if *flatten_array_refs {
+                        self.emit_op(Op::FlatMapWithBlock(block_idx), line, Some(root));
+                    } else {
+                        self.emit_op(Op::MapWithBlock(block_idx), line, Some(root));
+                    }
                 }
                 if ctx != WantarrayCtx::List {
                     self.emit_op(Op::StackArrayLen, line, Some(root));
                 }
             }
-            ExprKind::MapExprComma { expr, list } => {
+            ExprKind::MapExprComma {
+                expr,
+                list,
+                flatten_array_refs,
+            } => {
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
                 let idx = self.chunk.add_map_expr_entry(*expr.clone());
-                self.emit_op(Op::MapWithExpr(idx), line, Some(root));
+                if *flatten_array_refs {
+                    self.emit_op(Op::FlatMapWithExpr(idx), line, Some(root));
+                } else {
+                    self.emit_op(Op::MapWithExpr(idx), line, Some(root));
+                }
                 if ctx != WantarrayCtx::List {
                     self.emit_op(Op::StackArrayLen, line, Some(root));
                 }
@@ -5995,6 +6223,7 @@ impl Compiler {
                 block,
                 list,
                 progress,
+                flat_outputs,
             } => {
                 if let Some(p) = progress {
                     self.compile_expr(p)?;
@@ -6003,7 +6232,11 @@ impl Compiler {
                 }
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
                 let block_idx = self.chunk.add_block(block.clone());
-                self.emit_op(Op::PMapWithBlock(block_idx), line, Some(root));
+                if *flat_outputs {
+                    self.emit_op(Op::PFlatMapWithBlock(block_idx), line, Some(root));
+                } else {
+                    self.emit_op(Op::PMapWithBlock(block_idx), line, Some(root));
+                }
             }
             ExprKind::PMapChunkedExpr {
                 chunk_size,
@@ -6776,7 +7009,7 @@ mod tests {
     fn compile_map_expr_comma_emits_map_with_expr() {
         let chunk = compile_snippet(
             r#"no strict 'vars';
-            join(",", map $_ + 1, (4, 5));"#,
+            (map $_ + 1, (4, 5)) |> join ','"#,
         )
         .expect("compile");
         assert!(

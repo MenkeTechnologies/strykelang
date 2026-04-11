@@ -655,11 +655,29 @@ pub fn format_expr(e: &Expr) -> String {
             to,
             flags,
         } => format!("({} =~ tr/{}/{}/{})", format_expr(expr), from, to, flags),
-        ExprKind::MapExpr { block, list } => {
-            format!("map {{\n{}\n}} {}", format_block(block), format_expr(list))
+        ExprKind::MapExpr {
+            block,
+            list,
+            flatten_array_refs,
+        } => {
+            let kw = if *flatten_array_refs {
+                "flat_map"
+            } else {
+                "map"
+            };
+            format!("{kw} {{\n{}\n}} {}", format_block(block), format_expr(list))
         }
-        ExprKind::MapExprComma { expr, list } => {
-            format!("map {}, {}", format_expr(expr), format_expr(list))
+        ExprKind::MapExprComma {
+            expr,
+            list,
+            flatten_array_refs,
+        } => {
+            let kw = if *flatten_array_refs {
+                "flat_map"
+            } else {
+                "map"
+            };
+            format!("{kw} {}, {}", format_expr(expr), format_expr(list))
         }
         ExprKind::GrepExpr { block, list } => {
             format!("grep {{\n{}\n}} {}", format_block(block), format_expr(list))
@@ -697,8 +715,10 @@ pub fn format_expr(e: &Expr) -> String {
             block,
             list,
             progress,
+            flat_outputs,
         } => {
-            let base = format!("pmap {{\n{}\n}} {}", format_block(block), format_expr(list));
+            let kw = if *flat_outputs { "pflat_map" } else { "pmap" };
+            let base = format!("{kw} {{\n{}\n}} {}", format_block(block), format_expr(list));
             match progress {
                 Some(p) => format!("{}, progress => {}", base, format_expr(p)),
                 None => base,
