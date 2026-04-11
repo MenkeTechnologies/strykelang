@@ -150,7 +150,8 @@ fn string_comparison() {
 
 #[test]
 fn length_of_array() {
-    assert_eq!(eval_int("my @a = (1,2,3); length @a"), 3);
+    // Perl 5: `length @a` scalarizes `@a` to element count, then `length("3")` → 1.
+    assert_eq!(eval_int("my @a = (1,2,3); length @a"), 1);
 }
 
 #[test]

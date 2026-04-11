@@ -34,6 +34,8 @@ pub enum Op {
     Swap,
     /// Rotate the top three values upward (FORTH `rot`): `[a, b, c]` (c on top) → `[b, c, a]`.
     Rot,
+    /// Pop one value; push [`PerlValue::scalar_context`] of that value (Perl aggregate rules).
+    ValueScalarContext,
 
     // ── Scalars (u16 = name pool index) ──
     GetScalar(u16),
@@ -66,6 +68,10 @@ pub enum Op {
     ArraySlicePart(u16),
     /// Pop `b`, pop `a` (arrays); push concatenation `a` followed by `b` (Perl slice / list glue).
     ArrayConcatTwo,
+    /// `exists $a[$i]` — stack: `[index]` → 0/1 (stash-qualified array name pool index).
+    ExistsArrayElem(u16),
+    /// `delete $a[$i]` — stack: `[index]` → deleted value (or undef).
+    DeleteArrayElem(u16),
 
     // ── Hashes ──
     GetHash(u16),
@@ -94,8 +100,12 @@ pub enum Op {
     DeleteArrowHashElem,
     /// `exists $href->{key}` — stack: `[container, key]` → 0/1.
     ExistsArrowHashElem,
-    HashKeys(u16),       // → array of keys
-    HashValues(u16),     // → array of values
+    /// `exists $aref->[$i]` — stack: `[container, index]` (index on top, int-coerced).
+    ExistsArrowArrayElem,
+    /// `delete $aref->[$i]` — stack: `[container, index]` → deleted value (or undef).
+    DeleteArrowArrayElem,
+    HashKeys(u16),   // → array of keys
+    HashValues(u16), // → array of values
     /// Scalar `keys %h` — push integer key count.
     HashKeysScalar(u16),
     /// Scalar `values %h` — push integer value count.
@@ -520,6 +530,8 @@ pub enum Op {
     ReverseScalarOp,
     /// Pop TOS (array/list), push `to_list().len()` as integer (Perl `scalar` on map/grep result).
     StackArrayLen,
+    /// Pop list-slice result array; push last element (Perl `scalar (LIST)[i,...]`).
+    ListSliceToScalar,
     /// pmap { BLOCK } @list — block_idx; stack: \[progress_flag, list\] → \[mapped\] (`progress_flag` is 0/1)
     PMapWithBlock(u16),
     /// pmap_chunked N { BLOCK } @list — block_idx; stack: \[progress_flag, chunk_n, list\] → \[mapped\]
@@ -587,6 +599,14 @@ pub enum Op {
     MakeScalarRef,
     /// `\$name` when `name` is a plain scalar variable — ref aliases the live binding (same as tree `scalar_binding_ref`).
     MakeScalarBindingRef(u16),
+    /// `\@name` — ref aliases the live array in scope (name pool index, stash-qualified like [`Op::GetArray`]).
+    MakeArrayBindingRef(u16),
+    /// `\%name` — ref aliases the live hash in scope.
+    MakeHashBindingRef(u16),
+    /// `\@{ EXPR }` after `EXPR` is on the stack — ARRAY ref aliasing the same storage as Perl (ref to existing ref or package array).
+    MakeArrayRefAlias,
+    /// `\%{ EXPR }` — HASH ref alias (same semantics as [`Op::MakeArrayRefAlias`] for hashes).
+    MakeHashRefAlias,
     /// Make an array reference from TOS (which should be an Array)
     MakeArrayRef,
     /// Make a hash reference from TOS (which should be a Hash)

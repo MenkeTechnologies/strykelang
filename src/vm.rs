@@ -1930,6 +1930,11 @@ impl<'a> VM<'a> {
                         self.push(a);
                         Ok(())
                     }
+                    Op::ValueScalarContext => {
+                        let v = self.pop();
+                        self.push(v.scalar_context());
+                        Ok(())
+                    }
 
                     // ── Scalars ──
                     Op::GetScalar(idx) => {
@@ -2058,6 +2063,25 @@ impl<'a> VM<'a> {
                         self.push(val);
                         Ok(())
                     }
+                    Op::ExistsArrayElem(idx) => {
+                        let index = self.pop().to_int();
+                        let n = names[*idx as usize].as_str();
+                        let yes = self.interp.scope.exists_array_element(n, index);
+                        self.push(PerlValue::integer(if yes { 1 } else { 0 }));
+                        Ok(())
+                    }
+                    Op::DeleteArrayElem(idx) => {
+                        let index = self.pop().to_int();
+                        let n = names[*idx as usize].as_str();
+                        self.require_array_mutable(n)?;
+                        let v = self
+                            .interp
+                            .scope
+                            .delete_array_element(n, index)
+                            .map_err(|e| e.at_line(self.line()))?;
+                        self.push(v);
+                        Ok(())
+                    }
                     Op::SetArrayElem(idx) => {
                         let index = self.pop().to_int();
                         let val = self.pop();
@@ -2088,10 +2112,19 @@ impl<'a> VM<'a> {
                         let n = names[*idx as usize].as_str();
                         self.require_array_mutable(n)?;
                         let line = self.line();
-                        self.interp
-                            .scope
-                            .push_to_array(n, val)
-                            .map_err(|e| e.at_line(line))?;
+                        if let Some(items) = val.as_array_vec() {
+                            for item in items {
+                                self.interp
+                                    .scope
+                                    .push_to_array(n, item)
+                                    .map_err(|e| e.at_line(line))?;
+                            }
+                        } else {
+                            self.interp
+                                .scope
+                                .push_to_array(n, val)
+                                .map_err(|e| e.at_line(line))?;
+                        }
                         Ok(())
                     }
                     Op::PopArray(idx) => {
@@ -2181,6 +2214,25 @@ impl<'a> VM<'a> {
                             }
                         };
                         self.push(PerlValue::integer(len));
+                        Ok(())
+                    }
+                    Op::SpliceArrayDeref(n_rep) => {
+                        let n = *n_rep as usize;
+                        let mut rep_vals: Vec<PerlValue> = Vec::with_capacity(n);
+                        for _ in 0..n {
+                            rep_vals.push(self.pop());
+                        }
+                        rep_vals.reverse();
+                        let length_val = self.pop();
+                        let offset_val = self.pop();
+                        let aref = self.pop();
+                        let line = self.line();
+                        let v = vm_interp_result(
+                            self.interp
+                                .splice_array_deref(aref, offset_val, length_val, rep_vals, line),
+                            line,
+                        )?;
+                        self.push(v);
                         Ok(())
                     }
                     Op::ArrayLen(idx) => {
@@ -2479,6 +2531,33 @@ impl<'a> VM<'a> {
                         self.push(v);
                         Ok(())
                     }
+                    Op::ExistsArrowArrayElem => {
+                        let idx = self.pop().to_int();
+                        let container = self.pop();
+                        let line = self.line();
+                        let yes = vm_interp_result(
+                            self.interp
+                                .exists_arrow_array_element(container, idx, line)
+                                .map(|b| PerlValue::integer(if b { 1 } else { 0 }))
+                                .map_err(FlowOrError::Error),
+                            line,
+                        )?;
+                        self.push(yes);
+                        Ok(())
+                    }
+                    Op::DeleteArrowArrayElem => {
+                        let idx = self.pop().to_int();
+                        let container = self.pop();
+                        let line = self.line();
+                        let v = vm_interp_result(
+                            self.interp
+                                .delete_arrow_array_element(container, idx, line)
+                                .map_err(FlowOrError::Error),
+                            line,
+                        )?;
+                        self.push(v);
+                        Ok(())
+                    }
                     Op::HashKeys(idx) => {
                         let n = names[*idx as usize].as_str();
                         if n == "ENV" {
@@ -2674,7 +2753,8 @@ impl<'a> VM<'a> {
                         Ok(())
                     }
                     Op::ArrayStringifyListSep => {
-                        let v = self.pop();
+                        let raw = self.pop();
+                        let v = self.interp.peel_array_ref_for_list_join(raw);
                         let sep = self.interp.list_separator.clone();
                         let list = v.to_list();
                         let joined = list
@@ -3364,7 +3444,8 @@ impl<'a> VM<'a> {
                         let container = self.pop();
                         let line = self.line();
                         let out = vm_interp_result(
-                            Interpreter::hash_slice_deref_values(&container, &key_vals, line),
+                            self.interp
+                                .hash_slice_deref_values(&container, &key_vals, line),
                             line,
                         )?;
                         self.push(out);
@@ -3584,7 +3665,8 @@ impl<'a> VM<'a> {
                         let container = self.stack[base].clone();
                         let key_vals: Vec<PerlValue> = self.stack[base + 1..base + 1 + n].to_vec();
                         let list = vm_interp_result(
-                            Interpreter::hash_slice_deref_values(&container, &key_vals, line),
+                            self.interp
+                                .hash_slice_deref_values(&container, &key_vals, line),
                             line,
                         )?;
                         let cur = list.to_list().last().cloned().unwrap_or(PerlValue::UNDEF);
@@ -4686,6 +4768,31 @@ impl<'a> VM<'a> {
                         self.push(PerlValue::scalar_binding_ref(name));
                         Ok(())
                     }
+                    Op::MakeArrayBindingRef(name_idx) => {
+                        let name = names[*name_idx as usize].clone();
+                        self.push(PerlValue::array_binding_ref(name));
+                        Ok(())
+                    }
+                    Op::MakeHashBindingRef(name_idx) => {
+                        let name = names[*name_idx as usize].clone();
+                        self.push(PerlValue::hash_binding_ref(name));
+                        Ok(())
+                    }
+                    Op::MakeArrayRefAlias => {
+                        let v = self.pop();
+                        let line = self.line();
+                        let out =
+                            vm_interp_result(self.interp.make_array_ref_alias(v, line), line)?;
+                        self.push(out);
+                        Ok(())
+                    }
+                    Op::MakeHashRefAlias => {
+                        let v = self.pop();
+                        let line = self.line();
+                        let out = vm_interp_result(self.interp.make_hash_ref_alias(v, line), line)?;
+                        self.push(out);
+                        Ok(())
+                    }
                     Op::MakeArrayRef => {
                         let val = self.pop();
                         let arr = if let Some(a) = val.as_array_vec() {
@@ -4821,17 +4928,12 @@ impl<'a> VM<'a> {
                     Op::ArrowArray => {
                         let idx = self.pop().to_int();
                         let r = self.pop();
-                        if let Some(a) = r.as_array_ref() {
-                            let arr = a.read();
-                            let i = if idx < 0 {
-                                (arr.len() as i64 + idx) as usize
-                            } else {
-                                idx as usize
-                            };
-                            self.push(arr.get(i).cloned().unwrap_or(PerlValue::UNDEF));
-                        } else {
-                            self.push(PerlValue::UNDEF);
-                        }
+                        let line = self.line();
+                        let v = vm_interp_result(
+                            self.interp.read_arrow_array_element(r, idx, line),
+                            line,
+                        )?;
+                        self.push(v);
                         Ok(())
                     }
                     Op::ArrowHash => {
@@ -5353,6 +5455,12 @@ impl<'a> VM<'a> {
                     Op::StackArrayLen => {
                         let v = self.pop();
                         self.push(PerlValue::integer(v.to_list().len() as i64));
+                        Ok(())
+                    }
+                    Op::ListSliceToScalar => {
+                        let v = self.pop();
+                        let items = v.to_list();
+                        self.push(items.last().cloned().unwrap_or(PerlValue::UNDEF));
                         Ok(())
                     }
 

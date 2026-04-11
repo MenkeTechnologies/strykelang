@@ -398,6 +398,11 @@ pub enum ExprKind {
         container: Box<Expr>,
         keys: Vec<Expr>,
     },
+    /// `(LIST)[i,...]` / `(sort ...)[0]` — subscript after a non-arrow container (not `$a[i]` / `$r->[i]`).
+    AnonymousListSlice {
+        source: Box<Expr>,
+        indices: Vec<Expr>,
+    },
 
     // References
     ScalarRef(Box<Expr>),

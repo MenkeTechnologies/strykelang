@@ -245,8 +245,12 @@ fn scalar_util_reftype(arg: Option<&PerlValue>) -> crate::error::PerlResult<Perl
     }
     Ok(v.with_heap(|h| {
         let t = match h {
-            HeapObject::Array(_) | HeapObject::ArrayRef(_) => Some("ARRAY"),
-            HeapObject::Hash(_) | HeapObject::HashRef(_) => Some("HASH"),
+            HeapObject::Array(_) | HeapObject::ArrayRef(_) | HeapObject::ArrayBindingRef(_) => {
+                Some("ARRAY")
+            }
+            HeapObject::Hash(_) | HeapObject::HashRef(_) | HeapObject::HashBindingRef(_) => {
+                Some("HASH")
+            }
             HeapObject::ScalarRef(_) | HeapObject::ScalarBindingRef(_) => Some("SCALAR"),
             HeapObject::CodeRef(_) => Some("CODE"),
             HeapObject::Regex(_, _, _) => Some("REGEXP"),

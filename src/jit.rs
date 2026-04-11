@@ -993,7 +993,11 @@ fn simulate_one_op(
             stack.push(a);
             stack.push(b);
         }
-        Op::MakeScalarBindingRef(_) => {
+        Op::MakeScalarBindingRef(_) | Op::MakeArrayBindingRef(_) | Op::MakeHashBindingRef(_) => {
+            stack.push(Cell::Dyn);
+        }
+        Op::MakeArrayRefAlias | Op::MakeHashRefAlias => {
+            stack.pop()?;
             stack.push(Cell::Dyn);
         }
         Op::SetSymbolicScalarRef | Op::SetSymbolicScalarRefKeep => {
@@ -1016,6 +1020,10 @@ fn simulate_one_op(
             stack.push(b);
             stack.push(c);
             stack.push(a);
+        }
+        Op::ValueScalarContext => {
+            stack.pop()?;
+            stack.push(Cell::Dyn);
         }
         // Bitwise: only integers (Perl truncates floats to int for bitwise).
         Op::BitXor | Op::BitAnd | Op::BitOr | Op::BitNot | Op::Shl | Op::Shr => {
@@ -1118,6 +1126,7 @@ fn simulate_one_op(
             stack.push(Cell::Dyn);
         }
         Op::HashSliceDeref(_)
+        | Op::ListSliceToScalar
         | Op::ArrowArraySlice(_)
         | Op::SetHashSliceDeref(_)
         | Op::SetHashSlice(_, _)
@@ -1148,6 +1157,10 @@ fn simulate_one_op(
         | Op::SetNamedArraySlice(_, _)
         | Op::ExistsArrowHashElem
         | Op::DeleteArrowHashElem
+        | Op::ExistsArrowArrayElem
+        | Op::DeleteArrowArrayElem
+        | Op::ExistsArrayElem(_)
+        | Op::DeleteArrayElem(_)
         | Op::KeysFromValue
         | Op::KeysFromValueScalar
         | Op::ValuesFromValue
@@ -1156,7 +1169,8 @@ fn simulate_one_op(
         | Op::ArrayDerefLen
         | Op::PopArrayDeref
         | Op::ShiftArrayDeref
-        | Op::UnshiftArrayDeref(_) => {
+        | Op::UnshiftArrayDeref(_)
+        | Op::SpliceArrayDeref(_) => {
             return None;
         }
         _ => return None,
@@ -2055,8 +2069,14 @@ pub(crate) fn segment_blocks_subroutine_linear_jit(
         | Op::TypeglobAssignFromValueDynamic
         | Op::CopyTypeglobSlotsDynamicLhs(_)
         | Op::MakeScalarBindingRef(_)
+        | Op::MakeArrayBindingRef(_)
+        | Op::MakeHashBindingRef(_)
+        | Op::MakeArrayRefAlias
+        | Op::MakeHashRefAlias
         | Op::SymbolicDeref(_)
+        | Op::ValueScalarContext
         | Op::HashSliceDeref(_)
+        | Op::ListSliceToScalar
         | Op::ArrowArraySlice(_)
         | Op::SetHashSliceDeref(_)
         | Op::SetHashSlice(_, _)
@@ -2244,6 +2264,10 @@ fn is_block_data_op(op: &Op, sub_entries: &[(u16, usize, bool)]) -> bool {
             | Op::Spaceship
             | Op::LogNot
             | Op::MakeScalarBindingRef(_)
+            | Op::MakeArrayBindingRef(_)
+            | Op::MakeHashBindingRef(_)
+            | Op::MakeArrayRefAlias
+            | Op::MakeHashRefAlias
             | Op::GetScalarSlot(_)
             | Op::SetScalarSlot(_)
             | Op::SetScalarSlotKeep(_)
@@ -2386,7 +2410,11 @@ fn enforce_raw_jit_program(ops: &[Op], constants: &[PerlValue]) -> Option<()> {
             | Op::NumGe
             | Op::Spaceship
             | Op::LogNot
-            | Op::MakeScalarBindingRef(_) => return None,
+            | Op::MakeScalarBindingRef(_)
+            | Op::MakeArrayBindingRef(_)
+            | Op::MakeHashBindingRef(_)
+            | Op::MakeArrayRefAlias
+            | Op::MakeHashRefAlias => return None,
             Op::LoadFloat(_) => return None,
             Op::LoadConst(idx) => {
                 let pv = constants.get(*idx as usize)?;

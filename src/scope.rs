@@ -1328,6 +1328,60 @@ impl Scope {
         Ok(())
     }
 
+    /// Perl `exists $a[$i]` — true when the slot index is within the current array length.
+    pub fn exists_array_element(&self, name: &str, index: i64) -> bool {
+        if let Some(aa) = self.find_atomic_array(name) {
+            let arr = aa.0.lock();
+            let idx = if index < 0 {
+                (arr.len() as i64 + index) as usize
+            } else {
+                index as usize
+            };
+            return idx < arr.len();
+        }
+        for frame in self.frames.iter().rev() {
+            if let Some(arr) = frame.get_array(name) {
+                let idx = if index < 0 {
+                    (arr.len() as i64 + index) as usize
+                } else {
+                    index as usize
+                };
+                return idx < arr.len();
+            }
+        }
+        false
+    }
+
+    /// Perl `delete $a[$i]` — sets the element to `undef`, returns the previous value.
+    pub fn delete_array_element(&mut self, name: &str, index: i64) -> Result<PerlValue, PerlError> {
+        if let Some(aa) = self.find_atomic_array(name) {
+            let mut arr = aa.0.lock();
+            let idx = if index < 0 {
+                (arr.len() as i64 + index) as usize
+            } else {
+                index as usize
+            };
+            if idx >= arr.len() {
+                return Ok(PerlValue::UNDEF);
+            }
+            let old = arr.get(idx).cloned().unwrap_or(PerlValue::UNDEF);
+            arr[idx] = PerlValue::UNDEF;
+            return Ok(old);
+        }
+        let arr = self.get_array_mut(name)?;
+        let idx = if index < 0 {
+            (arr.len() as i64 + index) as usize
+        } else {
+            index as usize
+        };
+        if idx >= arr.len() {
+            return Ok(PerlValue::UNDEF);
+        }
+        let old = arr.get(idx).cloned().unwrap_or(PerlValue::UNDEF);
+        arr[idx] = PerlValue::UNDEF;
+        Ok(old)
+    }
+
     // ── Hashes ──
 
     #[inline]

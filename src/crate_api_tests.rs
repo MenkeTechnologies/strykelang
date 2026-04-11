@@ -615,7 +615,10 @@ fn try_vm_execute_eval_string_expression() {
     let p = parse(r#"eval '31 + 11';"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
-    assert!(out.is_some(), "eval string should compile on VM (BuiltinId::Eval)");
+    assert!(
+        out.is_some(),
+        "eval string should compile on VM (BuiltinId::Eval)"
+    );
     assert_eq!(out.unwrap().expect("vm").to_int(), 42);
 }
 
@@ -837,7 +840,7 @@ fn try_vm_execute_index_rindex_substr() {
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "index, rindex, substr should compile on VM");
-    assert_eq!(out.unwrap().expect("vm").to_int(), 0 + 30 + 3);
+    assert_eq!(out.unwrap().expect("vm").to_int(), 33);
 }
 
 #[test]
@@ -913,7 +916,8 @@ fn try_vm_execute_stat_file_size_at_index_seven() {
 
 #[test]
 fn try_vm_execute_stat_missing_path_empty_list() {
-    let p = parse(r#"my @st = stat("perlrs___stat___no_such___file"); scalar @st;"#).expect("parse");
+    let p =
+        parse(r#"my @st = stat("perlrs___stat___no_such___file"); scalar @st;"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "stat missing path should compile on VM");
@@ -923,7 +927,7 @@ fn try_vm_execute_stat_missing_path_empty_list() {
 #[test]
 fn try_vm_execute_readline_scalar_first_line() {
     let dir = std::env::temp_dir();
-    let path = dir.join("perlrs_vm_readline_scalar_test");
+    let path = dir.join(format!("perlrs_vm_readline_scalar_{}", std::process::id()));
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, b"first\nsecond\n").expect("write temp");
     let ps = path.to_string_lossy();
@@ -974,9 +978,7 @@ fn try_vm_execute_filetest_e_and_f_nonempty_file() {
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, b"!").expect("write temp");
     let ps = path.to_string_lossy();
-    let src = format!(
-        r#"((-e "{ps}") * 10) + (-f "{ps}");"#,
-    );
+    let src = format!(r#"((-e "{ps}") * 10) + (-f "{ps}");"#,);
     let p = parse(&src).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
@@ -1006,7 +1008,10 @@ fn try_vm_execute_opendir_readdir_finds_known_file() {
     let p = parse(&src).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
-    assert!(out.is_some(), "opendir/readdir/closedir should compile on VM");
+    assert!(
+        out.is_some(),
+        "opendir/readdir/closedir should compile on VM"
+    );
     assert_eq!(out.unwrap().expect("vm").to_int(), 1);
     let _ = std::fs::remove_dir_all(&base);
 }
@@ -1047,9 +1052,7 @@ fn try_vm_execute_readlink_returns_symlink_target() {
     let link = base.join("L");
     symlink("rel_tg", &link).expect("symlink");
     let sl = link.to_string_lossy();
-    let src = format!(
-        r#"(readlink "{sl}") eq "rel_tg" ? 1 : 0;"#,
-    );
+    let src = format!(r#"(readlink "{sl}") eq "rel_tg" ? 1 : 0;"#,);
     let p = parse(&src).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
@@ -1140,8 +1143,9 @@ fn try_vm_execute_wantarray_scalar_vs_list_in_sub() {
 #[test]
 fn try_vm_execute_rename_file() {
     let dir = std::env::temp_dir();
-    let p1 = dir.join("perlrs_vm_rename_from");
-    let p2 = dir.join("perlrs_vm_rename_to");
+    let pid = std::process::id();
+    let p1 = dir.join(format!("perlrs_vm_rename_from_{pid}"));
+    let p2 = dir.join(format!("perlrs_vm_rename_to_{pid}"));
     let _ = std::fs::remove_file(&p1);
     let _ = std::fs::remove_file(&p2);
     std::fs::write(&p1, b"mv").expect("write temp");
@@ -2006,6 +2010,43 @@ fn try_vm_execute_arrow_hash_defined_or_assign_short_circuit() {
 }
 
 #[test]
+fn try_vm_execute_scalar_deref_hash_defined_or_assign() {
+    let p = parse(
+        r#"my %h = ();
+        my $r = \%h;
+        $$r{x} //= 42;
+        $h{x};"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "hash-element defined-or assign on VM (\\%h via \\$r)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 42);
+}
+
+#[test]
+fn try_vm_execute_scalar_deref_hash_defined_or_assign_short_circuit() {
+    let p = parse(
+        r#"my %h = (a => 1);
+        my $r = \%h;
+        my $runs = 0;
+        $$r{a} //= ($runs = 1);
+        $runs;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "hash-element defined-or should skip RHS when defined"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 0);
+}
+
+#[test]
 fn try_vm_execute_arrow_hash_log_or_assign() {
     let p = parse(
         r#"no strict 'vars';
@@ -2315,12 +2356,18 @@ fn try_vm_compile_exists_delete_href_emits_arrow_hash_ops() {
         )
         .expect("compile");
     assert!(
-        chunk.ops.iter().any(|o| matches!(o, Op::ExistsArrowHashElem)),
+        chunk
+            .ops
+            .iter()
+            .any(|o| matches!(o, Op::ExistsArrowHashElem)),
         "expected ExistsArrowHashElem in {:?}",
         chunk.ops
     );
     assert!(
-        chunk.ops.iter().any(|o| matches!(o, Op::DeleteArrowHashElem)),
+        chunk
+            .ops
+            .iter()
+            .any(|o| matches!(o, Op::DeleteArrowHashElem)),
         "expected DeleteArrowHashElem in {:?}",
         chunk.ops
     );
@@ -2348,6 +2395,120 @@ fn try_vm_execute_exists_delete_href() {
 }
 
 #[test]
+fn try_vm_compile_exists_delete_named_array_emits_array_elem_ops() {
+    use crate::bytecode::Op;
+    use crate::compiler::Compiler;
+    let chunk = Compiler::new()
+        .compile_program(
+            &parse(
+                r#"my @a = (1, 2, 3);
+                exists $a[1];
+                delete $a[1];"#,
+            )
+            .expect("parse"),
+        )
+        .expect("compile");
+    assert!(
+        chunk
+            .ops
+            .iter()
+            .any(|o| matches!(o, Op::ExistsArrayElem(_))),
+        "expected ExistsArrayElem in {:?}",
+        chunk.ops
+    );
+    assert!(
+        chunk
+            .ops
+            .iter()
+            .any(|o| matches!(o, Op::DeleteArrayElem(_))),
+        "expected DeleteArrayElem in {:?}",
+        chunk.ops
+    );
+    assert!(
+        !chunk.ops.iter().any(|o| matches!(o, Op::ExistsExpr(_))),
+        r"exists $a[i] should not use ExistsExpr pool"
+    );
+}
+
+#[test]
+fn try_vm_execute_exists_delete_named_array() {
+    let p = parse(
+        r#"my @a = (10, 20, 30);
+        my $e0 = exists $a[99];
+        my $e1 = exists $a[1];
+        my $d = delete $a[1];
+        my $e2 = exists $a[1];
+        $e0 . "," . $e1 . "," . $d . "," . $e2;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "exists/delete on named array element should compile on VM"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_string(), "0,1,20,1");
+}
+
+#[test]
+fn try_vm_compile_exists_delete_aref_emits_arrow_array_ops() {
+    use crate::bytecode::Op;
+    use crate::compiler::Compiler;
+    let chunk = Compiler::new()
+        .compile_program(
+            &parse(
+                r#"no strict 'vars';
+                my $a = [1, 2, 3];
+                exists $a->[1];
+                delete $a->[1];"#,
+            )
+            .expect("parse"),
+        )
+        .expect("compile");
+    assert!(
+        chunk
+            .ops
+            .iter()
+            .any(|o| matches!(o, Op::ExistsArrowArrayElem)),
+        "expected ExistsArrowArrayElem in {:?}",
+        chunk.ops
+    );
+    assert!(
+        chunk
+            .ops
+            .iter()
+            .any(|o| matches!(o, Op::DeleteArrowArrayElem)),
+        "expected DeleteArrowArrayElem in {:?}",
+        chunk.ops
+    );
+    assert!(
+        !chunk.ops.iter().any(|o| matches!(o, Op::ExistsExpr(_))),
+        "exists on aref->[i] should not use ExistsExpr pool"
+    );
+}
+
+#[test]
+fn try_vm_execute_exists_delete_aref() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $a = [10, 20, 30];
+        my $e0 = exists $a->[99];
+        my $e1 = exists $a->[1];
+        my $d = delete $a->[1];
+        my $e2 = exists $a->[1];
+        $e0 . "," . $e1 . "," . $d . "," . $e2;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "exists/delete on array ref element should compile on VM"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_string(), "0,1,20,1");
+}
+
+#[test]
 fn try_vm_compile_keys_values_href_use_from_value_ops() {
     use crate::bytecode::Op;
     use crate::compiler::Compiler;
@@ -2364,12 +2525,18 @@ fn try_vm_compile_keys_values_href_use_from_value_ops() {
         )
         .expect("compile");
     assert!(
-        chunk.ops.iter().any(|o| matches!(o, Op::KeysFromValueScalar)),
+        chunk
+            .ops
+            .iter()
+            .any(|o| matches!(o, Op::KeysFromValueScalar)),
         "expected KeysFromValueScalar, got {:?}",
         chunk.ops
     );
     assert!(
-        chunk.ops.iter().any(|o| matches!(o, Op::ValuesFromValueScalar)),
+        chunk
+            .ops
+            .iter()
+            .any(|o| matches!(o, Op::ValuesFromValueScalar)),
         "expected ValuesFromValueScalar, got {:?}",
         chunk.ops
     );
@@ -2424,6 +2591,617 @@ fn try_vm_compile_push_aref_uses_push_array_deref() {
 }
 
 #[test]
+fn try_vm_compile_scalar_at_aref_uses_array_deref_len() {
+    use crate::bytecode::Op;
+    use crate::compiler::Compiler;
+    let chunk = Compiler::new()
+        .compile_program(
+            &parse(
+                r#"no strict 'vars';
+                my $a = [1, 2, 3];
+                scalar @$a;"#,
+            )
+            .expect("parse"),
+        )
+        .expect("compile");
+    assert!(
+        chunk.ops.iter().any(|o| matches!(o, Op::ArrayDerefLen)),
+        "expected ArrayDerefLen for scalar @$a, got {:?}",
+        chunk.ops
+    );
+    assert!(
+        !chunk
+            .ops
+            .iter()
+            .any(|o| matches!(o, Op::SymbolicDeref(b) if *b == 1)),
+        "scalar @$a should not use SymbolicDeref(Array), got {:?}",
+        chunk.ops
+    );
+}
+
+#[test]
+fn try_vm_execute_scalar_at_aref_is_length() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $a = [10, 20, 30];
+        scalar @$a;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "scalar @$a should compile on VM");
+    assert_eq!(out.unwrap().expect("vm").to_int(), 3);
+}
+
+#[test]
+fn try_vm_execute_scalar_at_aref_empty_is_zero() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $a = [];
+        scalar @$a;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "scalar @$a on empty array ref should compile on VM"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 0);
+}
+
+#[test]
+fn try_vm_compile_scalar_braced_aref_uses_array_deref_len() {
+    use crate::bytecode::Op;
+    use crate::compiler::Compiler;
+    let chunk = Compiler::new()
+        .compile_program(
+            &parse(
+                r#"no strict 'vars';
+                my $a = [9, 8];
+                scalar @{$a};"#,
+            )
+            .expect("parse"),
+        )
+        .expect("compile");
+    assert!(
+        chunk.ops.iter().any(|o| matches!(o, Op::ArrayDerefLen)),
+        "expected ArrayDerefLen for scalar @{{$a}}, got {:?}",
+        chunk.ops
+    );
+}
+
+#[test]
+fn try_vm_execute_scalar_braced_aref_is_length() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $a = [1, 2, 3, 4, 5];
+        scalar @{$a};"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "scalar @{{$a}} should compile on VM");
+    assert_eq!(out.unwrap().expect("vm").to_int(), 5);
+}
+
+#[test]
+fn try_vm_execute_scalar_braced_sub_returning_aref_is_length() {
+    let p = parse(
+        r#"no strict 'vars';
+        sub mk { [1, 2, 3, 4] }
+        scalar @{mk()};"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "scalar @{{sub()}} array deref should compile on VM"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 4);
+}
+
+#[test]
+fn try_vm_execute_assignment_rhs_at_aref_yields_length() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $a = [9, 8, 7];
+        my $n = @$a;
+        $n;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "my $n = @$a should compile on VM");
+    assert_eq!(out.unwrap().expect("vm").to_int(), 3);
+}
+
+#[test]
+fn try_vm_execute_assign_named_array_to_scalar_is_length() {
+    let p = parse(
+        r#"my @y = (10, 20, 30);
+        my $x = @y;
+        $x;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "my $x = @y should compile on VM");
+    assert_eq!(out.unwrap().expect("vm").to_int(), 3);
+}
+
+#[test]
+fn try_vm_compile_scalar_percent_hash_uses_value_scalar_context() {
+    use crate::bytecode::Op;
+    use crate::compiler::Compiler;
+    let chunk = Compiler::new()
+        .compile_program(
+            &parse(
+                r#"my %h = (a => 1, b => 2);
+                scalar %h;"#,
+            )
+            .expect("parse"),
+        )
+        .expect("compile");
+    assert!(
+        chunk
+            .ops
+            .iter()
+            .any(|o| matches!(o, Op::ValueScalarContext)),
+        "expected ValueScalarContext after GetHash for scalar %h, got {:?}",
+        chunk.ops
+    );
+}
+
+#[test]
+fn try_vm_execute_scalar_percent_empty_hash_is_zero() {
+    let p = parse(
+        r#"my %h = ();
+        scalar %h;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some());
+    assert_eq!(out.unwrap().expect("vm").to_int(), 0);
+}
+
+#[test]
+fn try_vm_compile_scalar_percent_href_emits_hash_deref_and_value_scalar_context() {
+    use crate::bytecode::Op;
+    use crate::compiler::Compiler;
+    let chunk = Compiler::new()
+        .compile_program(
+            &parse(
+                r#"no strict 'vars';
+                my $r = { a => 1, b => 2 };
+                scalar %$r;"#,
+            )
+            .expect("parse"),
+        )
+        .expect("compile");
+    assert!(
+        chunk.ops.iter().any(|o| matches!(o, Op::SymbolicDeref(2))),
+        "expected SymbolicDeref(Hash) for %$r, got {:?}",
+        chunk.ops
+    );
+    assert!(
+        chunk
+            .ops
+            .iter()
+            .any(|o| matches!(o, Op::ValueScalarContext)),
+        "expected ValueScalarContext after hash deref for scalar %$r, got {:?}",
+        chunk.ops
+    );
+}
+
+#[test]
+fn try_vm_execute_scalar_percent_href_nonempty_fill_string() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $r = { a => 1, b => 2 };
+        scalar %$r;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "scalar %$r should compile on VM");
+    assert_eq!(out.unwrap().expect("vm").to_string(), "2/3");
+}
+
+#[test]
+fn try_vm_execute_scalar_percent_href_empty_is_zero() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $r = {};
+        scalar %$r;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some());
+    assert_eq!(out.unwrap().expect("vm").to_int(), 0);
+}
+
+#[test]
+fn try_vm_compile_scalar_named_array_emits_array_len_not_get_array() {
+    use crate::bytecode::Op;
+    use crate::compiler::Compiler;
+    let chunk = Compiler::new()
+        .compile_program(
+            &parse(
+                r#"my @t = (9, 8);
+                scalar @t;"#,
+            )
+            .expect("parse"),
+        )
+        .expect("compile");
+    assert!(
+        chunk.ops.iter().any(|o| matches!(o, Op::ArrayLen(_))),
+        "expected ArrayLen for scalar @t, got {:?}",
+        chunk.ops
+    );
+    assert!(
+        !chunk.ops.iter().any(|o| matches!(o, Op::GetArray(_))),
+        "scalar @t should not load full array via GetArray, got {:?}",
+        chunk.ops
+    );
+}
+
+#[test]
+fn try_vm_execute_scalar_named_array_length() {
+    let p = parse(
+        r#"my @u = (1, 2, 3, 4);
+        scalar @u;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "scalar @u should compile on VM");
+    assert_eq!(out.unwrap().expect("vm").to_int(), 4);
+}
+
+#[test]
+fn try_vm_execute_join_scalar_at_aref_single_argument() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $a = [10, 20, 30, 40, 50];
+        join "-", scalar @$a;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "join with scalar @$a should compile on VM (one list element)"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_string(), "5");
+}
+
+#[test]
+fn try_vm_compile_splice_aref_uses_splice_array_deref() {
+    use crate::bytecode::Op;
+    use crate::compiler::Compiler;
+    let chunk = Compiler::new()
+        .compile_program(
+            &parse(
+                r#"no strict 'vars';
+                my $a = [10, 20, 30, 40];
+                join("-", splice @$a, 1, 2);"#,
+            )
+            .expect("parse"),
+        )
+        .expect("compile");
+    assert!(
+        chunk
+            .ops
+            .iter()
+            .any(|o| matches!(o, Op::SpliceArrayDeref(n) if *n == 0)),
+        "expected SpliceArrayDeref(0) for splice with no replacement list, got {:?}",
+        chunk.ops
+    );
+    assert!(
+        !chunk.ops.iter().any(|o| matches!(o, Op::SpliceExpr(_))),
+        "splice @$a with small replacement count should not use SpliceExpr pool"
+    );
+}
+
+#[test]
+fn try_vm_compile_splice_aref_with_replacements_emits_splice_array_deref_count() {
+    use crate::bytecode::Op;
+    use crate::compiler::Compiler;
+    let chunk = Compiler::new()
+        .compile_program(
+            &parse(
+                r#"no strict 'vars';
+                my $a = [1, 2, 3, 4];
+                join("-", splice @$a, 1, 2, 9, 8);"#,
+            )
+            .expect("parse"),
+        )
+        .expect("compile");
+    assert!(
+        chunk
+            .ops
+            .iter()
+            .any(|o| matches!(o, Op::SpliceArrayDeref(n) if *n == 2)),
+        "expected SpliceArrayDeref(2) for two replacement elems, got {:?}",
+        chunk.ops
+    );
+}
+
+#[test]
+fn try_vm_compile_splice_aref_negative_offset_emits_splice_array_deref() {
+    use crate::bytecode::Op;
+    use crate::compiler::Compiler;
+    let chunk = Compiler::new()
+        .compile_program(
+            &parse(
+                r#"no strict 'vars';
+                my $a = [1, 2, 3, 4, 5];
+                join("-", splice @$a, -2);"#,
+            )
+            .expect("parse"),
+        )
+        .expect("compile");
+    assert!(
+        chunk
+            .ops
+            .iter()
+            .any(|o| matches!(o, Op::SpliceArrayDeref(n) if *n == 0)),
+        "expected SpliceArrayDeref(0) for splice @$a with negative OFFSET, got {:?}",
+        chunk.ops
+    );
+    assert!(
+        !chunk.ops.iter().any(|o| matches!(o, Op::SpliceExpr(_))),
+        "small splice @$a should not fall back to SpliceExpr pool, got {:?}",
+        chunk.ops
+    );
+}
+
+#[test]
+fn try_vm_compile_splice_aref_negative_length_emits_splice_array_deref() {
+    use crate::bytecode::Op;
+    use crate::compiler::Compiler;
+    let chunk = Compiler::new()
+        .compile_program(
+            &parse(
+                r#"no strict 'vars';
+                my $a = [1, 2, 3, 4, 5];
+                join("-", splice @$a, 0, -2);"#,
+            )
+            .expect("parse"),
+        )
+        .expect("compile");
+    assert!(
+        chunk
+            .ops
+            .iter()
+            .any(|o| matches!(o, Op::SpliceArrayDeref(n) if *n == 0)),
+        "expected SpliceArrayDeref(0) for splice @$a with negative LENGTH, got {:?}",
+        chunk.ops
+    );
+    assert!(
+        !chunk.ops.iter().any(|o| matches!(o, Op::SpliceExpr(_))),
+        "splice @$a, 0, -2 should not use SpliceExpr pool, got {:?}",
+        chunk.ops
+    );
+}
+
+#[test]
+fn try_vm_compile_splice_aref_negative_offset_with_replacement_emits_splice_array_deref_count() {
+    use crate::bytecode::Op;
+    use crate::compiler::Compiler;
+    let chunk = Compiler::new()
+        .compile_program(
+            &parse(
+                r#"no strict 'vars';
+                my $a = [1, 2, 3, 4, 5];
+                join("-", splice @$a, -2, 1, 99);"#,
+            )
+            .expect("parse"),
+        )
+        .expect("compile");
+    assert!(
+        chunk
+            .ops
+            .iter()
+            .any(|o| matches!(o, Op::SpliceArrayDeref(n) if *n == 1)),
+        "expected SpliceArrayDeref(1) for one replacement with negative OFFSET, got {:?}",
+        chunk.ops
+    );
+    assert!(
+        !chunk.ops.iter().any(|o| matches!(o, Op::SpliceExpr(_))),
+        "splice @$a, -2, 1, 99 should not use SpliceExpr pool, got {:?}",
+        chunk.ops
+    );
+}
+
+#[test]
+fn try_vm_compile_splice_aref_three_replacements_emits_splice_array_deref_count() {
+    use crate::bytecode::Op;
+    use crate::compiler::Compiler;
+    let chunk = Compiler::new()
+        .compile_program(
+            &parse(
+                r#"no strict 'vars';
+                my $a = [10, 20, 30, 40];
+                join("-", splice @$a, 1, 2, 1, 2, 3);"#,
+            )
+            .expect("parse"),
+        )
+        .expect("compile");
+    assert!(
+        chunk
+            .ops
+            .iter()
+            .any(|o| matches!(o, Op::SpliceArrayDeref(n) if *n == 3)),
+        "expected SpliceArrayDeref(3) for three replacement elems, got {:?}",
+        chunk.ops
+    );
+    assert!(
+        !chunk.ops.iter().any(|o| matches!(o, Op::SpliceExpr(_))),
+        "three-elem replacement splice @$a should not use SpliceExpr pool, got {:?}",
+        chunk.ops
+    );
+}
+
+#[test]
+fn try_vm_execute_splice_aref_returns_removed_slice() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $v = [10, 20, 30, 40];
+        join("-", splice @$v, 1, 2);"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "splice on array ref should compile on VM");
+    assert_eq!(out.unwrap().expect("vm").to_string(), "20-30");
+}
+
+#[test]
+fn try_vm_execute_splice_aref_negative_offset_removed_tail() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $v = [1, 2, 3, 4, 5];
+        my $r = join "-", splice @$v, -2;
+        $r . "|" . join "-", @$v;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "splice @$v with negative OFFSET should compile on VM"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_string(), "4-5|1-2-3");
+}
+
+#[test]
+fn try_vm_execute_splice_aref_negative_length_preserves_tail() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $v = [1, 2, 3, 4, 5];
+        my $r = join "-", splice @$v, 0, -2;
+        $r . "|" . join "-", @$v;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "splice @$v with negative LENGTH should compile on VM"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_string(), "1-2-3|4-5");
+}
+
+#[test]
+fn try_vm_execute_splice_aref_negative_offset_with_replacement() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $v = [1, 2, 3, 4, 5];
+        splice @$v, -2, 1, 99;
+        join "-", @$v;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "splice @$v with negative OFFSET and replacement should compile on VM"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_string(), "1-2-3-99-5");
+}
+
+#[test]
+fn try_vm_execute_splice_aref_three_replacements_mutates_target() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $v = [10, 20, 30, 40];
+        splice @$v, 1, 2, 1, 2, 3;
+        join "-", @$v;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "splice @$v with three replacements should compile on VM"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_string(), "10-1-2-3-40");
+}
+
+#[test]
+fn try_vm_execute_splice_aref_zero_length_insert() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $v = [1, 2, 3];
+        splice @$v, 1, 0, 9;
+        join "-", @$v;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "splice LENGTH0 insert should compile on VM");
+    assert_eq!(out.unwrap().expect("vm").to_string(), "1-9-2-3");
+}
+
+#[test]
+fn try_vm_execute_push_aref_splice_list_chain() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $v = [1, 2, 3];
+        push @$v, splice @$v, 0, 1;
+        join "-", @$v;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "push + splice on same aref should compile on VM"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_string(), "2-3-1");
+}
+
+#[test]
+fn try_vm_execute_splice_aref_with_replacements_mutates_target() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $v = [1, 2, 3, 4];
+        my $removed = join "-", splice @$v, 1, 2, 9, 8;
+        ($removed eq "2-3" && $v->[1] == 9 && $v->[2] == 8 && $v->[3] == 4) ? 1 : 0;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "splice @$v with replacement list should compile on VM"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 1);
+}
+
+#[test]
+fn try_vm_execute_scalar_splice_aref_returns_last_removed() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $a = [5, 6, 7];
+        scalar splice @$a, 0, 2;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "scalar splice on array ref should compile on VM"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_int(), 6);
+}
+
+#[test]
 fn try_vm_execute_push_pop_shift_unshift_aref() {
     let p = parse(
         r#"no strict 'vars';
@@ -2443,6 +3221,188 @@ fn try_vm_execute_push_pop_shift_unshift_aref() {
     );
     // n=3 p=30 s=10 u=2 (unshift returns new length) a[0]=5 a[1]=20 => 70
     assert_eq!(out.unwrap().expect("vm").to_int(), 70);
+}
+
+#[test]
+fn try_vm_execute_named_array_splice_negative_offset_replacement() {
+    let p = parse(
+        r#"my @a = (1, 2, 3, 4, 5);
+        splice @a, -2, 1, 88;
+        join "-", @a;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "named splice with negative OFFSET on VM");
+    assert_eq!(out.unwrap().expect("vm").to_string(), "1-2-3-88-5");
+}
+
+#[test]
+fn try_vm_execute_unshift_splice_aref_chain() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $v = [1, 2, 3];
+        unshift @$v, splice(@$v, 0, 1);
+        join "-", @$v;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "unshift with splice on same aref");
+    assert_eq!(out.unwrap().expect("vm").to_string(), "1-2-3");
+}
+
+#[test]
+fn try_vm_execute_grep_block_aref() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $v = [1, 2, 3, 4];
+        scalar grep { $_ > 1 } @$v;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "grep block over array ref");
+    assert_eq!(out.unwrap().expect("vm").to_int(), 3);
+}
+
+#[test]
+fn try_vm_execute_map_block_aref() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $v = [1, 2, 3];
+        my @m = map { $_ * 2 } @$v;
+        $m[2];"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "map block over array ref");
+    assert_eq!(out.unwrap().expect("vm").to_int(), 6);
+}
+
+#[test]
+fn try_vm_execute_scalar_keys_hashref() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $h = { u => 1, v => 2, w => 3 };
+        scalar keys %$h;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "scalar keys on hashref");
+    assert_eq!(out.unwrap().expect("vm").to_int(), 3);
+}
+
+#[test]
+fn try_vm_execute_for_loop_over_aref() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $v = [1, 2, 3];
+        my $s = 0;
+        for my $x (@$v) { $s = $s + $x; }
+        $s;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "for-loop over array ref");
+    assert_eq!(out.unwrap().expect("vm").to_int(), 6);
+}
+
+#[test]
+fn try_vm_execute_splice_aref_variable_offset() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $v = [1, 2, 3, 4];
+        my $o = 1;
+        splice @$v, $o, 2, 9;
+        join "-", @$v;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "splice on aref with scalar OFFSET variable");
+    assert_eq!(out.unwrap().expect("vm").to_string(), "1-9-4");
+}
+
+#[test]
+fn try_vm_execute_concat_two_arefs() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $a = [1, 2];
+        my $b = [3, 4];
+        my @x = (@$a, @$b);
+        join "-", @x;"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "list concat of two arefs");
+    assert_eq!(out.unwrap().expect("vm").to_string(), "1-2-3-4");
+}
+
+#[test]
+fn try_vm_execute_scalar_splice_named_negative_offset() {
+    let p = parse(
+        r#"my @a = (1, 2, 3, 4, 5);
+        my $n = scalar splice @a, -3, 2;
+        $n . "|" . join("-", @a);"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "scalar splice named array negative OFFSET");
+    assert_eq!(out.unwrap().expect("vm").to_string(), "4|1-2-5");
+}
+
+#[test]
+fn try_vm_execute_splice_named_three_replacements_return_removed() {
+    let p = parse(
+        r#"my @a = (1, 2, 3, 4);
+        my @b = splice @a, 1, 2, 9, 8, 7;
+        join("-", @a) . "|" . join("-", @b);"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(
+        out.is_some(),
+        "named splice with three replacements, list return"
+    );
+    assert_eq!(out.unwrap().expect("vm").to_string(), "1-9-8-7-4|2-3");
+}
+
+#[test]
+fn try_vm_execute_splice_aref_three_replacements_return_removed() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $v = [1, 2, 3, 4];
+        my @b = splice @$v, 1, 2, 9, 8, 7;
+        join("-", @$v) . "|" . join("-", @b);"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "aref splice three replacements, list return");
+    assert_eq!(out.unwrap().expect("vm").to_string(), "1-9-8-7-4|2-3");
+}
+
+#[test]
+fn try_vm_execute_shift_then_pop_aref() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $v = [1, 2, 3];
+        shift @$v;
+        my $x = pop @$v;
+        $x . "|" . join("-", @$v);"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "shift then pop on same aref");
+    assert_eq!(out.unwrap().expect("vm").to_string(), "3|2");
 }
 
 #[test]

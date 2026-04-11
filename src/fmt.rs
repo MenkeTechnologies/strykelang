@@ -488,6 +488,15 @@ pub fn format_expr(e: &Expr) -> String {
             format_expr(container),
             keys.iter().map(format_expr).collect::<Vec<_>>().join(", ")
         ),
+        ExprKind::AnonymousListSlice { source, indices } => format!(
+            "({})[{}]",
+            format_expr(source),
+            indices
+                .iter()
+                .map(format_expr)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
         ExprKind::ScalarRef(_) => "/* ExprKind::ScalarRef */".to_string(),
         ExprKind::ArrayRef(_) => "/* ExprKind::ArrayRef */".to_string(),
         ExprKind::HashRef(_) => "/* ExprKind::HashRef */".to_string(),

@@ -341,7 +341,8 @@ fn defined_array_element() {
 
 #[test]
 fn array_stringify_in_concat() {
-    assert_eq!(eval_string(r#"my @a = (1, 2, 3); "" . @a"#), "123");
+    // Scalar `@a` is array length; string concat yields `"3"`.
+    assert_eq!(eval_string(r#"my @a = (1, 2, 3); "" . @a"#), "3");
 }
 
 #[test]

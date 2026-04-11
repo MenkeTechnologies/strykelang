@@ -116,6 +116,76 @@ fn scalar_context_hash_count_string() {
     );
 }
 
+/// Plain `@name` / `%name` on the RHS of scalar assignment must not expand the full aggregate
+/// (`ArrayLen` / scalar `%h`), matching Perl.
+#[test]
+fn perl_compat_named_array_rvalue_in_scalar_assign_is_length() {
+    assert_eq!(ri(r#"my @y = (10, 20, 30); my $x = @y; $x"#), 3);
+}
+
+#[test]
+fn perl_compat_named_hash_rvalue_in_scalar_assign_is_fill_string() {
+    assert_eq!(rs(r#"my %h = (a => 1, b => 2); my $x = %h; $x"#), "2/3");
+}
+
+/// `exists` / `delete` on `$a[$i]` lower to [`Op::ExistsArrayElem`] / [`Op::DeleteArrayElem`].
+#[test]
+fn perl_compat_named_array_exists_delete() {
+    assert_eq!(
+        rs(r#"my @a = (10, 20, 30);
+        my $e0 = exists $a[99] ? 1 : 0;
+        my $e1 = exists $a[1] ? 1 : 0;
+        my $d = delete $a[1];
+        my $e2 = exists $a[1] ? 1 : 0;
+        $e0 . "," . $e1 . "," . $d . "," . $e2;"#,),
+        "0,1,20,1"
+    );
+}
+
+/// `exists` / `delete` on `$aref->[$i]` use [`Op::ExistsArrowArrayElem`] /
+/// [`Op::DeleteArrowArrayElem`] (same outcome string as named-array exists/delete in this runtime).
+#[test]
+fn perl_compat_arrow_array_exists_delete() {
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $a = [10, 20, 30];
+        my $e0 = exists $a->[99] ? 1 : 0;
+        my $e1 = exists $a->[1] ? 1 : 0;
+        my $d = delete $a->[1];
+        my $e2 = exists $a->[1] ? 1 : 0;
+        $e0 . "," . $e1 . "," . $d . "," . $e2;"#,),
+        "0,1,20,1"
+    );
+}
+
+#[test]
+fn perl_compat_arrow_array_compound_add() {
+    assert_eq!(
+        ri(r#"no strict 'vars'; my $v = [1, 2, 3]; $v->[1] += 10; $v->[1]"#),
+        12
+    );
+}
+
+#[test]
+fn perl_compat_arrow_hash_compound_add_and_concat() {
+    assert_eq!(
+        ri(r#"no strict 'vars'; my $h = { a => 10 }; $h->{a} += 2; $h->{a}"#),
+        12
+    );
+    assert_eq!(
+        rs(r#"no strict 'vars'; my $h = { a => "z" }; $h->{a} .= "9"; $h->{a}"#),
+        "z9"
+    );
+}
+
+#[test]
+fn perl_compat_scalar_deref_hash_string_concat_assign() {
+    assert_eq!(
+        rs(r#"my %h = (a => "z"); my $r = \%h; $$r{a} .= "9"; $h{a}"#),
+        "z9"
+    );
+}
+
 #[test]
 fn unless_else_branch() {
     assert_eq!(
@@ -199,9 +269,116 @@ fn negative_zero_add() {
 }
 
 #[test]
-fn backslash_reference_not_in_sub() {
-    // Just ensure parse+run accepts common idiom where supported
-    let _ = run("my $x = 1; $x;");
+fn backslash_array_hash_ref_alias() {
+    assert_eq!(
+        rs("my @a = (1,2,3); my $r = \\@a; ref($r)"),
+        "ARRAY".to_string()
+    );
+    assert_eq!(ri("my @a = (1,2,3); my $r = \\@a; $r->[0] = 99; $a[0]"), 99);
+    assert_eq!(
+        ri("my @a = (1,2,3); my $r = \\@a; my @c = @$r; $c[0] + $c[1] + $c[2]"),
+        6
+    );
+    assert_eq!(
+        rs("my %h = (a=>7); my $r = \\%h; ref($r)"),
+        "HASH".to_string()
+    );
+    assert_eq!(ri("my %h = (a=>7); my $r = \\%h; $r->{a}"), 7);
+}
+
+#[test]
+fn scalar_deref_hashref_brace_subscript() {
+    assert_eq!(ri(r#"my %h=(a=>1); my $r=\%h; $$r{a}"#), 1);
+}
+
+#[test]
+fn scalar_deref_aref_bracket_subscript() {
+    assert_eq!(ri(r#"my @a=(10,20,30); my $r=\@a; $$r[1]"#), 20);
+}
+
+#[test]
+fn interpolated_string_at_scalar_aref() {
+    assert_eq!(
+        rs(r#"my $r = [1, 2, 3]; my $s = "@$r"; $s"#),
+        "1 2 3".to_string()
+    );
+}
+
+#[test]
+fn pop_push_peeled_array_deref_operand() {
+    assert_eq!(
+        rs(r#"my @a = (9, 8); my $r = \@a; pop((@$r)); join "-", @a"#),
+        "9".to_string()
+    );
+    assert_eq!(
+        rs(r#"my @a = (1); my $r = \@a; push((@$r), 2); join "", @a"#),
+        "12".to_string()
+    );
+}
+
+#[test]
+fn splice_offset_length_perl_rules() {
+    assert_eq!(
+        rs("my @a = (1,2,3,4,5); my @rem = splice(@a, -2); join(' ', @rem) . '|' . join(' ', @a);"),
+        "4 5|1 2 3"
+    );
+    assert_eq!(
+        rs("my @a = (1,2,3,4,5); my @rem = splice(@a, 0, -2); join(' ', @rem) . '|' . join(' ', @a);"),
+        "1 2 3|4 5"
+    );
+    assert_eq!(
+        rs("my @a = (1,2,3); my @r = splice(@a, 100); join(' ', @a) . '|' . scalar @r;"),
+        "1 2 3|0"
+    );
+}
+
+/// Mirrors the reported breakage: `\` on aggregates must yield `ARRAY`/`HASH` refs with shared
+/// storage; `splice` must not panic on past-end offsets and must honor negative offset/length;
+/// `pop`/`shift`/`push`/`unshift` and `splice` must accept `@$aref`; qq must expand `"@$r"`; and
+/// `$$r{...}` / `$$r[...]` must work like Perl `${$r}{...}` / `${$r}[...]`.
+#[test]
+fn perl_compat_regression_ref_deref_splice_qq_scalar_deref_subscript() {
+    assert_eq!(rs(r#"my @a=(1,2,3); my $r=\@a; ref($r)"#), "ARRAY");
+    assert_eq!(rs(r#"my %h=(a=>1); my $r=\%h; ref($r)"#), "HASH");
+    assert_eq!(
+        ri(r#"my @a=(1,2,3); my $r=\@a; my @c=@$r; $c[0]+$c[1]+$c[2]"#),
+        6
+    );
+    assert_eq!(ri(r#"my @a=(1,2,3); my $r=\@a; $r->[1]=42; $a[1]"#), 42);
+
+    assert_eq!(
+        rs(r#"my @a=(1,2,3); my @rem=splice(@a,100); join(" ",@a)."|".scalar @rem"#),
+        "1 2 3|0"
+    );
+    assert_eq!(
+        rs(r#"my @a=(1,2,3,4,5); my @rem=splice(@a,-2); join(" ",@rem)."|".join(" ",@a)"#),
+        "4 5|1 2 3"
+    );
+    assert_eq!(
+        rs(r#"my @a=(1,2,3,4,5); my @rem=splice(@a,0,-2); join(" ",@rem)."|".join(" ",@a)"#),
+        "1 2 3|4 5"
+    );
+    assert_eq!(
+        rs(r#"my $v=[1,2,3]; splice @$v,100; join "-", @$v"#),
+        "1-2-3"
+    );
+
+    assert_eq!(ri(r#"my @a=(9,8); my $r=\@a; my $x=pop @$r; $x+$a[0]"#), 17);
+    assert_eq!(ri(r#"my @a=(9,8); my $r=\@a; shift @$r; $a[0]"#), 8);
+    assert_eq!(
+        rs(r#"my @a=(1); my $r=\@a; push @$r,2,3; join "",@a"#),
+        "123"
+    );
+    assert_eq!(
+        rs(r#"my @a=(2); my $r=\@a; unshift @$r,1; join "-",@a"#),
+        "1-2"
+    );
+
+    assert_eq!(rs(r#"my $r=[1,2,3]; my $s="@$r\n"; $s"#), "1 2 3\n");
+
+    assert_eq!(ri(r#"my %h=(a=>1); my $r=\%h; $$r{a}"#), 1);
+    assert_eq!(ri(r#"my %h=(a=>1); my $r=\%h; $$r{b}=7; $h{b}"#), 7);
+    assert_eq!(ri(r#"my @a=(10,20,30); my $r=\@a; $$r[1]"#), 20);
 }
 
 #[test]
@@ -414,7 +591,10 @@ fn perl_compat_readlink_symlink_target_string() {
     let link = base.join("rl");
     symlink("expected_tgt", &link).expect("symlink");
     let sl = link.to_string_lossy();
-    assert_eq!(ri(&format!(r#"(readlink "{sl}") eq "expected_tgt" ? 1 : 0;"#)), 1);
+    assert_eq!(
+        ri(&format!(r#"(readlink "{sl}") eq "expected_tgt" ? 1 : 0;"#)),
+        1
+    );
     let _ = std::fs::remove_dir_all(&base);
 }
 
@@ -472,7 +652,7 @@ fn perl_compat_chomp_returns_chars_removed() {
 #[test]
 fn perl_compat_subst_replacement_expands_env_brace() {
     let home = std::env::var("HOME").expect("HOME");
-    let script = format!(r#"$_ = "~"; s@^~@$ENV{{HOME}}@; $_;"#);
+    let script = r#"$_ = "~"; s@^~@$ENV{HOME}@; $_;"#.to_string();
     assert_eq!(rs(&script), home);
 }
 
@@ -683,10 +863,7 @@ fn perl_compat_glob_txt_in_directory() {
 #[cfg(unix)]
 #[test]
 fn perl_compat_qx_printf_stdout() {
-    assert_eq!(
-        rs(r#"scalar `printf '%s' sem_qx`;"#),
-        "sem_qx"
-    );
+    assert_eq!(rs(r#"scalar `printf '%s' sem_qx`;"#), "sem_qx");
 }
 
 #[test]
@@ -724,6 +901,200 @@ fn perl_compat_index_rindex_substr_splice() {
         rs(r#"my @s = (1, 2, 3, 4);
         join(",", splice @s, 0, 2);"#),
         "1,2"
+    );
+}
+
+#[test]
+fn perl_compat_splice_aref_list_replacement() {
+    assert_eq!(
+        ri(r#"no strict 'vars';
+        my $v = [10, 20, 30, 40];
+        my $r = join "-", splice @$v, 1, 2, 7, 8;
+        ($r eq "20-30" && $v->[1] == 7 && $v->[2] == 8) ? 1 : 0;"#,),
+        1
+    );
+}
+
+#[test]
+fn perl_compat_scalar_splice_aref_last_removed() {
+    assert_eq!(
+        ri(r#"no strict 'vars';
+        my $a = [3, 4, 5];
+        scalar splice @$a, 0, 2;"#,),
+        4
+    );
+}
+
+/// `splice @$aref` must use the same OFFSET/LENGTH rules as `splice @name` (negative offset
+/// removes from the end; negative LENGTH preserves a tail). Exercises the VM fast path
+/// (`Op::SpliceArrayDeref`), not only the named-array builtin path.
+#[test]
+fn perl_compat_splice_aref_negative_offset_length() {
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $v = [1, 2, 3, 4, 5];
+        my @rem = splice @$v, -2;
+        join(" ", @$v) . "|" . join(" ", @rem);"#),
+        "1 2 3|4 5"
+    );
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $v = [1, 2, 3, 4, 5];
+        my @rem = splice @$v, 0, -2;
+        join(" ", @$v) . "|" . join(" ", @rem);"#),
+        "4 5|1 2 3"
+    );
+}
+
+/// Negative OFFSET with a replacement list must still use `SpliceArrayDeref(1)` (stack args), not
+/// only the no-replacement fast path.
+#[test]
+fn perl_compat_splice_aref_negative_offset_with_replacement() {
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $v = [1, 2, 3, 4, 5];
+        splice @$v, -2, 1, 99;
+        join "-", @$v;"#),
+        "1-2-3-99-5"
+    );
+}
+
+/// `$$r{key}` must keep the hash **reference** on the stack for `->`/arrow lowering (same fix as
+/// `$href->{key}`): compound assign and post-increment must mutate the underlying `%h`.
+#[test]
+fn perl_compat_scalar_deref_hash_compound_assign_and_postinc() {
+    assert_eq!(
+        ri(r#"my %h = (a => 1); my $r = \%h; $$r{a} += 5; $h{a}"#),
+        6
+    );
+    assert_eq!(
+        ri(r#"my %h = (a => 5); my $r = \%h; my $x = $$r{a}++; $x * 10 + $h{a}"#),
+        56
+    );
+}
+
+#[test]
+fn perl_compat_scalar_deref_hash_logassign() {
+    assert_eq!(
+        ri(r#"my %h = (a => 2); my $r = \%h; $$r{a} &&= 7; $h{a}"#),
+        7
+    );
+    assert_eq!(ri(r#"my %h = (); my $r = \%h; $$r{b} ||= 9; $h{b}"#), 9);
+}
+
+/// `$$r{key} //=` must use the hash reference as the container (same lowering as `$h->{key}`), not
+/// a copied `%` aggregate.
+#[test]
+fn perl_compat_scalar_deref_hash_defined_or_assign() {
+    assert_eq!(ri(r#"my %h = (); my $r = \%h; $$r{x} //= 42; $h{x}"#), 42);
+    assert_eq!(
+        ri(r#"my %h = (a => 1); my $r = \%h; $$r{a} //= 99; $h{a}"#),
+        1
+    );
+    assert_eq!(
+        ri(r#"my %h = (a => 1); my $r = \%h; my $runs = 0; $$r{a} //= ($runs = 1); $runs"#,),
+        0
+    );
+}
+
+#[test]
+fn perl_compat_scalar_splice_aref_remove_one() {
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $v = [1, 2, 3];
+        my $s = scalar splice @$v, 1, 1;
+        $s . "|" . join "-", @$v"#),
+        "2|1-3"
+    );
+}
+
+#[test]
+fn perl_compat_scalar_at_aref_is_array_length() {
+    assert_eq!(
+        ri(r#"no strict 'vars';
+        my $r = [7, 8, 9, 0];
+        scalar @$r;"#,),
+        4
+    );
+}
+
+#[test]
+fn perl_compat_scalar_at_aref_empty_ref_is_zero() {
+    assert_eq!(
+        ri(r#"no strict 'vars';
+        my $e = [];
+        scalar @$e;"#,),
+        0
+    );
+}
+
+#[test]
+fn perl_compat_scalar_braced_aref_is_length() {
+    assert_eq!(
+        ri(r#"no strict 'vars';
+        my $r = [1, 2, 3];
+        scalar @{$r};"#,),
+        3
+    );
+}
+
+#[test]
+fn perl_compat_scalar_braced_sub_return_aref_count() {
+    assert_eq!(
+        ri(r#"no strict 'vars';
+        sub row { [0, 0, 0, 0, 0, 0] }
+        scalar @{row()};"#,),
+        6
+    );
+}
+
+#[test]
+fn perl_compat_assignment_list_deref_aref_to_scalar() {
+    assert_eq!(
+        ri(r#"no strict 'vars';
+        my $x = [1, 1, 1];
+        my $c = @$x;
+        $c;"#,),
+        3
+    );
+}
+
+#[test]
+fn perl_compat_join_receives_scalar_at_aref_as_one_field() {
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $v = [2, 4, 6];
+        join "x", scalar @$v;"#,),
+        "3"
+    );
+}
+
+#[test]
+fn perl_compat_scalar_named_array_length() {
+    assert_eq!(
+        ri(r#"my @w = (0, 0, 0, 0, 0);
+        scalar @w;"#,),
+        5
+    );
+}
+
+#[test]
+fn perl_compat_scalar_percent_href_fill_metric() {
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $h = { x => 1, y => 2 };
+        scalar %$h;"#,),
+        "2/3"
+    );
+}
+
+#[test]
+fn perl_compat_scalar_percent_href_empty_zero() {
+    assert_eq!(
+        ri(r#"no strict 'vars';
+        my $e = {};
+        scalar %$e;"#,),
+        0
     );
 }
 
@@ -1957,6 +2328,479 @@ fn perl_compat_tie_scalar_fetch_store() {
         "#),
         7
     );
+}
+
+// ── VM / aggregate lowering: splice, arrow elems, scalar deref hash (regression catchers) ──
+
+#[test]
+fn perl_compat_splice_aref_zero_length_insert() {
+    assert_eq!(
+        rs(r#"no strict 'vars'; my $v = [1, 2, 3]; splice @$v, 1, 0, 9; join "-", @$v"#),
+        "1-9-2-3"
+    );
+}
+
+#[test]
+fn perl_compat_splice_named_zero_length_insert() {
+    assert_eq!(
+        rs(r#"my @a = (1, 2, 3); splice @a, 1, 0, 9; join "-", @a"#),
+        "1-9-2-3"
+    );
+}
+
+#[test]
+fn perl_compat_splice_aref_offset_only_returns_tail_removed() {
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $v = [1, 2, 3, 4];
+        my @r = splice @$v, 2;
+        join("-", @$v) . "|" . join("-", @r)"#),
+        "1-2|3-4"
+    );
+}
+
+#[test]
+fn perl_compat_scalar_splice_aref_two_arg_empties_target() {
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $v = [1, 2, 3];
+        my $s = scalar splice @$v;
+        $s . "|" . scalar(@$v)"#),
+        "3|0"
+    );
+}
+
+#[test]
+fn perl_compat_splice_aref_three_replacements() {
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $v = [10, 20, 30, 40];
+        splice @$v, 1, 2, 1, 2, 3;
+        join "-", @$v"#),
+        "10-1-2-3-40"
+    );
+}
+
+#[test]
+fn perl_compat_push_aref_splice_list_chain() {
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $v = [1, 2, 3];
+        push @$v, splice @$v, 0, 1;
+        join "-", @$v"#),
+        "2-3-1"
+    );
+}
+
+#[test]
+fn perl_compat_list_literal_leading_aref_flatten() {
+    assert_eq!(
+        rs(r#"no strict 'vars'; my $v = [1, 2]; my @x = (@$v, 3, 4); join "-", @x"#),
+        "1-2-3-4"
+    );
+}
+
+#[test]
+fn perl_compat_scalar_deref_hash_compound_sub_mul() {
+    assert_eq!(
+        ri(r#"my %h = (a => 10); my $r = \%h; $$r{a} -= 3; $h{a}"#),
+        7
+    );
+    assert_eq!(
+        ri(r#"my %h = (a => 4); my $r = \%h; $$r{a} *= 3; $h{a}"#),
+        12
+    );
+}
+
+#[test]
+fn perl_compat_arrow_array_compound_sub_mul_concat() {
+    assert_eq!(
+        ri(r#"no strict 'vars'; my $v = [10, 20, 30]; $v->[1] -= 5; $v->[1]"#),
+        15
+    );
+    assert_eq!(
+        ri(r#"no strict 'vars'; my $v = [2, 3, 4]; $v->[1] *= 5; $v->[1]"#),
+        15
+    );
+    assert_eq!(
+        rs(r#"no strict 'vars'; my $v = ["a"]; $v->[0] .= "b"; $v->[0]"#),
+        "ab"
+    );
+}
+
+#[test]
+fn perl_compat_arrow_hash_exists_delete_sequence() {
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $h = { x => 1 };
+        my $e0 = exists $h->{x} ? 1 : 0;
+        my $d = delete $h->{x};
+        my $e1 = exists $h->{x} ? 1 : 0;
+        $e0 . "," . $d . "," . $e1"#),
+        "1,1,0"
+    );
+}
+
+#[test]
+fn perl_compat_arrow_hash_compound_sub_mul() {
+    assert_eq!(
+        ri(r#"no strict 'vars'; my $h = { a => 10 }; $h->{a} -= 3; $h->{a}"#),
+        7
+    );
+    assert_eq!(
+        ri(r#"no strict 'vars'; my $h = { a => 4 }; $h->{a} *= 3; $h->{a}"#),
+        12
+    );
+}
+
+#[test]
+fn perl_compat_scalar_deref_hash_log_or_default() {
+    assert_eq!(
+        ri(r#"my %h = (a => 0); my $r = \%h; my $x = $$r{a} || 7; $x"#),
+        7
+    );
+}
+
+#[test]
+fn perl_compat_arrow_hash_log_or_default() {
+    assert_eq!(
+        ri(r#"no strict 'vars'; my $h = { a => 0 }; my $x = $h->{a} || 7; $x"#),
+        7
+    );
+}
+
+#[test]
+fn perl_compat_named_array_splice_negative_offset_with_replacement() {
+    assert_eq!(
+        rs(r#"my @a = (1, 2, 3, 4, 5);
+        splice @a, -2, 1, 88;
+        join "-", @a"#),
+        "1-2-3-88-5"
+    );
+}
+
+#[test]
+fn perl_compat_unshift_aref_splice_returns_removed_to_front() {
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $v = [1, 2, 3];
+        unshift @$v, splice(@$v, 0, 1);
+        join "-", @$v"#),
+        "1-2-3"
+    );
+}
+
+#[test]
+fn perl_compat_reverse_sort_aref_list_context() {
+    assert_eq!(
+        ri(r#"no strict 'vars';
+        my $v = [1, 2, 3];
+        my @t = reverse @$v;
+        $t[0];"#),
+        3
+    );
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $v = [3, 1, 2];
+        join "-", sort @$v"#),
+        "1-2-3"
+    );
+}
+
+#[test]
+fn perl_compat_keys_values_sort_on_hashref() {
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $h = { a => 1, b => 2 };
+        join "", sort keys %$h"#),
+        "ab"
+    );
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $h = { a => 1, b => 2 };
+        join "-", sort values %$h"#),
+        "1-2"
+    );
+}
+
+#[test]
+fn perl_compat_scalar_keys_on_hashref() {
+    assert_eq!(
+        ri(r#"no strict 'vars'; my $h = { u => 1, v => 2, w => 3 }; scalar keys %$h"#),
+        3
+    );
+}
+
+#[test]
+fn perl_compat_grep_map_blocks_receive_aref_list() {
+    assert_eq!(
+        ri(r#"no strict 'vars';
+        my $v = [1, 2, 3, 4];
+        scalar grep { $_ > 1 } @$v"#),
+        3
+    );
+    assert_eq!(
+        ri(r#"no strict 'vars';
+        my $v = [1, 2, 3];
+        my @m = map { $_ * 2 } @$v;
+        $m[2];"#),
+        6
+    );
+}
+
+#[test]
+fn perl_compat_arrow_array_postincrement() {
+    assert_eq!(
+        ri(r#"no strict 'vars'; my $v = [10, 20]; $v->[0]++; $v->[0]"#),
+        11
+    );
+}
+
+#[test]
+fn perl_compat_arrow_hash_and_scalar_deref_hash_decrement() {
+    assert_eq!(
+        ri(r#"no strict 'vars'; my $h = { k => 5 }; $h->{k}--; $h->{k}"#),
+        4
+    );
+    assert_eq!(ri(r#"my %h = (a => 3); my $r = \%h; $$r{a}--; $h{a}"#), 2);
+}
+
+#[test]
+fn perl_compat_for_loop_sum_over_arrayref() {
+    assert_eq!(
+        ri(r#"no strict 'vars';
+        my $v = [1, 2, 3];
+        my $s = 0;
+        for my $x (@$v) { $s = $s + $x; }
+        $s"#),
+        6
+    );
+}
+
+#[test]
+fn perl_compat_splice_aref_variable_offset_replacement() {
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $v = [1, 2, 3, 4];
+        my $o = 1;
+        splice @$v, $o, 2, 9;
+        join "-", @$v"#),
+        "1-9-4"
+    );
+}
+
+#[test]
+fn perl_compat_defined_exists_hash_elems_through_ref() {
+    assert_eq!(
+        ri(r#"my %h = (a => 1); my $r = \%h; defined $$r{a} ? 1 : 0"#),
+        1
+    );
+    assert_eq!(
+        ri(r#"no strict 'vars'; my $h = { a => 1 }; exists $h->{a} ? 1 : 0"#),
+        1
+    );
+}
+
+#[test]
+fn perl_compat_arrayref_slice_index_list() {
+    assert_eq!(
+        ri(r#"no strict 'vars';
+        my $v = [5, 6, 7];
+        my @s = @$v[0, 2];
+        $s[0] + $s[1]"#),
+        12
+    );
+}
+
+#[test]
+fn perl_compat_keys_list_from_hashref() {
+    assert_eq!(
+        ri(r#"no strict 'vars';
+        my $h = { "p" => 1, "q" => 2 };
+        my @k = keys %$h;
+        scalar @k"#),
+        2
+    );
+}
+
+#[test]
+fn perl_compat_bracket_copy_of_aref_is_shallow_new_array() {
+    assert_eq!(
+        ri(r#"no strict 'vars';
+        my $v = [1, 2, 3];
+        my $c = [@$v];
+        $c->[0] = 9;
+        $v->[0]"#),
+        1
+    );
+}
+
+#[test]
+fn perl_compat_ref_returns_array_and_hash() {
+    assert_eq!(rs(r#"no strict 'vars'; my $v = [1]; ref($v)"#), "ARRAY");
+    assert_eq!(rs(r#"my %h = (a => 1); ref(\%h)"#), "HASH");
+}
+
+#[test]
+fn perl_compat_scalar_splice_aref_returns_last_removed_middle() {
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $v = [10, 20, 30, 40];
+        my $n = scalar splice @$v, 1, 2;
+        $n . "|" . join("-", @$v)"#),
+        "30|10-40"
+    );
+}
+
+#[test]
+fn perl_compat_scalar_splice_named_negative_offset_two_removed() {
+    assert_eq!(
+        rs(r#"my @a = (1, 2, 3, 4, 5);
+        my $n = scalar splice @a, -3, 2;
+        $n . "|" . join("-", @a)"#),
+        "4|1-2-5"
+    );
+}
+
+#[test]
+fn perl_compat_hash_elem_falsy_andassign_short_circuit() {
+    assert_eq!(
+        ri(r#"no strict 'vars'; my $h = { a => 0 }; $h->{a} &&= 1; $h->{a}"#),
+        0
+    );
+    assert_eq!(
+        ri(r#"my %h = (a => 0); my $r = \%h; $$r{a} &&= 1; $h{a}"#),
+        0
+    );
+}
+
+#[test]
+fn perl_compat_concat_two_arefs_in_list() {
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $a = [1, 2];
+        my $b = [3, 4];
+        my @x = (@$a, @$b);
+        join "-", @x"#),
+        "1-2-3-4"
+    );
+}
+
+#[test]
+fn perl_compat_arrow_elem_assign_and_dynamic_index_mult() {
+    assert_eq!(
+        rs(r#"no strict 'vars'; my $v = [1, 2, 3]; $v->[1] = 9; join "-", @$v"#),
+        "1-9-3"
+    );
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $v = [1, 2, 3];
+        my $i = 0;
+        $v->[$i] *= 10;
+        join "-", @$v"#),
+        "10-2-3"
+    );
+}
+
+#[test]
+fn perl_compat_arrow_elem_last_index_assign() {
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $v = [0, 0, 0];
+        $v->[$#v] = 5;
+        join "-", @$v"#),
+        "0-0-5"
+    );
+}
+
+#[test]
+fn perl_compat_named_array_last_index_elem() {
+    assert_eq!(ri(r#"my @a = (1, 2, 3); $a[$#a]"#), 3);
+}
+
+#[test]
+fn perl_compat_new_hash_keys_via_arrow_and_scalar_deref() {
+    assert_eq!(
+        ri(r#"no strict 'vars'; my $h = { "a" => 1 }; $h->{"b"} = 2; $h->{"a"} + $h->{"b"}"#,),
+        3
+    );
+    assert_eq!(
+        ri(r#"my %h = (a => 1); my $r = \%h; $$r{b} = 3; $h{a} + $h{b}"#),
+        4
+    );
+}
+
+#[test]
+fn perl_compat_empty_hashref_or_default_fills_key() {
+    assert_eq!(
+        ri(r#"no strict 'vars'; my $h = {}; $h->{z} ||= 7; $h->{z}"#),
+        7
+    );
+    assert_eq!(ri(r#"my %h = (); my $r = \%h; $$r{z} ||= 8; $h{z}"#), 8);
+}
+
+#[test]
+fn perl_compat_empty_aref_push() {
+    assert_eq!(
+        ri(r#"no strict 'vars'; my $v = []; push @$v, 1, 2; scalar @$v"#),
+        2
+    );
+}
+
+#[test]
+fn perl_compat_empty_hashref_assign_then_key_count() {
+    assert_eq!(
+        ri(r#"no strict 'vars'; my $h = {}; $h->{x} = 1; scalar keys %$h"#),
+        1
+    );
+}
+
+#[test]
+fn perl_compat_splice_named_three_replacements_returns_removed() {
+    assert_eq!(
+        rs(r#"my @a = (1, 2, 3, 4);
+        my @b = splice @a, 1, 2, 9, 8, 7;
+        join("-", @a) . "|" . join("-", @b)"#),
+        "1-9-8-7-4|2-3"
+    );
+}
+
+#[test]
+fn perl_compat_splice_aref_three_replacements_returns_removed() {
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $v = [1, 2, 3, 4];
+        my @b = splice @$v, 1, 2, 9, 8, 7;
+        join("-", @$v) . "|" . join("-", @b)"#),
+        "1-9-8-7-4|2-3"
+    );
+}
+
+#[test]
+fn perl_compat_shift_pop_aref() {
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $v = [1, 2, 3];
+        shift @$v;
+        join "-", @$v"#),
+        "2-3"
+    );
+    assert_eq!(
+        rs(r#"no strict 'vars';
+        my $v = [1, 2, 3];
+        my $x = pop @$v;
+        $x . "|" . join("-", @$v)"#),
+        "3|1-2"
+    );
+}
+
+#[test]
+fn perl_compat_arrow_preinc_and_named_array_blshift_assign() {
+    assert_eq!(
+        ri(r#"no strict 'vars'; my $v = [3]; ++$v->[0]; $v->[0]"#),
+        4
+    );
+    assert_eq!(ri(r#"my @a = (1, 2, 4); $a[1] <<= 1; $a[1]"#), 4);
 }
 
 /// `local *Alias = *Real` aliases the handle name for `print` / `close`.

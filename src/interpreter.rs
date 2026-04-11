@@ -51,6 +51,34 @@ pub(crate) fn preduce_init_merge_maps(
     PerlValue::hash_ref(Arc::new(RwLock::new(acc)))
 }
 
+/// `(off, end)` for `splice` / `arr.drain(off..end)` — Perl negative OFFSET/LENGTH; clamps offset to array length.
+#[inline]
+fn splice_compute_range(
+    arr_len: usize,
+    offset_val: &PerlValue,
+    length_val: &PerlValue,
+) -> (usize, usize) {
+    let off_i = offset_val.to_int();
+    let off = if off_i < 0 {
+        arr_len.saturating_sub((-off_i) as usize)
+    } else {
+        (off_i as usize).min(arr_len)
+    };
+    let rest = arr_len.saturating_sub(off);
+    let take = if length_val.is_undef() {
+        rest
+    } else {
+        let l = length_val.to_int();
+        if l < 0 {
+            rest.saturating_sub((-l) as usize)
+        } else {
+            (l as usize).min(rest)
+        }
+    };
+    let end = (off + take).min(arr_len);
+    (off, end)
+}
+
 /// Combine two partial results from `preduce_init`: hash/hashref maps add per-key counts; otherwise
 /// the fold block is invoked with `$a` / `$b` as the two partial accumulators (associative combine).
 pub(crate) fn merge_preduce_init_partials(
@@ -276,6 +304,19 @@ pub(crate) fn assign_rhs_wantarray(target: &Expr) -> WantarrayCtx {
         } => WantarrayCtx::Scalar,
         ExprKind::HashSliceDeref { .. } | ExprKind::HashSlice { .. } => WantarrayCtx::List,
         ExprKind::ArraySlice { indices, .. } => {
+            if indices.len() > 1 {
+                WantarrayCtx::List
+            } else if indices.len() == 1 {
+                if arrow_deref_array_assign_rhs_list_ctx(&indices[0]) {
+                    WantarrayCtx::List
+                } else {
+                    WantarrayCtx::Scalar
+                }
+            } else {
+                WantarrayCtx::Scalar
+            }
+        }
+        ExprKind::AnonymousListSlice { indices, .. } => {
             if indices.len() > 1 {
                 WantarrayCtx::List
             } else if indices.len() == 1 {
@@ -1647,6 +1688,55 @@ impl Interpreter {
         }
         Err(PerlError::runtime(
             "delete argument is not a HASH reference",
+            line,
+        ))
+    }
+
+    /// `exists $aref->[$i]` — plain array ref only (same index rules as [`Self::read_arrow_array_element`]).
+    pub(crate) fn exists_arrow_array_element(
+        &self,
+        container: PerlValue,
+        idx: i64,
+        line: usize,
+    ) -> PerlResult<bool> {
+        if let Some(a) = container.as_array_ref() {
+            let arr = a.read();
+            let i = if idx < 0 {
+                (arr.len() as i64 + idx) as usize
+            } else {
+                idx as usize
+            };
+            return Ok(i < arr.len());
+        }
+        Err(PerlError::runtime(
+            "exists argument is not an ARRAY reference",
+            line,
+        ))
+    }
+
+    /// `delete $aref->[$i]` — sets element to undef, returns previous value (Perl array `delete`).
+    pub(crate) fn delete_arrow_array_element(
+        &self,
+        container: PerlValue,
+        idx: i64,
+        line: usize,
+    ) -> PerlResult<PerlValue> {
+        if let Some(a) = container.as_array_ref() {
+            let mut arr = a.write();
+            let i = if idx < 0 {
+                (arr.len() as i64 + idx) as usize
+            } else {
+                idx as usize
+            };
+            if i >= arr.len() {
+                return Ok(PerlValue::UNDEF);
+            }
+            let old = arr.get(i).cloned().unwrap_or(PerlValue::UNDEF);
+            arr[i] = PerlValue::UNDEF;
+            return Ok(old);
+        }
+        Err(PerlError::runtime(
+            "delete argument is not an ARRAY reference",
             line,
         ))
     }
@@ -3719,21 +3809,18 @@ impl Interpreter {
             return Err(PerlError::runtime("splice: missing array", line));
         }
         let arr_name = args[0].to_string();
-        let off = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
-        let len = match args.get(2) {
-            None => {
-                let arr = self.scope.get_array(&arr_name);
-                arr.len().saturating_sub(off)
-            }
-            Some(v) if v.is_undef() => {
-                let arr = self.scope.get_array(&arr_name);
-                arr.len().saturating_sub(off)
-            }
-            Some(v) => v.to_int().max(0) as usize,
+        let arr_len = self.scope.array_len(&arr_name);
+        let offset_val = args
+            .get(1)
+            .cloned()
+            .unwrap_or_else(|| PerlValue::integer(0));
+        let length_val = match args.get(2) {
+            None => PerlValue::UNDEF,
+            Some(v) => v.clone(),
         };
+        let (off, end) = splice_compute_range(arr_len, &offset_val, &length_val);
         let rep_vals: Vec<PerlValue> = args.iter().skip(3).cloned().collect();
         let arr = self.scope.get_array_mut(&arr_name)?;
-        let end = (off + len).min(arr.len());
         let removed: Vec<PerlValue> = arr.drain(off..end).collect();
         for (i, v) in rep_vals.into_iter().enumerate() {
             arr.insert(off + i, v);
@@ -3754,9 +3841,16 @@ impl Interpreter {
             return Err(PerlError::runtime("unshift: missing array", line));
         }
         let arr_name = args[0].to_string();
-        let vals: Vec<PerlValue> = args.iter().skip(1).cloned().collect();
+        let mut flat_vals: Vec<PerlValue> = Vec::new();
+        for a in args.iter().skip(1) {
+            if let Some(items) = a.as_array_vec() {
+                flat_vals.extend(items);
+            } else {
+                flat_vals.push(a.clone());
+            }
+        }
         let arr = self.scope.get_array_mut(&arr_name)?;
-        for (i, v) in vals.into_iter().enumerate() {
+        for (i, v) in flat_vals.into_iter().enumerate() {
             arr.insert(i, v);
         }
         Ok(PerlValue::integer(arr.len() as i64))
@@ -4590,16 +4684,23 @@ impl Interpreter {
     /// `@$href{k1,k2}` rvalue — `key_values` are already-evaluated key expressions (each may be an
     /// array to expand, like [`Self::eval_hash_slice_key_components`]). Shared by VM [`Op::HashSliceDeref`](crate::bytecode::Op::HashSliceDeref).
     pub(crate) fn hash_slice_deref_values(
+        &mut self,
         container: &PerlValue,
         key_values: &[PerlValue],
         line: usize,
     ) -> Result<PerlValue, FlowOrError> {
-        let h = Self::match_value_as_hash(container).ok_or_else(|| {
-            PerlError::runtime(
+        let h = if let Some(m) = Self::match_value_as_hash(container) {
+            m
+        } else if let Some(name) = container.as_hash_binding_name() {
+            self.touch_env_hash(&name);
+            self.scope.get_hash(&name)
+        } else {
+            return Err(PerlError::runtime(
                 "Hash slice dereference needs a hash or hash reference value",
                 line,
             )
-        })?;
+            .into());
+        };
         let mut result = Vec::new();
         for kv in key_values {
             let key_strings: Vec<String> = if let Some(vv) = kv.as_array_vec() {
@@ -4625,6 +4726,13 @@ impl Interpreter {
     ) -> Result<PerlValue, FlowOrError> {
         if let Some(r) = container.as_hash_ref() {
             r.write().insert(key.to_string(), val);
+            return Ok(PerlValue::UNDEF);
+        }
+        if let Some(name) = container.as_hash_binding_name() {
+            self.touch_env_hash(&name);
+            self.scope
+                .set_hash_element(&name, key, val)
+                .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
             return Ok(PerlValue::UNDEF);
         }
         if let Some(s) = container.as_str() {
@@ -4710,6 +4818,16 @@ impl Interpreter {
             }
             return Ok(PerlValue::UNDEF);
         }
+        if let Some(name) = container.as_hash_binding_name() {
+            self.touch_env_hash(&name);
+            for (i, k) in ks.iter().enumerate() {
+                let v = items.get(i).cloned().unwrap_or(PerlValue::UNDEF);
+                self.scope
+                    .set_hash_element(&name, k, v)
+                    .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+            }
+            return Ok(PerlValue::UNDEF);
+        }
         if let Some(s) = container.as_str() {
             if self.strict_refs {
                 return Err(PerlError::runtime(
@@ -4747,7 +4865,7 @@ impl Interpreter {
         rhs: PerlValue,
         line: usize,
     ) -> Result<PerlValue, FlowOrError> {
-        let old_list = Self::hash_slice_deref_values(&container, &key_values, line)?;
+        let old_list = self.hash_slice_deref_values(&container, &key_values, line)?;
         let last_old = old_list
             .to_list()
             .last()
@@ -4782,7 +4900,7 @@ impl Interpreter {
         kind: u8,
         line: usize,
     ) -> Result<PerlValue, FlowOrError> {
-        let old_list = Self::hash_slice_deref_values(&container, &key_values, line)?;
+        let old_list = self.hash_slice_deref_values(&container, &key_values, line)?;
         let last_old = old_list
             .to_list()
             .last()
@@ -5894,6 +6012,20 @@ impl Interpreter {
                 if let Some(r) = val.as_scalar_ref() {
                     return Ok(r.read().clone());
                 }
+                // `${$cref}` / `$$href{k}` outer deref — array or hash ref (incl. binding refs).
+                if let Some(r) = val.as_array_ref() {
+                    return Ok(PerlValue::array(r.read().clone()));
+                }
+                if let Some(name) = val.as_array_binding_name() {
+                    return Ok(PerlValue::array(self.scope.get_array(&name)));
+                }
+                if let Some(r) = val.as_hash_ref() {
+                    return Ok(PerlValue::hash(r.read().clone()));
+                }
+                if let Some(name) = val.as_hash_binding_name() {
+                    self.touch_env_hash(&name);
+                    return Ok(PerlValue::hash(self.scope.get_hash(&name)));
+                }
                 if let Some(s) = val.as_str() {
                     if self.strict_refs {
                         return Err(PerlError::runtime(
@@ -5913,6 +6045,9 @@ impl Interpreter {
                 if let Some(r) = val.as_array_ref() {
                     return Ok(PerlValue::array(r.read().clone()));
                 }
+                if let Some(name) = val.as_array_binding_name() {
+                    return Ok(PerlValue::array(self.scope.get_array(&name)));
+                }
                 if let Some(s) = val.as_str() {
                     if self.strict_refs {
                         return Err(PerlError::runtime(
@@ -5931,6 +6066,10 @@ impl Interpreter {
             Sigil::Hash => {
                 if let Some(r) = val.as_hash_ref() {
                     return Ok(PerlValue::hash(r.read().clone()));
+                }
+                if let Some(name) = val.as_hash_binding_name() {
+                    self.touch_env_hash(&name);
+                    return Ok(PerlValue::hash(self.scope.get_hash(&name)));
                 }
                 if let Some(s) = val.as_str() {
                     if self.strict_refs {
@@ -5955,6 +6094,72 @@ impl Interpreter {
                 Err(PerlError::runtime("Can't dereference non-reference as typeglob", line).into())
             }
         }
+    }
+
+    /// `qq` list join expects a plain array; if a bare [`PerlValue::array_ref`] reaches join, peel
+    /// one level so elements stringify like Perl (`"@$r"`).
+    #[inline]
+    pub(crate) fn peel_array_ref_for_list_join(&self, v: PerlValue) -> PerlValue {
+        if let Some(r) = v.as_array_ref() {
+            return PerlValue::array(r.read().clone());
+        }
+        v
+    }
+
+    /// `\@{EXPR}` / alias of an existing array ref — shared by [`crate::bytecode::Op::MakeArrayRefAlias`].
+    pub(crate) fn make_array_ref_alias(&self, val: PerlValue, line: usize) -> ExecResult {
+        if let Some(a) = val.as_array_ref() {
+            return Ok(PerlValue::array_ref(Arc::clone(&a)));
+        }
+        if let Some(name) = val.as_array_binding_name() {
+            return Ok(PerlValue::array_binding_ref(name));
+        }
+        if let Some(s) = val.as_str() {
+            if self.strict_refs {
+                return Err(PerlError::runtime(
+                    format!(
+                        "Can't use string (\"{}\") as an ARRAY ref while \"strict refs\" in use",
+                        s
+                    ),
+                    line,
+                )
+                .into());
+            }
+            return Ok(PerlValue::array_binding_ref(s.to_string()));
+        }
+        if let Some(r) = val.as_scalar_ref() {
+            let inner = r.read().clone();
+            return self.make_array_ref_alias(inner, line);
+        }
+        Err(PerlError::runtime("Can't make array reference from value", line).into())
+    }
+
+    /// `\%{EXPR}` — shared by [`crate::bytecode::Op::MakeHashRefAlias`].
+    pub(crate) fn make_hash_ref_alias(&self, val: PerlValue, line: usize) -> ExecResult {
+        if let Some(h) = val.as_hash_ref() {
+            return Ok(PerlValue::hash_ref(Arc::clone(&h)));
+        }
+        if let Some(name) = val.as_hash_binding_name() {
+            return Ok(PerlValue::hash_binding_ref(name));
+        }
+        if let Some(s) = val.as_str() {
+            if self.strict_refs {
+                return Err(PerlError::runtime(
+                    format!(
+                        "Can't use string (\"{}\") as a HASH ref while \"strict refs\" in use",
+                        s
+                    ),
+                    line,
+                )
+                .into());
+            }
+            return Ok(PerlValue::hash_binding_ref(s.to_string()));
+        }
+        if let Some(r) = val.as_scalar_ref() {
+            let inner = r.read().clone();
+            return self.make_hash_ref_alias(inner, line);
+        }
+        Err(PerlError::runtime("Can't make hash reference from value", line).into())
     }
 
     pub(crate) fn eval_expr_ctx(&mut self, expr: &Expr, ctx: WantarrayCtx) -> ExecResult {
@@ -6016,7 +6221,21 @@ impl Interpreter {
                         StringPart::Expr(e) => {
                             if let ExprKind::ArraySlice { array, .. } = &e.kind {
                                 self.check_strict_array_var(array, line)?;
-                                let val = self.eval_expr(e)?;
+                                let val = self.eval_expr_ctx(e, WantarrayCtx::List)?;
+                                let val = self.peel_array_ref_for_list_join(val);
+                                let list = val.to_list();
+                                let sep = self.list_separator.clone();
+                                let mut parts = Vec::with_capacity(list.len());
+                                for v in list {
+                                    parts.push(self.stringify_value(v, line)?);
+                                }
+                                result.push_str(&parts.join(&sep));
+                            } else if let ExprKind::Deref {
+                                kind: Sigil::Array, ..
+                            } = &e.kind
+                            {
+                                let val = self.eval_expr_ctx(e, WantarrayCtx::List)?;
+                                let val = self.peel_array_ref_for_list_join(val);
                                 let list = val.to_list();
                                 let sep = self.list_separator.clone();
                                 let mut parts = Vec::with_capacity(list.len());
@@ -6141,17 +6360,69 @@ impl Interpreter {
                 for key_expr in keys {
                     key_vals.push(self.eval_expr(key_expr)?);
                 }
-                Self::hash_slice_deref_values(&hv, &key_vals, line)
+                self.hash_slice_deref_values(&hv, &key_vals, line)
+            }
+            ExprKind::AnonymousListSlice { source, indices } => {
+                let list_val = self.eval_expr_ctx(source, WantarrayCtx::List)?;
+                let items = list_val.to_list();
+                let flat = self.flatten_array_slice_index_specs(indices)?;
+                let mut out = Vec::with_capacity(flat.len());
+                for idx in flat {
+                    let i = if idx < 0 {
+                        (items.len() as i64 + idx) as usize
+                    } else {
+                        idx as usize
+                    };
+                    out.push(items.get(i).cloned().unwrap_or(PerlValue::UNDEF));
+                }
+                let arr = PerlValue::array(out);
+                if ctx != WantarrayCtx::List {
+                    let v = arr.to_list();
+                    Ok(v.last().cloned().unwrap_or(PerlValue::UNDEF))
+                } else {
+                    Ok(arr)
+                }
             }
 
             // References
-            ExprKind::ScalarRef(inner) => {
-                if let ExprKind::ScalarVar(name) = &inner.kind {
-                    return Ok(PerlValue::scalar_binding_ref(name.clone()));
+            ExprKind::ScalarRef(inner) => match &inner.kind {
+                ExprKind::ScalarVar(name) => Ok(PerlValue::scalar_binding_ref(name.clone())),
+                ExprKind::ArrayVar(name) => {
+                    self.check_strict_array_var(name, line)?;
+                    let aname = self.stash_array_name_for_package(name);
+                    Ok(PerlValue::array_binding_ref(aname))
                 }
-                let val = self.eval_expr(inner)?;
-                Ok(PerlValue::scalar_ref(Arc::new(RwLock::new(val))))
-            }
+                ExprKind::HashVar(name) => {
+                    self.check_strict_hash_var(name, line)?;
+                    Ok(PerlValue::hash_binding_ref(name.clone()))
+                }
+                ExprKind::Deref {
+                    expr: e,
+                    kind: Sigil::Array,
+                } => {
+                    let v = self.eval_expr(e)?;
+                    self.make_array_ref_alias(v, line)
+                }
+                ExprKind::Deref {
+                    expr: e,
+                    kind: Sigil::Hash,
+                } => {
+                    let v = self.eval_expr(e)?;
+                    self.make_hash_ref_alias(v, line)
+                }
+                ExprKind::ArraySlice { .. } | ExprKind::HashSlice { .. } => {
+                    let list = self.eval_expr_ctx(inner, WantarrayCtx::List)?;
+                    Ok(PerlValue::array_ref(Arc::new(RwLock::new(list.to_list()))))
+                }
+                ExprKind::HashSliceDeref { .. } => {
+                    let list = self.eval_expr_ctx(inner, WantarrayCtx::List)?;
+                    Ok(PerlValue::array_ref(Arc::new(RwLock::new(list.to_list()))))
+                }
+                _ => {
+                    let val = self.eval_expr(inner)?;
+                    Ok(PerlValue::scalar_ref(Arc::new(RwLock::new(val))))
+                }
+            },
             ExprKind::ArrayRef(elems) => {
                 let mut arr = Vec::with_capacity(elems.len());
                 for e in elems {
@@ -6194,6 +6465,16 @@ impl Interpreter {
                 Ok(PerlValue::code_ref(sub))
             }
             ExprKind::Deref { expr, kind } => {
+                if ctx != WantarrayCtx::List && matches!(kind, Sigil::Array) {
+                    let val = self.eval_expr(expr)?;
+                    let n = self.array_deref_len(val, line)?;
+                    return Ok(PerlValue::integer(n));
+                }
+                if ctx != WantarrayCtx::List && matches!(kind, Sigil::Hash) {
+                    let val = self.eval_expr(expr)?;
+                    let h = self.symbolic_deref(val, Sigil::Hash, line)?;
+                    return Ok(h.scalar_context());
+                }
                 let val = self.eval_expr(expr)?;
                 self.symbolic_deref(val, *kind, line)
             }
@@ -6211,37 +6492,20 @@ impl Interpreter {
                                     line,
                                 )?);
                             }
-                            return Ok(PerlValue::array(out));
+                            let arr = PerlValue::array(out);
+                            if ctx != WantarrayCtx::List {
+                                let v = arr.to_list();
+                                return Ok(v.last().cloned().unwrap_or(PerlValue::UNDEF));
+                            }
+                            return Ok(arr);
                         }
                         let idx = self.eval_expr(index)?.to_int();
                         self.read_arrow_array_element(container, idx, line)
                     }
                     DerefKind::Hash => {
-                        let val = self.eval_expr(expr)?;
+                        let val = self.eval_arrow_hash_base(expr, line)?;
                         let key = self.eval_expr(index)?.to_string();
-                        if let Some(r) = val.as_hash_ref() {
-                            let h = r.read();
-                            return Ok(h.get(&key).cloned().unwrap_or(PerlValue::UNDEF));
-                        }
-                        if let Some(b) = val.as_blessed_ref() {
-                            let data = b.data.read();
-                            if let Some(v) = data.hash_get(&key) {
-                                return Ok(v);
-                            }
-                            if let Some(r) = data.as_hash_ref() {
-                                let h = r.read();
-                                return Ok(h.get(&key).cloned().unwrap_or(PerlValue::UNDEF));
-                            }
-                            return Err(PerlError::runtime(
-                                "Can't access hash field on non-hash blessed ref",
-                                line,
-                            )
-                            .into());
-                        }
-                        Err(
-                            PerlError::runtime("Can't use arrow deref on non-hash-ref", line)
-                                .into(),
-                        )
+                        self.read_arrow_hash_element(val, key.as_str(), line)
                     }
                     DerefKind::Call => {
                         // $coderef->(args)
@@ -6646,6 +6910,18 @@ impl Interpreter {
                         key_vals.push(self.eval_expr(key_expr)?);
                     }
                     return self.compound_assign_hash_slice_deref(href, key_vals, *op, rhs, line);
+                }
+                if let ExprKind::AnonymousListSlice { source, indices } = &target.kind {
+                    if let ExprKind::Deref {
+                        expr: inner,
+                        kind: Sigil::Array,
+                    } = &source.kind
+                    {
+                        let container = self.eval_arrow_array_base(inner, line)?;
+                        let idxs = self.flatten_array_slice_index_specs(indices)?;
+                        return self
+                            .compound_assign_arrow_array_slice(container, idxs, *op, rhs, line);
+                    }
                 }
                 if let ExprKind::ArrowDeref {
                     expr: arr_expr,
@@ -9239,6 +9515,12 @@ impl Interpreter {
             *a.write() = val.to_list();
             return Ok(PerlValue::UNDEF);
         }
+        if let Some(name) = ref_val.as_array_binding_name() {
+            self.scope
+                .set_array(&name, val.to_list())
+                .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+            return Ok(PerlValue::UNDEF);
+        }
         if let Some(s) = ref_val.as_str() {
             if self.strict_refs {
                 return Err(PerlError::runtime(
@@ -9315,6 +9597,13 @@ impl Interpreter {
             *h.write() = map;
             return Ok(PerlValue::UNDEF);
         }
+        if let Some(name) = ref_val.as_hash_binding_name() {
+            self.touch_env_hash(&name);
+            self.scope
+                .set_hash(&name, map)
+                .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+            return Ok(PerlValue::UNDEF);
+        }
         if let Some(s) = ref_val.as_str() {
             if self.strict_refs {
                 return Err(PerlError::runtime(
@@ -9360,6 +9649,13 @@ impl Interpreter {
             r.write().insert(key, val);
             return Ok(PerlValue::UNDEF);
         }
+        if let Some(name) = container.as_hash_binding_name() {
+            self.touch_env_hash(&name);
+            self.scope
+                .set_hash_element(&name, &key, val)
+                .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+            return Ok(PerlValue::UNDEF);
+        }
         Err(PerlError::runtime("Can't assign to arrow hash deref on non-hash(-ref)", line).into())
     }
 
@@ -9373,7 +9669,22 @@ impl Interpreter {
         match &expr.kind {
             ExprKind::Deref {
                 expr: inner,
-                kind: Sigil::Array,
+                kind: Sigil::Array | Sigil::Scalar,
+            } => self.eval_expr(inner),
+            _ => self.eval_expr(expr),
+        }
+    }
+
+    /// For `$href->{k}` / `$$r{k}`: container is the hashref scalar, not `%{ $r }` expansion.
+    pub(crate) fn eval_arrow_hash_base(
+        &mut self,
+        expr: &Expr,
+        _line: usize,
+    ) -> Result<PerlValue, FlowOrError> {
+        match &expr.kind {
+            ExprKind::Deref {
+                expr: inner,
+                kind: Sigil::Scalar,
             } => self.eval_expr(inner),
             _ => self.eval_expr(expr),
         }
@@ -9395,12 +9706,23 @@ impl Interpreter {
             };
             return Ok(arr.get(i).cloned().unwrap_or(PerlValue::UNDEF));
         }
+        if let Some(name) = container.as_array_binding_name() {
+            return Ok(self.scope.get_array_element(&name, idx));
+        }
+        if let Some(arr) = container.as_array_vec() {
+            let i = if idx < 0 {
+                (arr.len() as i64 + idx) as usize
+            } else {
+                idx as usize
+            };
+            return Ok(arr.get(i).cloned().unwrap_or(PerlValue::UNDEF));
+        }
         Err(PerlError::runtime("Can't use arrow deref on non-array-ref", line).into())
     }
 
     /// Read `$href->{key}` — same as the VM [`crate::bytecode::Op::ArrowHash`].
     pub(crate) fn read_arrow_hash_element(
-        &self,
+        &mut self,
         container: PerlValue,
         key: &str,
         line: usize,
@@ -9408,6 +9730,10 @@ impl Interpreter {
         if let Some(r) = container.as_hash_ref() {
             let h = r.read();
             return Ok(h.get(key).cloned().unwrap_or(PerlValue::UNDEF));
+        }
+        if let Some(name) = container.as_hash_binding_name() {
+            self.touch_env_hash(&name);
+            return Ok(self.scope.get_hash_element(&name, key));
         }
         if let Some(b) = container.as_blessed_ref() {
             let data = b.data.read();
@@ -9672,6 +9998,12 @@ impl Interpreter {
             arr[i] = val;
             return Ok(PerlValue::UNDEF);
         }
+        if let Some(name) = container.as_array_binding_name() {
+            self.scope
+                .set_array_element(&name, idx, val)
+                .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+            return Ok(PerlValue::UNDEF);
+        }
         Err(PerlError::runtime("Can't assign to arrow array deref on non-array-ref", line).into())
     }
 
@@ -9925,6 +10257,31 @@ impl Interpreter {
                     line: target.line,
                 };
                 self.assign_value(&synthetic, val)
+            }
+            ExprKind::AnonymousListSlice { source, indices } => {
+                if let ExprKind::Deref {
+                    expr: inner,
+                    kind: Sigil::Array,
+                } = &source.kind
+                {
+                    let container = self.eval_arrow_array_base(inner, target.line)?;
+                    let vals = val.to_list();
+                    let n = indices.len().min(vals.len());
+                    for i in 0..n {
+                        let idx = self.eval_expr(&indices[i])?.to_int();
+                        self.assign_arrow_array_deref(
+                            container.clone(),
+                            idx,
+                            vals[i].clone(),
+                            target.line,
+                        )?;
+                    }
+                    return Ok(PerlValue::UNDEF);
+                }
+                Err(
+                    PerlError::runtime("assign to list slice: unsupported base", target.line)
+                        .into(),
+                )
             }
             ExprKind::ArrowDeref {
                 expr,
@@ -10318,6 +10675,31 @@ impl Interpreter {
             ExprKind::ScalarVar(name) => Ok(name.clone()), // @_ written as shift of implicit
             _ => Err(PerlError::runtime("Expected array", expr.line).into()),
         }
+    }
+
+    /// `pop (expr)` / `scalar @arr` / one-element list — peel to the real array operand.
+    fn peel_array_builtin_operand(expr: &Expr) -> &Expr {
+        match &expr.kind {
+            ExprKind::ScalarContext(inner) => Self::peel_array_builtin_operand(inner),
+            ExprKind::List(es) if es.len() == 1 => Self::peel_array_builtin_operand(&es[0]),
+            _ => expr,
+        }
+    }
+
+    /// `@$aref` / `@{...}` after optional peeling — for tree `SpliceExpr` / `pop` fallbacks.
+    fn try_eval_array_deref_container(
+        &mut self,
+        expr: &Expr,
+    ) -> Result<Option<PerlValue>, FlowOrError> {
+        let e = Self::peel_array_builtin_operand(expr);
+        if let ExprKind::Deref {
+            expr: inner,
+            kind: Sigil::Array,
+        } = &e.kind
+        {
+            return Ok(Some(self.eval_expr(inner)?));
+        }
+        Ok(None)
     }
 
     /// Current package (`main` when `__PACKAGE__` is unset or empty).
@@ -12559,7 +12941,15 @@ impl Interpreter {
         values: &[Expr],
         line: usize,
     ) -> Result<PerlValue, FlowOrError> {
-        let arr_name = self.extract_array_name(array)?;
+        if let Some(aref) = self.try_eval_array_deref_container(array)? {
+            for v in values {
+                let val = self.eval_expr_ctx(v, WantarrayCtx::List)?;
+                self.push_array_deref_value(aref.clone(), val, line)?;
+            }
+            let len = self.array_deref_len(aref, line)?;
+            return Ok(PerlValue::integer(len));
+        }
+        let arr_name = self.extract_array_name(Self::peel_array_builtin_operand(array))?;
         if self.scope.is_array_frozen(&arr_name) {
             return Err(PerlError::runtime(
                 format!("Modification of a frozen value: @{}", arr_name),
@@ -12568,7 +12958,7 @@ impl Interpreter {
             .into());
         }
         for v in values {
-            let val = self.eval_expr(v)?;
+            let val = self.eval_expr_ctx(v, WantarrayCtx::List)?;
             if let Some(items) = val.as_array_vec() {
                 for item in items {
                     self.scope
@@ -12590,7 +12980,10 @@ impl Interpreter {
         array: &Expr,
         line: usize,
     ) -> Result<PerlValue, FlowOrError> {
-        let arr_name = self.extract_array_name(array)?;
+        if let Some(aref) = self.try_eval_array_deref_container(array)? {
+            return self.pop_array_deref(aref, line);
+        }
+        let arr_name = self.extract_array_name(Self::peel_array_builtin_operand(array))?;
         self.scope
             .pop_from_array(&arr_name)
             .map_err(|e| FlowOrError::Error(e.at_line(line)))
@@ -12601,7 +12994,10 @@ impl Interpreter {
         array: &Expr,
         line: usize,
     ) -> Result<PerlValue, FlowOrError> {
-        let arr_name = self.extract_array_name(array)?;
+        if let Some(aref) = self.try_eval_array_deref_container(array)? {
+            return self.shift_array_deref(aref, line);
+        }
+        let arr_name = self.extract_array_name(Self::peel_array_builtin_operand(array))?;
         self.scope
             .shift_from_array(&arr_name)
             .map_err(|e| FlowOrError::Error(e.at_line(line)))
@@ -12613,11 +13009,28 @@ impl Interpreter {
         values: &[Expr],
         line: usize,
     ) -> Result<PerlValue, FlowOrError> {
-        let arr_name = self.extract_array_name(array)?;
+        if let Some(aref) = self.try_eval_array_deref_container(array)? {
+            let mut vals = Vec::new();
+            for v in values {
+                let val = self.eval_expr_ctx(v, WantarrayCtx::List)?;
+                if let Some(items) = val.as_array_vec() {
+                    vals.extend(items);
+                } else {
+                    vals.push(val);
+                }
+            }
+            let len = self.unshift_array_deref_multi(aref, vals, line)?;
+            return Ok(PerlValue::integer(len));
+        }
+        let arr_name = self.extract_array_name(Self::peel_array_builtin_operand(array))?;
         let mut vals = Vec::new();
         for v in values {
-            let val = self.eval_expr(v)?;
-            vals.push(val);
+            let val = self.eval_expr_ctx(v, WantarrayCtx::List)?;
+            if let Some(items) = val.as_array_vec() {
+                vals.extend(items);
+            } else {
+                vals.push(val);
+            }
         }
         let arr = self
             .scope
@@ -12643,6 +13056,20 @@ impl Interpreter {
                 w.extend(items.iter().cloned());
             } else {
                 w.push(val);
+            }
+            return Ok(());
+        }
+        if let Some(name) = arr_ref.as_array_binding_name() {
+            if let Some(items) = val.as_array_vec() {
+                for item in items {
+                    self.scope
+                        .push_to_array(&name, item)
+                        .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+                }
+            } else {
+                self.scope
+                    .push_to_array(&name, val)
+                    .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
             }
             return Ok(());
         }
@@ -12682,6 +13109,9 @@ impl Interpreter {
         if let Some(r) = arr_ref.as_array_ref() {
             return Ok(r.read().len() as i64);
         }
+        if let Some(name) = arr_ref.as_array_binding_name() {
+            return Ok(self.scope.array_len(&name) as i64);
+        }
         if let Some(s) = arr_ref.as_str() {
             if self.strict_refs {
                 return Err(PerlError::runtime(
@@ -12706,6 +13136,12 @@ impl Interpreter {
         if let Some(r) = arr_ref.as_array_ref() {
             let mut w = r.write();
             return Ok(w.pop().unwrap_or(PerlValue::UNDEF));
+        }
+        if let Some(name) = arr_ref.as_array_binding_name() {
+            return self
+                .scope
+                .pop_from_array(&name)
+                .map_err(|e| FlowOrError::Error(e.at_line(line)));
         }
         if let Some(s) = arr_ref.as_str() {
             if self.strict_refs {
@@ -12739,6 +13175,12 @@ impl Interpreter {
                 w.remove(0)
             });
         }
+        if let Some(name) = arr_ref.as_array_binding_name() {
+            return self
+                .scope
+                .shift_from_array(&name)
+                .map_err(|e| FlowOrError::Error(e.at_line(line)));
+        }
         if let Some(s) = arr_ref.as_str() {
             if self.strict_refs {
                 return Err(PerlError::runtime(
@@ -12764,12 +13206,30 @@ impl Interpreter {
         vals: Vec<PerlValue>,
         line: usize,
     ) -> Result<i64, FlowOrError> {
+        let mut flat: Vec<PerlValue> = Vec::new();
+        for v in vals {
+            if let Some(items) = v.as_array_vec() {
+                flat.extend(items);
+            } else {
+                flat.push(v);
+            }
+        }
         if let Some(r) = arr_ref.as_array_ref() {
             let mut w = r.write();
-            for (i, v) in vals.into_iter().enumerate() {
+            for (i, v) in flat.into_iter().enumerate() {
                 w.insert(i, v);
             }
             return Ok(w.len() as i64);
+        }
+        if let Some(name) = arr_ref.as_array_binding_name() {
+            let arr = self
+                .scope
+                .get_array_mut(&name)
+                .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+            for (i, v) in flat.into_iter().enumerate() {
+                arr.insert(i, v);
+            }
+            return Ok(arr.len() as i64);
         }
         if let Some(s) = arr_ref.as_str() {
             if self.strict_refs {
@@ -12787,7 +13247,7 @@ impl Interpreter {
                 .scope
                 .get_array_mut(&name)
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-            for (i, v) in vals.into_iter().enumerate() {
+            for (i, v) in flat.into_iter().enumerate() {
                 arr.insert(i, v);
             }
             return Ok(arr.len() as i64);
@@ -12795,7 +13255,8 @@ impl Interpreter {
         Err(PerlError::runtime("unshift argument is not an ARRAY reference", line).into())
     }
 
-    /// `splice @$aref, OFFSET, LENGTH, LIST` — same semantics as [`Self::splice_builtin_execute`] / [`Self::eval_splice_expr`].
+    /// `splice @$aref, OFFSET, LENGTH, LIST` — uses [`Self::wantarray_kind`] (VM [`Op::WantarrayPush`]
+    /// / compiler wraps `splice` like other context-sensitive builtins).
     pub(crate) fn splice_array_deref(
         &mut self,
         aref: PerlValue,
@@ -12804,20 +13265,32 @@ impl Interpreter {
         rep_vals: Vec<PerlValue>,
         line: usize,
     ) -> Result<PerlValue, FlowOrError> {
-        let off = offset_val.to_int().max(0) as usize;
+        let ctx = self.wantarray_kind;
         if let Some(r) = aref.as_array_ref() {
+            let arr_len = r.read().len();
+            let (off, end) = splice_compute_range(arr_len, &offset_val, &length_val);
             let mut w = r.write();
-            let len = if length_val.is_undef() {
-                w.len().saturating_sub(off)
-            } else {
-                length_val.to_int().max(0) as usize
-            };
-            let end = (off + len).min(w.len());
             let removed: Vec<PerlValue> = w.drain(off..end).collect();
             for (i, v) in rep_vals.into_iter().enumerate() {
                 w.insert(off + i, v);
             }
-            return Ok(match self.wantarray_kind {
+            return Ok(match ctx {
+                WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(PerlValue::UNDEF),
+                WantarrayCtx::List | WantarrayCtx::Void => PerlValue::array(removed),
+            });
+        }
+        if let Some(name) = aref.as_array_binding_name() {
+            let arr_len = self.scope.array_len(&name);
+            let (off, end) = splice_compute_range(arr_len, &offset_val, &length_val);
+            let arr = self
+                .scope
+                .get_array_mut(&name)
+                .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+            let removed: Vec<PerlValue> = arr.drain(off..end).collect();
+            for (i, v) in rep_vals.into_iter().enumerate() {
+                arr.insert(off + i, v);
+            }
+            return Ok(match ctx {
                 WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(PerlValue::UNDEF),
                 WantarrayCtx::List | WantarrayCtx::Void => PerlValue::array(removed),
             });
@@ -12833,21 +13306,17 @@ impl Interpreter {
                 )
                 .into());
             }
+            let arr_len = self.scope.array_len(&s);
+            let (off, end) = splice_compute_range(arr_len, &offset_val, &length_val);
             let arr = self
                 .scope
                 .get_array_mut(&s)
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-            let len = if length_val.is_undef() {
-                arr.len().saturating_sub(off)
-            } else {
-                length_val.to_int().max(0) as usize
-            };
-            let end = (off + len).min(arr.len());
             let removed: Vec<PerlValue> = arr.drain(off..end).collect();
             for (i, v) in rep_vals.into_iter().enumerate() {
                 arr.insert(off + i, v);
             }
-            return Ok(match self.wantarray_kind {
+            return Ok(match ctx {
                 WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(PerlValue::UNDEF),
                 WantarrayCtx::List | WantarrayCtx::Void => PerlValue::array(removed),
             });
@@ -12864,21 +13333,40 @@ impl Interpreter {
         ctx: WantarrayCtx,
         line: usize,
     ) -> Result<PerlValue, FlowOrError> {
-        let arr_name = self.extract_array_name(array)?;
-        let off = if let Some(o) = offset {
-            self.eval_expr(o)?.to_int() as usize
+        if let Some(aref) = self.try_eval_array_deref_container(array)? {
+            let offset_val = if let Some(o) = offset {
+                self.eval_expr(o)?
+            } else {
+                PerlValue::integer(0)
+            };
+            let length_val = if let Some(l) = length {
+                self.eval_expr(l)?
+            } else {
+                PerlValue::UNDEF
+            };
+            let mut rep_vals = Vec::new();
+            for r in replacement {
+                rep_vals.push(self.eval_expr(r)?);
+            }
+            let saved = self.wantarray_kind;
+            self.wantarray_kind = ctx;
+            let out = self.splice_array_deref(aref, offset_val, length_val, rep_vals, line);
+            self.wantarray_kind = saved;
+            return out;
+        }
+        let arr_name = self.extract_array_name(Self::peel_array_builtin_operand(array))?;
+        let arr_len = self.scope.array_len(&arr_name);
+        let offset_val = if let Some(o) = offset {
+            self.eval_expr(o)?
         } else {
-            0
+            PerlValue::integer(0)
         };
-        let len = if let Some(l) = length {
-            self.eval_expr(l)?.to_int() as usize
+        let length_val = if let Some(l) = length {
+            self.eval_expr(l)?
         } else {
-            let arr = self
-                .scope
-                .get_array_mut(&arr_name)
-                .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-            arr.len() - off
+            PerlValue::UNDEF
         };
+        let (off, end) = splice_compute_range(arr_len, &offset_val, &length_val);
         let mut rep_vals = Vec::new();
         for r in replacement {
             rep_vals.push(self.eval_expr(r)?);
@@ -12887,7 +13375,6 @@ impl Interpreter {
             .scope
             .get_array_mut(&arr_name)
             .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-        let end = (off + len).min(arr.len());
         let removed: Vec<PerlValue> = arr.drain(off..end).collect();
         for (i, v) in rep_vals.into_iter().enumerate() {
             arr.insert(off + i, v);
@@ -12975,6 +13462,14 @@ impl Interpreter {
                     .delete_hash_element(hash, &k)
                     .map_err(|e| FlowOrError::Error(e.at_line(line)))
             }
+            ExprKind::ArrayElement { array, index } => {
+                self.check_strict_array_var(array, line)?;
+                let idx = self.eval_expr(index)?.to_int();
+                let aname = self.stash_array_name_for_package(array);
+                self.scope
+                    .delete_array_element(&aname, idx)
+                    .map_err(|e| FlowOrError::Error(e.at_line(line)))
+            }
             ExprKind::ArrowDeref {
                 expr: inner,
                 index,
@@ -12985,7 +13480,24 @@ impl Interpreter {
                 self.delete_arrow_hash_element(container, &k, line)
                     .map_err(Into::into)
             }
-            _ => Err(PerlError::runtime("delete requires hash element", line).into()),
+            ExprKind::ArrowDeref {
+                expr: inner,
+                index,
+                kind: DerefKind::Array,
+            } => {
+                if !crate::compiler::arrow_deref_arrow_subscript_is_plain_scalar_index(index) {
+                    return Err(PerlError::runtime(
+                        "delete on array element needs scalar subscript",
+                        line,
+                    )
+                    .into());
+                }
+                let container = self.eval_expr(inner)?;
+                let idx = self.eval_expr(index)?.to_int();
+                self.delete_arrow_array_element(container, idx, line)
+                    .map_err(Into::into)
+            }
+            _ => Err(PerlError::runtime("delete requires hash or array element", line).into()),
         }
     }
 
@@ -13021,6 +13533,18 @@ impl Interpreter {
                     },
                 ))
             }
+            ExprKind::ArrayElement { array, index } => {
+                self.check_strict_array_var(array, line)?;
+                let idx = self.eval_expr(index)?.to_int();
+                let aname = self.stash_array_name_for_package(array);
+                Ok(PerlValue::integer(
+                    if self.scope.exists_array_element(&aname, idx) {
+                        1
+                    } else {
+                        0
+                    },
+                ))
+            }
             ExprKind::ArrowDeref {
                 expr: inner,
                 index,
@@ -13031,7 +13555,24 @@ impl Interpreter {
                 let yes = self.exists_arrow_hash_element(container, &k, line)?;
                 Ok(PerlValue::integer(if yes { 1 } else { 0 }))
             }
-            _ => Err(PerlError::runtime("exists requires hash element", line).into()),
+            ExprKind::ArrowDeref {
+                expr: inner,
+                index,
+                kind: DerefKind::Array,
+            } => {
+                if !crate::compiler::arrow_deref_arrow_subscript_is_plain_scalar_index(index) {
+                    return Err(PerlError::runtime(
+                        "exists on array element needs scalar subscript",
+                        line,
+                    )
+                    .into());
+                }
+                let container = self.eval_expr(inner)?;
+                let idx = self.eval_expr(index)?.to_int();
+                let yes = self.exists_arrow_array_element(container, idx, line)?;
+                Ok(PerlValue::integer(if yes { 1 } else { 0 }))
+            }
+            _ => Err(PerlError::runtime("exists requires hash or array element", line).into()),
         }
     }
 

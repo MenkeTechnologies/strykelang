@@ -4,6 +4,21 @@ use crate::interpreter::Interpreter;
 use crate::lexer::{Lexer, LITERAL_DOLLAR_IN_DQUOTE};
 use crate::token::Token;
 
+/// True when `[` after `expr` is chained array access (`$r->{k}[0]`, `$a[1][2]`, `$$r[0]`).
+/// False for `(sort ...)[0]` / `@{ ... }[i]` — those slice a list value, not an array ref container.
+fn postfix_lbracket_is_arrow_container(expr: &Expr) -> bool {
+    matches!(
+        expr.kind,
+        ExprKind::ArrayElement { .. }
+            | ExprKind::HashElement { .. }
+            | ExprKind::ArrowDeref { .. }
+            | ExprKind::Deref {
+                kind: Sigil::Scalar,
+                ..
+            }
+    )
+}
+
 pub struct Parser {
     tokens: Vec<(Token, usize)>,
     pos: usize,
@@ -3081,6 +3096,7 @@ impl Parser {
                 if matches!(expr.kind, ExprKind::DynamicSubCodeRef(_)) {
                     return Ok(expr);
                 }
+                // `\` uses `ScalarRef`; array/hash vars and `\@{...}` lower to binding or alias refs.
                 Ok(Expr {
                     kind: ExprKind::ScalarRef(Box::new(expr)),
                     line,
@@ -3310,7 +3326,7 @@ impl Parser {
                     }
                 }
                 Token::LBracket => {
-                    // $array[index] — or $obj->{k}[i] / $aref[$i] after any postfix expression
+                    // `$a[i]` — or chained `$r->{k}[i]` / `$a[1][2]` — or list slice `(sort ...)[0]`.
                     let line = expr.line;
                     if matches!(expr.kind, ExprKind::ScalarVar(_)) {
                         if let ExprKind::ScalarVar(ref name) = expr.kind {
@@ -3326,15 +3342,29 @@ impl Parser {
                                 line,
                             };
                         }
-                    } else {
+                    } else if postfix_lbracket_is_arrow_container(&expr) {
                         self.advance();
-                        let index = self.parse_expression()?;
+                        let indices = self.parse_arg_list()?;
                         self.expect(&Token::RBracket)?;
                         expr = Expr {
                             kind: ExprKind::ArrowDeref {
                                 expr: Box::new(expr),
-                                index: Box::new(index),
+                                index: Box::new(Expr {
+                                    kind: ExprKind::List(indices),
+                                    line,
+                                }),
                                 kind: DerefKind::Array,
+                            },
+                            line,
+                        };
+                    } else {
+                        self.advance();
+                        let indices = self.parse_arg_list()?;
+                        self.expect(&Token::RBracket)?;
+                        expr = Expr {
+                            kind: ExprKind::AnonymousListSlice {
+                                source: Box::new(expr),
+                                indices,
                             },
                             line,
                         };
@@ -3351,6 +3381,10 @@ impl Parser {
                             ExprKind::HashElement { .. }
                                 | ExprKind::ArrayElement { .. }
                                 | ExprKind::ArrowDeref { .. }
+                                | ExprKind::Deref {
+                                    kind: Sigil::Scalar,
+                                    ..
+                                }
                         );
                     if !is_chainable_hash_subscript {
                         break;
@@ -6180,6 +6214,99 @@ impl Parser {
                 }
             } else if chars[i] == '@' && i + 1 < chars.len() {
                 let next = chars[i + 1];
+                // `@$aref` / `@${expr}` — array dereference in interpolation (Perl `"@$r"` → elements of @$r).
+                if next == '$' {
+                    if !literal.is_empty() {
+                        parts.push(StringPart::Literal(std::mem::take(&mut literal)));
+                    }
+                    i += 1; // past `@`
+                    debug_assert_eq!(chars[i], '$');
+                    i += 1; // past `$`
+                    while i < chars.len() && chars[i].is_whitespace() {
+                        i += 1;
+                    }
+                    if i >= chars.len() {
+                        return Err(self.syntax_err(
+                            "Expected variable or block after `@$` in double-quoted string",
+                            line,
+                        ));
+                    }
+                    let inner_expr = if chars[i] == '{' {
+                        i += 1;
+                        let start = i;
+                        let mut depth = 1usize;
+                        while i < chars.len() && depth > 0 {
+                            match chars[i] {
+                                '{' => depth += 1,
+                                '}' => {
+                                    depth -= 1;
+                                    if depth == 0 {
+                                        break;
+                                    }
+                                }
+                                _ => {}
+                            }
+                            i += 1;
+                        }
+                        if depth != 0 {
+                            return Err(self.syntax_err(
+                                "Unterminated `${ ... }` after `@` in double-quoted string",
+                                line,
+                            ));
+                        }
+                        let inner: String = chars[start..i].iter().collect();
+                        i += 1; // closing `}`
+                        parse_expression_from_str(inner.trim(), "-e")?
+                    } else {
+                        let mut name = String::new();
+                        if chars[i] == '^' {
+                            name.push('^');
+                            i += 1;
+                            while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_')
+                            {
+                                name.push(chars[i]);
+                                i += 1;
+                            }
+                        } else {
+                            while i < chars.len()
+                                && (chars[i].is_alphanumeric()
+                                    || chars[i] == '_'
+                                    || chars[i] == ':')
+                            {
+                                name.push(chars[i]);
+                                i += 1;
+                            }
+                            while i + 1 < chars.len() && chars[i] == ':' && chars[i + 1] == ':' {
+                                name.push_str("::");
+                                i += 2;
+                                while i < chars.len()
+                                    && (chars[i].is_alphanumeric() || chars[i] == '_')
+                                {
+                                    name.push(chars[i]);
+                                    i += 1;
+                                }
+                            }
+                        }
+                        if name.is_empty() {
+                            return Err(self.syntax_err(
+                                "Expected identifier after `@$` in double-quoted string",
+                                line,
+                            ));
+                        }
+                        Expr {
+                            kind: ExprKind::ScalarVar(name),
+                            line,
+                        }
+                    };
+                    parts.push(StringPart::Expr(Expr {
+                        kind: ExprKind::Deref {
+                            expr: Box::new(inner_expr),
+                            kind: Sigil::Array,
+                        },
+                        line,
+                    }));
+                    continue 'istr;
+                }
                 if next == '{' {
                     if !literal.is_empty() {
                         parts.push(StringPart::Literal(std::mem::take(&mut literal)));

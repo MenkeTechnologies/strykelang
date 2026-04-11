@@ -27,7 +27,7 @@ pub(crate) fn hash_slice_needs_slice_ops(keys: &[Expr]) -> bool {
 /// Range / multi-word `qw`/list subscripts need different semantics; keep those on the tree walker.
 /// `$r->[IX]` reads/writes via [`Op::ArrowArray`] only when `IX` is a **plain scalar** subscript.
 /// `..` / `qw/.../` / `(a,b)` / nested lists always go through slice ops (flattened index specs).
-fn arrow_deref_arrow_subscript_is_plain_scalar_index(index: &Expr) -> bool {
+pub(crate) fn arrow_deref_arrow_subscript_is_plain_scalar_index(index: &Expr) -> bool {
     match &index.kind {
         ExprKind::Range { .. } => false,
         ExprKind::QW(_) => false,
@@ -347,7 +347,20 @@ impl Compiler {
     fn compile_arrow_array_base_expr(&mut self, expr: &Expr) -> Result<(), CompileError> {
         if let ExprKind::Deref {
             expr: inner,
-            kind: Sigil::Array,
+            kind: Sigil::Array | Sigil::Scalar,
+        } = &expr.kind
+        {
+            self.compile_expr(inner)
+        } else {
+            self.compile_expr(expr)
+        }
+    }
+
+    /// For `$href->{k}` / `$$r{k}`: stack holds the hash **reference** scalar, not a copied `%` value.
+    fn compile_arrow_hash_base_expr(&mut self, expr: &Expr) -> Result<(), CompileError> {
+        if let ExprKind::Deref {
+            expr: inner,
+            kind: Sigil::Scalar,
         } = &expr.kind
         {
             self.compile_expr(inner)
@@ -2413,12 +2426,19 @@ impl Compiler {
             ExprKind::ArrayVar(name) => {
                 self.check_strict_array_access(name, line)?;
                 let idx = self.chunk.intern_name(&self.qualify_stash_array_name(name));
-                self.emit_op(Op::GetArray(idx), line, Some(root));
+                if ctx == WantarrayCtx::List {
+                    self.emit_op(Op::GetArray(idx), line, Some(root));
+                } else {
+                    self.emit_op(Op::ArrayLen(idx), line, Some(root));
+                }
             }
             ExprKind::HashVar(name) => {
                 self.check_strict_hash_access(name, line)?;
                 let idx = self.chunk.intern_name(name);
                 self.emit_op(Op::GetHash(idx), line, Some(root));
+                if ctx != WantarrayCtx::List {
+                    self.emit_op(Op::ValueScalarContext, line, Some(root));
+                }
             }
             ExprKind::Typeglob(name) => {
                 let idx = self.chunk.add_constant(PerlValue::string(name.clone()));
@@ -2472,6 +2492,21 @@ impl Compiler {
                     self.compile_expr(key_expr)?;
                 }
                 self.emit_op(Op::HashSliceDeref(keys.len() as u16), line, Some(root));
+            }
+            ExprKind::AnonymousListSlice { source, indices } => {
+                if indices.is_empty() {
+                    self.compile_expr_ctx(source, WantarrayCtx::List)?;
+                    self.emit_op(Op::MakeArray(0), line, Some(root));
+                } else {
+                    self.compile_expr_ctx(source, WantarrayCtx::List)?;
+                    for index_expr in indices {
+                        self.compile_array_slice_index_expr(index_expr)?;
+                    }
+                    self.emit_op(Op::ArrowArraySlice(indices.len() as u16), line, Some(root));
+                }
+                if ctx != WantarrayCtx::List {
+                    self.emit_op(Op::ListSliceToScalar, line, Some(root));
+                }
             }
 
             // ── Operators ──
@@ -2685,13 +2720,30 @@ impl Compiler {
                         self.compile_arrow_array_base_expr(expr)?;
                         self.compile_array_slice_index_expr(index)?;
                         self.emit_op(Op::ArrowArraySliceIncDec(0, 1), line, Some(root));
+                    } else if let ExprKind::AnonymousListSlice { source, indices } = &expr.kind {
+                        if let ExprKind::Deref {
+                            expr: inner,
+                            kind: Sigil::Array,
+                        } = &source.kind
+                        {
+                            self.compile_arrow_array_base_expr(inner)?;
+                            for ix in indices {
+                                self.compile_array_slice_index_expr(ix)?;
+                            }
+                            self.emit_op(
+                                Op::ArrowArraySliceIncDec(0, indices.len() as u16),
+                                line,
+                                Some(root),
+                            );
+                            return Ok(());
+                        }
                     } else if let ExprKind::ArrowDeref {
                         expr,
                         index,
                         kind: DerefKind::Hash,
                     } = &expr.kind
                     {
-                        self.compile_expr(expr)?;
+                        self.compile_arrow_hash_base_expr(expr)?;
                         self.compile_expr(index)?;
                         self.emit_op(Op::Dup2, line, Some(root));
                         self.emit_op(Op::ArrowHash, line, Some(root));
@@ -2858,13 +2910,30 @@ impl Compiler {
                         self.compile_arrow_array_base_expr(expr)?;
                         self.compile_array_slice_index_expr(index)?;
                         self.emit_op(Op::ArrowArraySliceIncDec(1, 1), line, Some(root));
+                    } else if let ExprKind::AnonymousListSlice { source, indices } = &expr.kind {
+                        if let ExprKind::Deref {
+                            expr: inner,
+                            kind: Sigil::Array,
+                        } = &source.kind
+                        {
+                            self.compile_arrow_array_base_expr(inner)?;
+                            for ix in indices {
+                                self.compile_array_slice_index_expr(ix)?;
+                            }
+                            self.emit_op(
+                                Op::ArrowArraySliceIncDec(1, indices.len() as u16),
+                                line,
+                                Some(root),
+                            );
+                            return Ok(());
+                        }
                     } else if let ExprKind::ArrowDeref {
                         expr,
                         index,
                         kind: DerefKind::Hash,
                     } = &expr.kind
                     {
-                        self.compile_expr(expr)?;
+                        self.compile_arrow_hash_base_expr(expr)?;
                         self.compile_expr(index)?;
                         self.emit_op(Op::Dup2, line, Some(root));
                         self.emit_op(Op::ArrowHash, line, Some(root));
@@ -3093,13 +3162,46 @@ impl Compiler {
                         PostfixOp::Decrement => 3,
                     };
                     self.emit_op(Op::ArrowArraySliceIncDec(kind_byte, 1), line, Some(root));
+                } else if let ExprKind::AnonymousListSlice { source, indices } = &expr.kind {
+                    let ExprKind::Deref {
+                        expr: inner,
+                        kind: Sigil::Array,
+                    } = &source.kind
+                    else {
+                        return Err(CompileError::Unsupported(
+                            "PostfixOp on list slice (non-array deref)".into(),
+                        ));
+                    };
+                    if indices.is_empty() {
+                        return Err(CompileError::Unsupported(
+                            "postfix ++/-- on empty list slice (internal)".into(),
+                        ));
+                    }
+                    let kind_byte: u8 = match op {
+                        PostfixOp::Increment => 2,
+                        PostfixOp::Decrement => 3,
+                    };
+                    self.compile_arrow_array_base_expr(inner)?;
+                    if indices.len() > 1 {
+                        for ix in indices {
+                            self.compile_array_slice_index_expr(ix)?;
+                        }
+                        self.emit_op(
+                            Op::ArrowArraySliceIncDec(kind_byte, indices.len() as u16),
+                            line,
+                            Some(root),
+                        );
+                    } else {
+                        self.compile_array_slice_index_expr(&indices[0])?;
+                        self.emit_op(Op::ArrowArraySliceIncDec(kind_byte, 1), line, Some(root));
+                    }
                 } else if let ExprKind::ArrowDeref {
                     expr: inner,
                     index,
                     kind: DerefKind::Hash,
                 } = &expr.kind
                 {
-                    self.compile_expr(inner)?;
+                    self.compile_arrow_hash_base_expr(inner)?;
                     self.compile_expr(index)?;
                     let b = match op {
                         PostfixOp::Increment => 0u8,
@@ -3541,7 +3643,7 @@ impl Compiler {
                 {
                     match op {
                         BinOp::DefinedOr | BinOp::LogOr | BinOp::LogAnd => {
-                            self.compile_expr(expr)?;
+                            self.compile_arrow_hash_base_expr(expr)?;
                             self.compile_expr(index)?;
                             self.emit_op(Op::Dup2, line, Some(root));
                             self.emit_op(Op::ArrowHash, line, Some(root));
@@ -3575,7 +3677,7 @@ impl Compiler {
                             let vm_op = binop_to_vm_op(*op).ok_or_else(|| {
                                 CompileError::Unsupported("CompoundAssign op".into())
                             })?;
-                            self.compile_expr(expr)?;
+                            self.compile_arrow_hash_base_expr(expr)?;
                             self.compile_expr(index)?;
                             self.emit_op(Op::Dup2, line, Some(root));
                             self.emit_op(Op::ArrowHash, line, Some(root));
@@ -3980,6 +4082,110 @@ impl Compiler {
                         Some(root),
                     );
                     return Ok(());
+                } else if let ExprKind::AnonymousListSlice { source, indices } = &target.kind {
+                    let ExprKind::Deref {
+                        expr: inner,
+                        kind: Sigil::Array,
+                    } = &source.kind
+                    else {
+                        return Err(CompileError::Unsupported(
+                            "CompoundAssign on AnonymousListSlice (non-array deref)".into(),
+                        ));
+                    };
+                    if indices.is_empty() {
+                        self.compile_arrow_array_base_expr(inner)?;
+                        self.emit_op(Op::Pop, line, Some(root));
+                        self.compile_expr(value)?;
+                        self.emit_op(Op::Pop, line, Some(root));
+                        let idx = self
+                            .chunk
+                            .add_constant(PerlValue::string("assign to empty array slice".into()));
+                        self.emit_op(Op::RuntimeErrorConst(idx), line, Some(root));
+                        self.emit_op(Op::LoadUndef, line, Some(root));
+                        return Ok(());
+                    }
+                    if indices.len() > 1 {
+                        if matches!(op, BinOp::DefinedOr | BinOp::LogOr | BinOp::LogAnd) {
+                            let k = indices.len() as u16;
+                            self.compile_arrow_array_base_expr(inner)?;
+                            for ix in indices {
+                                self.compile_array_slice_index_expr(ix)?;
+                            }
+                            self.emit_op(Op::ArrowArraySlicePeekLast(k), line, Some(root));
+                            let j = match *op {
+                                BinOp::DefinedOr => {
+                                    self.emit_op(Op::JumpIfDefinedKeep(0), line, Some(root))
+                                }
+                                BinOp::LogOr => {
+                                    self.emit_op(Op::JumpIfTrueKeep(0), line, Some(root))
+                                }
+                                BinOp::LogAnd => {
+                                    self.emit_op(Op::JumpIfFalseKeep(0), line, Some(root))
+                                }
+                                _ => unreachable!(),
+                            };
+                            self.compile_expr(value)?;
+                            self.emit_op(Op::ArrowArraySliceRollValUnderSpecs(k), line, Some(root));
+                            self.emit_op(Op::SetArrowArraySliceLastKeep(k), line, Some(root));
+                            let j_end = self.emit_op(Op::Jump(0), line, Some(root));
+                            self.chunk.patch_jump_here(j);
+                            self.emit_op(Op::ArrowArraySliceDropKeysKeepCur(k), line, Some(root));
+                            self.chunk.patch_jump_here(j_end);
+                            return Ok(());
+                        }
+                        let op_byte = scalar_compound_op_to_byte(*op).ok_or_else(|| {
+                            CompileError::Unsupported(
+                                "CompoundAssign op on multi-index array slice".into(),
+                            )
+                        })?;
+                        self.compile_expr(value)?;
+                        self.compile_arrow_array_base_expr(inner)?;
+                        for ix in indices {
+                            self.compile_array_slice_index_expr(ix)?;
+                        }
+                        self.emit_op(
+                            Op::ArrowArraySliceCompound(op_byte, indices.len() as u16),
+                            line,
+                            Some(root),
+                        );
+                        return Ok(());
+                    }
+                    let ix0 = &indices[0];
+                    match op {
+                        BinOp::DefinedOr | BinOp::LogOr | BinOp::LogAnd => {
+                            self.compile_arrow_array_base_expr(inner)?;
+                            self.compile_array_slice_index_expr(ix0)?;
+                            self.emit_op(Op::ArrowArraySlicePeekLast(1), line, Some(root));
+                            let j = match *op {
+                                BinOp::DefinedOr => {
+                                    self.emit_op(Op::JumpIfDefinedKeep(0), line, Some(root))
+                                }
+                                BinOp::LogOr => {
+                                    self.emit_op(Op::JumpIfTrueKeep(0), line, Some(root))
+                                }
+                                BinOp::LogAnd => {
+                                    self.emit_op(Op::JumpIfFalseKeep(0), line, Some(root))
+                                }
+                                _ => unreachable!(),
+                            };
+                            self.compile_expr(value)?;
+                            self.emit_op(Op::ArrowArraySliceRollValUnderSpecs(1), line, Some(root));
+                            self.emit_op(Op::SetArrowArraySliceLastKeep(1), line, Some(root));
+                            let j_end = self.emit_op(Op::Jump(0), line, Some(root));
+                            self.chunk.patch_jump_here(j);
+                            self.emit_op(Op::ArrowArraySliceDropKeysKeepCur(1), line, Some(root));
+                            self.chunk.patch_jump_here(j_end);
+                        }
+                        _ => {
+                            let op_byte = scalar_compound_op_to_byte(*op).ok_or_else(|| {
+                                CompileError::Unsupported("CompoundAssign op".into())
+                            })?;
+                            self.compile_expr(value)?;
+                            self.compile_arrow_array_base_expr(inner)?;
+                            self.compile_array_slice_index_expr(ix0)?;
+                            self.emit_op(Op::ArrowArraySliceCompound(op_byte, 1), line, Some(root));
+                        }
+                    }
                 } else {
                     return Err(CompileError::Unsupported(
                         "CompoundAssign on non-scalar".into(),
@@ -4332,7 +4538,7 @@ impl Compiler {
                 if let ExprKind::ArrayVar(name) = &array.kind {
                     let idx = self.chunk.intern_name(&self.qualify_stash_array_name(name));
                     for v in values {
-                        self.compile_expr(v)?;
+                        self.compile_expr_ctx(v, WantarrayCtx::List)?;
                         self.emit_op(Op::PushArray(idx), line, Some(root));
                     }
                     self.emit_op(Op::ArrayLen(idx), line, Some(root));
@@ -4344,7 +4550,7 @@ impl Compiler {
                     self.compile_expr(aref_expr)?;
                     for v in values {
                         self.emit_op(Op::Dup, line, Some(root));
-                        self.compile_expr(v)?;
+                        self.compile_expr_ctx(v, WantarrayCtx::List)?;
                         self.emit_op(Op::PushArrayDeref, line, Some(root));
                     }
                     self.emit_op(Op::ArrayDerefLen, line, Some(root));
@@ -4393,7 +4599,7 @@ impl Compiler {
                     let name_const = self.chunk.add_constant(PerlValue::string(q));
                     self.emit_op(Op::LoadConst(name_const), line, Some(root));
                     for v in values {
-                        self.compile_expr(v)?;
+                        self.compile_expr_ctx(v, WantarrayCtx::List)?;
                     }
                     let nargs = (1 + values.len()) as u8;
                     self.emit_op(
@@ -4414,13 +4620,9 @@ impl Compiler {
                     } else {
                         self.compile_expr(aref_expr)?;
                         for v in values {
-                            self.compile_expr(v)?;
+                            self.compile_expr_ctx(v, WantarrayCtx::List)?;
                         }
-                        self.emit_op(
-                            Op::UnshiftArrayDeref(values.len() as u8),
-                            line,
-                            Some(root),
-                        );
+                        self.emit_op(Op::UnshiftArrayDeref(values.len() as u8), line, Some(root));
                     }
                 } else {
                     let pool = self
@@ -4459,6 +4661,40 @@ impl Compiler {
                         line,
                         Some(root),
                     );
+                } else if let ExprKind::Deref {
+                    expr: aref_expr,
+                    kind: Sigil::Array,
+                } = &array.kind
+                {
+                    if replacement.len() > u8::MAX as usize {
+                        let pool = self.chunk.add_splice_expr_entry(
+                            array.as_ref().clone(),
+                            offset.as_deref().cloned(),
+                            length.as_deref().cloned(),
+                            replacement.clone(),
+                        );
+                        self.emit_op(Op::SpliceExpr(pool), line, Some(root));
+                    } else {
+                        self.compile_expr(aref_expr)?;
+                        if let Some(o) = offset {
+                            self.compile_expr(o)?;
+                        } else {
+                            self.emit_op(Op::LoadInt(0), line, Some(root));
+                        }
+                        if let Some(l) = length {
+                            self.compile_expr(l)?;
+                        } else {
+                            self.emit_op(Op::LoadUndef, line, Some(root));
+                        }
+                        for r in replacement {
+                            self.compile_expr(r)?;
+                        }
+                        self.emit_op(
+                            Op::SpliceArrayDeref(replacement.len() as u8),
+                            line,
+                            Some(root),
+                        );
+                    }
                 } else {
                     let pool = self.chunk.add_splice_expr_entry(
                         array.as_ref().clone(),
@@ -4473,12 +4709,7 @@ impl Compiler {
             ExprKind::ScalarContext(inner) => {
                 // `scalar EXPR` forces scalar context on EXPR regardless of the outer context
                 // (e.g. `print scalar grep { } @x` — grep's result is a count, not a list).
-                if let ExprKind::ArrayVar(name) = &inner.kind {
-                    let idx = self.chunk.intern_name(&self.qualify_stash_array_name(name));
-                    self.emit_op(Op::ArrayLen(idx), line, Some(root));
-                } else {
-                    self.compile_expr_ctx(inner, WantarrayCtx::Scalar)?;
-                }
+                self.compile_expr_ctx(inner, WantarrayCtx::Scalar)?;
             }
 
             // ── Hash ops ──
@@ -4488,15 +4719,36 @@ impl Compiler {
                     let idx = self.chunk.intern_name(hash);
                     self.compile_expr(key)?;
                     self.emit_op(Op::DeleteHashElem(idx), line, Some(root));
+                } else if let ExprKind::ArrayElement { array, index } = &inner.kind {
+                    self.check_strict_array_access(array, line)?;
+                    let q = self.qualify_stash_array_name(array);
+                    self.check_array_mutable(&q, line)?;
+                    let arr_idx = self.chunk.intern_name(&q);
+                    self.compile_expr(index)?;
+                    self.emit_op(Op::DeleteArrayElem(arr_idx), line, Some(root));
                 } else if let ExprKind::ArrowDeref {
                     expr: container,
                     index,
                     kind: DerefKind::Hash,
                 } = &inner.kind
                 {
-                    self.compile_expr(container)?;
+                    self.compile_arrow_hash_base_expr(container)?;
                     self.compile_expr(index)?;
                     self.emit_op(Op::DeleteArrowHashElem, line, Some(root));
+                } else if let ExprKind::ArrowDeref {
+                    expr: container,
+                    index,
+                    kind: DerefKind::Array,
+                } = &inner.kind
+                {
+                    if arrow_deref_arrow_subscript_is_plain_scalar_index(index) {
+                        self.compile_expr(container)?;
+                        self.compile_expr(index)?;
+                        self.emit_op(Op::DeleteArrowArrayElem, line, Some(root));
+                    } else {
+                        let pool = self.chunk.add_delete_expr_entry(inner.as_ref().clone());
+                        self.emit_op(Op::DeleteExpr(pool), line, Some(root));
+                    }
                 } else {
                     let pool = self.chunk.add_delete_expr_entry(inner.as_ref().clone());
                     self.emit_op(Op::DeleteExpr(pool), line, Some(root));
@@ -4507,15 +4759,36 @@ impl Compiler {
                     let idx = self.chunk.intern_name(hash);
                     self.compile_expr(key)?;
                     self.emit_op(Op::ExistsHashElem(idx), line, Some(root));
+                } else if let ExprKind::ArrayElement { array, index } = &inner.kind {
+                    self.check_strict_array_access(array, line)?;
+                    let arr_idx = self
+                        .chunk
+                        .intern_name(&self.qualify_stash_array_name(array));
+                    self.compile_expr(index)?;
+                    self.emit_op(Op::ExistsArrayElem(arr_idx), line, Some(root));
                 } else if let ExprKind::ArrowDeref {
                     expr: container,
                     index,
                     kind: DerefKind::Hash,
                 } = &inner.kind
                 {
-                    self.compile_expr(container)?;
+                    self.compile_arrow_hash_base_expr(container)?;
                     self.compile_expr(index)?;
                     self.emit_op(Op::ExistsArrowHashElem, line, Some(root));
+                } else if let ExprKind::ArrowDeref {
+                    expr: container,
+                    index,
+                    kind: DerefKind::Array,
+                } = &inner.kind
+                {
+                    if arrow_deref_arrow_subscript_is_plain_scalar_index(index) {
+                        self.compile_expr(container)?;
+                        self.compile_expr(index)?;
+                        self.emit_op(Op::ExistsArrowArrayElem, line, Some(root));
+                    } else {
+                        let pool = self.chunk.add_exists_expr_entry(inner.as_ref().clone());
+                        self.emit_op(Op::ExistsExpr(pool), line, Some(root));
+                    }
                 } else {
                     let pool = self.chunk.add_exists_expr_entry(inner.as_ref().clone());
                     self.emit_op(Op::ExistsExpr(pool), line, Some(root));
@@ -5217,15 +5490,48 @@ impl Compiler {
             }
 
             // ── References ──
-            ExprKind::ScalarRef(e) => {
-                if let ExprKind::ScalarVar(name) = &e.kind {
+            ExprKind::ScalarRef(e) => match &e.kind {
+                ExprKind::ScalarVar(name) => {
                     let idx = self.chunk.intern_name(name);
                     self.emit_op(Op::MakeScalarBindingRef(idx), line, Some(root));
-                } else {
+                }
+                ExprKind::ArrayVar(name) => {
+                    self.check_strict_array_access(name, line)?;
+                    let idx = self.chunk.intern_name(&self.qualify_stash_array_name(name));
+                    self.emit_op(Op::MakeArrayBindingRef(idx), line, Some(root));
+                }
+                ExprKind::HashVar(name) => {
+                    self.check_strict_hash_access(name, line)?;
+                    let idx = self.chunk.intern_name(name);
+                    self.emit_op(Op::MakeHashBindingRef(idx), line, Some(root));
+                }
+                ExprKind::Deref {
+                    expr: inner,
+                    kind: Sigil::Array,
+                } => {
+                    self.compile_expr(inner)?;
+                    self.emit_op(Op::MakeArrayRefAlias, line, Some(root));
+                }
+                ExprKind::Deref {
+                    expr: inner,
+                    kind: Sigil::Hash,
+                } => {
+                    self.compile_expr(inner)?;
+                    self.emit_op(Op::MakeHashRefAlias, line, Some(root));
+                }
+                ExprKind::ArraySlice { .. } | ExprKind::HashSlice { .. } => {
+                    self.compile_expr_ctx(e, WantarrayCtx::List)?;
+                    self.emit_op(Op::MakeArrayRef, line, Some(root));
+                }
+                ExprKind::AnonymousListSlice { .. } | ExprKind::HashSliceDeref { .. } => {
+                    self.compile_expr_ctx(e, WantarrayCtx::List)?;
+                    self.emit_op(Op::MakeArrayRef, line, Some(root));
+                }
+                _ => {
                     self.compile_expr(e)?;
                     self.emit_op(Op::MakeScalarRef, line, Some(root));
                 }
-            }
+            },
             ExprKind::ArrayRef(elems) => {
                 for e in elems {
                     self.compile_expr(e)?;
@@ -5265,11 +5571,13 @@ impl Compiler {
             ExprKind::ArrowDeref { expr, index, kind } => match kind {
                 DerefKind::Array => {
                     self.compile_arrow_array_base_expr(expr)?;
+                    let mut used_arrow_slice = false;
                     if let ExprKind::List(indices) = &index.kind {
                         for ix in indices {
                             self.compile_array_slice_index_expr(ix)?;
                         }
                         self.emit_op(Op::ArrowArraySlice(indices.len() as u16), line, Some(root));
+                        used_arrow_slice = true;
                     } else if arrow_deref_arrow_subscript_is_plain_scalar_index(index) {
                         self.compile_expr(index)?;
                         self.emit_op(Op::ArrowArray, line, Some(root));
@@ -5277,10 +5585,14 @@ impl Compiler {
                         // One subscript expr may expand to multiple indices (`$r->[0..1]`, `[(0,1)]`).
                         self.compile_array_slice_index_expr(index)?;
                         self.emit_op(Op::ArrowArraySlice(1), line, Some(root));
+                        used_arrow_slice = true;
+                    }
+                    if used_arrow_slice && ctx != WantarrayCtx::List {
+                        self.emit_op(Op::ListSliceToScalar, line, Some(root));
                     }
                 }
                 DerefKind::Hash => {
-                    self.compile_expr(expr)?;
+                    self.compile_arrow_hash_base_expr(expr)?;
                     self.compile_expr(index)?;
                     self.emit_op(Op::ArrowHash, line, Some(root));
                 }
@@ -5291,14 +5603,25 @@ impl Compiler {
                 }
             },
             ExprKind::Deref { expr, kind } => {
-                self.compile_expr(expr)?;
-                let b = match kind {
-                    Sigil::Scalar => 0u8,
-                    Sigil::Array => 1,
-                    Sigil::Hash => 2,
-                    Sigil::Typeglob => 3,
-                };
-                self.emit_op(Op::SymbolicDeref(b), line, Some(root));
+                // Perl: `scalar @{EXPR}` / `scalar @$r` is the array length (not a copy of the list).
+                // `scalar %{EXPR}` uses hash fill metrics like `%h` in scalar context.
+                if ctx != WantarrayCtx::List && matches!(kind, Sigil::Array) {
+                    self.compile_expr(expr)?;
+                    self.emit_op(Op::ArrayDerefLen, line, Some(root));
+                } else if ctx != WantarrayCtx::List && matches!(kind, Sigil::Hash) {
+                    self.compile_expr(expr)?;
+                    self.emit_op(Op::SymbolicDeref(2), line, Some(root));
+                    self.emit_op(Op::ValueScalarContext, line, Some(root));
+                } else {
+                    self.compile_expr(expr)?;
+                    let b = match kind {
+                        Sigil::Scalar => 0u8,
+                        Sigil::Array => 1,
+                        Sigil::Hash => 2,
+                        Sigil::Typeglob => 3,
+                    };
+                    self.emit_op(Op::SymbolicDeref(b), line, Some(root));
+                }
             }
 
             // ── Interpolated strings ──
@@ -5942,7 +6265,7 @@ impl Compiler {
                 self.emit_op(Op::ArrayStringifyListSep, line, parent);
             }
             StringPart::Expr(e) => {
-                self.compile_expr(e)?;
+                // Interpolation uses list/array values (`$"`), not Perl scalar(@arr) length.
                 if matches!(&e.kind, ExprKind::ArraySlice { .. })
                     || matches!(
                         &e.kind,
@@ -5952,7 +6275,10 @@ impl Compiler {
                         }
                     )
                 {
+                    self.compile_expr_ctx(e, WantarrayCtx::List)?;
                     self.emit_op(Op::ArrayStringifyListSep, line, parent);
+                } else {
+                    self.compile_expr(e)?;
                 }
             }
         }
@@ -6135,12 +6461,41 @@ impl Compiler {
                     ));
                 }
             }
+            ExprKind::AnonymousListSlice { source, indices } => {
+                if let ExprKind::Deref {
+                    expr: inner,
+                    kind: Sigil::Array,
+                } = &source.kind
+                {
+                    if indices.is_empty() {
+                        return Err(CompileError::Unsupported(
+                            "assign to empty list slice (internal)".into(),
+                        ));
+                    }
+                    self.compile_arrow_array_base_expr(inner)?;
+                    for ix in indices {
+                        self.compile_array_slice_index_expr(ix)?;
+                    }
+                    self.emit_op(Op::SetArrowArraySlice(indices.len() as u16), line, ast);
+                    if keep {
+                        self.compile_arrow_array_base_expr(inner)?;
+                        for ix in indices {
+                            self.compile_array_slice_index_expr(ix)?;
+                        }
+                        self.emit_op(Op::ArrowArraySlice(indices.len() as u16), line, ast);
+                    }
+                    return Ok(());
+                }
+                return Err(CompileError::Unsupported(
+                    "assign to anonymous list slice (non-@array-deref base)".into(),
+                ));
+            }
             ExprKind::ArrowDeref {
                 expr,
                 index,
                 kind: DerefKind::Hash,
             } => {
-                self.compile_expr(expr)?;
+                self.compile_arrow_hash_base_expr(expr)?;
                 self.compile_expr(index)?;
                 if keep {
                     self.emit_op(Op::SetArrowHashKeep, line, ast);
