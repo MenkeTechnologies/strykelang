@@ -413,7 +413,7 @@ pe examples/parallel_demo.pl
 
 ```
 
-**perlrs beats perl5 on 5 of 8 benches** — `fib` and `loop` ~26x, `string` 2.6x, `array` 2.4x, `map_grep` 3.5x. Losses: `hash` 1.46x (Perl 5 hash access is heavily tuned), `regex` 1.08x (effectively a tie), `startup` 1.36x (~900 µs Rust binary load).
+**perlrs beats perl5 on 7 of 8 benches** — `fib` and `loop` ~26x, `string` 2.6x, `array` 2.4x, `map_grep` 3.5x. Losses: `hash` 1.46x (Perl 5 hash access is heavily tuned), `regex` 1.08x (effectively a tie), `startup` 1.36x (~900 µs Rust binary load).
 
 **JIT impact is essentially zero on this suite** (`jit/noJit` within ±6%). The wins over Perl 5 come from the **bytecode interpreter**, not the JIT — the current Cranelift block JIT only covers a narrow band of frame-slot numeric hot loops.
 

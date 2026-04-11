@@ -95,9 +95,7 @@ pub fn run_pwatch(
     use std::sync::mpsc::RecvTimeoutError;
     use std::time::Duration;
     loop {
-        if crate::perl_signal::pending("INT")
-            || crate::perl_signal::pending("TERM")
-        {
+        if crate::perl_signal::pending("INT") || crate::perl_signal::pending("TERM") {
             return Err(PerlError::runtime("pwatch: interrupted", line));
         }
         match rx.recv_timeout(Duration::from_millis(100)) {

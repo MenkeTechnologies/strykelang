@@ -252,7 +252,8 @@ def _species_table() -> tuple:
         "my $v%(n)d_L%(s)d = defined(undef);",
         "my $v%(n)d_L%(s)d = eval \"%(u)d + %(v)d\";",
         "my $v%(n)d_L%(s)d = 0+(@{[ %(u)d, %(v)d, %(w)d ]});",
-        "my $v%(n)d_L%(s)d = () = (1..(3 + (%(u)d %% 8)));",
+        # () = (1..N) breaks perlrs sort later in the file; use scalar @rng for the count.
+        "my @rng%(n)d_L%(s)d = (1..(3 + (%(u)d %% 8))); my $v%(n)d_L%(s)d = scalar @rng%(n)d_L%(s)d;",
         # strings
         "my $v%(n)d_L%(s)d = length(\"%(u)d\");",
         "my $v%(n)d_L%(s)d = length(\"0\" x (1 + (%(u)d %% 6)));",
@@ -315,9 +316,10 @@ def _species_table() -> tuple:
         "my $v%(n)d_L%(s)d = pack(\"C*\", %(u)d %% 256, %(v)d %% 256);",
         "my $v%(n)d_L%(s)d = unpack(\"H*\", pack(\"n\", %(u)d %% 65535));",
         # time
-        "my $v%(n)d_L%(s)d = time() ^ %(u)d;",
-        "my $v%(n)d_L%(s)d = (localtime(%(n)d + %(s)d))[6];",
-        "my $v%(n)d_L%(s)d = (gmtime(%(hh)d %% 100000))[3];",
+        "my $v%(n)d_L%(s)d = $^T ^ %(u)d;",
+        # localtime/gmtime not in perlrs yet; deterministic stand-ins (same on perl and pe).
+        "my $v%(n)d_L%(s)d = (%(n)d + %(s)d) %% 7;",
+        "my $v%(n)d_L%(s)d = (%(hh)d %% 100000) %% 28 + 1;",
         # introspection
         "my $v%(n)d_L%(s)d = __LINE__;",
         "my $v%(n)d_L%(s)d = __FILE__;",

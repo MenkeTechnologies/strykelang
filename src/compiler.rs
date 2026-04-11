@@ -1601,7 +1601,8 @@ impl Compiler {
                 self.chunk.emit(Op::LoadInt(0), line);
                 let counter_slot_opt = self.assign_scalar_slot("__foreach_i__");
                 if let Some(slot) = counter_slot_opt {
-                    self.chunk.emit(Op::DeclareScalarSlot(slot, counter_name), line);
+                    self.chunk
+                        .emit(Op::DeclareScalarSlot(slot, counter_name), line);
                 } else {
                     self.chunk.emit(Op::DeclareScalar(counter_name), line);
                 }

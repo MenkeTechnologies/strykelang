@@ -2972,10 +2972,8 @@ impl<'a> VM<'a> {
                         Ok(())
                     }
                     Op::WantarrayPop => {
-                        self.interp.wantarray_kind = self
-                            .wantarray_stack
-                            .pop()
-                            .unwrap_or(WantarrayCtx::Scalar);
+                        self.interp.wantarray_kind =
+                            self.wantarray_stack.pop().unwrap_or(WantarrayCtx::Scalar);
                         Ok(())
                     }
 

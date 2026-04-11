@@ -963,12 +963,15 @@ fn main() {
         && !args[1].is_empty()
         && args[2..].iter().all(|a| !a.starts_with('-'))
     {
-        let mut c = Cli::default();
-        c.script = Some(args[1].clone());
-        if args.len() > 2 {
-            c.args = args[2..].to_vec();
+        Cli {
+            script: Some(args[1].clone()),
+            args: if args.len() > 2 {
+                args[2..].to_vec()
+            } else {
+                Vec::new()
+            },
+            ..Default::default()
         }
-        c
     } else {
         parse_cli_prelude(&args).unwrap_or_else(|| Cli::parse_from(&args))
     };

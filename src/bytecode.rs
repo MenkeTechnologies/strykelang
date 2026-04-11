@@ -1627,28 +1627,29 @@ impl Chunk {
         //   - Jump back-edge target must be i+6 (the GetScalarSlot(c) at loop top).
         let len = self.ops.len();
         if len >= 15 {
-            let has_inbound_jump = |ops: &[Op], pos: usize, ignore_from: usize, ignore_to: usize| -> bool {
-                for (j, op) in ops.iter().enumerate() {
-                    if j >= ignore_from && j <= ignore_to {
-                        continue;
+            let has_inbound_jump =
+                |ops: &[Op], pos: usize, ignore_from: usize, ignore_to: usize| -> bool {
+                    for (j, op) in ops.iter().enumerate() {
+                        if j >= ignore_from && j <= ignore_to {
+                            continue;
+                        }
+                        let t = match op {
+                            Op::Jump(t)
+                            | Op::JumpIfFalse(t)
+                            | Op::JumpIfTrue(t)
+                            | Op::JumpIfFalseKeep(t)
+                            | Op::JumpIfTrueKeep(t)
+                            | Op::JumpIfDefinedKeep(t) => *t,
+                            Op::SlotLtIntJumpIfFalse(_, _, t) => *t,
+                            Op::SlotIncLtIntJumpBack(_, _, t) => *t,
+                            _ => continue,
+                        };
+                        if t == pos {
+                            return true;
+                        }
                     }
-                    let t = match op {
-                        Op::Jump(t)
-                        | Op::JumpIfFalse(t)
-                        | Op::JumpIfTrue(t)
-                        | Op::JumpIfFalseKeep(t)
-                        | Op::JumpIfTrueKeep(t)
-                        | Op::JumpIfDefinedKeep(t) => *t,
-                        Op::SlotLtIntJumpIfFalse(_, _, t) => *t,
-                        Op::SlotIncLtIntJumpBack(_, _, t) => *t,
-                        _ => continue,
-                    };
-                    if t == pos {
-                        return true;
-                    }
-                }
-                false
-            };
+                    false
+                };
             let mut i = 0;
             while i + 15 < len {
                 if let (

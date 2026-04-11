@@ -2699,34 +2699,33 @@ impl Interpreter {
                         }
                     }
                     let mut line_str = String::new();
-                    let read_result: Result<usize, io::Error> = if let Some(reader) =
-                        self.diamond_reader.as_mut()
-                    {
-                        if self.open_pragma_utf8 {
-                            let mut buf = Vec::new();
-                            reader.read_until(b'\n', &mut buf).inspect(|n| {
-                                if *n > 0 {
-                                    line_str = String::from_utf8_lossy(&buf).into_owned();
-                                }
-                            })
-                        } else {
-                            let mut buf = Vec::new();
-                            match reader.read_until(b'\n', &mut buf) {
-                                Ok(n) => {
-                                    if n > 0 {
-                                        line_str =
+                    let read_result: Result<usize, io::Error> =
+                        if let Some(reader) = self.diamond_reader.as_mut() {
+                            if self.open_pragma_utf8 {
+                                let mut buf = Vec::new();
+                                reader.read_until(b'\n', &mut buf).inspect(|n| {
+                                    if *n > 0 {
+                                        line_str = String::from_utf8_lossy(&buf).into_owned();
+                                    }
+                                })
+                            } else {
+                                let mut buf = Vec::new();
+                                match reader.read_until(b'\n', &mut buf) {
+                                    Ok(n) => {
+                                        if n > 0 {
+                                            line_str =
                                             crate::perl_decode::decode_utf8_or_latin1_read_until(
                                                 &buf,
                                             );
+                                        }
+                                        Ok(n)
                                     }
-                                    Ok(n)
+                                    Err(e) => Err(e),
                                 }
-                                Err(e) => Err(e),
                             }
-                        }
-                    } else {
-                        unreachable!()
-                    };
+                        } else {
+                            unreachable!()
+                        };
                     match read_result {
                         Ok(0) => {
                             self.diamond_reader = None;
@@ -3315,12 +3314,7 @@ impl Interpreter {
             };
             if memo_hit {
                 if self.regex_capture_scope_fresh {
-                    return Ok(self
-                        .regex_match_memo
-                        .as_ref()
-                        .expect("memo")
-                        .result
-                        .clone());
+                    return Ok(self.regex_match_memo.as_ref().expect("memo").result.clone());
                 }
                 // Memo hit but scope side effects were invalidated. Re-apply captures
                 // from the memoized haystack + a fresh compiled regex.
@@ -3632,10 +3626,7 @@ impl Interpreter {
             arr.insert(off + i, v);
         }
         Ok(match self.wantarray_kind {
-            WantarrayCtx::Scalar => removed
-                .last()
-                .cloned()
-                .unwrap_or(PerlValue::UNDEF),
+            WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(PerlValue::UNDEF),
             WantarrayCtx::List | WantarrayCtx::Void => PerlValue::array(removed),
         })
     }
@@ -12195,10 +12186,7 @@ impl Interpreter {
             arr.insert(off + i, v);
         }
         Ok(match ctx {
-            WantarrayCtx::Scalar => removed
-                .last()
-                .cloned()
-                .unwrap_or(PerlValue::UNDEF),
+            WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(PerlValue::UNDEF),
             WantarrayCtx::List | WantarrayCtx::Void => PerlValue::array(removed),
         })
     }

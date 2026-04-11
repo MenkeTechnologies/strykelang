@@ -142,25 +142,17 @@ mod unix {
     }
 
     pub(super) fn poll(interp: &mut Interpreter) -> PerlResult<()> {
-        if SIGINT_INSTALLED.load(Ordering::Relaxed)
-            && SIGINT_P.swap(false, Ordering::SeqCst)
-        {
+        if SIGINT_INSTALLED.load(Ordering::Relaxed) && SIGINT_P.swap(false, Ordering::SeqCst) {
             interp.sigint_pending_caret.set(true);
             interp.invoke_sig_handler("INT")?;
         }
-        if SIGTERM_INSTALLED.load(Ordering::Relaxed)
-            && SIGTERM_P.swap(false, Ordering::SeqCst)
-        {
+        if SIGTERM_INSTALLED.load(Ordering::Relaxed) && SIGTERM_P.swap(false, Ordering::SeqCst) {
             interp.invoke_sig_handler("TERM")?;
         }
-        if SIGALRM_INSTALLED.load(Ordering::Relaxed)
-            && SIGALRM_P.swap(false, Ordering::SeqCst)
-        {
+        if SIGALRM_INSTALLED.load(Ordering::Relaxed) && SIGALRM_P.swap(false, Ordering::SeqCst) {
             interp.invoke_sig_handler("ALRM")?;
         }
-        if SIGCHLD_INSTALLED.load(Ordering::Relaxed)
-            && SIGCHLD_P.swap(false, Ordering::SeqCst)
-        {
+        if SIGCHLD_INSTALLED.load(Ordering::Relaxed) && SIGCHLD_P.swap(false, Ordering::SeqCst) {
             interp.invoke_sig_handler("CHLD")?;
         }
         Ok(())
