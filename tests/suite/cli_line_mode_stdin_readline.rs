@@ -73,3 +73,49 @@ fn line_mode_lpe_implicit_print_appends_ors_each_line() {
     );
     assert_eq!(String::from_utf8_lossy(&out.stdout), "A\nB\nC\n");
 }
+
+/// `-l` sets output record separator; implicit print after `-p` must still run for empty `$_`.
+#[test]
+fn line_mode_lpe_empty_lines_preserve_blank_records() {
+    let exe = perlrs_exe();
+    let mut child = Command::new(exe)
+        .args(["-lpe", r#""#])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("spawn perlrs");
+    let mut stdin = child.stdin.take().expect("stdin");
+    stdin.write_all(b"a\n\nb\n").expect("write stdin");
+    drop(stdin);
+    let out = child.wait_with_output().expect("wait");
+    assert!(
+        out.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "a\n\nb\n");
+}
+
+/// Regression: chomped line must not be rejoined; each record gets its own trailing `$\`.
+#[test]
+fn line_mode_lpe_multibyte_utf8_line_round_trips() {
+    let exe = perlrs_exe();
+    let mut child = Command::new(exe)
+        .args(["-lpe", r#"$_ = "«$_»""#])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("spawn perlrs");
+    let mut stdin = child.stdin.take().expect("stdin");
+    stdin
+        .write_all("café\nrésumé\n".as_bytes())
+        .expect("write stdin");
+    drop(stdin);
+    let out = child.wait_with_output().expect("wait");
+    assert!(
+        out.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "«café»\n«résumé»\n");
+}

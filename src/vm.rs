@@ -7322,6 +7322,10 @@ impl<'a> VM<'a> {
                 let handle = args.first().map(|v| v.to_string()).unwrap_or_default();
                 Ok(self.interp.readdir_handle(&handle))
             }
+            Some(BuiltinId::ReaddirList) => {
+                let handle = args.first().map(|v| v.to_string()).unwrap_or_default();
+                Ok(self.interp.readdir_handle_list(&handle))
+            }
             Some(BuiltinId::Closedir) => {
                 let handle = args.first().map(|v| v.to_string()).unwrap_or_default();
                 Ok(self.interp.closedir_handle(&handle))

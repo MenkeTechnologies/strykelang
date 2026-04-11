@@ -552,6 +552,24 @@ fn opendir_readdir_returns_name() {
 }
 
 #[test]
+fn readdir_list_context_returns_all_remaining_entries() {
+    let base = std::env::temp_dir().join(format!("perlrs_sem_rdl_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&base);
+    std::fs::create_dir_all(&base).expect("mkdir");
+    std::fs::write(base.join("a.txt"), b"x").expect("write");
+    std::fs::write(base.join("b.txt"), b"y").expect("write");
+    let pd = base.to_string_lossy();
+    let script = format!(
+        r#"opendir H, "{pd}" or die;
+        my @f = readdir H;
+        closedir H;
+        (scalar grep {{ $_ eq "a.txt" }} @f) && (scalar grep {{ $_ eq "b.txt" }} @f) ? 1 : 0"#,
+    );
+    assert_eq!(ri(&script), 1);
+    let _ = std::fs::remove_dir_all(&base);
+}
+
+#[test]
 fn rewinddir_resets_read_position() {
     assert_eq!(
         ri(r#"opendir D, "."; readdir D; rewinddir D; (telldir D) == 0 ? 1 : 0;"#),

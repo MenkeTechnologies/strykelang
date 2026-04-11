@@ -3072,6 +3072,21 @@ impl Interpreter {
         }
     }
 
+    /// List-context `readdir`: all directory entries not yet consumed (advances cursor to end).
+    pub(crate) fn readdir_handle_list(&mut self, handle: &str) -> PerlValue {
+        if let Some(dh) = self.dir_handles.get_mut(handle) {
+            let rest: Vec<PerlValue> = dh.entries[dh.pos..]
+                .iter()
+                .cloned()
+                .map(PerlValue::string)
+                .collect();
+            dh.pos = dh.entries.len();
+            PerlValue::array(rest)
+        } else {
+            PerlValue::array(Vec::new())
+        }
+    }
+
     pub(crate) fn closedir_handle(&mut self, handle: &str) -> PerlValue {
         PerlValue::integer(if self.dir_handles.remove(handle).is_some() {
             1
@@ -8606,7 +8621,11 @@ impl Interpreter {
             }
             ExprKind::Readdir(e) => {
                 let h = self.eval_expr(e)?.to_string();
-                Ok(self.readdir_handle(&h))
+                Ok(if ctx == WantarrayCtx::List {
+                    self.readdir_handle_list(&h)
+                } else {
+                    self.readdir_handle(&h)
+                })
             }
             ExprKind::Closedir(e) => {
                 let h = self.eval_expr(e)?.to_string();

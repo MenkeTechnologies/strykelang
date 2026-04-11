@@ -886,11 +886,13 @@ pub enum BuiltinId {
     Readpipe,
     /// `readline` / `<HANDLE>` in **list** context — all remaining lines until EOF (Perl `readline` list semantics).
     ReadLineList,
+    /// `readdir` in **list** context — all names not yet returned (Perl drains the rest of the stream).
+    ReaddirList,
 }
 
 impl BuiltinId {
     pub fn from_u16(v: u16) -> Option<Self> {
-        if v <= Self::ReadLineList as u16 {
+        if v <= Self::ReaddirList as u16 {
             Some(unsafe { std::mem::transmute::<u16, BuiltinId>(v) })
         } else {
             None
@@ -2118,14 +2120,15 @@ mod tests {
             BuiltinId::from_u16(BuiltinId::ReadLineList as u16),
             Some(BuiltinId::ReadLineList)
         );
+        assert_eq!(
+            BuiltinId::from_u16(BuiltinId::ReaddirList as u16),
+            Some(BuiltinId::ReaddirList)
+        );
     }
 
     #[test]
     fn builtin_id_from_u16_out_of_range() {
-        assert_eq!(
-            BuiltinId::from_u16(BuiltinId::ReadLineList as u16 + 1),
-            None
-        );
+        assert_eq!(BuiltinId::from_u16(BuiltinId::ReaddirList as u16 + 1), None);
         assert_eq!(BuiltinId::from_u16(u16::MAX), None);
     }
 

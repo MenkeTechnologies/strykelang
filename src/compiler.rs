@@ -5216,12 +5216,13 @@ impl Compiler {
                 );
             }
             ExprKind::Readdir(e) => {
+                let bid = if ctx == WantarrayCtx::List {
+                    BuiltinId::ReaddirList
+                } else {
+                    BuiltinId::Readdir
+                };
                 self.compile_expr(e)?;
-                self.emit_op(
-                    Op::CallBuiltin(BuiltinId::Readdir as u16, 1),
-                    line,
-                    Some(root),
-                );
+                self.emit_op(Op::CallBuiltin(bid as u16, 1), line, Some(root));
             }
             ExprKind::Closedir(e) => {
                 self.compile_expr(e)?;

@@ -19,6 +19,7 @@ mod error_kinds_extra;
 mod errors;
 mod eval_errors;
 mod expressions;
+mod fix_regressions;
 mod fs_io;
 mod language_extensions;
 mod lib_api;
