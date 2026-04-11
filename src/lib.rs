@@ -10,6 +10,7 @@ pub mod ast;
 pub mod builtins;
 pub mod bytecode;
 pub mod capture;
+pub mod cluster;
 pub mod compiler;
 mod crypt_util;
 pub mod data_section;

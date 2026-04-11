@@ -1,4 +1,32 @@
 //! Framed bincode over stdin/stdout for `pe --remote-worker` (distributed `pmap_on`).
+//!
+//! ## Wire protocol
+//!
+//! Every message is a length-prefixed frame: `[u64 LE length][u8 kind][bincode payload]`.
+//! The single-byte `kind` discriminator lets future revisions add message types without
+//! breaking older workers — an unknown kind is a hard error so version skew is loud.
+//!
+//! ### Message flow (v2 — persistent session)
+//!
+//! ```text
+//! dispatcher                    worker
+//!     │                            │
+//!     │── HELLO ─────────────────►│   (proto version, build id)
+//!     │◄───────────── HELLO_ACK ──│   (worker pe version, hostname)
+//!     │── SESSION_INIT ──────────►│   (subs prelude, block source, captured lexicals)
+//!     │◄────────── SESSION_ACK ───│   (or ERROR)
+//!     │── JOB(seq=0) ────────────►│   (item)
+//!     │◄────────── JOB_RESP(0) ───│
+//!     │── JOB(seq=1) ────────────►│
+//!     │◄────────── JOB_RESP(1) ───│
+//!     │           ...             │
+//!     │── SHUTDOWN ──────────────►│
+//!     │                            └─ exit 0
+//! ```
+//!
+//! Why this beats the basic v1 protocol: subs prelude + block source ship **once** per
+//! session instead of once per item, the parser+compiler runs once per worker instead of
+//! once per job, and one ssh handshake amortizes across the whole map.
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -10,6 +38,113 @@ use serde::{Deserialize, Serialize};
 use crate::ast::Block;
 use crate::interpreter::{FlowOrError, Interpreter};
 use crate::value::{PerlSub, PerlValue};
+
+/// Frame-kind discriminator. Stored as the first byte of every wire payload after the
+/// length prefix. Sub-byte values are reserved (anything outside the documented set is
+/// rejected with a clean error rather than silently misparsed).
+#[allow(dead_code)]
+pub mod frame_kind {
+    pub const HELLO: u8 = 0x01;
+    pub const HELLO_ACK: u8 = 0x02;
+    pub const SESSION_INIT: u8 = 0x03;
+    pub const SESSION_ACK: u8 = 0x04;
+    pub const JOB: u8 = 0x05;
+    pub const JOB_RESP: u8 = 0x06;
+    pub const SHUTDOWN: u8 = 0x07;
+    pub const ERROR: u8 = 0xFF;
+}
+
+/// Wire protocol version. Bumped whenever the layout of an existing message changes in a
+/// backwards-incompatible way. The HELLO handshake fails fast on version mismatch so
+/// dispatcher and worker never silently disagree on layout.
+pub const PROTO_VERSION: u32 = 2;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HelloMsg {
+    pub proto_version: u32,
+    pub pe_version: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HelloAck {
+    pub proto_version: u32,
+    pub pe_version: String,
+    pub hostname: String,
+}
+
+/// Sent **once** per worker session. Carries everything that doesn't change between jobs:
+/// the user's named subs, the `pmap_on` block source, and the captured-lexical snapshot.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionInit {
+    pub subs_prelude: String,
+    pub block_src: String,
+    pub capture: Vec<(String, serde_json::Value)>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionAck {
+    pub ok: bool,
+    pub err_msg: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JobMsg {
+    pub seq: u64,
+    pub item: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JobRespMsg {
+    pub seq: u64,
+    pub ok: bool,
+    pub result: serde_json::Value,
+    pub err_msg: String,
+}
+
+/// Read a typed frame: returns `(kind, body)` where `body` is the bincode payload after
+/// the kind byte. Caller decides how to interpret based on `kind`.
+pub fn read_typed_frame<R: Read>(r: &mut R) -> std::io::Result<(u8, Vec<u8>)> {
+    let raw = read_framed(r)?;
+    if raw.is_empty() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "remote frame: empty payload (missing kind byte)",
+        ));
+    }
+    let kind = raw[0];
+    Ok((kind, raw[1..].to_vec()))
+}
+
+/// Write a typed frame: prepends the `kind` byte to `payload` and writes one length-prefixed
+/// frame.
+pub fn write_typed_frame<W: Write>(w: &mut W, kind: u8, payload: &[u8]) -> std::io::Result<()> {
+    let mut framed = Vec::with_capacity(payload.len() + 1);
+    framed.push(kind);
+    framed.extend_from_slice(payload);
+    write_framed(w, &framed)
+}
+
+/// Bincode + write helper. The two-step `bincode::serialize` + `write_typed_frame` pattern
+/// is the same in every send site so it lives here once.
+pub fn send_msg<W: Write, T: Serialize>(w: &mut W, kind: u8, msg: &T) -> Result<(), String> {
+    let payload = bincode::serialize(msg).map_err(|e| format!("bincode encode: {e}"))?;
+    write_typed_frame(w, kind, &payload).map_err(|e| format!("write frame: {e}"))
+}
+
+/// Bincode + read helper. Returns the deserialized message and verifies the kind matches.
+pub fn recv_msg<R: Read, T: for<'de> Deserialize<'de>>(
+    r: &mut R,
+    expected_kind: u8,
+) -> Result<T, String> {
+    let (kind, body) = read_typed_frame(r).map_err(|e| format!("read frame: {e}"))?;
+    if kind != expected_kind {
+        return Err(format!(
+            "wire: expected frame kind {:#04x}, got {:#04x}",
+            expected_kind, kind
+        ));
+    }
+    bincode::deserialize(&body).map_err(|e| format!("bincode decode: {e}"))
+}
 
 /// One unit of work executed on a remote `pe --remote-worker`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -251,6 +386,233 @@ pub fn run_job_local(job: &RemoteJobV1) -> RemoteRespV1 {
             err_msg: e,
         },
     }
+}
+
+/// Persistent v2 worker session: handles many jobs over a single stdin/stdout pair, with
+/// one Interpreter and one parsed block shared across the whole session.
+///
+/// Protocol order: HELLO → HELLO_ACK → SESSION_INIT → SESSION_ACK → JOB / JOB_RESP loop
+/// → SHUTDOWN → exit. Any wire error or unknown frame kind causes a clean non-zero exit so
+/// the dispatcher can re-route in-flight jobs to a different slot.
+///
+/// Why this beats the basic v1 [`run_remote_worker_stdio`]: subs prelude + block source
+/// ship **once** per session instead of per-item, parser+compiler runs once per worker,
+/// and one ssh handshake amortizes across the whole map.
+pub fn run_remote_worker_session() -> i32 {
+    let stdin = std::io::stdin();
+    let mut stdin = stdin.lock();
+    let mut stdout = std::io::stdout();
+
+    // 1. HELLO handshake. Dispatcher sends first; we reply with our build info.
+    let hello: HelloMsg = match recv_msg(&mut stdin, frame_kind::HELLO) {
+        Ok(h) => h,
+        Err(e) => {
+            let _ = writeln!(std::io::stderr(), "remote-worker: hello: {e}");
+            return 1;
+        }
+    };
+    if hello.proto_version != PROTO_VERSION {
+        let _ = writeln!(
+            std::io::stderr(),
+            "remote-worker: proto version mismatch (dispatcher {} vs worker {})",
+            hello.proto_version,
+            PROTO_VERSION
+        );
+        return 1;
+    }
+    let ack = HelloAck {
+        proto_version: PROTO_VERSION,
+        pe_version: env!("CARGO_PKG_VERSION").to_string(),
+        hostname: hostname_or_unknown(),
+    };
+    if let Err(e) = send_msg(&mut stdout, frame_kind::HELLO_ACK, &ack) {
+        let _ = writeln!(std::io::stderr(), "remote-worker: hello ack: {e}");
+        return 1;
+    }
+
+    // 2. SESSION_INIT: subs prelude + block source + captured lexicals.
+    let init: SessionInit = match recv_msg(&mut stdin, frame_kind::SESSION_INIT) {
+        Ok(i) => i,
+        Err(e) => {
+            let _ = writeln!(std::io::stderr(), "remote-worker: session init: {e}");
+            return 1;
+        }
+    };
+
+    // Parse subs prelude ONCE so they're registered for every JOB; parse block ONCE so we
+    // can hand the same `Block` to `exec_block_smart` per item without re-parsing.
+    let mut interp = Interpreter::new();
+    let prelude_program = match crate::parse(&init.subs_prelude) {
+        Ok(p) => p,
+        Err(e) => {
+            let nack = SessionAck {
+                ok: false,
+                err_msg: format!("parse subs prelude: {}", e.message),
+            };
+            let _ = send_msg(&mut stdout, frame_kind::SESSION_ACK, &nack);
+            return 2;
+        }
+    };
+    let block_program = match crate::parse(&init.block_src) {
+        Ok(p) => p,
+        Err(e) => {
+            let nack = SessionAck {
+                ok: false,
+                err_msg: format!("parse block: {}", e.message),
+            };
+            let _ = send_msg(&mut stdout, frame_kind::SESSION_ACK, &nack);
+            return 2;
+        }
+    };
+
+    // Restore captured lexicals once per session — they don't change across jobs.
+    let cap_pv: Vec<(String, PerlValue)> = match init
+        .capture
+        .iter()
+        .map(|(k, v)| json_to_perl(v).map(|pv| (k.clone(), pv)))
+        .collect()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            let nack = SessionAck {
+                ok: false,
+                err_msg: format!("decode capture: {e}"),
+            };
+            let _ = send_msg(&mut stdout, frame_kind::SESSION_ACK, &nack);
+            return 2;
+        }
+    };
+    interp.scope_push_hook();
+    interp.scope.restore_capture(&cap_pv);
+
+    // Run the prelude (sub decls) once. After this every JOB has the user's named subs in
+    // scope without re-parsing or re-executing the prelude per item.
+    if let Err(e) = interp.execute(&prelude_program) {
+        let nack = SessionAck {
+            ok: false,
+            err_msg: format!("session prelude: {e}"),
+        };
+        let _ = send_msg(&mut stdout, frame_kind::SESSION_ACK, &nack);
+        return 2;
+    }
+
+    let ack = SessionAck {
+        ok: true,
+        err_msg: String::new(),
+    };
+    if let Err(e) = send_msg(&mut stdout, frame_kind::SESSION_ACK, &ack) {
+        let _ = writeln!(std::io::stderr(), "remote-worker: session ack: {e}");
+        return 1;
+    }
+
+    let block: Block = block_program.statements;
+
+    // 3. JOB loop. Each iteration sets `$_ = item`, re-evaluates the cached block, and
+    // sends back the result. The Interpreter is reused — sub registrations, package state,
+    // anything mutated by SESSION_INIT persists across jobs.
+    loop {
+        let (kind, body) = match read_typed_frame(&mut stdin) {
+            Ok(p) => p,
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return 0,
+            Err(e) => {
+                let _ = writeln!(std::io::stderr(), "remote-worker: read job: {e}");
+                return 1;
+            }
+        };
+        match kind {
+            frame_kind::JOB => {
+                let job: JobMsg = match bincode::deserialize(&body) {
+                    Ok(j) => j,
+                    Err(e) => {
+                        let resp = JobRespMsg {
+                            seq: 0,
+                            ok: false,
+                            result: serde_json::Value::Null,
+                            err_msg: format!("decode job: {e}"),
+                        };
+                        let _ = send_msg(&mut stdout, frame_kind::JOB_RESP, &resp);
+                        continue;
+                    }
+                };
+                let resp = run_one_session_job(&mut interp, &block, &job);
+                if let Err(e) = send_msg(&mut stdout, frame_kind::JOB_RESP, &resp) {
+                    let _ = writeln!(std::io::stderr(), "remote-worker: write resp: {e}");
+                    return 1;
+                }
+            }
+            frame_kind::SHUTDOWN => return 0,
+            other => {
+                let _ = writeln!(
+                    std::io::stderr(),
+                    "remote-worker: unexpected frame kind {:#04x} in JOB loop",
+                    other
+                );
+                return 1;
+            }
+        }
+    }
+}
+
+/// Run one JOB inside an active session. Sets `$_` to the item, evaluates the cached block,
+/// returns the JSON-marshalled result. Preserves Interpreter state across jobs so anything
+/// the prelude installed (named subs, package vars) stays live.
+fn run_one_session_job(interp: &mut Interpreter, block: &Block, job: &JobMsg) -> JobRespMsg {
+    let item_pv = match json_to_perl(&job.item) {
+        Ok(v) => v,
+        Err(e) => {
+            return JobRespMsg {
+                seq: job.seq,
+                ok: false,
+                result: serde_json::Value::Null,
+                err_msg: e,
+            };
+        }
+    };
+    let _ = interp.scope.set_scalar("_", item_pv);
+    let r = match interp.exec_block_smart(block) {
+        Ok(v) => v,
+        Err(FlowOrError::Error(pe)) => {
+            return JobRespMsg {
+                seq: job.seq,
+                ok: false,
+                result: serde_json::Value::Null,
+                err_msg: pe.to_string(),
+            };
+        }
+        Err(FlowOrError::Flow(f)) => {
+            return JobRespMsg {
+                seq: job.seq,
+                ok: false,
+                result: serde_json::Value::Null,
+                err_msg: format!("unexpected control flow: {:?}", f),
+            };
+        }
+    };
+    match perl_to_json_value(&r) {
+        Ok(j) => JobRespMsg {
+            seq: job.seq,
+            ok: true,
+            result: j,
+            err_msg: String::new(),
+        },
+        Err(e) => JobRespMsg {
+            seq: job.seq,
+            ok: false,
+            result: serde_json::Value::Null,
+            err_msg: e,
+        },
+    }
+}
+
+fn hostname_or_unknown() -> String {
+    std::env::var("HOSTNAME").unwrap_or_else(|_| {
+        std::process::Command::new("hostname")
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+            .map(|s| s.trim().to_string())
+            .unwrap_or_else(|| "unknown".to_string())
+    })
 }
 
 /// stdin/stdout worker loop: one framed request → one framed response, then exit 0.

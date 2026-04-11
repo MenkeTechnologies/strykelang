@@ -273,14 +273,14 @@ mysync $counter = 0;
 trace { fan 10 { $counter++ } };
 
 # timer / bench — wall-clock millis; bench returns "min/mean/p99"
-my $ms     = timer { heavy_work() };
-my $report = bench { heavy_work() } 1000;
+my $ms     = timer { heavy_work };
+my $report = bench { heavy_work } 1000;
 
 # eval_timeout — runs block on a worker thread; recv_timeout on main
 eval_timeout 5 { slow };
 
 # retry / rate_limit / every (tree interpreter only)
-retry { http_call() } times => 3, backoff => "exponential";
+retry { http_call } times => 3, backoff => "exponential";
 rate_limit(10, "1s") { hit_api() };
 every("500ms") { tick() };
 

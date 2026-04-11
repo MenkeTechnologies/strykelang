@@ -1,5 +1,6 @@
 //! Language server protocol (stdio) for editors — `pe --lsp`.
 
+use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::OnceLock;
 
@@ -9,16 +10,27 @@ use lsp_types::notification::{
     DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, PublishDiagnostics,
 };
 use lsp_types::request::Completion;
+use lsp_types::request::DocumentHighlightRequest;
 use lsp_types::request::DocumentSymbolRequest;
+use lsp_types::request::GotoDeclaration;
+use lsp_types::request::GotoDefinition;
+use lsp_types::request::HoverRequest;
+use lsp_types::request::PrepareRenameRequest;
+use lsp_types::request::References;
+use lsp_types::request::Rename;
 use lsp_types::request::Request as RequestTrait;
 use lsp_types::request::ResolveCompletionItem;
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionOptions, CompletionParams, CompletionResponse,
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams, Diagnostic,
-    DiagnosticSeverity, DocumentSymbolParams, DocumentSymbolResponse, Documentation, Location,
-    OneOf, PublishDiagnosticsParams, Range, ServerCapabilities, SymbolInformation, SymbolKind,
-    TextDocumentContentChangeEvent, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, Uri,
+    DeclarationCapability, DiagnosticSeverity, DocumentHighlight, DocumentHighlightKind,
+    DocumentHighlightParams, DocumentSymbolParams, DocumentSymbolResponse, Documentation,
+    GotoDefinitionParams, GotoDefinitionResponse, PrepareRenameResponse, ReferenceParams, RenameOptions,
+    RenameParams, Hover, HoverContents, HoverParams, HoverProviderCapability, Location, OneOf, Position,
+    PublishDiagnosticsParams, Range, ServerCapabilities, SymbolInformation,
+    SymbolKind, TextDocumentContentChangeEvent, TextDocumentPositionParams, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, TextEdit, Uri, WorkspaceEdit,
+    WorkDoneProgressOptions,
 };
 use lsp_types::{InsertTextFormat, MarkupContent, MarkupKind};
 use percent_encoding::percent_decode_str;
@@ -52,6 +64,15 @@ pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>
             ]),
             ..Default::default()
         }),
+        hover_provider: Some(HoverProviderCapability::Simple(true)),
+        declaration_provider: Some(DeclarationCapability::Simple(true)),
+        definition_provider: Some(OneOf::Left(true)),
+        references_provider: Some(OneOf::Left(true)),
+        rename_provider: Some(OneOf::Right(RenameOptions {
+            prepare_provider: Some(true),
+            work_done_progress_options: WorkDoneProgressOptions::default(),
+        })),
+        document_highlight_provider: Some(OneOf::Left(true)),
         document_symbol_provider: Some(OneOf::Left(true)),
         ..Default::default()
     };
@@ -150,6 +171,153 @@ fn dispatch_request(
         };
         let resolved = resolve_completion_item(item);
         let resp = Response::new_ok(id, resolved);
+        conn.sender.send(resp.into()).expect("lsp channel");
+        return Ok(());
+    }
+
+    if req.method == HoverRequest::METHOD {
+        let req_id = req.id.clone();
+        let (id, params) = match req.extract::<HoverParams>(HoverRequest::METHOD) {
+            Ok(p) => p,
+            Err(ExtractError::JsonError { method, error }) => {
+                let resp = Response::new_err(
+                    req_id,
+                    ErrorCode::InvalidParams as i32,
+                    format!("{method}: {error}"),
+                );
+                conn.sender.send(resp.into()).expect("lsp channel");
+                return Ok(());
+            }
+            Err(ExtractError::MethodMismatch(_)) => unreachable!(),
+        };
+        let result = hover(docs, params);
+        let resp = Response::new_ok(id, result);
+        conn.sender.send(resp.into()).expect("lsp channel");
+        return Ok(());
+    }
+
+    if req.method == GotoDefinition::METHOD {
+        let req_id = req.id.clone();
+        let (id, params) = match req.extract::<GotoDefinitionParams>(GotoDefinition::METHOD) {
+            Ok(p) => p,
+            Err(ExtractError::JsonError { method, error }) => {
+                let resp = Response::new_err(
+                    req_id,
+                    ErrorCode::InvalidParams as i32,
+                    format!("{method}: {error}"),
+                );
+                conn.sender.send(resp.into()).expect("lsp channel");
+                return Ok(());
+            }
+            Err(ExtractError::MethodMismatch(_)) => unreachable!(),
+        };
+        let result = goto_definition(docs, params);
+        let resp = Response::new_ok(id, result);
+        conn.sender.send(resp.into()).expect("lsp channel");
+        return Ok(());
+    }
+
+    if req.method == GotoDeclaration::METHOD {
+        let req_id = req.id.clone();
+        let (id, params) = match req.extract::<GotoDefinitionParams>(GotoDeclaration::METHOD) {
+            Ok(p) => p,
+            Err(ExtractError::JsonError { method, error }) => {
+                let resp = Response::new_err(
+                    req_id,
+                    ErrorCode::InvalidParams as i32,
+                    format!("{method}: {error}"),
+                );
+                conn.sender.send(resp.into()).expect("lsp channel");
+                return Ok(());
+            }
+            Err(ExtractError::MethodMismatch(_)) => unreachable!(),
+        };
+        let result = goto_definition(docs, params);
+        let resp = Response::new_ok(id, result);
+        conn.sender.send(resp.into()).expect("lsp channel");
+        return Ok(());
+    }
+
+    if req.method == References::METHOD {
+        let req_id = req.id.clone();
+        let (id, params) = match req.extract::<ReferenceParams>(References::METHOD) {
+            Ok(p) => p,
+            Err(ExtractError::JsonError { method, error }) => {
+                let resp = Response::new_err(
+                    req_id,
+                    ErrorCode::InvalidParams as i32,
+                    format!("{method}: {error}"),
+                );
+                conn.sender.send(resp.into()).expect("lsp channel");
+                return Ok(());
+            }
+            Err(ExtractError::MethodMismatch(_)) => unreachable!(),
+        };
+        let result = references(docs, params);
+        let resp = Response::new_ok(id, result);
+        conn.sender.send(resp.into()).expect("lsp channel");
+        return Ok(());
+    }
+
+    if req.method == DocumentHighlightRequest::METHOD {
+        let req_id = req.id.clone();
+        let (id, params) = match req.extract::<DocumentHighlightParams>(DocumentHighlightRequest::METHOD) {
+            Ok(p) => p,
+            Err(ExtractError::JsonError { method, error }) => {
+                let resp = Response::new_err(
+                    req_id,
+                    ErrorCode::InvalidParams as i32,
+                    format!("{method}: {error}"),
+                );
+                conn.sender.send(resp.into()).expect("lsp channel");
+                return Ok(());
+            }
+            Err(ExtractError::MethodMismatch(_)) => unreachable!(),
+        };
+        let result = document_highlight(docs, params);
+        let resp = Response::new_ok(id, result);
+        conn.sender.send(resp.into()).expect("lsp channel");
+        return Ok(());
+    }
+
+    if req.method == PrepareRenameRequest::METHOD {
+        let req_id = req.id.clone();
+        let (id, params) = match req.extract::<TextDocumentPositionParams>(PrepareRenameRequest::METHOD) {
+            Ok(p) => p,
+            Err(ExtractError::JsonError { method, error }) => {
+                let resp = Response::new_err(
+                    req_id,
+                    ErrorCode::InvalidParams as i32,
+                    format!("{method}: {error}"),
+                );
+                conn.sender.send(resp.into()).expect("lsp channel");
+                return Ok(());
+            }
+            Err(ExtractError::MethodMismatch(_)) => unreachable!(),
+        };
+        let result = prepare_rename(docs, params);
+        let resp = Response::new_ok(id, result);
+        conn.sender.send(resp.into()).expect("lsp channel");
+        return Ok(());
+    }
+
+    if req.method == Rename::METHOD {
+        let req_id = req.id.clone();
+        let (id, params) = match req.extract::<RenameParams>(Rename::METHOD) {
+            Ok(p) => p,
+            Err(ExtractError::JsonError { method, error }) => {
+                let resp = Response::new_err(
+                    req_id,
+                    ErrorCode::InvalidParams as i32,
+                    format!("{method}: {error}"),
+                );
+                conn.sender.send(resp.into()).expect("lsp channel");
+                return Ok(());
+            }
+            Err(ExtractError::MethodMismatch(_)) => unreachable!(),
+        };
+        let result = rename_symbol(docs, params);
+        let resp = Response::new_ok(id, result);
         conn.sender.send(resp.into()).expect("lsp channel");
         return Ok(());
     }
@@ -293,19 +461,20 @@ fn line_range_utf16(source: &str, line_1based: usize) -> Range {
     }
 }
 
-fn document_symbols(
-    docs: &HashMap<Uri, String>,
-    params: DocumentSymbolParams,
-) -> Option<DocumentSymbolResponse> {
+fn document_symbols(docs: &HashMap<Uri, String>, params: DocumentSymbolParams) -> DocumentSymbolResponse {
     let uri = params.text_document.uri;
-    let text = docs.get(&uri)?;
+    let Some(text) = docs.get(&uri) else {
+        return DocumentSymbolResponse::Flat(Vec::new());
+    };
     let path = uri_to_path(&uri);
-    let program = crate::parse_with_file(text, &path).ok()?;
+    let Ok(program) = crate::parse_with_file(text, &path) else {
+        return DocumentSymbolResponse::Flat(Vec::new());
+    };
     let mut symbols = Vec::new();
     for stmt in &program.statements {
         walk_stmt(stmt, &uri, text, &mut symbols, None);
     }
-    Some(DocumentSymbolResponse::Flat(symbols))
+    DocumentSymbolResponse::Flat(symbols)
 }
 
 fn walk_stmt(
@@ -485,6 +654,457 @@ fn sym(
     }
 }
 
+// ── hover & go-to-definition (subs in open document + builtin docs) ───────
+
+fn collect_sub_fqn_map(program: &crate::ast::Program) -> HashMap<String, usize> {
+    let mut m = HashMap::new();
+    let mut pkg = String::from("main");
+    for stmt in &program.statements {
+        collect_sub_fqns_stmt(stmt, &mut pkg, &mut m);
+    }
+    m
+}
+
+fn collect_sub_fqns_block(block: &Block, pkg: &mut String, m: &mut HashMap<String, usize>) {
+    for stmt in block {
+        collect_sub_fqns_stmt(stmt, pkg, m);
+    }
+}
+
+fn collect_sub_fqns_stmt(stmt: &Statement, pkg: &mut String, m: &mut HashMap<String, usize>) {
+    match &stmt.kind {
+        StmtKind::Package { name } => {
+            *pkg = name.clone();
+        }
+        StmtKind::SubDecl { name, body, .. } => {
+            let fqn = if name.contains("::") {
+                name.clone()
+            } else {
+                format!("{}::{}", pkg.as_str(), name)
+            };
+            m.insert(fqn, stmt.line);
+            collect_sub_fqns_block(body, pkg, m);
+        }
+        StmtKind::My(_)
+        | StmtKind::Our(_)
+        | StmtKind::Local(_)
+        | StmtKind::MySync(_)
+        | StmtKind::LocalExpr { .. }
+        | StmtKind::Expression(_)
+        | StmtKind::Return(_)
+        | StmtKind::Last(_)
+        | StmtKind::Next(_)
+        | StmtKind::Redo(_)
+        | StmtKind::Use { .. }
+        | StmtKind::UsePerlVersion { .. }
+        | StmtKind::UseOverload { .. }
+        | StmtKind::No { .. }
+        | StmtKind::Goto { .. }
+        | StmtKind::Tie { .. }
+        | StmtKind::Empty
+        | StmtKind::StructDecl { .. }
+        | StmtKind::FormatDecl { .. } => {}
+        StmtKind::Foreach { body, continue_block, .. } => {
+            collect_sub_fqns_block(body, pkg, m);
+            if let Some(b) = continue_block {
+                collect_sub_fqns_block(b, pkg, m);
+            }
+        }
+        StmtKind::Block(b)
+        | StmtKind::StmtGroup(b)
+        | StmtKind::Begin(b)
+        | StmtKind::End(b)
+        | StmtKind::UnitCheck(b)
+        | StmtKind::Check(b)
+        | StmtKind::Init(b)
+        | StmtKind::Continue(b) => collect_sub_fqns_block(b, pkg, m),
+        StmtKind::If {
+            body,
+            elsifs,
+            else_block,
+            ..
+        } => {
+            collect_sub_fqns_block(body, pkg, m);
+            for (_, b) in elsifs {
+                collect_sub_fqns_block(b, pkg, m);
+            }
+            if let Some(b) = else_block {
+                collect_sub_fqns_block(b, pkg, m);
+            }
+        }
+        StmtKind::Unless {
+            body,
+            else_block,
+            ..
+        } => {
+            collect_sub_fqns_block(body, pkg, m);
+            if let Some(b) = else_block {
+                collect_sub_fqns_block(b, pkg, m);
+            }
+        }
+        StmtKind::While {
+            body,
+            continue_block,
+            ..
+        }
+        | StmtKind::Until {
+            body,
+            continue_block,
+            ..
+        } => {
+            collect_sub_fqns_block(body, pkg, m);
+            if let Some(b) = continue_block {
+                collect_sub_fqns_block(b, pkg, m);
+            }
+        }
+        StmtKind::DoWhile { body, .. } => collect_sub_fqns_block(body, pkg, m),
+        StmtKind::For {
+            init,
+            body,
+            continue_block,
+            ..
+        } => {
+            if let Some(init) = init {
+                collect_sub_fqns_stmt(init, pkg, m);
+            }
+            collect_sub_fqns_block(body, pkg, m);
+            if let Some(b) = continue_block {
+                collect_sub_fqns_block(b, pkg, m);
+            }
+        }
+        StmtKind::EvalTimeout { body, .. } => collect_sub_fqns_block(body, pkg, m),
+        StmtKind::TryCatch {
+            try_block,
+            catch_block,
+            finally_block,
+            ..
+        } => {
+            collect_sub_fqns_block(try_block, pkg, m);
+            collect_sub_fqns_block(catch_block, pkg, m);
+            if let Some(b) = finally_block {
+                collect_sub_fqns_block(b, pkg, m);
+            }
+        }
+        StmtKind::Given { body, .. } => collect_sub_fqns_block(body, pkg, m),
+        StmtKind::When { body, .. } | StmtKind::DefaultCase { body } => {
+            collect_sub_fqns_block(body, pkg, m);
+        }
+    }
+}
+
+fn resolve_sub_decl_line(sub_map: &HashMap<String, usize>, word: &str) -> Option<usize> {
+    if word.is_empty() {
+        return None;
+    }
+    if word.contains("::") {
+        return sub_map.get(word).copied();
+    }
+    let suffix = format!("::{word}");
+    let hits: Vec<_> = sub_map
+        .iter()
+        .filter(|(k, _)| k.len() >= suffix.len() && k.ends_with(&suffix))
+        .collect();
+    if hits.len() == 1 {
+        return Some(*hits[0].1);
+    }
+    sub_map.get(word).copied()
+}
+
+fn is_ident_char(c: char) -> bool {
+    c.is_ascii_alphanumeric() || c == '_' || c == ':'
+}
+
+fn identifier_span_bytes(line: &str, byte_col: usize) -> Option<(usize, usize)> {
+    let b = byte_col.min(line.len());
+    let mut start = b;
+    for (i, c) in line[..b].char_indices().rev() {
+        if is_ident_char(c) {
+            start = i;
+        } else {
+            break;
+        }
+    }
+    let mut end = b;
+    for (i, c) in line[b..].char_indices() {
+        if is_ident_char(c) {
+            end = b + i + c.len_utf8();
+        } else {
+            break;
+        }
+    }
+    if start < end {
+        Some((start, end))
+    } else {
+        None
+    }
+}
+
+fn range_on_line(line_text: &str, line0: u32, start_byte: usize, end_byte: usize) -> Range {
+    let s = start_byte.min(line_text.len());
+    let e = end_byte.min(line_text.len());
+    let c0 = line_text[..s].encode_utf16().count() as u32;
+    let c1 = line_text[..e].encode_utf16().count() as u32;
+    Range {
+        start: Position {
+            line: line0,
+            character: c0,
+        },
+        end: Position {
+            line: line0,
+            character: c1,
+        },
+    }
+}
+
+fn documentation_to_string(doc: &Documentation) -> String {
+    match doc {
+        Documentation::String(s) => s.clone(),
+        Documentation::MarkupContent(m) => m.value.clone(),
+    }
+}
+
+fn hover_markdown_for_word(word: &str, text: &str, path: &str) -> Option<String> {
+    let program = crate::parse_with_file(text, path).ok()?;
+    let sub_map = collect_sub_fqn_map(&program);
+    if let Some(ln) = resolve_sub_decl_line(&sub_map, word) {
+        return Some(format!("Subroutine `{word}` — declared at line {ln}."));
+    }
+    if let Some(doc) = doc_for_label(word) {
+        return Some(documentation_to_string(&doc));
+    }
+    None
+}
+
+fn hover(docs: &HashMap<Uri, String>, params: HoverParams) -> Option<Hover> {
+    let tdp = params.text_document_position_params;
+    let uri = tdp.text_document.uri;
+    let text = docs.get(&uri)?;
+    let pos = tdp.position;
+    let path = uri_to_path(&uri);
+    let lines: Vec<&str> = text.lines().collect();
+    let line_text = lines.get(pos.line as usize).copied()?;
+    let byte_col = utf16_col_to_byte_idx(line_text, pos.character);
+    let (start, end) = identifier_span_bytes(line_text, byte_col)?;
+    let word = line_text.get(start..end)?.to_string();
+    if word.is_empty() {
+        return None;
+    }
+    let md = hover_markdown_for_word(&word, text, &path)?;
+    let range = range_on_line(line_text, pos.line, start, end);
+    Some(Hover {
+        contents: HoverContents::Markup(MarkupContent {
+            kind: MarkupKind::Markdown,
+            value: md,
+        }),
+        range: Some(range),
+    })
+}
+
+fn goto_definition(docs: &HashMap<Uri, String>, params: GotoDefinitionParams) -> Option<GotoDefinitionResponse> {
+    let tdp = params.text_document_position_params;
+    let uri = tdp.text_document.uri;
+    let text = docs.get(&uri)?;
+    let pos = tdp.position;
+    let path = uri_to_path(&uri);
+    let lines: Vec<&str> = text.lines().collect();
+    let line_text = lines.get(pos.line as usize).copied()?;
+    let byte_col = utf16_col_to_byte_idx(line_text, pos.character);
+    let (start, end) = identifier_span_bytes(line_text, byte_col)?;
+    let word = line_text.get(start..end)?.to_string();
+    if word.is_empty() {
+        return None;
+    }
+    let program = crate::parse_with_file(text, &path).ok()?;
+    let sub_map = collect_sub_fqn_map(&program);
+    let decl_line = resolve_sub_decl_line(&sub_map, &word)?;
+    Some(GotoDefinitionResponse::Scalar(Location {
+        uri: uri.clone(),
+        range: line_range_utf16(text, decl_line),
+    }))
+}
+
+fn highlights_for_identifier(source: &str, needle: &str) -> Vec<DocumentHighlight> {
+    if needle.is_empty() {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for (line0, line) in source.lines().enumerate() {
+        let line0 = line0 as u32;
+        let mut search_from = 0usize;
+        while search_from <= line.len() {
+            let hay = &line[search_from..];
+            let Some(rel) = hay.find(needle) else {
+                break;
+            };
+            let abs_start = search_from + rel;
+            let abs_end = abs_start + needle.len();
+            let before_ok = abs_start == 0
+                || line[..abs_start]
+                    .chars()
+                    .last()
+                    .map_or(true, |c| !is_ident_char(c));
+            let after_ok = abs_end >= line.len()
+                || line[abs_end..]
+                    .chars()
+                    .next()
+                    .map_or(true, |c| !is_ident_char(c));
+            if before_ok && after_ok {
+                out.push(DocumentHighlight {
+                    range: range_on_line(line, line0, abs_start, abs_end),
+                    kind: Some(DocumentHighlightKind::TEXT),
+                });
+            }
+            search_from = abs_start + needle.len().max(1);
+        }
+    }
+    out
+}
+
+fn document_highlight(
+    docs: &HashMap<Uri, String>,
+    params: DocumentHighlightParams,
+) -> Option<Vec<DocumentHighlight>> {
+    let tdp = params.text_document_position_params;
+    let uri = tdp.text_document.uri;
+    let text = docs.get(&uri)?;
+    let pos = tdp.position;
+    let lines: Vec<&str> = text.lines().collect();
+    let line_text = lines.get(pos.line as usize).copied()?;
+    let byte_col = utf16_col_to_byte_idx(line_text, pos.character);
+    let (start, end) = identifier_span_bytes(line_text, byte_col)?;
+    let needle = line_text.get(start..end)?;
+    if needle.is_empty() {
+        return None;
+    }
+    let v = highlights_for_identifier(text, needle);
+    if v.is_empty() {
+        None
+    } else {
+        Some(v)
+    }
+}
+
+fn references(docs: &HashMap<Uri, String>, params: ReferenceParams) -> Option<Vec<Location>> {
+    let tdp = params.text_document_position;
+    let uri = tdp.text_document.uri;
+    let text = docs.get(&uri)?;
+    let pos = tdp.position;
+    let lines: Vec<&str> = text.lines().collect();
+    let line_text = lines.get(pos.line as usize).copied()?;
+    let byte_col = utf16_col_to_byte_idx(line_text, pos.character);
+    let (start, end) = identifier_span_bytes(line_text, byte_col)?;
+    let needle = line_text.get(start..end)?;
+    if needle.is_empty() {
+        return None;
+    }
+    let path = uri_to_path(&uri);
+    let mut locs: Vec<Location> = highlights_for_identifier(text, needle)
+        .into_iter()
+        .map(|h| Location {
+            uri: uri.clone(),
+            range: h.range,
+        })
+        .collect();
+
+    if params.context.include_declaration {
+        if let Ok(program) = crate::parse_with_file(text, &path) {
+            let sub_map = collect_sub_fqn_map(&program);
+            if let Some(decl_line) = resolve_sub_decl_line(&sub_map, needle) {
+                let decl_range = line_range_utf16(text, decl_line);
+                let has_same_line = locs.iter().any(|l| l.range.start.line == decl_range.start.line);
+                if !has_same_line {
+                    locs.insert(
+                        0,
+                        Location {
+                            uri: uri.clone(),
+                            range: decl_range,
+                        },
+                    );
+                }
+            }
+        }
+    }
+
+    if locs.is_empty() {
+        None
+    } else {
+        Some(locs)
+    }
+}
+
+fn identifier_needle_at_position(text: &str, pos: Position) -> Option<(String, Range)> {
+    let lines: Vec<&str> = text.lines().collect();
+    let line_text = lines.get(pos.line as usize).copied()?;
+    let byte_col = utf16_col_to_byte_idx(line_text, pos.character);
+    let (start, end) = identifier_span_bytes(line_text, byte_col)?;
+    let needle = line_text.get(start..end)?;
+    if needle.is_empty() {
+        return None;
+    }
+    Some((needle.to_string(), range_on_line(line_text, pos.line, start, end)))
+}
+
+fn sub_map_for_doc(text: &str, path: &str) -> Option<HashMap<String, usize>> {
+    let program = crate::parse_with_file(text, path).ok()?;
+    Some(collect_sub_fqn_map(&program))
+}
+
+fn is_valid_rename_ident(s: &str) -> bool {
+    !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == ':')
+}
+
+fn cmp_range_start_desc(a: &Range, b: &Range) -> Ordering {
+    b.start
+        .line
+        .cmp(&a.start.line)
+        .then_with(|| b.start.character.cmp(&a.start.character))
+}
+
+fn prepare_rename(docs: &HashMap<Uri, String>, params: TextDocumentPositionParams) -> Option<PrepareRenameResponse> {
+    let uri = params.text_document.uri;
+    let text = docs.get(&uri)?;
+    let path = uri_to_path(&uri);
+    let (needle, range) = identifier_needle_at_position(text, params.position)?;
+    let sub_map = sub_map_for_doc(text, &path)?;
+    resolve_sub_decl_line(&sub_map, needle.as_str())?;
+    Some(PrepareRenameResponse::RangeWithPlaceholder {
+        range,
+        placeholder: needle,
+    })
+}
+
+fn rename_symbol(docs: &HashMap<Uri, String>, params: RenameParams) -> Option<WorkspaceEdit> {
+    if !is_valid_rename_ident(&params.new_name) {
+        return None;
+    }
+    let uri = params.text_document_position.text_document.uri;
+    let text = docs.get(&uri)?;
+    let path = uri_to_path(&uri);
+    let (needle, _) = identifier_needle_at_position(text, params.text_document_position.position)?;
+    let sub_map = sub_map_for_doc(text, &path)?;
+    resolve_sub_decl_line(&sub_map, needle.as_str())?;
+    if needle == params.new_name {
+        return Some(WorkspaceEdit::default());
+    }
+    let mut edits: Vec<TextEdit> = highlights_for_identifier(text, needle.as_str())
+        .into_iter()
+        .map(|h| TextEdit {
+            range: h.range,
+            new_text: params.new_name.clone(),
+        })
+        .collect();
+    edits.sort_by(|a, b| cmp_range_start_desc(&a.range, &b.range));
+    if edits.is_empty() {
+        return None;
+    }
+    let mut changes = HashMap::new();
+    changes.insert(uri, edits);
+    Some(WorkspaceEdit {
+        changes: Some(changes),
+        ..Default::default()
+    })
+}
+
 // ── completion: builtins, file subs/vars, sigils, `Foo::`, snippets, resolve ─
 
 static COMPLETION_WORDS: OnceLock<Vec<String>> = OnceLock::new();
@@ -563,10 +1183,28 @@ fn doc_for_label(label: &str) -> Option<Documentation> {
 }
 
 fn resolve_completion_item(mut item: CompletionItem) -> CompletionItem {
-    if item.documentation.is_none() {
-        if let Some(doc) = doc_for_label(&item.label) {
+    if item.documentation.is_some() {
+        return item;
+    }
+    let label = item.label.strip_suffix(" …").unwrap_or(item.label.as_str());
+    if let Some(doc) = doc_for_label(label) {
+        item.documentation = Some(doc);
+        return item;
+    }
+    if label.contains("::") {
+        let base = label.rsplit("::").next().unwrap_or(label);
+        if let Some(doc) = doc_for_label(base) {
             item.documentation = Some(doc);
+            return item;
         }
+    }
+    if item.kind == Some(CompletionItemKind::FUNCTION) {
+        let md = if label.contains("::") {
+            "Subroutine in this document (`Package::name`)."
+        } else {
+            "Subroutine declared in this document."
+        };
+        item.documentation = Some(doc_markup(md));
     }
     item
 }
@@ -968,8 +1606,10 @@ fn utf16_col_to_byte_idx(line: &str, col16: u32) -> usize {
 #[cfg(test)]
 mod completion_tests {
     use super::{
-        line_completion_mode, split_qualified_prefix, utf16_col_to_byte_idx, LineCompletionMode,
+        highlights_for_identifier, identifier_span_bytes, line_completion_mode, resolve_sub_decl_line,
+        split_qualified_prefix, utf16_col_to_byte_idx, LineCompletionMode,
     };
+    use std::collections::HashMap;
 
     fn raw_at(line: &str, col16: u32) -> (LineCompletionMode, String) {
         let b = utf16_col_to_byte_idx(line, col16);
@@ -1023,5 +1663,27 @@ mod completion_tests {
         );
         assert_eq!(split_qualified_prefix("foo"), None);
         assert_eq!(split_qualified_prefix("::foo"), None);
+    }
+
+    #[test]
+    fn identifier_span_finds_word_at_cursor() {
+        let line = "yellow_minion();";
+        let (s, e) = identifier_span_bytes(line, 5).unwrap();
+        assert_eq!(&line[s..e], "yellow_minion");
+    }
+
+    #[test]
+    fn resolve_sub_decl_prefers_unique_fqn_suffix() {
+        let mut m = HashMap::new();
+        m.insert("Foo::barbaz".to_string(), 2usize);
+        assert_eq!(resolve_sub_decl_line(&m, "barbaz"), Some(2));
+        assert_eq!(resolve_sub_decl_line(&m, "Foo::barbaz"), Some(2));
+    }
+
+    #[test]
+    fn highlights_skip_shorter_prefix_matches() {
+        let src = "my $xx;\n$xxa = 1;\n";
+        let h = highlights_for_identifier(src, "xx");
+        assert_eq!(h.len(), 1);
     }
 }

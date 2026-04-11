@@ -14910,7 +14910,13 @@ impl Interpreter {
         }
     }
 
-    /// `pmap_on` / `pflat_map_on` — one SSH job per list element; order preserved by sequence.
+    /// `pmap_on $cluster { ... } @list` — distributed map over an SSH worker pool.
+    ///
+    /// Uses the persistent dispatcher in [`crate::cluster`]: one ssh process per slot,
+    /// HELLO + SESSION_INIT once per slot lifetime, JOB frames flowing over a shared work
+    /// queue, fault tolerance via re-enqueue + retry budget. The basic v1 fan-out (one
+    /// ssh per item) was replaced because it spent ~50–200 ms per item on ssh handshakes;
+    /// the new path amortizes the handshake across the whole map.
     pub(crate) fn eval_pmap_remote(
         &mut self,
         cluster_pv: PerlValue,
@@ -14927,7 +14933,6 @@ impl Interpreter {
             )
             .into());
         };
-        let slots = cluster.slots.clone();
         let items = list_pv.to_list();
         let (scope_capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
         if !atomic_arrays.is_empty() || !atomic_hashes.is_empty() {
@@ -14941,52 +14946,33 @@ impl Interpreter {
             .map_err(|e| PerlError::runtime(e, line))?;
         let subs_prelude = crate::remote_wire::build_subs_prelude(&self.subs);
         let block_src = crate::fmt::format_block(block);
-        let pe_bin = std::env::current_exe().map_err(|e| {
-            PerlError::runtime(format!("pmap_on: could not resolve current_exe: {e}"), line)
-        })?;
-        let pe_s = pe_bin.to_string_lossy().into_owned();
+        let item_jsons = crate::cluster::perl_items_to_json(&items)
+            .map_err(|e| PerlError::runtime(e, line))?;
 
+        // Progress bar (best effort) — ticks once per result. The dispatcher itself is
+        // synchronous from the caller's POV, so we drive the bar before/after the call.
         let pmap_progress = PmapProgress::new(show_progress, items.len());
-        let results: Result<Vec<(usize, PerlValue)>, PerlError> = items
-            .into_par_iter()
-            .enumerate()
-            .map(|(i, item)| {
-                let host = &slots[i % slots.len()];
-                let item_j = crate::remote_wire::perl_to_json_value(&item)
-                    .map_err(|e| PerlError::runtime(e, line))?;
-                let job = crate::remote_wire::RemoteJobV1 {
-                    seq: i as u64,
-                    subs_prelude: subs_prelude.clone(),
-                    block_src: block_src.clone(),
-                    capture: cap_json.clone(),
-                    item: item_j,
-                };
-                let resp = crate::remote_wire::ssh_invoke_remote_worker(host, &pe_s, &job)
-                    .map_err(|e| PerlError::runtime(e, line))?;
-                pmap_progress.tick();
-                if !resp.ok {
-                    return Err(PerlError::runtime(
-                        format!("pmap_on remote: {}", resp.err_msg),
-                        line,
-                    ));
-                }
-                let pv = crate::remote_wire::json_to_perl(&resp.result)
-                    .map_err(|e| PerlError::runtime(e, line))?;
-                Ok((i, pv))
-            })
-            .collect();
+        let result_values = crate::cluster::run_cluster(
+            &cluster,
+            subs_prelude,
+            block_src,
+            cap_json,
+            item_jsons,
+        )
+        .map_err(|e| PerlError::runtime(format!("pmap_on remote: {e}"), line))?;
+        for _ in 0..result_values.len() {
+            pmap_progress.tick();
+        }
         pmap_progress.finish();
-        let mut pairs = results.map_err(FlowOrError::Error)?;
-        pairs.sort_by_key(|(i, _)| *i);
+
         if flat_outputs {
-            let results: Vec<PerlValue> = pairs
+            let flattened: Vec<PerlValue> = result_values
                 .into_iter()
-                .flat_map(|(_, v)| v.map_flatten_outputs(true))
+                .flat_map(|v| v.map_flatten_outputs(true))
                 .collect();
-            Ok(PerlValue::array(results))
+            Ok(PerlValue::array(flattened))
         } else {
-            let results: Vec<PerlValue> = pairs.into_iter().map(|(_, v)| v).collect();
-            Ok(PerlValue::array(results))
+            Ok(PerlValue::array(result_values))
         }
     }
 

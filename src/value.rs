@@ -61,31 +61,282 @@ pub struct PerlHeap {
     pub cmp: Arc<PerlSub>,
 }
 
-/// SSH worker pool for `pmap_on`: each slot is one `ssh HOST pe --remote-worker` lane.
+/// One SSH worker lane: a single `ssh HOST PE_PATH --remote-worker` process. The persistent
+/// dispatcher in [`crate::cluster`] holds one of these per concurrent worker thread.
+///
+/// `pe_path` is the path to the `pe` binary on the **remote** host — the basic implementation
+/// used `std::env::current_exe()` which is wrong by definition (a local `/Users/...` path
+/// rarely exists on a remote machine). Default is the bare string `"pe"` so the remote
+/// host's `$PATH` resolves it like any other ssh command.
+#[derive(Debug, Clone)]
+pub struct RemoteSlot {
+    /// Argument passed to `ssh` (e.g. `host`, `user@host`, `host` with `~/.ssh/config` host alias).
+    pub host: String,
+    /// Path to `pe` on the remote host. `"pe"` resolves via remote `$PATH`.
+    pub pe_path: String,
+}
+
+#[cfg(test)]
+mod cluster_parsing_tests {
+    use super::*;
+
+    fn s(v: &str) -> PerlValue {
+        PerlValue::string(v.to_string())
+    }
+
+    #[test]
+    fn parses_simple_host() {
+        let c = RemoteCluster::from_list_args(&[s("host1")]).expect("parse");
+        assert_eq!(c.slots.len(), 1);
+        assert_eq!(c.slots[0].host, "host1");
+        assert_eq!(c.slots[0].pe_path, "pe");
+    }
+
+    #[test]
+    fn parses_host_with_slot_count() {
+        let c = RemoteCluster::from_list_args(&[s("host1:4")]).expect("parse");
+        assert_eq!(c.slots.len(), 4);
+        assert!(c.slots.iter().all(|s| s.host == "host1"));
+    }
+
+    #[test]
+    fn parses_user_at_host_with_slots() {
+        let c = RemoteCluster::from_list_args(&[s("alice@build1:2")]).expect("parse");
+        assert_eq!(c.slots.len(), 2);
+        assert_eq!(c.slots[0].host, "alice@build1");
+    }
+
+    #[test]
+    fn parses_host_slots_pe_path_triple() {
+        let c =
+            RemoteCluster::from_list_args(&[s("build1:3:/usr/local/bin/pe")]).expect("parse");
+        assert_eq!(c.slots.len(), 3);
+        assert!(c.slots.iter().all(|sl| sl.host == "build1"));
+        assert!(c.slots.iter().all(|sl| sl.pe_path == "/usr/local/bin/pe"));
+    }
+
+    #[test]
+    fn parses_multiple_hosts_in_one_call() {
+        let c = RemoteCluster::from_list_args(&[s("host1:2"), s("host2:1")]).expect("parse");
+        assert_eq!(c.slots.len(), 3);
+        assert_eq!(c.slots[0].host, "host1");
+        assert_eq!(c.slots[1].host, "host1");
+        assert_eq!(c.slots[2].host, "host2");
+    }
+
+    #[test]
+    fn parses_hashref_slot_form() {
+        let mut h = indexmap::IndexMap::new();
+        h.insert("host".to_string(), s("data1"));
+        h.insert("slots".to_string(), PerlValue::integer(2));
+        h.insert("pe".to_string(), s("/opt/pe"));
+        let c = RemoteCluster::from_list_args(&[PerlValue::hash(h)]).expect("parse");
+        assert_eq!(c.slots.len(), 2);
+        assert_eq!(c.slots[0].host, "data1");
+        assert_eq!(c.slots[0].pe_path, "/opt/pe");
+    }
+
+    #[test]
+    fn parses_trailing_tunables_hashref() {
+        let mut tun = indexmap::IndexMap::new();
+        tun.insert("timeout".to_string(), PerlValue::integer(30));
+        tun.insert("retries".to_string(), PerlValue::integer(2));
+        tun.insert("connect_timeout".to_string(), PerlValue::integer(5));
+        let c = RemoteCluster::from_list_args(&[s("h1:1"), PerlValue::hash(tun)]).expect("parse");
+        // Tunables hash should NOT be treated as a slot.
+        assert_eq!(c.slots.len(), 1);
+        assert_eq!(c.job_timeout_ms, 30_000);
+        assert_eq!(c.max_attempts, 3); // retries=2 + initial = 3
+        assert_eq!(c.connect_timeout_ms, 5_000);
+    }
+
+    #[test]
+    fn defaults_when_no_tunables() {
+        let c = RemoteCluster::from_list_args(&[s("h1")]).expect("parse");
+        assert_eq!(c.job_timeout_ms, RemoteCluster::DEFAULT_JOB_TIMEOUT_MS);
+        assert_eq!(c.max_attempts, RemoteCluster::DEFAULT_MAX_ATTEMPTS);
+        assert_eq!(
+            c.connect_timeout_ms,
+            RemoteCluster::DEFAULT_CONNECT_TIMEOUT_MS
+        );
+    }
+
+    #[test]
+    fn rejects_empty_cluster() {
+        assert!(RemoteCluster::from_list_args(&[]).is_err());
+    }
+
+    #[test]
+    fn slot_count_minimum_one() {
+        let c = RemoteCluster::from_list_args(&[s("h1:0")]).expect("parse");
+        // `host:0` clamps to 1 slot — better to give the user something than to silently
+        // produce a cluster that does nothing.
+        assert_eq!(c.slots.len(), 1);
+    }
+}
+
+/// SSH worker pool for `pmap_on`. The dispatcher spawns one persistent ssh process per slot,
+/// performs HELLO + SESSION_INIT once, then streams JOB frames over the same stdin/stdout.
+///
+/// **Tunables:**
+/// - `job_timeout_ms` — per-job wall-clock budget. A slot that exceeds this is killed and the
+///   job is re-enqueued (counted against the retry budget).
+/// - `max_attempts` — total attempts (initial + retries) per job before it is failed.
+/// - `connect_timeout_ms` — `ssh -o ConnectTimeout=N`-equivalent for the initial handshake.
 #[derive(Debug, Clone)]
 pub struct RemoteCluster {
-    pub slots: Vec<String>,
+    pub slots: Vec<RemoteSlot>,
+    pub job_timeout_ms: u64,
+    pub max_attempts: u32,
+    pub connect_timeout_ms: u64,
 }
 
 impl RemoteCluster {
+    pub const DEFAULT_JOB_TIMEOUT_MS: u64 = 60_000;
+    pub const DEFAULT_MAX_ATTEMPTS: u32 = 3;
+    pub const DEFAULT_CONNECT_TIMEOUT_MS: u64 = 10_000;
+
+    /// Parse a list of cluster spec values into a [`RemoteCluster`]. Accepted forms (any may
+    /// appear in the same call):
+    ///
+    /// - `"host"`                       — 1 slot, default `pe` path
+    /// - `"host:N"`                     — N slots
+    /// - `"host:N:/path/to/pe"`         — N slots, custom remote `pe`
+    /// - `"user@host:N"`                — ssh user override (kept verbatim in `host`)
+    /// - hashref `{ host => "h", slots => N, pe => "/usr/local/bin/pe" }`
+    /// - trailing hashref `{ timeout => 30, retries => 2, connect_timeout => 5 }` — global
+    ///   tunables that apply to the whole cluster (must be the **last** argument; consumed
+    ///   only when its keys are all known tunable names so it cannot be confused with a slot)
+    ///
+    /// Backwards compatible with the basic v1 `"host:N"` syntax.
     pub fn from_list_args(items: &[PerlValue]) -> Result<Self, String> {
-        let mut slots = Vec::new();
-        for it in items {
-            let s = it.to_string();
-            if let Some((host, nstr)) = s.rsplit_once(':') {
-                if let Ok(n) = nstr.parse::<usize>() {
-                    for _ in 0..n.max(1) {
-                        slots.push(host.to_string());
-                    }
-                    continue;
+        let mut slots: Vec<RemoteSlot> = Vec::new();
+        let mut job_timeout_ms = Self::DEFAULT_JOB_TIMEOUT_MS;
+        let mut max_attempts = Self::DEFAULT_MAX_ATTEMPTS;
+        let mut connect_timeout_ms = Self::DEFAULT_CONNECT_TIMEOUT_MS;
+
+        // Trailing tunable hashref: peel it off if all its keys are known tunable names.
+        let (slot_items, tunables) = if let Some(last) = items.last() {
+            let h = last.as_hash_map().or_else(|| {
+                last.as_hash_ref()
+                    .map(|r| r.read().clone())
+            });
+            if let Some(map) = h {
+                let known = |k: &str| {
+                    matches!(
+                        k,
+                        "timeout" | "retries" | "connect_timeout" | "job_timeout"
+                    )
+                };
+                if !map.is_empty() && map.keys().all(|k| known(k.as_str())) {
+                    (&items[..items.len() - 1], Some(map))
+                } else {
+                    (items, None)
                 }
+            } else {
+                (items, None)
             }
-            slots.push(s);
+        } else {
+            (items, None)
+        };
+
+        if let Some(map) = tunables {
+            if let Some(v) = map.get("timeout").or_else(|| map.get("job_timeout")) {
+                job_timeout_ms = (v.to_number() * 1000.0) as u64;
+            }
+            if let Some(v) = map.get("retries") {
+                // `retries=2` means 2 RETRIES on top of the first attempt → 3 total.
+                max_attempts = v.to_int().max(0) as u32 + 1;
+            }
+            if let Some(v) = map.get("connect_timeout") {
+                connect_timeout_ms = (v.to_number() * 1000.0) as u64;
+            }
         }
+
+        for it in slot_items {
+            // Hashref form: { host => "h", slots => N, pe => "/path" }
+            if let Some(map) = it.as_hash_map().or_else(|| {
+                it.as_hash_ref().map(|r| r.read().clone())
+            }) {
+                let host = map
+                    .get("host")
+                    .map(|v| v.to_string())
+                    .ok_or_else(|| "cluster: hashref slot needs `host`".to_string())?;
+                let n = map
+                    .get("slots")
+                    .map(|v| v.to_int().max(1))
+                    .unwrap_or(1) as usize;
+                let pe = map
+                    .get("pe")
+                    .or_else(|| map.get("pe_path"))
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| "pe".to_string());
+                for _ in 0..n {
+                    slots.push(RemoteSlot {
+                        host: host.clone(),
+                        pe_path: pe.clone(),
+                    });
+                }
+                continue;
+            }
+
+            // String form. Split into up to 3 colon-separated fields, but be careful: a
+            // pe_path may itself contain a colon (rare but possible). We use rsplitn(2) to
+            // peel off the optional pe path only when the segment after the second colon
+            // looks like a path (starts with `/` or `.`) — otherwise treat the trailing
+            // segment as part of the pe path candidate.
+            let s = it.to_string();
+            // Heuristic: split into (left = host[:N], pe_path) if the third field is present.
+            let (left, pe_path) = if let Some(idx) = s.find(':') {
+                // first colon is host:rest
+                let rest = &s[idx + 1..];
+                if let Some(jdx) = rest.find(':') {
+                    // host:N:pe_path
+                    let count_seg = &rest[..jdx];
+                    if count_seg.parse::<usize>().is_ok() {
+                        (
+                            format!("{}:{}", &s[..idx], count_seg),
+                            Some(rest[jdx + 1..].to_string()),
+                        )
+                    } else {
+                        (s.clone(), None)
+                    }
+                } else {
+                    (s.clone(), None)
+                }
+            } else {
+                (s.clone(), None)
+            };
+            let pe_path = pe_path.unwrap_or_else(|| "pe".to_string());
+
+            // Now `left` is either `host` or `host:N`. The N suffix is digits only, so
+            // `user@host` (which contains `@` but no trailing `:digits`) is preserved.
+            let (host, n) = if let Some((h, nstr)) = left.rsplit_once(':') {
+                if let Ok(n) = nstr.parse::<usize>() {
+                    (h.to_string(), n.max(1))
+                } else {
+                    (left.clone(), 1)
+                }
+            } else {
+                (left.clone(), 1)
+            };
+            for _ in 0..n {
+                slots.push(RemoteSlot {
+                    host: host.clone(),
+                    pe_path: pe_path.clone(),
+                });
+            }
+        }
+
         if slots.is_empty() {
             return Err("cluster: need at least one host".into());
         }
-        Ok(RemoteCluster { slots })
+        Ok(RemoteCluster {
+            slots,
+            job_timeout_ms,
+            max_attempts,
+            connect_timeout_ms,
+        })
     }
 }
 

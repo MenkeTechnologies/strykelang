@@ -967,6 +967,12 @@ fn main() {
     let args = expand_perl_bundled_argv(std::env::args().collect());
 
     if args.len() == 2 && args[1] == "--remote-worker" {
+        // Persistent v2 session loop: HELLO → SESSION_INIT → many JOBs → SHUTDOWN.
+        // The basic v1 one-shot loop is still reachable via `--remote-worker-v1` for the
+        // round-trip integration test.
+        process::exit(perlrs::remote_wire::run_remote_worker_session());
+    }
+    if args.len() == 2 && args[1] == "--remote-worker-v1" {
         process::exit(perlrs::remote_wire::run_remote_worker_stdio());
     }
 
