@@ -39,6 +39,8 @@ A Perl 5 compatible interpreter in Rust with native parallel primitives, NaN-box
 - [\[0x0D\] Standalone Binaries (`pe build`)](#0x0d-standalone-binaries-pe-build)
 - [\[0x0E\] Inline Rust FFI (`rust { ... }`)](#0x0e-inline-rust-ffi-rust-----)
 - [\[0x0F\] Bytecode Cache (`.pec`)](#0x0f-bytecode-cache-pec)
+- [\[0x10\] Distributed `pmap_on` over SSH (`cluster`)](#0x10-distributed-pmap_on-over-ssh-cluster)
+- [\[0x11\] Language Server (`--lsp`)](#0x11-language-server---lsp)
 - [\[0xFF\] License](#0xff-license)
 
 ---
@@ -88,6 +90,9 @@ pe --ast script.pl                      # AST as JSON
 pe --fmt script.pl                      # pretty-print parsed source
 pe --profile script.pl                  # folded stacks + per-line/per-sub ns
 pe --explain E0001                      # expanded hint for an error code
+pe build script.pl -o myapp             # bake into a standalone binary ([0x0D])
+pe --lsp                                # language server over stdio ([0x11])
+PERLRS_BC_CACHE=1 pe app.pl             # warm starts skip parse + compile ([0x0F])
 ```
 
 #### Interactive REPL
@@ -182,6 +187,10 @@ pwatch "logs/*", { heavy };
 
 # control thread count
 pe -j 8 -e '@data |> pmap { heavy }'
+
+# distributed pmap over an SSH worker pool — see [0x10] for details
+my $cluster = cluster(["build1:8", "build2:16"]);
+my @r = @huge |> pmap_on $cluster { heavy };
 ```
 
 **Parallel capture safety** — workers set `Scope::parallel_guard` after restoring captured lexicals. Assignments to captured non-`mysync` aggregates are rejected at runtime; `mysync`, package-qualified names, and topics (`$_`/`$a`/`$b`) are allowed. `pmap`/`pgrep` treat block failures as `undef`/false; use `pfor` when failures must abort.
@@ -365,6 +374,11 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - HTTP (`fetch`/`fetch_json`/`fetch_async`/`par_fetch`), JSON (`json_encode`/`json_decode`).
 - Crypto, compression, time, TOML, YAML helpers (see [\[0x05\]](#0x05-native-data-scripting)).
 - All parallel primitives in [\[0x03\]](#0x03-parallel-primitives) (`pmap`, `fan`, `pipeline`, `par_pipeline_stream`, `pchannel`, `pselect`, `barrier`, `ppool`, `glob_par`, `par_walk`, `par_lines`, `par_sed`, `pwatch`, `watch`).
+- **Distributed compute** ([\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster)): `cluster([...])` builds an SSH worker pool; `pmap_on $cluster { } @list` and `pflat_map_on $cluster { } @list` fan a map across persistent remote workers with fault tolerance and per-job retries.
+- **Standalone binaries** ([\[0x0D\]](#0x0d-standalone-binaries-pe-build)): `pe build SCRIPT -o OUT` bakes a script into a self-contained executable.
+- **Inline Rust FFI** ([\[0x0E\]](#0x0e-inline-rust-ffi-rust-----)): `rust { pub extern "C" fn ... }` blocks compile to a cdylib on first run, dlopen + register as Perl-callable subs.
+- **Bytecode cache** ([\[0x0F\]](#0x0f-bytecode-cache-pec)): `PERLRS_BC_CACHE=1` skips parse + compile on warm starts via on-disk `.pec` bundles.
+- **Language server** ([\[0x11\]](#0x11-language-server---lsp)): `pe --lsp` runs an LSP server over stdio with diagnostics, hover, completion.
 - `mysync` shared state ([\[0x04\]](#0x04-shared-state-mysync)).
 - `frozen my`, `typed my`, `struct`, algebraic `match`, `try/catch/finally`, `eval_timeout`, `retry`, `rate_limit`, `every`, `gen { ... yield }`.
 - **Pipe-forward `|>`** — parse-time desugaring (zero runtime cost); threads the LHS as the **first** argument of the RHS call, left-associative:
@@ -619,6 +633,135 @@ The toy-script result is the honest one to call out: for tiny scripts the cache 
 - Bypassed for `-n` / `-p` / `--lint` / `--check` / `--ast` / `--fmt` / `--profile` modes (those paths run a different driver loop).
 - No automatic eviction yet — old `.pec` files for edited scripts accumulate. `rm ~/.cache/perlrs/bc/*.pec` is a fine workaround until `pe cache prune` lands.
 - Cache hit path cannot fall back to the tree walker mid-run — but this is unreachable in practice because `compile_program` only emits ops the VM implements before persisting.
+
+---
+
+## [0x10] DISTRIBUTED `pmap_on` OVER SSH (`cluster`)
+
+Distribute a `pmap`-style fan-out across many machines via SSH. The dispatcher spawns one persistent `pe --remote-worker` process per slot, performs a HELLO + SESSION_INIT handshake **once** per slot, then streams JOB frames over the same stdin/stdout. Pairs perfectly with `pe build`: ship one binary to N hosts, fan the workload across them.
+
+```perl
+# Build the worker pool. Each spec maps to one or more `ssh HOST PE --remote-worker` lanes.
+my $cluster = cluster([
+    "build1:8",                          # 8 slots on build1, default `pe` from PATH
+    "alice@build2:16",                   # 16 slots, ssh as alice
+    "build3:4:/usr/local/bin/pe",        # 4 slots, custom remote pe path
+    { host => "data1", slots => 12, pe => "/opt/pe" },  # hashref form
+    { timeout => 30, retries => 2, connect_timeout => 5 },  # trailing tunables
+]);
+
+my @hashes = @big_files |> pmap_on $cluster { sha256(slurp_raw($_)) };
+
+# pflat_map_on for one-to-many mapping
+my @lines = @log_paths |> pflat_map_on $cluster { split /\n/, slurp($_) };
+```
+
+#### Cluster syntax
+
+Each list element to `cluster([...])` is one of:
+
+| Form | Meaning |
+|------|---------|
+| `"host"` | One slot on `host`, remote `pe` from `$PATH` |
+| `"host:N"` | `N` slots on `host` |
+| `"host:N:/path/to/pe"` | `N` slots, custom remote `pe` binary |
+| `"user@host:N"` | `ssh` user override (kept verbatim, passed through to ssh) |
+| `{ host => "...", slots => N, pe => "..." }` | Hashref form with explicit fields |
+| trailing `{ timeout => SECS, retries => N, connect_timeout => SECS }` | Cluster-wide tunables (must be the last argument; consumed only when **all** keys are tunable names) |
+
+**Tunables** (defaults shown):
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `timeout` (alias `job_timeout`) | `60` | Per-job wall-clock budget in seconds. Slots that exceed this are killed and the job is re-enqueued. |
+| `retries` | `2` | Retries per job on top of the initial attempt. `retries=2` → up to 3 total tries. |
+| `connect_timeout` | `10` | `ssh -o ConnectTimeout=N` for the initial handshake. |
+
+#### Architecture
+
+```
+main thread                       ┌── slot 0 (ssh build1) ────┐
+┌──────────────────┐              │  worker thread + ssh proc  │
+│ enqueue all jobs ├──► work_tx ─►│  HELLO + SESSION_INIT once │
+│ collect results  │              │  loop: take JOB from queue │
+└──────────────────┘              │        send + read         │
+        ▲                         │        push to results     │
+        │                         └────────────────────────────┘
+        │                         ┌── slot 1 (ssh build1) ────┐
+        │                         │  worker thread + ssh proc  │
+        │                         └────────────────────────────┘
+        │                         ┌── slot 2 (ssh build2) ────┐
+        │                         │  ...                       │
+        │                         └────────────────────────────┘
+        │                                    │
+        └────────── result_rx ───────────────┘
+```
+
+Each slot runs in its own thread and pulls JOB messages from a shared crossbeam channel. Work-stealing emerges naturally — fast slots drain the queue faster, slow slots take fewer jobs. **No round-robin assignment**, which was the basic v1 implementation's biggest performance bug (fast hosts sat idle while slow hosts queued). The Interpreter on each remote worker is **reused across jobs** so package state, sub registrations, and module loads survive between items.
+
+#### Wire protocol (v2)
+
+Every message is `[u64 LE length][u8 kind][bincode payload]`. The single-byte `kind` discriminator lets future revisions extend the protocol without breaking older workers — an unknown kind is a hard error so version skew is loud. See [`src/remote_wire.rs`](src/remote_wire.rs).
+
+```text
+dispatcher                    worker
+    │                            │
+    │── HELLO ─────────────────►│   (proto version, build id)
+    │◄───────────── HELLO_ACK ──│   (worker pe version, hostname)
+    │── SESSION_INIT ──────────►│   (subs prelude, block source, captured lexicals)
+    │◄────────── SESSION_ACK ───│   (or ERROR)
+    │── JOB(seq=0) ────────────►│   (item)
+    │◄────────── JOB_RESP(0) ───│
+    │── JOB(seq=1) ────────────►│
+    │◄────────── JOB_RESP(1) ───│
+    │           ...             │
+    │── SHUTDOWN ──────────────►│
+    │                            └─ exit 0
+```
+
+The basic v1 protocol shipped the entire subs prelude on **every** job and spawned a fresh ssh process **per item**. For a 10k-item map across 8 hosts that's 10 000 ssh handshakes (~50–200 ms each) + 10 000 copies of the subs prelude over the wire — minutes of overhead before any work runs. The v2 persistent session amortizes the handshake across the whole map and ships the prelude once.
+
+#### Fault tolerance
+
+When a slot's read or write fails (ssh died, network blip, remote crash, per-job timeout), the worker thread re-enqueues the in-flight job to the shared queue with `attempts++` and exits. Other living slots pick the job up. A job is permanently failed when its attempt count reaches `cluster.max_attempts`. The whole map fails only when **every** slot is dead or every queued job has exhausted its retry budget.
+
+#### `pe --remote-worker`
+
+The worker subprocess. Reads a HELLO frame from stdin, parses subs prelude + block source from SESSION_INIT exactly once, then handles JOB frames in a loop until SHUTDOWN or stdin EOF. Started by the dispatcher via `ssh HOST PE_PATH --remote-worker`. Also reachable directly for local testing:
+
+```sh
+echo "..." | pe --remote-worker      # reads framed wire protocol from stdin
+pe --remote-worker-v1                # legacy one-shot session for compat tests
+```
+
+#### Limitations (v1)
+
+- **Unix only** — hardcoded `ssh`, hardcoded POSIX dlopen path. Windows would need a similar shim.
+- **JSON-marshalled values** — `serde_json` round-trip loses bigints, blessed refs, and other heap-only `PerlValue` payloads. The supported types are: undef, bool, i64, f64, string, array, hash. Anything outside that returns an error from `pmap_on`.
+- **`mysync` / atomic capture is rejected** — shared state across remote workers can't honour the cross-process mutex semantics in v1. Use the result list and aggregate locally.
+- **No streaming results** — the dispatcher buffers the full result vector before returning. For huge fan-outs this is the next thing to fix (likely via `pchannel` integration).
+- **No SSH connection pool across calls** — each `pmap_on` invocation builds fresh sessions. Subsequent `pmap_on` calls in the same script reconnect from scratch.
+
+---
+
+## [0x11] LANGUAGE SERVER (`--lsp`)
+
+`pe --lsp` runs an LSP server over stdio. Hooks into the existing parser, lexer, and symbol table — no separate analyzer to maintain. Surfaces:
+
+- **Diagnostics** on save (parse + compile errors with line / column / message)
+- **Hover docs** for builtins (`pmap`, `cluster`, `fetch_json`, `dataframe`, …) — including the parallel and cluster primitives from sections [\[0x03\]](#0x03-parallel-primitives) and [\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster)
+- **Symbol lookup** for subs and packages within the open file
+- **Completion** for built-in function names and the keywords listed in [\[0x08\]](#0x08-supported-perl-features)
+
+Wire it into VS Code, JetBrains, or any LSP-aware editor by pointing the client at `pe --lsp` as the language-server command. There is no `Cargo.toml`-style separate `perlrs-lsp` binary in v1 — the same `pe` you run scripts with also acts as its own language server when invoked with `--lsp`.
+
+```jsonc
+// .vscode/settings.json
+{
+  "perlrs.serverPath": "/usr/local/bin/pe",
+  "perlrs.serverArgs": ["--lsp"]
+}
+```
 
 ---
 
