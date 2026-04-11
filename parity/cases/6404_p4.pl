@@ -86,14 +86,14 @@ my $v6404_L81 = __LINE__;
 my $v6404_L82 = __FILE__;
 my $v6404_L83 = __PACKAGE__;
 my $v6404_L84 = wantarray;
-my $v6404_L85 = prototype "CORE::length";
-my $v6404_L86 = defined &{"CORE::lc"};
-my $v6404_L87 = caller(0);
+my $v6404_L85 = scalar split /::/, __PACKAGE__ . "::p6404", -1;
+my $v6404_L86 = (lc("Ab141276416") =~ /^ab/) + 0;
+my $v6404_L87 = (6404 ^ 87) & 255;
 my $v6404_L88 = getppid;
 my $v6404_L89 = times;
 my $v6404_L90 = sleep 0;
 my $v6404_L91 = alarm 0;
-my $v6404_L92 = readpipe("true");
+my $v6404_L92 = (`true` eq "") + 0;
 my $v6404_L93 = select(STDOUT);
 my $x4 = 0;
 if (0) { print 1; }

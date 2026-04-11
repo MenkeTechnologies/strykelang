@@ -86,14 +86,14 @@ my $v2552_L81 = __LINE__;
 my $v2552_L82 = __FILE__;
 my $v2552_L83 = __PACKAGE__;
 my $v2552_L84 = wantarray;
-my $v2552_L85 = prototype "CORE::length";
-my $v2552_L86 = defined &{"CORE::lc"};
-my $v2552_L87 = caller(0);
+my $v2552_L85 = scalar split /::/, __PACKAGE__ . "::p2552", -1;
+my $v2552_L86 = (lc("Ab701241656") =~ /^ab/) + 0;
+my $v2552_L87 = (2552 ^ 87) & 255;
 my $v2552_L88 = getppid;
 my $v2552_L89 = times;
 my $v2552_L90 = sleep 0;
 my $v2552_L91 = alarm 0;
-my $v2552_L92 = readpipe("true");
+my $v2552_L92 = (`true` eq "") + 0;
 my $v2552_L93 = select(STDOUT);
 my $x4 = 0;
 if (0) { print 1; }

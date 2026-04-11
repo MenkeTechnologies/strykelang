@@ -86,14 +86,14 @@ my $v7677_L81 = __LINE__;
 my $v7677_L82 = __FILE__;
 my $v7677_L83 = __PACKAGE__;
 my $v7677_L84 = wantarray;
-my $v7677_L85 = prototype "CORE::length";
-my $v7677_L86 = defined &{"CORE::lc"};
-my $v7677_L87 = caller(0);
+my $v7677_L85 = scalar split /::/, __PACKAGE__ . "::p7677", -1;
+my $v7677_L86 = (lc("Ab1566833142") =~ /^ab/) + 0;
+my $v7677_L87 = (7677 ^ 87) & 255;
 my $v7677_L88 = getppid;
 my $v7677_L89 = times;
 my $v7677_L90 = sleep 0;
 my $v7677_L91 = alarm 0;
-my $v7677_L92 = readpipe("true");
+my $v7677_L92 = (`true` eq "") + 0;
 my $v7677_L93 = select(STDOUT);
 my $x4 = 0;
 if (0) { print 1; }

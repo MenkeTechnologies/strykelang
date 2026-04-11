@@ -86,14 +86,14 @@ my $v9322_L81 = __LINE__;
 my $v9322_L82 = __FILE__;
 my $v9322_L83 = __PACKAGE__;
 my $v9322_L84 = wantarray;
-my $v9322_L85 = prototype "CORE::length";
-my $v9322_L86 = defined &{"CORE::lc"};
-my $v9322_L87 = caller(0);
+my $v9322_L85 = scalar split /::/, __PACKAGE__ . "::p9322", -1;
+my $v9322_L86 = (lc("Ab790828580") =~ /^ab/) + 0;
+my $v9322_L87 = (9322 ^ 87) & 255;
 my $v9322_L88 = getppid;
 my $v9322_L89 = times;
 my $v9322_L90 = sleep 0;
 my $v9322_L91 = alarm 0;
-my $v9322_L92 = readpipe("true");
+my $v9322_L92 = (`true` eq "") + 0;
 my $v9322_L93 = select(STDOUT);
 my $c2 = 0;
 for (qw/a b c/) { $c2++; }

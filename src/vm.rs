@@ -36,6 +36,7 @@ struct ParallelBlockVmShared {
     static_sub_calls: Vec<(usize, bool, u16)>,
     blocks: Vec<Block>,
     block_bytecode_ranges: Vec<Option<(usize, usize)>>,
+    map_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     grep_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     regex_flip_flop_rhs_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     given_entries: Vec<(Expr, Block)>,
@@ -50,6 +51,7 @@ struct ParallelBlockVmShared {
     substr_four_arg_entries: Vec<(Expr, Expr, Option<Expr>, Expr)>,
     keys_expr_entries: Vec<Expr>,
     keys_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
+    map_expr_entries: Vec<Expr>,
     grep_expr_entries: Vec<Expr>,
     regex_flip_flop_rhs_expr_entries: Vec<Expr>,
     values_expr_entries: Vec<Expr>,
@@ -81,6 +83,7 @@ impl ParallelBlockVmShared {
             static_sub_calls: vm.static_sub_calls.clone(),
             blocks: vm.blocks.clone(),
             block_bytecode_ranges: vm.block_bytecode_ranges.clone(),
+            map_expr_bytecode_ranges: vm.map_expr_bytecode_ranges.clone(),
             grep_expr_bytecode_ranges: vm.grep_expr_bytecode_ranges.clone(),
             regex_flip_flop_rhs_expr_bytecode_ranges: vm
                 .regex_flip_flop_rhs_expr_bytecode_ranges
@@ -99,6 +102,7 @@ impl ParallelBlockVmShared {
             substr_four_arg_entries: vm.substr_four_arg_entries.clone(),
             keys_expr_entries: vm.keys_expr_entries.clone(),
             keys_expr_bytecode_ranges: vm.keys_expr_bytecode_ranges.clone(),
+            map_expr_entries: vm.map_expr_entries.clone(),
             grep_expr_entries: vm.grep_expr_entries.clone(),
             regex_flip_flop_rhs_expr_entries: vm.regex_flip_flop_rhs_expr_entries.clone(),
             values_expr_entries: vm.values_expr_entries.clone(),
@@ -130,6 +134,7 @@ impl ParallelBlockVmShared {
             static_sub_calls: self.static_sub_calls.clone(),
             blocks: self.blocks.clone(),
             block_bytecode_ranges: self.block_bytecode_ranges.clone(),
+            map_expr_bytecode_ranges: self.map_expr_bytecode_ranges.clone(),
             grep_expr_bytecode_ranges: self.grep_expr_bytecode_ranges.clone(),
             regex_flip_flop_rhs_expr_bytecode_ranges: self
                 .regex_flip_flop_rhs_expr_bytecode_ranges
@@ -148,6 +153,7 @@ impl ParallelBlockVmShared {
             substr_four_arg_entries: self.substr_four_arg_entries.clone(),
             keys_expr_entries: self.keys_expr_entries.clone(),
             keys_expr_bytecode_ranges: self.keys_expr_bytecode_ranges.clone(),
+            map_expr_entries: self.map_expr_entries.clone(),
             grep_expr_entries: self.grep_expr_entries.clone(),
             regex_flip_flop_rhs_expr_entries: self.regex_flip_flop_rhs_expr_entries.clone(),
             values_expr_entries: self.values_expr_entries.clone(),
@@ -247,6 +253,8 @@ pub struct VM<'a> {
     blocks: Vec<Block>,
     /// Optional `ops[start..end]` lowering for [`Self::blocks`] (see [`Chunk::block_bytecode_ranges`]).
     block_bytecode_ranges: Vec<Option<(usize, usize)>>,
+    /// Optional lowering for [`Chunk::map_expr_entries`] (see [`Chunk::map_expr_bytecode_ranges`]).
+    map_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     /// Optional lowering for [`Chunk::grep_expr_entries`] (see [`Chunk::grep_expr_bytecode_ranges`]).
     grep_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     given_entries: Vec<(Expr, Block)>,
@@ -261,6 +269,7 @@ pub struct VM<'a> {
     substr_four_arg_entries: Vec<(Expr, Expr, Option<Expr>, Expr)>,
     keys_expr_entries: Vec<Expr>,
     keys_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
+    map_expr_entries: Vec<Expr>,
     grep_expr_entries: Vec<Expr>,
     regex_flip_flop_rhs_expr_entries: Vec<Expr>,
     regex_flip_flop_rhs_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
@@ -346,6 +355,7 @@ impl<'a> VM<'a> {
             static_sub_calls: chunk.static_sub_calls.clone(),
             blocks: chunk.blocks.clone(),
             block_bytecode_ranges: chunk.block_bytecode_ranges.clone(),
+            map_expr_bytecode_ranges: chunk.map_expr_bytecode_ranges.clone(),
             grep_expr_bytecode_ranges: chunk.grep_expr_bytecode_ranges.clone(),
             regex_flip_flop_rhs_expr_bytecode_ranges: chunk
                 .regex_flip_flop_rhs_expr_bytecode_ranges
@@ -364,6 +374,7 @@ impl<'a> VM<'a> {
             substr_four_arg_entries: chunk.substr_four_arg_entries.clone(),
             keys_expr_entries: chunk.keys_expr_entries.clone(),
             keys_expr_bytecode_ranges: chunk.keys_expr_bytecode_ranges.clone(),
+            map_expr_entries: chunk.map_expr_entries.clone(),
             grep_expr_entries: chunk.grep_expr_entries.clone(),
             regex_flip_flop_rhs_expr_entries: chunk.regex_flip_flop_rhs_expr_entries.clone(),
             values_expr_entries: chunk.values_expr_entries.clone(),
@@ -2849,7 +2860,7 @@ impl<'a> VM<'a> {
                         Ok(())
                     }
                     // ── I/O ──
-                    Op::Print(argc) => {
+                    Op::Print(handle_idx, argc) => {
                         let argc = *argc as usize;
                         let mut args = Vec::with_capacity(argc);
                         for _ in 0..argc {
@@ -2891,14 +2902,20 @@ impl<'a> VM<'a> {
                             }
                         }
                         output.push_str(&self.interp.ors);
-                        print!("{}", output);
-                        if self.interp.output_autoflush {
-                            let _ = io::stdout().flush();
-                        }
+                        let handle_name = match handle_idx {
+                            Some(idx) => self.interp.resolve_io_handle_name(
+                                self.names.get(*idx as usize).map_or("STDOUT", |s| s.as_str()),
+                            ),
+                            None => self.interp.resolve_io_handle_name(
+                                self.interp.default_print_handle.as_str(),
+                            ),
+                        };
+                        self.interp
+                            .write_formatted_print(handle_name.as_str(), &output, self.line())?;
                         self.push(PerlValue::integer(1));
                         Ok(())
                     }
-                    Op::Say(argc) => {
+                    Op::Say(handle_idx, argc) => {
                         if (self.interp.feature_bits & crate::interpreter::FEAT_SAY) == 0 {
                             return Err(PerlError::runtime(
                             "say() is disabled (enable with use feature 'say' or use feature ':5.10')",
@@ -2946,10 +2963,17 @@ impl<'a> VM<'a> {
                             }
                         }
                         output.push('\n');
-                        print!("{}", output);
-                        if self.interp.output_autoflush {
-                            let _ = io::stdout().flush();
-                        }
+                        output.push_str(&self.interp.ors);
+                        let handle_name = match handle_idx {
+                            Some(idx) => self.interp.resolve_io_handle_name(
+                                self.names.get(*idx as usize).map_or("STDOUT", |s| s.as_str()),
+                            ),
+                            None => self.interp.resolve_io_handle_name(
+                                self.interp.default_print_handle.as_str(),
+                            ),
+                        };
+                        self.interp
+                            .write_formatted_print(handle_name.as_str(), &output, self.line())?;
                         self.push(PerlValue::integer(1));
                         Ok(())
                     }
@@ -4347,6 +4371,45 @@ impl<'a> VM<'a> {
                                         return Err(e)
                                     }
                                     Err(_) => {}
+                                }
+                            }
+                            self.push(PerlValue::array(result));
+                            Ok(())
+                        }
+                    }
+                    Op::MapWithExpr(expr_idx) => {
+                        let list = self.pop().to_list();
+                        let idx = *expr_idx as usize;
+                        if let Some(&(start, end)) = self
+                            .map_expr_bytecode_ranges
+                            .get(idx)
+                            .and_then(|r| r.as_ref())
+                        {
+                            let mut result = Vec::new();
+                            for item in list {
+                                let _ = self.interp.scope.set_scalar("_", item);
+                                let val = self.run_block_region(start, end, op_count)?;
+                                if let Some(a) = val.as_array_vec() {
+                                    result.extend(a);
+                                } else {
+                                    result.push(val);
+                                }
+                            }
+                            self.push(PerlValue::array(result));
+                            Ok(())
+                        } else {
+                            let e = &self.map_expr_entries[idx];
+                            let mut result = Vec::new();
+                            for item in list {
+                                let _ = self.interp.scope.set_scalar("_", item);
+                                let val = vm_interp_result(
+                                    self.interp.eval_expr_ctx(e, WantarrayCtx::List),
+                                    self.line(),
+                                )?;
+                                if let Some(a) = val.as_array_vec() {
+                                    result.extend(a);
+                                } else {
+                                    result.push(val);
                                 }
                             }
                             self.push(PerlValue::array(result));
@@ -6600,8 +6663,11 @@ impl<'a> VM<'a> {
                     .unwrap_or(PerlValue::UNDEF)
                     .to_string();
                 match read_file_text_perl_compat(&filename) {
-                    Ok(code) => crate::parse_and_run_string_in_file(&code, self.interp, &filename)
-                        .or(Ok(PerlValue::UNDEF)),
+                    Ok(code) => {
+                        let code = crate::data_section::strip_perl_end_marker(&code);
+                        crate::parse_and_run_string_in_file(code, self.interp, &filename)
+                            .or(Ok(PerlValue::UNDEF))
+                    }
                     Err(_) => Ok(PerlValue::UNDEF),
                 }
             }

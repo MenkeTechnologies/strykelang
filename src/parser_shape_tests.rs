@@ -513,6 +513,10 @@ fn expr_map_grep_sort() {
         ExprKind::GrepExprComma { .. }
     ));
     assert!(matches!(
+        first_expr_kind("map $_ + 1, (1);"),
+        ExprKind::MapExprComma { .. }
+    ));
+    assert!(matches!(
         first_expr_kind("sort (1, 2);"),
         ExprKind::SortExpr { .. }
     ));

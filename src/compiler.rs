@@ -925,7 +925,16 @@ impl Compiler {
             }
         }
 
-        // Fifth pass: `grep EXPR, LIST` — single-expression filter bodies (same `ops` vec as blocks).
+        // Fifth pass: `map EXPR, LIST` — list-context expression per `$_` (same `ops` vec as blocks).
+        self.chunk.map_expr_bytecode_ranges = vec![None; self.chunk.map_expr_entries.len()];
+        for i in 0..self.chunk.map_expr_entries.len() {
+            let e = self.chunk.map_expr_entries[i].clone();
+            if let Ok(range) = self.try_compile_grep_expr_region(&e, WantarrayCtx::List) {
+                self.chunk.map_expr_bytecode_ranges[i] = Some(range);
+            }
+        }
+
+        // Fifth pass (a): `grep EXPR, LIST` — single-expression filter bodies (same `ops` vec as blocks).
         self.chunk.grep_expr_bytecode_ranges = vec![None; self.chunk.grep_expr_entries.len()];
         for i in 0..self.chunk.grep_expr_entries.len() {
             let e = self.chunk.grep_expr_entries[i].clone();
@@ -3653,17 +3662,19 @@ impl Compiler {
             }
 
             // ── Print / Say / Printf ──
-            ExprKind::Print { args, .. } => {
+            ExprKind::Print { handle, args } => {
                 for arg in args {
                     self.compile_expr_ctx(arg, WantarrayCtx::List)?;
                 }
-                self.emit_op(Op::Print(args.len() as u8), line, Some(root));
+                let h = handle.as_ref().map(|s| self.chunk.intern_name(s));
+                self.emit_op(Op::Print(h, args.len() as u8), line, Some(root));
             }
-            ExprKind::Say { args, .. } => {
+            ExprKind::Say { handle, args } => {
                 for arg in args {
                     self.compile_expr_ctx(arg, WantarrayCtx::List)?;
                 }
-                self.emit_op(Op::Say(args.len() as u8), line, Some(root));
+                let h = handle.as_ref().map(|s| self.chunk.intern_name(s));
+                self.emit_op(Op::Say(h, args.len() as u8), line, Some(root));
             }
             ExprKind::Printf { args, .. } => {
                 for arg in args {
@@ -4828,6 +4839,14 @@ impl Compiler {
                     self.emit_op(Op::StackArrayLen, line, Some(root));
                 }
             }
+            ExprKind::MapExprComma { expr, list } => {
+                self.compile_expr_ctx(list, WantarrayCtx::List)?;
+                let idx = self.chunk.add_map_expr_entry(*expr.clone());
+                self.emit_op(Op::MapWithExpr(idx), line, Some(root));
+                if ctx != WantarrayCtx::List {
+                    self.emit_op(Op::StackArrayLen, line, Some(root));
+                }
+            }
             ExprKind::GrepExpr { block, list } => {
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
                 if let Some((m, r)) = crate::map_grep_fast::detect_grep_int_mod_eq(block) {
@@ -5926,14 +5945,14 @@ mod tests {
     #[test]
     fn compile_print_statement() {
         let chunk = compile_snippet("print 1;").expect("compile");
-        assert!(chunk.ops.iter().any(|o| matches!(o, Op::Print(_))));
+        assert!(chunk.ops.iter().any(|o| matches!(o, Op::Print(_, _))));
         assert_last_halt(&chunk);
     }
 
     #[test]
     fn compile_say_statement() {
         let chunk = compile_snippet("say 1;").expect("compile");
-        assert!(chunk.ops.iter().any(|o| matches!(o, Op::Say(_))));
+        assert!(chunk.ops.iter().any(|o| matches!(o, Op::Say(_, _))));
         assert_last_halt(&chunk);
     }
 

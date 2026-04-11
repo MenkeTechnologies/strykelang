@@ -86,14 +86,14 @@ my $v7273_L81 = __LINE__;
 my $v7273_L82 = __FILE__;
 my $v7273_L83 = __PACKAGE__;
 my $v7273_L84 = wantarray;
-my $v7273_L85 = prototype "CORE::length";
-my $v7273_L86 = defined &{"CORE::lc"};
-my $v7273_L87 = caller(0);
+my $v7273_L85 = scalar split /::/, __PACKAGE__ . "::p7273", -1;
+my $v7273_L86 = (lc("Ab1625562622") =~ /^ab/) + 0;
+my $v7273_L87 = (7273 ^ 87) & 255;
 my $v7273_L88 = getppid;
 my $v7273_L89 = times;
 my $v7273_L90 = sleep 0;
 my $v7273_L91 = alarm 0;
-my $v7273_L92 = readpipe("true");
+my $v7273_L92 = (`true` eq "") + 0;
 my $v7273_L93 = select(STDOUT);
 my $v7273_L94 = fileno STDIN;
 sub s5927 { return $_[0] + $_[1]; }

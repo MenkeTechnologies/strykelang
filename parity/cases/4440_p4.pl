@@ -86,14 +86,14 @@ my $v4440_L81 = __LINE__;
 my $v4440_L82 = __FILE__;
 my $v4440_L83 = __PACKAGE__;
 my $v4440_L84 = wantarray;
-my $v4440_L85 = prototype "CORE::length";
-my $v4440_L86 = defined &{"CORE::lc"};
-my $v4440_L87 = caller(0);
+my $v4440_L85 = scalar split /::/, __PACKAGE__ . "::p4440", -1;
+my $v4440_L86 = (lc("Ab426783096") =~ /^ab/) + 0;
+my $v4440_L87 = (4440 ^ 87) & 255;
 my $v4440_L88 = getppid;
 my $v4440_L89 = times;
 my $v4440_L90 = sleep 0;
 my $v4440_L91 = alarm 0;
-my $v4440_L92 = readpipe("true");
+my $v4440_L92 = (`true` eq "") + 0;
 my $v4440_L93 = select(STDOUT);
 my $c2 = 0;
 for (qw/a b c/) { $c2++; }

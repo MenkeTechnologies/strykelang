@@ -86,14 +86,14 @@ my $v3825_L81 = __LINE__;
 my $v3825_L82 = __FILE__;
 my $v3825_L83 = __PACKAGE__;
 my $v3825_L84 = wantarray;
-my $v3825_L85 = prototype "CORE::length";
-my $v3825_L86 = defined &{"CORE::lc"};
-my $v3825_L87 = caller(0);
+my $v3825_L85 = scalar split /::/, __PACKAGE__ . "::p3825", -1;
+my $v3825_L86 = (lc("Ab2126798382") =~ /^ab/) + 0;
+my $v3825_L87 = (3825 ^ 87) & 255;
 my $v3825_L88 = getppid;
 my $v3825_L89 = times;
 my $v3825_L90 = sleep 0;
 my $v3825_L91 = alarm 0;
-my $v3825_L92 = readpipe("true");
+my $v3825_L92 = (`true` eq "") + 0;
 my $v3825_L93 = select(STDOUT);
 my $x4 = 0;
 if (0) { print 1; }

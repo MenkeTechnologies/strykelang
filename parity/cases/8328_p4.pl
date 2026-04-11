@@ -86,14 +86,14 @@ my $v8328_L81 = __LINE__;
 my $v8328_L82 = __FILE__;
 my $v8328_L83 = __PACKAGE__;
 my $v8328_L84 = wantarray;
-my $v8328_L85 = prototype "CORE::length";
-my $v8328_L86 = defined &{"CORE::lc"};
-my $v8328_L87 = caller(0);
+my $v8328_L85 = scalar split /::/, __PACKAGE__ . "::p8328", -1;
+my $v8328_L86 = (lc("Ab2009068184") =~ /^ab/) + 0;
+my $v8328_L87 = (8328 ^ 87) & 255;
 my $v8328_L88 = getppid;
 my $v8328_L89 = times;
 my $v8328_L90 = sleep 0;
 my $v8328_L91 = alarm 0;
-my $v8328_L92 = readpipe("true");
+my $v8328_L92 = (`true` eq "") + 0;
 my $v8328_L93 = select(STDOUT);
 my $x4 = 0;
 if (0) { print 1; }

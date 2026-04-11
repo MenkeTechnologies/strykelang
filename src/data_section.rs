@@ -1,5 +1,19 @@
 //! Split `__DATA__` from program source (line must equal `__DATA__` after trim).
 
+/// Truncate at the first line equal to `__END__` or `__DATA__` (after [`str::trim`]). Perl stops
+/// compiling there; required `.pm` files often put pod after `__END__`.
+pub fn strip_perl_end_marker(content: &str) -> &str {
+    let mut start = 0usize;
+    for chunk in content.split_inclusive('\n') {
+        let line = chunk.strip_suffix('\n').unwrap_or(chunk);
+        if line.trim() == "__END__" || line.trim() == "__DATA__" {
+            return &content[..start];
+        }
+        start += chunk.len();
+    }
+    content
+}
+
 /// Returns `(program_text_before_marker, Some(data bytes after marker))` or `(full, None)`.
 pub fn split_data_section(content: &str) -> (String, Option<Vec<u8>>) {
     let mut prog = String::new();
@@ -34,7 +48,13 @@ pub fn split_data_section(content: &str) -> (String, Option<Vec<u8>>) {
 
 #[cfg(test)]
 mod tests {
-    use super::split_data_section;
+    use super::{split_data_section, strip_perl_end_marker};
+
+    #[test]
+    fn strip_end_before_pod() {
+        let s = "1;\n__END__\n=pod\n";
+        assert_eq!(strip_perl_end_marker(s), "1;\n");
+    }
 
     #[test]
     fn no_marker_returns_full() {

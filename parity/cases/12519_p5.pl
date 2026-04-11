@@ -86,14 +86,14 @@ my $v12519_L81 = __LINE__;
 my $v12519_L82 = __FILE__;
 my $v12519_L83 = __PACKAGE__;
 my $v12519_L84 = wantarray;
-my $v12519_L85 = prototype "CORE::length";
-my $v12519_L86 = defined &{"CORE::lc"};
-my $v12519_L87 = caller(0);
+my $v12519_L85 = scalar split /::/, __PACKAGE__ . "::p12519", -1;
+my $v12519_L86 = (lc("Ab1936693426") =~ /^ab/) + 0;
+my $v12519_L87 = (12519 ^ 87) & 255;
 my $v12519_L88 = getppid;
 my $v12519_L89 = times;
 my $v12519_L90 = sleep 0;
 my $v12519_L91 = alarm 0;
-my $v12519_L92 = readpipe("true");
+my $v12519_L92 = (`true` eq "") + 0;
 my $v12519_L93 = select(STDOUT);
 my $c2 = 0;
 for (qw/a b c/) { $c2++; }

@@ -86,14 +86,14 @@ my $v7225_L81 = __LINE__;
 my $v7225_L82 = __FILE__;
 my $v7225_L83 = __PACKAGE__;
 my $v7225_L84 = wantarray;
-my $v7225_L85 = prototype "CORE::length";
-my $v7225_L86 = defined &{"CORE::lc"};
-my $v7225_L87 = caller(0);
+my $v7225_L85 = scalar split /::/, __PACKAGE__ . "::p7225", -1;
+my $v7225_L86 = (lc("Ab1632540382") =~ /^ab/) + 0;
+my $v7225_L87 = (7225 ^ 87) & 255;
 my $v7225_L88 = getppid;
 my $v7225_L89 = times;
 my $v7225_L90 = sleep 0;
 my $v7225_L91 = alarm 0;
-my $v7225_L92 = readpipe("true");
+my $v7225_L92 = (`true` eq "") + 0;
 my $v7225_L93 = select(STDOUT);
 my $c2 = 0;
 for (qw/a b c/) { $c2++; }

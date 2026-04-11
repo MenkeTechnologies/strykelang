@@ -86,14 +86,14 @@ my $v5761_L81 = __LINE__;
 my $v5761_L82 = __FILE__;
 my $v5761_L83 = __PACKAGE__;
 my $v5761_L84 = wantarray;
-my $v5761_L85 = prototype "CORE::length";
-my $v5761_L86 = defined &{"CORE::lc"};
-my $v5761_L87 = caller(0);
+my $v5761_L85 = scalar split /::/, __PACKAGE__ . "::p5761", -1;
+my $v5761_L86 = (lc("Ab1845362062") =~ /^ab/) + 0;
+my $v5761_L87 = (5761 ^ 87) & 255;
 my $v5761_L88 = getppid;
 my $v5761_L89 = times;
 my $v5761_L90 = sleep 0;
 my $v5761_L91 = alarm 0;
-my $v5761_L92 = readpipe("true");
+my $v5761_L92 = (`true` eq "") + 0;
 my $v5761_L93 = select(STDOUT);
 my $v5761_L94 = fileno STDIN;
 sub s1471 { return $_[0] + $_[1]; }

@@ -86,14 +86,14 @@ my $v7055_L81 = __LINE__;
 my $v7055_L82 = __FILE__;
 my $v7055_L83 = __PACKAGE__;
 my $v7055_L84 = wantarray;
-my $v7055_L85 = prototype "CORE::length";
-my $v7055_L86 = defined &{"CORE::lc"};
-my $v7055_L87 = caller(0);
+my $v7055_L85 = scalar split /::/, __PACKAGE__ . "::p7055", -1;
+my $v7055_L86 = (lc("Ab583511458") =~ /^ab/) + 0;
+my $v7055_L87 = (7055 ^ 87) & 255;
 my $v7055_L88 = getppid;
 my $v7055_L89 = times;
 my $v7055_L90 = sleep 0;
 my $v7055_L91 = alarm 0;
-my $v7055_L92 = readpipe("true");
+my $v7055_L92 = (`true` eq "") + 0;
 my $v7055_L93 = select(STDOUT);
 my $x4 = 0;
 if (0) { print 1; }

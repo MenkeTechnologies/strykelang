@@ -86,14 +86,14 @@ my $v4031_L81 = __LINE__;
 my $v4031_L82 = __FILE__;
 my $v4031_L83 = __PACKAGE__;
 my $v4031_L84 = wantarray;
-my $v4031_L85 = prototype "CORE::length";
-my $v4031_L86 = defined &{"CORE::lc"};
-my $v4031_L87 = caller(0);
+my $v4031_L85 = scalar split /::/, __PACKAGE__ . "::p4031", -1;
+my $v4031_L86 = (lc("Ab1023110338") =~ /^ab/) + 0;
+my $v4031_L87 = (4031 ^ 87) & 255;
 my $v4031_L88 = getppid;
 my $v4031_L89 = times;
 my $v4031_L90 = sleep 0;
 my $v4031_L91 = alarm 0;
-my $v4031_L92 = readpipe("true");
+my $v4031_L92 = (`true` eq "") + 0;
 my $v4031_L93 = select(STDOUT);
 my $x4 = 0;
 if (0) { print 1; }

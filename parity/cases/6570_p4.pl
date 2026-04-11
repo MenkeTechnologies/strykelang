@@ -86,14 +86,14 @@ my $v6570_L81 = __LINE__;
 my $v6570_L82 = __FILE__;
 my $v6570_L83 = __PACKAGE__;
 my $v6570_L84 = wantarray;
-my $v6570_L85 = prototype "CORE::length";
-my $v6570_L86 = defined &{"CORE::lc"};
-my $v6570_L87 = caller(0);
+my $v6570_L85 = scalar split /::/, __PACKAGE__ . "::p6570", -1;
+my $v6570_L86 = (lc("Ab1190886820") =~ /^ab/) + 0;
+my $v6570_L87 = (6570 ^ 87) & 255;
 my $v6570_L88 = getppid;
 my $v6570_L89 = times;
 my $v6570_L90 = sleep 0;
 my $v6570_L91 = alarm 0;
-my $v6570_L92 = readpipe("true");
+my $v6570_L92 = (`true` eq "") + 0;
 my $v6570_L93 = select(STDOUT);
 my $c2 = 0;
 for (qw/a b c/) { $c2++; }

@@ -649,6 +649,9 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::MapExpr { block, list } => {
             format!("map {{\n{}\n}} {}", format_block(block), format_expr(list))
         }
+        ExprKind::MapExprComma { expr, list } => {
+            format!("map {}, {}", format_expr(expr), format_expr(list))
+        }
         ExprKind::GrepExpr { block, list } => {
             format!("grep {{\n{}\n}} {}", format_block(block), format_expr(list))
         }

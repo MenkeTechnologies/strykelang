@@ -539,6 +539,11 @@ pub enum ExprKind {
         block: Block,
         list: Box<Expr>,
     },
+    /// `map EXPR, LIST` — EXPR is evaluated in list context with `$_` set to each element.
+    MapExprComma {
+        expr: Box<Expr>,
+        list: Box<Expr>,
+    },
     GrepExpr {
         block: Block,
         list: Box<Expr>,

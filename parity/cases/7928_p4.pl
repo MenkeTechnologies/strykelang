@@ -86,14 +86,14 @@ my $v7928_L81 = __LINE__;
 my $v7928_L82 = __FILE__;
 my $v7928_L83 = __PACKAGE__;
 my $v7928_L84 = wantarray;
-my $v7928_L85 = prototype "CORE::length";
-my $v7928_L86 = defined &{"CORE::lc"};
-my $v7928_L87 = caller(0);
+my $v7928_L85 = scalar split /::/, __PACKAGE__ . "::p7928", -1;
+my $v7928_L86 = (lc("Ab2067216184") =~ /^ab/) + 0;
+my $v7928_L87 = (7928 ^ 87) & 255;
 my $v7928_L88 = getppid;
 my $v7928_L89 = times;
 my $v7928_L90 = sleep 0;
 my $v7928_L91 = alarm 0;
-my $v7928_L92 = readpipe("true");
+my $v7928_L92 = (`true` eq "") + 0;
 my $v7928_L93 = select(STDOUT);
 my $v7928_L94 = fileno STDIN;
 sub s1329 { return $_[0] + $_[1]; }

@@ -86,14 +86,14 @@ my $v1243_L81 = __LINE__;
 my $v1243_L82 = __FILE__;
 my $v1243_L83 = __PACKAGE__;
 my $v1243_L84 = wantarray;
-my $v1243_L85 = prototype "CORE::length";
-my $v1243_L86 = defined &{"CORE::lc"};
-my $v1243_L87 = caller(0);
+my $v1243_L85 = scalar split /::/, __PACKAGE__ . "::p1243", -1;
+my $v1243_L86 = (lc("Ab1428401898") =~ /^ab/) + 0;
+my $v1243_L87 = (1243 ^ 87) & 255;
 my $v1243_L88 = getppid;
 my $v1243_L89 = times;
 my $v1243_L90 = sleep 0;
 my $v1243_L91 = alarm 0;
-my $v1243_L92 = readpipe("true");
+my $v1243_L92 = (`true` eq "") + 0;
 my $v1243_L93 = select(STDOUT);
 my $c2 = 0;
 for (qw/a b c/) { $c2++; }

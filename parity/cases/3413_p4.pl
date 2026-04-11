@@ -86,14 +86,14 @@ my $v3413_L81 = __LINE__;
 my $v3413_L82 = __FILE__;
 my $v3413_L83 = __PACKAGE__;
 my $v3413_L84 = wantarray;
-my $v3413_L85 = prototype "CORE::length";
-my $v3413_L86 = defined &{"CORE::lc"};
-my $v3413_L87 = caller(0);
+my $v3413_L85 = scalar split /::/, __PACKAGE__ . "::p3413", -1;
+my $v3413_L86 = (lc("Ab39207174") =~ /^ab/) + 0;
+my $v3413_L87 = (3413 ^ 87) & 255;
 my $v3413_L88 = getppid;
 my $v3413_L89 = times;
 my $v3413_L90 = sleep 0;
 my $v3413_L91 = alarm 0;
-my $v3413_L92 = readpipe("true");
+my $v3413_L92 = (`true` eq "") + 0;
 my $v3413_L93 = select(STDOUT);
 my $x4 = 0;
 if (0) { print 1; }

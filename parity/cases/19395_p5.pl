@@ -86,14 +86,14 @@ my $v19395_L81 = __LINE__;
 my $v19395_L82 = __FILE__;
 my $v19395_L83 = __PACKAGE__;
 my $v19395_L84 = wantarray;
-my $v19395_L85 = prototype "CORE::length";
-my $v19395_L86 = defined &{"CORE::lc"};
-my $v19395_L87 = caller(0);
+my $v19395_L85 = scalar split /::/, __PACKAGE__ . "::p19395", -1;
+my $v19395_L86 = (lc("Ab937129306") =~ /^ab/) + 0;
+my $v19395_L87 = (19395 ^ 87) & 255;
 my $v19395_L88 = getppid;
 my $v19395_L89 = times;
 my $v19395_L90 = sleep 0;
 my $v19395_L91 = alarm 0;
-my $v19395_L92 = readpipe("true");
+my $v19395_L92 = (`true` eq "") + 0;
 my $v19395_L93 = select(STDOUT);
 my $c2 = 0;
 for (qw/a b c/) { $c2++; }

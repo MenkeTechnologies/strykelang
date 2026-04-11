@@ -3,12 +3,13 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Cursor, Read, Write as IoWrite};
+use std::sync::Arc;
 #[cfg(unix)]
 use std::os::unix::process::ExitStatusExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::AtomicUsize;
-use std::sync::{Arc, Barrier, OnceLock};
+use std::sync::{Barrier, OnceLock};
 use std::time::{Duration, Instant};
 
 use indexmap::IndexMap;
@@ -284,6 +285,28 @@ struct FlipFlopTreeState {
     exclusive_left_line: Option<i64>,
 }
 
+/// `BufReader` / `print` / `sysread` / `tell` on the same handle share this [`File`] cursor.
+#[derive(Clone)]
+pub(crate) struct IoSharedFile(pub Arc<Mutex<File>>);
+
+impl Read for IoSharedFile {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.0.lock().read(buf)
+    }
+}
+
+pub(crate) struct IoSharedFileWrite(pub Arc<Mutex<File>>);
+
+impl IoWrite for IoSharedFileWrite {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.0.lock().write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.0.lock().flush()
+    }
+}
+
 pub struct Interpreter {
     pub scope: Scope,
     pub(crate) subs: HashMap<String, Arc<PerlSub>>,
@@ -425,8 +448,8 @@ pub struct Interpreter {
     pub(crate) rand_rng: StdRng,
     /// Directory handles from `opendir`: name → snapshot + read cursor (`readdir` / `rewinddir` / …).
     pub(crate) dir_handles: HashMap<String, DirHandleState>,
-    /// Raw `File` per handle for `sysread` / `syswrite` / `fileno` / `flock` (parallel to buffered I/O).
-    pub(crate) io_file_slots: HashMap<String, File>,
+    /// Raw `File` per handle (shared with buffered input / `print` / `sys*`) so `tell` matches writes.
+    pub(crate) io_file_slots: HashMap<String, Arc<Mutex<File>>>,
     /// Child processes for `open(H, "-|", cmd)` / `open(H, "|-", cmd)`; waited on `close`.
     pub(crate) pipe_children: HashMap<String, Child>,
     /// Sockets from `socket` / `accept` / `connect`.
@@ -1874,6 +1897,17 @@ impl Interpreter {
         None
     }
 
+    /// `use Module VERSION LIST` — numeric `VERSION` is not part of the import list (Perl strips it
+    /// before calling `import`).
+    fn imports_after_leading_use_version(imports: &[Expr]) -> &[Expr] {
+        if let Some(first) = imports.first() {
+            if matches!(first.kind, ExprKind::Integer(_) | ExprKind::Float(_)) {
+                return &imports[1..];
+            }
+        }
+        imports
+    }
+
     /// Compile-time pragma import list (`'refs'`, `qw(refs subs)`, version integers).
     fn pragma_import_strings(imports: &[Expr], default_line: usize) -> PerlResult<Vec<String>> {
         let mut out = Vec::new();
@@ -2107,10 +2141,11 @@ impl Interpreter {
                 line,
             )
         })?;
+        let code = crate::data_section::strip_perl_end_marker(&code);
         self.scope
             .set_hash_element("INC", &key, PerlValue::string(key.clone()))?;
         let saved_pkg = self.scope.get_scalar("__PACKAGE__");
-        let r = crate::parse_and_run_string_in_file(&code, self, &key);
+        let r = crate::parse_and_run_string_in_file(code, self, &key);
         let _ = self.scope.set_scalar("__PACKAGE__", saved_pkg);
         r?;
         self.invoke_require_hook("require__after", &key, line)?;
@@ -2131,12 +2166,13 @@ impl Interpreter {
                         line,
                     )
                 })?;
+                let code = crate::data_section::strip_perl_end_marker(&code);
                 let abs = full.canonicalize().unwrap_or(full);
                 let abs_s = abs.to_string_lossy().into_owned();
                 self.scope
                     .set_hash_element("INC", relpath, PerlValue::string(abs_s.clone()))?;
                 let saved_pkg = self.scope.get_scalar("__PACKAGE__");
-                let r = crate::parse_and_run_string_in_file(&code, self, &abs_s);
+                let r = crate::parse_and_run_string_in_file(code, self, &abs_s);
                 let _ = self.scope.set_scalar("__PACKAGE__", saved_pkg);
                 r?;
                 self.invoke_require_hook("require__after", relpath, line)?;
@@ -2184,6 +2220,7 @@ impl Interpreter {
             "threads" | "Thread::Pool" | "Parallel::ForkManager" => Ok(()),
             _ => {
                 self.require_execute(module, line)?;
+                let imports = Self::imports_after_leading_use_version(imports);
                 self.apply_module_import(module, imports, line)?;
                 Ok(())
             }
@@ -2572,22 +2609,26 @@ impl Interpreter {
                     self.apply_io_error_to_errno(&e);
                     PerlError::runtime(format!("Can't open '{}': {}", path, e), line)
                 })?;
-                if let Ok(raw) = file.try_clone() {
-                    self.io_file_slots.insert(handle_name.clone(), raw);
-                }
-                self.input_handles
-                    .insert(handle_name.clone(), BufReader::new(Box::new(file)));
+                let shared = Arc::new(Mutex::new(file));
+                self.io_file_slots
+                    .insert(handle_name.clone(), Arc::clone(&shared));
+                self.input_handles.insert(
+                    handle_name.clone(),
+                    BufReader::new(Box::new(IoSharedFile(Arc::clone(&shared)))),
+                );
             }
             ">" => {
                 let file = std::fs::File::create(&path).map_err(|e| {
                     self.apply_io_error_to_errno(&e);
                     PerlError::runtime(format!("Can't open '{}': {}", path, e), line)
                 })?;
-                if let Ok(raw) = file.try_clone() {
-                    self.io_file_slots.insert(handle_name.clone(), raw);
-                }
-                self.output_handles
-                    .insert(handle_name.clone(), Box::new(file));
+                let shared = Arc::new(Mutex::new(file));
+                self.io_file_slots
+                    .insert(handle_name.clone(), Arc::clone(&shared));
+                self.output_handles.insert(
+                    handle_name.clone(),
+                    Box::new(IoSharedFileWrite(Arc::clone(&shared))),
+                );
             }
             ">>" => {
                 let file = std::fs::OpenOptions::new()
@@ -2598,11 +2639,13 @@ impl Interpreter {
                         self.apply_io_error_to_errno(&e);
                         PerlError::runtime(format!("Can't open '{}': {}", path, e), line)
                     })?;
-                if let Ok(raw) = file.try_clone() {
-                    self.io_file_slots.insert(handle_name.clone(), raw);
-                }
-                self.output_handles
-                    .insert(handle_name.clone(), Box::new(file));
+                let shared = Arc::new(Mutex::new(file));
+                self.io_file_slots
+                    .insert(handle_name.clone(), Arc::clone(&shared));
+                self.output_handles.insert(
+                    handle_name.clone(),
+                    Box::new(IoSharedFileWrite(Arc::clone(&shared))),
+                );
             }
             _ => {
                 return Err(PerlError::runtime(
@@ -5702,13 +5745,16 @@ impl Interpreter {
         }
     }
 
-    fn eval_expr_ctx(&mut self, expr: &Expr, ctx: WantarrayCtx) -> ExecResult {
+    pub(crate) fn eval_expr_ctx(&mut self, expr: &Expr, ctx: WantarrayCtx) -> ExecResult {
         let line = expr.line;
         match &expr.kind {
             ExprKind::Integer(n) => Ok(PerlValue::integer(*n)),
             ExprKind::Float(f) => Ok(PerlValue::float(*f)),
             ExprKind::String(s) => Ok(PerlValue::string(s.clone())),
             ExprKind::Bareword(s) => {
+                if s == "__PACKAGE__" {
+                    return Ok(PerlValue::string(self.current_package()));
+                }
                 if let Some(sub) = self.resolve_sub_by_name(s) {
                     return self.call_sub(&sub, vec![], ctx, line);
                 }
@@ -6808,6 +6854,25 @@ impl Interpreter {
                 for item in items {
                     let _ = self.scope.set_scalar("_", item);
                     let val = self.exec_block(block)?;
+                    if let Some(a) = val.as_array_vec() {
+                        result.extend(a);
+                    } else {
+                        result.push(val);
+                    }
+                }
+                if ctx == WantarrayCtx::List {
+                    Ok(PerlValue::array(result))
+                } else {
+                    Ok(PerlValue::integer(result.len() as i64))
+                }
+            }
+            ExprKind::MapExprComma { expr, list } => {
+                let list_val = self.eval_expr_ctx(list, WantarrayCtx::List)?;
+                let items = list_val.to_list();
+                let mut result = Vec::new();
+                for item in items {
+                    let _ = self.scope.set_scalar("_", item.clone());
+                    let val = self.eval_expr_ctx(expr, WantarrayCtx::List)?;
                     if let Some(a) = val.as_array_vec() {
                         result.extend(a);
                     } else {
@@ -8192,7 +8257,8 @@ impl Interpreter {
                     let filename = val.to_string();
                     match read_file_text_perl_compat(&filename) {
                         Ok(code) => {
-                            match crate::parse_and_run_string_in_file(&code, self, &filename) {
+                            let code = crate::data_section::strip_perl_end_marker(&code);
+                            match crate::parse_and_run_string_in_file(code, self, &filename) {
                                 Ok(v) => Ok(v),
                                 Err(e) => {
                                     self.set_eval_error(e.to_string());
@@ -9153,6 +9219,9 @@ impl Interpreter {
         want: WantarrayCtx,
         line: usize,
     ) -> Result<PerlValue, FlowOrError> {
+        if name == "__PACKAGE__" {
+            return Ok(PerlValue::string(self.current_package()));
+        }
         if let Some(sub) = self.resolve_sub_by_name(name) {
             return self.call_sub(&sub, vec![], want, line);
         }
@@ -10165,6 +10234,18 @@ impl Interpreter {
         }
         output.push_str(&self.ors);
 
+        self.write_formatted_print(handle_name, &output, line)?;
+        Ok(PerlValue::integer(1))
+    }
+
+    /// Write a fully formatted `print`/`say` record (`LIST`, optional `say` newline, `$\`) to a handle.
+    /// `handle_name` must already be [`Self::resolve_io_handle_name`]-resolved.
+    pub(crate) fn write_formatted_print(
+        &mut self,
+        handle_name: &str,
+        output: &str,
+        line: usize,
+    ) -> PerlResult<()> {
         match handle_name {
             "STDOUT" => {
                 if !self.suppress_stdout {
@@ -10192,7 +10273,7 @@ impl Interpreter {
                 }
             }
         }
-        Ok(PerlValue::integer(1))
+        Ok(())
     }
 
     fn io_handle_printf(
@@ -11966,34 +12047,7 @@ impl Interpreter {
 
         let handle_name =
             self.resolve_io_handle_name(handle.unwrap_or(self.default_print_handle.as_str()));
-        match handle_name.as_str() {
-            "STDOUT" => {
-                if !self.suppress_stdout {
-                    print!("{}", output);
-                    if self.output_autoflush {
-                        let _ = io::stdout().flush();
-                    }
-                }
-            }
-            "STDERR" => {
-                eprint!("{}", output);
-                let _ = io::stderr().flush();
-            }
-            name => {
-                if let Some(writer) = self.output_handles.get_mut(name) {
-                    let _ = writer.write_all(output.as_bytes());
-                    if self.output_autoflush {
-                        let _ = writer.flush();
-                    }
-                } else {
-                    return Err(PerlError::runtime(
-                        format!("print on unopened filehandle {}", name),
-                        line,
-                    )
-                    .into());
-                }
-            }
-        }
+        self.write_formatted_print(handle_name.as_str(), &output, line)?;
         Ok(PerlValue::integer(1))
     }
 

@@ -86,14 +86,14 @@ my $v5507_L81 = __LINE__;
 my $v5507_L82 = __FILE__;
 my $v5507_L83 = __PACKAGE__;
 my $v5507_L84 = wantarray;
-my $v5507_L85 = prototype "CORE::length";
-my $v5507_L86 = defined &{"CORE::lc"};
-my $v5507_L87 = caller(0);
+my $v5507_L85 = scalar split /::/, __PACKAGE__ . "::p5507", -1;
+my $v5507_L86 = (lc("Ab808544218") =~ /^ab/) + 0;
+my $v5507_L87 = (5507 ^ 87) & 255;
 my $v5507_L88 = getppid;
 my $v5507_L89 = times;
 my $v5507_L90 = sleep 0;
 my $v5507_L91 = alarm 0;
-my $v5507_L92 = readpipe("true");
+my $v5507_L92 = (`true` eq "") + 0;
 my $v5507_L93 = select(STDOUT);
 my $c2 = 0;
 for (qw/a b c/) { $c2++; }

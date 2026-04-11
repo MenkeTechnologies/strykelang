@@ -177,8 +177,9 @@ pub enum Op {
     PopFrame,
 
     // ── I/O ──
-    Print(u8), // arg count
-    Say(u8),
+    /// `print [HANDLE] LIST` — `None` uses [`crate::interpreter::Interpreter::default_print_handle`].
+    Print(Option<u16>, u8),
+    Say(Option<u16>, u8),
 
     // ── Built-in function calls ──
     /// Calls a registered built-in: (builtin_id, arg_count)
@@ -280,6 +281,9 @@ pub enum Op {
     MapWithBlock(u16),
     /// grep { BLOCK } @list — block_idx; stack: \[list\] → \[filtered\]
     GrepWithBlock(u16),
+    /// map EXPR, LIST — index into [`Chunk::map_expr_entries`] / [`Chunk::map_expr_bytecode_ranges`];
+    /// stack: \[list\] → \[mapped\]
+    MapWithExpr(u16),
     /// grep EXPR, LIST — index into [`Chunk::grep_expr_entries`] / [`Chunk::grep_expr_bytecode_ranges`];
     /// stack: \[list\] → \[filtered\]
     GrepWithExpr(u16),
@@ -851,6 +855,10 @@ pub struct Chunk {
     pub shift_expr_entries: Vec<Expr>,
     pub unshift_expr_entries: Vec<(Expr, Vec<Expr>)>,
     pub splice_expr_entries: Vec<SpliceExprEntry>,
+    /// `map EXPR, LIST` — map expression (list context) with `$_` set to each element.
+    pub map_expr_entries: Vec<Expr>,
+    /// When `Some((start, end))`, `map_expr_entries[i]` is lowered like [`Self::grep_expr_bytecode_ranges`].
+    pub map_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     /// `grep EXPR, LIST` — filter expression evaluated with `$_` set to each element.
     pub grep_expr_entries: Vec<Expr>,
     /// When `Some((start, end))`, `grep_expr_entries[i]` is also lowered to `ops[start..end]`
@@ -911,6 +919,8 @@ impl Chunk {
             shift_expr_entries: Vec::new(),
             unshift_expr_entries: Vec::new(),
             splice_expr_entries: Vec::new(),
+            map_expr_entries: Vec::new(),
+            map_expr_bytecode_ranges: Vec::new(),
             grep_expr_entries: Vec::new(),
             grep_expr_bytecode_ranges: Vec::new(),
             regex_flip_flop_rhs_expr_entries: Vec::new(),
@@ -925,6 +935,13 @@ impl Chunk {
         let id = self.flip_flop_slots;
         self.flip_flop_slots = self.flip_flop_slots.saturating_add(1);
         id
+    }
+
+    /// `map EXPR, LIST` — pool index for [`Op::MapWithExpr`].
+    pub fn add_map_expr_entry(&mut self, expr: Expr) -> u16 {
+        let idx = self.map_expr_entries.len() as u16;
+        self.map_expr_entries.push(expr);
+        idx
     }
 
     /// `grep EXPR, LIST` — pool index for [`Op::GrepWithExpr`].
@@ -1766,6 +1783,7 @@ impl Chunk {
             }
         }
         remap_ranges(&mut self.block_bytecode_ranges, &remap);
+        remap_ranges(&mut self.map_expr_bytecode_ranges, &remap);
         remap_ranges(&mut self.grep_expr_bytecode_ranges, &remap);
         remap_ranges(&mut self.keys_expr_bytecode_ranges, &remap);
         remap_ranges(&mut self.values_expr_bytecode_ranges, &remap);

@@ -38,6 +38,8 @@ pub(crate) fn try_builtin(
         "prototype" => Some(builtin_prototype(args)),
         "binmode" => Some(interp.builtin_binmode(args, line)),
         "fileno" => Some(interp.builtin_fileno(args, line)),
+        "tell" => Some(interp.builtin_tell(args, line)),
+        "CORE::tell" | "builtin::tell" => Some(interp.builtin_tell(args, line)),
         "flock" => Some(interp.builtin_flock(args, line)),
         "getc" => Some(interp.builtin_getc(args, line)),
         "readline" => Some({
@@ -449,7 +451,7 @@ impl Interpreter {
         #[cfg(unix)]
         {
             if let Some(f) = self.io_file_slots.get(&name) {
-                return Ok(PerlValue::integer(f.as_raw_fd() as i64));
+                return Ok(PerlValue::integer(f.lock().as_raw_fd() as i64));
             }
             match name.as_str() {
                 "STDIN" => Ok(PerlValue::integer(0)),
@@ -467,13 +469,42 @@ impl Interpreter {
         }
     }
 
+    /// `tell FILEHANDLE` / `tell` — byte offset for handles in [`Interpreter::io_file_slots`]
+    /// (same underlying `File` as `sysseek`). Unseekable or unopened handles return `-1`.
+    /// No-arg form uses [`Interpreter::last_readline_handle`] after `readline` / `<>` (Perl semantics).
+    fn builtin_tell(&mut self, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+        let name = match args.len() {
+            0 => {
+                if self.last_readline_handle.is_empty() {
+                    return Ok(PerlValue::integer(-1));
+                }
+                self.last_readline_handle.clone()
+            }
+            1 => args[0]
+                .as_io_handle_name()
+                .unwrap_or_else(|| args[0].to_string()),
+            _ => return Err(PerlError::runtime("tell: too many arguments", line)),
+        };
+        if let Some(slot) = self.io_file_slots.get(&name).cloned() {
+            match slot.lock().seek(SeekFrom::Current(0)) {
+                Ok(p) => Ok(PerlValue::integer(p as i64)),
+                Err(e) => {
+                    self.apply_io_error_to_errno(&e);
+                    Ok(PerlValue::integer(-1))
+                }
+            }
+        } else {
+            Ok(PerlValue::integer(-1))
+        }
+    }
+
     fn builtin_flock(&mut self, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
         let name = args.first().map(|v| v.to_string()).unwrap_or_default();
         let op = args.get(1).map(|v| v.to_int()).unwrap_or(0);
         #[cfg(unix)]
         {
             if let Some(f) = self.io_file_slots.get(&name) {
-                let fd = f.as_raw_fd();
+                let fd = f.lock().as_raw_fd();
                 let lock_op = match op {
                     1 => libc::LOCK_SH,
                     2 => libc::LOCK_EX,
@@ -507,8 +538,8 @@ impl Interpreter {
                 }
             }
         }
-        if let Some(f) = self.io_file_slots.get_mut(&name) {
-            match f.read(&mut buf) {
+        if let Some(slot) = self.io_file_slots.get(&name).cloned() {
+            match slot.lock().read(&mut buf) {
                 Ok(0) => Ok(PerlValue::UNDEF),
                 Ok(_) => Ok(PerlValue::string(decode_utf8_or_latin1(&buf[..1]))),
                 Err(e) => {
@@ -532,7 +563,8 @@ impl Interpreter {
         let len = args[2].to_int().max(0) as usize;
         let offset = args.get(3).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
         let mut buf = vec![0u8; len];
-        let n = if let Some(f) = self.io_file_slots.get_mut(&fh) {
+        let n = if let Some(slot) = self.io_file_slots.get(&fh) {
+            let mut f = slot.lock();
             if offset > 0 {
                 let _ = f.seek(SeekFrom::Start(offset as u64));
             }
@@ -554,7 +586,8 @@ impl Interpreter {
         let data = args[1].to_string();
         let len = args[2].to_int().max(0) as usize;
         let chunk = &data.as_bytes()[..len.min(data.len())];
-        if let Some(f) = self.io_file_slots.get_mut(&fh) {
+        if let Some(slot) = self.io_file_slots.get(&fh) {
+            let mut f = slot.lock();
             let n = f.write(chunk).unwrap_or(0);
             let _ = f.flush();
             return Ok(PerlValue::integer(n as i64));
@@ -572,14 +605,14 @@ impl Interpreter {
         let fh = args[0].to_string();
         let pos = args[1].to_int();
         let whence = args[2].to_int();
-        if let Some(f) = self.io_file_slots.get_mut(&fh) {
+        if let Some(slot) = self.io_file_slots.get(&fh).cloned() {
             let w = match whence {
                 0 => SeekFrom::Start(pos as u64),
                 1 => SeekFrom::Current(pos),
                 2 => SeekFrom::End(pos),
                 _ => SeekFrom::Start(pos as u64),
             };
-            match f.seek(w) {
+            match slot.lock().seek(w) {
                 Ok(p) => Ok(PerlValue::integer(p as i64)),
                 Err(e) => {
                     self.apply_io_error_to_errno(&e);

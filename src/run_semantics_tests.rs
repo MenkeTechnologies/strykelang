@@ -383,6 +383,24 @@ fn rewinddir_resets_read_position() {
 }
 
 #[test]
+fn tell_stdout_unbuffered_slot_returns_negative_one() {
+    assert_eq!(ri(r#"tell STDOUT;"#), -1);
+}
+
+#[test]
+fn tell_writable_open_file_reports_byte_offset() {
+    let dir = std::env::temp_dir();
+    let path = dir.join("perlrs_tell_semantics_test");
+    let _ = std::fs::remove_file(&path);
+    let ps = path.to_string_lossy();
+    let script = format!(
+        r#"open F, ">", "{ps}"; print F "abc"; my $p = tell F; close F; $p"#
+    );
+    assert_eq!(ri(&script), 3);
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
 fn pchannel_fan_send_recv() {
     let s = r#"
         my ($tx, $rx) = pchannel();
@@ -400,6 +418,24 @@ fn fan_progress_optional_parses_and_runs() {
     assert!(v.is_undef());
     let v2 = run(r#"fan { 1 }, progress => 0;"#).expect("run");
     assert!(v2.is_undef());
+}
+
+/// Postfix `pfor` may follow a readpipe (or any expr stmt) without `;` — not only `{ } pfor` / `do { } pfor`.
+/// Regression: `fan { ... `cmd` pfor (1,2,3); ... }, progress => …` must parse.
+#[test]
+fn postfix_pfor_after_backtick_without_semicolon_runs() {
+    assert_eq!(
+        ri(r#"my $x = 1; `true` pfor (1, 2, 3); 42"#),
+        42,
+    );
+}
+
+#[test]
+fn fan_block_backtick_postfix_pfor_progress_runs() {
+    run(
+        r#"fan { my $x = "tommy"; `true` pfor (1, 2, 3); sleep 0 }, progress => 0;"#,
+    )
+    .expect("run");
 }
 
 #[test]

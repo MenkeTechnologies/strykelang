@@ -86,14 +86,14 @@ my $v7034_L81 = __LINE__;
 my $v7034_L82 = __FILE__;
 my $v7034_L83 = __PACKAGE__;
 my $v7034_L84 = wantarray;
-my $v7034_L85 = prototype "CORE::length";
-my $v7034_L86 = defined &{"CORE::lc"};
-my $v7034_L87 = caller(0);
+my $v7034_L85 = scalar split /::/, __PACKAGE__ . "::p7034", -1;
+my $v7034_L86 = (lc("Ab1123435140") =~ /^ab/) + 0;
+my $v7034_L87 = (7034 ^ 87) & 255;
 my $v7034_L88 = getppid;
 my $v7034_L89 = times;
 my $v7034_L90 = sleep 0;
 my $v7034_L91 = alarm 0;
-my $v7034_L92 = readpipe("true");
+my $v7034_L92 = (`true` eq "") + 0;
 my $v7034_L93 = select(STDOUT);
 my $v7034_L94 = fileno STDIN;
 sub s3837 { return $_[0] + $_[1]; }

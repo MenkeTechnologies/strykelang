@@ -86,14 +86,14 @@ my $v14686_L81 = __LINE__;
 my $v14686_L82 = __FILE__;
 my $v14686_L83 = __PACKAGE__;
 my $v14686_L84 = wantarray;
-my $v14686_L85 = prototype "CORE::length";
-my $v14686_L86 = defined &{"CORE::lc"};
-my $v14686_L87 = caller(0);
+my $v14686_L85 = scalar split /::/, __PACKAGE__ . "::p14686", -1;
+my $v14686_L86 = (lc("Ab11063900") =~ /^ab/) + 0;
+my $v14686_L87 = (14686 ^ 87) & 255;
 my $v14686_L88 = getppid;
 my $v14686_L89 = times;
 my $v14686_L90 = sleep 0;
 my $v14686_L91 = alarm 0;
-my $v14686_L92 = readpipe("true");
+my $v14686_L92 = (`true` eq "") + 0;
 my $v14686_L93 = select(STDOUT);
 my $c2 = 0;
 for (qw/a b c/) { $c2++; }

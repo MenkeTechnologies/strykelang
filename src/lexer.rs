@@ -705,6 +705,28 @@ impl Lexer {
         }
     }
 
+    /// `${$name}` / `${$Foo::bar}` — when the braced body is a plain scalar `$identifier`, Perl treats it
+    /// like `$$name` (scalar deref). The naive lexer otherwise yields a bogus [`Token::ScalarVar`] name
+    /// containing a leading `$` (e.g. Try::Tiny's `${$code_ref}`).
+    fn braced_body_symbolic_scalar_deref_name(body: &str) -> Option<&str> {
+        let body = body.trim();
+        let rest = body.strip_prefix('$')?;
+        if rest.is_empty() {
+            return None;
+        }
+        let mut chars = rest.chars();
+        let c0 = chars.next()?;
+        if !(c0.is_alphabetic() || c0 == '_') {
+            return None;
+        }
+        for c in chars {
+            if !(c.is_alphanumeric() || c == '_' || c == ':') {
+                return None;
+            }
+        }
+        Some(rest)
+    }
+
     pub fn next_token(&mut self) -> PerlResult<Token> {
         self.skip_whitespace_and_comments();
 
@@ -739,6 +761,9 @@ impl Lexer {
                     return Err(self.syntax_err("Expected variable name after $", self.line));
                 }
                 self.last_was_term = true;
+                if let Some(tail) = Self::braced_body_symbolic_scalar_deref_name(&name) {
+                    return Ok(Token::DerefScalarVar(tail.to_string()));
+                }
                 Ok(Token::ScalarVar(name))
             }
             '@' => {
@@ -1952,6 +1977,14 @@ mod tests {
         let t = l.tokenize().expect("tokenize");
         assert!(matches!(t[0].0, Token::ScalarVar(ref s) if s == "_"));
         assert!(matches!(t[1].0, Token::LBrace));
+    }
+
+    #[test]
+    fn tokenize_braced_scalar_deref_try_tiny() {
+        // `${$code_ref}` ≡ `$$code_ref` (Try::Tiny blesses scalar refs to coderefs).
+        let mut l = Lexer::new("${$code_ref}");
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[0].0, Token::DerefScalarVar(ref s) if s == "code_ref"));
     }
 
     #[test]

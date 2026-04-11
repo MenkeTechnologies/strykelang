@@ -446,13 +446,11 @@ impl Parser {
                         } else {
                             if let Some(expr) = self.try_parse_bareword_stmt_call() {
                                 let stmt = self.maybe_postfix_modifier(expr)?;
-                                self.eat(&Token::Semicolon);
-                                stmt
+                                self.parse_stmt_postfix_modifier(stmt)?
                             } else {
                                 let expr = self.parse_expression()?;
                                 let stmt = self.maybe_postfix_modifier(expr)?;
-                                self.eat(&Token::Semicolon);
-                                stmt
+                                self.parse_stmt_postfix_modifier(stmt)?
                             }
                         }
                     }
@@ -460,13 +458,11 @@ impl Parser {
                         // `foo;` or `{ foo }` — bareword statement is a zero-arg call (topic `$_` at runtime).
                         if let Some(expr) = self.try_parse_bareword_stmt_call() {
                             let stmt = self.maybe_postfix_modifier(expr)?;
-                            self.eat(&Token::Semicolon);
-                            stmt
+                            self.parse_stmt_postfix_modifier(stmt)?
                         } else {
                             let expr = self.parse_expression()?;
                             let stmt = self.maybe_postfix_modifier(expr)?;
-                            self.eat(&Token::Semicolon);
-                            stmt
+                            self.parse_stmt_postfix_modifier(stmt)?
                         }
                     }
                 },
@@ -483,8 +479,7 @@ impl Parser {
                 _ => {
                     let expr = self.parse_expression()?;
                     let stmt = self.maybe_postfix_modifier(expr)?;
-                    self.eat(&Token::Semicolon);
-                    stmt
+                    self.parse_stmt_postfix_modifier(stmt)?
                 }
             };
 
@@ -593,24 +588,26 @@ impl Parser {
         Ok(stmt)
     }
 
-    /// Block body for postfix `pmap` / `pfor` / … — bare `{ }` or `do { }` ([`ExprKind::Do`](ExprKind::Do)([`CodeRef`](ExprKind::CodeRef))).
+    /// Block body for postfix `pmap` / `pfor` / … — bare `{ }`, `do { }`, or any expression
+    /// statement (wrapped as a one-line block, e.g. `` `cmd` pfor @a ``).
     fn stmt_into_parallel_block(&self, stmt: Statement) -> PerlResult<Block> {
         let line = stmt.line;
         match stmt.kind {
             StmtKind::Block(block) => Ok(block),
             StmtKind::Expression(expr) => {
-                if let ExprKind::Do(inner) = expr.kind {
-                    if let ExprKind::CodeRef { body, .. } = inner.kind {
-                        return Ok(body);
+                if let ExprKind::Do(ref inner) = expr.kind {
+                    if let ExprKind::CodeRef { ref body, .. } = inner.kind {
+                        return Ok(body.clone());
                     }
                 }
-                Err(self.syntax_err(
-                    "postfix parallel op expects `do { }` or a bare `{ }` block",
+                Ok(vec![Statement {
+                    label: None,
+                    kind: StmtKind::Expression(expr),
                     line,
-                ))
+                }])
             }
             _ => Err(self.syntax_err(
-                "postfix parallel op expects `do { }` or a bare `{ }` block",
+                "postfix parallel op expects `do { }`, a bare `{ }` block, or an expression statement",
                 line,
             )),
         }
@@ -1601,11 +1598,20 @@ impl Parser {
                     s.push('@');
                     s.push_str(&v);
                 }
+                // Bare `@` / `%` in prototypes (e.g. Try::Tiny's `sub try (&;@)`).
+                Token::ArrayAt => {
+                    self.advance();
+                    s.push('@');
+                }
                 Token::HashVar(v) => {
                     let v = v.clone();
                     self.advance();
                     s.push('%');
                     s.push_str(&v);
+                }
+                Token::HashPercent => {
+                    self.advance();
+                    s.push('%');
                 }
                 Token::Plus => {
                     self.advance();
@@ -1859,13 +1865,24 @@ impl Parser {
             decls.push(self.parse_var_decl(allow_type_annotation)?);
         }
 
-        // Optional initializer: my $x = expr
+        // Optional initializer: my $x = expr — plus `our @EXPORT = our @EXPORT_OK = qw(...)` (Try::Tiny).
         if self.eat(&Token::Assign) {
+            if keyword == "our" && decls.len() == 1 {
+                while matches!(self.peek(), Token::Ident(ref i) if i == "our") {
+                    self.advance();
+                    decls.push(self.parse_var_decl(allow_type_annotation)?);
+                    if !self.eat(&Token::Assign) {
+                        return Err(self.syntax_err(
+                            "expected `=` after `our` in chained our-declaration",
+                            self.peek_line(),
+                        ));
+                    }
+                }
+            }
             let val = self.parse_expression()?;
             if decls.len() == 1 {
                 decls[0].initializer = Some(val);
             } else {
-                // List assignment: distribute to each decl from the list
                 for decl in &mut decls {
                     decl.initializer = Some(val.clone());
                 }
@@ -4270,14 +4287,35 @@ impl Parser {
                 })
             }
             "map" => {
-                let (block, list) = self.parse_block_list()?;
-                Ok(Expr {
-                    kind: ExprKind::MapExpr {
-                        block,
-                        list: Box::new(list),
-                    },
-                    line,
-                })
+                if matches!(self.peek(), Token::LBrace) {
+                    let (block, list) = self.parse_block_list()?;
+                    Ok(Expr {
+                        kind: ExprKind::MapExpr {
+                            block,
+                            list: Box::new(list),
+                        },
+                        line,
+                    })
+                } else {
+                    let expr = self.parse_assign_expr()?;
+                    self.expect(&Token::Comma)?;
+                    let list_parts = self.parse_list_until_terminator()?;
+                    let list_expr = if list_parts.len() == 1 {
+                        list_parts.into_iter().next().unwrap()
+                    } else {
+                        Expr {
+                            kind: ExprKind::List(list_parts),
+                            line,
+                        }
+                    };
+                    Ok(Expr {
+                        kind: ExprKind::MapExprComma {
+                            expr: Box::new(expr),
+                            list: Box::new(list_expr),
+                        },
+                        line,
+                    })
+                }
             }
             "match" => self.parse_algebraic_match_expr(line),
             "grep" => {

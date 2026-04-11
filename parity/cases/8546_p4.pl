@@ -86,14 +86,14 @@ my $v8546_L81 = __LINE__;
 my $v8546_L82 = __FILE__;
 my $v8546_L83 = __PACKAGE__;
 my $v8546_L84 = wantarray;
-my $v8546_L85 = prototype "CORE::length";
-my $v8546_L86 = defined &{"CORE::lc"};
-my $v8546_L87 = caller(0);
+my $v8546_L85 = scalar split /::/, __PACKAGE__ . "::p8546", -1;
+my $v8546_L86 = (lc("Ab903635700") =~ /^ab/) + 0;
+my $v8546_L87 = (8546 ^ 87) & 255;
 my $v8546_L88 = getppid;
 my $v8546_L89 = times;
 my $v8546_L90 = sleep 0;
 my $v8546_L91 = alarm 0;
-my $v8546_L92 = readpipe("true");
+my $v8546_L92 = (`true` eq "") + 0;
 my $v8546_L93 = select(STDOUT);
 my $v8546_L94 = fileno STDIN;
 sub s9293 { return $_[0] + $_[1]; }
