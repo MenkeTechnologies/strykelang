@@ -1280,11 +1280,7 @@ impl<'a> VM<'a> {
                 self.interp.scope.restore_capture(env);
             }
             let line = self.line();
-            let argv = self
-                .interp
-                .scope
-                .take_sub_underscore()
-                .unwrap_or_default();
+            let argv = self.interp.scope.take_sub_underscore().unwrap_or_default();
             self.interp
                 .apply_sub_signature(sub.as_ref(), &argv, line)
                 .map_err(|e| e.at_line(line))?;
@@ -1896,11 +1892,7 @@ impl<'a> VM<'a> {
                         self.interp.scope.restore_capture(env);
                     }
                     let line = self.line();
-                    let argv = self
-                        .interp
-                        .scope
-                        .take_sub_underscore()
-                        .unwrap_or_default();
+                    let argv = self.interp.scope.take_sub_underscore().unwrap_or_default();
                     self.interp
                         .apply_sub_signature(sub.as_ref(), &argv, line)
                         .map_err(|e| e.at_line(line))?;
@@ -5421,11 +5413,7 @@ impl<'a> VM<'a> {
                                 self.interp.scope.restore_capture(env);
                             }
                             let line = self.line();
-                            let argv = self
-                                .interp
-                                .scope
-                                .take_sub_underscore()
-                                .unwrap_or_default();
+                            let argv = self.interp.scope.take_sub_underscore().unwrap_or_default();
                             self.interp
                                 .apply_sub_signature(sub.as_ref(), &argv, line)
                                 .map_err(|e| e.at_line(line))?;

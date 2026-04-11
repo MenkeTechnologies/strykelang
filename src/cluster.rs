@@ -141,7 +141,8 @@ pub fn run_cluster(
 
     // Collect results in seq order. We allocate the full vector up-front and assign by
     // index so we don't depend on receive order — slot threads complete jobs in any order.
-    let mut results: Vec<Option<Result<PerlValue, String>>> = (0..items.len()).map(|_| None).collect();
+    let mut results: Vec<Option<Result<PerlValue, String>>> =
+        (0..items.len()).map(|_| None).collect();
     let mut received = 0usize;
     while received < items.len() {
         match result_rx.recv() {
@@ -357,27 +358,25 @@ impl SlotSession {
             proto_version: PROTO_VERSION,
             pe_version: env!("CARGO_PKG_VERSION").to_string(),
         };
-        send_msg(&mut stdin, frame_kind::HELLO, &hello)
-            .map_err(|e| format!("send HELLO: {e}"))?;
-        let (kind, body) = read_typed_frame(&mut stdout)
-            .map_err(|e| format!("read HELLO_ACK: {e}"))?;
+        send_msg(&mut stdin, frame_kind::HELLO, &hello).map_err(|e| format!("send HELLO: {e}"))?;
+        let (kind, body) =
+            read_typed_frame(&mut stdout).map_err(|e| format!("read HELLO_ACK: {e}"))?;
         if kind != frame_kind::HELLO_ACK {
             return Err(format!("expected HELLO_ACK, got frame kind {kind:#04x}"));
         }
-        let _: HelloAck = bincode::deserialize(&body)
-            .map_err(|e| format!("decode HELLO_ACK: {e}"))?;
+        let _: HelloAck =
+            bincode::deserialize(&body).map_err(|e| format!("decode HELLO_ACK: {e}"))?;
 
-        // 2. SESSION_INIT. `init` is an `Arc<SessionInit>`; deref through `&*init` instead
-        // of `as_ref()` because `Arc::as_ref` would return `&Arc<SessionInit>` here.
-        send_msg(&mut stdin, frame_kind::SESSION_INIT, &**&init)
+        // 2. SESSION_INIT (`init` is `&SessionInit` via deref coercion from `&Arc<SessionInit>`).
+        send_msg(&mut stdin, frame_kind::SESSION_INIT, init)
             .map_err(|e| format!("send SESSION_INIT: {e}"))?;
-        let (kind, body) = read_typed_frame(&mut stdout)
-            .map_err(|e| format!("read SESSION_ACK: {e}"))?;
+        let (kind, body) =
+            read_typed_frame(&mut stdout).map_err(|e| format!("read SESSION_ACK: {e}"))?;
         if kind != frame_kind::SESSION_ACK {
             return Err(format!("expected SESSION_ACK, got frame kind {kind:#04x}"));
         }
-        let ack: SessionAck = bincode::deserialize(&body)
-            .map_err(|e| format!("decode SESSION_ACK: {e}"))?;
+        let ack: SessionAck =
+            bincode::deserialize(&body).map_err(|e| format!("decode SESSION_ACK: {e}"))?;
         if !ack.ok {
             return Err(format!("worker rejected session: {}", ack.err_msg));
         }
@@ -401,8 +400,9 @@ impl SlotSession {
                     }
                 }
                 Ok((other, _)) => {
-                    let _ = resp_tx
-                        .send(Err(format!("unexpected frame kind {other:#04x} in resp loop")));
+                    let _ = resp_tx.send(Err(format!(
+                        "unexpected frame kind {other:#04x} in resp loop"
+                    )));
                     return;
                 }
                 Err(e) => {
@@ -426,10 +426,7 @@ impl SlotSession {
         };
         send_msg(&mut self.stdin, frame_kind::JOB, &msg)
             .map_err(|e| SlotError::Transport(format!("send JOB: {e}")))?;
-        match self
-            .resp_rx
-            .recv_timeout(Duration::from_millis(timeout_ms))
-        {
+        match self.resp_rx.recv_timeout(Duration::from_millis(timeout_ms)) {
             Ok(Ok(r)) => Ok(r),
             Ok(Err(e)) => Err(SlotError::Transport(e)),
             Err(RecvTimeoutError::Timeout) => Err(SlotError::Timeout),

@@ -549,7 +549,10 @@ pub enum Op {
     /// pflat_map { BLOCK } @list — flatten array results; output in **input order**; stack same as [`Op::PMapWithBlock`]
     PFlatMapWithBlock(u16),
     /// `pmap_on` / `pflat_map_on` over SSH — stack: \[progress_flag, list, cluster\] → \[mapped\]; `flat` = 1 for flatten
-    PMapRemote { block_idx: u16, flat: u8 },
+    PMapRemote {
+        block_idx: u16,
+        flat: u8,
+    },
     /// puniq LIST — hash-partition parallel distinct (first occurrence order); stack: \[progress_flag, list\] → \[array\]
     Puniq,
     /// pfirst { BLOCK } LIST — short-circuit parallel; stack: \[progress_flag, list\] → value or undef

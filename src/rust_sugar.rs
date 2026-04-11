@@ -322,7 +322,8 @@ mod tests {
 
     #[test]
     fn simple_rust_block_is_replaced_with_begin_call() {
-        let src = "rust { pub extern \"C\" fn add(a: i64, b: i64) -> i64 { a + b } }\nprint add(1, 2);\n";
+        let src =
+            "rust { pub extern \"C\" fn add(a: i64, b: i64) -> i64 { a + b } }\nprint add(1, 2);\n";
         let out = desugar_rust_blocks(src);
         assert!(out.contains("BEGIN"), "no BEGIN: {out}");
         assert!(out.contains("__perlrs_rust_compile"), "no builtin call");

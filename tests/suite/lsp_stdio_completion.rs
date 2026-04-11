@@ -165,7 +165,8 @@ impl LspHarness {
                 panic!("timeout waiting for diagnostics; stderr:\n{err}");
             }
             let msg = read_msg(&mut self.reader);
-            if msg.get("method").and_then(Value::as_str) == Some("textDocument/publishDiagnostics") {
+            if msg.get("method").and_then(Value::as_str) == Some("textDocument/publishDiagnostics")
+            {
                 break;
             }
         }
@@ -424,7 +425,10 @@ fn lsp_stdio_hover_sub_decl_line() {
     let result = h.hover(1, 3);
     h.finish();
     let contents = result.get("contents").expect("hover contents");
-    let value = contents.get("value").and_then(Value::as_str).expect("value");
+    let value = contents
+        .get("value")
+        .and_then(Value::as_str)
+        .expect("value");
     assert!(
         value.contains("Subroutine") && value.contains("yellow_minion"),
         "unexpected hover: {value}"
@@ -456,7 +460,7 @@ fn lsp_stdio_document_symbol_lists_sub() {
         .filter_map(|s| s.get("name").and_then(Value::as_str))
         .collect();
     assert!(
-        names.iter().any(|n| *n == "sub yellow_minion"),
+        names.contains(&"sub yellow_minion"),
         "expected sub in {:?}",
         names
     );
@@ -474,7 +478,7 @@ fn lsp_stdio_resolve_completion_adds_function_doc() {
         .pointer("/documentation/value")
         .and_then(Value::as_str)
         .expect("resolved documentation markdown");
-       assert!(
+    assert!(
         doc.contains("Subroutine") && doc.contains("this document"),
         "unexpected resolve doc: {doc}"
     );
@@ -535,7 +539,10 @@ fn lsp_stdio_rename_sub_returns_workspace_edits() {
     let mut h = LspHarness::new("sub yellow_minion { }\nyellow_minion();\n");
     let r = h.rename(1, 3, "banana");
     h.finish();
-    let changes = r.get("changes").and_then(Value::as_object).expect("changes map");
+    let changes = r
+        .get("changes")
+        .and_then(Value::as_object)
+        .expect("changes map");
     let edit_lists: Vec<usize> = changes
         .values()
         .filter_map(|v| v.as_array().map(Vec::len))

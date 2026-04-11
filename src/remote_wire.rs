@@ -6,7 +6,7 @@
 //! The single-byte `kind` discriminator lets future revisions add message types without
 //! breaking older workers — an unknown kind is a hard error so version skew is loud.
 //!
-//! ### Message flow (v2 — persistent session)
+//! ### Message flow (v3 — persistent session)
 //!
 //! ```text
 //! dispatcher                    worker
@@ -27,6 +27,10 @@
 //! Why this beats the basic v1 protocol: subs prelude + block source ship **once** per
 //! session instead of once per item, the parser+compiler runs once per worker instead of
 //! once per job, and one ssh handshake amortizes across the whole map.
+//!
+//! Dynamic [`serde_json::Value`] fields are embedded as JSON UTF-8 bytes inside the bincode
+//! envelope (v3+). Bincode cannot deserialize `Value` directly (`deserialize_any`); nested
+//! JSON keeps the on-wire type self-describing.
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -57,7 +61,58 @@ pub mod frame_kind {
 /// Wire protocol version. Bumped whenever the layout of an existing message changes in a
 /// backwards-incompatible way. The HELLO handshake fails fast on version mismatch so
 /// dispatcher and worker never silently disagree on layout.
-pub const PROTO_VERSION: u32 = 2;
+pub const PROTO_VERSION: u32 = 3;
+
+mod json_value_bincode {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S>(value: &serde_json::Value, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let buf = serde_json::to_vec(value).map_err(serde::ser::Error::custom)?;
+        buf.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<serde_json::Value, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let buf: Vec<u8> = Vec::deserialize(deserializer)?;
+        serde_json::from_slice(&buf).map_err(serde::de::Error::custom)
+    }
+}
+
+mod capture_json_bincode {
+    use serde::{de::Deserializer, ser::SerializeSeq, Deserialize, Serializer};
+
+    pub fn serialize<S>(v: &[(String, serde_json::Value)], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(v.len()))?;
+        for (k, val) in v {
+            let enc = serde_json::to_vec(val).map_err(serde::ser::Error::custom)?;
+            seq.serialize_element(&(k, enc))?;
+        }
+        seq.end()
+    }
+
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<Vec<(String, serde_json::Value)>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let raw: Vec<(String, Vec<u8>)> = Vec::deserialize(deserializer)?;
+        let mut out = Vec::with_capacity(raw.len());
+        for (k, enc) in raw {
+            let val = serde_json::from_slice(&enc).map_err(serde::de::Error::custom)?;
+            out.push((k, val));
+        }
+        Ok(out)
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HelloMsg {
@@ -78,6 +133,7 @@ pub struct HelloAck {
 pub struct SessionInit {
     pub subs_prelude: String,
     pub block_src: String,
+    #[serde(with = "capture_json_bincode")]
     pub capture: Vec<(String, serde_json::Value)>,
 }
 
@@ -90,6 +146,7 @@ pub struct SessionAck {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JobMsg {
     pub seq: u64,
+    #[serde(with = "json_value_bincode")]
     pub item: serde_json::Value,
 }
 
@@ -97,6 +154,7 @@ pub struct JobMsg {
 pub struct JobRespMsg {
     pub seq: u64,
     pub ok: bool,
+    #[serde(with = "json_value_bincode")]
     pub result: serde_json::Value,
     pub err_msg: String,
 }
@@ -152,7 +210,9 @@ pub struct RemoteJobV1 {
     pub seq: u64,
     pub subs_prelude: String,
     pub block_src: String,
+    #[serde(with = "capture_json_bincode")]
     pub capture: Vec<(String, serde_json::Value)>,
+    #[serde(with = "json_value_bincode")]
     pub item: serde_json::Value,
 }
 
@@ -160,6 +220,7 @@ pub struct RemoteJobV1 {
 pub struct RemoteRespV1 {
     pub seq: u64,
     pub ok: bool,
+    #[serde(with = "json_value_bincode")]
     pub result: serde_json::Value,
     pub err_msg: String,
 }
@@ -388,7 +449,7 @@ pub fn run_job_local(job: &RemoteJobV1) -> RemoteRespV1 {
     }
 }
 
-/// Persistent v2 worker session: handles many jobs over a single stdin/stdout pair, with
+/// Persistent v3 worker session: handles many jobs over a single stdin/stdout pair, with
 /// one Interpreter and one parsed block shared across the whole session.
 ///
 /// Protocol order: HELLO → HELLO_ACK → SESSION_INIT → SESSION_ACK → JOB / JOB_RESP loop
@@ -654,7 +715,11 @@ pub fn run_remote_worker_stdio() -> i32 {
     }
 }
 
-pub fn ssh_invoke_remote_worker(host: &str, pe_bin: &str, job: &RemoteJobV1) -> Result<RemoteRespV1, String> {
+pub fn ssh_invoke_remote_worker(
+    host: &str,
+    pe_bin: &str,
+    job: &RemoteJobV1,
+) -> Result<RemoteRespV1, String> {
     let payload = encode_job(job)?;
     let mut child = Command::new("ssh")
         .arg(host)
@@ -668,8 +733,14 @@ pub fn ssh_invoke_remote_worker(host: &str, pe_bin: &str, job: &RemoteJobV1) -> 
     let mut stdin = child.stdin.take().ok_or_else(|| "ssh: stdin".to_string())?;
     write_framed(&mut stdin, &payload).map_err(|e| format!("ssh stdin: {e}"))?;
     drop(stdin);
-       let mut stdout = child.stdout.take().ok_or_else(|| "ssh: stdout".to_string())?;
-    let mut stderr = child.stderr.take().ok_or_else(|| "ssh: stderr".to_string())?;
+    let mut stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "ssh: stdout".to_string())?;
+    let mut stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| "ssh: stderr".to_string())?;
     let stderr_task = std::thread::spawn(move || {
         let mut s = String::new();
         let _ = stderr.read_to_string(&mut s);
@@ -696,6 +767,22 @@ pub fn ssh_invoke_remote_worker(host: &str, pe_bin: &str, job: &RemoteJobV1) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn job_resp_msg_bincode_roundtrip() {
+        let msg = JobRespMsg {
+            seq: 1,
+            ok: true,
+            result: serde_json::json!(42i64),
+            err_msg: String::new(),
+        };
+        let bytes = bincode::serialize(&msg).unwrap();
+        let back: JobRespMsg = bincode::deserialize(&bytes).unwrap();
+        assert_eq!(back.seq, msg.seq);
+        assert_eq!(back.ok, msg.ok);
+        assert_eq!(back.result, msg.result);
+        assert_eq!(back.err_msg, msg.err_msg);
+    }
 
     #[test]
     fn local_roundtrip_doubles() {

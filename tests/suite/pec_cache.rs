@@ -20,11 +20,7 @@ fn tmp_path(tag: &str) -> PathBuf {
     ))
 }
 
-fn run_with_cache(
-    exe: &str,
-    cache_dir: &PathBuf,
-    script: &PathBuf,
-) -> std::process::Output {
+fn run_with_cache(exe: &str, cache_dir: &PathBuf, script: &PathBuf) -> std::process::Output {
     Command::new(exe)
         .env("PERLRS_BC_CACHE", "1")
         .env("PERLRS_BC_DIR", cache_dir)
@@ -53,11 +49,7 @@ fn pec_first_run_writes_cache_warm_run_reuses_it() {
     let pec_files: Vec<_> = fs::read_dir(&cache_dir)
         .unwrap()
         .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.file_name()
-                .to_string_lossy()
-                .ends_with(".pec")
-        })
+        .filter(|e| e.file_name().to_string_lossy().ends_with(".pec"))
         .collect();
     assert_eq!(
         pec_files.len(),
@@ -69,7 +61,10 @@ fn pec_first_run_writes_cache_warm_run_reuses_it() {
     assert!(pec_size > 0, ".pec file is empty");
 
     // Warm: same script → must produce identical output without rewriting the cache.
-    let cache_mtime_before = fs::metadata(pec_files[0].path()).unwrap().modified().unwrap();
+    let cache_mtime_before = fs::metadata(pec_files[0].path())
+        .unwrap()
+        .modified()
+        .unwrap();
     let warm = run_with_cache(exe, &cache_dir, &script);
     assert!(
         warm.status.success(),
@@ -77,7 +72,10 @@ fn pec_first_run_writes_cache_warm_run_reuses_it() {
         String::from_utf8_lossy(&warm.stderr)
     );
     assert_eq!(String::from_utf8_lossy(&warm.stdout), "55\n");
-    let cache_mtime_after = fs::metadata(pec_files[0].path()).unwrap().modified().unwrap();
+    let cache_mtime_after = fs::metadata(pec_files[0].path())
+        .unwrap()
+        .modified()
+        .unwrap();
     // The save path is gated on `pec_cache_fingerprint` being set, which is taken on cache
     // miss only — so a warm hit must NOT rewrite the file.
     assert_eq!(

@@ -408,10 +408,7 @@ pub(crate) fn try_builtin(
         "__perlrs_rust_compile" => {
             let body = args.first().map(|v| v.to_string()).unwrap_or_default();
             let bline = args.get(1).map(|v| v.to_int() as usize).unwrap_or(line);
-            Some(
-                crate::rust_ffi::compile_and_register(&body, bline)
-                    .map(|()| PerlValue::UNDEF),
-            )
+            Some(crate::rust_ffi::compile_and_register(&body, bline).map(|()| PerlValue::UNDEF))
         }
         _ => crate::rust_ffi::try_call(name, args, line),
     }
@@ -1078,7 +1075,9 @@ fn builtin_canonpath(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(crate::perl_fs::canonpath_logical(&path)))
 }
 
-fn localtime_parts(secs: i64, utc: bool) -> Option<(i64, i64, i64, i64, i64, i64, i64, i64, i64)> {
+type LocaltimeParts = (i64, i64, i64, i64, i64, i64, i64, i64, i64);
+
+fn localtime_parts(secs: i64, utc: bool) -> Option<LocaltimeParts> {
     if utc {
         let dt = Utc.timestamp_opt(secs, 0).single()?;
         let wday = dt.weekday().num_days_from_sunday() as i64;

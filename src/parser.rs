@@ -2199,10 +2199,7 @@ impl Parser {
                 Ok(Statement {
                     label: None,
                     kind: StmtKind::Expression(Expr {
-                        kind: ExprKind::CodeRef {
-                            params,
-                            body,
-                        },
+                        kind: ExprKind::CodeRef { params, body },
                         line,
                     }),
                     line,
@@ -2305,11 +2302,7 @@ impl Parser {
         self.parse_stmt_postfix_modifier(stmt)
     }
 
-    fn parse_decl_hash_destructure(
-        &mut self,
-        keyword: &str,
-        line: usize,
-    ) -> PerlResult<Statement> {
+    fn parse_decl_hash_destructure(&mut self, keyword: &str, line: usize) -> PerlResult<Statement> {
         let MatchPattern::Hash(pairs) = self.parse_match_hash_pattern()? else {
             unreachable!("parse_match_hash_pattern returns Hash");
         };
@@ -2342,12 +2335,9 @@ impl Parser {
             line,
         ));
 
-        let has_rest = elems.iter().any(|e| {
-            matches!(
-                e,
-                MatchArrayElem::Rest | MatchArrayElem::RestBind(_)
-            )
-        });
+        let has_rest = elems
+            .iter()
+            .any(|e| matches!(e, MatchArrayElem::Rest | MatchArrayElem::RestBind(_)));
         let fixed_slots = elems
             .iter()
             .filter(|e| {
@@ -2594,7 +2584,8 @@ impl Parser {
         let line = self.peek_line();
         self.advance(); // 'my'/'our'/'local'
 
-        if keyword == "local" && !matches!(self.peek(), Token::LParen | Token::LBracket | Token::LBrace)
+        if keyword == "local"
+            && !matches!(self.peek(), Token::LParen | Token::LBracket | Token::LBrace)
         {
             let target = self.parse_postfix()?;
             let mut initializer: Option<Expr> = None;
@@ -7171,10 +7162,7 @@ impl Parser {
                 let (params, _prototype) = self.parse_sub_sig_or_prototype_opt()?;
                 let body = self.parse_block()?;
                 Ok(Expr {
-                    kind: ExprKind::CodeRef {
-                        params,
-                        body,
-                    },
+                    kind: ExprKind::CodeRef { params, body },
                     line,
                 })
             }

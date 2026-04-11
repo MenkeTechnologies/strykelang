@@ -46,7 +46,10 @@ pub fn source_fingerprint(strict_vars: bool, source_file: &str, code: &str) -> [
 }
 
 pub fn cache_path_for_fingerprint(fp: &[u8; 32]) -> PathBuf {
-    cache_dir().join(format!("{:x}.pec", u128::from_be_bytes(fp[0..16].try_into().unwrap())))
+    cache_dir().join(format!(
+        "{:x}.pec",
+        u128::from_be_bytes(fp[0..16].try_into().unwrap())
+    ))
 }
 
 /// Hex form of full32-byte fingerprint (collision-safe filename).
@@ -92,9 +95,8 @@ impl PecBundle {
     pub fn encode(&self) -> PerlResult<Vec<u8>> {
         let mut out = Vec::new();
         out.extend_from_slice(&Self::MAGIC);
-        let payload = bincode::serialize(self).map_err(|e| {
-            PerlError::runtime(format!("pec: bincode serialize failed: {e}"), 0)
-        })?;
+        let payload = bincode::serialize(self)
+            .map_err(|e| PerlError::runtime(format!("pec: bincode serialize failed: {e}"), 0))?;
         let compressed = zstd::stream::encode_all(&payload[..], Self::ZSTD_LEVEL)
             .map_err(|e| PerlError::runtime(format!("pec: zstd encode failed: {e}"), 0))?;
         out.extend_from_slice(&compressed);
@@ -110,9 +112,8 @@ impl PecBundle {
         }
         let payload = zstd::stream::decode_all(&bytes[4..])
             .map_err(|e| PerlError::runtime(format!("pec: zstd decode failed: {e}"), 0))?;
-        let bundle: PecBundle = bincode::deserialize(&payload).map_err(|e| {
-            PerlError::runtime(format!("pec: bincode deserialize failed: {e}"), 0)
-        })?;
+        let bundle: PecBundle = bincode::deserialize(&payload)
+            .map_err(|e| PerlError::runtime(format!("pec: bincode deserialize failed: {e}"), 0))?;
         if bundle.format_version != Self::FORMAT_VERSION {
             return Err(PerlError::runtime(
                 format!(
@@ -143,7 +144,12 @@ pub fn try_load(expected_fp: &[u8; 32], strict_vars: bool) -> PerlResult<Option<
     let bytes = match fs::read(&path) {
         Ok(b) => b,
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => return Err(PerlError::runtime(format!("pec: read {}: {e}", path.display()), 0)),
+        Err(e) => {
+            return Err(PerlError::runtime(
+                format!("pec: read {}: {e}", path.display()),
+                0,
+            ))
+        }
     };
     let bundle = PecBundle::decode(&bytes)?;
     if bundle.source_fingerprint != *expected_fp {
@@ -163,15 +169,16 @@ pub fn try_save(bundle: &PecBundle) -> PerlResult<()> {
     let path = cache_path(&bundle.source_fingerprint);
     let data = bundle.encode()?;
     let tmp = path.with_extension("pec.tmp");
-    let mut f = fs::File::create(&tmp).map_err(|e| {
-        PerlError::runtime(format!("pec: create {}: {e}", tmp.display()), 0)
-    })?;
-    f.write_all(&data).map_err(|e| {
-        PerlError::runtime(format!("pec: write {}: {e}", tmp.display()), 0)
-    })?;
+    let mut f = fs::File::create(&tmp)
+        .map_err(|e| PerlError::runtime(format!("pec: create {}: {e}", tmp.display()), 0))?;
+    f.write_all(&data)
+        .map_err(|e| PerlError::runtime(format!("pec: write {}: {e}", tmp.display()), 0))?;
     drop(f);
     fs::rename(&tmp, &path).map_err(|e| {
-        PerlError::runtime(format!("pec: rename {} -> {}: {e}", tmp.display(), path.display()), 0)
+        PerlError::runtime(
+            format!("pec: rename {} -> {}: {e}", tmp.display(), path.display()),
+            0,
+        )
     })?;
     Ok(())
 }

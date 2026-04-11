@@ -305,6 +305,7 @@ fn expand_perl_bundled_token(arg: &str) -> Option<Vec<String>> {
 
 fn print_cyberpunk_help() {
     let version = env!("CARGO_PKG_VERSION");
+    let bin = env!("CARGO_BIN_NAME");
     let threads = std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(1);
@@ -331,7 +332,7 @@ fn print_cyberpunk_help() {
     println!();
     println!("A highly parallel Perl 5 interpreter written in Rust");
     println!();
-    println!("{Y}  USAGE:{N} pe [switches] [--] [programfile] [arguments]");
+    println!("{Y}  USAGE:{N} {bin} [switches] [--] [programfile] [arguments]");
     println!();
     println!("{C}  ── EXECUTION ──────────────────────────────────────────{N}");
     println!("  -e CODE                {G}//{N} One line of program (several -e's allowed)");
@@ -343,6 +344,9 @@ fn print_cyberpunk_help() {
     );
     println!("  --ast                  {G}//{N} Dump parsed AST as JSON and exit (no execution)");
     println!("  --fmt                  {G}//{N} Pretty-print parsed Perl to stdout and exit");
+    println!(
+        "  --explain CODE         {G}//{N} Print expanded hint for an error code (e.g. E0001) and exit"
+    );
     println!(
         "  --profile              {G}//{N} Wall-clock profile stderr (VM op lines; flamegraph-ready)"
     );
@@ -382,6 +386,24 @@ fn print_cyberpunk_help() {
     println!("  -v                     {G}//{N} Print version, patchlevel and license");
     println!("  -V[:configvar]         {G}//{N} Print configuration summary");
     println!("  -h, --help             {G}//{N} Print help");
+    println!("{C}  ── TOOLCHAIN ─────────────────────────────────────────{N}");
+    println!(
+        "  --lsp                  {G}//{N} Language Server (JSON-RPC on stdio); must be the only arg after {bin}"
+    );
+    println!(
+        "  build SCRIPT [-o OUT]  {G}//{N} AOT: copy this binary with SCRIPT embedded (standalone exe)"
+    );
+    println!(
+        "  --remote-worker        {G}//{N} Persistent cluster worker (stdio); only arg after {bin}"
+    );
+    println!(
+        "  --remote-worker-v1     {G}//{N} Legacy one-shot worker (stdio); only arg after {bin}"
+    );
+    if bin == "pe" {
+        println!(
+            "  (no switches, TTY stdin) {G}//{N} Interactive REPL (readline; exit with quit or EOF)"
+        );
+    }
     println!("{C}  ── PARALLEL EXTENSIONS (perlrs) ─────────────────────{N}");
     println!("  -j N                   {G}//{N} Set number of parallel threads (rayon)");
     println!(
@@ -967,7 +989,7 @@ fn main() {
     let args = expand_perl_bundled_argv(std::env::args().collect());
 
     if args.len() == 2 && args[1] == "--remote-worker" {
-        // Persistent v2 session loop: HELLO → SESSION_INIT → many JOBs → SHUTDOWN.
+        // Persistent v3 session loop: HELLO → SESSION_INIT → many JOBs → SHUTDOWN.
         // The basic v1 one-shot loop is still reachable via `--remote-worker-v1` for the
         // round-trip integration test.
         process::exit(perlrs::remote_wire::run_remote_worker_session());
@@ -1149,7 +1171,9 @@ fn main() {
         // `strict_vars` enters the fingerprint as `false` here; an eventual [`PecBundle::strict_vars`]
         // mismatch at load time is treated as a miss (see [`perlrs::pec::try_load`]), so two strict
         // modes may collide in one slot without producing wrong answers.
-        Some(perlrs::pec::source_fingerprint(false, &filename, &full_code))
+        Some(perlrs::pec::source_fingerprint(
+            false, &filename, &full_code,
+        ))
     } else {
         None
     };
@@ -1406,9 +1430,15 @@ fn run_build_subcommand(args: &[String]) -> i32 {
             "-h" | "--help" => {
                 println!("usage: pe build SCRIPT [-o OUTPUT]");
                 println!();
-                println!("Compile a Perl script into a standalone executable binary. The output is");
-                println!("a copy of this pe binary with the script source embedded as a compressed");
-                println!("trailer. `scp` the result to any compatible machine and run it directly —");
+                println!(
+                    "Compile a Perl script into a standalone executable binary. The output is"
+                );
+                println!(
+                    "a copy of this pe binary with the script source embedded as a compressed"
+                );
+                println!(
+                    "trailer. `scp` the result to any compatible machine and run it directly —"
+                );
                 println!("no perl, no perlrs, no @INC setup required.");
                 println!();
                 println!("Examples:");

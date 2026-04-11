@@ -3,7 +3,7 @@
 //! Two layers exercised here:
 //!
 //! 1. **Wire protocol vs a real `pe --remote-worker` subprocess.** Spawns the worker
-//!    directly (no ssh), drives the v2 handshake (HELLO → SESSION_INIT → JOB → JOB_RESP →
+//!    directly (no ssh), drives the v3 handshake (HELLO → SESSION_INIT → JOB → JOB_RESP →
 //!    SHUTDOWN) using the public [`perlrs::remote_wire`] helpers, and verifies many JOBs
 //!    flow over a single session. This is the closest we can get to a real cluster without
 //!    actually setting up SSH in CI.
@@ -23,8 +23,8 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 
 use perlrs::remote_wire::{
-    frame_kind, read_typed_frame, send_msg, HelloAck, HelloMsg, JobMsg, JobRespMsg,
-    SessionAck, SessionInit, PROTO_VERSION,
+    frame_kind, read_typed_frame, send_msg, HelloAck, HelloMsg, JobMsg, JobRespMsg, SessionAck,
+    SessionInit, PROTO_VERSION,
 };
 
 fn tmp_path(tag: &str) -> PathBuf {

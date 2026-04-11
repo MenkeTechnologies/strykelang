@@ -4,7 +4,9 @@ use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::OnceLock;
 
-use lsp_server::{Connection, ErrorCode, ExtractError, Message, Notification, ProtocolError, Request, Response};
+use lsp_server::{
+    Connection, ErrorCode, ExtractError, Message, Notification, ProtocolError, Request, Response,
+};
 use lsp_types::notification::Notification as NotificationTrait;
 use lsp_types::notification::{
     DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, PublishDiagnostics,
@@ -22,21 +24,21 @@ use lsp_types::request::Request as RequestTrait;
 use lsp_types::request::ResolveCompletionItem;
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionOptions, CompletionParams, CompletionResponse,
-    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams, Diagnostic,
-    DeclarationCapability, DiagnosticSeverity, DocumentHighlight, DocumentHighlightKind,
-    DocumentHighlightParams, DocumentSymbolParams, DocumentSymbolResponse, Documentation,
-    GotoDefinitionParams, GotoDefinitionResponse, PrepareRenameResponse, ReferenceParams, RenameOptions,
-    RenameParams, Hover, HoverContents, HoverParams, HoverProviderCapability, Location, OneOf, Position,
-    PublishDiagnosticsParams, Range, ServerCapabilities, SymbolInformation,
-    SymbolKind, TextDocumentContentChangeEvent, TextDocumentPositionParams, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextDocumentSyncOptions, TextEdit, Uri, WorkspaceEdit,
-    WorkDoneProgressOptions,
+    DeclarationCapability, Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams,
+    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DocumentHighlight,
+    DocumentHighlightKind, DocumentHighlightParams, DocumentSymbolParams, DocumentSymbolResponse,
+    Documentation, GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams,
+    HoverProviderCapability, Location, OneOf, Position, PrepareRenameResponse,
+    PublishDiagnosticsParams, Range, ReferenceParams, RenameOptions, RenameParams,
+    ServerCapabilities, SymbolInformation, SymbolKind, TextDocumentContentChangeEvent,
+    TextDocumentPositionParams, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, TextEdit, Uri, WorkDoneProgressOptions, WorkspaceEdit,
 };
 use lsp_types::{InsertTextFormat, MarkupContent, MarkupKind};
 use percent_encoding::percent_decode_str;
 
-use crate::ast::{Block, Sigil, StmtKind, SubSigParam, Statement, VarDecl};
 use crate::ast::MatchArrayElem;
+use crate::ast::{Block, Sigil, Statement, StmtKind, SubSigParam, VarDecl};
 use crate::error::{ErrorKind, PerlError};
 use crate::interpreter::Interpreter;
 
@@ -47,13 +49,15 @@ pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>
     let _: lsp_types::InitializeParams = serde_json::from_value(init_params).unwrap_or_default();
 
     let caps = ServerCapabilities {
-        text_document_sync: Some(TextDocumentSyncCapability::Options(TextDocumentSyncOptions {
-            open_close: Some(true),
-            change: Some(TextDocumentSyncKind::FULL),
-            will_save: None,
-            will_save_wait_until: None,
-            save: None,
-        })),
+        text_document_sync: Some(TextDocumentSyncCapability::Options(
+            TextDocumentSyncOptions {
+                open_close: Some(true),
+                change: Some(TextDocumentSyncKind::FULL),
+                will_save: None,
+                will_save_wait_until: None,
+                save: None,
+            },
+        )),
         completion_provider: Some(CompletionOptions {
             resolve_provider: Some(true),
             trigger_characters: Some(vec![
@@ -86,7 +90,7 @@ pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>
     });
     conn.initialize_finish(init_id, init_result)?;
 
-    let mut docs: HashMap<Uri, String> = HashMap::new();
+    let mut docs: HashMap<String, String> = HashMap::new();
 
     for msg in &conn.receiver {
         match msg {
@@ -109,7 +113,7 @@ pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>
 
 fn dispatch_request(
     conn: &Connection,
-    docs: &mut HashMap<Uri, String>,
+    docs: &mut HashMap<String, String>,
     req: Request,
 ) -> Result<(), ProtocolError> {
     if req.method == DocumentSymbolRequest::METHOD {
@@ -261,19 +265,20 @@ fn dispatch_request(
 
     if req.method == DocumentHighlightRequest::METHOD {
         let req_id = req.id.clone();
-        let (id, params) = match req.extract::<DocumentHighlightParams>(DocumentHighlightRequest::METHOD) {
-            Ok(p) => p,
-            Err(ExtractError::JsonError { method, error }) => {
-                let resp = Response::new_err(
-                    req_id,
-                    ErrorCode::InvalidParams as i32,
-                    format!("{method}: {error}"),
-                );
-                conn.sender.send(resp.into()).expect("lsp channel");
-                return Ok(());
-            }
-            Err(ExtractError::MethodMismatch(_)) => unreachable!(),
-        };
+        let (id, params) =
+            match req.extract::<DocumentHighlightParams>(DocumentHighlightRequest::METHOD) {
+                Ok(p) => p,
+                Err(ExtractError::JsonError { method, error }) => {
+                    let resp = Response::new_err(
+                        req_id,
+                        ErrorCode::InvalidParams as i32,
+                        format!("{method}: {error}"),
+                    );
+                    conn.sender.send(resp.into()).expect("lsp channel");
+                    return Ok(());
+                }
+                Err(ExtractError::MethodMismatch(_)) => unreachable!(),
+            };
         let result = document_highlight(docs, params);
         let resp = Response::new_ok(id, result);
         conn.sender.send(resp.into()).expect("lsp channel");
@@ -282,19 +287,20 @@ fn dispatch_request(
 
     if req.method == PrepareRenameRequest::METHOD {
         let req_id = req.id.clone();
-        let (id, params) = match req.extract::<TextDocumentPositionParams>(PrepareRenameRequest::METHOD) {
-            Ok(p) => p,
-            Err(ExtractError::JsonError { method, error }) => {
-                let resp = Response::new_err(
-                    req_id,
-                    ErrorCode::InvalidParams as i32,
-                    format!("{method}: {error}"),
-                );
-                conn.sender.send(resp.into()).expect("lsp channel");
-                return Ok(());
-            }
-            Err(ExtractError::MethodMismatch(_)) => unreachable!(),
-        };
+        let (id, params) =
+            match req.extract::<TextDocumentPositionParams>(PrepareRenameRequest::METHOD) {
+                Ok(p) => p,
+                Err(ExtractError::JsonError { method, error }) => {
+                    let resp = Response::new_err(
+                        req_id,
+                        ErrorCode::InvalidParams as i32,
+                        format!("{method}: {error}"),
+                    );
+                    conn.sender.send(resp.into()).expect("lsp channel");
+                    return Ok(());
+                }
+                Err(ExtractError::MethodMismatch(_)) => unreachable!(),
+            };
         let result = prepare_rename(docs, params);
         let resp = Response::new_ok(id, result);
         conn.sender.send(resp.into()).expect("lsp channel");
@@ -333,13 +339,16 @@ fn dispatch_request(
 
 fn dispatch_notification(
     conn: &Connection,
-    docs: &mut HashMap<Uri, String>,
+    docs: &mut HashMap<String, String>,
     not: Notification,
 ) -> Result<(), ProtocolError> {
-    if let Ok(params) = not.clone().extract::<DidOpenTextDocumentParams>(DidOpenTextDocument::METHOD) {
+    if let Ok(params) = not
+        .clone()
+        .extract::<DidOpenTextDocumentParams>(DidOpenTextDocument::METHOD)
+    {
         let uri = params.text_document.uri;
         let text = params.text_document.text;
-        docs.insert(uri.clone(), text.clone());
+        docs.insert(uri.to_string(), text.clone());
         publish_diagnostics(conn, &uri, &text, &uri_to_path(&uri))?;
         return Ok(());
     }
@@ -348,14 +357,14 @@ fn dispatch_notification(
         .extract::<DidChangeTextDocumentParams>(DidChangeTextDocument::METHOD)
     {
         let uri = params.text_document.uri;
-        let text = merge_full_change(docs.get(&uri), params.content_changes);
-        docs.insert(uri.clone(), text.clone());
+        let text = merge_full_change(docs.get(uri.as_str()), params.content_changes);
+        docs.insert(uri.to_string(), text.clone());
         publish_diagnostics(conn, &uri, &text, &uri_to_path(&uri))?;
         return Ok(());
     }
     if let Ok(params) = not.extract::<DidCloseTextDocumentParams>(DidCloseTextDocument::METHOD) {
         let uri = params.text_document.uri;
-        docs.remove(&uri);
+        docs.remove(uri.as_str());
         let n = Notification::new(
             PublishDiagnostics::METHOD.to_string(),
             PublishDiagnosticsParams::new(uri, Vec::new(), None),
@@ -366,7 +375,10 @@ fn dispatch_notification(
     Ok(())
 }
 
-fn merge_full_change(prev: Option<&String>, changes: Vec<TextDocumentContentChangeEvent>) -> String {
+fn merge_full_change(
+    prev: Option<&String>,
+    changes: Vec<TextDocumentContentChangeEvent>,
+) -> String {
     if let Some(c) = changes.into_iter().last() {
         return c.text;
     }
@@ -379,7 +391,7 @@ fn uri_to_path(uri: &Uri) -> String {
         let path_bytes = if rest.starts_with('/') {
             rest.as_bytes()
         } else if let Some(i) = rest.find('/') {
-            rest[i..].as_bytes()
+            &rest.as_bytes()[i..]
         } else {
             rest.as_bytes()
         };
@@ -422,8 +434,13 @@ fn compute_diagnostics(text: &str, path: &str) -> Vec<Diagnostic> {
 
 fn perror_to_diagnostic(e: &PerlError, source: &str) -> Diagnostic {
     let severity = Some(match e.kind {
-        ErrorKind::Syntax | ErrorKind::Runtime | ErrorKind::Type | ErrorKind::UndefinedVariable
-        | ErrorKind::UndefinedSubroutine | ErrorKind::Regex | ErrorKind::DivisionByZero
+        ErrorKind::Syntax
+        | ErrorKind::Runtime
+        | ErrorKind::Type
+        | ErrorKind::UndefinedVariable
+        | ErrorKind::UndefinedSubroutine
+        | ErrorKind::Regex
+        | ErrorKind::DivisionByZero
         | ErrorKind::Die => DiagnosticSeverity::ERROR,
         ErrorKind::FileNotFound | ErrorKind::IO => DiagnosticSeverity::WARNING,
         ErrorKind::Exit(_) => DiagnosticSeverity::HINT,
@@ -461,9 +478,12 @@ fn line_range_utf16(source: &str, line_1based: usize) -> Range {
     }
 }
 
-fn document_symbols(docs: &HashMap<Uri, String>, params: DocumentSymbolParams) -> DocumentSymbolResponse {
+fn document_symbols(
+    docs: &HashMap<String, String>,
+    params: DocumentSymbolParams,
+) -> DocumentSymbolResponse {
     let uri = params.text_document.uri;
-    let Some(text) = docs.get(&uri) else {
+    let Some(text) = docs.get(uri.as_str()) else {
         return DocumentSymbolResponse::Flat(Vec::new());
     };
     let path = uri_to_path(&uri);
@@ -549,9 +569,7 @@ fn walk_stmt(
             }
         }
         StmtKind::Unless {
-            body,
-            else_block,
-            ..
+            body, else_block, ..
         } => {
             walk_block(body, uri, source, symbols, container);
             if let Some(b) = else_block {
@@ -704,7 +722,11 @@ fn collect_sub_fqns_stmt(stmt: &Statement, pkg: &mut String, m: &mut HashMap<Str
         | StmtKind::Empty
         | StmtKind::StructDecl { .. }
         | StmtKind::FormatDecl { .. } => {}
-        StmtKind::Foreach { body, continue_block, .. } => {
+        StmtKind::Foreach {
+            body,
+            continue_block,
+            ..
+        } => {
             collect_sub_fqns_block(body, pkg, m);
             if let Some(b) = continue_block {
                 collect_sub_fqns_block(b, pkg, m);
@@ -733,9 +755,7 @@ fn collect_sub_fqns_stmt(stmt: &Statement, pkg: &mut String, m: &mut HashMap<Str
             }
         }
         StmtKind::Unless {
-            body,
-            else_block,
-            ..
+            body, else_block, ..
         } => {
             collect_sub_fqns_block(body, pkg, m);
             if let Some(b) = else_block {
@@ -875,10 +895,10 @@ fn hover_markdown_for_word(word: &str, text: &str, path: &str) -> Option<String>
     None
 }
 
-fn hover(docs: &HashMap<Uri, String>, params: HoverParams) -> Option<Hover> {
+fn hover(docs: &HashMap<String, String>, params: HoverParams) -> Option<Hover> {
     let tdp = params.text_document_position_params;
     let uri = tdp.text_document.uri;
-    let text = docs.get(&uri)?;
+    let text = docs.get(uri.as_str())?;
     let pos = tdp.position;
     let path = uri_to_path(&uri);
     let lines: Vec<&str> = text.lines().collect();
@@ -900,10 +920,13 @@ fn hover(docs: &HashMap<Uri, String>, params: HoverParams) -> Option<Hover> {
     })
 }
 
-fn goto_definition(docs: &HashMap<Uri, String>, params: GotoDefinitionParams) -> Option<GotoDefinitionResponse> {
+fn goto_definition(
+    docs: &HashMap<String, String>,
+    params: GotoDefinitionParams,
+) -> Option<GotoDefinitionResponse> {
     let tdp = params.text_document_position_params;
     let uri = tdp.text_document.uri;
-    let text = docs.get(&uri)?;
+    let text = docs.get(uri.as_str())?;
     let pos = tdp.position;
     let path = uri_to_path(&uri);
     let lines: Vec<&str> = text.lines().collect();
@@ -942,12 +965,12 @@ fn highlights_for_identifier(source: &str, needle: &str) -> Vec<DocumentHighligh
                 || line[..abs_start]
                     .chars()
                     .last()
-                    .map_or(true, |c| !is_ident_char(c));
+                    .is_none_or(|c| !is_ident_char(c));
             let after_ok = abs_end >= line.len()
                 || line[abs_end..]
                     .chars()
                     .next()
-                    .map_or(true, |c| !is_ident_char(c));
+                    .is_none_or(|c| !is_ident_char(c));
             if before_ok && after_ok {
                 out.push(DocumentHighlight {
                     range: range_on_line(line, line0, abs_start, abs_end),
@@ -961,12 +984,12 @@ fn highlights_for_identifier(source: &str, needle: &str) -> Vec<DocumentHighligh
 }
 
 fn document_highlight(
-    docs: &HashMap<Uri, String>,
+    docs: &HashMap<String, String>,
     params: DocumentHighlightParams,
 ) -> Option<Vec<DocumentHighlight>> {
     let tdp = params.text_document_position_params;
     let uri = tdp.text_document.uri;
-    let text = docs.get(&uri)?;
+    let text = docs.get(uri.as_str())?;
     let pos = tdp.position;
     let lines: Vec<&str> = text.lines().collect();
     let line_text = lines.get(pos.line as usize).copied()?;
@@ -984,10 +1007,10 @@ fn document_highlight(
     }
 }
 
-fn references(docs: &HashMap<Uri, String>, params: ReferenceParams) -> Option<Vec<Location>> {
+fn references(docs: &HashMap<String, String>, params: ReferenceParams) -> Option<Vec<Location>> {
     let tdp = params.text_document_position;
     let uri = tdp.text_document.uri;
-    let text = docs.get(&uri)?;
+    let text = docs.get(uri.as_str())?;
     let pos = tdp.position;
     let lines: Vec<&str> = text.lines().collect();
     let line_text = lines.get(pos.line as usize).copied()?;
@@ -1011,7 +1034,9 @@ fn references(docs: &HashMap<Uri, String>, params: ReferenceParams) -> Option<Ve
             let sub_map = collect_sub_fqn_map(&program);
             if let Some(decl_line) = resolve_sub_decl_line(&sub_map, needle) {
                 let decl_range = line_range_utf16(text, decl_line);
-                let has_same_line = locs.iter().any(|l| l.range.start.line == decl_range.start.line);
+                let has_same_line = locs
+                    .iter()
+                    .any(|l| l.range.start.line == decl_range.start.line);
                 if !has_same_line {
                     locs.insert(
                         0,
@@ -1041,7 +1066,10 @@ fn identifier_needle_at_position(text: &str, pos: Position) -> Option<(String, R
     if needle.is_empty() {
         return None;
     }
-    Some((needle.to_string(), range_on_line(line_text, pos.line, start, end)))
+    Some((
+        needle.to_string(),
+        range_on_line(line_text, pos.line, start, end),
+    ))
 }
 
 fn sub_map_for_doc(text: &str, path: &str) -> Option<HashMap<String, usize>> {
@@ -1050,7 +1078,9 @@ fn sub_map_for_doc(text: &str, path: &str) -> Option<HashMap<String, usize>> {
 }
 
 fn is_valid_rename_ident(s: &str) -> bool {
-    !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == ':')
+    !s.is_empty()
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == ':')
 }
 
 fn cmp_range_start_desc(a: &Range, b: &Range) -> Ordering {
@@ -1060,9 +1090,12 @@ fn cmp_range_start_desc(a: &Range, b: &Range) -> Ordering {
         .then_with(|| b.start.character.cmp(&a.start.character))
 }
 
-fn prepare_rename(docs: &HashMap<Uri, String>, params: TextDocumentPositionParams) -> Option<PrepareRenameResponse> {
+fn prepare_rename(
+    docs: &HashMap<String, String>,
+    params: TextDocumentPositionParams,
+) -> Option<PrepareRenameResponse> {
     let uri = params.text_document.uri;
-    let text = docs.get(&uri)?;
+    let text = docs.get(uri.as_str())?;
     let path = uri_to_path(&uri);
     let (needle, range) = identifier_needle_at_position(text, params.position)?;
     let sub_map = sub_map_for_doc(text, &path)?;
@@ -1073,12 +1106,12 @@ fn prepare_rename(docs: &HashMap<Uri, String>, params: TextDocumentPositionParam
     })
 }
 
-fn rename_symbol(docs: &HashMap<Uri, String>, params: RenameParams) -> Option<WorkspaceEdit> {
+fn rename_symbol(docs: &HashMap<String, String>, params: RenameParams) -> Option<WorkspaceEdit> {
     if !is_valid_rename_ident(&params.new_name) {
         return None;
     }
     let uri = params.text_document_position.text_document.uri;
-    let text = docs.get(&uri)?;
+    let text = docs.get(uri.as_str())?;
     let path = uri_to_path(&uri);
     let (needle, _) = identifier_needle_at_position(text, params.text_document_position.position)?;
     let sub_map = sub_map_for_doc(text, &path)?;
@@ -1097,7 +1130,8 @@ fn rename_symbol(docs: &HashMap<Uri, String>, params: RenameParams) -> Option<Wo
     if edits.is_empty() {
         return None;
     }
-    let mut changes = HashMap::new();
+    #[allow(clippy::mutable_key_type)]
+    let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
     changes.insert(uri, edits);
     Some(WorkspaceEdit {
         changes: Some(changes),
@@ -1209,9 +1243,12 @@ fn resolve_completion_item(mut item: CompletionItem) -> CompletionItem {
     item
 }
 
-fn completions(docs: &HashMap<Uri, String>, params: CompletionParams) -> Option<CompletionResponse> {
+fn completions(
+    docs: &HashMap<String, String>,
+    params: CompletionParams,
+) -> Option<CompletionResponse> {
     let uri = params.text_document_position.text_document.uri;
-    let text = docs.get(&uri)?;
+    let text = docs.get(uri.as_str())?;
     let pos = params.text_document_position.position;
     let path = uri_to_path(&uri);
 
@@ -1391,7 +1428,11 @@ fn push_snippet_completions(filter: &str, items: &mut Vec<CompletionItem>) {
             "my \\$${1:name} = ${2:undef};",
             "Lexical declaration (snippet)",
         ),
-        ("sub", "sub ${1:name} {\n\t${0}\n}\n", "New subroutine (snippet)"),
+        (
+            "sub",
+            "sub ${1:name} {\n\t${0}\n}\n",
+            "New subroutine (snippet)",
+        ),
         ("say", "say ${1:expr};", "say with placeholder (snippet)"),
         (
             "foreach",
@@ -1479,10 +1520,7 @@ fn visit_stmt_for_index(stmt: &Statement, pkg: &mut String, idx: &mut Completion
             *pkg = name.clone();
         }
         StmtKind::SubDecl {
-            name,
-            params,
-            body,
-            ..
+            name, params, body, ..
         } => {
             let fqn = if name.contains("::") {
                 name.clone()
@@ -1491,7 +1529,12 @@ fn visit_stmt_for_index(stmt: &Statement, pkg: &mut String, idx: &mut Completion
             };
             idx.subs_qualified.insert(fqn);
             idx.subs_short.insert(name.clone());
-            idx.subs_short.insert(name.rsplit("::").next().unwrap_or(name.as_str()).to_string());
+            idx.subs_short.insert(
+                name.rsplit("::")
+                    .next()
+                    .unwrap_or(name.as_str())
+                    .to_string(),
+            );
             collect_sub_params(params, idx);
             visit_block_for_index(body, pkg, idx);
         }
@@ -1501,7 +1544,12 @@ fn visit_stmt_for_index(stmt: &Statement, pkg: &mut String, idx: &mut Completion
         | StmtKind::MySync(decls) => {
             collect_var_decls(decls, idx);
         }
-        StmtKind::Foreach { var, body, continue_block, .. } => {
+        StmtKind::Foreach {
+            var,
+            body,
+            continue_block,
+            ..
+        } => {
             idx.scalars.insert(var.clone());
             visit_block_for_index(body, pkg, idx);
             if let Some(b) = continue_block {
@@ -1531,9 +1579,7 @@ fn visit_stmt_for_index(stmt: &Statement, pkg: &mut String, idx: &mut Completion
             }
         }
         StmtKind::Unless {
-            body,
-            else_block,
-            ..
+            body, else_block, ..
         } => {
             visit_block_for_index(body, pkg, idx);
             if let Some(b) = else_block {
@@ -1606,8 +1652,8 @@ fn utf16_col_to_byte_idx(line: &str, col16: u32) -> usize {
 #[cfg(test)]
 mod completion_tests {
     use super::{
-        highlights_for_identifier, identifier_span_bytes, line_completion_mode, resolve_sub_decl_line,
-        split_qualified_prefix, utf16_col_to_byte_idx, LineCompletionMode,
+        highlights_for_identifier, identifier_span_bytes, line_completion_mode,
+        resolve_sub_decl_line, split_qualified_prefix, utf16_col_to_byte_idx, LineCompletionMode,
     };
     use std::collections::HashMap;
 

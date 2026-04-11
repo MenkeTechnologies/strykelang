@@ -5789,10 +5789,7 @@ impl Interpreter {
                     if idx >= arr.len() {
                         return Ok(None);
                     }
-                    binds.push(PatternBinding::Scalar(
-                        name.clone(),
-                        arr[idx].clone(),
-                    ));
+                    binds.push(PatternBinding::Scalar(name.clone(), arr[idx].clone()));
                     idx += 1;
                 }
                 MatchArrayElem::Expr(e) => {
@@ -8068,10 +8065,7 @@ impl Interpreter {
                 // Builtins read [`Self::wantarray_kind`] (VM sets it too); thread `ctx` through.
                 let saved_wa = self.wantarray_kind;
                 self.wantarray_kind = ctx;
-                if matches!(
-                    name.as_str(),
-                    "take_while" | "drop_while" | "tap" | "peek"
-                ) {
+                if matches!(name.as_str(), "take_while" | "drop_while" | "tap" | "peek") {
                     let r = self.list_higher_order_block_builtin(name.as_str(), &arg_vals, line);
                     self.wantarray_kind = saved_wa;
                     return r.map_err(Into::into);
@@ -13981,7 +13975,7 @@ impl Interpreter {
             return Err(PerlError::runtime(
                 format!(
                     "sub signature hash destruct: expected HASH or HASH reference, got {}",
-                    v.ref_type().to_string()
+                    v.ref_type()
                 ),
                 line,
             ));
@@ -14015,7 +14009,7 @@ impl Interpreter {
                         return Err(PerlError::runtime(
                             format!(
                                 "sub signature array destruct: expected ARRAY or ARRAY reference, got {}",
-                                arg.ref_type().to_string()
+                                arg.ref_type()
                             ),
                             line,
                         ));
@@ -14927,11 +14921,7 @@ impl Interpreter {
         line: usize,
     ) -> Result<PerlValue, FlowOrError> {
         let Some(cluster) = cluster_pv.as_remote_cluster() else {
-            return Err(PerlError::runtime(
-                "pmap_on: expected cluster(...) value",
-                line,
-            )
-            .into());
+            return Err(PerlError::runtime("pmap_on: expected cluster(...) value", line).into());
         };
         let items = list_pv.to_list();
         let (scope_capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
@@ -14946,20 +14936,15 @@ impl Interpreter {
             .map_err(|e| PerlError::runtime(e, line))?;
         let subs_prelude = crate::remote_wire::build_subs_prelude(&self.subs);
         let block_src = crate::fmt::format_block(block);
-        let item_jsons = crate::cluster::perl_items_to_json(&items)
-            .map_err(|e| PerlError::runtime(e, line))?;
+        let item_jsons =
+            crate::cluster::perl_items_to_json(&items).map_err(|e| PerlError::runtime(e, line))?;
 
         // Progress bar (best effort) — ticks once per result. The dispatcher itself is
         // synchronous from the caller's POV, so we drive the bar before/after the call.
         let pmap_progress = PmapProgress::new(show_progress, items.len());
-        let result_values = crate::cluster::run_cluster(
-            &cluster,
-            subs_prelude,
-            block_src,
-            cap_json,
-            item_jsons,
-        )
-        .map_err(|e| PerlError::runtime(format!("pmap_on remote: {e}"), line))?;
+        let result_values =
+            crate::cluster::run_cluster(&cluster, subs_prelude, block_src, cap_json, item_jsons)
+                .map_err(|e| PerlError::runtime(format!("pmap_on remote: {e}"), line))?;
         for _ in 0..result_values.len() {
             pmap_progress.tick();
         }

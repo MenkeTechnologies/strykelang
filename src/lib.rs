@@ -22,9 +22,9 @@ pub mod format;
 pub mod interpreter;
 mod jit;
 mod jwt;
-mod lsp;
 pub mod lexer;
 pub mod list_util;
+mod lsp;
 mod map_grep_fast;
 pub mod mro;
 mod nanbox;
@@ -32,7 +32,6 @@ mod native_codec;
 pub mod native_data;
 pub mod pack;
 pub mod par_lines;
-pub mod pec;
 mod par_list;
 pub mod par_pipeline;
 pub mod par_walk;
@@ -40,6 +39,7 @@ pub mod parallel_trace;
 pub mod parser;
 pub mod pcache;
 pub mod pchannel;
+pub mod pec;
 pub mod perl_decode;
 pub mod perl_fs;
 pub mod perl_inc;
@@ -47,9 +47,9 @@ mod perl_regex;
 pub mod perl_signal;
 mod pmap_progress;
 pub mod ppool;
-pub mod remote_wire;
 pub mod profiler;
 pub mod pwatch;
+pub mod remote_wire;
 pub mod rust_ffi;
 pub mod rust_sugar;
 pub mod scope;
@@ -174,12 +174,8 @@ pub fn try_vm_execute(
             // compile. Save failures are swallowed: a broken cache is an optimization loss,
             // not a runtime error.
             if let Some(fp) = interp.pec_cache_fingerprint.take() {
-                let bundle = pec::PecBundle::new(
-                    interp.strict_vars,
-                    fp,
-                    program.clone(),
-                    chunk.clone(),
-                );
+                let bundle =
+                    pec::PecBundle::new(interp.strict_vars, fp, program.clone(), chunk.clone());
                 let _ = pec::try_save(&bundle);
             }
             match run_compiled_chunk(chunk, interp) {
@@ -213,10 +209,7 @@ pub fn try_vm_execute(
 /// Shared execution tail used by both the cache-hit and compile paths in
 /// [`try_vm_execute`]. Pulled out so the `.pec` fast path does not duplicate the
 /// flip-flop / BEGIN-END / struct-def wiring every VM run depends on.
-fn run_compiled_chunk(
-    chunk: bytecode::Chunk,
-    interp: &mut Interpreter,
-) -> PerlResult<PerlValue> {
+fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut Interpreter) -> PerlResult<PerlValue> {
     interp.clear_flip_flop_state();
     interp.prepare_flip_flop_vm_slots(chunk.flip_flop_slots);
     if interp.disasm_bytecode {

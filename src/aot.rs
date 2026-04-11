@@ -69,8 +69,12 @@ fn decode_payload(bytes: &[u8]) -> Option<EmbeddedScript> {
     if 4 + name_len > bytes.len() {
         return None;
     }
-    let name = std::str::from_utf8(&bytes[4..4 + name_len]).ok()?.to_string();
-    let source = std::str::from_utf8(&bytes[4 + name_len..]).ok()?.to_string();
+    let name = std::str::from_utf8(&bytes[4..4 + name_len])
+        .ok()?
+        .to_string();
+    let source = std::str::from_utf8(&bytes[4 + name_len..])
+        .ok()?
+        .to_string();
     Some(EmbeddedScript { name, source })
 }
 
@@ -160,8 +164,14 @@ pub fn build(script_path: &Path, out_path: &Path) -> Result<PathBuf, String> {
     // If the running `pe` itself already has an embedded trailer (e.g. nested build), strip
     // it first so the output binary does not end up with two trailers stacked. The strip is
     // done implicitly: `copy_exe_without_trailer` writes only the untrimmed prefix.
-    copy_exe_without_trailer(&exe, out_path)
-        .map_err(|e| format!("pe build: copy {} -> {}: {}", exe.display(), out_path.display(), e))?;
+    copy_exe_without_trailer(&exe, out_path).map_err(|e| {
+        format!(
+            "pe build: copy {} -> {}: {}",
+            exe.display(),
+            out_path.display(),
+            e
+        )
+    })?;
 
     append_embedded_script(out_path, &script_name, &source)
         .map_err(|e| format!("pe build: write trailer: {}", e))?;
@@ -245,7 +255,11 @@ mod tests {
     fn append_and_load_trailer_roundtrips_on_plain_file() {
         let path = tmp_path("roundtrip");
         // Pretend this is a `pe` binary: write a non-empty prefix so trailer math is exercised.
-        fs::write(&path, b"not really an ELF, but good enough for trailer tests").unwrap();
+        fs::write(
+            &path,
+            b"not really an ELF, but good enough for trailer tests",
+        )
+        .unwrap();
         append_embedded_script(&path, "script.pl", "my $x = 1 + 2;").unwrap();
         let loaded = try_load_embedded(&path).expect("load");
         assert_eq!(loaded.name, "script.pl");

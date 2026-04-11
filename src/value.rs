@@ -108,8 +108,7 @@ mod cluster_parsing_tests {
 
     #[test]
     fn parses_host_slots_pe_path_triple() {
-        let c =
-            RemoteCluster::from_list_args(&[s("build1:3:/usr/local/bin/pe")]).expect("parse");
+        let c = RemoteCluster::from_list_args(&[s("build1:3:/usr/local/bin/pe")]).expect("parse");
         assert_eq!(c.slots.len(), 3);
         assert!(c.slots.iter().all(|sl| sl.host == "build1"));
         assert!(c.slots.iter().all(|sl| sl.pe_path == "/usr/local/bin/pe"));
@@ -217,16 +216,12 @@ impl RemoteCluster {
 
         // Trailing tunable hashref: peel it off if all its keys are known tunable names.
         let (slot_items, tunables) = if let Some(last) = items.last() {
-            let h = last.as_hash_map().or_else(|| {
-                last.as_hash_ref()
-                    .map(|r| r.read().clone())
-            });
+            let h = last
+                .as_hash_map()
+                .or_else(|| last.as_hash_ref().map(|r| r.read().clone()));
             if let Some(map) = h {
                 let known = |k: &str| {
-                    matches!(
-                        k,
-                        "timeout" | "retries" | "connect_timeout" | "job_timeout"
-                    )
+                    matches!(k, "timeout" | "retries" | "connect_timeout" | "job_timeout")
                 };
                 if !map.is_empty() && map.keys().all(|k| known(k.as_str())) {
                     (&items[..items.len() - 1], Some(map))
@@ -255,17 +250,15 @@ impl RemoteCluster {
 
         for it in slot_items {
             // Hashref form: { host => "h", slots => N, pe => "/path" }
-            if let Some(map) = it.as_hash_map().or_else(|| {
-                it.as_hash_ref().map(|r| r.read().clone())
-            }) {
+            if let Some(map) = it
+                .as_hash_map()
+                .or_else(|| it.as_hash_ref().map(|r| r.read().clone()))
+            {
                 let host = map
                     .get("host")
                     .map(|v| v.to_string())
                     .ok_or_else(|| "cluster: hashref slot needs `host`".to_string())?;
-                let n = map
-                    .get("slots")
-                    .map(|v| v.to_int().max(1))
-                    .unwrap_or(1) as usize;
+                let n = map.get("slots").map(|v| v.to_int().max(1)).unwrap_or(1) as usize;
                 let pe = map
                     .get("pe")
                     .or_else(|| map.get("pe_path"))
@@ -1724,9 +1717,7 @@ impl PerlValue {
             HeapObject::Capture(_)
             | HeapObject::Ppool(_)
             | HeapObject::RemoteCluster(_)
-            | HeapObject::Barrier(_) => {
-                PerlValue::integer(1)
-            }
+            | HeapObject::Barrier(_) => PerlValue::integer(1),
             HeapObject::Generator(_) => PerlValue::integer(1),
             _ => self.clone(),
         }

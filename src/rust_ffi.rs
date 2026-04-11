@@ -51,7 +51,7 @@
 use std::ffi::{CStr, CString};
 use std::fs;
 use std::os::raw::c_char;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use parking_lot::Mutex;
@@ -77,17 +77,17 @@ unsafe impl Sync for FfiEntry {}
 
 #[derive(Clone, Copy, Debug)]
 enum FfiSig {
-    I0,          // fn() -> i64
-    I1,          // fn(i64) -> i64
-    I2,          // fn(i64, i64) -> i64
-    I3,          // fn(i64, i64, i64) -> i64
-    I4,          // fn(i64, i64, i64, i64) -> i64
-    F0,          // fn() -> f64
-    F1,          // fn(f64) -> f64
-    F2,          // fn(f64, f64) -> f64
-    F3,          // fn(f64, f64, f64) -> f64
-    StrToInt,    // fn(*const c_char) -> i64
-    StrToStr,    // fn(*const c_char) -> *const c_char
+    I0,       // fn() -> i64
+    I1,       // fn(i64) -> i64
+    I2,       // fn(i64, i64) -> i64
+    I3,       // fn(i64, i64, i64) -> i64
+    I4,       // fn(i64, i64, i64, i64) -> i64
+    F0,       // fn() -> f64
+    F1,       // fn(f64) -> f64
+    F2,       // fn(f64, f64) -> f64
+    F3,       // fn(f64, f64, f64) -> f64
+    StrToInt, // fn(*const c_char) -> i64
+    StrToStr, // fn(*const c_char) -> *const c_char
 }
 
 impl FfiSig {
@@ -151,9 +151,7 @@ pub fn compile_and_register(body_b64: &str, line: usize) -> PerlResult<()> {
     use base64::Engine as _;
     let body = base64::engine::general_purpose::STANDARD
         .decode(body_b64)
-        .map_err(|e| {
-            PerlError::runtime(format!("rust FFI: invalid base64 body: {}", e), line)
-        })?;
+        .map_err(|e| PerlError::runtime(format!("rust FFI: invalid base64 body: {}", e), line))?;
     let body = String::from_utf8(body)
         .map_err(|e| PerlError::runtime(format!("rust FFI: non-utf8 body: {}", e), line))?;
 
@@ -334,11 +332,10 @@ fn invoke_rustc(src: &PathBuf, out: &PathBuf, line: usize) -> PerlResult<()> {
 }
 
 #[cfg(unix)]
-fn dlopen_lib(path: &PathBuf, line: usize) -> PerlResult<usize> {
+fn dlopen_lib(path: &Path, line: usize) -> PerlResult<usize> {
     use std::ffi::CString;
-    let cpath = CString::new(path.to_string_lossy().as_bytes()).map_err(|e| {
-        PerlError::runtime(format!("rust FFI: dlopen path nul: {}", e), line)
-    })?;
+    let cpath = CString::new(path.to_string_lossy().as_bytes())
+        .map_err(|e| PerlError::runtime(format!("rust FFI: dlopen path nul: {}", e), line))?;
     // SAFETY: libc::dlopen with RTLD_NOW|RTLD_LOCAL is the standard portable load path.
     let handle = unsafe { libc::dlopen(cpath.as_ptr(), libc::RTLD_NOW | libc::RTLD_LOCAL) };
     if handle.is_null() {
@@ -360,7 +357,7 @@ fn dlopen_lib(path: &PathBuf, line: usize) -> PerlResult<usize> {
 }
 
 #[cfg(not(unix))]
-fn dlopen_lib(_path: &PathBuf, line: usize) -> PerlResult<usize> {
+fn dlopen_lib(_path: &Path, line: usize) -> PerlResult<usize> {
     Err(PerlError::runtime(
         "rust FFI: only unix (Linux/macOS) is supported in v1".to_string(),
         line,
@@ -439,7 +436,7 @@ fn parse_extern_fns(body: &str) -> Vec<(String, FfiSig)> {
         }
         let args_text = body[args_start..j].trim().to_string();
         j += 1; // past `)`
-        // Optional `-> ret`.
+                // Optional `-> ret`.
         while j < bytes.len() && (bytes[j] as char).is_whitespace() {
             j += 1;
         }
@@ -453,8 +450,7 @@ fn parse_extern_fns(body: &str) -> Vec<(String, FfiSig)> {
             while j < bytes.len()
                 && bytes[j] != b'{'
                 && bytes[j] != b';'
-                && !(bytes[j] == b'w'
-                    && body[j..].starts_with("where"))
+                && !(bytes[j] == b'w' && body[j..].starts_with("where"))
             {
                 j += 1;
             }
@@ -520,12 +516,7 @@ fn is_c_str_ptr(t: &str) -> bool {
     t == "*constc_char" || t == "*mutc_char"
 }
 
-fn invoke(
-    name: &str,
-    entry: &FfiEntry,
-    args: &[PerlValue],
-    line: usize,
-) -> PerlResult<PerlValue> {
+fn invoke(name: &str, entry: &FfiEntry, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     let expected = entry.sig.arity();
     if args.len() != expected {
         return Err(PerlError::runtime(
@@ -565,8 +556,7 @@ fn invoke(
                 )))
             }
             FfiSig::I4 => {
-                let f: extern "C" fn(i64, i64, i64, i64) -> i64 =
-                    std::mem::transmute(entry.sym);
+                let f: extern "C" fn(i64, i64, i64, i64) -> i64 = std::mem::transmute(entry.sym);
                 Ok(PerlValue::integer(f(
                     args[0].to_int(),
                     args[1].to_int(),
@@ -599,17 +589,15 @@ fn invoke(
             }
             FfiSig::StrToInt => {
                 let s = args[0].to_string();
-                let c = CString::new(s).map_err(|e| {
-                    PerlError::runtime(format!("rust FFI: arg nul: {}", e), line)
-                })?;
+                let c = CString::new(s)
+                    .map_err(|e| PerlError::runtime(format!("rust FFI: arg nul: {}", e), line))?;
                 let f: extern "C" fn(*const c_char) -> i64 = std::mem::transmute(entry.sym);
                 Ok(PerlValue::integer(f(c.as_ptr())))
             }
             FfiSig::StrToStr => {
                 let s = args[0].to_string();
-                let c = CString::new(s).map_err(|e| {
-                    PerlError::runtime(format!("rust FFI: arg nul: {}", e), line)
-                })?;
+                let c = CString::new(s)
+                    .map_err(|e| PerlError::runtime(format!("rust FFI: arg nul: {}", e), line))?;
                 let f: extern "C" fn(*const c_char) -> *const c_char =
                     std::mem::transmute(entry.sym);
                 let ret = f(c.as_ptr());
