@@ -1156,7 +1156,8 @@ fn simulate_one_op(
         | Op::ArrayDerefLen
         | Op::PopArrayDeref
         | Op::ShiftArrayDeref
-        | Op::UnshiftArrayDeref(_) => {
+        | Op::UnshiftArrayDeref(_)
+        | Op::SpliceArrayDeref(_) => {
             return None;
         }
         _ => return None,

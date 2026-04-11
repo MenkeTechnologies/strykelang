@@ -2424,6 +2424,45 @@ fn try_vm_compile_push_aref_uses_push_array_deref() {
 }
 
 #[test]
+fn try_vm_compile_splice_aref_uses_splice_array_deref() {
+    use crate::bytecode::Op;
+    use crate::compiler::Compiler;
+    let chunk = Compiler::new()
+        .compile_program(
+            &parse(
+                r#"no strict 'vars';
+                my $a = [10, 20, 30, 40];
+                join("-", splice @$a, 1, 2);"#,
+            )
+            .expect("parse"),
+        )
+        .expect("compile");
+    assert!(
+        chunk.ops.iter().any(|o| matches!(o, Op::SpliceArrayDeref(n) if *n == 0)),
+        "expected SpliceArrayDeref(0) for splice with no replacement list, got {:?}",
+        chunk.ops
+    );
+    assert!(
+        !chunk.ops.iter().any(|o| matches!(o, Op::SpliceExpr(_))),
+        "splice @$a with small replacement count should not use SpliceExpr pool"
+    );
+}
+
+#[test]
+fn try_vm_execute_splice_aref_returns_removed_slice() {
+    let p = parse(
+        r#"no strict 'vars';
+        my $v = [10, 20, 30, 40];
+        join("-", splice @$v, 1, 2);"#,
+    )
+    .expect("parse");
+    let mut i = Interpreter::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "splice on array ref should compile on VM");
+    assert_eq!(out.unwrap().expect("vm").to_string(), "20-30");
+}
+
+#[test]
 fn try_vm_execute_push_pop_shift_unshift_aref() {
     let p = parse(
         r#"no strict 'vars';

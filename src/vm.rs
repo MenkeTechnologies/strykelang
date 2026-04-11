@@ -2183,6 +2183,32 @@ impl<'a> VM<'a> {
                         self.push(PerlValue::integer(len));
                         Ok(())
                     }
+                    Op::SpliceArrayDeref(n_rep) => {
+                        let n = *n_rep as usize;
+                        let mut rep_vals: Vec<PerlValue> = Vec::with_capacity(n);
+                        for _ in 0..n {
+                            rep_vals.push(self.pop());
+                        }
+                        rep_vals.reverse();
+                        let length_val = self.pop();
+                        let offset_val = self.pop();
+                        let aref = self.pop();
+                        let line = self.line();
+                        let ctx = self.interp.wantarray_kind;
+                        let v = vm_interp_result(
+                            self.interp.splice_array_deref(
+                                aref,
+                                offset_val,
+                                length_val,
+                                rep_vals,
+                                ctx,
+                                line,
+                            ),
+                            line,
+                        )?;
+                        self.push(v);
+                        Ok(())
+                    }
                     Op::ArrayLen(idx) => {
                         let len = self.interp.scope.array_len(&self.names[*idx as usize]);
                         self.push(PerlValue::integer(len as i64));

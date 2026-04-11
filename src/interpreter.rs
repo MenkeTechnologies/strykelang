@@ -12795,13 +12795,14 @@ impl Interpreter {
         Err(PerlError::runtime("unshift argument is not an ARRAY reference", line).into())
     }
 
-    /// `splice @$aref, OFFSET, LENGTH, LIST` — same semantics as [`Self::splice_builtin_execute`] / [`Self::eval_splice_expr`].
+    /// `splice @$aref, OFFSET, LENGTH, LIST` — same semantics as [`Self::splice_builtin_execute`] / named-array [`Self::eval_splice_expr`].
     pub(crate) fn splice_array_deref(
         &mut self,
         aref: PerlValue,
         offset_val: PerlValue,
         length_val: PerlValue,
         rep_vals: Vec<PerlValue>,
+        ctx: WantarrayCtx,
         line: usize,
     ) -> Result<PerlValue, FlowOrError> {
         let off = offset_val.to_int().max(0) as usize;
@@ -12817,7 +12818,7 @@ impl Interpreter {
             for (i, v) in rep_vals.into_iter().enumerate() {
                 w.insert(off + i, v);
             }
-            return Ok(match self.wantarray_kind {
+            return Ok(match ctx {
                 WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(PerlValue::UNDEF),
                 WantarrayCtx::List | WantarrayCtx::Void => PerlValue::array(removed),
             });
@@ -12847,7 +12848,7 @@ impl Interpreter {
             for (i, v) in rep_vals.into_iter().enumerate() {
                 arr.insert(off + i, v);
             }
-            return Ok(match self.wantarray_kind {
+            return Ok(match ctx {
                 WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(PerlValue::UNDEF),
                 WantarrayCtx::List | WantarrayCtx::Void => PerlValue::array(removed),
             });
@@ -12864,6 +12865,28 @@ impl Interpreter {
         ctx: WantarrayCtx,
         line: usize,
     ) -> Result<PerlValue, FlowOrError> {
+        if let ExprKind::Deref {
+            expr: aref_expr,
+            kind: Sigil::Array,
+        } = &array.kind
+        {
+            let aref = self.eval_expr(aref_expr)?;
+            let offset_val = if let Some(o) = offset {
+                self.eval_expr(o)?
+            } else {
+                PerlValue::integer(0)
+            };
+            let length_val = if let Some(l) = length {
+                self.eval_expr(l)?
+            } else {
+                PerlValue::UNDEF
+            };
+            let mut rep_vals = Vec::new();
+            for r in replacement {
+                rep_vals.push(self.eval_expr(r)?);
+            }
+            return self.splice_array_deref(aref, offset_val, length_val, rep_vals, ctx, line);
+        }
         let arr_name = self.extract_array_name(array)?;
         let off = if let Some(o) = offset {
             self.eval_expr(o)?.to_int() as usize

@@ -4459,6 +4459,40 @@ impl Compiler {
                         line,
                         Some(root),
                     );
+                } else if let ExprKind::Deref {
+                    expr: aref_expr,
+                    kind: Sigil::Array,
+                } = &array.kind
+                {
+                    if replacement.len() > u8::MAX as usize {
+                        let pool = self.chunk.add_splice_expr_entry(
+                            array.as_ref().clone(),
+                            offset.as_deref().cloned(),
+                            length.as_deref().cloned(),
+                            replacement.clone(),
+                        );
+                        self.emit_op(Op::SpliceExpr(pool), line, Some(root));
+                    } else {
+                        self.compile_expr(aref_expr)?;
+                        if let Some(o) = offset {
+                            self.compile_expr(o)?;
+                        } else {
+                            self.emit_op(Op::LoadInt(0), line, Some(root));
+                        }
+                        if let Some(l) = length {
+                            self.compile_expr(l)?;
+                        } else {
+                            self.emit_op(Op::LoadUndef, line, Some(root));
+                        }
+                        for r in replacement {
+                            self.compile_expr(r)?;
+                        }
+                        self.emit_op(
+                            Op::SpliceArrayDeref(replacement.len() as u8),
+                            line,
+                            Some(root),
+                        );
+                    }
                 } else {
                     let pool = self.chunk.add_splice_expr_entry(
                         array.as_ref().clone(),
