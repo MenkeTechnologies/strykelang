@@ -26,6 +26,7 @@ mod jwt_and_log;
 mod language_extensions;
 mod lib_api;
 mod list_util;
+mod lsp_stdio_completion;
 mod modules_inc;
 mod native_codec;
 mod native_ext;

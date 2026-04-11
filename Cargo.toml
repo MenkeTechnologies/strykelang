@@ -1,6 +1,6 @@
 [package]
 name = "perlrs"
-version = "0.1.35"
+version = "0.1.36"
 edition = "2021"
 description = "A highly parallel Perl 5 interpreter written in Rust"
 license = "MIT"
@@ -86,6 +86,7 @@ signal-hook = "0.3"
 [dev-dependencies]
 criterion = "0.5"
 rayon = "1.10"
+serde_json = "1"
 
 [[bench]]
 name = "jit_compare"
