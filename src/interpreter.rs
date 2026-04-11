@@ -932,6 +932,69 @@ fn unix_group_list_for_special(_name: &str) -> String {
     String::new()
 }
 
+/// Home directory for [`getuid`](libc::getuid) when **`HOME`** is missing (OpenSSH uses it for
+/// `~/.ssh/config` and keys).
+#[cfg(unix)]
+fn pw_home_dir_for_current_uid() -> Option<std::ffi::OsString> {
+    use std::ffi::CStr;
+    use std::os::unix::ffi::OsStringExt;
+    use libc::{getpwuid_r, getuid};
+    let uid = unsafe { getuid() };
+    let mut pw: libc::passwd = unsafe { std::mem::zeroed() };
+    let mut result: *mut libc::passwd = std::ptr::null_mut();
+    let mut buf = vec![0u8; 16_384];
+    let rc = unsafe {
+        getpwuid_r(
+            uid,
+            &mut pw,
+            buf.as_mut_ptr().cast::<libc::c_char>(),
+            buf.len(),
+            &mut result,
+        )
+    };
+    if rc != 0 || result.is_null() || pw.pw_dir.is_null() {
+        return None;
+    }
+    let bytes = unsafe { CStr::from_ptr(pw.pw_dir).to_bytes() };
+    if bytes.is_empty() {
+        return None;
+    }
+    Some(std::ffi::OsString::from_vec(bytes.to_vec()))
+}
+
+/// Passwd home for a login name (e.g. **`SUDO_USER`** when `pe` runs under `sudo`).
+#[cfg(unix)]
+fn pw_home_dir_for_login_name(login: &std::ffi::OsStr) -> Option<std::ffi::OsString> {
+    use std::ffi::{CStr, CString};
+    use std::os::unix::ffi::{OsStrExt, OsStringExt};
+    use libc::getpwnam_r;
+    let bytes = login.as_bytes();
+    if bytes.is_empty() || bytes.contains(&0) {
+        return None;
+    }
+    let cname = CString::new(bytes).ok()?;
+    let mut pw: libc::passwd = unsafe { std::mem::zeroed() };
+    let mut result: *mut libc::passwd = std::ptr::null_mut();
+    let mut buf = vec![0u8; 16_384];
+    let rc = unsafe {
+        getpwnam_r(
+            cname.as_ptr(),
+            &mut pw,
+            buf.as_mut_ptr().cast::<libc::c_char>(),
+            buf.len(),
+            &mut result,
+        )
+    };
+    if rc != 0 || result.is_null() || pw.pw_dir.is_null() {
+        return None;
+    }
+    let dir_bytes = unsafe { CStr::from_ptr(pw.pw_dir).to_bytes() };
+    if dir_bytes.is_empty() {
+        return None;
+    }
+    Some(std::ffi::OsString::from_vec(dir_bytes.to_vec()))
+}
+
 impl Default for Interpreter {
     fn default() -> Self {
         Self::new()
@@ -1271,6 +1334,50 @@ impl Interpreter {
     pub(crate) fn apply_io_error_to_errno(&mut self, e: &std::io::Error) {
         self.errno = e.to_string();
         self.errno_code = e.raw_os_error().unwrap_or(0);
+    }
+
+    /// `ssh LIST` — run the real `ssh` binary with `LIST` as argv (no `sh -c`).
+    ///
+    /// **`Host` aliases in `~/.ssh/config`** are honored by OpenSSH like in a normal shell (same
+    /// binary, inherited env). **Shell** `alias` / functions are not applied (no `sh -c`). If
+    /// **`HOME`** is unset, on Unix we set it from the passwd DB so config and keys resolve.
+    ///
+    /// **`sudo`:** the child `ssh` normally sees **`HOME=/root`**, so it reads **`/root/.ssh/config`**
+    /// and host aliases in *your* config are missing. When **`SUDO_USER`** is set and the effective
+    /// uid is **0**, we set **`HOME`** for this subprocess to **`SUDO_USER`'s** passwd home so your
+    /// `~/.ssh/config` and keys apply.
+    pub(crate) fn ssh_builtin_execute(&mut self, args: &[PerlValue]) -> PerlResult<PerlValue> {
+        use std::process::Command;
+        let mut cmd = Command::new("ssh");
+        #[cfg(unix)]
+        {
+            use libc::geteuid;
+            let home_for_ssh = if unsafe { geteuid() } == 0 {
+                std::env::var_os("SUDO_USER").and_then(|u| pw_home_dir_for_login_name(&u))
+            } else {
+                None
+            };
+            if let Some(h) = home_for_ssh {
+                cmd.env("HOME", h);
+            } else if std::env::var_os("HOME").is_none() {
+                if let Some(h) = pw_home_dir_for_current_uid() {
+                    cmd.env("HOME", h);
+                }
+            }
+        }
+        for a in args {
+            cmd.arg(a.to_string());
+        }
+        match cmd.status() {
+            Ok(s) => {
+                self.record_child_exit_status(s);
+                Ok(PerlValue::integer(s.code().unwrap_or(-1) as i64))
+            }
+            Err(e) => {
+                self.apply_io_error_to_errno(&e);
+                Ok(PerlValue::integer(-1))
+            }
+        }
     }
 
     /// Set `$@` message; numeric side is `0` if empty, else `1`.

@@ -57,6 +57,7 @@ pub(crate) fn try_builtin(
         "fork" => Some(builtin_fork()),
         "wait" => Some(builtin_wait()),
         "waitpid" => Some(builtin_waitpid(args)),
+        "ssh" => Some(interp.ssh_builtin_execute(args)),
         "kill" => Some(builtin_kill(args)),
         "alarm" => Some(builtin_alarm(args)),
         "sleep" => Some(builtin_sleep(args)),

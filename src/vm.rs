@@ -7054,6 +7054,7 @@ impl<'a> VM<'a> {
                     }
                 }
             }
+            Some(BuiltinId::Ssh) => self.interp.ssh_builtin_execute(&args),
             Some(BuiltinId::Chomp) => {
                 // Chomp modifies the variable in-place — but in CallBuiltin we get the value, not a reference.
                 // Return the number of chars removed (like Perl).

@@ -647,3 +647,14 @@ fn expr_postfix_increment_second_statement() {
         _ => panic!("expected expression statement for postfix"),
     }
 }
+
+#[test]
+fn shape_ssh_parenless_list_call() {
+    match first_expr_kind("ssh r5, ls;") {
+        ExprKind::FuncCall { name, args } => {
+            assert_eq!(name, "ssh");
+            assert_eq!(args.len(), 2);
+        }
+        k => panic!("expected FuncCall for ssh r5, ls, got {k:?}"),
+    }
+}

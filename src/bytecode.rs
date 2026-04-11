@@ -888,11 +888,13 @@ pub enum BuiltinId {
     ReadLineList,
     /// `readdir` in **list** context — all names not yet returned (Perl drains the rest of the stream).
     ReaddirList,
+    /// `ssh HOST, CMD, …` / `ssh(HOST, …)` — `execvp` style `ssh` only (no shell).
+    Ssh,
 }
 
 impl BuiltinId {
     pub fn from_u16(v: u16) -> Option<Self> {
-        if v <= Self::ReaddirList as u16 {
+        if v <= Self::Ssh as u16 {
             Some(unsafe { std::mem::transmute::<u16, BuiltinId>(v) })
         } else {
             None
@@ -2124,11 +2126,15 @@ mod tests {
             BuiltinId::from_u16(BuiltinId::ReaddirList as u16),
             Some(BuiltinId::ReaddirList)
         );
+        assert_eq!(
+            BuiltinId::from_u16(BuiltinId::Ssh as u16),
+            Some(BuiltinId::Ssh)
+        );
     }
 
     #[test]
     fn builtin_id_from_u16_out_of_range() {
-        assert_eq!(BuiltinId::from_u16(BuiltinId::ReaddirList as u16 + 1), None);
+        assert_eq!(BuiltinId::from_u16(BuiltinId::Ssh as u16 + 1), None);
         assert_eq!(BuiltinId::from_u16(u16::MAX), None);
     }
 

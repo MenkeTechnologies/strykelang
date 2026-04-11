@@ -4408,6 +4408,16 @@ impl Compiler {
                         Some(root),
                     );
                 }
+                "ssh" => {
+                    for arg in args {
+                        self.compile_expr(arg)?;
+                    }
+                    self.emit_op(
+                        Op::CallBuiltin(BuiltinId::Ssh as u16, args.len() as u8),
+                        line,
+                        Some(root),
+                    );
+                }
                 _ => {
                     for arg in args {
                         self.compile_expr(arg)?;

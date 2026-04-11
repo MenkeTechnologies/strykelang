@@ -44,6 +44,18 @@ fn caller_builtin() {
     assert_eq!(eval_string(r#"join(",", caller())"#), "main,-e,1");
 }
 
+/// `ssh LIST` runs the real `ssh` binary (argv only, no shell). No-op when `ssh` is missing.
+#[cfg(unix)]
+#[test]
+fn ssh_builtin_matches_system_for_version_flag() {
+    use std::process::Command;
+    if !Command::new("ssh").arg("-V").status().map(|s| s.success()).unwrap_or(false) {
+        return;
+    }
+    assert_eq!(eval_int(r#"ssh("-V")"#), 0);
+    assert_eq!(eval_int(r#"ssh("-V") == system("ssh -V") ? 1 : 0"#), 1);
+}
+
 #[test]
 fn package_sets_package_glob() {
     assert_eq!(eval_string(r#"package Foo::Bar; $__PACKAGE__"#), "Foo::Bar");
