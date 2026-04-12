@@ -972,6 +972,7 @@ impl Parser {
                 | "do"
                 | "each"
                 | "eof"
+                | "fore"
                 | "eval"
                 | "exec"
                 | "exists"
@@ -1419,8 +1420,8 @@ impl Parser {
     fn parse_eval_timeout(&mut self) -> PerlResult<Statement> {
         let line = self.peek_line();
         self.advance();
-        let timeout = self.parse_expression()?;
-        let body = self.parse_block()?;
+        let timeout = self.parse_postfix()?;
+        let body = self.parse_block_or_bareword_block_no_args()?;
         self.eat(&Token::Semicolon);
         Ok(Statement {
             label: None,
@@ -3555,6 +3556,10 @@ impl Parser {
                 expr,
                 list: Box::new(lhs),
             },
+            ExprKind::ForEachExpr { block, list: _ } => ExprKind::ForEachExpr {
+                block,
+                list: Box::new(lhs),
+            },
             ExprKind::SortExpr { cmp, list: _ } => ExprKind::SortExpr {
                 cmp,
                 list: Box::new(lhs),
@@ -5121,14 +5126,14 @@ impl Parser {
                 })
             }
             "defined" => {
-                let a = self.parse_one_arg()?;
+                let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Defined(Box::new(a)),
                     line,
                 })
             }
             "ref" => {
-                let a = self.parse_one_arg()?;
+                let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Ref(Box::new(a)),
                     line,
@@ -5168,21 +5173,21 @@ impl Parser {
                 })
             }
             "sqrt" => {
-                let a = self.parse_one_arg()?;
+                let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Sqrt(Box::new(a)),
                     line,
                 })
             }
             "sin" => {
-                let a = self.parse_one_arg()?;
+                let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Sin(Box::new(a)),
                     line,
                 })
             }
             "cos" => {
-                let a = self.parse_one_arg()?;
+                let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Cos(Box::new(a)),
                     line,
@@ -5202,14 +5207,14 @@ impl Parser {
                 })
             }
             "exp" => {
-                let a = self.parse_one_arg()?;
+                let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Exp(Box::new(a)),
                     line,
                 })
             }
             "log" => {
-                let a = self.parse_one_arg()?;
+                let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Log(Box::new(a)),
                     line,
@@ -5426,7 +5431,7 @@ impl Parser {
                 }
             }
             "study" => {
-                let a = self.parse_one_arg()?;
+                let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Study(Box::new(a)),
                     line,
@@ -5521,11 +5526,66 @@ impl Parser {
                 })
             }
             "each" => {
+                // `each(%hash)` / `each(@array)` — hash/array iterator
                 let a = self.parse_one_arg()?;
                 Ok(Expr {
                     kind: ExprKind::Each(Box::new(a)),
                     line,
                 })
+            }
+            "fore" => {
+                // `fore { BLOCK } LIST` — forEach expression (pipe-forward friendly)
+                if matches!(self.peek(), Token::LBrace) {
+                    let (block, list) = self.parse_block_list()?;
+                    Ok(Expr {
+                        kind: ExprKind::ForEachExpr {
+                            block,
+                            list: Box::new(list),
+                        },
+                        line,
+                    })
+                } else if self.in_pipe_rhs() {
+                    // `|> fore say` — blockless pipe form: wrap EXPR into a synthetic block
+                    let expr = self.parse_assign_expr_stop_at_pipe()?;
+                    let block = vec![Statement {
+                        label: None,
+                        kind: StmtKind::Expression(expr),
+                        line,
+                    }];
+                    let list = self.pipe_placeholder_list(line);
+                    Ok(Expr {
+                        kind: ExprKind::ForEachExpr {
+                            block,
+                            list: Box::new(list),
+                        },
+                        line,
+                    })
+                } else {
+                    // `fore EXPR, LIST` — comma form
+                    let expr = self.parse_assign_expr()?;
+                    self.expect(&Token::Comma)?;
+                    let list_parts = self.parse_list_until_terminator()?;
+                    let list_expr = if list_parts.len() == 1 {
+                        list_parts.into_iter().next().unwrap()
+                    } else {
+                        Expr {
+                            kind: ExprKind::List(list_parts),
+                            line,
+                        }
+                    };
+                    let block = vec![Statement {
+                        label: None,
+                        kind: StmtKind::Expression(expr),
+                        line,
+                    }];
+                    Ok(Expr {
+                        kind: ExprKind::ForEachExpr {
+                            block,
+                            list: Box::new(list_expr),
+                        },
+                        line,
+                    })
+                }
             }
             "reverse" | "reversed" => {
                 // On the RHS of `|>`, the operand is supplied by the piped LHS.
@@ -5647,15 +5707,27 @@ impl Parser {
                         line,
                     })
                 } else {
-                    let expr = self.parse_assign_expr()?;
-                    self.expect(&Token::Comma)?;
-                    let list_parts = self.parse_list_until_terminator()?;
-                    let list_expr = if list_parts.len() == 1 {
-                        list_parts.into_iter().next().unwrap()
+                    let expr = self.parse_assign_expr_stop_at_pipe()?;
+                    let list_expr = if self.in_pipe_rhs()
+                        && matches!(
+                            self.peek(),
+                            Token::Semicolon
+                                | Token::RBrace
+                                | Token::RParen
+                                | Token::Eof
+                                | Token::PipeForward
+                        ) {
+                        self.pipe_placeholder_list(line)
                     } else {
-                        Expr {
-                            kind: ExprKind::List(list_parts),
-                            line,
+                        self.expect(&Token::Comma)?;
+                        let list_parts = self.parse_list_until_terminator()?;
+                        if list_parts.len() == 1 {
+                            list_parts.into_iter().next().unwrap()
+                        } else {
+                            Expr {
+                                kind: ExprKind::List(list_parts),
+                                line,
+                            }
                         }
                     };
                     Ok(Expr {
@@ -5680,24 +5752,87 @@ impl Parser {
                         line,
                     })
                 } else {
-                    let expr = self.parse_assign_expr()?;
-                    self.expect(&Token::Comma)?;
-                    let list_parts = self.parse_list_until_terminator()?;
-                    let list_expr = if list_parts.len() == 1 {
-                        list_parts.into_iter().next().unwrap()
-                    } else {
-                        Expr {
-                            kind: ExprKind::List(list_parts),
+                    let expr = self.parse_assign_expr_stop_at_pipe()?;
+                    if self.in_pipe_rhs()
+                        && matches!(
+                            self.peek(),
+                            Token::Semicolon
+                                | Token::RBrace
+                                | Token::RParen
+                                | Token::Eof
+                                | Token::PipeForward
+                        )
+                    {
+                        // Pipe-RHS blockless form: `|> grep EXPR`
+                        // For literals, desugar to `$_ eq/== EXPR` so
+                        // `|> filter 't'` keeps only elements equal to 't'.
+                        // For regexes, desugar to `$_ =~ EXPR`.
+                        let list = self.pipe_placeholder_list(line);
+                        let topic = Expr {
+                            kind: ExprKind::ScalarVar("_".into()),
                             line,
-                        }
-                    };
-                    Ok(Expr {
-                        kind: ExprKind::GrepExprComma {
-                            expr: Box::new(expr),
-                            list: Box::new(list_expr),
-                        },
-                        line,
-                    })
+                        };
+                        let test = match &expr.kind {
+                            ExprKind::Integer(_) | ExprKind::Float(_) => Expr {
+                                kind: ExprKind::BinOp {
+                                    op: BinOp::NumEq,
+                                    left: Box::new(topic),
+                                    right: Box::new(expr),
+                                },
+                                line,
+                            },
+                            ExprKind::String(_) | ExprKind::InterpolatedString(_) => Expr {
+                                kind: ExprKind::BinOp {
+                                    op: BinOp::StrEq,
+                                    left: Box::new(topic),
+                                    right: Box::new(expr),
+                                },
+                                line,
+                            },
+                            ExprKind::Regex { .. } => Expr {
+                                kind: ExprKind::BinOp {
+                                    op: BinOp::BindMatch,
+                                    left: Box::new(topic),
+                                    right: Box::new(expr),
+                                },
+                                line,
+                            },
+                            _ => {
+                                // Non-literal (e.g. `defined`): use as-is (Perl grep semantics)
+                                expr
+                            }
+                        };
+                        let block = vec![Statement {
+                            label: None,
+                            kind: StmtKind::Expression(test),
+                            line,
+                        }];
+                        Ok(Expr {
+                            kind: ExprKind::GrepExpr {
+                                block,
+                                list: Box::new(list),
+                            },
+                            line,
+                        })
+                    } else {
+                        self.expect(&Token::Comma)?;
+                        let list_parts = self.parse_list_until_terminator()?;
+                        let list_expr = if list_parts.len() == 1 {
+                            list_parts.into_iter().next().unwrap()
+                        } else {
+                            Expr {
+                                kind: ExprKind::List(list_parts),
+                                line,
+                            }
+                        };
+                        Ok(Expr {
+                            kind: ExprKind::GrepExprComma {
+                                expr: Box::new(expr),
+                                list: Box::new(list_expr),
+                            },
+                            line,
+                        })
+                    }
                 }
             }
             "sort" => {
@@ -5839,7 +5974,7 @@ impl Parser {
             }
             "pmap_chunked" => {
                 let chunk_size = self.parse_assign_expr()?;
-                let block = self.parse_block()?;
+                let block = self.parse_block_or_bareword_block()?;
                 self.eat(&Token::Comma);
                 let (list, progress) = self.parse_assign_expr_list_optional_progress()?;
                 Ok(Expr {
@@ -5953,14 +6088,12 @@ impl Parser {
                 })
             }
             "fan" => {
-                // fan COUNT { BLOCK }  |  fan { BLOCK }  (COUNT defaults to rayon thread pool size)
+                // fan { BLOCK }            — no count, block body
+                // fan COUNT { BLOCK }      — count + block body
+                // fan EXPR;                — no count, blockless body (wrap EXPR as block)
+                // fan COUNT EXPR;          — count + blockless body
                 // Optional: `, progress => EXPR` or `progress => EXPR` (no comma before progress)
-                let count = if matches!(self.peek(), Token::LBrace) {
-                    None
-                } else {
-                    Some(Box::new(self.parse_postfix()?))
-                };
-                let block = self.parse_block()?;
+                let (count, block) = self.parse_fan_count_and_block(line)?;
                 let progress = self.parse_fan_optional_progress("fan")?;
                 Ok(Expr {
                     kind: ExprKind::FanExpr {
@@ -5973,12 +6106,7 @@ impl Parser {
                 })
             }
             "fan_cap" => {
-                let count = if matches!(self.peek(), Token::LBrace) {
-                    None
-                } else {
-                    Some(Box::new(self.parse_postfix()?))
-                };
-                let block = self.parse_block()?;
+                let (count, block) = self.parse_fan_count_and_block(line)?;
                 let progress = self.parse_fan_optional_progress("fan_cap")?;
                 Ok(Expr {
                     kind: ExprKind::FanExpr {
@@ -6021,31 +6149,22 @@ impl Parser {
                 })
             }
             "timer" => {
-                if !matches!(self.peek(), Token::LBrace) {
-                    return Err(self.syntax_err("timer must be followed by { BLOCK }", line));
-                }
-                let block = self.parse_block()?;
+                let block = self.parse_block_or_bareword_block_no_args()?;
                 Ok(Expr {
                     kind: ExprKind::Timer { body: block },
                     line,
                 })
             }
             "bench" => {
-                if !matches!(self.peek(), Token::LBrace) {
-                    return Err(self.syntax_err("bench must be followed by { BLOCK }", line));
-                }
-                let body = self.parse_block()?;
+                let block = self.parse_block_or_bareword_block_no_args()?;
                 let times = Box::new(self.parse_expression()?);
                 Ok(Expr {
-                    kind: ExprKind::Bench { body, times },
+                    kind: ExprKind::Bench { body: block, times },
                     line,
                 })
             }
             "retry" => {
-                if !matches!(self.peek(), Token::LBrace) {
-                    return Err(self.syntax_err("retry must be followed by { BLOCK }", line));
-                }
-                let body = self.parse_block()?;
+                let body = self.parse_block_or_bareword_block_no_args()?;
                 match self.peek() {
                     Token::Ident(ref s) if s == "times" => {
                         self.advance();
@@ -6102,10 +6221,7 @@ impl Parser {
                 self.expect(&Token::Comma)?;
                 let window = Box::new(self.parse_expression()?);
                 self.expect(&Token::RParen)?;
-                if !matches!(self.peek(), Token::LBrace) {
-                    return Err(self.syntax_err("rate_limit must be followed by { BLOCK }", line));
-                }
-                let body = self.parse_block()?;
+                let body = self.parse_block_or_bareword_block_no_args()?;
                 let slot = self.alloc_rate_limit_slot();
                 Ok(Expr {
                     kind: ExprKind::RateLimitBlock {
@@ -6121,10 +6237,7 @@ impl Parser {
                 self.expect(&Token::LParen)?;
                 let interval = Box::new(self.parse_expression()?);
                 self.expect(&Token::RParen)?;
-                if !matches!(self.peek(), Token::LBrace) {
-                    return Err(self.syntax_err("every must be followed by { BLOCK }", line));
-                }
-                let body = self.parse_block()?;
+                let body = self.parse_block_or_bareword_block_no_args()?;
                 Ok(Expr {
                     kind: ExprKind::EveryBlock { interval, body },
                     line,
@@ -7310,7 +7423,7 @@ impl Parser {
     ) -> PerlResult<(Expr, Block, Expr, Option<Expr>)> {
         let init = self.parse_assign_expr()?;
         self.expect(&Token::Comma)?;
-        let block = self.parse_block()?;
+        let block = self.parse_block_or_bareword_block()?;
         self.eat(&Token::Comma);
         let line = self.peek_line();
         if let Token::Ident(ref kw) = self.peek().clone() {
@@ -7375,7 +7488,7 @@ impl Parser {
         &mut self,
     ) -> PerlResult<(Expr, Block, Expr, Option<Expr>)> {
         let cluster = self.parse_assign_expr()?;
-        let block = self.parse_block()?;
+        let block = self.parse_block_or_bareword_block()?;
         self.eat(&Token::Comma);
         let line = self.peek_line();
         if let Token::Ident(ref kw) = self.peek().clone() {
@@ -7447,7 +7560,7 @@ impl Parser {
     fn parse_block_then_list_optional_progress(
         &mut self,
     ) -> PerlResult<(Block, Expr, Option<Expr>)> {
-        let block = self.parse_block()?;
+        let block = self.parse_block_or_bareword_block()?;
         self.eat(&Token::Comma);
         let line = self.peek_line();
         if let Token::Ident(ref kw) = self.peek().clone() {
@@ -7509,6 +7622,125 @@ impl Parser {
             parts.push(self.parse_assign_expr_stop_at_pipe()?);
         }
         Ok((block, merge_expr_list(parts), None))
+    }
+
+    /// Parse fan/fan_cap arguments: optional count + block or blockless expression.
+    fn parse_fan_count_and_block(
+        &mut self,
+        _line: usize,
+    ) -> PerlResult<(Option<Box<Expr>>, Block)> {
+        // `fan { BLOCK }` — no count
+        if matches!(self.peek(), Token::LBrace) {
+            let block = self.parse_block()?;
+            return Ok((None, block));
+        }
+        // Not a brace — first expr could be count or body
+        let first = self.parse_postfix()?;
+        if matches!(self.peek(), Token::LBrace) {
+            // `fan COUNT { BLOCK }`
+            let block = self.parse_block()?;
+            Ok((Some(Box::new(first)), block))
+        } else if matches!(self.peek(), Token::Semicolon | Token::RBrace | Token::Eof)
+            || (matches!(self.peek(), Token::Comma)
+                && matches!(self.peek_at(1), Token::Ident(ref kw) if kw == "progress"))
+        {
+            // `fan EXPR;` — no count, first is the body
+            let block = self.bareword_to_no_arg_block(first);
+            Ok((None, block))
+        } else {
+            // `fan COUNT EXPR;`
+            let body = self.parse_block_or_bareword_block_no_args()?;
+            Ok((Some(Box::new(first)), body))
+        }
+    }
+
+    /// Wrap a parsed expression as a single-statement block, converting bare
+    /// identifiers to zero-arg calls (`work` → `work()`).
+    fn bareword_to_no_arg_block(&self, expr: Expr) -> Block {
+        let line = expr.line;
+        let body = match &expr.kind {
+            ExprKind::Bareword(name) => Expr {
+                kind: ExprKind::FuncCall {
+                    name: name.clone(),
+                    args: vec![],
+                },
+                line,
+            },
+            _ => expr,
+        };
+        vec![Statement::new(StmtKind::Expression(body), line)]
+    }
+
+    /// Parse either a `{ BLOCK }` or a bare expression and wrap it as a synthetic block.
+    ///
+    /// When the next token is `{`, delegates to [`Self::parse_block`].
+    /// Otherwise parses a single postfix expression and wraps it as a call
+    /// with `$_` as argument (for barewords) or a plain expression statement:
+    ///
+    /// - Bareword `foo` → `{ foo($_) }`
+    /// - Other expr     → `{ EXPR }`
+    fn parse_block_or_bareword_block(&mut self) -> PerlResult<Block> {
+        if matches!(self.peek(), Token::LBrace) {
+            return self.parse_block();
+        }
+        let line = self.peek_line();
+        // A lone identifier followed by a list-terminator is a bare sub name:
+        // `pmap double, @list` → block is `{ double($_) }`, rest is list.
+        if let Token::Ident(ref name) = self.peek().clone() {
+            if matches!(
+                self.peek_at(1),
+                Token::Comma | Token::Semicolon | Token::RBrace | Token::Eof | Token::PipeForward
+            ) {
+                let name = name.clone();
+                self.advance();
+                let body = Expr {
+                    kind: ExprKind::FuncCall {
+                        name,
+                        args: vec![Expr {
+                            kind: ExprKind::ScalarVar("_".to_string()),
+                            line,
+                        }],
+                    },
+                    line,
+                };
+                return Ok(vec![Statement::new(StmtKind::Expression(body), line)]);
+            }
+        }
+        // Not a simple bareword — parse as expression (e.g. `$_ * 2`, `uc $_`)
+        let expr = self.parse_assign_expr_stop_at_pipe()?;
+        Ok(vec![Statement::new(StmtKind::Expression(expr), line)])
+    }
+
+    /// Like [`parse_block_or_bareword_block`] but for fan/timer/bench where the
+    /// bare function takes no args (body runs stand-alone, not per-element).
+    /// Only consumes a single bareword identifier — does NOT let `parse_primary`
+    /// greedily swallow subsequent tokens as function arguments.
+    fn parse_block_or_bareword_block_no_args(&mut self) -> PerlResult<Block> {
+        if matches!(self.peek(), Token::LBrace) {
+            return self.parse_block();
+        }
+        let line = self.peek_line();
+        if let Token::Ident(ref name) = self.peek().clone() {
+            if matches!(
+                self.peek_at(1),
+                Token::Comma
+                    | Token::Semicolon
+                    | Token::RBrace
+                    | Token::Eof
+                    | Token::PipeForward
+                    | Token::Integer(_)
+            ) {
+                let name = name.clone();
+                self.advance();
+                let body = Expr {
+                    kind: ExprKind::FuncCall { name, args: vec![] },
+                    line,
+                };
+                return Ok(vec![Statement::new(StmtKind::Expression(body), line)]);
+            }
+        }
+        let expr = self.parse_postfix()?;
+        Ok(vec![Statement::new(StmtKind::Expression(expr), line)])
     }
 
     /// After `fan` / `fan_cap` `{ BLOCK }`, optional `, progress => EXPR` or `progress => EXPR` (no comma).

@@ -6367,6 +6367,11 @@ impl Compiler {
                     self.emit_op(Op::StackArrayLen, line, Some(root));
                 }
             }
+            ExprKind::ForEachExpr { block, list } => {
+                self.compile_expr_ctx(list, WantarrayCtx::List)?;
+                let block_idx = self.chunk.add_block(block.clone());
+                self.emit_op(Op::ForEachWithBlock(block_idx), line, Some(root));
+            }
             ExprKind::GrepExpr { block, list } => {
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
                 if let Some((m, r)) = crate::map_grep_fast::detect_grep_int_mod_eq(block) {

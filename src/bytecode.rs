@@ -387,6 +387,8 @@ pub enum Op {
     FlatMapWithBlock(u16),
     /// grep { BLOCK } @list — block_idx; stack: \[list\] → \[filtered\]
     GrepWithBlock(u16),
+    /// each { BLOCK } @list — block_idx; stack: \[list\] → \[count\]
+    ForEachWithBlock(u16),
     /// map EXPR, LIST — index into [`Chunk::map_expr_entries`] / [`Chunk::map_expr_bytecode_ranges`];
     /// stack: \[list\] → \[mapped\]
     MapWithExpr(u16),

@@ -136,41 +136,45 @@ Each parallel block runs in its own interpreter context with **captured lexical 
 
 ```perl
 # map / grep / sort / fold / for in parallel (list can be piped in)
-my @doubled = @data |> pmap   { $_ * 2     },    progress => 1;
-my @evens   = @data |> pgrep  { $_ % 2 == 0 };
-my @sorted  = @data |> psort  { $a <=> $b  };
+my @doubled = @data |> pmap $_ * 2 , progress => 1;
+my @evens   = @data |> pgrep $_ % 2 == 0;
+my @sorted  = @data |> psort { $a <=> $b };
 my $sum     = @numbers |> preduce { $a + $b };
-pfor @items { process };
+pfor process, @items;
 
 # fused map+reduce, chunked map, memoized map, init fold
-my $sum2     = @nums |> pmap_reduce  { $_ * 2 } { $a + $b };
+my $sum2     = @nums |> pmap_reduce { $_ * 2 } { $a + $b };
 my @squared  = @million |> pmap_chunked 1000 { $_ ** 2 };
-my @once     = @inputs |> pcache       { expensive };
+my @once     = @inputs |> pcache expensive;
 my $hist     = @words |> preduce_init {}, { my ($acc, $x) = @_; $acc->{$x}++; $acc };
 
 # fan — run a block N times in parallel ($_ = 0..N-1)
-fan 8           { work };
-fan             { work };                # uses rayon pool size (`pe -j`)
-my @r = fan_cap { $_ * $_ };             # capture results in $_ order
+fan 8 work;
+fan work;                # uses rayon pool size (`pe -j`)
+## or
+fan { work } ;                # uses rayon pool size (`pe -j`)
+## or
+fan { work $_ } ;                # uses rayon pool size (`pe -j`)
+my @r = fan_cap $_ * $_;             # capture results in $_ order
 
 # pipelines — sequential or rayon-backed; same chain methods
 my @r = (@data |> pipeline)->filter({ $_ > 10 })->map({ $_ * 2 })->take(100)->collect;
 ### or 
-my @r = @data |> pipeline |> filter { $_ > 10 } |> map { $_ * 2 } |> take 100 |> collect;
-my @r = @data |> par_pipeline |> filter { $_ > 10 } |> map { $_ * 2 } |> collect;
+my @r = @data |> pipeline |> filter $_ > 10 |> map $_ * 2 |> take 100 |> collect;
+my @r = @data |> par_pipeline |> filter  $_ > 10 |> map $_ * 2 |> collect;
 
 # multi-stage: batch (each stage drains list before next)
 my $n = par_pipeline(
     source  => { readline(STDIN) },
-    stages  => [ { parse_json }, { transform } ],
+    stages  => [ parse_json, transform ],
     workers => [4, 2],
     buffer  => 256,
 );
 
 # multi-stage: streaming (bounded crossbeam channels, concurrent stages, order NOT preserved)
-my @r = ((1..1_000) |> par_pipeline_stream)->filter({ $_ > 500 })->map({ $_ * 2 })->collect();
+my @r = ((1..1_000) |> par_pipeline_stream)->filter{ $_ > 500 })->map({ $_ * 2 })->collect();
 ## or
-my @r = (1..1_000) |> par_pipeline_stream |> filter { $_ > 500 } |> map { $_ * 2 } |> collect;
+my @r = (1..1_000) |> par_pipeline_stream |> filter $_ > 500 |> map $_ * 2 |> collect;
 
 # channels + Go-style select
 my ($tx, $rx) = pchannel(128);           # bounded; pchannel() is unbounded
@@ -183,8 +187,8 @@ fan 3 { $sync->wait; say "all arrived" };
 
 # persistent thread pool (avoids per-task spawn from pmap/pfor)
 my $pool = ppool(4);
-$pool->submit { heavy_work }  for @tasks;
-my @results = $pool->collect();
+$pool->submit heavy_work for @tasks;
+my @results = $pool |> collect;
 
 # parallel file IO
 my @logs = "**/*.log" |> glob_par;              # rayon recursive glob
@@ -193,15 +197,15 @@ par_walk  ".", { say if /\.rs$/ };              # parallel directory walk
 par_sed qr/\bfoo\b/, "bar", @paths;             # parallel in-place sed (returns # changed)
 
 # native file watcher (notify crate: inotify/kqueue/FSEvents)
-watch  "/tmp/x", { say };
-pwatch "logs/*", { heavy };
+watch  "/tmp/x", say;
+pwatch "logs/*", heavy;
 
 # control thread count
-pe -j 8 -e '@data |> pmap { heavy }'
+pe -j 8 -e '@data |> pmap heavy'
 
 # distributed pmap over an SSH worker pool — see [0x10] for details
 my $cluster = cluster(["build1:8", "build2:16"]);
-my @r = @huge |> pmap_on $cluster { heavy };
+my @r = @huge |> pmap_on $cluster heavy;
 ```
 
 **Parallel capture safety** — workers set `Scope::parallel_guard` after restoring captured lexicals. Assignments to captured non-`mysync` aggregates are rejected at runtime; `mysync`, package-qualified names, and topics (`$_`/`$a`/`$b`) are allowed. `pmap`/`pgrep` treat block failures as `undef`/false; use `pfor` when failures must abort.
@@ -225,7 +229,7 @@ mysync %histogram;
 
 # deque() and heap(...) already use Arc<Mutex<...>> internally
 mysync $q  = deque();
-mysync $pq = heap({ $a <=> $b });
+mysync $pq = heap { $a <=> $b };
 ```
 
 For `mysync` scalars holding a `Set`, `|`/`&` are union/intersection. Without `mysync`, each thread gets an independent copy.
@@ -293,16 +297,16 @@ mysync $counter = 0;
 trace { fan 10 { $counter++ } };
 
 # timer / bench — wall-clock millis; bench returns "min/mean/p99"
-my $ms     = timer { heavy_work };
-my $report = bench { heavy_work } 1000;
+my $ms     = timer heavy_work;
+my $report = bench heavy_work 1000;
 
 # eval_timeout — runs block on a worker thread; recv_timeout on main
-eval_timeout 5 { slow };
+eval_timeout 5 slow;
 
 # retry / rate_limit / every (tree interpreter only)
-retry { http_call } times => 3, backoff => "exponential";
-rate_limit(10, "1s") { hit_api() };
-every("500ms") { tick() };
+retry http_call times => 3, backoff => "exponential";
+rate_limit 10, "1s" hit_api;
+every "500ms" tick;
 
 # generators — lazy `yield` values
 my $g = gen { yield $_ for 1..5 };
@@ -357,7 +361,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
 | Category | Functions |
 | --- | --- |
-| Array | `push`, `pop`, `shift`, `unshift`, `splice`, `reverse`, `sort`, `map`, `grep`, `reduce`, `fold`, `preduce`, `scalar` |
+| Array | `push`, `pop`, `shift`, `unshift`, `splice`, `reverse`, `sort`, `map`, `grep`, `filter`, `reduce`, `fold`, `fore`, `preduce`, `scalar` |
 | Hash | `keys`, `values`, `each`, `delete`, `exists` |
 | String | `chomp`, `chop`, `length`, `substr`, `index`, `rindex`, `split`, `join`, `sprintf`, `printf`, `uc`/`lc`/`ucfirst`/`lcfirst`, `chr`, `ord`, `hex`, `oct`, `crypt`, `fc`, `pos`, `study`, `quotemeta` |
 | Binary | `pack`, `unpack` (subset `A a N n V v C Q q Z H x w i I l L s S f d` + `*`), `vec` |
@@ -413,26 +417,36 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **Language server** ([\[0x11\]](#0x11-language-server---lsp)): `pe --lsp` runs an LSP server over stdio with diagnostics, hover, completion.
 - `mysync` shared state ([\[0x04\]](#0x04-shared-state-mysync)).
 - `frozen my`, `typed my`, `struct`, algebraic `match`, `try/catch/finally`, `eval_timeout`, `retry`, `rate_limit`, `every`, `gen { ... yield }`.
-- **Pipe-forward `|>`** — parse-time desugaring (zero runtime cost); threads the LHS as the **first** argument of the RHS call, left-associative:
+- **`fore`** — side-effect-only list iterator (like `map` but void, returns item count). Works with `{ BLOCK } LIST`, blockless `fore EXPR, LIST`, and pipe-forward `|> fore say`. Use for print/log/accumulator loops.
+- **Pipe-forward `|>`** — parse-time desugaring (zero runtime cost); threads the LHS as the **first** argument of the RHS call, left-associative. `map`, `grep`/`filter`, `sort`, and `fore` accept **blockless expressions** on the RHS of `|>` — no `{ }` required for simple transforms:
 
   ```perl
   # chain HTTP fetch → JSON decode → jq filter
   my @titles = $url |> fetch_json |> json_decode |> json_jq '.articles[].title';
 
-  # list pipelines
-  my $csv = (1..5) |> map { $_ * $_ } |> join(",");    # "1,4,9,16,25"
-  my @big = @rows  |> grep { $_->{n} > 10 } |> sort;
+  # blockless list pipelines — no braces needed for simple expressions
+  "a".."z" |> map uc |> fore say;                      # A B C … Z
+  "a".."z" |> grep /[aeiou]/ |> fore say;              # a e i o u
+  "a".."z" |> filter 't' |> fore say;                  # t  (literal = equality test)
+  1..10 |> filter { $_ > 5 } |> sort |> fore say;      # blocks still work
+  1..5 |> map { $_ * $_ } |> join(",") |> say;         # 1,4,9,16,25
 
-  # unary builtins — `x |> length`, `x |> uc`, etc.
+  # fore — side-effect-only iteration (like map but void, returns count)
+  qw(apple banana cherry) |> grep /^a/ |> map uc |> fore say;  # APPLE
+
+  # unary builtins — `x |> length`, `x |> uc`, `x |> sqrt`, etc.
   "hello" |> length |> say;                            # 5
-  # builtins parsed as `name(ARG)` only (no bare `name` RHS): use `x |> \&slurp` or `slurp("x")`
+  16 |> sqrt |> say;                                   # 4
+  "ff" |> hex |> say;                                  # 255
 
   # bareword on RHS becomes a unary call: `x |> f` → `f(x)`
   # call on RHS prepends: `x |> f(a, b)` → `f(x, a, b)`
-  # map/grep/sort/join/reduce/fold — LHS fills the list slot
+  # map/grep/filter/sort/join/reduce/fold/fore — LHS fills the list slot
   # chunked/windowed — `LIST |> chunked(N)` prepends the list before the size
   # scalar on RHS: `x |> $cr` → `$cr->(x)`
   ```
+
+  **Blockless `|>` rules for `grep`/`filter`**: string literals test `$_ eq EXPR`, numbers test `$_ == EXPR`, regexes test `$_ =~ EXPR`, anything else (e.g. `defined`) uses standard Perl grep semantics (sets `$_`, evaluates expression).
 
   Precedence: `|>` binds **looser** than `||` but **tighter** than `?:` / `and`/`or`/`not` — the slot sits between `parse_ternary` and `parse_or_word` in the parser stack. So `$x + 1 |> f` parses as `f($x + 1)`, and `0 || 1 |> yes` parses as `yes(0 || 1)`. The RHS must be a call, builtin, method invocation, bareword, or coderef expression; bare binary expressions / literals on the right are a parse error (`42 |> 1 + 2` is rejected).
 
@@ -682,10 +696,10 @@ my $cluster = cluster([
     { timeout => 30, retries => 2, connect_timeout => 5 },  # trailing tunables
 ]);
 
-my @hashes = @big_files |> pmap_on $cluster { sha256(slurp_raw($_)) };
+my @hashes = @big_files |> pmap_on $cluster { slurp_raw |> sha_256) };
 
 # pflat_map_on for one-to-many mapping
-my @lines = @log_paths |> pflat_map_on $cluster { split /\n/, slurp($_) };
+my @lines = @log_paths |> pflat_map_on $cluster { split /\n/, slurp };
 ```
 
 #### Cluster syntax

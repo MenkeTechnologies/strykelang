@@ -737,6 +737,9 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::GrepExprComma { expr, list } => {
             format!("grep {}, {}", format_expr(expr), format_expr(list))
         }
+        ExprKind::ForEachExpr { block, list } => {
+            format!("fore {{\n{}\n}} {}", format_block(block), format_expr(list))
+        }
         ExprKind::SortExpr { cmp, list } => match cmp {
             Some(crate::ast::SortComparator::Block(b)) => {
                 format!("sort {{\n{}\n}} {}", format_block(b), format_expr(list))

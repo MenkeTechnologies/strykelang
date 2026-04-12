@@ -5699,6 +5699,33 @@ impl<'a> VM<'a> {
                             Ok(())
                         }
                     }
+                    Op::ForEachWithBlock(block_idx) => {
+                        let list = self.pop().to_list();
+                        let count = list.len() as i64;
+                        let idx = *block_idx as usize;
+                        if let Some(&(start, end)) =
+                            self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
+                        {
+                            for item in list {
+                                let _ = self.interp.scope.set_scalar("_", item);
+                                self.run_block_region(start, end, op_count)?;
+                            }
+                        } else {
+                            let block = self.blocks[idx].clone();
+                            for item in list {
+                                let _ = self.interp.scope.set_scalar("_", item);
+                                match self.interp.exec_block(&block) {
+                                    Ok(_) => {}
+                                    Err(crate::interpreter::FlowOrError::Error(e)) => {
+                                        return Err(e)
+                                    }
+                                    Err(_) => {}
+                                }
+                            }
+                        }
+                        self.push(PerlValue::integer(count));
+                        Ok(())
+                    }
                     Op::GrepWithExpr(expr_idx) => {
                         let list = self.pop().to_list();
                         let idx = *expr_idx as usize;

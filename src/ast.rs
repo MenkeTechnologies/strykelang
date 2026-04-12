@@ -600,6 +600,12 @@ pub enum ExprKind {
         string: Box<Expr>,
         limit: Option<Box<Expr>>,
     },
+    /// `each { BLOCK } @list` — execute BLOCK for each element
+    /// with `$_` aliased; void context (returns count in scalar context).
+    ForEachExpr {
+        block: Block,
+        list: Box<Expr>,
+    },
 
     // Parallel extensions
     PMapExpr {

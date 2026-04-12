@@ -8595,6 +8595,16 @@ impl Interpreter {
                     Ok(PerlValue::integer(result.len() as i64))
                 }
             }
+            ExprKind::ForEachExpr { block, list } => {
+                let list_val = self.eval_expr_ctx(list, WantarrayCtx::List)?;
+                let items = list_val.to_list();
+                let count = items.len();
+                for item in items {
+                    let _ = self.scope.set_scalar("_", item);
+                    self.exec_block(block)?;
+                }
+                Ok(PerlValue::integer(count as i64))
+            }
             ExprKind::MapExprComma {
                 expr,
                 list,
