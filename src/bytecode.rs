@@ -2188,11 +2188,15 @@ mod tests {
             BuiltinId::from_u16(BuiltinId::Pipe as u16),
             Some(BuiltinId::Pipe)
         );
+        assert_eq!(
+            BuiltinId::from_u16(BuiltinId::Files as u16),
+            Some(BuiltinId::Files)
+        );
     }
 
     #[test]
     fn builtin_id_from_u16_out_of_range() {
-        assert_eq!(BuiltinId::from_u16(BuiltinId::Pipe as u16 + 1), None);
+        assert_eq!(BuiltinId::from_u16(BuiltinId::Files as u16 + 1), None);
         assert_eq!(BuiltinId::from_u16(u16::MAX), None);
     }
 

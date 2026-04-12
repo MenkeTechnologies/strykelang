@@ -5911,7 +5911,8 @@ impl Parser {
                         },
                         line,
                     })
-                } else if matches!(self.peek(), Token::Ident(ref name) if !Self::is_perl_keyword(name)) {
+                } else if matches!(self.peek(), Token::Ident(ref name) if !Self::is_perl_keyword(name))
+                {
                     // Blockless comparator via bare sub name: `sort my_cmp @list`
                     let block = self.parse_block_or_bareword_cmp_block()?;
                     let _ = self.eat(&Token::Comma);
@@ -7880,8 +7881,14 @@ impl Parser {
                     kind: ExprKind::FuncCall {
                         name,
                         args: vec![
-                            Expr { kind: ExprKind::ScalarVar("a".to_string()), line },
-                            Expr { kind: ExprKind::ScalarVar("b".to_string()), line },
+                            Expr {
+                                kind: ExprKind::ScalarVar("a".to_string()),
+                                line,
+                            },
+                            Expr {
+                                kind: ExprKind::ScalarVar("b".to_string()),
+                                line,
+                            },
                         ],
                     },
                     line,
