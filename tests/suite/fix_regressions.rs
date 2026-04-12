@@ -963,8 +963,26 @@ fn preincrement_hash_element() {
 
 #[test]
 fn exponentiation_integer_pow() {
-    // Avoid `<<`: in perlrs it starts a here-doc, not a bit-shift.
     assert_eq!(eval_int(r#"2 ** 6"#), 64);
+}
+
+#[test]
+fn shift_left_binary_after_term() {
+    assert_eq!(eval_int(r#"1 << 4"#), 16);
+    assert_eq!(eval_int(r#"3 << 2"#), 12);
+}
+
+#[test]
+fn destroy_runs_when_lexical_blessed_ref_dropped() {
+    assert_eq!(
+        eval_int(
+            r#"our $d = 0;
+            sub Dtor::DESTROY { $main::d = $main::d + 1; }
+            { my $o = bless {}, "Dtor"; }
+            $d"#
+        ),
+        1
+    );
 }
 
 #[test]

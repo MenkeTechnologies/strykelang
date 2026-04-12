@@ -35,7 +35,7 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 | `<>` | Read lines | Iterate `@ARGV` files in order (then undef); if `@ARGV` is empty, stdin. |
 | `@INC` | Library path | Array of search dirs; `%INC` used for loaded paths in `require`. |
 | `%INC` | Loaded modules | Hash entries set by `require`/`use` (see `require_execute`). |
-| `%{^HOOK}` | `require` hooks (Perl 5.37+) | Hash `^HOOK` pre-declared (empty); Perl installs `require__before` / `require__after` coderefs — not executed in perlrs yet. Lexer: `%^NAME` → `HashVar("^NAME")`. |
+| `%{^HOOK}` | `require` hooks (Perl 5.37+) | Hash `^HOOK` pre-declared (empty). Coderefs `require__before` / `require__after` are invoked from [`Interpreter::require_execute`](src/interpreter.rs) (`invoke_require_hook`) around each successful file load. Lexer: `%^NAME` → `HashVar("^NAME")`. |
 | `%ENV` | Environment | Hash in scope; filled from `std::env::vars()` on first access (`Interpreter::materialize_env_if_needed`) to reduce cold-start cost. |
 | `%SIG` | Signal handlers | Hash in scope. On **Unix**, `SIGINT` / `SIGTERM` / `SIGALRM` / `SIGCHLD` are registered (`signal_hook`); [`perl_signal::poll`](src/perl_signal.rs) runs **before each tree-walker statement** (`exec_statement_inner`) and **before each VM opcode** (and once before the linear JIT fast path). Invokes code refs (`IGNORE` / `DEFAULT` are no-ops). Non-Unix: no OS delivery. |
 | `$]` | Numeric language version | `get_special_var("]")` → `perl_bracket_version()` (emulated Perl 5.x.y level; see `perl_bracket_version` in `src/interpreter.rs`). |
@@ -86,7 +86,7 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 | `$^I` | The **`pe`/`perlrs` driver** applies **`-i`** / **`-i.bak`** for **`-n`/`-p`** over **`@ARGV`**; value is stored for compatibility with other code paths. |
 | `$^V` | String form only (`v…` from crate version); not a Perl `version` object. |
 | `$^E` | Uses `std::io::Error::last_os_error()`, not Perl’s per-platform extended error. |
-| `${^GLOBAL_PHASE}` | Missing Perl’s **`DESTRUCT`** and other late phases; otherwise **`START`** … **`END`** track the tree-walker and VM the same way. |
+| `${^GLOBAL_PHASE}` | **`DESTRUCT`** is set during [`Interpreter::run_global_teardown`](src/interpreter.rs) after a top-level program (post-`END`) so `DESTROY` drains match Perl’s global-destruction phase name; ordering vs every Perl 5 edge case is not guaranteed. Otherwise **`START`** … **`END`** track the tree-walker and VM the same way. |
 
 ---
 
@@ -115,13 +115,13 @@ Single-character names after `$` are accepted (`src/lexer.rs` `read_variable_nam
 
 ## Short list (what’s still missing)
 
-**Still commonly missing vs stock Perl 5:** **`English`** (long-name aliases); **full `perlform` state machine** (formats/`write` are implemented but not full Perl parity); full **`$^V`** as a version object; Windows-only **`${^…}`** internals. **`exists $href->{key}`** / **`delete $href->{key}`** (hash references and blessed hash-like objects) are implemented; other exotic **`exists`/`delete`** targets may still differ from Perl 5.
+**Still commonly missing vs stock Perl 5:** **full `English`** (only a subset of long names via [`english::scalar_alias`](src/english.rs)); **full `perlform` state machine** (formats/`write` are implemented but not full Perl parity); full **`$^V`** as a version object; Windows-only **`${^…}`** internals. **`exists $href->{key}`** / **`delete $href->{key}`** (hash references and blessed hash-like objects) are implemented; other exotic **`exists`/`delete`** targets may still differ from Perl 5.
 
 | Area | Perl | Notes |
 |------|------|--------|
 | Dualvar | `$!`, `$@` | Both use **`errno_dual`** / **`ErrnoDual`**; numeric and string contexts differ per field. |
 | Signals | `%SIG` | Unix: **`INT`**/**`TERM`**/**`ALRM`**/**`CHLD`** into subs between statements; non-Unix: stubs. |
-| Aliases | `English` | No long-name aliases module. |
+| Aliases | `English` | Subset of long names when `use English` is active (see [`english`](src/english.rs)); not full core `English.pm`. |
 
 ---
 

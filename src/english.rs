@@ -3,8 +3,8 @@
 //! Stock `English` maps long names to the same globals as short punctuation variables.
 //! Only a subset is listed; unknown names are not aliased.
 //!
-//! Not yet wired into the compiler/interpreter; this module is covered by unit tests and
-//! reserved for a future `use English` implementation.
+//! Wired through [`Interpreter::english_scalar_name`](crate::interpreter::Interpreter::english_scalar_name)
+//! when `use English` sets [`Interpreter::english_enabled`](crate::interpreter::Interpreter::english_enabled).
 
 use std::collections::HashMap;
 use std::sync::LazyLock;

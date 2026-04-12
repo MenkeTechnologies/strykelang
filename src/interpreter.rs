@@ -631,6 +631,8 @@ pub struct Interpreter {
     pub(crate) english_enabled: bool,
     /// Lexical scalar names (`my`/`our`/`foreach`/`given`/`match`/`try` catch) per scope frame (parallel to [`Scope`] depth).
     english_lexical_scalars: Vec<HashSet<String>>,
+    /// Bare names from `our $x` per frame — same length as [`Self::english_lexical_scalars`].
+    our_lexical_scalars: Vec<HashSet<String>>,
     /// When false, the bytecode VM runs without Cranelift (see [`crate::try_vm_execute`]). Disabled by
     /// `PERLRS_NO_JIT=1` / `true` / `yes`, or `pe --no-jit` after [`Self::new`].
     pub vm_jit_enabled: bool,
@@ -1199,6 +1201,7 @@ impl Interpreter {
             glob_restore_frames: vec![Vec::new()],
             english_enabled: false,
             english_lexical_scalars: vec![HashSet::new()],
+            our_lexical_scalars: vec![HashSet::new()],
             vm_jit_enabled: !matches!(
                 std::env::var("PERLRS_NO_JIT"),
                 Ok(v)
@@ -1364,6 +1367,7 @@ impl Interpreter {
             glob_restore_frames: self.glob_restore_frames.clone(),
             english_enabled: self.english_enabled,
             english_lexical_scalars: self.english_lexical_scalars.clone(),
+            our_lexical_scalars: self.our_lexical_scalars.clone(),
             vm_jit_enabled: self.vm_jit_enabled,
             disasm_bytecode: self.disasm_bytecode,
             // Sideband cache fields belong to the top-level driver, not line-mode workers.
@@ -1605,6 +1609,40 @@ impl Interpreter {
         name.to_string()
     }
 
+    /// Package stash key for `our $name` (same rule as [`Compiler::qualify_stash_scalar_name`]).
+    pub(crate) fn stash_scalar_name_for_package(&self, name: &str) -> String {
+        if name.contains("::") {
+            return name.to_string();
+        }
+        let pkg = self.current_package();
+        if pkg.is_empty() || pkg == "main" {
+            format!("main::{}", name)
+        } else {
+            format!("{}::{}", pkg, name)
+        }
+    }
+
+    /// Tree-walker: bare `$x` after `our $x` reads the package stash scalar (`main::x` / `Pkg::x`).
+    pub(crate) fn tree_scalar_storage_name(&self, name: &str) -> String {
+        if name.contains("::") {
+            return name.to_string();
+        }
+        for (lex, our) in self
+            .english_lexical_scalars
+            .iter()
+            .zip(self.our_lexical_scalars.iter())
+            .rev()
+        {
+            if lex.contains(name) {
+                if our.contains(name) {
+                    return self.stash_scalar_name_for_package(name);
+                }
+                return name.to_string();
+            }
+        }
+        name.to_string()
+    }
+
     /// Shared by tree `StmtKind::Tie` and bytecode [`crate::bytecode::Op::Tie`].
     pub(crate) fn tie_execute(
         &mut self,
@@ -1811,12 +1849,20 @@ impl Interpreter {
         self.scope.push_frame();
         self.glob_restore_frames.push(Vec::new());
         self.english_lexical_scalars.push(HashSet::new());
+        self.our_lexical_scalars.push(HashSet::new());
     }
 
     #[inline]
     pub(crate) fn english_note_lexical_scalar(&mut self, name: &str) {
         if let Some(s) = self.english_lexical_scalars.last_mut() {
             s.insert(name.to_string());
+        }
+    }
+
+    #[inline]
+    fn note_our_scalar(&mut self, bare_name: &str) {
+        if let Some(s) = self.our_lexical_scalars.last_mut() {
+            s.insert(bare_name.to_string());
         }
     }
 
@@ -1838,6 +1884,7 @@ impl Interpreter {
         }
         self.scope.pop_frame();
         let _ = self.english_lexical_scalars.pop();
+        let _ = self.our_lexical_scalars.pop();
     }
 
     /// After [`Scope::restore_capture`] / [`Scope::restore_atomics`] on a parallel or async worker,
@@ -4732,6 +4779,44 @@ impl Interpreter {
         Ok(())
     }
 
+    /// After a **top-level** program finishes (post-`END`), set `${^GLOBAL_PHASE}` to **`DESTRUCT`**
+    /// and drain remaining `DESTROY` callbacks.
+    pub fn run_global_teardown(&mut self) -> PerlResult<()> {
+        self.global_phase = "DESTRUCT".to_string();
+        self.drain_pending_destroys(0)
+    }
+
+    /// Run queued `DESTROY` methods from blessed objects whose last reference was dropped.
+    pub(crate) fn drain_pending_destroys(&mut self, line: usize) -> PerlResult<()> {
+        loop {
+            let batch = crate::pending_destroy::take_queue();
+            if batch.is_empty() {
+                break;
+            }
+            for (class, payload) in batch {
+                let fq = format!("{}::DESTROY", class);
+                let Some(sub) = self.subs.get(&fq).cloned() else {
+                    continue;
+                };
+                let inv = PerlValue::blessed(Arc::new(
+                    crate::value::BlessedRef::new_for_destroy_invocant(class, payload),
+                ));
+                match self.call_sub(&sub, vec![inv], WantarrayCtx::Void, line) {
+                    Ok(_) => {}
+                    Err(FlowOrError::Error(e)) => return Err(e),
+                    Err(FlowOrError::Flow(Flow::Return(_))) => {}
+                    Err(FlowOrError::Flow(other)) => {
+                        return Err(PerlError::runtime(
+                            format!("DESTROY: unexpected control flow ({other:?})"),
+                            line,
+                        ));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Tree-walking execution (fallback when bytecode compilation fails).
     pub fn execute_tree(&mut self, program: &Program) -> PerlResult<PerlValue> {
         // `${^GLOBAL_PHASE}` — each program starts in `RUN` (Perl before any `BEGIN` runs).
@@ -4838,6 +4923,7 @@ impl Interpreter {
             let _ = self.exec_block(block);
         }
 
+        self.drain_pending_destroys(0)?;
         Ok(last)
     }
 
@@ -5921,6 +6007,9 @@ impl Interpreter {
         if let Err(e) = crate::perl_signal::poll(self) {
             return Err(FlowOrError::Error(e));
         }
+        if let Err(e) = self.drain_pending_destroys(stmt.line) {
+            return Err(FlowOrError::Error(e));
+        }
         match &stmt.kind {
             StmtKind::StmtGroup(block) => self.exec_block_no_scope(block),
             StmtKind::Expression(expr) => self.eval_expr_ctx(expr, WantarrayCtx::Void),
@@ -6208,13 +6297,21 @@ impl Interpreter {
                         match decl.sigil {
                             Sigil::Scalar => {
                                 let v = items.get(idx).cloned().unwrap_or(PerlValue::UNDEF);
+                                let skey = if is_our {
+                                    self.stash_scalar_name_for_package(&decl.name)
+                                } else {
+                                    decl.name.clone()
+                                };
                                 self.scope.declare_scalar_frozen(
-                                    &decl.name,
+                                    &skey,
                                     v,
                                     decl.frozen,
                                     decl.type_annotation,
                                 )?;
                                 self.english_note_lexical_scalar(&decl.name);
+                                if is_our {
+                                    self.note_our_scalar(&decl.name);
+                                }
                                 idx += 1;
                             }
                             Sigil::Array => {
@@ -6268,13 +6365,21 @@ impl Interpreter {
                                     .into());
                                 }
                                 Sigil::Scalar => {
+                                    let skey = if is_our {
+                                        self.stash_scalar_name_for_package(&decl.name)
+                                    } else {
+                                        decl.name.clone()
+                                    };
                                     self.scope.declare_scalar_frozen(
-                                        &decl.name,
+                                        &skey,
                                         PerlValue::UNDEF,
                                         decl.frozen,
                                         decl.type_annotation,
                                     )?;
                                     self.english_note_lexical_scalar(&decl.name);
+                                    if is_our {
+                                        self.note_our_scalar(&decl.name);
+                                    }
                                     let init = decl.initializer.as_ref().unwrap();
                                     self.eval_expr_ctx(init, WantarrayCtx::Void)?;
                                 }
@@ -6319,13 +6424,21 @@ impl Interpreter {
                                 .into());
                             }
                             Sigil::Scalar => {
+                                let skey = if is_our {
+                                    self.stash_scalar_name_for_package(&decl.name)
+                                } else {
+                                    decl.name.clone()
+                                };
                                 self.scope.declare_scalar_frozen(
-                                    &decl.name,
+                                    &skey,
                                     val,
                                     decl.frozen,
                                     decl.type_annotation,
                                 )?;
                                 self.english_note_lexical_scalar(&decl.name);
+                                if is_our {
+                                    self.note_our_scalar(&decl.name);
+                                }
                             }
                             Sigil::Array => {
                                 let items = val.to_list();
@@ -7075,7 +7188,8 @@ impl Interpreter {
             // Variables
             ExprKind::ScalarVar(name) => {
                 self.check_strict_scalar_var(name, line)?;
-                if let Some(obj) = self.tied_scalars.get(name).cloned() {
+                let stor = self.tree_scalar_storage_name(name);
+                if let Some(obj) = self.tied_scalars.get(&stor).cloned() {
                     let class = obj
                         .as_blessed_ref()
                         .map(|b| b.class.clone())
@@ -7085,7 +7199,7 @@ impl Interpreter {
                         return self.call_sub(&sub, vec![obj], ctx, line);
                     }
                 }
-                Ok(self.get_special_var(name))
+                Ok(self.get_special_var(&stor))
             }
             ExprKind::ArrayVar(name) => {
                 self.check_strict_array_var(name, line)?;
@@ -9971,10 +10085,9 @@ impl Interpreter {
                 } else {
                     self.scope.get_scalar("__PACKAGE__").to_string()
                 };
-                Ok(PerlValue::blessed(Arc::new(crate::value::BlessedRef {
-                    class: class_name,
-                    data: RwLock::new(val),
-                })))
+                Ok(PerlValue::blessed(Arc::new(
+                    crate::value::BlessedRef::new_blessed(class_name, val),
+                )))
             }
             ExprKind::Caller(_) => {
                 // Simplified: return package, file, line
@@ -10183,18 +10296,48 @@ impl Interpreter {
         Ok(buf)
     }
 
+    /// Resolve `write FH` / `write $fh` — same handle shapes as `$fh->print` ([`Self::try_native_method`]).
+    pub(crate) fn resolve_write_output_handle(
+        &self,
+        v: &PerlValue,
+        line: usize,
+    ) -> PerlResult<String> {
+        if let Some(n) = v.as_io_handle_name() {
+            let n = self.resolve_io_handle_name(&n);
+            if self.is_bound_handle(&n) {
+                return Ok(n);
+            }
+        }
+        if let Some(s) = v.as_str() {
+            if self.is_bound_handle(&s) {
+                return Ok(self.resolve_io_handle_name(&s));
+            }
+        }
+        let s = v.to_string();
+        if self.is_bound_handle(&s) {
+            return Ok(self.resolve_io_handle_name(&s));
+        }
+        Err(PerlError::runtime(
+            format!("write: invalid or unopened filehandle {}", s),
+            line,
+        ))
+    }
+
     /// `write` — output one record using `$~` format name in the current package (subset of Perl).
+    /// With no args, uses [`Self::default_print_handle`] (Perl `select`); with one arg, writes to
+    /// that handle like `write FH`.
     pub(crate) fn write_format_execute(
         &mut self,
         args: &[PerlValue],
         line: usize,
     ) -> PerlResult<PerlValue> {
-        if !args.is_empty() {
-            return Err(PerlError::runtime(
-                "write: filehandle argument not implemented (use selected STDOUT)",
-                line,
-            ));
-        }
+        let handle_name = match args.len() {
+            0 => self.default_print_handle.clone(),
+            1 => self.resolve_write_output_handle(&args[0], line)?,
+            _ => {
+                return Err(PerlError::runtime("write: too many arguments", line));
+            }
+        };
         let pkg = self.current_package();
         let mut fmt_name = self.scope.get_scalar("~").to_string();
         if fmt_name.is_empty() {
@@ -10217,10 +10360,7 @@ impl Interpreter {
                 FlowOrError::Error(e) => e,
                 FlowOrError::Flow(_) => PerlError::runtime("write: unexpected control flow", line),
             })?;
-        print!("{}", out);
-        if self.output_autoflush {
-            let _ = IoWrite::flush(&mut io::stdout());
-        }
+        self.write_formatted_print(handle_name.as_str(), &out, line)?;
         Ok(PerlValue::integer(1))
     }
 
@@ -11119,13 +11259,14 @@ impl Interpreter {
     fn assign_value(&mut self, target: &Expr, val: PerlValue) -> ExecResult {
         match &target.kind {
             ExprKind::ScalarVar(name) => {
-                if self.scope.is_scalar_frozen(name) {
+                let stor = self.tree_scalar_storage_name(name);
+                if self.scope.is_scalar_frozen(&stor) {
                     return Err(FlowOrError::Error(PerlError::runtime(
                         format!("Modification of a frozen value: ${}", name),
                         target.line,
                     )));
                 }
-                if let Some(obj) = self.tied_scalars.get(name).cloned() {
+                if let Some(obj) = self.tied_scalars.get(&stor).cloned() {
                     let class = obj
                         .as_blessed_ref()
                         .map(|b| b.class.clone())
@@ -11145,7 +11286,7 @@ impl Interpreter {
                         };
                     }
                 }
-                self.set_special_var(name, &val)
+                self.set_special_var(&stor, &val)
                     .map_err(|e| FlowOrError::Error(e.at_line(target.line)))?;
                 Ok(PerlValue::UNDEF)
             }
@@ -14230,10 +14371,10 @@ impl Interpreter {
             map.insert(k, v);
             i += 2;
         }
-        Ok(PerlValue::blessed(Arc::new(crate::value::BlessedRef {
-            class: class.to_string(),
-            data: RwLock::new(PerlValue::hash(map)),
-        })))
+        Ok(PerlValue::blessed(Arc::new(crate::value::BlessedRef::new_blessed(
+            class.to_string(),
+            PerlValue::hash(map),
+        ))))
     }
 
     fn exec_print(

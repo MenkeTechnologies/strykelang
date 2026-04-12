@@ -1310,6 +1310,7 @@ fn main() {
             eprintln!("{}", e);
             process::exit(255);
         }
+        let _ = interp.run_global_teardown();
         if let Some(mut p) = interp.profiler.take() {
             p.print_report();
         }
@@ -1317,6 +1318,7 @@ fn main() {
         // Normal execution
         match interp.execute(&program) {
             Ok(_) => {
+                let _ = interp.run_global_teardown();
                 let _ = io::stdout().flush();
                 if let Some(mut p) = interp.profiler.take() {
                     p.print_report();
@@ -1401,6 +1403,7 @@ fn run_embedded_script(embedded: perlrs::aot::EmbeddedScript, argv: Vec<String>)
     interp.pec_cache_fingerprint = pec_fp;
     match interp.execute(&program) {
         Ok(_) => {
+            let _ = interp.run_global_teardown();
             let _ = io::stdout().flush();
             0
         }

@@ -95,6 +95,17 @@ pe --lsp                                # language server over stdio ([0x11])
 PERLRS_BC_CACHE=1 pe app.pl             # warm starts skip parse + compile ([0x0F])
 ```
 
+#### Semicolons
+
+A newline ends a statement, so you do not need a trailing `;` on each line. Use semicolons only when you put more than one statement on the same physical line.
+
+```perl
+my $answer = 40 + 2
+say $answer                       # 42 — one statement per line, no `;` required
+
+my $x = 1; my $y = 2; say $x + $y # 3 — same line needs `;` between statements
+```
+
 #### Interactive REPL
 
 Run `pe` in a terminal with no script and no `-e`/`-n`/`-p`/etc. to enter a readline session: line editing, history (`~/.perlrs_history`), tab completion for keywords, lexicals in scope, sub names, methods after `->` on blessed objects, and file paths. `exit`/`quit`/Ctrl-D leaves. Non-TTY stdin is read as a complete program.

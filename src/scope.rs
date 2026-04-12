@@ -85,6 +85,25 @@ struct Frame {
 }
 
 impl Frame {
+    /// Drop all lexical bindings so blessed objects run `DESTROY` when frames are recycled
+    /// ([`Scope::pop_frame`]) or reused ([`Scope::push_frame`]).
+    #[inline]
+    fn clear_all_bindings(&mut self) {
+        self.scalars.clear();
+        self.arrays.clear();
+        self.sub_underscore = None;
+        self.hashes.clear();
+        self.scalar_slots.clear();
+        self.scalar_slot_names.clear();
+        self.local_restores.clear();
+        self.frozen_scalars.clear();
+        self.frozen_arrays.clear();
+        self.frozen_hashes.clear();
+        self.typed_scalars.clear();
+        self.atomic_arrays.clear();
+        self.atomic_hashes.clear();
+    }
+
     /// True if this slot index is a real binding (not vec padding before a higher-index declare).
     /// Anonymous temps use [`Option::Some`] with an empty string so slot ops do not fall through
     /// to an outer frame's same slot index.
@@ -359,19 +378,7 @@ impl Scope {
     #[inline]
     pub fn push_frame(&mut self) {
         if let Some(mut frame) = self.frame_pool.pop() {
-            frame.scalars.clear();
-            frame.arrays.clear();
-            frame.sub_underscore = None;
-            frame.hashes.clear();
-            frame.scalar_slots.clear();
-            frame.scalar_slot_names.clear();
-            frame.local_restores.clear();
-            frame.frozen_scalars.clear();
-            frame.frozen_arrays.clear();
-            frame.frozen_hashes.clear();
-            frame.typed_scalars.clear();
-            frame.atomic_arrays.clear();
-            frame.atomic_hashes.clear();
+            frame.clear_all_bindings();
             self.frames.push(frame);
         } else {
             self.frames.push(Frame::new());
@@ -620,6 +627,7 @@ impl Scope {
                 }
             }
             self.parallel_guard = saved_guard;
+            frame.clear_all_bindings();
             // Return frame to pool for reuse (avoids allocation on next push_frame).
             if self.frame_pool.len() < 64 {
                 self.frame_pool.push(frame);

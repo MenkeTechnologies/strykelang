@@ -1336,10 +1336,9 @@ impl<'a> VM<'a> {
                     map.insert(all_args[i].to_string(), all_args[i + 1].clone());
                     i += 2;
                 }
-                self.push(PerlValue::blessed(Arc::new(crate::value::BlessedRef {
-                    class,
-                    data: RwLock::new(PerlValue::hash(map)),
-                })));
+                self.push(PerlValue::blessed(Arc::new(
+                    crate::value::BlessedRef::new_blessed(class, PerlValue::hash(map)),
+                )));
             }
         } else if let Some(result) =
             self.interp
@@ -7209,6 +7208,11 @@ impl<'a> VM<'a> {
                 }
                 return Err(e);
             }
+            // Blessed refcount drops enqueue from `PerlValue::drop`; drain before the next opcode
+            // so `$x = undef; f()` runs `DESTROY` before `f` (Perl semantics).
+            if crate::pending_destroy::pending_destroy_vm_sync_needed() {
+                self.interp.drain_pending_destroys(line)?;
+            }
             if self.exit_main_dispatch {
                 if let Some(v) = self.exit_main_dispatch_value.take() {
                     last = v;
@@ -8120,10 +8124,9 @@ impl<'a> VM<'a> {
                     .get(1)
                     .map(|v| v.to_string())
                     .unwrap_or_else(|| self.interp.scope.get_scalar("__PACKAGE__").to_string());
-                Ok(PerlValue::blessed(Arc::new(crate::value::BlessedRef {
-                    class,
-                    data: RwLock::new(ref_val),
-                })))
+                Ok(PerlValue::blessed(Arc::new(
+                    crate::value::BlessedRef::new_blessed(class, ref_val),
+                )))
             }
             Some(BuiltinId::Caller) => Ok(PerlValue::array(vec![
                 PerlValue::string("main".into()),

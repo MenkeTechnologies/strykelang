@@ -33,6 +33,7 @@ pub mod native_data;
 pub mod pack;
 pub mod par_lines;
 mod par_list;
+mod pending_destroy;
 pub mod par_pipeline;
 pub mod par_walk;
 pub mod parallel_trace;
@@ -110,7 +111,9 @@ pub fn parse_and_run_string_in_file(
     interp.file = file.to_string();
     let r = interp.execute(&program);
     interp.file = saved;
-    r
+    let v = r?;
+    interp.drain_pending_destroys(0)?;
+    Ok(v)
 }
 
 /// Crate-root `vendor/perl` (e.g. `List/Util.pm`). The `perlrs` / `pe` driver prepends this to
@@ -134,7 +137,9 @@ pub fn run_lsp_stdio() -> i32 {
 pub fn run(code: &str) -> PerlResult<PerlValue> {
     let program = parse(code)?;
     let mut interp = Interpreter::new();
-    interp.execute(&program)
+    let v = interp.execute(&program)?;
+    interp.run_global_teardown()?;
+    Ok(v)
 }
 
 /// Try to compile and run via bytecode VM. Returns None if compilation fails.
@@ -225,7 +230,10 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut Interpreter) -> PerlR
     let mut vm = vm::VM::new(&chunk, interp);
     vm.set_jit_enabled(vm_jit);
     match vm.execute() {
-        Ok(val) => Ok(val),
+        Ok(val) => {
+            interp.drain_pending_destroys(0)?;
+            Ok(val)
+        }
         // On cache-hit path we cannot fall back to the tree walker (we no longer hold the
         // fresh Program the caller passed). For the cold-compile path, the compiler would
         // have already returned `Unsupported` for anything the VM cannot run, so this

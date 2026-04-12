@@ -109,6 +109,8 @@ pub enum CompileError {
 #[derive(Default)]
 struct ScopeLayer {
     declared_scalars: HashSet<String>,
+    /// Bare names from `our $x` — rvalue/lvalue ops must use the package stash key (`main::x`).
+    declared_our_scalars: HashSet<String>,
     declared_arrays: HashSet<String>,
     declared_hashes: HashSet<String>,
     frozen_scalars: HashSet<String>,
@@ -357,6 +359,59 @@ impl Compiler {
             }
         }
         name.to_string()
+    }
+
+    /// Package stash key for `our $name` (matches [`Interpreter::stash_scalar_name_for_package`]).
+    fn qualify_stash_scalar_name(&self, name: &str) -> String {
+        if name.contains("::") {
+            return name.to_string();
+        }
+        let pkg = &self.current_package;
+        if pkg.is_empty() || pkg == "main" {
+            format!("main::{}", name)
+        } else {
+            format!("{}::{}", pkg, name)
+        }
+    }
+
+    /// Runtime name for `$x` in bytecode after `my`/`our` resolution (`our` → qualified stash).
+    fn scalar_storage_name_for_ops(&self, bare: &str) -> String {
+        if bare.contains("::") {
+            return bare.to_string();
+        }
+        for layer in self.scope_stack.iter().rev() {
+            if layer.declared_scalars.contains(bare) {
+                if layer.declared_our_scalars.contains(bare) {
+                    return self.qualify_stash_scalar_name(bare);
+                }
+                return bare.to_string();
+            }
+        }
+        bare.to_string()
+    }
+
+    #[inline]
+    fn intern_scalar_var_for_ops(&mut self, bare: &str) -> u16 {
+        let s = self.scalar_storage_name_for_ops(bare);
+        self.chunk.intern_name(&s)
+    }
+
+    fn register_declare_our_scalar(&mut self, bare_name: &str) {
+        let layer = self.scope_stack.last_mut().expect("scope stack");
+        layer.declared_scalars.insert(bare_name.to_string());
+        layer.declared_our_scalars.insert(bare_name.to_string());
+    }
+
+    /// `our $x` — package stash binding; no slot indices (bare `$x` maps to `main::x` / `Pkg::x`).
+    fn emit_declare_our_scalar(&mut self, bare_name: &str, line: usize, frozen: bool) {
+        let stash = self.qualify_stash_scalar_name(bare_name);
+        let stash_idx = self.chunk.intern_name(&stash);
+        self.register_declare_our_scalar(bare_name);
+        if frozen {
+            self.chunk.emit(Op::DeclareScalarFrozen(stash_idx), line);
+        } else {
+            self.chunk.emit(Op::DeclareScalar(stash_idx), line);
+        }
     }
 
     /// Stash key for a subroutine name in the current package (matches [`Interpreter::qualify_sub_key`]).
@@ -1297,10 +1352,14 @@ impl Compiler {
                 let frozen = allow_frozen && decl.frozen;
                 match decl.sigil {
                     Sigil::Scalar => {
-                        let name_idx = self.chunk.intern_name(&decl.name);
                         self.chunk.emit(Op::LoadInt(i as i64), line);
                         self.chunk.emit(Op::GetArrayElem(tmp_name), line);
-                        self.emit_declare_scalar(name_idx, line, frozen);
+                        if is_my {
+                            let name_idx = self.chunk.intern_name(&decl.name);
+                            self.emit_declare_scalar(name_idx, line, frozen);
+                        } else {
+                            self.emit_declare_our_scalar(&decl.name, line, frozen);
+                        }
                     }
                     Sigil::Array => {
                         let name_idx = self
@@ -1326,24 +1385,31 @@ impl Compiler {
                 let frozen = allow_frozen && decl.frozen;
                 match decl.sigil {
                     Sigil::Scalar => {
-                        let name_idx = self.chunk.intern_name(&decl.name);
                         if let Some(init) = &decl.initializer {
                             self.compile_expr(init)?;
                         } else {
                             self.chunk.emit(Op::LoadUndef, line);
                         }
-                        if let Some(ty) = decl.type_annotation {
-                            if frozen {
-                                return Err(CompileError::Unsupported(
-                                    "typed frozen my — use `typed my` without frozen".into(),
-                                ));
+                        if is_my {
+                            let name_idx = self.chunk.intern_name(&decl.name);
+                            if let Some(ty) = decl.type_annotation {
+                                if frozen {
+                                    return Err(CompileError::Unsupported(
+                                        "typed frozen my — use `typed my` without frozen".into(),
+                                    ));
+                                }
+                                let name = self.chunk.names[name_idx as usize].clone();
+                                self.register_declare(Sigil::Scalar, &name, false);
+                                self.chunk
+                                    .emit(Op::DeclareScalarTyped(name_idx, ty.as_byte()), line);
+                            } else {
+                                self.emit_declare_scalar(name_idx, line, frozen);
                             }
-                            let name = self.chunk.names[name_idx as usize].clone();
-                            self.register_declare(Sigil::Scalar, &name, false);
-                            self.chunk
-                                .emit(Op::DeclareScalarTyped(name_idx, ty.as_byte()), line);
                         } else {
-                            self.emit_declare_scalar(name_idx, line, frozen);
+                            if decl.type_annotation.is_some() {
+                                return Err(CompileError::Unsupported("typed our".into()));
+                            }
+                            self.emit_declare_our_scalar(&decl.name, line, false);
                         }
                     }
                     Sigil::Array => {
@@ -1609,7 +1675,7 @@ impl Compiler {
                 Ok(())
             }
             ExprKind::ScalarVar(name) => {
-                let name_idx = self.chunk.intern_name(name);
+                let name_idx = self.intern_scalar_var_for_ops(name);
                 if let Some(init) = initializer {
                     self.compile_expr(init)?;
                 } else {
@@ -2517,7 +2583,7 @@ impl Compiler {
             }
             ExprKind::ScalarVar(name) => {
                 self.check_strict_scalar_access(name, line)?;
-                let idx = self.chunk.intern_name(name);
+                let idx = self.intern_scalar_var_for_ops(name);
                 self.emit_get_scalar(idx, line, Some(root));
             }
             ExprKind::ArrayVar(name) => {
@@ -2721,7 +2787,7 @@ impl Compiler {
                 UnaryOp::PreIncrement => {
                     if let ExprKind::ScalarVar(name) = &expr.kind {
                         self.check_scalar_mutable(name, line)?;
-                        let idx = self.chunk.intern_name(name);
+                        let idx = self.intern_scalar_var_for_ops(name);
                         self.emit_pre_inc(idx, line, Some(root));
                     } else if let ExprKind::ArrayElement { array, index } = &expr.kind {
                         if self.is_mysync_array(array) {
@@ -2912,7 +2978,7 @@ impl Compiler {
                 UnaryOp::PreDecrement => {
                     if let ExprKind::ScalarVar(name) = &expr.kind {
                         self.check_scalar_mutable(name, line)?;
-                        let idx = self.chunk.intern_name(name);
+                        let idx = self.intern_scalar_var_for_ops(name);
                         self.emit_pre_dec(idx, line, Some(root));
                     } else if let ExprKind::ArrayElement { array, index } = &expr.kind {
                         if self.is_mysync_array(array) {
@@ -3120,7 +3186,7 @@ impl Compiler {
             ExprKind::PostfixOp { expr, op } => {
                 if let ExprKind::ScalarVar(name) = &expr.kind {
                     self.check_scalar_mutable(name, line)?;
-                    let idx = self.chunk.intern_name(name);
+                    let idx = self.intern_scalar_var_for_ops(name);
                     match op {
                         PostfixOp::Increment => {
                             self.emit_post_inc(idx, line, Some(root));
@@ -3485,7 +3551,7 @@ impl Compiler {
             ExprKind::CompoundAssign { target, op, value } => {
                 if let ExprKind::ScalarVar(name) = &target.kind {
                     self.check_scalar_mutable(name, line)?;
-                    let idx = self.chunk.intern_name(name);
+                    let idx = self.intern_scalar_var_for_ops(name);
                     // Fast path: `.=` on scalar → in-place append (no clone)
                     if *op == BinOp::Concat {
                         self.compile_expr(value)?;
@@ -5370,7 +5436,8 @@ impl Compiler {
                 }
                 Some(pos_arg) => {
                     if let ExprKind::ScalarVar(name) = &pos_arg.kind {
-                        let idx = self.chunk.add_constant(PerlValue::string(name.clone()));
+                        let stor = self.scalar_storage_name_for_ops(name);
+                        let idx = self.chunk.add_constant(PerlValue::string(stor));
                         self.emit_op(Op::LoadConst(idx), line, Some(root));
                     } else {
                         self.compile_expr(pos_arg)?;
@@ -5885,7 +5952,7 @@ impl Compiler {
             // ── References ──
             ExprKind::ScalarRef(e) => match &e.kind {
                 ExprKind::ScalarVar(name) => {
-                    let idx = self.chunk.intern_name(name);
+                    let idx = self.intern_scalar_var_for_ops(name);
                     self.emit_op(Op::MakeScalarBindingRef(idx), line, Some(root));
                 }
                 ExprKind::ArrayVar(name) => {
@@ -6192,7 +6259,9 @@ impl Compiler {
                 let flags_idx = self.chunk.add_constant(PerlValue::string(flags.clone()));
                 let pos_key_idx = if *scalar_g && flags.contains('g') {
                     if let ExprKind::ScalarVar(n) = &expr.kind {
-                        self.chunk.add_constant(PerlValue::string(n.clone()))
+                        let stor = self.scalar_storage_name_for_ops(n);
+                        self.chunk
+                            .add_constant(PerlValue::string(stor))
                     } else {
                         u16::MAX
                     }
@@ -6690,7 +6759,7 @@ impl Compiler {
                 self.emit_op(Op::LoadConst(idx), line, parent);
             }
             StringPart::ScalarVar(name) => {
-                let idx = self.chunk.intern_name(name);
+                let idx = self.intern_scalar_var_for_ops(name);
                 self.emit_get_scalar(idx, line, parent);
             }
             StringPart::ArrayVar(name) => {
@@ -6730,7 +6799,7 @@ impl Compiler {
             ExprKind::ScalarVar(name) => {
                 self.check_strict_scalar_access(name, line)?;
                 self.check_scalar_mutable(name, line)?;
-                let idx = self.chunk.intern_name(name);
+                let idx = self.intern_scalar_var_for_ops(name);
                 if keep {
                     self.emit_set_scalar_keep(idx, line, ast);
                 } else {
@@ -7011,7 +7080,8 @@ impl Compiler {
                 }
                 match &inner_e.kind {
                     ExprKind::ScalarVar(name) => {
-                        let idx = self.chunk.add_constant(PerlValue::string(name.clone()));
+                        let stor = self.scalar_storage_name_for_ops(name);
+                        let idx = self.chunk.add_constant(PerlValue::string(stor));
                         self.emit_op(Op::LoadConst(idx), line, ast);
                     }
                     _ => {
@@ -7401,9 +7471,15 @@ mod tests {
 
     #[test]
     fn compile_shift_right() {
-        // Note: bare `<<` is tokenized as heredoc start, not binary shift — see lexer.
         let chunk = compile_snippet("8 >> 1;").expect("compile");
         assert!(chunk.ops.iter().any(|o| matches!(o, Op::Shr)));
+        assert_last_halt(&chunk);
+    }
+
+    #[test]
+    fn compile_shift_left() {
+        let chunk = compile_snippet("1 << 4;").expect("compile");
+        assert!(chunk.ops.iter().any(|o| matches!(o, Op::Shl)));
         assert_last_halt(&chunk);
     }
 

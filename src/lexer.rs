@@ -1099,7 +1099,12 @@ impl Lexer {
                         self.last_was_term = false;
                         return Ok(Token::ShiftLeftAssign);
                     }
-                    // Heredoc
+                    // `<<` — binary shift after a complete term (`1 << 4`, `"x" << 2`); heredoc when a
+                    // term is expected (`print <<EOF`, `my $x = <<EOF`, after `.` / `,` / `(` …).
+                    if self.last_was_term {
+                        self.last_was_term = false;
+                        return Ok(Token::ShiftLeft);
+                    }
                     let (tag, _interpolate) = self.read_heredoc_tag()?;
                     let body = self.read_heredoc_body(&tag)?;
                     self.last_was_term = true;
@@ -2197,14 +2202,30 @@ mod tests {
 
     #[test]
     fn tokenize_shift_right_and_shift_left_assign() {
-        // Bare `<<` starts a heredoc in this lexer; `>>` is bitwise shift right.
         let mut l = Lexer::new("8 >> 1");
         let t = l.tokenize().expect("tokenize");
         assert!(matches!(t[1].0, Token::ShiftRight));
 
+        let mut l = Lexer::new("8 << 1");
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[1].0, Token::ShiftLeft));
+
         let mut l = Lexer::new("x <<= 3");
         let t = l.tokenize().expect("tokenize");
         assert!(matches!(t[1].0, Token::ShiftLeftAssign));
+    }
+
+    #[test]
+    fn tokenize_heredoc_after_print_not_shift() {
+        let src = "print <<EOT\nhi\nEOT\n";
+        let mut l = Lexer::new(src);
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[0].0, Token::Ident(ref s) if s == "print"));
+        assert!(
+            matches!(&t[1].0, Token::HereDoc(tag, body) if tag == "EOT" && body == "hi\n"),
+            "got {:?}",
+            t[1].0
+        );
     }
 
     #[test]

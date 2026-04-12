@@ -4,6 +4,7 @@ use parking_lot::{Mutex, RwLock};
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::fmt;
+use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 use std::sync::Arc;
 use std::sync::Barrier;
 
@@ -628,6 +629,27 @@ pub struct PipelineInner {
 pub struct BlessedRef {
     pub class: String,
     pub data: RwLock<PerlValue>,
+    /// When true, dropping does not enqueue `DESTROY` (temporary invocant built while running a destructor).
+    pub(crate) suppress_destroy_queue: AtomicBool,
+}
+
+impl BlessedRef {
+    pub(crate) fn new_blessed(class: String, data: PerlValue) -> Self {
+        Self {
+            class,
+            data: RwLock::new(data),
+            suppress_destroy_queue: AtomicBool::new(false),
+        }
+    }
+
+    /// Invocant for a running `DESTROY` — must not re-queue when dropped after the call.
+    pub(crate) fn new_for_destroy_invocant(class: String, data: PerlValue) -> Self {
+        Self {
+            class,
+            data: RwLock::new(data),
+            suppress_destroy_queue: AtomicBool::new(true),
+        }
+    }
 }
 
 impl Clone for BlessedRef {
@@ -635,7 +657,24 @@ impl Clone for BlessedRef {
         Self {
             class: self.class.clone(),
             data: RwLock::new(self.data.read().clone()),
+            suppress_destroy_queue: AtomicBool::new(false),
         }
+    }
+}
+
+impl Drop for BlessedRef {
+    fn drop(&mut self) {
+        if self
+            .suppress_destroy_queue
+            .load(AtomicOrdering::Acquire)
+        {
+            return;
+        }
+        let inner = {
+            let mut g = self.data.write();
+            std::mem::take(&mut *g)
+        };
+        crate::pending_destroy::enqueue(self.class.clone(), inner);
     }
 }
 
@@ -2460,11 +2499,24 @@ mod tests {
 
     #[test]
     fn ref_type_blessed_uses_class_name() {
-        let b = PerlValue::blessed(Arc::new(super::BlessedRef {
-            class: "Pkg".into(),
-            data: RwLock::new(PerlValue::UNDEF),
-        }));
+        let b = PerlValue::blessed(Arc::new(super::BlessedRef::new_blessed(
+            "Pkg".into(),
+            PerlValue::UNDEF,
+        )));
         assert_eq!(b.ref_type().to_string(), "Pkg");
+    }
+
+    #[test]
+    fn blessed_drop_enqueues_pending_destroy() {
+        let v = PerlValue::blessed(Arc::new(super::BlessedRef::new_blessed(
+            "Z".into(),
+            PerlValue::integer(7),
+        )));
+        drop(v);
+        let q = crate::pending_destroy::take_queue();
+        assert_eq!(q.len(), 1);
+        assert_eq!(q[0].0, "Z");
+        assert_eq!(q[0].1.to_int(), 7);
     }
 
     #[test]

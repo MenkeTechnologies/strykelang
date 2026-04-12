@@ -6,6 +6,34 @@ use crate::parse;
 use crate::value::PerlValue;
 
 #[test]
+fn destroy_runs_when_lexical_overwritten_with_undef() {
+    let mut i = Interpreter::new();
+    let prog = parse(
+        r#"$main::d = 0;
+        sub Dtor::DESTROY { $main::d = $main::d + 1 }
+        my $o = bless {}, "Dtor";
+        $o = undef;
+        $main::d"#,
+    )
+    .unwrap();
+    let v = i.execute(&prog).expect("execute");
+    assert!(
+        i.subs.contains_key("Dtor::DESTROY"),
+        "missing Dtor::DESTROY in subs keys"
+    );
+    assert!(
+        crate::pending_destroy::take_queue().is_empty(),
+        "pending DESTROY queue should be empty after execute"
+    );
+    assert_eq!(v.to_int(), 1, "expected DESTROY to bump $d, got {:?}", v);
+    assert_eq!(
+        i.scope.get_scalar("main::d").to_int(),
+        1,
+        "scope main::d after execute"
+    );
+}
+
+#[test]
 fn our_isa_stores_c_isa_for_parents_of_class() {
     let mut i = Interpreter::new();
     let prog = parse("package C; our @ISA = qw(P); 1;").unwrap();

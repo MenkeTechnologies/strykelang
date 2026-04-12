@@ -1044,10 +1044,10 @@ fn pairs_native(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
     while i + 1 < args.len() {
         let row = vec![args[i].clone(), args[i + 1].clone()];
         let ar = PerlValue::array_ref(Arc::new(RwLock::new(row)));
-        let b = PerlValue::blessed(Arc::new(BlessedRef {
-            class: "List::Util::_Pair".to_string(),
-            data: RwLock::new(ar),
-        }));
+        let b = PerlValue::blessed(Arc::new(BlessedRef::new_blessed(
+            "List::Util::_Pair".to_string(),
+            ar,
+        )));
         out.push(b);
         i += 2;
     }
