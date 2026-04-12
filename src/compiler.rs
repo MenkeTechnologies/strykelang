@@ -4724,7 +4724,8 @@ impl Compiler {
                             ));
                         }
                         1 => {
-                            self.compile_expr(&args[0])?;
+                            // chunked @l / windowed @l — compile in list context, default size
+                            self.compile_expr_ctx(&args[0], WantarrayCtx::List)?;
                         }
                         2 => {
                             self.compile_expr_ctx(&args[0], WantarrayCtx::List)?;

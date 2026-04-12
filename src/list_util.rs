@@ -681,8 +681,14 @@ fn chunked_with_want(
             0,
         ));
     }
-    let n = args[args.len() - 1].to_int().max(0) as usize;
-    let items: Vec<PerlValue> = args[..args.len().saturating_sub(1)].to_vec();
+    // chunked @l == chunked @l, 2 — single arg is the list, chunk size defaults to 2
+    let (n, items) = if args.len() == 1 {
+        (2usize, args[0].to_list())
+    } else {
+        let n = args[args.len() - 1].to_int().max(0) as usize;
+        let items: Vec<PerlValue> = args[..args.len().saturating_sub(1)].to_vec();
+        (n, items)
+    };
     if n == 0 {
         return Ok(match want {
             WantarrayCtx::Scalar => PerlValue::integer(0),
@@ -719,8 +725,14 @@ fn windowed_with_want(
             0,
         ));
     }
-    let n = args[args.len() - 1].to_int().max(0) as usize;
-    let items: Vec<PerlValue> = args[..args.len().saturating_sub(1)].to_vec();
+    // windowed @l == windowed @l, 2 — single arg is the list, window size defaults to 2
+    let (n, items) = if args.len() == 1 {
+        (2usize, args[0].to_list())
+    } else {
+        let n = args[args.len() - 1].to_int().max(0) as usize;
+        let items: Vec<PerlValue> = args[..args.len().saturating_sub(1)].to_vec();
+        (n, items)
+    };
     if n == 0 || items.len() < n {
         return Ok(match want {
             WantarrayCtx::Scalar => PerlValue::integer(0),
@@ -878,7 +890,7 @@ pub(crate) fn extension_tail_impl(
 }
 
 /// Builtin `drop` — skip the first `$n` items; negative `$n` clamps to zero. Operands are
-/// **list values then count**: `drop(@l, N)`. One argument is **N** only (empty list).
+/// **list values then count**: `drop(@l, N)`. One argument is the list with count defaulting to 1.
 /// Same multiline-string line split as [`extension_tail_impl`].
 pub(crate) fn extension_drop_impl(
     args: &[PerlValue],
@@ -890,13 +902,14 @@ pub(crate) fn extension_drop_impl(
             _ => PerlValue::array(vec![]),
         });
     }
+    // drop @l == drop @l, 1 — single arg is the list, count defaults to 1
     let raw = if args.len() == 1 {
-        args[0].to_int()
+        1
     } else {
         args[args.len() - 1].to_int()
     };
     let mut list: Vec<PerlValue> = if args.len() == 1 {
-        Vec::new()
+        args[0].to_list()
     } else {
         let mut list = Vec::new();
         for a in &args[..args.len() - 1] {

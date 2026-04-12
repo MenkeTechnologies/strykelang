@@ -8342,7 +8342,8 @@ impl Interpreter {
                             .into());
                         }
                         1 => {
-                            list_out.push(self.eval_expr(&args[0])?);
+                            // chunked @l / windowed @l — evaluate in list context, default size
+                            list_out.push(self.eval_expr_ctx(&args[0], WantarrayCtx::List)?);
                         }
                         2 => {
                             list_out.extend(
