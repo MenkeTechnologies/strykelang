@@ -399,7 +399,7 @@ fn print_cyberpunk_help() {
     println!(
         "  --remote-worker-v1     {G}//{N} Legacy one-shot worker (stdio); only arg after {bin}"
     );
-    if bin == "pe" {
+    if matches!(bin, "pe" | "perlrs") {
         println!(
             "  (no switches, TTY stdin) {G}//{N} Interactive REPL (readline; exit with quit or EOF)"
         );
@@ -1080,7 +1080,7 @@ fn main() {
             .ok();
     }
 
-    let is_repl = env!("CARGO_BIN_NAME") == "pe"
+    let is_repl = matches!(env!("CARGO_BIN_NAME"), "pe" | "perlrs")
         && cli.script.is_none()
         && cli.execute.is_empty()
         && cli.execute_features.is_empty()
@@ -1114,16 +1114,24 @@ fn main() {
     } else if !cli.execute_features.is_empty() {
         (cli.execute_features.join("; "), "-E".to_string())
     } else if let Some(ref script) = cli.script {
-        let script_path = if cli.path_lookup {
-            find_in_path(script).unwrap_or_else(|| script.clone())
+        if script == "-" {
+            // Like `perl -`: program text from stdin (not a file named `-` in cwd).
+            let mut code = Vec::new();
+            let _ = IoRead::read_to_end(&mut io::stdin(), &mut code);
+            let code = decode_utf8_or_latin1(&code);
+            (code, "-".to_string())
         } else {
-            script.clone()
-        };
-        match read_file_text_perl_compat(&script_path) {
-            Ok(content) => (content, script_path),
-            Err(e) => {
-                eprintln!("Can't open perl script \"{}\": {}", script_path, e);
-                process::exit(2);
+            let script_path = if cli.path_lookup {
+                find_in_path(script).unwrap_or_else(|| script.clone())
+            } else {
+                script.clone()
+            };
+            match read_file_text_perl_compat(&script_path) {
+                Ok(content) => (content, script_path),
+                Err(e) => {
+                    eprintln!("Can't open perl script \"{}\": {}", script_path, e);
+                    process::exit(2);
+                }
             }
         }
     } else if cli.line_mode || cli.print_mode {

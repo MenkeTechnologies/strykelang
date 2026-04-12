@@ -298,6 +298,12 @@ fn accepts_range_dots() {
 }
 
 #[test]
+fn accepts_range_three_dot() {
+    p("1...10;");
+    p("my @x = (1...3);");
+}
+
+#[test]
 fn accepts_list_paren() {
     p("(1, 2, 3);");
 }

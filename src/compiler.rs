@@ -4471,13 +4471,15 @@ impl Compiler {
                         Some(root),
                     );
                 }
-                // `collect(PIPELINE)` — compile the argument in list context so nested
+                // `collect(EXPR)` — compile the argument in list context so nested
                 // `map { }` / `grep { }` keep a pipeline handle (scalar context adds
-                // `StackArrayLen`, which turns a pipeline into `1`).
+                // `StackArrayLen`, which turns a pipeline into `1`). At runtime, a
+                // pipeline runs staged ops; any other value is materialized as an array
+                // (`|> … |> collect()`).
                 "collect" => {
                     if args.len() != 1 {
                         return Err(CompileError::Unsupported(
-                            "collect() expects one argument (a pipeline value)".into(),
+                            "collect() expects exactly one argument".into(),
                         ));
                     }
                     self.compile_expr_ctx(&args[0], WantarrayCtx::List)?;

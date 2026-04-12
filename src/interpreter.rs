@@ -12831,19 +12831,21 @@ impl Interpreter {
         args: &[PerlValue],
         line: usize,
     ) -> PerlResult<PerlValue> {
-        if args.len() != 1 {
+        if args.is_empty() {
             return Err(PerlError::runtime(
-                "collect() expects one argument (a pipeline object)",
+                "collect() expects at least one argument",
                 line,
             ));
         }
-        let Some(p) = args[0].as_pipeline() else {
-            return Err(PerlError::runtime(
-                "collect(): argument must be a pipeline object",
-                line,
-            ));
-        };
-        self.pipeline_collect(&p, line)
+        // `Op::Call` uses `pop_call_operands_flattened`: a single array actual becomes
+        // many operands. Treat multi-arg as one materialized list (eager `|> … |> collect()`).
+        if args.len() == 1 {
+            if let Some(p) = args[0].as_pipeline() {
+                return self.pipeline_collect(&p, line);
+            }
+            return Ok(PerlValue::array(args[0].to_list()));
+        }
+        Ok(PerlValue::array(args.to_vec()))
     }
 
     pub(crate) fn pipeline_push(

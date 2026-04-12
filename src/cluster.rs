@@ -48,7 +48,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-use crossbeam::channel::{bounded, unbounded, Receiver, RecvTimeoutError, Sender};
+use crossbeam::channel::{bounded, select, unbounded, Receiver, RecvTimeoutError, Sender};
 
 use crate::remote_wire::{
     frame_kind, perl_to_json_value, read_typed_frame, send_msg, HelloAck, HelloMsg, JobMsg,
@@ -100,6 +100,11 @@ pub fn run_cluster(
     let work_capacity = (cluster.slots.len() * 2).max(8);
     let (work_tx, work_rx) = bounded::<DispatchJob>(work_capacity);
     let (result_tx, result_rx) = unbounded::<DispatchResult>();
+    // Shutdown signal: slot workers hold their own `work_tx` clones for re-enqueue, so the
+    // work channel never closes on its own once every initial job is sent. When all results
+    // have been collected the main thread drops `shutdown_tx`, which closes `shutdown_rx`
+    // and breaks the slot workers out of their blocking `recv` in `select!`.
+    let (shutdown_tx, shutdown_rx) = bounded::<()>(0);
 
     // Spawn one worker thread per slot.
     let mut handles = Vec::with_capacity(cluster.slots.len());
@@ -115,16 +120,27 @@ pub fn run_cluster(
         let work_rx = work_rx.clone();
         let work_tx = work_tx.clone();
         let result_tx = result_tx.clone();
+        let shutdown_rx = shutdown_rx.clone();
         let init = Arc::clone(&session_init);
         let cluster = Arc::clone(&cluster_arc);
         handles.push(thread::spawn(move || {
-            slot_worker_loop(slot_idx, slot, init, cluster, work_rx, work_tx, result_tx);
+            slot_worker_loop(
+                slot_idx,
+                slot,
+                init,
+                cluster,
+                work_rx,
+                work_tx,
+                result_tx,
+                shutdown_rx,
+            );
         }));
     }
 
     // Drop the dispatcher-side handles so closing all slot copies signals queue shutdown.
     drop(work_rx);
     drop(result_tx);
+    drop(shutdown_rx);
 
     // Seed the queue with the initial work.
     for (i, item) in items.iter().enumerate() {
@@ -160,7 +176,13 @@ pub fn run_cluster(
         }
     }
 
-    // Wait for slot threads to wind down (they exit on work_rx close).
+    // All results (or terminal slot-death) are in. Signal slots to stop pulling new work
+    // from the queue so they can run their SHUTDOWN handshake and exit cleanly. Without
+    // this drop the slot `select!` below would park forever on `work_rx.recv()` because
+    // every slot still holds its own `work_tx` clone for re-enqueue.
+    drop(shutdown_tx);
+
+    // Wait for slot threads to wind down.
     for h in handles {
         let _ = h.join();
     }
@@ -195,6 +217,7 @@ fn slot_worker_loop(
     work_rx: Receiver<DispatchJob>,
     work_tx: Sender<DispatchJob>,
     result_tx: Sender<DispatchResult>,
+    shutdown_rx: Receiver<()>,
 ) {
     // Spawn the ssh child + initial handshake. Failures here mean this slot never makes
     // any progress; we exit and let other slots drain the queue.
@@ -210,14 +233,24 @@ fn slot_worker_loop(
     };
 
     loop {
-        // Take one job. `recv()` blocks until something arrives or the channel closes.
-        let job = match work_rx.recv() {
-            Ok(j) => j,
-            Err(_) => {
-                // Queue closed and drained — clean shutdown.
+        // Take one job, or bail out if the dispatcher has signalled shutdown. We can't rely
+        // on `work_rx` closing by itself because every slot holds its own `work_tx` clone
+        // for re-enqueue on transport failure — so the channel would stay open forever once
+        // all initial jobs are drained. The shutdown channel is the explicit wakeup.
+        let job = select! {
+            recv(work_rx) -> r => match r {
+                Ok(j) => j,
+                Err(_) => {
+                    // Queue fully closed (e.g. every slot dropped its `work_tx`) — done.
+                    let _ = session.shutdown();
+                    return;
+                }
+            },
+            recv(shutdown_rx) -> _ => {
+                // Dispatcher collected every result — clean SHUTDOWN frame + child wait.
                 let _ = session.shutdown();
                 return;
-            }
+            },
         };
 
         match session.run_job(&job, cluster.job_timeout_ms) {

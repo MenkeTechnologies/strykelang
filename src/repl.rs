@@ -1,4 +1,4 @@
-//! Interactive REPL for the `pe` binary (readline, history, tab-completion).
+//! Interactive REPL for `pe` and `perlrs` (readline, history, tab-completion).
 
 use std::process;
 use std::sync::{Arc, Mutex};
@@ -196,7 +196,7 @@ pub fn run(cli: &Cli) {
             *s = interp.repl_completion_snapshot();
         }
 
-        let read = rl.readline("perl> ");
+        let read = rl.readline("perlrs> ");
         match read {
             Ok(line) => {
                 let trimmed = line.trim();

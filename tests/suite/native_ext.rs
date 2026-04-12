@@ -159,6 +159,19 @@ fn pipeline_pipe_forward_filter_map_collect() {
     );
 }
 
+/// Eager list `|>` chain ending in `collect()` — final value is not a `pipeline()` handle; still yields an array.
+#[test]
+fn pipe_forward_take_while_collect_materializes() {
+    assert_eq!(
+        eval_string(
+            r#"my @x = ("a".."z") |> map { $_ } |> take_while { $_ le "c" } |> collect;
+            join ",", @x"#,
+        )
+        .trim(),
+        "a,b,c"
+    );
+}
+
 /// Pipe form with `par_pipeline` (list overload): same chain as `pipeline`, parallel stages on `collect()`.
 #[test]
 fn par_pipeline_pipe_forward_filter_map_collect() {

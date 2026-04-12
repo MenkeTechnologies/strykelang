@@ -1584,6 +1584,54 @@ fn reduce_left_fold_sum_and_concat() {
 }
 
 #[test]
+fn collect_after_pipe_chain_materializes_list() {
+    let s = r#"
+        my @x = ("a".."z") |> map { $_ } |> take_while { $_ le "c" } |> collect;
+        join ",", @x;
+    "#;
+    assert_eq!(rs(s), "a,b,c");
+}
+
+/// `collect((a,b))` — one syntactic argument that flattens to multiple VM operands; repack as array.
+#[test]
+fn collect_eager_repacks_list_literal_actuals() {
+    assert_eq!(ri(r#"my @x = collect((40, 2)); $x[0] + $x[1];"#), 42);
+}
+
+#[test]
+fn collect_after_map_pipe_chain() {
+    assert_eq!(
+        rs(
+            r#"my @x = (1, 2, 3) |> map { $_ * 2 } |> collect;
+               join ",", @x;"#,
+        ),
+        "2,4,6"
+    );
+}
+
+#[test]
+fn collect_after_grep_pipe_chain() {
+    assert_eq!(
+        ri(
+            r#"my @x = (1, 2, 3, 4) |> grep { $_ % 2 == 0 } |> collect;
+               scalar @x;"#,
+        ),
+        2
+    );
+}
+
+#[test]
+fn collect_without_arguments_is_runtime_error() {
+    let e = run(r#"collect();"#).expect_err("collect()");
+    assert_eq!(e.kind, ErrorKind::Runtime);
+    assert!(
+        e.message.contains("at least one argument"),
+        "unexpected message: {}",
+        e.message
+    );
+}
+
+#[test]
 fn pipeline_filter_map_take_collect() {
     let s = r#"
         my @a = pipeline(1, 9, 10, 15)
