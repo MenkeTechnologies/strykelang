@@ -52,8 +52,10 @@ _perlrs() {
   # (`1:...:->cmd` and `*::arg:->args`) defer subcommand handling to the case block below.
   #
   # `-C` is mandatory: without it, `$state` is not exported to the surrounding function.
-  _arguments -s S \
+  _arguments -s -S \
     '--lsp[run language server over stdio (no script needed)]' \
+    '--remote-worker[persistent cluster worker over stdio]' \
+    '--remote-worker-v1[legacy one-shot cluster worker over stdio]' \
     '*-e+[one line of program (several allowed)]:code:' \
     '*-E+[like -e but enables all optional features]:code:' \
     '-c[check syntax only (parse; does not compile or run)]' \
@@ -89,11 +91,10 @@ _perlrs() {
     '-w[enable many useful warnings]' \
     '-W[enable all warnings]' \
     '-X[disable all warnings]' \
-    '-v[print version patchlevel and license]' \
+    '(-v --version)'{-v,--version}'[print version patchlevel and license]' \
     '-V+[print configuration summary]::config variable:(version api_version archname osname threads useithreads usethreads use64bitint use64bitall cc optimize prefix installprefix perlpath)' \
     '(- *)'{-h,--help}'[print help]' \
-    '-j+[number of threads for parallel operations]:threads:' \
-    '--threads=[number of threads for parallel operations]:threads:' \
+    '(-j --threads)'{-j+,--threads=}'[number of threads for parallel operations]:threads:' \
     '(-)1:script or subcommand:->script_or_subcommand' \
     '(-)*::script arguments:->script_args'
 

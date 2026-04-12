@@ -271,12 +271,34 @@ fn expand_perl_bundled_token(arg: &str) -> Option<Vec<String>> {
                     out.push(s[start..i].to_string());
                 }
             }
-            // `-F` takes the rest of the bundled token as the split pattern (Perl `perl -F: -a`…).
-            b'F' => {
-                out.push("-F".to_string());
+            // Flags that consume the rest of the token as their value:
+            //   -F pattern  — split pattern for -a
+            //   -M module   — use module
+            //   -m module   — use module ()
+            //   -I dir      — @INC directory
+            //   -V:var      — config variable (Perl: `perl -V:version`)
+            //   -d:mod      — debugger module
+            //   -D flags    — debug flags
+            //   -x dir      — ignore text before #!perl
+            //   -C flags    — unicode features
+            b'F' | b'M' | b'm' | b'I' | b'd' | b'D' | b'x' | b'C' => {
+                let ch = b[i] as char;
+                out.push(format!("-{ch}"));
                 i += 1;
                 if i < b.len() {
                     out.push(s[i..].to_string());
+                }
+                return Some(out);
+            }
+            b'V' => {
+                // `-V:var` → `-V` `:var`; `-V` alone → `-V`
+                out.push("-V".to_string());
+                i += 1;
+                if i < b.len() {
+                    // Perl's `-V:version` passes `:version` but the handler expects just `version`.
+                    let rest = &s[i..];
+                    let rest = rest.strip_prefix(':').unwrap_or(rest);
+                    out.push(rest.to_string());
                 }
                 return Some(out);
             }

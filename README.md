@@ -313,6 +313,25 @@ my $next = $g->next;                    # [value, more]
 
 ## [0x07] CLI FLAGS
 
+All stock `perl` flags are supported: `-0`, `-a`, `-c`, `-C`, `-d`, `-D`, `-e`, `-E`, `-f`, `-F`, `-g`, `-h`, `-i`, `-I`, `-l`, `-m`, `-M`, `-n`, `-p`, `-s`, `-S`, `-t`, `-T`, `-u`, `-U`, `-v`, `-V`, `-w`, `-W`, `-x`, `-X`. Perl-style single-dash (`-version`, `-help`) and GNU-style double-dash (`--version`, `--help`) long forms work. Bundled switches are expanded: `-Mstrict` → `-M strict`, `-I/tmp` → `-I /tmp`, `-V:version` → `-V version`, `-lane` → `-l -a -n -e`.
+
+perlrs-specific long flags:
+
+| Flag | Description |
+| --- | --- |
+| `--lint` / `--check` | Parse + compile bytecode without running |
+| `--disasm` / `--disassemble` | Print bytecode disassembly to stderr before VM execution |
+| `--ast` | Dump parsed AST as JSON and exit |
+| `--fmt` | Pretty-print parsed Perl to stdout and exit |
+| `--profile` | Wall-clock profile: per-line + per-sub timings on stderr |
+| `--no-jit` | Disable Cranelift JIT (bytecode interpreter only) |
+| `--explain CODE` | Print expanded hint for an error code (e.g. `E0001`) |
+| `--lsp` | Language server over stdio ([\[0x11\]](#0x11-language-server---lsp)) |
+| `-j N` / `--threads N` | Set number of parallel threads (rayon) |
+| `--remote-worker` | Persistent cluster worker over stdio ([\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster)) |
+| `--remote-worker-v1` | Legacy one-shot cluster worker over stdio |
+| `build SCRIPT [-o OUT]` | AOT compile script to standalone binary ([\[0x0D\]](#0x0d-standalone-binaries-pe-build)) |
+
 ![pe -h](img/pe-help.png)
 
 ---
@@ -341,19 +360,21 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 | Array | `push`, `pop`, `shift`, `unshift`, `splice`, `reverse`, `sort`, `map`, `grep`, `reduce`, `fold`, `preduce`, `scalar` |
 | Hash | `keys`, `values`, `each`, `delete`, `exists` |
 | String | `chomp`, `chop`, `length`, `substr`, `index`, `rindex`, `split`, `join`, `sprintf`, `printf`, `uc`/`lc`/`ucfirst`/`lcfirst`, `chr`, `ord`, `hex`, `oct`, `crypt`, `fc`, `pos`, `study`, `quotemeta` |
-| Binary | `pack`, `unpack` (subset `A a N n V v C Q q Z H x` + `*`) |
+| Binary | `pack`, `unpack` (subset `A a N n V v C Q q Z H x w i I l L s S f d` + `*`), `vec` |
 | Numeric | `abs`, `int`, `sqrt`, `sin`, `cos`, `atan2`, `exp`, `log`, `rand`, `srand` |
-| I/O | `print`, `say`, `printf`, `open` (incl. `open my $fh`, files, `-\|` / `\|-` pipes), `close`, `eof`, `readline`, handle methods `->print/->say/->printf/->getline/->close/->eof/->getc/->flush`, `slurp`, backticks/`qx{}`, `capture` (structured: `->stdout/->stderr/->exit`), `binmode`, `fileno`, `flock`, `getc`, `sysread/syswrite/sysseek`, `select`, `truncate` |
+| I/O | `print`, `say`, `printf`, `open` (incl. `open my $fh`, files, `-\|` / `\|-` pipes), `close`, `eof`, `readline`, `read`, `seek`, `tell`, `sysopen`, `sysread`/`syswrite`/`sysseek`, handle methods `->print/->say/->printf/->getline/->close/->eof/->getc/->flush`, `slurp`, backticks/`qx{}`, `capture` (structured: `->stdout/->stderr/->exit`), `binmode`, `fileno`, `flock`, `getc`, `select`, `truncate`, `formline` |
 | Directory | `opendir`, `readdir`, `closedir`, `rewinddir`, `telldir`, `seekdir` |
 | File tests | `-e`, `-f`, `-d`, `-l`, `-r`, `-w`, `-s`, `-z`, `-x`, `-t` (defaults to `$_`) |
-| System | `system`, `exec`, `exit`, `chdir`, `mkdir`, `unlink`, `rename`, `chmod`, `chown`, `stat`, `lstat`, `link`, `symlink`, `readlink`, `glob`, `glob_par`, `par_sed`, `ppool`, `barrier`, `fork`, `wait`, `waitpid`, `kill`, `alarm`, `sleep`, `times` |
-| Sockets | `socket`, `bind`, `listen`, `accept`, `connect`, `send`, `recv`, `shutdown` |
-| Type | `defined`, `undef`, `ref`, `bless` |
+| System | `system`, `exec`, `exit`, `chdir`, `mkdir`, `unlink`, `rename`, `chmod`, `chown`, `chroot`, `stat`, `lstat`, `link`, `symlink`, `readlink`, `glob`, `glob_par`, `par_sed`, `ppool`, `barrier`, `fork`, `wait`, `waitpid`, `kill`, `alarm`, `sleep`, `times`, `dump`, `reset` |
+| Sockets | `socket`, `bind`, `listen`, `accept`, `connect`, `send`, `recv`, `shutdown`, `socketpair` |
+| Network | `gethostbyname`, `gethostbyaddr`, `getpwnam`, `getpwuid`, `getpwent`/`setpwent`/`endpwent`, `getgrnam`, `getgrgid`, `getgrent`/`setgrent`/`endgrent`, `getprotobyname`, `getprotobynumber`, `getservbyname`, `getservbyport` |
+| SysV IPC | `msgctl`, `msgget`, `msgsnd`, `msgrcv`, `semctl`, `semget`, `semop`, `shmctl`, `shmget`, `shmread`, `shmwrite` (stubs — runtime error) |
+| Type | `defined`, `undef`, `ref`, `bless`, `tied`, `untie` |
 | Control | `die`, `warn`, `eval`, `do`, `require`, `caller`, `wantarray`, `goto LABEL`, `continue { }` on loops, `prototype` |
 
 #### Perl-compat highlights
 
-- **OOP** — `@ISA` (incl. `our @ISA` outside `main`), C3 MRO (live, not cached), `$obj->SUPER::method`. `tie` for scalars/arrays/hashes with `TIESCALAR/TIEARRAY/TIEHASH`, `FETCH`/`STORE`, plus `EXISTS`/`DELETE` on tied hashes.
+- **OOP** — `@ISA` (incl. `our @ISA` outside `main`), C3 MRO (live, not cached), `$obj->SUPER::method`. `tie` for scalars/arrays/hashes with `TIESCALAR/TIEARRAY/TIEHASH`, `FETCH`/`STORE`, plus `EXISTS`/`DELETE` on tied hashes. `tied` returns the underlying object; `untie` removes the tie.
 - **`use overload`** — `'op' => 'method'` or `\&handler`; binary dispatch with `(invocant, other)`, `nomethod`, unary `neg`/`bool`/`abs`, `""` for stringification, `fallback => 1`.
 - **`$?` / `$|`** — packed POSIX status from `system`/backticks/pipe close; autoflush on print/printf.
 - **`$.`** — undef until first successful read, then last-read line count.
@@ -361,7 +382,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **Bareword statement** — `name;` calls a sub with `@_ = ($_)`.
 - **Typeglobs** — `*foo = \&bar`, `*lhs = *rhs` copies sub/scalar/array/hash/IO slots; package-qualified `*Pkg::name` supported.
 - **`%SIG` (Unix)** — `SIGINT`/`SIGTERM`/`SIGALRM`/`SIGCHLD` as code refs; handlers run between statements/opcodes via `perl_signal::poll`. `IGNORE` and `DEFAULT` honored.
-- **`format` / `write`** — partial: `format NAME = ... .` registers a template; pictures `@<<<<`, `@>>>>`, `@||||`, `@####`, `@****`, literal `@@`. `write` (no args) uses `$~` to stdout. Not yet: `write FILEHANDLE`, `$^`, `formline`.
+- **`format` / `write`** — partial: `format NAME = ... .` registers a template; pictures `@<<<<`, `@>>>>`, `@||||`, `@####`, `@****`, literal `@@`. `formline` populates `$^A`. `write` (no args) uses `$~` to stdout. Not yet: `write FILEHANDLE`, `$^`.
 - **`@INC` / `%INC` / `require` / `use`** — `@INC` is built from `-I`, `vendor/perl`, system `perl`'s `@INC` (set `PERLRS_NO_PERL_INC` to skip), the script dir, `PERLRS_INC`, then `.`. `List::Util` is implemented natively in Rust (`src/list_util.rs`). `use Module qw(a b);` honors `@EXPORT_OK`/`@EXPORT`. Built-in pragmas (`strict`, `warnings`, `utf8`, `feature`, `open`, `Env`) do not load files.
 - **`chunked` / `windowed` / `fold`** — Use **pipe-forward**: **`LIST |> chunked(N)`**, **`LIST |> windowed(N)`**, **`LIST |> fold { BLOCK }`** (same for **`reduce`**). `List::Util::fold` / **`qw(...) |> List::Util::fold { }`** alias **`List::Util::reduce`**. List context → arrayrefs per chunk/window or the folded value; scalar context → chunk/window count where applicable.
 
@@ -474,7 +495,7 @@ pe -e 'my $a = set(1,2,2,3); my $b = set(2,3,4); say scalar($a | $b), " ", scala
  perlrs benchmark harness (honest mode)
  ---------------------------------------
   perl5:   perl 5, version 42, subversion 2 (v5.42.2) built for darwin-thread-multi-2level
-  perlrs:  This is perlrs v0.1.35 — A highly parallel Perl 5 interpreter (Rust)
+  perlrs:  This is perlrs v0.1.41 — A highly parallel Perl 5 interpreter (Rust)
   cores:   18
   warmup:  3 runs
   measure: hyperfine (min 10 runs)
@@ -516,14 +537,14 @@ The `noJit` column is `perlrs --no-jit`. The `perturb` column re-runs each bench
 
 ## [0x0C] DEVELOPMENT & CI
 
-Pull requests and pushes to `main` run [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (Check, Test, Format, Clippy, Doc, Release Build).
+Pull requests and pushes to `main` run [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (Check, Test, Format, Clippy, Doc, Parity, Release Build).
 
 ```sh
 cargo test --lib                # parser smoke, lexer/value/error/scope, interpreter, vm, jit
 cargo test --test integration   # tests/suite/* (runtime, readline list context, line-mode stdin, …)
 cargo bench --bench jit_compare # JIT vs interpreter on the same bytecode
 bash bench/run_bench.sh         # full perl5 vs perlrs suite (needs hyperfine)
-bash parity/run_parity.sh       # exact stdout/stderr parity vs system perl
+bash parity/run_parity.sh       # exact stdout/stderr parity vs system perl (20 000+ cases)
 ```
 
 - `Cargo.lock` is committed (CI uses `--locked`). If your global gitignore strips it, force-add updates: `git add -f Cargo.lock`.
