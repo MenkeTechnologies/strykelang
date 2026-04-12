@@ -3853,6 +3853,32 @@ fn substitution_eval_flag_re_evaluates_replacement_expression() {
 }
 
 #[test]
+fn substitution_stacked_eval_ee_second_pass_evals_interpolated_string() {
+    assert_eq!(
+        eval_string(
+            r#"no strict 'vars';
+            my $x = "a2";
+            $x =~ s/(\d)/q{$1+1}/ee;
+            $x;"#
+        ),
+        "a3"
+    );
+}
+
+#[test]
+fn substitution_triple_eval_eeg_parity_194() {
+    assert_eq!(
+        eval_string(
+            r#"no strict 'vars';
+            my $x = "a2";
+            $x =~ s/(\d)/$1+1/eeg;
+            $x;"#
+        ),
+        "a3"
+    );
+}
+
+#[test]
 fn reverse_list_assigns_back_into_named_array() {
     assert_eq!(
         eval_string(

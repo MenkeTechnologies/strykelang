@@ -19,6 +19,8 @@ pub fn program_needs_list_util(program: &Program) -> bool {
         || s.contains("chunked")
         || s.contains("windowed")
         || s.contains("fold")
+        || s.contains("inject")
+        || s.contains("find_all")
 }
 
 /// Ensure [`install_list_util`] ran (cheap `contains_key` after the first program prepare).

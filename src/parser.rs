@@ -1007,6 +1007,9 @@ impl Parser {
                 | "set"
                 | "list_count"
                 | "list_size"
+                | "count"
+                | "size"
+                | "cnt"
                 | "all"
                 | "any"
                 | "none"
@@ -1065,6 +1068,11 @@ impl Parser {
                 | "readlink"
                 | "reduce"
                 | "fold"
+                | "inject"
+                | "first"
+                | "detect"
+                | "find"
+                | "find_all"
                 | "ref"
                 | "rename"
                 | "require"
@@ -3338,7 +3346,7 @@ impl Parser {
             ExprKind::FuncCall { name, mut args } => {
                 match name.as_str() {
                     "puniq" | "uniq" | "distinct" | "flatten" | "set" | "list_count"
-                    | "list_size" | "with_index" | "shuffle" => {
+                    | "list_size" | "count" | "size" | "cnt" | "with_index" | "shuffle" => {
                         if args.is_empty() {
                             args.push(lhs);
                         } else {
@@ -3357,8 +3365,8 @@ impl Parser {
                     "List::Util::reduce" | "List::Util::fold" => {
                         args.push(lhs);
                     }
-                    "pfirst" | "pany" | "any" | "all" | "none" | "take_while" | "drop_while"
-                    | "tap" | "peek" | "group_by" | "chunk_by" => {
+                    "pfirst" | "pany" | "any" | "all" | "none" | "first" | "take_while"
+                    | "drop_while" | "tap" | "peek" | "group_by" | "chunk_by" => {
                         if args.len() < 2 {
                             return Err(self.syntax_err(
                                 format!(
@@ -5746,7 +5754,7 @@ impl Parser {
                 }
             }
             "match" => self.parse_algebraic_match_expr(line),
-            "grep" | "filter" => {
+            "grep" | "filter" | "find_all" => {
                 if matches!(self.peek(), Token::LBrace) {
                     let (block, list) = self.parse_block_list()?;
                     Ok(Expr {
@@ -5961,7 +5969,7 @@ impl Parser {
                     })
                 }
             }
-            "reduce" | "fold" => {
+            "reduce" | "fold" | "inject" => {
                 let (block, list) = self.parse_block_list()?;
                 Ok(Expr {
                     kind: ExprKind::ReduceExpr {
@@ -6634,7 +6642,7 @@ impl Parser {
                     line,
                 })
             }
-            "list_count" | "list_size" => {
+            "list_count" | "list_size" | "count" | "size" | "cnt" => {
                 if self.pipe_supplies_slurped_list_operand() {
                     return Ok(Expr {
                         kind: ExprKind::FuncCall {
@@ -6647,7 +6655,7 @@ impl Parser {
                 let (list, progress) = self.parse_assign_expr_list_optional_progress()?;
                 if progress.is_some() {
                     return Err(self.syntax_err(
-                        "`progress =>` is not supported for list_count / list_size",
+                        "`progress =>` is not supported for list_count / list_size / count / size / cnt",
                         line,
                     ));
                 }
@@ -6844,6 +6852,30 @@ impl Parser {
                 Ok(Expr {
                     kind: ExprKind::FuncCall {
                         name: name.clone(),
+                        args: vec![cr, list],
+                    },
+                    line,
+                })
+            }
+            // Ruby `detect` / `find` — same as `List::Util::first` (first element matching block).
+            "first" | "detect" | "find" => {
+                let (block, list, progress) = self.parse_block_then_list_optional_progress()?;
+                if progress.is_some() {
+                    return Err(self.syntax_err(
+                        "`progress =>` is not supported for first/detect/find (use pfirst for parallel + progress)",
+                        line,
+                    ));
+                }
+                let cr = Expr {
+                    kind: ExprKind::CodeRef {
+                        params: vec![],
+                        body: block,
+                    },
+                    line,
+                };
+                Ok(Expr {
+                    kind: ExprKind::FuncCall {
+                        name: "first".to_string(),
                         args: vec![cr, list],
                     },
                     line,
@@ -7853,7 +7885,7 @@ impl Parser {
             | "sum" | "product" | "zip" | "chunk" | "sliding_window" | "enumerate"
             | "reject" | "detect" | "find" | "find_all" | "collect" | "inject"
             | "compact" | "min_by" | "max_by" | "sort_by" | "tally"
-            | "find_index" | "each_with_index" | "count" | "group_by" | "chunk_by"
+            | "find_index" | "each_with_index" | "count" | "cnt" | "group_by" | "chunk_by"
             | "fan" | "fan_cap" | "pmap" | "pgrep" | "pfor" | "psort" | "preduce"
             | "pcache" | "timer" | "bench" | "eval_timeout" | "retry"
             | "rate_limit" | "every" | "pmap_chunked" | "pmap_on"

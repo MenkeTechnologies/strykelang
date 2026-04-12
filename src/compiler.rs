@@ -4668,6 +4668,9 @@ impl Compiler {
                 | "with_index"
                 | "list_count"
                 | "list_size"
+                | "count"
+                | "size"
+                | "cnt"
                 | "List::Util::uniq"
                 | "sum"
                 | "sum0"
@@ -4762,15 +4765,16 @@ impl Compiler {
                         Some(root),
                     );
                 }
-                "any" | "all" | "none" | "take_while" | "drop_while" | "tap" | "peek" => {
+                "any" | "all" | "none" | "first" | "take_while" | "drop_while" | "tap" | "peek" => {
                     if args.len() != 2 {
                         return Err(CompileError::Unsupported(
-                            "any/all/none/take_while/drop_while/tap/peek expect BLOCK, LIST".into(),
+                            "any/all/none/first/take_while/drop_while/tap/peek expect BLOCK, LIST"
+                                .into(),
                         ));
                     }
                     if !matches!(&args[0].kind, ExprKind::CodeRef { .. }) {
                         return Err(CompileError::Unsupported(
-                            "any/all/none/take_while/drop_while/tap/peek: first argument must be a { BLOCK }"
+                            "any/all/none/first/take_while/drop_while/tap/peek: first argument must be a { BLOCK }"
                                 .into(),
                         ));
                     }

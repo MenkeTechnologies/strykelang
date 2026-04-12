@@ -708,6 +708,10 @@ fn accepts_bare_uniq_any_all_none() {
     p(r#"any { $_ > 1 } (1, 2, 3);"#);
     p(r#"all { $_ > 0 } (1, 2);"#);
     p(r#"none { $_ < 0 } (1, 2);"#);
+    p(r#"inject { $a + $b } (1, 2, 3);"#);
+    p(r#"detect { $_ > 1 } (1, 2, 3);"#);
+    p(r#"find { $_ > 1 } (1, 2, 3);"#);
+    p(r#"find_all { $_ % 2 == 0 } (1, 2, 3, 4);"#);
     p(r#"chunk_by { $_ % 2 } (1, 3, 2);"#);
     p(r#"group_by { 0 } (9);"#);
     p(r#"group_by $_ % 2, (1, 2);"#);

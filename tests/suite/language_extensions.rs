@@ -238,6 +238,27 @@ fn list_count_and_list_size_use_list_context_like_flatten_scalar() {
     assert_eq!(eval_int(r#"scalar flatten(1, 2, [3, 4])"#), 4);
     assert_eq!(eval_int(r#"list_count(1, 2, [3, 4])"#), 4);
     assert_eq!(eval_int(r#"(1, 2, 3) |> list_count"#), 3);
+    assert_eq!(eval_int(r#"(1, 2, 3) |> count"#), 3);
+    assert_eq!(eval_int(r#"(1, 2) |> size"#), 2);
+    assert_eq!(eval_int(r#"list_count("tom")"#), 1);
+    assert_eq!(eval_int(r#""tom" |> cnt"#), 3);
+    assert_eq!(eval_int(r#""tom" |> size"#), 3);
+    assert_eq!(eval_int(r#""tom" |> count"#), 3);
+    assert_eq!(eval_int(r#"1..5 |> cnt"#), 5);
+    assert_eq!(eval_int(r#"1..5 |> size"#), 5);
+    assert_eq!(eval_int(r#"1..5 |> count"#), 5);
+    assert_eq!(eval_int(r#"cnt("x", "y")"#), 2);
+}
+
+#[test]
+fn ruby_aliases_inject_detect_find_find_all() {
+    assert_eq!(eval_int(r#"inject { $a + $b } (1, 2, 3, 4)"#), 10);
+    assert_eq!(eval_int(r#"detect { $_ > 2 } (1, 2, 5, 4)"#), 5);
+    assert_eq!(eval_int(r#"find { $_ > 2 } (1, 2, 5, 4)"#), 5);
+    assert_eq!(
+        eval_string(r#"(1, 2, 3, 4) |> find_all { $_ % 2 == 0 } |> join ','"#),
+        "2,4"
+    );
 }
 
 #[test]

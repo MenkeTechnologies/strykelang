@@ -4504,29 +4504,29 @@ impl Interpreter {
         Ok(PerlValue::integer(count as i64))
     }
 
-    fn parse_substitution_replacement_expr(
-        &self,
+    /// Run the `s///…e…` replacement side: `e_count` stacked `eval`s like Perl (each round parses
+    /// and executes the string; the next round uses [`PerlValue::to_string`] of the prior value).
+    fn regex_subst_run_eval_rounds(
+        &mut self,
         replacement: &str,
-        line: usize,
-    ) -> Result<Expr, PerlError> {
-        let mut code = replacement.trim().to_string();
-        if !code.ends_with(';') {
-            code.push(';');
+        e_count: usize,
+    ) -> ExecResult {
+        let prep_source = |raw: &str| -> String {
+            let mut code = raw.trim().to_string();
+            if !code.ends_with(';') {
+                code.push(';');
+            }
+            code
+        };
+        let mut cur = prep_source(replacement);
+        let mut last = PerlValue::UNDEF;
+        for round in 0..e_count {
+            last = crate::parse_and_run_string(&cur, self)?;
+            if round + 1 < e_count {
+                cur = prep_source(&last.to_string());
+            }
         }
-        let program = crate::parse_with_file(&code, "-e")?;
-        match program.statements.as_slice() {
-            [stmt] => match &stmt.kind {
-                StmtKind::Expression(e) => Ok(e.clone()),
-                _ => Err(PerlError::runtime(
-                    "s///e replacement must be a single expression".to_string(),
-                    line,
-                )),
-            },
-            _ => Err(PerlError::runtime(
-                "s///e replacement must be a single expression".to_string(),
-                line,
-            )),
-        }
+        Ok(last)
     }
 
     fn regex_subst_execute_eval(
@@ -4538,7 +4538,11 @@ impl Interpreter {
         target: &Expr,
         line: usize,
     ) -> ExecResult {
-        let repl_expr = self.parse_substitution_replacement_expr(replacement, line)?;
+        let e_count = flags.chars().filter(|c| *c == 'e').count();
+        if e_count == 0 {
+            return Err(PerlError::runtime("s///e: internal error (no e flag)", line).into());
+        }
+
         if flags.contains('g') {
             let mut rows = Vec::new();
             let mut out = String::new();
@@ -4548,7 +4552,7 @@ impl Interpreter {
                 let m0 = caps.get(0).expect("regex capture 0");
                 out.push_str(&s[last..m0.start]);
                 self.apply_regex_captures(&s, 0, re, &caps, CaptureAllMode::Empty)?;
-                let repl_val = self.eval_expr(&repl_expr)?;
+                let repl_val = self.regex_subst_run_eval_rounds(replacement, e_count)?;
                 out.push_str(&repl_val.to_string());
                 last = m0.end;
                 count += 1;
@@ -4564,7 +4568,7 @@ impl Interpreter {
         if let Some(caps) = re.captures(&s) {
             let m0 = caps.get(0).expect("regex capture 0");
             self.apply_regex_captures(&s, 0, re, &caps, CaptureAllMode::Empty)?;
-            let repl_val = self.eval_expr(&repl_expr)?;
+            let repl_val = self.regex_subst_run_eval_rounds(replacement, e_count)?;
             let mut out = String::new();
             out.push_str(&s[..m0.start]);
             out.push_str(&repl_val.to_string());
@@ -8232,7 +8236,7 @@ impl Interpreter {
                     self.wantarray_kind = saved_wa;
                     return r.map_err(Into::into);
                 }
-                let arg_vals = if matches!(name.as_str(), "any" | "all" | "none")
+                let arg_vals = if matches!(name.as_str(), "any" | "all" | "none" | "first")
                     || matches!(name.as_str(), "take_while" | "drop_while" | "tap" | "peek")
                 {
                     if args.len() != 2 {
@@ -8264,6 +8268,9 @@ impl Interpreter {
                         | "set"
                         | "list_count"
                         | "list_size"
+                        | "count"
+                        | "size"
+                        | "cnt"
                         | "with_index"
                         | "List::Util::uniq"
                         | "shuffle"
@@ -12247,7 +12254,7 @@ impl Interpreter {
     /// Bare `uniq` / `distinct` (alias of `uniq`) / `shuffle` / `chunked` / `windowed` / `zip` /
     /// `sum` / `sum0` /
     /// `product` / `min` / `max` / `mean` / `median` / `mode` / `stddev` / `variance` /
-    /// `any` / `all` / `none` (same as `List::Util` after
+    /// `any` / `all` / `none` / `first` (Ruby `detect` / `find` parse to `first`; same as `List::Util` after
     /// [`crate::list_util::ensure_list_util`]).
     pub(crate) fn call_bare_list_util(
         &mut self,
@@ -12266,6 +12273,7 @@ impl Interpreter {
             "any" => "List::Util::any",
             "all" => "List::Util::all",
             "none" => "List::Util::none",
+            "first" => "List::Util::first",
             "sum" => "List::Util::sum",
             "sum0" => "List::Util::sum0",
             "product" => "List::Util::product",
@@ -12308,8 +12316,8 @@ impl Interpreter {
         }
         match name {
             "uniq" | "distinct" | "shuffle" | "chunked" | "windowed" | "zip" | "any" | "all"
-            | "none" | "sum" | "sum0" | "product" | "min" | "max" | "mean" | "median" | "mode"
-            | "stddev" | "variance" => self.call_bare_list_util(name, args, line, want),
+            | "none" | "first" | "sum" | "sum0" | "product" | "min" | "max" | "mean" | "median"
+            | "mode" | "stddev" | "variance" => self.call_bare_list_util(name, args, line, want),
             "deque" => {
                 if !args.is_empty() {
                     return Err(PerlError::runtime("deque() takes no arguments", line).into());

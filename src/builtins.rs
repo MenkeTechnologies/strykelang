@@ -210,6 +210,7 @@ pub(crate) fn try_builtin(
         "flatten" => Some(builtin_flatten(interp, args)),
         "set" => Some(Ok(crate::value::set_from_elements(args.iter().cloned()))),
         "list_count" | "list_size" => Some(builtin_list_count(args)),
+        "count" | "size" | "cnt" => Some(builtin_count_size_cnt(args)),
         "uname" => Some(builtin_uname()),
         "rmdir" | "CORE::rmdir" => Some(interp.builtin_rmdir_execute(args, line)),
         "utime" | "CORE::utime" => Some(interp.builtin_utime_execute(args, line)),
@@ -791,14 +792,46 @@ fn builtin_drop(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValu
     crate::list_util::extension_drop_impl(args, interp.wantarray_kind)
 }
 
-/// `list_count LIST` / `list_size LIST` — evaluate like [`builtin_flatten`] (list context per actual,
-/// one-level [`PerlValue::map_flatten_outputs`]); always returns the element count as an integer.
+/// `list_count` / `list_size` + `LIST` — like [`builtin_flatten`]: one-level
+/// [`PerlValue::map_flatten_outputs`] per actual; returns the **element** count.
 fn builtin_list_count(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut out = Vec::new();
     for a in args {
         out.extend(a.map_flatten_outputs(true));
     }
     Ok(PerlValue::integer(out.len() as i64))
+}
+
+/// `count` / `size` / `cnt`: pipe-friendly “how big is this value?”
+/// — **one string** → UTF-8 byte length (same as the `length` builtin);
+/// **one array / aref** → flattened element count (list context ranges become arrays first);
+/// **one hash** → number of keys; **one set** → set size; **several actuals** → same as [`builtin_list_count`].
+fn builtin_count_size_cnt(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Ok(PerlValue::integer(0));
+    }
+    if args.len() == 1 {
+        let a = &args[0];
+        if let Some(h) = a.as_hash_map() {
+            return Ok(PerlValue::integer(h.len() as i64));
+        }
+        if let Some(Some(n)) = a.with_heap(|h| match h {
+            crate::value::HeapObject::Set(st) => Some(st.len()),
+            _ => None,
+        }) {
+            return Ok(PerlValue::integer(n as i64));
+        }
+        if let Some(b) = a.as_bytes_arc() {
+            return Ok(PerlValue::integer(b.len() as i64));
+        }
+        if a.is_string_like() {
+            return Ok(PerlValue::integer(a.to_string().len() as i64));
+        }
+        return Ok(PerlValue::integer(
+            a.map_flatten_outputs(true).len() as i64,
+        ));
+    }
+    builtin_list_count(args)
 }
 
 /// One-level list flatten: plain arrays and arrayrefs expand like `flat_map` / [`PerlValue::map_flatten_outputs`].

@@ -1991,6 +1991,7 @@ impl<'a> VM<'a> {
                             | "any"
                             | "all"
                             | "none"
+                            | "first"
                             | "sum"
                             | "sum0"
                             | "product"

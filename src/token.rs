@@ -282,6 +282,14 @@ pub const KEYWORDS: &[&str] = &[
     "set",
     "list_count",
     "list_size",
+    "count",
+    "size",
+    "cnt",
+    "inject",
+    "first",
+    "detect",
+    "find",
+    "find_all",
     "match",
     "grep",
     "keys",
@@ -497,6 +505,7 @@ mod tests {
             keyword_or_ident("list_size"),
             Token::Ident(s) if s == "list_size"
         ));
+        assert!(matches!(keyword_or_ident("cnt"), Token::Ident(s) if s == "cnt"));
         assert!(matches!(
             keyword_or_ident("capture"),
             Token::Ident(s) if s == "capture"
