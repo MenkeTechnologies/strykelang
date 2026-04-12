@@ -218,8 +218,8 @@ fn expand_perl_bundled_argv(args: Vec<String>) -> Vec<String> {
 /// Perl documents `-help` / `-version` as aliases; bundling would mis-parse them as `-h`+`-e`+….
 fn expand_perl_bundled_token(arg: &str) -> Option<Vec<String>> {
     match arg {
-        "-help" => return Some(vec!["-h".to_string()]),
-        "-version" => return Some(vec!["-v".to_string()]),
+        "-help" | "--help" => return Some(vec!["-h".to_string()]),
+        "-version" | "--version" => return Some(vec!["-v".to_string()]),
         _ => {}
     }
     if arg == "-" || !arg.starts_with('-') || arg.starts_with("--") {
