@@ -1053,6 +1053,19 @@ impl Parser {
                 | "interleave"
                 | "ddump"
                 | "input"
+                | "lines"
+                | "words"
+                | "chars"
+                | "trim"
+                | "avg"
+                | "top"
+                | "count_by"
+                | "to_file"
+                | "to_json"
+                | "to_csv"
+                | "grep_v"
+                | "select_keys"
+                | "pluck"
                 | "set"
                 | "list_count"
                 | "list_size"
@@ -3406,7 +3419,8 @@ impl Parser {
                 match name.as_str() {
                     "puniq" | "uniq" | "distinct" | "flatten" | "set" | "list_count"
                     | "list_size" | "count" | "size" | "cnt" | "with_index" | "shuffle"
-                    | "frequencies" | "interleave" | "ddump" => {
+                    | "frequencies" | "interleave" | "ddump" | "lines" | "words"
+                    | "chars" | "trim" | "avg" | "to_json" | "to_csv" => {
                         if args.is_empty() {
                             args.push(lhs);
                         } else {
@@ -3425,9 +3439,14 @@ impl Parser {
                     "List::Util::reduce" | "List::Util::fold" => {
                         args.push(lhs);
                     }
+                    "grep_v" | "pluck" => {
+                        // data |> grep_v "pattern" → grep_v("pattern", data...)
+                        // data |> pluck "key" → pluck("key", data...)
+                        args.push(lhs);
+                    }
                     "pfirst" | "pany" | "any" | "all" | "none" | "first" | "take_while"
                     | "drop_while" | "tap" | "peek" | "group_by" | "chunk_by" | "partition"
-                    | "min_by" | "max_by" | "zip_with" => {
+                    | "min_by" | "max_by" | "zip_with" | "count_by" => {
                         if args.len() < 2 {
                             return Err(self.syntax_err(
                                 format!(
@@ -3792,6 +3811,41 @@ impl Parser {
                 pattern,
                 string: Box::new(lhs),
                 limit,
+            },
+
+            // ── Regex ops: pipe the subject — `$str |> s/\n//g` ────────────────
+            ExprKind::Substitution {
+                pattern,
+                replacement,
+                flags,
+                expr: _,
+            } => ExprKind::Substitution {
+                expr: Box::new(lhs),
+                pattern,
+                replacement,
+                flags,
+            },
+            ExprKind::Transliterate {
+                from,
+                to,
+                flags,
+                expr: _,
+            } => ExprKind::Transliterate {
+                expr: Box::new(lhs),
+                from,
+                to,
+                flags,
+            },
+            ExprKind::Match {
+                pattern,
+                flags,
+                scalar_g,
+                expr: _,
+            } => ExprKind::Match {
+                expr: Box::new(lhs),
+                pattern,
+                flags,
+                scalar_g,
             },
 
             // ── Bareword function name → plain unary call ──────────────────────
@@ -7029,7 +7083,7 @@ impl Parser {
                 })
             }
             "take_while" | "drop_while" | "tap" | "peek" | "partition" | "min_by" | "max_by"
-            | "zip_with" => {
+            | "zip_with" | "count_by" => {
                 let (block, list, progress) = self.parse_block_then_list_optional_progress()?;
                 if progress.is_some() {
                     return Err(

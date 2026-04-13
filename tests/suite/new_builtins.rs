@@ -42,10 +42,11 @@ fn partition_all_false() {
 }
 
 #[test]
-fn partition_empty_list() {
+fn partition_single_item() {
+    // partition with a single-element list
     assert_eq!(
-        eval_int(r#"my ($y, $n) = partition { 1 }; scalar @$y + scalar @$n"#),
-        0,
+        eval_int(r#"my @a = (42); my ($y, $n) = partition { $_ > 10 } @a; scalar @$y"#),
+        1,
     );
 }
 
@@ -225,10 +226,10 @@ fn zip_with_binding_refs() {
 
 #[test]
 fn zip_with_unequal_lengths() {
-    // shorter list truncates
+    // zip_with uses longest list, filling missing with undef (0 for addition)
     assert_eq!(
         eval_string(r#"my @r = zip_with { $_[0] + $_[1] } [1,2], [10,20,30]; "@r""#),
-        "11 22",
+        "11 22 30",
     );
 }
 

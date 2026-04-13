@@ -208,13 +208,25 @@ pub(crate) fn try_builtin(
         "tail" => Some(builtin_tail(interp, args)),
         "drop" => Some(builtin_drop(interp, args)),
         "take_while" | "drop_while" | "tap" | "peek" | "partition" | "min_by" | "max_by"
-        | "zip_with" => Some(interp.list_higher_order_block_builtin(name, args, line)),
+        | "zip_with" | "count_by" => Some(interp.list_higher_order_block_builtin(name, args, line)),
         "with_index" => Some(builtin_with_index(interp, args)),
         "flatten" => Some(builtin_flatten(interp, args)),
         "interleave" => Some(builtin_interleave(interp, args)),
         "frequencies" => Some(builtin_frequencies(args)),
         "ddump" => Some(builtin_ddump(args)),
         "input" => Some(builtin_input(interp, args, line)),
+        "lines" => Some(builtin_lines(interp, args)),
+        "words" => Some(builtin_words(interp, args)),
+        "chars" => Some(builtin_chars(interp, args)),
+        "trim" => Some(builtin_trim(args)),
+        "avg" => Some(builtin_avg(args)),
+        "top" => Some(builtin_top(args)),
+        "to_file" => Some(builtin_to_file(args, line)),
+        "to_json" => Some(builtin_to_json(args)),
+        "to_csv" => Some(builtin_to_csv(args)),
+        "grep_v" => Some(builtin_grep_v(args, line)),
+        "select_keys" => Some(builtin_select_keys(args)),
+        "pluck" => Some(builtin_pluck(args)),
         "set" => Some(Ok(crate::value::set_from_elements(args.iter().cloned()))),
         "list_count" | "list_size" => Some(builtin_list_count(args)),
         "count" | "size" | "cnt" => Some(builtin_count_size_cnt(args)),
@@ -1007,6 +1019,242 @@ fn builtin_input(
     let content = std::fs::read_to_string(&name)
         .map_err(|e| PerlError::runtime(format!("input: {}: {}", name, e), line))?;
     Ok(PerlValue::string(content))
+}
+
+/// `lines STRING` — split string into array on newlines (no trailing empty).
+fn builtin_lines(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let items: Vec<PerlValue> = s.lines().map(|l| PerlValue::string(l.to_string())).collect();
+    Ok(match interp.wantarray_kind {
+        WantarrayCtx::List => PerlValue::array(items),
+        WantarrayCtx::Scalar => PerlValue::integer(items.len() as i64),
+        WantarrayCtx::Void => PerlValue::UNDEF,
+    })
+}
+
+/// `words STRING` — split on whitespace into array.
+fn builtin_words(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let items: Vec<PerlValue> = s.split_whitespace().map(|w| PerlValue::string(w.to_string())).collect();
+    Ok(match interp.wantarray_kind {
+        WantarrayCtx::List => PerlValue::array(items),
+        WantarrayCtx::Scalar => PerlValue::integer(items.len() as i64),
+        WantarrayCtx::Void => PerlValue::UNDEF,
+    })
+}
+
+/// `chars STRING` — split into individual characters (no empty leading element).
+fn builtin_chars(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let items: Vec<PerlValue> = s.chars().map(|c| PerlValue::string(c.to_string())).collect();
+    Ok(match interp.wantarray_kind {
+        WantarrayCtx::List => PerlValue::array(items),
+        WantarrayCtx::Scalar => PerlValue::integer(items.len() as i64),
+        WantarrayCtx::Void => PerlValue::UNDEF,
+    })
+}
+
+/// `trim STRING` — strip leading and trailing whitespace.
+fn builtin_trim(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    Ok(PerlValue::string(s.trim().to_string()))
+}
+
+/// `avg LIST` — arithmetic mean of numeric list.
+fn builtin_avg(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let flat: Vec<PerlValue> = args.iter().flat_map(|a| a.map_flatten_outputs(true)).collect();
+    if flat.is_empty() {
+        return Ok(PerlValue::UNDEF);
+    }
+    let sum: f64 = flat.iter().map(|v| v.to_number()).sum();
+    Ok(PerlValue::float(sum / flat.len() as f64))
+}
+
+/// `top N, HASHREF` — return top N keys from a frequencies-style hash ref, sorted by count desc.
+fn builtin_top(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    // When piped: top(HASHREF, N) or top(HASHREF) defaults N=10
+    // Direct: top N, HASHREF  or  top HASHREF
+    let (href, n) = if args.len() >= 2 {
+        // Could be (N, HASHREF) or (HASHREF, N)
+        if args[0].as_hash_ref().is_some() {
+            (&args[0], args[1].to_int() as usize)
+        } else {
+            (&args[1], args[0].to_int() as usize)
+        }
+    } else if args.len() == 1 {
+        (&args[0], 10)
+    } else {
+        return Ok(PerlValue::UNDEF);
+    };
+    if let Some(hr) = href.as_hash_ref() {
+        let guard = hr.read();
+        let mut pairs: Vec<_> = guard.iter().collect();
+        pairs.sort_by(|a, b| b.1.to_int().cmp(&a.1.to_int()));
+        let items: Vec<PerlValue> = pairs.into_iter().take(n)
+            .flat_map(|(k, v)| vec![PerlValue::string(k.clone()), v.clone()])
+            .collect();
+        Ok(PerlValue::hash_ref(Arc::new(RwLock::new(
+            items.chunks(2)
+                .map(|c| (c[0].to_string(), c[1].clone()))
+                .collect::<indexmap::IndexMap<_, _>>(),
+        ))))
+    } else {
+        Ok(PerlValue::UNDEF)
+    }
+}
+
+/// `to_file PATH, STRING` — write string to file, returns the string for further piping.
+fn builtin_to_file(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    if args.len() < 2 {
+        return Err(PerlError::runtime("to_file: need PATH and content".to_string(), line));
+    }
+    // to_file(STRING, PATH) when piped, to_file(PATH, STRING) when called directly
+    // Heuristic: if first arg contains newlines or is long, it's content
+    let (path, content) = if args[0].to_string().contains('\n') || args[0].to_string().len() > 260 {
+        (args[1].to_string(), args[0].to_string())
+    } else {
+        (args[0].to_string(), args[1].to_string())
+    };
+    std::fs::write(&path, &content)
+        .map_err(|e| PerlError::runtime(format!("to_file: {}: {}", path, e), line))?;
+    Ok(PerlValue::string(content))
+}
+
+/// `to_json VALUE` — serialize a PerlValue to a JSON string.
+fn builtin_to_json(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let val = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    Ok(PerlValue::string(perl_value_to_json_string(&val)))
+}
+
+fn perl_value_to_json_string(val: &PerlValue) -> String {
+    use std::fmt::Write;
+    if val.is_undef() {
+        return "null".to_string();
+    }
+    if val.is_integer_like() {
+        return format!("{}", val.to_int());
+    }
+    if val.is_float_like() {
+        return format!("{}", val.to_number());
+    }
+    if let Some(ar) = val.as_array_ref() {
+        let guard = ar.read();
+        let parts: Vec<String> = guard.iter().map(perl_value_to_json_string).collect();
+        return format!("[{}]", parts.join(","));
+    }
+    if let Some(hr) = val.as_hash_ref() {
+        let guard = hr.read();
+        let mut buf = String::from("{");
+        for (i, (k, v)) in guard.iter().enumerate() {
+            if i > 0 { buf.push(','); }
+            let _ = write!(buf, "\"{}\":{}", json_escape(k), perl_value_to_json_string(v));
+        }
+        buf.push('}');
+        return buf;
+    }
+    format!("\"{}\"", json_escape(&val.to_string()))
+}
+
+fn json_escape(s: &str) -> String {
+    s.replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
+        .replace('\t', "\\t")
+}
+
+/// `to_csv ARRAYREF_OF_HASHREFS` — serialize to CSV string.
+fn builtin_to_csv(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let val = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let rows: Vec<PerlValue> = if let Some(ar) = val.as_array_ref() {
+        ar.read().clone()
+    } else {
+        args.iter().flat_map(|a| a.map_flatten_outputs(true)).collect()
+    };
+    if rows.is_empty() {
+        return Ok(PerlValue::string(String::new()));
+    }
+    // Collect all keys from first row for header order
+    let headers: Vec<String> = if let Some(hr) = rows[0].as_hash_ref() {
+        hr.read().keys().cloned().collect()
+    } else {
+        return Ok(PerlValue::string(String::new()));
+    };
+    let mut buf = headers.join(",");
+    buf.push('\n');
+    for row in &rows {
+        if let Some(hr) = row.as_hash_ref() {
+            let guard = hr.read();
+            let vals: Vec<String> = headers.iter()
+                .map(|h| {
+                    let v = guard.get(h).map(|v| v.to_string()).unwrap_or_default();
+                    if v.contains(',') || v.contains('"') || v.contains('\n') {
+                        format!("\"{}\"", v.replace('"', "\"\""))
+                    } else {
+                        v
+                    }
+                })
+                .collect();
+            buf.push_str(&vals.join(","));
+            buf.push('\n');
+        }
+    }
+    Ok(PerlValue::string(buf))
+}
+
+/// `grep_v PATTERN, LIST` — inverse grep: reject elements matching regex.
+fn builtin_grep_v(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let pattern = args[0].to_string();
+    let re = regex::Regex::new(&pattern)
+        .map_err(|e| PerlError::runtime(format!("grep_v: bad pattern: {}", e), line))?;
+    let items: Vec<PerlValue> = args[1..].iter()
+        .flat_map(|a| a.map_flatten_outputs(true))
+        .filter(|v| !re.is_match(&v.to_string()))
+        .collect();
+    Ok(PerlValue::array(items))
+}
+
+/// `select_keys HASHREF, KEY, KEY, ...` — pick only named keys from a hash ref.
+fn builtin_select_keys(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Ok(PerlValue::UNDEF);
+    }
+    let href = &args[0];
+    if let Some(hr) = href.as_hash_ref() {
+        let guard = hr.read();
+        let mut result = indexmap::IndexMap::new();
+        for key_val in &args[1..] {
+            let k = key_val.to_string();
+            if let Some(v) = guard.get(&k) {
+                result.insert(k, v.clone());
+            }
+        }
+        Ok(PerlValue::hash_ref(Arc::new(RwLock::new(result))))
+    } else {
+        Ok(PerlValue::UNDEF)
+    }
+}
+
+/// `pluck KEY, LIST_OF_HASHREFS` — extract one key from each hashref in a list.
+fn builtin_pluck(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let key = args[0].to_string();
+    let items: Vec<PerlValue> = args[1..].iter()
+        .flat_map(|a| a.map_flatten_outputs(true))
+        .map(|v| {
+            if let Some(hr) = v.as_hash_ref() {
+                hr.read().get(&key).cloned().unwrap_or(PerlValue::UNDEF)
+            } else {
+                PerlValue::UNDEF
+            }
+        })
+        .collect();
+    Ok(PerlValue::array(items))
 }
 
 fn ddump_value(buf: &mut String, val: &PerlValue, depth: usize) {

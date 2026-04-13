@@ -3474,6 +3474,17 @@ impl Interpreter {
                     WantarrayCtx::Void => PerlValue::UNDEF,
                 })
             }
+            "count_by" => {
+                let mut counts = indexmap::IndexMap::new();
+                for item in items {
+                    let _ = self.scope.set_scalar("_", item.clone());
+                    let key = self.call_sub(&sub, vec![], WantarrayCtx::Scalar, line)?;
+                    let k = key.to_string();
+                    let entry = counts.entry(k).or_insert(PerlValue::integer(0));
+                    *entry = PerlValue::integer(entry.to_int() + 1);
+                }
+                Ok(PerlValue::hash_ref(Arc::new(RwLock::new(counts))))
+            }
             _ => Err(PerlError::runtime(
                 format!("internal: unknown list block builtin `{name}`"),
                 line,
@@ -8334,7 +8345,7 @@ impl Interpreter {
                     || matches!(name.as_str(), "take_while" | "drop_while" | "tap" | "peek")
                     || matches!(
                         name.as_str(),
-                        "partition" | "min_by" | "max_by" | "zip_with"
+                        "partition" | "min_by" | "max_by" | "zip_with" | "count_by"
                     ) {
                     if args.len() != 2 {
                         return Err(PerlError::runtime(
