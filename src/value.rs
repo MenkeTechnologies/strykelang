@@ -63,7 +63,7 @@ pub struct FsWalkIterator {
     /// `(base_path, relative_prefix)` stack.
     stack: Mutex<Vec<(std::path::PathBuf, String)>>,
     /// Buffered sorted entries from the current directory level.
-    buf: Mutex<Vec<(String, bool)>>,   // (child_rel, is_dir)
+    buf: Mutex<Vec<(String, bool)>>, // (child_rel, is_dir)
     /// Pending subdirs to push (reversed, so first is popped next).
     pending_dirs: Mutex<Vec<(std::path::PathBuf, String)>>,
     files_only: bool,
@@ -112,7 +112,11 @@ impl FsWalkIterator {
                     Some(n) => n.to_string(),
                     None => continue,
                 };
-                let child_rel = if rel.is_empty() { name.clone() } else { format!("{rel}/{name}") };
+                let child_rel = if rel.is_empty() {
+                    name.clone()
+                } else {
+                    format!("{rel}/{name}")
+                };
                 children.push((os_name, child_rel, ft.is_file(), ft.is_dir()));
             }
             children.sort_by(|a, b| a.0.cmp(&b.0));
@@ -2175,7 +2179,7 @@ fn format_float(f: f64) -> String {
             libc::snprintf(
                 buf.as_mut_ptr() as *mut libc::c_char,
                 buf.len(),
-                b"%.15g\0".as_ptr() as *const libc::c_char,
+                c"%.15g".as_ptr(),
                 f,
             );
             std::ffi::CStr::from_ptr(buf.as_ptr() as *const libc::c_char)

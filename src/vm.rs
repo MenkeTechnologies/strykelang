@@ -5940,7 +5940,11 @@ impl<'a> VM<'a> {
                         } else {
                             let items = val.to_list();
                             if items.len() <= 1 {
-                                let s = if items.is_empty() { String::new() } else { items[0].to_string() };
+                                let s = if items.is_empty() {
+                                    String::new()
+                                } else {
+                                    items[0].to_string()
+                                };
                                 self.push(PerlValue::string(s.chars().rev().collect()));
                             } else {
                                 let mut items = items;

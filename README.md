@@ -102,9 +102,9 @@ A newline ends a statement, so you do not need a trailing `;` on each line. Use 
 
 ```perl
 my $answer = 40 + 2
-say $answer                       # 42 — one statement per line, no `;` required
+p $answer                       # 42 — one statement per line, no `;` required
 
-my $x = 1; my $y = 2; say $x + $y # 3 — same line needs `;` between statements
+my $x = 1; my $y = 2; p $x + $y # 3 — same line needs `;` between statements
 ```
 
 #### Interactive REPL
@@ -257,7 +257,7 @@ For `mysync` scalars holding a `Set`, `|`/`&` are union/intersection. Without `m
 
 ```perl
 my $data = "https://api.example.com/users/1" |> fetch_json;
-say $data->{name};
+p $data->{name};
 
 my @rows = "data.csv" |> csv_read;
 my $df   = "data.csv" |> dataframe;
@@ -266,7 +266,7 @@ $db->exec("CREATE TABLE t (id INTEGER, name TEXT)");
 
 struct Point { x => Float, y => Float };
 my $p = Point->new(x => 1.5, y => 2.0);
-say $p->x;
+p $p->x;
 typed my $n : Int = 42;
 ```
 
@@ -371,7 +371,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 | String | `chomp`, `chop`, `length`, `substr`, `index`, `rindex`, `split`, `join`, `sprintf`, `printf`, `uc`/`lc`/`ucfirst`/`lcfirst`, `chr`, `ord`, `hex`, `oct`, `crypt`, `fc`, `pos`, `study`, `quotemeta`, `trim`, `lines`, `words`, `chars`, `snake_case`, `camel_case`, `kebab_case` |
 | Binary | `pack`, `unpack` (subset `A a N n V v C Q q Z H x w i I l L s S f d` + `*`), `vec` |
 | Numeric | `abs`, `int`, `sqrt`, `sin`, `cos`, `atan2`, `exp`, `log`, `rand`, `srand`, `avg`, `stddev`, `clamp`, `normalize` |
-| I/O | `print`, `say`, `printf`, `open` (incl. `open my $fh`, files, `-\|` / `\|-` pipes), `close`, `eof`, `readline`, `read`, `seek`, `tell`, `sysopen`, `sysread`/`syswrite`/`sysseek`, handle methods `->print/->say/->printf/->getline/->close/->eof/->getc/->flush`, `slurp`, `input`, backticks/`qx{}`, `capture` (structured: `->stdout/->stderr/->exit`), `binmode`, `fileno`, `flock`, `getc`, `select`, `truncate`, `formline`, `read_lines`, `append_file`, `to_file`, `read_json`, `write_json`, `tempfile`, `tempdir` |
+| I/O | `print`, `p`, `say`, `printf`, `open` (incl. `open my $fh`, files, `-\|` / `\|-` pipes), `close`, `eof`, `readline`, `read`, `seek`, `tell`, `sysopen`, `sysread`/`syswrite`/`sysseek`, handle methods `->print/->say/->printf/->getline/->close/->eof/->getc/->flush`, `slurp`, `input`, backticks/`qx{}`, `capture` (structured: `->stdout/->stderr/->exit`), `binmode`, `fileno`, `flock`, `getc`, `select`, `truncate`, `formline`, `read_lines`, `append_file`, `to_file`, `read_json`, `write_json`, `tempfile`, `tempdir` |
 | Directory | `opendir`, `readdir`, `closedir`, `rewinddir`, `telldir`, `seekdir`, `files`, `filesf`/`f`, `fr` (recursive files, lazy iterator), `dirs`/`d`, `dr` (recursive dirs, lazy iterator), `sym_links`, `sockets`, `pipes`, `block_devices`, `char_devices` |
 | File tests | `-e`, `-f`, `-d`, `-l`, `-r`, `-w`, `-s`, `-z`, `-x`, `-t` (defaults to `$_`) |
 | System | `system`, `exec`, `exit`, `chdir`, `mkdir`, `unlink`, `rename`, `chmod`, `chown`, `chroot`, `stat`, `lstat`, `link`, `symlink`, `readlink`, `glob`, `glob_par`, `glob_match`, `which_all`, `par_sed`, `par_find_files`, `par_line_count`, `ppool`, `barrier`, `fork`, `wait`, `waitpid`, `kill`, `alarm`, `sleep`, `times`, `dump`, `reset` |
@@ -388,7 +388,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **`use overload`** — `'op' => 'method'` or `\&handler`; binary dispatch with `(invocant, other)`, `nomethod`, unary `neg`/`bool`/`abs`, `""` for stringification, `fallback => 1`.
 - **`$?` / `$|`** — packed POSIX status from `system`/backticks/pipe close; autoflush on print/printf.
 - **`$.`** — undef until first successful read, then last-read line count.
-- **`print`/`say`/`printf` with no args** — uses `$_` (and `printf`'s format defaults to `$_`).
+- **`print`/`say`/`p`/`printf` with no args** — uses `$_` (and `printf`'s format defaults to `$_`).
 - **Bareword statement** — `name;` calls a sub with `@_ = ($_)`.
 - **Typeglobs** — `*foo = \&bar`, `*lhs = *rhs` copies sub/scalar/array/hash/IO slots; package-qualified `*Pkg::name` supported.
 - **`%SIG` (Unix)** — `SIGINT`/`SIGTERM`/`SIGALRM`/`SIGCHLD` as code refs; handlers run between statements/opcodes via `perl_signal::poll`. `IGNORE` and `DEFAULT` honored.
@@ -408,7 +408,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **String interpolation** — `$var` `#{23 * 52}`, `$h{k}`, `$a[i]`, `@a`, `@a[slice]` (joined with `$"`), `$#a` in slice indices, `$0`, `$1..$n`. `\x{hex}` and unbraced `\x`.
 - **`__FILE__` / `__LINE__`** — compile-time literals.
 - Heredocs `<<EOF`, POD skipping, shebang handling, `qw()/q()/qq()` with paired delimiters.
-- **Special variables** — large set of `${^NAME}` scalars pre-seeded; see [`SPECIAL_VARIABLES.md`](SPECIAL_VARIABLES.md). Still missing vs Perl 5: `English`, full `$^V` as a version object.
+- **Special variables** — large set of `${^NAME}` scalars pre-seeded; see [`SPECIAL_VARIABLES.md`](parity/SPECIAL_VARIABLES.md). Still missing vs Perl 5: `English`, full `$^V` as a version object.
 
 #### Extensions beyond stock Perl 5
 
@@ -432,19 +432,19 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   # blockless list pipelines — no braces needed for simple expressions
   files |> filter /[a-e]/ |> e -f $_ && system("cat $_")
-  "a".."z" |> map uc |> e say;                      # A B C … Z
-  "a".."z" |> grep /[aeiou]/ |> e say;              # a e i o u
-  "a".."z" |> filter 't' |> e say;                  # t  (literal = equality test)
-  1..10 |> filter $_ > 5 |> sort |> e say;      # blocks still work
-  1..5 |> map $_ * $_ |> join "," |> say;         # 1,4,9,16,25
+  "a".."z" |> map uc |> e p;                      # A B C … Z
+  "a".."z" |> grep /[aeiou]/ |> e p;              # a e i o u
+  "a".."z" |> filter 't' |> e p;                  # t  (literal = equality test)
+  1..10 |> filter $_ > 5 |> sort |> e p;      # blocks still work
+  1..5 |> map $_ * $_ |> join "," |> p;         # 1,4,9,16,25
 
   # e — side-effect-only iteration (like map but void, returns count)
-  qw(apple banana cherry) |> grep /^a/ |> map uc |> e say;  # APPLE
+  qw(apple banana cherry) |> grep /^a/ |> map uc |> e p;  # APPLE
 
   # unary builtins — `x |> length`, `x |> uc`, `x |> sqrt`, etc.
-  "hello" |> length |> say;                            # 5
-  16 |> sqrt |> say;                                   # 4
-  "ff" |> hex |> say;                                  # 255
+  "hello" |> length |> p;                            # 5
+  16 |> sqrt |> p;                                   # 4
+  "ff" |> hex |> p;                                  # 255
 
   # bareword on RHS becomes a unary call: `x |> f` → `f(x)`
   # call on RHS prepends: `x |> f(a, b)` → `f(x, a, b)`
@@ -454,20 +454,20 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   # regex ops in pipelines — s///, tr///, and m// work as RHS of |>
   # s/// and tr/// auto-inject /r so the modified string flows through:
-  "hello world" |> s/world/perl/  |> say;              # hello perl
-  "hello world" |> tr/a-z/A-Z/   |> say;              # HELLO WORLD
+  "hello world" |> s/world/perl/  |> p;              # hello perl
+  "hello world" |> tr/a-z/A-Z/   |> p;              # HELLO WORLD
 
   # m//g extracts all matches as an array:
-  "foo123bar456" |> /\d+/g |> say;                     # 123 456
+  "foo123bar456" |> /\d+/g |> p;                     # 123 456
 
   # full pipeline: read input, strip newlines, split, count word frequencies
-  # man ls | pe -e 'input |> s@\n@@g |> split |> frequencies |> ddump |> say'
+  # man ls | pe -e 'input |> s@\n@@g |> split |> frequencies |> ddump |> p'
 
   # extract all emails from text, deduplicate
-  # cat log.txt | pe -e 'input |> /[\w.]+@[\w.]+/g |> distinct |> e say'
+  # cat log.txt | pe -e 'input |> /[\w.]+@[\w.]+/g |> distinct |> e p'
 
   # capture groups with /g:
-  "a=1 b=2" |> /(\w+)=(\w+)/g |> ddump |> say;
+  "a=1 b=2" |> /(\w+)=(\w+)/g |> ddump |> p;
   ```
 
   **Pipeline builtins** — designed for `|>` chains:
@@ -476,56 +476,56 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   # ── input / output ─────────────────────────────────────────────────
   input                                # slurp all of stdin as one string
   input($fh)                           # slurp a filehandle
-  # cat data.txt | pe -e 'input |> lines |> e say'
+  # cat data.txt | pe -e 'input |> lines |> e p'
 
   # ── string → list ──────────────────────────────────────────────────
-  "hello\nworld" |> lines |> ddump |> say;       # ("hello", "world")
-  "foo bar baz"  |> words |> ddump |> say;       # ("foo", "bar", "baz")
-  "hello"        |> chars |> ddump |> say;       # ("h","e","l","l","o")
-  "  hello  "    |> trim  |> say;                # "hello"
+  "hello\nworld" |> lines |> ddump |> p;       # ("hello", "world")
+  "foo bar baz"  |> words |> ddump |> p;       # ("foo", "bar", "baz")
+  "hello"        |> chars |> ddump |> p;       # ("h","e","l","l","o")
+  "  hello  "    |> trim  |> p;                # "hello"
 
   # ── case conversion ────────────────────────────────────────────────
-  "helloWorld"     |> snake_case  |> say;   # hello_world
-  "hello_world"    |> camel_case  |> say;   # helloWorld
-  "Hello World"    |> kebab_case  |> say;   # hello-world
+  "helloWorld"     |> snake_case  |> p;   # hello_world
+  "hello_world"    |> camel_case  |> p;   # helloWorld
+  "Hello World"    |> kebab_case  |> p;   # hello-world
 
   # ── aggregation / stats ────────────────────────────────────────────
-  1 .. 100 |> avg    |> say;                # 50.5
-  1 .. 100 |> stddev |> say;                # 28.86607…
-  "hello"  |> chars  |> frequencies |> ddump |> say;
+  1 .. 100 |> avg    |> p;                # 50.5
+  1 .. 100 |> stddev |> p;                # 28.86607…
+  "hello"  |> chars  |> frequencies |> ddump |> p;
   # { h => 1, e => 1, l => 2, o => 1 }
 
   # ── frequencies + top ──────────────────────────────────────────────
-  "the quick brown fox" |> chars |> frequencies |> top 3 |> ddump |> say;
+  "the quick brown fox" |> chars |> frequencies |> top 3 |> ddump |> p;
   # top 3 chars by count
 
   # ── count_by { BLOCK } LIST ────────────────────────────────────────
-  1 .. 20 |> count_by { $_ % 2 == 0 ? "even" : "odd" } |> ddump |> say;
+  1 .. 20 |> count_by { $_ % 2 == 0 ? "even" : "odd" } |> ddump |> p;
   # { odd => 10, even => 10 }
 
   # ── numeric transforms ─────────────────────────────────────────────
-  1 .. 10  |> clamp 3, 7    |> ddump |> say;   # 3 3 3 4 5 6 7 7 7 7
-  1 .. 5   |> normalize     |> ddump |> say;   # 0 0.25 0.5 0.75 1
+  1 .. 10  |> clamp 3, 7    |> ddump |> p;   # 3 3 3 4 5 6 7 7 7 7
+  1 .. 5   |> normalize     |> ddump |> p;   # 0 0.25 0.5 0.75 1
 
   # ── inverse grep (regex) ───────────────────────────────────────────
-  1 .. 10 |> grep_v "^[35]$" |> ddump |> say;  # removes 3 and 5
+  1 .. 10 |> grep_v "^[35]$" |> ddump |> p;  # removes 3 and 5
 
   # ── hash manipulation ──────────────────────────────────────────────
   my $h = {a => 1, b => 2, c => 3};
-  $h |> select_keys "a", "c" |> ddump |> say;  # { a => 1, c => 3 }
+  $h |> select_keys "a", "c" |> ddump |> p;  # { a => 1, c => 3 }
 
   # ── pluck key from list of hashrefs ────────────────────────────────
   my @people = ({name=>"Alice",age=>30}, {name=>"Bob",age=>25});
-  @people |> pluck "name" |> ddump |> say;      # ("Alice", "Bob")
+  @people |> pluck "name" |> ddump |> p;      # ("Alice", "Bob")
 
   # ── serialization ──────────────────────────────────────────────────
   my $data = {a => 1, b => [2,3]};
-  $data |> to_json |> say;                        # {"a":1,"b":[2,3]}
-  @people |> to_csv |> say;                      # CSV with headers
+  $data |> to_json |> p;                        # {"a":1,"b":[2,3]}
+  @people |> to_csv |> p;                      # CSV with headers
   my $cfg = {title => "My App", package => {name => "myapp", version => "1.0"}};
-  $cfg |> to_toml |> say;                         # TOML with [package] table
-  $data |> to_yaml |> say;                        # YAML with --- header
-  $data |> to_xml  |> say;                        # XML with <root> wrapper
+  $cfg |> to_toml |> p;                         # TOML with [package] table
+  $data |> to_yaml |> p;                        # YAML with --- header
+  $data |> to_xml  |> p;                        # XML with <root> wrapper
 
   # ── partition / min_by / max_by / zip_with ─────────────────────────
   my ($yes, $no) = partition { $_ > 5 } 1..10;
@@ -535,7 +535,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   # ── pretty-print (Data::Dumper style) ──────────────────────────────
   my $nested = {key => [1, {nested => "val"}]};
-  $nested |> ddump |> say;
+  $nested |> ddump |> p;
 
   # ── write to file (returns content for further piping) ─────────────
   my $text = "hello\nworld\n";
@@ -555,7 +555,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   my @merged = interleave [1,2,3], [10,20,30];  # (1,10,2,20,3,30)
 
   # ── glob_match / which_all ──────────────────────────────────────────
-  say glob_match "*.txt", "readme.txt";          # 1 (matches)
+  p glob_match "*.txt", "readme.txt";          # 1 (matches)
   my @bins = which_all "perl";                   # all paths for "perl" in $PATH
   ```
 
@@ -563,7 +563,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   Precedence: `|>` binds **looser** than `||` but **tighter** than `?:` / `and`/`or`/`not` — the slot sits between `parse_ternary` and `parse_or_word` in the parser stack. So `$x + 1 |> f` parses as `f($x + 1)`, and `0 || 1 |> yes` parses as `yes(0 || 1)`. The RHS must be a call, builtin, method invocation, bareword, or coderef expression; bare binary expressions / literals on the right are a parse error (`42 |> 1 + 2` is rejected).
 
-`perlrs` is **not** a full `perl` replacement: many real `.pm` files (especially XS modules) will not run. See [`PARITY_ROADMAP.md`](PARITY_ROADMAP.md).
+`perlrs` is **not** a full `perl` replacement: many real `.pm` files (especially XS modules) will not run. See [`PARITY_ROADMAP.md`](parity/PARITY_ROADMAP.md).
 
 ---
 
@@ -611,7 +611,7 @@ pe examples/fibonacci.pr
 
 ```sh
 # sets: dedupe + union / intersection (`scalar` gives member count, like `scalar @array`)
-pe -e 'my $a = set(1,2,2,3); my $b = set(2,3,4); say scalar($a | $b), " ", scalar($a & $b)'
+pe -e 'my $a = set(1,2,2,3); my $b = set(2,3,4); p scalar($a | $b), " ", scalar($a & $b)'
 ```
 
 ---
@@ -678,7 +678,7 @@ bash parity/run_parity.sh       # exact stdout/stderr parity vs system perl (20 
 
 - `Cargo.lock` is committed (CI uses `--locked`). If your global gitignore strips it, force-add updates: `git add -f Cargo.lock`.
 - Disable JIT: `PERLRS_NO_JIT=1` or `pe --no-jit`.
-- Parity work is tracked in [`PARITY_ROADMAP.md`](PARITY_ROADMAP.md).
+- Parity work is tracked in [`PARITY_ROADMAP.md`](parity/PARITY_ROADMAP.md).
 
 ---
 
@@ -729,9 +729,9 @@ rust {
     }
 }
 
-say add(21, 21);         # 42
-say mul3(1.5, 2.0, 3.0); # 9
-say fib(50);             # 12586269025
+p add 21, 21         # 42
+p mul3 1.5, 2.0, 3.0 # 9
+p fib 50             # 12586269025
 ```
 
 **v1 signature table** (parser rejects anything outside this — users write private Rust helpers freely, only exported fns matching the table become Perl-callable):

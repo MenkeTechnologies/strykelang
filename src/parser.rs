@@ -8007,7 +8007,9 @@ impl Parser {
                     && (next.is_term_start()
                         || matches!(
                             next,
-                            Token::DoubleString(_) | Token::BacktickString(_) | Token::SingleString(_)
+                            Token::DoubleString(_)
+                                | Token::BacktickString(_)
+                                | Token::SingleString(_)
                         ))
                 {
                     // Next token looks like a print argument — $var is the handle.
