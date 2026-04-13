@@ -3689,9 +3689,17 @@ impl Parser {
                 args.insert(0, lhs);
                 ExprKind::Filesf(args)
             }
+            ExprKind::FilesfRecursive(mut args) => {
+                args.insert(0, lhs);
+                ExprKind::FilesfRecursive(args)
+            }
             ExprKind::Dirs(mut args) => {
                 args.insert(0, lhs);
                 ExprKind::Dirs(args)
+            }
+            ExprKind::DirsRecursive(mut args) => {
+                args.insert(0, lhs);
+                ExprKind::DirsRecursive(args)
             }
             ExprKind::SymLinks(mut args) => {
                 args.insert(0, lhs);
