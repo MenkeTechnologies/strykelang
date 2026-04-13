@@ -805,12 +805,31 @@ impl Compiler {
     /// compiler pass knows they exist.
     fn register_env_imports(layer: &mut ScopeLayer, imports: &[Expr]) {
         for e in imports {
-            let names: Vec<&str> = match &e.kind {
-                ExprKind::String(s) => vec![s.as_str()],
-                ExprKind::QW(ws) => ws.iter().map(|s| s.as_str()).collect(),
+            let mut names_owned: Vec<String> = Vec::new();
+            match &e.kind {
+                ExprKind::String(s) => names_owned.push(s.clone()),
+                ExprKind::QW(ws) => names_owned.extend(ws.iter().cloned()),
+                ExprKind::InterpolatedString(parts) => {
+                    let mut s = String::new();
+                    for p in parts {
+                        match p {
+                            StringPart::Literal(l) => s.push_str(l),
+                            StringPart::ScalarVar(v) => {
+                                s.push('$');
+                                s.push_str(v);
+                            }
+                            StringPart::ArrayVar(v) => {
+                                s.push('@');
+                                s.push_str(v);
+                            }
+                            _ => continue,
+                        }
+                    }
+                    names_owned.push(s);
+                }
                 _ => continue,
             };
-            for raw in names {
+            for raw in &names_owned {
                 if let Some(arr) = raw.strip_prefix('@') {
                     layer.declared_arrays.insert(arr.to_string());
                 } else if let Some(hash) = raw.strip_prefix('%') {
@@ -2359,7 +2378,10 @@ impl Compiler {
             StmtKind::Use { module, imports } => {
                 // `use Env '@PATH'` declares variables that must be visible to strict checking.
                 if module == "Env" {
-                    Self::register_env_imports(self.scope_stack.last_mut().expect("scope"), imports);
+                    Self::register_env_imports(
+                        self.scope_stack.last_mut().expect("scope"),
+                        imports,
+                    );
                 }
             }
             StmtKind::UsePerlVersion { .. }

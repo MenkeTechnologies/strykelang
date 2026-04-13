@@ -525,7 +525,10 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::MagicConst(crate::ast::MagicConstKind::File) => "__FILE__".to_string(),
         ExprKind::MagicConst(crate::ast::MagicConstKind::Line) => "__LINE__".to_string(),
         ExprKind::InterpolatedString(parts) => {
-            format!("\"{}\"", parts.iter().map(format_string_part).collect::<String>())
+            format!(
+                "\"{}\"",
+                parts.iter().map(format_string_part).collect::<String>()
+            )
         }
         ExprKind::ScalarVar(name) => format!("${}", name),
         ExprKind::ArrayVar(name) => format!("@{}", name),

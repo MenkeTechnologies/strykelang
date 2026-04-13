@@ -2484,6 +2484,31 @@ impl Interpreter {
                 ExprKind::String(s) => out.push(s.clone()),
                 ExprKind::QW(ws) => out.extend(ws.iter().cloned()),
                 ExprKind::Integer(n) => out.push(n.to_string()),
+                // `use Env "@PATH"` / `use Env "$HOME"` — double-quoted string containing
+                // a single interpolated variable.  Reconstruct the sigil+name form.
+                ExprKind::InterpolatedString(parts) => {
+                    let mut s = String::new();
+                    for p in parts {
+                        match p {
+                            StringPart::Literal(l) => s.push_str(l),
+                            StringPart::ScalarVar(v) => {
+                                s.push('$');
+                                s.push_str(v);
+                            }
+                            StringPart::ArrayVar(v) => {
+                                s.push('@');
+                                s.push_str(v);
+                            }
+                            _ => {
+                                return Err(PerlError::runtime(
+                                    "pragma import must be a compile-time string, qw(), or integer",
+                                    e.line.max(default_line),
+                                ));
+                            }
+                        }
+                    }
+                    out.push(s);
+                }
                 _ => {
                     return Err(PerlError::runtime(
                         "pragma import must be a compile-time string, qw(), or integer",

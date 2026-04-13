@@ -1579,7 +1579,11 @@ fn run_convert_subcommand(args: &[String]) -> i32 {
             println!("{}", converted);
         }
     }
-    if errors > 0 { 1 } else { 0 }
+    if errors > 0 {
+        1
+    } else {
+        0
+    }
 }
 
 /// Strip shebang line; if extract mode (-x), skip everything until #!...perl line.

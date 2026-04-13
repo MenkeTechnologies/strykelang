@@ -49,7 +49,7 @@ A Perl 5 compatible interpreter in Rust with native parallel primitives, NaN-box
 
 `perlrs` parses and executes Perl 5 scripts with rayon-powered work-stealing primitives across every CPU core. Highlights:
 
-- **New Parallel Subroutines and |> Pipeline Syntactic Sugar **
+- **New Parallel Subroutines and |> Pipeline Syntactic Sugar**
 - **Runtime values** — `PerlValue` is a NaN-boxed `u64`: immediates (`undef`, `i32`, raw `f64` bits) and tagged `Arc<HeapObject>` pointers for big ints, strings, arrays, hashes, refs, regexes, atomics, channels.
 - **Three-tier regex** — Rust [`regex`](https://docs.rs/regex) → [`fancy-regex`](https://docs.rs/fancy-regex) (backrefs) → [`pcre2`](https://docs.rs/pcre2) (PCRE-only verbs).
 - **Bytecode VM + JIT** — match-dispatch interpreter with Cranelift block + linear-sub JIT (`src/vm.rs`, `src/jit.rs`).
@@ -404,7 +404,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   ```
 - **`use strict`** — refs/subs/vars modes (per-mode `use strict 'refs'` etc.). `strict refs` rejects symbolic derefs at runtime; `strict vars` requires a visible binding.
 - **`BEGIN` / `UNITCHECK` / `CHECK` / `INIT` / `END`** — Perl order; `${^GLOBAL_PHASE}` matches Perl in tree-walker and VM.
-- **String interpolation** — `$var`, `$h{k}`, `$a[i]`, `@a`, `@a[slice]` (joined with `$"`), `$#a` in slice indices, `$0`, `$1..$n`. `\x{hex}` and unbraced `\x`.
+- **String interpolation** — `$var` `#{23 * 52}`, `$h{k}`, `$a[i]`, `@a`, `@a[slice]` (joined with `$"`), `$#a` in slice indices, `$0`, `$1..$n`. `\x{hex}` and unbraced `\x`.
 - **`__FILE__` / `__LINE__`** — compile-time literals.
 - Heredocs `<<EOF`, POD skipping, shebang handling, `qw()/q()/qq()` with paired delimiters.
 - **Special variables** — large set of `${^NAME}` scalars pre-seeded; see [`SPECIAL_VARIABLES.md`](SPECIAL_VARIABLES.md). Still missing vs Perl 5: `English`, full `$^V` as a version object.
@@ -604,6 +604,8 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 pe examples/fibonacci.pl
 pe examples/text_processing.pl
 pe examples/parallel_demo.pl
+pe convert examples/fibonacci.pl > examples/fibonacci.pr
+pe examples/fibonacci.pr
 ```
 
 ```sh

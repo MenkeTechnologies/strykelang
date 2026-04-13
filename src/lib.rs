@@ -8,11 +8,11 @@
 pub mod aot;
 pub mod ast;
 pub mod builtins;
-pub mod convert;
 pub mod bytecode;
 pub mod capture;
 pub mod cluster;
 pub mod compiler;
+pub mod convert;
 mod crypt_util;
 pub mod data_section;
 pub mod english;

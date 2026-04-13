@@ -20,11 +20,11 @@ fn recursive_fibonacci() {
 fn return_exits_sub_before_following_statement() {
     assert_eq!(
         eval_int(
-            "sub f { \
+            "sub foo { \
                  if (1) { return 3; } \
                  9 \
              } \
-             f()",
+             foo()",
         ),
         3
     );
@@ -33,11 +33,11 @@ fn return_exits_sub_before_following_statement() {
 #[test]
 fn return_with_postfix_if() {
     assert_eq!(
-        eval_int("sub f { my $n = shift @_; return 0 if $n <= 0; return $n; } f(5)"),
+        eval_int("sub foo { my $n = shift @_; return 0 if $n <= 0; return $n; } foo(5)"),
         5
     );
     assert_eq!(
-        eval_int("sub f { my $n = shift @_; return 0 if $n <= 0; return $n; } f(-1)"),
+        eval_int("sub foo { my $n = shift @_; return 0 if $n <= 0; return $n; } foo(-1)"),
         0
     );
 }

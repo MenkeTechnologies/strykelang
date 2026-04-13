@@ -711,6 +711,14 @@ impl Parser {
     /// Handle postfix if/unless on statement-level keywords like last/next.
     fn parse_stmt_postfix_modifier(&mut self, stmt: Statement) -> PerlResult<Statement> {
         let line = stmt.line;
+        // Implicit semicolon: a modifier keyword on a new line is a new
+        // statement, not a postfix modifier.  This prevents semicolon-less
+        // code like `my $x = "val"\nif ($x) { ... }` from being mis-parsed
+        // as `my $x = "val" if ($x) { ... }`.
+        if self.peek_line() > self.prev_line() {
+            self.eat(&Token::Semicolon);
+            return Ok(stmt);
+        }
         if let Token::Ident(ref kw) = self.peek().clone() {
             match kw.as_str() {
                 "if" => {
@@ -881,6 +889,14 @@ impl Parser {
 
     fn maybe_postfix_modifier(&mut self, expr: Expr) -> PerlResult<Statement> {
         let line = expr.line;
+        // Implicit semicolon: modifier keyword on a new line starts a new statement.
+        if self.peek_line() > self.prev_line() {
+            return Ok(Statement {
+                label: None,
+                kind: StmtKind::Expression(expr),
+                line,
+            });
+        }
         match self.peek() {
             Token::Ident(ref kw) => match kw.as_str() {
                 "if" => {
@@ -4655,6 +4671,12 @@ impl Parser {
                     if self.suppress_indirect_paren_call > 0 {
                         break;
                     }
+                    // Implicit semicolon: `(` on a new line after an expression
+                    // is a new statement, not a postfix code-ref call.
+                    // e.g.  `my $x = $ENV{"KEY"}\n($y =~ s/.../.../)`
+                    if self.peek_line() > self.prev_line() {
+                        break;
+                    }
                     let line = expr.line;
                     self.advance();
                     let args = self.parse_arg_list()?;
@@ -4688,7 +4710,7 @@ impl Parser {
                         }
                         Token::LBrace => {
                             self.advance();
-                            let key = self.parse_expression()?;
+                            let key = self.parse_hash_subscript_key()?;
                             self.expect(&Token::RBrace)?;
                             expr = Expr {
                                 kind: ExprKind::ArrowDeref {
@@ -4875,7 +4897,7 @@ impl Parser {
                         break;
                     }
                     self.advance();
-                    let key = self.parse_expression()?;
+                    let key = self.parse_hash_subscript_key()?;
                     self.expect(&Token::RBrace)?;
                     expr = if is_scalar_named_hash {
                         if let ExprKind::ScalarVar(ref name) = expr.kind {
@@ -5306,6 +5328,15 @@ impl Parser {
                     ));
                 }
             }
+        }
+
+        // Single-letter keyword aliases (d/f/p) must yield to fat-arrow auto-quoting
+        // so that `(d => 4)`, `{f => 1}`, etc. keep working as bareword hash keys.
+        if matches!(name.as_str(), "d" | "f" | "p") && matches!(self.peek(), Token::FatArrow) {
+            return Ok(Expr {
+                kind: ExprKind::String(name),
+                line,
+            });
         }
 
         match name.as_str() {
@@ -7844,15 +7875,18 @@ impl Parser {
             // Treat as handle when the next token (after $var) is a term-start or
             // string literal *without* a preceding comma/operator, matching Perl's
             // indirect-object heuristic.
+            // Exclude `[` and `{` — those are array/hash subscripts on the variable
+            // itself (`print $F[0]`, `print $h{k}`), not separate print arguments.
             let v = v.clone();
             let saved = self.pos;
             self.advance();
             let next = self.peek().clone();
-            if next.is_term_start()
-                || matches!(
-                    next,
-                    Token::DoubleString(_) | Token::BacktickString(_) | Token::SingleString(_)
-                )
+            if !matches!(next, Token::LBracket | Token::LBrace)
+                && (next.is_term_start()
+                    || matches!(
+                        next,
+                        Token::DoubleString(_) | Token::BacktickString(_) | Token::SingleString(_)
+                    ))
             {
                 // Next token looks like a print argument — $var is the handle.
                 Some(format!("${v}"))
@@ -7872,15 +7906,16 @@ impl Parser {
 
     fn parse_block_list(&mut self) -> PerlResult<(Block, Expr)> {
         let block = self.parse_block()?;
+        let block_end_line = self.prev_line();
         self.eat(&Token::Comma);
         // On the RHS of `|>`, the list operand is supplied by the piped LHS
         // and will be substituted at desugar time — accept a placeholder when
-        // we're at a terminator here.
+        // we're at a terminator here or on a new line (implicit semicolon).
         if self.in_pipe_rhs()
-            && matches!(
+            && (matches!(
                 self.peek(),
                 Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof | Token::PipeForward
-            )
+            ) || self.peek_line() > block_end_line)
         {
             let line = self.peek_line();
             return Ok((block, self.pipe_placeholder_list(line)));
@@ -8526,6 +8561,25 @@ impl Parser {
         }
     }
 
+    /// Parse a hash subscript key inside `{…}`.
+    ///
+    /// Perl auto-quotes a single bareword before `}`, even for keywords:
+    /// `$h{print}`, `$r->{f}` etc. all yield the string key.
+    fn parse_hash_subscript_key(&mut self) -> PerlResult<Expr> {
+        let line = self.peek_line();
+        if let Token::Ident(ref k) = self.peek().clone() {
+            if matches!(self.peek_at(1), Token::RBrace) {
+                let s = k.clone();
+                self.advance();
+                return Ok(Expr {
+                    kind: ExprKind::String(s),
+                    line,
+                });
+            }
+        }
+        self.parse_expression()
+    }
+
     /// `progress` introducing the optional `progress => EXPR` suffix for `glob_par` / `par_sed`.
     #[inline]
     fn peek_is_glob_par_progress_kw(&self) -> bool {
@@ -8884,7 +8938,9 @@ impl Parser {
                     i += 1; // skip second `$` — same as a single `$` before the identifier
                 }
                 if chars[i] == '{' {
-                    // ${expr} — braced interpolation
+                    // ${name} — braced variable interpolation (Perl standard).
+                    // Always treated as a variable name; for expression
+                    // interpolation use `#{expr}` instead.
                     i += 1;
                     let mut name = String::new();
                     let mut depth = 1usize;
@@ -8905,17 +8961,7 @@ impl Parser {
                     if i < chars.len() {
                         i += 1;
                     }
-                    // If the content is a plain identifier, treat as variable name (backward compat).
-                    // Otherwise parse as an arbitrary expression.
-                    let is_identifier = !name.is_empty()
-                        && (name.starts_with(|c: char| c.is_alphabetic() || c == '_'))
-                        && name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == ':');
-                    if is_identifier {
-                        parts.push(StringPart::ScalarVar(name));
-                    } else {
-                        let expr = parse_expression_from_str(name.trim(), "-e")?;
-                        parts.push(StringPart::Expr(expr));
-                    }
+                    parts.push(StringPart::ScalarVar(name));
                 } else if chars[i] == '^' {
                     // `$^V`, `$^O`, … — name stored as `^V`, `^O`, … (see [`Interpreter::get_special_var`]).
                     let mut name = String::from("^");
@@ -9303,6 +9349,33 @@ impl Parser {
                     }
                     parts.push(StringPart::ArrayVar(name));
                 }
+            } else if chars[i] == '#' && i + 1 < chars.len() && chars[i + 1] == '{' {
+                // #{expr} — Ruby-style expression interpolation (perlrs extension).
+                if !literal.is_empty() {
+                    parts.push(StringPart::Literal(std::mem::take(&mut literal)));
+                }
+                i += 2; // skip `#{`
+                let mut inner = String::new();
+                let mut depth = 1usize;
+                while i < chars.len() && depth > 0 {
+                    match chars[i] {
+                        '{' => depth += 1,
+                        '}' => {
+                            depth -= 1;
+                            if depth == 0 {
+                                break;
+                            }
+                        }
+                        _ => {}
+                    }
+                    inner.push(chars[i]);
+                    i += 1;
+                }
+                if i < chars.len() {
+                    i += 1; // skip closing `}`
+                }
+                let expr = parse_expression_from_str(inner.trim(), "-e")?;
+                parts.push(StringPart::Expr(expr));
             } else {
                 literal.push(chars[i]);
                 i += 1;

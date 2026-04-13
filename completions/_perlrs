@@ -50,7 +50,7 @@ _perlrs_convert() {
   _arguments -s -S \
     '(-i --in-place)'{-i,--in-place}'[rewrite files in place]' \
     '(-h --help)'{-h,--help}'[show pe convert usage]' \
-    '*:perl files:_files -g "*.pr *.pl *.pm *.t *.cgi *.psgi"'
+    '*:perl files:_files -g "*.pl *.pm *.t *.cgi *.psgi"'
 }
 
 _perlrs() {
@@ -105,7 +105,7 @@ _perlrs() {
     '(- *)'{-h,--help}'[print help]' \
     '(-j --threads)'{-j+,--threads=}'[number of threads for parallel operations]:threads:' \
     '(-)1:script or subcommand:->script_or_subcommand' \
-    '(-)*::script arguments:->script_args'
+    '(-)*::script arguments:->script_args' && return 0
 
   case $state in
     script_or_subcommand)
@@ -119,7 +119,7 @@ _perlrs() {
       )
       _alternative \
         'subcommands:perlrs subcommand:((${subcmds}))' \
-        'scripts:perl script:_files -g "*.pl *.pm *.t *.cgi *.psgi"'
+        'scripts:perl script:_files -g "*.pr *.pl *.pm *.t *.cgi *.psgi"'
       ;;
     script_args)
       # `$line[1]` is the first positional that was already consumed. If it was `build`,

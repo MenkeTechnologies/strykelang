@@ -663,12 +663,12 @@ fn shape_ssh_parenless_list_call() {
 // Pipe-forward is a parse-time desugaring; the AST after `parse()` should never
 // contain a `PipeForward` token — every `|>` must fold into a call shape.
 
-/// `x |> f` — bareword on the RHS becomes a unary FuncCall.
+/// `x |> foo` — bareword on the RHS becomes a unary FuncCall.
 #[test]
 fn pipe_bareword_rhs_becomes_funccall() {
-    match first_expr_kind("42 |> f;") {
+    match first_expr_kind("42 |> foo;") {
         ExprKind::FuncCall { name, args } => {
-            assert_eq!(name, "f");
+            assert_eq!(name, "foo");
             assert_eq!(args.len(), 1);
             assert!(matches!(args[0].kind, ExprKind::Integer(42)));
         }
@@ -676,12 +676,12 @@ fn pipe_bareword_rhs_becomes_funccall() {
     }
 }
 
-/// `x |> f a, b` — LHS is prepended as the **first** argument (Elixir-style).
+/// `x |> foo a, b` — LHS is prepended as the **first** argument (Elixir-style).
 #[test]
 fn pipe_prepends_lhs_as_first_arg() {
-    match first_expr_kind("10 |> f 20, 30;") {
+    match first_expr_kind("10 |> foo 20, 30;") {
         ExprKind::FuncCall { name, args } => {
-            assert_eq!(name, "f");
+            assert_eq!(name, "foo");
             assert_eq!(args.len(), 3);
             assert!(matches!(args[0].kind, ExprKind::Integer(10)));
             assert!(matches!(args[1].kind, ExprKind::Integer(20)));
@@ -691,19 +691,19 @@ fn pipe_prepends_lhs_as_first_arg() {
     }
 }
 
-/// `x |> f |> g` — left-associative chaining nests the calls `g(f(x))`.
+/// `x |> foo |> bar` — left-associative chaining nests the calls `bar(foo(x))`.
 #[test]
 fn pipe_chain_is_left_associative() {
-    match first_expr_kind("1 |> f |> g;") {
+    match first_expr_kind("1 |> foo |> bar;") {
         ExprKind::FuncCall { name, args } => {
-            assert_eq!(name, "g");
+            assert_eq!(name, "bar");
             assert_eq!(args.len(), 1);
             match &args[0].kind {
                 ExprKind::FuncCall {
                     name: inner_name,
                     args: inner_args,
                 } => {
-                    assert_eq!(inner_name, "f");
+                    assert_eq!(inner_name, "foo");
                     assert_eq!(inner_args.len(), 1);
                     assert!(matches!(inner_args[0].kind, ExprKind::Integer(1)));
                 }
@@ -890,9 +890,9 @@ fn pipe_into_scalar_becomes_indirect_call() {
 /// piped subject.
 #[test]
 fn pipe_binds_looser_than_logical_or() {
-    match first_expr_kind("0 || 1 |> f;") {
+    match first_expr_kind("0 || 1 |> foo;") {
         ExprKind::FuncCall { name, args } => {
-            assert_eq!(name, "f");
+            assert_eq!(name, "foo");
             assert_eq!(args.len(), 1);
             assert!(matches!(
                 args[0].kind,
@@ -906,12 +906,12 @@ fn pipe_binds_looser_than_logical_or() {
     }
 }
 
-/// Precedence: `|>` binds looser than `+`, so `1 + 2 |> f` is `f(1 + 2)`.
+/// Precedence: `|>` binds looser than `+`, so `1 + 2 |> foo` is `foo(1 + 2)`.
 #[test]
 fn pipe_binds_looser_than_addition() {
-    match first_expr_kind("1 + 2 |> f;") {
+    match first_expr_kind("1 + 2 |> foo;") {
         ExprKind::FuncCall { name, args } => {
-            assert_eq!(name, "f");
+            assert_eq!(name, "foo");
             assert_eq!(args.len(), 1);
             assert!(matches!(
                 args[0].kind,

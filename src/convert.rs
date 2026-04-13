@@ -75,7 +75,11 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
                 ));
             }
             if let Some(eb) = else_block {
-                s.push_str(&format!(" else {{\n{}\n{}}}", convert_block(eb, depth + 1), pfx));
+                s.push_str(&format!(
+                    " else {{\n{}\n{}}}",
+                    convert_block(eb, depth + 1),
+                    pfx
+                ));
             }
             s
         }
@@ -91,7 +95,11 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
                 pfx
             );
             if let Some(eb) = else_block {
-                s.push_str(&format!(" else {{\n{}\n{}}}", convert_block(eb, depth + 1), pfx));
+                s.push_str(&format!(
+                    " else {{\n{}\n{}}}",
+                    convert_block(eb, depth + 1),
+                    pfx
+                ));
             }
             s
         }
@@ -113,7 +121,11 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
                 pfx
             );
             if let Some(cb) = continue_block {
-                s.push_str(&format!(" continue {{\n{}\n{}}}", convert_block(cb, depth + 1), pfx));
+                s.push_str(&format!(
+                    " continue {{\n{}\n{}}}",
+                    convert_block(cb, depth + 1),
+                    pfx
+                ));
             }
             s
         }
@@ -135,7 +147,11 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
                 pfx
             );
             if let Some(cb) = continue_block {
-                s.push_str(&format!(" continue {{\n{}\n{}}}", convert_block(cb, depth + 1), pfx));
+                s.push_str(&format!(
+                    " continue {{\n{}\n{}}}",
+                    convert_block(cb, depth + 1),
+                    pfx
+                ));
             }
             s
         }
@@ -163,8 +179,8 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
                 .as_ref()
                 .map(|s| convert_statement_body(s))
                 .unwrap_or_default();
-            let cond = condition.as_ref().map(|e| convert_expr(e)).unwrap_or_default();
-            let st = step.as_ref().map(|e| convert_expr(e)).unwrap_or_default();
+            let cond = condition.as_ref().map(convert_expr).unwrap_or_default();
+            let st = step.as_ref().map(convert_expr).unwrap_or_default();
             let mut s = format!(
                 "{}for ({}; {}; {}) {{\n{}\n{}}}",
                 lb,
@@ -175,7 +191,11 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
                 pfx
             );
             if let Some(cb) = continue_block {
-                s.push_str(&format!(" continue {{\n{}\n{}}}", convert_block(cb, depth + 1), pfx));
+                s.push_str(&format!(
+                    " continue {{\n{}\n{}}}",
+                    convert_block(cb, depth + 1),
+                    pfx
+                ));
             }
             s
         }
@@ -199,7 +219,11 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
                 pfx
             );
             if let Some(cb) = continue_block {
-                s.push_str(&format!(" continue {{\n{}\n{}}}", convert_block(cb, depth + 1), pfx));
+                s.push_str(&format!(
+                    " continue {{\n{}\n{}}}",
+                    convert_block(cb, depth + 1),
+                    pfx
+                ));
             }
             s
         }
@@ -224,7 +248,13 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
                     .map(|p| format!(" ({})", p))
                     .unwrap_or_default()
             };
-            format!("sub {}{} {{\n{}\n{}}}", name, sig, convert_block(body, depth + 1), pfx)
+            format!(
+                "sub {}{} {{\n{}\n{}}}",
+                name,
+                sig,
+                convert_block(body, depth + 1),
+                pfx
+            )
         }
         StmtKind::Package { name } => format!("package {}", name),
         StmtKind::UsePerlVersion { version } => {
@@ -296,7 +326,9 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
         StmtKind::StmtGroup(b) => convert_block(b, depth),
         StmtKind::Block(b) => format!("{{\n{}\n{}}}", convert_block(b, depth + 1), pfx),
         StmtKind::Begin(b) => format!("BEGIN {{\n{}\n{}}}", convert_block(b, depth + 1), pfx),
-        StmtKind::UnitCheck(b) => format!("UNITCHECK {{\n{}\n{}}}", convert_block(b, depth + 1), pfx),
+        StmtKind::UnitCheck(b) => {
+            format!("UNITCHECK {{\n{}\n{}}}", convert_block(b, depth + 1), pfx)
+        }
         StmtKind::Check(b) => format!("CHECK {{\n{}\n{}}}", convert_block(b, depth + 1), pfx),
         StmtKind::Init(b) => format!("INIT {{\n{}\n{}}}", convert_block(b, depth + 1), pfx),
         StmtKind::End(b) => format!("END {{\n{}\n{}}}", convert_block(b, depth + 1), pfx),
@@ -328,7 +360,14 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
         } => {
             let fin = finally_block
                 .as_ref()
-                .map(|b| format!("\n{}finally {{\n{}\n{}}}", pfx, convert_block(b, depth + 1), pfx))
+                .map(|b| {
+                    format!(
+                        "\n{}finally {{\n{}\n{}}}",
+                        pfx,
+                        convert_block(b, depth + 1),
+                        pfx
+                    )
+                })
                 .unwrap_or_default();
             format!(
                 "try {{\n{}\n{}}} catch (${}) {{\n{}\n{}}}{}",
@@ -356,7 +395,9 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
                 pfx
             )
         }
-        StmtKind::DefaultCase { body } => format!("default {{\n{}\n{}}}", convert_block(body, depth + 1), pfx),
+        StmtKind::DefaultCase { body } => {
+            format!("default {{\n{}\n{}}}", convert_block(body, depth + 1), pfx)
+        }
         StmtKind::FormatDecl { name, lines } => {
             let mut s = format!("format {} =\n", name);
             for ln in lines {
@@ -429,7 +470,7 @@ fn convert_var_decls(decls: &[VarDecl]) -> String {
 // ── Expression conversion ───────────────────────────────────────────────────
 
 fn convert_expr_list(es: &[Expr]) -> String {
-    es.iter().map(|e| convert_expr(e)).collect::<Vec<_>>().join(", ")
+    es.iter().map(convert_expr).collect::<Vec<_>>().join(", ")
 }
 
 /// Convert an expression at statement level or assignment RHS — pipe chains
@@ -471,44 +512,158 @@ fn convert_expr_impl(e: &Expr, top: bool) -> String {
 fn extract_pipe_source(e: &Expr, segments: &mut Vec<String>) -> String {
     match &e.kind {
         // ── Unary builtins ──────────────────────────────────────────────
-        ExprKind::Uc(inner) => { segments.push("uc".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Lc(inner) => { segments.push("lc".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Ucfirst(inner) => { segments.push("ucfirst".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Lcfirst(inner) => { segments.push("lcfirst".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Fc(inner) => { segments.push("fc".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Chomp(inner) => { segments.push("chomp".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Chop(inner) => { segments.push("chop".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Length(inner) => { segments.push("length".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Abs(inner) => { segments.push("abs".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Int(inner) => { segments.push("int".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Sqrt(inner) => { segments.push("sqrt".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Sin(inner) => { segments.push("sin".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Cos(inner) => { segments.push("cos".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Exp(inner) => { segments.push("exp".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Log(inner) => { segments.push("log".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Hex(inner) => { segments.push("hex".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Oct(inner) => { segments.push("oct".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Chr(inner) => { segments.push("chr".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Ord(inner) => { segments.push("ord".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Defined(inner) => { segments.push("defined".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Ref(inner) => { segments.push("ref".into()); extract_pipe_source(inner, segments) }
-        ExprKind::ScalarContext(inner) => { segments.push("scalar".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Keys(inner) => { segments.push("keys".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Values(inner) => { segments.push("values".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Each(inner) => { segments.push("each".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Pop(inner) => { segments.push("pop".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Shift(inner) => { segments.push("shift".into()); extract_pipe_source(inner, segments) }
-        ExprKind::ReverseExpr(inner) => { segments.push("reverse".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Slurp(inner) => { segments.push("slurp".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Chdir(inner) => { segments.push("chdir".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Stat(inner) => { segments.push("stat".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Lstat(inner) => { segments.push("lstat".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Readlink(inner) => { segments.push("readlink".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Study(inner) => { segments.push("study".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Close(inner) => { segments.push("close".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Readdir(inner) => { segments.push("readdir".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Eval(inner) => { segments.push("eval".into()); extract_pipe_source(inner, segments) }
-        ExprKind::Require(inner) => { segments.push("require".into()); extract_pipe_source(inner, segments) }
+        ExprKind::Uc(inner) => {
+            segments.push("uc".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Lc(inner) => {
+            segments.push("lc".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Ucfirst(inner) => {
+            segments.push("ucfirst".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Lcfirst(inner) => {
+            segments.push("lcfirst".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Fc(inner) => {
+            segments.push("fc".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Chomp(inner) => {
+            segments.push("chomp".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Chop(inner) => {
+            segments.push("chop".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Length(inner) => {
+            segments.push("length".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Abs(inner) => {
+            segments.push("abs".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Int(inner) => {
+            segments.push("int".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Sqrt(inner) => {
+            segments.push("sqrt".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Sin(inner) => {
+            segments.push("sin".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Cos(inner) => {
+            segments.push("cos".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Exp(inner) => {
+            segments.push("exp".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Log(inner) => {
+            segments.push("log".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Hex(inner) => {
+            segments.push("hex".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Oct(inner) => {
+            segments.push("oct".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Chr(inner) => {
+            segments.push("chr".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Ord(inner) => {
+            segments.push("ord".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Defined(inner) => {
+            segments.push("defined".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Ref(inner) => {
+            segments.push("ref".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::ScalarContext(inner) => {
+            segments.push("scalar".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Keys(inner) => {
+            segments.push("keys".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Values(inner) => {
+            segments.push("values".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Each(inner) => {
+            segments.push("each".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Pop(inner) => {
+            segments.push("pop".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Shift(inner) => {
+            segments.push("shift".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::ReverseExpr(inner) => {
+            segments.push("reverse".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Slurp(inner) => {
+            segments.push("slurp".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Chdir(inner) => {
+            segments.push("chdir".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Stat(inner) => {
+            segments.push("stat".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Lstat(inner) => {
+            segments.push("lstat".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Readlink(inner) => {
+            segments.push("readlink".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Study(inner) => {
+            segments.push("study".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Close(inner) => {
+            segments.push("close".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Readdir(inner) => {
+            segments.push("readdir".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Eval(inner) => {
+            segments.push("eval".into());
+            extract_pipe_source(inner, segments)
+        }
+        ExprKind::Require(inner) => {
+            segments.push("require".into());
+            extract_pipe_source(inner, segments)
+        }
 
         // ── List-taking higher-order builtins ────────────────────────────
         ExprKind::MapExpr {
@@ -516,7 +671,11 @@ fn extract_pipe_source(e: &Expr, segments: &mut Vec<String>) -> String {
             list,
             flatten_array_refs,
         } => {
-            let kw = if *flatten_array_refs { "flat_map" } else { "map" };
+            let kw = if *flatten_array_refs {
+                "flat_map"
+            } else {
+                "map"
+            };
             segments.push(format!("{} {{\n{}\n}}", kw, convert_block(block, 0)));
             extract_pipe_source(list, segments)
         }
@@ -525,7 +684,11 @@ fn extract_pipe_source(e: &Expr, segments: &mut Vec<String>) -> String {
             list,
             flatten_array_refs,
         } => {
-            let kw = if *flatten_array_refs { "flat_map" } else { "map" };
+            let kw = if *flatten_array_refs {
+                "flat_map"
+            } else {
+                "map"
+            };
             // Convert comma form to block form for cleaner pipe syntax.
             segments.push(format!("{} {{ {} }}", kw, convert_expr_top(expr)));
             extract_pipe_source(list, segments)
@@ -604,7 +767,7 @@ fn extract_pipe_source(e: &Expr, segments: &mut Vec<String>) -> String {
             } else {
                 let rest = args[1..]
                     .iter()
-                    .map(|e| convert_expr(e))
+                    .map(convert_expr)
                     .collect::<Vec<_>>()
                     .join(", ");
                 format!("{} {}", name, rest)
@@ -669,7 +832,13 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
 
         // ── Interpolated strings — parts may embed expressions ───────────
         ExprKind::InterpolatedString(parts) => {
-            format!("\"{}\"", parts.iter().map(fmt::format_string_part).collect::<String>())
+            format!(
+                "\"{}\"",
+                parts
+                    .iter()
+                    .map(fmt::format_string_part)
+                    .collect::<String>()
+            )
         }
 
         // ── Binary operations ────────────────────────────────────────────
@@ -680,17 +849,29 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
                 fmt::format_binop(*op),
                 convert_expr(right)
             );
-            if top { inner } else { format!("({})", inner) }
+            if top {
+                inner
+            } else {
+                format!("({})", inner)
+            }
         }
 
         // ── Unary / postfix ──────────────────────────────────────────────
         ExprKind::UnaryOp { op, expr } => {
             let inner = format!("{}{}", fmt::format_unary(*op), convert_expr(expr));
-            if top { inner } else { format!("({})", inner) }
+            if top {
+                inner
+            } else {
+                format!("({})", inner)
+            }
         }
         ExprKind::PostfixOp { expr, op } => {
             let inner = format!("{}{}", convert_expr(expr), fmt::format_postfix(*op));
-            if top { inner } else { format!("({})", inner) }
+            if top {
+                inner
+            } else {
+                format!("({})", inner)
+            }
         }
 
         // ── Assignment ───────────────────────────────────────────────────
@@ -730,11 +911,7 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
         }
 
         // ── Calls ────────────────────────────────────────────────────────
-        ExprKind::FuncCall { name, args } => format!(
-            "{}({})",
-            name,
-            convert_expr_list(args)
-        ),
+        ExprKind::FuncCall { name, args } => format!("{}({})", name, convert_expr_list(args)),
         ExprKind::MethodCall {
             object,
             method,
@@ -762,11 +939,7 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
             if *pass_caller_arglist && args.is_empty() {
                 format!("&{}", convert_expr(target))
             } else {
-                let inner = format!(
-                    "{}({})",
-                    convert_expr(target),
-                    convert_expr_list(args)
-                );
+                let inner = format!("{}({})", convert_expr(target), convert_expr_list(args));
                 if *ampersand {
                     format!("&{}", inner)
                 } else {
@@ -827,15 +1000,24 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
 
         // ── Print / say / die / warn ─────────────────────────────────────
         ExprKind::Print { handle, args } => {
-            let h = handle.as_ref().map(|h| format!("{} ", h)).unwrap_or_default();
+            let h = handle
+                .as_ref()
+                .map(|h| format!("{} ", h))
+                .unwrap_or_default();
             format!("print {}{}", h, convert_expr_list(args))
         }
         ExprKind::Say { handle, args } => {
-            let h = handle.as_ref().map(|h| format!("{} ", h)).unwrap_or_default();
+            let h = handle
+                .as_ref()
+                .map(|h| format!("{} ", h))
+                .unwrap_or_default();
             format!("say {}{}", h, convert_expr_list(args))
         }
         ExprKind::Printf { handle, args } => {
-            let h = handle.as_ref().map(|h| format!("{} ", h)).unwrap_or_default();
+            let h = handle
+                .as_ref()
+                .map(|h| format!("{} ", h))
+                .unwrap_or_default();
             format!("printf {}{}", h, convert_expr_list(args))
         }
         ExprKind::Die(args) => {
@@ -902,15 +1084,32 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
             list,
             flatten_array_refs,
         } => {
-            let kw = if *flatten_array_refs { "flat_map" } else { "map" };
-            format!("{} {{\n{}\n}} {}", kw, convert_block(block, 0), convert_expr(list))
+            let kw = if *flatten_array_refs {
+                "flat_map"
+            } else {
+                "map"
+            };
+            format!(
+                "{} {{\n{}\n}} {}",
+                kw,
+                convert_block(block, 0),
+                convert_expr(list)
+            )
         }
         ExprKind::GrepExpr { block, list } => {
-            format!("grep {{\n{}\n}} {}", convert_block(block, 0), convert_expr(list))
+            format!(
+                "grep {{\n{}\n}} {}",
+                convert_block(block, 0),
+                convert_expr(list)
+            )
         }
         ExprKind::SortExpr { cmp, list } => match cmp {
             Some(SortComparator::Block(b)) => {
-                format!("sort {{\n{}\n}} {}", convert_block(b, 0), convert_expr(list))
+                format!(
+                    "sort {{\n{}\n}} {}",
+                    convert_block(b, 0),
+                    convert_expr(list)
+                )
             }
             Some(SortComparator::Code(e)) => {
                 format!("sort {} {}", convert_expr(e), convert_expr(list))
@@ -931,11 +1130,7 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
                 convert_expr(string),
                 convert_expr(l)
             ),
-            None => format!(
-                "split({}, {})",
-                convert_expr(pattern),
-                convert_expr(string)
-            ),
+            None => format!("split({}, {})", convert_expr(pattern), convert_expr(string)),
         },
 
         // ── Bless ────────────────────────────────────────────────────────
@@ -946,10 +1141,18 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
 
         // ── Push / unshift / splice ──────────────────────────────────────
         ExprKind::Push { array, values } => {
-            format!("push({}, {})", convert_expr(array), convert_expr_list(values))
+            format!(
+                "push({}, {})",
+                convert_expr(array),
+                convert_expr_list(values)
+            )
         }
         ExprKind::Unshift { array, values } => {
-            format!("unshift({}, {})", convert_expr(array), convert_expr_list(values))
+            format!(
+                "unshift({}, {})",
+                convert_expr(array),
+                convert_expr_list(values)
+            )
         }
 
         // ── Algebraic match ──────────────────────────────────────────────
@@ -991,7 +1194,9 @@ mod tests {
         let p = parse(code).expect("parse failed");
         let out = convert_program(&p);
         // Strip shebang line for test comparisons
-        out.strip_prefix("#!/usr/bin/env perlrs\n").unwrap_or(&out).to_string()
+        out.strip_prefix("#!/usr/bin/env perlrs\n")
+            .unwrap_or(&out)
+            .to_string()
     }
 
     #[test]

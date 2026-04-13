@@ -53,8 +53,8 @@ fn range_hash_slice_deref_string_keys_read() {
 #[test]
 fn range_return_list_context() {
     assert_eq!(
-        rs(r#"sub f { return 1..$_[0]; }
-               join ",", f(4);"#),
+        rs(r#"sub foo { return 1..$_[0]; }
+               join ",", foo(4);"#),
         "1,2,3,4"
     );
 }
@@ -73,8 +73,8 @@ fn range_array_slice_reverse_range_index() {
 #[test]
 fn range_sub_call_args_flatten_range() {
     assert_eq!(
-        ri(r#"sub f { return scalar @_; }
-               f(1..10);"#),
+        ri(r#"sub foo { return scalar @_; }
+               foo(1..10);"#),
         10
     );
 }

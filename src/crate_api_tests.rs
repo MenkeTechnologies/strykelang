@@ -4638,13 +4638,13 @@ fn try_vm_execute_strict_refs_via_transitive_helper() {
 fn try_vm_execute_compound_assign_on_slot_lexical_in_sub() {
     let p = parse(
         r#"no strict 'vars';
-        sub f {
+        sub foo {
             my $s = 0;
             $s += 5;
             $s *= 2;
             return $s;
         }
-        f();"#,
+        foo();"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4662,13 +4662,13 @@ fn try_vm_execute_compound_assign_on_slot_lexical_in_sub() {
 fn try_vm_execute_concat_compound_assign_on_slot_lexical_in_sub() {
     let p = parse(
         r#"no strict 'vars';
-        sub f {
+        sub foo {
             my $s = "";
             $s .= "ab";
             $s .= "cd";
             return $s;
         }
-        f();"#,
+        foo();"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4712,13 +4712,13 @@ fn try_vm_execute_top_level_goto_forward() {
 fn try_vm_execute_sub_body_goto_forward() {
     let p = parse(
         r#"no strict 'vars';
-        sub f {
+        sub foo {
             my $r = 10;
             goto SKIP;
             $r = 20;
             SKIP: return $r;
         }
-        f();"#,
+        foo();"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
