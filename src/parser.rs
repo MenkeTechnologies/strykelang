@@ -5382,7 +5382,7 @@ impl Parser {
                 })
             }
             "scalar" => {
-                let a = self.parse_one_arg()?;
+                let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::ScalarContext(Box::new(a)),
                     line,
@@ -7816,7 +7816,7 @@ impl Parser {
         make: impl FnOnce(Option<String>, Vec<Expr>) -> ExprKind,
     ) -> PerlResult<Expr> {
         let line = self.peek_line();
-        // Check for filehandle: print STDERR "msg"
+        // Check for filehandle: print STDERR "msg"  /  print $fh "msg"
         let handle = if let Token::Ident(ref h) = self.peek().clone() {
             if h.chars().all(|c| c.is_uppercase() || c == '_')
                 && !matches!(self.peek(), Token::LParen)
@@ -7837,6 +7837,27 @@ impl Parser {
                     None
                 }
             } else {
+                None
+            }
+        } else if let Token::ScalarVar(ref v) = self.peek().clone() {
+            // `print $fh "msg"` — scalar variable as indirect filehandle.
+            // Treat as handle when the next token (after $var) is a term-start or
+            // string literal *without* a preceding comma/operator, matching Perl's
+            // indirect-object heuristic.
+            let v = v.clone();
+            let saved = self.pos;
+            self.advance();
+            let next = self.peek().clone();
+            if next.is_term_start()
+                || matches!(
+                    next,
+                    Token::DoubleString(_) | Token::BacktickString(_) | Token::SingleString(_)
+                )
+            {
+                // Next token looks like a print argument — $var is the handle.
+                Some(format!("${v}"))
+            } else {
+                self.pos = saved;
                 None
             }
         } else {
@@ -8863,17 +8884,38 @@ impl Parser {
                     i += 1; // skip second `$` — same as a single `$` before the identifier
                 }
                 if chars[i] == '{' {
-                    // ${expr}
+                    // ${expr} — braced interpolation
                     i += 1;
                     let mut name = String::new();
-                    while i < chars.len() && chars[i] != '}' {
+                    let mut depth = 1usize;
+                    while i < chars.len() && depth > 0 {
+                        match chars[i] {
+                            '{' => depth += 1,
+                            '}' => {
+                                depth -= 1;
+                                if depth == 0 {
+                                    break;
+                                }
+                            }
+                            _ => {}
+                        }
                         name.push(chars[i]);
                         i += 1;
                     }
                     if i < chars.len() {
                         i += 1;
                     }
-                    parts.push(StringPart::ScalarVar(name));
+                    // If the content is a plain identifier, treat as variable name (backward compat).
+                    // Otherwise parse as an arbitrary expression.
+                    let is_identifier = !name.is_empty()
+                        && (name.starts_with(|c: char| c.is_alphabetic() || c == '_'))
+                        && name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == ':');
+                    if is_identifier {
+                        parts.push(StringPart::ScalarVar(name));
+                    } else {
+                        let expr = parse_expression_from_str(name.trim(), "-e")?;
+                        parts.push(StringPart::Expr(expr));
+                    }
                 } else if chars[i] == '^' {
                     // `$^V`, `$^O`, … — name stored as `^V`, `^O`, … (see [`Interpreter::get_special_var`]).
                     let mut name = String::from("^");

@@ -3078,8 +3078,12 @@ impl<'a> VM<'a> {
                         self.push_binop_with_overload(BinOp::Pow, a, b, |a, b| {
                             Ok(
                                 if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
-                                    if (0..=63).contains(&y) {
-                                        PerlValue::integer(x.wrapping_pow(y as u32))
+                                    if let Some(r) = (y >= 0)
+                                        .then(|| u32::try_from(y).ok())
+                                        .flatten()
+                                        .and_then(|yu| x.checked_pow(yu))
+                                    {
+                                        PerlValue::integer(r)
                                     } else {
                                         PerlValue::float(a.to_number().powf(b.to_number()))
                                     }

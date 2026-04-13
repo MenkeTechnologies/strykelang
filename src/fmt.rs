@@ -401,11 +401,11 @@ fn format_var_decls(decls: &[VarDecl]) -> String {
         .join(", ")
 }
 
-fn format_expr_list(es: &[Expr]) -> String {
+pub(crate) fn format_expr_list(es: &[Expr]) -> String {
     es.iter().map(format_expr).collect::<Vec<_>>().join(", ")
 }
 
-fn format_binop(op: BinOp) -> &'static str {
+pub(crate) fn format_binop(op: BinOp) -> &'static str {
     match op {
         BinOp::Add => "+",
         BinOp::Sub => "-",
@@ -443,7 +443,7 @@ fn format_binop(op: BinOp) -> &'static str {
     }
 }
 
-fn format_unary(op: UnaryOp) -> &'static str {
+pub(crate) fn format_unary(op: UnaryOp) -> &'static str {
     match op {
         UnaryOp::Negate => "-",
         UnaryOp::LogNot => "!",
@@ -455,23 +455,43 @@ fn format_unary(op: UnaryOp) -> &'static str {
     }
 }
 
-fn format_postfix(op: PostfixOp) -> &'static str {
+pub(crate) fn format_postfix(op: PostfixOp) -> &'static str {
     match op {
         PostfixOp::Increment => "++",
         PostfixOp::Decrement => "--",
     }
 }
 
-fn format_string_part(p: &StringPart) -> String {
+pub(crate) fn format_string_part(p: &StringPart) -> String {
     match p {
-        StringPart::Literal(s) => s.clone(),
+        StringPart::Literal(s) => escape_interpolated_literal(s),
         StringPart::ScalarVar(n) => format!("${{{}}}", n),
         StringPart::ArrayVar(n) => format!("@{{{}}}", n),
         StringPart::Expr(e) => format_expr(e),
     }
 }
 
-fn format_string_literal(s: &str) -> String {
+/// Escape special characters inside the literal portions of an interpolated string.
+fn escape_interpolated_literal(s: &str) -> String {
+    let mut out = String::new();
+    for c in s.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            '\x1b' => out.push_str("\\e"),
+            c if c.is_control() => {
+                out.push_str(&format!("\\x{{{:02x}}}", c as u32));
+            }
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+pub(crate) fn format_string_literal(s: &str) -> String {
     let mut out = String::new();
     out.push('"');
     for c in s.chars() {
@@ -481,6 +501,10 @@ fn format_string_literal(s: &str) -> String {
             '\n' => out.push_str("\\n"),
             '\r' => out.push_str("\\r"),
             '\t' => out.push_str("\\t"),
+            '\x1b' => out.push_str("\\e"),
+            c if c.is_control() => {
+                out.push_str(&format!("\\x{{{:02x}}}", c as u32));
+            }
             _ => out.push(c),
         }
     }
@@ -501,7 +525,7 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::MagicConst(crate::ast::MagicConstKind::File) => "__FILE__".to_string(),
         ExprKind::MagicConst(crate::ast::MagicConstKind::Line) => "__LINE__".to_string(),
         ExprKind::InterpolatedString(parts) => {
-            parts.iter().map(format_string_part).collect::<String>()
+            format!("\"{}\"", parts.iter().map(format_string_part).collect::<String>())
         }
         ExprKind::ScalarVar(name) => format!("${}", name),
         ExprKind::ArrayVar(name) => format!("@{}", name),
@@ -1126,7 +1150,7 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::ScalarContext(e) => format!("scalar {}", format_expr(e)),
         ExprKind::Chr(e) => format!("chr {}", format_expr(e)),
         ExprKind::Ord(e) => format!("ord {}", format_expr(e)),
-        ExprKind::OpenMyHandle { name } => format!("open my ${}", name),
+        ExprKind::OpenMyHandle { name } => format!("my ${}", name),
         ExprKind::Open { handle, mode, file } => match file {
             Some(f) => format!(
                 "open({}, {}, {})",
@@ -1138,7 +1162,13 @@ pub fn format_expr(e: &Expr) -> String {
         },
         ExprKind::Close(e) => format!("close {}", format_expr(e)),
         ExprKind::ReadLine(handle) => match handle {
-            Some(h) => format!("<{}>", h),
+            Some(h) => {
+                if h.starts_with(|c: char| c.is_uppercase()) {
+                    format!("<{}>", h)
+                } else {
+                    format!("<${}>", h)
+                }
+            }
             None => "<STDIN>".to_string(),
         },
         ExprKind::Eof(opt) => match opt {
@@ -1296,7 +1326,7 @@ pub fn format_expr(e: &Expr) -> String {
     }
 }
 
-fn format_match_pattern(p: &crate::ast::MatchPattern) -> String {
+pub(crate) fn format_match_pattern(p: &crate::ast::MatchPattern) -> String {
     use crate::ast::{MatchArrayElem, MatchHashPair, MatchPattern};
     match p {
         MatchPattern::Any => "_".to_string(),

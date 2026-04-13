@@ -1756,10 +1756,19 @@ impl Interpreter {
     }
 
     pub(crate) fn resolve_io_handle_name(&self, name: &str) -> String {
-        self.glob_handle_alias
-            .get(name)
-            .cloned()
-            .unwrap_or_else(|| name.to_string())
+        if let Some(alias) = self.glob_handle_alias.get(name) {
+            return alias.clone();
+        }
+        // `print $fh …` stores the handle as "$varname"; resolve it by
+        // reading the scalar variable which holds the IO handle name.
+        if let Some(var_name) = name.strip_prefix('$') {
+            let val = self.scope.get_scalar(var_name);
+            let s = val.to_string();
+            if !s.is_empty() {
+                return self.resolve_io_handle_name(&s);
+            }
+        }
+        name.to_string()
     }
 
     /// Stash key for `sub name` / `&name` when `name` is a typeglob basename (`*foo`, `*Pkg::foo`).

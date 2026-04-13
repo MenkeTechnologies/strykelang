@@ -8,6 +8,7 @@
 pub mod aot;
 pub mod ast;
 pub mod builtins;
+pub mod convert;
 pub mod bytecode;
 pub mod capture;
 pub mod cluster;
@@ -72,6 +73,11 @@ use value::PerlValue;
 /// Pretty-print a parsed program as Perl-like source (`pe --fmt`).
 pub fn format_program(p: &ast::Program) -> String {
     fmt::format_program(p)
+}
+
+/// Convert a parsed program to perlrs syntax with `|>` pipes and no semicolons.
+pub fn convert_to_perlrs(p: &ast::Program) -> String {
+    convert::convert_program(p)
 }
 
 pub fn parse(code: &str) -> PerlResult<ast::Program> {

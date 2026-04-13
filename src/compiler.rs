@@ -801,6 +801,28 @@ impl Compiler {
         Ok(())
     }
 
+    /// Register variables declared by `use Env qw(@PATH $HOME ...)` so the strict-vars
+    /// compiler pass knows they exist.
+    fn register_env_imports(layer: &mut ScopeLayer, imports: &[Expr]) {
+        for e in imports {
+            let names: Vec<&str> = match &e.kind {
+                ExprKind::String(s) => vec![s.as_str()],
+                ExprKind::QW(ws) => ws.iter().map(|s| s.as_str()).collect(),
+                _ => continue,
+            };
+            for raw in names {
+                if let Some(arr) = raw.strip_prefix('@') {
+                    layer.declared_arrays.insert(arr.to_string());
+                } else if let Some(hash) = raw.strip_prefix('%') {
+                    layer.declared_hashes.insert(hash.to_string());
+                } else {
+                    let scalar = raw.strip_prefix('$').unwrap_or(raw);
+                    layer.declared_scalars.insert(scalar.to_string());
+                }
+            }
+        }
+    }
+
     /// Emit an `Op::RuntimeErrorConst` that matches the tree-walker's
     /// `Can't modify {array,hash} dereference in {pre,post}{increment,decrement} (++|--)` message.
     /// Used for `++@{…}`, `%{…}--`, `@$r++`, etc. — constructs that are invalid in Perl 5.
@@ -2334,8 +2356,13 @@ impl Compiler {
                 let idx = self.chunk.add_use_overload(pairs.clone());
                 self.chunk.emit(Op::UseOverload(idx), line);
             }
+            StmtKind::Use { module, imports } => {
+                // `use Env '@PATH'` declares variables that must be visible to strict checking.
+                if module == "Env" {
+                    Self::register_env_imports(self.scope_stack.last_mut().expect("scope"), imports);
+                }
+            }
             StmtKind::UsePerlVersion { .. }
-            | StmtKind::Use { .. }
             | StmtKind::No { .. }
             | StmtKind::Begin(_)
             | StmtKind::UnitCheck(_)

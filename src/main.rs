@@ -1030,6 +1030,11 @@ fn main() {
         process::exit(run_build_subcommand(&args[2..]));
     }
 
+    // `pe convert FILE...` subcommand: convert Perl source to perlrs syntax with |> pipes.
+    if args.len() >= 2 && args[1] == "convert" {
+        process::exit(run_convert_subcommand(&args[2..]));
+    }
+
     // Fast path: `perlrs SCRIPT [ARGS...]` with no dashes anywhere — the common case, and
     // clap parsing is the dominant term on `print "hello\n"` (it knocks ~1ms off the
     // startup bench). We can't bypass clap when any flag is present, so fall through to the
@@ -1510,6 +1515,71 @@ fn run_build_subcommand(args: &[String]) -> i32 {
             1
         }
     }
+}
+
+/// `pe convert FILE...` — convert Perl source to idiomatic perlrs syntax.
+fn run_convert_subcommand(args: &[String]) -> i32 {
+    let mut files: Vec<String> = Vec::new();
+    let mut in_place = false;
+    for a in args {
+        match a.as_str() {
+            "-i" | "--in-place" => in_place = true,
+            "-h" | "--help" => {
+                println!("usage: pe convert [-i] FILE...");
+                println!();
+                println!("Convert standard Perl source to idiomatic perlrs syntax:");
+                println!("  - Nested calls → |> pipe-forward chains");
+                println!("  - map/grep/sort/join LIST → LIST |> map/grep/sort/join");
+                println!("  - No trailing semicolons");
+                println!("  - 4-space indentation");
+                println!("  - #!/usr/bin/env perlrs shebang");
+                println!();
+                println!("Options:");
+                println!("  -i, --in-place   Write .pr files alongside originals");
+                println!();
+                println!("Examples:");
+                println!("  pe convert app.pl           # print to stdout");
+                println!("  pe convert -i lib/*.pm      # write lib/*.pr");
+                return 0;
+            }
+            s => files.push(s.to_string()),
+        }
+    }
+    if files.is_empty() {
+        eprintln!("pe convert: no input files");
+        eprintln!("usage: pe convert [-i] FILE...");
+        return 2;
+    }
+    let mut errors = 0;
+    for f in &files {
+        let code = match std::fs::read_to_string(f) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("pe convert: {}: {}", f, e);
+                errors += 1;
+                continue;
+            }
+        };
+        let program = match perlrs::parse_with_file(&code, f) {
+            Ok(p) => p,
+            Err(e) => {
+                eprintln!("pe convert: {}: {}", f, e);
+                errors += 1;
+                continue;
+            }
+        };
+        let converted = perlrs::convert_to_perlrs(&program);
+        if in_place {
+            let out_path = std::path::Path::new(f).with_extension("pr");
+            if let Err(e) = std::fs::write(&out_path, &converted) {
+                eprintln!("pe convert: {}: {}", out_path.display(), e);
+                errors += 1;
+            }
+        } else {
+            println!("{}", converted);
+        }
+    }
+    if errors > 0 { 1 } else { 0 }
 }
 
 /// Strip shebang line; if extract mode (-x), skip everything until #!...perl line.

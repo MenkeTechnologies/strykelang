@@ -1998,9 +1998,19 @@ fn format_float(f: f64) -> String {
     if f.fract() == 0.0 && f.abs() < 1e16 {
         format!("{}", f as i64)
     } else {
-        // Perl uses %g-like formatting
-        let s = format!("{}", f);
-        s
+        // Perl uses Gconvert which is sprintf("%.15g", f) on most platforms.
+        let mut buf = [0u8; 64];
+        unsafe {
+            libc::snprintf(
+                buf.as_mut_ptr() as *mut libc::c_char,
+                buf.len(),
+                b"%.15g\0".as_ptr() as *const libc::c_char,
+                f,
+            );
+            std::ffi::CStr::from_ptr(buf.as_ptr() as *const libc::c_char)
+                .to_string_lossy()
+                .into_owned()
+        }
     }
 }
 
