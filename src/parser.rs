@@ -1051,6 +1051,8 @@ impl Parser {
                 | "flatten"
                 | "frequencies"
                 | "interleave"
+                | "ddump"
+                | "input"
                 | "set"
                 | "list_count"
                 | "list_size"
@@ -3404,7 +3406,7 @@ impl Parser {
                 match name.as_str() {
                     "puniq" | "uniq" | "distinct" | "flatten" | "set" | "list_count"
                     | "list_size" | "count" | "size" | "cnt" | "with_index" | "shuffle"
-                    | "frequencies" | "interleave" => {
+                    | "frequencies" | "interleave" | "ddump" => {
                         if args.is_empty() {
                             args.push(lhs);
                         } else {
@@ -5321,6 +5323,39 @@ impl Parser {
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Log(Box::new(a)),
+                    line,
+                })
+            }
+            "input" => {
+                let args = if matches!(
+                    self.peek(),
+                    Token::Semicolon
+                        | Token::RBrace
+                        | Token::RParen
+                        | Token::Eof
+                        | Token::Comma
+                        | Token::PipeForward
+                ) {
+                    vec![]
+                } else if matches!(self.peek(), Token::LParen) {
+                    self.advance();
+                    if matches!(self.peek(), Token::RParen) {
+                        self.advance();
+                        vec![]
+                    } else {
+                        let a = self.parse_expression()?;
+                        self.expect(&Token::RParen)?;
+                        vec![a]
+                    }
+                } else {
+                    let a = self.parse_one_arg()?;
+                    vec![a]
+                };
+                Ok(Expr {
+                    kind: ExprKind::FuncCall {
+                        name: "input".to_string(),
+                        args,
+                    },
                     line,
                 })
             }

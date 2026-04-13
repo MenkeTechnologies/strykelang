@@ -31,6 +31,7 @@ mod lsp_stdio_completion;
 mod modules_inc;
 mod native_codec;
 mod native_ext;
+mod new_builtins;
 mod pack_unpack_runtime;
 mod parallel;
 mod parse_accepts;

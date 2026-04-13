@@ -213,6 +213,8 @@ pub(crate) fn try_builtin(
         "flatten" => Some(builtin_flatten(interp, args)),
         "interleave" => Some(builtin_interleave(interp, args)),
         "frequencies" => Some(builtin_frequencies(args)),
+        "ddump" => Some(builtin_ddump(args)),
+        "input" => Some(builtin_input(interp, args, line)),
         "set" => Some(Ok(crate::value::set_from_elements(args.iter().cloned()))),
         "list_count" | "list_size" => Some(builtin_list_count(args)),
         "count" | "size" | "cnt" => Some(builtin_count_size_cnt(args)),
@@ -948,6 +950,142 @@ fn builtin_frequencies(args: &[PerlValue]) -> PerlResult<PerlValue> {
         }
     }
     Ok(PerlValue::hash_ref(Arc::new(RwLock::new(counts))))
+}
+
+/// `ddump EXPR, ...` — Data::Dumper-style pretty printer.  Prints to STDOUT
+/// and returns the formatted string so callers can capture it.
+fn builtin_ddump(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let mut buf = String::new();
+    for (i, val) in args.iter().enumerate() {
+        if i > 0 {
+            buf.push('\n');
+        }
+        let name = format!("$VAR{}", i + 1);
+        buf.push_str(&name);
+        buf.push_str(" = ");
+        ddump_value(&mut buf, val, 0);
+        buf.push(';');
+    }
+    buf.push('\n');
+    Ok(PerlValue::string(buf))
+}
+
+/// `input` — read all of stdin. `input $fh` / `input "path"` — read from filehandle or file.
+fn builtin_input(
+    interp: &Interpreter,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<PerlValue> {
+    use std::io::Read;
+    if args.is_empty() {
+        let mut buf = String::new();
+        std::io::stdin().read_to_string(&mut buf).unwrap_or(0);
+        return Ok(PerlValue::string(buf));
+    }
+    let name = args[0].to_string();
+    // STDIN handle — read stdin directly
+    if name == "STDIN" {
+        let mut buf = String::new();
+        std::io::stdin().read_to_string(&mut buf).unwrap_or(0);
+        return Ok(PerlValue::string(buf));
+    }
+    // If <STDIN> was used, the parser already read all of stdin into the arg string.
+    // Detect this: if the arg came from a readline (contains newlines, not a valid path),
+    // just return it as-is.
+    if name.contains('\n') && std::fs::metadata(&name).is_err() {
+        return Ok(args[0].clone());
+    }
+    // Try as an open filehandle via io_file_slots
+    if let Some(slot) = interp.io_file_slots.get(&name) {
+        let mut f = slot.lock();
+        let mut buf = String::new();
+        f.read_to_string(&mut buf)
+            .map_err(|e| PerlError::runtime(format!("input: {}: {}", name, e), line))?;
+        return Ok(PerlValue::string(buf));
+    }
+    // Fall back to treating it as a file path
+    let content = std::fs::read_to_string(&name)
+        .map_err(|e| PerlError::runtime(format!("input: {}: {}", name, e), line))?;
+    Ok(PerlValue::string(content))
+}
+
+fn ddump_value(buf: &mut String, val: &PerlValue, depth: usize) {
+    use std::fmt::Write;
+    let indent = "  ".repeat(depth);
+    let inner = "  ".repeat(depth + 1);
+
+    if val.is_undef() {
+        buf.push_str("undef");
+        return;
+    }
+
+    if let Some(ar) = val.as_array_ref() {
+        let guard = ar.read();
+        if guard.is_empty() {
+            buf.push_str("[]");
+            return;
+        }
+        buf.push_str("[\n");
+        for (i, elem) in guard.iter().enumerate() {
+            buf.push_str(&inner);
+            ddump_value(buf, elem, depth + 1);
+            if i + 1 < guard.len() {
+                buf.push(',');
+            }
+            buf.push('\n');
+        }
+        buf.push_str(&indent);
+        buf.push(']');
+        return;
+    }
+
+    if let Some(hr) = val.as_hash_ref() {
+        let guard = hr.read();
+        if guard.is_empty() {
+            buf.push_str("{}");
+            return;
+        }
+        buf.push_str("{\n");
+        let len = guard.len();
+        for (i, (k, v)) in guard.iter().enumerate() {
+            buf.push_str(&inner);
+            let _ = write!(buf, "'{k}' => ");
+            ddump_value(buf, v, depth + 1);
+            if i + 1 < len {
+                buf.push(',');
+            }
+            buf.push('\n');
+        }
+        buf.push_str(&indent);
+        buf.push('}');
+        return;
+    }
+
+    if let Some(sr) = val.as_scalar_ref() {
+        let inner_val = sr.read().clone();
+        buf.push_str("\\");
+        ddump_value(buf, &inner_val, depth);
+        return;
+    }
+
+    if let Some(blessed) = val.as_blessed_ref() {
+        let data = blessed.data.read().clone();
+        let _ = write!(buf, "bless(");
+        ddump_value(buf, &data, depth);
+        let _ = write!(buf, ", '{}')", blessed.class);
+        return;
+    }
+
+    // Numeric (int or float) — print bare
+    if val.is_integer_like() || val.is_float_like() {
+        let _ = write!(buf, "{val}");
+        return;
+    }
+
+    // String — quote it
+    let s = val.to_string();
+    let escaped = s.replace('\\', "\\\\").replace('\'', "\\'");
+    let _ = write!(buf, "'{escaped}'");
 }
 
 /// `read_lines PATH` — slurp file into array of chomped lines.
