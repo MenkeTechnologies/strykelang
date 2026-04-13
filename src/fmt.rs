@@ -659,27 +659,40 @@ pub fn format_expr(e: &Expr) -> String {
             }
         }
         ExprKind::Print { handle, args } => {
-            let h = handle.as_ref().map(|h| format!("{} ", h)).unwrap_or_default();
+            let h = handle
+                .as_ref()
+                .map(|h| format!("{} ", h))
+                .unwrap_or_default();
             format!("print {}{}", h, format_expr_list(args))
         }
         ExprKind::Say { handle, args } => {
-            let h = handle.as_ref().map(|h| format!("{} ", h)).unwrap_or_default();
+            let h = handle
+                .as_ref()
+                .map(|h| format!("{} ", h))
+                .unwrap_or_default();
             format!("say {}{}", h, format_expr_list(args))
         }
         ExprKind::Printf { handle, args } => {
-            let h = handle.as_ref().map(|h| format!("{} ", h)).unwrap_or_default();
+            let h = handle
+                .as_ref()
+                .map(|h| format!("{} ", h))
+                .unwrap_or_default();
             format!("printf {}{}", h, format_expr_list(args))
         }
-        ExprKind::Die(args) => if args.is_empty() {
-            "die".to_string()
-        } else {
-            format!("die {}", format_expr_list(args))
-        },
-        ExprKind::Warn(args) => if args.is_empty() {
-            "warn".to_string()
-        } else {
-            format!("warn {}", format_expr_list(args))
-        },
+        ExprKind::Die(args) => {
+            if args.is_empty() {
+                "die".to_string()
+            } else {
+                format!("die {}", format_expr_list(args))
+            }
+        }
+        ExprKind::Warn(args) => {
+            if args.is_empty() {
+                "warn".to_string()
+            } else {
+                format!("warn {}", format_expr_list(args))
+            }
+        }
         ExprKind::Match {
             expr,
             pattern,
@@ -1051,7 +1064,12 @@ pub fn format_expr(e: &Expr) -> String {
             substr,
             position,
         } => match position {
-            Some(p) => format!("index({}, {}, {})", format_expr(string), format_expr(substr), format_expr(p)),
+            Some(p) => format!(
+                "index({}, {}, {})",
+                format_expr(string),
+                format_expr(substr),
+                format_expr(p)
+            ),
             None => format!("index({}, {})", format_expr(string), format_expr(substr)),
         },
         ExprKind::Rindex {
@@ -1059,7 +1077,12 @@ pub fn format_expr(e: &Expr) -> String {
             substr,
             position,
         } => match position {
-            Some(p) => format!("rindex({}, {}, {})", format_expr(string), format_expr(substr), format_expr(p)),
+            Some(p) => format!(
+                "rindex({}, {}, {})",
+                format_expr(string),
+                format_expr(substr),
+                format_expr(p)
+            ),
             None => format!("rindex({}, {})", format_expr(string), format_expr(substr)),
         },
         ExprKind::Sprintf { format, args } => format!(
@@ -1105,7 +1128,12 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::Ord(e) => format!("ord {}", format_expr(e)),
         ExprKind::OpenMyHandle { name } => format!("open my ${}", name),
         ExprKind::Open { handle, mode, file } => match file {
-            Some(f) => format!("open({}, {}, {})", format_expr(handle), format_expr(mode), format_expr(f)),
+            Some(f) => format!(
+                "open({}, {}, {})",
+                format_expr(handle),
+                format_expr(mode),
+                format_expr(f)
+            ),
             None => format!("open({}, {})", format_expr(handle), format_expr(mode)),
         },
         ExprKind::Close(e) => format!("close {}", format_expr(e)),

@@ -212,7 +212,7 @@ pub(crate) fn try_builtin(
         "with_index" => Some(builtin_with_index(interp, args)),
         "flatten" => Some(builtin_flatten(interp, args)),
         "interleave" => Some(builtin_interleave(interp, args)),
-        "frequencies" => Some(builtin_frequencies(args)),
+        "frequencies" | "freq" => Some(builtin_frequencies(args)),
         "ddump" => Some(builtin_ddump(args)),
         "input" => Some(builtin_input(interp, args, line)),
         "lines" => Some(builtin_lines(interp, args)),

@@ -264,10 +264,7 @@ impl Parser {
     /// Line number of the most recently consumed token (the token at `pos - 1`).
     fn prev_line(&self) -> usize {
         if self.pos > 0 {
-            self.tokens
-                .get(self.pos - 1)
-                .map(|(_, l)| *l)
-                .unwrap_or(0)
+            self.tokens.get(self.pos - 1).map(|(_, l)| *l).unwrap_or(0)
         } else {
             0
         }
@@ -1055,7 +1052,9 @@ impl Parser {
                 | "fan_cap"
                 | "fc"
                 | "fetch_url"
+                | "d"
                 | "dirs"
+                | "f"
                 | "files"
                 | "filesf"
                 | "filter"
@@ -1080,6 +1079,7 @@ impl Parser {
                 | "flat_map"
                 | "flatten"
                 | "frequencies"
+                | "freq"
                 | "interleave"
                 | "ddump"
                 | "input"
@@ -1139,6 +1139,7 @@ impl Parser {
                 | "gen"
                 | "oct"
                 | "open"
+                | "p"
                 | "opendir"
                 | "ord"
                 | "par_lines"
@@ -3463,9 +3464,10 @@ impl Parser {
                 match name.as_str() {
                     "puniq" | "uniq" | "distinct" | "flatten" | "set" | "list_count"
                     | "list_size" | "count" | "size" | "cnt" | "with_index" | "shuffle"
-                    | "frequencies" | "interleave" | "ddump" | "lines" | "words" | "chars"
-                    | "trim" | "avg" | "to_json" | "to_csv" | "to_toml" | "to_yaml" | "to_xml"
-                    | "stddev" | "normalize" | "snake_case" | "camel_case" | "kebab_case" => {
+                    | "frequencies" | "freq" | "interleave" | "ddump" | "lines" | "words"
+                    | "chars" | "trim" | "avg" | "to_json" | "to_csv" | "to_toml" | "to_yaml"
+                    | "to_xml" | "stddev" | "normalize" | "snake_case" | "camel_case"
+                    | "kebab_case" => {
                         if args.is_empty() {
                             args.push(lhs);
                         } else {
@@ -5316,7 +5318,7 @@ impl Parser {
                 line,
             }),
             "print" => self.parse_print_like(|h, a| ExprKind::Print { handle: h, args: a }),
-            "say" => self.parse_print_like(|h, a| ExprKind::Say { handle: h, args: a }),
+            "say" | "p" => self.parse_print_like(|h, a| ExprKind::Say { handle: h, args: a }),
             "printf" => self.parse_print_like(|h, a| ExprKind::Printf { handle: h, args: a }),
             "die" => {
                 let args = self.parse_list_until_terminator()?;
@@ -7647,14 +7649,14 @@ impl Parser {
                     line,
                 })
             }
-            "filesf" => {
+            "filesf" | "f" => {
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::Filesf(args),
                     line,
                 })
             }
-            "dirs" => {
+            "dirs" | "d" => {
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::Dirs(args),
@@ -8638,11 +8640,7 @@ impl Parser {
             }
             if matches!(
                 self.peek(),
-                Token::Semicolon
-                    | Token::RBrace
-                    | Token::RParen
-                    | Token::Eof
-                    | Token::PipeForward
+                Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof | Token::PipeForward
             ) {
                 break;
             }

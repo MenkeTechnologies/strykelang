@@ -113,17 +113,16 @@ static ENGLISH_ALIASES: LazyLock<HashMap<&'static str, &'static str>> = LazyLock
 
 /// Match-related aliases: `$MATCH`, `$PREMATCH`, `$POSTMATCH`.
 /// Suppressed when `use English qw(-no_match_vars)`.
-static ENGLISH_MATCH_ALIASES: LazyLock<HashMap<&'static str, &'static str>> =
-    LazyLock::new(|| {
-        HashMap::from([
-            // $&
-            ("MATCH", "&"),
-            // $`
-            ("PREMATCH", "`"),
-            // $'
-            ("POSTMATCH", "'"),
-        ])
-    });
+static ENGLISH_MATCH_ALIASES: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
+    HashMap::from([
+        // $&
+        ("MATCH", "&"),
+        // $`
+        ("PREMATCH", "`"),
+        // $'
+        ("POSTMATCH", "'"),
+    ])
+});
 
 /// If `name` is a known `English` long name, return the short special name (`_`, `.`, …).
 /// Match aliases (`MATCH`, `PREMATCH`, `POSTMATCH`) are only returned when
@@ -236,7 +235,10 @@ mod tests {
         assert_eq!(scalar_alias("FORMAT_LINES_LEFT", false), Some("-"));
         assert_eq!(scalar_alias("FORMAT_NAME", false), Some("~"));
         assert_eq!(scalar_alias("FORMAT_TOP_NAME", false), Some("^"));
-        assert_eq!(scalar_alias("FORMAT_LINE_BREAK_CHARACTERS", false), Some(":"));
+        assert_eq!(
+            scalar_alias("FORMAT_LINE_BREAK_CHARACTERS", false),
+            Some(":")
+        );
         assert_eq!(scalar_alias("FORMAT_FORMFEED", false), Some("^L"));
     }
 

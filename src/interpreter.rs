@@ -2772,9 +2772,7 @@ impl Interpreter {
             "English" => {
                 self.english_enabled = true;
                 let args = Self::pragma_import_strings(imports, line)?;
-                self.english_no_match_vars = args
-                    .iter()
-                    .any(|a| a == "-no_match_vars");
+                self.english_no_match_vars = args.iter().any(|a| a == "-no_match_vars");
                 Ok(())
             }
             "Env" => self.apply_use_env(imports, line),

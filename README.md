@@ -184,7 +184,8 @@ my ($v, $i)     = pselect($rx1, $rx2, timeout => 0.5);   # $i == -1 on timeout
 
 # barrier — N workers rendezvous
 my $sync = barrier(3);
-fan 3 { $sync->wait; say "all arrived" };
+# p is alias to say
+fan 3 { $sync->wait; p "all arrived" };
 
 # persistent thread pool (avoids per-task spawn from pmap/pfor)
 my $pool = ppool(4);
@@ -193,14 +194,14 @@ my @results = $pool->collect();
 
 # parallel file IO
 my @logs = "**/*.log" |> glob_par;              # rayon recursive glob
-par_lines "./big.log", { say if /ERROR/ };  # mmap + chunked line scan
-par_walk  ".", { say if /\.rs$/ };              # parallel directory walk
+par_lines "./big.log", { p if /ERROR/ };  # mmap + chunked line scan
+par_walk  ".", { p if /\.rs$/ };              # parallel directory walk
 par_sed qr/\bfoo\b/, "bar", @paths;             # parallel in-place sed (returns # changed)
 my @rs = par_find_files "src", "*.rs";           # parallel recursive file search by glob
 my $n  = par_line_count @rs;                     # parallel line count across files
 
 # native file watcher (notify crate: inotify/kqueue/FSEvents)
-watch  "/tmp/x", say;
+watch  "/tmp/x", p;
 pwatch "logs/*", heavy;
 
 # control thread count
