@@ -3323,7 +3323,7 @@ impl Interpreter {
         args: &[PerlValue],
         line: usize,
     ) -> ExecResult {
-        if args.len() < 2 {
+        if args.is_empty() {
             return Err(
                 PerlError::runtime(format!("{name}: expected {{ BLOCK }}, LIST"), line).into(),
             );
@@ -4710,8 +4710,8 @@ impl Interpreter {
         line: usize,
     ) -> ExecResult {
         let _ = line;
-        let from_chars: Vec<char> = from.chars().collect();
-        let to_chars: Vec<char> = to.chars().collect();
+        let from_chars = Self::tr_expand_ranges(from);
+        let to_chars = Self::tr_expand_ranges(to);
         let mut count = 0i64;
         let new_s: String = s
             .chars()
@@ -4733,6 +4733,30 @@ impl Interpreter {
             }
             Ok(PerlValue::integer(count))
         }
+    }
+
+    /// Expand Perl `tr///` range notation: `a-z` → `a`, `b`, …, `z`.
+    /// A literal `-` at the start or end of the spec is kept as-is.
+    fn tr_expand_ranges(spec: &str) -> Vec<char> {
+        let raw: Vec<char> = spec.chars().collect();
+        let mut out = Vec::with_capacity(raw.len());
+        let mut i = 0;
+        while i < raw.len() {
+            if i + 2 < raw.len() && raw[i + 1] == '-' && raw[i] <= raw[i + 2] {
+                let start = raw[i] as u32;
+                let end = raw[i + 2] as u32;
+                for code in start..=end {
+                    if let Some(c) = char::from_u32(code) {
+                        out.push(c);
+                    }
+                }
+                i += 3;
+            } else {
+                out.push(raw[i]);
+                i += 1;
+            }
+        }
+        out
     }
 
     /// `splice @array, offset, length, LIST` — used by the VM `CallBuiltin(Splice)` path.

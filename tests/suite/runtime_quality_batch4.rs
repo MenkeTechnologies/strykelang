@@ -141,7 +141,7 @@ fn hash_slice_assign_two_keys_sum() {
 
 #[test]
 fn transliterate_count_matches_engine() {
-    assert_eq!(eval_int(r#"my $s = "abc"; $s =~ tr/a-z/A-Z/"#), 1);
+    assert_eq!(eval_int(r#"my $s = "abc"; $s =~ tr/a-z/A-Z/"#), 3);
 }
 
 #[test]

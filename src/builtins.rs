@@ -233,6 +233,9 @@ pub(crate) fn try_builtin(
         "snake_case" => Some(builtin_snake_case(args)),
         "camel_case" => Some(builtin_camel_case(args)),
         "kebab_case" => Some(builtin_kebab_case(args)),
+        "to_toml" => Some(builtin_to_toml(args)),
+        "to_yaml" => Some(builtin_to_yaml(args)),
+        "to_xml" => Some(builtin_to_xml(args)),
         "set" => Some(Ok(crate::value::set_from_elements(args.iter().cloned()))),
         "list_count" | "list_size" => Some(builtin_list_count(args)),
         "count" | "size" | "cnt" => Some(builtin_count_size_cnt(args)),
@@ -989,11 +992,7 @@ fn builtin_ddump(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 /// `input` — read all of stdin. `input $fh` / `input "path"` — read from filehandle or file.
-fn builtin_input(
-    interp: &Interpreter,
-    args: &[PerlValue],
-    line: usize,
-) -> PerlResult<PerlValue> {
+fn builtin_input(interp: &Interpreter, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     use std::io::Read;
     if args.is_empty() {
         let mut buf = String::new();
@@ -1030,7 +1029,10 @@ fn builtin_input(
 /// `lines STRING` — split string into array on newlines (no trailing empty).
 fn builtin_lines(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let items: Vec<PerlValue> = s.lines().map(|l| PerlValue::string(l.to_string())).collect();
+    let items: Vec<PerlValue> = s
+        .lines()
+        .map(|l| PerlValue::string(l.to_string()))
+        .collect();
     Ok(match interp.wantarray_kind {
         WantarrayCtx::List => PerlValue::array(items),
         WantarrayCtx::Scalar => PerlValue::integer(items.len() as i64),
@@ -1041,7 +1043,10 @@ fn builtin_lines(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVal
 /// `words STRING` — split on whitespace into array.
 fn builtin_words(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let items: Vec<PerlValue> = s.split_whitespace().map(|w| PerlValue::string(w.to_string())).collect();
+    let items: Vec<PerlValue> = s
+        .split_whitespace()
+        .map(|w| PerlValue::string(w.to_string()))
+        .collect();
     Ok(match interp.wantarray_kind {
         WantarrayCtx::List => PerlValue::array(items),
         WantarrayCtx::Scalar => PerlValue::integer(items.len() as i64),
@@ -1052,7 +1057,10 @@ fn builtin_words(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVal
 /// `chars STRING` — split into individual characters (no empty leading element).
 fn builtin_chars(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let items: Vec<PerlValue> = s.chars().map(|c| PerlValue::string(c.to_string())).collect();
+    let items: Vec<PerlValue> = s
+        .chars()
+        .map(|c| PerlValue::string(c.to_string()))
+        .collect();
     Ok(match interp.wantarray_kind {
         WantarrayCtx::List => PerlValue::array(items),
         WantarrayCtx::Scalar => PerlValue::integer(items.len() as i64),
@@ -1068,7 +1076,10 @@ fn builtin_trim(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `avg LIST` — arithmetic mean of numeric list.
 fn builtin_avg(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let flat: Vec<PerlValue> = args.iter().flat_map(|a| a.map_flatten_outputs(true)).collect();
+    let flat: Vec<PerlValue> = args
+        .iter()
+        .flat_map(|a| a.map_flatten_outputs(true))
+        .collect();
     if flat.is_empty() {
         return Ok(PerlValue::UNDEF);
     }
@@ -1096,11 +1107,14 @@ fn builtin_top(args: &[PerlValue]) -> PerlResult<PerlValue> {
         let guard = hr.read();
         let mut pairs: Vec<_> = guard.iter().collect();
         pairs.sort_by(|a, b| b.1.to_int().cmp(&a.1.to_int()));
-        let items: Vec<PerlValue> = pairs.into_iter().take(n)
+        let items: Vec<PerlValue> = pairs
+            .into_iter()
+            .take(n)
             .flat_map(|(k, v)| vec![PerlValue::string(k.clone()), v.clone()])
             .collect();
         Ok(PerlValue::hash_ref(Arc::new(RwLock::new(
-            items.chunks(2)
+            items
+                .chunks(2)
                 .map(|c| (c[0].to_string(), c[1].clone()))
                 .collect::<indexmap::IndexMap<_, _>>(),
         ))))
@@ -1112,7 +1126,10 @@ fn builtin_top(args: &[PerlValue]) -> PerlResult<PerlValue> {
 /// `to_file PATH, STRING` — write string to file, returns the string for further piping.
 fn builtin_to_file(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     if args.len() < 2 {
-        return Err(PerlError::runtime("to_file: need PATH and content".to_string(), line));
+        return Err(PerlError::runtime(
+            "to_file: need PATH and content".to_string(),
+            line,
+        ));
     }
     // to_file(STRING, PATH) when piped, to_file(PATH, STRING) when called directly
     // Heuristic: if first arg contains newlines or is long, it's content
@@ -1128,6 +1145,11 @@ fn builtin_to_file(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
 
 /// `to_json VALUE` — serialize a PerlValue to a JSON string.
 fn builtin_to_json(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if args.len() > 1 {
+        // Multiple values (e.g. flattened array) → JSON array
+        let parts: Vec<String> = args.iter().map(perl_value_to_json_string).collect();
+        return Ok(PerlValue::string(format!("[{}]", parts.join(","))));
+    }
     let val = args.first().cloned().unwrap_or(PerlValue::UNDEF);
     Ok(PerlValue::string(perl_value_to_json_string(&val)))
 }
@@ -1152,8 +1174,15 @@ fn perl_value_to_json_string(val: &PerlValue) -> String {
         let guard = hr.read();
         let mut buf = String::from("{");
         for (i, (k, v)) in guard.iter().enumerate() {
-            if i > 0 { buf.push(','); }
-            let _ = write!(buf, "\"{}\":{}", json_escape(k), perl_value_to_json_string(v));
+            if i > 0 {
+                buf.push(',');
+            }
+            let _ = write!(
+                buf,
+                "\"{}\":{}",
+                json_escape(k),
+                perl_value_to_json_string(v)
+            );
         }
         buf.push('}');
         return buf;
@@ -1175,7 +1204,9 @@ fn builtin_to_csv(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let rows: Vec<PerlValue> = if let Some(ar) = val.as_array_ref() {
         ar.read().clone()
     } else {
-        args.iter().flat_map(|a| a.map_flatten_outputs(true)).collect()
+        args.iter()
+            .flat_map(|a| a.map_flatten_outputs(true))
+            .collect()
     };
     if rows.is_empty() {
         return Ok(PerlValue::string(String::new()));
@@ -1191,7 +1222,8 @@ fn builtin_to_csv(args: &[PerlValue]) -> PerlResult<PerlValue> {
     for row in &rows {
         if let Some(hr) = row.as_hash_ref() {
             let guard = hr.read();
-            let vals: Vec<String> = headers.iter()
+            let vals: Vec<String> = headers
+                .iter()
                 .map(|h| {
                     let v = guard.get(h).map(|v| v.to_string()).unwrap_or_default();
                     if v.contains(',') || v.contains('"') || v.contains('\n') {
@@ -1216,7 +1248,8 @@ fn builtin_grep_v(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     let pattern = args[0].to_string();
     let re = regex::Regex::new(&pattern)
         .map_err(|e| PerlError::runtime(format!("grep_v: bad pattern: {}", e), line))?;
-    let items: Vec<PerlValue> = args[1..].iter()
+    let items: Vec<PerlValue> = args[1..]
+        .iter()
         .flat_map(|a| a.map_flatten_outputs(true))
         .filter(|v| !re.is_match(&v.to_string()))
         .collect();
@@ -1250,7 +1283,8 @@ fn builtin_pluck(args: &[PerlValue]) -> PerlResult<PerlValue> {
         return Ok(PerlValue::array(vec![]));
     }
     let key = args[0].to_string();
-    let items: Vec<PerlValue> = args[1..].iter()
+    let items: Vec<PerlValue> = args[1..]
+        .iter()
         .flat_map(|a| a.map_flatten_outputs(true))
         .map(|v| {
             if let Some(hr) = v.as_hash_ref() {
@@ -1272,12 +1306,18 @@ fn builtin_clamp(args: &[PerlValue]) -> PerlResult<PerlValue> {
     // args layout after pipe: (LIST_ITEM, MIN, MAX) via insert(0, lhs)
     // or direct: clamp(MIN, MAX, LIST...)
     // Heuristic: if args[2..] expand to multiple items, first two are min/max
-    let rest: Vec<PerlValue> = args[2..].iter().flat_map(|a| a.map_flatten_outputs(true)).collect();
+    let rest: Vec<PerlValue> = args[2..]
+        .iter()
+        .flat_map(|a| a.map_flatten_outputs(true))
+        .collect();
     let (min_val, max_val, values) = if rest.is_empty() {
         // piped: (value, min, max)
         let min_v = args[1].to_number();
         let max_v = args[2].to_number();
-        let vals: Vec<PerlValue> = args[0..1].iter().flat_map(|a| a.map_flatten_outputs(true)).collect();
+        let vals: Vec<PerlValue> = args[0..1]
+            .iter()
+            .flat_map(|a| a.map_flatten_outputs(true))
+            .collect();
         (min_v, max_v, vals)
     } else {
         // direct: clamp(min, max, list...)
@@ -1315,7 +1355,8 @@ fn builtin_normalize(args: &[PerlValue]) -> PerlResult<PerlValue> {
         return Ok(PerlValue::UNDEF);
     }
 
-    let all: Vec<f64> = args.iter()
+    let all: Vec<f64> = args
+        .iter()
         .flat_map(|a| a.map_flatten_outputs(true))
         .map(|v| v.to_number())
         .collect();
@@ -1345,7 +1386,10 @@ fn builtin_normalize(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `stddev LIST` — population standard deviation of numeric list.
 fn builtin_stddev(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let flat: Vec<PerlValue> = args.iter().flat_map(|a| a.map_flatten_outputs(true)).collect();
+    let flat: Vec<PerlValue> = args
+        .iter()
+        .flat_map(|a| a.map_flatten_outputs(true))
+        .collect();
     if flat.is_empty() {
         return Ok(PerlValue::UNDEF);
     }
@@ -1360,15 +1404,16 @@ fn builtin_stddev(args: &[PerlValue]) -> PerlResult<PerlValue> {
 fn split_case_words(s: &str) -> Vec<String> {
     let mut words = Vec::new();
     let mut cur = String::new();
-    let chars: Vec<char> = s.chars().collect();
-    for i in 0..chars.len() {
-        let c = chars[i];
+    for c in s.chars() {
         if c == '_' || c == '-' || c == ' ' || c == '\t' {
             if !cur.is_empty() {
                 words.push(cur.clone());
                 cur.clear();
             }
-        } else if c.is_uppercase() && !cur.is_empty() && cur.chars().last().map_or(false, |p| p.is_lowercase()) {
+        } else if c.is_uppercase()
+            && !cur.is_empty()
+            && cur.chars().last().is_some_and(|p| p.is_lowercase())
+        {
             words.push(cur.clone());
             cur.clear();
             cur.push(c);
@@ -1421,6 +1466,260 @@ fn builtin_kebab_case(args: &[PerlValue]) -> PerlResult<PerlValue> {
         .collect::<Vec<_>>()
         .join("-");
     Ok(PerlValue::string(result))
+}
+
+/// `to_toml VALUE` — serialize a PerlValue to a TOML string.
+fn builtin_to_toml(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if args.len() > 1 {
+        let parts: Vec<String> = args
+            .iter()
+            .map(|v| perl_value_to_toml_string(v, 0))
+            .collect();
+        return Ok(PerlValue::string(parts.join("\n")));
+    }
+    let val = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    Ok(PerlValue::string(perl_value_to_toml_string(&val, 0)))
+}
+
+fn perl_value_to_toml_string(val: &PerlValue, _depth: usize) -> String {
+    if val.is_undef() {
+        return String::new();
+    }
+    if let Some(hr) = val.as_hash_ref() {
+        let guard = hr.read();
+        let mut buf = String::new();
+        let mut tables = Vec::new();
+        // First pass: simple key-value pairs
+        for (k, v) in guard.iter() {
+            if v.as_hash_ref().is_some() {
+                tables.push((k.clone(), v.clone()));
+            } else if let Some(ar) = v.as_array_ref() {
+                let arr_guard = ar.read();
+                // Check if array of tables
+                if arr_guard.first().and_then(|v| v.as_hash_ref()).is_some() {
+                    tables.push((k.clone(), v.clone()));
+                } else {
+                    buf.push_str(&format!(
+                        "{} = [{}]\n",
+                        k,
+                        arr_guard
+                            .iter()
+                            .map(toml_scalar)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ));
+                }
+            } else {
+                buf.push_str(&format!("{} = {}\n", k, toml_scalar(v)));
+            }
+        }
+        // Second pass: nested tables
+        for (k, v) in &tables {
+            if let Some(hr2) = v.as_hash_ref() {
+                buf.push_str(&format!("\n[{}]\n", k));
+                let g2 = hr2.read();
+                for (k2, v2) in g2.iter() {
+                    buf.push_str(&format!("{} = {}\n", k2, toml_scalar(v2)));
+                }
+            } else if let Some(ar) = v.as_array_ref() {
+                let arr_guard = ar.read();
+                for item in arr_guard.iter() {
+                    buf.push_str(&format!("\n[[{}]]\n", k));
+                    if let Some(ihr) = item.as_hash_ref() {
+                        let ig = ihr.read();
+                        for (ik, iv) in ig.iter() {
+                            buf.push_str(&format!("{} = {}\n", ik, toml_scalar(iv)));
+                        }
+                    }
+                }
+            }
+        }
+        buf
+    } else {
+        toml_scalar(val)
+    }
+}
+
+fn toml_scalar(val: &PerlValue) -> String {
+    if val.is_undef() {
+        return "\"\"".to_string();
+    }
+    if val.is_integer_like() {
+        return format!("{}", val.to_int());
+    }
+    if val.is_float_like() {
+        return format!("{}", val.to_number());
+    }
+    let s = val.to_string();
+    if s == "true" || s == "false" {
+        return s;
+    }
+    format!(
+        "\"{}\"",
+        s.replace('\\', "\\\\")
+            .replace('"', "\\\"")
+            .replace('\n', "\\n")
+    )
+}
+
+/// `to_yaml VALUE` — serialize a PerlValue to a YAML string.
+fn builtin_to_yaml(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if args.len() > 1 {
+        let mut buf = String::new();
+        for v in args {
+            buf.push_str("---\n");
+            yaml_value(&mut buf, v, 0);
+        }
+        return Ok(PerlValue::string(buf));
+    }
+    let val = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let mut buf = String::from("---\n");
+    yaml_value(&mut buf, &val, 0);
+    Ok(PerlValue::string(buf))
+}
+
+fn yaml_value(buf: &mut String, val: &PerlValue, depth: usize) {
+    let indent = "  ".repeat(depth);
+    if val.is_undef() {
+        buf.push_str("~\n");
+        return;
+    }
+    if let Some(hr) = val.as_hash_ref() {
+        let guard = hr.read();
+        if guard.is_empty() {
+            buf.push_str("{}\n");
+            return;
+        }
+        if depth > 0 {
+            buf.push('\n');
+        }
+        for (k, v) in guard.iter() {
+            buf.push_str(&format!("{}{}:", indent, k));
+            if v.as_hash_ref().is_some() || v.as_array_ref().is_some() {
+                yaml_value(buf, v, depth + 1);
+            } else {
+                buf.push(' ');
+                yaml_value(buf, v, depth + 1);
+            }
+        }
+        return;
+    }
+    if let Some(ar) = val.as_array_ref() {
+        let guard = ar.read();
+        if guard.is_empty() {
+            buf.push_str("[]\n");
+            return;
+        }
+        if depth > 0 {
+            buf.push('\n');
+        }
+        for item in guard.iter() {
+            buf.push_str(&format!("{}- ", indent));
+            if item.as_hash_ref().is_some() || item.as_array_ref().is_some() {
+                // Inline the first level for array-of-hashes
+                if let Some(ihr) = item.as_hash_ref() {
+                    let ig = ihr.read();
+                    let mut first = true;
+                    for (ik, iv) in ig.iter() {
+                        if first {
+                            buf.push_str(&format!("{}: ", ik));
+                            yaml_scalar(buf, iv);
+                            first = false;
+                        } else {
+                            buf.push_str(&format!("{}  {}: ", indent, ik));
+                            yaml_scalar(buf, iv);
+                        }
+                    }
+                } else {
+                    yaml_value(buf, item, depth + 1);
+                }
+            } else {
+                yaml_scalar(buf, item);
+            }
+        }
+        return;
+    }
+    yaml_scalar(buf, val);
+}
+
+fn yaml_scalar(buf: &mut String, val: &PerlValue) {
+    if val.is_undef() {
+        buf.push_str("~\n");
+    } else if val.is_integer_like() {
+        buf.push_str(&format!("{}\n", val.to_int()));
+    } else if val.is_float_like() {
+        buf.push_str(&format!("{}\n", val.to_number()));
+    } else {
+        let s = val.to_string();
+        if s.contains(':')
+            || s.contains('#')
+            || s.contains('\n')
+            || s.contains('"')
+            || s.is_empty()
+            || s == "true"
+            || s == "false"
+            || s == "null"
+        {
+            buf.push_str(&format!(
+                "\"{}\"\n",
+                s.replace('\\', "\\\\").replace('"', "\\\"")
+            ));
+        } else {
+            buf.push_str(&format!("{}\n", s));
+        }
+    }
+}
+
+/// `to_xml VALUE` — serialize a PerlValue to an XML string.
+fn builtin_to_xml(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if args.len() > 1 {
+        let mut buf = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root>\n");
+        for (i, v) in args.iter().enumerate() {
+            xml_value(&mut buf, &format!("item{}", i), v, 1);
+        }
+        buf.push_str("</root>\n");
+        return Ok(PerlValue::string(buf));
+    }
+    let val = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let mut buf = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+    xml_value(&mut buf, "root", &val, 0);
+    Ok(PerlValue::string(buf))
+}
+
+fn xml_value(buf: &mut String, tag: &str, val: &PerlValue, depth: usize) {
+    let indent = "  ".repeat(depth);
+    if val.is_undef() {
+        buf.push_str(&format!("{}<{}/>\n", indent, tag));
+        return;
+    }
+    if let Some(hr) = val.as_hash_ref() {
+        let guard = hr.read();
+        buf.push_str(&format!("{}<{}>\n", indent, tag));
+        for (k, v) in guard.iter() {
+            xml_value(buf, k, v, depth + 1);
+        }
+        buf.push_str(&format!("{}</{}>\n", indent, tag));
+        return;
+    }
+    if let Some(ar) = val.as_array_ref() {
+        let guard = ar.read();
+        buf.push_str(&format!("{}<{}>\n", indent, tag));
+        for item in guard.iter() {
+            xml_value(buf, "item", item, depth + 1);
+        }
+        buf.push_str(&format!("{}</{}>\n", indent, tag));
+        return;
+    }
+    let s = xml_escape(&val.to_string());
+    buf.push_str(&format!("{}<{}>{}</{}>\n", indent, tag, s, tag));
+}
+
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
 }
 
 fn ddump_value(buf: &mut String, val: &PerlValue, depth: usize) {
@@ -1477,7 +1776,7 @@ fn ddump_value(buf: &mut String, val: &PerlValue, depth: usize) {
 
     if let Some(sr) = val.as_scalar_ref() {
         let inner_val = sr.read().clone();
-        buf.push_str("\\");
+        buf.push('\\');
         ddump_value(buf, &inner_val, depth);
         return;
     }

@@ -292,7 +292,7 @@ fn match_with_anchors() {
 fn transliterate_lowercase_to_upper_range() {
     assert_eq!(
         eval_string(r#"my $s = "abc"; $s =~ tr/a-z/A-Z/; $s"#),
-        "Abc"
+        "ABC"
     );
 }
 

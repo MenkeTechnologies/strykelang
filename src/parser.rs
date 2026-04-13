@@ -1072,6 +1072,9 @@ impl Parser {
                 | "snake_case"
                 | "camel_case"
                 | "kebab_case"
+                | "to_toml"
+                | "to_yaml"
+                | "to_xml"
                 | "set"
                 | "list_count"
                 | "list_size"
@@ -3425,10 +3428,9 @@ impl Parser {
                 match name.as_str() {
                     "puniq" | "uniq" | "distinct" | "flatten" | "set" | "list_count"
                     | "list_size" | "count" | "size" | "cnt" | "with_index" | "shuffle"
-                    | "frequencies" | "interleave" | "ddump" | "lines" | "words"
-                    | "chars" | "trim" | "avg" | "to_json" | "to_csv"
-                    | "stddev" | "normalize"
-                    | "snake_case" | "camel_case" | "kebab_case" => {
+                    | "frequencies" | "interleave" | "ddump" | "lines" | "words" | "chars"
+                    | "trim" | "avg" | "to_json" | "to_csv" | "to_toml" | "to_yaml" | "to_xml"
+                    | "stddev" | "normalize" | "snake_case" | "camel_case" | "kebab_case" => {
                         if args.is_empty() {
                             args.push(lhs);
                         } else {
@@ -3870,6 +3872,13 @@ impl Parser {
                 pattern,
                 flags,
                 scalar_g,
+            },
+            // Bare `/regex/` (no explicit `m`): promote to Match on piped LHS
+            ExprKind::Regex(pattern, flags) => ExprKind::Match {
+                expr: Box::new(lhs),
+                pattern,
+                flags,
+                scalar_g: false,
             },
 
             // ── Bareword function name → plain unary call ──────────────────────
@@ -5765,7 +5774,7 @@ impl Parser {
                     line,
                 })
             }
-            "fore" => {
+            "fore" | "e" => {
                 // `fore { BLOCK } LIST` — forEach expression (pipe-forward friendly)
                 if matches!(self.peek(), Token::LBrace) {
                     let (block, list) = self.parse_block_list()?;

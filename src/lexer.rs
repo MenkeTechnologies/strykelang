@@ -1689,6 +1689,7 @@ impl Lexer {
                     | "find_index"
                     | "each_with_index"
                     | "fore"
+                    | "e"
                     | "flat_map"
                     | "group_by"
                     | "chunk_by"

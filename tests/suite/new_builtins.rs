@@ -53,7 +53,9 @@ fn partition_single_item() {
 #[test]
 fn partition_with_array_variable() {
     assert_eq!(
-        eval_string(r#"my @a = (10, 15, 20, 25); my ($big, $small) = partition { $_ >= 20 } @a; "@$big""#),
+        eval_string(
+            r#"my @a = (10, 15, 20, 25); my ($big, $small) = partition { $_ >= 20 } @a; "@$big""#
+        ),
         "20 25",
     );
 }
@@ -78,10 +80,7 @@ fn frequencies_basic_counts() {
 
 #[test]
 fn frequencies_single_element() {
-    assert_eq!(
-        eval_int(r#"my $f = frequencies("x"); $f->{x}"#),
-        1,
-    );
+    assert_eq!(eval_int(r#"my $f = frequencies("x"); $f->{x}"#), 1,);
 }
 
 #[test]
@@ -94,18 +93,12 @@ fn frequencies_from_array() {
 
 #[test]
 fn frequencies_numeric_keys() {
-    assert_eq!(
-        eval_int(r#"my $f = frequencies(1,2,2,3,3,3); $f->{3}"#),
-        3,
-    );
+    assert_eq!(eval_int(r#"my $f = frequencies(1,2,2,3,3,3); $f->{3}"#), 3,);
 }
 
 #[test]
 fn frequencies_returns_hashref() {
-    assert_eq!(
-        eval_string(r#"ref(frequencies("a","b"))"#),
-        "HASH",
-    );
+    assert_eq!(eval_string(r#"ref(frequencies("a","b"))"#), "HASH",);
 }
 
 #[test]
@@ -118,10 +111,7 @@ fn frequencies_pipe_forward() {
 
 #[test]
 fn frequencies_empty_list() {
-    assert_eq!(
-        eval_int(r#"my $f = frequencies(); scalar keys %$f"#),
-        0,
-    );
+    assert_eq!(eval_int(r#"my $f = frequencies(); scalar keys %$f"#), 0,);
 }
 
 // ── min_by / max_by ─────────────────────────────────────────────────
@@ -144,34 +134,22 @@ fn max_by_finds_longest_string() {
 
 #[test]
 fn min_by_numeric_key() {
-    assert_eq!(
-        eval_int(r#"min_by { $_ * $_ } -3, 1, -2, 4"#),
-        1,
-    );
+    assert_eq!(eval_int(r#"min_by { $_ * $_ } -3, 1, -2, 4"#), 1,);
 }
 
 #[test]
 fn max_by_numeric_key() {
-    assert_eq!(
-        eval_int(r#"max_by { $_ * $_ } -3, 1, -2, 4"#),
-        4,
-    );
+    assert_eq!(eval_int(r#"max_by { $_ * $_ } -3, 1, -2, 4"#), 4,);
 }
 
 #[test]
 fn min_by_single_element() {
-    assert_eq!(
-        eval_int(r#"min_by { $_ } 42"#),
-        42,
-    );
+    assert_eq!(eval_int(r#"min_by { $_ } 42"#), 42,);
 }
 
 #[test]
 fn max_by_single_element() {
-    assert_eq!(
-        eval_int(r#"max_by { $_ } 99"#),
-        99,
-    );
+    assert_eq!(eval_int(r#"max_by { $_ } 99"#), 99,);
 }
 
 #[test]
@@ -219,7 +197,9 @@ fn zip_with_string_concat() {
 #[test]
 fn zip_with_binding_refs() {
     assert_eq!(
-        eval_string(r#"my @a = (1,2,3); my @b = (10,20,30); my @r = zip_with { $_[0] + $_[1] } \@a, \@b; "@r""#),
+        eval_string(
+            r#"my @a = (1,2,3); my @b = (10,20,30); my @r = zip_with { $_[0] + $_[1] } \@a, \@b; "@r""#
+        ),
         "11 22 33",
     );
 }
@@ -269,10 +249,7 @@ fn interleave_unequal_lengths() {
 
 #[test]
 fn interleave_single_array() {
-    assert_eq!(
-        eval_string(r#"my @r = interleave [1,2,3]; "@r""#),
-        "1 2 3",
-    );
+    assert_eq!(eval_string(r#"my @r = interleave [1,2,3]; "@r""#), "1 2 3",);
 }
 
 #[test]
@@ -376,9 +353,7 @@ fn write_json_read_json_roundtrip_array() {
     let dir = std::env::temp_dir();
     let path = dir.join(format!("perlrs_test_json2_{}.json", std::process::id()));
     let ps = path.to_string_lossy().replace('\\', "/");
-    let code = format!(
-        r#"write_json("{ps}", [1,2,3]); my $d = read_json("{ps}"); $d->[1]"#
-    );
+    let code = format!(r#"write_json("{ps}", [1,2,3]); my $d = read_json("{ps}"); $d->[1]"#);
     let got = eval_int(&code);
     let _ = fs::remove_file(&path);
     assert_eq!(got, 2);
@@ -400,34 +375,22 @@ fn read_json_nested_hash() {
 
 #[test]
 fn glob_match_star_dot_rs() {
-    assert_eq!(
-        eval_int(r#"glob_match("*.rs", "main.rs")"#),
-        1,
-    );
+    assert_eq!(eval_int(r#"glob_match("*.rs", "main.rs")"#), 1,);
 }
 
 #[test]
 fn glob_match_no_match() {
-    assert_eq!(
-        eval_int(r#"glob_match("*.txt", "main.rs")"#),
-        0,
-    );
+    assert_eq!(eval_int(r#"glob_match("*.txt", "main.rs")"#), 0,);
 }
 
 #[test]
 fn glob_match_question_mark() {
-    assert_eq!(
-        eval_int(r#"glob_match("f?o", "foo")"#),
-        1,
-    );
+    assert_eq!(eval_int(r#"glob_match("f?o", "foo")"#), 1,);
 }
 
 #[test]
 fn glob_match_question_mark_no_match() {
-    assert_eq!(
-        eval_int(r#"glob_match("f?o", "fooo")"#),
-        0,
-    );
+    assert_eq!(eval_int(r#"glob_match("f?o", "fooo")"#), 0,);
 }
 
 #[test]
@@ -440,18 +403,12 @@ fn glob_match_double_star() {
 
 #[test]
 fn glob_match_exact() {
-    assert_eq!(
-        eval_int(r#"glob_match("hello", "hello")"#),
-        1,
-    );
+    assert_eq!(eval_int(r#"glob_match("hello", "hello")"#), 1,);
 }
 
 #[test]
 fn glob_match_prefix_star() {
-    assert_eq!(
-        eval_int(r#"glob_match("*.txt", "readme.txt")"#),
-        1,
-    );
+    assert_eq!(eval_int(r#"glob_match("*.txt", "readme.txt")"#), 1,);
 }
 
 // ── which_all ───────────────────────────────────────────────────────
@@ -475,7 +432,9 @@ fn which_all_nonexistent_returns_empty() {
 fn which_all_paths_are_executable() {
     // every path which_all returns should actually exist
     assert_eq!(
-        eval_string(r#"my @w = which_all("sh"); my $ok = 1; for (@w) { $ok = 0 unless -e $_ } $ok ? "ok" : "bad""#),
+        eval_string(
+            r#"my @w = which_all("sh"); my $ok = 1; for (@w) { $ok = 0 unless -e $_ } $ok ? "ok" : "bad""#
+        ),
         "ok",
     );
 }

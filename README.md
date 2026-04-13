@@ -363,20 +363,20 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
 | Category | Functions |
 | --- | --- |
-| Array | `push`, `pop`, `shift`, `unshift`, `splice`, `reverse`, `sort`, `map`, `grep`, `filter`, `reduce`, `fold`, `fore`, `preduce`, `scalar`, `partition`, `min_by`, `max_by`, `zip_with`, `interleave`, `frequencies`, `count_by`, `pluck`, `grep_v` |
+| Array | `push`, `pop`, `shift`, `unshift`, `splice`, `reverse`, `sort`, `map`, `grep`, `filter`, `reduce`, `fold`, `fore`, `e`, `preduce`, `scalar`, `partition`, `min_by`, `max_by`, `zip_with`, `interleave`, `frequencies`, `count_by`, `pluck`, `grep_v` |
 | Hash | `keys`, `values`, `each`, `delete`, `exists`, `select_keys`, `top` |
 | String | `chomp`, `chop`, `length`, `substr`, `index`, `rindex`, `split`, `join`, `sprintf`, `printf`, `uc`/`lc`/`ucfirst`/`lcfirst`, `chr`, `ord`, `hex`, `oct`, `crypt`, `fc`, `pos`, `study`, `quotemeta`, `trim`, `lines`, `words`, `chars`, `snake_case`, `camel_case`, `kebab_case` |
 | Binary | `pack`, `unpack` (subset `A a N n V v C Q q Z H x w i I l L s S f d` + `*`), `vec` |
 | Numeric | `abs`, `int`, `sqrt`, `sin`, `cos`, `atan2`, `exp`, `log`, `rand`, `srand`, `avg`, `stddev`, `clamp`, `normalize` |
-| I/O | `print`, `say`, `printf`, `open` (incl. `open my $fh`, files, `-\|` / `\|-` pipes), `close`, `eof`, `readline`, `read`, `seek`, `tell`, `sysopen`, `sysread`/`syswrite`/`sysseek`, handle methods `->print/->say/->printf/->getline/->close/->eof/->getc/->flush`, `slurp`, `input`, backticks/`qx{}`, `capture` (structured: `->stdout/->stderr/->exit`), `binmode`, `fileno`, `flock`, `getc`, `select`, `truncate`, `formline`, `read_lines`, `append_file`, `to_file`, `read_json`, `write_json` |
+| I/O | `print`, `say`, `printf`, `open` (incl. `open my $fh`, files, `-\|` / `\|-` pipes), `close`, `eof`, `readline`, `read`, `seek`, `tell`, `sysopen`, `sysread`/`syswrite`/`sysseek`, handle methods `->print/->say/->printf/->getline/->close/->eof/->getc/->flush`, `slurp`, `input`, backticks/`qx{}`, `capture` (structured: `->stdout/->stderr/->exit`), `binmode`, `fileno`, `flock`, `getc`, `select`, `truncate`, `formline`, `read_lines`, `append_file`, `to_file`, `read_json`, `write_json`, `tempfile`, `tempdir` |
 | Directory | `opendir`, `readdir`, `closedir`, `rewinddir`, `telldir`, `seekdir` |
 | File tests | `-e`, `-f`, `-d`, `-l`, `-r`, `-w`, `-s`, `-z`, `-x`, `-t` (defaults to `$_`) |
-| System | `system`, `exec`, `exit`, `chdir`, `mkdir`, `unlink`, `rename`, `chmod`, `chown`, `chroot`, `stat`, `lstat`, `link`, `symlink`, `readlink`, `glob`, `glob_par`, `par_sed`, `par_find_files`, `par_line_count`, `ppool`, `barrier`, `fork`, `wait`, `waitpid`, `kill`, `alarm`, `sleep`, `times`, `dump`, `reset` |
+| System | `system`, `exec`, `exit`, `chdir`, `mkdir`, `unlink`, `rename`, `chmod`, `chown`, `chroot`, `stat`, `lstat`, `link`, `symlink`, `readlink`, `glob`, `glob_par`, `glob_match`, `which_all`, `par_sed`, `par_find_files`, `par_line_count`, `ppool`, `barrier`, `fork`, `wait`, `waitpid`, `kill`, `alarm`, `sleep`, `times`, `dump`, `reset` |
 | Sockets | `socket`, `bind`, `listen`, `accept`, `connect`, `send`, `recv`, `shutdown`, `socketpair` |
 | Network | `gethostbyname`, `gethostbyaddr`, `getpwnam`, `getpwuid`, `getpwent`/`setpwent`/`endpwent`, `getgrnam`, `getgrgid`, `getgrent`/`setgrent`/`endgrent`, `getprotobyname`, `getprotobynumber`, `getservbyname`, `getservbyport` |
 | SysV IPC | `msgctl`, `msgget`, `msgsnd`, `msgrcv`, `semctl`, `semget`, `semop`, `shmctl`, `shmget`, `shmread`, `shmwrite` (stubs — runtime error) |
 | Type | `defined`, `undef`, `ref`, `bless`, `tied`, `untie` |
-| Serialization | `to_json`, `to_csv`, `ddump`, `json_encode`/`json_decode` |
+| Serialization | `to_json`, `to_csv`, `to_toml`, `to_yaml`, `to_xml`, `ddump`, `json_encode`/`json_decode` |
 | Control | `die`, `warn`, `eval`, `do`, `require`, `caller`, `wantarray`, `goto LABEL`, `continue { }` on loops, `prototype` |
 
 #### Perl-compat highlights
@@ -420,23 +420,23 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **Language server** ([\[0x11\]](#0x11-language-server---lsp)): `pe --lsp` runs an LSP server over stdio with diagnostics, hover, completion.
 - `mysync` shared state ([\[0x04\]](#0x04-shared-state-mysync)).
 - `frozen my`, `typed my`, `struct`, algebraic `match`, `try/catch/finally`, `eval_timeout`, `retry`, `rate_limit`, `every`, `gen { ... yield }`.
-- **`fore`** — side-effect-only list iterator (like `map` but void, returns item count). Works with `{ BLOCK } LIST`, blockless `fore EXPR, LIST`, and pipe-forward `|> fore say`. Use for print/log/accumulator loops.
-- **Pipe-forward `|>`** — parse-time desugaring (zero runtime cost); threads the LHS as the **first** argument of the RHS call, left-associative. `map`, `grep`/`filter`, `sort`, and `fore` accept **blockless expressions** on the RHS of `|>` — no `{ }` required for simple transforms:
+- **`fore`** (`e`) — side-effect-only list iterator (like `map` but void, returns item count). Works with `{ BLOCK } LIST`, blockless `e EXPR, LIST`, and pipe-forward `|> e say`. Use for print/log/accumulator loops.
+- **Pipe-forward `|>`** — parse-time desugaring (zero runtime cost); threads the LHS as the **first** argument of the RHS call, left-associative. `map`, `grep`/`filter`, `sort`, and `e` accept **blockless expressions** on the RHS of `|>` — no `{ }` required for simple transforms:
 
   ```perl
   # chain HTTP fetch → JSON decode → jq filter
   my @titles = $url |> fetch_json |> json_decode |> json_jq '.articles[].title';
 
   # blockless list pipelines — no braces needed for simple expressions
-  files |> filter /[a-e]/ |> fore -f $_ && system("cat $_")
-  "a".."z" |> map uc |> fore say;                      # A B C … Z
-  "a".."z" |> grep /[aeiou]/ |> fore say;              # a e i o u
-  "a".."z" |> filter 't' |> fore say;                  # t  (literal = equality test)
-  1..10 |> filter $_ > 5 |> sort |> fore say;      # blocks still work
+  files |> filter /[a-e]/ |> e -f $_ && system("cat $_")
+  "a".."z" |> map uc |> e say;                      # A B C … Z
+  "a".."z" |> grep /[aeiou]/ |> e say;              # a e i o u
+  "a".."z" |> filter 't' |> e say;                  # t  (literal = equality test)
+  1..10 |> filter $_ > 5 |> sort |> e say;      # blocks still work
   1..5 |> map $_ * $_ |> join "," |> say;         # 1,4,9,16,25
 
-  # fore — side-effect-only iteration (like map but void, returns count)
-  qw(apple banana cherry) |> grep /^a/ |> map uc |> fore say;  # APPLE
+  # e — side-effect-only iteration (like map but void, returns count)
+  qw(apple banana cherry) |> grep /^a/ |> map uc |> e say;  # APPLE
 
   # unary builtins — `x |> length`, `x |> uc`, `x |> sqrt`, etc.
   "hello" |> length |> say;                            # 5
@@ -445,7 +445,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   # bareword on RHS becomes a unary call: `x |> f` → `f(x)`
   # call on RHS prepends: `x |> f(a, b)` → `f(x, a, b)`
-  # map/grep/filter/sort/join/reduce/fold/fore — LHS fills the list slot
+  # map/grep/filter/sort/join/reduce/fold/e — LHS fills the list slot
   # chunked/windowed — `LIST |> chunked(N)` prepends the list before the size
   # scalar on RHS: `x |> $cr` → `$cr->(x)`
 
@@ -461,7 +461,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   # man ls | pe -e 'input |> s@\n@@g |> split |> frequencies |> ddump |> say'
 
   # extract all emails from text, deduplicate
-  # cat log.txt | pe -e 'input |> /[\w.]+@[\w.]+/g |> distinct |> fore say'
+  # cat log.txt | pe -e 'input |> /[\w.]+@[\w.]+/g |> distinct |> e say'
 
   # capture groups with /g:
   "a=1 b=2" |> /(\w+)=(\w+)/g |> ddump |> say;
@@ -473,7 +473,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   # ── input / output ─────────────────────────────────────────────────
   input                                # slurp all of stdin as one string
   input($fh)                           # slurp a filehandle
-  # cat data.txt | pe -e 'input |> lines |> fore say'
+  # cat data.txt | pe -e 'input |> lines |> e say'
 
   # ── string → list ──────────────────────────────────────────────────
   "hello\nworld" |> lines |> ddump |> say;       # ("hello", "world")
@@ -519,6 +519,10 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   my $data = {a => 1, b => [2,3]};
   $data |> to_json |> say;                        # {"a":1,"b":[2,3]}
   @people |> to_csv |> say;                      # CSV with headers
+  my $cfg = {title => "My App", package => {name => "myapp", version => "1.0"}};
+  $cfg |> to_toml |> say;                         # TOML with [package] table
+  $data |> to_yaml |> say;                        # YAML with --- header
+  $data |> to_xml  |> say;                        # XML with <root> wrapper
 
   # ── partition / min_by / max_by / zip_with ─────────────────────────
   my ($yes, $no) = partition { $_ > 5 } 1..10;
@@ -533,6 +537,23 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   # ── write to file (returns content for further piping) ─────────────
   my $text = "hello\nworld\n";
   $text |> to_file "/tmp/out.txt";
+
+  # ── file I/O helpers ────────────────────────────────────────────────
+  my @lines = read_lines "/tmp/out.txt";        # slurp file → list of lines
+  append_file "/tmp/out.txt", "extra\n";         # append to file
+  my $tmp = tempfile();                          # create temp file, returns path
+  my $dir = tempdir();                           # create temp directory, returns path
+
+  # ── JSON file I/O ──────────────────────────────────────────────────
+  write_json "/tmp/data.json", {a => 1, b => 2}; # write hash as JSON file
+  my $obj = read_json "/tmp/data.json";           # read JSON file → hashref
+
+  # ── interleave ─────────────────────────────────────────────────────
+  my @merged = interleave [1,2,3], [10,20,30];  # (1,10,2,20,3,30)
+
+  # ── glob_match / which_all ──────────────────────────────────────────
+  say glob_match "*.txt", "readme.txt";          # 1 (matches)
+  my @bins = which_all "perl";                   # all paths for "perl" in $PATH
   ```
 
   **Blockless `|>` rules for `grep`/`filter`**: string literals test `$_ eq EXPR`, numbers test `$_ == EXPR`, regexes test `$_ =~ EXPR`, anything else (e.g. `defined`) uses standard Perl grep semantics (sets `$_`, evaluates expression).
