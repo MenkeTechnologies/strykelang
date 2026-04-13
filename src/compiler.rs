@@ -5956,6 +5956,9 @@ impl Compiler {
                     Some(root),
                 );
             }
+            ExprKind::FilesfRecursiveStream { .. } => {
+                return Err(CompileError::Unsupported("frs { } DIR (tree-walker only)".into()));
+            }
             ExprKind::Dirs(args) => {
                 for a in args {
                     self.compile_expr(a)?;
@@ -5975,6 +5978,9 @@ impl Compiler {
                     line,
                     Some(root),
                 );
+            }
+            ExprKind::DirsRecursiveStream { .. } => {
+                return Err(CompileError::Unsupported("drs { } DIR (tree-walker only)".into()));
             }
             ExprKind::SymLinks(args) => {
                 for a in args {

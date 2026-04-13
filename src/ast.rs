@@ -920,10 +920,14 @@ pub enum ExprKind {
     Filesf(Vec<Expr>),
     /// `fr DIR` — list only regular file names recursively (default: `.`).
     FilesfRecursive(Vec<Expr>),
+    /// `frs { BLOCK } DIR` — streaming recursive file walk; sets `$_` per file, no collect.
+    FilesfRecursiveStream { block: Block, dir: Box<Expr> },
     /// `dirs` / `dirs DIR` / `d` — list subdirectory names in a directory (default: `.`).
     Dirs(Vec<Expr>),
     /// `dr DIR` — list subdirectory paths recursively (default: `.`).
     DirsRecursive(Vec<Expr>),
+    /// `drs { BLOCK } DIR` — streaming recursive dir walk; sets `$_` per dir, no collect.
+    DirsRecursiveStream { block: Block, dir: Box<Expr> },
     /// `sym_links` / `sym_links DIR` — list symlink names in a directory (default: `.`).
     SymLinks(Vec<Expr>),
     /// `sockets` / `sockets DIR` — list Unix socket names in a directory (default: `.`).

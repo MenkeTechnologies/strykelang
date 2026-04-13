@@ -1103,11 +1103,13 @@ impl Parser {
                 | "d"
                 | "dirs"
                 | "dr"
+                | "drs"
                 | "f"
                 | "files"
                 | "filesf"
                 | "filter"
                 | "fr"
+                | "frs"
                 | "getcwd"
                 | "glob_par"
                 | "par_sed"
@@ -3693,6 +3695,9 @@ impl Parser {
                 args.insert(0, lhs);
                 ExprKind::FilesfRecursive(args)
             }
+            ExprKind::FilesfRecursiveStream { block, .. } => {
+                ExprKind::FilesfRecursiveStream { block, dir: Box::new(lhs) }
+            }
             ExprKind::Dirs(mut args) => {
                 args.insert(0, lhs);
                 ExprKind::Dirs(args)
@@ -3700,6 +3705,9 @@ impl Parser {
             ExprKind::DirsRecursive(mut args) => {
                 args.insert(0, lhs);
                 ExprKind::DirsRecursive(args)
+            }
+            ExprKind::DirsRecursiveStream { block, .. } => {
+                ExprKind::DirsRecursiveStream { block, dir: Box::new(lhs) }
             }
             ExprKind::SymLinks(mut args) => {
                 args.insert(0, lhs);
@@ -7793,12 +7801,42 @@ impl Parser {
                     line,
                 })
             }
+            "frs" => {
+                if matches!(self.peek(), Token::LBrace) {
+                    let (block, dir) = self.parse_block_list()?;
+                    Ok(Expr {
+                        kind: ExprKind::FilesfRecursiveStream { block, dir: Box::new(dir) },
+                        line,
+                    })
+                } else {
+                    let args = self.parse_builtin_args()?;
+                    Ok(Expr {
+                        kind: ExprKind::FilesfRecursive(args),
+                        line,
+                    })
+                }
+            }
             "dirs" | "d" => {
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::Dirs(args),
                     line,
                 })
+            }
+            "drs" => {
+                if matches!(self.peek(), Token::LBrace) {
+                    let (block, dir) = self.parse_block_list()?;
+                    Ok(Expr {
+                        kind: ExprKind::DirsRecursiveStream { block, dir: Box::new(dir) },
+                        line,
+                    })
+                } else {
+                    let args = self.parse_builtin_args()?;
+                    Ok(Expr {
+                        kind: ExprKind::DirsRecursive(args),
+                        line,
+                    })
+                }
             }
             "dr" => {
                 let args = self.parse_builtin_args()?;
@@ -8515,7 +8553,7 @@ impl Parser {
             | "tempfile" | "tempdir" | "list_count" | "list_size" | "size"
             | "clamp" | "grep_v" | "select_keys" | "pluck" | "glob_match" | "which_all"
             // ── filesystem extensions ───────────────────────────────────────
-            | "files" | "filesf" | "f" | "fr" | "dirs" | "d" | "dr" | "sym_links"
+            | "files" | "filesf" | "f" | "fr" | "frs" | "dirs" | "d" | "dr" | "drs" | "sym_links"
             | "sockets" | "pipes" | "block_devices" | "char_devices"
             // ── data / network ──────────────────────────────────────────────
             | "csv_read" | "csv_write" | "dataframe" | "sqlite"

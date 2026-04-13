@@ -10497,6 +10497,11 @@ impl Interpreter {
                 };
                 Ok(crate::perl_fs::list_filesf_recursive(&dir))
             }
+            ExprKind::FilesfRecursiveStream { block, dir } => {
+                let dir = self.eval_expr(dir)?.to_string();
+                let count = self.walk_recursive_stream(&dir, block, true)?;
+                Ok(PerlValue::integer(count))
+            }
             ExprKind::Dirs(args) => {
                 let dir = if args.is_empty() {
                     ".".to_string()
@@ -10512,6 +10517,11 @@ impl Interpreter {
                     self.eval_expr(&args[0])?.to_string()
                 };
                 Ok(crate::perl_fs::list_dirs_recursive(&dir))
+            }
+            ExprKind::DirsRecursiveStream { block, dir } => {
+                let dir = self.eval_expr(dir)?.to_string();
+                let count = self.walk_recursive_stream(&dir, block, false)?;
+                Ok(PerlValue::integer(count))
             }
             ExprKind::SymLinks(args) => {
                 let dir = if args.is_empty() {
@@ -11766,6 +11776,65 @@ impl Interpreter {
             line,
         )
         .into())
+    }
+
+    /// Streaming recursive walk: calls `block` with `$_` set to each relative path.
+    /// `files_only=true` → only regular files; `false` → only directories.
+    /// Returns the count of items visited.
+    fn walk_recursive_stream(
+        &mut self,
+        dir: &str,
+        block: &Block,
+        files_only: bool,
+    ) -> Result<i64, FlowOrError> {
+        let mut count = 0i64;
+        let mut stack = vec![(std::path::PathBuf::from(dir), String::new())];
+        while let Some((base, rel)) = stack.pop() {
+            let entries = match std::fs::read_dir(&base) {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+            // Collect and sort this level so output is deterministic within each directory.
+            let mut children: Vec<(std::fs::DirEntry, bool)> = Vec::new();
+            for entry in entries.flatten() {
+                let is_dir = entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
+                let is_file = entry.file_type().map(|ft| ft.is_file()).unwrap_or(false);
+                if is_dir || is_file {
+                    children.push((entry, is_dir));
+                }
+            }
+            children.sort_by(|a, b| a.0.file_name().cmp(&b.0.file_name()));
+            // Push dirs in reverse so they're visited in sorted order.
+            let mut subdirs = Vec::new();
+            for (entry, is_dir) in &children {
+                let name = match entry.file_name().into_string() {
+                    Ok(n) => n,
+                    Err(_) => continue,
+                };
+                let child_rel = if rel.is_empty() {
+                    name.clone()
+                } else {
+                    format!("{rel}/{name}")
+                };
+                if *is_dir {
+                    if !files_only {
+                        count += 1;
+                        let _ = self.scope.set_scalar("_", PerlValue::string(child_rel.clone()));
+                        self.exec_block(block)?;
+                    }
+                    subdirs.push((base.join(&name), child_rel));
+                } else if files_only {
+                    count += 1;
+                    let _ = self.scope.set_scalar("_", PerlValue::string(child_rel));
+                    self.exec_block(block)?;
+                }
+            }
+            // Push subdirs in reverse so the first child is processed next.
+            for s in subdirs.into_iter().rev() {
+                stack.push(s);
+            }
+        }
+        Ok(count)
     }
 
     fn assign_value(&mut self, target: &Expr, val: PerlValue) -> ExecResult {
