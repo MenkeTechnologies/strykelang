@@ -238,7 +238,7 @@ pub(crate) fn try_builtin(
         "to_xml" => Some(builtin_to_xml(args)),
         "set" => Some(Ok(crate::value::set_from_elements(args.iter().cloned()))),
         "list_count" | "list_size" => Some(builtin_list_count(args)),
-        "count" | "size" | "cnt" => Some(builtin_count_size_cnt(args)),
+        "count" | "len" | "size" | "cnt" => Some(builtin_count_size_cnt(args)),
         "read_lines" => Some(builtin_read_lines(interp, args, line)),
         "append_file" => Some(builtin_append_file(args, line)),
         "tempfile" => Some(builtin_tempfile(args, line)),

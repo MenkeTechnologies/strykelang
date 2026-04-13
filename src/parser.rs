@@ -1161,6 +1161,7 @@ impl Parser {
                 | "count"
                 | "size"
                 | "cnt"
+                | "len"
                 | "all"
                 | "any"
                 | "none"
@@ -1181,6 +1182,7 @@ impl Parser {
                 | "uniq"
                 | "distinct"
                 | "shuffle"
+                | "shuffled"
                 | "chunked"
                 | "windowed"
                 | "match"
@@ -3532,7 +3534,7 @@ impl Parser {
             ExprKind::FuncCall { name, mut args } => {
                 match name.as_str() {
                     "puniq" | "uniq" | "distinct" | "flatten" | "set" | "list_count"
-                    | "list_size" | "count" | "size" | "cnt" | "with_index" | "shuffle"
+                    | "list_size" | "count" | "size" | "cnt" | "len" | "with_index" | "shuffle" | "shuffled"
                     | "frequencies" | "freq" | "interleave" | "ddump" | "lines" | "words"
                     | "chars" | "trim" | "avg" | "to_json" | "to_csv" | "to_toml" | "to_yaml"
                     | "to_xml" | "stddev" | "normalize" | "snake_case" | "camel_case"
@@ -7073,7 +7075,7 @@ impl Parser {
                     line,
                 })
             }
-            "list_count" | "list_size" | "count" | "size" | "cnt" => {
+            "list_count" | "list_size" | "count" | "size" | "len" | "cnt" => {
                 if self.pipe_supplies_slurped_list_operand() {
                     return Ok(Expr {
                         kind: ExprKind::FuncCall {
@@ -7098,7 +7100,7 @@ impl Parser {
                     line,
                 })
             }
-            "shuffle" => {
+            "shuffle" | "shuffled" => {
                 if self.pipe_supplies_slurped_list_operand() {
                     return Ok(Expr {
                         kind: ExprKind::FuncCall {
@@ -8503,9 +8505,9 @@ impl Parser {
             | "inject" | "collect" | "uniq" | "distinct" | "any" | "all" | "none"
             | "first" | "detect" | "find" | "compact" | "reject" | "flatten" | "set"
             | "min_by" | "max_by" | "sort_by" | "tally" | "find_index"
-            | "each_with_index" | "count" | "cnt" | "group_by" | "chunk_by"
+            | "each_with_index" | "count" | "cnt" |"len" | "group_by" | "chunk_by"
             | "zip" | "chunk" | "chunked" | "sliding_window" | "windowed"
-            | "enumerate" | "with_index" | "shuffle" | "heap"
+            | "enumerate" | "with_index" | "shuffle" | "shuffled"| "heap"
             | "take_while" | "drop_while" | "tap" | "peek" | "partition"
             | "zip_with" | "count_by"
             // ── pipeline / string helpers ───────────────────────────────────
