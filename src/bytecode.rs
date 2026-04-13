@@ -930,11 +930,25 @@ pub enum BuiltinId {
     Pipe,
     /// `files` / `files DIR` — list file names in a directory (default: `.`).
     Files,
+    /// `filesf` / `filesf DIR` — list only regular file names in a directory (default: `.`).
+    Filesf,
+    /// `dirs` / `dirs DIR` — list subdirectory names in a directory (default: `.`).
+    Dirs,
+    /// `sym_links` / `sym_links DIR` — list symlink names in a directory (default: `.`).
+    SymLinks,
+    /// `sockets` / `sockets DIR` — list Unix socket names in a directory (default: `.`).
+    Sockets,
+    /// `pipes` / `pipes DIR` — list named-pipe (FIFO) names in a directory (default: `.`).
+    Pipes,
+    /// `block_devices` / `block_devices DIR` — list block device names in a directory (default: `.`).
+    BlockDevices,
+    /// `char_devices` / `char_devices DIR` — list character device names in a directory (default: `.`).
+    CharDevices,
 }
 
 impl BuiltinId {
     pub fn from_u16(v: u16) -> Option<Self> {
-        if v <= Self::Files as u16 {
+        if v <= Self::CharDevices as u16 {
             Some(unsafe { std::mem::transmute::<u16, BuiltinId>(v) })
         } else {
             None
@@ -2192,11 +2206,39 @@ mod tests {
             BuiltinId::from_u16(BuiltinId::Files as u16),
             Some(BuiltinId::Files)
         );
+        assert_eq!(
+            BuiltinId::from_u16(BuiltinId::Filesf as u16),
+            Some(BuiltinId::Filesf)
+        );
+        assert_eq!(
+            BuiltinId::from_u16(BuiltinId::Dirs as u16),
+            Some(BuiltinId::Dirs)
+        );
+        assert_eq!(
+            BuiltinId::from_u16(BuiltinId::SymLinks as u16),
+            Some(BuiltinId::SymLinks)
+        );
+        assert_eq!(
+            BuiltinId::from_u16(BuiltinId::Sockets as u16),
+            Some(BuiltinId::Sockets)
+        );
+        assert_eq!(
+            BuiltinId::from_u16(BuiltinId::Pipes as u16),
+            Some(BuiltinId::Pipes)
+        );
+        assert_eq!(
+            BuiltinId::from_u16(BuiltinId::BlockDevices as u16),
+            Some(BuiltinId::BlockDevices)
+        );
+        assert_eq!(
+            BuiltinId::from_u16(BuiltinId::CharDevices as u16),
+            Some(BuiltinId::CharDevices)
+        );
     }
 
     #[test]
     fn builtin_id_from_u16_out_of_range() {
-        assert_eq!(BuiltinId::from_u16(BuiltinId::Files as u16 + 1), None);
+        assert_eq!(BuiltinId::from_u16(BuiltinId::CharDevices as u16 + 1), None);
         assert_eq!(BuiltinId::from_u16(u16::MAX), None);
     }
 

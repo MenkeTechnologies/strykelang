@@ -1114,6 +1114,13 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::Readlink(e) => format!("readlink {}", format_expr(e)),
         ExprKind::Glob(_) => "/* ExprKind::Glob */".to_string(),
         ExprKind::Files(_) => "/* ExprKind::Files */".to_string(),
+        ExprKind::Filesf(_) => "/* ExprKind::Filesf */".to_string(),
+        ExprKind::Dirs(_) => "/* ExprKind::Dirs */".to_string(),
+        ExprKind::SymLinks(_) => "/* ExprKind::SymLinks */".to_string(),
+        ExprKind::Sockets(_) => "/* ExprKind::Sockets */".to_string(),
+        ExprKind::Pipes(_) => "/* ExprKind::Pipes */".to_string(),
+        ExprKind::BlockDevices(_) => "/* ExprKind::BlockDevices */".to_string(),
+        ExprKind::CharDevices(_) => "/* ExprKind::CharDevices */".to_string(),
         ExprKind::GlobPar { args, progress } => {
             let base = format!("glob_par({})", format_expr_list(args));
             match progress {

@@ -7981,6 +7981,62 @@ impl<'a> VM<'a> {
                 };
                 Ok(crate::perl_fs::list_files(&dir))
             }
+            Some(BuiltinId::Filesf) => {
+                let dir = if args.is_empty() {
+                    ".".to_string()
+                } else {
+                    args[0].to_string()
+                };
+                Ok(crate::perl_fs::list_filesf(&dir))
+            }
+            Some(BuiltinId::Dirs) => {
+                let dir = if args.is_empty() {
+                    ".".to_string()
+                } else {
+                    args[0].to_string()
+                };
+                Ok(crate::perl_fs::list_dirs(&dir))
+            }
+            Some(BuiltinId::SymLinks) => {
+                let dir = if args.is_empty() {
+                    ".".to_string()
+                } else {
+                    args[0].to_string()
+                };
+                Ok(crate::perl_fs::list_sym_links(&dir))
+            }
+            Some(BuiltinId::Sockets) => {
+                let dir = if args.is_empty() {
+                    ".".to_string()
+                } else {
+                    args[0].to_string()
+                };
+                Ok(crate::perl_fs::list_sockets(&dir))
+            }
+            Some(BuiltinId::Pipes) => {
+                let dir = if args.is_empty() {
+                    ".".to_string()
+                } else {
+                    args[0].to_string()
+                };
+                Ok(crate::perl_fs::list_pipes(&dir))
+            }
+            Some(BuiltinId::BlockDevices) => {
+                let dir = if args.is_empty() {
+                    ".".to_string()
+                } else {
+                    args[0].to_string()
+                };
+                Ok(crate::perl_fs::list_block_devices(&dir))
+            }
+            Some(BuiltinId::CharDevices) => {
+                let dir = if args.is_empty() {
+                    ".".to_string()
+                } else {
+                    args[0].to_string()
+                };
+                Ok(crate::perl_fs::list_char_devices(&dir))
+            }
             Some(BuiltinId::GlobPar) => {
                 let pats: Vec<String> = args.iter().map(|v| v.to_string()).collect();
                 Ok(crate::perl_fs::glob_par_patterns(&pats))

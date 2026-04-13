@@ -406,6 +406,146 @@ pub fn list_files(dir: &str) -> PerlValue {
     PerlValue::array(names.into_iter().map(PerlValue::string).collect())
 }
 
+/// List only regular file names inside `dir` (non-recursive), sorted.
+/// Excludes directories, symlinks, and special files.
+/// Returns an empty list if `dir` cannot be read.
+pub fn list_filesf(dir: &str) -> PerlValue {
+    let mut names: Vec<String> = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            if entry.file_type().map(|ft| ft.is_file()).unwrap_or(false) {
+                if let Some(name) = entry.file_name().to_str() {
+                    names.push(name.to_string());
+                }
+            }
+        }
+    }
+    names.sort();
+    PerlValue::array(names.into_iter().map(PerlValue::string).collect())
+}
+
+/// List only directory names inside `dir` (non-recursive), sorted.
+/// Returns an empty list if `dir` cannot be read.
+pub fn list_dirs(dir: &str) -> PerlValue {
+    let mut names: Vec<String> = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
+                if let Some(name) = entry.file_name().to_str() {
+                    names.push(name.to_string());
+                }
+            }
+        }
+    }
+    names.sort();
+    PerlValue::array(names.into_iter().map(PerlValue::string).collect())
+}
+
+/// List only symlink names inside `dir` (non-recursive), sorted.
+/// Returns an empty list if `dir` cannot be read.
+pub fn list_sym_links(dir: &str) -> PerlValue {
+    let mut names: Vec<String> = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            if entry.file_type().map(|ft| ft.is_symlink()).unwrap_or(false) {
+                if let Some(name) = entry.file_name().to_str() {
+                    names.push(name.to_string());
+                }
+            }
+        }
+    }
+    names.sort();
+    PerlValue::array(names.into_iter().map(PerlValue::string).collect())
+}
+
+/// List only Unix socket names inside `dir` (non-recursive), sorted.
+/// Returns an empty list if `dir` cannot be read or on non-Unix platforms.
+pub fn list_sockets(dir: &str) -> PerlValue {
+    let mut names: Vec<String> = Vec::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::FileTypeExt;
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                if entry.file_type().map(|ft| ft.is_socket()).unwrap_or(false) {
+                    if let Some(name) = entry.file_name().to_str() {
+                        names.push(name.to_string());
+                    }
+                }
+            }
+        }
+    }
+    let _ = dir;
+    names.sort();
+    PerlValue::array(names.into_iter().map(PerlValue::string).collect())
+}
+
+/// List only named-pipe (FIFO) names inside `dir` (non-recursive), sorted.
+/// Returns an empty list if `dir` cannot be read or on non-Unix platforms.
+pub fn list_pipes(dir: &str) -> PerlValue {
+    let mut names: Vec<String> = Vec::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::FileTypeExt;
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                if entry.file_type().map(|ft| ft.is_fifo()).unwrap_or(false) {
+                    if let Some(name) = entry.file_name().to_str() {
+                        names.push(name.to_string());
+                    }
+                }
+            }
+        }
+    }
+    let _ = dir;
+    names.sort();
+    PerlValue::array(names.into_iter().map(PerlValue::string).collect())
+}
+
+/// List only block device names inside `dir` (non-recursive), sorted.
+/// Returns an empty list if `dir` cannot be read or on non-Unix platforms.
+pub fn list_block_devices(dir: &str) -> PerlValue {
+    let mut names: Vec<String> = Vec::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::FileTypeExt;
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                if entry.file_type().map(|ft| ft.is_block_device()).unwrap_or(false) {
+                    if let Some(name) = entry.file_name().to_str() {
+                        names.push(name.to_string());
+                    }
+                }
+            }
+        }
+    }
+    let _ = dir;
+    names.sort();
+    PerlValue::array(names.into_iter().map(PerlValue::string).collect())
+}
+
+/// List only character device names inside `dir` (non-recursive), sorted.
+/// Returns an empty list if `dir` cannot be read or on non-Unix platforms.
+pub fn list_char_devices(dir: &str) -> PerlValue {
+    let mut names: Vec<String> = Vec::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::FileTypeExt;
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                if entry.file_type().map(|ft| ft.is_char_device()).unwrap_or(false) {
+                    if let Some(name) = entry.file_name().to_str() {
+                        names.push(name.to_string());
+                    }
+                }
+            }
+        }
+    }
+    let _ = dir;
+    names.sort();
+    PerlValue::array(names.into_iter().map(PerlValue::string).collect())
+}
+
 pub fn glob_patterns(patterns: &[String]) -> PerlValue {
     let mut paths: Vec<String> = Vec::new();
     for pat in patterns {

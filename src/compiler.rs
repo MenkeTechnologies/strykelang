@@ -5869,6 +5869,76 @@ impl Compiler {
                     Some(root),
                 );
             }
+            ExprKind::Filesf(args) => {
+                for a in args {
+                    self.compile_expr(a)?;
+                }
+                self.emit_op(
+                    Op::CallBuiltin(BuiltinId::Filesf as u16, args.len() as u8),
+                    line,
+                    Some(root),
+                );
+            }
+            ExprKind::Dirs(args) => {
+                for a in args {
+                    self.compile_expr(a)?;
+                }
+                self.emit_op(
+                    Op::CallBuiltin(BuiltinId::Dirs as u16, args.len() as u8),
+                    line,
+                    Some(root),
+                );
+            }
+            ExprKind::SymLinks(args) => {
+                for a in args {
+                    self.compile_expr(a)?;
+                }
+                self.emit_op(
+                    Op::CallBuiltin(BuiltinId::SymLinks as u16, args.len() as u8),
+                    line,
+                    Some(root),
+                );
+            }
+            ExprKind::Sockets(args) => {
+                for a in args {
+                    self.compile_expr(a)?;
+                }
+                self.emit_op(
+                    Op::CallBuiltin(BuiltinId::Sockets as u16, args.len() as u8),
+                    line,
+                    Some(root),
+                );
+            }
+            ExprKind::Pipes(args) => {
+                for a in args {
+                    self.compile_expr(a)?;
+                }
+                self.emit_op(
+                    Op::CallBuiltin(BuiltinId::Pipes as u16, args.len() as u8),
+                    line,
+                    Some(root),
+                );
+            }
+            ExprKind::BlockDevices(args) => {
+                for a in args {
+                    self.compile_expr(a)?;
+                }
+                self.emit_op(
+                    Op::CallBuiltin(BuiltinId::BlockDevices as u16, args.len() as u8),
+                    line,
+                    Some(root),
+                );
+            }
+            ExprKind::CharDevices(args) => {
+                for a in args {
+                    self.compile_expr(a)?;
+                }
+                self.emit_op(
+                    Op::CallBuiltin(BuiltinId::CharDevices as u16, args.len() as u8),
+                    line,
+                    Some(root),
+                );
+            }
             ExprKind::Glob(args) => {
                 for a in args {
                     self.compile_expr(a)?;

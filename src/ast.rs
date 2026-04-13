@@ -914,6 +914,20 @@ pub enum ExprKind {
     Readlink(Box<Expr>),
     /// `files` / `files DIR` — list file names in a directory (default: `.`).
     Files(Vec<Expr>),
+    /// `filesf` / `filesf DIR` — list only regular file names in a directory (default: `.`).
+    Filesf(Vec<Expr>),
+    /// `dirs` / `dirs DIR` — list subdirectory names in a directory (default: `.`).
+    Dirs(Vec<Expr>),
+    /// `sym_links` / `sym_links DIR` — list symlink names in a directory (default: `.`).
+    SymLinks(Vec<Expr>),
+    /// `sockets` / `sockets DIR` — list Unix socket names in a directory (default: `.`).
+    Sockets(Vec<Expr>),
+    /// `pipes` / `pipes DIR` — list named-pipe (FIFO) names in a directory (default: `.`).
+    Pipes(Vec<Expr>),
+    /// `block_devices` / `block_devices DIR` — list block device names in a directory (default: `.`).
+    BlockDevices(Vec<Expr>),
+    /// `char_devices` / `char_devices DIR` — list character device names in a directory (default: `.`).
+    CharDevices(Vec<Expr>),
     Glob(Vec<Expr>),
     /// Parallel recursive glob (rayon); same patterns as `glob`, different walk strategy.
     /// Optional `, progress => EXPR` — stderr progress bar (one tick per pattern).

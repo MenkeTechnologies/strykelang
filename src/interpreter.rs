@@ -10254,6 +10254,62 @@ impl Interpreter {
                 };
                 Ok(crate::perl_fs::list_files(&dir))
             }
+            ExprKind::Filesf(args) => {
+                let dir = if args.is_empty() {
+                    ".".to_string()
+                } else {
+                    self.eval_expr(&args[0])?.to_string()
+                };
+                Ok(crate::perl_fs::list_filesf(&dir))
+            }
+            ExprKind::Dirs(args) => {
+                let dir = if args.is_empty() {
+                    ".".to_string()
+                } else {
+                    self.eval_expr(&args[0])?.to_string()
+                };
+                Ok(crate::perl_fs::list_dirs(&dir))
+            }
+            ExprKind::SymLinks(args) => {
+                let dir = if args.is_empty() {
+                    ".".to_string()
+                } else {
+                    self.eval_expr(&args[0])?.to_string()
+                };
+                Ok(crate::perl_fs::list_sym_links(&dir))
+            }
+            ExprKind::Sockets(args) => {
+                let dir = if args.is_empty() {
+                    ".".to_string()
+                } else {
+                    self.eval_expr(&args[0])?.to_string()
+                };
+                Ok(crate::perl_fs::list_sockets(&dir))
+            }
+            ExprKind::Pipes(args) => {
+                let dir = if args.is_empty() {
+                    ".".to_string()
+                } else {
+                    self.eval_expr(&args[0])?.to_string()
+                };
+                Ok(crate::perl_fs::list_pipes(&dir))
+            }
+            ExprKind::BlockDevices(args) => {
+                let dir = if args.is_empty() {
+                    ".".to_string()
+                } else {
+                    self.eval_expr(&args[0])?.to_string()
+                };
+                Ok(crate::perl_fs::list_block_devices(&dir))
+            }
+            ExprKind::CharDevices(args) => {
+                let dir = if args.is_empty() {
+                    ".".to_string()
+                } else {
+                    self.eval_expr(&args[0])?.to_string()
+                };
+                Ok(crate::perl_fs::list_char_devices(&dir))
+            }
             ExprKind::Glob(args) => {
                 let mut pats = Vec::new();
                 for a in args {

@@ -174,21 +174,151 @@ impl Parser {
     /// call this so that `map sha512, @list` invokes `sha512($_)` for each
     /// element instead of stringifying the bareword.  Non-bareword expressions
     /// pass through unchanged.
+    ///
+    /// Also injects `$_` into known builtins that were parsed with zero
+    /// arguments (e.g. `fore unlink`, `map stat`) so they operate on the
+    /// topic variable instead of being no-ops.
     fn lift_bareword_to_topic_call(expr: Expr) -> Expr {
-        if let ExprKind::Bareword(ref name) = expr.kind {
-            let line = expr.line;
-            Expr {
+        let line = expr.line;
+        let topic = || Expr {
+            kind: ExprKind::ScalarVar("_".into()),
+            line,
+        };
+        match expr.kind {
+            ExprKind::Bareword(ref name) => Expr {
                 kind: ExprKind::FuncCall {
                     name: name.clone(),
-                    args: vec![Expr {
-                        kind: ExprKind::ScalarVar("_".into()),
-                        line,
-                    }],
+                    args: vec![topic()],
                 },
                 line,
+            },
+            // Builtins that take Vec<Expr> args — inject $_ when empty.
+            ExprKind::Unlink(ref args) if args.is_empty() => Expr {
+                kind: ExprKind::Unlink(vec![topic()]),
+                line,
+            },
+            ExprKind::Chmod(ref args) if args.is_empty() => Expr {
+                kind: ExprKind::Chmod(vec![topic()]),
+                line,
+            },
+            // Builtins that take Box<Expr> — inject $_ when arg is implicit.
+            ExprKind::Stat(_) => expr,
+            ExprKind::Lstat(_) => expr,
+            ExprKind::Readlink(_) => expr,
+            _ => expr,
+        }
+    }
+
+    /// Like [`Self::lift_bareword_to_topic_call`] but also rewrites
+    /// builtins that require exactly one argument (stat, lstat, readlink)
+    /// from a parse error into `builtin($_)` when used in pipe contexts
+    /// where the parser would otherwise reject the zero-arg form.
+    fn parse_pipe_builtin_or_expr(&mut self) -> PerlResult<Expr> {
+        let line = self.peek_line();
+        let topic = Expr {
+            kind: ExprKind::ScalarVar("_".into()),
+            line,
+        };
+        match self.peek() {
+            Token::Ident(ref kw)
+                if matches!(
+                    kw.as_str(),
+                    "stat" | "lstat" | "readlink" | "unlink" | "rm"
+                        | "rmdir" | "chdir" | "chmod"
+                ) =>
+            {
+                let kw = kw.clone();
+                self.advance(); // consume keyword
+                // Try to parse args; if none follow, inject $_.
+                let args = self.parse_builtin_args()?;
+                match kw.as_str() {
+                    "stat" => {
+                        let arg = if args.is_empty() {
+                            topic
+                        } else {
+                            args[0].clone()
+                        };
+                        Ok(Expr {
+                            kind: ExprKind::Stat(Box::new(arg)),
+                            line,
+                        })
+                    }
+                    "lstat" => {
+                        let arg = if args.is_empty() {
+                            topic
+                        } else {
+                            args[0].clone()
+                        };
+                        Ok(Expr {
+                            kind: ExprKind::Lstat(Box::new(arg)),
+                            line,
+                        })
+                    }
+                    "readlink" => {
+                        let arg = if args.is_empty() {
+                            topic
+                        } else {
+                            args[0].clone()
+                        };
+                        Ok(Expr {
+                            kind: ExprKind::Readlink(Box::new(arg)),
+                            line,
+                        })
+                    }
+                    "unlink" | "rm" => {
+                        let a = if args.is_empty() {
+                            vec![topic]
+                        } else {
+                            args
+                        };
+                        Ok(Expr {
+                            kind: ExprKind::Unlink(a),
+                            line,
+                        })
+                    }
+                    "rmdir" => {
+                        let a = if args.is_empty() {
+                            vec![topic]
+                        } else {
+                            args
+                        };
+                        Ok(Expr {
+                            kind: ExprKind::FuncCall {
+                                name: "rmdir".into(),
+                                args: a,
+                            },
+                            line,
+                        })
+                    }
+                    "chdir" => {
+                        let arg = if args.is_empty() {
+                            topic
+                        } else {
+                            args[0].clone()
+                        };
+                        Ok(Expr {
+                            kind: ExprKind::Chdir(Box::new(arg)),
+                            line,
+                        })
+                    }
+                    "chmod" => {
+                        let a = if args.is_empty() {
+                            vec![topic]
+                        } else {
+                            args
+                        };
+                        Ok(Expr {
+                            kind: ExprKind::Chmod(a),
+                            line,
+                        })
+                    }
+                    _ => unreachable!(),
+                }
             }
-        } else {
-            expr
+            _ => {
+                let expr = self.parse_assign_expr_stop_at_pipe()?;
+                Ok(Self::lift_bareword_to_topic_call(expr))
+            }
         }
     }
 
@@ -1007,7 +1137,9 @@ impl Parser {
                 | "fan_cap"
                 | "fc"
                 | "fetch_url"
+                | "dirs"
                 | "files"
+                | "filesf"
                 | "filter"
                 | "getcwd"
                 | "glob_par"
@@ -1064,6 +1196,9 @@ impl Parser {
                 | "par_lines"
                 | "par_walk"
                 | "pipe"
+                | "pipes"
+                | "block_devices"
+                | "char_devices"
                 | "rate_limit"
                 | "retry"
                 | "pcache"
@@ -1106,12 +1241,14 @@ impl Parser {
                 | "rewinddir"
                 | "rindex"
                 | "rmdir"
+                | "rm"
                 | "say"
                 | "scalar"
                 | "seekdir"
                 | "shift"
                 | "sin"
                 | "slurp"
+                | "sockets"
                 | "sort"
                 | "splice"
                 | "split"
@@ -1122,6 +1259,7 @@ impl Parser {
                 | "study"
                 | "substr"
                 | "symlink"
+                | "sym_links"
                 | "system"
                 | "telldir"
                 | "timer"
@@ -3509,6 +3647,34 @@ impl Parser {
             ExprKind::Files(mut args) => {
                 args.insert(0, lhs);
                 ExprKind::Files(args)
+            }
+            ExprKind::Filesf(mut args) => {
+                args.insert(0, lhs);
+                ExprKind::Filesf(args)
+            }
+            ExprKind::Dirs(mut args) => {
+                args.insert(0, lhs);
+                ExprKind::Dirs(args)
+            }
+            ExprKind::SymLinks(mut args) => {
+                args.insert(0, lhs);
+                ExprKind::SymLinks(args)
+            }
+            ExprKind::Sockets(mut args) => {
+                args.insert(0, lhs);
+                ExprKind::Sockets(args)
+            }
+            ExprKind::Pipes(mut args) => {
+                args.insert(0, lhs);
+                ExprKind::Pipes(args)
+            }
+            ExprKind::BlockDevices(mut args) => {
+                args.insert(0, lhs);
+                ExprKind::BlockDevices(args)
+            }
+            ExprKind::CharDevices(mut args) => {
+                args.insert(0, lhs);
+                ExprKind::CharDevices(args)
             }
             ExprKind::GlobPar { mut args, progress } => {
                 args.insert(0, lhs);
@@ -7250,7 +7416,7 @@ impl Parser {
                     line,
                 })
             }
-            "unlink" => {
+            "unlink" | "rm" => {
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::Unlink(args),
@@ -7294,21 +7460,29 @@ impl Parser {
             }
             "stat" => {
                 let args = self.parse_builtin_args()?;
-                if args.len() != 1 {
-                    return Err(self.syntax_err("stat requires one argument", line));
-                }
+                let arg = if args.len() == 1 {
+                    args[0].clone()
+                } else if args.is_empty() {
+                    Expr { kind: ExprKind::ScalarVar("_".into()), line }
+                } else {
+                    return Err(self.syntax_err("stat requires zero or one argument", line));
+                };
                 Ok(Expr {
-                    kind: ExprKind::Stat(Box::new(args[0].clone())),
+                    kind: ExprKind::Stat(Box::new(arg)),
                     line,
                 })
             }
             "lstat" => {
                 let args = self.parse_builtin_args()?;
-                if args.len() != 1 {
-                    return Err(self.syntax_err("lstat requires one argument", line));
-                }
+                let arg = if args.len() == 1 {
+                    args[0].clone()
+                } else if args.is_empty() {
+                    Expr { kind: ExprKind::ScalarVar("_".into()), line }
+                } else {
+                    return Err(self.syntax_err("lstat requires zero or one argument", line));
+                };
                 Ok(Expr {
-                    kind: ExprKind::Lstat(Box::new(args[0].clone())),
+                    kind: ExprKind::Lstat(Box::new(arg)),
                     line,
                 })
             }
@@ -7340,11 +7514,15 @@ impl Parser {
             }
             "readlink" => {
                 let args = self.parse_builtin_args()?;
-                if args.len() != 1 {
-                    return Err(self.syntax_err("readlink requires one argument", line));
-                }
+                let arg = if args.len() == 1 {
+                    args[0].clone()
+                } else if args.is_empty() {
+                    Expr { kind: ExprKind::ScalarVar("_".into()), line }
+                } else {
+                    return Err(self.syntax_err("readlink requires zero or one argument", line));
+                };
                 Ok(Expr {
-                    kind: ExprKind::Readlink(Box::new(args[0].clone())),
+                    kind: ExprKind::Readlink(Box::new(arg)),
                     line,
                 })
             }
@@ -7352,6 +7530,55 @@ impl Parser {
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::Files(args),
+                    line,
+                })
+            }
+            "filesf" => {
+                let args = self.parse_builtin_args()?;
+                Ok(Expr {
+                    kind: ExprKind::Filesf(args),
+                    line,
+                })
+            }
+            "dirs" => {
+                let args = self.parse_builtin_args()?;
+                Ok(Expr {
+                    kind: ExprKind::Dirs(args),
+                    line,
+                })
+            }
+            "sym_links" => {
+                let args = self.parse_builtin_args()?;
+                Ok(Expr {
+                    kind: ExprKind::SymLinks(args),
+                    line,
+                })
+            }
+            "sockets" => {
+                let args = self.parse_builtin_args()?;
+                Ok(Expr {
+                    kind: ExprKind::Sockets(args),
+                    line,
+                })
+            }
+            "pipes" => {
+                let args = self.parse_builtin_args()?;
+                Ok(Expr {
+                    kind: ExprKind::Pipes(args),
+                    line,
+                })
+            }
+            "block_devices" => {
+                let args = self.parse_builtin_args()?;
+                Ok(Expr {
+                    kind: ExprKind::BlockDevices(args),
+                    line,
+                })
+            }
+            "char_devices" => {
+                let args = self.parse_builtin_args()?;
+                Ok(Expr {
+                    kind: ExprKind::CharDevices(args),
                     line,
                 })
             }
