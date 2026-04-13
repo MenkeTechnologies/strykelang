@@ -168,6 +168,30 @@ impl Parser {
         }
     }
 
+    /// Lift a `Bareword("f")` to `FuncCall { f, [$_] }`.
+    ///
+    /// perlrs extension contexts (map/grep/fore expression forms, pipe-forward)
+    /// call this so that `map sha512, @list` invokes `sha512($_)` for each
+    /// element instead of stringifying the bareword.  Non-bareword expressions
+    /// pass through unchanged.
+    fn lift_bareword_to_topic_call(expr: Expr) -> Expr {
+        if let ExprKind::Bareword(ref name) = expr.kind {
+            let line = expr.line;
+            Expr {
+                kind: ExprKind::FuncCall {
+                    name: name.clone(),
+                    args: vec![Expr {
+                        kind: ExprKind::ScalarVar("_".into()),
+                        line,
+                    }],
+                },
+                line,
+            }
+        } else {
+            expr
+        }
+    }
+
     /// `parse_assign_expr` with `no_pipe_forward_depth` bumped for the
     /// duration, so any trailing `|>` is left to the enclosing parser instead
     /// of being absorbed into this sub-expression. Used by paren-less arg
@@ -255,6 +279,7 @@ impl Parser {
                 | Token::LogOr
                 | Token::LogAndWord
                 | Token::LogOrWord
+                | Token::PipeForward
         )
     }
 
@@ -5560,6 +5585,7 @@ impl Parser {
                 } else if self.in_pipe_rhs() {
                     // `|> fore say` — blockless pipe form: wrap EXPR into a synthetic block
                     let expr = self.parse_assign_expr_stop_at_pipe()?;
+                    let expr = Self::lift_bareword_to_topic_call(expr);
                     let block = vec![Statement {
                         label: None,
                         kind: StmtKind::Expression(expr),
@@ -5576,6 +5602,7 @@ impl Parser {
                 } else {
                     // `fore EXPR, LIST` — comma form
                     let expr = self.parse_assign_expr()?;
+                    let expr = Self::lift_bareword_to_topic_call(expr);
                     self.expect(&Token::Comma)?;
                     let list_parts = self.parse_list_until_terminator()?;
                     let list_expr = if list_parts.len() == 1 {
@@ -5721,6 +5748,9 @@ impl Parser {
                     })
                 } else {
                     let expr = self.parse_assign_expr_stop_at_pipe()?;
+                    // Lift bareword to FuncCall($_) so `map sha512, @list`
+                    // calls sha512($_) for each element instead of stringifying.
+                    let expr = Self::lift_bareword_to_topic_call(expr);
                     let list_expr = if self.in_pipe_rhs()
                         && matches!(
                             self.peek(),
@@ -5811,8 +5841,8 @@ impl Parser {
                                 line,
                             },
                             _ => {
-                                // Non-literal (e.g. `defined`): use as-is (Perl grep semantics)
-                                expr
+                                // Non-literal (e.g. `defined`): lift bareword to call
+                                Self::lift_bareword_to_topic_call(expr)
                             }
                         };
                         let block = vec![Statement {
@@ -5828,6 +5858,7 @@ impl Parser {
                             line,
                         })
                     } else {
+                        let expr = Self::lift_bareword_to_topic_call(expr);
                         self.expect(&Token::Comma)?;
                         let list_parts = self.parse_list_until_terminator()?;
                         let list_expr = if list_parts.len() == 1 {
@@ -6330,7 +6361,7 @@ impl Parser {
                 })
             }
             "slurp" => {
-                let a = self.parse_one_arg()?;
+                let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Slurp(Box::new(a)),
                     line,
@@ -7418,7 +7449,11 @@ impl Parser {
                         line,
                     })
                 } else {
-                    // Bareword — distinct from quoted strings (see `ExprKind::Bareword`).
+                    // No parens, no visible arguments — emit a Bareword.
+                    // At runtime, Bareword tries sub resolution first (zero-arg
+                    // call) and falls back to a string value.  perlrs extension
+                    // contexts (pipe-forward, map/fore) lift Bareword → FuncCall
+                    // with `$_` injection separately.
                     Ok(Expr {
                         kind: ExprKind::Bareword(name),
                         line,
@@ -8025,7 +8060,7 @@ impl Parser {
             self.expect(&Token::RParen)?;
             Ok(expr)
         } else {
-            self.parse_assign_expr()
+            self.parse_assign_expr_stop_at_pipe()
         }
     }
 

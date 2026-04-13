@@ -921,7 +921,15 @@ impl Lexer {
                     if let Some(c) = self.peek() {
                         if "efdlpSszrwxoRWXOBCTMAgut".contains(c)
                             && self.peek_at(1).is_none_or(|n| {
-                                n.is_whitespace() || n == '$' || n == '\'' || n == '"' || n == '('
+                                n.is_whitespace()
+                                    || n == '$'
+                                    || n == '\''
+                                    || n == '"'
+                                    || n == '('
+                                    || n == ')'
+                                    || n == '}'
+                                    || n == ';'
+                                    || n == ','
                             })
                         {
                             self.advance();
