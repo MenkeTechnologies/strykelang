@@ -5942,6 +5942,16 @@ impl Compiler {
                     Some(root),
                 );
             }
+            ExprKind::FilesfRecursive(args) => {
+                for a in args {
+                    self.compile_expr(a)?;
+                }
+                self.emit_op(
+                    Op::CallBuiltin(BuiltinId::FilesfRecursive as u16, args.len() as u8),
+                    line,
+                    Some(root),
+                );
+            }
             ExprKind::Dirs(args) => {
                 for a in args {
                     self.compile_expr(a)?;

@@ -914,8 +914,10 @@ pub enum ExprKind {
     Readlink(Box<Expr>),
     /// `files` / `files DIR` — list file names in a directory (default: `.`).
     Files(Vec<Expr>),
-    /// `filesf` / `filesf DIR` — list only regular file names in a directory (default: `.`).
+    /// `filesf` / `filesf DIR` / `f` — list only regular file names in a directory (default: `.`).
     Filesf(Vec<Expr>),
+    /// `fr DIR` — list only regular file names recursively (default: `.`).
+    FilesfRecursive(Vec<Expr>),
     /// `dirs` / `dirs DIR` — list subdirectory names in a directory (default: `.`).
     Dirs(Vec<Expr>),
     /// `sym_links` / `sym_links DIR` — list symlink names in a directory (default: `.`).

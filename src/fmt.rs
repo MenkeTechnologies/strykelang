@@ -1221,6 +1221,7 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::Glob(args) => format!("glob({})", format_expr_list(args)),
         ExprKind::Files(args) => format!("files({})", format_expr_list(args)),
         ExprKind::Filesf(args) => format!("filesf({})", format_expr_list(args)),
+        ExprKind::FilesfRecursive(args) => format!("fr({})", format_expr_list(args)),
         ExprKind::Dirs(args) => format!("dirs({})", format_expr_list(args)),
         ExprKind::SymLinks(args) => format!("sym_links({})", format_expr_list(args)),
         ExprKind::Sockets(args) => format!("sockets({})", format_expr_list(args)),

@@ -1106,6 +1106,7 @@ impl Parser {
                 | "files"
                 | "filesf"
                 | "filter"
+                | "fr"
                 | "getcwd"
                 | "glob_par"
                 | "par_sed"
@@ -7754,6 +7755,13 @@ impl Parser {
                     line,
                 })
             }
+            "fr" => {
+                let args = self.parse_builtin_args()?;
+                Ok(Expr {
+                    kind: ExprKind::FilesfRecursive(args),
+                    line,
+                })
+            }
             "dirs" | "d" => {
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
@@ -8459,7 +8467,7 @@ impl Parser {
             | "tempfile" | "tempdir" | "list_count" | "list_size" | "size"
             | "clamp" | "grep_v" | "select_keys" | "pluck" | "glob_match" | "which_all"
             // ── filesystem extensions ───────────────────────────────────────
-            | "files" | "filesf" | "f" | "dirs" | "d" | "sym_links"
+            | "files" | "filesf" | "f" | "fr" | "dirs" | "d" | "sym_links"
             | "sockets" | "pipes" | "block_devices" | "char_devices"
             // ── data / network ──────────────────────────────────────────────
             | "csv_read" | "csv_write" | "dataframe" | "sqlite"

@@ -932,8 +932,10 @@ pub enum BuiltinId {
     Pipe,
     /// `files` / `files DIR` — list file names in a directory (default: `.`).
     Files,
-    /// `filesf` / `filesf DIR` — list only regular file names in a directory (default: `.`).
+    /// `filesf` / `filesf DIR` / `f` — list only regular file names in a directory (default: `.`).
     Filesf,
+    /// `fr DIR` — list only regular file names recursively (default: `.`).
+    FilesfRecursive,
     /// `dirs` / `dirs DIR` — list subdirectory names in a directory (default: `.`).
     Dirs,
     /// `sym_links` / `sym_links DIR` — list symlink names in a directory (default: `.`).

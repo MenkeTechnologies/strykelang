@@ -10475,6 +10475,14 @@ impl Interpreter {
                 };
                 Ok(crate::perl_fs::list_filesf(&dir))
             }
+            ExprKind::FilesfRecursive(args) => {
+                let dir = if args.is_empty() {
+                    ".".to_string()
+                } else {
+                    self.eval_expr(&args[0])?.to_string()
+                };
+                Ok(crate::perl_fs::list_filesf_recursive(&dir))
+            }
             ExprKind::Dirs(args) => {
                 let dir = if args.is_empty() {
                     ".".to_string()

@@ -424,6 +424,42 @@ pub fn list_filesf(dir: &str) -> PerlValue {
     PerlValue::array(names.into_iter().map(PerlValue::string).collect())
 }
 
+/// List only regular file paths under `dir` **recursively**, sorted.
+/// Returns relative paths from `dir` (e.g. `"sub/file.txt"`).
+/// Returns an empty list if `dir` cannot be read.
+pub fn list_filesf_recursive(dir: &str) -> PerlValue {
+    let root = std::path::Path::new(dir);
+    let mut paths: Vec<String> = Vec::new();
+    fn walk(base: &std::path::Path, rel: &str, out: &mut Vec<String>) {
+        let Ok(entries) = std::fs::read_dir(base) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let ft = match entry.file_type() {
+                Ok(ft) => ft,
+                Err(_) => continue,
+            };
+            let name = match entry.file_name().into_string() {
+                Ok(n) => n,
+                Err(_) => continue,
+            };
+            let child_rel = if rel.is_empty() {
+                name.clone()
+            } else {
+                format!("{rel}/{name}")
+            };
+            if ft.is_file() {
+                out.push(child_rel);
+            } else if ft.is_dir() {
+                walk(&base.join(&name), &child_rel, out);
+            }
+        }
+    }
+    walk(root, "", &mut paths);
+    paths.sort();
+    PerlValue::array(paths.into_iter().map(PerlValue::string).collect())
+}
+
 /// List only directory names inside `dir` (non-recursive), sorted.
 /// Returns an empty list if `dir` cannot be read.
 pub fn list_dirs(dir: &str) -> PerlValue {

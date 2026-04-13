@@ -8008,6 +8008,14 @@ impl<'a> VM<'a> {
                 };
                 Ok(crate::perl_fs::list_filesf(&dir))
             }
+            Some(BuiltinId::FilesfRecursive) => {
+                let dir = if args.is_empty() {
+                    ".".to_string()
+                } else {
+                    args[0].to_string()
+                };
+                Ok(crate::perl_fs::list_filesf_recursive(&dir))
+            }
             Some(BuiltinId::Dirs) => {
                 let dir = if args.is_empty() {
                     ".".to_string()
