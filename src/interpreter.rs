@@ -8815,6 +8815,17 @@ impl Interpreter {
             }
             ExprKind::ForEachExpr { block, list } => {
                 let list_val = self.eval_expr_ctx(list, WantarrayCtx::List)?;
+                // Lazy: consume iterator one-at-a-time without materializing.
+                if list_val.is_iterator() {
+                    let iter = list_val.into_iterator();
+                    let mut count = 0i64;
+                    while let Some(item) = iter.next_item() {
+                        count += 1;
+                        let _ = self.scope.set_scalar("_", item);
+                        self.exec_block(block)?;
+                    }
+                    return Ok(PerlValue::integer(count));
+                }
                 let items = list_val.to_list();
                 let count = items.len();
                 for item in items {
@@ -8947,13 +8958,17 @@ impl Interpreter {
             }
             ExprKind::ScalarReverse(expr) => {
                 let val = self.eval_expr_ctx(expr, WantarrayCtx::List)?;
+                // Lazy: wrap iterator without materializing
+                if val.is_iterator() {
+                    return Ok(PerlValue::iterator(Arc::new(
+                        crate::value::ScalarReverseIterator::new(val.into_iterator()),
+                    )));
+                }
                 let items = val.to_list();
                 if items.len() <= 1 {
-                    // Single value or empty: character-reverse the string
                     let s = if items.is_empty() { String::new() } else { items[0].to_string() };
                     Ok(PerlValue::string(s.chars().rev().collect()))
                 } else {
-                    // Multiple values: reverse the list order
                     let mut items = items;
                     items.reverse();
                     Ok(PerlValue::array(items))
@@ -10495,7 +10510,9 @@ impl Interpreter {
                 } else {
                     self.eval_expr(&args[0])?.to_string()
                 };
-                Ok(crate::perl_fs::list_filesf_recursive(&dir))
+                Ok(PerlValue::iterator(Arc::new(
+                    crate::value::FsWalkIterator::new(&dir, true),
+                )))
             }
             ExprKind::FilesfRecursiveStream { block, dir } => {
                 let dir = self.eval_expr(dir)?.to_string();
@@ -10516,7 +10533,9 @@ impl Interpreter {
                 } else {
                     self.eval_expr(&args[0])?.to_string()
                 };
-                Ok(crate::perl_fs::list_dirs_recursive(&dir))
+                Ok(PerlValue::iterator(Arc::new(
+                    crate::value::FsWalkIterator::new(&dir, false),
+                )))
             }
             ExprKind::DirsRecursiveStream { block, dir } => {
                 let dir = self.eval_expr(dir)?.to_string();

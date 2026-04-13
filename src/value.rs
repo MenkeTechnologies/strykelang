@@ -43,6 +43,140 @@ impl PerlAsyncTask {
     }
 }
 
+// ── Lazy iterator protocol (`|>` streaming) ─────────────────────────────────
+
+/// Pull-based lazy iterator.  Sources (`frs`, `drs`) produce one; transform
+/// stages (`rev`) wrap one; terminals (`e`/`fore`) consume one item at a time.
+pub trait PerlIterator: Send + Sync {
+    /// Return the next item, or `None` when exhausted.
+    fn next_item(&self) -> Option<PerlValue>;
+}
+
+impl fmt::Debug for dyn PerlIterator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("PerlIterator")
+    }
+}
+
+/// Lazy recursive file walker — yields one relative path per `next_item()` call.
+pub struct FsWalkIterator {
+    /// `(base_path, relative_prefix)` stack.
+    stack: Mutex<Vec<(std::path::PathBuf, String)>>,
+    /// Buffered sorted entries from the current directory level.
+    buf: Mutex<Vec<(String, bool)>>,   // (child_rel, is_dir)
+    /// Pending subdirs to push (reversed, so first is popped next).
+    pending_dirs: Mutex<Vec<(std::path::PathBuf, String)>>,
+    files_only: bool,
+}
+
+impl FsWalkIterator {
+    pub fn new(dir: &str, files_only: bool) -> Self {
+        Self {
+            stack: Mutex::new(vec![(std::path::PathBuf::from(dir), String::new())]),
+            buf: Mutex::new(Vec::new()),
+            pending_dirs: Mutex::new(Vec::new()),
+            files_only,
+        }
+    }
+
+    /// Refill `buf` from the next directory on the stack.
+    /// Loops until items are found or the stack is fully exhausted.
+    fn refill(&self) -> bool {
+        loop {
+            let mut stack = self.stack.lock();
+            // Push any pending subdirs from the previous level.
+            let mut pending = self.pending_dirs.lock();
+            while let Some(d) = pending.pop() {
+                stack.push(d);
+            }
+            drop(pending);
+
+            let (base, rel) = match stack.pop() {
+                Some(v) => v,
+                None => return false,
+            };
+            drop(stack);
+
+            let entries = match std::fs::read_dir(&base) {
+                Ok(e) => e,
+                Err(_) => continue, // skip unreadable, try next
+            };
+            let mut children: Vec<(std::ffi::OsString, String, bool, bool)> = Vec::new();
+            for entry in entries.flatten() {
+                let ft = match entry.file_type() {
+                    Ok(ft) => ft,
+                    Err(_) => continue,
+                };
+                let os_name = entry.file_name();
+                let name = match os_name.to_str() {
+                    Some(n) => n.to_string(),
+                    None => continue,
+                };
+                let child_rel = if rel.is_empty() { name.clone() } else { format!("{rel}/{name}") };
+                children.push((os_name, child_rel, ft.is_file(), ft.is_dir()));
+            }
+            children.sort_by(|a, b| a.0.cmp(&b.0));
+
+            let mut buf = self.buf.lock();
+            let mut pending = self.pending_dirs.lock();
+            let mut subdirs = Vec::new();
+            for (os_name, child_rel, is_file, is_dir) in children {
+                if is_dir {
+                    if !self.files_only {
+                        buf.push((child_rel.clone(), true));
+                    }
+                    subdirs.push((base.join(os_name), child_rel));
+                } else if is_file && self.files_only {
+                    buf.push((child_rel, false));
+                }
+            }
+            for s in subdirs.into_iter().rev() {
+                pending.push(s);
+            }
+            buf.reverse();
+            if !buf.is_empty() {
+                return true;
+            }
+            // buf empty but pending_dirs may have subdirs to explore — loop.
+        }
+    }
+}
+
+impl PerlIterator for FsWalkIterator {
+    fn next_item(&self) -> Option<PerlValue> {
+        loop {
+            {
+                let mut buf = self.buf.lock();
+                if let Some((path, _)) = buf.pop() {
+                    return Some(PerlValue::string(path));
+                }
+            }
+            if !self.refill() {
+                return None;
+            }
+        }
+    }
+}
+
+/// Wraps a source iterator, applying `scalar reverse` (char-reverse) to each string.
+pub struct ScalarReverseIterator {
+    source: Arc<dyn PerlIterator>,
+}
+
+impl ScalarReverseIterator {
+    pub fn new(source: Arc<dyn PerlIterator>) -> Self {
+        Self { source }
+    }
+}
+
+impl PerlIterator for ScalarReverseIterator {
+    fn next_item(&self) -> Option<PerlValue> {
+        let item = self.source.next_item()?;
+        let s = item.to_string();
+        Some(PerlValue::string(s.chars().rev().collect()))
+    }
+}
+
 /// Lazy generator from `gen { }`; resume with `->next` on the value.
 #[derive(Debug)]
 pub struct PerlGenerator {
@@ -417,6 +551,8 @@ pub(crate) enum HeapObject {
     SqliteConn(Arc<Mutex<rusqlite::Connection>>),
     StructInst(Arc<StructInstance>),
     DataFrame(Arc<Mutex<PerlDataFrame>>),
+    /// Lazy pull-based iterator (`frs`, `drs`, `rev` wrapping, etc.).
+    Iterator(Arc<dyn PerlIterator>),
     /// Numeric/string dualvar: **`$!`** (errno + message) and **`$@`** (numeric flag or code + message).
     ErrnoDual {
         code: i32,
@@ -800,6 +936,31 @@ impl PerlValue {
     #[inline]
     pub fn array(v: Vec<PerlValue>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Array(v)))
+    }
+
+    /// Wrap a lazy iterator as a PerlValue.
+    #[inline]
+    pub fn iterator(it: Arc<dyn PerlIterator>) -> Self {
+        Self::from_heap(Arc::new(HeapObject::Iterator(it)))
+    }
+
+    /// True when this value is a lazy iterator.
+    #[inline]
+    pub fn is_iterator(&self) -> bool {
+        if !nanbox::is_heap(self.0) {
+            return false;
+        }
+        matches!(unsafe { self.heap_ref() }, HeapObject::Iterator(_))
+    }
+
+    /// Extract the iterator Arc (panics if not an iterator).
+    pub fn into_iterator(&self) -> Arc<dyn PerlIterator> {
+        if nanbox::is_heap(self.0) {
+            if let HeapObject::Iterator(it) = &*self.heap_arc() {
+                return Arc::clone(it);
+            }
+        }
+        panic!("into_iterator on non-iterator value");
     }
 
     #[inline]
@@ -1636,6 +1797,7 @@ impl PerlValue {
             HeapObject::Barrier(_) => "Barrier".to_string(),
             HeapObject::SqliteConn(_) => "SqliteConn".to_string(),
             HeapObject::StructInst(s) => s.def.name.to_string(),
+            HeapObject::Iterator(_) => "Iterator".to_string(),
             HeapObject::ErrnoDual { .. } => "Errno".to_string(),
             HeapObject::Integer(_) => "INTEGER".to_string(),
             HeapObject::Float(_) => "FLOAT".to_string(),
@@ -1726,6 +1888,13 @@ impl PerlValue {
             HeapObject::Atomic(arc) => arc.lock().to_list(),
             HeapObject::Set(s) => s.values().cloned().collect(),
             HeapObject::Deque(d) => d.lock().iter().cloned().collect(),
+            HeapObject::Iterator(it) => {
+                let mut out = Vec::new();
+                while let Some(v) = it.next_item() {
+                    out.push(v);
+                }
+                out
+            }
             _ => vec![self.clone()],
         }
     }
@@ -1825,6 +1994,7 @@ impl fmt::Display for PerlValue {
                 let g = d.lock();
                 write!(f, "DataFrame({} rows)", g.nrows())
             }
+            HeapObject::Iterator(_) => f.write_str("Iterator"),
             HeapObject::Integer(n) => write!(f, "{n}"),
             HeapObject::Float(fl) => write!(f, "{}", format_float(*fl)),
         }
@@ -1910,6 +2080,7 @@ pub fn set_member_key(v: &PerlValue) -> String {
         HeapObject::SqliteConn(c) => format!("sql:{:p}", Arc::as_ptr(c)),
         HeapObject::StructInst(s) => format!("st:{}:{:?}", s.def.name, s.values),
         HeapObject::DataFrame(d) => format!("df:{:p}", Arc::as_ptr(d)),
+        HeapObject::Iterator(_) => "iter".to_string(),
         HeapObject::ErrnoDual { code, msg } => format!("e:{code}:{msg}"),
         HeapObject::Integer(n) => format!("i:{n}"),
         HeapObject::Float(fl) => format!("f:{}", fl.to_bits()),

@@ -5720,9 +5720,39 @@ impl<'a> VM<'a> {
                         }
                     }
                     Op::ForEachWithBlock(block_idx) => {
-                        let list = self.pop().to_list();
-                        let count = list.len() as i64;
+                        let val = self.pop();
                         let idx = *block_idx as usize;
+                        // Lazy iterator: consume one-at-a-time without materializing.
+                        if val.is_iterator() {
+                            let iter = val.into_iterator();
+                            let mut count = 0i64;
+                            if let Some(&(start, end)) =
+                                self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
+                            {
+                                while let Some(item) = iter.next_item() {
+                                    count += 1;
+                                    let _ = self.interp.scope.set_scalar("_", item);
+                                    self.run_block_region(start, end, op_count)?;
+                                }
+                            } else {
+                                let block = self.blocks[idx].clone();
+                                while let Some(item) = iter.next_item() {
+                                    count += 1;
+                                    let _ = self.interp.scope.set_scalar("_", item);
+                                    match self.interp.exec_block(&block) {
+                                        Ok(_) => {}
+                                        Err(crate::interpreter::FlowOrError::Error(e)) => {
+                                            return Err(e)
+                                        }
+                                        Err(_) => {}
+                                    }
+                                }
+                            }
+                            self.push(PerlValue::integer(count));
+                            return Ok(());
+                        }
+                        let list = val.to_list();
+                        let count = list.len() as i64;
                         if let Some(&(start, end)) =
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
                         {
@@ -5903,14 +5933,20 @@ impl<'a> VM<'a> {
                     }
                     Op::RevOp => {
                         let val = self.pop();
-                        let items = val.to_list();
-                        if items.len() <= 1 {
-                            let s = if items.is_empty() { String::new() } else { items[0].to_string() };
-                            self.push(PerlValue::string(s.chars().rev().collect()));
+                        if val.is_iterator() {
+                            self.push(PerlValue::iterator(std::sync::Arc::new(
+                                crate::value::ScalarReverseIterator::new(val.into_iterator()),
+                            )));
                         } else {
-                            let mut items = items;
-                            items.reverse();
-                            self.push(PerlValue::array(items));
+                            let items = val.to_list();
+                            if items.len() <= 1 {
+                                let s = if items.is_empty() { String::new() } else { items[0].to_string() };
+                                self.push(PerlValue::string(s.chars().rev().collect()));
+                            } else {
+                                let mut items = items;
+                                items.reverse();
+                                self.push(PerlValue::array(items));
+                            }
                         }
                         Ok(())
                     }
@@ -8027,7 +8063,9 @@ impl<'a> VM<'a> {
                 } else {
                     args[0].to_string()
                 };
-                Ok(crate::perl_fs::list_filesf_recursive(&dir))
+                Ok(PerlValue::iterator(std::sync::Arc::new(
+                    crate::value::FsWalkIterator::new(&dir, true),
+                )))
             }
             Some(BuiltinId::Dirs) => {
                 let dir = if args.is_empty() {
@@ -8043,7 +8081,9 @@ impl<'a> VM<'a> {
                 } else {
                     args[0].to_string()
                 };
-                Ok(crate::perl_fs::list_dirs_recursive(&dir))
+                Ok(PerlValue::iterator(std::sync::Arc::new(
+                    crate::value::FsWalkIterator::new(&dir, false),
+                )))
             }
             Some(BuiltinId::SymLinks) => {
                 let dir = if args.is_empty() {
