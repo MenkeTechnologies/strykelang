@@ -1006,6 +1006,38 @@ pub fn chown_paths(paths: &[String], uid: i64, gid: i64) -> i64 {
     }
 }
 
+/// `touch FILES...` — create files if they don't exist, update atime/mtime to
+/// now if they do.  Returns count of files successfully touched.
+pub fn touch_paths(paths: &[String]) -> i64 {
+    use std::fs::OpenOptions;
+    let mut count = 0i64;
+    for path in paths {
+        if path.is_empty() {
+            continue;
+        }
+        // Create the file if it doesn't exist (like coreutils touch).
+        let created = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .is_ok();
+        if !created {
+            continue;
+        }
+        // Update atime + mtime to now.
+        #[cfg(unix)]
+        {
+            use std::ffi::CString;
+            if let Ok(cs) = CString::new(path.as_str()) {
+                // null timeval pointer ⇒ set both times to now
+                unsafe { libc::utimes(cs.as_ptr(), std::ptr::null()) };
+            }
+        }
+        count += 1;
+    }
+    count
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

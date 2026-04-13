@@ -3413,6 +3413,16 @@ impl Interpreter {
         Ok(PerlValue::integer(count))
     }
 
+    /// `touch FILE, ...` — create if absent, update timestamps to now.
+    pub(crate) fn builtin_touch_execute(
+        &mut self,
+        args: &[PerlValue],
+        _line: usize,
+    ) -> PerlResult<PerlValue> {
+        let paths: Vec<String> = args.iter().map(|v| v.to_string()).collect();
+        Ok(PerlValue::integer(crate::perl_fs::touch_paths(&paths)))
+    }
+
     /// `utime ATIME, MTIME, LIST`
     pub(crate) fn builtin_utime_execute(
         &mut self,

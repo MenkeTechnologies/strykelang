@@ -209,118 +209,7 @@ impl Parser {
         }
     }
 
-    /// Like [`Self::lift_bareword_to_topic_call`] but also rewrites
-    /// builtins that require exactly one argument (stat, lstat, readlink)
-    /// from a parse error into `builtin($_)` when used in pipe contexts
-    /// where the parser would otherwise reject the zero-arg form.
-    fn parse_pipe_builtin_or_expr(&mut self) -> PerlResult<Expr> {
-        let line = self.peek_line();
-        let topic = Expr {
-            kind: ExprKind::ScalarVar("_".into()),
-            line,
-        };
-        match self.peek() {
-            Token::Ident(ref kw)
-                if matches!(
-                    kw.as_str(),
-                    "stat" | "lstat" | "readlink" | "unlink" | "rm"
-                        | "rmdir" | "chdir" | "chmod"
-                ) =>
-            {
-                let kw = kw.clone();
-                self.advance(); // consume keyword
-                // Try to parse args; if none follow, inject $_.
-                let args = self.parse_builtin_args()?;
-                match kw.as_str() {
-                    "stat" => {
-                        let arg = if args.is_empty() {
-                            topic
-                        } else {
-                            args[0].clone()
-                        };
-                        Ok(Expr {
-                            kind: ExprKind::Stat(Box::new(arg)),
-                            line,
-                        })
-                    }
-                    "lstat" => {
-                        let arg = if args.is_empty() {
-                            topic
-                        } else {
-                            args[0].clone()
-                        };
-                        Ok(Expr {
-                            kind: ExprKind::Lstat(Box::new(arg)),
-                            line,
-                        })
-                    }
-                    "readlink" => {
-                        let arg = if args.is_empty() {
-                            topic
-                        } else {
-                            args[0].clone()
-                        };
-                        Ok(Expr {
-                            kind: ExprKind::Readlink(Box::new(arg)),
-                            line,
-                        })
-                    }
-                    "unlink" | "rm" => {
-                        let a = if args.is_empty() {
-                            vec![topic]
-                        } else {
-                            args
-                        };
-                        Ok(Expr {
-                            kind: ExprKind::Unlink(a),
-                            line,
-                        })
-                    }
-                    "rmdir" => {
-                        let a = if args.is_empty() {
-                            vec![topic]
-                        } else {
-                            args
-                        };
-                        Ok(Expr {
-                            kind: ExprKind::FuncCall {
-                                name: "rmdir".into(),
-                                args: a,
-                            },
-                            line,
-                        })
-                    }
-                    "chdir" => {
-                        let arg = if args.is_empty() {
-                            topic
-                        } else {
-                            args[0].clone()
-                        };
-                        Ok(Expr {
-                            kind: ExprKind::Chdir(Box::new(arg)),
-                            line,
-                        })
-                    }
-                    "chmod" => {
-                        let a = if args.is_empty() {
-                            vec![topic]
-                        } else {
-                            args
-                        };
-                        Ok(Expr {
-                            kind: ExprKind::Chmod(a),
-                            line,
-                        })
-                    }
-                    _ => unreachable!(),
-                }
-            }
-            _ => {
-                let expr = self.parse_assign_expr_stop_at_pipe()?;
-                Ok(Self::lift_bareword_to_topic_call(expr))
-            }
-        }
-    }
+
 
     /// `parse_assign_expr` with `no_pipe_forward_depth` bumped for the
     /// duration, so any trailing `|>` is left to the enclosing parser instead
@@ -1109,6 +998,7 @@ impl Parser {
                 | "bless"
                 | "caller"
                 | "capture"
+                | "cat"
                 | "chdir"
                 | "chmod"
                 | "chomp"
@@ -3732,6 +3622,10 @@ impl Parser {
             ExprKind::Study(_) => ExprKind::Study(Box::new(lhs)),
             ExprKind::Await(_) => ExprKind::Await(Box::new(lhs)),
             ExprKind::Eval(_) => ExprKind::Eval(Box::new(lhs)),
+            ExprKind::Rand(_) => ExprKind::Rand(Some(Box::new(lhs))),
+            ExprKind::Srand(_) => ExprKind::Srand(Some(Box::new(lhs))),
+            ExprKind::Pos(_) => ExprKind::Pos(Some(Box::new(lhs))),
+            ExprKind::Exit(_) => ExprKind::Exit(Some(Box::new(lhs))),
 
             // ── Higher-order / list-taking forms: replace the `list` slot ──────
             ExprKind::MapExpr {
@@ -5428,6 +5322,7 @@ impl Parser {
                 if matches!(
                     self.peek(),
                     Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof | Token::Comma
+                        | Token::PipeForward
                 ) {
                     Ok(Expr {
                         kind: ExprKind::Rand(None),
@@ -5461,6 +5356,7 @@ impl Parser {
                 if matches!(
                     self.peek(),
                     Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof | Token::Comma
+                        | Token::PipeForward
                 ) {
                     Ok(Expr {
                         kind: ExprKind::Srand(None),
@@ -5570,6 +5466,7 @@ impl Parser {
                 if matches!(
                     self.peek(),
                     Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof | Token::Comma
+                        | Token::PipeForward
                 ) {
                     Ok(Expr {
                         kind: ExprKind::Pos(None),
@@ -6526,7 +6423,7 @@ impl Parser {
                     line,
                 })
             }
-            "slurp" => {
+            "slurp" | "cat" => {
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Slurp(Box::new(a)),
@@ -7255,7 +7152,7 @@ impl Parser {
                 }
             }
             "close" => {
-                let a = self.parse_one_arg()?;
+                let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Close(Box::new(a)),
                     line,
@@ -7364,7 +7261,7 @@ impl Parser {
                         line,
                     }
                 } else {
-                    self.parse_one_arg()?
+                    self.parse_one_arg_or_default()?
                 };
                 Ok(Expr {
                     kind: ExprKind::Eval(Box::new(a)),
@@ -7386,7 +7283,8 @@ impl Parser {
                 })
             }
             "exit" => {
-                if matches!(self.peek(), Token::Semicolon | Token::RBrace | Token::Eof) {
+                if matches!(self.peek(), Token::Semicolon | Token::RBrace | Token::Eof
+                        | Token::PipeForward) {
                     Ok(Expr {
                         kind: ExprKind::Exit(None),
                         line,
@@ -7400,7 +7298,7 @@ impl Parser {
                 }
             }
             "chdir" => {
-                let a = self.parse_one_arg()?;
+                let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Chdir(Box::new(a)),
                     line,

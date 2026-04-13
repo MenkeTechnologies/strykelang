@@ -217,6 +217,7 @@ pub(crate) fn try_builtin(
         "count" | "size" | "cnt" => Some(builtin_count_size_cnt(args)),
         "uname" => Some(builtin_uname()),
         "rmdir" | "CORE::rmdir" => Some(interp.builtin_rmdir_execute(args, line)),
+        "touch" => Some(interp.builtin_touch_execute(args, line)),
         "utime" | "CORE::utime" => Some(interp.builtin_utime_execute(args, line)),
         "umask" | "CORE::umask" => Some(interp.builtin_umask_execute(args, line)),
         "getcwd" | "CORE::getcwd" | "Cwd::getcwd" => {
