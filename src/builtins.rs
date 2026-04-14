@@ -203,11 +203,27 @@ pub(crate) fn try_builtin(
                     line,
                 ));
             }
+            if args.len() == 2 && (args[0].is_iterator() || args[0].as_array_vec().is_some()) {
+                let n = args[1].to_int().max(0) as usize;
+                let source = crate::map_stream::into_pull_iter(args[0].clone());
+                return Some(Ok(PerlValue::iterator(Arc::new(
+                    crate::map_stream::TakeIterator::new(source, n),
+                ))));
+            }
             Some(builtin_take(interp, args))
         }
         "tail" => Some(builtin_tail(interp, args)),
-        "drop" => Some(builtin_drop(interp, args)),
-        "take_while" | "drop_while" | "tap" | "peek" | "partition" | "min_by" | "max_by"
+        "drop" | "skip" => {
+            if args.len() == 2 && (args[0].is_iterator() || args[0].as_array_vec().is_some()) {
+                let n = args[1].to_int().max(0) as usize;
+                let source = crate::map_stream::into_pull_iter(args[0].clone());
+                return Some(Ok(PerlValue::iterator(Arc::new(
+                    crate::map_stream::SkipIterator::new(source, n),
+                ))));
+            }
+            Some(builtin_drop(interp, args))
+        }
+        "take_while" | "drop_while" | "skip_while" | "tap" | "peek" | "partition" | "min_by" | "max_by"
         | "zip_with" | "count_by" => Some(interp.list_higher_order_block_builtin(name, args, line)),
         "with_index" => Some(builtin_with_index(interp, args)),
         "flatten" => Some(builtin_flatten(interp, args)),
@@ -227,6 +243,7 @@ pub(crate) fn try_builtin(
         "grep_v" => Some(builtin_grep_v(args, line)),
         "select_keys" => Some(builtin_select_keys(args)),
         "pluck" => Some(builtin_pluck(args)),
+        "first_or" => Some(builtin_first_or(args)),
         "clamp" => Some(builtin_clamp(args)),
         "normalize" => Some(builtin_normalize(args)),
         "stddev" => Some(builtin_stddev(args)),
@@ -1027,17 +1044,12 @@ fn builtin_input(interp: &Interpreter, args: &[PerlValue], line: usize) -> PerlR
 }
 
 /// `lines STRING` — split string into array on newlines (no trailing empty).
-fn builtin_lines(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+/// Returns a streaming iterator for lazy consumption.
+fn builtin_lines(_interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let items: Vec<PerlValue> = s
-        .lines()
-        .map(|l| PerlValue::string(l.to_string()))
-        .collect();
-    Ok(match interp.wantarray_kind {
-        WantarrayCtx::List => PerlValue::array(items),
-        WantarrayCtx::Scalar => PerlValue::integer(items.len() as i64),
-        WantarrayCtx::Void => PerlValue::UNDEF,
-    })
+    Ok(PerlValue::iterator(Arc::new(
+        crate::map_stream::LinesIterator::new(&s),
+    )))
 }
 
 /// `words STRING` — split on whitespace into array.
@@ -1055,23 +1067,41 @@ fn builtin_words(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVal
 }
 
 /// `chars STRING` — split into individual characters (no empty leading element).
-fn builtin_chars(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+/// Returns a streaming iterator for lazy consumption.
+fn builtin_chars(_interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let items: Vec<PerlValue> = s
-        .chars()
-        .map(|c| PerlValue::string(c.to_string()))
-        .collect();
-    Ok(match interp.wantarray_kind {
-        WantarrayCtx::List => PerlValue::array(items),
-        WantarrayCtx::Scalar => PerlValue::integer(items.len() as i64),
-        WantarrayCtx::Void => PerlValue::UNDEF,
-    })
+    Ok(PerlValue::iterator(Arc::new(
+        crate::map_stream::CharsIterator::new(&s),
+    )))
 }
 
-/// `trim STRING` — strip leading and trailing whitespace.
+/// `trim STRING` or `trim LIST` — strip leading and trailing whitespace.
+/// If input is an iterator or list, returns a streaming iterator that trims each element.
 fn builtin_trim(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    Ok(PerlValue::string(s.trim().to_string()))
+    if args.len() == 1 {
+        let v = &args[0];
+        if v.is_iterator() {
+            let source = v.clone().into_iterator();
+            return Ok(PerlValue::iterator(Arc::new(
+                crate::map_stream::TrimIterator::new(source),
+            )));
+        }
+        if v.as_array_vec().is_some() {
+            let source = crate::map_stream::into_pull_iter(v.clone());
+            return Ok(PerlValue::iterator(Arc::new(
+                crate::map_stream::TrimIterator::new(source),
+            )));
+        }
+        let s = v.to_string();
+        return Ok(PerlValue::string(s.trim().to_string()));
+    }
+    if args.len() > 1 {
+        let source = crate::map_stream::into_pull_iter(PerlValue::array(args.to_vec()));
+        return Ok(PerlValue::iterator(Arc::new(
+            crate::map_stream::TrimIterator::new(source),
+        )));
+    }
+    Ok(PerlValue::string(String::new()))
 }
 
 /// `avg LIST` — arithmetic mean of numeric list.
@@ -1241,6 +1271,8 @@ fn builtin_to_csv(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 /// `grep_v PATTERN, LIST` — inverse grep: reject elements matching regex.
+/// `grep_v PATTERN, LIST` — inverse filter (rejects matching items).
+/// Returns a streaming iterator for lazy consumption.
 fn builtin_grep_v(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     if args.is_empty() {
         return Ok(PerlValue::array(vec![]));
@@ -1248,12 +1280,23 @@ fn builtin_grep_v(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     let pattern = args[0].to_string();
     let re = regex::Regex::new(&pattern)
         .map_err(|e| PerlError::runtime(format!("grep_v: bad pattern: {}", e), line))?;
-    let items: Vec<PerlValue> = args[1..]
-        .iter()
-        .flat_map(|a| a.map_flatten_outputs(true))
-        .filter(|v| !re.is_match(&v.to_string()))
-        .collect();
-    Ok(PerlValue::array(items))
+    if args.len() == 2 {
+        let v = &args[1];
+        if v.is_iterator() {
+            let source = v.clone().into_iterator();
+            return Ok(PerlValue::iterator(Arc::new(
+                crate::map_stream::GrepVIterator::new(source, re),
+            )));
+        }
+    }
+    let source = crate::map_stream::into_pull_iter(if args.len() == 2 {
+        args[1].clone()
+    } else {
+        PerlValue::array(args[1..].to_vec())
+    });
+    Ok(PerlValue::iterator(Arc::new(
+        crate::map_stream::GrepVIterator::new(source, re),
+    )))
 }
 
 /// `select_keys HASHREF, KEY, KEY, ...` — pick only named keys from a hash ref.
@@ -1277,24 +1320,53 @@ fn builtin_select_keys(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
 }
 
+/// `first_or DEFAULT, LIST` — returns first element of list, or DEFAULT if empty.
+/// Works lazily on iterators.
+fn builtin_first_or(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Ok(PerlValue::UNDEF);
+    }
+    let default = args[0].clone();
+    if args.len() == 1 {
+        return Ok(default);
+    }
+    let v = &args[1];
+    if v.is_iterator() {
+        let iter = v.clone().into_iterator();
+        return Ok(iter.next_item().unwrap_or(default));
+    }
+    if let Some(arr) = v.as_array_vec() {
+        return Ok(arr.first().cloned().unwrap_or(default));
+    }
+    let list = v.to_list();
+    Ok(list.into_iter().next().unwrap_or(default))
+}
+
 /// `pluck KEY, LIST_OF_HASHREFS` — extract one key from each hashref in a list.
+/// `pluck KEY, LIST` — extracts a key from each hash ref.
+/// Returns a streaming iterator for lazy consumption.
 fn builtin_pluck(args: &[PerlValue]) -> PerlResult<PerlValue> {
     if args.is_empty() {
         return Ok(PerlValue::array(vec![]));
     }
     let key = args[0].to_string();
-    let items: Vec<PerlValue> = args[1..]
-        .iter()
-        .flat_map(|a| a.map_flatten_outputs(true))
-        .map(|v| {
-            if let Some(hr) = v.as_hash_ref() {
-                hr.read().get(&key).cloned().unwrap_or(PerlValue::UNDEF)
-            } else {
-                PerlValue::UNDEF
-            }
-        })
-        .collect();
-    Ok(PerlValue::array(items))
+    if args.len() == 2 {
+        let v = &args[1];
+        if v.is_iterator() {
+            let source = v.clone().into_iterator();
+            return Ok(PerlValue::iterator(Arc::new(
+                crate::map_stream::PluckIterator::new(source, key),
+            )));
+        }
+    }
+    let source = crate::map_stream::into_pull_iter(if args.len() == 2 {
+        args[1].clone()
+    } else {
+        PerlValue::array(args[1..].to_vec())
+    });
+    Ok(PerlValue::iterator(Arc::new(
+        crate::map_stream::PluckIterator::new(source, key),
+    )))
 }
 
 /// `clamp MIN, MAX, LIST` — clamp each numeric value to [MIN, MAX].

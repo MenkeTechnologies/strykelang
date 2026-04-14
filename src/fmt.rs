@@ -748,11 +748,13 @@ pub fn format_expr(e: &Expr) -> String {
             block,
             list,
             flatten_array_refs,
+            stream,
         } => {
-            let kw = if *flatten_array_refs {
-                "flat_map"
-            } else {
-                "map"
+            let kw = match (*flatten_array_refs, *stream) {
+                (true, true) => "flat_maps",
+                (true, false) => "flat_map",
+                (false, true) => "maps",
+                (false, false) => "map",
             };
             format!("{kw} {{\n{}\n}} {}", format_block(block), format_expr(list))
         }
@@ -760,19 +762,21 @@ pub fn format_expr(e: &Expr) -> String {
             expr,
             list,
             flatten_array_refs,
+            stream,
         } => {
-            let kw = if *flatten_array_refs {
-                "flat_map"
-            } else {
-                "map"
+            let kw = match (*flatten_array_refs, *stream) {
+                (true, true) => "flat_maps",
+                (true, false) => "flat_map",
+                (false, true) => "maps",
+                (false, false) => "map",
             };
             format!("{kw} {}, {}", format_expr(expr), format_expr(list))
         }
-        ExprKind::GrepExpr { block, list } => {
-            format!("grep {{\n{}\n}} {}", format_block(block), format_expr(list))
+        ExprKind::GrepExpr { block, list, keyword } => {
+            format!("{} {{\n{}\n}} {}", keyword.as_str(), format_block(block), format_expr(list))
         }
-        ExprKind::GrepExprComma { expr, list } => {
-            format!("grep {}, {}", format_expr(expr), format_expr(list))
+        ExprKind::GrepExprComma { expr, list, keyword } => {
+            format!("{} {}, {}", keyword.as_str(), format_expr(expr), format_expr(list))
         }
         ExprKind::ForEachExpr { block, list } => {
             format!("fore {{\n{}\n}} {}", format_block(block), format_expr(list))

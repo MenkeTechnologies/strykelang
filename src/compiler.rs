@@ -6508,9 +6508,17 @@ impl Compiler {
                 block,
                 list,
                 flatten_array_refs,
+                stream,
             } => {
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
-                if let Some(k) = crate::map_grep_fast::detect_map_int_mul(block) {
+                if *stream {
+                    let block_idx = self.chunk.add_block(block.clone());
+                    if *flatten_array_refs {
+                        self.emit_op(Op::MapsFlatMapWithBlock(block_idx), line, Some(root));
+                    } else {
+                        self.emit_op(Op::MapsWithBlock(block_idx), line, Some(root));
+                    }
+                } else if let Some(k) = crate::map_grep_fast::detect_map_int_mul(block) {
                     self.emit_op(Op::MapIntMul(k), line, Some(root));
                 } else {
                     let block_idx = self.chunk.add_block(block.clone());
@@ -6528,10 +6536,17 @@ impl Compiler {
                 expr,
                 list,
                 flatten_array_refs,
+                stream,
             } => {
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
                 let idx = self.chunk.add_map_expr_entry(*expr.clone());
-                if *flatten_array_refs {
+                if *stream {
+                    if *flatten_array_refs {
+                        self.emit_op(Op::MapsFlatMapWithExpr(idx), line, Some(root));
+                    } else {
+                        self.emit_op(Op::MapsWithExpr(idx), line, Some(root));
+                    }
+                } else if *flatten_array_refs {
                     self.emit_op(Op::FlatMapWithExpr(idx), line, Some(root));
                 } else {
                     self.emit_op(Op::MapWithExpr(idx), line, Some(root));
@@ -6545,9 +6560,12 @@ impl Compiler {
                 let block_idx = self.chunk.add_block(block.clone());
                 self.emit_op(Op::ForEachWithBlock(block_idx), line, Some(root));
             }
-            ExprKind::GrepExpr { block, list } => {
+            ExprKind::GrepExpr { block, list, keyword } => {
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
-                if let Some((m, r)) = crate::map_grep_fast::detect_grep_int_mod_eq(block) {
+                if keyword.is_stream() {
+                    let block_idx = self.chunk.add_block(block.clone());
+                    self.emit_op(Op::FilterWithBlock(block_idx), line, Some(root));
+                } else if let Some((m, r)) = crate::map_grep_fast::detect_grep_int_mod_eq(block) {
                     self.emit_op(Op::GrepIntModEq(m, r), line, Some(root));
                 } else {
                     let block_idx = self.chunk.add_block(block.clone());
@@ -6557,10 +6575,14 @@ impl Compiler {
                     self.emit_op(Op::StackArrayLen, line, Some(root));
                 }
             }
-            ExprKind::GrepExprComma { expr, list } => {
+            ExprKind::GrepExprComma { expr, list, keyword } => {
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
                 let idx = self.chunk.add_grep_expr_entry(*expr.clone());
-                self.emit_op(Op::GrepWithExpr(idx), line, Some(root));
+                if keyword.is_stream() {
+                    self.emit_op(Op::FilterWithExpr(idx), line, Some(root));
+                } else {
+                    self.emit_op(Op::GrepWithExpr(idx), line, Some(root));
+                }
                 if ctx != WantarrayCtx::List {
                     self.emit_op(Op::StackArrayLen, line, Some(root));
                 }

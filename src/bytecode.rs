@@ -754,6 +754,20 @@ pub enum Op {
     /// Set `${^GLOBAL_PHASE}` on the interpreter. See [`GP_START`] … [`GP_END`].
     SetGlobalPhase(u8),
     Halt,
+
+    // ── Streaming map (appended — do not reorder earlier op tags) ─────────────
+    /// `maps { BLOCK } LIST` — stack: \[list\] → lazy iterator (pull-based; perlrs extension).
+    MapsWithBlock(u16),
+    /// `flat_maps { BLOCK } LIST` — like [`Op::MapsWithBlock`] with `flat_map`-style flattening.
+    MapsFlatMapWithBlock(u16),
+    /// `maps EXPR, LIST` — index into [`Chunk::map_expr_entries`]; stack: \[list\] → iterator.
+    MapsWithExpr(u16),
+    /// `flat_maps EXPR, LIST` — same pools as [`Op::MapsWithExpr`].
+    MapsFlatMapWithExpr(u16),
+    /// `filter { BLOCK } LIST` — stack: \[list\] → lazy iterator (perlrs; `grep` remains eager).
+    FilterWithBlock(u16),
+    /// `filter EXPR, LIST` — index into [`Chunk::grep_expr_entries`]; stack: \[list\] → iterator.
+    FilterWithExpr(u16),
 }
 
 /// `${^GLOBAL_PHASE}` values emitted with [`Op::SetGlobalPhase`] (matches Perl’s phase strings).

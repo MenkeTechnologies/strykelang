@@ -5663,6 +5663,63 @@ impl<'a> VM<'a> {
                         let list = self.pop().to_list();
                         self.map_with_expr_common(list, *expr_idx, true, op_count)
                     }
+                    Op::MapsWithBlock(block_idx) => {
+                        let val = self.pop();
+                        let block = self.blocks[*block_idx as usize].clone();
+                        let out =
+                            self.interp
+                                .map_stream_block_output(val, &block, false, self.line())?;
+                        self.push(out);
+                        Ok(())
+                    }
+                    Op::MapsFlatMapWithBlock(block_idx) => {
+                        let val = self.pop();
+                        let block = self.blocks[*block_idx as usize].clone();
+                        let out = self
+                            .interp
+                            .map_stream_block_output(val, &block, true, self.line())?;
+                        self.push(out);
+                        Ok(())
+                    }
+                    Op::MapsWithExpr(expr_idx) => {
+                        let val = self.pop();
+                        let idx = *expr_idx as usize;
+                        let expr = self.map_expr_entries[idx].clone();
+                        let out =
+                            self.interp
+                                .map_stream_expr_output(val, &expr, false, self.line())?;
+                        self.push(out);
+                        Ok(())
+                    }
+                    Op::MapsFlatMapWithExpr(expr_idx) => {
+                        let val = self.pop();
+                        let idx = *expr_idx as usize;
+                        let expr = self.map_expr_entries[idx].clone();
+                        let out =
+                            self.interp
+                                .map_stream_expr_output(val, &expr, true, self.line())?;
+                        self.push(out);
+                        Ok(())
+                    }
+                    Op::FilterWithBlock(block_idx) => {
+                        let val = self.pop();
+                        let block = self.blocks[*block_idx as usize].clone();
+                        let out =
+                            self.interp
+                                .filter_stream_block_output(val, &block, self.line())?;
+                        self.push(out);
+                        Ok(())
+                    }
+                    Op::FilterWithExpr(expr_idx) => {
+                        let val = self.pop();
+                        let idx = *expr_idx as usize;
+                        let expr = self.grep_expr_entries[idx].clone();
+                        let out =
+                            self.interp
+                                .filter_stream_expr_output(val, &expr, self.line())?;
+                        self.push(out);
+                        Ok(())
+                    }
                     Op::ChunkByWithBlock(block_idx) => {
                         let list = self.pop().to_list();
                         self.chunk_by_with_block_common(list, *block_idx, op_count)

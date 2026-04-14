@@ -670,11 +670,13 @@ fn extract_pipe_source(e: &Expr, segments: &mut Vec<String>) -> String {
             block,
             list,
             flatten_array_refs,
+            stream,
         } => {
-            let kw = if *flatten_array_refs {
-                "flat_map"
-            } else {
-                "map"
+            let kw = match (*flatten_array_refs, *stream) {
+                (true, true) => "flat_maps",
+                (true, false) => "flat_map",
+                (false, true) => "maps",
+                (false, false) => "map",
             };
             segments.push(format!("{} {{\n{}\n}}", kw, convert_block(block, 0)));
             extract_pipe_source(list, segments)
@@ -683,22 +685,24 @@ fn extract_pipe_source(e: &Expr, segments: &mut Vec<String>) -> String {
             expr,
             list,
             flatten_array_refs,
+            stream,
         } => {
-            let kw = if *flatten_array_refs {
-                "flat_map"
-            } else {
-                "map"
+            let kw = match (*flatten_array_refs, *stream) {
+                (true, true) => "flat_maps",
+                (true, false) => "flat_map",
+                (false, true) => "maps",
+                (false, false) => "map",
             };
             // Convert comma form to block form for cleaner pipe syntax.
             segments.push(format!("{} {{ {} }}", kw, convert_expr_top(expr)));
             extract_pipe_source(list, segments)
         }
-        ExprKind::GrepExpr { block, list } => {
-            segments.push(format!("grep {{\n{}\n}}", convert_block(block, 0)));
+        ExprKind::GrepExpr { block, list, keyword } => {
+            segments.push(format!("{} {{\n{}\n}}", keyword.as_str(), convert_block(block, 0)));
             extract_pipe_source(list, segments)
         }
-        ExprKind::GrepExprComma { expr, list } => {
-            segments.push(format!("grep {{ {} }}", convert_expr_top(expr)));
+        ExprKind::GrepExprComma { expr, list, keyword } => {
+            segments.push(format!("{} {{ {} }}", keyword.as_str(), convert_expr_top(expr)));
             extract_pipe_source(list, segments)
         }
         ExprKind::SortExpr { cmp, list } => {
@@ -1083,11 +1087,13 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
             block,
             list,
             flatten_array_refs,
+            stream,
         } => {
-            let kw = if *flatten_array_refs {
-                "flat_map"
-            } else {
-                "map"
+            let kw = match (*flatten_array_refs, *stream) {
+                (true, true) => "flat_maps",
+                (true, false) => "flat_map",
+                (false, true) => "maps",
+                (false, false) => "map",
             };
             format!(
                 "{} {{\n{}\n}} {}",
@@ -1096,9 +1102,10 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
                 convert_expr(list)
             )
         }
-        ExprKind::GrepExpr { block, list } => {
+        ExprKind::GrepExpr { block, list, keyword } => {
             format!(
-                "grep {{\n{}\n}} {}",
+                "{} {{\n{}\n}} {}",
+                keyword.as_str(),
                 convert_block(block, 0),
                 convert_expr(list)
             )

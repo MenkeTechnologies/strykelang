@@ -530,7 +530,14 @@ pub(crate) fn try_match_map_grep_scalar_fusion(
         {
             let init = decls[0].initializer.as_ref()?;
             match &init.kind {
-                ExprKind::GrepExpr { block, list } => {
+                ExprKind::GrepExpr {
+                    block,
+                    list,
+                    keyword,
+                } => {
+                    if keyword.is_stream() {
+                        return None;
+                    }
                     match &list.kind {
                         ExprKind::ArrayVar(an) if an == &doubled_name => {}
                         _ => return None,

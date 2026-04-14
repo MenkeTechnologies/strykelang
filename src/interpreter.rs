@@ -3401,6 +3401,35 @@ impl Interpreter {
                 return Ok(PerlValue::pipeline(Arc::clone(&p)));
             }
         }
+        if matches!(name, "take_while" | "drop_while" | "skip_while") && items.len() == 1 {
+            let v = &items[0];
+            if v.is_iterator() || v.as_array_vec().is_some() {
+                let source = crate::map_stream::into_pull_iter(v.clone());
+                let (capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
+                return Ok(match name {
+                    "take_while" => PerlValue::iterator(Arc::new(
+                        crate::map_stream::TakeWhileIterator::new(
+                            source,
+                            sub,
+                            self.subs.clone(),
+                            capture,
+                            atomic_arrays,
+                            atomic_hashes,
+                        ),
+                    )),
+                    _ => PerlValue::iterator(Arc::new(
+                        crate::map_stream::SkipWhileIterator::new(
+                            source,
+                            sub,
+                            self.subs.clone(),
+                            capture,
+                            atomic_arrays,
+                            atomic_hashes,
+                        ),
+                    )),
+                });
+            }
+        }
         let wa = self.wantarray_kind;
         match name {
             "take_while" => {
@@ -3419,7 +3448,7 @@ impl Interpreter {
                     WantarrayCtx::Void => PerlValue::UNDEF,
                 })
             }
-            "drop_while" => {
+            "drop_while" | "skip_while" => {
                 let mut i = 0usize;
                 while i < items.len() {
                     let _ = self.scope.set_scalar("_", items[i].clone());
@@ -8443,7 +8472,7 @@ impl Interpreter {
                     return r.map_err(Into::into);
                 }
                 let arg_vals = if matches!(name.as_str(), "any" | "all" | "none" | "first")
-                    || matches!(name.as_str(), "take_while" | "drop_while" | "tap" | "peek")
+                    || matches!(name.as_str(), "take_while" | "drop_while" | "skip_while" | "tap" | "peek")
                     || matches!(
                         name.as_str(),
                         "partition" | "min_by" | "max_by" | "zip_with" | "count_by"
@@ -8592,7 +8621,7 @@ impl Interpreter {
                 // Builtins read [`Self::wantarray_kind`] (VM sets it too); thread `ctx` through.
                 let saved_wa = self.wantarray_kind;
                 self.wantarray_kind = ctx;
-                if matches!(name.as_str(), "take_while" | "drop_while" | "tap" | "peek") {
+                if matches!(name.as_str(), "take_while" | "drop_while" | "skip_while" | "tap" | "peek") {
                     let r = self.list_higher_order_block_builtin(name.as_str(), &arg_vals, line);
                     self.wantarray_kind = saved_wa;
                     return r.map_err(Into::into);
@@ -8780,8 +8809,17 @@ impl Interpreter {
                 block,
                 list,
                 flatten_array_refs,
+                stream,
             } => {
                 let list_val = self.eval_expr_ctx(list, WantarrayCtx::List)?;
+                if *stream {
+                    let out =
+                        self.map_stream_block_output(list_val, block, *flatten_array_refs, line)?;
+                    if ctx == WantarrayCtx::List {
+                        return Ok(out);
+                    }
+                    return Ok(PerlValue::integer(out.to_list().len() as i64));
+                }
                 let items = list_val.to_list();
                 if items.len() == 1 {
                     if let Some(p) = items[0].as_pipeline() {
@@ -8838,8 +8876,16 @@ impl Interpreter {
                 expr,
                 list,
                 flatten_array_refs,
+                stream,
             } => {
                 let list_val = self.eval_expr_ctx(list, WantarrayCtx::List)?;
+                if *stream {
+                    let out = self.map_stream_expr_output(list_val, expr, *flatten_array_refs, line)?;
+                    if ctx == WantarrayCtx::List {
+                        return Ok(out);
+                    }
+                    return Ok(PerlValue::integer(out.to_list().len() as i64));
+                }
                 let items = list_val.to_list();
                 let mut result = Vec::new();
                 for item in items {
@@ -8853,8 +8899,15 @@ impl Interpreter {
                     Ok(PerlValue::integer(result.len() as i64))
                 }
             }
-            ExprKind::GrepExpr { block, list } => {
+            ExprKind::GrepExpr { block, list, keyword } => {
                 let list_val = self.eval_expr_ctx(list, WantarrayCtx::List)?;
+                if keyword.is_stream() {
+                    let out = self.filter_stream_block_output(list_val, block, line)?;
+                    if ctx == WantarrayCtx::List {
+                        return Ok(out);
+                    }
+                    return Ok(PerlValue::integer(out.to_list().len() as i64));
+                }
                 let items = list_val.to_list();
                 if items.len() == 1 {
                     if let Some(p) = items[0].as_pipeline() {
@@ -8877,8 +8930,15 @@ impl Interpreter {
                     Ok(PerlValue::integer(result.len() as i64))
                 }
             }
-            ExprKind::GrepExprComma { expr, list } => {
+            ExprKind::GrepExprComma { expr, list, keyword } => {
                 let list_val = self.eval_expr_ctx(list, WantarrayCtx::List)?;
+                if keyword.is_stream() {
+                    let out = self.filter_stream_expr_output(list_val, expr, line)?;
+                    if ctx == WantarrayCtx::List {
+                        return Ok(out);
+                    }
+                    return Ok(PerlValue::integer(out.to_list().len() as i64));
+                }
                 let items = list_val.to_list();
                 let mut result = Vec::new();
                 for item in items {

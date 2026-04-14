@@ -26,6 +26,39 @@ impl Statement {
     }
 }
 
+/// Surface spelling for `grep` / `greps` / `filter` / `find_all`.
+/// `grep` is eager (Perl-compatible); `greps` / `filter` / `find_all` are lazy (streaming).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GrepBuiltinKeyword {
+    Grep,
+    Greps,
+    Filter,
+    FindAll,
+}
+
+impl Default for GrepBuiltinKeyword {
+    fn default() -> Self {
+        Self::Grep
+    }
+}
+
+impl GrepBuiltinKeyword {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Grep => "grep",
+            Self::Greps => "greps",
+            Self::Filter => "filter",
+            Self::FindAll => "find_all",
+        }
+    }
+
+    /// Returns `true` for streaming variants (`greps`, `filter`, `find_all`).
+    pub const fn is_stream(self) -> bool {
+        !matches!(self, Self::Grep)
+    }
+}
+
 /// Named parameter in `sub name (SIG ...) { }` — perlrs extension (not Perl 5 prototype syntax).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SubSigParam {
@@ -569,21 +602,30 @@ pub enum ExprKind {
         list: Box<Expr>,
         /// `flat_map { }` — peel one ARRAY ref from each iteration (perlrs extension).
         flatten_array_refs: bool,
+        /// `maps` / `flat_maps` — lazy iterator output (perlrs); `map` / `flat_map` use `false`.
+        #[serde(default)]
+        stream: bool,
     },
     /// `map EXPR, LIST` — EXPR is evaluated in list context with `$_` set to each element.
     MapExprComma {
         expr: Box<Expr>,
         list: Box<Expr>,
         flatten_array_refs: bool,
+        #[serde(default)]
+        stream: bool,
     },
     GrepExpr {
         block: Block,
         list: Box<Expr>,
+        #[serde(default)]
+        keyword: GrepBuiltinKeyword,
     },
     /// `grep EXPR, LIST` — EXPR is evaluated with `$_` set to each element (Perl list vs scalar context).
     GrepExprComma {
         expr: Box<Expr>,
         list: Box<Expr>,
+        #[serde(default)]
+        keyword: GrepBuiltinKeyword,
     },
     /// `sort BLOCK LIST`, `sort SUB LIST`, or `sort $coderef LIST` (Perl uses `$a`/`$b` in the comparator).
     SortExpr {

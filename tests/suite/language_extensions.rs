@@ -30,6 +30,51 @@ fn flat_map_alias_expands_array_results_like_map() {
 }
 
 #[test]
+fn maps_streams_through_pipe_uc_comma_form() {
+    assert_eq!(
+        eval_string(r#"(qw(a b)) |> maps uc |> join ','"#),
+        "A,B"
+    );
+}
+
+#[test]
+fn filter_streams_while_grep_stays_eager() {
+    assert_eq!(
+        eval_string(r#"(1, 2, 3, 4) |> filter { $_ % 2 == 0 } |> join ','"#),
+        "2,4"
+    );
+    assert_eq!(
+        eval_string(r#"(1, 2, 3, 4) |> grep { $_ % 2 == 0 } |> join ','"#),
+        "2,4"
+    );
+    assert_eq!(
+        eval_string(
+            r#"no strict 'vars';
+            my $root = tempdir();
+            open my $f, '>', "$root/y" or die;
+            close $f;
+            fr($root) |> filter { length $_ == 1 } |> join ",""#,
+        ),
+        "y"
+    );
+}
+
+#[test]
+fn maps_streams_iterator_from_fr_shape_without_double_read() {
+    // `fr` yields a pull iterator; `maps` must not materialize it up front.
+    assert_eq!(
+        eval_string(
+            r#"no strict 'vars';
+            my $root = tempdir();
+            open my $f, '>', "$root/x" or die;
+            close $f;
+            fr($root) |> maps { uc $_ } |> join ",""#,
+        ),
+        "X"
+    );
+}
+
+#[test]
 fn pflat_map_preserves_input_order_when_flattening() {
     let s = eval_string(r#"(3, 2, 1) |> pflat_map { [$_] } |> join ','"#);
     assert_eq!(s, "3,2,1");

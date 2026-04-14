@@ -1113,6 +1113,7 @@ impl Parser {
                 | "par_sed"
                 | "glob"
                 | "grep"
+                | "greps"
                 | "heap"
                 | "hex"
                 | "index"
@@ -1127,6 +1128,8 @@ impl Parser {
                 | "lstat"
                 | "map"
                 | "flat_map"
+                | "maps"
+                | "flat_maps"
                 | "flatten"
                 | "frequencies"
                 | "freq"
@@ -1167,6 +1170,9 @@ impl Parser {
                 | "none"
                 | "take_while"
                 | "drop_while"
+                | "skip_while"
+                | "skip"
+                | "first_or"
                 | "tap"
                 | "peek"
                 | "partition"
@@ -3567,7 +3573,7 @@ impl Parser {
                         args.push(lhs);
                     }
                     "pfirst" | "pany" | "any" | "all" | "none" | "first" | "take_while"
-                    | "drop_while" | "tap" | "peek" | "group_by" | "chunk_by" | "partition"
+                    | "drop_while" | "skip_while" | "tap" | "peek" | "group_by" | "chunk_by" | "partition"
                     | "min_by" | "max_by" | "zip_with" | "count_by" => {
                         if args.len() < 2 {
                             return Err(self.syntax_err(
@@ -3790,27 +3796,41 @@ impl Parser {
                 block,
                 list: _,
                 flatten_array_refs,
+                stream,
             } => ExprKind::MapExpr {
                 block,
                 list: Box::new(lhs),
                 flatten_array_refs,
+                stream,
             },
             ExprKind::MapExprComma {
                 expr,
                 list: _,
                 flatten_array_refs,
+                stream,
             } => ExprKind::MapExprComma {
                 expr,
                 list: Box::new(lhs),
                 flatten_array_refs,
+                stream,
             },
-            ExprKind::GrepExpr { block, list: _ } => ExprKind::GrepExpr {
+            ExprKind::GrepExpr {
+                block,
+                list: _,
+                keyword,
+            } => ExprKind::GrepExpr {
                 block,
                 list: Box::new(lhs),
+                keyword,
             },
-            ExprKind::GrepExprComma { expr, list: _ } => ExprKind::GrepExprComma {
+            ExprKind::GrepExprComma {
+                expr,
+                list: _,
+                keyword,
+            } => ExprKind::GrepExprComma {
                 expr,
                 list: Box::new(lhs),
+                keyword,
             },
             ExprKind::ForEachExpr { block, list: _ } => ExprKind::ForEachExpr {
                 block,
@@ -6098,8 +6118,9 @@ impl Parser {
                     line,
                 })
             }
-            "map" | "flat_map" => {
-                let flatten_array_refs = name == "flat_map";
+            "map" | "flat_map" | "maps" | "flat_maps" => {
+                let flatten_array_refs = matches!(name.as_str(), "flat_map" | "flat_maps");
+                let stream = matches!(name.as_str(), "maps" | "flat_maps");
                 if matches!(self.peek(), Token::LBrace) {
                     let (block, list) = self.parse_block_list()?;
                     Ok(Expr {
@@ -6107,6 +6128,7 @@ impl Parser {
                             block,
                             list: Box::new(list),
                             flatten_array_refs,
+                            stream,
                         },
                         line,
                     })
@@ -6142,6 +6164,7 @@ impl Parser {
                             expr: Box::new(expr),
                             list: Box::new(list_expr),
                             flatten_array_refs,
+                            stream,
                         },
                         line,
                     })
@@ -6156,13 +6179,21 @@ impl Parser {
                 }
                 self.parse_algebraic_match_expr(line)
             }
-            "grep" | "filter" | "find_all" => {
+            "grep" | "greps" | "filter" | "find_all" => {
+                let keyword = match name.as_str() {
+                    "grep" => crate::ast::GrepBuiltinKeyword::Grep,
+                    "greps" => crate::ast::GrepBuiltinKeyword::Greps,
+                    "filter" => crate::ast::GrepBuiltinKeyword::Filter,
+                    "find_all" => crate::ast::GrepBuiltinKeyword::FindAll,
+                    _ => unreachable!(),
+                };
                 if matches!(self.peek(), Token::LBrace) {
                     let (block, list) = self.parse_block_list()?;
                     Ok(Expr {
                         kind: ExprKind::GrepExpr {
                             block,
                             list: Box::new(list),
+                            keyword,
                         },
                         line,
                     })
@@ -6226,6 +6257,7 @@ impl Parser {
                             kind: ExprKind::GrepExpr {
                                 block,
                                 list: Box::new(list),
+                                keyword,
                             },
                             line,
                         })
@@ -6245,6 +6277,7 @@ impl Parser {
                             kind: ExprKind::GrepExprComma {
                                 expr: Box::new(expr),
                                 list: Box::new(list_expr),
+                                keyword,
                             },
                             line,
                         })
@@ -7314,7 +7347,7 @@ impl Parser {
                     line,
                 })
             }
-            "take_while" | "drop_while" | "tap" | "peek" | "partition" | "min_by" | "max_by"
+            "take_while" | "drop_while" | "skip_while" | "tap" | "peek" | "partition" | "min_by" | "max_by"
             | "zip_with" | "count_by" => {
                 let (block, list, progress) = self.parse_block_then_list_optional_progress()?;
                 if progress.is_some() {
@@ -8448,7 +8481,7 @@ impl Parser {
     fn is_perl_keyword(name: &str) -> bool {
         matches!(
             name,
-            "keys" | "values" | "reverse" | "map" | "grep" | "sort" | "join"
+            "keys" | "values" | "reverse" | "map" | "maps" | "grep" | "greps" | "sort" | "join"
             | "split" | "push" | "pop" | "shift" | "unshift" | "splice"
             | "chomp" | "chop" | "chr" | "ord" | "hex" | "oct" | "lc" | "uc"
             | "lcfirst" | "ucfirst" | "length" | "substr" | "index" | "rindex"
@@ -8476,7 +8509,7 @@ impl Parser {
             | "setprotoent" | "setservent" | "endpwent" | "endgrent"
             | "endhostent" | "endnetent" | "endprotoent" | "endservent"
             // perlrs extensions that produce lists or have special syntax:
-            | "filter" | "fore" | "flat_map" | "reduce" | "fold" | "uniq"
+            | "filter" | "fore" | "flat_map" | "flat_maps" | "reduce" | "fold" | "uniq"
             | "distinct" | "any" | "all" | "none" | "first" | "min" | "max"
             | "sum" | "product" | "zip" | "chunk" | "sliding_window" | "enumerate"
             | "reject" | "detect" | "find" | "find_all" | "collect" | "inject"
@@ -8501,15 +8534,15 @@ impl Parser {
             | "par_find_files" | "par_line_count" | "pwatch" | "par_pipeline_stream"
             | "glob_par" | "ppool" | "barrier" | "pipeline" | "cluster"
             // ── functional / iterator ───────────────────────────────────────
-            | "fore" | "e" | "flat_map" | "filter" | "find_all" | "reduce" | "fold"
+            | "fore" | "e" | "flat_map" | "flat_maps" | "maps" | "filter" | "find_all" | "reduce" | "fold"
             | "inject" | "collect" | "uniq" | "distinct" | "any" | "all" | "none"
             | "first" | "detect" | "find" | "compact" | "reject" | "flatten" | "set"
             | "min_by" | "max_by" | "sort_by" | "tally" | "find_index"
             | "each_with_index" | "count" | "cnt" |"len" | "group_by" | "chunk_by"
             | "zip" | "chunk" | "chunked" | "sliding_window" | "windowed"
             | "enumerate" | "with_index" | "shuffle" | "shuffled"| "heap"
-            | "take_while" | "drop_while" | "tap" | "peek" | "partition"
-            | "zip_with" | "count_by"
+            | "take_while" | "drop_while" | "skip_while" | "tap" | "peek" | "partition"
+            | "zip_with" | "count_by" | "skip" | "first_or"
             // ── pipeline / string helpers ───────────────────────────────────
             | "input" | "lines" | "words" | "chars" | "trim" | "avg" | "stddev"
             | "normalize" | "snake_case" | "camel_case" | "kebab_case"
