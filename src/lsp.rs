@@ -1373,7 +1373,7 @@ fn doc_for_label(label: &str) -> Option<Documentation> {
         "enumerate" | "en" => "`enumerate ITERATOR` — yields `[$index, $item]` pairs (streaming).",
         "chunk" | "chk" => "`chunk N, ITERATOR` — yields N-element arrayrefs (streaming).",
         "dedup" | "dup" => "`dedup ITERATOR` — drops consecutive duplicates (streaming).",
-        "range" => "`range(N, M)` — lazy bidirectional integer iterator.\n\n```perl\nrange(1, 5) |> e p;  # 1 2 3 4 5\nrange(5, 1) |> e p;  # 5 4 3 2 1\n```",
+        "range" => "`range(START, END [, STEP])` — lazy integer iterator with optional step.\n\n```perl\nrange(1, 5) |> e p;       # 1 2 3 4 5\nrange(5, 1) |> e p;       # 5 4 3 2 1\nrange(0, 10, 2) |> e p;   # 0 2 4 6 8 10\nrange(10, 0, -2) |> e p;  # 10 8 6 4 2 0\n```",
         "tap" => "`tap { side_effect } @list` — execute block per element, return original list (streaming).",
         "tee" => "`tee FILE, ITERATOR` — write each item to file while passing through (streaming).",
         "nth" => "`nth N, LIST` — get Nth element (0-indexed).",

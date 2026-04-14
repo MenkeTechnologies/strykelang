@@ -1028,4 +1028,159 @@ mod tests {
     fn nested_sub_scope() {
         assert!(lint("sub outer { my $x = 1; sub inner { say $x; } }").is_ok());
     }
+
+    #[test]
+    fn hash_element_access_ok() {
+        assert!(lint("my %h = (a => 1); say $h{a};").is_ok());
+    }
+
+    #[test]
+    fn array_element_access_ok() {
+        assert!(lint("my @a = (1, 2, 3); say $a[0];").is_ok());
+    }
+
+    #[test]
+    fn undefined_hash_detected() {
+        let r = lint("say $undefined_hash{key};");
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn undefined_array_detected() {
+        let r = lint("say $undefined_array[0];");
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn map_with_topic_ok() {
+        assert!(lint("my @x = map { $_ * 2 } 1..3;").is_ok());
+    }
+
+    #[test]
+    fn grep_with_topic_ok() {
+        assert!(lint("my @x = grep { $_ > 1 } 1..3;").is_ok());
+    }
+
+    #[test]
+    fn sort_with_ab_ok() {
+        assert!(lint("my @x = sort { $a <=> $b } 1..3;").is_ok());
+    }
+
+    #[test]
+    fn ternary_undefined_var_detected() {
+        let r = lint("my $x = $undefined ? 1 : 0;");
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn binop_undefined_var_detected() {
+        let r = lint("my $x = 1 + $undefined;");
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn postfix_if_undefined_detected() {
+        let r = lint("say 'x' if $undefined;");
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn while_loop_var_ok() {
+        assert!(lint("my $i = 0; while ($i < 10) { say $i; $i++; }").is_ok());
+    }
+
+    #[test]
+    fn for_loop_init_var_in_scope() {
+        assert!(lint("for (my $i = 0; $i < 10; $i++) { say $i; }").is_ok());
+    }
+
+    #[test]
+    fn given_when_ok() {
+        assert!(lint("my $x = 1; given ($x) { when (1) { say 'one'; } }").is_ok());
+    }
+
+    #[test]
+    fn arrow_deref_ok() {
+        assert!(lint("my $h = { a => 1 }; say $h->{a};").is_ok());
+    }
+
+    #[test]
+    fn method_call_ok() {
+        assert!(lint("my $obj = bless {}, 'Foo'; $obj->method();").is_ok());
+    }
+
+    #[test]
+    fn push_builtin_ok() {
+        assert!(lint("my @a; push @a, 1, 2, 3;").is_ok());
+    }
+
+    #[test]
+    fn splice_builtin_ok() {
+        assert!(lint("my @a = (1, 2, 3); splice @a, 1, 1, 'x';").is_ok());
+    }
+
+    #[test]
+    fn substr_builtin_ok() {
+        assert!(lint("my $s = 'hello'; say substr($s, 0, 2);").is_ok());
+    }
+
+    #[test]
+    fn sprintf_builtin_ok() {
+        assert!(lint("my $s = sprintf('%d', 42);").is_ok());
+    }
+
+    #[test]
+    fn range_ok() {
+        assert!(lint("my @a = 1..10;").is_ok());
+    }
+
+    #[test]
+    fn qw_ok() {
+        assert!(lint("my @a = qw(a b c);").is_ok());
+    }
+
+    #[test]
+    fn regex_ok() {
+        assert!(lint("my $x = 'hello'; $x =~ /ell/;").is_ok());
+    }
+
+    #[test]
+    fn anonymous_sub_captures_outer_var() {
+        assert!(lint("my $x = 1; my $f = sub { say $x; };").is_ok());
+    }
+
+    #[test]
+    fn state_var_ok() {
+        assert!(lint("sub counter { state $n = 0; $n++; }").is_ok());
+    }
+
+    #[test]
+    fn our_var_ok() {
+        assert!(lint("our $VERSION = '1.0';").is_ok());
+    }
+
+    #[test]
+    fn local_var_ok() {
+        assert!(lint("local $/ = undef;").is_ok());
+    }
+
+    #[test]
+    fn chained_method_calls_ok() {
+        assert!(lint("my $x = Foo->new->bar->baz;").is_ok());
+    }
+
+    #[test]
+    fn list_assignment_ok() {
+        assert!(lint("my ($a, $b, $c) = (1, 2, 3); say $a + $b + $c;").is_ok());
+    }
+
+    #[test]
+    fn hash_slice_ok() {
+        assert!(lint("my %h = (a => 1, b => 2); my @v = @h{qw(a b)};").is_ok());
+    }
+
+    #[test]
+    fn array_slice_ok() {
+        assert!(lint("my @a = (1, 2, 3, 4); my @b = @a[0, 2];").is_ok());
+    }
 }

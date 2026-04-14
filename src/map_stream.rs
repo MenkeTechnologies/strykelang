@@ -579,6 +579,15 @@ impl RangeIterator {
             step,
         }
     }
+
+    pub(crate) fn new_with_step(start: i64, end: i64, step: i64) -> Self {
+        let step = if step == 0 { 1 } else { step };
+        Self {
+            current: Mutex::new(start),
+            end,
+            step,
+        }
+    }
 }
 
 impl PerlIterator for RangeIterator {

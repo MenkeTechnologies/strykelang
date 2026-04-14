@@ -1680,9 +1680,13 @@ fn builtin_dedup(args: &[PerlValue]) -> PerlResult<PerlValue> {
 fn builtin_range(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let start = args.first().map(|v| v.to_int()).unwrap_or(0);
     let end = args.get(1).map(|v| v.to_int()).unwrap_or(start);
-    Ok(PerlValue::iterator(Arc::new(
-        crate::map_stream::RangeIterator::new(start, end),
-    )))
+    let iter = if let Some(step_val) = args.get(2) {
+        let step = step_val.to_int();
+        crate::map_stream::RangeIterator::new_with_step(start, end, step)
+    } else {
+        crate::map_stream::RangeIterator::new(start, end)
+    };
+    Ok(PerlValue::iterator(Arc::new(iter)))
 }
 
 /// `tee FILE, ITERATOR` — write each item to file while passing through (streaming).

@@ -1076,3 +1076,149 @@ fn inc_in_pipe_chain() {
 fn dec_in_pipe_chain() {
     assert_eq!(eval_int(r#"10 |> dec |> dec |> dec"#), 7);
 }
+
+// ── pipe forward chains ──
+
+#[test]
+fn pipe_map_filter_sum() {
+    assert_eq!(eval_int(r#"(1..10) |> map { $_ * 2 } |> grep { $_ > 10 } |> sum"#), 90);
+}
+
+#[test]
+fn pipe_with_rev_and_join() {
+    assert_eq!(eval_string(r#""hello" |> rev |> uc"#), "OLLEH");
+}
+
+#[test]
+fn pipe_take_drop() {
+    assert_eq!(eval_string(r#"(1..10) |> drop 3 |> take 4 |> join ','"#), "4,5,6,7");
+}
+
+#[test]
+fn pipe_uniq_sort() {
+    assert_eq!(eval_string(r#"(3,1,2,1,3,2) |> uniq |> sort { $a <=> $b } |> join ','"#), "1,2,3");
+}
+
+// ── thread macro edge cases ──
+
+#[test]
+fn thread_with_map_block() {
+    assert_eq!(eval_int(r#"t (1,2,3) map { $_ * 10 } sum"#), 60);
+}
+
+#[test]
+fn thread_with_grep_block() {
+    assert_eq!(eval_int(r#"t (1..10) grep { $_ % 2 == 0 } sum"#), 30);
+}
+
+#[test]
+fn thread_empty_list() {
+    assert_eq!(eval_int(r#"t () sum"#), 0);
+}
+
+// ── static analysis compatible patterns ──
+
+#[test]
+fn foreach_with_my_declares_var() {
+    assert_eq!(eval_int(r#"my $sum = 0; foreach my $i (1..5) { $sum += $i; } $sum"#), 15);
+}
+
+#[test]
+fn nested_foreach_scopes() {
+    assert_eq!(
+        eval_int(r#"my $sum = 0; foreach my $i (1..3) { foreach my $j (1..3) { $sum += $i * $j; } } $sum"#),
+        36
+    );
+}
+
+#[test]
+fn try_catch_error_var() {
+    assert_eq!(
+        eval_string(r#"my $msg; try { die "oops"; } catch ($e) { $msg = $e; } $msg"#),
+        "oops"
+    );
+}
+
+#[test]
+fn coderef_with_params() {
+    assert_eq!(eval_int(r#"my $add = sub ($a, $b) { $a + $b }; $add->(3, 4)"#), 7);
+}
+
+#[test]
+fn arrow_sub_syntax() {
+    assert_eq!(eval_int(r#"my $double = fn ($x) { $x * 2 }; $double->(21)"#), 42);
+}
+
+// ── builtin aliases ──
+
+#[test]
+fn hd_alias_for_head() {
+    assert_eq!(eval_string(r#"(1..10) |> hd 3 |> join ','"#), "1,2,3");
+}
+
+#[test]
+fn tl_alias_for_tail() {
+    assert_eq!(eval_string(r#"(1..10) |> tl 3 |> join ','"#), "8,9,10");
+}
+
+#[test]
+fn uq_alias_for_uniq() {
+    assert_eq!(eval_string(r#"(1,1,2,2,3,3) |> uq |> join ','"#), "1,2,3");
+}
+
+#[test]
+fn rv_alias_for_reverse() {
+    assert_eq!(eval_string(r#"(1,2,3) |> rv |> join ','"#), "3,2,1");
+}
+
+#[test]
+fn fl_alias_for_flatten() {
+    assert_eq!(eval_string(r#"([1,2], [3,4]) |> fl |> join ','"#), "1,2,3,4");
+}
+
+// ── range with step ──
+
+#[test]
+fn range_with_step_ascending() {
+    assert_eq!(eval_string(r#"range(0, 10, 2) |> join ','"#), "0,2,4,6,8,10");
+}
+
+#[test]
+fn range_with_step_descending() {
+    assert_eq!(eval_string(r#"range(10, 0, -2) |> join ','"#), "10,8,6,4,2,0");
+}
+
+#[test]
+fn range_with_step_three() {
+    assert_eq!(eval_string(r#"range(1, 10, 3) |> join ','"#), "1,4,7,10");
+}
+
+#[test]
+fn range_with_step_five() {
+    assert_eq!(eval_string(r#"range(0, 100, 5) |> take 5 |> join ','"#), "0,5,10,15,20");
+}
+
+#[test]
+fn range_without_step_ascending() {
+    assert_eq!(eval_string(r#"range(1, 5) |> join ','"#), "1,2,3,4,5");
+}
+
+#[test]
+fn range_without_step_descending() {
+    assert_eq!(eval_string(r#"range(5, 1) |> join ','"#), "5,4,3,2,1");
+}
+
+#[test]
+fn range_zero_step_treated_as_one() {
+    assert_eq!(eval_string(r#"range(1, 5, 0) |> join ','"#), "1,2,3,4,5");
+}
+
+#[test]
+fn range_step_in_pipeline() {
+    assert_eq!(eval_int(r#"range(0, 100, 10) |> sum"#), 550);
+}
+
+#[test]
+fn range_step_with_map() {
+    assert_eq!(eval_string(r#"range(1, 9, 2) |> map { $_ * 2 } |> join ','"#), "2,6,10,14,18");
+}
