@@ -453,7 +453,7 @@ impl Lexer {
             }
         }
         let flags = self.read_while(|c| REGEX_FLAG_CHARS.contains(c));
-        Ok(Token::Regex(pattern, flags))
+        Ok(Token::Regex(pattern, flags, '/'))
     }
 
     fn read_qw(&mut self) -> PerlResult<Token> {
@@ -1346,7 +1346,7 @@ impl Lexer {
                         let pattern = self.read_escaped_until(close)?;
                         let flags = self.read_while(|c| REGEX_FLAG_CHARS.contains(c));
                         self.last_was_term = true;
-                        return Ok(Token::Regex(pattern, flags));
+                        return Ok(Token::Regex(pattern, flags, delim));
                     }
                     "m" => {
                         // m/pattern/flags
@@ -1379,7 +1379,7 @@ impl Lexer {
                                 }
                                 let flags = self.read_while(|c| REGEX_FLAG_CHARS.contains(c));
                                 self.last_was_term = true;
-                                return Ok(Token::Regex(pattern, flags));
+                                return Ok(Token::Regex(pattern, flags, delim));
                             }
                         }
                         // Just the identifier 'm'
@@ -1432,17 +1432,18 @@ impl Lexer {
                                     let flags = self.read_while(|c| REGEX_FLAG_CHARS.contains(c));
                                     self.last_was_term = true;
                                     // Encode as special token — parser will decode
+                                    // Format: \x00s\x00pattern\x00replacement\x00flags\x00delim
                                     return Ok(Token::Ident(format!(
-                                        "\x00s\x00{}\x00{}\x00{}",
-                                        pattern, replacement, flags
+                                        "\x00s\x00{}\x00{}\x00{}\x00{}",
+                                        pattern, replacement, flags, delim
                                     )));
                                 }
                                 let replacement = self.read_escaped_until(close)?;
                                 let flags = self.read_while(|c| REGEX_FLAG_CHARS.contains(c));
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(format!(
-                                    "\x00s\x00{}\x00{}\x00{}",
-                                    pattern, replacement, flags
+                                    "\x00s\x00{}\x00{}\x00{}\x00{}",
+                                    pattern, replacement, flags, delim
                                 )));
                             }
                         }
@@ -1484,8 +1485,8 @@ impl Lexer {
                                 let flags = self.read_while(|c| "cdsr".contains(c));
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(format!(
-                                    "\x00tr\x00{}\x00{}\x00{}",
-                                    from, to, flags
+                                    "\x00tr\x00{}\x00{}\x00{}\x00{}",
+                                    from, to, flags, delim
                                 )));
                             }
                         }
@@ -1825,7 +1826,7 @@ mod tests {
     fn tokenize_m_regex_literal() {
         let mut l = Lexer::new("m/abc/");
         let t = l.tokenize().expect("tokenize");
-        assert!(matches!(t[0].0, Token::Regex(ref p, ref f) if p == "abc" && f.is_empty()));
+        assert!(matches!(t[0].0, Token::Regex(ref p, ref f, _) if p == "abc" && f.is_empty()));
     }
 
     #[test]
@@ -1876,28 +1877,28 @@ mod tests {
     fn tokenize_qr_regex_with_flags() {
         let mut l = Lexer::new("qr/pat/i");
         let t = l.tokenize().expect("tokenize");
-        assert!(matches!(t[0].0, Token::Regex(ref p, ref f) if p == "pat" && f == "i"));
+        assert!(matches!(t[0].0, Token::Regex(ref p, ref f, _) if p == "pat" && f == "i"));
     }
 
     #[test]
     fn tokenize_m_slash_includes_gc_flags() {
         let mut l = Lexer::new("m/./gc");
         let t = l.tokenize().expect("tokenize");
-        assert!(matches!(&t[0].0, Token::Regex(p, f) if p == "." && f == "gc"));
+        assert!(matches!(&t[0].0, Token::Regex(p, f, _) if p == "." && f == "gc"));
     }
 
     #[test]
     fn tokenize_m_hash_delimiter_includes_gc_flags() {
         let mut l = Lexer::new("m#\\w#gc");
         let t = l.tokenize().expect("tokenize");
-        assert!(matches!(&t[0].0, Token::Regex(p, f) if p == r"\w" && f == "gc"));
+        assert!(matches!(&t[0].0, Token::Regex(p, f, _) if p == r"\w" && f == "gc"));
     }
 
     #[test]
     fn tokenize_qr_slash_includes_gco_flags() {
         let mut l = Lexer::new("qr/x/gco");
         let t = l.tokenize().expect("tokenize");
-        assert!(matches!(&t[0].0, Token::Regex(p, f) if p == "x" && f == "gco"));
+        assert!(matches!(&t[0].0, Token::Regex(p, f, _) if p == "x" && f == "gco"));
     }
 
     #[test]
@@ -1924,7 +1925,7 @@ mod tests {
         let src = "qr#(\n    [!=]~\n    | split|grep|map\n    | not|and|or|xor\n)#x";
         let mut l = Lexer::new(src);
         let t = l.tokenize().expect("tokenize");
-        let Token::Regex(p, f) = &t[0].0 else {
+        let Token::Regex(p, f, _) = &t[0].0 else {
             panic!("expected Regex, got {:?}", t[0].0);
         };
         let rest: Vec<_> = t.iter().skip(1).take(8).map(|x| &x.0).collect();

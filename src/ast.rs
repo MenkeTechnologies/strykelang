@@ -3,6 +3,10 @@
 
 use serde::{Deserialize, Serialize};
 
+fn default_delim() -> char {
+    '/'
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Program {
     pub statements: Vec<Statement>,
@@ -580,18 +584,24 @@ pub enum ExprKind {
         flags: String,
         /// When true, `/g` uses Perl scalar semantics (one match per eval, updates `pos`).
         scalar_g: bool,
+        #[serde(default = "default_delim")]
+        delim: char,
     },
     Substitution {
         expr: Box<Expr>,
         pattern: String,
         replacement: String,
         flags: String,
+        #[serde(default = "default_delim")]
+        delim: char,
     },
     Transliterate {
         expr: Box<Expr>,
         from: String,
         to: String,
         flags: String,
+        #[serde(default = "default_delim")]
+        delim: char,
     },
 
     // List operations

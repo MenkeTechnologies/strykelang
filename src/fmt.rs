@@ -578,7 +578,7 @@ pub(crate) fn format_string_part(p: &StringPart) -> String {
 }
 
 /// Escape special characters inside the literal portions of an interpolated string.
-fn escape_interpolated_literal(s: &str) -> String {
+pub(crate) fn escape_interpolated_literal(s: &str) -> String {
     let mut out = String::new();
     for c in s.chars() {
         match c {
@@ -590,6 +590,25 @@ fn escape_interpolated_literal(s: &str) -> String {
             '\x1b' => out.push_str("\\e"),
             c if c.is_control() => {
                 out.push_str(&format!("\\x{{{:02x}}}", c as u32));
+            }
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+/// Escape control characters in regex pattern/replacement strings.
+/// Does not escape `/` since that's handled by the delimiter.
+pub(crate) fn escape_regex_part(s: &str) -> String {
+    let mut out = String::new();
+    for c in s.chars() {
+        match c {
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            '\x1b' => out.push_str("\\x1b"),
+            c if c.is_control() => {
+                out.push_str(&format!("\\x{:02x}", c as u32));
             }
             _ => out.push(c),
         }
@@ -831,13 +850,15 @@ pub fn format_expr(e: &Expr) -> String {
             expr,
             pattern,
             flags,
-            scalar_g,
+            scalar_g: _,
+            delim: _,
         } => format!("{} =~ /{}/{}", format_expr(expr), pattern, flags),
         ExprKind::Substitution {
             expr,
             pattern,
             replacement,
             flags,
+            delim: _,
         } => format!(
             "{} =~ s/{}/{}/{}",
             format_expr(expr),
@@ -850,6 +871,7 @@ pub fn format_expr(e: &Expr) -> String {
             from,
             to,
             flags,
+            delim: _,
         } => format!("{} =~ tr/{}/{}/{}", format_expr(expr), from, to, flags),
         ExprKind::MapExpr {
             block,

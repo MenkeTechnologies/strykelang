@@ -6465,6 +6465,7 @@ impl Compiler {
                 pattern,
                 flags,
                 scalar_g,
+                delim: _,
             } => {
                 self.compile_expr(expr)?;
                 let pat_idx = self.chunk.add_constant(PerlValue::string(pattern.clone()));
@@ -6491,6 +6492,7 @@ impl Compiler {
                 pattern,
                 replacement,
                 flags,
+                delim: _,
             } => {
                 self.compile_expr(expr)?;
                 let pat_idx = self.chunk.add_constant(PerlValue::string(pattern.clone()));
@@ -6510,6 +6512,7 @@ impl Compiler {
                 from,
                 to,
                 flags,
+                delim: _,
             } => {
                 self.compile_expr(expr)?;
                 let from_idx = self.chunk.add_constant(PerlValue::string(from.clone()));

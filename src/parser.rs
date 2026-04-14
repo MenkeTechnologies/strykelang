@@ -1945,7 +1945,7 @@ impl Parser {
 
     fn parse_match_pattern(&mut self) -> PerlResult<MatchPattern> {
         match self.peek().clone() {
-            Token::Regex(pattern, flags) => {
+            Token::Regex(pattern, flags, _delim) => {
                 self.advance();
                 Ok(MatchPattern::Regex { pattern, flags })
             }
@@ -4487,6 +4487,7 @@ impl Parser {
                 replacement,
                 mut flags,
                 expr: _,
+                delim,
             } => {
                 if !flags.contains('r') {
                     flags.push('r');
@@ -4496,6 +4497,7 @@ impl Parser {
                     pattern,
                     replacement,
                     flags,
+                    delim,
                 }
             }
             ExprKind::Transliterate {
@@ -4503,6 +4505,7 @@ impl Parser {
                 to,
                 mut flags,
                 expr: _,
+                delim,
             } => {
                 if !flags.contains('r') {
                     flags.push('r');
@@ -4512,6 +4515,7 @@ impl Parser {
                     from,
                     to,
                     flags,
+                    delim,
                 }
             }
             ExprKind::Match {
@@ -4519,11 +4523,13 @@ impl Parser {
                 flags,
                 scalar_g,
                 expr: _,
+                delim,
             } => ExprKind::Match {
                 expr: Box::new(lhs),
                 pattern,
                 flags,
                 scalar_g,
+                delim,
             },
             // Bare `/regex/` (no explicit `m`): promote to Match on piped LHS
             ExprKind::Regex(pattern, flags) => ExprKind::Match {
@@ -4531,6 +4537,7 @@ impl Parser {
                 pattern,
                 flags,
                 scalar_g: false,
+                delim: '/',
             },
 
             // ── Bareword function name → plain unary call ──────────────────────
@@ -4894,7 +4901,7 @@ impl Parser {
                 let line = left.line;
                 self.advance();
                 match self.peek().clone() {
-                    Token::Regex(pattern, flags) => {
+                    Token::Regex(pattern, flags, delim) => {
                         self.advance();
                         Ok(Expr {
                             kind: ExprKind::Match {
@@ -4902,6 +4909,7 @@ impl Parser {
                                 pattern,
                                 flags,
                                 scalar_g: false,
+                                delim,
                             },
                             line,
                         })
@@ -4912,22 +4920,26 @@ impl Parser {
                         };
                         let parts: Vec<&str> = encoded.split('\x00').collect();
                         if parts.len() >= 4 && parts[1] == "s" {
+                            let delim = parts.get(5).and_then(|s| s.chars().next()).unwrap_or('/');
                             Ok(Expr {
                                 kind: ExprKind::Substitution {
                                     expr: Box::new(left),
                                     pattern: parts[2].to_string(),
                                     replacement: parts[3].to_string(),
                                     flags: parts.get(4).unwrap_or(&"").to_string(),
+                                    delim,
                                 },
                                 line,
                             })
                         } else if parts.len() >= 4 && parts[1] == "tr" {
+                            let delim = parts.get(5).and_then(|s| s.chars().next()).unwrap_or('/');
                             Ok(Expr {
                                 kind: ExprKind::Transliterate {
                                     expr: Box::new(left),
                                     from: parts[2].to_string(),
                                     to: parts[3].to_string(),
                                     flags: parts.get(4).unwrap_or(&"").to_string(),
+                                    delim,
                                 },
                                 line,
                             })
@@ -4952,7 +4964,7 @@ impl Parser {
                 let line = left.line;
                 self.advance();
                 match self.peek().clone() {
-                    Token::Regex(pattern, flags) => {
+                    Token::Regex(pattern, flags, delim) => {
                         self.advance();
                         Ok(Expr {
                             kind: ExprKind::UnaryOp {
@@ -4963,6 +4975,7 @@ impl Parser {
                                         pattern,
                                         flags,
                                         scalar_g: false,
+                                        delim,
                                     },
                                     line,
                                 }),
@@ -4976,6 +4989,7 @@ impl Parser {
                         };
                         let parts: Vec<&str> = encoded.split('\x00').collect();
                         if parts.len() >= 4 && parts[1] == "s" {
+                            let delim = parts.get(5).and_then(|s| s.chars().next()).unwrap_or('/');
                             Ok(Expr {
                                 kind: ExprKind::UnaryOp {
                                     op: UnaryOp::LogNot,
@@ -4985,6 +4999,7 @@ impl Parser {
                                             pattern: parts[2].to_string(),
                                             replacement: parts[3].to_string(),
                                             flags: parts.get(4).unwrap_or(&"").to_string(),
+                                            delim,
                                         },
                                         line,
                                     }),
@@ -4992,6 +5007,7 @@ impl Parser {
                                 line,
                             })
                         } else if parts.len() >= 4 && parts[1] == "tr" {
+                            let delim = parts.get(5).and_then(|s| s.chars().next()).unwrap_or('/');
                             Ok(Expr {
                                 kind: ExprKind::UnaryOp {
                                     op: UnaryOp::LogNot,
@@ -5001,6 +5017,7 @@ impl Parser {
                                             from: parts[2].to_string(),
                                             to: parts[3].to_string(),
                                             flags: parts.get(4).unwrap_or(&"").to_string(),
+                                            delim,
                                         },
                                         line,
                                     }),
@@ -5654,7 +5671,7 @@ impl Parser {
                 self.advance();
                 self.parse_interpolated_string(&body, line)
             }
-            Token::Regex(pattern, flags) => {
+            Token::Regex(pattern, flags, _delim) => {
                 self.advance();
                 Ok(Expr {
                     kind: ExprKind::Regex(pattern, flags),
@@ -5888,6 +5905,7 @@ impl Parser {
                     self.advance();
                     let parts: Vec<&str> = name.split('\x00').collect();
                     if parts.len() >= 4 && parts[1] == "s" {
+                        let delim = parts.get(5).and_then(|s| s.chars().next()).unwrap_or('/');
                         return Ok(Expr {
                             kind: ExprKind::Substitution {
                                 expr: Box::new(Expr {
@@ -5897,11 +5915,13 @@ impl Parser {
                                 pattern: parts[2].to_string(),
                                 replacement: parts[3].to_string(),
                                 flags: parts.get(4).unwrap_or(&"").to_string(),
+                                delim,
                             },
                             line,
                         });
                     }
                     if parts.len() >= 4 && parts[1] == "tr" {
+                        let delim = parts.get(5).and_then(|s| s.chars().next()).unwrap_or('/');
                         return Ok(Expr {
                             kind: ExprKind::Transliterate {
                                 expr: Box::new(Expr {
@@ -5911,6 +5931,7 @@ impl Parser {
                                 from: parts[2].to_string(),
                                 to: parts[3].to_string(),
                                 flags: parts.get(4).unwrap_or(&"").to_string(),
+                                delim,
                             },
                             line,
                         });

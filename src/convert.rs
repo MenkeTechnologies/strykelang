@@ -22,22 +22,66 @@ const INDENT: &str = "    ";
 
 /// Convert a parsed Perl program to perlrs syntax.
 pub fn convert_program(p: &Program) -> String {
-    let body = p
-        .statements
-        .iter()
-        .map(|s| convert_statement(s, 0))
-        .collect::<Vec<_>>()
-        .join("\n");
+    let body = convert_statements(&p.statements, 0);
     format!("#!/usr/bin/env perlrs\n{}", body)
 }
 
 // ── Block / Statement ───────────────────────────────────────────────────────
 
 fn convert_block(b: &Block, depth: usize) -> String {
-    b.iter()
-        .map(|s| convert_statement(s, depth))
-        .collect::<Vec<_>>()
-        .join("\n")
+    convert_statements(b, depth)
+}
+
+/// Convert a slice of statements, merging bare say/print with following string literals.
+fn convert_statements(stmts: &[Statement], depth: usize) -> String {
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < stmts.len() {
+        // Check for bare say/print followed by string literal
+        if let Some(merged) = try_merge_say_print(&stmts[i..], depth) {
+            out.push(merged);
+            i += 2; // skip both statements
+        } else {
+            out.push(convert_statement(&stmts[i], depth));
+            i += 1;
+        }
+    }
+    out.join("\n")
+}
+
+/// Try to merge a bare say/print statement with a following string literal.
+/// Returns Some(merged_string) if merge happened, None otherwise.
+fn try_merge_say_print(stmts: &[Statement], depth: usize) -> Option<String> {
+    if stmts.len() < 2 {
+        return None;
+    }
+    let pfx = indent(depth);
+
+    // First statement must be bare say or print (no args, no handle)
+    let (is_say, handle) = match &stmts[0].kind {
+        StmtKind::Expression(e) => match &e.kind {
+            ExprKind::Say { handle, args } if args.is_empty() => (true, handle),
+            ExprKind::Print { handle, args } if args.is_empty() => (false, handle),
+            _ => return None,
+        },
+        _ => return None,
+    };
+
+    // No handle allowed for merge
+    if handle.is_some() {
+        return None;
+    }
+
+    // Second statement must be a bare string expression
+    let str_expr = match &stmts[1].kind {
+        StmtKind::Expression(e) => e,
+        _ => return None,
+    };
+
+    // Format as: p "string" or print "string"
+    let cmd = if is_say { "p" } else { "print" };
+    let arg = convert_expr_top(str_expr);
+    Some(format!("{}{} {}", pfx, cmd, arg))
 }
 
 /// Indent a string by `depth` levels of 4 spaces.
@@ -62,14 +106,14 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
         } => {
             let mut s = format!(
                 "if ({}) {{\n{}\n{}}}",
-                convert_expr(condition),
+                convert_expr_top(condition),
                 convert_block(body, depth + 1),
                 pfx
             );
             for (c, b) in elsifs {
                 s.push_str(&format!(
                     " elsif ({}) {{\n{}\n{}}}",
-                    convert_expr(c),
+                    convert_expr_top(c),
                     convert_block(b, depth + 1),
                     pfx
                 ));
@@ -90,7 +134,7 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
         } => {
             let mut s = format!(
                 "unless ({}) {{\n{}\n{}}}",
-                convert_expr(condition),
+                convert_expr_top(condition),
                 convert_block(body, depth + 1),
                 pfx
             );
@@ -116,7 +160,7 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
             let mut s = format!(
                 "{}while ({}) {{\n{}\n{}}}",
                 lb,
-                convert_expr(condition),
+                convert_expr_top(condition),
                 convert_block(body, depth + 1),
                 pfx
             );
@@ -142,7 +186,7 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
             let mut s = format!(
                 "{}until ({}) {{\n{}\n{}}}",
                 lb,
-                convert_expr(condition),
+                convert_expr_top(condition),
                 convert_block(body, depth + 1),
                 pfx
             );
@@ -160,7 +204,7 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
                 "do {{\n{}\n{}}} while ({})",
                 convert_block(body, depth + 1),
                 pfx,
-                convert_expr(condition)
+                convert_expr_top(condition)
             )
         }
         StmtKind::For {
@@ -473,6 +517,40 @@ fn convert_expr_list(es: &[Expr]) -> String {
     es.iter().map(convert_expr).collect::<Vec<_>>().join(", ")
 }
 
+/// Format a string part for converted output.
+/// Uses simple `$name` when possible, `${name}` only when needed.
+fn convert_string_part(p: &StringPart) -> String {
+    match p {
+        StringPart::Literal(s) => fmt::escape_interpolated_literal(s),
+        StringPart::ScalarVar(n) => {
+            // Use ${} only if name has special chars or would be ambiguous
+            if needs_braces(n) {
+                format!("${{{}}}", n)
+            } else {
+                format!("${}", n)
+            }
+        }
+        StringPart::ArrayVar(n) => {
+            if needs_braces(n) {
+                format!("@{{{}}}", n)
+            } else {
+                format!("@{}", n)
+            }
+        }
+        StringPart::Expr(e) => fmt::format_expr(e),
+    }
+}
+
+/// Check if a variable name needs braces in interpolation.
+fn needs_braces(name: &str) -> bool {
+    // Empty or starts with digit needs braces
+    if name.is_empty() || name.chars().next().is_some_and(|c| c.is_ascii_digit()) {
+        return true;
+    }
+    // Contains non-identifier chars
+    !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
 /// Convert an expression at statement level or assignment RHS — pipe chains
 /// are emitted without outer parentheses.
 fn convert_expr_top(e: &Expr) -> String {
@@ -490,6 +568,16 @@ fn convert_expr_impl(e: &Expr, top: bool) -> String {
     let source = extract_pipe_source(e, &mut segments);
     if !segments.is_empty() {
         segments.reverse();
+        // 1-2 stages: direct call syntax (e.g., `print "$x"`, `uc lc $x`)
+        // 3+ stages: thread macro (e.g., `t $x lc uc print`)
+        if segments.len() <= 2 {
+            let result = format!("{} {}", segments.join(" "), source);
+            if !top {
+                return format!("({})", result);
+            }
+            return result;
+        }
+        // 3+ stages: use thread macro
         let stages = segments.join(" ");
         // Strip outer parens from source if it's a parenthesized list/thread
         let source = if source.starts_with("(t ") || source.starts_with("((") {
@@ -817,11 +905,20 @@ fn extract_pipe_source(e: &Expr, segments: &mut Vec<String>) -> String {
             pattern,
             replacement,
             flags,
+            delim,
         } if flags.contains('r') => {
             // `$str =~ s/old/new/r` → `$str |> s/old/new/r`
             // In pipe context the parser auto-injects `r`, but keeping it
             // is harmless and explicit.
-            segments.push(format!("s/{}/{}/{}", pattern, replacement, flags));
+            segments.push(format!(
+                "s{}{}{}{}{}{}",
+                delim,
+                fmt::escape_regex_part(pattern),
+                delim,
+                fmt::escape_regex_part(replacement),
+                delim,
+                flags
+            ));
             extract_pipe_source(expr, segments)
         }
 
@@ -831,15 +928,22 @@ fn extract_pipe_source(e: &Expr, segments: &mut Vec<String>) -> String {
             from,
             to,
             flags,
+            delim,
         } if flags.contains('r') => {
-            segments.push(format!("tr/{}/{}/{}", from, to, flags));
+            segments.push(format!(
+                "tr{}{}{}{}{}{}",
+                delim,
+                fmt::escape_regex_part(from),
+                delim,
+                fmt::escape_regex_part(to),
+                delim,
+                flags
+            ));
             extract_pipe_source(expr, segments)
         }
 
         // ── Single-element list: unwrap and continue extraction ──────────
-        ExprKind::List(elems) if elems.len() == 1 => {
-            extract_pipe_source(&elems[0], segments)
-        }
+        ExprKind::List(elems) if elems.len() == 1 => extract_pipe_source(&elems[0], segments),
 
         // ── Base case: not pipeable ──────────────────────────────────────
         _ => convert_expr_direct(e, false),
@@ -874,10 +978,7 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
         ExprKind::InterpolatedString(parts) => {
             format!(
                 "\"{}\"",
-                parts
-                    .iter()
-                    .map(fmt::format_string_part)
-                    .collect::<String>()
+                parts.iter().map(convert_string_part).collect::<String>()
             )
         }
 
@@ -1026,7 +1127,10 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
         // ── Print / say / die / warn ─────────────────────────────────────
         // print has no newline; say/p adds newline
         ExprKind::Print { handle, args } => {
-            let h = handle.as_ref().map(|h| format!("{} ", h)).unwrap_or_default();
+            let h = handle
+                .as_ref()
+                .map(|h| format!("{} ", h))
+                .unwrap_or_default();
             format!("print {}{}", h, convert_expr_list(args))
         }
         ExprKind::Say { handle, args } => {
@@ -1063,18 +1167,30 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
             expr,
             pattern,
             flags,
+            delim,
             ..
-        } => format!("{} =~ /{}/{}", convert_expr(expr), pattern, flags),
+        } => format!(
+            "{} =~ {}{}{}{}",
+            convert_expr(expr),
+            delim,
+            fmt::escape_regex_part(pattern),
+            delim,
+            flags
+        ),
         ExprKind::Substitution {
             expr,
             pattern,
             replacement,
             flags,
+            delim,
         } => format!(
-            "{} =~ s/{}/{}/{}",
+            "{} =~ s{}{}{}{}{}{}",
             convert_expr(expr),
-            pattern,
-            replacement,
+            delim,
+            fmt::escape_regex_part(pattern),
+            delim,
+            fmt::escape_regex_part(replacement),
+            delim,
             flags
         ),
         ExprKind::Transliterate {
@@ -1082,20 +1198,42 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
             from,
             to,
             flags,
-        } => format!("{} =~ tr/{}/{}/{}", convert_expr(expr), from, to, flags),
+            delim,
+        } => format!(
+            "{} =~ tr{}{}{}{}{}{}",
+            convert_expr(expr),
+            delim,
+            fmt::escape_regex_part(from),
+            delim,
+            fmt::escape_regex_part(to),
+            delim,
+            flags
+        ),
 
         // ── Postfix modifiers ────────────────────────────────────────────
         ExprKind::PostfixIf { expr, condition } => {
             format!("{} if {}", convert_expr_top(expr), convert_expr(condition))
         }
         ExprKind::PostfixUnless { expr, condition } => {
-            format!("{} unless {}", convert_expr_top(expr), convert_expr(condition))
+            format!(
+                "{} unless {}",
+                convert_expr_top(expr),
+                convert_expr(condition)
+            )
         }
         ExprKind::PostfixWhile { expr, condition } => {
-            format!("{} while {}", convert_expr_top(expr), convert_expr(condition))
+            format!(
+                "{} while {}",
+                convert_expr_top(expr),
+                convert_expr(condition)
+            )
         }
         ExprKind::PostfixUntil { expr, condition } => {
-            format!("{} until {}", convert_expr_top(expr), convert_expr(condition))
+            format!(
+                "{} until {}",
+                convert_expr_top(expr),
+                convert_expr(condition)
+            )
         }
         ExprKind::PostfixForeach { expr, list } => {
             format!("{} for {}", convert_expr_top(expr), convert_expr(list))
@@ -1231,16 +1369,16 @@ mod tests {
 
     #[test]
     fn unary_builtin_direct() {
-        // Single-stage: direct call syntax, no thread
+        // Single-stage: direct call syntax
         assert_eq!(convert("uc($x);"), "uc $x");
         assert_eq!(convert("length($str);"), "length $str");
     }
 
     #[test]
-    fn nested_unary_thread() {
-        // Multi-stage: use thread macro
+    fn nested_unary_direct() {
+        // 2-stage: direct call syntax (inner-to-outer order)
         let out = convert("uc(lc($x));");
-        assert_eq!(out, "t $x lc uc");
+        assert_eq!(out, "lc uc $x");
     }
 
     #[test]
@@ -1264,10 +1402,10 @@ mod tests {
     }
 
     #[test]
-    fn join_thread() {
+    fn join_direct() {
         let out = convert(r#"join(",", sort(@arr));"#);
-        assert!(out.contains("t @arr sort"));
-        assert!(out.contains(" join"));
+        // 2-stage: direct call (inner-to-outer)
+        assert!(out.contains("sort join \",\" @arr"));
     }
 
     #[test]
@@ -1279,23 +1417,25 @@ mod tests {
     }
 
     #[test]
-    fn assignment_rhs_thread() {
+    fn assignment_rhs_direct() {
         let out = convert("my $x = uc(lc($str));");
-        assert_eq!(out, "my $x = t $str lc uc");
+        // 2-stage: direct call
+        assert_eq!(out, "my $x = lc uc $str");
     }
 
     #[test]
-    fn thread_in_subexpression_parenthesized() {
+    fn chain_in_subexpression_parenthesized() {
         let out = convert("$x + uc(lc($str));");
-        // Multi-stage thread should be parenthesized inside the binary op.
-        assert!(out.contains("(t $str lc uc)"));
+        // 2-stage chain should be parenthesized inside the binary op.
+        assert!(out.contains("(lc uc $str)"));
     }
 
     #[test]
     fn fn_body_indented() {
         let out = convert("sub foo { return uc(lc($x)); }");
         assert!(out.contains("fn foo"));
-        assert!(out.contains("t $x lc uc"));
+        // 2-stage: direct call
+        assert!(out.contains("lc uc $x"));
         // Body should be indented
         assert!(out.contains("    return"));
     }
@@ -1303,7 +1443,8 @@ mod tests {
     #[test]
     fn if_condition_converted() {
         let out = convert("if (defined(length($x))) { 1; }");
-        assert!(out.contains("t $x length defined"));
+        // 2-stage: direct call
+        assert!(out.contains("length defined $x"));
     }
 
     #[test]
@@ -1320,18 +1461,19 @@ mod tests {
     }
 
     #[test]
-    fn user_func_call_thread() {
+    fn user_func_call_direct() {
         let out = convert("sub trim { } trim(uc($x));");
         assert!(out.contains("fn trim"));
-        assert!(out.contains("t $x uc trim"));
+        // 2-stage: direct call (inner-to-outer)
+        assert!(out.contains("uc trim $x"));
     }
 
     #[test]
-    fn user_func_extra_args_thread() {
+    fn user_func_extra_args_direct() {
         let out = convert("sub process { } process(uc($x), 42);");
         assert!(out.contains("fn process"));
-        // Thread RHS uses bare args
-        assert!(out.contains("t $x uc process 42"));
+        // Direct call (inner-to-outer): uc process 42 $x
+        assert!(out.contains("uc process 42 $x"));
     }
 
     #[test]
@@ -1360,7 +1502,7 @@ mod tests {
     #[test]
     fn indentation_in_blocks() {
         let out = convert("if ($x) { print 1; print 2; }");
-        // Single-stage: direct call syntax
+        // Single stage: direct call syntax
         assert!(out.contains("\n    print 1\n    print 2\n"));
     }
 

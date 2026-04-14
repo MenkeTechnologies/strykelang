@@ -964,6 +964,7 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
             pattern,
             replacement,
             flags,
+            delim: _,
         } => {
             deparse_expr_into(buf, expr);
             let _ = write!(
@@ -979,6 +980,7 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
             from,
             to,
             flags,
+            delim: _,
         } => {
             deparse_expr_into(buf, expr);
             let _ = write!(buf, " =~ tr/{}/{}/{}", from, to, flags);

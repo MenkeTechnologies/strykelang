@@ -8817,6 +8817,7 @@ impl Interpreter {
                 pattern,
                 flags,
                 scalar_g,
+                delim: _,
             } => {
                 let val = self.eval_expr(expr)?;
                 if val.is_iterator() {
@@ -8845,6 +8846,7 @@ impl Interpreter {
                 pattern,
                 replacement,
                 flags,
+                delim: _,
             } => {
                 let val = self.eval_expr(expr)?;
                 if val.is_iterator() {
@@ -8875,6 +8877,7 @@ impl Interpreter {
                 from,
                 to,
                 flags,
+                delim: _,
             } => {
                 let val = self.eval_expr(expr)?;
                 if val.is_iterator() {

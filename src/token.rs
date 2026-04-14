@@ -7,7 +7,8 @@ pub enum Token {
     DoubleString(String),
     /// `` `...` `` or `qx{...}` — interpolated like double quotes, then executed as `sh -c` (Perl `qx`).
     BacktickString(String),
-    Regex(String, String),
+    /// Regex pattern: (pattern, flags, delimiter)
+    Regex(String, String, char),
     HereDoc(String, String),
     QW(Vec<String>),
 
@@ -167,7 +168,7 @@ impl Token {
                 | Token::BitNot
                 | Token::LogNotWord
                 | Token::QW(_)
-                | Token::Regex(_, _)
+                | Token::Regex(_, _, _)
                 | Token::FileTest(_)
         )
     }
