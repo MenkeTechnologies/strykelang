@@ -1754,6 +1754,29 @@ fn typed_my_int_str_float_runtime_checks() {
 }
 
 #[test]
+fn typed_sub_params_runtime_checks() {
+    assert_eq!(
+        ri(r#"my $f = fn ($a: Int, $b: Int) { $a + $b }; $f->(3, 4)"#),
+        7
+    );
+    assert_eq!(
+        rs(r#"sub greet ($name: Str) { "hello $name" } greet("world")"#),
+        "hello world"
+    );
+    assert_eq!(rf(r#"my $f = fn ($x: Float) { $x * 2.0 }; $f->(1.5)"#), 3.0);
+    let e = run(r#"my $f = fn ($a: Int) { $a }; $f->("oops")"#).expect_err("type mismatch");
+    assert!(
+        format!("{}", e).contains("expected Int"),
+        "error should mention Int"
+    );
+    let e2 = run(r#"sub foo ($s: Str) { $s } foo(123)"#).expect_err("type mismatch");
+    assert!(
+        format!("{}", e2).contains("expected Str"),
+        "error should mention Str"
+    );
+}
+
+#[test]
 fn pack_unpack_and_length() {
     assert_eq!(ri(r#"unpack("C", "A");"#), 65);
     assert_eq!(ri(r#"length pack("C3", 1, 2, 3);"#), 3);

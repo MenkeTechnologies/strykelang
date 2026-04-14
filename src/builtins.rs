@@ -281,6 +281,9 @@ pub(crate) fn try_builtin(
         "clamp" | "clp" => Some(builtin_clamp(args)),
         "normalize" | "nrm" => Some(builtin_normalize(args)),
         "stddev" | "std" => Some(builtin_stddev(args)),
+        "squared" | "sq" => Some(builtin_squared(args)),
+        "cubed" | "cb" => Some(builtin_cubed(args)),
+        "expt" => Some(builtin_expt(args)),
         "snake_case" | "sc" => Some(builtin_snake_case(args)),
         "camel_case" | "cc" => Some(builtin_camel_case(args)),
         "kebab_case" | "kc" => Some(builtin_kebab_case(args)),
@@ -1915,6 +1918,25 @@ fn builtin_stddev(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mean = nums.iter().sum::<f64>() / n;
     let variance = nums.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / n;
     Ok(PerlValue::float(variance.sqrt()))
+}
+
+/// `squared N` / `sq N` — return N squared (N * N).
+fn builtin_squared(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float(n * n))
+}
+
+/// `cubed N` / `cb N` — return N cubed (N * N * N).
+fn builtin_cubed(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float(n * n * n))
+}
+
+/// `expt BASE, EXP` — return BASE raised to power EXP.
+fn builtin_expt(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let base = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let exp = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(base.powf(exp)))
 }
 
 /// Split a string into word boundaries for case conversion.

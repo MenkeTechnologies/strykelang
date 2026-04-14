@@ -1,0 +1,20 @@
+# Helix editor configuration for perlrs
+# Add to ~/.config/helix/languages.toml
+
+[[language]]
+name = "perlrs"
+scope = "source.perl"
+injection-regex = "perlrs"
+file-types = ["pr"]
+comment-token = "#"
+indent = { tab-width = 4, unit = "    " }
+language-servers = ["perlrs"]
+
+[language-server.perlrs]
+command = "pe"
+args = ["--lsp"]
+
+# Also use perlrs for regular .pl/.pm files
+[[language]]
+name = "perl"
+language-servers = ["perlrs"]

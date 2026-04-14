@@ -3128,6 +3128,24 @@ impl<'a> VM<'a> {
                         }
                         Ok(())
                     }
+                    Op::Inc => {
+                        let a = self.pop();
+                        self.push(if let Some(n) = a.as_integer() {
+                            PerlValue::integer(n.wrapping_add(1))
+                        } else {
+                            PerlValue::float(a.to_number() + 1.0)
+                        });
+                        Ok(())
+                    }
+                    Op::Dec => {
+                        let a = self.pop();
+                        self.push(if let Some(n) = a.as_integer() {
+                            PerlValue::integer(n.wrapping_sub(1))
+                        } else {
+                            PerlValue::float(a.to_number() - 1.0)
+                        });
+                        Ok(())
+                    }
 
                     // ── String ──
                     Op::Concat => {

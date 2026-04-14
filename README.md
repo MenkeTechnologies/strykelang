@@ -253,7 +253,7 @@ For `mysync` scalars holding a `Set`, `|`/`&` are union/intersection. Without `m
 | **Crypto** | `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `md5`, `hmac`, `hmac_sha256`, `crc32`, `uuid`, `base64_encode/decode`, `hex_encode/decode` |
 | **Compression** ([`flate2`](https://crates.io/crates/flate2), [`zstd`](https://crates.io/crates/zstd)) | `gzip`, `gunzip`, `zstd`, `zstd_decode` |
 | **Time** ([`chrono`](https://crates.io/crates/chrono), [`chrono-tz`](https://crates.io/crates/chrono-tz)) | `datetime_utc`, `datetime_from_epoch`, `datetime_parse_rfc3339`, `datetime_strftime`, `datetime_now_tz`, `datetime_format_tz`, `datetime_parse_local`, `datetime_add_seconds`, `elapsed` |
-| **Structs / Types** | `struct Name { x => Float, y => Int }; Name->new(...)`; `typed my $x : Int\|Str\|Float` |
+| **Structs / Types** | `struct Name { x => Float, y => Int }; Name->new(...)`; `typed my $x : Int\|Str\|Float`; typed sub params `fn ($a: Int, $b: Str) { }` |
 
 ```perl
 my $data = "https://api.example.com/users/1" |> fetch_json;
@@ -268,6 +268,30 @@ struct Point { x => Float, y => Float };
 my $p = Point->new(x => 1.5, y => 2.0);
 p $p->x;
 typed my $n : Int = 42;
+
+# Typed sub parameters — runtime type checking on call
+my $add = fn ($a: Int, $b: Int) { $a + $b };
+p $add->(3, 4);                              # 7
+# $add->("x", 1);                            # ERROR: sub parameter $a: expected Int
+
+sub greet ($name: Str) { "Hello, $name!" }
+p greet("world");                            # Hello, world!
+
+# stringify/str — convert any value to a parseable perlrs literal
+my $data = {a => [1, 2], b => "hello"};
+my $s = str $data;                           # +{a => [1, 2], b => "hello"}
+my $copy = eval $s;                          # round-trip via eval
+p $copy->{a}[0];                             # 1
+
+# stringify works with functions (first-class serialization)
+my $f = fn ($x: Int) { $x * 2 };
+p str $f;                                    # sub ($x: Int) { $x * 2; }
+my $f2 = eval str $f;                        # round-trip: deserialize back to callable
+p $f2->(21);                                 # 42
+
+# streaming range — bidirectional lazy iterator
+range(1, 5) |> e p;                          # 1 2 3 4 5
+range(5, 1) |> e p;                          # 5 4 3 2 1
 ```
 
 #### Sets
@@ -370,7 +394,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 | Hash | `keys`, `values`, `each`, `delete`, `exists`, `select_keys`, `top` |
 | String | `chomp`, `chop`, `length`, `substr`, `index`, `rindex`, `split`, `join`, `sprintf`, `printf`, `uc`/`lc`/`ucfirst`/`lcfirst`, `chr`, `ord`, `hex`, `oct`, `crypt`, `fc`, `pos`, `study`, `quotemeta`, `trim`, `lines`, `words`, `chars`, `snake_case`, `camel_case`, `kebab_case` |
 | Binary | `pack`, `unpack` (subset `A a N n V v C Q q Z H x w i I l L s S f d` + `*`), `vec` |
-| Numeric | `abs`, `int`, `sqrt`, `sin`, `cos`, `atan2`, `exp`, `log`, `rand`, `srand`, `avg`, `stddev`, `clamp`, `normalize` |
+| Numeric | `abs`, `int`, `sqrt`, `squared`/`sq`, `cubed`/`cb`, `expt(B,E)`, `sin`, `cos`, `atan2`, `exp`, `log`, `rand`, `srand`, `avg`, `stddev`, `clamp`, `normalize`, `range(N, M)` (lazy bidirectional) |
 | I/O | `print`, `p`, `say`, `printf`, `open` (incl. `open my $fh`, files, `-\|` / `\|-` pipes), `close`, `eof`, `readline`, `read`, `seek`, `tell`, `sysopen`, `sysread`/`syswrite`/`sysseek`, handle methods `->print/->say/->printf/->getline/->close/->eof/->getc/->flush`, `slurp`, `input`, backticks/`qx{}`, `capture` (structured: `->stdout/->stderr/->exit`), `binmode`, `fileno`, `flock`, `getc`, `select`, `truncate`, `formline`, `read_lines`, `append_file`, `to_file`, `read_json`, `write_json`, `tempfile`, `tempdir` |
 | Directory | `opendir`, `readdir`, `closedir`, `rewinddir`, `telldir`, `seekdir`, `files`, `filesf`/`f`, `fr` (recursive files, lazy iterator), `dirs`/`d`, `dr` (recursive dirs, lazy iterator), `sym_links`, `sockets`, `pipes`, `block_devices`, `char_devices` |
 | File tests | `-e`, `-f`, `-d`, `-l`, `-r`, `-w`, `-s`, `-z`, `-x`, `-t` (defaults to `$_`) |
@@ -379,7 +403,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 | Network | `gethostbyname`, `gethostbyaddr`, `getpwnam`, `getpwuid`, `getpwent`/`setpwent`/`endpwent`, `getgrnam`, `getgrgid`, `getgrent`/`setgrent`/`endgrent`, `getprotobyname`, `getprotobynumber`, `getservbyname`, `getservbyport` |
 | SysV IPC | `msgctl`, `msgget`, `msgsnd`, `msgrcv`, `semctl`, `semget`, `semop`, `shmctl`, `shmget`, `shmread`, `shmwrite` (stubs — runtime error) |
 | Type | `defined`, `undef`, `ref`, `bless`, `tied`, `untie` |
-| Serialization | `to_json`, `to_csv`, `to_toml`, `to_yaml`, `to_xml`, `ddump`, `json_encode`/`json_decode` |
+| Serialization | `to_json`, `to_csv`, `to_toml`, `to_yaml`, `to_xml`, `ddump`, `stringify`/`str`, `json_encode`/`json_decode` |
 | Control | `die`, `warn`, `eval`, `do`, `require`, `caller`, `wantarray`, `goto LABEL`, `continue { }` on loops, `prototype` |
 
 #### Perl-compat highlights
@@ -526,6 +550,16 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   $cfg |> to_toml |> p;                         # TOML with [package] table
   $data |> to_yaml |> p;                        # YAML with --- header
   $data |> to_xml  |> p;                        # XML with <root> wrapper
+
+  # ── stringify / str — parseable perlrs literals ──────────────────────
+  $data |> str |> p;                            # +{a => 1, b => [2, 3]}
+  my $fn = fn { $_ * 2 };
+  $fn |> str |> p;                              # sub { $_ * 2; }
+  range(1, 3) |> str |> p;                      # (1, 2, 3)
+  # round-trip: str -> eval -> callable
+  my $f = fn ($x: Int) { $x + 1 };
+  my $f2 = $f |> str |> eval;
+  $f2->(5) |> p;                                # 6
 
   # ── partition / min_by / max_by / zip_with ─────────────────────────
   my ($yes, $no) = partition { $_ > 5 } 1..10;

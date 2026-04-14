@@ -4579,6 +4579,22 @@ impl Compiler {
                         Some(root),
                     );
                 }
+                "inc" => {
+                    let arg = args.first().cloned().unwrap_or_else(|| Expr {
+                        kind: ExprKind::ScalarVar("_".into()),
+                        line,
+                    });
+                    self.compile_expr(&arg)?;
+                    self.emit_op(Op::Inc, line, Some(root));
+                }
+                "dec" => {
+                    let arg = args.first().cloned().unwrap_or_else(|| Expr {
+                        kind: ExprKind::ScalarVar("_".into()),
+                        line,
+                    });
+                    self.compile_expr(&arg)?;
+                    self.emit_op(Op::Dec, line, Some(root));
+                }
                 "heap" => {
                     if args.len() != 1 {
                         return Err(CompileError::Unsupported(

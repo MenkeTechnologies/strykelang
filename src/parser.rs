@@ -1096,6 +1096,7 @@ impl Parser {
                 | "cos"
                 | "crypt"
                 | "defined"
+                | "dec"
                 | "delete"
                 | "die"
                 | "deque"
@@ -1128,6 +1129,7 @@ impl Parser {
                 | "greps"
                 | "heap"
                 | "hex"
+                | "inc"
                 | "index"
                 | "int"
                 | "join"
@@ -1149,6 +1151,7 @@ impl Parser {
                 | "ddump"
                 | "stringify"
                 | "str"
+                | "s"
                 | "input"
                 | "lines"
                 | "words"
@@ -1166,6 +1169,9 @@ impl Parser {
                 | "clamp"
                 | "normalize"
                 | "stddev"
+                | "squared"
+                | "cubed"
+                | "expt"
                 | "snake_case"
                 | "camel_case"
                 | "kebab_case"
@@ -4040,7 +4046,8 @@ impl Parser {
                     | "shuffled" | "frequencies" | "freq" | "interleave" | "ddump"
                     | "stringify" | "str" | "lines" | "words" | "chars" | "trim" | "avg"
                     | "to_json" | "to_csv" | "to_toml" | "to_yaml" | "to_xml" | "stddev"
-                    | "normalize" | "snake_case" | "camel_case" | "kebab_case" => {
+                    | "squared" | "sq" | "cubed" | "cb" | "normalize" | "snake_case"
+                    | "camel_case" | "kebab_case" => {
                         if args.is_empty() {
                             args.push(lhs);
                         } else {
@@ -4075,6 +4082,10 @@ impl Parser {
                     "clamp" => {
                         // data |> clamp MIN, MAX → clamp(MIN, MAX, data...)
                         args.push(lhs);
+                    }
+                    "expt" => {
+                        // base |> expt EXP → expt(base, EXP)
+                        args.insert(0, lhs);
                     }
                     "pfirst" | "pany" | "any" | "all" | "none" | "first" | "take_while"
                     | "drop_while" | "skip_while" | "reject" | "tap" | "peek" | "group_by"
@@ -9081,6 +9092,7 @@ impl Parser {
             | "zip_with" | "count_by" | "skip" | "first_or"
             // ── pipeline / string helpers ───────────────────────────────────
             | "input" | "lines" | "words" | "chars" | "trim" | "avg" | "stddev"
+            | "squared" | "sq" | "cubed" | "cb" | "expt"
             | "normalize" | "snake_case" | "camel_case" | "kebab_case"
             | "frequencies" | "freq" | "interleave" | "ddump" | "stringify" | "str" | "top"
             | "to_json" | "to_csv" | "to_toml" | "to_yaml" | "to_xml"

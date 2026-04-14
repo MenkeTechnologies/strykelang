@@ -144,6 +144,10 @@ pub enum Op {
     Mod,
     Pow,
     Negate,
+    /// `inc EXPR` — pop value, push value + 1 (integer if input is integer, else float).
+    Inc,
+    /// `dec EXPR` — pop value, push value - 1.
+    Dec,
 
     // ── String ──
     Concat,

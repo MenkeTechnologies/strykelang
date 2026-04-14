@@ -495,6 +495,14 @@ fn print_cyberpunk_help() {
     println!(
         "  typed my \\$x : Int|Str|Float  {G}//{N} Optional scalar types; runtime checks on assign"
     );
+    println!(
+        "  fn (\\$a: Int, \\$b: Str) {{}}   {G}//{N} Typed sub params; runtime checks on call"
+    );
+    println!("{C}  ── SERIALIZATION (perlrs) ───────────────────────────────{N}");
+    println!(
+        "  str \\$val / stringify \\$val  {G}//{N} Convert any value to parseable perlrs literal"
+    );
+    println!("  eval str \\$fn              {G}//{N} Round-trip: serialize + deserialize coderefs");
     println!("{C}  ── POSITIONAL ─────────────────────────────────────────{N}");
     println!("  [programfile]          {G}//{N} Perl script to execute");
     println!("  [arguments]            {G}//{N} Arguments passed to script (@ARGV)");

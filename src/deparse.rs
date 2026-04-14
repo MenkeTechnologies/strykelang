@@ -393,7 +393,7 @@ fn deparse_stmt_into(buf: &mut String, stmt: &Statement, indent: usize) {
             deparse_block_into(buf, try_block, indent + 1);
             buf.push('\n');
             buf.push_str(&ind);
-            let _ = write!(buf, "}} catch (my ${}) {{\n", catch_var);
+            let _ = writeln!(buf, "}} catch (my ${}) {{", catch_var);
             deparse_block_into(buf, catch_block, indent + 1);
             buf.push('\n');
             buf.push_str(&ind);
@@ -498,7 +498,7 @@ fn deparse_stmt_into(buf: &mut String, stmt: &Statement, indent: usize) {
             buf.push(';');
         }
         StmtKind::FormatDecl { name, lines } => {
-            let _ = write!(buf, "format {} =\n", name);
+            let _ = writeln!(buf, "format {} =", name);
             for l in lines {
                 buf.push_str(l);
                 buf.push('\n');
@@ -685,7 +685,7 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
             buf.push(']');
         }
         ExprKind::HashElement { hash, key } => {
-            let _ = write!(buf, "${}{}", hash, '{');
+            let _ = write!(buf, "${}{{", hash);
             deparse_expr_into(buf, key);
             buf.push('}');
         }
@@ -695,7 +695,7 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
             buf.push(']');
         }
         ExprKind::HashSlice { hash, keys } => {
-            let _ = write!(buf, "@{}{}", hash, '{');
+            let _ = write!(buf, "@{}{{", hash);
             deparse_list(buf, keys);
             buf.push('}');
         }
