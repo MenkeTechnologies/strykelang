@@ -1008,3 +1008,71 @@ fn defer_with_explicit_return() {
         42
     );
 }
+
+// ── short aliases: inc, dec, rev, p, t ──
+
+#[test]
+fn inc_increments_value() {
+    assert_eq!(eval_int(r#"my $x = 5; inc($x)"#), 6);
+}
+
+#[test]
+fn inc_default_topic() {
+    assert_eq!(eval_int(r#"$_ = 10; inc()"#), 11);
+}
+
+#[test]
+fn dec_decrements_value() {
+    assert_eq!(eval_int(r#"my $x = 5; dec($x)"#), 4);
+}
+
+#[test]
+fn dec_default_topic() {
+    assert_eq!(eval_int(r#"$_ = 10; dec()"#), 9);
+}
+
+#[test]
+fn rev_reverses_string() {
+    assert_eq!(eval_string(r#"rev "hello""#), "olleh");
+}
+
+#[test]
+fn rev_in_pipe() {
+    assert_eq!(eval_string(r#""world" |> rev"#), "dlrow");
+}
+
+#[test]
+fn p_alias_for_say() {
+    // p is alias for say, output captured but returns 1
+    assert_eq!(eval_int(r#"p("test")"#), 1);
+}
+
+#[test]
+fn t_alias_for_thread_inc_chain() {
+    assert_eq!(eval_int(r#"t 5 inc inc inc"#), 8);
+}
+
+#[test]
+fn t_alias_for_thread_dec_chain() {
+    assert_eq!(eval_int(r#"t 10 dec dec"#), 8);
+}
+
+#[test]
+fn t_thread_rev_string() {
+    assert_eq!(eval_string(r#"t "abc" rev"#), "cba");
+}
+
+#[test]
+fn t_thread_mixed_ops() {
+    assert_eq!(eval_int(r#"t 1 inc inc dec inc"#), 3);
+}
+
+#[test]
+fn inc_in_pipe_chain() {
+    assert_eq!(eval_int(r#"5 |> inc |> inc"#), 7);
+}
+
+#[test]
+fn dec_in_pipe_chain() {
+    assert_eq!(eval_int(r#"10 |> dec |> dec |> dec"#), 7);
+}

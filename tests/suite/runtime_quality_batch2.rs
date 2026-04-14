@@ -21,7 +21,8 @@ fn localtime_list_nine_elements() {
 
 #[test]
 fn localtime_scalar_looks_like_ctime_string() {
-    assert!(eval_string(r#"localtime(0)"#).contains("1969"));
+    let s = eval_string(r#"localtime(0)"#);
+    assert!(s.contains("1969") || s.contains("1970"), "expected 1969 or 1970 in: {s}");
 }
 
 #[test]

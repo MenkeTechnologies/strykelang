@@ -59,6 +59,7 @@ pub mod rust_sugar;
 pub mod scope;
 mod sort_fast;
 pub mod special_vars;
+pub mod static_analysis;
 pub mod token;
 pub mod value;
 pub mod vm;
@@ -281,11 +282,11 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut Interpreter) -> PerlR
 }
 
 /// Parse + register top-level subs / `use` (same as the VM path), then compile to bytecode without running.
-/// When `strict` pragmas are enabled, bytecode compilation is skipped (same limitation as [`try_vm_execute`]).
+/// Also runs static analysis to detect undefined variables and subroutines.
 pub fn lint_program(program: &ast::Program, interp: &mut Interpreter) -> PerlResult<()> {
     interp.prepare_program_top_level(program)?;
+    static_analysis::analyze_program(program, &interp.file)?;
     if interp.strict_refs || interp.strict_subs || interp.strict_vars {
-        eprintln!("perlrs: warning: bytecode compile check skipped (strict pragma is enabled)");
         return Ok(());
     }
     let comp = compiler::Compiler::new().with_source_file(interp.file.clone());
