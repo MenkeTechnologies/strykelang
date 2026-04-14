@@ -5,11 +5,13 @@
 
 use crate::ast::*;
 
+const INDENT: &str = "    ";
+
 /// Format a whole program as Perl-like source.
 pub fn format_program(p: &Program) -> String {
     p.statements
         .iter()
-        .map(format_statement)
+        .map(|s| format_statement_indent(s, 0))
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -42,14 +44,20 @@ pub(crate) fn format_sub_sig_param(p: &SubSigParam) -> String {
     }
 }
 
+#[allow(dead_code)]
 fn format_statement(s: &Statement) -> String {
+    format_statement_indent(s, 0)
+}
+
+fn format_statement_indent(s: &Statement, depth: usize) -> String {
+    let prefix = INDENT.repeat(depth);
     let lab = s
         .label
         .as_ref()
         .map(|l| format!("{}: ", l))
         .unwrap_or_default();
     let body = match &s.kind {
-        StmtKind::Expression(e) => format!("{};", format_expr(e)),
+        StmtKind::Expression(e) => format_expr(e),
         StmtKind::If {
             condition,
             body,
@@ -57,19 +65,25 @@ fn format_statement(s: &Statement) -> String {
             else_block,
         } => {
             let mut s = format!(
-                "if ({}) {{\n{}\n}}",
+                "if ({}) {{\n{}\n{}}}",
                 format_expr(condition),
-                format_block(body)
+                format_block_indent(body, depth + 1),
+                prefix
             );
             for (c, b) in elsifs {
                 s.push_str(&format!(
-                    " elsif ({}) {{\n{}\n}}",
+                    " elsif ({}) {{\n{}\n{}}}",
                     format_expr(c),
-                    format_block(b)
+                    format_block_indent(b, depth + 1),
+                    prefix
                 ));
             }
             if let Some(eb) = else_block {
-                s.push_str(&format!(" else {{\n{}\n}}", format_block(eb)));
+                s.push_str(&format!(
+                    " else {{\n{}\n{}}}",
+                    format_block_indent(eb, depth + 1),
+                    prefix
+                ));
             }
             s
         }
@@ -79,12 +93,17 @@ fn format_statement(s: &Statement) -> String {
             else_block,
         } => {
             let mut s = format!(
-                "unless ({}) {{\n{}\n}}",
+                "unless ({}) {{\n{}\n{}}}",
                 format_expr(condition),
-                format_block(body)
+                format_block_indent(body, depth + 1),
+                prefix
             );
             if let Some(eb) = else_block {
-                s.push_str(&format!(" else {{\n{}\n}}", format_block(eb)));
+                s.push_str(&format!(
+                    " else {{\n{}\n{}}}",
+                    format_block_indent(eb, depth + 1),
+                    prefix
+                ));
             }
             s
         }
@@ -99,13 +118,18 @@ fn format_statement(s: &Statement) -> String {
                 .map(|l| format!("{}: ", l))
                 .unwrap_or_default();
             let mut s = format!(
-                "{}while ({}) {{\n{}\n}}",
+                "{}while ({}) {{\n{}\n{}}}",
                 lb,
                 format_expr(condition),
-                format_block(body)
+                format_block_indent(body, depth + 1),
+                prefix
             );
             if let Some(cb) = continue_block {
-                s.push_str(&format!(" continue {{\n{}\n}}", format_block(cb)));
+                s.push_str(&format!(
+                    " continue {{\n{}\n{}}}",
+                    format_block_indent(cb, depth + 1),
+                    prefix
+                ));
             }
             s
         }
@@ -120,20 +144,26 @@ fn format_statement(s: &Statement) -> String {
                 .map(|l| format!("{}: ", l))
                 .unwrap_or_default();
             let mut s = format!(
-                "{}until ({}) {{\n{}\n}}",
+                "{}until ({}) {{\n{}\n{}}}",
                 lb,
                 format_expr(condition),
-                format_block(body)
+                format_block_indent(body, depth + 1),
+                prefix
             );
             if let Some(cb) = continue_block {
-                s.push_str(&format!(" continue {{\n{}\n}}", format_block(cb)));
+                s.push_str(&format!(
+                    " continue {{\n{}\n{}}}",
+                    format_block_indent(cb, depth + 1),
+                    prefix
+                ));
             }
             s
         }
         StmtKind::DoWhile { body, condition } => {
             format!(
-                "do {{\n{}\n}} while ({})",
-                format_block(body),
+                "do {{\n{}\n{}}} while ({})",
+                format_block_indent(body, depth + 1),
+                prefix,
                 format_expr(condition)
             )
         }
@@ -151,20 +181,25 @@ fn format_statement(s: &Statement) -> String {
                 .unwrap_or_default();
             let ini = init
                 .as_ref()
-                .map(|s| format_statement(s))
+                .map(|s| format_statement_indent(s, 0))
                 .unwrap_or_default();
             let cond = condition.as_ref().map(format_expr).unwrap_or_default();
             let st = step.as_ref().map(format_expr).unwrap_or_default();
             let mut s = format!(
-                "{}for ({}; {}; {}) {{\n{}\n}}",
+                "{}for ({}; {}; {}) {{\n{}\n{}}}",
                 lb,
                 ini,
                 cond,
                 st,
-                format_block(body)
+                format_block_indent(body, depth + 1),
+                prefix
             );
             if let Some(cb) = continue_block {
-                s.push_str(&format!(" continue {{\n{}\n}}", format_block(cb)));
+                s.push_str(&format!(
+                    " continue {{\n{}\n{}}}",
+                    format_block_indent(cb, depth + 1),
+                    prefix
+                ));
             }
             s
         }
@@ -180,14 +215,19 @@ fn format_statement(s: &Statement) -> String {
                 .map(|l| format!("{}: ", l))
                 .unwrap_or_default();
             let mut s = format!(
-                "{}foreach ${} ({}) {{\n{}\n}}",
+                "{}for ${} ({}) {{\n{}\n{}}}",
                 lb,
                 var,
                 format_expr(list),
-                format_block(body)
+                format_block_indent(body, depth + 1),
+                prefix
             );
             if let Some(cb) = continue_block {
-                s.push_str(&format!(" continue {{\n{}\n}}", format_block(cb)));
+                s.push_str(&format!(
+                    " continue {{\n{}\n{}}}",
+                    format_block_indent(cb, depth + 1),
+                    prefix
+                ));
             }
             s
         }
@@ -212,21 +252,27 @@ fn format_statement(s: &Statement) -> String {
                     .map(|p| format!(" ({})", p))
                     .unwrap_or_default()
             };
-            format!("sub {}{} {{\n{}\n}}", name, sig, format_block(body))
+            format!(
+                "sub {}{} {{\n{}\n{}}}",
+                name,
+                sig,
+                format_block_indent(body, depth + 1),
+                prefix
+            )
         }
-        StmtKind::Package { name } => format!("package {};", name),
+        StmtKind::Package { name } => format!("package {}", name),
         StmtKind::UsePerlVersion { version } => {
             if version.fract() == 0.0 && *version >= 0.0 {
-                format!("use {};", *version as i64)
+                format!("use {}", *version as i64)
             } else {
-                format!("use {};", version)
+                format!("use {}", version)
             }
         }
         StmtKind::Use { module, imports } => {
             if imports.is_empty() {
-                format!("use {};", module)
+                format!("use {}", module)
             } else {
-                format!("use {} {};", module, format_expr_list(imports))
+                format!("use {} {}", module, format_expr_list(imports))
             }
         }
         StmtKind::UseOverload { pairs } => {
@@ -241,35 +287,35 @@ fn format_statement(s: &Statement) -> String {
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
-            format!("use overload {inner};")
+            format!("use overload {inner}")
         }
         StmtKind::No { module, imports } => {
             if imports.is_empty() {
-                format!("no {};", module)
+                format!("no {}", module)
             } else {
-                format!("no {} {};", module, format_expr_list(imports))
+                format!("no {} {}", module, format_expr_list(imports))
             }
         }
         StmtKind::Return(e) => e
             .as_ref()
-            .map(|x| format!("return {};", format_expr(x)))
-            .unwrap_or_else(|| "return;".to_string()),
+            .map(|x| format!("return {}", format_expr(x)))
+            .unwrap_or_else(|| "return".to_string()),
         StmtKind::Last(l) => l
             .as_ref()
-            .map(|x| format!("last {};", x))
-            .unwrap_or_else(|| "last;".to_string()),
+            .map(|x| format!("last {}", x))
+            .unwrap_or_else(|| "last".to_string()),
         StmtKind::Next(l) => l
             .as_ref()
-            .map(|x| format!("next {};", x))
-            .unwrap_or_else(|| "next;".to_string()),
+            .map(|x| format!("next {}", x))
+            .unwrap_or_else(|| "next".to_string()),
         StmtKind::Redo(l) => l
             .as_ref()
-            .map(|x| format!("redo {};", x))
-            .unwrap_or_else(|| "redo;".to_string()),
-        StmtKind::My(decls) => format!("my {};", format_var_decls(decls)),
-        StmtKind::Our(decls) => format!("our {};", format_var_decls(decls)),
-        StmtKind::Local(decls) => format!("local {};", format_var_decls(decls)),
-        StmtKind::State(decls) => format!("state {};", format_var_decls(decls)),
+            .map(|x| format!("redo {}", x))
+            .unwrap_or_else(|| "redo".to_string()),
+        StmtKind::My(decls) => format!("my {}", format_var_decls(decls)),
+        StmtKind::Our(decls) => format!("our {}", format_var_decls(decls)),
+        StmtKind::Local(decls) => format!("local {}", format_var_decls(decls)),
+        StmtKind::State(decls) => format!("state {}", format_var_decls(decls)),
         StmtKind::LocalExpr {
             target,
             initializer,
@@ -278,20 +324,43 @@ fn format_statement(s: &Statement) -> String {
             if let Some(init) = initializer {
                 s.push_str(&format!(" = {}", format_expr(init)));
             }
-            s.push(';');
             s
         }
-        StmtKind::MySync(decls) => format!("mysync {};", format_var_decls(decls)),
-        StmtKind::StmtGroup(b) => format_block(b),
-        StmtKind::Block(b) => format!("{{\n{}\n}}", format_block(b)),
-        StmtKind::Begin(b) => format!("BEGIN {{\n{}\n}}", format_block(b)),
-        StmtKind::UnitCheck(b) => format!("UNITCHECK {{\n{}\n}}", format_block(b)),
-        StmtKind::Check(b) => format!("CHECK {{\n{}\n}}", format_block(b)),
-        StmtKind::Init(b) => format!("INIT {{\n{}\n}}", format_block(b)),
-        StmtKind::End(b) => format!("END {{\n{}\n}}", format_block(b)),
-        StmtKind::Empty => ";".to_string(),
-        StmtKind::Goto { target } => format!("goto {};", format_expr(target)),
-        StmtKind::Continue(b) => format!("continue {{\n{}\n}}", format_block(b)),
+        StmtKind::MySync(decls) => format!("mysync {}", format_var_decls(decls)),
+        StmtKind::StmtGroup(b) => format_block_indent(b, depth),
+        StmtKind::Block(b) => format!("{{\n{}\n{}}}", format_block_indent(b, depth + 1), prefix),
+        StmtKind::Begin(b) => format!(
+            "BEGIN {{\n{}\n{}}}",
+            format_block_indent(b, depth + 1),
+            prefix
+        ),
+        StmtKind::UnitCheck(b) => format!(
+            "UNITCHECK {{\n{}\n{}}}",
+            format_block_indent(b, depth + 1),
+            prefix
+        ),
+        StmtKind::Check(b) => format!(
+            "CHECK {{\n{}\n{}}}",
+            format_block_indent(b, depth + 1),
+            prefix
+        ),
+        StmtKind::Init(b) => format!(
+            "INIT {{\n{}\n{}}}",
+            format_block_indent(b, depth + 1),
+            prefix
+        ),
+        StmtKind::End(b) => format!(
+            "END {{\n{}\n{}}}",
+            format_block_indent(b, depth + 1),
+            prefix
+        ),
+        StmtKind::Empty => String::new(),
+        StmtKind::Goto { target } => format!("goto {}", format_expr(target)),
+        StmtKind::Continue(b) => format!(
+            "continue {{\n{}\n{}}}",
+            format_block_indent(b, depth + 1),
+            prefix
+        ),
         StmtKind::StructDecl { def } => {
             let fields = def
                 .fields
@@ -303,9 +372,10 @@ fn format_statement(s: &Statement) -> String {
         }
         StmtKind::EvalTimeout { timeout, body } => {
             format!(
-                "eval_timeout {} {{\n{}\n}}",
+                "eval_timeout {} {{\n{}\n{}}}",
                 format_expr(timeout),
-                format_block(body)
+                format_block_indent(body, depth + 1),
+                prefix
             )
         }
         StmtKind::TryCatch {
@@ -316,31 +386,45 @@ fn format_statement(s: &Statement) -> String {
         } => {
             let fin = finally_block
                 .as_ref()
-                .map(|b| format!("\nfinally {{\n{}\n}}", format_block(b)))
+                .map(|b| {
+                    format!(
+                        " finally {{\n{}\n{}}}",
+                        format_block_indent(b, depth + 1),
+                        prefix
+                    )
+                })
                 .unwrap_or_default();
             format!(
-                "try {{\n{}\n}} catch (${}) {{\n{}\n}}{}",
-                format_block(try_block),
+                "try {{\n{}\n{}}} catch (${}) {{\n{}\n{}}}{}",
+                format_block_indent(try_block, depth + 1),
+                prefix,
                 catch_var,
-                format_block(catch_block),
+                format_block_indent(catch_block, depth + 1),
+                prefix,
                 fin
             )
         }
         StmtKind::Given { topic, body } => {
             format!(
-                "given ({}) {{\n{}\n}}",
+                "given ({}) {{\n{}\n{}}}",
                 format_expr(topic),
-                format_block(body)
+                format_block_indent(body, depth + 1),
+                prefix
             )
         }
         StmtKind::When { cond, body } => {
             format!(
-                "when ({}) {{\n{}\n}}",
+                "when ({}) {{\n{}\n{}}}",
                 format_expr(cond),
-                format_block(body)
+                format_block_indent(body, depth + 1),
+                prefix
             )
         }
-        StmtKind::DefaultCase { body } => format!("default {{\n{}\n}}", format_block(body)),
+        StmtKind::DefaultCase { body } => format!(
+            "default {{\n{}\n{}}}",
+            format_block_indent(body, depth + 1),
+            prefix
+        ),
         StmtKind::FormatDecl { name, lines } => {
             let mut s = format!("format {} =\n", name);
             for ln in lines {
@@ -364,18 +448,29 @@ fn format_statement(s: &Statement) -> String {
             for a in args {
                 s.push_str(&format!(", {}", format_expr(a)));
             }
-            s.push(';');
             s
         }
     };
-    format!("{}{}", lab, body)
+    format!("{}{}{}", prefix, lab, body)
 }
 
 pub fn format_block(b: &Block) -> String {
+    format_block_indent(b, 0)
+}
+
+fn format_block_indent(b: &Block, depth: usize) -> String {
     b.iter()
-        .map(format_statement)
+        .map(|s| format_statement_indent(s, depth))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+/// Format a block as a single line for inline use (short blocks in expressions).
+fn format_block_inline(b: &Block) -> String {
+    b.iter()
+        .map(|s| format_statement_indent(s, 0))
+        .collect::<Vec<_>>()
+        .join("; ")
 }
 
 fn format_var_decls(decls: &[VarDecl]) -> String {
@@ -577,14 +672,14 @@ pub fn format_expr(e: &Expr) -> String {
         }
         ExprKind::CodeRef { params, body } => {
             if params.is_empty() {
-                format!("sub {{\n{}\n}}", format_block(body))
+                format!("sub {{ {} }}", format_block_inline(body))
             } else {
                 let sig = params
                     .iter()
                     .map(format_sub_sig_param)
                     .collect::<Vec<_>>()
                     .join(", ");
-                format!("sub ({}) {{\n{}\n}}", sig, format_block(body))
+                format!("sub ({}) {{ {} }}", sig, format_block_inline(body))
             }
         }
         ExprKind::SubroutineRef(name) => format!("&{}", name),
@@ -602,14 +697,14 @@ pub fn format_expr(e: &Expr) -> String {
             DerefKind::Call => format!("({})->({})", format_expr(expr), format_expr(index)),
         },
         ExprKind::BinOp { left, op, right } => format!(
-            "({} {} {})",
+            "{} {} {}",
             format_expr(left),
             format_binop(*op),
             format_expr(right)
         ),
-        ExprKind::UnaryOp { op, expr } => format!("({}{})", format_unary(*op), format_expr(expr)),
+        ExprKind::UnaryOp { op, expr } => format!("{}{}", format_unary(*op), format_expr(expr)),
         ExprKind::PostfixOp { expr, op } => {
-            format!("({}{})", format_expr(expr), format_postfix(*op))
+            format!("{}{}", format_expr(expr), format_postfix(*op))
         }
         ExprKind::Assign { target, value } => {
             format!("{} = {}", format_expr(target), format_expr(value))
@@ -625,13 +720,13 @@ pub fn format_expr(e: &Expr) -> String {
             then_expr,
             else_expr,
         } => format!(
-            "({} ? {} : {})",
+            "{} ? {} : {}",
             format_expr(condition),
             format_expr(then_expr),
             format_expr(else_expr)
         ),
         ExprKind::Repeat { expr, count } => {
-            format!("({} x {})", format_expr(expr), format_expr(count))
+            format!("{} x {}", format_expr(expr), format_expr(count))
         }
         ExprKind::Range {
             from,
@@ -639,7 +734,7 @@ pub fn format_expr(e: &Expr) -> String {
             exclusive,
         } => {
             let op = if *exclusive { "..." } else { ".." };
-            format!("({} {} {})", format_expr(from), op, format_expr(to))
+            format!("{} {} {}", format_expr(from), op, format_expr(to))
         }
         ExprKind::FuncCall { name, args } => format!(
             "{}({})",
@@ -725,14 +820,14 @@ pub fn format_expr(e: &Expr) -> String {
             pattern,
             flags,
             scalar_g,
-        } => format!("({} =~ /{}/{})", format_expr(expr), pattern, flags),
+        } => format!("{} =~ /{}/{}", format_expr(expr), pattern, flags),
         ExprKind::Substitution {
             expr,
             pattern,
             replacement,
             flags,
         } => format!(
-            "({} =~ s/{}/{}/{})",
+            "{} =~ s/{}/{}/{}",
             format_expr(expr),
             pattern,
             replacement,
@@ -743,7 +838,7 @@ pub fn format_expr(e: &Expr) -> String {
             from,
             to,
             flags,
-        } => format!("({} =~ tr/{}/{}/{})", format_expr(expr), from, to, flags),
+        } => format!("{} =~ tr/{}/{}/{}", format_expr(expr), from, to, flags),
         ExprKind::MapExpr {
             block,
             list,
@@ -756,7 +851,11 @@ pub fn format_expr(e: &Expr) -> String {
                 (false, true) => "maps",
                 (false, false) => "map",
             };
-            format!("{kw} {{\n{}\n}} {}", format_block(block), format_expr(list))
+            format!(
+                "{kw} {{ {} }} {}",
+                format_block_inline(block),
+                format_expr(list)
+            )
         }
         ExprKind::MapExprComma {
             expr,
@@ -772,18 +871,44 @@ pub fn format_expr(e: &Expr) -> String {
             };
             format!("{kw} {}, {}", format_expr(expr), format_expr(list))
         }
-        ExprKind::GrepExpr { block, list, keyword } => {
-            format!("{} {{\n{}\n}} {}", keyword.as_str(), format_block(block), format_expr(list))
+        ExprKind::GrepExpr {
+            block,
+            list,
+            keyword,
+        } => {
+            format!(
+                "{} {{ {} }} {}",
+                keyword.as_str(),
+                format_block_inline(block),
+                format_expr(list)
+            )
         }
-        ExprKind::GrepExprComma { expr, list, keyword } => {
-            format!("{} {}, {}", keyword.as_str(), format_expr(expr), format_expr(list))
+        ExprKind::GrepExprComma {
+            expr,
+            list,
+            keyword,
+        } => {
+            format!(
+                "{} {}, {}",
+                keyword.as_str(),
+                format_expr(expr),
+                format_expr(list)
+            )
         }
         ExprKind::ForEachExpr { block, list } => {
-            format!("fore {{\n{}\n}} {}", format_block(block), format_expr(list))
+            format!(
+                "fore {{ {} }} {}",
+                format_block_inline(block),
+                format_expr(list)
+            )
         }
         ExprKind::SortExpr { cmp, list } => match cmp {
             Some(crate::ast::SortComparator::Block(b)) => {
-                format!("sort {{\n{}\n}} {}", format_block(b), format_expr(list))
+                format!(
+                    "sort {{ {} }} {}",
+                    format_block_inline(b),
+                    format_expr(list)
+                )
             }
             Some(crate::ast::SortComparator::Code(e)) => {
                 format!("sort {} {}", format_expr(e), format_expr(list))
@@ -823,13 +948,17 @@ pub fn format_expr(e: &Expr) -> String {
             };
             let base = if let Some(c) = on_cluster {
                 format!(
-                    "{kw} {} {{\n{}\n}} {}",
+                    "{kw} {} {{ {} }} {}",
                     format_expr(c),
-                    format_block(block),
+                    format_block_inline(block),
                     format_expr(list)
                 )
             } else {
-                format!("{kw} {{\n{}\n}} {}", format_block(block), format_expr(list))
+                format!(
+                    "{kw} {{ {} }} {}",
+                    format_block_inline(block),
+                    format_expr(list)
+                )
             };
             match progress {
                 Some(p) => format!("{}, progress => {}", base, format_expr(p)),
@@ -843,9 +972,9 @@ pub fn format_expr(e: &Expr) -> String {
             progress,
         } => {
             let base = format!(
-                "pmap_chunked {} {{\n{}\n}} {}",
+                "pmap_chunked {} {{ {} }} {}",
                 format_expr(chunk_size),
-                format_block(block),
+                format_block_inline(block),
                 format_expr(list)
             );
             match progress {
@@ -859,8 +988,8 @@ pub fn format_expr(e: &Expr) -> String {
             progress,
         } => {
             let base = format!(
-                "pgrep {{\n{}\n}} {}",
-                format_block(block),
+                "pgrep {{ {} }} {}",
+                format_block_inline(block),
                 format_expr(list)
             );
             match progress {
@@ -873,7 +1002,11 @@ pub fn format_expr(e: &Expr) -> String {
             list,
             progress,
         } => {
-            let base = format!("pfor {{\n{}\n}} {}", format_block(block), format_expr(list));
+            let base = format!(
+                "pfor {{ {} }} {}",
+                format_block_inline(block),
+                format_expr(list)
+            );
             match progress {
                 Some(p) => format!("{}, progress => {}", base, format_expr(p)),
                 None => base,
@@ -918,7 +1051,11 @@ pub fn format_expr(e: &Expr) -> String {
             progress,
         } => {
             let base = match cmp {
-                Some(b) => format!("psort {{\n{}\n}} {}", format_block(b), format_expr(list)),
+                Some(b) => format!(
+                    "psort {{ {} }} {}",
+                    format_block_inline(b),
+                    format_expr(list)
+                ),
                 None => format!("psort {}", format_expr(list)),
             };
             match progress {
@@ -927,8 +1064,8 @@ pub fn format_expr(e: &Expr) -> String {
             }
         }
         ExprKind::ReduceExpr { block, list } => format!(
-            "reduce {{\n{}\n}} {}",
-            format_block(block),
+            "reduce {{ {} }} {}",
+            format_block_inline(block),
             format_expr(list)
         ),
         ExprKind::PReduceExpr {
@@ -937,8 +1074,8 @@ pub fn format_expr(e: &Expr) -> String {
             progress,
         } => {
             let base = format!(
-                "preduce {{\n{}\n}} {}",
-                format_block(block),
+                "preduce {{ {} }} {}",
+                format_block_inline(block),
                 format_expr(list)
             );
             match progress {
@@ -953,9 +1090,9 @@ pub fn format_expr(e: &Expr) -> String {
             progress,
         } => {
             let base = format!(
-                "preduce_init {}, {{\n{}\n}} {}",
+                "preduce_init {}, {{ {} }} {}",
                 format_expr(init),
-                format_block(block),
+                format_block_inline(block),
                 format_expr(list)
             );
             match progress {
@@ -970,9 +1107,9 @@ pub fn format_expr(e: &Expr) -> String {
             progress,
         } => {
             let base = format!(
-                "pmap_reduce {{\n{}\n}} {{\n{}\n}} {}",
-                format_block(map_block),
-                format_block(reduce_block),
+                "pmap_reduce {{ {} }} {{ {} }} {}",
+                format_block_inline(map_block),
+                format_block_inline(reduce_block),
                 format_expr(list)
             );
             match progress {
@@ -986,8 +1123,8 @@ pub fn format_expr(e: &Expr) -> String {
             progress,
         } => {
             let base = format!(
-                "pcache {{\n{}\n}} {}",
-                format_block(block),
+                "pcache {{ {} }} {}",
+                format_block_inline(block),
                 format_expr(list)
             );
             match progress {
@@ -1014,21 +1151,26 @@ pub fn format_expr(e: &Expr) -> String {
         } => {
             let kw = if *capture { "fan_cap" } else { "fan" };
             let base = match count {
-                Some(c) => format!("{} {} {{\n{}\n}}", kw, format_expr(c), format_block(block)),
-                None => format!("{} {{\n{}\n}}", kw, format_block(block)),
+                Some(c) => format!(
+                    "{} {} {{ {} }}",
+                    kw,
+                    format_expr(c),
+                    format_block_inline(block)
+                ),
+                None => format!("{} {{ {} }}", kw, format_block_inline(block)),
             };
             match progress {
                 Some(p) => format!("{}, progress => {}", base, format_expr(p)),
                 None => base,
             }
         }
-        ExprKind::AsyncBlock { body } => format!("async {{\n{}\n}}", format_block(body)),
-        ExprKind::SpawnBlock { body } => format!("spawn {{\n{}\n}}", format_block(body)),
-        ExprKind::Trace { body } => format!("trace {{\n{}\n}}", format_block(body)),
-        ExprKind::Timer { body } => format!("timer {{\n{}\n}}", format_block(body)),
+        ExprKind::AsyncBlock { body } => format!("async {{ {} }}", format_block_inline(body)),
+        ExprKind::SpawnBlock { body } => format!("spawn {{ {} }}", format_block_inline(body)),
+        ExprKind::Trace { body } => format!("trace {{ {} }}", format_block_inline(body)),
+        ExprKind::Timer { body } => format!("timer {{ {} }}", format_block_inline(body)),
         ExprKind::Bench { body, times } => format!(
-            "bench {{\n{}\n}} {}",
-            format_block(body),
+            "bench {{ {} }} {}",
+            format_block_inline(body),
             format_expr(times)
         ),
         ExprKind::Await(e) => format!("await {}", format_expr(e)),
@@ -1305,7 +1447,7 @@ pub fn format_expr(e: &Expr) -> String {
             };
             format!(
                 "retry {{ {} }} times => {}, backoff => {}",
-                format_block(body),
+                format_block_inline(body),
                 format_expr(times),
                 bo
             )
@@ -1317,18 +1459,18 @@ pub fn format_expr(e: &Expr) -> String {
                 "rate_limit({}, {}) {{ {} }}",
                 format_expr(max),
                 format_expr(window),
-                format_block(body)
+                format_block_inline(body)
             )
         }
         ExprKind::EveryBlock { interval, body } => {
             format!(
                 "every({}) {{ {} }}",
                 format_expr(interval),
-                format_block(body)
+                format_block_inline(body)
             )
         }
         ExprKind::GenBlock { body } => {
-            format!("gen {{ {} }}", format_block(body))
+            format!("gen {{ {} }}", format_block_inline(body))
         }
         ExprKind::Yield(e) => {
             format!("yield {}", format_expr(e))

@@ -697,12 +697,28 @@ fn extract_pipe_source(e: &Expr, segments: &mut Vec<String>) -> String {
             segments.push(format!("{} {{ {} }}", kw, convert_expr_top(expr)));
             extract_pipe_source(list, segments)
         }
-        ExprKind::GrepExpr { block, list, keyword } => {
-            segments.push(format!("{} {{\n{}\n}}", keyword.as_str(), convert_block(block, 0)));
+        ExprKind::GrepExpr {
+            block,
+            list,
+            keyword,
+        } => {
+            segments.push(format!(
+                "{} {{\n{}\n}}",
+                keyword.as_str(),
+                convert_block(block, 0)
+            ));
             extract_pipe_source(list, segments)
         }
-        ExprKind::GrepExprComma { expr, list, keyword } => {
-            segments.push(format!("{} {{ {} }}", keyword.as_str(), convert_expr_top(expr)));
+        ExprKind::GrepExprComma {
+            expr,
+            list,
+            keyword,
+        } => {
+            segments.push(format!(
+                "{} {{ {} }}",
+                keyword.as_str(),
+                convert_expr_top(expr)
+            ));
             extract_pipe_source(list, segments)
         }
         ExprKind::SortExpr { cmp, list } => {
@@ -847,35 +863,20 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
 
         // ── Binary operations ────────────────────────────────────────────
         ExprKind::BinOp { left, op, right } => {
-            let inner = format!(
+            format!(
                 "{} {} {}",
                 convert_expr(left),
                 fmt::format_binop(*op),
                 convert_expr(right)
-            );
-            if top {
-                inner
-            } else {
-                format!("({})", inner)
-            }
+            )
         }
 
         // ── Unary / postfix ──────────────────────────────────────────────
         ExprKind::UnaryOp { op, expr } => {
-            let inner = format!("{}{}", fmt::format_unary(*op), convert_expr(expr));
-            if top {
-                inner
-            } else {
-                format!("({})", inner)
-            }
+            format!("{}{}", fmt::format_unary(*op), convert_expr(expr))
         }
         ExprKind::PostfixOp { expr, op } => {
-            let inner = format!("{}{}", convert_expr(expr), fmt::format_postfix(*op));
-            if top {
-                inner
-            } else {
-                format!("({})", inner)
-            }
+            format!("{}{}", convert_expr(expr), fmt::format_postfix(*op))
         }
 
         // ── Assignment ───────────────────────────────────────────────────
@@ -895,7 +896,7 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
             then_expr,
             else_expr,
         } => format!(
-            "({} ? {} : {})",
+            "{} ? {} : {}",
             convert_expr(condition),
             convert_expr(then_expr),
             convert_expr(else_expr)
@@ -908,10 +909,10 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
             exclusive,
         } => {
             let op = if *exclusive { "..." } else { ".." };
-            format!("({} {} {})", convert_expr(from), op, convert_expr(to))
+            format!("{} {} {}", convert_expr(from), op, convert_expr(to))
         }
         ExprKind::Repeat { expr, count } => {
-            format!("({} x {})", convert_expr(expr), convert_expr(count))
+            format!("{} x {}", convert_expr(expr), convert_expr(count))
         }
 
         // ── Calls ────────────────────────────────────────────────────────
@@ -1102,7 +1103,11 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
                 convert_expr(list)
             )
         }
-        ExprKind::GrepExpr { block, list, keyword } => {
+        ExprKind::GrepExpr {
+            block,
+            list,
+            keyword,
+        } => {
             format!(
                 "{} {{\n{}\n}} {}",
                 keyword.as_str(),

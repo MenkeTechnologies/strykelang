@@ -205,6 +205,17 @@ impl Parser {
             ExprKind::Stat(_) => expr,
             ExprKind::Lstat(_) => expr,
             ExprKind::Readlink(_) => expr,
+            // rev with empty list should use $_
+            ExprKind::ScalarReverse(ref inner) => {
+                if matches!(inner.kind, ExprKind::List(ref v) if v.is_empty()) {
+                    Expr {
+                        kind: ExprKind::ScalarReverse(Box::new(topic())),
+                        line,
+                    }
+                } else {
+                    expr
+                }
+            }
             _ => expr,
         }
     }
@@ -437,7 +448,7 @@ impl Parser {
                         }
                         s
                     }
-                    "sub" => self.parse_sub_decl()?,
+                    "sub" | "fn" => self.parse_sub_decl()?,
                     "struct" => {
                         if crate::compat_mode() {
                             return Err(self.syntax_err(
@@ -1336,6 +1347,273 @@ impl Parser {
             },
             line,
         })
+    }
+
+    /// `thread EXPR stage1 stage2 ...` — Clojure-style threading macro.
+    /// Desugars to `EXPR |> stage1 |> stage2 |> ...`
+    fn parse_thread_macro(&mut self, _line: usize) -> PerlResult<Expr> {
+        // Parse the initial expression (stops before identifiers that look like stages)
+        let mut result = self.parse_unary()?;
+
+        // Parse stages until we hit a statement terminator
+        loop {
+            // Check for terminators - |> ends thread and allows piping the result
+            match self.peek() {
+                Token::Semicolon
+                | Token::Newline
+                | Token::RBrace
+                | Token::RParen
+                | Token::RBracket
+                | Token::PipeForward
+                | Token::Eof => break,
+                _ => {}
+            }
+
+            let stage_line = self.peek_line();
+
+            // Parse a stage and apply it to result via pipe
+            match self.peek().clone() {
+                // `>{ block }` — standalone anonymous block (sugar for sub { })
+                Token::ArrowBrace => {
+                    self.advance(); // consume `>{`
+                    let mut stmts = Vec::new();
+                    while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+                        if self.eat(&Token::Semicolon) {
+                            continue;
+                        }
+                        stmts.push(self.parse_statement()?);
+                    }
+                    self.expect(&Token::RBrace)?;
+                    let code_ref = Expr {
+                        kind: ExprKind::CodeRef {
+                            params: vec![],
+                            body: stmts,
+                        },
+                        line: stage_line,
+                    };
+                    result = self.pipe_forward_apply(result, code_ref, stage_line)?;
+                }
+                // `sub { block }` or `fn { block }` — explicit anonymous block
+                Token::Ident(ref name) if name == "sub" || name == "fn" => {
+                    self.advance(); // consume `sub`
+                    let (params, _prototype) = self.parse_sub_sig_or_prototype_opt()?;
+                    let body = self.parse_block()?;
+                    let code_ref = Expr {
+                        kind: ExprKind::CodeRef { params, body },
+                        line: stage_line,
+                    };
+                    result = self.pipe_forward_apply(result, code_ref, stage_line)?;
+                }
+                // `ident` possibly followed by block
+                Token::Ident(ref name) => {
+                    let func_name = name.clone();
+                    self.advance();
+
+                    // Check if followed by a block (like `filter { }`, `sort { }`, `map { }`)
+                    if matches!(self.peek(), Token::LBrace) {
+                        // Parse as a block-taking builtin
+                        self.pipe_rhs_depth = self.pipe_rhs_depth.saturating_add(1);
+                        let stage = self.parse_thread_stage_with_block(&func_name, stage_line)?;
+                        self.pipe_rhs_depth = self.pipe_rhs_depth.saturating_sub(1);
+                        result = self.pipe_forward_apply(result, stage, stage_line)?;
+                    } else {
+                        // Bare function name — handle unary builtins specially
+                        result = self.thread_apply_bare_func(&func_name, result, stage_line)?;
+                    }
+                }
+                tok => {
+                    return Err(self.syntax_err(
+                        format!(
+                            "thread: expected stage (ident, sub {{}}, or >{{}}), got {:?}",
+                            tok
+                        ),
+                        stage_line,
+                    ));
+                }
+            };
+        }
+
+        Ok(result)
+    }
+
+    /// Apply a bare function name in thread context, handling unary builtins specially.
+    fn thread_apply_bare_func(&self, name: &str, arg: Expr, line: usize) -> PerlResult<Expr> {
+        let kind = match name {
+            // String functions
+            "uc" => ExprKind::Uc(Box::new(arg)),
+            "lc" => ExprKind::Lc(Box::new(arg)),
+            "ucfirst" => ExprKind::Ucfirst(Box::new(arg)),
+            "lcfirst" => ExprKind::Lcfirst(Box::new(arg)),
+            "fc" => ExprKind::Fc(Box::new(arg)),
+            "chomp" => ExprKind::Chomp(Box::new(arg)),
+            "chop" => ExprKind::Chop(Box::new(arg)),
+            "length" => ExprKind::Length(Box::new(arg)),
+            "quotemeta" => ExprKind::FuncCall {
+                name: "quotemeta".to_string(),
+                args: vec![arg],
+            },
+            // Numeric functions
+            "abs" => ExprKind::Abs(Box::new(arg)),
+            "int" => ExprKind::Int(Box::new(arg)),
+            "sqrt" => ExprKind::Sqrt(Box::new(arg)),
+            "sin" => ExprKind::Sin(Box::new(arg)),
+            "cos" => ExprKind::Cos(Box::new(arg)),
+            "exp" => ExprKind::Exp(Box::new(arg)),
+            "log" => ExprKind::Log(Box::new(arg)),
+            "hex" => ExprKind::Hex(Box::new(arg)),
+            "oct" => ExprKind::Oct(Box::new(arg)),
+            "chr" => ExprKind::Chr(Box::new(arg)),
+            "ord" => ExprKind::Ord(Box::new(arg)),
+            // Type/ref functions
+            "defined" => ExprKind::Defined(Box::new(arg)),
+            "ref" => ExprKind::Ref(Box::new(arg)),
+            "scalar" => ExprKind::ScalarContext(Box::new(arg)),
+            // Array/hash functions
+            "keys" => ExprKind::Keys(Box::new(arg)),
+            "values" => ExprKind::Values(Box::new(arg)),
+            "each" => ExprKind::Each(Box::new(arg)),
+            "pop" => ExprKind::Pop(Box::new(arg)),
+            "shift" => ExprKind::Shift(Box::new(arg)),
+            "reverse" | "reversed" => ExprKind::ReverseExpr(Box::new(arg)),
+            "rev" => ExprKind::ScalarReverse(Box::new(arg)),
+            "uniq" | "distinct" => ExprKind::FuncCall {
+                name: "uniq".to_string(),
+                args: vec![arg],
+            },
+            "trim" => ExprKind::FuncCall {
+                name: "trim".to_string(),
+                args: vec![arg],
+            },
+            // File functions
+            "slurp" => ExprKind::Slurp(Box::new(arg)),
+            "chdir" => ExprKind::Chdir(Box::new(arg)),
+            "stat" => ExprKind::Stat(Box::new(arg)),
+            "lstat" => ExprKind::Lstat(Box::new(arg)),
+            "readlink" => ExprKind::Readlink(Box::new(arg)),
+            "readdir" => ExprKind::Readdir(Box::new(arg)),
+            "close" => ExprKind::Close(Box::new(arg)),
+            // Other
+            "eval" => ExprKind::Eval(Box::new(arg)),
+            "require" => ExprKind::Require(Box::new(arg)),
+            "study" => ExprKind::Study(Box::new(arg)),
+            // Case conversion
+            "snake_case" => ExprKind::FuncCall {
+                name: "snake_case".to_string(),
+                args: vec![arg],
+            },
+            "camel_case" => ExprKind::FuncCall {
+                name: "camel_case".to_string(),
+                args: vec![arg],
+            },
+            "kebab_case" => ExprKind::FuncCall {
+                name: "kebab_case".to_string(),
+                args: vec![arg],
+            },
+            // Serialization
+            "to_json" => ExprKind::FuncCall {
+                name: "to_json".to_string(),
+                args: vec![arg],
+            },
+            "to_yaml" => ExprKind::FuncCall {
+                name: "to_yaml".to_string(),
+                args: vec![arg],
+            },
+            "to_toml" => ExprKind::FuncCall {
+                name: "to_toml".to_string(),
+                args: vec![arg],
+            },
+            "ddump" => ExprKind::FuncCall {
+                name: "ddump".to_string(),
+                args: vec![arg],
+            },
+            // Output
+            "p" | "say" => ExprKind::Say {
+                handle: None,
+                args: vec![arg],
+            },
+            "print" => ExprKind::Print {
+                handle: None,
+                args: vec![arg],
+            },
+            // Default: generic function call
+            _ => ExprKind::FuncCall {
+                name: name.to_string(),
+                args: vec![arg],
+            },
+        };
+        Ok(Expr { kind, line })
+    }
+
+    /// Parse a thread stage that has a block: `map { }`, `filter { }`, `sort { }`, etc.
+    /// In thread context, we only parse the block - the list comes from the piped result.
+    fn parse_thread_stage_with_block(&mut self, name: &str, line: usize) -> PerlResult<Expr> {
+        let block = self.parse_block()?;
+        // Use a placeholder for the list - pipe_forward_apply will replace it
+        let placeholder = self.pipe_placeholder_list(line);
+
+        match name {
+            "map" | "flat_map" | "maps" | "flat_maps" => {
+                let flatten_array_refs = matches!(name, "flat_map" | "flat_maps");
+                let stream = matches!(name, "maps" | "flat_maps");
+                Ok(Expr {
+                    kind: ExprKind::MapExpr {
+                        block,
+                        list: Box::new(placeholder),
+                        flatten_array_refs,
+                        stream,
+                    },
+                    line,
+                })
+            }
+            "grep" | "greps" | "filter" | "find_all" => {
+                let keyword = match name {
+                    "grep" => crate::ast::GrepBuiltinKeyword::Grep,
+                    "greps" => crate::ast::GrepBuiltinKeyword::Greps,
+                    "filter" => crate::ast::GrepBuiltinKeyword::Filter,
+                    "find_all" => crate::ast::GrepBuiltinKeyword::FindAll,
+                    _ => unreachable!(),
+                };
+                Ok(Expr {
+                    kind: ExprKind::GrepExpr {
+                        block,
+                        list: Box::new(placeholder),
+                        keyword,
+                    },
+                    line,
+                })
+            }
+            "sort" => Ok(Expr {
+                kind: ExprKind::SortExpr {
+                    cmp: Some(SortComparator::Block(block)),
+                    list: Box::new(placeholder),
+                },
+                line,
+            }),
+            "reduce" => Ok(Expr {
+                kind: ExprKind::ReduceExpr {
+                    block,
+                    list: Box::new(placeholder),
+                },
+                line,
+            }),
+            _ => {
+                // Generic: parse block and treat as FuncCall with code ref arg
+                let code_ref = Expr {
+                    kind: ExprKind::CodeRef {
+                        params: vec![],
+                        body: block,
+                    },
+                    line,
+                };
+                Ok(Expr {
+                    kind: ExprKind::FuncCall {
+                        name: name.to_string(),
+                        args: vec![code_ref],
+                    },
+                    line,
+                })
+            }
+        }
     }
 
     /// `tie %hash | tie @arr | tie $x , 'Class', ...args`
@@ -3540,11 +3818,11 @@ impl Parser {
             ExprKind::FuncCall { name, mut args } => {
                 match name.as_str() {
                     "puniq" | "uniq" | "distinct" | "flatten" | "set" | "list_count"
-                    | "list_size" | "count" | "size" | "cnt" | "len" | "with_index" | "shuffle" | "shuffled"
-                    | "frequencies" | "freq" | "interleave" | "ddump" | "lines" | "words"
-                    | "chars" | "trim" | "avg" | "to_json" | "to_csv" | "to_toml" | "to_yaml"
-                    | "to_xml" | "stddev" | "normalize" | "snake_case" | "camel_case"
-                    | "kebab_case" => {
+                    | "list_size" | "count" | "size" | "cnt" | "len" | "with_index" | "shuffle"
+                    | "shuffled" | "frequencies" | "freq" | "interleave" | "ddump" | "lines"
+                    | "words" | "chars" | "trim" | "avg" | "to_json" | "to_csv" | "to_toml"
+                    | "to_yaml" | "to_xml" | "stddev" | "normalize" | "snake_case"
+                    | "camel_case" | "kebab_case" => {
                         if args.is_empty() {
                             args.push(lhs);
                         } else {
@@ -3563,18 +3841,26 @@ impl Parser {
                     "List::Util::reduce" | "List::Util::fold" => {
                         args.push(lhs);
                     }
-                    "grep_v" | "pluck" => {
+                    "grep_v" | "pluck" | "tee" | "nth" | "chunk" => {
                         // data |> grep_v "pattern" → grep_v("pattern", data...)
                         // data |> pluck "key" → pluck("key", data...)
+                        // data |> tee "file" → tee("file", data...)
+                        // data |> nth N → nth(N, data...)
+                        // data |> chunk N → chunk(N, data...)
                         args.push(lhs);
+                    }
+                    "enumerate" | "dedup" => {
+                        // data |> enumerate → enumerate(data)
+                        // data |> dedup → dedup(data)
+                        args.insert(0, lhs);
                     }
                     "clamp" => {
                         // data |> clamp MIN, MAX → clamp(MIN, MAX, data...)
                         args.push(lhs);
                     }
                     "pfirst" | "pany" | "any" | "all" | "none" | "first" | "take_while"
-                    | "drop_while" | "skip_while" | "tap" | "peek" | "group_by" | "chunk_by" | "partition"
-                    | "min_by" | "max_by" | "zip_with" | "count_by" => {
+                    | "drop_while" | "skip_while" | "reject" | "tap" | "peek" | "group_by"
+                    | "chunk_by" | "partition" | "min_by" | "max_by" | "zip_with" | "count_by" => {
                         if args.len() < 2 {
                             return Err(self.syntax_err(
                                 format!(
@@ -5441,6 +5727,23 @@ impl Parser {
                 kind: ExprKind::MagicConst(MagicConstKind::Line),
                 line,
             }),
+            "stdin" => Ok(Expr {
+                kind: ExprKind::FuncCall {
+                    name: "stdin".into(),
+                    args: vec![],
+                },
+                line,
+            }),
+            "range" => {
+                let args = self.parse_builtin_args()?;
+                Ok(Expr {
+                    kind: ExprKind::FuncCall {
+                        name: "range".into(),
+                        args,
+                    },
+                    line,
+                })
+            }
             "print" => self.parse_print_like(|h, a| ExprKind::Print { handle: h, args: a }),
             "say" | "p" => self.parse_print_like(|h, a| ExprKind::Say { handle: h, args: a }),
             "printf" => self.parse_print_like(|h, a| ExprKind::Printf { handle: h, args: a }),
@@ -5992,19 +6295,18 @@ impl Parser {
                 }
             }
             "rev" => {
-                // `rev` — always string-reverse (scalar reverse), even in list context.
+                // `rev` — context-aware reverse: string in scalar, list in list context.
+                // Defaults to $_ when no argument given.
+                // Only use pipe placeholder when directly in pipe RHS (not inside a block).
+                // RBrace means we're inside a block like `map { rev }` - use $_ default.
                 let a = if self.in_pipe_rhs()
                     && matches!(
                         self.peek(),
-                        Token::Semicolon
-                            | Token::RBrace
-                            | Token::RParen
-                            | Token::Eof
-                            | Token::PipeForward
+                        Token::Semicolon | Token::RParen | Token::Eof | Token::PipeForward
                     ) {
                     self.pipe_placeholder_list(line)
                 } else {
-                    self.parse_one_arg()?
+                    self.parse_one_arg_or_default()?
                 };
                 Ok(Expr {
                     kind: ExprKind::ScalarReverse(Box::new(a)),
@@ -6660,6 +6962,17 @@ impl Parser {
                     kind: ExprKind::Bench { body: block, times },
                     line,
                 })
+            }
+            "thread" => {
+                // `thread EXPR stage1 stage2 ...` — threading macro (like Clojure's ->>)
+                // Each stage is either:
+                //   - `ident` — bare function call
+                //   - `ident { block }` — function with block arg
+                //   - `ident arg1 arg2 { block }` — function with args and optional block
+                //   - `sub { block }` — standalone anonymous block
+                //   - `>{ block }` — shorthand for standalone anonymous block
+                // Desugars to: EXPR |> stage1 |> stage2 |> ...
+                self.parse_thread_macro(line)
             }
             "retry" => {
                 // `retry { BLOCK }` or `retry BAREWORD` — bareword becomes zero-arg call.
@@ -7347,8 +7660,8 @@ impl Parser {
                     line,
                 })
             }
-            "take_while" | "drop_while" | "skip_while" | "tap" | "peek" | "partition" | "min_by" | "max_by"
-            | "zip_with" | "count_by" => {
+            "take_while" | "drop_while" | "skip_while" | "reject" | "tap" | "peek"
+            | "partition" | "min_by" | "max_by" | "zip_with" | "count_by" => {
                 let (block, list, progress) = self.parse_block_then_list_optional_progress()?;
                 if progress.is_some() {
                     return Err(
@@ -7936,8 +8249,8 @@ impl Parser {
                 kind: ExprKind::Wantarray,
                 line,
             }),
-            "sub" => {
-                // Anonymous sub — optional prototype `sub () { }` (e.g. Carp.pm `*X = sub () { 1 }`)
+            "sub" | "fn" => {
+                // Anonymous sub/fn — optional prototype `sub () { }` (e.g. Carp.pm `*X = sub () { 1 }`)
                 let (params, _prototype) = self.parse_sub_sig_or_prototype_opt()?;
                 let body = self.parse_block()?;
                 Ok(Expr {
@@ -8513,7 +8826,7 @@ impl Parser {
             | "distinct" | "any" | "all" | "none" | "first" | "min" | "max"
             | "sum" | "product" | "zip" | "chunk" | "sliding_window" | "enumerate"
             | "reject" | "detect" | "find" | "find_all" | "collect" | "inject"
-            | "compact" | "min_by" | "max_by" | "sort_by" | "tally"
+            | "compact" | "concat" | "chain" | "min_by" | "max_by" | "sort_by" | "tally"
             | "find_index" | "each_with_index" | "count" | "cnt" | "group_by" | "chunk_by"
             | "fan" | "fan_cap" | "pmap" | "pgrep" | "pfor" | "psort" | "preduce"
             | "pcache" | "timer" | "bench" | "eval_timeout" | "retry"
@@ -8536,7 +8849,7 @@ impl Parser {
             // ── functional / iterator ───────────────────────────────────────
             | "fore" | "e" | "flat_map" | "flat_maps" | "maps" | "filter" | "find_all" | "reduce" | "fold"
             | "inject" | "collect" | "uniq" | "distinct" | "any" | "all" | "none"
-            | "first" | "detect" | "find" | "compact" | "reject" | "flatten" | "set"
+            | "first" | "detect" | "find" | "compact" | "concat" | "chain" | "reject" | "flatten" | "set"
             | "min_by" | "max_by" | "sort_by" | "tally" | "find_index"
             | "each_with_index" | "count" | "cnt" |"len" | "group_by" | "chunk_by"
             | "zip" | "chunk" | "chunked" | "sliding_window" | "windowed"
@@ -8730,6 +9043,7 @@ impl Parser {
 
     /// Array operand for `shift` / `pop`: default `@_`, or `shift(@a)` / `shift()` (empty parens = `@_`).
     fn parse_one_arg_or_argv(&mut self) -> PerlResult<Expr> {
+        let line = self.prev_line(); // line where shift/pop keyword was
         if matches!(self.peek(), Token::LParen) {
             self.advance();
             if matches!(self.peek(), Token::RParen) {
@@ -8743,6 +9057,7 @@ impl Parser {
             self.expect(&Token::RParen)?;
             return Ok(expr);
         }
+        // Implicit semicolon: if next token is on a different line, don't consume it
         if matches!(
             self.peek(),
             Token::Semicolon
@@ -8751,10 +9066,11 @@ impl Parser {
                 | Token::Eof
                 | Token::Comma
                 | Token::PipeForward
-        ) {
+        ) || self.peek_line() > line
+        {
             Ok(Expr {
                 kind: ExprKind::ArrayVar("_".into()),
-                line: self.peek_line(),
+                line,
             })
         } else {
             self.parse_assign_expr()

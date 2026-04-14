@@ -183,7 +183,7 @@ fn worker_loop(job_rx: Receiver<PoolJob>, result_tx: Sender<(u64, PerlValue)>) {
             interp.scope.restore_capture(env);
         }
         interp.enable_parallel_guard();
-        let _ = interp.scope.set_scalar("_", job.arg);
+        interp.scope.set_topic(job.arg);
         interp.scope_push_hook();
         let val = match interp.exec_block_no_scope(&job.sub.body) {
             Ok(v) => v,

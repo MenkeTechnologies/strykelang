@@ -30,17 +30,13 @@ impl Statement {
 /// `grep` is eager (Perl-compatible); `greps` / `filter` / `find_all` are lazy (streaming).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum GrepBuiltinKeyword {
+    #[default]
     Grep,
     Greps,
     Filter,
     FindAll,
-}
-
-impl Default for GrepBuiltinKeyword {
-    fn default() -> Self {
-        Self::Grep
-    }
 }
 
 impl GrepBuiltinKeyword {

@@ -13,6 +13,8 @@ use std::io::{stderr, IsTerminal, Read, Seek, SeekFrom, Write};
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream, ToSocketAddrs, UdpSocket};
 use std::sync::Arc;
 use std::sync::LazyLock;
+
+use crate::value::PerlIterator;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use chrono::{Datelike, Local, TimeZone, Timelike, Utc};
@@ -84,11 +86,29 @@ fn builtin_copy(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
 }
 
 fn builtin_basename(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if let Some(v) = args.first() {
+        if v.is_iterator() {
+            let source = v.clone().into_iterator();
+            return Ok(PerlValue::iterator(Arc::new(
+                crate::map_stream::MapFnIterator::new(source, |s| {
+                    crate::perl_fs::path_basename(&s)
+                }),
+            )));
+        }
+    }
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     Ok(PerlValue::string(crate::perl_fs::path_basename(&s)))
 }
 
 fn builtin_dirname(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if let Some(v) = args.first() {
+        if v.is_iterator() {
+            let source = v.clone().into_iterator();
+            return Ok(PerlValue::iterator(Arc::new(
+                crate::map_stream::MapFnIterator::new(source, |s| crate::perl_fs::path_dirname(&s)),
+            )));
+        }
+    }
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     Ok(PerlValue::string(crate::perl_fs::path_dirname(&s)))
 }
@@ -206,9 +226,12 @@ pub(crate) fn try_builtin(
             if args.len() == 2 && (args[0].is_iterator() || args[0].as_array_vec().is_some()) {
                 let n = args[1].to_int().max(0) as usize;
                 let source = crate::map_stream::into_pull_iter(args[0].clone());
-                return Some(Ok(PerlValue::iterator(Arc::new(
-                    crate::map_stream::TakeIterator::new(source, n),
-                ))));
+                let iter = crate::map_stream::TakeIterator::new(source, n);
+                if interp.wantarray_kind == WantarrayCtx::Scalar {
+                    let items = iter.collect_all();
+                    return Some(Ok(items.last().cloned().unwrap_or(PerlValue::UNDEF)));
+                }
+                return Some(Ok(PerlValue::iterator(Arc::new(iter))));
             }
             Some(builtin_take(interp, args))
         }
@@ -217,14 +240,19 @@ pub(crate) fn try_builtin(
             if args.len() == 2 && (args[0].is_iterator() || args[0].as_array_vec().is_some()) {
                 let n = args[1].to_int().max(0) as usize;
                 let source = crate::map_stream::into_pull_iter(args[0].clone());
-                return Some(Ok(PerlValue::iterator(Arc::new(
-                    crate::map_stream::SkipIterator::new(source, n),
-                ))));
+                let iter = crate::map_stream::SkipIterator::new(source, n);
+                if interp.wantarray_kind == WantarrayCtx::Scalar {
+                    let items = iter.collect_all();
+                    return Some(Ok(items.last().cloned().unwrap_or(PerlValue::UNDEF)));
+                }
+                return Some(Ok(PerlValue::iterator(Arc::new(iter))));
             }
             Some(builtin_drop(interp, args))
         }
-        "take_while" | "drop_while" | "skip_while" | "tap" | "peek" | "partition" | "min_by" | "max_by"
-        | "zip_with" | "count_by" => Some(interp.list_higher_order_block_builtin(name, args, line)),
+        "take_while" | "drop_while" | "skip_while" | "reject" | "tap" | "peek" | "partition"
+        | "min_by" | "max_by" | "zip_with" | "count_by" => {
+            Some(interp.list_higher_order_block_builtin(name, args, line))
+        }
         "with_index" => Some(builtin_with_index(interp, args)),
         "flatten" => Some(builtin_flatten(interp, args)),
         "interleave" => Some(builtin_interleave(interp, args)),
@@ -235,6 +263,9 @@ pub(crate) fn try_builtin(
         "words" => Some(builtin_words(interp, args)),
         "chars" => Some(builtin_chars(interp, args)),
         "trim" => Some(builtin_trim(args)),
+        "stdin" => Some(Ok(PerlValue::iterator(Arc::new(
+            crate::map_stream::StdinIterator::new(),
+        )))),
         "avg" => Some(builtin_avg(args)),
         "top" => Some(builtin_top(args)),
         "to_file" => Some(builtin_to_file(args, line)),
@@ -244,6 +275,8 @@ pub(crate) fn try_builtin(
         "select_keys" => Some(builtin_select_keys(args)),
         "pluck" => Some(builtin_pluck(args)),
         "first_or" => Some(builtin_first_or(args)),
+        "compact" => Some(builtin_compact(args)),
+        "concat" | "chain" => Some(builtin_concat(args)),
         "clamp" => Some(builtin_clamp(args)),
         "normalize" => Some(builtin_normalize(args)),
         "stddev" => Some(builtin_stddev(args)),
@@ -254,6 +287,14 @@ pub(crate) fn try_builtin(
         "to_yaml" => Some(builtin_to_yaml(args)),
         "to_xml" => Some(builtin_to_xml(args)),
         "set" => Some(Ok(crate::value::set_from_elements(args.iter().cloned()))),
+        "tee" => Some(builtin_tee(args, line)),
+        "nth" => Some(builtin_nth(args)),
+        "to_set" => Some(builtin_to_set(args)),
+        "to_hash" => Some(builtin_to_hash(args)),
+        "enumerate" => Some(builtin_enumerate(args)),
+        "chunk" => Some(builtin_chunk(args)),
+        "dedup" => Some(builtin_dedup(args)),
+        "range" => Some(builtin_range(args)),
         "list_count" | "list_size" => Some(builtin_list_count(args)),
         "count" | "len" | "size" | "cnt" => Some(builtin_count_size_cnt(args)),
         "read_lines" => Some(builtin_read_lines(interp, args, line)),
@@ -1044,8 +1085,17 @@ fn builtin_input(interp: &Interpreter, args: &[PerlValue], line: usize) -> PerlR
 }
 
 /// `lines STRING` — split string into array on newlines (no trailing empty).
+/// `lines ITERATOR` — flat-map each element's lines (streaming).
 /// Returns a streaming iterator for lazy consumption.
 fn builtin_lines(_interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if let Some(v) = args.first() {
+        if v.is_iterator() {
+            let source = v.clone().into_iterator();
+            return Ok(PerlValue::iterator(Arc::new(
+                crate::map_stream::LinesFlatMapIterator::new(source),
+            )));
+        }
+    }
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     Ok(PerlValue::iterator(Arc::new(
         crate::map_stream::LinesIterator::new(&s),
@@ -1053,22 +1103,34 @@ fn builtin_lines(_interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVa
 }
 
 /// `words STRING` — split on whitespace into array.
-fn builtin_words(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+/// `words ITERATOR` — flat-map each element's words (streaming).
+fn builtin_words(_interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if let Some(v) = args.first() {
+        if v.is_iterator() {
+            let source = v.clone().into_iterator();
+            return Ok(PerlValue::iterator(Arc::new(
+                crate::map_stream::WordsFlatMapIterator::new(source),
+            )));
+        }
+    }
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let items: Vec<PerlValue> = s
-        .split_whitespace()
-        .map(|w| PerlValue::string(w.to_string()))
-        .collect();
-    Ok(match interp.wantarray_kind {
-        WantarrayCtx::List => PerlValue::array(items),
-        WantarrayCtx::Scalar => PerlValue::integer(items.len() as i64),
-        WantarrayCtx::Void => PerlValue::UNDEF,
-    })
+    Ok(PerlValue::iterator(Arc::new(
+        crate::map_stream::WordsIterator::new(&s),
+    )))
 }
 
 /// `chars STRING` — split into individual characters (no empty leading element).
+/// `chars ITERATOR` — flat-map each element's characters (streaming).
 /// Returns a streaming iterator for lazy consumption.
 fn builtin_chars(_interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if let Some(v) = args.first() {
+        if v.is_iterator() {
+            let source = v.clone().into_iterator();
+            return Ok(PerlValue::iterator(Arc::new(
+                crate::map_stream::CharsFlatMapIterator::new(source),
+            )));
+        }
+    }
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     Ok(PerlValue::iterator(Arc::new(
         crate::map_stream::CharsIterator::new(&s),
@@ -1342,6 +1404,213 @@ fn builtin_first_or(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(list.into_iter().next().unwrap_or(default))
 }
 
+/// `compact LIST` — removes undef and empty string values (streaming).
+fn builtin_compact(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let source = if args.len() == 1 {
+        let v = &args[0];
+        if v.is_iterator() {
+            v.clone().into_iterator()
+        } else {
+            crate::map_stream::into_pull_iter(v.clone())
+        }
+    } else {
+        crate::map_stream::into_pull_iter(PerlValue::array(args.to_vec()))
+    };
+    Ok(PerlValue::iterator(Arc::new(
+        crate::map_stream::CompactIterator::new(source),
+    )))
+}
+
+/// `concat LIST1, LIST2, ...` / `chain LIST1, LIST2, ...` — concatenates iterators (streaming).
+fn builtin_concat(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let sources: Vec<Arc<dyn crate::value::PerlIterator>> = args
+        .iter()
+        .map(|v| {
+            if v.is_iterator() {
+                v.clone().into_iterator()
+            } else {
+                crate::map_stream::into_pull_iter(v.clone())
+            }
+        })
+        .collect();
+    Ok(PerlValue::iterator(Arc::new(
+        crate::map_stream::ConcatIterator::new(sources),
+    )))
+}
+
+/// `enumerate ITERATOR` — yields `[$index, $item]` pairs (streaming).
+/// In pipeline: `ITERATOR |> enumerate`
+fn builtin_enumerate(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let source = if args.len() == 1 && args[0].is_iterator() {
+        args[0].clone().into_iterator()
+    } else {
+        crate::map_stream::into_pull_iter(PerlValue::array(args.to_vec()))
+    };
+    Ok(PerlValue::iterator(Arc::new(
+        crate::map_stream::EnumerateIterator::new(source),
+    )))
+}
+
+/// `chunk N, ITERATOR` — yields N-element arrayrefs (streaming).
+/// In pipeline: `ITERATOR |> chunk N`
+fn builtin_chunk(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let n = args[0].to_int().max(1) as usize;
+    if args.len() < 2 {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let v = &args[1];
+    let source = if v.is_iterator() {
+        v.clone().into_iterator()
+    } else {
+        crate::map_stream::into_pull_iter(v.clone())
+    };
+    Ok(PerlValue::iterator(Arc::new(
+        crate::map_stream::ChunkIterator::new(source, n),
+    )))
+}
+
+/// `dedup ITERATOR` — drops consecutive duplicates (streaming).
+/// In pipeline: `ITERATOR |> dedup`
+fn builtin_dedup(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let source = if args.len() == 1 && args[0].is_iterator() {
+        args[0].clone().into_iterator()
+    } else {
+        crate::map_stream::into_pull_iter(PerlValue::array(args.to_vec()))
+    };
+    Ok(PerlValue::iterator(Arc::new(
+        crate::map_stream::DedupIterator::new(source),
+    )))
+}
+
+/// `range N, M` — lazy integer sequence from N to M (inclusive).
+fn builtin_range(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let start = args.first().map(|v| v.to_int()).unwrap_or(0);
+    let end = args.get(1).map(|v| v.to_int()).unwrap_or(start);
+    Ok(PerlValue::iterator(Arc::new(
+        crate::map_stream::RangeIterator::new(start, end),
+    )))
+}
+
+/// `tee FILE, ITERATOR` — write each item to file while passing through (streaming).
+/// In pipeline: `ITERATOR |> tee FILE`
+fn builtin_tee(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    if args.len() < 2 {
+        return Err(PerlError::runtime("tee: expected FILE, ITERATOR", line));
+    }
+    let path = args[0].to_string();
+    let v = &args[1];
+    let source = if v.is_iterator() {
+        v.clone().into_iterator()
+    } else {
+        crate::map_stream::into_pull_iter(v.clone())
+    };
+    let iter = crate::map_stream::TeeIterator::new(source, &path)
+        .map_err(|e| PerlError::runtime(format!("tee: {}: {}", path, e), line))?;
+    Ok(PerlValue::iterator(Arc::new(iter)))
+}
+
+/// `nth N, ITERATOR` — get Nth element (0-indexed), consumes up to that point.
+/// In pipeline: `ITERATOR |> nth N`
+fn builtin_nth(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Ok(PerlValue::UNDEF);
+    }
+    let n = args[0].to_int().max(0) as usize;
+    if args.len() < 2 {
+        return Ok(PerlValue::UNDEF);
+    }
+    let v = &args[1];
+    if v.is_iterator() {
+        let iter = v.clone().into_iterator();
+        for _ in 0..n {
+            if iter.next_item().is_none() {
+                return Ok(PerlValue::UNDEF);
+            }
+        }
+        return Ok(iter.next_item().unwrap_or(PerlValue::UNDEF));
+    }
+    let list = v.to_list();
+    Ok(list.get(n).cloned().unwrap_or(PerlValue::UNDEF))
+}
+
+/// `to_set ITERATOR` or `to_set LIST` — collect iterator/list to a set.
+fn builtin_to_set(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Ok(crate::value::set_from_elements(std::iter::empty()));
+    }
+    if args.len() == 1 {
+        let v = &args[0];
+        if v.is_iterator() {
+            let iter = v.clone().into_iterator();
+            let mut items = Vec::new();
+            while let Some(item) = iter.next_item() {
+                items.push(item);
+            }
+            return Ok(crate::value::set_from_elements(items));
+        }
+        let list = v.to_list();
+        return Ok(crate::value::set_from_elements(list));
+    }
+    Ok(crate::value::set_from_elements(args.iter().cloned()))
+}
+
+/// `to_hash ITERATOR` or `to_hash LIST` — collect pairs (or flat k,v,k,v) to a hash.
+fn builtin_to_hash(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    use parking_lot::RwLock;
+    if args.is_empty() {
+        return Ok(PerlValue::hash_ref(Arc::new(RwLock::new(
+            indexmap::IndexMap::new(),
+        ))));
+    }
+    let items: Vec<PerlValue> = if args.len() == 1 {
+        let v = &args[0];
+        if v.is_iterator() {
+            let iter = v.clone().into_iterator();
+            let mut out = Vec::new();
+            while let Some(item) = iter.next_item() {
+                out.push(item);
+            }
+            out
+        } else {
+            v.to_list()
+        }
+    } else {
+        args.to_vec()
+    };
+    let mut map = indexmap::IndexMap::new();
+    let mut i = 0;
+    while i < items.len() {
+        if let Some(aref) = items[i].as_array_ref() {
+            let pair = aref.read();
+            if pair.len() >= 2 {
+                map.insert(pair[0].to_string(), pair[1].clone());
+                i += 1;
+                continue;
+            }
+        }
+        let key = items[i].to_string();
+        let val = items.get(i + 1).cloned().unwrap_or(PerlValue::UNDEF);
+        map.insert(key, val);
+        i += 2;
+    }
+    Ok(PerlValue::hash_ref(Arc::new(RwLock::new(map))))
+}
+
 /// `pluck KEY, LIST_OF_HASHREFS` — extract one key from each hashref in a list.
 /// `pluck KEY, LIST` — extracts a key from each hash ref.
 /// Returns a streaming iterator for lazy consumption.
@@ -1499,21 +1768,16 @@ fn split_case_words(s: &str) -> Vec<String> {
     words
 }
 
-/// `snake_case STRING` — convert to snake_case.
-fn builtin_snake_case(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let result = split_case_words(&s)
+fn to_snake_case(s: &str) -> String {
+    split_case_words(s)
         .iter()
         .map(|w| w.to_lowercase())
         .collect::<Vec<_>>()
-        .join("_");
-    Ok(PerlValue::string(result))
+        .join("_")
 }
 
-/// `camel_case STRING` — convert to camelCase (lower first).
-fn builtin_camel_case(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let words = split_case_words(&s);
+fn to_camel_case(s: &str) -> String {
+    let words = split_case_words(s);
     let mut result = String::new();
     for (i, w) in words.iter().enumerate() {
         if i == 0 {
@@ -1526,18 +1790,60 @@ fn builtin_camel_case(args: &[PerlValue]) -> PerlResult<PerlValue> {
             }
         }
     }
-    Ok(PerlValue::string(result))
+    result
 }
 
-/// `kebab_case STRING` — convert to kebab-case.
-fn builtin_kebab_case(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let result = split_case_words(&s)
+fn to_kebab_case(s: &str) -> String {
+    split_case_words(s)
         .iter()
         .map(|w| w.to_lowercase())
         .collect::<Vec<_>>()
-        .join("-");
-    Ok(PerlValue::string(result))
+        .join("-")
+}
+
+/// `snake_case STRING` — convert to snake_case.
+/// `snake_case ITERATOR` — map each element (streaming).
+fn builtin_snake_case(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if let Some(v) = args.first() {
+        if v.is_iterator() {
+            let source = v.clone().into_iterator();
+            return Ok(PerlValue::iterator(Arc::new(
+                crate::map_stream::MapFnIterator::new(source, |s| to_snake_case(&s)),
+            )));
+        }
+    }
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    Ok(PerlValue::string(to_snake_case(&s)))
+}
+
+/// `camel_case STRING` — convert to camelCase (lower first).
+/// `camel_case ITERATOR` — map each element (streaming).
+fn builtin_camel_case(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if let Some(v) = args.first() {
+        if v.is_iterator() {
+            let source = v.clone().into_iterator();
+            return Ok(PerlValue::iterator(Arc::new(
+                crate::map_stream::MapFnIterator::new(source, |s| to_camel_case(&s)),
+            )));
+        }
+    }
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    Ok(PerlValue::string(to_camel_case(&s)))
+}
+
+/// `kebab_case STRING` — convert to kebab-case.
+/// `kebab_case ITERATOR` — map each element (streaming).
+fn builtin_kebab_case(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if let Some(v) = args.first() {
+        if v.is_iterator() {
+            let source = v.clone().into_iterator();
+            return Ok(PerlValue::iterator(Arc::new(
+                crate::map_stream::MapFnIterator::new(source, |s| to_kebab_case(&s)),
+            )));
+        }
+    }
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    Ok(PerlValue::string(to_kebab_case(&s)))
 }
 
 /// `to_toml VALUE` — serialize a PerlValue to a TOML string.

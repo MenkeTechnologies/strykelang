@@ -1253,7 +1253,8 @@ fn main() {
     }
 
     if cli.format_source {
-        println!("{}", perlrs::format_program(&program));
+        // Use convert_program for clean perlrs (.pr) syntax with pipes
+        println!("{}", perlrs::convert::convert_program(&program));
         return;
     }
 

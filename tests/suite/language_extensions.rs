@@ -31,10 +31,7 @@ fn flat_map_alias_expands_array_results_like_map() {
 
 #[test]
 fn maps_streams_through_pipe_uc_comma_form() {
-    assert_eq!(
-        eval_string(r#"(qw(a b)) |> maps uc |> join ','"#),
-        "A,B"
-    );
+    assert_eq!(eval_string(r#"(qw(a b)) |> maps uc |> join ','"#), "A,B");
 }
 
 #[test]
@@ -581,5 +578,346 @@ my $f = Fmt->new;
 "hello" |> uc |> $f->exclaim"#,
         ),
         "HELLO!"
+    );
+}
+
+// ── $_0, $_1, $_N closure arguments ──
+
+#[test]
+fn closure_args_in_named_sub_single_arg() {
+    assert_eq!(eval_int(r#"sub double { $_0 * 2 } double(21)"#), 42);
+}
+
+#[test]
+fn closure_args_in_named_sub_two_args() {
+    assert_eq!(eval_int(r#"sub add { $_0 + $_1 } add(3, 4)"#), 7);
+}
+
+#[test]
+fn closure_args_in_named_sub_three_args() {
+    assert_eq!(
+        eval_int(r#"sub mul3 { $_0 * $_1 * $_2 } mul3(2, 3, 4)"#),
+        24
+    );
+}
+
+#[test]
+fn closure_args_in_anonymous_fn() {
+    assert_eq!(
+        eval_int(r#"my $f = fn { $_0 + $_1 + $_2 }; $f->(1, 2, 3)"#),
+        6
+    );
+}
+
+#[test]
+fn closure_args_in_thread_with_named_subs() {
+    assert_eq!(
+        eval_int(r#"sub double { $_0 * 2 } sub add10 { $_0 + 10 } thread 5 double add10"#),
+        20
+    );
+}
+
+#[test]
+fn closure_args_in_thread_chain_of_udfs() {
+    assert_eq!(
+        eval_int(
+            r#"sub double { $_0 * 2 }
+               sub triple { $_0 * 3 }
+               sub add5   { $_0 + 5 }
+               thread 2 double triple add5"#
+        ),
+        17
+    );
+}
+
+#[test]
+fn closure_args_in_pipe_map() {
+    assert_eq!(
+        eval_string(r#"(1..5) |> map { $_0 * 2 } |> join ",""#),
+        "2,4,6,8,10"
+    );
+}
+
+#[test]
+fn closure_args_in_pipe_sort() {
+    assert_eq!(
+        eval_string(r#"(5,2,8,1) |> sort { $_0 <=> $_1 } |> join ",""#),
+        "1,2,5,8"
+    );
+}
+
+#[test]
+fn closure_args_in_pipe_reduce() {
+    assert_eq!(eval_int(r#"(1..5) |> reduce { $_0 + $_1 }"#), 15);
+    assert_eq!(eval_int(r#"(1..5) |> reduce { $_0 * $_1 }"#), 120);
+}
+
+#[test]
+fn closure_args_in_thread_reduce() {
+    assert_eq!(eval_int(r#"thread (1..5) reduce { $_0 + $_1 }"#), 15);
+    assert_eq!(eval_int(r#"thread (1..5) reduce { $_0 * $_1 }"#), 120);
+}
+
+#[test]
+fn closure_args_in_thread_grep_map_sum() {
+    assert_eq!(
+        eval_int(r#"thread (1..10) grep { $_0 % 2 == 0 } map { $_0 * $_0 } sum"#),
+        220
+    );
+}
+
+#[test]
+fn closure_args_zip_with_two_args() {
+    assert_eq!(
+        eval_string(r#"zip_with { $_0 + $_1 } [1,2,3], [10,20,30] |> join ",""#),
+        "11,22,33"
+    );
+}
+
+#[test]
+fn closure_args_zip_with_string_concat() {
+    assert_eq!(
+        eval_string(r#"zip_with { "$_0:$_1" } [1,2,3], ["a","b","c"] |> join ",""#),
+        "1:a,2:b,3:c"
+    );
+}
+
+// ── thread macro with builtins ──
+
+#[test]
+fn thread_sum_product_mean() {
+    assert_eq!(eval_int(r#"thread (1..10) sum"#), 55);
+    assert_eq!(eval_int(r#"thread (1..5) product"#), 120);
+    assert_eq!(eval_string(r#"thread (1..10) mean"#), "5.5");
+}
+
+#[test]
+fn thread_min_max_minstr_maxstr() {
+    assert_eq!(eval_int(r#"thread (5,2,8,1,9) min"#), 1);
+    assert_eq!(eval_int(r#"thread (5,2,8,1,9) max"#), 9);
+    assert_eq!(
+        eval_string(r#"thread ("apple","banana","cherry") minstr"#),
+        "apple"
+    );
+    assert_eq!(
+        eval_string(r#"thread ("apple","banana","cherry") maxstr"#),
+        "cherry"
+    );
+}
+
+#[test]
+fn thread_uniq_shuffle_reverse() {
+    assert_eq!(
+        eval_string(r#"thread (1,1,2,2,3,3) uniq |> join ",""#),
+        "1,2,3"
+    );
+    assert_eq!(
+        eval_string(r#"thread (1,2,3) reverse |> join ",""#),
+        "3,2,1"
+    );
+}
+
+#[test]
+fn thread_pairs_pairkeys_pairvalues() {
+    assert_eq!(
+        eval_string(r#"thread (1,2,3,4,5,6) pairkeys |> join ",""#),
+        "1,3,5"
+    );
+    assert_eq!(
+        eval_string(r#"thread (1,2,3,4,5,6) pairvalues |> join ",""#),
+        "2,4,6"
+    );
+}
+
+#[test]
+fn thread_grep_map_sum_chain() {
+    assert_eq!(
+        eval_int(r#"thread (1..10) grep { $_ % 2 == 0 } map { $_ * $_ } sum"#),
+        220
+    );
+    assert_eq!(
+        eval_int(r#"thread (1..100) grep { $_ % 7 == 0 } map { $_ * 2 } sum"#),
+        1470
+    );
+}
+
+#[test]
+fn thread_sort_with_closure_args() {
+    assert_eq!(
+        eval_string(r#"thread (5,2,8,1) sort { $_0 <=> $_1 } |> join ",""#),
+        "1,2,5,8"
+    );
+    assert_eq!(
+        eval_string(r#"thread (5,2,8,1) sort { $_1 <=> $_0 } |> join ",""#),
+        "8,5,2,1"
+    );
+}
+
+#[test]
+fn thread_string_transforms() {
+    assert_eq!(eval_string(r#"thread " hello " trim uc"#), "HELLO");
+    assert_eq!(eval_string(r#"thread "HELLO" lc ucfirst"#), "Hello");
+    assert_eq!(eval_string(r#"thread "hello" rev"#), "olleh");
+}
+
+#[test]
+fn thread_case_conversions() {
+    assert_eq!(
+        eval_string(r#"thread "hello_world" camel_case"#),
+        "helloWorld"
+    );
+    assert_eq!(
+        eval_string(r#"thread "helloWorld" snake_case"#),
+        "hello_world"
+    );
+    assert_eq!(
+        eval_string(r#"thread "helloWorld" kebab_case"#),
+        "hello-world"
+    );
+}
+
+#[test]
+fn thread_arrow_block_transforms() {
+    assert_eq!(eval_int(r#"thread 5 >{ $_ * 2 } >{ $_ + 10 }"#), 20);
+    assert_eq!(
+        eval_int(r#"thread 100 >{ $_0 / 2 } >{ $_0 + 10 } >{ $_0 * 3 }"#),
+        180
+    );
+}
+
+#[test]
+fn thread_terminates_at_pipe() {
+    // |> ends the thread macro, result can be used
+    assert_eq!(eval_int(r#"my $x = thread 5 >{ $_ * 2 }; $x + 100"#), 110);
+}
+
+// ── pipe forward with new builtins ──
+
+#[test]
+fn pipe_pairs_pairkeys_pairvalues() {
+    assert_eq!(
+        eval_string(r#"(1,2,3,4,5,6) |> pairkeys |> join ",""#),
+        "1,3,5"
+    );
+    assert_eq!(
+        eval_string(r#"(1,2,3,4,5,6) |> pairvalues |> join ",""#),
+        "2,4,6"
+    );
+}
+
+#[test]
+fn pipe_sum_product_mean_median() {
+    assert_eq!(eval_int(r#"(1..10) |> sum"#), 55);
+    assert_eq!(eval_int(r#"(1..5) |> product"#), 120);
+    assert_eq!(eval_string(r#"(1..10) |> mean"#), "5.5");
+    assert_eq!(eval_string(r#"(1..10) |> median"#), "5.5");
+}
+
+#[test]
+fn pipe_min_max_minstr_maxstr() {
+    assert_eq!(eval_int(r#"(5,2,8,1,9) |> min"#), 1);
+    assert_eq!(eval_int(r#"(5,2,8,1,9) |> max"#), 9);
+    assert_eq!(
+        eval_string(r#"("apple","banana","cherry") |> minstr"#),
+        "apple"
+    );
+    assert_eq!(
+        eval_string(r#"("apple","banana","cherry") |> maxstr"#),
+        "cherry"
+    );
+}
+
+#[test]
+fn pipe_shuffle_uniq() {
+    // shuffle changes order but preserves elements
+    assert_eq!(eval_int(r#"(1..10) |> shuffle |> sum"#), 55);
+    assert_eq!(eval_string(r#"(1,1,2,2,3,3) |> uniq |> join ",""#), "1,2,3");
+}
+
+#[test]
+fn pipe_long_chain_numeric() {
+    assert_eq!(
+        eval_int(r#"(1..50) |> grep { $_ % 2 == 1 } |> map { $_ ** 2 } |> sum |> sqrt |> int"#),
+        144
+    );
+}
+
+#[test]
+fn pipe_long_chain_string() {
+    assert_eq!(
+        eval_string(r#"" hello world " |> trim |> uc |> rev |> lc |> ucfirst"#),
+        "Dlrow olleh"
+    );
+}
+
+// ── user-defined functions in thread ──
+
+#[test]
+fn thread_user_defined_functions_long_chain() {
+    assert_eq!(
+        eval_string(
+            r#"sub double { $_0 * 2 }
+               sub triple { $_0 * 3 }
+               sub add5   { $_0 + 5 }
+               sub square { $_0 ** 2 }
+               sub half   { $_0 / 2 }
+               thread 2 double triple add5 square half"#
+        ),
+        "144.5"
+    );
+}
+
+#[test]
+fn thread_user_defined_string_functions() {
+    assert_eq!(
+        eval_string(
+            r#"sub wrap  { "[$_0]" }
+               sub upper { uc($_0) }
+               sub trim_ { trim($_0) }
+               sub rev_  { rev($_0) }
+               sub bang  { "$_0!" }
+               thread "  hello  " trim_ upper rev_ wrap bang"#
+        ),
+        "[OLLEH]!"
+    );
+}
+
+#[test]
+fn thread_mixed_builtins_and_udfs() {
+    assert_eq!(
+        eval_int(
+            r#"sub double { $_0 * 2 }
+               thread 5 double uc length"#
+        ),
+        2
+    );
+}
+
+#[test]
+fn pipe_stddev_variance_mode() {
+    // stddev of 1..10 is ~2.87
+    let s = eval_string(r#"(1..10) |> stddev"#);
+    assert!(s.starts_with("2.87"));
+    // mode of (1,1,2,2,2,3) is 2
+    assert_eq!(eval_int(r#"(1,1,2,2,2,3) |> mode"#), 2);
+}
+
+#[test]
+fn sample_returns_correct_count() {
+    // sample N returns N elements
+    assert_eq!(eval_int(r#"my @s = sample 3, 1..10; scalar @s"#), 3);
+    assert_eq!(eval_int(r#"my @s = sample 5, 1..20; scalar @s"#), 5);
+}
+
+#[test]
+fn arrow_call_passes_all_args() {
+    // Verify $f->(1,2,3) passes all 3 args, not just last
+    assert_eq!(
+        eval_int(r#"my $f = fn { $_0 + $_1 + $_2 }; $f->(10, 20, 30)"#),
+        60
+    );
+    assert_eq!(
+        eval_string(r#"my $f = fn { "$_0-$_1-$_2" }; $f->("a", "b", "c")"#),
+        "a-b-c"
     );
 }

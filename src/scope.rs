@@ -1015,6 +1015,27 @@ impl Scope {
         Ok(())
     }
 
+    /// Set the topic variable `$_` and its numeric alias `$_0` together.
+    /// Use this for single-arg closures (map, grep, etc.) so both `$_` and `$_0` work.
+    /// This declares them in the current scope (not global), suitable for sub calls.
+    #[inline]
+    pub fn set_topic(&mut self, val: PerlValue) {
+        self.declare_scalar("_", val.clone());
+        self.declare_scalar("_0", val);
+    }
+
+    /// Set numeric closure argument aliases `$_0`, `$_1`, `$_2`, ... for all args.
+    /// Also sets `$_` to the first argument (if any).
+    #[inline]
+    pub fn set_closure_args(&mut self, args: &[PerlValue]) {
+        if let Some(first) = args.first() {
+            self.declare_scalar("_", first.clone());
+        }
+        for (i, val) in args.iter().enumerate() {
+            self.declare_scalar(&format!("_{}", i), val.clone());
+        }
+    }
+
     // ── Atomic array/hash declarations ──
 
     pub fn declare_atomic_array(&mut self, name: &str, val: Vec<PerlValue>) {

@@ -575,7 +575,7 @@ impl<'a> VM<'a> {
             {
                 let mut result = Vec::new();
                 for item in list {
-                    let _ = self.interp.scope.set_scalar("_", item);
+                    self.interp.scope.set_topic(item);
                     let val = self.run_block_region(start, end, op_count)?;
                     Self::extend_map_outputs(&mut result, val, peel_array_ref);
                 }
@@ -586,7 +586,7 @@ impl<'a> VM<'a> {
         let block = self.blocks[idx].clone();
         let mut result = Vec::new();
         for item in list {
-            let _ = self.interp.scope.set_scalar("_", item);
+            self.interp.scope.set_topic(item);
             match self.interp.exec_block_with_tail(&block, WantarrayCtx::List) {
                 Ok(val) => Self::extend_map_outputs(&mut result, val, peel_array_ref),
                 Err(FlowOrError::Error(e)) => return Err(e),
@@ -612,7 +612,7 @@ impl<'a> VM<'a> {
         {
             let mut result = Vec::new();
             for item in list {
-                let _ = self.interp.scope.set_scalar("_", item);
+                self.interp.scope.set_topic(item);
                 let val = self.run_block_region(start, end, op_count)?;
                 Self::extend_map_outputs(&mut result, val, peel_array_ref);
             }
@@ -621,7 +621,7 @@ impl<'a> VM<'a> {
             let e = &self.map_expr_entries[idx];
             let mut result = Vec::new();
             for item in list {
-                let _ = self.interp.scope.set_scalar("_", item);
+                self.interp.scope.set_topic(item);
                 let val = vm_interp_result(
                     self.interp.eval_expr_ctx(e, WantarrayCtx::List),
                     self.line(),
@@ -651,7 +651,7 @@ impl<'a> VM<'a> {
 
         let eval_key =
             |vm: &mut VM, item: PerlValue, op_count: &mut u64| -> PerlResult<PerlValue> {
-                let _ = vm.interp.scope.set_scalar("_", item);
+                vm.interp.scope.set_topic(item);
                 if let Some(&(start, end)) =
                     vm.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
                 {
@@ -709,7 +709,7 @@ impl<'a> VM<'a> {
         let mut run: Vec<PerlValue> = Vec::new();
         let mut prev_key: Option<PerlValue> = None;
         for item in list {
-            let _ = self.interp.scope.set_scalar("_", item.clone());
+            self.interp.scope.set_topic(item.clone());
             let key = if let Some(&(start, end)) = self
                 .map_expr_bytecode_ranges
                 .get(idx)
@@ -1387,9 +1387,7 @@ impl<'a> VM<'a> {
                 .scope
                 .restore_atomics(&atomic_arrays, &atomic_hashes);
             local_interp.enable_parallel_guard();
-            let _ = local_interp
-                .scope
-                .set_scalar("_", PerlValue::integer(i as i64));
+            local_interp.scope.set_topic(PerlValue::integer(i as i64));
             crate::parallel_trace::fan_worker_set_index(Some(i as i64));
             local_interp.scope_push_hook();
             match local_interp.exec_block_no_scope(&block) {
@@ -1444,9 +1442,7 @@ impl<'a> VM<'a> {
                     .scope
                     .restore_atomics(&atomic_arrays, &atomic_hashes);
                 local_interp.enable_parallel_guard();
-                let _ = local_interp
-                    .scope
-                    .set_scalar("_", PerlValue::integer(i as i64));
+                local_interp.scope.set_topic(PerlValue::integer(i as i64));
                 crate::parallel_trace::fan_worker_set_index(Some(i as i64));
                 local_interp.scope_push_hook();
                 let res = local_interp.exec_block_no_scope(&block);
@@ -1917,7 +1913,8 @@ impl<'a> VM<'a> {
                     self.interp
                         .apply_sub_signature(sub.as_ref(), &argv, line)
                         .map_err(|e| e.at_line(line))?;
-                    self.interp.scope.declare_array("_", argv);
+                    self.interp.scope.declare_array("_", argv.clone());
+                    self.interp.scope.set_closure_args(&argv);
                 }
                 self.ip = entry_ip;
             }
@@ -1958,7 +1955,8 @@ impl<'a> VM<'a> {
                     {
                         r
                     } else {
-                        self.interp.scope.declare_array("_", argv);
+                        self.interp.scope.declare_array("_", argv.clone());
+                        self.interp.scope.set_closure_args(&argv);
                         self.interp.exec_block_no_scope(&sub.body)
                     };
                     self.interp.wantarray_kind = saved_wa;
@@ -1984,24 +1982,43 @@ impl<'a> VM<'a> {
                         name,
                         "uniq"
                             | "distinct"
+                            | "uniqstr"
+                            | "uniqint"
+                            | "uniqnum"
                             | "shuffle"
+                            | "sample"
                             | "chunked"
                             | "windowed"
                             | "zip"
+                            | "zip_shortest"
+                            | "mesh"
+                            | "mesh_shortest"
                             | "any"
                             | "all"
                             | "none"
+                            | "notall"
                             | "first"
+                            | "reduce"
+                            | "reductions"
                             | "sum"
                             | "sum0"
                             | "product"
                             | "min"
                             | "max"
+                            | "minstr"
+                            | "maxstr"
                             | "mean"
                             | "median"
                             | "mode"
                             | "stddev"
                             | "variance"
+                            | "pairs"
+                            | "unpairs"
+                            | "pairkeys"
+                            | "pairvalues"
+                            | "pairgrep"
+                            | "pairmap"
+                            | "pairfirst"
                     )
                 {
                     let t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
@@ -4484,16 +4501,41 @@ impl<'a> VM<'a> {
 
                     // ── Regex ──
                     Op::RegexMatch(pat_idx, flags_idx, scalar_g, pos_key_idx) => {
-                        let string = self.pop().into_string();
+                        let val = self.pop();
                         let pattern = constants[*pat_idx as usize].as_str_or_empty();
                         let flags = constants[*flags_idx as usize].as_str_or_empty();
+                        let line = self.line();
+                        if val.is_iterator() {
+                            let source = crate::map_stream::into_pull_iter(val);
+                            let re = match self.interp.compile_regex(&pattern, &flags, line) {
+                                Ok(r) => r,
+                                Err(FlowOrError::Error(e)) => return Err(e),
+                                Err(FlowOrError::Flow(_)) => {
+                                    return Err(PerlError::runtime(
+                                        "unexpected flow in regex compile",
+                                        line,
+                                    ));
+                                }
+                            };
+                            let global = flags.contains('g');
+                            if global {
+                                self.push(PerlValue::iterator(std::sync::Arc::new(
+                                    crate::map_stream::MatchGlobalStreamIterator::new(source, re),
+                                )));
+                            } else {
+                                self.push(PerlValue::iterator(std::sync::Arc::new(
+                                    crate::map_stream::MatchStreamIterator::new(source, re),
+                                )));
+                            }
+                            return Ok(());
+                        }
+                        let string = val.into_string();
                         let pos_key_owned = if *pos_key_idx == u16::MAX {
                             None
                         } else {
                             Some(constants[*pos_key_idx as usize].as_str_or_empty())
                         };
                         let pos_key: &str = pos_key_owned.as_deref().unwrap_or("_");
-                        let line = self.line();
                         match self
                             .interp
                             .regex_match_execute(string, &pattern, &flags, *scalar_g, pos_key, line)
@@ -4509,12 +4551,36 @@ impl<'a> VM<'a> {
                         }
                     }
                     Op::RegexSubst(pat_idx, repl_idx, flags_idx, lvalue_idx) => {
-                        let string = self.pop().into_string();
+                        let val = self.pop();
                         let pattern = constants[*pat_idx as usize].as_str_or_empty();
                         let replacement = constants[*repl_idx as usize].as_str_or_empty();
                         let flags = constants[*flags_idx as usize].as_str_or_empty();
-                        let target = &self.lvalues[*lvalue_idx as usize];
                         let line = self.line();
+                        if val.is_iterator() {
+                            let source = crate::map_stream::into_pull_iter(val);
+                            let re = match self.interp.compile_regex(&pattern, &flags, line) {
+                                Ok(r) => r,
+                                Err(FlowOrError::Error(e)) => return Err(e),
+                                Err(FlowOrError::Flow(_)) => {
+                                    return Err(PerlError::runtime(
+                                        "unexpected flow in regex compile",
+                                        line,
+                                    ));
+                                }
+                            };
+                            let global = flags.contains('g');
+                            self.push(PerlValue::iterator(std::sync::Arc::new(
+                                crate::map_stream::SubstStreamIterator::new(
+                                    source,
+                                    re,
+                                    replacement.to_string(),
+                                    global,
+                                ),
+                            )));
+                            return Ok(());
+                        }
+                        let string = val.into_string();
+                        let target = &self.lvalues[*lvalue_idx as usize];
                         match self.interp.regex_subst_execute(
                             string,
                             &pattern,
@@ -4534,12 +4600,22 @@ impl<'a> VM<'a> {
                         }
                     }
                     Op::RegexTransliterate(from_idx, to_idx, flags_idx, lvalue_idx) => {
-                        let string = self.pop().into_string();
+                        let val = self.pop();
                         let from = constants[*from_idx as usize].as_str_or_empty();
                         let to = constants[*to_idx as usize].as_str_or_empty();
                         let flags = constants[*flags_idx as usize].as_str_or_empty();
-                        let target = &self.lvalues[*lvalue_idx as usize];
                         let line = self.line();
+                        if val.is_iterator() {
+                            let source = crate::map_stream::into_pull_iter(val);
+                            self.push(PerlValue::iterator(std::sync::Arc::new(
+                                crate::map_stream::TransliterateStreamIterator::new(
+                                    source, &from, &to, &flags,
+                                ),
+                            )));
+                            return Ok(());
+                        }
+                        let string = val.into_string();
+                        let target = &self.lvalues[*lvalue_idx as usize];
                         match self
                             .interp
                             .regex_transliterate_execute(string, &from, &to, &flags, target, line)
@@ -5449,7 +5525,7 @@ impl<'a> VM<'a> {
                             let saved_wa = self.interp.wantarray_kind;
                             self.interp.wantarray_kind = want;
                             self.interp.scope_push_hook();
-                            self.interp.scope.declare_array("_", args);
+                            self.interp.scope.declare_array("_", args.clone());
                             if let Some(ref env) = sub.closure_env {
                                 self.interp.scope.restore_capture(env);
                             }
@@ -5458,7 +5534,9 @@ impl<'a> VM<'a> {
                             self.interp
                                 .apply_sub_signature(sub.as_ref(), &argv, line)
                                 .map_err(|e| e.at_line(line))?;
-                            self.interp.scope.declare_array("_", argv);
+                            self.interp.scope.declare_array("_", argv.clone());
+                            // Set $_0, $_1, $_2, ... for all args, and $_ to first arg
+                            self.interp.scope.set_closure_args(&argv);
                             let result = self.interp.exec_block_no_scope(&sub.body);
                             self.interp.wantarray_kind = saved_wa;
                             self.interp.scope_pop_hook();
@@ -5675,9 +5753,9 @@ impl<'a> VM<'a> {
                     Op::MapsFlatMapWithBlock(block_idx) => {
                         let val = self.pop();
                         let block = self.blocks[*block_idx as usize].clone();
-                        let out = self
-                            .interp
-                            .map_stream_block_output(val, &block, true, self.line())?;
+                        let out =
+                            self.interp
+                                .map_stream_block_output(val, &block, true, self.line())?;
                         self.push(out);
                         Ok(())
                     }
@@ -5714,9 +5792,9 @@ impl<'a> VM<'a> {
                         let val = self.pop();
                         let idx = *expr_idx as usize;
                         let expr = self.grep_expr_entries[idx].clone();
-                        let out =
-                            self.interp
-                                .filter_stream_expr_output(val, &expr, self.line())?;
+                        let out = self
+                            .interp
+                            .filter_stream_expr_output(val, &expr, self.line())?;
                         self.push(out);
                         Ok(())
                     }
@@ -5747,7 +5825,7 @@ impl<'a> VM<'a> {
                         {
                             let mut result = Vec::new();
                             for item in list {
-                                let _ = self.interp.scope.set_scalar("_", item.clone());
+                                self.interp.scope.set_topic(item.clone());
                                 let val = self.run_block_region(start, end, op_count)?;
                                 if val.is_true() {
                                     result.push(item);
@@ -5759,7 +5837,7 @@ impl<'a> VM<'a> {
                             let block = self.blocks[idx].clone();
                             let mut result = Vec::new();
                             for item in list {
-                                let _ = self.interp.scope.set_scalar("_", item.clone());
+                                self.interp.scope.set_topic(item.clone());
                                 match self.interp.exec_block(&block) {
                                     Ok(val) => {
                                         if val.is_true() {
@@ -5788,14 +5866,14 @@ impl<'a> VM<'a> {
                             {
                                 while let Some(item) = iter.next_item() {
                                     count += 1;
-                                    let _ = self.interp.scope.set_scalar("_", item);
+                                    self.interp.scope.set_topic(item);
                                     self.run_block_region(start, end, op_count)?;
                                 }
                             } else {
                                 let block = self.blocks[idx].clone();
                                 while let Some(item) = iter.next_item() {
                                     count += 1;
-                                    let _ = self.interp.scope.set_scalar("_", item);
+                                    self.interp.scope.set_topic(item);
                                     match self.interp.exec_block(&block) {
                                         Ok(_) => {}
                                         Err(crate::interpreter::FlowOrError::Error(e)) => {
@@ -5814,13 +5892,13 @@ impl<'a> VM<'a> {
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
                         {
                             for item in list {
-                                let _ = self.interp.scope.set_scalar("_", item);
+                                self.interp.scope.set_topic(item);
                                 self.run_block_region(start, end, op_count)?;
                             }
                         } else {
                             let block = self.blocks[idx].clone();
                             for item in list {
-                                let _ = self.interp.scope.set_scalar("_", item);
+                                self.interp.scope.set_topic(item);
                                 match self.interp.exec_block(&block) {
                                     Ok(_) => {}
                                     Err(crate::interpreter::FlowOrError::Error(e)) => {
@@ -5843,7 +5921,7 @@ impl<'a> VM<'a> {
                         {
                             let mut result = Vec::new();
                             for item in list {
-                                let _ = self.interp.scope.set_scalar("_", item.clone());
+                                self.interp.scope.set_topic(item.clone());
                                 let val = self.run_block_region(start, end, op_count)?;
                                 if val.is_true() {
                                     result.push(item);
@@ -5855,7 +5933,7 @@ impl<'a> VM<'a> {
                             let e = &self.grep_expr_entries[idx];
                             let mut result = Vec::new();
                             for item in list {
-                                let _ = self.interp.scope.set_scalar("_", item.clone());
+                                self.interp.scope.set_topic(item.clone());
                                 let val = vm_interp_result(self.interp.eval_expr(e), self.line())?;
                                 if val.is_true() {
                                     result.push(item);
@@ -5878,6 +5956,8 @@ impl<'a> VM<'a> {
                                 }
                                 let _ = self.interp.scope.set_scalar("a", a.clone());
                                 let _ = self.interp.scope.set_scalar("b", b.clone());
+                                let _ = self.interp.scope.set_scalar("_0", a.clone());
+                                let _ = self.interp.scope.set_scalar("_1", b.clone());
                                 match self.run_block_region(start, end, op_count) {
                                     Ok(v) => {
                                         let n = v.to_int();
@@ -5905,6 +5985,8 @@ impl<'a> VM<'a> {
                             items.sort_by(|a, b| {
                                 let _ = self.interp.scope.set_scalar("a", a.clone());
                                 let _ = self.interp.scope.set_scalar("b", b.clone());
+                                let _ = self.interp.scope.set_scalar("_0", a.clone());
+                                let _ = self.interp.scope.set_scalar("_1", b.clone());
                                 match self.interp.exec_block(&block) {
                                     Ok(v) => {
                                         let n = v.to_int();
@@ -5957,6 +6039,8 @@ impl<'a> VM<'a> {
                         items.sort_by(|a, b| {
                             let _ = interp.scope.set_scalar("a", a.clone());
                             let _ = interp.scope.set_scalar("b", b.clone());
+                            let _ = interp.scope.set_scalar("_0", a.clone());
+                            let _ = interp.scope.set_scalar("_1", b.clone());
                             match interp.call_sub(sub.as_ref(), vec![], want, line) {
                                 Ok(v) => {
                                     let n = v.to_int();
@@ -6231,7 +6315,7 @@ impl<'a> VM<'a> {
                                         .scope
                                         .restore_atomics(&atomic_arrays, &atomic_hashes);
                                     local_interp.enable_parallel_guard();
-                                    let _ = local_interp.scope.set_scalar("_", item);
+                                    local_interp.scope.set_topic(item);
                                     let mut vm = shared.worker_vm(&mut local_interp);
                                     let mut op_count = 0u64;
                                     let val = match vm.run_block_region(start, end, &mut op_count) {
@@ -6257,7 +6341,7 @@ impl<'a> VM<'a> {
                                         .scope
                                         .restore_atomics(&atomic_arrays, &atomic_hashes);
                                     local_interp.enable_parallel_guard();
-                                    let _ = local_interp.scope.set_scalar("_", item);
+                                    local_interp.scope.set_topic(item);
                                     local_interp.scope_push_hook();
                                     let val = match local_interp.exec_block_no_scope(&block) {
                                         Ok(val) => val,
@@ -6296,7 +6380,7 @@ impl<'a> VM<'a> {
                                         .scope
                                         .restore_atomics(&atomic_arrays, &atomic_hashes);
                                     local_interp.enable_parallel_guard();
-                                    let _ = local_interp.scope.set_scalar("_", item);
+                                    local_interp.scope.set_topic(item);
                                     let mut vm = shared.worker_vm(&mut local_interp);
                                     let mut op_count = 0u64;
                                     let val = match vm.run_block_region(start, end, &mut op_count) {
@@ -6327,7 +6411,7 @@ impl<'a> VM<'a> {
                                         .scope
                                         .restore_atomics(&atomic_arrays, &atomic_hashes);
                                     local_interp.enable_parallel_guard();
-                                    let _ = local_interp.scope.set_scalar("_", item);
+                                    local_interp.scope.set_topic(item);
                                     local_interp.scope_push_hook();
                                     let val = match local_interp.exec_block_no_scope(&block) {
                                         Ok(val) => val,
@@ -6398,7 +6482,7 @@ impl<'a> VM<'a> {
                                     .scope
                                     .restore_atomics(&atomic_arrays, &atomic_hashes);
                                 local_interp.enable_parallel_guard();
-                                let _ = local_interp.scope.set_scalar("_", item);
+                                local_interp.scope.set_topic(item);
                                 let mut vm = shared.worker_vm(&mut local_interp);
                                 let mut op_count = 0u64;
                                 match vm.run_block_region(start, end, &mut op_count) {
@@ -6416,7 +6500,7 @@ impl<'a> VM<'a> {
                                     .scope
                                     .restore_atomics(&atomic_arrays, &atomic_hashes);
                                 local_interp.enable_parallel_guard();
-                                let _ = local_interp.scope.set_scalar("_", item);
+                                local_interp.scope.set_topic(item);
                                 local_interp.scope_push_hook();
                                 let ok = match local_interp.exec_block_no_scope(&block) {
                                     Ok(v) => v.is_true(),
@@ -6450,7 +6534,7 @@ impl<'a> VM<'a> {
                                     .scope
                                     .restore_atomics(&atomic_arrays, &atomic_hashes);
                                 local_interp.enable_parallel_guard();
-                                let _ = local_interp.scope.set_scalar("_", item);
+                                local_interp.scope.set_topic(item);
                                 let mut vm = shared.worker_vm(&mut local_interp);
                                 let mut op_count = 0u64;
                                 match vm.run_block_region(start, end, &mut op_count) {
@@ -6468,7 +6552,7 @@ impl<'a> VM<'a> {
                                     .scope
                                     .restore_atomics(&atomic_arrays, &atomic_hashes);
                                 local_interp.enable_parallel_guard();
-                                let _ = local_interp.scope.set_scalar("_", item);
+                                local_interp.scope.set_topic(item);
                                 local_interp.scope_push_hook();
                                 let ok = match local_interp.exec_block_no_scope(&block) {
                                     Ok(v) => v.is_true(),
@@ -6513,7 +6597,7 @@ impl<'a> VM<'a> {
                                     local_interp.enable_parallel_guard();
                                     let mut out = Vec::with_capacity(chunk.len());
                                     for item in chunk {
-                                        let _ = local_interp.scope.set_scalar("_", item);
+                                        local_interp.scope.set_topic(item);
                                         let mut vm = shared.worker_vm(&mut local_interp);
                                         let mut op_count = 0u64;
                                         let val =
@@ -6547,7 +6631,7 @@ impl<'a> VM<'a> {
                                     local_interp.enable_parallel_guard();
                                     let mut out = Vec::with_capacity(chunk.len());
                                     for item in chunk {
-                                        let _ = local_interp.scope.set_scalar("_", item);
+                                        local_interp.scope.set_topic(item);
                                         local_interp.scope_push_hook();
                                         let val = match local_interp.exec_block_no_scope(&block) {
                                             Ok(val) => val,
@@ -6592,8 +6676,10 @@ impl<'a> VM<'a> {
                                 let mut local_interp = Interpreter::new();
                                 local_interp.subs = subs.clone();
                                 local_interp.scope.restore_capture(&scope_capture);
-                                let _ = local_interp.scope.set_scalar("a", acc);
-                                let _ = local_interp.scope.set_scalar("b", b);
+                                let _ = local_interp.scope.set_scalar("a", acc.clone());
+                                let _ = local_interp.scope.set_scalar("b", b.clone());
+                                let _ = local_interp.scope.set_scalar("_0", acc);
+                                let _ = local_interp.scope.set_scalar("_1", b);
                                 let mut vm = shared.worker_vm(&mut local_interp);
                                 let mut op_count = 0u64;
                                 acc = match vm.run_block_region(start, end, &mut op_count) {
@@ -6607,8 +6693,10 @@ impl<'a> VM<'a> {
                                 let mut local_interp = Interpreter::new();
                                 local_interp.subs = subs.clone();
                                 local_interp.scope.restore_capture(&scope_capture);
-                                let _ = local_interp.scope.set_scalar("a", acc);
-                                let _ = local_interp.scope.set_scalar("b", b);
+                                let _ = local_interp.scope.set_scalar("a", acc.clone());
+                                let _ = local_interp.scope.set_scalar("b", b.clone());
+                                let _ = local_interp.scope.set_scalar("_0", acc);
+                                let _ = local_interp.scope.set_scalar("_1", b);
                                 acc = match local_interp.exec_block(&block) {
                                     Ok(val) => val,
                                     Err(_) => PerlValue::UNDEF,
@@ -6647,8 +6735,10 @@ impl<'a> VM<'a> {
                                     let mut local_interp = Interpreter::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
-                                    let _ = local_interp.scope.set_scalar("a", a);
-                                    let _ = local_interp.scope.set_scalar("b", b);
+                                    let _ = local_interp.scope.set_scalar("a", a.clone());
+                                    let _ = local_interp.scope.set_scalar("b", b.clone());
+                                    let _ = local_interp.scope.set_scalar("_0", a);
+                                    let _ = local_interp.scope.set_scalar("_1", b);
                                     let mut vm = shared.worker_vm(&mut local_interp);
                                     let mut op_count = 0u64;
                                     match vm.run_block_region(start, end, &mut op_count) {
@@ -6671,8 +6761,10 @@ impl<'a> VM<'a> {
                                     let mut local_interp = Interpreter::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
-                                    let _ = local_interp.scope.set_scalar("a", a);
-                                    let _ = local_interp.scope.set_scalar("b", b);
+                                    let _ = local_interp.scope.set_scalar("a", a.clone());
+                                    let _ = local_interp.scope.set_scalar("b", b.clone());
+                                    let _ = local_interp.scope.set_scalar("_0", a);
+                                    let _ = local_interp.scope.set_scalar("_1", b);
                                     match local_interp.exec_block(&block) {
                                         Ok(val) => val,
                                         Err(_) => PerlValue::UNDEF,
@@ -6740,9 +6832,9 @@ impl<'a> VM<'a> {
                             let mut local_interp = Interpreter::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
-                            let _ = local_interp
+                            local_interp
                                 .scope
-                                .set_scalar("_", list.into_iter().next().unwrap());
+                                .set_topic(list.into_iter().next().unwrap());
                             let map_block = self.blocks[map_i].clone();
                             let v = match local_interp.exec_block_no_scope(&map_block) {
                                 Ok(v) => v,
@@ -6772,7 +6864,7 @@ impl<'a> VM<'a> {
                                     let mut local_interp = Interpreter::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
-                                    let _ = local_interp.scope.set_scalar("_", item);
+                                    local_interp.scope.set_topic(item);
                                     let mut vm = shared.worker_vm(&mut local_interp);
                                     let mut op_count = 0u64;
                                     let val = match vm.run_block_region(
@@ -6790,8 +6882,10 @@ impl<'a> VM<'a> {
                                     let mut local_interp = Interpreter::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
-                                    let _ = local_interp.scope.set_scalar("a", a);
-                                    let _ = local_interp.scope.set_scalar("b", b);
+                                    let _ = local_interp.scope.set_scalar("a", a.clone());
+                                    let _ = local_interp.scope.set_scalar("b", b.clone());
+                                    let _ = local_interp.scope.set_scalar("_0", a);
+                                    let _ = local_interp.scope.set_scalar("_1", b);
                                     let mut vm = shared.worker_vm(&mut local_interp);
                                     let mut op_count = 0u64;
                                     match vm.run_block_region(
@@ -6815,7 +6909,7 @@ impl<'a> VM<'a> {
                                     let mut local_interp = Interpreter::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
-                                    let _ = local_interp.scope.set_scalar("_", item);
+                                    local_interp.scope.set_topic(item);
                                     let val = match local_interp.exec_block_no_scope(&map_block) {
                                         Ok(val) => val,
                                         Err(_) => PerlValue::UNDEF,
@@ -6827,8 +6921,10 @@ impl<'a> VM<'a> {
                                     let mut local_interp = Interpreter::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
-                                    let _ = local_interp.scope.set_scalar("a", a);
-                                    let _ = local_interp.scope.set_scalar("b", b);
+                                    let _ = local_interp.scope.set_scalar("a", a.clone());
+                                    let _ = local_interp.scope.set_scalar("b", b.clone());
+                                    let _ = local_interp.scope.set_scalar("_0", a);
+                                    let _ = local_interp.scope.set_scalar("_1", b);
                                     match local_interp.exec_block_no_scope(&reduce_block) {
                                         Ok(val) => val,
                                         Err(_) => PerlValue::UNDEF,
@@ -6863,7 +6959,7 @@ impl<'a> VM<'a> {
                                     let mut local_interp = Interpreter::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
-                                    let _ = local_interp.scope.set_scalar("_", item.clone());
+                                    local_interp.scope.set_topic(item.clone());
                                     let mut vm = shared.worker_vm(&mut local_interp);
                                     let mut op_count = 0u64;
                                     let val = match vm.run_block_region(start, end, &mut op_count) {
@@ -6890,7 +6986,7 @@ impl<'a> VM<'a> {
                                     let mut local_interp = Interpreter::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
-                                    let _ = local_interp.scope.set_scalar("_", item.clone());
+                                    local_interp.scope.set_topic(item.clone());
                                     let val = match local_interp.exec_block_no_scope(&block) {
                                         Ok(v) => v,
                                         Err(_) => PerlValue::UNDEF,
@@ -6946,7 +7042,7 @@ impl<'a> VM<'a> {
                                         .scope
                                         .restore_atomics(&atomic_arrays, &atomic_hashes);
                                     local_interp.enable_parallel_guard();
-                                    let _ = local_interp.scope.set_scalar("_", item.clone());
+                                    local_interp.scope.set_topic(item.clone());
                                     let mut vm = shared.worker_vm(&mut local_interp);
                                     let mut op_count = 0u64;
                                     let keep = match vm.run_block_region(start, end, &mut op_count)
@@ -6977,7 +7073,7 @@ impl<'a> VM<'a> {
                                         .scope
                                         .restore_atomics(&atomic_arrays, &atomic_hashes);
                                     local_interp.enable_parallel_guard();
-                                    let _ = local_interp.scope.set_scalar("_", item.clone());
+                                    local_interp.scope.set_topic(item.clone());
                                     local_interp.scope_push_hook();
                                     let keep = match local_interp.exec_block_no_scope(&block) {
                                         Ok(val) => val.is_true(),
@@ -7022,7 +7118,7 @@ impl<'a> VM<'a> {
                                     .scope
                                     .restore_atomics(&atomic_arrays, &atomic_hashes);
                                 local_interp.enable_parallel_guard();
-                                let _ = local_interp.scope.set_scalar("_", item);
+                                local_interp.scope.set_topic(item);
                                 let mut vm = shared.worker_vm(&mut local_interp);
                                 let mut op_count = 0u64;
                                 match vm.run_block_region(start, end, &mut op_count) {
@@ -7049,7 +7145,7 @@ impl<'a> VM<'a> {
                                     .scope
                                     .restore_atomics(&atomic_arrays, &atomic_hashes);
                                 local_interp.enable_parallel_guard();
-                                let _ = local_interp.scope.set_scalar("_", item);
+                                local_interp.scope.set_topic(item);
                                 local_interp.scope_push_hook();
                                 match local_interp.exec_block_no_scope(&block) {
                                     Ok(_) => {}
@@ -7101,6 +7197,8 @@ impl<'a> VM<'a> {
                                 local_interp.enable_parallel_guard();
                                 let _ = local_interp.scope.set_scalar("a", a.clone());
                                 let _ = local_interp.scope.set_scalar("b", b.clone());
+                                let _ = local_interp.scope.set_scalar("_0", a.clone());
+                                let _ = local_interp.scope.set_scalar("_1", b.clone());
                                 let mut vm = shared.worker_vm(&mut local_interp);
                                 let mut op_count = 0u64;
                                 match vm.run_block_region(start, end, &mut op_count) {
@@ -7129,6 +7227,8 @@ impl<'a> VM<'a> {
                                 local_interp.enable_parallel_guard();
                                 let _ = local_interp.scope.set_scalar("a", a.clone());
                                 let _ = local_interp.scope.set_scalar("b", b.clone());
+                                let _ = local_interp.scope.set_scalar("_0", a.clone());
+                                let _ = local_interp.scope.set_scalar("_1", b.clone());
                                 local_interp.scope_push_hook();
                                 let ord = match local_interp.exec_block_no_scope(&block) {
                                     Ok(v) => {

@@ -6244,7 +6244,8 @@ impl Compiler {
                 }
                 DerefKind::Call => {
                     self.compile_expr(expr)?;
-                    self.compile_expr(index)?;
+                    // Always compile args in list context to preserve all arguments
+                    self.compile_expr_ctx(index, WantarrayCtx::List)?;
                     self.emit_op(Op::ArrowCall(ctx.as_byte()), line, Some(root));
                 }
             },
@@ -6560,7 +6561,11 @@ impl Compiler {
                 let block_idx = self.chunk.add_block(block.clone());
                 self.emit_op(Op::ForEachWithBlock(block_idx), line, Some(root));
             }
-            ExprKind::GrepExpr { block, list, keyword } => {
+            ExprKind::GrepExpr {
+                block,
+                list,
+                keyword,
+            } => {
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
                 if keyword.is_stream() {
                     let block_idx = self.chunk.add_block(block.clone());
@@ -6575,7 +6580,11 @@ impl Compiler {
                     self.emit_op(Op::StackArrayLen, line, Some(root));
                 }
             }
-            ExprKind::GrepExprComma { expr, list, keyword } => {
+            ExprKind::GrepExprComma {
+                expr,
+                list,
+                keyword,
+            } => {
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
                 let idx = self.chunk.add_grep_expr_entry(*expr.clone());
                 if keyword.is_stream() {

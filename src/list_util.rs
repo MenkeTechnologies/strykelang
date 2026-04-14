@@ -969,6 +969,8 @@ fn reduce_like(
     for b in items.iter().skip(1) {
         let _ = interp.scope.set_scalar("a", acc.clone());
         let _ = interp.scope.set_scalar("b", b.clone());
+        let _ = interp.scope.set_scalar("_0", acc.clone());
+        let _ = interp.scope.set_scalar("_1", b.clone());
         acc = interp.call_sub(&code, vec![], WantarrayCtx::Scalar, 0)?;
         if reductions {
             chain.push(acc.clone());
@@ -1012,7 +1014,7 @@ fn any_all_none(
         return Ok(PerlValue::integer(if empty_ok { 1 } else { 0 }));
     }
     for it in items {
-        let _ = interp.scope.set_scalar("_", it);
+        interp.scope.set_topic(it);
         let v = interp.call_sub(&code, vec![], WantarrayCtx::Scalar, 0)?;
         let t = v.is_true();
         match mode {
@@ -1044,7 +1046,7 @@ fn first_native(interp: &mut Interpreter, args: &[PerlValue], _want: WantarrayCt
     };
     let items: Vec<PerlValue> = args[1..].to_vec();
     for it in items {
-        let _ = interp.scope.set_scalar("_", it.clone());
+        interp.scope.set_topic(it.clone());
         let v = interp.call_sub(&code, vec![], WantarrayCtx::Scalar, 0)?;
         if v.is_true() {
             return Ok(it);
@@ -1142,6 +1144,8 @@ fn pairgrep_map(
                 let b = flat[i + 1].clone();
                 let _ = interp.scope.set_scalar("a", a.clone());
                 let _ = interp.scope.set_scalar("b", b.clone());
+                let _ = interp.scope.set_scalar("_0", a.clone());
+                let _ = interp.scope.set_scalar("_1", b.clone());
                 let v = interp.call_sub(&code, vec![], WantarrayCtx::Scalar, 0)?;
                 if v.is_true() {
                     out.push(a);
@@ -1160,6 +1164,8 @@ fn pairgrep_map(
             while i + 1 < flat.len() {
                 let _ = interp.scope.set_scalar("a", flat[i].clone());
                 let _ = interp.scope.set_scalar("b", flat[i + 1].clone());
+                let _ = interp.scope.set_scalar("_0", flat[i].clone());
+                let _ = interp.scope.set_scalar("_1", flat[i + 1].clone());
                 let produced = interp.call_sub(&code, vec![], WantarrayCtx::List, 0)?;
                 if let Some(items) = produced.as_array_vec() {
                     out.extend(items);
@@ -1180,6 +1186,8 @@ fn pairgrep_map(
                 let b = flat[i + 1].clone();
                 let _ = interp.scope.set_scalar("a", a.clone());
                 let _ = interp.scope.set_scalar("b", b.clone());
+                let _ = interp.scope.set_scalar("_0", a.clone());
+                let _ = interp.scope.set_scalar("_1", b.clone());
                 let v = interp.call_sub(&code, vec![], WantarrayCtx::Scalar, 0)?;
                 if v.is_true() {
                     if want == WantarrayCtx::Scalar {

@@ -50,6 +50,15 @@ impl PerlAsyncTask {
 pub trait PerlIterator: Send + Sync {
     /// Return the next item, or `None` when exhausted.
     fn next_item(&self) -> Option<PerlValue>;
+
+    /// Collect all remaining items into a `Vec`.
+    fn collect_all(&self) -> Vec<PerlValue> {
+        let mut out = Vec::new();
+        while let Some(v) = self.next_item() {
+            out.push(v);
+        }
+        out
+    }
 }
 
 impl fmt::Debug for dyn PerlIterator {

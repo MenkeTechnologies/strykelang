@@ -143,7 +143,7 @@ fn run_worker(
             interp.scope.restore_capture(env);
         }
         interp.enable_parallel_guard();
-        let _ = interp.scope.set_scalar("_", item);
+        interp.scope.set_topic(item);
         interp.scope_push_hook();
         let out = match interp.exec_block_no_scope(&sub.body) {
             Ok(v) => v,
@@ -288,7 +288,7 @@ pub(crate) fn run_par_pipeline(
                     local_interp.scope.restore_capture(env);
                 }
                 local_interp.enable_parallel_guard();
-                let _ = local_interp.scope.set_scalar("_", item);
+                local_interp.scope.set_topic(item);
                 local_interp.scope_push_hook();
                 let out = match local_interp.exec_block_no_scope(&sub.body) {
                     Ok(v) => Ok(v),

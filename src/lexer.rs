@@ -1123,6 +1123,11 @@ impl Lexer {
             }
             '>' => {
                 self.advance();
+                if self.peek() == Some('{') {
+                    self.advance();
+                    self.last_was_term = false;
+                    return Ok(Token::ArrowBrace);
+                }
                 if self.peek() == Some('=') {
                     self.advance();
                     self.last_was_term = false;
@@ -1688,6 +1693,8 @@ impl Lexer {
                     | "reject"
                     | "collect"
                     | "compact"
+                    | "concat"
+                    | "chain"
                     | "min_by"
                     | "max_by"
                     | "sort_by"

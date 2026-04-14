@@ -401,7 +401,7 @@ pub fn run_job_local(job: &RemoteJobV1) -> RemoteRespV1 {
             };
         }
     };
-    let _ = interp.scope.set_scalar("_", item_pv);
+    interp.scope.set_topic(item_pv);
     let full_src = format!("{}\n{}", job.subs_prelude, job.block_src);
     let prog = match crate::parse(&full_src) {
         Ok(p) => p,
@@ -629,7 +629,7 @@ fn run_one_session_job(interp: &mut Interpreter, block: &Block, job: &JobMsg) ->
             };
         }
     };
-    let _ = interp.scope.set_scalar("_", item_pv);
+    interp.scope.set_topic(item_pv);
     let r = match interp.exec_block_smart(block) {
         Ok(v) => v,
         Err(FlowOrError::Error(pe)) => {
