@@ -430,26 +430,31 @@ fn uniq_with_want(args: &[PerlValue], want: WantarrayCtx) -> crate::error::PerlR
 /// Adjacent-unique like Perl 5 `uniq` (DWIM string/undef; refs compared by string form).
 fn uniq_list(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
     let mut out = Vec::new();
-    let mut prev: Option<PerlValue> = None;
-    let mut have = false;
-    for x in args.iter().cloned() {
-        if !have || !same_dwim(prev.as_ref().unwrap(), &x) {
-            out.push(x.clone());
-            prev = Some(x);
-            have = true;
+    let mut seen = std::collections::HashSet::new();
+    for arg in args {
+        if arg.is_iterator() {
+            let iter = arg.clone().into_iterator();
+            while let Some(x) = iter.next_item() {
+                let key = x.to_string();
+                if seen.insert(key) {
+                    out.push(x);
+                }
+            }
+        } else if let Some(arr) = arg.as_array_vec() {
+            for x in arr {
+                let key = x.to_string();
+                if seen.insert(key) {
+                    out.push(x.clone());
+                }
+            }
+        } else {
+            let key = arg.to_string();
+            if seen.insert(key) {
+                out.push(arg.clone());
+            }
         }
     }
     Ok(PerlValue::array(out))
-}
-
-fn same_dwim(a: &PerlValue, b: &PerlValue) -> bool {
-    if a.is_undef() && b.is_undef() {
-        return true;
-    }
-    if a.is_undef() || b.is_undef() {
-        return false;
-    }
-    a.to_string() == b.to_string()
 }
 
 fn uniqstr_with_want(
@@ -549,7 +554,18 @@ fn sum(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
     }
     let mut s = 0.0;
     for x in args {
-        s += x.to_number();
+        if x.is_iterator() {
+            let iter = x.clone().into_iterator();
+            while let Some(item) = iter.next_item() {
+                s += item.to_number();
+            }
+        } else if let Some(arr) = x.as_array_vec() {
+            for item in arr {
+                s += item.to_number();
+            }
+        } else {
+            s += x.to_number();
+        }
     }
     Ok(PerlValue::float(s))
 }
@@ -557,7 +573,18 @@ fn sum(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
 fn sum0(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
     let mut s = 0.0;
     for x in args {
-        s += x.to_number();
+        if x.is_iterator() {
+            let iter = x.clone().into_iterator();
+            while let Some(item) = iter.next_item() {
+                s += item.to_number();
+            }
+        } else if let Some(arr) = x.as_array_vec() {
+            for item in arr {
+                s += item.to_number();
+            }
+        } else {
+            s += x.to_number();
+        }
     }
     Ok(PerlValue::float(s))
 }
@@ -565,7 +592,18 @@ fn sum0(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
 fn product(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
     let mut p = 1.0;
     for x in args {
-        p *= x.to_number();
+        if x.is_iterator() {
+            let iter = x.clone().into_iterator();
+            while let Some(item) = iter.next_item() {
+                p *= item.to_number();
+            }
+        } else if let Some(arr) = x.as_array_vec() {
+            for item in arr {
+                p *= item.to_number();
+            }
+        } else {
+            p *= x.to_number();
+        }
     }
     Ok(PerlValue::float(p))
 }

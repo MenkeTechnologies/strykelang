@@ -4534,9 +4534,21 @@ impl Parser {
             },
 
             // ── Bareword function name → plain unary call ──────────────────────
-            ExprKind::Bareword(name) => ExprKind::FuncCall {
-                name,
-                args: vec![lhs],
+            ExprKind::Bareword(name) => match name.as_str() {
+                "rv" | "reverse" | "reversed" => ExprKind::ReverseExpr(Box::new(lhs)),
+                "rev" => ExprKind::ScalarReverse(Box::new(lhs)),
+                "uq" | "uniq" | "distinct" => ExprKind::FuncCall {
+                    name: "uniq".to_string(),
+                    args: vec![lhs],
+                },
+                "fl" | "flatten" => ExprKind::FuncCall {
+                    name: "flatten".to_string(),
+                    args: vec![lhs],
+                },
+                _ => ExprKind::FuncCall {
+                    name,
+                    args: vec![lhs],
+                },
             },
 
             // ── Callable scalars / coderefs / derefs → IndirectCall ────────────

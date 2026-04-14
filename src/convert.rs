@@ -249,7 +249,7 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
                     .unwrap_or_default()
             };
             format!(
-                "sub {}{} {{\n{}\n{}}}",
+                "fn {}{} {{\n{}\n{}}}",
                 name,
                 sig,
                 convert_block(body, depth + 1),
@@ -780,6 +780,17 @@ fn extract_pipe_source(e: &Expr, segments: &mut Vec<String>) -> String {
             extract_pipe_source(list, segments)
         }
 
+        // ── Print / say with single arg → pipe ───────────────────────────
+        // say adds newline → p; print does not → print
+        ExprKind::Say { handle: None, args } if args.len() == 1 => {
+            segments.push("p".into());
+            extract_pipe_source(&args[0], segments)
+        }
+        ExprKind::Print { handle: None, args } if args.len() == 1 => {
+            segments.push("print".into());
+            extract_pipe_source(&args[0], segments)
+        }
+
         // ── Generic function calls ───────────────────────────────────────
         ExprKind::FuncCall { name, args } if !args.is_empty() => {
             let seg = if args.len() == 1 {
@@ -966,14 +977,14 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
         }
         ExprKind::CodeRef { params, body } => {
             if params.is_empty() {
-                format!("sub {{\n{}\n}}", convert_block(body, 0))
+                format!("fn {{\n{}\n}}", convert_block(body, 0))
             } else {
                 let sig = params
                     .iter()
                     .map(fmt::format_sub_sig_param)
                     .collect::<Vec<_>>()
                     .join(", ");
-                format!("sub ({}) {{\n{}\n}}", sig, convert_block(body, 0))
+                format!("fn ({}) {{\n{}\n}}", sig, convert_block(body, 0))
             }
         }
 
@@ -1004,19 +1015,17 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
         },
 
         // ── Print / say / die / warn ─────────────────────────────────────
+        // print has no newline; say/p adds newline
         ExprKind::Print { handle, args } => {
-            let h = handle
-                .as_ref()
-                .map(|h| format!("{} ", h))
-                .unwrap_or_default();
+            let h = handle.as_ref().map(|h| format!("{} ", h)).unwrap_or_default();
             format!("print {}{}", h, convert_expr_list(args))
         }
         ExprKind::Say { handle, args } => {
-            let h = handle
-                .as_ref()
-                .map(|h| format!("{} ", h))
-                .unwrap_or_default();
-            format!("say {}{}", h, convert_expr_list(args))
+            if let Some(h) = handle {
+                format!("say {} {}", h, convert_expr_list(args))
+            } else {
+                format!("p {}", convert_expr_list(args))
+            }
         }
         ExprKind::Printf { handle, args } => {
             let h = handle
@@ -1080,7 +1089,7 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
             format!("{} until {}", convert_expr(expr), convert_expr(condition))
         }
         ExprKind::PostfixForeach { expr, list } => {
-            format!("{} foreach {}", convert_expr(expr), convert_expr(list))
+            format!("{} for {}", convert_expr(expr), convert_expr(list))
         }
 
         // ── Higher-order forms (fallback when not piped — e.g. empty list) ─
@@ -1272,8 +1281,9 @@ mod tests {
     }
 
     #[test]
-    fn sub_body_indented() {
+    fn fn_body_indented() {
         let out = convert("sub foo { return uc(lc($x)); }");
+        assert!(out.contains("fn foo"));
         assert!(out.contains("|> lc |> uc"));
         // Body should be indented
         assert!(out.contains("    return"));
@@ -1300,12 +1310,14 @@ mod tests {
     #[test]
     fn user_func_call_pipe() {
         let out = convert("sub trim { } trim(uc($x));");
+        assert!(out.contains("fn trim"));
         assert!(out.contains("$x |> uc |> trim"));
     }
 
     #[test]
     fn user_func_extra_args_pipe() {
         let out = convert("sub process { } process(uc($x), 42);");
+        assert!(out.contains("fn process"));
         // Pipe RHS uses bare args, not parens
         assert!(out.contains("$x |> uc |> process 42"));
     }
@@ -1335,8 +1347,8 @@ mod tests {
     #[test]
     fn indentation_in_blocks() {
         let out = convert("if ($x) { print 1; print 2; }");
-        // Inner statements should have 4-space indent
-        assert!(out.contains("\n    print 1\n    print 2\n"));
+        // Inner statements should have 4-space indent, print stays as print (no newline)
+        assert!(out.contains("\n    1 |> print\n    2 |> print\n"));
     }
 
     #[test]

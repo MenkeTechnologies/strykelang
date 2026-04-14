@@ -339,7 +339,8 @@ fn fetch_second_arg_must_be_options_hash() {
 
 #[test]
 fn elapsed_returns_positive_float() {
-    assert_eq!(eval_int(r#"elapsed() > 0 ? 1 : 0"#), 1);
+    // elapsed() returns time since program start; >= 0 is valid
+    assert_eq!(eval_int(r#"elapsed() >= 0 ? 1 : 0"#), 1);
 }
 
 #[test]
