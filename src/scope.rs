@@ -82,6 +82,8 @@ struct Frame {
     atomic_arrays: Vec<(String, AtomicArray)>,
     /// Thread-safe hashes from `mysync %h`
     atomic_hashes: Vec<(String, AtomicHash)>,
+    /// `defer { BLOCK }` closures to run when this frame is popped (LIFO order).
+    defers: Vec<PerlValue>,
 }
 
 impl Frame {
@@ -101,6 +103,7 @@ impl Frame {
         self.frozen_hashes.clear();
         self.typed_scalars.clear();
         self.atomic_arrays.clear();
+        self.defers.clear();
         self.atomic_hashes.clear();
     }
 
@@ -128,6 +131,7 @@ impl Frame {
             atomic_arrays: Vec::new(),
             atomic_hashes: Vec::new(),
             local_restores: Vec::new(),
+            defers: Vec::new(),
         }
     }
 
@@ -1033,6 +1037,27 @@ impl Scope {
         }
         for (i, val) in args.iter().enumerate() {
             self.declare_scalar(&format!("_{}", i), val.clone());
+        }
+    }
+
+    /// Register a `defer { BLOCK }` closure to run when this scope exits.
+    #[inline]
+    pub fn push_defer(&mut self, coderef: PerlValue) {
+        if let Some(frame) = self.frames.last_mut() {
+            frame.defers.push(coderef);
+        }
+    }
+
+    /// Take all deferred blocks from the current frame (for execution on scope exit).
+    /// Returns them in reverse order (LIFO - last defer runs first).
+    #[inline]
+    pub fn take_defers(&mut self) -> Vec<PerlValue> {
+        if let Some(frame) = self.frames.last_mut() {
+            let mut defers = std::mem::take(&mut frame.defers);
+            defers.reverse();
+            defers
+        } else {
+            Vec::new()
         }
     }
 

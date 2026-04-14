@@ -619,6 +619,7 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::Undef => "undef".to_string(),
         ExprKind::MagicConst(crate::ast::MagicConstKind::File) => "__FILE__".to_string(),
         ExprKind::MagicConst(crate::ast::MagicConstKind::Line) => "__LINE__".to_string(),
+        ExprKind::MagicConst(crate::ast::MagicConstKind::Sub) => "__SUB__".to_string(),
         ExprKind::InterpolatedString(parts) => {
             format!(
                 "\"{}\"",

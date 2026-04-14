@@ -644,6 +644,7 @@ impl Parser {
                         }
                     }
                     "try" => self.parse_try_catch()?,
+                    "defer" => self.parse_defer_stmt()?,
                     "tie" => self.parse_tie_stmt()?,
                     "given" => self.parse_given()?,
                     "when" => self.parse_when_stmt()?,
@@ -1310,6 +1311,35 @@ impl Parser {
         }
         self.expect(&Token::RBrace)?;
         Ok(stmts)
+    }
+
+    /// `defer { BLOCK }` — register a block to run when the current scope exits.
+    /// Desugars to a `defer__internal(sub { BLOCK })` function call that the compiler
+    /// handles specially by emitting Op::DeferBlock.
+    fn parse_defer_stmt(&mut self) -> PerlResult<Statement> {
+        let line = self.peek_line();
+        self.advance(); // defer
+        let body = self.parse_block()?;
+        self.eat(&Token::Semicolon);
+        // Desugar: defer { BLOCK } → defer__internal(sub { BLOCK })
+        let coderef = Expr {
+            kind: ExprKind::CodeRef {
+                params: vec![],
+                body,
+            },
+            line,
+        };
+        Ok(Statement {
+            label: None,
+            kind: StmtKind::Expression(Expr {
+                kind: ExprKind::FuncCall {
+                    name: "defer__internal".to_string(),
+                    args: vec![coderef],
+                },
+                line,
+            }),
+            line,
+        })
     }
 
     /// `try { } catch ($err) { }` with optional `finally { }`
@@ -5725,6 +5755,10 @@ impl Parser {
             }),
             "__LINE__" => Ok(Expr {
                 kind: ExprKind::MagicConst(MagicConstKind::Line),
+                line,
+            }),
+            "__SUB__" => Ok(Expr {
+                kind: ExprKind::MagicConst(MagicConstKind::Sub),
                 line,
             }),
             "stdin" => Ok(Expr {

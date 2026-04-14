@@ -677,6 +677,9 @@ pub struct Interpreter {
     pub(crate) rate_limit_slots: Vec<VecDeque<Instant>>,
     /// `log_level('…')` override; when `None`, use `%ENV{LOG_LEVEL}` (default `info`).
     pub(crate) log_level_override: Option<LogLevelFilter>,
+    /// Stack of currently-executing subroutines for `__SUB__` (anonymous recursion).
+    /// Pushed on `call_sub` entry, popped on exit.
+    pub(crate) current_sub_stack: Vec<Arc<PerlSub>>,
 }
 
 /// Snapshot of stash + `@ISA` for REPL `$obj->method` tab-completion (no `Interpreter` handle needed).
@@ -1238,6 +1241,7 @@ impl Interpreter {
             line_mode_stdin_pending: VecDeque::new(),
             rate_limit_slots: Vec::new(),
             log_level_override: None,
+            current_sub_stack: Vec::new(),
         };
         s.install_overload_pragma_stubs();
         crate::list_util::install_scalar_util(&mut s);
@@ -1403,6 +1407,7 @@ impl Interpreter {
             line_mode_stdin_pending: VecDeque::new(),
             rate_limit_slots: Vec::new(),
             log_level_override: self.log_level_override,
+            current_sub_stack: Vec::new(),
         }
     }
 
@@ -1903,6 +1908,14 @@ impl Interpreter {
     pub(crate) fn scope_pop_hook(&mut self) {
         if !self.scope.can_pop_frame() {
             return;
+        }
+        // Execute deferred blocks in LIFO order before popping the frame
+        let defers = self.scope.take_defers();
+        for coderef in defers {
+            if let Some(sub) = coderef.as_code_ref() {
+                // Defers run in void context, errors are silently ignored
+                let _ = self.call_sub(&sub, vec![], WantarrayCtx::Void, 0);
+            }
         }
         // Save state variable values back before popping the frame
         if let Some(bindings) = self.state_bindings_stack.pop() {
@@ -7439,6 +7452,13 @@ impl Interpreter {
             ExprKind::Undef => Ok(PerlValue::UNDEF),
             ExprKind::MagicConst(MagicConstKind::File) => Ok(PerlValue::string(self.file.clone())),
             ExprKind::MagicConst(MagicConstKind::Line) => Ok(PerlValue::integer(expr.line as i64)),
+            ExprKind::MagicConst(MagicConstKind::Sub) => {
+                if let Some(sub) = self.current_sub_stack.last().cloned() {
+                    Ok(PerlValue::code_ref(sub))
+                } else {
+                    Ok(PerlValue::UNDEF)
+                }
+            }
             ExprKind::Regex(pattern, flags) => {
                 if ctx == WantarrayCtx::Void {
                     // Expression statement: bare `/pat/;` is `$_ =~ /pat/` (Perl), not a regex object.
@@ -12824,6 +12844,17 @@ impl Interpreter {
                 }
                 Ok(PerlValue::deque(Arc::new(Mutex::new(VecDeque::new()))))
             }
+            "defer__internal" => {
+                if args.len() != 1 {
+                    return Err(PerlError::runtime(
+                        "defer__internal expects one coderef argument",
+                        line,
+                    )
+                    .into());
+                }
+                self.scope.push_defer(args[0].clone());
+                Ok(PerlValue::UNDEF)
+            }
             "heap" => {
                 if args.len() != 1 {
                     return Err(
@@ -15020,6 +15051,9 @@ impl Interpreter {
         want: WantarrayCtx,
         _line: usize,
     ) -> ExecResult {
+        // Push current sub for __SUB__ access
+        self.current_sub_stack.push(Arc::new(sub.clone()));
+
         // Single frame for both @_ and the block's local variables —
         // avoids the double push_frame/pop_frame overhead per call.
         self.scope_push_hook();
@@ -15039,6 +15073,7 @@ impl Interpreter {
         if let Some(r) = crate::list_util::native_dispatch(self, sub, &argv, want) {
             self.wantarray_kind = saved;
             self.scope_pop_hook();
+            self.current_sub_stack.pop();
             return match r {
                 Ok(v) => Ok(v),
                 Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
@@ -15058,6 +15093,7 @@ impl Interpreter {
                     }
                     self.wantarray_kind = saved;
                     self.scope_pop_hook();
+                    self.current_sub_stack.pop();
                     return Ok(PerlValue::integer(n));
                 }
             }
@@ -15081,6 +15117,7 @@ impl Interpreter {
         };
         self.wantarray_kind = saved;
         self.scope_pop_hook();
+        self.current_sub_stack.pop();
         match result {
             Ok(v) => Ok(v),
             Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),

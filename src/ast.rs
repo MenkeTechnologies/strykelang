@@ -400,6 +400,8 @@ pub enum MagicConstKind {
     File,
     /// Line number of this token (1-based, same as lexer).
     Line,
+    /// Reference to currently executing subroutine (for anonymous recursion).
+    Sub,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

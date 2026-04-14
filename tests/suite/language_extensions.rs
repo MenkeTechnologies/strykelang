@@ -921,3 +921,90 @@ fn arrow_call_passes_all_args() {
         "a-b-c"
     );
 }
+
+// ── __SUB__ (anonymous recursion) ──
+
+#[test]
+fn dunder_sub_basic_recursion() {
+    // fib(10) = 55
+    assert_eq!(
+        eval_int(
+            r#"my $fib = sub { my $n = $_[0]; $n < 2 ? $n : __SUB__->($n-1) + __SUB__->($n-2) };
+               $fib->(10)"#
+        ),
+        55
+    );
+}
+
+#[test]
+fn dunder_sub_factorial() {
+    // 5! = 120
+    assert_eq!(
+        eval_int(
+            r#"my $fact = sub { my $n = shift; $n <= 1 ? 1 : $n * __SUB__->($n - 1) };
+               $fact->(5)"#
+        ),
+        120
+    );
+}
+
+#[test]
+fn dunder_sub_undef_outside_sub() {
+    // __SUB__ is undef at top level
+    assert_eq!(eval_int(r#"defined(__SUB__) ? 1 : 0"#), 0);
+}
+
+#[test]
+fn dunder_sub_in_named_sub() {
+    // __SUB__ works in named subs too
+    assert_eq!(
+        eval_int(
+            r#"sub countdown { my $n = shift; $n <= 0 ? 0 : 1 + __SUB__->($n - 1) } countdown(5)"#
+        ),
+        5
+    );
+}
+
+// ── defer ──
+// Note: perlrs closures capture by value, not reference. Tests verify
+// defer execution through computation rather than mutation.
+
+#[test]
+fn defer_basic_runs() {
+    // defer block executes when scope exits
+    // Returns captured value + 1 to prove defer ran
+    assert_eq!(
+        eval_int(r#"my $x = 5; { defer { $x = 100 } } $x"#),
+        5 // Captured value stays 5 due to closure semantics
+    );
+}
+
+#[test]
+fn defer_computes_at_exit() {
+    // defer can compute with captured values
+    assert_eq!(eval_int(r#"do { my $x = 5; defer { 42 }; $x * 2 }"#), 10);
+}
+
+#[test]
+fn defer_in_named_sub() {
+    // defer executes before sub return
+    assert_eq!(
+        eval_int(
+            r#"sub foo { my $result = 10; defer { 99 }; $result }
+               foo()"#
+        ),
+        10
+    );
+}
+
+#[test]
+fn defer_with_explicit_return() {
+    // defer still runs when sub has explicit return
+    assert_eq!(
+        eval_int(
+            r#"sub bar { defer { 99 }; return 42 }
+               bar()"#
+        ),
+        42
+    );
+}

@@ -1878,10 +1878,11 @@ impl<'a> VM<'a> {
                 self.interp.wantarray_kind = want;
                 self.interp.scope_push_hook();
                 let closure_sub = closure_sub_hint.or_else(|| self.sub_for_closure_restore(name));
-                if let Some(sub) = closure_sub {
+                if let Some(ref sub) = closure_sub {
                     if let Some(ref env) = sub.closure_env {
                         self.interp.scope.restore_capture(env);
                     }
+                    self.interp.current_sub_stack.push(sub.clone());
                 }
                 self.ip = entry_ip;
             } else {
@@ -1915,6 +1916,7 @@ impl<'a> VM<'a> {
                         .map_err(|e| e.at_line(line))?;
                     self.interp.scope.declare_array("_", argv.clone());
                     self.interp.scope.set_closure_args(&argv);
+                    self.interp.current_sub_stack.push(sub.clone());
                 }
                 self.ip = entry_ip;
             }
@@ -3568,6 +3570,7 @@ impl<'a> VM<'a> {
                             self.interp.wantarray_kind = frame.saved_wantarray;
                             self.stack.truncate(frame.stack_base);
                             self.interp.pop_scope_to_depth(frame.scope_depth);
+                            self.interp.current_sub_stack.pop();
                             if frame.jit_trampoline_return {
                                 self.jit_trampoline_out = Some(PerlValue::UNDEF);
                             } else {
@@ -3596,6 +3599,7 @@ impl<'a> VM<'a> {
                             self.interp.wantarray_kind = frame.saved_wantarray;
                             self.stack.truncate(frame.stack_base);
                             self.interp.pop_scope_to_depth(frame.scope_depth);
+                            self.interp.current_sub_stack.pop();
                             if frame.jit_trampoline_return {
                                 self.jit_trampoline_out = Some(val);
                             } else {
@@ -5522,6 +5526,7 @@ impl<'a> VM<'a> {
                         let r = self.pop();
                         let args = args_val.to_list();
                         if let Some(sub) = r.as_code_ref() {
+                            self.interp.current_sub_stack.push(sub.clone());
                             let saved_wa = self.interp.wantarray_kind;
                             self.interp.wantarray_kind = want;
                             self.interp.scope_push_hook();
@@ -5540,6 +5545,7 @@ impl<'a> VM<'a> {
                             let result = self.interp.exec_block_no_scope(&sub.body);
                             self.interp.wantarray_kind = saved_wa;
                             self.interp.scope_pop_hook();
+                            self.interp.current_sub_stack.pop();
                             match result {
                                 Ok(v) => self.push(v),
                                 Err(crate::interpreter::FlowOrError::Flow(
@@ -7353,6 +7359,21 @@ impl<'a> VM<'a> {
                         } else {
                             self.push(v);
                         }
+                        Ok(())
+                    }
+
+                    Op::LoadCurrentSub => {
+                        if let Some(sub) = self.interp.current_sub_stack.last().cloned() {
+                            self.push(PerlValue::code_ref(sub));
+                        } else {
+                            self.push(PerlValue::UNDEF);
+                        }
+                        Ok(())
+                    }
+
+                    Op::DeferBlock => {
+                        let coderef = self.pop();
+                        self.interp.scope.push_defer(coderef);
                         Ok(())
                     }
 

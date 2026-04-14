@@ -626,6 +626,11 @@ pub enum Op {
     AsyncBlock(u16),
     /// `await EXPR` — stack: \[value\] → result
     Await,
+    /// `__SUB__` — push reference to currently executing sub (for anonymous recursion).
+    LoadCurrentSub,
+    /// `defer { BLOCK }` — register a block to run when the current scope exits.
+    /// Stack: `[coderef]` → `[]`. The coderef is pushed to the frame's defer list.
+    DeferBlock,
     /// Make a scalar reference from TOS (copies value into a new `RwLock`).
     MakeScalarRef,
     /// `\$name` when `name` is a plain scalar variable — ref aliases the live binding (same as tree `scalar_binding_ref`).

@@ -2645,6 +2645,9 @@ impl Compiler {
                     .add_constant(PerlValue::integer(root.line as i64));
                 self.emit_op(Op::LoadConst(idx), line, Some(root));
             }
+            ExprKind::MagicConst(crate::ast::MagicConstKind::Sub) => {
+                self.emit_op(Op::LoadCurrentSub, line, Some(root));
+            }
             ExprKind::ScalarVar(name) => {
                 self.check_strict_scalar_access(name, line)?;
                 let idx = self.intern_scalar_var_for_ops(name);
@@ -4551,6 +4554,18 @@ impl Compiler {
                     return Err(CompileError::Unsupported(
                         "read() needs tree-walker for lvalue buffer arg".into(),
                     ));
+                }
+                // `defer { BLOCK }` — desugared by parser to `defer__internal(sub { BLOCK })`
+                "defer__internal" => {
+                    if args.len() != 1 {
+                        return Err(CompileError::Unsupported(
+                            "defer__internal expects exactly one argument".into(),
+                        ));
+                    }
+                    // Compile the coderef argument
+                    self.compile_expr(&args[0])?;
+                    // Register it for execution on scope exit
+                    self.emit_op(Op::DeferBlock, line, Some(root));
                 }
                 "deque" => {
                     if !args.is_empty() {
