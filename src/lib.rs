@@ -15,6 +15,7 @@ pub mod compiler;
 pub mod convert;
 mod crypt_util;
 pub mod data_section;
+pub mod deconvert;
 pub mod deparse;
 pub mod english;
 pub mod error;
@@ -106,6 +107,19 @@ pub fn convert_to_perlrs(p: &ast::Program) -> String {
 /// Convert a parsed program to perlrs syntax with custom options.
 pub fn convert_to_perlrs_with_options(p: &ast::Program, opts: &convert::ConvertOptions) -> String {
     convert::convert_program_with_options(p, opts)
+}
+
+/// Deconvert a parsed perlrs program back to standard Perl .pl syntax.
+pub fn deconvert_to_perl(p: &ast::Program) -> String {
+    deconvert::deconvert_program(p)
+}
+
+/// Deconvert a parsed perlrs program back to standard Perl .pl syntax with options.
+pub fn deconvert_to_perl_with_options(
+    p: &ast::Program,
+    opts: &deconvert::DeconvertOptions,
+) -> String {
+    deconvert::deconvert_program_with_options(p, opts)
 }
 
 pub fn parse(code: &str) -> PerlResult<ast::Program> {

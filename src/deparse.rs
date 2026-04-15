@@ -3,11 +3,38 @@
 //! Converts [`Expr`], [`Statement`], and [`Block`] back to valid perlrs source code.
 
 use crate::ast::*;
+use std::cell::RefCell;
 use std::fmt::Write;
+
+thread_local! {
+    static OUTPUT_DELIM: RefCell<Option<char>> = const { RefCell::new(None) };
+}
+
+fn get_output_delim() -> Option<char> {
+    OUTPUT_DELIM.with(|d| *d.borrow())
+}
+
+fn set_output_delim(delim: Option<char>) {
+    OUTPUT_DELIM.with(|d| *d.borrow_mut() = delim);
+}
+
+/// Choose the output delimiter: custom if set, else default `/`.
+fn choose_delim() -> char {
+    get_output_delim().unwrap_or('/')
+}
 
 pub fn deparse_block(block: &Block) -> String {
     let mut buf = String::new();
     deparse_block_into(&mut buf, block, 0);
+    buf
+}
+
+/// Deparse a block with a custom delimiter for regex operations.
+pub fn deparse_block_with_delim(block: &Block, delim: char) -> String {
+    set_output_delim(Some(delim));
+    let mut buf = String::new();
+    deparse_block_into(&mut buf, block, 0);
+    set_output_delim(None);
     buf
 }
 
@@ -628,7 +655,8 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
             buf.push_str(s);
         }
         ExprKind::Regex(pat, flags) => {
-            let _ = write!(buf, "qr/{}/{}", escape_regex(pat), flags);
+            let d = choose_delim();
+            let _ = write!(buf, "qr{}{}{}{}", d, escape_regex_delim(pat, d), d, flags);
         }
         ExprKind::QW(words) => {
             buf.push_str("qw(");
@@ -956,8 +984,16 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
             flags,
             ..
         } => {
+            let d = choose_delim();
             deparse_expr_into(buf, expr);
-            let _ = write!(buf, " =~ /{}/{}", escape_regex(pattern), flags);
+            let _ = write!(
+                buf,
+                " =~ {}{}{}{}",
+                d,
+                escape_regex_delim(pattern, d),
+                d,
+                flags
+            );
         }
         ExprKind::Substitution {
             expr,
@@ -966,12 +1002,16 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
             flags,
             delim: _,
         } => {
+            let d = choose_delim();
             deparse_expr_into(buf, expr);
             let _ = write!(
                 buf,
-                " =~ s/{}/{}/{}",
-                escape_regex(pattern),
-                escape_replacement(replacement),
+                " =~ s{}{}{}{}{}{}",
+                d,
+                escape_regex_delim(pattern, d),
+                d,
+                escape_regex_delim(replacement, d),
+                d,
                 flags
             );
         }
@@ -982,8 +1022,18 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
             flags,
             delim: _,
         } => {
+            let d = choose_delim();
             deparse_expr_into(buf, expr);
-            let _ = write!(buf, " =~ tr/{}/{}/{}", from, to, flags);
+            let _ = write!(
+                buf,
+                " =~ tr{}{}{}{}{}{}",
+                d,
+                escape_tr_delim(from, d),
+                d,
+                escape_tr_delim(to, d),
+                d,
+                flags
+            );
         }
         ExprKind::MapExpr {
             block,
@@ -1771,7 +1821,8 @@ fn deparse_match_pattern(buf: &mut String, pat: &MatchPattern) {
         MatchPattern::Any => buf.push('_'),
         MatchPattern::Value(e) => deparse_expr_into(buf, e),
         MatchPattern::Regex { pattern, flags } => {
-            let _ = write!(buf, "/{}/{}", escape_regex(pattern), flags);
+            let d = choose_delim();
+            let _ = write!(buf, "{}{}{}{}", d, escape_regex_delim(pattern, d), d, flags);
         }
         MatchPattern::Array(elems) => {
             buf.push('[');
@@ -1844,12 +1895,16 @@ fn escape_string(s: &str) -> String {
     out
 }
 
-fn escape_regex(s: &str) -> String {
-    s.replace('/', "\\/")
+fn escape_regex_delim(s: &str, delim: char) -> String {
+    let delim_str = delim.to_string();
+    let escaped = format!("\\{}", delim);
+    s.replace(&delim_str, &escaped)
 }
 
-fn escape_replacement(s: &str) -> String {
-    s.replace('/', "\\/")
+fn escape_tr_delim(s: &str, delim: char) -> String {
+    let delim_str = delim.to_string();
+    let escaped = format!("\\{}", delim);
+    s.replace(&delim_str, &escaped)
 }
 
 fn binop_str(op: BinOp) -> &'static str {

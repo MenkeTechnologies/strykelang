@@ -1050,6 +1050,11 @@ fn main() {
         process::exit(run_convert_subcommand(&args[2..]));
     }
 
+    // `pe deconvert FILE...` subcommand: convert perlrs .pr files back to standard Perl .pl syntax.
+    if args.len() >= 2 && args[1] == "deconvert" {
+        process::exit(run_deconvert_subcommand(&args[2..]));
+    }
+
     // Fast path: `perlrs SCRIPT [ARGS...]` with no dashes anywhere — the common case, and
     // clap parsing is the dominant term on `print "hello\n"` (it knocks ~1ms off the
     // startup bench). We can't bypass clap when any flag is present, so fall through to the
@@ -1625,6 +1630,102 @@ fn run_convert_subcommand(args: &[String]) -> i32 {
             }
         } else {
             println!("{}", converted);
+        }
+    }
+    if errors > 0 {
+        1
+    } else {
+        0
+    }
+}
+
+/// `pe deconvert FILE...` — convert perlrs .pr files back to standard Perl .pl syntax.
+fn run_deconvert_subcommand(args: &[String]) -> i32 {
+    let mut files: Vec<String> = Vec::new();
+    let mut in_place = false;
+    let mut output_delim: Option<char> = None;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "-i" | "--in-place" => in_place = true,
+            "-d" | "--output-delim" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("pe deconvert: --output-delim requires an argument");
+                    return 2;
+                }
+                let delim_str = &args[i];
+                if delim_str.chars().count() != 1 {
+                    eprintln!(
+                        "pe deconvert: --output-delim must be a single character, got {:?}",
+                        delim_str
+                    );
+                    return 2;
+                }
+                output_delim = delim_str.chars().next();
+            }
+            "-h" | "--help" => {
+                println!("usage: pe deconvert [-i] [-d DELIM] FILE...");
+                println!();
+                println!("Convert perlrs .pr files back to standard Perl .pl syntax:");
+                println!("  - Pipe chains and thread macros → nested function calls");
+                println!("  - fn → sub");
+                println!("  - p → say");
+                println!("  - Adds trailing semicolons");
+                println!("  - #!/usr/bin/env perl shebang prepended");
+                println!();
+                println!("Options:");
+                println!("  -i, --in-place       Write .pl files alongside originals");
+                println!("  -d, --output-delim   Delimiter for s///, tr///, m// (default: preserve original)");
+                println!();
+                println!("Examples:");
+                println!("  pe deconvert app.pr              # print to stdout");
+                println!("  pe deconvert -i lib/*.pr         # write lib/*.pl");
+                println!("  pe deconvert -d '|' app.pr       # use | as delimiter: s|old|new|g");
+                return 0;
+            }
+            s if s.starts_with('-') => {
+                eprintln!("pe deconvert: unknown option: {}", s);
+                eprintln!("usage: pe deconvert [-i] [-d DELIM] FILE...");
+                return 2;
+            }
+            s => files.push(s.to_string()),
+        }
+        i += 1;
+    }
+    if files.is_empty() {
+        eprintln!("pe deconvert: no input files");
+        eprintln!("usage: pe deconvert [-i] [-d DELIM] FILE...");
+        return 2;
+    }
+    let opts = perlrs::deconvert::DeconvertOptions { output_delim };
+    let mut errors = 0;
+    for f in &files {
+        let code = match std::fs::read_to_string(f) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("pe deconvert: {}: {}", f, e);
+                errors += 1;
+                continue;
+            }
+        };
+        let program = match perlrs::parse_with_file(&code, f) {
+            Ok(p) => p,
+            Err(e) => {
+                eprintln!("pe deconvert: {}: {}", f, e);
+                errors += 1;
+                continue;
+            }
+        };
+        let deconverted = perlrs::deconvert_to_perl_with_options(&program, &opts);
+        if in_place {
+            let out_path = std::path::Path::new(f).with_extension("pl");
+            if let Err(e) = std::fs::write(&out_path, &deconverted) {
+                eprintln!("pe deconvert: {}: {}", out_path.display(), e);
+                errors += 1;
+            }
+        } else {
+            println!("{}", deconverted);
         }
     }
     if errors > 0 {

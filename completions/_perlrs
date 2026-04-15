@@ -45,6 +45,13 @@ _perlrs_build() {
     '1:script file:_files -g "*.pr *.pl *.pm *.t *.cgi *.psgi"'
 }
 
+_perlrs_deconvert() {
+  _arguments -s -S \
+    '(-i --in-place)'{-i,--in-place}'[write .pl files alongside originals]' \
+    '(-d --output-delim)'{-d+,--output-delim=}'[delimiter for s/// tr/// m// (default: preserve original)]:delimiter:' \
+    '(-h --help)'{-h,--help}'[show pe deconvert usage]' \
+    '*:perlrs files:_files -g "*.pr"'
+}
 # `pe convert [-i] [-d DELIM] FILE...` — convert Perl source to idiomatic perlrs syntax
 _perlrs_convert() {
   _arguments -s -S \
@@ -118,6 +125,7 @@ _perlrs() {
       subcmds=(
         'build:compile a Perl script into a standalone executable binary'
         'convert:convert Perl source to idiomatic perlrs syntax with |> pipes'
+        'deconvert:convert Perlrs source to vanilla perl syntax'
       )
       _alternative \
         'subcommands:perlrs subcommand:((${subcmds}))' \
@@ -129,6 +137,9 @@ _perlrs() {
       case $line[1] in
         build)
           _perlrs_build
+          ;;
+        deconvert)
+          _perlrs_deconvert
           ;;
         convert)
           _perlrs_convert
