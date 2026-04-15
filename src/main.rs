@@ -1888,11 +1888,18 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
     let N = "\x1b[0m";
 
     // Build topic entries from categorized list, then pick up any uncategorized leftovers.
+    // Deduplicate aliases that map to the same doc text (e.g. thread/t, hmac/hmac_sha256).
     let mut entries: Vec<(&str, &str, String)> = Vec::new();
     let mut seen = std::collections::HashSet::new();
+    let mut seen_text_ptrs = std::collections::HashSet::new();
     for &(category, topics) in DOC_CATEGORIES {
         for &topic in topics {
             if let Some(text) = perlrs::lsp::doc_text_for(topic) {
+                let ptr = text.as_ptr() as usize;
+                if !seen_text_ptrs.insert(ptr) {
+                    seen.insert(topic);
+                    continue; // alias — same doc already rendered under canonical name
+                }
                 let rendered = render_page_content(topic, text, C, G, D, N);
                 entries.push((category, topic, rendered));
                 seen.insert(topic);
@@ -1905,6 +1912,10 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
             continue;
         }
         if let Some(text) = perlrs::lsp::doc_text_for(topic) {
+            let ptr = text.as_ptr() as usize;
+            if !seen_text_ptrs.insert(ptr) {
+                continue; // alias already rendered
+            }
             let rendered = render_page_content(topic, text, C, G, D, N);
             entries.push(("Other", topic, rendered));
         }
