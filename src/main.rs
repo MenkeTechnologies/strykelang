@@ -1917,32 +1917,7 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
     // Pack topics into full-screen pages. Each page fills the terminal.
     // Chapter nav (]/[) jumps to the first page of the next/prev category.
     let avail = term_height().saturating_sub(16).max(10);
-    let mut pages: Vec<(String, String, Vec<usize>)> = Vec::new();
-    let mut page_content = String::new();
-    let mut page_lines: usize = 0;
-    let mut page_indices: Vec<usize> = Vec::new();
-    let mut page_cat = String::new();
-    for (i, (cat, _topic, rendered)) in entries.iter().enumerate() {
-        let entry_lines = rendered.lines().count() + 1;
-        // New category always starts a new page
-        let new_chapter = !page_cat.is_empty() && *cat != page_cat;
-        if page_lines > 0 && (page_lines + entry_lines > avail || new_chapter) {
-            pages.push((page_cat.clone(), page_content.clone(), page_indices.clone()));
-            page_content.clear();
-            page_lines = 0;
-            page_indices.clear();
-        }
-        if page_lines == 0 {
-            page_cat = cat.to_string();
-        }
-        page_content.push_str(rendered);
-        page_content.push('\n');
-        page_lines += entry_lines;
-        page_indices.push(i);
-    }
-    if page_lines > 0 {
-        pages.push((page_cat, page_content, page_indices));
-    }
+    let mut pages = build_doc_pages(&entries, avail);
 
     // Insert intro page at position 0
     let entry_count = entries.len();
@@ -2123,6 +2098,59 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
     doc_interactive_loop(&pages, &entries, start_page, total, C, G, Y, M, B, D, N)
 }
 
+/// Build pages from entries given available terminal height.
+fn build_doc_pages(
+    entries: &[(&str, &str, String)],
+    avail: usize,
+) -> Vec<(String, String, Vec<usize>)> {
+    let mut pages: Vec<(String, String, Vec<usize>)> = Vec::new();
+    let mut page_content = String::new();
+    let mut page_lines: usize = 0;
+    let mut page_indices: Vec<usize> = Vec::new();
+    let mut page_cat = String::new();
+    for (i, (cat, _topic, rendered)) in entries.iter().enumerate() {
+        let entry_lines = rendered.lines().count() + 1;
+        let new_chapter = !page_cat.is_empty() && *cat != page_cat;
+        if page_lines > 0 && (page_lines + entry_lines > avail || new_chapter) {
+            pages.push((page_cat.clone(), page_content.clone(), page_indices.clone()));
+            page_content.clear();
+            page_lines = 0;
+            page_indices.clear();
+        }
+        if page_lines == 0 {
+            page_cat = cat.to_string();
+        }
+        page_content.push_str(rendered);
+        page_content.push('\n');
+        page_lines += entry_lines;
+        page_indices.push(i);
+    }
+    if page_lines > 0 {
+        pages.push((page_cat, page_content, page_indices));
+    }
+    pages
+}
+
+/// Find the page index that contains the given entry index.
+fn find_page_for_entry(pages: &[(String, String, Vec<usize>)], entry_idx: usize) -> usize {
+    for (pi, (_cat, _content, indices)) in pages.iter().enumerate() {
+        if indices.contains(&entry_idx) {
+            return pi;
+        }
+    }
+    0
+}
+
+/// SIGWINCH flag — set by the signal handler, cleared after re-render.
+static SIGWINCH_RECEIVED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// Bare signal handler — just sets the atomic flag.
+#[cfg(unix)]
+extern "C" fn sigwinch_handler(_sig: libc::c_int) {
+    SIGWINCH_RECEIVED.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// The interactive full-screen pager loop.
 #[cfg(unix)]
 #[allow(non_snake_case)]
@@ -2149,6 +2177,13 @@ fn doc_interactive_loop(
     unsafe { libc::cfmakeraw(&mut raw) };
     unsafe { libc::tcsetattr(stdin_fd, libc::TCSANOW, &raw) };
 
+    // Install SIGWINCH handler
+    let old_sigwinch =
+        unsafe { libc::signal(libc::SIGWINCH, sigwinch_handler as *const () as libc::sighandler_t) };
+
+    // Mutable pages — rebuilt on resize
+    let mut pages = pages.to_vec();
+    let mut total = total;
     let mut current: usize = start;
 
     // In raw mode, \n doesn't do \r\n — use this macro for every output line.
@@ -2157,7 +2192,9 @@ fn doc_interactive_loop(
         ($($arg:tt)*) => { print!("{}\r\n", format!($($arg)*)); };
     }
 
-    let render = |cur: usize| {
+    let render = |cur: usize,
+                  pages: &[(String, String, Vec<usize>)],
+                  total: usize| {
         let (ref cat, ref content, ref indices) = pages[cur];
         // Build topic list for status line
         let topic_list: String = indices
@@ -2228,11 +2265,33 @@ fn doc_interactive_loop(
         let _ = io::stdout().flush();
     };
 
-    render(current);
+    render(current, &pages, total);
 
     loop {
         let mut buf = [0u8; 1];
-        if unsafe { libc::read(stdin_fd, buf.as_mut_ptr() as *mut libc::c_void, 1) } != 1 {
+        let nread = unsafe { libc::read(stdin_fd, buf.as_mut_ptr() as *mut libc::c_void, 1) };
+        if nread != 1 {
+            // SIGWINCH interrupts read with EINTR — re-paginate and re-render
+            if SIGWINCH_RECEIVED.swap(false, std::sync::atomic::Ordering::Relaxed) {
+                // Remember which entry we were viewing
+                let entry_idx = pages[current].2.first().copied().unwrap_or(0);
+                // Rebuild pages for new terminal height
+                let avail = term_height().saturating_sub(16).max(10);
+                let mut rebuilt = build_doc_pages(entries, avail);
+                // Re-insert intro page at position 0
+                let intro_page = pages[0].clone();
+                rebuilt.insert(0, intro_page);
+                pages = rebuilt;
+                total = pages.len();
+                // Find the page containing our entry (offset by 1 for intro)
+                if entry_idx == 0 && current == 0 {
+                    current = 0; // stay on intro
+                } else {
+                    current = find_page_for_entry(&pages, entry_idx).min(total - 1);
+                }
+                render(current, &pages, total);
+                continue;
+            }
             break;
         }
         let key = buf[0];
@@ -2290,7 +2349,7 @@ fn doc_interactive_loop(
                 // Restore cooked mode for line input
                 unsafe { libc::tcsetattr(stdin_fd, libc::TCSANOW, &old_termios) };
                 print!("\x1b[H\x1b[2J");
-                doc_print_toc_entries(entries, pages, C, G, M, B, D, N);
+                doc_print_toc_entries(entries, &pages, C, G, M, B, D, N);
                 print!("  {D}enter page number or press enter to return >>>{N} ");
                 let _ = io::stdout().flush();
                 let mut line = String::new();
@@ -2380,10 +2439,11 @@ fn doc_interactive_loop(
             }
             _ => {}
         }
-        render(current);
+        render(current, &pages, total);
     }
 
-    // Restore terminal
+    // Restore terminal and SIGWINCH handler
+    unsafe { libc::signal(libc::SIGWINCH, old_sigwinch) };
     unsafe { libc::tcsetattr(stdin_fd, libc::TCSANOW, &old_termios) };
     print!("\x1b[H\x1b[2J");
     let _ = io::stdout().flush();
