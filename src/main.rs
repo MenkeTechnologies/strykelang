@@ -1925,15 +1925,11 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         return 1;
     }
 
-    // One topic per page — content is padded to fill the terminal (like zpwr wizard).
+    // Pack topics into uniform fixed-height pages.  Each page has exactly `avail`
+    // content lines — if a topic doesn't fit it gets split across pages.
     // Chapter nav (]/[) jumps to the first page of the next/prev category.
-    let mut pages: Vec<(String, String, Vec<usize>)> = entries
-        .iter()
-        .enumerate()
-        .map(|(i, (cat, _topic, rendered))| {
-            (cat.to_string(), rendered.clone(), vec![i])
-        })
-        .collect();
+    let avail = term_height().saturating_sub(15).max(6);
+    let mut pages = build_fixed_pages(&entries, avail);
 
     // Insert intro page at position 0
     let entry_count = entries.len();
@@ -2114,6 +2110,66 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
     doc_interactive_loop(&pages, &entries, start_page, total, C, G, Y, M, B, D, N)
 }
 
+/// Pack topics into uniform fixed-height pages.  Lines stream left to right
+/// across entries; when a page fills it is flushed — even mid-topic — and
+/// a new page begins.  Every page (except possibly the last) has exactly
+/// `page_height` content lines, giving a stable banner position.
+fn build_fixed_pages(
+    entries: &[(&str, &str, String)],
+    page_height: usize,
+) -> Vec<(String, String, Vec<usize>)> {
+    let mut pages: Vec<(String, String, Vec<usize>)> = Vec::new();
+    let mut buf: Vec<&str> = Vec::with_capacity(page_height);
+    let mut cat = String::new();
+    let mut indices: Vec<usize> = Vec::new();
+
+    for (i, (entry_cat, _topic, rendered)) in entries.iter().enumerate() {
+        if cat.is_empty() {
+            cat = entry_cat.to_string();
+        }
+        let lines: Vec<&str> = rendered.lines().collect();
+        for line in &lines {
+            if buf.len() >= page_height {
+                // flush full page
+                pages.push((cat.clone(), buf.join("\r\n"), indices.clone()));
+                buf.clear();
+                cat = entry_cat.to_string();
+                indices = vec![i]; // continuation of same entry
+            }
+            buf.push(line);
+        }
+        // blank separator between topics
+        if buf.len() >= page_height {
+            pages.push((cat.clone(), buf.join("\r\n"), indices.clone()));
+            buf.clear();
+            cat = entry_cat.to_string();
+            indices = Vec::new();
+        }
+        buf.push("");
+        if !indices.contains(&i) {
+            indices.push(i);
+        }
+    }
+    // flush remainder (pad to page_height with empty lines)
+    if !buf.is_empty() {
+        while buf.len() < page_height {
+            buf.push("");
+        }
+        pages.push((cat, buf.join("\r\n"), indices));
+    }
+    pages
+}
+
+/// Find the page whose `indices` contains `entry_idx`.
+fn find_page_for_entry(pages: &[(String, String, Vec<usize>)], entry_idx: usize) -> usize {
+    for (pi, (_cat, _content, indices)) in pages.iter().enumerate() {
+        if indices.contains(&entry_idx) {
+            return pi;
+        }
+    }
+    0
+}
+
 /// SIGWINCH flag — set by the signal handler, cleared after re-render.
 static SIGWINCH_RECEIVED: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
@@ -2154,6 +2210,9 @@ fn doc_interactive_loop(
     let old_sigwinch =
         unsafe { libc::signal(libc::SIGWINCH, sigwinch_handler as *const () as libc::sighandler_t) };
 
+    // Mutable — rebuilt on terminal resize
+    let mut pages = pages.to_vec();
+    let mut total = total;
     let mut current: usize = start;
 
     // In raw mode, \n doesn't do \r\n — use this macro for every output line.
@@ -2162,7 +2221,9 @@ fn doc_interactive_loop(
         ($($arg:tt)*) => { print!("{}\r\n", format!($($arg)*)); };
     }
 
-    let render = |cur: usize| {
+    let render = |cur: usize,
+                  pages: &[(String, String, Vec<usize>)],
+                  total: usize| {
         let (ref cat, ref content, ref indices) = pages[cur];
         // Build topic list for status line
         let topic_list: String = indices
@@ -2207,21 +2268,8 @@ fn doc_interactive_loop(
         }
         print!("┘{N}\r\n");
         rprint!();
-        // Content (multiple topics packed)
-        for line in content.lines() {
-            print!("{line}\r\n");
-        }
-        // Pad to push footer down
-        let term_h = term_height();
-        let header_lines = 12;
-        let content_lines = content.lines().count();
-        let footer_lines = 3;
-        let used = header_lines + content_lines + footer_lines;
-        if used < term_h {
-            for _ in 0..(term_h - used) {
-                print!("\r\n");
-            }
-        }
+        // Content — fixed height, already padded by build_fixed_pages
+        print!("{content}\r\n");
         // Footer
         print!("  {D}");
         for _ in 0..76 {
@@ -2233,15 +2281,27 @@ fn doc_interactive_loop(
         let _ = io::stdout().flush();
     };
 
-    render(current);
+    render(current, &pages, total);
 
     loop {
         let mut buf = [0u8; 1];
         let nread = unsafe { libc::read(stdin_fd, buf.as_mut_ptr() as *mut libc::c_void, 1) };
         if nread != 1 {
-            // SIGWINCH interrupts read with EINTR — just re-render (padding recalculates)
+            // SIGWINCH — rebuild pages for new terminal height, then re-render
             if SIGWINCH_RECEIVED.swap(false, std::sync::atomic::Ordering::Relaxed) {
-                render(current);
+                let entry_idx = pages[current].2.first().copied().unwrap_or(0);
+                let avail = term_height().saturating_sub(15).max(6);
+                let mut rebuilt = build_fixed_pages(entries, avail);
+                let intro_page = pages[0].clone();
+                rebuilt.insert(0, intro_page);
+                pages = rebuilt;
+                total = pages.len();
+                current = if entry_idx == 0 && current == 0 {
+                    0
+                } else {
+                    find_page_for_entry(&pages, entry_idx).min(total - 1)
+                };
+                render(current, &pages, total);
                 continue;
             }
             break;
@@ -2391,7 +2451,7 @@ fn doc_interactive_loop(
             }
             _ => {}
         }
-        render(current);
+        render(current, &pages, total);
     }
 
     // Restore terminal and SIGWINCH handler
