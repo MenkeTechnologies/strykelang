@@ -430,7 +430,7 @@ fn print_cyberpunk_help() {
         "  build SCRIPT [-o OUT]  {G}//{N} AOT: copy this binary with SCRIPT embedded (standalone exe)"
     );
     println!(
-        "  doc [TOPIC]            {G}//{N} Built-in docs (pe doc pmap, pe doc |>, pe doc)"
+        "  docs [TOPIC]           {G}//{N} Built-in docs (pe docs pmap, pe docs |>, pe docs)"
     );
     println!(
         "  serve PORT SCRIPT      {G}//{N} HTTP server (pe serve 8080 app.pr)"
@@ -1093,8 +1093,8 @@ fn main() {
         process::exit(run_deconvert_subcommand(&args[2..]));
     }
 
-    // `pe doc [TOPIC]` subcommand: built-in documentation browser.
-    if args.len() >= 2 && args[1] == "doc" {
+    // `pe docs [TOPIC]` subcommand: built-in documentation browser.
+    if args.len() >= 2 && args[1] == "docs" {
         process::exit(run_doc_subcommand(&args[2..]));
     }
 
@@ -1717,15 +1717,19 @@ fn run_serve_subcommand(args: &[String]) -> i32 {
         || args[0] == "-h"
         || args[0] == "--help"
     {
-        eprintln!("usage: pe serve PORT SCRIPT");
-        eprintln!("       pe serve PORT -e 'HANDLER_EXPR'");
+        eprintln!("usage: pe serve PORT [SCRIPT | -e CODE]");
         eprintln!();
-        eprintln!("  The handler receives $req (hashref with method, path, query, headers, body, peer)");
-        eprintln!("  and returns a response: string (200 OK), key-value pairs, hashref, or undef (404).");
+        eprintln!("  pe serve PORT              serve $PWD as static files");
+        eprintln!("  pe serve PORT SCRIPT       run script (must call serve())");
+        eprintln!("  pe serve PORT -e CODE      one-liner handler");
+        eprintln!();
+        eprintln!("  Handler receives $req (hashref: method, path, query, headers, body, peer)");
+        eprintln!("  and returns: string (200 OK), key-value pairs, hashref, or undef (404).");
         eprintln!();
         eprintln!("examples:");
-        eprintln!("  pe serve 8080 app.pr");
-        eprintln!("  pe serve 3000 -e '\"hello \" . $req->{{path}}'");
+        eprintln!("  pe serve 8080                                         # static file server");
+        eprintln!("  pe serve 8080 app.pr                                  # script handler");
+        eprintln!("  pe serve 3000 -e '\"hello \" . $req->{{path}}'           # one-liner");
         eprintln!("  pe serve 8080 -e 'status => 200, body => json_encode(+{{ok => 1}})'");
         return 0;
     }
@@ -1736,14 +1740,97 @@ fn run_serve_subcommand(args: &[String]) -> i32 {
         return 1;
     }
 
-    if args.len() < 2 {
-        eprintln!("pe serve: need PORT and SCRIPT or -e CODE");
-        eprintln!("run 'pe serve -h' for help");
-        return 1;
-    }
+    // Detect mode: no arg or directory = static file server, -e = one-liner, else = script
+    let static_dir = if args.len() < 2 {
+        Some(std::env::current_dir().unwrap_or_default().to_string_lossy().to_string())
+    } else if args[1] != "-e" && Path::new(&args[1]).is_dir() {
+        Some(std::fs::canonicalize(&args[1]).unwrap_or_else(|_| PathBuf::from(&args[1])).to_string_lossy().to_string())
+    } else {
+        None
+    };
 
-    // Build the wrapper code that calls serve(PORT, fn ($req) { ... })
-    let code = if args[1] == "-e" {
+    let code = if let Some(dir) = static_dir {
+        let dir_escaped = dir.replace('\\', "\\\\").replace('"', "\\\"");
+        eprintln!("perlrs: serving {} on http://0.0.0.0:{}", dir, port);
+        format!(r#"
+chdir "{dir_escaped}";
+serve {port}, fn ($req) {{
+    my $url_path = $req->{{path}};
+    $url_path =~ s|\.\./||g;
+    my $fs_path = $url_path;
+    $fs_path =~ s|^/||;
+    $fs_path = "." if $fs_path eq "";
+
+    # If it's a directory, try index.html, else list contents
+    if (-d $fs_path) {{
+        my $idx = $fs_path eq "." ? "index.html" : "$fs_path/index.html";
+        if (-f $idx) {{
+            +{{ status => 200, body => slurp($idx), headers => +{{ "content-type" => "text/html; charset=utf-8" }} }}
+        }} else {{
+            # Directory listing
+            $url_path .= "/" unless $url_path =~ m|/$|;
+            my @entries;
+            push @entries, ".." unless $url_path eq "/";
+            my @all = sort((dirs($fs_path)), (filesf($fs_path)));
+            push @entries, @all;
+            my $html = "<!DOCTYPE html><html><head><meta charset=\"utf-8\">";
+            $html .= "<title>Directory listing for $url_path</title>";
+            $html .= "<style>body{{font-family:monospace;margin:2em}}a{{text-decoration:none}}a:hover{{text-decoration:underline}}li{{padding:2px 0}}.dir{{font-weight:bold}}</style>";
+            $html .= "</head><body>";
+            $html .= "<h1>Directory listing for $url_path</h1><hr><ul>";
+            my $e;
+            for $e (@entries) {{
+                my $name = $e;
+                $name =~ s|.*/||;
+                my $href = $url_path . $name;
+                if (-d $e) {{
+                    $html .= "<li class=\"dir\"><a href=\"$href/\">$name/</a></li>";
+                }} else {{
+                    my @st = stat($e);
+                    my $sz = defined $st[7] ? $st[7] : 0;
+                    $html .= "<li><a href=\"$href\">$name</a> <span style=\"color:#888\">($sz bytes)</span></li>";
+                }}
+            }}
+            $html .= "</ul><hr><p style=\"color:#888\">perlrs/{port}</p></body></html>";
+            +{{ status => 200, body => $html, headers => +{{ "content-type" => "text/html; charset=utf-8" }} }}
+        }}
+    }} elsif (-f $fs_path) {{
+        my $body = slurp($fs_path);
+        my $ct = "text/plain";
+        $ct = "text/html; charset=utf-8"  if $fs_path =~ /\.html?$/;
+        $ct = "text/css; charset=utf-8"   if $fs_path =~ /\.css$/;
+        $ct = "application/javascript; charset=utf-8" if $fs_path =~ /\.m?js$/;
+        $ct = "application/json; charset=utf-8" if $fs_path =~ /\.json$/;
+        $ct = "image/png"  if $fs_path =~ /\.png$/;
+        $ct = "image/jpeg" if $fs_path =~ /\.jpe?g$/;
+        $ct = "image/gif"  if $fs_path =~ /\.gif$/;
+        $ct = "image/svg+xml" if $fs_path =~ /\.svg$/;
+        $ct = "image/webp" if $fs_path =~ /\.webp$/;
+        $ct = "image/avif" if $fs_path =~ /\.avif$/;
+        $ct = "image/x-icon" if $fs_path =~ /\.ico$/;
+        $ct = "application/wasm" if $fs_path =~ /\.wasm$/;
+        $ct = "text/xml; charset=utf-8"   if $fs_path =~ /\.xml$/;
+        $ct = "application/pdf" if $fs_path =~ /\.pdf$/;
+        $ct = "font/woff2" if $fs_path =~ /\.woff2$/;
+        $ct = "font/woff"  if $fs_path =~ /\.woff$/;
+        $ct = "font/ttf"   if $fs_path =~ /\.ttf$/;
+        $ct = "audio/mpeg" if $fs_path =~ /\.mp3$/;
+        $ct = "audio/ogg"  if $fs_path =~ /\.ogg$/;
+        $ct = "video/mp4"  if $fs_path =~ /\.mp4$/;
+        $ct = "video/webm" if $fs_path =~ /\.webm$/;
+        $ct = "application/zip" if $fs_path =~ /\.zip$/;
+        $ct = "application/gzip" if $fs_path =~ /\.gz$/;
+        $ct = "text/markdown; charset=utf-8" if $fs_path =~ /\.md$/;
+        $ct = "text/plain; charset=utf-8" if $fs_path =~ /\.txt$/;
+        $ct = "application/toml; charset=utf-8" if $fs_path =~ /\.toml$/;
+        $ct = "text/x-perl; charset=utf-8" if $fs_path =~ /\.p[lrm]$/;
+        +{{ status => 200, body => $body, headers => +{{ "content-type" => $ct }} }}
+    }} else {{
+        +{{ status => 404, body => "404 Not Found: $url_path\n" }}
+    }}
+}};
+"#)
+    } else if args[1] == "-e" {
         if args.len() < 3 {
             eprintln!("pe serve: -e requires an argument");
             return 1;
@@ -1779,13 +1866,13 @@ fn run_serve_subcommand(args: &[String]) -> i32 {
 }
 
 #[allow(non_snake_case)]
-/// `pe doc [TOPIC]` — interactive built-in documentation book.
+/// `pe docs [TOPIC]` — interactive built-in documentation book.
 ///
-/// - `pe doc`          → full-screen interactive book (vim-style navigation)
-/// - `pe doc TOPIC`    → single-topic lookup
-/// - `pe doc -t`       → table of contents
-/// - `pe doc -s PAT`   → search topics
-/// - `pe doc -h`       → help
+/// - `pe docs`          → full-screen interactive book (vim-style navigation)
+/// - `pe docs TOPIC`    → single-topic lookup
+/// - `pe docs -t`       → table of contents
+/// - `pe docs -s PAT`   → search topics
+/// - `pe docs -h`       → help
 fn run_doc_subcommand(args: &[String]) -> i32 {
     let C = "\x1b[36m";
     let G = "\x1b[32m";
@@ -1818,7 +1905,7 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         }
     }
     if entries.is_empty() {
-        eprintln!("pe doc: no documentation pages found");
+        eprintln!("pe docs: no documentation pages found");
         return 1;
     }
 
@@ -1909,14 +1996,14 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         doc_print_hline('└', '┘', D, N);
         println!("  {D}>> THE PERLRS ENCYCLOPEDIA // INTERACTIVE REFERENCE SYSTEM <<{N}");
         println!();
-        println!("  {B}USAGE:{N} pe doc {D}[OPTIONS] [PAGE|TOPIC]{N}");
+        println!("  {B}USAGE:{N} pe docs {D}[OPTIONS] [PAGE|TOPIC]{N}");
         println!();
         doc_print_separator("OPTIONS", D, N);
         println!("  {C}-h, --help{N}                          {D}// Show this help{N}");
         println!("  {C}-t, --toc{N}                           {D}// Table of contents{N}");
         println!("  {C}-s, --search <pattern>{N}              {D}// Search pages{N}");
         println!("  {C}-l, --list{N}                          {D}// List all pages{N}");
-        println!("  {C}TOPIC{N}                               {D}// Jump to topic (pe doc pmap){N}");
+        println!("  {C}TOPIC{N}                               {D}// Jump to topic (pe docs pmap){N}");
         println!("  {C}PAGE{N}                                {D}// Jump to page number{N}");
         println!();
         doc_print_separator("NAVIGATION (vim-style)", D, N);
@@ -1936,11 +2023,11 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         println!("  {C}q{N}                                   {D}// Quit{N}");
         println!();
         doc_print_separator("EXAMPLES", D, N);
-        println!("  {C}pe doc{N}                              {D}// start from page 1{N}");
-        println!("  {C}pe doc --toc{N}                        {D}// table of contents{N}");
-        println!("  {C}pe doc 42{N}                           {D}// jump to page 42{N}");
-        println!("  {C}pe doc pmap{N}                         {D}// jump to pmap{N}");
-        println!("  {C}pe doc --search parallel{N}            {D}// find parallel pages{N}");
+        println!("  {C}pe docs{N}                             {D}// start from page 1{N}");
+        println!("  {C}pe docs --toc{N}                       {D}// table of contents{N}");
+        println!("  {C}pe docs 42{N}                          {D}// jump to page 42{N}");
+        println!("  {C}pe docs pmap{N}                        {D}// jump to pmap{N}");
+        println!("  {C}pe docs --search parallel{N}           {D}// find parallel pages{N}");
         println!();
         return 0;
     }
@@ -2014,8 +2101,8 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
                         .unwrap_or(0);
                 }
                 None => {
-                    eprintln!("pe doc: no documentation for '{}'", arg);
-                    eprintln!("run 'pe doc -h' for help");
+                    eprintln!("pe docs: no documentation for '{}'", arg);
+                    eprintln!("run 'pe docs -h' for help");
                     return 1;
                 }
             }

@@ -93,10 +93,11 @@ pe --profile script.pl                  # folded stacks + per-line/per-sub ns
 pe --flame script.pr                    # colored flamegraph bars in terminal
 pe --flame script.pr > flame.svg        # interactive SVG flamegraph when piped
 pe --explain E0001                      # expanded hint for an error code
-pe doc                                  # interactive reference book (vim-style: j/k/]/[/t/q)
-pe doc pmap                             # jump straight to a topic
-pe doc --toc                            # table of contents
-pe doc --search parallel                # search all pages
+pe docs                                  # interactive reference book (vim-style: j/k/]/[/t/q)
+pe docs pmap                             # jump straight to a topic
+pe docs --toc                            # table of contents
+pe docs --search parallel                # search all pages
+pe serve 8080                           # static file server for $PWD
 pe serve 8080 app.pr                    # HTTP server with handler script
 pe serve 3000 -e '"hello " . $req->{path}'  # one-liner HTTP server
 pe build script.pl -o myapp             # bake into a standalone binary ([0x0D])
@@ -404,7 +405,7 @@ perlrs-specific long flags:
 | `--remote-worker-v1` | Legacy one-shot cluster worker over stdio |
 | `build SCRIPT [-o OUT]` | AOT compile script to standalone binary ([\[0x0D\]](#0x0d-standalone-binaries-pe-build)) |
 | `doc [TOPIC]` | Interactive reference book with vim-style navigation (`pe doc`, `pe doc pmap`, `pe doc --toc`) |
-| `serve PORT SCRIPT` | Built-in HTTP server (`pe serve 8080 app.pr`, `pe serve 3000 -e 'EXPR'`) |
+| `serve PORT [SCRIPT]` | HTTP server: static files (`pe serve 8080`), script (`pe serve 8080 app.pr`), one-liner (`pe serve 3000 -e 'EXPR'`) |
 
 ![pe -h](img/pe-help.png)
 
