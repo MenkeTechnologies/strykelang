@@ -2514,6 +2514,22 @@ fn term_height() -> usize {
     24
 }
 
+fn term_width() -> usize {
+    #[cfg(unix)]
+    {
+        let mut ws = libc::winsize {
+            ws_row: 0,
+            ws_col: 0,
+            ws_xpixel: 0,
+            ws_ypixel: 0,
+        };
+        if unsafe { libc::ioctl(2, libc::TIOCGWINSZ, &mut ws) } == 0 && ws.ws_col > 0 {
+            return ws.ws_col as usize;
+        }
+    }
+    80
+}
+
 fn strip_ansi_len(s: &str) -> usize {
     let mut len = 0;
     let mut in_esc = false;
@@ -2668,7 +2684,7 @@ fn word_wrap(text: &str, max_vis: usize) -> Vec<String> {
 /// Code lines are kept as-is (indented 4 spaces).
 #[allow(non_snake_case)]
 fn render_page_content(topic: &str, text: &str, C: &str, G: &str, D: &str, N: &str) -> String {
-    let max_vis = 76; // 80 - 2 indent on left - 2 margin
+    let max_vis = term_width().saturating_sub(4).max(40); // width - 2 indent - 2 margin
     let mut out = String::with_capacity(text.len() + 512);
     out.push_str(&format!("  {C}{topic}{N}\n"));
     out.push_str(&format!(
