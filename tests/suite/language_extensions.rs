@@ -1126,6 +1126,66 @@ fn thread_empty_list() {
     assert_eq!(eval_int(r#"t () sum"#), 0);
 }
 
+// ── thread s/// and tr/// ──
+
+#[test]
+fn thread_subst_basic() {
+    assert_eq!(
+        eval_string(r#"t "hello world" s/world/perl/"#),
+        "hello perl"
+    );
+}
+
+#[test]
+fn thread_subst_global() {
+    assert_eq!(eval_string(r#"t "aaa" s/a/b/g"#), "bbb");
+}
+
+#[test]
+fn thread_subst_in_chain() {
+    assert_eq!(eval_string(r#"t 5 inc dec sqrt squared str s/5/10/"#), "10");
+}
+
+#[test]
+fn thread_subst_with_flags() {
+    assert_eq!(eval_string(r#"t "tomm" s/o/b/g"#), "tbmm");
+}
+
+#[test]
+fn thread_tr_basic() {
+    assert_eq!(eval_string(r#"t "abc" tr/a-z/A-Z/"#), "ABC");
+}
+
+#[test]
+fn thread_tr_in_chain() {
+    assert_eq!(eval_string(r#"t "hello" uc tr/A-Z/a-z/"#), "hello");
+}
+
+#[test]
+fn thread_subst_then_func() {
+    assert_eq!(eval_string(r#"t "foo" s/o/O/g uc"#), "FOO");
+}
+
+#[test]
+fn thread_match_basic() {
+    assert_eq!(eval_int(r#"t "hello world" m/world/"#), 1);
+}
+
+#[test]
+fn thread_match_no_match() {
+    assert_eq!(eval_int(r#"t "hello" m/xyz/"#), 0);
+}
+
+#[test]
+fn thread_match_case_insensitive() {
+    assert_eq!(eval_int(r#"t "FOO" m/foo/i"#), 1);
+}
+
+#[test]
+fn thread_match_digits() {
+    assert_eq!(eval_int(r#"t "abc123" m/\d+/"#), 1);
+}
+
 // ── static analysis compatible patterns ──
 
 #[test]

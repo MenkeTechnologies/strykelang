@@ -1447,6 +1447,44 @@ impl Parser {
                     let func_name = name.clone();
                     self.advance();
 
+                    // Handle s/// and tr/// encoded tokens
+                    if func_name.starts_with('\x00') {
+                        let parts: Vec<&str> = func_name.split('\x00').collect();
+                        if parts.len() >= 4 && parts[1] == "s" {
+                            let delim = parts.get(5).and_then(|s| s.chars().next()).unwrap_or('/');
+                            let stage = Expr {
+                                kind: ExprKind::Substitution {
+                                    expr: Box::new(result.clone()),
+                                    pattern: parts[2].to_string(),
+                                    replacement: parts[3].to_string(),
+                                    flags: format!("{}r", parts.get(4).unwrap_or(&"")),
+                                    delim,
+                                },
+                                line: stage_line,
+                            };
+                            result = stage;
+                            continue;
+                        }
+                        if parts.len() >= 4 && parts[1] == "tr" {
+                            let delim = parts.get(5).and_then(|s| s.chars().next()).unwrap_or('/');
+                            let stage = Expr {
+                                kind: ExprKind::Transliterate {
+                                    expr: Box::new(result.clone()),
+                                    from: parts[2].to_string(),
+                                    to: parts[3].to_string(),
+                                    flags: format!("{}r", parts.get(4).unwrap_or(&"")),
+                                    delim,
+                                },
+                                line: stage_line,
+                            };
+                            result = stage;
+                            continue;
+                        }
+                        return Err(
+                            self.syntax_err("Unexpected encoded token in thread", stage_line)
+                        );
+                    }
+
                     // Check if followed by a block (like `filter { }`, `sort { }`, `map { }`)
                     if matches!(self.peek(), Token::LBrace) {
                         // Parse as a block-taking builtin
@@ -1459,10 +1497,27 @@ impl Parser {
                         result = self.thread_apply_bare_func(&func_name, result, stage_line)?;
                     }
                 }
+                // `/pattern/flags` — regex match (from `m/…/` which forces regex context)
+                Token::Regex(ref pattern, ref flags, delim) => {
+                    let pattern = pattern.clone();
+                    let flags = flags.clone();
+                    self.advance();
+                    let stage = Expr {
+                        kind: ExprKind::Match {
+                            expr: Box::new(result.clone()),
+                            pattern,
+                            flags,
+                            scalar_g: false,
+                            delim,
+                        },
+                        line: stage_line,
+                    };
+                    result = stage;
+                }
                 tok => {
                     return Err(self.syntax_err(
                         format!(
-                            "thread: expected stage (ident, sub {{}}, or >{{}}), got {:?}",
+                            "thread: expected stage (ident, sub {{}}, s///, tr///, or /re/), got {:?}",
                             tok
                         ),
                         stage_line,
