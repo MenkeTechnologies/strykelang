@@ -1329,3 +1329,146 @@ fn range_sum_pipeline() {
 fn range_product_pipeline() {
     assert_eq!(eval_int(r#"range(1, 10) |> product"#), 3628800);
 }
+
+// ── outer topic $_< ──
+
+#[test]
+fn outer_topic_basic_map() {
+    // $_< is the previous topic value (shifted per set_topic call)
+    assert_eq!(
+        eval_string(r#"$_ = 10; my @r = map { $_ + $_< } (1, 2, 3); join ',', @r"#),
+        "11,3,5"
+    );
+}
+
+#[test]
+fn outer_topic_in_grep() {
+    // $_< holds the previous $_ before grep set the current element
+    assert_eq!(
+        eval_string(r#"$_ = 3; (1, 2, 3, 4, 5) |> grep { $_ > $_< } |> join ','"#),
+        "2,3,4,5"
+    );
+}
+
+#[test]
+fn outer_topic_double_nesting() {
+    // Two levels: $_< is one up, $_<< is two up
+    assert_eq!(
+        eval_int(
+            r#"$_ = 100;
+            my @outer = map {
+                my @inner = map { $_ + $_< + $_<< } (1);
+                $inner[0]
+            } (10);
+            $outer[0]"#
+        ),
+        111 // 1 + 10 + 100
+    );
+}
+
+#[test]
+fn outer_topic_undef_when_no_enclosing() {
+    // At top level with no enclosing topic, $_< should be undef
+    assert_eq!(
+        eval_int(r#"defined($_<) ? 1 : 0"#),
+        0
+    );
+}
+
+#[test]
+fn outer_topic_in_thread_sub_stage() {
+    assert_eq!(
+        eval_int(r#"$_ = 50; t 10 >{ $_ + $_< }"#),
+        60
+    );
+}
+
+// ── sum/sum0/product with iterators and arrays ──
+
+#[test]
+fn sum_with_array_arg() {
+    assert_eq!(eval_int(r#"my @a = (1, 2, 3); sum(@a)"#), 6);
+}
+
+#[test]
+fn sum0_empty_returns_zero() {
+    assert_eq!(eval_int(r#"sum0()"#), 0);
+}
+
+#[test]
+fn sum_with_iterator_from_range() {
+    assert_eq!(eval_int(r#"sum(range(1, 10))"#), 55);
+}
+
+#[test]
+fn product_with_iterator_from_range() {
+    assert_eq!(eval_int(r#"product(range(1, 6))"#), 720);
+}
+
+#[test]
+fn sum0_with_array_and_scalars_mixed() {
+    assert_eq!(eval_int(r#"my @a = (10, 20); sum0(@a, 5)"#), 35);
+}
+
+// ── range with step edge cases ──
+
+#[test]
+fn range_negative_step() {
+    assert_eq!(eval_string(r#"range(10, 0, -2) |> join ','"#), "10,8,6,4,2,0");
+}
+
+#[test]
+fn range_step_not_evenly_divisible() {
+    assert_eq!(eval_string(r#"range(0, 10, 3) |> join ','"#), "0,3,6,9");
+}
+
+#[test]
+fn range_step_large_jump() {
+    assert_eq!(eval_string(r#"range(0, 100, 50) |> join ','"#), "0,50,100");
+}
+
+#[test]
+fn range_step_single_element() {
+    assert_eq!(eval_string(r#"range(5, 5, 1) |> join ','"#), "5");
+}
+
+#[test]
+fn range_step_descending_with_filter() {
+    assert_eq!(
+        eval_string(r#"range(20, 0, -5) |> grep { $_ % 2 == 0 } |> join ','"#),
+        "20,10,0"
+    );
+}
+
+// ── thread s/// / tr/// edge cases ──
+
+#[test]
+fn thread_subst_empty_replacement() {
+    assert_eq!(eval_string(r#"t "hello" s/l//g"#), "heo");
+}
+
+#[test]
+fn thread_subst_regex_special_chars() {
+    assert_eq!(eval_string(r#"t "a.b.c" s/\./-/g"#), "a-b-c");
+}
+
+#[test]
+fn thread_tr_partial_range() {
+    assert_eq!(eval_string(r#"t "abc123" tr/a-z/A-Z/"#), "ABC123");
+}
+
+#[test]
+fn thread_subst_then_tr() {
+    assert_eq!(eval_string(r#"t "hello world" s/world/perl/ tr/a-z/A-Z/"#), "HELLO PERL");
+}
+
+#[test]
+fn thread_match_in_chain() {
+    // match returns 1/0, then multiply
+    assert_eq!(eval_int(r#"t "abc" m/b/ inc"#), 2);
+}
+
+#[test]
+fn thread_match_no_match_in_chain() {
+    assert_eq!(eval_int(r#"t "abc" m/z/ inc"#), 1);
+}
