@@ -1378,62 +1378,64 @@ perlrs exposes its own parser and dispatcher state as plain Perl hashes, so
 you can enumerate, look up, filter, and pipe over everything the interpreter
 knows about — no separate API surface to learn, just standard hash ops.
 
-The data is derived at compile time from the source of truth (`is_perl5_core`,
-`perlrs_extension_name`, `try_builtin` arm primaries) by `build.rs`, so the
-hashes are **always** in sync with the real parser/dispatcher — no
-hand-maintained count that can go stale.
+The data is derived at compile time by `build.rs` from the source of truth:
+section-commented groups in `is_perl5_core` / `perlrs_extension_name` (for
+categories), `try_builtin` arm names (for aliases), and `doc_for_label_text`
+in `src/lsp.rs` (for descriptions). No hand-maintained list, no stale counts.
 
 #### Hashes
 
-| Long name | Short | Contents |
+| Long name | Short | Key → Value |
 | --- | --- | --- |
-| `%perlrs::builtins` | `%b` | every callable name → `"perl"` or `"extension"` |
-| `%perlrs::perl_compats` | `%pc` | Perl 5 core keyword → `1` |
-| `%perlrs::extensions` | `%e` | perlrs-only name → `1` |
-| `%perlrs::aliases` | `%a` | alias → canonical primary (e.g. `tj` → `to_json`) |
-| `%perlrs::callable` | `%c` | any spelling → canonical name (primary/alias/core unified) |
-
-Invariants (enforced by tests in `tests/suite/reflection.rs`):
-- `keys %perl_compats ∩ keys %extensions == ∅` (disjoint sides).
-- `|%builtins| == |%perl_compats| + |%extensions|`.
-- Every `%aliases` value is present in `%builtins` (no dangling primaries).
+| `%perlrs::builtins` | `%b` | callable name → **category** string (`"parallel"`, `"string"`, `"filesystem"`, `"serialization"`, `"array / list"`, …) |
+| `%perlrs::aliases` | `%a` | alias → canonical primary (`$a{tj}` → `"to_json"`) |
+| `%perlrs::descriptions` | `%d` | name → one-line LSP hover summary (**sparse** — only documented names) |
 
 #### Examples
 
 ```sh
-pe -e 'p scalar keys %b'                       # count every known name
-pe -e 'p $b{map}'                              # "perl"
-pe -e 'p $b{pmap}'                             # "extension"
-pe -e 'p $a{tj}'                               # "to_json" (alias → primary)
-pe -e 'p $c{keys}'                             # "keys" (ExprKind-backed core)
-pe -e 'p exists $pc{pmap} ? 1 : 0'             # 0 — pmap is an extension, not core
+pe -e 'p scalar keys %b'                                 # total callable names
+pe -e 'p $b{pmap}'                                       # "parallel"
+pe -e 'p $b{map}'                                        # "array / list"
+pe -e 'p $b{to_json}'                                    # "serialization"
+pe -e 'p $a{tj}'                                         # "to_json"
+pe -e 'p $d{pmap}'                                       # one-line summary from LSP docs
 
-# iterate + pipe — every encoder primary name:
-pe -e 'keys %b |> grep /^to_/ |> sort |> p'
+# category grep — the main unlock vs. the old tag
+pe -e 'keys %b |> grep { $b{$_} eq "parallel" } |> sort |> p'
 
-# all two-letter short aliases, sorted:
-pe -e 'keys %a |> grep { length == 2 } |> sort |> p'
+# frequency table: how many ops per category?
+pe -e 'my %f; $f{$b{$_}}++ for keys %b; dd \%f'
 
-# find every extension under a pattern (e.g. all p* parallel ops):
-pe -e 'keys %e |> grep /^p/ |> sort |> p'
-
-# reverse lookup — what aliases point at `basename`?
+# aliases pointing at a given primary
 pe -e 'my $p = "basename"; keys %a |> grep { $a{$_} eq $p } |> sort |> p'
 
-# catalog the reflection surface itself:
-pe -e 'for my $h (qw(b a e pc c)) { printf "%-3s %d\n", "%$h", scalar keys %$h }'
+# find every documented op mentioning "parallel"
+pe -e 'keys %d |> grep { $d{$_} =~ /parallel/i } |> sort |> p'
+
+# extensions (anything not in a Perl 5 core category)
+pe -e 'my @core = qw(array\ /\ list hash string numeric time type\ /\ reflection io filesystem ipc process\ /\ system socket posix\ metadata control\ flow quoting phase\ blocks);
+       my %is_core = map { $_ => 1 } @core;
+       keys %b |> grep { !exists $is_core{$b{$_}} } |> sort |> p'
 ```
+
+A cleaner "is this Perl core?" query (no brittle category list): check whether
+the name would satisfy stock `perl`. Since we dropped `%perl_compats`, the most
+stable equivalent now is `grep { $b{$_} ne "uncategorized" } keys %b` for "do
+we know what this is", and the category tells you what *kind* of op it is.
 
 #### Notes
 
-- Hash sigil namespace is separate from scalars and subs, so `%a`/`%b` don't
-  collide with `$a`/`$b` sort specials, and `%e` doesn't collide with the
-  `e` extension sub (bare-name alias for `fore`).
-- Short aliases (`%b`/`%a`/...) are value copies of the long `%perlrs::*`
+- Hash sigil namespace is separate from scalars and subs, so `%a`/`%b`/`%d`
+  don't collide with `$a`/`$b` sort specials or the `e` extension sub.
+- Short aliases (`%b`/`%a`/`%d`) are value copies of the long `%perlrs::*`
   names — currently read-only in practice, so the copy never diverges.
-- `%callable{$name}` returning `$name` unchanged for names like `uc` or `keys`
-  means "this is callable and its canonical form is itself" — i.e. it's either
-  a primary dispatcher name or a core keyword modeled directly in the parser.
+- `%descriptions` is sparse: `exists $d{$name}` doubles as "is this
+  documented in the LSP?". Undocumented ops (`alarm`, `readdir`, …) still
+  appear in `%builtins` with a category — they just lack a hover summary.
+- A value of `"uncategorized"` in `%builtins` means the name is dispatched
+  at runtime but doesn't match any `// ── category ──` section comment in
+  `parser.rs` yet — a flag for "add a section header here", not an error.
 
 ---
 

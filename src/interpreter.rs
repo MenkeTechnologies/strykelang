@@ -1107,28 +1107,27 @@ impl Interpreter {
         scope.declare_hash("ENV", IndexMap::new());
         scope.declare_hash("SIG", IndexMap::new());
         // Reflection hashes — populated from `build.rs`-generated tables so
-        // they track the real parser/dispatcher without hand-maintenance.
-        // Registered under the `perlrs::` namespace (no collision with user
-        // scripts) plus short single/two-letter aliases (`%b`, `%a`, `%e`,
-        // `%pc`, `%c`) — safe because the hash sigil namespace is distinct
-        // from scalars (`$a`/`$b` sort specials) and subs (the `e` extension
-        // is a sub, not a hash). Short aliases duplicate the map; reflection
-        // data is read-only in practice, so divergence isn't a concern.
+        // they track the real parser/dispatcher/LSP without hand-maintenance.
+        // Three hashes instead of the earlier five: values now carry real
+        // signal (category strings / aliases / descriptions) so the old
+        // set-shaped `%perl_compats`/`%extensions`/`%callable` dropped out
+        // — derive those with `grep` + `exists` on `%builtins` / `%aliases`
+        // if needed.
+        //
+        // Registered under `perlrs::*` (no collision with user scripts) plus
+        // short single-letter aliases (`%b`, `%a`, `%d`) — safe because the
+        // hash sigil namespace is distinct from scalars (`$a`/`$b` sort
+        // specials) and subs. Aliases duplicate the map; reflection data is
+        // read-only in practice, so divergence isn't a concern.
         let builtins_map = crate::builtins::builtins_hash_map();
         let aliases_map = crate::builtins::aliases_hash_map();
-        let perl_compats_map = crate::builtins::perl_compats_hash_map();
-        let extensions_map = crate::builtins::extensions_hash_map();
-        let callable_map = crate::builtins::callable_hash_map();
+        let descriptions_map = crate::builtins::descriptions_hash_map();
         scope.declare_hash("perlrs::builtins", builtins_map.clone());
         scope.declare_hash("perlrs::aliases", aliases_map.clone());
-        scope.declare_hash("perlrs::perl_compats", perl_compats_map.clone());
-        scope.declare_hash("perlrs::extensions", extensions_map.clone());
-        scope.declare_hash("perlrs::callable", callable_map.clone());
+        scope.declare_hash("perlrs::descriptions", descriptions_map.clone());
         scope.declare_hash("b", builtins_map);
         scope.declare_hash("a", aliases_map);
-        scope.declare_hash("pc", perl_compats_map);
-        scope.declare_hash("e", extensions_map);
-        scope.declare_hash("c", callable_map);
+        scope.declare_hash("d", descriptions_map);
         scope.declare_array("-", vec![]);
         scope.declare_array("+", vec![]);
         scope.declare_array("^CAPTURE", vec![]);

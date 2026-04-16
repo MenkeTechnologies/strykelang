@@ -197,9 +197,7 @@ pchannel
 peek
 perlrs::aliases
 perlrs::builtins
-perlrs::callable
-perlrs::extensions
-perlrs::perl_compats
+perlrs::descriptions
 pfirst
 pflat_map
 pflat_map_on
