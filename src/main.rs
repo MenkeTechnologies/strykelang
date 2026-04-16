@@ -900,12 +900,12 @@ pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut Interpreter, filenam
 
     if let Some(ref sep) = cli.input_separator {
         match sep.as_deref() {
-            None | Some("") => interp.irs = "\0".to_string(),
-            Some("777") => interp.irs = String::new(),
+            None | Some("") => interp.irs = Some("\0".to_string()),
+            Some("777") => interp.irs = None,   // perl `-0777` enables slurp mode
             Some(oct_str) => {
                 if let Ok(val) = u32::from_str_radix(oct_str, 8) {
                     if let Some(ch) = char::from_u32(val) {
-                        interp.irs = ch.to_string();
+                        interp.irs = Some(ch.to_string());
                     }
                 }
             }

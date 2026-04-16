@@ -436,8 +436,9 @@ pub struct Interpreter {
     pub ofs: String,
     /// Output record separator ($\)
     pub ors: String,
-    /// Input record separator ($/)
-    pub irs: String,
+    /// Input record separator (`$/`). `None` represents undef (slurp mode in `<>`).
+    /// Default at startup: `Some("\n")`. `local $/` (no init) sets `None`.
+    pub irs: Option<String>,
     /// $! — last OS error
     pub errno: String,
     /// Numeric errno for `$!` dualvar (`raw_os_error()`), `0` when unset.
@@ -637,6 +638,11 @@ pub struct Interpreter {
     pub(crate) glob_handle_alias: HashMap<String, String>,
     /// Parallel to [`Scope`] frames: `local *GLOB` entries to restore on [`Self::scope_pop_hook`].
     glob_restore_frames: Vec<Vec<(String, Option<String>)>>,
+    /// `local` saves of special-variable backing fields (`$/`, `$\`, `$,`, `$"`, …).
+    /// Mirrors `glob_restore_frames`: one Vec per scope frame; on `scope_pop_hook` each
+    /// `(name, old_value)` is replayed via `set_special_var` so the underlying interpreter
+    /// state (`self.irs` / `self.ofs` / etc.) restores when a `{ local $X = … }` block exits.
+    pub(crate) special_var_restore_frames: Vec<Vec<(String, PerlValue)>>,
     /// `use English` — long names ([`crate::english::scalar_alias`]) map to short special scalars.
     pub(crate) english_enabled: bool,
     /// `use English qw(-no_match_vars)` — suppress `$MATCH`/`$PREMATCH`/`$POSTMATCH` aliases.
@@ -1128,7 +1134,7 @@ impl Interpreter {
             input_handles: HashMap::new(),
             ofs: String::new(),
             ors: String::new(),
-            irs: "\n".to_string(),
+            irs: Some("\n".to_string()),
             errno: String::new(),
             errno_code: 0,
             eval_error: String::new(),
@@ -1220,6 +1226,7 @@ impl Interpreter {
             formfeed_string: "\x0c".to_string(),
             glob_handle_alias: HashMap::new(),
             glob_restore_frames: vec![Vec::new()],
+            special_var_restore_frames: vec![Vec::new()],
             english_enabled: false,
             english_no_match_vars: false,
             english_match_vars_ever_enabled: false,
@@ -1391,6 +1398,7 @@ impl Interpreter {
             formfeed_string: self.formfeed_string.clone(),
             glob_handle_alias: self.glob_handle_alias.clone(),
             glob_restore_frames: self.glob_restore_frames.clone(),
+            special_var_restore_frames: self.special_var_restore_frames.clone(),
             english_enabled: self.english_enabled,
             english_no_match_vars: self.english_no_match_vars,
             english_match_vars_ever_enabled: self.english_match_vars_ever_enabled,
@@ -1886,6 +1894,7 @@ impl Interpreter {
     pub(crate) fn scope_push_hook(&mut self) {
         self.scope.push_frame();
         self.glob_restore_frames.push(Vec::new());
+        self.special_var_restore_frames.push(Vec::new());
         self.english_lexical_scalars.push(HashSet::new());
         self.our_lexical_scalars.push(HashSet::new());
         self.state_bindings_stack.push(Vec::new());
@@ -1922,6 +1931,13 @@ impl Interpreter {
             for (var_name, state_key) in &bindings {
                 let val = self.scope.get_scalar(var_name).clone();
                 self.state_vars.insert(state_key.clone(), val);
+            }
+        }
+        // `local $/` / `$\` / `$,` / `$"` etc. — restore each special-var backing field
+        // BEFORE the scope frame is popped, since `set_special_var` may consult `self.scope`.
+        if let Some(entries) = self.special_var_restore_frames.pop() {
+            for (name, old) in entries.into_iter().rev() {
+                let _ = self.set_special_var(&name, &old);
             }
         }
         if let Some(entries) = self.glob_restore_frames.pop() {
@@ -2662,6 +2678,28 @@ impl Interpreter {
             "state" => FEAT_STATE,
             "switch" => FEAT_SWITCH,
             "unicode_strings" => FEAT_UNICODE_STRINGS,
+            // Features that perlrs accepts as known but tracks no separate bit for —
+            // either always-on, always-off, or syntactic sugar already enabled.
+            // Keeps `use feature 'X'` from erroring on common Perl 5.20+ pragmas.
+            "postderef"
+            | "postderef_qq"
+            | "evalbytes"
+            | "current_sub"
+            | "fc"
+            | "lexical_subs"
+            | "signatures"
+            | "refaliasing"
+            | "bitwise"
+            | "isa"
+            | "indirect"
+            | "multidimensional"
+            | "bareword_filehandles"
+            | "try"
+            | "defer"
+            | "extra_paired_delimiters"
+            | "module_true"
+            | "class"
+            | "array_base" => return Ok(()),
             _ => {
                 return Err(PerlError::runtime(
                     format!("unknown feature `{}`", name),
@@ -6876,6 +6914,19 @@ impl Interpreter {
                                 }
                             }
                             Sigil::Scalar => {
+                                // `local $X = …` on a special var (`$/`, `$\`, `$,`, `$"`, …)
+                                // must update the interpreter's backing field too — these are
+                                // not stored in `Scope`. Save the prior value for restoration
+                                // on `scope_pop_hook` so the block-exit restore is visible to
+                                // print/I/O code.
+                                if Self::is_special_scalar_name_for_set(&decl.name) {
+                                    let old = self.get_special_var(&decl.name);
+                                    if let Some(frame) = self.special_var_restore_frames.last_mut() {
+                                        frame.push((decl.name.clone(), old));
+                                    }
+                                    self.set_special_var(&decl.name, &val)
+                                        .map_err(|e| e.at_line(stmt.line))?;
+                                }
                                 self.scope.local_set_scalar(&decl.name, val)?;
                             }
                             Sigil::Array => {
@@ -6960,6 +7011,16 @@ impl Interpreter {
                 };
                 match &target.kind {
                     ExprKind::ScalarVar(name) => {
+                        // `local $X = …` on a special var — see twin block in
+                        // `StmtKind::Local` (`Sigil::Scalar`) for rationale.
+                        if Self::is_special_scalar_name_for_set(name) {
+                            let old = self.get_special_var(name);
+                            if let Some(frame) = self.special_var_restore_frames.last_mut() {
+                                frame.push((name.clone(), old));
+                            }
+                            self.set_special_var(name, &val)
+                                .map_err(|e| e.at_line(stmt.line))?;
+                        }
                         self.scope.local_set_scalar(name, val)?;
                     }
                     ExprKind::ArrayVar(name) => {
@@ -12430,7 +12491,10 @@ impl Interpreter {
             "0" => PerlValue::string(self.program_name.clone()),
             "!" => PerlValue::errno_dual(self.errno_code, self.errno.clone()),
             "@" => PerlValue::errno_dual(self.eval_error_code, self.eval_error.clone()),
-            "/" => PerlValue::string(self.irs.clone()),
+            "/" => match &self.irs {
+                Some(s) => PerlValue::string(s.clone()),
+                None => PerlValue::UNDEF,
+            },
             "\\" => PerlValue::string(self.ors.clone()),
             "," => PerlValue::string(self.ofs.clone()),
             "." => {
@@ -12547,7 +12611,7 @@ impl Interpreter {
                 }
             }
             "0" => self.program_name = val.to_string(),
-            "/" => self.irs = val.to_string(),
+            "/" => self.irs = if val.is_undef() { None } else { Some(val.to_string()) },
             "\\" => self.ors = val.to_string(),
             "," => self.ofs = val.to_string(),
             ";" => self.subscript_sep = val.to_string(),

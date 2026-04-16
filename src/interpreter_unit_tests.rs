@@ -99,7 +99,7 @@ fn new_default_program_name() {
 
 #[test]
 fn new_default_irs_newline() {
-    assert_eq!(Interpreter::new().irs, "\n");
+    assert_eq!(Interpreter::new().irs.as_deref(), Some("\n"));
 }
 
 #[test]

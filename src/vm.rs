@@ -2701,6 +2701,20 @@ impl<'a> VM<'a> {
                     Op::LocalDeclareScalar(idx) => {
                         let val = self.pop();
                         let n = names[*idx as usize].as_str();
+                        // `local $X` on a special var (`$/`, `$\`, `$,`, `$"`, …) — see
+                        // tree-interpreter's `StmtKind::Local` handler. Save prior value to
+                        // the interpreter's `special_var_restore_frames` so `scope_pop_hook`
+                        // restores the backing field on block exit.
+                        if Interpreter::is_special_scalar_name_for_set(n) {
+                            let old = self.interp.get_special_var(n);
+                            if let Some(frame) = self.interp.special_var_restore_frames.last_mut() {
+                                frame.push((n.to_string(), old));
+                            }
+                            let line = self.line();
+                            self.interp
+                                .set_special_var(n, &val)
+                                .map_err(|e| e.at_line(line))?;
+                        }
                         self.interp
                             .scope
                             .local_set_scalar(n, val)
