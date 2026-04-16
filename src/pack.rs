@@ -1175,7 +1175,7 @@ mod tests {
         let data = vec![0xDE, 0xAD, 0xBE];
         let v = unpack_vals("H5", &data);
         assert_eq!(v[0].to_string(), "DEADB");
-        
+
         let v2 = unpack_vals("H*", &data);
         assert_eq!(v2[0].to_string(), "DEADBE");
     }

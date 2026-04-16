@@ -822,17 +822,17 @@ mod http_json_tests {
         let tmp = std::env::temp_dir().join(format!("test_df_{}.csv", std::process::id()));
         let csv_data = "id,name,val\n1,alice,10.5\n2,bob,20.0\n";
         std::fs::write(&tmp, csv_data).expect("write csv");
-        
+
         let df_val = dataframe_from_path(tmp.to_str().unwrap()).expect("dataframe_from_path");
         let df_lock = df_val.as_dataframe().expect("as_dataframe");
         let df = df_lock.lock();
-        
+
         assert_eq!(df.columns, vec!["id", "name", "val"]);
         assert_eq!(df.cols.len(), 3);
         assert_eq!(df.cols[0][0].to_string(), "1");
         assert_eq!(df.cols[1][1].to_string(), "bob");
         assert_eq!(df.cols[2][0].to_string(), "10.5");
-        
+
         let _ = std::fs::remove_file(&tmp);
     }
 }

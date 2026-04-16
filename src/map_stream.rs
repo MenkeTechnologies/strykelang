@@ -1453,7 +1453,6 @@ impl PerlIterator for MatchGlobalStreamIterator {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1521,7 +1520,7 @@ mod tests {
             PerlValue::string("b".into()),
         ]));
         let iter = EnumerateIterator::new(source);
-        
+
         let first = iter.next_item().unwrap();
         let first_lock = first.as_array_ref().unwrap();
         let first_arr = first_lock.read();
@@ -1533,7 +1532,7 @@ mod tests {
         let second_arr = second_lock.read();
         assert_eq!(second_arr[0].to_int(), 1);
         assert_eq!(second_arr[1].to_string(), "b");
-        
+
         assert!(iter.next_item().is_none());
     }
 

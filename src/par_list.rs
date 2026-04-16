@@ -139,8 +139,8 @@ pub(crate) fn pfirst_run(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::value::PerlValue;
     use crate::pmap_progress::PmapProgress;
+    use crate::value::PerlValue;
 
     #[test]
     fn test_puniq_run_sequential() {
@@ -205,7 +205,7 @@ mod tests {
         let progress = PmapProgress::new(false, list.len());
         let res = pfirst_run(list.clone(), &progress, |v| v.to_int() == 2);
         assert_eq!(res.unwrap().to_int(), 2);
-        
+
         let res_none = pfirst_run(list, &progress, |v| v.to_int() == 5);
         assert!(res_none.is_none());
     }

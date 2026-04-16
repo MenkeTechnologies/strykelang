@@ -2108,7 +2108,9 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         return 0;
     }
 
-    doc_interactive_loop(&pages, &entries, &intro, start_page, total, C, G, Y, M, B, D, N)
+    doc_interactive_loop(
+        &pages, &entries, &intro, start_page, total, C, G, Y, M, B, D, N,
+    )
 }
 
 /// Truncate/pad text to exactly `height` lines, joined with `\r\n`.
@@ -2139,9 +2141,7 @@ fn build_fixed_pages(
         let mut end = (i + 2).min(entries.len());
         // Try to fit a 3rd if same chapter and lines fit
         if end < entries.len() && entries[end].0 == cat {
-            let lines: usize = (i..=end)
-                .map(|j| entries[j].2.lines().count() + 1)
-                .sum();
+            let lines: usize = (i..=end).map(|j| entries[j].2.lines().count() + 1).sum();
             if lines <= max_lines {
                 end += 1;
             }
@@ -2179,8 +2179,7 @@ fn find_page_for_entry(pages: &[(String, String, Vec<usize>)], entry_idx: usize)
 }
 
 /// SIGWINCH flag — set by the signal handler, cleared after re-render.
-static SIGWINCH_RECEIVED: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
+static SIGWINCH_RECEIVED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Bare signal handler — just sets the atomic flag.
 #[cfg(unix)]
@@ -2216,8 +2215,12 @@ fn doc_interactive_loop(
     unsafe { libc::tcsetattr(stdin_fd, libc::TCSANOW, &raw) };
 
     // Install SIGWINCH handler
-    let old_sigwinch =
-        unsafe { libc::signal(libc::SIGWINCH, sigwinch_handler as *const () as libc::sighandler_t) };
+    let old_sigwinch = unsafe {
+        libc::signal(
+            libc::SIGWINCH,
+            sigwinch_handler as *const () as libc::sighandler_t,
+        )
+    };
 
     // Mutable — rebuilt on terminal resize
     let mut pages = pages.to_vec();
@@ -2230,9 +2233,7 @@ fn doc_interactive_loop(
         ($($arg:tt)*) => { print!("{}\r\n", format!($($arg)*)); };
     }
 
-    let render = |cur: usize,
-                  pages: &[(String, String, Vec<usize>)],
-                  total: usize| {
+    let render = |cur: usize, pages: &[(String, String, Vec<usize>)], total: usize| {
         let (ref cat, ref content, ref indices) = pages[cur];
         // Build topic list for status line
         let topic_list: String = indices
@@ -2252,7 +2253,7 @@ fn doc_interactive_loop(
         print!("\x1b[H\x1b[2J");
 
         // ── Header (rows 1-11, absolute positioned) ──
-        print!("\x1b[1;1H");  // row 1
+        print!("\x1b[1;1H"); // row 1
         rprint!();
         rprint!(" {C}██████╗ ███████╗██████╗ ██╗     ██████╗ ███████╗{N}");
         rprint!(" {C}██╔══██╗██╔════╝██╔══██╗██║     ██╔══██╗██╔════╝{N}");
@@ -2262,17 +2263,24 @@ fn doc_interactive_loop(
         rprint!(" {C}╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚══════╝{N}");
         // Status box
         print!(" {D}┌");
-        for _ in 0..74 { print!("─"); }
+        for _ in 0..74 {
+            print!("─");
+        }
         print!("┐{N}\r\n");
         let status = format!(
             " {G}{:>3}/{}{N}  {D}//{N} {C}{}{N}  {D}//{N} {M}{}{N}",
-            cur + 1, total, topic_display, cat,
+            cur + 1,
+            total,
+            topic_display,
+            cat,
         );
         let vis_len = strip_ansi_len(&status);
         let pad = if vis_len < 74 { 74 - vis_len } else { 0 };
         print!(" {D}│{N}{status}{:>pad$}{D}│{N}\r\n", "", pad = pad);
         print!(" {D}└");
-        for _ in 0..74 { print!("─"); }
+        for _ in 0..74 {
+            print!("─");
+        }
         print!("┘{N}\r\n");
 
         // ── Content (row 12 onward, truncated to fit above footer) ──
@@ -2294,7 +2302,9 @@ fn doc_interactive_loop(
         // ── Footer (pinned to last 3 rows, absolute positioned) ──
         print!("\x1b[{};1H", term_h - 2);
         print!("  {D}");
-        for _ in 0..76 { print!("─"); }
+        for _ in 0..76 {
+            print!("─");
+        }
         print!("{N}\r\n");
         print!("  {C}j{N}/{C}n{N} next  {C}k{N}/{C}p{N} prev  {C}d{N}/{C}u{N} ±5  {C}]{N}/{C}[{N} chapter  {C}t{N} toc  {C}/{N} search  {C}:{N}num  {C}r{N} rand  {C}?{N} help  {C}q{N} quit\r\n");
         print!("  {D}>>>{N} ");
