@@ -530,6 +530,16 @@ pub enum ExprKind {
         exclusive: bool,
     },
 
+    /// `my $x = EXPR` (or `our` / `state` / `local`) used as an *expression* —
+    /// e.g. inside `if (my $line = readline)` / `while (my $x = next())`.
+    /// Evaluation: declare each var in the current scope, evaluate the initializer
+    /// (or default to `undef`), then return the assigned value(s).
+    /// Distinct from `StmtKind::My` which only appears at statement level.
+    MyExpr {
+        keyword: String,    // "my" / "our" / "state" / "local"
+        decls: Vec<VarDecl>,
+    },
+
     // Function call
     FuncCall {
         name: String,
