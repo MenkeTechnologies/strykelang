@@ -6883,7 +6883,9 @@ impl Interpreter {
                             }
                         }
                     }
+                    Ok(val)
                 } else {
+                    let mut last_val = PerlValue::UNDEF;
                     for decl in decls {
                         let val = if let Some(init) = &decl.initializer {
                             let ctx = match decl.sigil {
@@ -6894,6 +6896,7 @@ impl Interpreter {
                         } else {
                             PerlValue::UNDEF
                         };
+                        last_val = val.clone();
                         match decl.sigil {
                             Sigil::Typeglob => {
                                 let old = self.glob_handle_alias.remove(&decl.name);
@@ -6950,8 +6953,8 @@ impl Interpreter {
                             }
                         }
                     }
+                    Ok(last_val)
                 }
-                Ok(PerlValue::UNDEF)
             }
             StmtKind::LocalExpr {
                 target,
@@ -7022,7 +7025,7 @@ impl Interpreter {
                             self.set_special_var(name, &val)
                                 .map_err(|e| e.at_line(stmt.line))?;
                         }
-                        self.scope.local_set_scalar(name, val)?;
+                        self.scope.local_set_scalar(name, val.clone())?;
                     }
                     ExprKind::ArrayVar(name) => {
                         self.scope.local_set_array(name, val.to_list())?;
@@ -7042,13 +7045,13 @@ impl Interpreter {
                     }
                     ExprKind::HashElement { hash, key } => {
                         let ks = self.eval_expr(key)?.to_string();
-                        self.scope.local_set_hash_element(hash, &ks, val)?;
+                        self.scope.local_set_hash_element(hash, &ks, val.clone())?;
                     }
                     ExprKind::ArrayElement { array, index } => {
                         self.check_strict_array_var(array, stmt.line)?;
                         let aname = self.stash_array_name_for_package(array);
                         let idx = self.eval_expr(index)?.to_int();
-                        self.scope.local_set_array_element(&aname, idx, val)?;
+                        self.scope.local_set_array_element(&aname, idx, val.clone())?;
                     }
                     _ => {
                         return Err(PerlError::runtime(
@@ -7061,7 +7064,7 @@ impl Interpreter {
                         .into());
                     }
                 }
-                Ok(PerlValue::UNDEF)
+                Ok(val)
             }
             StmtKind::MySync(decls) => {
                 for decl in decls {
@@ -8496,6 +8499,48 @@ impl Interpreter {
                 } else {
                     Ok(PerlValue::string(val.to_string().repeat(n)))
                 }
+            }
+
+            // `my $x = …` / `our` / `state` / `local` used as an expression
+            // (e.g. `if (my $line = readline)`).  Declare each variable in the
+            // current scope, evaluate the initializer (if any), and return the
+            // assigned value(s).  Re-uses the same scope APIs as `StmtKind::My`.
+            ExprKind::MyExpr { keyword, decls } => {
+                // Build a temporary statement and dispatch to the canonical
+                // statement handler so behavior matches `my $x = …;` exactly.
+                let stmt_kind = match keyword.as_str() {
+                    "my" => StmtKind::My(decls.clone()),
+                    "our" => StmtKind::Our(decls.clone()),
+                    "state" => StmtKind::State(decls.clone()),
+                    "local" => StmtKind::Local(decls.clone()),
+                    _ => StmtKind::My(decls.clone()),
+                };
+                let stmt = Statement {
+                    label: None,
+                    kind: stmt_kind,
+                    line,
+                };
+                self.exec_statement(&stmt)?;
+                // Return the value of the (first) declared variable so the
+                // surrounding expression sees the assigned value, matching
+                // Perl: `if (my $x = 5) { … }` evaluates the condition as 5.
+                let first = decls.first().ok_or_else(|| {
+                    FlowOrError::Error(PerlError::runtime("MyExpr: empty decl list", line))
+                })?;
+                Ok(match first.sigil {
+                    Sigil::Scalar => self.scope.get_scalar(&first.name),
+                    Sigil::Array => PerlValue::array(self.scope.get_array(&first.name)),
+                    Sigil::Hash => {
+                        let h = self.scope.get_hash(&first.name);
+                        let mut flat: Vec<PerlValue> = Vec::with_capacity(h.len() * 2);
+                        for (k, v) in h {
+                            flat.push(PerlValue::string(k));
+                            flat.push(v);
+                        }
+                        PerlValue::array(flat)
+                    }
+                    Sigil::Typeglob => PerlValue::UNDEF,
+                })
             }
 
             // Function calls
@@ -11709,6 +11754,21 @@ impl Interpreter {
             };
             return Ok(arr.get(i).cloned().unwrap_or(PerlValue::UNDEF));
         }
+        // Blessed arrayref (e.g. `List::Util::_Pair`) — Perl allows `->[N]` on
+        // blessed arrayrefs; `pairs` returns blessed `_Pair` objects that the
+        // doc shows being indexed via `$_->[0]` / `$_->[1]`.
+        if let Some(b) = container.as_blessed_ref() {
+            let inner = b.data.read().clone();
+            if let Some(a) = inner.as_array_ref() {
+                let arr = a.read();
+                let i = if idx < 0 {
+                    (arr.len() as i64 + idx) as usize
+                } else {
+                    idx as usize
+                };
+                return Ok(arr.get(i).cloned().unwrap_or(PerlValue::UNDEF));
+            }
+        }
         Err(PerlError::runtime("Can't use arrow deref on non-array-ref", line).into())
     }
 
@@ -12844,8 +12904,10 @@ impl Interpreter {
             "chunked" | "chk" => "List::Util::chunked",
             "windowed" | "win" => "List::Util::windowed",
             "zip" | "zp" => "List::Util::zip",
+            "zip_longest" => "List::Util::zip_longest",
             "zip_shortest" => "List::Util::zip_shortest",
             "mesh" => "List::Util::mesh",
+            "mesh_longest" => "List::Util::mesh_longest",
             "mesh_shortest" => "List::Util::mesh_shortest",
             "any" => "List::Util::any",
             "all" => "List::Util::all",
@@ -12906,11 +12968,13 @@ impl Interpreter {
         match name {
             "uniq" | "distinct" | "uq" | "uniqstr" | "uniqint" | "uniqnum" | "shuffle" | "shuf"
             | "sample" | "chunked" | "chk" | "windowed" | "win" | "zip" | "zp" | "zip_shortest"
-            | "mesh" | "mesh_shortest" | "any" | "all" | "none" | "notall" | "first" | "fst"
-            | "reduce" | "rd" | "reductions" | "sum" | "sum0" | "product" | "min" | "max"
-            | "minstr" | "maxstr" | "mean" | "median" | "med" | "mode" | "stddev" | "std"
-            | "variance" | "var" | "pairs" | "unpairs" | "pairkeys" | "pairvalues" | "pairgrep"
-            | "pairmap" | "pairfirst" => self.call_bare_list_util(name, args, line, want),
+            | "zip_longest" | "mesh" | "mesh_shortest" | "mesh_longest" | "any" | "all"
+            | "none" | "notall" | "first" | "fst" | "reduce" | "rd" | "reductions" | "sum"
+            | "sum0" | "product" | "min" | "max" | "minstr" | "maxstr" | "mean" | "median"
+            | "med" | "mode" | "stddev" | "std" | "variance" | "var" | "pairs" | "unpairs"
+            | "pairkeys" | "pairvalues" | "pairgrep" | "pairmap" | "pairfirst" => {
+                self.call_bare_list_util(name, args, line, want)
+            }
             "deque" => {
                 if !args.is_empty() {
                     return Err(PerlError::runtime("deque() takes no arguments", line).into());

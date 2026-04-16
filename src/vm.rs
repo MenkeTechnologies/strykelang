@@ -1973,8 +1973,10 @@ impl<'a> VM<'a> {
                             | "windowed"
                             | "zip"
                             | "zip_shortest"
+                            | "zip_longest"
                             | "mesh"
                             | "mesh_shortest"
+                            | "mesh_longest"
                             | "any"
                             | "all"
                             | "none"
@@ -2697,8 +2699,9 @@ impl<'a> VM<'a> {
                         }
                         self.interp
                             .scope
-                            .local_set_scalar(n, val)
+                            .local_set_scalar(n, val.clone())
                             .map_err(|e| e.at_line(self.line()))?;
+                        self.push(val);
                         Ok(())
                     }
                     Op::LocalDeclareArray(idx) => {
@@ -2708,6 +2711,7 @@ impl<'a> VM<'a> {
                             .scope
                             .local_set_array(n, val.to_list())
                             .map_err(|e| e.at_line(self.line()))?;
+                        self.push(val);
                         Ok(())
                     }
                     Op::LocalDeclareHash(idx) => {
@@ -2727,6 +2731,7 @@ impl<'a> VM<'a> {
                             .scope
                             .local_set_hash(n, map)
                             .map_err(|e| e.at_line(self.line()))?;
+                        self.push(val);
                         Ok(())
                     }
                     Op::LocalDeclareHashElement(idx) => {
@@ -2738,8 +2743,9 @@ impl<'a> VM<'a> {
                         }
                         self.interp
                             .scope
-                            .local_set_hash_element(n, key.as_str(), val)
+                            .local_set_hash_element(n, key.as_str(), val.clone())
                             .map_err(|e| e.at_line(self.line()))?;
+                        self.push(val);
                         Ok(())
                     }
                     Op::LocalDeclareArrayElement(idx) => {
@@ -2749,8 +2755,9 @@ impl<'a> VM<'a> {
                         self.require_array_mutable(n)?;
                         self.interp
                             .scope
-                            .local_set_array_element(n, index, val)
+                            .local_set_array_element(n, index, val.clone())
                             .map_err(|e| e.at_line(self.line()))?;
+                        self.push(val);
                         Ok(())
                     }
                     Op::LocalDeclareTypeglob(lhs_i, rhs_opt) => {

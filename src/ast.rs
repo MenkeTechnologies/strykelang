@@ -536,7 +536,7 @@ pub enum ExprKind {
     /// (or default to `undef`), then return the assigned value(s).
     /// Distinct from `StmtKind::My` which only appears at statement level.
     MyExpr {
-        keyword: String,    // "my" / "our" / "state" / "local"
+        keyword: String, // "my" / "our" / "state" / "local"
         decls: Vec<VarDecl>,
     },
 

@@ -396,6 +396,17 @@ impl Compiler {
         self.chunk.intern_name(&s)
     }
 
+    /// For `local $x`, qualify to package stash since local only works on package variables.
+    /// Special vars (like `$/`, `$\`, `$,`, `$"`, or `^X` caret vars) are not qualified.
+    fn intern_scalar_for_local(&mut self, bare: &str) -> u16 {
+        if Interpreter::is_special_scalar_name_for_set(bare) || bare.starts_with('^') {
+            self.chunk.intern_name(bare)
+        } else {
+            let s = self.qualify_stash_scalar_name(bare);
+            self.chunk.intern_name(&s)
+        }
+    }
+
     fn register_declare_our_scalar(&mut self, bare_name: &str) {
         let layer = self.scope_stack.last_mut().expect("scope stack");
         layer.declared_scalars.insert(bare_name.to_string());
@@ -1519,18 +1530,21 @@ impl Compiler {
             let tmp_name = self.chunk.intern_name("__list_assign_tmp__");
             self.emit_declare_array(tmp_name, line, false);
             for (i, decl) in decls.iter().enumerate() {
-                let name_idx = self.chunk.intern_name(&decl.name);
                 match decl.sigil {
                     Sigil::Scalar => {
+                        let name_idx = self.intern_scalar_for_local(&decl.name);
                         self.chunk.emit(Op::LoadInt(i as i64), line);
                         self.chunk.emit(Op::GetArrayElem(tmp_name), line);
                         self.chunk.emit(Op::LocalDeclareScalar(name_idx), line);
                     }
                     Sigil::Array => {
+                        let q = self.qualify_stash_array_name(&decl.name);
+                        let name_idx = self.chunk.intern_name(&q);
                         self.chunk.emit(Op::GetArray(tmp_name), line);
                         self.chunk.emit(Op::LocalDeclareArray(name_idx), line);
                     }
                     Sigil::Hash => {
+                        let name_idx = self.chunk.intern_name(&decl.name);
                         self.chunk.emit(Op::GetArray(tmp_name), line);
                         self.chunk.emit(Op::LocalDeclareHash(name_idx), line);
                     }
@@ -1544,9 +1558,9 @@ impl Compiler {
             }
         } else {
             for decl in decls {
-                let name_idx = self.chunk.intern_name(&decl.name);
                 match decl.sigil {
                     Sigil::Scalar => {
+                        let name_idx = self.intern_scalar_for_local(&decl.name);
                         if let Some(init) = &decl.initializer {
                             self.compile_expr(init)?;
                         } else {
@@ -1555,6 +1569,8 @@ impl Compiler {
                         self.chunk.emit(Op::LocalDeclareScalar(name_idx), line);
                     }
                     Sigil::Array => {
+                        let q = self.qualify_stash_array_name(&decl.name);
+                        let name_idx = self.chunk.intern_name(&q);
                         if let Some(init) = &decl.initializer {
                             self.compile_expr_ctx(init, WantarrayCtx::List)?;
                         } else {
@@ -1563,6 +1579,7 @@ impl Compiler {
                         self.chunk.emit(Op::LocalDeclareArray(name_idx), line);
                     }
                     Sigil::Hash => {
+                        let name_idx = self.chunk.intern_name(&decl.name);
                         if let Some(init) = &decl.initializer {
                             self.compile_expr_ctx(init, WantarrayCtx::List)?;
                         } else {
@@ -1571,6 +1588,7 @@ impl Compiler {
                         self.chunk.emit(Op::LocalDeclareHash(name_idx), line);
                     }
                     Sigil::Typeglob => {
+                        let name_idx = self.chunk.intern_name(&decl.name);
                         if let Some(init) = &decl.initializer {
                             let ExprKind::Typeglob(rhs) = &init.kind else {
                                 return Err(CompileError::Unsupported(
@@ -1738,7 +1756,7 @@ impl Compiler {
                 Ok(())
             }
             ExprKind::ScalarVar(name) => {
-                let name_idx = self.intern_scalar_var_for_ops(name);
+                let name_idx = self.intern_scalar_for_local(name);
                 if let Some(init) = initializer {
                     self.compile_expr(init)?;
                 } else {
@@ -2465,10 +2483,19 @@ impl Compiler {
         false
     }
 
+    /// Returns true if the block contains a local declaration.
+    fn block_has_local(block: &Block) -> bool {
+        block.iter().any(|s| match &s.kind {
+            StmtKind::Local(_) | StmtKind::LocalExpr { .. } => true,
+            StmtKind::StmtGroup(inner) => Self::block_has_local(inner),
+            _ => false,
+        })
+    }
+
     fn compile_block(&mut self, block: &Block) -> Result<(), CompileError> {
         if Self::block_has_return(block) {
             self.compile_block_inner(block)?;
-        } else if self.scope_stack.last().is_some_and(|l| l.use_slots) {
+        } else if self.scope_stack.last().is_some_and(|l| l.use_slots) && !Self::block_has_local(block) {
             // When scalar slots are active, skip PushFrame/PopFrame so slot indices keep
             // addressing the same runtime frame. New `my` decls still get fresh slot indices.
             self.compile_block_inner(block)?;
@@ -7046,6 +7073,13 @@ impl Compiler {
             | ExprKind::Yield(_) => {
                 return Err(CompileError::Unsupported(
                     "retry/rate_limit/every/gen/yield (tree interpreter only)".into(),
+                ));
+            }
+            ExprKind::MyExpr { .. } => {
+                // `my $x = …` used as an expression (e.g. `if (my $x = …)`).
+                // Tree interpreter handles via `Interpreter::exec_statement`.
+                return Err(CompileError::Unsupported(
+                    "my/our/state/local in expression context (tree interpreter only)".into(),
                 ));
             }
         }

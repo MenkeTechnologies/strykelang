@@ -1509,6 +1509,32 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::Yield(e) => {
             format!("yield {}", format_expr(e))
         }
+        ExprKind::MyExpr { keyword, decls } => {
+            // Render `my $x = …` etc. inline. Single-decl is the common case
+            // (e.g. `if (my $x = …)`); list-decl reuses the same formatter.
+            let parts: Vec<String> = decls
+                .iter()
+                .map(|d| {
+                    let sigil = match d.sigil {
+                        crate::ast::Sigil::Scalar => '$',
+                        crate::ast::Sigil::Array => '@',
+                        crate::ast::Sigil::Hash => '%',
+                        crate::ast::Sigil::Typeglob => '*',
+                    };
+                    let mut s = format!("{}{}", sigil, d.name);
+                    if let Some(init) = &d.initializer {
+                        s.push_str(" = ");
+                        s.push_str(&format_expr(init));
+                    }
+                    s
+                })
+                .collect();
+            if parts.len() == 1 {
+                format!("{} {}", keyword, parts[0])
+            } else {
+                format!("{} ({})", keyword, parts.join(", "))
+            }
+        }
     }
 }
 

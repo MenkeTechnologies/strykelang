@@ -3589,6 +3589,20 @@ impl Parser {
                     type_annotation: None,
                 }
             }
+            // `my ($a, undef, $c) = (1, 2, 3)` — Perl idiom for discarding a
+            // slot in a list assignment. The interpreter treats `undef`-named
+            // scalar decls as throwaway: declared into a unique sink so the
+            // distribute-to-decls loop advances past the slot.
+            (Token::Ident(ref kw), _) if kw == "undef" => VarDecl {
+                sigil: Sigil::Scalar,
+                // Synthesize a name that user code cannot reference. Each
+                // sink slot in a list-assign gets its own unique name so the
+                // declarations don't collide.
+                name: format!("__undef_sink_{}", self.pos),
+                initializer: None,
+                frozen: false,
+                type_annotation: None,
+            },
             (tok, line) => {
                 return Err(self.syntax_err(
                     format!("Expected variable in declaration, got {:?}", tok),
@@ -5783,6 +5797,45 @@ impl Parser {
 
     fn parse_primary(&mut self) -> PerlResult<Expr> {
         let line = self.peek_line();
+        // `my $x = …` (or `our` / `state` / `local`) used inside an expression —
+        // typically `if (my $x = …)` / `while (my $line = <FH>)`.  Returns the
+        // assigned value(s); has the side effect of declaring the variable in
+        // the current scope.  See `ExprKind::MyExpr`.
+        if let Token::Ident(ref kw) = self.peek().clone() {
+            if matches!(kw.as_str(), "my" | "our" | "state" | "local") {
+                let kw_owned = kw.clone();
+                // Parse exactly like the statement form via `parse_my_our_local`,
+                // then unwrap the resulting `StmtKind::*` back into a list of
+                // `VarDecl`s for the expression node.  This re-uses the full
+                // syntax (typed sigs, list destructuring, type annotations).
+                let saved_pos = self.pos;
+                let stmt = self.parse_my_our_local(&kw_owned, false)?;
+                let decls = match stmt.kind {
+                    StmtKind::My(d)
+                    | StmtKind::Our(d)
+                    | StmtKind::State(d)
+                    | StmtKind::Local(d) => d,
+                    _ => {
+                        // `local *FOO = …` / non-decl forms — fall back to the
+                        // statement parser (already advanced); restore position
+                        // and let the surrounding code handle it as a statement
+                        // by erroring loudly here.
+                        self.pos = saved_pos;
+                        return Err(self.syntax_err(
+                            "`my`/`our`/`local` in expression must declare variables",
+                            line,
+                        ));
+                    }
+                };
+                return Ok(Expr {
+                    kind: ExprKind::MyExpr {
+                        keyword: kw_owned,
+                        decls,
+                    },
+                    line,
+                });
+            }
+        }
         match self.peek().clone() {
             Token::Integer(n) => {
                 self.advance();
@@ -6237,6 +6290,25 @@ impl Parser {
                 })
             }
             "warn" => {
+                let args = self.parse_list_until_terminator()?;
+                Ok(Expr {
+                    kind: ExprKind::Warn(args),
+                    line,
+                })
+            }
+            // `croak` / `confess` — `Carp` builtins available without `use Carp`
+            // (matches the doc claim in `lsp.rs:1243`). For now both desugar to
+            // `die` — TODO: croak should report caller's file/line, confess
+            // should append a full stack trace.
+            "croak" | "confess" => {
+                let args = self.parse_list_until_terminator()?;
+                Ok(Expr {
+                    kind: ExprKind::Die(args),
+                    line,
+                })
+            }
+            // `carp` / `cluck` — `Carp` warning siblings of `croak`/`confess`.
+            "carp" | "cluck" => {
                 let args = self.parse_list_until_terminator()?;
                 Ok(Expr {
                     kind: ExprKind::Warn(args),
@@ -7585,7 +7657,9 @@ impl Parser {
                 })
             }
             "await" => {
-                let a = self.parse_one_arg()?;
+                // `await` defaults to `$_` so `map { await } @tasks` works
+                // (Perl-style topic-defaulting unary).
+                let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Await(Box::new(a)),
                     line,
