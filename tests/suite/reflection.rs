@@ -27,7 +27,10 @@ fn builtins_values_are_category_strings() {
         $n
         "#,
     );
-    assert_eq!(empty, 0, "every %builtins value should be a non-empty category");
+    assert_eq!(
+        empty, 0,
+        "every %builtins value should be a non-empty category"
+    );
 }
 
 /// `%perl_compats` holds only Perl 5 core; `%extensions` only perlrs-only.
@@ -41,7 +44,10 @@ fn perl_compats_and_extensions_partition_builtins() {
         n_b,
         n_pc + n_e,
         "|%builtins|={n_b} but |%perl_compats|+|%extensions|={pc}+{e}={sum} — disjointness broken",
-        n_b = n_b, pc = n_pc, e = n_e, sum = n_pc + n_e,
+        n_b = n_b,
+        pc = n_pc,
+        e = n_e,
+        sum = n_pc + n_e,
     );
 
     // Sample membership.
@@ -101,7 +107,11 @@ fn aliases_resolve_short_form_to_primary() {
 #[test]
 fn descriptions_cover_documented_names() {
     let d = eval_string(r#"$perlrs::descriptions{pmap}"#);
-    assert!(d.len() > 10, "%d{{pmap}} should be real sentence, got {:?}", d);
+    assert!(
+        d.len() > 10,
+        "%d{{pmap}} should be real sentence, got {:?}",
+        d
+    );
     assert_eq!(
         eval_int(r#"exists $perlrs::descriptions{definitely_not_a_builtin_xyz} ? 1 : 0"#),
         0,
@@ -135,7 +145,7 @@ fn categories_inverted_index_returns_name_arrayrefs() {
     );
     assert_eq!(
         mismatch, 0,
-        "%categories[string] should match grep { $b{_} eq 'string' } keys %b",
+        "%categories[string] should match grep {{ $b{{_}} eq 'string' }} keys %b",
     );
 }
 
@@ -177,7 +187,10 @@ fn primaries_inverted_index_returns_alias_arrayrefs() {
         $n
         "#,
     );
-    assert_eq!(dangling, 0, "every %primaries key should be a known builtin");
+    assert_eq!(
+        dangling, 0,
+        "every %primaries key should be a known builtin"
+    );
 }
 
 /// Short aliases mirror long names. Seven one-char hashes: b, pc, e, a, d, c, p.

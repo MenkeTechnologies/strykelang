@@ -1534,6 +1534,7 @@ impl Lexer {
                     "my"
                     | "mysync"
                     | "frozen"
+                    | "const"
                     | "typed"
                     | "our"
                     | "local"

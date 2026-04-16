@@ -442,7 +442,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 | String | `chomp`, `chop`, `length`, `substr`, `index`, `rindex`, `split`, `join`, `sprintf`, `printf`, `uc`/`lc`/`ucfirst`/`lcfirst`, `chr`, `ord`, `hex`, `oct`, `crypt`, `fc`, `pos`, `study`, `quotemeta`, `trim`, `lines`, `words`, `chars`, `snake_case`, `camel_case`, `kebab_case` |
 | Binary | `pack`, `unpack` (subset `A a N n V v C Q q Z H x w i I l L s S f d` + `*`), `vec` |
 | Numeric | `abs`, `int`, `sqrt`, `squared`/`sq`, `cubed`/`cb`, `expt(B,E)`, `sin`, `cos`, `atan2`, `exp`, `log`, `rand`, `srand`, `avg`, `stddev`, `clamp`, `normalize`, `range(N, M)` (lazy bidirectional) |
-| I/O | `print`, `p`, `say`, `printf`, `open` (incl. `open my $fh`, files, `-\|` / `\|-` pipes), `close`, `eof`, `readline`, `read`, `seek`, `tell`, `sysopen`, `sysread`/`syswrite`/`sysseek`, handle methods `->print/->say/->printf/->getline/->close/->eof/->getc/->flush`, `slurp`, `input`, backticks/`qx{}`, `capture` (structured: `->stdout/->stderr/->exit`), `binmode`, `fileno`, `flock`, `getc`, `select`, `truncate`, `formline`, `read_lines`, `append_file`, `to_file`, `read_json`, `write_json`, `tempfile`, `tempdir` |
+| I/O | `print`, `p`, `say`, `printf`, `open` (incl. `open my $fh`, files, `-\|` / `\|-` pipes), `close`, `eof`, `readline`, `read`, `seek`, `tell`, `sysopen`, `sysread`/`syswrite`/`sysseek`, handle methods `->print/->say/->printf/->getline/->close/->eof/->getc/->flush`, `slurp`, `input`, backticks/`qx{}`, `capture` (structured: `->stdout/->stderr/->exit`), `pager`/`pg`/`less` (pipes value into `$PAGER`; TTY-gated), `binmode`, `fileno`, `flock`, `getc`, `select`, `truncate`, `formline`, `read_lines`, `append_file`, `to_file`, `read_json`, `write_json`, `tempfile`, `tempdir` |
 | Directory | `opendir`, `readdir`, `closedir`, `rewinddir`, `telldir`, `seekdir`, `files`, `filesf`/`f`, `fr` (recursive files, lazy iterator), `dirs`/`d`, `dr` (recursive dirs, lazy iterator), `sym_links`, `sockets`, `pipes`, `block_devices`, `char_devices` |
 | File tests | `-e`, `-f`, `-d`, `-l`, `-r`, `-w`, `-s`, `-z`, `-x`, `-t` (defaults to `$_`) |
 | System | `system`, `exec`, `exit`, `chdir`, `mkdir`, `unlink`, `rename`, `chmod`, `chown`, `chroot`, `stat`, `lstat`, `link`, `symlink`, `readlink`, `glob`, `glob_par`, `glob_match`, `which_all`, `par_sed`, `par_find_files`, `par_line_count`, `ppool`, `barrier`, `fork`, `wait`, `waitpid`, `kill`, `alarm`, `sleep`, `times`, `dump`, `reset` |
@@ -493,7 +493,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **Bytecode cache** ([\[0x0F\]](#0x0f-bytecode-cache-pec)): `PERLRS_BC_CACHE=1` skips parse + compile on warm starts via on-disk `.pec` bundles.
 - **Language server** ([\[0x11\]](#0x11-language-server---lsp)): `pe --lsp` runs an LSP server over stdio with diagnostics, hover, completion.
 - `mysync` shared state ([\[0x04\]](#0x04-shared-state-mysync)).
-- `frozen my`, `typed my`, `struct`, algebraic `match`, `try/catch/finally`, `eval_timeout`, `retry`, `rate_limit`, `every`, `gen { ... yield }`.
+- `frozen my` (or `const my` — same thing, more familiar spelling), `typed my`, `struct`, algebraic `match`, `try/catch/finally`, `eval_timeout`, `retry`, `rate_limit`, `every`, `gen { ... yield }`.
 - **Outer topic `$_<`** — access the enclosing scope's `$_` from nested blocks; up to 4 levels (`$_<` through `$_<<<<`). See [\[0x03\]](#0x03-parallel-primitives).
 - **`fore`** (`e`) — side-effect-only list iterator (like `map` but void, returns item count). Works with `{ BLOCK } LIST`, blockless `e EXPR, LIST`, and pipe-forward `|> e say`. Use for print/log/accumulator loops.
 - **Pipe-forward `|>`** — parse-time desugaring (zero runtime cost); threads the LHS as the **first** argument of the RHS call, left-associative. `map`, `grep`/`filter`, `sort`, and `e` accept **blockless expressions** on the RHS of `|>` — no `{ }` required for simple transforms:
@@ -1385,13 +1385,14 @@ in `src/lsp.rs` (for descriptions). No hand-maintained list, no stale counts.
 
 #### Hashes
 
-Seven hashes; every direct lookup (`$h{name}`) is **O(1)**. Forward maps:
+Eight hashes; every direct lookup (`$h{name}`) is **O(1)**. Forward maps:
 
 | Long name | Short | Key → Value |
 | --- | --- | --- |
-| `%perlrs::builtins` | `%b` | callable name → category (`"parallel"`, `"string"`, …) |
-| `%perlrs::perl_compats` | `%pc` | subset: Perl 5 core only, name → category |
-| `%perlrs::extensions` | `%e` | subset: perlrs-only, name → category |
+| `%perlrs::builtins` | `%b` | **primary** callable name → category (`"parallel"`, `"string"`, …). Primaries-only — clean unique-op count. |
+| `%perlrs::all` | `%all` | **every spelling** (primary + alias) → category. Aliases inherit their primary's tag. Use this for `scalar keys %all`. |
+| `%perlrs::perl_compats` | `%pc` | subset of `%b`: Perl 5 core only, name → category |
+| `%perlrs::extensions` | `%e` | subset of `%b`: perlrs-only, name → category |
 | `%perlrs::aliases` | `%a` | alias → canonical primary (`$a{tj}` → `"to_json"`) |
 | `%perlrs::descriptions` | `%d` | name → one-line LSP summary (**sparse**) |
 
@@ -1412,8 +1413,12 @@ pe -e 'p $pc{map}'              # "array / list"
 pe -e 'p $e{pmap}'              # "parallel"
 pe -e 'p $a{tj}'                # "to_json"
 pe -e 'p $d{pmap}'              # LSP one-liner
+pe -e 'p $all{tj}'              # "serialization"  (alias resolved via %all)
 pe -e 'p scalar @{$c{parallel}}'  # number of parallel ops
 pe -e '$p{to_json} |> e p'        # every alias of to_json
+
+# total callable spellings (primaries + aliases), one direct count
+pe -e 'p scalar keys %all'
 
 # see just Perl compats
 pe -e 'keys %pc |> sort |> p'
@@ -1425,6 +1430,9 @@ pe -e 'keys %e |> sort |> p'
 pe -e '$c{parallel} |> e p'
 pe -e '$c{"array / list"} |> e p'
 
+# browse any of them interactively via the pager
+pe -e 'keys %all |> less'
+
 # frequency table: how many ops per category?
 pe -e 'my %f; $f{$b{$_}}++ for keys %b; dd \%f'
 
@@ -1432,8 +1440,8 @@ pe -e 'my %f; $f{$b{$_}}++ for keys %b; dd \%f'
 pe -e 'keys %d |> grep { $d{$_} =~ /parallel/i } |> sort |> p'
 
 # catalog the full reflection surface
-pe -e 'for my $h (qw(b pc e a d c p)) {
-         printf "%%%-2s %d\n", $h, scalar keys %$h
+pe -e 'for my $h (qw(b all pc e a d c p)) {
+         printf "%%%-4s %d\n", $h, scalar keys %$h
        }'
 ```
 

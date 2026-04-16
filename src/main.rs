@@ -2726,7 +2726,6 @@ fn render_page_content(topic: &str, text: &str, C: &str, G: &str, D: &str, N: &s
     out
 }
 
-
 /// Replace `backtick` spans with colored versions for terminal output.
 fn render_inline_code(line: &str, color: &str, reset: &str) -> String {
     let mut out = String::with_capacity(line.len() + 64);

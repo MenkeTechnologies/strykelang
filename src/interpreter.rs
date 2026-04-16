@@ -1128,6 +1128,7 @@ impl Interpreter {
         let descriptions_map = crate::builtins::descriptions_hash_map();
         let categories_map = crate::builtins::categories_hash_map();
         let primaries_map = crate::builtins::primaries_hash_map();
+        let all_map = crate::builtins::all_hash_map();
         scope.declare_hash("perlrs::builtins", builtins_map.clone());
         scope.declare_hash("perlrs::perl_compats", perl_compats_map.clone());
         scope.declare_hash("perlrs::extensions", extensions_map.clone());
@@ -1135,6 +1136,7 @@ impl Interpreter {
         scope.declare_hash("perlrs::descriptions", descriptions_map.clone());
         scope.declare_hash("perlrs::categories", categories_map.clone());
         scope.declare_hash("perlrs::primaries", primaries_map.clone());
+        scope.declare_hash("perlrs::all", all_map.clone());
         scope.declare_hash("b", builtins_map);
         scope.declare_hash("pc", perl_compats_map);
         scope.declare_hash("e", extensions_map);
@@ -1142,6 +1144,7 @@ impl Interpreter {
         scope.declare_hash("d", descriptions_map);
         scope.declare_hash("c", categories_map);
         scope.declare_hash("p", primaries_map);
+        scope.declare_hash("all", all_map);
         scope.declare_array("-", vec![]);
         scope.declare_array("+", vec![]);
         scope.declare_array("^CAPTURE", vec![]);

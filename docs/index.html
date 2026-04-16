@@ -149,7 +149,7 @@
             <span class="sep">/</span>
             <a href="https://docs.rs/perlrs" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line">Rust-powered · Rayon work-stealing · Cranelift JIT · Perl 5 compat surface + pipe-forward sugar</p>
+          <p class="docs-build-line" id="perlrsBuildLine">perlrs v0.4.8 · Rust-powered · Rayon work-stealing · Cranelift JIT · Perl 5 compat surface + pipe-forward sugar</p>
         </div>
         <div class="tutorial-toolbar">
           <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -209,7 +209,7 @@ pe -e 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
 
       <section class="tutorial-section">
         <h2>Language reflection</h2>
-        <p>Everything the parser and dispatcher know about is exposed as plain Perl hashes, populated from the source of truth at compile time. <code>build.rs</code> parses category-labeled section comments in <code>is_perl5_core</code> / <code>perlrs_extension_name</code>, the <code>try_builtin</code> match arms, and LSP hover docs in <code>doc_for_label_text</code>. <strong>Seven hashes — every direct lookup is O(1)</strong>.</p>
+        <p>Everything the parser and dispatcher know about is exposed as plain Perl hashes, populated from the source of truth at compile time. <code>build.rs</code> parses category-labeled section comments in <code>is_perl5_core</code> / <code>perlrs_extension_name</code>, the <code>try_builtin</code> match arms, and LSP hover docs in <code>doc_for_label_text</code>. <strong>Eight hashes — every direct lookup is O(1)</strong>.</p>
 
         <h3>Forward maps</h3>
         <table class="reflection-table">
@@ -217,9 +217,10 @@ pe -e 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
             <tr><th>Long name</th><th>Short</th><th>Key → Value</th></tr>
           </thead>
           <tbody>
-            <tr><td><code>%perlrs::builtins</code></td><td><code>%b</code></td><td>callable name → <strong>category</strong> (<code>"parallel"</code>, <code>"string"</code>, …)</td></tr>
-            <tr><td><code>%perlrs::perl_compats</code></td><td><code>%pc</code></td><td>Perl 5 core only, name → category</td></tr>
-            <tr><td><code>%perlrs::extensions</code></td><td><code>%e</code></td><td>perlrs-only, name → category</td></tr>
+            <tr><td><code>%perlrs::builtins</code></td><td><code>%b</code></td><td><strong>primary</strong> callable name → category. Clean unique-op count.</td></tr>
+            <tr><td><code>%perlrs::all</code></td><td><code>%all</code></td><td><strong>every spelling</strong> (primary + alias) → category. Aliases inherit their primary's tag. Use for <code>scalar keys %all</code>.</td></tr>
+            <tr><td><code>%perlrs::perl_compats</code></td><td><code>%pc</code></td><td>subset of <code>%b</code>: Perl 5 core only, name → category</td></tr>
+            <tr><td><code>%perlrs::extensions</code></td><td><code>%e</code></td><td>subset of <code>%b</code>: perlrs-only, name → category</td></tr>
             <tr><td><code>%perlrs::aliases</code></td><td><code>%a</code></td><td>alias → canonical primary</td></tr>
             <tr><td><code>%perlrs::descriptions</code></td><td><code>%d</code></td><td>name → LSP one-liner (<em>sparse</em>)</td></tr>
           </tbody>
@@ -239,17 +240,19 @@ pe -e 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
         <h3>Examples</h3>
         <div class="oneliner">pe -e 'p $b{pmap}'                              <span class="comment"># "parallel"</span></div>
         <div class="oneliner">pe -e 'p $b{to_json}'                           <span class="comment"># "serialization"</span></div>
-        <div class="oneliner">pe -e 'p $pc{map}'                              <span class="comment"># "array / list"  (Perl core only)</span></div>
-        <div class="oneliner">pe -e 'p $e{pmap}'                              <span class="comment"># "parallel"      (extensions only)</span></div>
+        <div class="oneliner">pe -e 'p $all{tj}'                              <span class="comment"># "serialization"  (alias resolves via %all)</span></div>
+        <div class="oneliner">pe -e 'p scalar keys %all'                      <span class="comment"># total callable spellings (primaries + aliases)</span></div>
+        <div class="oneliner">pe -e 'p $pc{map}'                              <span class="comment"># "array / list"   (Perl core only)</span></div>
+        <div class="oneliner">pe -e 'p $e{pmap}'                              <span class="comment"># "parallel"       (extensions only)</span></div>
         <div class="oneliner">pe -e 'p $a{tj}'                                <span class="comment"># "to_json"</span></div>
         <div class="oneliner">pe -e 'p $d{pmap}'                              <span class="comment"># LSP one-liner</span></div>
         <div class="oneliner">pe -e '$c{parallel} |&gt; e p'                      <span class="comment"># every parallel op, O(1) reverse-lookup</span></div>
-        <div class="oneliner">pe -e 'p scalar @{ $c{parallel} }'              <span class="comment"># how many</span></div>
         <div class="oneliner">pe -e '$p{to_json} |&gt; e p'                       <span class="comment"># every alias of to_json</span></div>
         <div class="oneliner">pe -e 'keys %pc |&gt; sort |&gt; p'                    <span class="comment"># every Perl compat, sorted</span></div>
         <div class="oneliner">pe -e 'keys %e  |&gt; sort |&gt; p'                    <span class="comment"># every perlrs extension</span></div>
+        <div class="oneliner">pe -e 'keys %all |&gt; less'                       <span class="comment"># browse every spelling in $PAGER</span></div>
         <div class="oneliner">pe -e 'my %f; $f{$b{$_}}++ for keys %b; dd \%f'  <span class="comment"># per-category frequency</span></div>
-        <div class="oneliner">pe -e 'for my $h (qw(b pc e a d c p)) { printf "%%%-2s %d\n", $h, scalar keys %$h }'  <span class="comment"># catalog</span></div>
+        <div class="oneliner">pe -e 'for my $h (qw(b all pc e a d c p)) { printf "%%%-4s %d\n", $h, scalar keys %$h }'  <span class="comment"># catalog</span></div>
 
         <h3>Notes</h3>
         <ul>
@@ -291,14 +294,14 @@ f("*.txt") |&gt; map { [$_, slurp($_) |&gt; split(/\s+/) |&gt; scalar] }
           <div class="cat-card"><h4>Hash</h4><p><code>keys values each delete exists select_keys top</code></p></div>
           <div class="cat-card"><h4>String</h4><p><code>chomp chop length substr index rindex split join sprintf printf uc lc ucfirst lcfirst chr ord hex oct fc pos study quotemeta trim lines words chars snake_case camel_case kebab_case</code></p></div>
           <div class="cat-card"><h4>Numeric</h4><p><code>abs int sqrt squared/sq cubed/cb expt/pow sin cos atan2 exp log rand srand inc dec avg stddev clamp normalize range</code></p></div>
-          <div class="cat-card"><h4>I/O</h4><p><code>print p say printf open close eof readline read seek tell slurp input capture binmode flock getc select truncate read_lines append_file to_file read_json write_json tempfile tempdir</code></p></div>
+          <div class="cat-card"><h4>I/O</h4><p><code>print p say printf open close eof readline read seek tell slurp input capture pager/pg/less binmode flock getc select truncate read_lines append_file to_file read_json write_json tempfile tempdir</code></p></div>
           <div class="cat-card"><h4>Filesystem</h4><p><code>files/f fr dirs/d dr sym_links sockets pipes block_devices char_devices glob glob_par basename dirname realpath which which_all stat lstat size</code></p></div>
           <div class="cat-card"><h4>Serialization</h4><p><code>to_json/tj to_csv/tc to_toml/tt to_yaml/ty to_xml/tx ddump/dd stringify/str json_encode/decode yaml_encode/decode toml_encode/decode xml_encode/decode</code></p></div>
           <div class="cat-card"><h4>Parallel</h4><p><code>pmap pflat_map pgrep pfor psort preduce preduce_init pmap_reduce pmap_chunked pcache ppool pchannel pselect puniq pfirst pany fan fan_cap pipeline par_pipeline_stream glob_par par_walk par_lines par_sed par_find_files par_line_count pwatch watch</code></p></div>
           <div class="cat-card"><h4>Async / timing</h4><p><code>async spawn await timer bench trace eval_timeout retry rate_limit every gen</code></p></div>
           <div class="cat-card"><h4>Data / network</h4><p><code>fetch fetch_json fetch_async par_fetch csv_read csv_write dataframe sqlite json_jq jwt_encode/decode hmac sha1 sha256 md5 uuid base64_encode/decode hex_encode/decode url_encode/decode gzip gunzip zstd</code></p></div>
           <div class="cat-card"><h4>System</h4><p><code>system exec exit chdir mkdir unlink rename chmod chown stat lstat link symlink readlink fork wait waitpid kill alarm sleep times uname gethostname getcwd chroot touch utime umask realpath canonpath</code></p></div>
-          <div class="cat-card"><h4>Reflection</h4><p>Seven O(1) hashes — forward maps (<code>%b</code> builtins, <code>%pc</code> perl_compats, <code>%e</code> extensions, <code>%a</code> aliases, <code>%d</code> descriptions) and inverted indexes (<code>%c</code> categories, <code>%p</code> primaries). See the Language reflection section.</p></div>
+          <div class="cat-card"><h4>Reflection</h4><p>Eight O(1) hashes — forward maps (<code>%b</code> builtins, <code>%all</code> every spelling, <code>%pc</code> perl_compats, <code>%e</code> extensions, <code>%a</code> aliases, <code>%d</code> descriptions) and inverted indexes (<code>%c</code> categories, <code>%p</code> primaries). See the Language reflection section.</p></div>
         </div>
       </section>
 

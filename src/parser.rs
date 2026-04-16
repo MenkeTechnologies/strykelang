@@ -337,7 +337,7 @@ impl Parser {
                 "use" | "no" | "my" | "our" | "local" | "sub" | "struct"
                 | "if" | "unless" | "while" | "until" | "for" | "foreach"
                 | "return" | "last" | "next" | "redo" | "package" | "require"
-                | "BEGIN" | "END" | "UNITCHECK" | "frozen" | "typed"
+                | "BEGIN" | "END" | "UNITCHECK" | "frozen" | "const" | "typed"
             )
         )
     }
@@ -388,305 +388,290 @@ impl Parser {
             _ => None,
         };
 
-        let mut stmt =
-            match self.peek().clone() {
-                Token::FormatDecl { .. } => {
-                    let tok_line = self.peek_line();
-                    let (tok, _) = self.advance();
-                    match tok {
-                        Token::FormatDecl { name, lines } => Statement {
-                            label: label.clone(),
-                            kind: StmtKind::FormatDecl { name, lines },
-                            line: tok_line,
-                        },
-                        _ => unreachable!(),
+        let mut stmt = match self.peek().clone() {
+            Token::FormatDecl { .. } => {
+                let tok_line = self.peek_line();
+                let (tok, _) = self.advance();
+                match tok {
+                    Token::FormatDecl { name, lines } => Statement {
+                        label: label.clone(),
+                        kind: StmtKind::FormatDecl { name, lines },
+                        line: tok_line,
+                    },
+                    _ => unreachable!(),
+                }
+            }
+            Token::Ident(ref kw) => match kw.as_str() {
+                "if" => self.parse_if()?,
+                "unless" => self.parse_unless()?,
+                "while" => {
+                    let mut s = self.parse_while()?;
+                    if let StmtKind::While {
+                        label: ref mut lbl, ..
+                    } = s.kind
+                    {
+                        *lbl = label.clone();
+                    }
+                    s
+                }
+                "until" => {
+                    let mut s = self.parse_until()?;
+                    if let StmtKind::Until {
+                        label: ref mut lbl, ..
+                    } = s.kind
+                    {
+                        *lbl = label.clone();
+                    }
+                    s
+                }
+                "for" => {
+                    let mut s = self.parse_for_or_foreach()?;
+                    match s.kind {
+                        StmtKind::For {
+                            label: ref mut lbl, ..
+                        }
+                        | StmtKind::Foreach {
+                            label: ref mut lbl, ..
+                        } => *lbl = label.clone(),
+                        _ => {}
+                    }
+                    s
+                }
+                "foreach" => {
+                    let mut s = self.parse_foreach()?;
+                    if let StmtKind::Foreach {
+                        label: ref mut lbl, ..
+                    } = s.kind
+                    {
+                        *lbl = label.clone();
+                    }
+                    s
+                }
+                "sub" | "fn" => self.parse_sub_decl()?,
+                "struct" => {
+                    if crate::compat_mode() {
+                        return Err(self.syntax_err(
+                            "`struct` is a perlrs extension (disabled by --compat)",
+                            self.peek_line(),
+                        ));
+                    }
+                    self.parse_struct_decl()?
+                }
+                "my" => self.parse_my_our_local("my", false)?,
+                "state" => self.parse_my_our_local("state", false)?,
+                "mysync" => {
+                    if crate::compat_mode() {
+                        return Err(self.syntax_err(
+                            "`mysync` is a perlrs extension (disabled by --compat)",
+                            self.peek_line(),
+                        ));
+                    }
+                    self.parse_my_our_local("mysync", false)?
+                }
+                "frozen" | "const" => {
+                    let leading = kw.as_str().to_string();
+                    if crate::compat_mode() {
+                        return Err(self.syntax_err(
+                            format!("`{leading}` is a perlrs extension (disabled by --compat)"),
+                            self.peek_line(),
+                        ));
+                    }
+                    // `frozen my $x = val;` / `const my $x = val;` — the
+                    // two spellings are interchangeable (`const` is the
+                    // more-familiar name for new users). Expects `my`
+                    // to follow.
+                    self.advance(); // consume "frozen"/"const"
+                    if let Token::Ident(ref kw) = self.peek().clone() {
+                        if kw == "my" {
+                            let mut stmt = self.parse_my_our_local("my", false)?;
+                            if let StmtKind::My(ref mut decls) = stmt.kind {
+                                for decl in decls.iter_mut() {
+                                    decl.frozen = true;
+                                }
+                            }
+                            stmt
+                        } else {
+                            return Err(self.syntax_err(
+                                format!("Expected 'my' after '{leading}'"),
+                                self.peek_line(),
+                            ));
+                        }
+                    } else {
+                        return Err(self.syntax_err(
+                            format!("Expected 'my' after '{leading}'"),
+                            self.peek_line(),
+                        ));
                     }
                 }
-                Token::Ident(ref kw) => match kw.as_str() {
-                    "if" => self.parse_if()?,
-                    "unless" => self.parse_unless()?,
-                    "while" => {
-                        let mut s = self.parse_while()?;
-                        if let StmtKind::While {
-                            label: ref mut lbl, ..
-                        } = s.kind
-                        {
-                            *lbl = label.clone();
-                        }
-                        s
+                "typed" => {
+                    if crate::compat_mode() {
+                        return Err(self.syntax_err(
+                            "`typed` is a perlrs extension (disabled by --compat)",
+                            self.peek_line(),
+                        ));
                     }
-                    "until" => {
-                        let mut s = self.parse_until()?;
-                        if let StmtKind::Until {
-                            label: ref mut lbl, ..
-                        } = s.kind
-                        {
-                            *lbl = label.clone();
-                        }
-                        s
-                    }
-                    "for" => {
-                        let mut s = self.parse_for_or_foreach()?;
-                        match s.kind {
-                            StmtKind::For {
-                                label: ref mut lbl, ..
-                            }
-                            | StmtKind::Foreach {
-                                label: ref mut lbl, ..
-                            } => *lbl = label.clone(),
-                            _ => {}
-                        }
-                        s
-                    }
-                    "foreach" => {
-                        let mut s = self.parse_foreach()?;
-                        if let StmtKind::Foreach {
-                            label: ref mut lbl, ..
-                        } = s.kind
-                        {
-                            *lbl = label.clone();
-                        }
-                        s
-                    }
-                    "sub" | "fn" => self.parse_sub_decl()?,
-                    "struct" => {
-                        if crate::compat_mode() {
-                            return Err(self.syntax_err(
-                                "`struct` is a perlrs extension (disabled by --compat)",
-                                self.peek_line(),
-                            ));
-                        }
-                        self.parse_struct_decl()?
-                    }
-                    "my" => self.parse_my_our_local("my", false)?,
-                    "state" => self.parse_my_our_local("state", false)?,
-                    "mysync" => {
-                        if crate::compat_mode() {
-                            return Err(self.syntax_err(
-                                "`mysync` is a perlrs extension (disabled by --compat)",
-                                self.peek_line(),
-                            ));
-                        }
-                        self.parse_my_our_local("mysync", false)?
-                    }
-                    "frozen" => {
-                        if crate::compat_mode() {
-                            return Err(self.syntax_err(
-                                "`frozen` is a perlrs extension (disabled by --compat)",
-                                self.peek_line(),
-                            ));
-                        }
-                        // frozen my $x = val; — expect "my" keyword after "frozen"
-                        self.advance(); // consume "frozen"
-                        if let Token::Ident(ref kw) = self.peek().clone() {
-                            if kw == "my" {
-                                let mut stmt = self.parse_my_our_local("my", false)?;
-                                // Mark all decls as frozen
-                                if let StmtKind::My(ref mut decls) = stmt.kind {
-                                    for decl in decls.iter_mut() {
-                                        decl.frozen = true;
-                                    }
-                                }
-                                stmt
-                            } else {
-                                return Err(self
-                                    .syntax_err("Expected 'my' after 'frozen'", self.peek_line()));
-                            }
-                        } else {
-                            return Err(
-                                self.syntax_err("Expected 'my' after 'frozen'", self.peek_line())
-                            );
-                        }
-                    }
-                    "typed" => {
-                        if crate::compat_mode() {
-                            return Err(self.syntax_err(
-                                "`typed` is a perlrs extension (disabled by --compat)",
-                                self.peek_line(),
-                            ));
-                        }
-                        self.advance();
-                        if let Token::Ident(ref kw) = self.peek().clone() {
-                            if kw == "my" {
-                                self.parse_my_our_local("my", true)?
-                            } else {
-                                return Err(self
-                                    .syntax_err("Expected 'my' after 'typed'", self.peek_line()));
-                            }
+                    self.advance();
+                    if let Token::Ident(ref kw) = self.peek().clone() {
+                        if kw == "my" {
+                            self.parse_my_our_local("my", true)?
                         } else {
                             return Err(
                                 self.syntax_err("Expected 'my' after 'typed'", self.peek_line())
                             );
                         }
+                    } else {
+                        return Err(
+                            self.syntax_err("Expected 'my' after 'typed'", self.peek_line())
+                        );
                     }
-                    "our" => self.parse_my_our_local("our", false)?,
-                    "local" => self.parse_my_our_local("local", false)?,
-                    "package" => self.parse_package()?,
-                    "use" => self.parse_use()?,
-                    "no" => self.parse_no()?,
-                    "return" => self.parse_return()?,
-                    "last" => {
-                        self.advance();
-                        let lbl = if let Token::Ident(ref s) = self.peek() {
-                            if s.chars().all(|c| c.is_uppercase() || c == '_') {
-                                let (Token::Ident(l), _) = self.advance() else {
-                                    unreachable!()
-                                };
-                                Some(l)
-                            } else {
-                                None
-                            }
+                }
+                "our" => self.parse_my_our_local("our", false)?,
+                "local" => self.parse_my_our_local("local", false)?,
+                "package" => self.parse_package()?,
+                "use" => self.parse_use()?,
+                "no" => self.parse_no()?,
+                "return" => self.parse_return()?,
+                "last" => {
+                    self.advance();
+                    let lbl = if let Token::Ident(ref s) = self.peek() {
+                        if s.chars().all(|c| c.is_uppercase() || c == '_') {
+                            let (Token::Ident(l), _) = self.advance() else {
+                                unreachable!()
+                            };
+                            Some(l)
                         } else {
                             None
-                        };
-                        let stmt = Statement {
-                            label: None,
-                            kind: StmtKind::Last(lbl.or(label.clone())),
-                            line,
-                        };
-                        self.parse_stmt_postfix_modifier(stmt)?
-                    }
-                    "next" => {
-                        self.advance();
-                        let lbl = if let Token::Ident(ref s) = self.peek() {
-                            if s.chars().all(|c| c.is_uppercase() || c == '_') {
-                                let (Token::Ident(l), _) = self.advance() else {
-                                    unreachable!()
-                                };
-                                Some(l)
-                            } else {
-                                None
-                            }
+                        }
+                    } else {
+                        None
+                    };
+                    let stmt = Statement {
+                        label: None,
+                        kind: StmtKind::Last(lbl.or(label.clone())),
+                        line,
+                    };
+                    self.parse_stmt_postfix_modifier(stmt)?
+                }
+                "next" => {
+                    self.advance();
+                    let lbl = if let Token::Ident(ref s) = self.peek() {
+                        if s.chars().all(|c| c.is_uppercase() || c == '_') {
+                            let (Token::Ident(l), _) = self.advance() else {
+                                unreachable!()
+                            };
+                            Some(l)
                         } else {
                             None
-                        };
-                        let stmt = Statement {
-                            label: None,
-                            kind: StmtKind::Next(lbl.or(label.clone())),
-                            line,
-                        };
-                        self.parse_stmt_postfix_modifier(stmt)?
-                    }
-                    "redo" => {
-                        self.advance();
-                        self.eat(&Token::Semicolon);
-                        Statement {
-                            label: None,
-                            kind: StmtKind::Redo(label.clone()),
-                            line,
                         }
+                    } else {
+                        None
+                    };
+                    let stmt = Statement {
+                        label: None,
+                        kind: StmtKind::Next(lbl.or(label.clone())),
+                        line,
+                    };
+                    self.parse_stmt_postfix_modifier(stmt)?
+                }
+                "redo" => {
+                    self.advance();
+                    self.eat(&Token::Semicolon);
+                    Statement {
+                        label: None,
+                        kind: StmtKind::Redo(label.clone()),
+                        line,
                     }
-                    "BEGIN" => {
+                }
+                "BEGIN" => {
+                    self.advance();
+                    let block = self.parse_block()?;
+                    Statement {
+                        label: None,
+                        kind: StmtKind::Begin(block),
+                        line,
+                    }
+                }
+                "END" => {
+                    self.advance();
+                    let block = self.parse_block()?;
+                    Statement {
+                        label: None,
+                        kind: StmtKind::End(block),
+                        line,
+                    }
+                }
+                "UNITCHECK" => {
+                    self.advance();
+                    let block = self.parse_block()?;
+                    Statement {
+                        label: None,
+                        kind: StmtKind::UnitCheck(block),
+                        line,
+                    }
+                }
+                "CHECK" => {
+                    self.advance();
+                    let block = self.parse_block()?;
+                    Statement {
+                        label: None,
+                        kind: StmtKind::Check(block),
+                        line,
+                    }
+                }
+                "INIT" => {
+                    self.advance();
+                    let block = self.parse_block()?;
+                    Statement {
+                        label: None,
+                        kind: StmtKind::Init(block),
+                        line,
+                    }
+                }
+                "goto" => {
+                    self.advance();
+                    let target = self.parse_expression()?;
+                    let stmt = Statement {
+                        label: None,
+                        kind: StmtKind::Goto {
+                            target: Box::new(target),
+                        },
+                        line,
+                    };
+                    // `goto $l if COND;` / `goto &$cr if defined &$cr;` (XSLoader.pm)
+                    self.parse_stmt_postfix_modifier(stmt)?
+                }
+                "continue" => {
+                    self.advance();
+                    let block = self.parse_block()?;
+                    Statement {
+                        label: None,
+                        kind: StmtKind::Continue(block),
+                        line,
+                    }
+                }
+                "try" => self.parse_try_catch()?,
+                "defer" => self.parse_defer_stmt()?,
+                "tie" => self.parse_tie_stmt()?,
+                "given" => self.parse_given()?,
+                "when" => self.parse_when_stmt()?,
+                "default" => self.parse_default_stmt()?,
+                "eval_timeout" => self.parse_eval_timeout()?,
+                "do" => {
+                    if matches!(self.peek_at(1), Token::LBrace) {
                         self.advance();
-                        let block = self.parse_block()?;
-                        Statement {
-                            label: None,
-                            kind: StmtKind::Begin(block),
-                            line,
-                        }
-                    }
-                    "END" => {
-                        self.advance();
-                        let block = self.parse_block()?;
-                        Statement {
-                            label: None,
-                            kind: StmtKind::End(block),
-                            line,
-                        }
-                    }
-                    "UNITCHECK" => {
-                        self.advance();
-                        let block = self.parse_block()?;
-                        Statement {
-                            label: None,
-                            kind: StmtKind::UnitCheck(block),
-                            line,
-                        }
-                    }
-                    "CHECK" => {
-                        self.advance();
-                        let block = self.parse_block()?;
-                        Statement {
-                            label: None,
-                            kind: StmtKind::Check(block),
-                            line,
-                        }
-                    }
-                    "INIT" => {
-                        self.advance();
-                        let block = self.parse_block()?;
-                        Statement {
-                            label: None,
-                            kind: StmtKind::Init(block),
-                            line,
-                        }
-                    }
-                    "goto" => {
-                        self.advance();
-                        let target = self.parse_expression()?;
-                        let stmt = Statement {
-                            label: None,
-                            kind: StmtKind::Goto {
-                                target: Box::new(target),
-                            },
-                            line,
-                        };
-                        // `goto $l if COND;` / `goto &$cr if defined &$cr;` (XSLoader.pm)
-                        self.parse_stmt_postfix_modifier(stmt)?
-                    }
-                    "continue" => {
-                        self.advance();
-                        let block = self.parse_block()?;
-                        Statement {
-                            label: None,
-                            kind: StmtKind::Continue(block),
-                            line,
-                        }
-                    }
-                    "try" => self.parse_try_catch()?,
-                    "defer" => self.parse_defer_stmt()?,
-                    "tie" => self.parse_tie_stmt()?,
-                    "given" => self.parse_given()?,
-                    "when" => self.parse_when_stmt()?,
-                    "default" => self.parse_default_stmt()?,
-                    "eval_timeout" => self.parse_eval_timeout()?,
-                    "do" => {
-                        if matches!(self.peek_at(1), Token::LBrace) {
-                            self.advance();
-                            let body = self.parse_block()?;
-                            if let Token::Ident(ref w) = self.peek().clone() {
-                                if w == "while" {
-                                    self.advance();
-                                    self.expect(&Token::LParen)?;
-                                    let mut condition = self.parse_expression()?;
-                                    Self::mark_match_scalar_g_for_boolean_condition(&mut condition);
-                                    self.expect(&Token::RParen)?;
-                                    self.eat(&Token::Semicolon);
-                                    Statement {
-                                        label: label.clone(),
-                                        kind: StmtKind::DoWhile { body, condition },
-                                        line,
-                                    }
-                                } else {
-                                    let inner_line = body.first().map(|s| s.line).unwrap_or(line);
-                                    let inner = Expr {
-                                        kind: ExprKind::CodeRef {
-                                            params: vec![],
-                                            body,
-                                        },
-                                        line: inner_line,
-                                    };
-                                    let expr = Expr {
-                                        kind: ExprKind::Do(Box::new(inner)),
-                                        line,
-                                    };
-                                    let stmt = Statement {
-                                        label: label.clone(),
-                                        kind: StmtKind::Expression(expr),
-                                        line,
-                                    };
-                                    // `do { } if EXPR` / `do { } unless EXPR` — postfix modifier, not a new `if (` statement.
-                                    self.parse_stmt_postfix_modifier(stmt)?
+                        let body = self.parse_block()?;
+                        if let Token::Ident(ref w) = self.peek().clone() {
+                            if w == "while" {
+                                self.advance();
+                                self.expect(&Token::LParen)?;
+                                let mut condition = self.parse_expression()?;
+                                Self::mark_match_scalar_g_for_boolean_condition(&mut condition);
+                                self.expect(&Token::RParen)?;
+                                self.eat(&Token::Semicolon);
+                                Statement {
+                                    label: label.clone(),
+                                    kind: StmtKind::DoWhile { body, condition },
+                                    line,
                                 }
                             } else {
                                 let inner_line = body.first().map(|s| s.line).unwrap_or(line);
@@ -706,21 +691,30 @@ impl Parser {
                                     kind: StmtKind::Expression(expr),
                                     line,
                                 };
+                                // `do { } if EXPR` / `do { } unless EXPR` — postfix modifier, not a new `if (` statement.
                                 self.parse_stmt_postfix_modifier(stmt)?
                             }
                         } else {
-                            if let Some(expr) = self.try_parse_bareword_stmt_call() {
-                                let stmt = self.maybe_postfix_modifier(expr)?;
-                                self.parse_stmt_postfix_modifier(stmt)?
-                            } else {
-                                let expr = self.parse_expression()?;
-                                let stmt = self.maybe_postfix_modifier(expr)?;
-                                self.parse_stmt_postfix_modifier(stmt)?
-                            }
+                            let inner_line = body.first().map(|s| s.line).unwrap_or(line);
+                            let inner = Expr {
+                                kind: ExprKind::CodeRef {
+                                    params: vec![],
+                                    body,
+                                },
+                                line: inner_line,
+                            };
+                            let expr = Expr {
+                                kind: ExprKind::Do(Box::new(inner)),
+                                line,
+                            };
+                            let stmt = Statement {
+                                label: label.clone(),
+                                kind: StmtKind::Expression(expr),
+                                line,
+                            };
+                            self.parse_stmt_postfix_modifier(stmt)?
                         }
-                    }
-                    _ => {
-                        // `foo;` or `{ foo }` — bareword statement is a zero-arg call (topic `$_` at runtime).
+                    } else {
                         if let Some(expr) = self.try_parse_bareword_stmt_call() {
                             let stmt = self.maybe_postfix_modifier(expr)?;
                             self.parse_stmt_postfix_modifier(stmt)?
@@ -730,23 +724,35 @@ impl Parser {
                             self.parse_stmt_postfix_modifier(stmt)?
                         }
                     }
-                },
-                Token::LBrace => {
-                    let block = self.parse_block()?;
-                    let stmt = Statement {
-                        label: None,
-                        kind: StmtKind::Block(block),
-                        line,
-                    };
-                    // `{ … } if EXPR` / `{ … } unless EXPR` — same postfix rule as `do { } if …` (not `if (`).
-                    self.parse_stmt_postfix_modifier(stmt)?
                 }
                 _ => {
-                    let expr = self.parse_expression()?;
-                    let stmt = self.maybe_postfix_modifier(expr)?;
-                    self.parse_stmt_postfix_modifier(stmt)?
+                    // `foo;` or `{ foo }` — bareword statement is a zero-arg call (topic `$_` at runtime).
+                    if let Some(expr) = self.try_parse_bareword_stmt_call() {
+                        let stmt = self.maybe_postfix_modifier(expr)?;
+                        self.parse_stmt_postfix_modifier(stmt)?
+                    } else {
+                        let expr = self.parse_expression()?;
+                        let stmt = self.maybe_postfix_modifier(expr)?;
+                        self.parse_stmt_postfix_modifier(stmt)?
+                    }
                 }
-            };
+            },
+            Token::LBrace => {
+                let block = self.parse_block()?;
+                let stmt = Statement {
+                    label: None,
+                    kind: StmtKind::Block(block),
+                    line,
+                };
+                // `{ … } if EXPR` / `{ … } unless EXPR` — same postfix rule as `do { } if …` (not `if (`).
+                self.parse_stmt_postfix_modifier(stmt)?
+            }
+            _ => {
+                let expr = self.parse_expression()?;
+                let stmt = self.maybe_postfix_modifier(expr)?;
+                self.parse_stmt_postfix_modifier(stmt)?
+            }
+        };
 
         stmt.label = label;
         Ok(stmt)
@@ -1159,6 +1165,9 @@ impl Parser {
                 | "trim"
                 | "avg"
                 | "top"
+                | "pager"
+                | "pg"
+                | "less"
                 | "count_by"
                 | "to_file"
                 | "to_json"
@@ -9644,7 +9653,7 @@ impl Parser {
             | "eval_timeout" | "retry" | "rate_limit" | "every"
             | "gen" | "watch"
             // ── I/O extensions ──────────────────────────────────────────────
-            | "slurp" | "cat" | "capture"
+            | "slurp" | "cat" | "capture" | "pager" | "pg" | "less"
             // ── short aliases ───────────────────────────────────────────────
             | "p" | "rev"
             // ── algebraic match ─────────────────────────────────────────────

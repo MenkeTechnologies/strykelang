@@ -138,6 +138,7 @@ last
 lc
 lcfirst
 length
+less
 link
 listen
 local
@@ -192,10 +193,12 @@ par_pipeline
 par_pipeline_stream
 par_sed
 par_walk
+pager
 pcache
 pchannel
 peek
 perlrs::aliases
+perlrs::all
 perlrs::builtins
 perlrs::categories
 perlrs::descriptions
@@ -206,6 +209,7 @@ pfirst
 pflat_map
 pflat_map_on
 pfor
+pg
 pgrep
 pipeline
 pmap

@@ -99,6 +99,18 @@ pub fn extensions_hash_map() -> indexmap::IndexMap<String, PerlValue> {
         .collect()
 }
 
+/// `%all` — every callable spelling (primaries + aliases) → category.
+/// `%builtins` is primaries-only so op counts stay clean; `%all` is the
+/// "everything you can type" view. `scalar keys %all` is a direct total
+/// callable-spellings count; `$all{tj}` returns the primary's category
+/// without a hop through `%aliases`.
+pub fn all_hash_map() -> indexmap::IndexMap<String, PerlValue> {
+    ALL_CATEGORY_MAP
+        .iter()
+        .map(|(n, c)| (n.to_string(), PerlValue::string(c.to_string())))
+        .collect()
+}
+
 /// `%categories` — category string → arrayref of names in that category.
 /// Inverted index on `CATEGORY_MAP` so `$c{parallel}` returns all parallel
 /// ops in O(1) instead of an O(n) `grep` over `%builtins`. Names within
@@ -114,12 +126,7 @@ pub fn categories_hash_map() -> indexmap::IndexMap<String, PerlValue> {
     }
     buckets
         .into_iter()
-        .map(|(cat, names)| {
-            (
-                cat,
-                PerlValue::array_ref(Arc::new(RwLock::new(names))),
-            )
-        })
+        .map(|(cat, names)| (cat, PerlValue::array_ref(Arc::new(RwLock::new(names)))))
         .collect()
 }
 
@@ -394,6 +401,7 @@ pub(crate) fn try_builtin(
         )))),
         "avg" => Some(builtin_avg(args)),
         "top" => Some(builtin_top(args)),
+        "pager" | "pg" | "less" => Some(builtin_pager(interp, args)),
         "to_file" => Some(builtin_to_file(args, line)),
         "to_json" | "tj" => Some(builtin_to_json(args)),
         "to_csv" | "tc" => Some(builtin_to_csv(args)),
@@ -1515,6 +1523,84 @@ fn builtin_avg(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
     let sum: f64 = flat.iter().map(|v| v.to_number()).sum();
     Ok(PerlValue::float(sum / flat.len() as f64))
+}
+
+/// `LIST |> pager` / `pager LIST` — send each arg on its own line to the
+/// user's `$PAGER` (default `less -R`, falls back to `more` then `cat`).
+/// When stdout isn't a TTY (piped into another command, output redirected
+/// to file, etc.) the pager is bypassed — the list is just printed so
+/// output composes with other tools.
+///
+/// The block form runs the pager process synchronously: control returns
+/// once the user quits the pager. Return value is always `undef` so the
+/// stage terminates pipelines cleanly.
+///
+/// Aliases: `pager`, `pg`.
+fn builtin_pager(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    use std::io::Write as _;
+    use std::process::{Command, Stdio};
+
+    // Flatten iterators/arrayrefs and stringify each element on its own line.
+    let mut buf = String::new();
+    for a in args {
+        for v in a.clone().map_flatten_outputs(true) {
+            buf.push_str(&v.to_string());
+            buf.push('\n');
+        }
+    }
+
+    // Not a TTY → just print. Preserves pipelines: `pe -e '... |> pager' | grep`
+    // still works because `pager` becomes an identity stage under redirection.
+    if !std::io::stdout().is_terminal() {
+        print!("{}", buf);
+        return Ok(PerlValue::UNDEF);
+    }
+
+    // Pick a pager: `$PAGER` env var (honored verbatim, shell-split on
+    // whitespace for the common `less -R` / `less -FRX` cases), else `less`
+    // with sensible defaults, else `more`, else just print.
+    let pager_env = std::env::var("PAGER").ok().filter(|s| !s.trim().is_empty());
+    let (cmd, default_args): (String, Vec<String>) = match pager_env {
+        Some(p) => {
+            let mut parts = p.split_whitespace();
+            let head = parts.next().unwrap_or("").to_string();
+            let rest: Vec<String> = parts.map(str::to_string).collect();
+            (head, rest)
+        }
+        None => ("less".to_string(), vec!["-R".to_string()]),
+    };
+
+    let mut child = match Command::new(&cmd)
+        .args(&default_args)
+        .stdin(Stdio::piped())
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(_) if cmd != "more" => {
+            // First choice unavailable — try `more` as a universal fallback.
+            match Command::new("more").stdin(Stdio::piped()).spawn() {
+                Ok(c) => c,
+                Err(_) => {
+                    // No pager available at all — just print.
+                    print!("{}", buf);
+                    return Ok(PerlValue::UNDEF);
+                }
+            }
+        }
+        Err(_) => {
+            print!("{}", buf);
+            return Ok(PerlValue::UNDEF);
+        }
+    };
+    if let Some(mut stdin) = child.stdin.take() {
+        // Ignore write errors — a pager like `less -q` terminates early on
+        // `q`, closing its pipe; we don't want that to bubble as an error.
+        let _ = stdin.write_all(buf.as_bytes());
+    }
+    // Block until the user quits the pager.
+    let _ = child.wait();
+    let _ = interp; // reserved for future per-interpreter config
+    Ok(PerlValue::UNDEF)
 }
 
 /// `top N, HASHREF` — return top N keys from a frequencies-style hash ref, sorted by count desc.

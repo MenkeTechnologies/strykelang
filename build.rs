@@ -43,8 +43,8 @@ fn main() {
     core_pairs.sort();
     core_pairs.dedup_by(|a, b| a.0 == b.0);
 
-    let core_set: std::collections::HashSet<&str> =
-        core_pairs.iter().map(|(n, _)| n.as_str()).collect();
+    let core_set: std::collections::HashSet<String> =
+        core_pairs.iter().map(|(n, _)| n.clone()).collect();
 
     let mut ext_pairs: Vec<(String, String)> = Vec::new();
     let mut ext_seen: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -66,11 +66,44 @@ fn main() {
             }
         }
     }
+
     ext_pairs.sort();
+
+    // `ALL_CATEGORY_MAP` — every callable spelling (primary + every alias)
+    // → its category. Aliases inherit their primary's category so
+    // `scalar keys %all` is a clean total-callables count and lookups on
+    // short forms (`$all{tj}`) work directly. Stays separate from `%b` so
+    // primaries-only counts / queries don't inflate.
+    let primary_to_cat: std::collections::HashMap<String, String> = core_pairs
+        .iter()
+        .chain(ext_pairs.iter())
+        .map(|(n, c)| (n.clone(), c.clone()))
+        .collect();
+    let mut all_pairs: Vec<(String, String)> = Vec::new();
+    let mut all_seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for (n, c) in core_pairs.iter().chain(ext_pairs.iter()) {
+        if all_seen.insert(n.clone()) {
+            all_pairs.push((n.clone(), c.clone()));
+        }
+    }
+    for arm in &arms {
+        let Some((primary, rest)) = arm.split_first() else {
+            continue;
+        };
+        let Some(cat) = primary_to_cat.get(primary) else {
+            continue;
+        };
+        for alias in rest {
+            if all_seen.insert(alias.clone()) {
+                all_pairs.push((alias.clone(), cat.clone()));
+            }
+        }
+    }
+    all_pairs.sort();
 
     // Merged `%b` (name → category) is just the concatenation: core first,
     // then extensions. Sort once more to keep `keys %b` alphabetical.
-    let mut cat_pairs: Vec<(String, String)> = core_pairs.iter().cloned().collect();
+    let mut cat_pairs: Vec<(String, String)> = core_pairs.to_vec();
     cat_pairs.extend(ext_pairs.iter().cloned());
     cat_pairs.sort();
 
@@ -106,6 +139,12 @@ fn main() {
 
     body.push_str("pub(crate) const EXT_CATEGORY_MAP: &[(&str, &str)] = &[\n");
     for (n, c) in &ext_pairs {
+        body.push_str(&format!("    ({:?}, {:?}),\n", n, c));
+    }
+    body.push_str("];\n\n");
+
+    body.push_str("pub(crate) const ALL_CATEGORY_MAP: &[(&str, &str)] = &[\n");
+    for (n, c) in &all_pairs {
         body.push_str(&format!("    ({:?}, {:?}),\n", n, c));
     }
     body.push_str("];\n\n");
@@ -174,8 +213,14 @@ fn extract_try_builtin_arms(src: &str) -> Vec<Vec<String>> {
 /// of quoted names, returning one (name, category) pair per listed name.
 /// Works for both `is_perl5_core` (matches!) and `perlrs_extension_name`
 /// (match name { … }).
-fn extract_categorized_names(src: &str, fn_marker: &str, block_marker: &str) -> Vec<(String, String)> {
-    let fn_pos = src.find(fn_marker).unwrap_or_else(|| panic!("{} not found", fn_marker));
+fn extract_categorized_names(
+    src: &str,
+    fn_marker: &str,
+    block_marker: &str,
+) -> Vec<(String, String)> {
+    let fn_pos = src
+        .find(fn_marker)
+        .unwrap_or_else(|| panic!("{} not found", fn_marker));
     let after = &src[fn_pos..];
     let block_rel = after
         .find(block_marker)
@@ -228,7 +273,10 @@ fn extract_categorized_names(src: &str, fn_marker: &str, block_marker: &str) -> 
 /// drawing ruling and its ASCII fallback.
 fn parse_section_header(comment_body: &str) -> Option<String> {
     // Require a ruling run — comments without one are commentary.
-    if !comment_body.contains("──") && !comment_body.contains("──────") && !comment_body.contains("─") {
+    if !comment_body.contains("──")
+        && !comment_body.contains("──────")
+        && !comment_body.contains("─")
+    {
         return None;
     }
     let mut cleaned = String::new();

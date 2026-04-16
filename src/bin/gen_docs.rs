@@ -25,6 +25,48 @@ fn main() {
     let html = build_page();
     fs::write(&out_path, html).expect("write docs/reference.html");
     println!("wrote {}", out_path.display());
+    stamp_index_version();
+}
+
+/// Rewrite the `perlrs v…` line in `docs/index.html` so the hub page stays
+/// in sync with `Cargo.toml` without hand-editing. Relies on a stable id
+/// selector (`id="perlrsBuildLine"`) on the `<p class="docs-build-line">`
+/// so we can swap just that line without touching the rest of the markup.
+fn stamp_index_version() {
+    let path = PathBuf::from("docs/index.html");
+    let Ok(src) = fs::read_to_string(&path) else {
+        println!("note: docs/index.html not found, skipping version stamp");
+        return;
+    };
+    let version = env!("CARGO_PKG_VERSION");
+    let needle_start = r#"<p class="docs-build-line" id="perlrsBuildLine">"#;
+    let needle_end = "</p>";
+    let Some(s) = src.find(needle_start) else {
+        println!("note: build-line marker not found in docs/index.html, skipping");
+        return;
+    };
+    let after = s + needle_start.len();
+    let Some(e_rel) = src[after..].find(needle_end) else {
+        return;
+    };
+    let e = after + e_rel;
+    // Everything after the first ` · ` stays — that's the static tagline
+    // content ("Rust-powered · Rayon work-stealing …").
+    let current = &src[after..e];
+    let tail = current.find(" · ").map(|i| &current[i..]).unwrap_or("");
+    let replacement = format!("perlrs v{version}{tail}");
+    if current == replacement {
+        return;
+    }
+    let new_src = format!(
+        "{}{}{}{}",
+        &src[..after],
+        replacement,
+        needle_end,
+        &src[e + needle_end.len()..]
+    );
+    fs::write(&path, new_src).expect("write docs/index.html");
+    println!("stamped docs/index.html with v{version}");
 }
 
 fn build_page() -> String {
@@ -87,7 +129,7 @@ fn build_page() -> String {
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/perlrs" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">{total_topics} topics · {chapter_count} chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">perlrs v{version} · {total_topics} topics · {chapter_count} chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -110,15 +152,18 @@ fn build_page() -> String {
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>LANGUAGE REFERENCE</h2>
     <p class="tutorial-subtitle">Every builtin, keyword, alias, and extension with an LSP hover doc — rendered from the exact markdown that `pe docs` shows in the terminal. Jump via the chapter index, or <kbd>Ctrl+F</kbd> for a specific name.</p>
 "#,
+        version = env!("CARGO_PKG_VERSION"),
         total_topics = total_topics,
         chapter_count = chapter_count,
     ));
 
     // Chapter index
-    out.push_str(r#"    <section class="tutorial-section">
+    out.push_str(
+        r#"    <section class="tutorial-section">
       <h2>Chapters</h2>
       <ul class="chapter-index">
-"#);
+"#,
+    );
     for (chapter, rows) in &chapters {
         let slug = slugify(chapter);
         out.push_str(&format!(
