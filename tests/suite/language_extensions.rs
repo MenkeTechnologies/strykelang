@@ -671,9 +671,7 @@ fn thread_udf_with_explicit_paren_args() {
     );
     // `$_` inside an interpolated string
     assert_eq!(
-        eval_string(
-            r#"sub greet { "$_0 from $_1" } thread "alice" greet("hi $_", "bob")"#
-        ),
+        eval_string(r#"sub greet { "$_0 from $_1" } thread "alice" greet("hi $_", "bob")"#),
         "hi alice from bob"
     );
 }

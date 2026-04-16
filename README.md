@@ -146,11 +146,16 @@ Each parallel block runs in its own interpreter context with **captured lexical 
 
 ```perl
 # map / grep / sort / fold / for in parallel (list can be piped in)
+# Three surface forms work for pmap/pgrep/pfor/pcache/pflat_map:
+#   pmap { $_ * 2 } @list              # block form  ($_ = element)
+#   pmap $_ * 2, @list                 # expression form
+#   pmap double, @list                 # bare-fn form (sub double { $_0 * 2 })
 my @doubled = @data |> pmap $_ * 2 , progress => 1;
 my @evens   = @data |> pgrep $_ % 2 == 0;
 my @sorted  = @data |> psort { $a <=> $b };
 my $sum     = @numbers |> preduce { $a + $b };
 pfor process, @items;
+my @hashes  = pmap sha256, @blobs, progress => 1;     # bare-fn
 
 # fused map+reduce, chunked map, memoized map, init fold
 my $sum2     = @nums |> pmap_reduce { $_ * 2 } { $a + $b };
@@ -158,14 +163,13 @@ my @squared  = @million |> pmap_chunked 1000 { $_ ** 2 };
 my @once     = @inputs |> pcache expensive;
 my $hist     = @words |> preduce_init {}, { my ($acc, $x) = @_; $acc->{$x}++; $acc };
 
-# fan — run a block N times in parallel ($_ = 0..N-1)
-fan 8 work;
-fan work;                # uses rayon pool size (`pe -j`)
-## or
-fan { work } ;                # uses rayon pool size (`pe -j`)
-## or
-fan { work $_ } ;                # uses rayon pool size (`pe -j`)
-my @r = fan_cap $_ * $_;             # capture results in $_ order
+# fan — run a block or fn N times in parallel ($_/$_0 = index 0..N-1)
+fan 8, work;                       # bare-fn form: fan N, FUNC
+fan work, progress => 1;           # uses rayon pool size (`pe -j`)
+fan 8 { work($_) };                # block form
+fan { work($_) };                  # block form, pool-sized
+my @r = fan_cap 8, compute;        # capture results in index order
+my @r = fan_cap 8 { $_ * $_ };     # block form, capture
 
 # pipelines — sequential or rayon-backed; same chain methods
 my @r = (@data |> pipeline)->filter({ $_ > 10 })->map({ $_ * 2 })->take(100)->collect;

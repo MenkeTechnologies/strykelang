@@ -8755,7 +8755,22 @@ impl Parser {
         } else {
             None
         };
-        let args = self.parse_list_until_terminator()?;
+        // `print()` / `say()` / `printf()` — empty parens default to `$_`,
+        // matching Perl 5: `perldoc -f print` / `-f say` say "If no arguments
+        // are given, prints $_." (Same convention as the topic-default unary
+        // builtins handled in `parse_one_arg_or_default`.)
+        let args =
+            if matches!(self.peek(), Token::LParen) && matches!(self.peek_at(1), Token::RParen) {
+                let line_topic = self.peek_line();
+                self.advance(); // (
+                self.advance(); // )
+                vec![Expr {
+                    kind: ExprKind::ScalarVar("_".into()),
+                    line: line_topic,
+                }]
+            } else {
+                self.parse_list_until_terminator()?
+            };
         Ok(Expr {
             kind: make(handle, args),
             line,
@@ -9409,22 +9424,63 @@ impl Parser {
     }
 
     fn parse_one_arg_or_default(&mut self) -> PerlResult<Expr> {
+        // Default to `$_` when the next token cannot start an argument expression
+        // because it has lower precedence than a named unary operator. Perl 5
+        // named unary precedence sits above ternary / comparison / logical / bitwise
+        // / assignment / list ops; everything below should terminate the implicit
+        // argument and let the surrounding expression continue.
+        // See `perldoc perlop` ("Named Unary Operators").
         if matches!(
             self.peek(),
+            // Statement / list / call boundaries
             Token::Semicolon
                 | Token::RBrace
                 | Token::RParen
+                | Token::RBracket
                 | Token::Eof
                 | Token::Comma
+                | Token::FatArrow
                 | Token::PipeForward
+            // Ternary `? :`
+                | Token::Question
+                | Token::Colon
+            // Comparison / equality (numeric + string)
+                | Token::NumEq | Token::NumNe | Token::NumLt | Token::NumGt
+                | Token::NumLe | Token::NumGe | Token::Spaceship
+                | Token::StrEq | Token::StrNe | Token::StrLt | Token::StrGt
+                | Token::StrLe | Token::StrGe | Token::StrCmp
+            // Logical (symbolic and word forms) + defined-or
+                | Token::LogAnd | Token::LogOr | Token::LogNot
+                | Token::LogAndWord | Token::LogOrWord | Token::LogNotWord
+                | Token::DefinedOr
+            // Range (lower precedence than named unary)
+                | Token::Range | Token::RangeExclusive
+            // Assignment (any compound form)
+                | Token::Assign | Token::PlusAssign | Token::MinusAssign
+                | Token::MulAssign | Token::DivAssign | Token::ModAssign
+                | Token::PowAssign | Token::DotAssign | Token::AndAssign
+                | Token::OrAssign | Token::XorAssign | Token::DefinedOrAssign
+                | Token::ShiftLeftAssign | Token::ShiftRightAssign
+                | Token::BitAndAssign | Token::BitOrAssign
         ) {
-            Ok(Expr {
+            return Ok(Expr {
                 kind: ExprKind::ScalarVar("_".into()),
                 line: self.peek_line(),
-            })
-        } else {
-            self.parse_one_arg()
+            });
         }
+        // `f()` — empty parens default to `$_`, matching Perl 5 semantics.
+        // `perldoc -f length`: "If EXPR is omitted, returns the length of $_."
+        // Perl accepts both `length` and `length()` as `length($_)`.
+        if matches!(self.peek(), Token::LParen) && matches!(self.peek_at(1), Token::RParen) {
+            let line = self.peek_line();
+            self.advance(); // (
+            self.advance(); // )
+            return Ok(Expr {
+                kind: ExprKind::ScalarVar("_".into()),
+                line,
+            });
+        }
+        self.parse_one_arg()
     }
 
     /// Array operand for `shift` / `pop`: default `@_`, or `shift(@a)` / `shift()` (empty parens = `@_`).
