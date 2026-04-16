@@ -7051,7 +7051,8 @@ impl Interpreter {
                         self.check_strict_array_var(array, stmt.line)?;
                         let aname = self.stash_array_name_for_package(array);
                         let idx = self.eval_expr(index)?.to_int();
-                        self.scope.local_set_array_element(&aname, idx, val.clone())?;
+                        self.scope
+                            .local_set_array_element(&aname, idx, val.clone())?;
                     }
                     _ => {
                         return Err(PerlError::runtime(

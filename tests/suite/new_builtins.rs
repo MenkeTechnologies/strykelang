@@ -491,7 +491,9 @@ fn compact_with_iterator() {
 #[test]
 fn enumerate_yields_index_value_pairs() {
     assert_eq!(
-        eval_string(r#"range(0, 2) |> maps { chr(ord("a") + $_) } |> enumerate |> map { "$_->[0]:$_->[1]" } |> join ",""#),
+        eval_string(
+            r#"range(0, 2) |> maps { chr(ord("a") + $_) } |> enumerate |> map { "$_->[0]:$_->[1]" } |> join ",""#
+        ),
         "0:a,1:b,2:c"
     );
 }
@@ -521,7 +523,9 @@ fn dedup_removes_consecutive_duplicates() {
 #[test]
 fn top_returns_highest_frequency_items() {
     assert_eq!(
-        eval_string(r#"my $f = { a => 5, b => 10, c => 1 }; my $t = top 2, $f; join ",", keys %$t"#),
+        eval_string(
+            r#"my $f = { a => 5, b => 10, c => 1 }; my $t = top 2, $f; join ",", keys %$t"#
+        ),
         "b,a"
     );
 }
@@ -529,9 +533,9 @@ fn top_returns_highest_frequency_items() {
 #[test]
 fn top_with_frequencies_pipe() {
     assert_eq!(
-        eval_string(r#"my $t = ("x", "y", "x", "z", "x", "y") |> frequencies |> top 2; join ",", keys %$t"#),
+        eval_string(
+            r#"my $t = ("x", "y", "x", "z", "x", "y") |> frequencies |> top 2; join ",", keys %$t"#
+        ),
         "x,y"
     );
 }
-
-

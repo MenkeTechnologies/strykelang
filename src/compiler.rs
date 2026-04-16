@@ -2495,7 +2495,9 @@ impl Compiler {
     fn compile_block(&mut self, block: &Block) -> Result<(), CompileError> {
         if Self::block_has_return(block) {
             self.compile_block_inner(block)?;
-        } else if self.scope_stack.last().is_some_and(|l| l.use_slots) && !Self::block_has_local(block) {
+        } else if self.scope_stack.last().is_some_and(|l| l.use_slots)
+            && !Self::block_has_local(block)
+        {
             // When scalar slots are active, skip PushFrame/PopFrame so slot indices keep
             // addressing the same runtime frame. New `my` decls still get fresh slot indices.
             self.compile_block_inner(block)?;

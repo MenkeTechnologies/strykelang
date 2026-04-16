@@ -3392,7 +3392,9 @@ fn local_scalar_ref() {
 #[test]
 fn local_array_push() {
     assert_eq!(
-        rs(r#"our @a = (1); my $in; { local @a = (2); push @a, 3; $in = join ",", @a } $in . "|" . join ",", @a"#),
+        rs(
+            r#"our @a = (1); my $in; { local @a = (2); push @a, 3; $in = join ",", @a } $in . "|" . join ",", @a"#
+        ),
         "2,3|1"
     );
 }
@@ -3400,7 +3402,9 @@ fn local_array_push() {
 #[test]
 fn local_hash_delete() {
     assert_eq!(
-        rs(r#"our %h = (a => 1); my $in; { local %h = (a => 2, b => 3); delete $h{a}; $in = exists $h{a} ? 1 : 0 } $in . $h{a}"#),
+        rs(
+            r#"our %h = (a => 1); my $in; { local %h = (a => 2, b => 3); delete $h{a}; $in = exists $h{a} ? 1 : 0 } $in . $h{a}"#
+        ),
         "01"
     );
 }

@@ -286,7 +286,7 @@ fn fan_default_count_matches_rayon_thread_pool() {
     let n = rayon::current_num_threads();
     let expected = (n * n.saturating_sub(1) / 2) as i64;
     assert_eq!(
-        eval_int(r#"sub pr { $s += $_ } mysync $s = 0; fan { pr }; $s"#),
+        eval_int(r#"sub prto { $s += $_ } mysync $s = 0; fan { prto }; $s"#),
         expected,
     );
 }

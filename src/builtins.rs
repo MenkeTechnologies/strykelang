@@ -283,7 +283,9 @@ pub(crate) fn try_builtin(
         "stddev" | "std" => Some(builtin_stddev(args)),
         "squared" | "sq" | "square" => Some(builtin_squared(args)),
         "cubed" | "cb" | "cube" => Some(builtin_cubed(args)),
-        "expt" => Some(builtin_expt(args)),
+        "expt" | "pow" | "pw" => Some(builtin_expt(args)),
+        "inc" => Some(builtin_inc(args)),
+        "dec" => Some(builtin_dec(args)),
         "snake_case" | "sc" => Some(builtin_snake_case(args)),
         "camel_case" | "cc" => Some(builtin_camel_case(args)),
         "kebab_case" | "kc" => Some(builtin_kebab_case(args)),
@@ -1446,14 +1448,27 @@ fn builtin_to_file(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(content))
 }
 
-/// `to_json VALUE` — serialize a PerlValue to a JSON string.
-fn builtin_to_json(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    if args.len() > 1 {
-        // Multiple values (e.g. flattened array) → JSON array
-        let parts: Vec<String> = args.iter().map(perl_value_to_json_string).collect();
-        return Ok(PerlValue::string(format!("[{}]", parts.join(","))));
+/// Pipeline `LHS |> to_X` spreads LHS as individual args. For the encoders
+/// below, the natural user intent is "serialize this one logical thing" — so
+/// when multiple args arrive, coalesce into a single arrayref. One arg
+/// passes through; zero args yields `undef`.
+///
+/// Uses `array_ref` (not `array`) because the encoders dispatch via
+/// `as_array_ref()` — a flat array would be stringified as a scalar, making
+/// every row render as `"ARRAY(0x…)"`.
+fn normalize_serialize_root(args: &[PerlValue]) -> PerlValue {
+    match args.len() {
+        0 => PerlValue::UNDEF,
+        1 => args[0].clone(),
+        _ => PerlValue::array_ref(Arc::new(RwLock::new(args.to_vec()))),
     }
-    let val = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+}
+
+/// `to_json VALUE` — serialize a PerlValue to a JSON string.
+/// Handles nested arrays, hashes, and scalars. Pipeline spread (N args) is
+/// coalesced into a single JSON array.
+fn builtin_to_json(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let val = normalize_serialize_root(args);
     Ok(PerlValue::string(perl_value_to_json_string(&val)))
 }
 
@@ -1501,46 +1516,113 @@ fn json_escape(s: &str) -> String {
         .replace('\t', "\\t")
 }
 
-/// `to_csv ARRAYREF_OF_HASHREFS` — serialize to CSV string.
+/// `to_csv VALUE` — serialize to CSV. Accepted shapes:
+/// * array of arrayrefs (AoA) → each inner array is one row.
+/// * array of hashrefs (AoH) → header is the union of all keys (preserving
+///   first-seen order); missing keys produce empty cells, so mixed-key rows
+///   no longer silently drop data.
+/// * single hashref → 2-column `key,value` table.
+/// * flat array of scalars → single-column table.
+/// * single scalar → one cell.
 fn builtin_to_csv(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let val = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let val = normalize_serialize_root(args);
+    if val.is_undef() {
+        return Ok(PerlValue::string(String::new()));
+    }
+
+    // Single hashref at root: treat as one-column "key,value" table.
+    if let Some(hr) = val.as_hash_ref() {
+        let mut buf = String::from("key,value\n");
+        for (k, v) in hr.read().iter() {
+            buf.push_str(&csv_cell(k));
+            buf.push(',');
+            buf.push_str(&csv_cell(&v.to_string()));
+            buf.push('\n');
+        }
+        return Ok(PerlValue::string(buf));
+    }
+
+    // Otherwise we want rows. An arrayref is N rows; a flat scalar is one
+    // row with one cell.
     let rows: Vec<PerlValue> = if let Some(ar) = val.as_array_ref() {
         ar.read().clone()
     } else {
-        args.iter()
-            .flat_map(|a| a.map_flatten_outputs(true))
-            .collect()
+        vec![val]
     };
     if rows.is_empty() {
         return Ok(PerlValue::string(String::new()));
     }
-    // Collect all keys from first row for header order
-    let headers: Vec<String> = if let Some(hr) = rows[0].as_hash_ref() {
-        hr.read().keys().cloned().collect()
-    } else {
-        return Ok(PerlValue::string(String::new()));
-    };
-    let mut buf = headers.join(",");
-    buf.push('\n');
-    for row in &rows {
-        if let Some(hr) = row.as_hash_ref() {
-            let guard = hr.read();
-            let vals: Vec<String> = headers
-                .iter()
-                .map(|h| {
-                    let v = guard.get(h).map(|v| v.to_string()).unwrap_or_default();
-                    if v.contains(',') || v.contains('"') || v.contains('\n') {
-                        format!("\"{}\"", v.replace('"', "\"\""))
-                    } else {
-                        v
+
+    // Decide schema from the first row: hashref → AoH, arrayref → AoA,
+    // scalar → single-column.
+    if rows[0].as_hash_ref().is_some() {
+        // Union-of-keys across all rows, preserving first-seen order.
+        let mut headers: Vec<String> = Vec::new();
+        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for row in &rows {
+            if let Some(hr) = row.as_hash_ref() {
+                for k in hr.read().keys() {
+                    if seen.insert(k.clone()) {
+                        headers.push(k.clone());
                     }
-                })
-                .collect();
-            buf.push_str(&vals.join(","));
-            buf.push('\n');
+                }
+            }
         }
+        let mut buf = headers
+            .iter()
+            .map(|s| csv_cell(s))
+            .collect::<Vec<_>>()
+            .join(",");
+        buf.push('\n');
+        for row in &rows {
+            if let Some(hr) = row.as_hash_ref() {
+                let guard = hr.read();
+                let cells: Vec<String> = headers
+                    .iter()
+                    .map(|h| {
+                        guard
+                            .get(h)
+                            .map(|v| csv_cell(&v.to_string()))
+                            .unwrap_or_default()
+                    })
+                    .collect();
+                buf.push_str(&cells.join(","));
+                buf.push('\n');
+            }
+        }
+        return Ok(PerlValue::string(buf));
+    }
+
+    if rows[0].as_array_ref().is_some() {
+        // AoA: emit each inner array as a CSV row.
+        let mut buf = String::new();
+        for row in &rows {
+            if let Some(ar) = row.as_array_ref() {
+                let cells: Vec<String> =
+                    ar.read().iter().map(|v| csv_cell(&v.to_string())).collect();
+                buf.push_str(&cells.join(","));
+                buf.push('\n');
+            }
+        }
+        return Ok(PerlValue::string(buf));
+    }
+
+    // Flat array of scalars → single column.
+    let mut buf = String::new();
+    for row in &rows {
+        buf.push_str(&csv_cell(&row.to_string()));
+        buf.push('\n');
     }
     Ok(PerlValue::string(buf))
+}
+
+/// Quote a CSV field if it contains a comma, quote, or newline (RFC 4180).
+fn csv_cell(s: &str) -> String {
+    if s.contains(',') || s.contains('"') || s.contains('\n') || s.contains('\r') {
+        format!("\"{}\"", s.replace('"', "\"\""))
+    } else {
+        s.to_string()
+    }
 }
 
 /// `grep_v PATTERN, LIST` — inverse grep: reject elements matching regex.
@@ -1975,6 +2057,29 @@ fn builtin_expt(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(base.powf(exp)))
 }
 
+/// `inc N` — add 1; integer stays integer (matching `Op::Inc` so JIT and
+/// interpreter paths agree; the compiler's `Op::Inc` only runs for top-level
+/// calls, so without this dispatch `inc` inside a coderef body errors out as
+/// an unknown sub).
+fn builtin_inc(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    Ok(if let Some(n) = v.as_integer() {
+        PerlValue::integer(n.wrapping_add(1))
+    } else {
+        PerlValue::float(v.to_number() + 1.0)
+    })
+}
+
+/// `dec N` — subtract 1; mirrors `Op::Dec`. See [`builtin_inc`] for why.
+fn builtin_dec(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    Ok(if let Some(n) = v.as_integer() {
+        PerlValue::integer(n.wrapping_sub(1))
+    } else {
+        PerlValue::float(v.to_number() - 1.0)
+    })
+}
+
 /// Split a string into word boundaries for case conversion.
 fn split_case_words(s: &str) -> Vec<String> {
     let mut words = Vec::new();
@@ -2081,16 +2186,90 @@ fn builtin_kebab_case(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 /// `to_toml VALUE` — serialize a PerlValue to a TOML string.
+/// TOML requires a table at root. Anything else gets wrapped:
+/// * arrayref of hashrefs → `[[data]]` array-of-tables.
+/// * arrayref of arrayrefs / scalars → `data = [...]` top-level array.
+/// * single scalar → `value = …`.
+/// Single hashrefs with single-key entries (the `map +{ k => v }` pattern)
+/// are merged into one flat table — otherwise each row produces its own
+/// blank-line-separated block, which doesn't round-trip as valid TOML.
 fn builtin_to_toml(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    if args.len() > 1 {
-        let parts: Vec<String> = args
-            .iter()
-            .map(|v| perl_value_to_toml_string(v, 0))
-            .collect();
-        return Ok(PerlValue::string(parts.join("\n")));
+    let root = normalize_serialize_root(args);
+    Ok(PerlValue::string(toml_root(&root)))
+}
+
+/// Produce a TOML document from an arbitrary root value, wrapping anything
+/// that isn't already a table.
+fn toml_root(val: &PerlValue) -> String {
+    if val.is_undef() {
+        return String::new();
     }
-    let val = args.first().cloned().unwrap_or(PerlValue::UNDEF);
-    Ok(PerlValue::string(perl_value_to_toml_string(&val, 0)))
+    if val.as_hash_ref().is_some() {
+        return perl_value_to_toml_string(val, 0);
+    }
+    if let Some(ar) = val.as_array_ref() {
+        let items = ar.read().clone();
+        // AoH of single-key hashes → merge into one flat table.
+        // This matches `f |> map +{ $_ => size $_ }` — the idiomatic way to
+        // tag each item with a value, and the natural TOML is one table.
+        let all_single_key_hash = !items.is_empty()
+            && items
+                .iter()
+                .all(|v| v.as_hash_ref().is_some_and(|hr| hr.read().len() == 1));
+        if all_single_key_hash {
+            let mut merged: indexmap::IndexMap<String, PerlValue> = indexmap::IndexMap::new();
+            for v in &items {
+                if let Some(hr) = v.as_hash_ref() {
+                    for (k, inner) in hr.read().iter() {
+                        merged.insert(k.clone(), inner.clone());
+                    }
+                }
+            }
+            let wrapped = PerlValue::hash_ref(Arc::new(RwLock::new(merged)));
+            return perl_value_to_toml_string(&wrapped, 0);
+        }
+        // AoH with multiple keys → `[[data]]` array of tables.
+        let all_hash = !items.is_empty() && items.iter().all(|v| v.as_hash_ref().is_some());
+        if all_hash {
+            let mut buf = String::new();
+            for item in &items {
+                if let Some(hr) = item.as_hash_ref() {
+                    buf.push_str("[[data]]\n");
+                    for (k, v) in hr.read().iter() {
+                        buf.push_str(&format!("{} = {}\n", k, toml_scalar(v)));
+                    }
+                }
+            }
+            return buf;
+        }
+        // AoA / mixed / scalars → `data = [...]` top-level array.
+        let mut buf = String::from("data = [");
+        let parts: Vec<String> = items.iter().map(toml_array_value).collect();
+        buf.push_str(&parts.join(", "));
+        buf.push_str("]\n");
+        return buf;
+    }
+    // Plain scalar → single-key table.
+    format!("value = {}\n", toml_scalar(val))
+}
+
+/// TOML-format a single value used inside an inline array — recurses for
+/// nested arrays (e.g. AoA becomes `[[...], [...]]`).
+fn toml_array_value(val: &PerlValue) -> String {
+    if let Some(ar) = val.as_array_ref() {
+        let parts: Vec<String> = ar.read().iter().map(toml_array_value).collect();
+        format!("[{}]", parts.join(", "))
+    } else if let Some(hr) = val.as_hash_ref() {
+        // Inline table for a nested hashref inside a regular array.
+        let parts: Vec<String> = hr
+            .read()
+            .iter()
+            .map(|(k, v)| format!("{} = {}", k, toml_scalar(v)))
+            .collect();
+        format!("{{ {} }}", parts.join(", "))
+    } else {
+        toml_scalar(val)
+    }
 }
 
 fn perl_value_to_toml_string(val: &PerlValue, _depth: usize) -> String {
@@ -2175,16 +2354,10 @@ fn toml_scalar(val: &PerlValue) -> String {
 }
 
 /// `to_yaml VALUE` — serialize a PerlValue to a YAML string.
+/// Always emits a single document (no `---` per-arg split when called via
+/// pipeline spread — those are logically one value, not N documents).
 fn builtin_to_yaml(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    if args.len() > 1 {
-        let mut buf = String::new();
-        for v in args {
-            buf.push_str("---\n");
-            yaml_value(&mut buf, v, 0);
-        }
-        return Ok(PerlValue::string(buf));
-    }
-    let val = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let val = normalize_serialize_root(args);
     let mut buf = String::from("---\n");
     yaml_value(&mut buf, &val, 0);
     Ok(PerlValue::string(buf))
@@ -2283,16 +2456,12 @@ fn yaml_scalar(buf: &mut String, val: &PerlValue) {
 }
 
 /// `to_xml VALUE` — serialize a PerlValue to an XML string.
+/// Arbitrary hash keys are allowed — when a key isn't a valid XML `Name`
+/// (e.g. starts with `.` or contains `/`), the entry is emitted as
+/// `<entry key="…">value</entry>` instead of `<key>value</key>`, which
+/// would produce malformed XML.
 fn builtin_to_xml(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    if args.len() > 1 {
-        let mut buf = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root>\n");
-        for (i, v) in args.iter().enumerate() {
-            xml_value(&mut buf, &format!("item{}", i), v, 1);
-        }
-        buf.push_str("</root>\n");
-        return Ok(PerlValue::string(buf));
-    }
-    let val = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let val = normalize_serialize_root(args);
     let mut buf = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
     xml_value(&mut buf, "root", &val, 0);
     Ok(PerlValue::string(buf))
@@ -2308,7 +2477,7 @@ fn xml_value(buf: &mut String, tag: &str, val: &PerlValue, depth: usize) {
         let guard = hr.read();
         buf.push_str(&format!("{}<{}>\n", indent, tag));
         for (k, v) in guard.iter() {
-            xml_value(buf, k, v, depth + 1);
+            xml_entry(buf, k, v, depth + 1);
         }
         buf.push_str(&format!("{}</{}>\n", indent, tag));
         return;
@@ -2324,6 +2493,57 @@ fn xml_value(buf: &mut String, tag: &str, val: &PerlValue, depth: usize) {
     }
     let s = xml_escape(&val.to_string());
     buf.push_str(&format!("{}<{}>{}</{}>\n", indent, tag, s, tag));
+}
+
+/// Emit one hash entry. If `key` is a valid XML `Name`, use it as the tag;
+/// otherwise fall back to `<entry key="…">…</entry>` so the output stays
+/// well-formed for arbitrary keys (file paths, URLs, etc.).
+fn xml_entry(buf: &mut String, key: &str, val: &PerlValue, depth: usize) {
+    if is_valid_xml_name(key) {
+        xml_value(buf, key, val, depth);
+        return;
+    }
+    let indent = "  ".repeat(depth);
+    let attr = xml_escape(key);
+    if val.is_undef() {
+        buf.push_str(&format!("{}<entry key=\"{}\"/>\n", indent, attr));
+        return;
+    }
+    if val.as_hash_ref().is_some() || val.as_array_ref().is_some() {
+        // Complex child → open/close tags, recurse with a neutral inner tag.
+        buf.push_str(&format!("{}<entry key=\"{}\">\n", indent, attr));
+        // Recurse without re-wrapping in another <root>: walk children directly.
+        if let Some(hr) = val.as_hash_ref() {
+            for (k, v) in hr.read().iter() {
+                xml_entry(buf, k, v, depth + 1);
+            }
+        } else if let Some(ar) = val.as_array_ref() {
+            for item in ar.read().iter() {
+                xml_value(buf, "item", item, depth + 1);
+            }
+        }
+        buf.push_str(&format!("{}</entry>\n", indent));
+        return;
+    }
+    let s = xml_escape(&val.to_string());
+    buf.push_str(&format!(
+        "{}<entry key=\"{}\">{}</entry>\n",
+        indent, attr, s
+    ));
+}
+
+/// XML 1.0 `Name` production (simplified ASCII subset — colon is intentionally
+/// excluded since we don't resolve namespaces). Rejects empty, non-alpha starts,
+/// and any char outside `[A-Za-z0-9_.-]` after the first.
+fn is_valid_xml_name(s: &str) -> bool {
+    let mut chars = s.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !(first.is_ascii_alphabetic() || first == '_') {
+        return false;
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.')
 }
 
 fn xml_escape(s: &str) -> String {

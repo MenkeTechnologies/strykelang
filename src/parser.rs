@@ -1174,6 +1174,8 @@ impl Parser {
                 | "cubed"
                 | "cube"
                 | "expt"
+                | "pow"
+                | "pw"
                 | "snake_case"
                 | "camel_case"
                 | "kebab_case"
@@ -1249,6 +1251,7 @@ impl Parser {
                 | "pselect"
                 | "printf"
                 | "print"
+                | "pr"
                 | "psort"
                 | "push"
                 | "pwatch"
@@ -1391,9 +1394,31 @@ impl Parser {
 
     /// `thread EXPR stage1 stage2 ...` — Clojure-style threading macro.
     /// Desugars to `EXPR |> stage1 |> stage2 |> ...`
+    ///
+    /// When invoked as the RHS of `|>` (e.g. `LHS |> t s1 s2 ...`), the init
+    /// is not parsed from tokens — using `parse_unary()` there lets the first
+    /// bareword greedily consume the next token as its arg, which misparses
+    /// `t inc pow($_, 2) p` as init=`inc(pow(…))` + stage=`p` instead of three
+    /// separate stages. Instead, seed init with `$_[0]`, run every remaining
+    /// token through the stage loop, and wrap the resulting chain in a
+    /// `CodeRef`. The outer `pipe_forward_apply` then calls it with `lhs` as
+    /// `$_[0]`, giving `LHS |> t s1 s2 s3` == `LHS |> s1 |> s2 |> s3`.
     fn parse_thread_macro(&mut self, _line: usize) -> PerlResult<Expr> {
-        // Parse the initial expression (stops before identifiers that look like stages)
-        let mut result = self.parse_unary()?;
+        let pipe_rhs_wrap = self.in_pipe_rhs();
+        let mut result = if pipe_rhs_wrap {
+            Expr {
+                kind: ExprKind::ArrayElement {
+                    array: "_".to_string(),
+                    index: Box::new(Expr {
+                        kind: ExprKind::Integer(0),
+                        line: _line,
+                    }),
+                },
+                line: _line,
+            }
+        } else {
+            self.parse_unary()?
+        };
 
         // Parse stages until we hit a statement terminator
         loop {
@@ -1575,6 +1600,22 @@ impl Parser {
             };
         }
 
+        if pipe_rhs_wrap {
+            // Wrap as `sub { …stages threaded from $_[0]… }` so the outer
+            // `pipe_forward_apply` can invoke it with `lhs` as the arg.
+            let body_line = result.line;
+            return Ok(Expr {
+                kind: ExprKind::CodeRef {
+                    params: vec![],
+                    body: vec![Statement {
+                        label: None,
+                        kind: StmtKind::Expression(result),
+                        line: body_line,
+                    }],
+                },
+                line: _line,
+            });
+        }
         Ok(result)
     }
 
@@ -4213,10 +4254,6 @@ impl Parser {
                         // data |> clamp MIN, MAX → clamp(MIN, MAX, data...)
                         args.push(lhs);
                     }
-                    "expt" => {
-                        // base |> expt EXP → expt(base, EXP)
-                        args.insert(0, lhs);
-                    }
                     "pfirst" | "pany" | "any" | "all" | "none" | "first" | "take_while"
                     | "drop_while" | "skip_while" | "reject" | "tap" | "peek" | "group_by"
                     | "chunk_by" | "partition" | "min_by" | "max_by" | "zip_with" | "count_by" => {
@@ -4703,6 +4740,18 @@ impl Parser {
                 ampersand: false,
                 pass_caller_arglist: false,
             },
+
+            // `LHS |> >{ BLOCK }` — the `>{}` form is parsed everywhere as `Do(CodeRef)` (IIFE).
+            // On the RHS of `|>` we want pipe-apply semantics instead: unwrap the Do and invoke
+            // the inner coderef with `lhs` as `$_[0]`, matching `LHS |> sub { ... }`.
+            ExprKind::Do(inner) if matches!(inner.kind, ExprKind::CodeRef { .. }) => {
+                ExprKind::IndirectCall {
+                    target: inner,
+                    args: vec![lhs],
+                    ampersand: false,
+                    pass_caller_arglist: false,
+                }
+            }
 
             other => {
                 return Err(self.syntax_err(
@@ -5851,6 +5900,34 @@ impl Parser {
                     line,
                 })
             }
+            // `>{ BLOCK }` — IIFE block expression (immediately-invoked anonymous sub).
+            // Valid in any expression position; evaluates the block and yields its last value.
+            // In thread-macro stage position (`EXPR |>` already consumed by the stage loop in
+            // `parse_thread_macro`), the explicit branch at ~1417 wins and the block is
+            // instead pipe-applied as a coderef — that path is never reached from here.
+            Token::ArrowBrace => {
+                self.advance();
+                let mut stmts = Vec::new();
+                while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+                    if self.eat(&Token::Semicolon) {
+                        continue;
+                    }
+                    stmts.push(self.parse_statement()?);
+                }
+                self.expect(&Token::RBrace)?;
+                let inner_line = stmts.first().map(|s| s.line).unwrap_or(line);
+                let inner = Expr {
+                    kind: ExprKind::CodeRef {
+                        params: vec![],
+                        body: stmts,
+                    },
+                    line: inner_line,
+                };
+                Ok(Expr {
+                    kind: ExprKind::Do(Box::new(inner)),
+                    line,
+                })
+            }
             Token::Star => {
                 self.advance();
                 if matches!(self.peek(), Token::LBrace) {
@@ -6036,8 +6113,45 @@ impl Parser {
                         line,
                     });
                 }
+                // `%[a => 1, b => 2]` — sugar for `%{+{a=>1,b=>2}}`: dereference an
+                // anonymous hashref inline, using `[...]` as the delimiter to avoid
+                // the block-vs-hashref ambiguity that `%{a=>1}` has in real Perl.
+                // Real Perl errors on `%[...]` syntactically, so no compat risk.
+                if matches!(self.peek(), Token::LBracket) {
+                    self.advance();
+                    let pairs = self.parse_hashref_pairs_until(&Token::RBracket)?;
+                    self.expect(&Token::RBracket)?;
+                    let href = Expr {
+                        kind: ExprKind::HashRef(pairs),
+                        line,
+                    };
+                    return Ok(Expr {
+                        kind: ExprKind::Deref {
+                            expr: Box::new(href),
+                            kind: Sigil::Hash,
+                        },
+                        line,
+                    });
+                }
                 self.expect(&Token::LBrace)?;
-                let inner = self.parse_expression()?;
+                // Peek to disambiguate `%{ $ref }` (deref a hashref expression) from
+                // `%{ k => v }` (inline hash literal). Real Perl's block-vs-hashref
+                // heuristic is famously unreliable — when the first non-whitespace
+                // token is an ident/string followed by `=>`, treat the whole thing
+                // as a hashref literal to make `%{a=>1,b=>2}` work reliably.
+                let looks_like_pair = matches!(
+                    self.peek(),
+                    Token::Ident(_) | Token::SingleString(_) | Token::DoubleString(_)
+                ) && matches!(self.peek_at(1), Token::FatArrow);
+                let inner = if looks_like_pair {
+                    let pairs = self.parse_hashref_pairs_until(&Token::RBrace)?;
+                    Expr {
+                        kind: ExprKind::HashRef(pairs),
+                        line,
+                    }
+                } else {
+                    self.parse_expression()?
+                };
                 self.expect(&Token::RBrace)?;
                 Ok(Expr {
                     kind: ExprKind::Deref {
@@ -6062,6 +6176,34 @@ impl Parser {
                         line,
                     });
                 }
+                // `@[a, b, c]` — sugar for `@{[a, b, c]}`: dereference an
+                // anonymous arrayref inline. Real Perl rejects `@[...]` at
+                // the parser level, so this extension has no compat risk.
+                if matches!(self.peek(), Token::LBracket) {
+                    self.advance();
+                    let mut elems = Vec::new();
+                    if !matches!(self.peek(), Token::RBracket) {
+                        elems.push(self.parse_assign_expr()?);
+                        while self.eat(&Token::Comma) {
+                            if matches!(self.peek(), Token::RBracket) {
+                                break;
+                            }
+                            elems.push(self.parse_assign_expr()?);
+                        }
+                    }
+                    self.expect(&Token::RBracket)?;
+                    let aref = Expr {
+                        kind: ExprKind::ArrayRef(elems),
+                        line,
+                    };
+                    return Ok(Expr {
+                        kind: ExprKind::Deref {
+                            expr: Box::new(aref),
+                            kind: Sigil::Array,
+                        },
+                        line,
+                    });
+                }
                 // `@$arr` — array dereference; `@$h{k1,k2}` — hash slice via hashref
                 let container = match self.peek().clone() {
                     Token::ScalarVar(n) => {
@@ -6073,7 +6215,7 @@ impl Parser {
                     }
                     _ => {
                         return Err(self.syntax_err(
-                            "Expected `$name` or `{` after `@` (e.g. `@$aref`, `@{expr}`, or `@$href{keys}`)",
+                            "Expected `$name`, `{`, or `[` after `@` (e.g. `@$aref`, `@{expr}`, `@[1,2,3]`, or `@$href{keys}`)",
                             line,
                         ));
                     }
@@ -6279,7 +6421,7 @@ impl Parser {
                     line,
                 })
             }
-            "print" => self.parse_print_like(|h, a| ExprKind::Print { handle: h, args: a }),
+            "print" | "pr" => self.parse_print_like(|h, a| ExprKind::Print { handle: h, args: a }),
             "say" | "p" => self.parse_print_like(|h, a| ExprKind::Say { handle: h, args: a }),
             "printf" => self.parse_print_like(|h, a| ExprKind::Printf { handle: h, args: a }),
             "die" => {
@@ -7978,7 +8120,29 @@ impl Parser {
                     line,
                 })
             }
-            "list_count" | "list_size" | "count" | "size" | "len" | "cnt" => {
+            // `size` is the file-size builtin (Perl `-s`), not a list-count alias.
+            // Defaults to `$_` when no arg is given, like `length`. See
+            // `builtin_file_size` in builtins.rs for the runtime behavior.
+            "size" => {
+                if self.pipe_supplies_slurped_list_operand() {
+                    return Ok(Expr {
+                        kind: ExprKind::FuncCall {
+                            name: "size".to_string(),
+                            args: vec![],
+                        },
+                        line,
+                    });
+                }
+                let a = self.parse_one_arg_or_default()?;
+                Ok(Expr {
+                    kind: ExprKind::FuncCall {
+                        name: "size".to_string(),
+                        args: vec![a],
+                    },
+                    line,
+                })
+            }
+            "list_count" | "list_size" | "count" | "len" | "cnt" => {
                 if self.pipe_supplies_slurped_list_operand() {
                     return Ok(Expr {
                         kind: ExprKind::FuncCall {
@@ -7991,7 +8155,7 @@ impl Parser {
                 let (list, progress) = self.parse_assign_expr_list_optional_progress()?;
                 if progress.is_some() {
                     return Err(self.syntax_err(
-                        "`progress =>` is not supported for list_count / list_size / count / size / cnt",
+                        "`progress =>` is not supported for list_count / list_size / count / cnt",
                         line,
                     ));
                 }
@@ -9430,7 +9594,7 @@ impl Parser {
             | "zip_with" | "count_by" | "skip" | "first_or"
             // ── pipeline / string helpers ───────────────────────────────────
             | "input" | "lines" | "words" | "chars" | "trim" | "avg" | "stddev"
-            | "squared" | "sq" | "square" | "cubed" | "cb" | "cube" | "expt"
+            | "squared" | "sq" | "square" | "cubed" | "cb" | "cube" | "expt" | "pow" | "pw"
             | "normalize" | "snake_case" | "camel_case" | "kebab_case"
             | "frequencies" | "freq" | "interleave" | "ddump" | "stringify" | "str" | "top"
             | "to_json" | "to_csv" | "to_toml" | "to_yaml" | "to_xml"
@@ -10002,6 +10166,40 @@ impl Parser {
             }
         }
         self.expect(&Token::RBrace)?;
+        Ok(pairs)
+    }
+
+    /// Parse `key => val, key => val, ...` up to (but not consuming) `term`.
+    /// Used by the `%[…]` and `%{k=>v,…}` sugar to build an inline hashref
+    /// AST node, sidestepping the block/hashref ambiguity that `try_parse_hash_ref`
+    /// navigates. Caller expects and consumes `term` itself.
+    fn parse_hashref_pairs_until(&mut self, term: &Token) -> PerlResult<Vec<(Expr, Expr)>> {
+        let mut pairs = Vec::new();
+        while !matches!(&self.peek(), t if std::mem::discriminant(*t) == std::mem::discriminant(term))
+            && !matches!(self.peek(), Token::Eof)
+        {
+            let line = self.peek_line();
+            let key = if let Token::Ident(ref name) = self.peek().clone() {
+                if matches!(self.peek_at(1), Token::FatArrow) {
+                    self.advance();
+                    Expr {
+                        kind: ExprKind::String(name.clone()),
+                        line,
+                    }
+                } else {
+                    self.parse_assign_expr()?
+                }
+            } else {
+                self.parse_assign_expr()?
+            };
+            if self.eat(&Token::FatArrow) || self.eat(&Token::Comma) {
+                let val = self.parse_assign_expr()?;
+                pairs.push((key, val));
+                self.eat(&Token::Comma);
+            } else {
+                return Err(self.syntax_err("Expected => or , in hash ref", key.line));
+            }
+        }
         Ok(pairs)
     }
 

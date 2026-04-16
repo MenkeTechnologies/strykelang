@@ -318,7 +318,10 @@ fn size_returns_file_byte_size_like_dash_s() {
         ),
         2,
     );
-    // Pipeline + map — each file wrapped as `{path => size}` hashref
+    // Pipeline + map — each file wrapped as `{path => size}` hashref.
+    // `$_` inside the map is the full path that was piped in, so the JSON
+    // key is the whole path (e.g. `/var/folders/.../sz3`) — we only assert
+    // on the tail so the test isn't tied to the tmpdir layout.
     let out = eval_string(
         r#"no strict 'vars';
         my $root = tempdir();
@@ -329,8 +332,8 @@ fn size_returns_file_byte_size_like_dash_s() {
         ($p) |> map +{ $_ => size } |> to_json"#,
     );
     assert!(
-        out.contains(r#""sz3":4"#),
-        "expected `\"sz3\":4` (filename keyed to size) in {out}",
+        out.contains(r#"sz3":4"#),
+        "expected key ending in `sz3\":4` (path → size) in {out}",
     );
     // Nonexistent path → undef, not 0 (matches `-s` semantics)
     assert_eq!(
