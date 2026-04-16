@@ -41,6 +41,7 @@ A Perl 5 compatible interpreter in Rust with native parallel primitives, NaN-box
 - [\[0x0F\] Bytecode Cache (`.pec`)](#0x0f-bytecode-cache-pec)
 - [\[0x10\] Distributed `pmap_on` over SSH (`cluster`)](#0x10-distributed-pmap_on-over-ssh-cluster)
 - [\[0x11\] Language Server (`--lsp`)](#0x11-language-server---lsp)
+- [\[0x12\] Language Reflection](#0x12-language-reflection)
 - [\[0xFF\] License](#0xff-license)
 
 ---
@@ -1368,6 +1369,71 @@ Wire it into VS Code, JetBrains, or any LSP-aware editor by pointing the client 
   "perlrs.serverArgs": ["--lsp"]
 }
 ```
+
+---
+
+## [0x12] LANGUAGE REFLECTION
+
+perlrs exposes its own parser and dispatcher state as plain Perl hashes, so
+you can enumerate, look up, filter, and pipe over everything the interpreter
+knows about — no separate API surface to learn, just standard hash ops.
+
+The data is derived at compile time from the source of truth (`is_perl5_core`,
+`perlrs_extension_name`, `try_builtin` arm primaries) by `build.rs`, so the
+hashes are **always** in sync with the real parser/dispatcher — no
+hand-maintained count that can go stale.
+
+#### Hashes
+
+| Long name | Short | Contents |
+| --- | --- | --- |
+| `%perlrs::builtins` | `%b` | every callable name → `"perl"` or `"extension"` |
+| `%perlrs::perl_compats` | `%pc` | Perl 5 core keyword → `1` |
+| `%perlrs::extensions` | `%e` | perlrs-only name → `1` |
+| `%perlrs::aliases` | `%a` | alias → canonical primary (e.g. `tj` → `to_json`) |
+| `%perlrs::callable` | `%c` | any spelling → canonical name (primary/alias/core unified) |
+
+Invariants (enforced by tests in `tests/suite/reflection.rs`):
+- `keys %perl_compats ∩ keys %extensions == ∅` (disjoint sides).
+- `|%builtins| == |%perl_compats| + |%extensions|`.
+- Every `%aliases` value is present in `%builtins` (no dangling primaries).
+
+#### Examples
+
+```sh
+pe -e 'p scalar keys %b'                       # count every known name
+pe -e 'p $b{map}'                              # "perl"
+pe -e 'p $b{pmap}'                             # "extension"
+pe -e 'p $a{tj}'                               # "to_json" (alias → primary)
+pe -e 'p $c{keys}'                             # "keys" (ExprKind-backed core)
+pe -e 'p exists $pc{pmap} ? 1 : 0'             # 0 — pmap is an extension, not core
+
+# iterate + pipe — every encoder primary name:
+pe -e 'keys %b |> grep /^to_/ |> sort |> p'
+
+# all two-letter short aliases, sorted:
+pe -e 'keys %a |> grep { length == 2 } |> sort |> p'
+
+# find every extension under a pattern (e.g. all p* parallel ops):
+pe -e 'keys %e |> grep /^p/ |> sort |> p'
+
+# reverse lookup — what aliases point at `basename`?
+pe -e 'my $p = "basename"; keys %a |> grep { $a{$_} eq $p } |> sort |> p'
+
+# catalog the reflection surface itself:
+pe -e 'for my $h (qw(b a e pc c)) { printf "%-3s %d\n", "%$h", scalar keys %$h }'
+```
+
+#### Notes
+
+- Hash sigil namespace is separate from scalars and subs, so `%a`/`%b` don't
+  collide with `$a`/`$b` sort specials, and `%e` doesn't collide with the
+  `e` extension sub (bare-name alias for `fore`).
+- Short aliases (`%b`/`%a`/...) are value copies of the long `%perlrs::*`
+  names — currently read-only in practice, so the copy never diverges.
+- `%callable{$name}` returning `$name` unchanged for names like `uc` or `keys`
+  means "this is callable and its canonical form is itself" — i.e. it's either
+  a primary dispatcher name or a core keyword modeled directly in the parser.
 
 ---
 

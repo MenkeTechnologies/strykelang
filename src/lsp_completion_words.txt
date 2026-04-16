@@ -195,6 +195,11 @@ par_walk
 pcache
 pchannel
 peek
+perlrs::aliases
+perlrs::builtins
+perlrs::callable
+perlrs::extensions
+perlrs::perl_compats
 pfirst
 pflat_map
 pflat_map_on
