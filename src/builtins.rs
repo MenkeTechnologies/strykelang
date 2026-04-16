@@ -300,7 +300,8 @@ pub(crate) fn try_builtin(
         "dedup" | "dup" => Some(builtin_dedup(args)),
         "range" => Some(builtin_range(args)),
         "list_count" | "list_size" => Some(builtin_list_count(args)),
-        "count" | "len" | "size" | "cnt" => Some(builtin_count_size_cnt(args)),
+        "count" | "len" | "cnt" => Some(builtin_count_size_cnt(args)),
+        "size" => Some(builtin_file_size(interp, args)),
         "read_lines" | "rl" => Some(builtin_read_lines(interp, args, line)),
         "append_file" | "af" => Some(builtin_append_file(args, line)),
         "tempfile" | "tf" => Some(builtin_tempfile(args, line)),
@@ -937,6 +938,36 @@ fn builtin_count_size_cnt(args: &[PerlValue]) -> PerlResult<PerlValue> {
         return Ok(PerlValue::integer(a.map_flatten_outputs(true).len() as i64));
     }
     builtin_list_count(args)
+}
+
+/// `size` — byte size of a file, like Perl's `-s`.
+/// No args → `-s $_`. One arg → `-s arg`. Multiple args / flattened list → array of sizes.
+/// Returns `undef` for paths that can't be stat'd.
+fn builtin_file_size(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let size_of = |v: &PerlValue| -> PerlValue {
+        let path = v.to_string();
+        match std::fs::metadata(&path) {
+            Ok(m) => PerlValue::integer(m.len() as i64),
+            Err(_) => PerlValue::UNDEF,
+        }
+    };
+    if args.is_empty() {
+        let topic = interp.scope.get_scalar("_");
+        return Ok(size_of(&topic));
+    }
+    let flat: Vec<PerlValue> = if args.len() == 1 {
+        args[0].map_flatten_outputs(true)
+    } else {
+        let mut out = Vec::new();
+        for a in args {
+            out.extend(a.map_flatten_outputs(true));
+        }
+        out
+    };
+    if flat.len() <= 1 {
+        return Ok(size_of(flat.first().unwrap_or(&PerlValue::UNDEF)));
+    }
+    Ok(PerlValue::array(flat.iter().map(size_of).collect()))
 }
 
 /// One-level list flatten: plain arrays and arrayrefs expand like `flat_map` / [`PerlValue::map_flatten_outputs`].

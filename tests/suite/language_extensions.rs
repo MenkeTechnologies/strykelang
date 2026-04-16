@@ -281,15 +281,62 @@ fn list_count_and_list_size_use_list_context_like_flatten_scalar() {
     assert_eq!(eval_int(r#"list_count(1, 2, [3, 4])"#), 4);
     assert_eq!(eval_int(r#"(1, 2, 3) |> list_count"#), 3);
     assert_eq!(eval_int(r#"(1, 2, 3) |> count"#), 3);
-    assert_eq!(eval_int(r#"(1, 2) |> size"#), 2);
     assert_eq!(eval_int(r#"list_count("tom")"#), 1);
     assert_eq!(eval_int(r#""tom" |> cnt"#), 3);
-    assert_eq!(eval_int(r#""tom" |> size"#), 3);
     assert_eq!(eval_int(r#""tom" |> count"#), 3);
     assert_eq!(eval_int(r#"1..5 |> cnt"#), 5);
-    assert_eq!(eval_int(r#"1..5 |> size"#), 5);
     assert_eq!(eval_int(r#"1..5 |> count"#), 5);
     assert_eq!(eval_int(r#"cnt("x", "y")"#), 2);
+}
+
+#[test]
+fn size_returns_file_byte_size_like_dash_s() {
+    // size($path) — explicit arg
+    assert_eq!(
+        eval_int(
+            r#"no strict 'vars';
+            my $root = tempdir();
+            my $p = "$root/sz";
+            open my $f, '>', $p or die;
+            print $f "hello!";
+            close $f;
+            size($p)"#,
+        ),
+        6,
+    );
+    // size — no args, defaults to $_
+    assert_eq!(
+        eval_int(
+            r#"no strict 'vars';
+            my $root = tempdir();
+            my $p = "$root/sz2";
+            open my $f, '>', $p or die;
+            print $f "12";
+            close $f;
+            $_ = $p;
+            size"#,
+        ),
+        2,
+    );
+    // Pipeline + map — each file wrapped as `{path => size}` hashref
+    let out = eval_string(
+        r#"no strict 'vars';
+        my $root = tempdir();
+        my $p = "$root/sz3";
+        open my $f, '>', $p or die;
+        print $f "abcd";
+        close $f;
+        ($p) |> map +{ $_ => size } |> to_json"#,
+    );
+    assert!(
+        out.contains(r#""sz3":4"#),
+        "expected `\"sz3\":4` (filename keyed to size) in {out}",
+    );
+    // Nonexistent path → undef, not 0 (matches `-s` semantics)
+    assert_eq!(
+        eval_int(r#"defined(size("this/path/should/never/exist")) ? 1 : 0"#),
+        0,
+    );
 }
 
 #[test]
