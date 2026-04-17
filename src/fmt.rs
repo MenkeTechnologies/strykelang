@@ -377,6 +377,21 @@ fn format_statement_indent(s: &Statement, depth: usize) -> String {
                 .join(", ");
             format!("struct {} {{ {} }}", def.name, fields)
         }
+        StmtKind::EnumDecl { def } => {
+            let variants = def
+                .variants
+                .iter()
+                .map(|v| {
+                    if let Some(ty) = &v.ty {
+                        format!("{} => {}", v.name, ty.display_name())
+                    } else {
+                        v.name.clone()
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("enum {} {{ {} }}", def.name, variants)
+        }
         StmtKind::EvalTimeout { timeout, body } => {
             format!(
                 "eval_timeout {} {{\n{}\n{}}}",

@@ -204,6 +204,7 @@ pub const KEYWORDS: &[&str] = &[
     "sub",
     "fn",
     "struct",
+    "enum",
     "return",
     "if",
     "elsif",

@@ -468,6 +468,20 @@ fn deparse_stmt_into(buf: &mut String, stmt: &Statement, indent: usize) {
             }
             buf.push_str(" }");
         }
+        StmtKind::EnumDecl { def } => {
+            let _ = write!(buf, "enum {} {{ ", def.name);
+            for (i, variant) in def.variants.iter().enumerate() {
+                if i > 0 {
+                    buf.push_str(", ");
+                }
+                if let Some(ty) = &variant.ty {
+                    let _ = write!(buf, "{} => {}", variant.name, ty.display_name());
+                } else {
+                    buf.push_str(&variant.name);
+                }
+            }
+            buf.push_str(" }");
+        }
         StmtKind::Empty => {
             buf.push(';');
         }

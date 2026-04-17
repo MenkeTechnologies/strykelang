@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 use std::sync::Arc;
 use std::sync::Barrier;
 
-use crate::ast::{Block, StructDef, SubSigParam};
+use crate::ast::{Block, EnumDef, StructDef, SubSigParam};
 use crate::error::PerlResult;
 use crate::nanbox;
 use crate::perl_decode::decode_utf8_or_latin1;
@@ -564,6 +564,7 @@ pub(crate) enum HeapObject {
     SqliteConn(Arc<Mutex<rusqlite::Connection>>),
     StructInst(Arc<StructInstance>),
     DataFrame(Arc<Mutex<PerlDataFrame>>),
+    EnumInst(Arc<EnumInstance>),
     /// Lazy pull-based iterator (`frs`, `drs`, `rev` wrapping, etc.).
     Iterator(Arc<dyn PerlIterator>),
     /// Numeric/string dualvar: **`$!`** (errno + message) and **`$@`** (numeric flag or code + message).
@@ -866,6 +867,39 @@ impl Clone for StructInstance {
         Self {
             def: Arc::clone(&self.def),
             values: RwLock::new(self.values.read().clone()),
+        }
+    }
+}
+
+/// Instance of an `enum Name { Variant ... }` definition.
+#[derive(Debug)]
+pub struct EnumInstance {
+    pub def: Arc<EnumDef>,
+    pub variant_idx: usize,
+    /// Data carried by this variant. For variants with no data, this is UNDEF.
+    pub data: PerlValue,
+}
+
+impl EnumInstance {
+    pub fn new(def: Arc<EnumDef>, variant_idx: usize, data: PerlValue) -> Self {
+        Self {
+            def,
+            variant_idx,
+            data,
+        }
+    }
+
+    pub fn variant_name(&self) -> &str {
+        &self.def.variants[self.variant_idx].name
+    }
+}
+
+impl Clone for EnumInstance {
+    fn clone(&self) -> Self {
+        Self {
+            def: Arc::clone(&self.def),
+            variant_idx: self.variant_idx,
+            data: self.data.clone(),
         }
     }
 }
@@ -1233,6 +1267,15 @@ impl PerlValue {
     }
 
     #[inline]
+    pub fn as_enum_inst(&self) -> Option<Arc<EnumInstance>> {
+        self.with_heap(|h| match h {
+            HeapObject::EnumInst(e) => Some(Arc::clone(e)),
+            _ => None,
+        })
+        .flatten()
+    }
+
+    #[inline]
     pub fn as_dataframe(&self) -> Option<Arc<Mutex<PerlDataFrame>>> {
         self.with_heap(|h| match h {
             HeapObject::DataFrame(d) => Some(Arc::clone(d)),
@@ -1486,6 +1529,11 @@ impl PerlValue {
     #[inline]
     pub fn struct_inst(s: Arc<StructInstance>) -> Self {
         Self::from_heap(Arc::new(HeapObject::StructInst(s)))
+    }
+
+    #[inline]
+    pub fn enum_inst(e: Arc<EnumInstance>) -> Self {
+        Self::from_heap(Arc::new(HeapObject::EnumInst(e)))
     }
 
     #[inline]
@@ -1864,6 +1912,7 @@ impl PerlValue {
             HeapObject::Barrier(_) => "Barrier".to_string(),
             HeapObject::SqliteConn(_) => "SqliteConn".to_string(),
             HeapObject::StructInst(s) => s.def.name.to_string(),
+            HeapObject::EnumInst(e) => e.def.name.to_string(),
             HeapObject::Iterator(_) => "Iterator".to_string(),
             HeapObject::ErrnoDual { .. } => "Errno".to_string(),
             HeapObject::Integer(_) => "INTEGER".to_string(),
@@ -1903,6 +1952,7 @@ impl PerlValue {
             HeapObject::Barrier(_) => PerlValue::string("Barrier".into()),
             HeapObject::SqliteConn(_) => PerlValue::string("SqliteConn".into()),
             HeapObject::StructInst(s) => PerlValue::string(s.def.name.clone()),
+            HeapObject::EnumInst(e) => PerlValue::string(e.def.name.clone()),
             HeapObject::Bytes(_) => PerlValue::string("BYTES".into()),
             HeapObject::Blessed(b) => PerlValue::string(b.class.clone()),
             _ => PerlValue::string(String::new()),
@@ -2164,6 +2214,14 @@ impl fmt::Display for PerlValue {
                 }
                 f.write_str(")")
             }
+            HeapObject::EnumInst(e) => {
+                // Smart stringify: Color::Red or Maybe::Some(value)
+                write!(f, "{}::{}", e.def.name, e.variant_name())?;
+                if e.def.variants[e.variant_idx].ty.is_some() {
+                    write!(f, "({})", e.data)?;
+                }
+                Ok(())
+            }
             HeapObject::DataFrame(d) => {
                 let g = d.lock();
                 write!(f, "DataFrame({} rows)", g.nrows())
@@ -2251,6 +2309,9 @@ pub fn set_member_key(v: &PerlValue) -> String {
         HeapObject::Barrier(b) => format!("br:{:p}", Arc::as_ptr(&b.0)),
         HeapObject::SqliteConn(c) => format!("sql:{:p}", Arc::as_ptr(c)),
         HeapObject::StructInst(s) => format!("st:{}:{:?}", s.def.name, s.values),
+        HeapObject::EnumInst(e) => {
+            format!("en:{}::{}:{}", e.def.name, e.variant_name(), e.data)
+        }
         HeapObject::DataFrame(d) => format!("df:{:p}", Arc::as_ptr(d)),
         HeapObject::Iterator(_) => "iter".to_string(),
         HeapObject::ErrnoDual { code, msg } => format!("e:{code}:{msg}"),

@@ -185,6 +185,10 @@ pub enum StmtKind {
     StructDecl {
         def: StructDef,
     },
+    /// `enum Name { Variant1 => Type, Variant2, ... }` — algebraic data types.
+    EnumDecl {
+        def: EnumDef,
+    },
     /// `eval_timeout SECS { ... }` — run block on a worker thread; main waits up to SECS (portable timeout).
     EvalTimeout {
         timeout: Expr,
@@ -245,6 +249,8 @@ pub enum PerlTypeName {
     Ref,
     /// Struct-typed field: `field => Point` where Point is a struct name.
     Struct(String),
+    /// Enum-typed field: `field => Color` where Color is an enum name.
+    Enum(String),
     /// Accepts any value (no runtime type check).
     Any,
 }
@@ -265,6 +271,33 @@ pub struct StructMethod {
     pub name: String,
     pub params: Vec<SubSigParam>,
     pub body: Block,
+}
+
+/// Single variant in an enum definition.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnumVariant {
+    pub name: String,
+    /// Optional type for data carried by this variant. If None, it carries no data.
+    pub ty: Option<PerlTypeName>,
+}
+
+/// Compile-time algebraic data type: `enum Name { Variant1 => Type, Variant2, ... }`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnumDef {
+    pub name: String,
+    pub variants: Vec<EnumVariant>,
+}
+
+impl EnumDef {
+    #[inline]
+    pub fn variant_index(&self, name: &str) -> Option<usize> {
+        self.variants.iter().position(|v| v.name == name)
+    }
+
+    #[inline]
+    pub fn variant(&self, name: &str) -> Option<&EnumVariant> {
+        self.variants.iter().find(|v| v.name == name)
+    }
 }
 
 /// Compile-time record type: `struct Name { field => Type, ... ; fn method { } }`.
@@ -313,7 +346,7 @@ impl PerlTypeName {
         }
     }
 
-    /// Bytecode encoding (simple types only; `Struct(name)` requires separate name pool lookup).
+    /// Bytecode encoding (simple types only; `Struct(name)` / `Enum(name)` requires separate name pool lookup).
     #[inline]
     pub fn as_byte(&self) -> Option<u8> {
         match self {
@@ -325,7 +358,7 @@ impl PerlTypeName {
             Self::Hash => Some(5),
             Self::Ref => Some(6),
             Self::Any => Some(7),
-            Self::Struct(_) => None,
+            Self::Struct(_) | Self::Enum(_) => None,
         }
     }
 
@@ -341,6 +374,7 @@ impl PerlTypeName {
             Self::Ref => "Ref".to_string(),
             Self::Any => "Any".to_string(),
             Self::Struct(name) => name.clone(),
+            Self::Enum(name) => name.clone(),
         }
     }
 
@@ -407,8 +441,25 @@ impl PerlTypeName {
                             name, s.def.name
                         ))
                     }
+                } else if let Some(e) = v.as_enum_inst() {
+                    if e.def.name == *name {
+                        Ok(())
+                    } else {
+                        Err(format!("expected {}, got enum {}", name, e.def.name))
+                    }
                 } else {
-                    Err(format!("expected struct {}, got {}", name, v.type_name()))
+                    Err(format!("expected {}, got {}", name, v.type_name()))
+                }
+            }
+            Self::Enum(name) => {
+                if let Some(e) = v.as_enum_inst() {
+                    if e.def.name == *name {
+                        Ok(())
+                    } else {
+                        Err(format!("expected enum {}, got enum {}", name, e.def.name))
+                    }
+                } else {
+                    Err(format!("expected enum {}, got {}", name, v.type_name()))
                 }
             }
             Self::Any => Ok(()),

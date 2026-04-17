@@ -593,6 +593,8 @@ pub struct Interpreter {
     pub(crate) wantarray_kind: WantarrayCtx,
     /// `struct Name { ... }` definitions (merged from VM chunks and tree-walker).
     pub struct_defs: HashMap<String, Arc<StructDef>>,
+    /// `enum Name { ... }` definitions (merged from VM chunks and tree-walker).
+    pub enum_defs: HashMap<String, Arc<EnumDef>>,
     /// When set, `pe --profile` records timings: VM path uses per-opcode line samples and sub
     /// call/return (JIT disabled); tree-walker fallback uses per-statement lines and subs.
     pub profiler: Option<Profiler>,
@@ -1267,6 +1269,7 @@ impl Interpreter {
             scope,
             subs: HashMap::new(),
             struct_defs: HashMap::new(),
+            enum_defs: HashMap::new(),
             file: "-e".to_string(),
             output_handles: HashMap::new(),
             input_handles: HashMap::new(),
@@ -1441,6 +1444,7 @@ impl Interpreter {
             scope: self.scope.clone(),
             subs: self.subs.clone(),
             struct_defs: self.struct_defs.clone(),
+            enum_defs: self.enum_defs.clone(),
             file: self.file.clone(),
             output_handles: HashMap::new(),
             input_handles: HashMap::new(),
@@ -5555,6 +5559,7 @@ impl Interpreter {
         let block = body.clone();
         let subs = self.subs.clone();
         let struct_defs = self.struct_defs.clone();
+        let enum_defs = self.enum_defs.clone();
         let (scalars, aar, ahash) = self.scope.capture_with_atomics();
         self.materialize_env_if_needed();
         let env = self.env.clone();
@@ -5565,6 +5570,7 @@ impl Interpreter {
             let mut interp = Interpreter::new();
             interp.subs = subs;
             interp.struct_defs = struct_defs;
+            interp.enum_defs = enum_defs;
             interp.env = env.clone();
             interp.argv = argv.clone();
             interp.scope.declare_array(
@@ -6777,6 +6783,18 @@ impl Interpreter {
                     .into());
                 }
                 self.struct_defs
+                    .insert(def.name.clone(), Arc::new(def.clone()));
+                Ok(PerlValue::UNDEF)
+            }
+            StmtKind::EnumDecl { def } => {
+                if self.enum_defs.contains_key(&def.name) {
+                    return Err(PerlError::runtime(
+                        format!("duplicate enum `{}`", def.name),
+                        stmt.line,
+                    )
+                    .into());
+                }
+                self.enum_defs
                     .insert(def.name.clone(), Arc::new(def.clone()));
                 Ok(PerlValue::UNDEF)
             }
@@ -13464,6 +13482,12 @@ impl Interpreter {
                 if let Some(def) = self.struct_defs.get(name).cloned() {
                     return self.struct_construct(&def, args, line);
                 }
+                // Check for enum variant constructor: Color::Red or Maybe::Some(value)
+                if let Some((enum_name, variant_name)) = name.rsplit_once("::") {
+                    if let Some(def) = self.enum_defs.get(enum_name).cloned() {
+                        return self.enum_construct(&def, variant_name, args, line);
+                    }
+                }
                 let args = self.with_topic_default_args(args);
                 if let Some(r) = self.try_autoload_call(name, args, line, want, None) {
                     return r;
@@ -13523,6 +13547,54 @@ impl Interpreter {
         Ok(crate::native_data::struct_new_with_defaults(
             def, &provided, &defaults, line,
         )?)
+    }
+
+    /// Construct an enum variant: `Enum::Variant` or `Enum::Variant(data)`.
+    pub(crate) fn enum_construct(
+        &mut self,
+        def: &Arc<EnumDef>,
+        variant_name: &str,
+        args: Vec<PerlValue>,
+        line: usize,
+    ) -> ExecResult {
+        let variant_idx = def.variant_index(variant_name).ok_or_else(|| {
+            FlowOrError::Error(PerlError::runtime(
+                format!("unknown variant `{}` for enum `{}`", variant_name, def.name),
+                line,
+            ))
+        })?;
+        let variant = &def.variants[variant_idx];
+        let data = if variant.ty.is_some() {
+            if args.is_empty() {
+                return Err(PerlError::runtime(
+                    format!(
+                        "enum variant `{}::{}` requires data",
+                        def.name, variant_name
+                    ),
+                    line,
+                )
+                .into());
+            }
+            if args.len() == 1 {
+                args.into_iter().next().unwrap()
+            } else {
+                PerlValue::array(args)
+            }
+        } else {
+            if !args.is_empty() {
+                return Err(PerlError::runtime(
+                    format!(
+                        "enum variant `{}::{}` does not take data",
+                        def.name, variant_name
+                    ),
+                    line,
+                )
+                .into());
+            }
+            PerlValue::UNDEF
+        };
+        let inst = crate::value::EnumInstance::new(Arc::clone(def), variant_idx, data);
+        Ok(PerlValue::enum_inst(Arc::new(inst)))
     }
 
     /// True if `name` is a registered or standard process-global handle.

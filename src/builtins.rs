@@ -6900,7 +6900,7 @@ fn builtin_sorted(args: &[PerlValue]) -> PerlResult<PerlValue> {
 /// `sorted_desc` — Sorted desc. Returns a list.
 fn builtin_sorted_desc(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut xs = flatten_args(args);
-    xs.sort_by(|a, b| b.to_string().cmp(&a.to_string()));
+    xs.sort_by_key(|v| std::cmp::Reverse(v.to_string()));
     Ok(PerlValue::array(xs))
 }
 /// `sorted_nums` — Sorted nums. Returns a list.
@@ -11387,11 +11387,11 @@ fn builtin_levenshtein(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m = s1.len();
     let n = s2.len();
     let mut dp = vec![vec![0usize; n + 1]; m + 1];
-    for i in 0..=m {
-        dp[i][0] = i;
+    for (i, row) in dp.iter_mut().enumerate().take(m + 1) {
+        row[0] = i;
     }
-    for j in 0..=n {
-        dp[0][j] = j;
+    for (j, cell) in dp[0].iter_mut().enumerate().take(n + 1) {
+        *cell = j;
     }
     for i in 1..=m {
         for j in 1..=n {
@@ -11464,11 +11464,11 @@ fn builtin_similarity(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m = s1c.len();
     let n = s2c.len();
     let mut dp = vec![vec![0usize; n + 1]; m + 1];
-    for i in 0..=m {
-        dp[i][0] = i;
+    for (i, row) in dp.iter_mut().enumerate().take(m + 1) {
+        row[0] = i;
     }
-    for j in 0..=n {
-        dp[0][j] = j;
+    for (j, cell) in dp[0].iter_mut().enumerate().take(n + 1) {
+        *cell = j;
     }
     for i in 1..=m {
         for j in 1..=n {
@@ -12531,6 +12531,7 @@ fn builtin_matrix_sub(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 /// `matrix_mult M1, M2` — matrix multiplication.
+#[allow(clippy::needless_range_loop)]
 fn builtin_matrix_mult(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m1 = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
     let m2 = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF));
@@ -12549,12 +12550,12 @@ fn builtin_matrix_mult(args: &[PerlValue]) -> PerlResult<PerlValue> {
         .map(|r| arg_to_vec(r).iter().map(|v| v.to_number()).collect())
         .collect();
     let mut result = Vec::with_capacity(rows1);
-    for i in 0..rows1 {
+    for m1_row in &m1_flat {
         let mut row = Vec::with_capacity(cols2);
         for j in 0..cols2 {
             let mut sum = 0.0;
-            for k in 0..cols1 {
-                sum += m1_flat[i][k] * m2_flat[k][j];
+            for (k, m1_val) in m1_row.iter().enumerate().take(cols1) {
+                sum += m1_val * m2_flat[k][j];
             }
             row.push(PerlValue::float(sum));
         }
@@ -13700,9 +13701,9 @@ fn builtin_power_set(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut result = Vec::with_capacity(count);
     for mask in 0..count {
         let mut subset = Vec::new();
-        for i in 0..n {
+        for (i, x) in xs.iter().enumerate().take(n) {
             if mask & (1 << i) != 0 {
-                subset.push(xs[i].clone());
+                subset.push(x.clone());
             }
         }
         result.push(PerlValue::array_ref(Arc::new(RwLock::new(subset))));
@@ -14135,7 +14136,7 @@ fn builtin_week_of_year(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
     let dow = day_of_week_jan1(year);
     let week = (doy + dow + 5) / 7;
-    Ok(PerlValue::integer(week.max(1).min(53)))
+    Ok(PerlValue::integer(week.clamp(1, 53)))
 }
 
 /// `days_in_month_fn YEAR, MONTH` — number of days in month.
@@ -14894,10 +14895,10 @@ fn builtin_matrix_mul(args: &[PerlValue]) -> PerlResult<PerlValue> {
         a.first().map(|r| r.len()).unwrap_or(0),
     );
     let mut out = vec![vec![0.0; cols]; rows];
-    for i in 0..rows {
-        for j in 0..cols {
+    for (i, out_row) in out.iter_mut().enumerate().take(rows) {
+        for (j, cell) in out_row.iter_mut().enumerate().take(cols) {
             for k in 0..inner {
-                out[i][j] += a[i].get(k).copied().unwrap_or(0.0)
+                *cell += a[i].get(k).copied().unwrap_or(0.0)
                     * b.get(k).and_then(|r| r.get(j)).copied().unwrap_or(0.0);
             }
         }
@@ -14911,8 +14912,8 @@ fn builtin_identity_matrix(args: &[PerlValue]) -> PerlResult<PerlValue> {
         .map(|v| v.to_int().max(0) as usize)
         .unwrap_or(3);
     let mut m = vec![vec![0.0; n]; n];
-    for i in 0..n {
-        m[i][i] = 1.0;
+    for (i, row) in m.iter_mut().enumerate().take(n) {
+        row[i] = 1.0;
     }
     Ok(aoa_to_pv(m))
 }
@@ -15200,7 +15201,7 @@ fn builtin_counter_most_common(args: &[PerlValue]) -> PerlResult<PerlValue> {
         *counts.entry(v.to_string()).or_default() += 1;
     }
     let mut pairs: Vec<_> = counts.into_iter().collect();
-    pairs.sort_by(|a, b| b.1.cmp(&a.1));
+    pairs.sort_by_key(|p| std::cmp::Reverse(p.1));
     Ok(PerlValue::array(
         pairs
             .into_iter()
@@ -17744,6 +17745,7 @@ fn builtin_kebab_case(args: &[PerlValue]) -> PerlResult<PerlValue> {
 /// * arrayref of hashrefs → `[[data]]` array-of-tables.
 /// * arrayref of arrayrefs / scalars → `data = [...]` top-level array.
 /// * single scalar → `value = …`.
+///
 /// Single hashrefs with single-key entries (the `map +{ k => v }` pattern)
 /// are merged into one flat table — otherwise each row produces its own
 /// blank-line-separated block, which doesn't round-trip as valid TOML.

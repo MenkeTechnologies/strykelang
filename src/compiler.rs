@@ -2323,6 +2323,15 @@ impl Compiler {
                 }
                 self.chunk.struct_defs.push(def.clone());
             }
+            StmtKind::EnumDecl { def } => {
+                if self.chunk.enum_defs.iter().any(|d| d.name == def.name) {
+                    return Err(CompileError::Unsupported(format!(
+                        "duplicate enum `{}`",
+                        def.name
+                    )));
+                }
+                self.chunk.enum_defs.push(def.clone());
+            }
             StmtKind::TryCatch {
                 try_block,
                 catch_var,

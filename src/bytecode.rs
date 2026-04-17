@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::ast::{Block, Expr, MatchArm, StructDef, SubSigParam};
+use crate::ast::{Block, EnumDef, Expr, MatchArm, StructDef, SubSigParam};
 use crate::value::PerlValue;
 
 /// `splice` operand tuple: array expr, offset, length, replacement list (see [`Chunk::splice_expr_entries`]).
@@ -1022,6 +1022,8 @@ pub struct Chunk {
     pub lvalues: Vec<Expr>,
     /// `struct Name { ... }` definitions in this chunk (registered on the interpreter at VM start).
     pub struct_defs: Vec<StructDef>,
+    /// `enum Name { ... }` definitions in this chunk (registered on the interpreter at VM start).
+    pub enum_defs: Vec<EnumDef>,
     /// `given (topic) { body }` — topic expression + body (when/default handled by interpreter).
     pub given_entries: Vec<(Expr, Block)>,
     /// When `Some((start, end))`, `given_entries[i].0` (topic) is lowered to `ops[start..end]` +
@@ -1113,6 +1115,7 @@ impl Chunk {
             static_sub_calls: Vec::new(),
             lvalues: Vec::new(),
             struct_defs: Vec::new(),
+            enum_defs: Vec::new(),
             given_entries: Vec::new(),
             given_topic_bytecode_ranges: Vec::new(),
             eval_timeout_entries: Vec::new(),

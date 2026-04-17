@@ -1658,6 +1658,7 @@ impl Lexer {
                     | "list_count"
                     | "list_size"
                     | "count"
+                    | "len"
                     | "size"
                     | "cnt"
                     | "zip"
@@ -1755,7 +1756,9 @@ impl Lexer {
                     | "flat_map"
                     | "group_by"
                     | "chunk_by"
-                    | "bench" => false,
+                    | "bench"
+                    | "thread"
+                    | "t" => false,
                     _ => matches!(tok, Token::Ident(_)),
                 };
                 Ok(tok)

@@ -288,7 +288,7 @@ For `mysync` scalars holding a `Set`, `|`/`&` are union/intersection. Without `m
 | **Crypto** | `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `md5`, `hmac`, `hmac_sha256`, `crc32`, `uuid`, `base64_encode/decode`, `hex_encode/decode` |
 | **Compression** ([`flate2`](https://crates.io/crates/flate2), [`zstd`](https://crates.io/crates/zstd)) | `gzip`, `gunzip`, `zstd`, `zstd_decode` |
 | **Time** ([`chrono`](https://crates.io/crates/chrono), [`chrono-tz`](https://crates.io/crates/chrono-tz)) | `datetime_utc`, `datetime_from_epoch`, `datetime_parse_rfc3339`, `datetime_strftime`, `datetime_now_tz`, `datetime_format_tz`, `datetime_parse_local`, `datetime_add_seconds`, `elapsed` |
-| **Structs / Types** | `struct Name { x => Float, y => Int }; Name(x => 1, y => 2)`; `typed my $x : Int\|Str\|Float`; typed sub params `fn ($a: Int, $b: Str) { }` |
+| **Structs / Enums / Types** | `struct Name { x => Float, y => Int }; Name(x => 1, y => 2)`; `enum Color { Red, Green, Blue }; Color::Red()`; `typed my $x : Int\|Str\|Float`; typed sub params `fn ($a: Int, $b: Str) { }` |
 
 ```perl
 my $data = "https://api.example.com/users/1" |> fetch_json;
@@ -350,6 +350,28 @@ p $p;                                # Point(x => 3, y => 2)
 my $a = Point(1, 2);
 my $b = Point(1, 2);
 p $a == $b;                          # 1 (equal)
+# ────────────────────────────────────────────────────────────────────
+
+# ─── Enums (algebraic data types) ───────────────────────────────────
+# Declaration: variants with optional typed data
+enum Color { Red, Green, Blue };              # unit variants (no data)
+enum Maybe { None, Some => Any };             # Some carries any value
+enum Result { Ok => Int, Err => Str };        # typed data per variant
+
+# Construction: Enum::Variant() syntax
+my $c = Color::Red();                         # unit variant
+my $m = Maybe::Some(42);                      # variant with data
+my $r = Result::Err("not found");             # typed variant
+
+# Smart stringify — shows enum name, variant, and data
+p $c;                                # Color::Red
+p $m;                                # Maybe::Some(42)
+p $r;                                # Result::Err(not found)
+
+# Type checking on variants with data
+# Result::Ok("bad");                 # ERROR: expected Int
+# Maybe::Some();                     # ERROR: requires data
+# Color::Red(42);                    # ERROR: does not take data
 # ────────────────────────────────────────────────────────────────────
 
 typed my $n : Int = 42;
@@ -443,7 +465,7 @@ perlrs-specific long flags:
 | `--profile` | Wall-clock profile: per-line + per-sub timings on stderr |
 | `--flame` | Flamegraph: colored terminal bars when interactive, SVG when piped (`pe --flame x.pr > flame.svg`) |
 | `--no-jit` | Disable Cranelift JIT (bytecode interpreter only) |
-| `--compat` | Perl 5 strict-compatibility mode: disable all perlrs extensions (`\|>`, `struct`, `match`, `pmap`, `#{expr}`, etc.) |
+| `--compat` | Perl 5 strict-compatibility mode: disable all perlrs extensions (`\|>`, `struct`, `enum`, `match`, `pmap`, `#{expr}`, etc.) |
 | `--explain CODE` | Print expanded hint for an error code (e.g. `E0001`) |
 | `--lsp` | Language server over stdio ([\[0x11\]](#0x11-language-server---lsp)) |
 | `-j N` / `--threads N` | Set number of parallel threads (rayon) |
@@ -535,7 +557,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **Bytecode cache** ([\[0x0F\]](#0x0f-bytecode-cache-pec)): `PERLRS_BC_CACHE=1` skips parse + compile on warm starts via on-disk `.pec` bundles.
 - **Language server** ([\[0x11\]](#0x11-language-server---lsp)): `pe --lsp` runs an LSP server over stdio with diagnostics, hover, completion.
 - `mysync` shared state ([\[0x04\]](#0x04-shared-state-mysync)).
-- `frozen my` (or `const my` — same thing, more familiar spelling), `typed my`, `struct`, algebraic `match`, `try/catch/finally`, `eval_timeout`, `retry`, `rate_limit`, `every`, `gen { ... yield }`.
+- `frozen my` (or `const my` — same thing, more familiar spelling), `typed my`, `struct`, `enum`, algebraic `match`, `try/catch/finally`, `eval_timeout`, `retry`, `rate_limit`, `every`, `gen { ... yield }`.
 - **Functional composition** — `compose`, `partial`, `curry`, `memoize`, `once`, `constantly`, `complement`, `juxt`, `fnil`:
 
   ```perl

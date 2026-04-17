@@ -433,6 +433,7 @@ impl StaticAnalyzer {
                 }
             }
             StmtKind::StructDecl { .. }
+            | StmtKind::EnumDecl { .. }
             | StmtKind::FormatDecl { .. }
             | StmtKind::UsePerlVersion { .. }
             | StmtKind::UseOverload { .. }

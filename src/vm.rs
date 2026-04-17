@@ -2131,6 +2131,23 @@ impl<'a> VM<'a> {
                         Err(crate::interpreter::FlowOrError::Error(e)) => return Err(e),
                         _ => self.push(PerlValue::UNDEF),
                     }
+                } else if let Some((enum_name, variant_name)) = name.rsplit_once("::") {
+                    // Enum variant constructor: Color::Red or Maybe::Some(value)
+                    if let Some(def) = self.interp.enum_defs.get(enum_name).cloned() {
+                        let result =
+                            self.interp
+                                .enum_construct(&def, variant_name, args, self.line());
+                        match result {
+                            Ok(v) => self.push(v),
+                            Err(crate::interpreter::FlowOrError::Error(e)) => return Err(e),
+                            _ => self.push(PerlValue::UNDEF),
+                        }
+                    } else {
+                        return Err(PerlError::runtime(
+                            self.interp.undefined_subroutine_call_message(name),
+                            self.line(),
+                        ));
+                    }
                 } else {
                     return Err(PerlError::runtime(
                         self.interp.undefined_subroutine_call_message(name),

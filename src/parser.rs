@@ -337,7 +337,7 @@ impl Parser {
         matches!(
             self.peek(),
             Token::Ident(ref kw) if matches!(kw.as_str(),
-                "use" | "no" | "my" | "our" | "local" | "sub" | "struct"
+                "use" | "no" | "my" | "our" | "local" | "sub" | "struct" | "enum"
                 | "if" | "unless" | "while" | "until" | "for" | "foreach"
                 | "return" | "last" | "next" | "redo" | "package" | "require"
                 | "BEGIN" | "END" | "UNITCHECK" | "frozen" | "const" | "typed"
@@ -459,6 +459,15 @@ impl Parser {
                         ));
                     }
                     self.parse_struct_decl()?
+                }
+                "enum" => {
+                    if crate::compat_mode() {
+                        return Err(self.syntax_err(
+                            "`enum` is a perlrs extension (disabled by --compat)",
+                            self.peek_line(),
+                        ));
+                    }
+                    self.parse_enum_decl()?
                 }
                 "my" => self.parse_my_our_local("my", false)?,
                 "state" => self.parse_my_our_local("state", false)?,
@@ -1736,6 +1745,10 @@ impl Parser {
             "shift" => ExprKind::Shift(Box::new(arg)),
             "reverse" | "reversed" | "rv" => ExprKind::ReverseExpr(Box::new(arg)),
             "rev" => ExprKind::ScalarReverse(Box::new(arg)),
+            "sort" | "so" => ExprKind::SortExpr {
+                cmp: None,
+                list: Box::new(arg),
+            },
             "uniq" | "distinct" | "uq" => ExprKind::FuncCall {
                 name: "uniq".to_string(),
                 args: vec![arg],
@@ -3228,6 +3241,51 @@ impl Parser {
                     fields,
                     methods,
                 },
+            },
+            line,
+        })
+    }
+
+    /// `enum Name { Variant1, Variant2 => Type, ... }`
+    fn parse_enum_decl(&mut self) -> PerlResult<Statement> {
+        let line = self.peek_line();
+        self.advance(); // enum
+        let name = match self.advance() {
+            (Token::Ident(n), _) => n,
+            (tok, err_line) => {
+                return Err(self.syntax_err(format!("Expected enum name, got {:?}", tok), err_line))
+            }
+        };
+        self.expect(&Token::LBrace)?;
+        let mut variants = Vec::new();
+        while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            let variant_name = match self.advance() {
+                (Token::Ident(n), _) => n,
+                (tok, err_line) => {
+                    return Err(
+                        self.syntax_err(format!("Expected variant name, got {:?}", tok), err_line)
+                    )
+                }
+            };
+            let ty = if self.eat(&Token::FatArrow) {
+                Some(self.parse_type_name()?)
+            } else {
+                None
+            };
+            variants.push(EnumVariant {
+                name: variant_name,
+                ty,
+            });
+            if !self.eat(&Token::Comma) {
+                self.eat(&Token::Semicolon);
+            }
+        }
+        self.expect(&Token::RBrace)?;
+        self.eat(&Token::Semicolon);
+        Ok(Statement {
+            label: None,
+            kind: StmtKind::EnumDecl {
+                def: EnumDef { name, variants },
             },
             line,
         })
@@ -6478,6 +6536,81 @@ impl Parser {
                     return Err(self.syntax_err("Unexpected encoded token", line));
                 }
                 self.parse_named_expr(name)
+            }
+
+            // `%name` when lexer emitted `Token::Percent` (due to preceding term context)
+            // instead of `Token::HashVar`. This happens after `t` (thread macro) etc.
+            Token::Percent => {
+                self.advance();
+                match self.peek().clone() {
+                    Token::Ident(name) => {
+                        self.advance();
+                        Ok(Expr {
+                            kind: ExprKind::HashVar(name),
+                            line,
+                        })
+                    }
+                    Token::ScalarVar(n) => {
+                        self.advance();
+                        Ok(Expr {
+                            kind: ExprKind::Deref {
+                                expr: Box::new(Expr {
+                                    kind: ExprKind::ScalarVar(n),
+                                    line,
+                                }),
+                                kind: Sigil::Hash,
+                            },
+                            line,
+                        })
+                    }
+                    Token::LBrace => {
+                        self.advance();
+                        let looks_like_pair = matches!(
+                            self.peek(),
+                            Token::Ident(_) | Token::SingleString(_) | Token::DoubleString(_)
+                        ) && matches!(self.peek_at(1), Token::FatArrow);
+                        let inner = if looks_like_pair {
+                            let pairs = self.parse_hashref_pairs_until(&Token::RBrace)?;
+                            Expr {
+                                kind: ExprKind::HashRef(pairs),
+                                line,
+                            }
+                        } else {
+                            self.parse_expression()?
+                        };
+                        self.expect(&Token::RBrace)?;
+                        Ok(Expr {
+                            kind: ExprKind::Deref {
+                                expr: Box::new(inner),
+                                kind: Sigil::Hash,
+                            },
+                            line,
+                        })
+                    }
+                    Token::LBracket => {
+                        self.advance();
+                        let pairs = self.parse_hashref_pairs_until(&Token::RBracket)?;
+                        self.expect(&Token::RBracket)?;
+                        let href = Expr {
+                            kind: ExprKind::HashRef(pairs),
+                            line,
+                        };
+                        Ok(Expr {
+                            kind: ExprKind::Deref {
+                                expr: Box::new(href),
+                                kind: Sigil::Hash,
+                            },
+                            line,
+                        })
+                    }
+                    tok => Err(self.syntax_err(
+                        format!(
+                            "Expected identifier, `$`, `{{`, or `[` after `%`, got {:?}",
+                            tok
+                        ),
+                        line,
+                    )),
+                }
             }
 
             tok => Err(self.syntax_err(format!("Unexpected token {:?}", tok), line)),

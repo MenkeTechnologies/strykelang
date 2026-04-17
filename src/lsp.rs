@@ -536,6 +536,16 @@ fn walk_stmt(
                 container,
             ));
         }
+        StmtKind::EnumDecl { def } => {
+            symbols.push(sym(
+                format!("enum {}", def.name),
+                SymbolKind::ENUM,
+                uri,
+                source,
+                stmt.line,
+                container,
+            ));
+        }
         StmtKind::FormatDecl { name, .. } => {
             symbols.push(sym(
                 format!("format {name}"),
@@ -722,6 +732,7 @@ fn collect_sub_fqns_stmt(stmt: &Statement, pkg: &mut String, m: &mut HashMap<Str
         | StmtKind::Tie { .. }
         | StmtKind::Empty
         | StmtKind::StructDecl { .. }
+        | StmtKind::EnumDecl { .. }
         | StmtKind::FormatDecl { .. } => {}
         StmtKind::Foreach {
             body,
