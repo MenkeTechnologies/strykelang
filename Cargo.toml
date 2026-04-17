@@ -1,6 +1,6 @@
 [package]
 name = "perlrs"
-version = "0.4.10"
+version = "0.4.12"
 edition = "2021"
 description = "A highly parallel Perl 5 interpreter written in Rust"
 license = "MIT"
@@ -100,3 +100,6 @@ strip = true
 
 [profile.dev]
 opt-level = 1
+
+[build-dependencies]
+regex = "1.11"

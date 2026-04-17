@@ -149,7 +149,7 @@
             <span class="sep">/</span>
             <a href="https://docs.rs/perlrs" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line" id="perlrsBuildLine">perlrs v0.4.9 · Rust-powered · Rayon work-stealing · Cranelift JIT · Perl 5 compat surface + pipe-forward sugar</p>
+          <p class="docs-build-line" id="perlrsBuildLine">perlrs v0.4.12 · Rust-powered · Rayon work-stealing · Cranelift JIT · Perl 5 compat surface + pipe-forward sugar</p>
         </div>
         <div class="tutorial-toolbar">
           <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -288,7 +288,7 @@ f("*.txt") |&gt; map { [$_, slurp($_) |&gt; split(/\s+/) |&gt; scalar] }
 
       <section class="tutorial-section">
         <h2>Builtin categories</h2>
-        <p>1,739 operations across 1,833 spellings. Query them via <code>keys %perlrs::builtins</code> — the table below is a navigational overview, not a full index. Run <code>pe -e 'p scalar keys %b'</code> for the live count.</p>
+        <p>2,001 operations across 2,093 spellings. Query them via <code>keys %perlrs::builtins</code> — the table below is a navigational overview, not a full index. Run <code>pe -e 'p scalar keys %b'</code> for the live count.</p>
         <div class="cat-grid">
           <div class="cat-card"><h4>Array / List (134+)</h4><p><code>map maps flat_map grep sort reverse push pop shift unshift splice reduce fold fore e first any all none take take_while drop skip_while partition min_by max_by zip zip_with interleave frequencies count_by chunk windowed enumerate shuffle uniq dedup compact flatten concat pluck grep_v with_index sorted sorted_desc sorted_nums without take_last drop_last pairwise batch rotate swap_pairs sliding_pairs run_length_encode group_consecutive permutations combinations power_set cartesian_product</code> &hellip;</p></div>
           <div class="cat-card"><h4>String (129+)</h4><p><code>chomp chop length substr index rindex split join uc lc ucfirst lcfirst chr ord trim lines words chars snake_case camel_case kebab_case pascal_case constant_case capitalize swap_case title_case squish pad_left pad_right center truncate_at reverse_str rot13 rot47 caesar_shift count_vowels count_consonants first_word last_word left_str right_str wrap_text dedent indent strip_html levenshtein soundex extract_numbers extract_emails extract_urls</code> &hellip;</p></div>

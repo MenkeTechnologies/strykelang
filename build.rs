@@ -32,7 +32,19 @@ fn main() {
     // uses `match name { … }` (braces). Different block markers per fn.
     let core_cats = extract_categorized_names(&parser_src, "fn is_perl5_core", "matches!");
     let ext_cats = extract_categorized_names(&parser_src, "fn perlrs_extension_name", "match name");
-    let descriptions = extract_lsp_descriptions(&lsp_src);
+    // Descriptions: /// doc comments from builtins.rs (primary source for ~990 fns)
+    // merged with hand-written lsp.rs entries (keywords, operators, reflection hashes).
+    let mut descriptions = extract_builtin_doc_comments(&builtins_src, &arms);
+    let lsp_descs = extract_lsp_descriptions(&lsp_src);
+    let builtin_keys: std::collections::HashSet<String> =
+        descriptions.iter().map(|(k, _)| k.clone()).collect();
+    for (k, v) in lsp_descs {
+        if !builtin_keys.contains(&k) {
+            descriptions.push((k, v));
+        }
+    }
+    descriptions.sort();
+    descriptions.dedup_by(|a, b| a.0 == b.0);
 
     // Two source-partitioned tables fed into `%pc` (Perl 5 core) and
     // `%e` (extensions) respectively. Dispatch primaries that aren't in
@@ -508,4 +520,89 @@ fn extract_quoted(slice: &str, out: &mut Vec<String>) {
             i += 1;
         }
     }
+}
+
+/// Extract `///` doc comments from `fn builtin_*` in `src/builtins.rs` and
+/// map each to its dispatch names. Makes `///` comments the single source of
+/// truth for `%perlrs::descriptions` and LSP hover.
+fn extract_builtin_doc_comments(src: &str, _arms: &[Vec<String>]) -> Vec<(String, String)> {
+    // Scan dispatch: "name" => Some(builtin_xyz( to build name->fn map
+    let mut name_to_fn: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+    let dispatch_re =
+        regex::Regex::new(r#""([a-z_][a-z0-9_:]*)"[^=]*=>[^(]*\((builtin_\w+)\("#).unwrap();
+    for cap in dispatch_re.captures_iter(src) {
+        name_to_fn.insert(cap[1].to_string(), cap[2].to_string());
+    }
+
+    // Scan fn builtin_* and collect preceding /// comments
+    let mut fn_docs: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let lines: Vec<&str> = src.lines().collect();
+    for (i, line) in lines.iter().enumerate() {
+        let trimmed = line.trim();
+        if !(trimmed.starts_with("fn builtin_") || trimmed.starts_with("pub fn builtin_")) {
+            continue;
+        }
+        let fn_name = trimmed
+            .split('(')
+            .next()
+            .unwrap_or("")
+            .split_whitespace()
+            .last()
+            .unwrap_or("");
+        if fn_name.is_empty() {
+            continue;
+        }
+
+        let mut doc_lines: Vec<&str> = Vec::new();
+        let mut j = i as isize - 1;
+        while j >= 0 {
+            let prev = lines[j as usize].trim();
+            if prev.starts_with("///") {
+                doc_lines.push(
+                    prev.strip_prefix("/// ")
+                        .unwrap_or(prev.strip_prefix("///").unwrap_or(prev)),
+                );
+                j -= 1;
+            } else if prev.is_empty() {
+                j -= 1;
+            } else {
+                break;
+            }
+        }
+        if doc_lines.is_empty() {
+            continue;
+        }
+        doc_lines.reverse();
+        let doc = doc_lines.join(" ").trim().to_string();
+        if !doc.is_empty() {
+            fn_docs.insert(fn_name.to_string(), doc);
+        }
+    }
+
+    // Build (dispatch_name, doc) pairs
+    let mut out: Vec<(String, String)> = Vec::new();
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for (dispatch_name, fn_name) in &name_to_fn {
+        if let Some(doc) = fn_docs.get(fn_name) {
+            if seen.insert(dispatch_name.clone()) {
+                out.push((dispatch_name.clone(), first_sentence_build(doc)));
+            }
+        }
+    }
+    out.sort();
+    out.dedup_by(|a, b| a.0 == b.0);
+    out
+}
+
+fn first_sentence_build(s: &str) -> String {
+    let mut sentence = s.to_string();
+    if let Some(idx) = sentence.find(". ") {
+        sentence.truncate(idx + 1);
+    }
+    if sentence.chars().count() > 200 {
+        let truncated: String = sentence.chars().take(199).collect();
+        sentence = format!("{}\u{2026}", truncated);
+    }
+    sentence
 }

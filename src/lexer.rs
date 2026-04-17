@@ -538,8 +538,13 @@ impl Lexer {
         Ok(Token::QW(words))
     }
 
-    fn read_heredoc_tag(&mut self) -> PerlResult<(String, bool)> {
+    fn read_heredoc_tag(&mut self) -> PerlResult<(String, bool, bool)> {
+        self.read_heredoc_tag_inner(false)
+    }
+
+    fn read_heredoc_tag_inner(&mut self, indented: bool) -> PerlResult<(String, bool, bool)> {
         // We've consumed '<<'. Now figure out the tag.
+        // Returns (tag, interpolate, indented).
         let quoted;
         let tag;
         match self.peek() {
@@ -557,19 +562,20 @@ impl Lexer {
             }
             Some('~') => {
                 self.advance(); // indented heredoc
-                return self.read_heredoc_tag(); // recurse for the actual tag
+                return self.read_heredoc_tag_inner(true); // recurse with indented=true
             }
             _ => {
                 tag = self.read_while(|c| c.is_alphanumeric() || c == '_');
                 quoted = true;
             }
         }
-        Ok((tag, quoted))
+        Ok((tag, quoted, indented))
     }
 
-    fn read_heredoc_body(&mut self, tag: &str) -> PerlResult<String> {
-        // Read until we find a line that is exactly the tag
-        let mut body = String::new();
+    fn read_heredoc_body(&mut self, tag: &str, indented: bool) -> PerlResult<String> {
+        // Read until we find a line that is exactly the tag (or, for indented heredocs,
+        // a line whose trimmed content equals the tag).
+        let mut lines: Vec<String> = Vec::new();
         // First, skip to end of current line
         while let Some(ch) = self.peek() {
             if ch == '\n' {
@@ -578,14 +584,19 @@ impl Lexer {
             }
             self.advance();
         }
+        let mut terminator_indent: Option<usize> = None;
         loop {
             let _line_start = self.pos;
             let line = self.read_while(|c| c != '\n');
             if line.trim() == tag {
+                // For indented heredocs, the terminator's leading whitespace determines
+                // how much to strip from all body lines.
+                if indented {
+                    terminator_indent = Some(line.len() - line.trim_start().len());
+                }
                 break;
             }
-            body.push_str(&line);
-            body.push('\n');
+            lines.push(line);
             if self.peek() == Some('\n') {
                 self.advance();
             } else if self.pos >= self.input.len() {
@@ -598,7 +609,26 @@ impl Lexer {
         if self.peek() == Some('\n') {
             self.advance();
         }
-        Ok(body)
+        // For indented heredocs (<<~), strip leading whitespace from each line,
+        // up to the amount of indentation on the terminator line.
+        if indented {
+            let strip = terminator_indent.unwrap_or(0);
+            let mut body = String::new();
+            for line in lines {
+                let ws_count = line.len() - line.trim_start().len();
+                let to_strip = ws_count.min(strip);
+                body.push_str(&line[to_strip..]);
+                body.push('\n');
+            }
+            Ok(body)
+        } else {
+            let mut body = String::new();
+            for line in lines {
+                body.push_str(&line);
+                body.push('\n');
+            }
+            Ok(body)
+        }
     }
 
     fn read_identifier(&mut self) -> String {
@@ -1127,8 +1157,8 @@ impl Lexer {
                         self.last_was_term = false;
                         return Ok(Token::ShiftLeft);
                     }
-                    let (tag, interpolate) = self.read_heredoc_tag()?;
-                    let body = self.read_heredoc_body(&tag)?;
+                    let (tag, interpolate, indented) = self.read_heredoc_tag()?;
+                    let body = self.read_heredoc_body(&tag, indented)?;
                     self.last_was_term = true;
                     return Ok(Token::HereDoc(tag, body, interpolate));
                 }
