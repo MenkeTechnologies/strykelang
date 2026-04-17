@@ -66,7 +66,10 @@ impl fmt::Display for PerlError {
         match self.kind {
             ErrorKind::Die => write!(f, "{}", self.message),
             ErrorKind::Exit(_) => write!(f, ""),
-            _ => write!(f, "{} at {} line {}", self.message, self.file, self.line),
+            // Perl 5 ends runtime errors with `.` after the line number
+            // (`Illegal division by zero at -e line 1.`). Matches stock
+            // perl for `pe --compat` parity — see `tests/suite/error_parity.rs`.
+            _ => write!(f, "{} at {} line {}.", self.message, self.file, self.line),
         }
     }
 }

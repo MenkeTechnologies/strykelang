@@ -1332,7 +1332,53 @@ impl Parser {
             stmts.push(self.parse_statement()?);
         }
         self.expect(&Token::RBrace)?;
+        Self::default_topic_for_sole_bareword(&mut stmts);
         Ok(stmts)
+    }
+
+    /// Block shorthand: when the body is literally one bare builtin call
+    /// (`{ uc }`, `{ basename }`, `{ to_json }`), inject `$_` as its first
+    /// argument so `map { basename }` == `map { basename($_) }` uniformly.
+    ///
+    /// Without this, the ExprKind-modeled core names (`uc`/`lc`/`length`/…)
+    /// default to `$_` via their own parse arms, but generic `FuncCall`-
+    /// dispatched builtins (`basename`/`to_json`/`tj`/`bn`) are called with
+    /// empty args and return the wrong value. This rewrite levels the
+    /// playing field at parse time — no per-builtin handling needed.
+    ///
+    /// Narrow by design: fires only when the block has *exactly one*
+    /// expression statement whose sole content is a known-bareword call
+    /// with zero args. Multi-statement blocks and blocks with any other
+    /// content are untouched.
+    fn default_topic_for_sole_bareword(stmts: &mut [Statement]) {
+        let [only] = stmts else { return };
+        let StmtKind::Expression(ref mut expr) = only.kind else { return };
+        let topic_line = expr.line;
+        let topic_arg = || Expr {
+            kind: ExprKind::ScalarVar("_".to_string()),
+            line: topic_line,
+        };
+        match expr.kind {
+            // Zero-arg FuncCall whose name is a known builtin → inject `$_`.
+            ExprKind::FuncCall { ref name, ref mut args } if args.is_empty() => {
+                if Self::is_known_bareword(name) || Self::is_try_builtin_name(name) {
+                    args.push(topic_arg());
+                }
+            }
+            // Lone bareword (the parser sometimes keeps a bareword as a
+            // `Bareword` node instead of a zero-arg `FuncCall` —
+            // e.g. `{ to_json }`, `{ ddump }`). Promote to a call.
+            ExprKind::Bareword(ref name) => {
+                if Self::is_known_bareword(name) || Self::is_try_builtin_name(name) {
+                    let n = name.clone();
+                    expr.kind = ExprKind::FuncCall {
+                        name: n,
+                        args: vec![topic_arg()],
+                    };
+                }
+            }
+            _ => {}
+        }
     }
 
     /// `defer { BLOCK }` — register a block to run when the current scope exits.
@@ -6527,6 +6573,20 @@ impl Parser {
                     line,
                 })
             }
+            // perlrs unary numeric extensions — treat like `abs` so a bare
+            // identifier in `map { inc }` / `for (…) { p inc }` becomes a
+            // call with implicit `$_` rather than falling through to the
+            // generic `Bareword` arm (which stringifies to `"inc"`).
+            "inc" | "dec" => {
+                let a = self.parse_one_arg_or_default()?;
+                Ok(Expr {
+                    kind: ExprKind::FuncCall {
+                        name,
+                        args: vec![a],
+                    },
+                    line,
+                })
+            }
             "int" => {
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
@@ -9545,6 +9605,17 @@ impl Parser {
         Self::is_perl5_core(name) || Self::perlrs_extension_name(name).is_some()
     }
 
+    /// True iff `name` appears as any spelling (primary *or* alias) in a
+    /// `try_builtin` match arm. Picks up the ~300 aliases that don't show
+    /// up in the parser-level keyword lists but are still callable at
+    /// runtime — so `map { tj }` can default to `tj($_)` the same way
+    /// `map { to_json }` does.
+    fn is_try_builtin_name(name: &str) -> bool {
+        crate::builtins::BUILTIN_ARMS
+            .iter()
+            .any(|arm| arm.iter().any(|n| *n == name))
+    }
+
     /// True iff `name` is a Perl 5 core keyword/builtin (as shipped in stock
     /// `perl`). Extensions (`pmap`, `fan`, `timer`, …) are *not* included
     /// here — those live in `perlrs_extension_name`. `%perlrs::perl_compats`
@@ -9571,30 +9642,42 @@ impl Parser {
             | "time" | "localtime" | "gmtime"
             // ── type / reflection ───────────────────────────────────────
             | "defined" | "undef" | "ref" | "scalar" | "wantarray"
-            | "caller" | "delete" | "exists" | "bless"
+            | "caller" | "delete" | "exists" | "bless" | "prototype"
             | "tie" | "untie" | "tied"
             // ── io ──────────────────────────────────────────────────────
-            | "open" | "close" | "read" | "write" | "seek" | "tell"
+            | "open" | "close" | "read" | "readline" | "write" | "seek" | "tell"
             | "eof" | "binmode" | "getc" | "fileno" | "truncate"
             | "format" | "formline" | "select" | "vec"
+            | "sysopen" | "sysread" | "sysseek" | "syswrite"
             // ── filesystem ──────────────────────────────────────────────
-            | "stat" | "lstat" | "rename" | "unlink"
+            | "stat" | "lstat" | "rename" | "unlink" | "utime"
             | "mkdir" | "rmdir" | "chdir" | "chmod" | "chown"
             | "glob" | "opendir" | "readdir" | "closedir"
             | "link" | "readlink" | "symlink"
             // ── ipc ─────────────────────────────────────────────────────
             | "fcntl" | "flock" | "ioctl" | "pipe" | "dbmopen" | "dbmclose"
+            // ── sysv ipc ────────────────────────────────────────────────
+            | "msgctl" | "msgget" | "msgrcv" | "msgsnd"
+            | "semctl" | "semget" | "semop"
+            | "shmctl" | "shmget" | "shmread" | "shmwrite"
             // ── process / system ────────────────────────────────────────
             | "system" | "exec" | "exit" | "die" | "warn" | "dump"
             | "fork" | "wait" | "waitpid" | "kill" | "alarm" | "sleep"
-            | "chroot"
+            | "chroot" | "times" | "umask" | "reset"
+            | "getpgrp" | "setpgrp" | "getppid"
+            | "getpriority" | "setpriority"
             // ── socket ──────────────────────────────────────────────────
-            | "socket" | "connect" | "listen" | "accept" | "shutdown"
+            | "socket" | "socketpair" | "connect" | "listen" | "accept" | "shutdown"
             | "send" | "recv" | "bind" | "setsockopt" | "getsockopt"
+            | "getpeername" | "getsockname"
             // ── posix metadata ──────────────────────────────────────────
-            | "getpwnam" | "getpwuid" | "getgrnam" | "getgrgid"
-            | "gethostbyname" | "getnetbyname"
-            | "getprotobyname" | "getservbyname"
+            | "getpwnam" | "getpwuid" | "getpwent" | "setpwent"
+            | "getgrnam" | "getgrgid" | "getgrent" | "setgrent"
+            | "getlogin"
+            | "gethostbyname" | "gethostbyaddr" | "gethostent"
+            | "getnetbyname" | "getnetent"
+            | "getprotobyname" | "getprotoent"
+            | "getservbyname" | "getservent"
             | "sethostent" | "setnetent" | "setprotoent" | "setservent"
             | "endpwent" | "endgrent"
             | "endhostent" | "endnetent" | "endprotoent" | "endservent"
@@ -9638,22 +9721,55 @@ impl Parser {
             | "normalize" | "snake_case" | "camel_case" | "kebab_case"
             | "frequencies" | "freq" | "interleave" | "ddump" | "stringify" | "str" | "top"
             | "to_json" | "to_csv" | "to_toml" | "to_yaml" | "to_xml"
+            | "to_hash" | "to_set"
             | "to_file" | "read_lines" | "append_file" | "write_json" | "read_json"
             | "tempfile" | "tempdir" | "list_count" | "list_size" | "size"
             | "clamp" | "grep_v" | "select_keys" | "pluck" | "glob_match" | "which_all"
+            | "dedup" | "nth" | "tail" | "take" | "drop" | "tee" | "range"
+            | "inc" | "dec" | "elapsed"
             // ── filesystem extensions ───────────────────────────────────────
             | "files" | "filesf" | "f" | "fr" | "dirs" | "d" | "dr" | "sym_links"
             | "sockets" | "pipes" | "block_devices" | "char_devices"
+            | "basename" | "dirname" | "fileparse" | "realpath" | "canonpath"
+            | "copy" | "move" | "spurt" | "read_bytes" | "which"
+            | "getcwd" | "touch" | "gethostname" | "uname"
             // ── data / network ──────────────────────────────────────────────
             | "csv_read" | "csv_write" | "dataframe" | "sqlite"
-            | "fetch" | "fetch_json" | "fetch_async" | "par_fetch"
+            | "fetch" | "fetch_json" | "fetch_async" | "fetch_async_json"
+            | "par_fetch" | "par_csv_read" | "par_pipeline"
             | "json_encode" | "json_decode" | "json_jq"
+            | "http_request" | "serve" | "ssh"
+            // ── serialization (perlrs-only encoders) ────────────────────────
+            | "toml_encode" | "toml_decode"
+            | "yaml_encode" | "yaml_decode"
+            | "xml_encode" | "xml_decode"
+            // ── crypto / encoding ───────────────────────────────────────────
+            | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512"
+            | "hmac_sha256" | "uuid" | "crc32"
+            | "base64_encode" | "base64_decode"
+            | "hex_encode" | "hex_decode"
+            | "url_encode" | "url_decode"
+            | "gzip" | "gunzip" | "zstd" | "zstd_decode"
+            // ── date / time ─────────────────────────────────────────────────
+            | "datetime_utc" | "datetime_now_tz"
+            | "datetime_format_tz" | "datetime_add_seconds"
+            | "datetime_from_epoch"
+            | "datetime_parse_rfc3339" | "datetime_parse_local"
+            | "datetime_strftime"
+            // ── jwt ─────────────────────────────────────────────────────────
+            | "jwt_encode" | "jwt_decode" | "jwt_decode_unsafe"
+            // ── logging ─────────────────────────────────────────────────────
+            | "log_info" | "log_warn" | "log_error"
+            | "log_debug" | "log_trace" | "log_json" | "log_level"
             // ── concurrency / timing ────────────────────────────────────────
             | "async" | "spawn" | "trace" | "timer" | "bench"
             | "eval_timeout" | "retry" | "rate_limit" | "every"
             | "gen" | "watch"
             // ── I/O extensions ──────────────────────────────────────────────
             | "slurp" | "cat" | "capture" | "pager" | "pg" | "less"
+            | "stdin"
+            // ── internal ────────────────────────────────────────────────────
+            | "__perlrs_rust_compile"
             // ── short aliases ───────────────────────────────────────────────
             | "p" | "rev"
             // ── algebraic match ─────────────────────────────────────────────
