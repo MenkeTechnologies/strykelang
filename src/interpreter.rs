@@ -9474,7 +9474,14 @@ impl Interpreter {
                 for item in items {
                     self.scope.set_topic(item.clone());
                     let val = self.exec_block(block)?;
-                    if val.is_true() {
+                    // Bare regex in block → match against $_ (Perl: /pat/ in
+                    // grep is `$_ =~ /pat/`, not a truthy regex object).
+                    let keep = if let Some(re) = val.as_regex() {
+                        re.is_match(&item.to_string())
+                    } else {
+                        val.is_true()
+                    };
+                    if keep {
                         result.push(item);
                     }
                 }
@@ -9502,7 +9509,12 @@ impl Interpreter {
                 for item in items {
                     self.scope.set_topic(item.clone());
                     let val = self.eval_expr(expr)?;
-                    if val.is_true() {
+                    let keep = if let Some(re) = val.as_regex() {
+                        re.is_match(&item.to_string())
+                    } else {
+                        val.is_true()
+                    };
+                    if keep {
                         result.push(item);
                     }
                 }

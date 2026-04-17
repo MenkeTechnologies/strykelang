@@ -5967,7 +5967,13 @@ impl<'a> VM<'a> {
                             for item in list {
                                 self.interp.scope.set_topic(item.clone());
                                 let val = self.run_block_region(start, end, op_count)?;
-                                if val.is_true() {
+                                // Bare regex → match against $_ (Perl: /pat/ in grep is $_ =~ /pat/)
+                                let keep = if let Some(re) = val.as_regex() {
+                                    re.is_match(&item.to_string())
+                                } else {
+                                    val.is_true()
+                                };
+                                if keep {
                                     result.push(item);
                                 }
                             }
@@ -5980,7 +5986,12 @@ impl<'a> VM<'a> {
                                 self.interp.scope.set_topic(item.clone());
                                 match self.interp.exec_block(&block) {
                                     Ok(val) => {
-                                        if val.is_true() {
+                                        let keep = if let Some(re) = val.as_regex() {
+                                            re.is_match(&item.to_string())
+                                        } else {
+                                            val.is_true()
+                                        };
+                                        if keep {
                                             result.push(item);
                                         }
                                     }
@@ -6063,7 +6074,12 @@ impl<'a> VM<'a> {
                             for item in list {
                                 self.interp.scope.set_topic(item.clone());
                                 let val = self.run_block_region(start, end, op_count)?;
-                                if val.is_true() {
+                                let keep = if let Some(re) = val.as_regex() {
+                                    re.is_match(&item.to_string())
+                                } else {
+                                    val.is_true()
+                                };
+                                if keep {
                                     result.push(item);
                                 }
                             }
@@ -6075,7 +6091,12 @@ impl<'a> VM<'a> {
                             for item in list {
                                 self.interp.scope.set_topic(item.clone());
                                 let val = vm_interp_result(self.interp.eval_expr(e), self.line())?;
-                                if val.is_true() {
+                                let keep = if let Some(re) = val.as_regex() {
+                                    re.is_match(&item.to_string())
+                                } else {
+                                    val.is_true()
+                                };
+                                if keep {
                                     result.push(item);
                                 }
                             }
