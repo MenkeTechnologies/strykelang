@@ -1363,6 +1363,210 @@ pub(crate) fn try_builtin(
         "maximum_by" | "maxby" => Some(builtin_maximum_by(interp, args, line)),
         "minimum_by" | "minby" => Some(builtin_minimum_by(interp, args, line)),
         "batched" | "btch" => Some(builtin_batched(args)),
+        // ── Extended stdlib: Text Processing ─────────────────────────────────
+        "match_all" | "mall" => Some(builtin_match_all(args)),
+        "capture_groups" | "capg" => Some(builtin_capture_groups(args)),
+        "is_match" | "ism" => Some(builtin_is_match(args)),
+        "split_regex" | "splre" => Some(builtin_split_regex(args)),
+        "replace_regex" | "replre" => Some(builtin_replace_regex(args)),
+        "is_ascii" | "isasc" => Some(builtin_is_ascii(interp, args)),
+        "to_ascii" | "toasc" => Some(builtin_to_ascii(interp, args)),
+        "char_at" | "chat" => Some(builtin_char_at(args)),
+        "code_point_at" | "cpat" => Some(builtin_code_point_at(args)),
+        "from_code_point" | "fcp" => Some(builtin_from_code_point(args)),
+        "normalize_spaces" | "nrmsp" => Some(builtin_normalize_spaces(interp, args)),
+        "remove_whitespace" | "rmws" => Some(builtin_remove_whitespace(interp, args)),
+        "pluralize" | "plur" => Some(builtin_pluralize(args)),
+        "ordinalize" | "ordn" => Some(builtin_ordinalize(args)),
+        "parse_int" | "pint" => Some(builtin_parse_int(args)),
+        "parse_float" | "pflt" => Some(builtin_parse_float(args)),
+        "parse_bool" | "pbool" => Some(builtin_parse_bool(args)),
+        "levenshtein" | "lev" => Some(builtin_levenshtein(args)),
+        "soundex" | "sdx" => Some(builtin_soundex(args)),
+        "similarity" | "sim" => Some(builtin_similarity(args)),
+        "common_prefix" | "cpfx" => Some(builtin_common_prefix(args)),
+        "common_suffix" | "csfx" => Some(builtin_common_suffix(args)),
+        "wrap_text" | "wrpt" => Some(builtin_wrap_text(args)),
+        "dedent" | "ddt" => Some(builtin_dedent(args)),
+        "indent" | "idt" => Some(builtin_indent(args)),
+        // ── Extended stdlib: Advanced Numeric ────────────────────────────────
+        "lerp" => Some(builtin_lerp(args)),
+        "inv_lerp" | "ilerp" => Some(builtin_inv_lerp(args)),
+        "smoothstep" | "smst" => Some(builtin_smoothstep(args)),
+        "remap" => Some(builtin_remap(args)),
+        "dot_product" | "dotp" => Some(builtin_dot_product(args)),
+        "cross_product" | "crossp" => Some(builtin_cross_product(args)),
+        "magnitude" | "mag" => Some(builtin_magnitude(args)),
+        "normalize_vec" | "nrmv" => Some(builtin_normalize_vec(args)),
+        "distance" | "dist" => Some(builtin_distance(args)),
+        "manhattan_distance" | "mdist" => Some(builtin_manhattan_distance(args)),
+        "covariance" | "cov" => Some(builtin_covariance(args)),
+        "correlation" | "corr" => Some(builtin_correlation(args)),
+        "iqr" => Some(builtin_iqr(args)),
+        "quantile" | "qntl" => Some(builtin_quantile(args)),
+        "clamp_int" | "clpi" => Some(builtin_clamp_int(args)),
+        "in_range" | "inrng" => Some(builtin_in_range(args)),
+        "wrap_range" | "wrprng" => Some(builtin_wrap_range(args)),
+        "sum_squares" | "sumsq" => Some(builtin_sum_squares(args)),
+        "rms" => Some(builtin_rms(args)),
+        "cumsum" | "csum" => Some(builtin_cumsum(args)),
+        "cumprod" | "cprod_acc" => Some(builtin_cumprod(args)),
+        "diff" => Some(builtin_diff(args)),
+        // ── Extended stdlib: Date/Time ───────────────────────────────────────
+        "add_days" | "addd" => Some(builtin_add_days(args)),
+        "add_hours" | "addh" => Some(builtin_add_hours(args)),
+        "add_minutes" | "addm" => Some(builtin_add_minutes(args)),
+        "diff_days" | "diffd" => Some(builtin_diff_days(args)),
+        "diff_hours" | "diffh" => Some(builtin_diff_hours(args)),
+        "start_of_day" | "sod" => Some(builtin_start_of_day(args)),
+        "end_of_day" | "eod" => Some(builtin_end_of_day(args)),
+        "start_of_hour" | "soh" => Some(builtin_start_of_hour(args)),
+        "start_of_minute" | "som" => Some(builtin_start_of_minute(args)),
+        // ── Extended stdlib: Encoding/Hashing ────────────────────────────────
+        "urle" => Some(builtin_url_encode(interp, args)),
+        "urld" => Some(builtin_url_decode(interp, args)),
+        "html_encode" | "htmle" => Some(builtin_html_encode(interp, args)),
+        "html_decode" | "htmld" => Some(builtin_html_decode(interp, args)),
+        "adler32" | "adl32" => Some(builtin_adler32(interp, args)),
+        "fnv1a" => Some(builtin_fnv1a(interp, args)),
+        "djb2" => Some(builtin_djb2(interp, args)),
+        // ── Extended stdlib: Validation ──────────────────────────────────────
+        "is_credit_card" | "iscc" => Some(builtin_is_credit_card(interp, args)),
+        "is_isbn10" | "isbn10" => Some(builtin_is_isbn10(interp, args)),
+        "is_isbn13" | "isbn13" => Some(builtin_is_isbn13(interp, args)),
+        "is_iban" | "isiban" => Some(builtin_is_iban(interp, args)),
+        "is_hex_str" | "ishex" => Some(builtin_is_hex_str(interp, args)),
+        "is_binary_str" | "isbin" => Some(builtin_is_binary_str(interp, args)),
+        "is_octal_str" | "isoct" => Some(builtin_is_octal_str(interp, args)),
+        "is_json" | "isjson" => Some(builtin_is_json(interp, args)),
+        "is_base64" | "isb64" => Some(builtin_is_base64(interp, args)),
+        "is_semver" | "issv" => Some(builtin_is_semver(interp, args)),
+        "is_slug" | "isslug" => Some(builtin_is_slug(interp, args)),
+        "slugify" | "slug" => Some(builtin_slugify(interp, args)),
+        // ── Extended stdlib: Collection Advanced ─────────────────────────────
+        "mode_stat" | "mstat" => Some(builtin_mode(args)),
+        "sampn" => Some(builtin_sample_n(args)),
+        "weighted_sample" | "wsamp" => Some(builtin_weighted_sample(args)),
+        "shuffle_arr" | "shuf" => Some(builtin_shuffle_arr(args)),
+        "argmax" | "amax" => Some(builtin_argmax(args)),
+        "argmin" | "amin" => Some(builtin_argmin(args)),
+        "argsort" | "asrt" => Some(builtin_argsort(args)),
+        "rank" | "rnk" => Some(builtin_rank(args)),
+        "dense_rank" | "drnk" => Some(builtin_dense_rank(args)),
+        "partition_point" | "ppt" => Some(builtin_partition_point(interp, args, line)),
+        "lower_bound" | "lbound" => Some(builtin_lower_bound(args)),
+        "upper_bound" | "ubound" => Some(builtin_upper_bound(args)),
+        "equal_range" | "eqrng" => Some(builtin_equal_range(args)),
+        // ── Extended stdlib: Matrix Operations ───────────────────────────────
+        "matrix_add" | "madd" => Some(builtin_matrix_add(args)),
+        "matrix_sub" | "msub" => Some(builtin_matrix_sub(args)),
+        "matrix_mult" | "mmult" => Some(builtin_matrix_mult(args)),
+        "matrix_scalar" | "mscal" => Some(builtin_matrix_scalar(args)),
+        "matrix_identity" | "mident" => Some(builtin_matrix_identity(args)),
+        "matrix_zeros" | "mzeros" => Some(builtin_matrix_zeros(args)),
+        "matrix_ones" | "mones" => Some(builtin_matrix_ones(args)),
+        "matrix_diag" | "mdiag" => Some(builtin_matrix_diag(args)),
+        "matrix_trace" | "mtrace" => Some(builtin_matrix_trace(args)),
+        "matrix_row" | "mrow" => Some(builtin_matrix_row(args)),
+        "matrix_col" | "mcol" => Some(builtin_matrix_col(args)),
+        "matrix_shape" | "mshape" => Some(builtin_matrix_shape(args)),
+        "matrix_det" | "mdet" => Some(builtin_matrix_det(args)),
+        // ── Extended stdlib: Graph Algorithms ────────────────────────────────
+        "topological_sort" | "toposort" => Some(builtin_topological_sort(args)),
+        "bfs_traverse" | "bfs" => Some(builtin_bfs_traverse(args)),
+        "dfs_traverse" | "dfs" => Some(builtin_dfs_traverse(args)),
+        "shortest_path_bfs" | "spbfs" => Some(builtin_shortest_path_bfs(args)),
+        "connected_components_graph" | "ccgraph" => Some(builtin_connected_components_graph(args)),
+        "has_cycle_graph" | "hascyc" => Some(builtin_has_cycle_graph(args)),
+        "is_bipartite_graph" | "isbip" => Some(builtin_is_bipartite_graph(args)),
+        // ── Extended stdlib: Data Validation ─────────────────────────────────
+        "is_ipv4_addr" | "isip4" => Some(builtin_is_ipv4_addr(interp, args)),
+        "is_ipv6_addr" | "isip6" => Some(builtin_is_ipv6_addr(interp, args)),
+        "is_mac_addr" | "ismac" => Some(builtin_is_mac_addr(interp, args)),
+        "is_port_num" | "isport" => Some(builtin_is_port_num(args)),
+        "is_hostname_valid" | "ishost" => Some(builtin_is_hostname_valid(interp, args)),
+        "is_iso_date" | "isisodt" => Some(builtin_is_iso_date(interp, args)),
+        "is_iso_time" | "isisotm" => Some(builtin_is_iso_time(interp, args)),
+        "is_iso_datetime" | "isisodtm" => Some(builtin_is_iso_datetime(interp, args)),
+        "is_phone_num" | "isphone" => Some(builtin_is_phone_num(interp, args)),
+        "is_us_zip" | "iszip" => Some(builtin_is_us_zip(interp, args)),
+        // ── Extended stdlib: String Utilities Novel ──────────────────────────
+        "word_wrap_text" | "wwrap" => Some(builtin_word_wrap_text(args)),
+        "center_text" | "ctxt" => Some(builtin_center_text(args)),
+        "ljust_text" | "ljt" => Some(builtin_ljust_text(args)),
+        "rjust_text" | "rjt" => Some(builtin_rjust_text(args)),
+        "zfill_num" | "zfill" => Some(builtin_zfill_num(args)),
+        "remove_all_str" | "rmall" => Some(builtin_remove_all_str(args)),
+        "replace_n_times" | "repln" => Some(builtin_replace_n_times(args)),
+        "find_all_indices" | "fndalli" => Some(builtin_find_all_indices(args)),
+        "text_between" | "txbtwn" => Some(builtin_text_between(args)),
+        "text_before" | "txbef" => Some(builtin_text_before(args)),
+        "text_after" | "txaft" => Some(builtin_text_after(args)),
+        "text_before_last" | "txbefl" => Some(builtin_text_before_last(args)),
+        "text_after_last" | "txaftl" => Some(builtin_text_after_last(args)),
+        // ── Extended stdlib: Math Novel ──────────────────────────────────────
+        "is_even_num" | "iseven" => Some(builtin_is_even_num(args)),
+        "is_odd_num" | "isodd" => Some(builtin_is_odd_num(args)),
+        "is_positive_num" | "ispos" => Some(builtin_is_positive_num(args)),
+        "is_negative_num" | "isneg" => Some(builtin_is_negative_num(args)),
+        "is_zero_num" | "iszero" => Some(builtin_is_zero_num(args)),
+        "is_whole_num" | "iswhole" => Some(builtin_is_whole_num(args)),
+        "log_with_base" | "logb" => Some(builtin_log_with_base(args)),
+        "nth_root_of" | "nroot" => Some(builtin_nth_root_of(args)),
+        "frac_part" | "fracp" => Some(builtin_frac_part(args)),
+        "reciprocal_of" | "recip" => Some(builtin_reciprocal_of(args)),
+        "copy_sign" | "cpsgn" => Some(builtin_copy_sign(args)),
+        "fused_mul_add" | "fmadd" => Some(builtin_fused_mul_add(args)),
+        "floor_mod" | "fmod" => Some(builtin_floor_mod(args)),
+        "floor_div_op" | "fdivop" => Some(builtin_floor_div_op(args)),
+        "signum_of" | "sgnum" => Some(builtin_signum_of(args)),
+        "midpoint_of" | "midpt" => Some(builtin_midpoint_of(args)),
+        // ── Extended stdlib batch 3: Array Analysis ──────────────────────────
+        "longest_run" | "lrun" => Some(builtin_longest_run(args)),
+        "longest_increasing" | "linc" => Some(builtin_longest_increasing(args)),
+        "longest_decreasing" | "ldec" => Some(builtin_longest_decreasing(args)),
+        "max_sum_subarray" | "maxsub" => Some(builtin_max_sum_subarray(args)),
+        "majority_element" | "majority" => Some(builtin_majority_element(args)),
+        "kth_largest" | "kthl" => Some(builtin_kth_largest(args)),
+        "kth_smallest" | "kths" => Some(builtin_kth_smallest(args)),
+        "count_inversions" | "cinv" => Some(builtin_count_inversions(args)),
+        "is_monotonic" | "ismono" => Some(builtin_is_monotonic(args)),
+        "equilibrium_index" | "eqidx" => Some(builtin_equilibrium_index(args)),
+        // ── Extended stdlib batch 3: Set Operations ──────────────────────────
+        "jaccard_index" | "jaccard" => Some(builtin_jaccard_index(args)),
+        "dice_coefficient" | "dicecoef" => Some(builtin_dice_coefficient(args)),
+        "overlap_coefficient" | "overlapcoef" => Some(builtin_overlap_coefficient(args)),
+        "power_set" | "powerset" => Some(builtin_power_set(args)),
+        "cartesian_power" | "cartpow" => Some(builtin_cartesian_power(args)),
+        // ── Extended stdlib batch 3: Advanced String ─────────────────────────
+        "is_isogram" | "isiso" => Some(builtin_is_isogram(interp, args)),
+        "is_heterogram" | "ishet" => Some(builtin_is_heterogram(interp, args)),
+        "hamdist" => Some(builtin_hamming_distance(args)),
+        "jaro_similarity" | "jarosim" => Some(builtin_jaro_similarity(args)),
+        "longest_common_substring" | "lcsub" => Some(builtin_longest_common_substring(args)),
+        "longest_common_subsequence" | "lcseq" => Some(builtin_longest_common_subsequence(args)),
+        "count_words" | "wcount" => Some(builtin_count_words(args)),
+        "count_lines" | "lcount" => Some(builtin_count_lines(args)),
+        "count_chars" | "ccount" => Some(builtin_count_chars(args)),
+        "count_bytes" | "bcount" => Some(builtin_count_bytes(args)),
+        // ── Extended stdlib batch 3: More Math ───────────────────────────────
+        "binomial" | "binom" => Some(builtin_binomial(args)),
+        "catalan" | "catn" => Some(builtin_catalan(args)),
+        "pascal_row" | "pascrow" => Some(builtin_pascal_row(args)),
+        "is_coprime" | "iscopr" => Some(builtin_is_coprime(args)),
+        "euler_totient" | "etot" => Some(builtin_euler_totient(args)),
+        "mobius" | "mob" => Some(builtin_mobius(args)),
+        "is_squarefree" | "issqfr" => Some(builtin_is_squarefree(args)),
+        "digital_root" | "digroot" => Some(builtin_digital_root(args)),
+        "is_narcissistic" | "isnarc" => Some(builtin_is_narcissistic(args)),
+        "is_harshad" | "isharsh" => Some(builtin_is_harshad(args)),
+        "is_kaprekar" | "iskap" => Some(builtin_is_kaprekar(args)),
+        // ── Extended stdlib batch 3: Date/Time Additional ────────────────────
+        "day_of_year" | "doy" => Some(builtin_day_of_year(args)),
+        "week_of_year" | "woy" => Some(builtin_week_of_year(args)),
+        "days_in_month_fn" | "daysinmo" => Some(builtin_days_in_month_fn(args)),
+        "is_valid_date" | "isvdate" => Some(builtin_is_valid_date(args)),
+        "age_in_years" | "ageyrs" => Some(builtin_age_in_years(args)),
         _ => crate::rust_ffi::try_call(name, args, line),
     }
 }
@@ -10205,6 +10409,3046 @@ fn builtin_batched(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // End of additional missing stdlib functions
+// ─────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────
+// Extended stdlib: Text Processing
+// ─────────────────────────────────────────────────────────────────────────
+
+/// `match_all REGEX, STR` — returns all matches as array.
+fn builtin_match_all(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let pattern = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let text = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let re = regex::Regex::new(&pattern)
+        .map_err(|e| PerlError::runtime(&format!("match_all: {}", e), 0))?;
+    let matches: Vec<PerlValue> = re
+        .find_iter(&text)
+        .map(|m| PerlValue::string(m.as_str().to_string()))
+        .collect();
+    Ok(PerlValue::array(matches))
+}
+
+/// `capture_groups REGEX, STR` — returns capture groups as array of arrays.
+fn builtin_capture_groups(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let pattern = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let text = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let re = regex::Regex::new(&pattern)
+        .map_err(|e| PerlError::runtime(&format!("capture_groups: {}", e), 0))?;
+    let mut result = Vec::new();
+    for caps in re.captures_iter(&text) {
+        let groups: Vec<PerlValue> = caps
+            .iter()
+            .map(|m| {
+                m.map(|x| PerlValue::string(x.as_str().to_string()))
+                    .unwrap_or(PerlValue::UNDEF)
+            })
+            .collect();
+        result.push(PerlValue::array_ref(Arc::new(RwLock::new(groups))));
+    }
+    Ok(PerlValue::array(result))
+}
+
+/// `is_match REGEX, STR` — returns true if regex matches.
+fn builtin_is_match(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let pattern = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let text = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let re = regex::Regex::new(&pattern)
+        .map_err(|e| PerlError::runtime(&format!("is_match: {}", e), 0))?;
+    Ok(bool_iv(re.is_match(&text)))
+}
+
+/// `split_regex REGEX, STR [, LIMIT]` — split string by regex.
+fn builtin_split_regex(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let pattern = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let text = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let limit = args.get(2).map(|v| v.to_int() as usize).unwrap_or(0);
+    let re = regex::Regex::new(&pattern)
+        .map_err(|e| PerlError::runtime(&format!("split_regex: {}", e), 0))?;
+    let parts: Vec<PerlValue> = if limit > 0 {
+        re.splitn(&text, limit)
+            .map(|s| PerlValue::string(s.to_string()))
+            .collect()
+    } else {
+        re.split(&text)
+            .map(|s| PerlValue::string(s.to_string()))
+            .collect()
+    };
+    Ok(PerlValue::array(parts))
+}
+
+/// `replace_regex REGEX, REPLACEMENT, STR` — replace all matches.
+fn builtin_replace_regex(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let pattern = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let replacement = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let text = args.get(2).map(|v| v.to_string()).unwrap_or_default();
+    let re = regex::Regex::new(&pattern)
+        .map_err(|e| PerlError::runtime(&format!("replace_regex: {}", e), 0))?;
+    Ok(PerlValue::string(
+        re.replace_all(&text, replacement.as_str()).to_string(),
+    ))
+}
+
+/// `is_ascii STR` — returns true if string is all ASCII.
+fn builtin_is_ascii(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    Ok(bool_iv(s.is_ascii()))
+}
+
+/// `to_ascii STR` — converts to ASCII, replacing non-ASCII with '?'.
+fn builtin_to_ascii(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let ascii: String = s
+        .chars()
+        .map(|c| if c.is_ascii() { c } else { '?' })
+        .collect();
+    Ok(PerlValue::string(ascii))
+}
+
+/// `char_at STR, INDEX` — returns character at index.
+fn builtin_char_at(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let idx = args.get(1).map(|v| v.to_int()).unwrap_or(0);
+    let chars: Vec<char> = s.chars().collect();
+    let idx = if idx < 0 {
+        chars.len() as i64 + idx
+    } else {
+        idx
+    };
+    if idx >= 0 && (idx as usize) < chars.len() {
+        Ok(PerlValue::string(chars[idx as usize].to_string()))
+    } else {
+        Ok(PerlValue::UNDEF)
+    }
+}
+
+/// `code_point_at STR, INDEX` — returns Unicode code point at index.
+fn builtin_code_point_at(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let idx = args.get(1).map(|v| v.to_int()).unwrap_or(0);
+    let chars: Vec<char> = s.chars().collect();
+    let idx = if idx < 0 {
+        chars.len() as i64 + idx
+    } else {
+        idx
+    };
+    if idx >= 0 && (idx as usize) < chars.len() {
+        Ok(PerlValue::integer(chars[idx as usize] as i64))
+    } else {
+        Ok(PerlValue::UNDEF)
+    }
+}
+
+/// `from_code_point CODE` — converts code point to character.
+fn builtin_from_code_point(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let code = args.first().map(|v| v.to_int() as u32).unwrap_or(0);
+    if let Some(c) = char::from_u32(code) {
+        Ok(PerlValue::string(c.to_string()))
+    } else {
+        Ok(PerlValue::UNDEF)
+    }
+}
+
+/// `normalize_spaces STR` — collapses whitespace to single spaces.
+fn builtin_normalize_spaces(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let normalized: String = s.split_whitespace().collect::<Vec<_>>().join(" ");
+    Ok(PerlValue::string(normalized))
+}
+
+/// `remove_whitespace STR` — removes all whitespace.
+fn builtin_remove_whitespace(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let result: String = s.chars().filter(|c| !c.is_whitespace()).collect();
+    Ok(PerlValue::string(result))
+}
+
+/// `pluralize WORD, COUNT` — simple pluralization.
+fn builtin_pluralize(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let word = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let count = args.get(1).map(|v| v.to_int()).unwrap_or(1);
+    if count == 1 {
+        Ok(PerlValue::string(word))
+    } else if word.ends_with('s')
+        || word.ends_with('x')
+        || word.ends_with("ch")
+        || word.ends_with("sh")
+    {
+        Ok(PerlValue::string(format!("{}es", word)))
+    } else if word.ends_with('y')
+        && !word.ends_with("ay")
+        && !word.ends_with("ey")
+        && !word.ends_with("oy")
+        && !word.ends_with("uy")
+    {
+        Ok(PerlValue::string(format!("{}ies", &word[..word.len() - 1])))
+    } else {
+        Ok(PerlValue::string(format!("{}s", word)))
+    }
+}
+
+/// `ordinalize NUM` — converts number to ordinal (1st, 2nd, 3rd, etc).
+fn builtin_ordinalize(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_int()).unwrap_or(0);
+    let suffix = match (n % 10, n % 100) {
+        (1, 11) | (2, 12) | (3, 13) => "th",
+        (1, _) => "st",
+        (2, _) => "nd",
+        (3, _) => "rd",
+        _ => "th",
+    };
+    Ok(PerlValue::string(format!("{}{}", n, suffix)))
+}
+
+/// `parse_int STR [, RADIX]` — parse string to integer.
+fn builtin_parse_int(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let radix = args.get(1).map(|v| v.to_int() as u32).unwrap_or(10);
+    match i64::from_str_radix(s.trim(), radix) {
+        Ok(n) => Ok(PerlValue::integer(n)),
+        Err(_) => Ok(PerlValue::UNDEF),
+    }
+}
+
+/// `parse_float STR` — parse string to float.
+fn builtin_parse_float(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    match s.trim().parse::<f64>() {
+        Ok(n) => Ok(PerlValue::float(n)),
+        Err(_) => Ok(PerlValue::UNDEF),
+    }
+}
+
+/// `parse_bool STR` — parse string to boolean.
+fn builtin_parse_bool(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args
+        .first()
+        .map(|v| v.to_string())
+        .unwrap_or_default()
+        .to_lowercase();
+    match s.as_str() {
+        "true" | "yes" | "on" | "1" => Ok(bool_iv(true)),
+        "false" | "no" | "off" | "0" | "" => Ok(bool_iv(false)),
+        _ => Ok(PerlValue::UNDEF),
+    }
+}
+
+/// `levenshtein STR1, STR2` — Levenshtein edit distance.
+fn builtin_levenshtein(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s1 = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let s2 = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let s1: Vec<char> = s1.chars().collect();
+    let s2: Vec<char> = s2.chars().collect();
+    let m = s1.len();
+    let n = s2.len();
+    let mut dp = vec![vec![0usize; n + 1]; m + 1];
+    for i in 0..=m {
+        dp[i][0] = i;
+    }
+    for j in 0..=n {
+        dp[0][j] = j;
+    }
+    for i in 1..=m {
+        for j in 1..=n {
+            let cost = if s1[i - 1] == s2[j - 1] { 0 } else { 1 };
+            dp[i][j] = (dp[i - 1][j] + 1)
+                .min(dp[i][j - 1] + 1)
+                .min(dp[i - 1][j - 1] + cost);
+        }
+    }
+    Ok(PerlValue::integer(dp[m][n] as i64))
+}
+
+/// `soundex STR` — Soundex phonetic encoding.
+fn builtin_soundex(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args
+        .first()
+        .map(|v| v.to_string())
+        .unwrap_or_default()
+        .to_uppercase();
+    if s.is_empty() {
+        return Ok(PerlValue::string("".to_string()));
+    }
+    let chars: Vec<char> = s.chars().filter(|c| c.is_ascii_alphabetic()).collect();
+    if chars.is_empty() {
+        return Ok(PerlValue::string("".to_string()));
+    }
+    let code = |c: char| -> char {
+        match c {
+            'B' | 'F' | 'P' | 'V' => '1',
+            'C' | 'G' | 'J' | 'K' | 'Q' | 'S' | 'X' | 'Z' => '2',
+            'D' | 'T' => '3',
+            'L' => '4',
+            'M' | 'N' => '5',
+            'R' => '6',
+            _ => '0',
+        }
+    };
+    let mut result = String::with_capacity(4);
+    result.push(chars[0]);
+    let mut prev = code(chars[0]);
+    for &c in &chars[1..] {
+        let curr = code(c);
+        if curr != '0' && curr != prev {
+            result.push(curr);
+            if result.len() == 4 {
+                break;
+            }
+        }
+        prev = curr;
+    }
+    while result.len() < 4 {
+        result.push('0');
+    }
+    Ok(PerlValue::string(result))
+}
+
+/// `similarity STR1, STR2` — returns similarity ratio 0.0-1.0.
+fn builtin_similarity(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s1 = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let s2 = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    if s1.is_empty() && s2.is_empty() {
+        return Ok(PerlValue::float(1.0));
+    }
+    let max_len = s1.len().max(s2.len());
+    if max_len == 0 {
+        return Ok(PerlValue::float(1.0));
+    }
+    let s1c: Vec<char> = s1.chars().collect();
+    let s2c: Vec<char> = s2.chars().collect();
+    let m = s1c.len();
+    let n = s2c.len();
+    let mut dp = vec![vec![0usize; n + 1]; m + 1];
+    for i in 0..=m {
+        dp[i][0] = i;
+    }
+    for j in 0..=n {
+        dp[0][j] = j;
+    }
+    for i in 1..=m {
+        for j in 1..=n {
+            let cost = if s1c[i - 1] == s2c[j - 1] { 0 } else { 1 };
+            dp[i][j] = (dp[i - 1][j] + 1)
+                .min(dp[i][j - 1] + 1)
+                .min(dp[i - 1][j - 1] + cost);
+        }
+    }
+    let dist = dp[m][n];
+    Ok(PerlValue::float(1.0 - (dist as f64 / max_len as f64)))
+}
+
+/// `common_prefix STR1, STR2` — longest common prefix.
+fn builtin_common_prefix(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s1 = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let s2 = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let prefix: String = s1
+        .chars()
+        .zip(s2.chars())
+        .take_while(|(a, b)| a == b)
+        .map(|(a, _)| a)
+        .collect();
+    Ok(PerlValue::string(prefix))
+}
+
+/// `common_suffix STR1, STR2` — longest common suffix.
+fn builtin_common_suffix(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s1 = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let s2 = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let suffix: String = s1
+        .chars()
+        .rev()
+        .zip(s2.chars().rev())
+        .take_while(|(a, b)| a == b)
+        .map(|(a, _)| a)
+        .collect::<String>()
+        .chars()
+        .rev()
+        .collect();
+    Ok(PerlValue::string(suffix))
+}
+
+/// `wrap_text STR, WIDTH` — wraps text to width.
+fn builtin_wrap_text(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let text = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let width = args
+        .get(1)
+        .map(|v| v.to_int().max(1) as usize)
+        .unwrap_or(80);
+    let mut result = String::new();
+    let mut line_len = 0;
+    for word in text.split_whitespace() {
+        if line_len + word.len() + 1 > width && line_len > 0 {
+            result.push('\n');
+            line_len = 0;
+        }
+        if line_len > 0 {
+            result.push(' ');
+            line_len += 1;
+        }
+        result.push_str(word);
+        line_len += word.len();
+    }
+    Ok(PerlValue::string(result))
+}
+
+/// `dedent STR` — removes common leading whitespace from lines.
+fn builtin_dedent(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let text = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let lines: Vec<&str> = text.lines().collect();
+    let min_indent = lines
+        .iter()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| l.len() - l.trim_start().len())
+        .min()
+        .unwrap_or(0);
+    let result: String = lines
+        .iter()
+        .map(|l| {
+            if l.len() >= min_indent {
+                &l[min_indent..]
+            } else {
+                *l
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    Ok(PerlValue::string(result))
+}
+
+/// `indent STR, PREFIX` — adds prefix to each line.
+fn builtin_indent(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let text = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let prefix = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "  ".to_string());
+    let result: String = text
+        .lines()
+        .map(|l| format!("{}{}", prefix, l))
+        .collect::<Vec<_>>()
+        .join("\n");
+    Ok(PerlValue::string(result))
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Extended stdlib: Advanced Numeric/Math
+// ─────────────────────────────────────────────────────────────────────────
+
+/// `lerp A, B, T` — linear interpolation.
+fn builtin_lerp(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let b = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let t = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
+    Ok(PerlValue::float(a + (b - a) * t))
+}
+
+/// `inv_lerp A, B, V` — inverse linear interpolation.
+fn builtin_inv_lerp(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let b = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let v = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
+    if (b - a).abs() < f64::EPSILON {
+        return Ok(PerlValue::float(0.0));
+    }
+    Ok(PerlValue::float((v - a) / (b - a)))
+}
+
+/// `smoothstep EDGE0, EDGE1, X` — smooth Hermite interpolation.
+fn builtin_smoothstep(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let edge0 = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let edge1 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let x = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
+    let t = ((x - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
+    Ok(PerlValue::float(t * t * (3.0 - 2.0 * t)))
+}
+
+/// `remap VALUE, IN_MIN, IN_MAX, OUT_MIN, OUT_MAX` — remap value from one range to another.
+fn builtin_remap(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let value = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let in_min = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let in_max = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let out_min = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
+    let out_max = args.get(4).map(|v| v.to_number()).unwrap_or(1.0);
+    if (in_max - in_min).abs() < f64::EPSILON {
+        return Ok(PerlValue::float(out_min));
+    }
+    let t = (value - in_min) / (in_max - in_min);
+    Ok(PerlValue::float(out_min + (out_max - out_min) * t))
+}
+
+/// `dot_product VEC1, VEC2` — dot product of two vectors.
+fn builtin_dot_product(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v1 = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let v2 = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF));
+    let sum: f64 = v1
+        .iter()
+        .zip(v2.iter())
+        .map(|(a, b)| a.to_number() * b.to_number())
+        .sum();
+    Ok(PerlValue::float(sum))
+}
+
+/// `cross_product VEC1, VEC2` — cross product of 3D vectors.
+fn builtin_cross_product(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v1 = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let v2 = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF));
+    if v1.len() < 3 || v2.len() < 3 {
+        return Err(PerlError::runtime(
+            "cross_product: vectors must have at least 3 elements",
+            0,
+        ));
+    }
+    let (a1, a2, a3) = (v1[0].to_number(), v1[1].to_number(), v1[2].to_number());
+    let (b1, b2, b3) = (v2[0].to_number(), v2[1].to_number(), v2[2].to_number());
+    Ok(PerlValue::array(vec![
+        PerlValue::float(a2 * b3 - a3 * b2),
+        PerlValue::float(a3 * b1 - a1 * b3),
+        PerlValue::float(a1 * b2 - a2 * b1),
+    ]))
+}
+
+/// `magnitude VEC` — magnitude/length of vector.
+fn builtin_magnitude(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v = flatten_args(args);
+    let sum_sq: f64 = v.iter().map(|x| x.to_number().powi(2)).sum();
+    Ok(PerlValue::float(sum_sq.sqrt()))
+}
+
+/// `normalize_vec VEC` — normalizes vector to unit length.
+fn builtin_normalize_vec(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v = flatten_args(args);
+    let mag: f64 = v.iter().map(|x| x.to_number().powi(2)).sum::<f64>().sqrt();
+    if mag < f64::EPSILON {
+        return Ok(PerlValue::array(v));
+    }
+    let result: Vec<PerlValue> = v
+        .iter()
+        .map(|x| PerlValue::float(x.to_number() / mag))
+        .collect();
+    Ok(PerlValue::array(result))
+}
+
+/// `distance VEC1, VEC2` — Euclidean distance between vectors.
+fn builtin_distance(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v1 = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let v2 = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF));
+    let sum_sq: f64 = v1
+        .iter()
+        .zip(v2.iter())
+        .map(|(a, b)| (a.to_number() - b.to_number()).powi(2))
+        .sum();
+    Ok(PerlValue::float(sum_sq.sqrt()))
+}
+
+/// `manhattan_distance VEC1, VEC2` — Manhattan/taxicab distance.
+fn builtin_manhattan_distance(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v1 = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let v2 = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF));
+    let sum: f64 = v1
+        .iter()
+        .zip(v2.iter())
+        .map(|(a, b)| (a.to_number() - b.to_number()).abs())
+        .sum();
+    Ok(PerlValue::float(sum))
+}
+
+/// `covariance LIST1, LIST2` — sample covariance.
+fn builtin_covariance(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let ys = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF));
+    let n = xs.len().min(ys.len());
+    if n < 2 {
+        return Ok(PerlValue::float(0.0));
+    }
+    let mean_x: f64 = xs.iter().take(n).map(|x| x.to_number()).sum::<f64>() / n as f64;
+    let mean_y: f64 = ys.iter().take(n).map(|y| y.to_number()).sum::<f64>() / n as f64;
+    let cov: f64 = xs
+        .iter()
+        .zip(ys.iter())
+        .take(n)
+        .map(|(x, y)| (x.to_number() - mean_x) * (y.to_number() - mean_y))
+        .sum::<f64>()
+        / (n - 1) as f64;
+    Ok(PerlValue::float(cov))
+}
+
+/// `correlation LIST1, LIST2` — Pearson correlation coefficient.
+fn builtin_correlation(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let ys = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF));
+    let n = xs.len().min(ys.len());
+    if n < 2 {
+        return Ok(PerlValue::float(0.0));
+    }
+    let mean_x: f64 = xs.iter().take(n).map(|x| x.to_number()).sum::<f64>() / n as f64;
+    let mean_y: f64 = ys.iter().take(n).map(|y| y.to_number()).sum::<f64>() / n as f64;
+    let mut cov = 0.0;
+    let mut var_x = 0.0;
+    let mut var_y = 0.0;
+    for i in 0..n {
+        let dx = xs[i].to_number() - mean_x;
+        let dy = ys[i].to_number() - mean_y;
+        cov += dx * dy;
+        var_x += dx * dx;
+        var_y += dy * dy;
+    }
+    let denom = (var_x * var_y).sqrt();
+    if denom < f64::EPSILON {
+        return Ok(PerlValue::float(0.0));
+    }
+    Ok(PerlValue::float(cov / denom))
+}
+
+/// `iqr LIST` — interquartile range.
+fn builtin_iqr(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let mut xs: Vec<f64> = flatten_args(args).iter().map(|x| x.to_number()).collect();
+    if xs.len() < 4 {
+        return Ok(PerlValue::float(0.0));
+    }
+    xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let q1_idx = xs.len() / 4;
+    let q3_idx = (3 * xs.len()) / 4;
+    Ok(PerlValue::float(xs[q3_idx] - xs[q1_idx]))
+}
+
+/// `quantile LIST, P` — returns p-th quantile (0.0-1.0).
+fn builtin_quantile(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = flatten_args(&args[..args.len().saturating_sub(1)]);
+    let p = args
+        .last()
+        .map(|v| v.to_number())
+        .unwrap_or(0.5)
+        .clamp(0.0, 1.0);
+    if xs.is_empty() {
+        return Ok(PerlValue::UNDEF);
+    }
+    let mut sorted: Vec<f64> = xs.iter().map(|x| x.to_number()).collect();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let idx = p * (sorted.len() - 1) as f64;
+    let lo = idx.floor() as usize;
+    let hi = idx.ceil() as usize;
+    let frac = idx - lo as f64;
+    Ok(PerlValue::float(
+        sorted[lo] * (1.0 - frac) + sorted[hi.min(sorted.len() - 1)] * frac,
+    ))
+}
+
+/// `clamp_int VALUE, MIN, MAX` — clamp integer value.
+fn builtin_clamp_int(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let val = args.first().map(|v| v.to_int()).unwrap_or(0);
+    let min = args.get(1).map(|v| v.to_int()).unwrap_or(i64::MIN);
+    let max = args.get(2).map(|v| v.to_int()).unwrap_or(i64::MAX);
+    Ok(PerlValue::integer(val.clamp(min, max)))
+}
+
+/// `in_range VALUE, MIN, MAX` — returns true if value in range [min, max].
+fn builtin_in_range(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let val = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let min = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let max = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(bool_iv(val >= min && val <= max))
+}
+
+/// `wrap_range VALUE, MIN, MAX` — wraps value into range.
+fn builtin_wrap_range(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let val = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let min = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let max = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let range = max - min;
+    if range <= 0.0 {
+        return Ok(PerlValue::float(min));
+    }
+    let mut result = val;
+    while result < min {
+        result += range;
+    }
+    while result >= max {
+        result -= range;
+    }
+    Ok(PerlValue::float(result))
+}
+
+/// `sum_squares LIST` — sum of squares.
+fn builtin_sum_squares(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let sum: f64 = flatten_args(args)
+        .iter()
+        .map(|x| x.to_number().powi(2))
+        .sum();
+    Ok(PerlValue::float(sum))
+}
+
+/// `root_mean_square LIST` — RMS.
+fn builtin_rms(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = flatten_args(args);
+    if xs.is_empty() {
+        return Ok(PerlValue::float(0.0));
+    }
+    let sum_sq: f64 = xs.iter().map(|x| x.to_number().powi(2)).sum();
+    Ok(PerlValue::float((sum_sq / xs.len() as f64).sqrt()))
+}
+
+/// `cumsum LIST` — cumulative sum.
+fn builtin_cumsum(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = flatten_args(args);
+    let mut sum = 0.0;
+    let result: Vec<PerlValue> = xs
+        .iter()
+        .map(|x| {
+            sum += x.to_number();
+            PerlValue::float(sum)
+        })
+        .collect();
+    Ok(PerlValue::array(result))
+}
+
+/// `cumprod LIST` — cumulative product.
+fn builtin_cumprod(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = flatten_args(args);
+    let mut prod = 1.0;
+    let result: Vec<PerlValue> = xs
+        .iter()
+        .map(|x| {
+            prod *= x.to_number();
+            PerlValue::float(prod)
+        })
+        .collect();
+    Ok(PerlValue::array(result))
+}
+
+/// `diff LIST` — differences between consecutive elements.
+fn builtin_diff(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = flatten_args(args);
+    if xs.len() < 2 {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let result: Vec<PerlValue> = xs
+        .windows(2)
+        .map(|w| PerlValue::float(w[1].to_number() - w[0].to_number()))
+        .collect();
+    Ok(PerlValue::array(result))
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Extended stdlib: Date/Time
+// ─────────────────────────────────────────────────────────────────────────
+
+/// `add_days DATE, N` — add N days to Unix timestamp.
+fn builtin_add_days(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let ts = args.first().map(|v| v.to_int()).unwrap_or(0);
+    let days = args.get(1).map(|v| v.to_int()).unwrap_or(0);
+    Ok(PerlValue::integer(ts + days * 86400))
+}
+
+/// `add_hours DATE, N` — add N hours to Unix timestamp.
+fn builtin_add_hours(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let ts = args.first().map(|v| v.to_int()).unwrap_or(0);
+    let hours = args.get(1).map(|v| v.to_int()).unwrap_or(0);
+    Ok(PerlValue::integer(ts + hours * 3600))
+}
+
+/// `add_minutes DATE, N` — add N minutes to Unix timestamp.
+fn builtin_add_minutes(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let ts = args.first().map(|v| v.to_int()).unwrap_or(0);
+    let mins = args.get(1).map(|v| v.to_int()).unwrap_or(0);
+    Ok(PerlValue::integer(ts + mins * 60))
+}
+
+/// `diff_days DATE1, DATE2` — difference in days.
+fn builtin_diff_days(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let ts1 = args.first().map(|v| v.to_int()).unwrap_or(0);
+    let ts2 = args.get(1).map(|v| v.to_int()).unwrap_or(0);
+    Ok(PerlValue::integer((ts2 - ts1) / 86400))
+}
+
+/// `diff_hours DATE1, DATE2` — difference in hours.
+fn builtin_diff_hours(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let ts1 = args.first().map(|v| v.to_int()).unwrap_or(0);
+    let ts2 = args.get(1).map(|v| v.to_int()).unwrap_or(0);
+    Ok(PerlValue::integer((ts2 - ts1) / 3600))
+}
+
+/// `start_of_day TS` — returns timestamp at start of day.
+fn builtin_start_of_day(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let ts = args.first().map(|v| v.to_int()).unwrap_or(0);
+    Ok(PerlValue::integer(ts - (ts % 86400)))
+}
+
+/// `end_of_day TS` — returns timestamp at end of day.
+fn builtin_end_of_day(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let ts = args.first().map(|v| v.to_int()).unwrap_or(0);
+    Ok(PerlValue::integer(ts - (ts % 86400) + 86399))
+}
+
+/// `start_of_hour TS` — returns timestamp at start of hour.
+fn builtin_start_of_hour(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let ts = args.first().map(|v| v.to_int()).unwrap_or(0);
+    Ok(PerlValue::integer(ts - (ts % 3600)))
+}
+
+/// `start_of_minute TS` — returns timestamp at start of minute.
+fn builtin_start_of_minute(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let ts = args.first().map(|v| v.to_int()).unwrap_or(0);
+    Ok(PerlValue::integer(ts - (ts % 60)))
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Extended stdlib: Encoding/Hashing
+// ─────────────────────────────────────────────────────────────────────────
+
+/// `url_encode STR` — URL encode string.
+fn builtin_url_encode(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let encoded: String = s
+        .bytes()
+        .map(|b| {
+            if b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'.' || b == b'~' {
+                format!("{}", b as char)
+            } else {
+                format!("%{:02X}", b)
+            }
+        })
+        .collect();
+    Ok(PerlValue::string(encoded))
+}
+
+/// `url_decode STR` — URL decode string.
+fn builtin_url_decode(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let mut result = Vec::new();
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let Ok(byte) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
+                result.push(byte);
+                i += 3;
+                continue;
+            }
+        }
+        if bytes[i] == b'+' {
+            result.push(b' ');
+        } else {
+            result.push(bytes[i]);
+        }
+        i += 1;
+    }
+    Ok(PerlValue::string(
+        String::from_utf8_lossy(&result).to_string(),
+    ))
+}
+
+/// `html_encode STR` — HTML encode string.
+fn builtin_html_encode(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let encoded: String = s
+        .chars()
+        .map(|c| match c {
+            '&' => "&amp;".to_string(),
+            '<' => "&lt;".to_string(),
+            '>' => "&gt;".to_string(),
+            '"' => "&quot;".to_string(),
+            '\'' => "&#x27;".to_string(),
+            _ => c.to_string(),
+        })
+        .collect();
+    Ok(PerlValue::string(encoded))
+}
+
+/// `html_decode STR` — HTML decode string.
+fn builtin_html_decode(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let decoded = s
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#x27;", "'")
+        .replace("&#39;", "'")
+        .replace("&nbsp;", " ");
+    Ok(PerlValue::string(decoded))
+}
+
+/// `adler32 STR` — Adler32 checksum.
+fn builtin_adler32(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let mut a: u32 = 1;
+    let mut b: u32 = 0;
+    for byte in s.bytes() {
+        a = (a + byte as u32) % 65521;
+        b = (b + a) % 65521;
+    }
+    Ok(PerlValue::integer(((b << 16) | a) as i64))
+}
+
+/// `fnv1a STR` — FNV-1a hash.
+fn builtin_fnv1a(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for byte in s.bytes() {
+        hash ^= byte as u64;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    Ok(PerlValue::integer(hash as i64))
+}
+
+/// `djb2 STR` — DJB2 hash.
+fn builtin_djb2(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let mut hash: u64 = 5381;
+    for byte in s.bytes() {
+        hash = hash.wrapping_mul(33).wrapping_add(byte as u64);
+    }
+    Ok(PerlValue::integer(hash as i64))
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Extended stdlib: Validation
+// ─────────────────────────────────────────────────────────────────────────
+
+/// `is_credit_card STR` — validates credit card number (Luhn).
+fn builtin_is_credit_card(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let digits: Vec<u32> = s
+        .chars()
+        .filter(|c| c.is_ascii_digit())
+        .map(|c| c.to_digit(10).unwrap())
+        .collect();
+    if digits.len() < 13 || digits.len() > 19 {
+        return Ok(bool_iv(false));
+    }
+    let mut sum = 0u32;
+    let mut double = false;
+    for &d in digits.iter().rev() {
+        let mut digit = d;
+        if double {
+            digit *= 2;
+            if digit > 9 {
+                digit -= 9;
+            }
+        }
+        sum += digit;
+        double = !double;
+    }
+    Ok(bool_iv(sum % 10 == 0))
+}
+
+/// `is_isbn10 STR` — validates ISBN-10.
+fn builtin_is_isbn10(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let chars: Vec<char> = s
+        .chars()
+        .filter(|c| c.is_ascii_digit() || *c == 'X' || *c == 'x')
+        .collect();
+    if chars.len() != 10 {
+        return Ok(bool_iv(false));
+    }
+    let mut sum = 0i32;
+    for (i, c) in chars.iter().enumerate() {
+        let val = if *c == 'X' || *c == 'x' {
+            10
+        } else {
+            c.to_digit(10).unwrap() as i32
+        };
+        sum += val * (10 - i as i32);
+    }
+    Ok(bool_iv(sum % 11 == 0))
+}
+
+/// `is_isbn13 STR` — validates ISBN-13.
+fn builtin_is_isbn13(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let digits: Vec<u32> = s
+        .chars()
+        .filter(|c| c.is_ascii_digit())
+        .map(|c| c.to_digit(10).unwrap())
+        .collect();
+    if digits.len() != 13 {
+        return Ok(bool_iv(false));
+    }
+    let sum: u32 = digits
+        .iter()
+        .enumerate()
+        .map(|(i, &d)| if i % 2 == 0 { d } else { d * 3 })
+        .sum();
+    Ok(bool_iv(sum % 10 == 0))
+}
+
+/// `is_iban STR` — validates IBAN (basic check).
+fn builtin_is_iban(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args)
+        .to_string()
+        .replace(|c: char| c.is_whitespace(), "")
+        .to_uppercase();
+    if s.len() < 15 || s.len() > 34 {
+        return Ok(bool_iv(false));
+    }
+    if !s.chars().take(2).all(|c| c.is_ascii_alphabetic()) {
+        return Ok(bool_iv(false));
+    }
+    if !s.chars().skip(2).take(2).all(|c| c.is_ascii_digit()) {
+        return Ok(bool_iv(false));
+    }
+    let rearranged = format!("{}{}", &s[4..], &s[..4]);
+    let numeric: String = rearranged
+        .chars()
+        .map(|c| {
+            if c.is_ascii_digit() {
+                c.to_string()
+            } else {
+                ((c as u8) - b'A' + 10).to_string()
+            }
+        })
+        .collect();
+    let mut remainder = 0u64;
+    for chunk in numeric.as_bytes().chunks(9) {
+        let s = std::str::from_utf8(chunk).unwrap_or("0");
+        let n: u64 = format!("{}{}", remainder, s).parse().unwrap_or(0);
+        remainder = n % 97;
+    }
+    Ok(bool_iv(remainder == 1))
+}
+
+/// `is_hex STR` — validates hexadecimal string.
+fn builtin_is_hex_str(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    Ok(bool_iv(
+        !s.is_empty() && s.chars().all(|c| c.is_ascii_hexdigit()),
+    ))
+}
+
+/// `is_binary STR` — validates binary string.
+fn builtin_is_binary_str(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    Ok(bool_iv(
+        !s.is_empty() && s.chars().all(|c| c == '0' || c == '1'),
+    ))
+}
+
+/// `is_octal STR` — validates octal string.
+fn builtin_is_octal_str(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    Ok(bool_iv(
+        !s.is_empty() && s.chars().all(|c| c >= '0' && c <= '7'),
+    ))
+}
+
+/// `is_json STR` — validates JSON syntax (basic).
+fn builtin_is_json(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    Ok(bool_iv(
+        serde_json::from_str::<serde_json::Value>(&s).is_ok(),
+    ))
+}
+
+/// `is_base64 STR` — validates base64 string.
+fn builtin_is_base64(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let s = s.trim();
+    if s.is_empty() {
+        return Ok(bool_iv(false));
+    }
+    let valid_chars = s
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=');
+    Ok(bool_iv(valid_chars && s.len() % 4 == 0))
+}
+
+/// `is_semver STR` — validates semantic version.
+fn builtin_is_semver(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let re = regex::Regex::new(r"^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([\da-zA-Z-]+(?:\.[\da-zA-Z-]+)*))?(?:\+([\da-zA-Z-]+(?:\.[\da-zA-Z-]+)*))?$").unwrap();
+    Ok(bool_iv(re.is_match(&s)))
+}
+
+/// `is_slug STR` — validates URL slug.
+fn builtin_is_slug(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let re = regex::Regex::new(r"^[a-z0-9]+(?:-[a-z0-9]+)*$").unwrap();
+    Ok(bool_iv(re.is_match(&s)))
+}
+
+/// `slugify STR` — converts string to URL slug.
+fn builtin_slugify(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string().to_lowercase();
+    let slug: String = s
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect::<String>()
+        .split('-')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+    Ok(PerlValue::string(slug))
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Extended stdlib: Collection Advanced
+// ─────────────────────────────────────────────────────────────────────────
+
+/// `mode LIST` — most frequent element(s).
+fn builtin_mode(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = flatten_args(args);
+    if xs.is_empty() {
+        return Ok(PerlValue::UNDEF);
+    }
+    let mut counts: std::collections::HashMap<String, (usize, PerlValue)> =
+        std::collections::HashMap::new();
+    for x in xs {
+        let key = x.to_string();
+        counts.entry(key).or_insert((0, x.clone())).0 += 1;
+    }
+    let max_count = counts.values().map(|(c, _)| *c).max().unwrap_or(0);
+    let modes: Vec<PerlValue> = counts
+        .into_values()
+        .filter(|(c, _)| *c == max_count)
+        .map(|(_, v)| v)
+        .collect();
+    if modes.len() == 1 {
+        Ok(modes.into_iter().next().unwrap())
+    } else {
+        Ok(PerlValue::array(modes))
+    }
+}
+
+/// `sample_n LIST, N` — random sample of N elements without replacement.
+fn builtin_sample_n(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    use rand::seq::SliceRandom;
+    let xs = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let n = args
+        .get(1)
+        .map(|v| v.to_int().max(0) as usize)
+        .unwrap_or(1)
+        .min(xs.len());
+    let mut rng = rand::thread_rng();
+    let sample: Vec<PerlValue> = xs.choose_multiple(&mut rng, n).cloned().collect();
+    Ok(PerlValue::array(sample))
+}
+
+/// `weighted_sample LIST_OF_PAIRS` — weighted random selection.
+fn builtin_weighted_sample(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    use rand::Rng;
+    let pairs = flatten_args(args);
+    if pairs.is_empty() {
+        return Ok(PerlValue::UNDEF);
+    }
+    let mut items: Vec<(PerlValue, f64)> = Vec::new();
+    let mut total = 0.0;
+    for pair in pairs {
+        let list = arg_to_vec(&pair);
+        if list.len() >= 2 {
+            let weight = list[1].to_number().max(0.0);
+            total += weight;
+            items.push((list[0].clone(), weight));
+        }
+    }
+    if total <= 0.0 {
+        return Ok(PerlValue::UNDEF);
+    }
+    let mut rng = rand::thread_rng();
+    let mut r = rng.gen::<f64>() * total;
+    for (item, weight) in items {
+        r -= weight;
+        if r <= 0.0 {
+            return Ok(item);
+        }
+    }
+    Ok(PerlValue::UNDEF)
+}
+
+/// `shuffle_in_place LIST` — Fisher-Yates shuffle (returns new array).
+fn builtin_shuffle_arr(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    use rand::seq::SliceRandom;
+    let mut xs = flatten_args(args);
+    let mut rng = rand::thread_rng();
+    xs.shuffle(&mut rng);
+    Ok(PerlValue::array(xs))
+}
+
+/// `argmax LIST` — index of maximum element.
+fn builtin_argmax(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = flatten_args(args);
+    if xs.is_empty() {
+        return Ok(PerlValue::UNDEF);
+    }
+    let (idx, _) = xs
+        .iter()
+        .enumerate()
+        .max_by(|(_, a), (_, b)| {
+            a.to_number()
+                .partial_cmp(&b.to_number())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .unwrap();
+    Ok(PerlValue::integer(idx as i64))
+}
+
+/// `argmin LIST` — index of minimum element.
+fn builtin_argmin(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = flatten_args(args);
+    if xs.is_empty() {
+        return Ok(PerlValue::UNDEF);
+    }
+    let (idx, _) = xs
+        .iter()
+        .enumerate()
+        .min_by(|(_, a), (_, b)| {
+            a.to_number()
+                .partial_cmp(&b.to_number())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .unwrap();
+    Ok(PerlValue::integer(idx as i64))
+}
+
+/// `argsort LIST` — indices that would sort the list.
+fn builtin_argsort(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = flatten_args(args);
+    let mut indices: Vec<usize> = (0..xs.len()).collect();
+    indices.sort_by(|&a, &b| {
+        xs[a]
+            .to_number()
+            .partial_cmp(&xs[b].to_number())
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    Ok(PerlValue::array(
+        indices
+            .into_iter()
+            .map(|i| PerlValue::integer(i as i64))
+            .collect(),
+    ))
+}
+
+/// `rank LIST` — rank of each element (1-based).
+fn builtin_rank(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = flatten_args(args);
+    let mut indexed: Vec<(usize, f64)> = xs
+        .iter()
+        .enumerate()
+        .map(|(i, x)| (i, x.to_number()))
+        .collect();
+    indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+    let mut ranks = vec![0i64; xs.len()];
+    for (rank, (idx, _)) in indexed.into_iter().enumerate() {
+        ranks[idx] = rank as i64 + 1;
+    }
+    Ok(PerlValue::array(
+        ranks.into_iter().map(PerlValue::integer).collect(),
+    ))
+}
+
+/// `dense_rank LIST` — dense rank (no gaps).
+fn builtin_dense_rank(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = flatten_args(args);
+    let mut sorted: Vec<(usize, f64)> = xs
+        .iter()
+        .enumerate()
+        .map(|(i, x)| (i, x.to_number()))
+        .collect();
+    sorted.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+    let mut ranks = vec![0i64; xs.len()];
+    let mut rank = 1i64;
+    let mut prev: Option<f64> = None;
+    for (idx, val) in sorted {
+        if prev.is_some() && (val - prev.unwrap()).abs() > f64::EPSILON {
+            rank += 1;
+        }
+        ranks[idx] = rank;
+        prev = Some(val);
+    }
+    Ok(PerlValue::array(
+        ranks.into_iter().map(PerlValue::integer).collect(),
+    ))
+}
+
+/// `partition_point FN, LIST` — index where predicate becomes false (binary search).
+fn builtin_partition_point(
+    interp: &mut Interpreter,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Ok(PerlValue::integer(0));
+    }
+    let f = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let Some(sub) = f.as_code_ref() else {
+        return Err(PerlError::runtime(
+            "partition_point: first argument must be a code reference",
+            line,
+        ));
+    };
+    let xs = flatten_args(&args[1..]);
+    let mut lo = 0;
+    let mut hi = xs.len();
+    while lo < hi {
+        let mid = lo + (hi - lo) / 2;
+        let result = exec_to_perl_result(
+            interp.call_sub(&sub, vec![xs[mid].clone()], WantarrayCtx::Scalar, line),
+            "partition_point",
+            line,
+        )?;
+        if result.is_true() {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+    Ok(PerlValue::integer(lo as i64))
+}
+
+/// `lower_bound VALUE, LIST` — first position where value could be inserted.
+fn builtin_lower_bound(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let value = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let xs = flatten_args(&args[1..]);
+    let mut lo = 0;
+    let mut hi = xs.len();
+    while lo < hi {
+        let mid = lo + (hi - lo) / 2;
+        if xs[mid].to_number() < value {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+    Ok(PerlValue::integer(lo as i64))
+}
+
+/// `upper_bound VALUE, LIST` — last position where value could be inserted.
+fn builtin_upper_bound(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let value = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let xs = flatten_args(&args[1..]);
+    let mut lo = 0;
+    let mut hi = xs.len();
+    while lo < hi {
+        let mid = lo + (hi - lo) / 2;
+        if xs[mid].to_number() <= value {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+    Ok(PerlValue::integer(lo as i64))
+}
+
+/// `equal_range VALUE, LIST` — [lower_bound, upper_bound] pair.
+fn builtin_equal_range(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let lb = builtin_lower_bound(args)?.to_int();
+    let ub = builtin_upper_bound(args)?.to_int();
+    Ok(PerlValue::array(vec![
+        PerlValue::integer(lb),
+        PerlValue::integer(ub),
+    ]))
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Extended stdlib: Novel batch - Matrix Operations
+// ─────────────────────────────────────────────────────────────────────────
+
+/// `matrix_add M1, M2` — element-wise matrix addition.
+fn builtin_matrix_add(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m1 = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let m2 = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF));
+    let result: Vec<PerlValue> = m1
+        .iter()
+        .zip(m2.iter())
+        .map(|(r1, r2)| {
+            let row1 = arg_to_vec(r1);
+            let row2 = arg_to_vec(r2);
+            let row: Vec<PerlValue> = row1
+                .iter()
+                .zip(row2.iter())
+                .map(|(a, b)| PerlValue::float(a.to_number() + b.to_number()))
+                .collect();
+            PerlValue::array_ref(Arc::new(RwLock::new(row)))
+        })
+        .collect();
+    Ok(PerlValue::array(result))
+}
+
+/// `matrix_sub M1, M2` — element-wise matrix subtraction.
+fn builtin_matrix_sub(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m1 = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let m2 = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF));
+    let result: Vec<PerlValue> = m1
+        .iter()
+        .zip(m2.iter())
+        .map(|(r1, r2)| {
+            let row1 = arg_to_vec(r1);
+            let row2 = arg_to_vec(r2);
+            let row: Vec<PerlValue> = row1
+                .iter()
+                .zip(row2.iter())
+                .map(|(a, b)| PerlValue::float(a.to_number() - b.to_number()))
+                .collect();
+            PerlValue::array_ref(Arc::new(RwLock::new(row)))
+        })
+        .collect();
+    Ok(PerlValue::array(result))
+}
+
+/// `matrix_mult M1, M2` — matrix multiplication.
+fn builtin_matrix_mult(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m1 = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let m2 = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF));
+    if m1.is_empty() || m2.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let rows1 = m1.len();
+    let cols1 = arg_to_vec(&m1[0]).len();
+    let cols2 = arg_to_vec(&m2[0]).len();
+    let m1_flat: Vec<Vec<f64>> = m1
+        .iter()
+        .map(|r| arg_to_vec(r).iter().map(|v| v.to_number()).collect())
+        .collect();
+    let m2_flat: Vec<Vec<f64>> = m2
+        .iter()
+        .map(|r| arg_to_vec(r).iter().map(|v| v.to_number()).collect())
+        .collect();
+    let mut result = Vec::with_capacity(rows1);
+    for i in 0..rows1 {
+        let mut row = Vec::with_capacity(cols2);
+        for j in 0..cols2 {
+            let mut sum = 0.0;
+            for k in 0..cols1 {
+                sum += m1_flat[i][k] * m2_flat[k][j];
+            }
+            row.push(PerlValue::float(sum));
+        }
+        result.push(PerlValue::array_ref(Arc::new(RwLock::new(row))));
+    }
+    Ok(PerlValue::array(result))
+}
+
+/// `matrix_scalar M, S` — multiply matrix by scalar.
+fn builtin_matrix_scalar(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let s = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let result: Vec<PerlValue> = m
+        .iter()
+        .map(|r| {
+            let row = arg_to_vec(r);
+            let scaled: Vec<PerlValue> = row
+                .iter()
+                .map(|v| PerlValue::float(v.to_number() * s))
+                .collect();
+            PerlValue::array_ref(Arc::new(RwLock::new(scaled)))
+        })
+        .collect();
+    Ok(PerlValue::array(result))
+}
+
+/// `matrix_identity N` — create NxN identity matrix.
+fn builtin_matrix_identity(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args
+        .first()
+        .map(|v| v.to_int().max(0) as usize)
+        .unwrap_or(1);
+    let mut result = Vec::with_capacity(n);
+    for i in 0..n {
+        let mut row = vec![PerlValue::float(0.0); n];
+        row[i] = PerlValue::float(1.0);
+        result.push(PerlValue::array_ref(Arc::new(RwLock::new(row))));
+    }
+    Ok(PerlValue::array(result))
+}
+
+/// `matrix_zeros ROWS, COLS` — create zero matrix.
+fn builtin_matrix_zeros(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let rows = args
+        .first()
+        .map(|v| v.to_int().max(0) as usize)
+        .unwrap_or(1);
+    let cols = args
+        .get(1)
+        .map(|v| v.to_int().max(0) as usize)
+        .unwrap_or(rows);
+    let mut result = Vec::with_capacity(rows);
+    for _ in 0..rows {
+        result.push(PerlValue::array_ref(Arc::new(RwLock::new(
+            vec![PerlValue::float(0.0); cols],
+        ))));
+    }
+    Ok(PerlValue::array(result))
+}
+
+/// `matrix_ones ROWS, COLS` — create matrix of ones.
+fn builtin_matrix_ones(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let rows = args
+        .first()
+        .map(|v| v.to_int().max(0) as usize)
+        .unwrap_or(1);
+    let cols = args
+        .get(1)
+        .map(|v| v.to_int().max(0) as usize)
+        .unwrap_or(rows);
+    let mut result = Vec::with_capacity(rows);
+    for _ in 0..rows {
+        result.push(PerlValue::array_ref(Arc::new(RwLock::new(
+            vec![PerlValue::float(1.0); cols],
+        ))));
+    }
+    Ok(PerlValue::array(result))
+}
+
+/// `matrix_diag VEC` — create diagonal matrix from vector.
+fn builtin_matrix_diag(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v = flatten_args(args);
+    let n = v.len();
+    let mut result = Vec::with_capacity(n);
+    for i in 0..n {
+        let mut row = vec![PerlValue::float(0.0); n];
+        row[i] = v[i].clone();
+        result.push(PerlValue::array_ref(Arc::new(RwLock::new(row))));
+    }
+    Ok(PerlValue::array(result))
+}
+
+/// `matrix_trace M` — sum of diagonal elements.
+fn builtin_matrix_trace(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let mut sum = 0.0;
+    for (i, row) in m.iter().enumerate() {
+        let r = arg_to_vec(row);
+        if i < r.len() {
+            sum += r[i].to_number();
+        }
+    }
+    Ok(PerlValue::float(sum))
+}
+
+/// `matrix_row M, I` — get row I from matrix.
+fn builtin_matrix_row(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let i = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
+    if i < m.len() {
+        Ok(PerlValue::array(arg_to_vec(&m[i])))
+    } else {
+        Ok(PerlValue::array(vec![]))
+    }
+}
+
+/// `matrix_col M, J` — get column J from matrix.
+fn builtin_matrix_col(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let j = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
+    let col: Vec<PerlValue> = m
+        .iter()
+        .map(|r| {
+            let row = arg_to_vec(r);
+            row.get(j).cloned().unwrap_or(PerlValue::UNDEF)
+        })
+        .collect();
+    Ok(PerlValue::array(col))
+}
+
+/// `matrix_shape M` — returns [rows, cols].
+fn builtin_matrix_shape(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let rows = m.len();
+    let cols = if rows > 0 { arg_to_vec(&m[0]).len() } else { 0 };
+    Ok(PerlValue::array(vec![
+        PerlValue::integer(rows as i64),
+        PerlValue::integer(cols as i64),
+    ]))
+}
+
+/// `matrix_det M` — determinant (2x2 or 3x3 only).
+fn builtin_matrix_det(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let n = m.len();
+    if n == 0 {
+        return Ok(PerlValue::float(0.0));
+    }
+    let mat: Vec<Vec<f64>> = m
+        .iter()
+        .map(|r| arg_to_vec(r).iter().map(|v| v.to_number()).collect())
+        .collect();
+    if n == 1 {
+        return Ok(PerlValue::float(mat[0][0]));
+    }
+    if n == 2 {
+        return Ok(PerlValue::float(
+            mat[0][0] * mat[1][1] - mat[0][1] * mat[1][0],
+        ));
+    }
+    if n == 3 {
+        let det = mat[0][0] * (mat[1][1] * mat[2][2] - mat[1][2] * mat[2][1])
+            - mat[0][1] * (mat[1][0] * mat[2][2] - mat[1][2] * mat[2][0])
+            + mat[0][2] * (mat[1][0] * mat[2][1] - mat[1][1] * mat[2][0]);
+        return Ok(PerlValue::float(det));
+    }
+    Err(PerlError::runtime(
+        "matrix_det: only 1x1, 2x2, 3x3 matrices supported",
+        0,
+    ))
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Extended stdlib: Graph Algorithms
+// ─────────────────────────────────────────────────────────────────────────
+
+/// `topological_sort EDGES` — topological sort on DAG (edges as [[from, to], ...]).
+fn builtin_topological_sort(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let edges = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let mut graph: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    let mut in_degree: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut all_nodes: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for edge in edges {
+        let e = arg_to_vec(&edge);
+        if e.len() >= 2 {
+            let from = e[0].to_string();
+            let to = e[1].to_string();
+            all_nodes.insert(from.clone());
+            all_nodes.insert(to.clone());
+            graph.entry(from.clone()).or_default().push(to.clone());
+            *in_degree.entry(to).or_insert(0) += 1;
+            in_degree.entry(from).or_insert(0);
+        }
+    }
+    let mut queue: Vec<String> = all_nodes
+        .iter()
+        .filter(|n| *in_degree.get(*n).unwrap_or(&0) == 0)
+        .cloned()
+        .collect();
+    queue.sort();
+    let mut result = Vec::new();
+    while let Some(node) = queue.pop() {
+        result.push(PerlValue::string(node.clone()));
+        if let Some(neighbors) = graph.get(&node) {
+            for neighbor in neighbors {
+                if let Some(deg) = in_degree.get_mut(neighbor) {
+                    *deg -= 1;
+                    if *deg == 0 {
+                        queue.push(neighbor.clone());
+                        queue.sort();
+                    }
+                }
+            }
+        }
+    }
+    if result.len() != all_nodes.len() {
+        return Err(PerlError::runtime("topological_sort: cycle detected", 0));
+    }
+    Ok(PerlValue::array(result))
+}
+
+/// `bfs_traverse START, EDGES` — breadth-first search traversal order.
+fn builtin_bfs_traverse(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let start = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let edges = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF));
+    let mut graph: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for edge in edges {
+        let e = arg_to_vec(&edge);
+        if e.len() >= 2 {
+            let from = e[0].to_string();
+            let to = e[1].to_string();
+            graph.entry(from).or_default().push(to);
+        }
+    }
+    let mut visited: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut queue = std::collections::VecDeque::new();
+    let mut result = Vec::new();
+    queue.push_back(start.clone());
+    visited.insert(start);
+    while let Some(node) = queue.pop_front() {
+        result.push(PerlValue::string(node.clone()));
+        if let Some(neighbors) = graph.get(&node) {
+            for neighbor in neighbors {
+                if !visited.contains(neighbor) {
+                    visited.insert(neighbor.clone());
+                    queue.push_back(neighbor.clone());
+                }
+            }
+        }
+    }
+    Ok(PerlValue::array(result))
+}
+
+/// `dfs_traverse START, EDGES` — depth-first search traversal order.
+fn builtin_dfs_traverse(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let start = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let edges = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF));
+    let mut graph: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for edge in edges {
+        let e = arg_to_vec(&edge);
+        if e.len() >= 2 {
+            let from = e[0].to_string();
+            let to = e[1].to_string();
+            graph.entry(from).or_default().push(to);
+        }
+    }
+    let mut visited: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut stack = vec![start.clone()];
+    let mut result = Vec::new();
+    while let Some(node) = stack.pop() {
+        if visited.contains(&node) {
+            continue;
+        }
+        visited.insert(node.clone());
+        result.push(PerlValue::string(node.clone()));
+        if let Some(neighbors) = graph.get(&node) {
+            for neighbor in neighbors.iter().rev() {
+                if !visited.contains(neighbor) {
+                    stack.push(neighbor.clone());
+                }
+            }
+        }
+    }
+    Ok(PerlValue::array(result))
+}
+
+/// `shortest_path_bfs START, END, EDGES` — BFS-based shortest path (unweighted).
+fn builtin_shortest_path_bfs(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let start = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let end = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let edges = arg_to_vec(&args.get(2).cloned().unwrap_or(PerlValue::UNDEF));
+    let mut graph: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for edge in edges {
+        let e = arg_to_vec(&edge);
+        if e.len() >= 2 {
+            let from = e[0].to_string();
+            let to = e[1].to_string();
+            graph.entry(from).or_default().push(to);
+        }
+    }
+    let mut visited: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut queue = std::collections::VecDeque::new();
+    queue.push_back(start.clone());
+    visited.insert(start.clone(), String::new());
+    while let Some(node) = queue.pop_front() {
+        if node == end {
+            let mut path = vec![PerlValue::string(end.clone())];
+            let mut current = end.clone();
+            while let Some(prev) = visited.get(&current) {
+                if prev.is_empty() {
+                    break;
+                }
+                path.push(PerlValue::string(prev.clone()));
+                current = prev.clone();
+            }
+            path.reverse();
+            return Ok(PerlValue::array(path));
+        }
+        if let Some(neighbors) = graph.get(&node) {
+            for neighbor in neighbors {
+                if !visited.contains_key(neighbor) {
+                    visited.insert(neighbor.clone(), node.clone());
+                    queue.push_back(neighbor.clone());
+                }
+            }
+        }
+    }
+    Ok(PerlValue::array(vec![]))
+}
+
+/// `connected_components_graph EDGES` — find connected components (undirected).
+fn builtin_connected_components_graph(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let edges = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let mut graph: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    let mut all_nodes: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for edge in edges {
+        let e = arg_to_vec(&edge);
+        if e.len() >= 2 {
+            let a = e[0].to_string();
+            let b = e[1].to_string();
+            all_nodes.insert(a.clone());
+            all_nodes.insert(b.clone());
+            graph.entry(a.clone()).or_default().push(b.clone());
+            graph.entry(b).or_default().push(a);
+        }
+    }
+    let mut visited: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut components = Vec::new();
+    for node in &all_nodes {
+        if visited.contains(node) {
+            continue;
+        }
+        let mut component = Vec::new();
+        let mut stack = vec![node.clone()];
+        while let Some(n) = stack.pop() {
+            if visited.contains(&n) {
+                continue;
+            }
+            visited.insert(n.clone());
+            component.push(PerlValue::string(n.clone()));
+            if let Some(neighbors) = graph.get(&n) {
+                for neighbor in neighbors {
+                    if !visited.contains(neighbor) {
+                        stack.push(neighbor.clone());
+                    }
+                }
+            }
+        }
+        component.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+        components.push(PerlValue::array_ref(Arc::new(RwLock::new(component))));
+    }
+    Ok(PerlValue::array(components))
+}
+
+/// `has_cycle_graph EDGES` — check if directed graph has a cycle.
+fn builtin_has_cycle_graph(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let edges = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let mut graph: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    let mut all_nodes: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for edge in edges {
+        let e = arg_to_vec(&edge);
+        if e.len() >= 2 {
+            let from = e[0].to_string();
+            let to = e[1].to_string();
+            all_nodes.insert(from.clone());
+            all_nodes.insert(to.clone());
+            graph.entry(from).or_default().push(to);
+        }
+    }
+    fn dfs_cycle(
+        node: &str,
+        graph: &std::collections::HashMap<String, Vec<String>>,
+        visiting: &mut std::collections::HashSet<String>,
+        visited: &mut std::collections::HashSet<String>,
+    ) -> bool {
+        if visiting.contains(node) {
+            return true;
+        }
+        if visited.contains(node) {
+            return false;
+        }
+        visiting.insert(node.to_string());
+        if let Some(neighbors) = graph.get(node) {
+            for neighbor in neighbors {
+                if dfs_cycle(neighbor, graph, visiting, visited) {
+                    return true;
+                }
+            }
+        }
+        visiting.remove(node);
+        visited.insert(node.to_string());
+        false
+    }
+    let mut visiting = std::collections::HashSet::new();
+    let mut visited = std::collections::HashSet::new();
+    for node in &all_nodes {
+        if dfs_cycle(node, &graph, &mut visiting, &mut visited) {
+            return Ok(bool_iv(true));
+        }
+    }
+    Ok(bool_iv(false))
+}
+
+/// `is_bipartite_graph EDGES` — check if graph is bipartite (two-colorable).
+fn builtin_is_bipartite_graph(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let edges = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let mut graph: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    let mut all_nodes: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for edge in edges {
+        let e = arg_to_vec(&edge);
+        if e.len() >= 2 {
+            let a = e[0].to_string();
+            let b = e[1].to_string();
+            all_nodes.insert(a.clone());
+            all_nodes.insert(b.clone());
+            graph.entry(a.clone()).or_default().push(b.clone());
+            graph.entry(b).or_default().push(a);
+        }
+    }
+    let mut color: std::collections::HashMap<String, i32> = std::collections::HashMap::new();
+    for start in &all_nodes {
+        if color.contains_key(start) {
+            continue;
+        }
+        let mut queue = std::collections::VecDeque::new();
+        queue.push_back(start.clone());
+        color.insert(start.clone(), 0);
+        while let Some(node) = queue.pop_front() {
+            let c = *color.get(&node).unwrap();
+            if let Some(neighbors) = graph.get(&node) {
+                for neighbor in neighbors {
+                    if let Some(&nc) = color.get(neighbor) {
+                        if nc == c {
+                            return Ok(bool_iv(false));
+                        }
+                    } else {
+                        color.insert(neighbor.clone(), 1 - c);
+                        queue.push_back(neighbor.clone());
+                    }
+                }
+            }
+        }
+    }
+    Ok(bool_iv(true))
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Extended stdlib: More Data Validation
+// ─────────────────────────────────────────────────────────────────────────
+
+/// `is_ipv4_addr STR` — validate IPv4 address.
+fn builtin_is_ipv4_addr(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    Ok(bool_iv(s.parse::<std::net::Ipv4Addr>().is_ok()))
+}
+
+/// `is_ipv6_addr STR` — validate IPv6 address.
+fn builtin_is_ipv6_addr(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    Ok(bool_iv(s.parse::<std::net::Ipv6Addr>().is_ok()))
+}
+
+/// `is_mac_addr STR` — validate MAC address.
+fn builtin_is_mac_addr(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let parts: Vec<&str> = s.split(|c| c == ':' || c == '-').collect();
+    if parts.len() != 6 {
+        return Ok(bool_iv(false));
+    }
+    for part in parts {
+        if part.len() != 2 {
+            return Ok(bool_iv(false));
+        }
+        if !part.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Ok(bool_iv(false));
+        }
+    }
+    Ok(bool_iv(true))
+}
+
+/// `is_port_num N` — validate port number (1-65535).
+fn builtin_is_port_num(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_int()).unwrap_or(-1);
+    Ok(bool_iv(n >= 1 && n <= 65535))
+}
+
+/// `is_hostname_valid STR` — validate hostname.
+fn builtin_is_hostname_valid(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    if s.is_empty() || s.len() > 253 {
+        return Ok(bool_iv(false));
+    }
+    let labels: Vec<&str> = s.split('.').collect();
+    for label in labels {
+        if label.is_empty() || label.len() > 63 {
+            return Ok(bool_iv(false));
+        }
+        if !label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+            return Ok(bool_iv(false));
+        }
+        if label.starts_with('-') || label.ends_with('-') {
+            return Ok(bool_iv(false));
+        }
+    }
+    Ok(bool_iv(true))
+}
+
+/// `is_iso_date STR` — validate ISO date (YYYY-MM-DD).
+fn builtin_is_iso_date(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let re = regex::Regex::new(r"^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$").unwrap();
+    Ok(bool_iv(re.is_match(&s)))
+}
+
+/// `is_iso_time STR` — validate ISO time (HH:MM:SS).
+fn builtin_is_iso_time(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let re = regex::Regex::new(r"^(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$").unwrap();
+    Ok(bool_iv(re.is_match(&s)))
+}
+
+/// `is_iso_datetime STR` — validate ISO datetime.
+fn builtin_is_iso_datetime(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let re = regex::Regex::new(
+        r"^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d",
+    )
+    .unwrap();
+    Ok(bool_iv(re.is_match(&s)))
+}
+
+/// `is_phone_num STR` — validate phone number (basic).
+fn builtin_is_phone_num(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    Ok(bool_iv(digits.len() >= 7 && digits.len() <= 15))
+}
+
+/// `is_us_zip STR` — validate US ZIP code.
+fn builtin_is_us_zip(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let re = regex::Regex::new(r"^\d{5}(?:-\d{4})?$").unwrap();
+    Ok(bool_iv(re.is_match(&s)))
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Extended stdlib: String Utilities Novel
+// ─────────────────────────────────────────────────────────────────────────
+
+/// `word_wrap_text STR, WIDTH` — word wrap to width.
+fn builtin_word_wrap_text(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let text = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let width = args
+        .get(1)
+        .map(|v| v.to_int().max(1) as usize)
+        .unwrap_or(80);
+    let mut result = String::new();
+    let mut line = String::new();
+    for word in text.split_whitespace() {
+        if line.len() + word.len() + 1 > width {
+            if !result.is_empty() {
+                result.push('\n');
+            }
+            result.push_str(&line);
+            line = word.to_string();
+        } else {
+            if !line.is_empty() {
+                line.push(' ');
+            }
+            line.push_str(word);
+        }
+    }
+    if !line.is_empty() {
+        if !result.is_empty() {
+            result.push('\n');
+        }
+        result.push_str(&line);
+    }
+    Ok(PerlValue::string(result))
+}
+
+/// `center_text STR, WIDTH [, CHAR]` — center string in width.
+fn builtin_center_text(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let width = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
+    let ch = args
+        .get(2)
+        .map(|v| v.to_string().chars().next().unwrap_or(' '))
+        .unwrap_or(' ');
+    if s.len() >= width {
+        return Ok(PerlValue::string(s));
+    }
+    let total_pad = width - s.len();
+    let left = total_pad / 2;
+    let right = total_pad - left;
+    let result = format!(
+        "{}{}{}",
+        std::iter::repeat(ch).take(left).collect::<String>(),
+        s,
+        std::iter::repeat(ch).take(right).collect::<String>()
+    );
+    Ok(PerlValue::string(result))
+}
+
+/// `ljust_text STR, WIDTH [, CHAR]` — left justify string.
+fn builtin_ljust_text(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let width = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
+    let ch = args
+        .get(2)
+        .map(|v| v.to_string().chars().next().unwrap_or(' '))
+        .unwrap_or(' ');
+    if s.len() >= width {
+        return Ok(PerlValue::string(s));
+    }
+    let padding: String = std::iter::repeat(ch).take(width - s.len()).collect();
+    Ok(PerlValue::string(format!("{}{}", s, padding)))
+}
+
+/// `rjust_text STR, WIDTH [, CHAR]` — right justify string.
+fn builtin_rjust_text(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let width = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
+    let ch = args
+        .get(2)
+        .map(|v| v.to_string().chars().next().unwrap_or(' '))
+        .unwrap_or(' ');
+    if s.len() >= width {
+        return Ok(PerlValue::string(s));
+    }
+    let padding: String = std::iter::repeat(ch).take(width - s.len()).collect();
+    Ok(PerlValue::string(format!("{}{}", padding, s)))
+}
+
+/// `zfill_num STR, WIDTH` — zero-fill number string.
+fn builtin_zfill_num(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let width = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
+    if s.len() >= width {
+        return Ok(PerlValue::string(s));
+    }
+    let (sign, num) = if s.starts_with('-') || s.starts_with('+') {
+        (s.chars().next().unwrap().to_string(), &s[1..])
+    } else {
+        (String::new(), s.as_str())
+    };
+    let zeros: String = std::iter::repeat('0').take(width - s.len()).collect();
+    Ok(PerlValue::string(format!("{}{}{}", sign, zeros, num)))
+}
+
+/// `remove_all_str STR, SUBSTR` — remove all occurrences of substring.
+fn builtin_remove_all_str(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let sub = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    Ok(PerlValue::string(s.replace(&sub, "")))
+}
+
+/// `replace_n_times STR, OLD, NEW, N` — replace first N occurrences.
+fn builtin_replace_n_times(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let old = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let new = args.get(2).map(|v| v.to_string()).unwrap_or_default();
+    let n = args.get(3).map(|v| v.to_int().max(0) as usize).unwrap_or(1);
+    Ok(PerlValue::string(s.replacen(&old, &new, n)))
+}
+
+/// `find_all_indices STR, SUBSTR` — find all positions of substring.
+fn builtin_find_all_indices(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let sub = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    if sub.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let positions: Vec<PerlValue> = s
+        .match_indices(&sub)
+        .map(|(i, _)| PerlValue::integer(i as i64))
+        .collect();
+    Ok(PerlValue::array(positions))
+}
+
+/// `text_between STR, START, END` — extract text between delimiters.
+fn builtin_text_between(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let start = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let end = args.get(2).map(|v| v.to_string()).unwrap_or_default();
+    if let Some(start_idx) = s.find(&start) {
+        let after_start = start_idx + start.len();
+        if let Some(end_idx) = s[after_start..].find(&end) {
+            return Ok(PerlValue::string(
+                s[after_start..after_start + end_idx].to_string(),
+            ));
+        }
+    }
+    Ok(PerlValue::UNDEF)
+}
+
+/// `text_before STR, DELIM` — get text before delimiter.
+fn builtin_text_before(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let delim = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    if let Some(idx) = s.find(&delim) {
+        Ok(PerlValue::string(s[..idx].to_string()))
+    } else {
+        Ok(PerlValue::string(s))
+    }
+}
+
+/// `text_after STR, DELIM` — get text after delimiter.
+fn builtin_text_after(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let delim = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    if let Some(idx) = s.find(&delim) {
+        Ok(PerlValue::string(s[idx + delim.len()..].to_string()))
+    } else {
+        Ok(PerlValue::string(String::new()))
+    }
+}
+
+/// `text_before_last STR, DELIM` — get text before last occurrence.
+fn builtin_text_before_last(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let delim = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    if let Some(idx) = s.rfind(&delim) {
+        Ok(PerlValue::string(s[..idx].to_string()))
+    } else {
+        Ok(PerlValue::string(s))
+    }
+}
+
+/// `text_after_last STR, DELIM` — get text after last occurrence.
+fn builtin_text_after_last(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let delim = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    if let Some(idx) = s.rfind(&delim) {
+        Ok(PerlValue::string(s[idx + delim.len()..].to_string()))
+    } else {
+        Ok(PerlValue::string(String::new()))
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Extended stdlib: More Math Functions
+// ─────────────────────────────────────────────────────────────────────────
+
+/// `is_even_num N` — check if even.
+fn builtin_is_even_num(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_int()).unwrap_or(0);
+    Ok(bool_iv(n % 2 == 0))
+}
+
+/// `is_odd_num N` — check if odd.
+fn builtin_is_odd_num(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_int()).unwrap_or(0);
+    Ok(bool_iv(n % 2 != 0))
+}
+
+/// `is_positive_num N` — check if positive.
+fn builtin_is_positive_num(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(bool_iv(n > 0.0))
+}
+
+/// `is_negative_num N` — check if negative.
+fn builtin_is_negative_num(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(bool_iv(n < 0.0))
+}
+
+/// `is_zero_num N` — check if zero.
+fn builtin_is_zero_num(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(bool_iv(n.abs() < f64::EPSILON))
+}
+
+/// `is_whole_num N` — check if whole number.
+fn builtin_is_whole_num(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(bool_iv((n - n.round()).abs() < f64::EPSILON))
+}
+
+/// `log_with_base N, BASE` — logarithm with custom base.
+fn builtin_log_with_base(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let base = args.get(1).map(|v| v.to_number()).unwrap_or(10.0);
+    Ok(PerlValue::float(n.log(base)))
+}
+
+/// `nth_root_of N, ROOT` — nth root of number.
+fn builtin_nth_root_of(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let root = args.get(1).map(|v| v.to_number()).unwrap_or(2.0);
+    if root.abs() < f64::EPSILON {
+        return Ok(PerlValue::float(f64::NAN));
+    }
+    Ok(PerlValue::float(n.powf(1.0 / root)))
+}
+
+/// `frac_part N` — fractional part of number.
+fn builtin_frac_part(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float(n - n.trunc()))
+}
+
+/// `reciprocal_of N` — 1/N.
+fn builtin_reciprocal_of(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    if n.abs() < f64::EPSILON {
+        return Ok(PerlValue::float(f64::INFINITY));
+    }
+    Ok(PerlValue::float(1.0 / n))
+}
+
+/// `copy_sign X, Y` — copy sign of Y to X.
+fn builtin_copy_sign(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let y = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(x.copysign(y)))
+}
+
+/// `fused_mul_add A, B, C` — fused multiply-add (A * B + C).
+fn builtin_fused_mul_add(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let c = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float(a.mul_add(b, c)))
+}
+
+/// `floor_mod A, B` — floor modulo (Python-style).
+fn builtin_floor_mod(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let b = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    if b.abs() < f64::EPSILON {
+        return Ok(PerlValue::float(f64::NAN));
+    }
+    Ok(PerlValue::float(a - b * (a / b).floor()))
+}
+
+/// `floor_div_op A, B` — floor division.
+fn builtin_floor_div_op(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let b = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    if b.abs() < f64::EPSILON {
+        return Ok(PerlValue::float(f64::INFINITY));
+    }
+    Ok(PerlValue::float((a / b).floor()))
+}
+
+/// `signum_of N` — sign of number (-1, 0, 1).
+fn builtin_signum_of(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    if n > 0.0 {
+        Ok(PerlValue::integer(1))
+    } else if n < 0.0 {
+        Ok(PerlValue::integer(-1))
+    } else {
+        Ok(PerlValue::integer(0))
+    }
+}
+
+/// `midpoint_of A, B` — midpoint of two values.
+fn builtin_midpoint_of(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float((a + b) / 2.0))
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Extended stdlib batch 3: More Novel Functions
+// ─────────────────────────────────────────────────────────────────────────
+
+// ── Array Analysis ──────────────────────────────────────────────────────
+
+/// `longest_run ARR` — length of longest run of equal elements.
+fn builtin_longest_run(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = flatten_args(args);
+    if xs.is_empty() {
+        return Ok(PerlValue::integer(0));
+    }
+    let mut max_run = 1;
+    let mut current_run = 1;
+    for i in 1..xs.len() {
+        if xs[i].to_string() == xs[i - 1].to_string() {
+            current_run += 1;
+            max_run = max_run.max(current_run);
+        } else {
+            current_run = 1;
+        }
+    }
+    Ok(PerlValue::integer(max_run))
+}
+
+/// `longest_increasing ARR` — length of longest increasing subsequence.
+fn builtin_longest_increasing(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
+    if xs.is_empty() {
+        return Ok(PerlValue::integer(0));
+    }
+    let mut dp = vec![1; xs.len()];
+    for i in 1..xs.len() {
+        for j in 0..i {
+            if xs[i] > xs[j] {
+                dp[i] = dp[i].max(dp[j] + 1);
+            }
+        }
+    }
+    Ok(PerlValue::integer(*dp.iter().max().unwrap_or(&0)))
+}
+
+/// `longest_decreasing ARR` — length of longest decreasing subsequence.
+fn builtin_longest_decreasing(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
+    if xs.is_empty() {
+        return Ok(PerlValue::integer(0));
+    }
+    let mut dp = vec![1; xs.len()];
+    for i in 1..xs.len() {
+        for j in 0..i {
+            if xs[i] < xs[j] {
+                dp[i] = dp[i].max(dp[j] + 1);
+            }
+        }
+    }
+    Ok(PerlValue::integer(*dp.iter().max().unwrap_or(&0)))
+}
+
+/// `max_sum_subarray ARR` — maximum sum subarray (Kadane's algorithm).
+fn builtin_max_sum_subarray(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
+    if xs.is_empty() {
+        return Ok(PerlValue::float(0.0));
+    }
+    let mut max_so_far = xs[0];
+    let mut max_ending_here = xs[0];
+    for &x in &xs[1..] {
+        max_ending_here = x.max(max_ending_here + x);
+        max_so_far = max_so_far.max(max_ending_here);
+    }
+    Ok(PerlValue::float(max_so_far))
+}
+
+/// `majority_element ARR` — element appearing more than n/2 times (or undef).
+fn builtin_majority_element(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = flatten_args(args);
+    if xs.is_empty() {
+        return Ok(PerlValue::UNDEF);
+    }
+    let mut candidate = xs[0].clone();
+    let mut count = 1i64;
+    for x in &xs[1..] {
+        if count == 0 {
+            candidate = x.clone();
+            count = 1;
+        } else if x.to_string() == candidate.to_string() {
+            count += 1;
+        } else {
+            count -= 1;
+        }
+    }
+    let freq = xs
+        .iter()
+        .filter(|x| x.to_string() == candidate.to_string())
+        .count();
+    if freq > xs.len() / 2 {
+        Ok(candidate)
+    } else {
+        Ok(PerlValue::UNDEF)
+    }
+}
+
+/// `kth_largest ARR, K` — kth largest element.
+fn builtin_kth_largest(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let mut xs: Vec<f64> = flatten_args(&args[..args.len().saturating_sub(1)])
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let k = args.last().map(|v| v.to_int().max(1) as usize).unwrap_or(1);
+    if k > xs.len() {
+        return Ok(PerlValue::UNDEF);
+    }
+    xs.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+    Ok(PerlValue::float(xs[k - 1]))
+}
+
+/// `kth_smallest ARR, K` — kth smallest element.
+fn builtin_kth_smallest(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let mut xs: Vec<f64> = flatten_args(&args[..args.len().saturating_sub(1)])
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let k = args.last().map(|v| v.to_int().max(1) as usize).unwrap_or(1);
+    if k > xs.len() {
+        return Ok(PerlValue::UNDEF);
+    }
+    xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    Ok(PerlValue::float(xs[k - 1]))
+}
+
+/// `count_inversions ARR` — count inversions in array.
+fn builtin_count_inversions(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
+    let mut count = 0i64;
+    for i in 0..xs.len() {
+        for j in i + 1..xs.len() {
+            if xs[i] > xs[j] {
+                count += 1;
+            }
+        }
+    }
+    Ok(PerlValue::integer(count))
+}
+
+/// `is_monotonic ARR` — check if monotonically increasing or decreasing.
+fn builtin_is_monotonic(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
+    if xs.len() <= 1 {
+        return Ok(bool_iv(true));
+    }
+    let mut inc = true;
+    let mut dec = true;
+    for i in 1..xs.len() {
+        if xs[i] > xs[i - 1] {
+            dec = false;
+        }
+        if xs[i] < xs[i - 1] {
+            inc = false;
+        }
+    }
+    Ok(bool_iv(inc || dec))
+}
+
+/// `equilibrium_index ARR` — index where left sum equals right sum.
+fn builtin_equilibrium_index(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
+    let total: f64 = xs.iter().sum();
+    let mut left_sum = 0.0;
+    for (i, &x) in xs.iter().enumerate() {
+        let right_sum = total - left_sum - x;
+        if (left_sum - right_sum).abs() < f64::EPSILON {
+            return Ok(PerlValue::integer(i as i64));
+        }
+        left_sum += x;
+    }
+    Ok(PerlValue::integer(-1))
+}
+
+// ── Set Operations ──────────────────────────────────────────────────────
+
+/// `jaccard_index SET1, SET2` — Jaccard similarity coefficient.
+fn builtin_jaccard_index(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s1: std::collections::HashSet<String> =
+        arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+            .iter()
+            .map(|v| v.to_string())
+            .collect();
+    let s2: std::collections::HashSet<String> =
+        arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+            .iter()
+            .map(|v| v.to_string())
+            .collect();
+    let intersection = s1.intersection(&s2).count() as f64;
+    let union = s1.union(&s2).count() as f64;
+    if union == 0.0 {
+        return Ok(PerlValue::float(1.0));
+    }
+    Ok(PerlValue::float(intersection / union))
+}
+
+/// `dice_coefficient SET1, SET2` — Dice similarity coefficient.
+fn builtin_dice_coefficient(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s1: std::collections::HashSet<String> =
+        arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+            .iter()
+            .map(|v| v.to_string())
+            .collect();
+    let s2: std::collections::HashSet<String> =
+        arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+            .iter()
+            .map(|v| v.to_string())
+            .collect();
+    let intersection = s1.intersection(&s2).count() as f64;
+    let total = (s1.len() + s2.len()) as f64;
+    if total == 0.0 {
+        return Ok(PerlValue::float(1.0));
+    }
+    Ok(PerlValue::float(2.0 * intersection / total))
+}
+
+/// `overlap_coefficient SET1, SET2` — overlap coefficient (Szymkiewicz-Simpson).
+fn builtin_overlap_coefficient(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s1: std::collections::HashSet<String> =
+        arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+            .iter()
+            .map(|v| v.to_string())
+            .collect();
+    let s2: std::collections::HashSet<String> =
+        arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+            .iter()
+            .map(|v| v.to_string())
+            .collect();
+    let intersection = s1.intersection(&s2).count() as f64;
+    let min_size = s1.len().min(s2.len()) as f64;
+    if min_size == 0.0 {
+        return Ok(PerlValue::float(1.0));
+    }
+    Ok(PerlValue::float(intersection / min_size))
+}
+
+/// `power_set ARR` — all subsets of array.
+fn builtin_power_set(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = flatten_args(args);
+    let n = xs.len();
+    if n > 20 {
+        return Err(PerlError::runtime("power_set: array too large (max 20)", 0));
+    }
+    let count = 1usize << n;
+    let mut result = Vec::with_capacity(count);
+    for mask in 0..count {
+        let mut subset = Vec::new();
+        for i in 0..n {
+            if mask & (1 << i) != 0 {
+                subset.push(xs[i].clone());
+            }
+        }
+        result.push(PerlValue::array_ref(Arc::new(RwLock::new(subset))));
+    }
+    Ok(PerlValue::array(result))
+}
+
+/// `cartesian_power ARR, N` — n-th Cartesian power.
+fn builtin_cartesian_power(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let n = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(1);
+    if xs.is_empty() || n == 0 {
+        return Ok(PerlValue::array(vec![]));
+    }
+    if xs
+        .len()
+        .checked_pow(n as u32)
+        .map(|x| x > 10000)
+        .unwrap_or(true)
+    {
+        return Err(PerlError::runtime("cartesian_power: result too large", 0));
+    }
+    fn generate(
+        xs: &[PerlValue],
+        n: usize,
+        current: &mut Vec<PerlValue>,
+        result: &mut Vec<PerlValue>,
+    ) {
+        if current.len() == n {
+            result.push(PerlValue::array_ref(Arc::new(RwLock::new(current.clone()))));
+            return;
+        }
+        for x in xs {
+            current.push(x.clone());
+            generate(xs, n, current, result);
+            current.pop();
+        }
+    }
+    let mut result = Vec::new();
+    let mut current = Vec::new();
+    generate(&xs, n, &mut current, &mut result);
+    Ok(PerlValue::array(result))
+}
+
+// ── Advanced String ─────────────────────────────────────────────────────
+
+/// `is_isogram STR` — check if no repeated letters.
+fn builtin_is_isogram(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string().to_lowercase();
+    let letters: Vec<char> = s.chars().filter(|c| c.is_alphabetic()).collect();
+    let unique: std::collections::HashSet<char> = letters.iter().cloned().collect();
+    Ok(bool_iv(letters.len() == unique.len()))
+}
+
+/// `is_heterogram STR` — alias for isogram.
+fn builtin_is_heterogram(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    builtin_is_isogram(interp, args)
+}
+
+/// `hamming_distance STR1, STR2` — Hamming distance (equal length only).
+fn builtin_hamming_distance(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s1 = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let s2 = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let c1: Vec<char> = s1.chars().collect();
+    let c2: Vec<char> = s2.chars().collect();
+    if c1.len() != c2.len() {
+        return Err(PerlError::runtime(
+            "hamming_distance: strings must be equal length",
+            0,
+        ));
+    }
+    let dist = c1.iter().zip(c2.iter()).filter(|(a, b)| a != b).count();
+    Ok(PerlValue::integer(dist as i64))
+}
+
+/// `jaro_similarity STR1, STR2` — Jaro similarity (0.0-1.0).
+fn builtin_jaro_similarity(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s1 = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let s2 = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    if s1.is_empty() && s2.is_empty() {
+        return Ok(PerlValue::float(1.0));
+    }
+    if s1.is_empty() || s2.is_empty() {
+        return Ok(PerlValue::float(0.0));
+    }
+    let c1: Vec<char> = s1.chars().collect();
+    let c2: Vec<char> = s2.chars().collect();
+    let match_distance = (c1.len().max(c2.len()) / 2).saturating_sub(1);
+    let mut s1_matches = vec![false; c1.len()];
+    let mut s2_matches = vec![false; c2.len()];
+    let mut matches = 0;
+    for (i, &ch1) in c1.iter().enumerate() {
+        let start = i.saturating_sub(match_distance);
+        let end = (i + match_distance + 1).min(c2.len());
+        for j in start..end {
+            if s2_matches[j] || c2[j] != ch1 {
+                continue;
+            }
+            s1_matches[i] = true;
+            s2_matches[j] = true;
+            matches += 1;
+            break;
+        }
+    }
+    if matches == 0 {
+        return Ok(PerlValue::float(0.0));
+    }
+    let mut transpositions = 0;
+    let mut k = 0;
+    for i in 0..c1.len() {
+        if !s1_matches[i] {
+            continue;
+        }
+        while !s2_matches[k] {
+            k += 1;
+        }
+        if c1[i] != c2[k] {
+            transpositions += 1;
+        }
+        k += 1;
+    }
+    let m = matches as f64;
+    let t = (transpositions / 2) as f64;
+    Ok(PerlValue::float(
+        (m / c1.len() as f64 + m / c2.len() as f64 + (m - t) / m) / 3.0,
+    ))
+}
+
+/// `longest_common_substring STR1, STR2` — longest common substring.
+fn builtin_longest_common_substring(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s1 = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let s2 = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let c1: Vec<char> = s1.chars().collect();
+    let c2: Vec<char> = s2.chars().collect();
+    let m = c1.len();
+    let n = c2.len();
+    let mut dp = vec![vec![0usize; n + 1]; m + 1];
+    let mut max_len = 0;
+    let mut end_idx = 0;
+    for i in 1..=m {
+        for j in 1..=n {
+            if c1[i - 1] == c2[j - 1] {
+                dp[i][j] = dp[i - 1][j - 1] + 1;
+                if dp[i][j] > max_len {
+                    max_len = dp[i][j];
+                    end_idx = i;
+                }
+            }
+        }
+    }
+    let result: String = c1[end_idx - max_len..end_idx].iter().collect();
+    Ok(PerlValue::string(result))
+}
+
+/// `longest_common_subsequence STR1, STR2` — longest common subsequence.
+fn builtin_longest_common_subsequence(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s1 = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let s2 = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let c1: Vec<char> = s1.chars().collect();
+    let c2: Vec<char> = s2.chars().collect();
+    let m = c1.len();
+    let n = c2.len();
+    let mut dp = vec![vec![0usize; n + 1]; m + 1];
+    for i in 1..=m {
+        for j in 1..=n {
+            if c1[i - 1] == c2[j - 1] {
+                dp[i][j] = dp[i - 1][j - 1] + 1;
+            } else {
+                dp[i][j] = dp[i - 1][j].max(dp[i][j - 1]);
+            }
+        }
+    }
+    let mut result = Vec::new();
+    let mut i = m;
+    let mut j = n;
+    while i > 0 && j > 0 {
+        if c1[i - 1] == c2[j - 1] {
+            result.push(c1[i - 1]);
+            i -= 1;
+            j -= 1;
+        } else if dp[i - 1][j] > dp[i][j - 1] {
+            i -= 1;
+        } else {
+            j -= 1;
+        }
+    }
+    result.reverse();
+    Ok(PerlValue::string(result.into_iter().collect()))
+}
+
+/// `count_words STR` — count words in string.
+fn builtin_count_words(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    Ok(PerlValue::integer(s.split_whitespace().count() as i64))
+}
+
+/// `count_lines STR` — count lines in string.
+fn builtin_count_lines(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    if s.is_empty() {
+        return Ok(PerlValue::integer(0));
+    }
+    Ok(PerlValue::integer(s.lines().count() as i64))
+}
+
+/// `count_chars STR` — count characters in string.
+fn builtin_count_chars(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    Ok(PerlValue::integer(s.chars().count() as i64))
+}
+
+/// `count_bytes STR` — count bytes in string.
+fn builtin_count_bytes(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    Ok(PerlValue::integer(s.len() as i64))
+}
+
+// ── More Math ───────────────────────────────────────────────────────────
+
+/// `binomial N, K` — binomial coefficient.
+fn builtin_binomial(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_int().max(0)).unwrap_or(0);
+    let k = args.get(1).map(|v| v.to_int().max(0)).unwrap_or(0);
+    if k > n {
+        return Ok(PerlValue::integer(0));
+    }
+    let k = k.min(n - k);
+    let mut result = 1i64;
+    for i in 0..k {
+        result = result * (n - i) / (i + 1);
+    }
+    Ok(PerlValue::integer(result))
+}
+
+/// `catalan N` — Nth Catalan number.
+fn builtin_catalan(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_int().max(0)).unwrap_or(0);
+    let n2 = builtin_binomial(&[PerlValue::integer(2 * n), PerlValue::integer(n)])?.to_int();
+    Ok(PerlValue::integer(n2 / (n + 1)))
+}
+
+/// `pascal_row N` — Nth row of Pascal's triangle.
+fn builtin_pascal_row(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_int().max(0)).unwrap_or(0);
+    let mut row = Vec::with_capacity((n + 1) as usize);
+    for k in 0..=n {
+        let binom = builtin_binomial(&[PerlValue::integer(n), PerlValue::integer(k)])?.to_int();
+        row.push(PerlValue::integer(binom));
+    }
+    Ok(PerlValue::array(row))
+}
+
+/// `is_coprime A, B` — check if coprime (gcd = 1).
+fn builtin_is_coprime(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    fn gcd(a: i64, b: i64) -> i64 {
+        if b == 0 {
+            a.abs()
+        } else {
+            gcd(b, a % b)
+        }
+    }
+    let a = args.first().map(|v| v.to_int()).unwrap_or(0);
+    let b = args.get(1).map(|v| v.to_int()).unwrap_or(0);
+    Ok(bool_iv(gcd(a, b) == 1))
+}
+
+/// `euler_totient N` — Euler's totient function.
+fn builtin_euler_totient(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_int().max(1)).unwrap_or(1);
+    let mut result = n;
+    let mut num = n;
+    let mut p = 2i64;
+    while p * p <= num {
+        if num % p == 0 {
+            while num % p == 0 {
+                num /= p;
+            }
+            result -= result / p;
+        }
+        p += 1;
+    }
+    if num > 1 {
+        result -= result / num;
+    }
+    Ok(PerlValue::integer(result))
+}
+
+/// `mobius N` — Möbius function.
+fn builtin_mobius(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_int().abs()).unwrap_or(1);
+    if n == 1 {
+        return Ok(PerlValue::integer(1));
+    }
+    let mut num = n;
+    let mut prime_factors = 0;
+    let mut p = 2i64;
+    while p * p <= num {
+        if num % p == 0 {
+            if num % (p * p) == 0 {
+                return Ok(PerlValue::integer(0));
+            }
+            prime_factors += 1;
+            while num % p == 0 {
+                num /= p;
+            }
+        }
+        p += 1;
+    }
+    if num > 1 {
+        prime_factors += 1;
+    }
+    if prime_factors % 2 == 0 {
+        Ok(PerlValue::integer(1))
+    } else {
+        Ok(PerlValue::integer(-1))
+    }
+}
+
+/// `is_squarefree N` — check if no perfect square divides N.
+fn builtin_is_squarefree(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_int().abs()).unwrap_or(1);
+    if n == 0 {
+        return Ok(bool_iv(false));
+    }
+    let mut num = n;
+    let mut p = 2i64;
+    while p * p <= num {
+        if num % (p * p) == 0 {
+            return Ok(bool_iv(false));
+        }
+        while num % p == 0 {
+            num /= p;
+        }
+        p += 1;
+    }
+    Ok(bool_iv(true))
+}
+
+/// `digital_root N` — digital root (repeated digit sum).
+fn builtin_digital_root(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let mut n = args.first().map(|v| v.to_int().abs()).unwrap_or(0);
+    while n >= 10 {
+        let mut sum = 0i64;
+        while n > 0 {
+            sum += n % 10;
+            n /= 10;
+        }
+        n = sum;
+    }
+    Ok(PerlValue::integer(n))
+}
+
+/// `is_narcissistic N` — check if narcissistic number.
+fn builtin_is_narcissistic(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_int()).unwrap_or(0);
+    if n < 0 {
+        return Ok(bool_iv(false));
+    }
+    let digits: Vec<i64> = n
+        .to_string()
+        .chars()
+        .filter_map(|c| c.to_digit(10).map(|d| d as i64))
+        .collect();
+    let k = digits.len() as u32;
+    let sum: i64 = digits.iter().map(|d| d.pow(k)).sum();
+    Ok(bool_iv(sum == n))
+}
+
+/// `is_harshad N` — check if Harshad number (divisible by digit sum).
+fn builtin_is_harshad(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_int()).unwrap_or(0);
+    if n <= 0 {
+        return Ok(bool_iv(false));
+    }
+    let digit_sum: i64 = n
+        .to_string()
+        .chars()
+        .filter_map(|c| c.to_digit(10).map(|d| d as i64))
+        .sum();
+    Ok(bool_iv(digit_sum > 0 && n % digit_sum == 0))
+}
+
+/// `is_kaprekar N` — check if Kaprekar number.
+fn builtin_is_kaprekar(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_int()).unwrap_or(0);
+    if n <= 0 {
+        return Ok(bool_iv(false));
+    }
+    if n == 1 {
+        return Ok(bool_iv(true));
+    }
+    let sq = (n as i128) * (n as i128);
+    let sq_str = sq.to_string();
+    let len = sq_str.len();
+    for i in 1..len {
+        let left: i64 = sq_str[..i].parse().unwrap_or(0);
+        let right: i64 = sq_str[i..].parse().unwrap_or(0);
+        if right > 0 && left + right == n {
+            return Ok(bool_iv(true));
+        }
+    }
+    Ok(bool_iv(false))
+}
+
+// ── Date/Time Additional ────────────────────────────────────────────────
+
+/// `day_of_year YEAR, MONTH, DAY` — day of year (1-366).
+fn builtin_day_of_year(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let year = args.first().map(|v| v.to_int()).unwrap_or(2000);
+    let month = args.get(1).map(|v| v.to_int().clamp(1, 12)).unwrap_or(1);
+    let day = args.get(2).map(|v| v.to_int().clamp(1, 31)).unwrap_or(1);
+    let leap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+    let days_before = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+    let mut doy = days_before[(month - 1) as usize] + day;
+    if leap && month > 2 {
+        doy += 1;
+    }
+    Ok(PerlValue::integer(doy))
+}
+
+/// `week_of_year YEAR, MONTH, DAY` — ISO week number (1-53).
+fn builtin_week_of_year(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let year = args.first().map(|v| v.to_int()).unwrap_or(2000);
+    let doy = builtin_day_of_year(args)?.to_int();
+    fn day_of_week_jan1(y: i64) -> i64 {
+        let a = (14 - 1) / 12;
+        let y2 = y - a;
+        let m2 = 1 + 12 * a - 2;
+        (1 + y2 + y2 / 4 - y2 / 100 + y2 / 400 + (31 * m2) / 12) % 7
+    }
+    let dow = day_of_week_jan1(year);
+    let week = (doy + dow + 5) / 7;
+    Ok(PerlValue::integer(week.max(1).min(53)))
+}
+
+/// `days_in_month_fn YEAR, MONTH` — number of days in month.
+fn builtin_days_in_month_fn(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let year = args.first().map(|v| v.to_int()).unwrap_or(2000);
+    let month = args.get(1).map(|v| v.to_int().clamp(1, 12)).unwrap_or(1);
+    let leap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+    let days = match month {
+        2 => {
+            if leap {
+                29
+            } else {
+                28
+            }
+        }
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    };
+    Ok(PerlValue::integer(days))
+}
+
+/// `is_valid_date YEAR, MONTH, DAY` — check if valid date.
+fn builtin_is_valid_date(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let month = args.get(1).map(|v| v.to_int()).unwrap_or(0);
+    let day = args.get(2).map(|v| v.to_int()).unwrap_or(0);
+    if month < 1 || month > 12 || day < 1 {
+        return Ok(bool_iv(false));
+    }
+    let max_day = builtin_days_in_month_fn(args)?.to_int();
+    Ok(bool_iv(day <= max_day))
+}
+
+/// `age_in_years BIRTH_YEAR, BIRTH_MONTH, BIRTH_DAY` — age in years (as of today).
+fn builtin_age_in_years(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let birth_year = args.first().map(|v| v.to_int()).unwrap_or(2000);
+    let birth_month = args.get(1).map(|v| v.to_int().clamp(1, 12)).unwrap_or(1);
+    let birth_day = args.get(2).map(|v| v.to_int().clamp(1, 31)).unwrap_or(1);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let days = now / 86400;
+    let years_since_1970 = days / 365;
+    let current_year = 1970 + years_since_1970 as i64;
+    let mut age = current_year - birth_year;
+    let current_doy = (days % 365) as i64;
+    let birth_doy = builtin_day_of_year(&[
+        PerlValue::integer(birth_year),
+        PerlValue::integer(birth_month),
+        PerlValue::integer(birth_day),
+    ])?
+    .to_int();
+    if current_doy < birth_doy {
+        age -= 1;
+    }
+    Ok(PerlValue::integer(age.max(0)))
+}
+
+// End of batch 3
 // ─────────────────────────────────────────────────────────────────────────
 
 fn builtin_zipmap(args: &[PerlValue]) -> PerlResult<PerlValue> {
