@@ -292,7 +292,8 @@ pub(crate) fn struct_new_with_defaults(
                     )
                 })?;
                 values[idx] = dv.clone();
-            } else if field.default.is_none() {
+            } else if field.default.is_none() && !matches!(field.ty, crate::ast::PerlTypeName::Any)
+            {
                 return Err(PerlError::runtime(
                     format!(
                         "struct {}: missing field `{}` ({})",

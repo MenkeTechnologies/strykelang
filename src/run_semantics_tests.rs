@@ -3474,3 +3474,307 @@ EOF
         "value is 42\n"
     );
 }
+
+#[test]
+fn struct_basic_decl_and_named_construct() {
+    let s = r#"
+        struct Point { x => Float, y => Float };
+        my $p = Point(x => 1.5, y => 2.0);
+        $p->x + $p->y;
+    "#;
+    assert_eq!(rf(s), 3.5);
+}
+
+#[test]
+fn struct_positional_construct() {
+    let s = r#"
+        struct Point { x => Float, y => Float };
+        my $p = Point(10.0, 20.0);
+        $p->x . "," . $p->y;
+    "#;
+    assert_eq!(rs(s), "10,20");
+}
+
+#[test]
+fn struct_default_values() {
+    let s = r#"
+        struct Config { timeout => Int = 30, retries => Int = 3 };
+        my $c = Config(retries => 5);
+        $c->timeout . "," . $c->retries;
+    "#;
+    assert_eq!(rs(s), "30,5");
+}
+
+#[test]
+fn struct_field_setter() {
+    let s = r#"
+        struct Point { x => Float, y => Float };
+        my $p = Point(1.0, 2.0);
+        $p->x(5.5);
+        $p->x;
+    "#;
+    assert_eq!(rf(s), 5.5);
+}
+
+#[test]
+fn struct_functional_update_with() {
+    let s = r#"
+        struct Point { x => Float, y => Float };
+        my $p1 = Point(1.0, 2.0);
+        my $p2 = $p1->with(y => 10.0);
+        $p1->y . "," . $p2->y;
+    "#;
+    assert_eq!(rs(s), "2,10");
+}
+
+#[test]
+fn struct_user_defined_method() {
+    let s = r#"
+        struct Circle {
+            radius => Float,
+            fn area { 3 * $self->radius ** 2 }
+        };
+        my $c = Circle(radius => 5);
+        $c->area;
+    "#;
+    assert_eq!(ri(s), 75);
+}
+
+#[test]
+fn struct_structural_equality() {
+    let s = r#"
+        struct Point { x => Int, y => Int };
+        my $a = Point(1, 2);
+        my $b = Point(1, 2);
+        my $c = Point(1, 3);
+        ($a == $b) . "," . ($a == $c);
+    "#;
+    assert_eq!(rs(s), "1,0");
+}
+
+#[test]
+fn struct_to_hash() {
+    let s = r#"
+        struct Point { x => Int, y => Int };
+        my $p = Point(10, 20);
+        my $h = $p->to_hash;
+        $h->{x} + $h->{y};
+    "#;
+    assert_eq!(ri(s), 30);
+}
+
+#[test]
+fn struct_fields_method() {
+    let s = r#"
+        struct Point { x, y, z };
+        join ",", Point()->fields;
+    "#;
+    assert_eq!(rs(s), "x,y,z");
+}
+
+#[test]
+fn struct_type_checking_at_construction() {
+    let s = r#"
+        struct Point { x => Int };
+        Point(x => "not an int");
+    "#;
+    let res = run(s);
+    assert!(res.is_err());
+    assert!(format!("{}", res.unwrap_err()).contains("expected Int"));
+}
+
+#[test]
+fn struct_type_checking_at_mutation() {
+    let s = r#"
+        struct Point { x => Int };
+        my $p = Point(x => 1);
+        $p->x("oops");
+    "#;
+    let res = run(s);
+    assert!(res.is_err());
+}
+
+#[test]
+fn struct_nested() {
+    let s = r#"
+        struct Point { x => Int, y => Int };
+        struct Rect { top_left => Point, bottom_right => Point };
+        my $r = Rect(
+            top_left => Point(0, 0),
+            bottom_right => Point(10, 10)
+        );
+        $r->bottom_right->x;
+    "#;
+    assert_eq!(ri(s), 10);
+}
+
+#[test]
+fn struct_oo_style_new() {
+    let s = r#"
+        struct Point { x => Int, y => Int };
+        my $p = Point->new(x => 5, y => 10);
+        $p->x;
+    "#;
+    assert_eq!(ri(s), 5);
+}
+
+#[test]
+fn struct_clone() {
+    let s = r#"
+        struct Point { x => Int };
+        my $p1 = Point(1);
+        my $p2 = $p1->clone;
+        $p2->x(2);
+        $p1->x;
+    "#;
+    assert_eq!(ri(s), 1);
+}
+
+#[test]
+fn struct_stringify_and_eval() {
+    let s = r#"
+        struct Point { x => Int, y => Int };
+        my $p = Point(1, 2);
+        "$p";
+    "#;
+    assert_eq!(rs(s), "Point(x => 1, y => 2)");
+}
+
+// ── Higher-order function wrappers ─────────────────────────────────────
+
+#[test]
+fn compose_right_to_left() {
+    let s = r#"
+        my $f = compose(sub { $_[0] + 1 }, sub { $_[0] * 2 });
+        $f->(5);
+    "#;
+    assert_eq!(ri(s), 11); // double(5)=10, inc(10)=11
+}
+
+#[test]
+fn compose_single_fn() {
+    let s = r#"
+        my $f = compose(sub { $_[0] * 3 });
+        $f->(7);
+    "#;
+    assert_eq!(ri(s), 21);
+}
+
+#[test]
+fn partial_prepends_args() {
+    let s = r#"
+        my $add = sub { $_[0] + $_[1] };
+        my $add5 = partial($add, 5);
+        $add5->(3);
+    "#;
+    assert_eq!(ri(s), 8);
+}
+
+#[test]
+fn constantly_ignores_args() {
+    let s = r#"
+        my $c = constantly(42);
+        $c->(1, 2, 3);
+    "#;
+    assert_eq!(ri(s), 42);
+}
+
+#[test]
+fn complement_negates() {
+    let s = r#"
+        my $even = sub { $_[0] % 2 == 0 };
+        my $odd = complement($even);
+        $odd->(3);
+    "#;
+    assert_eq!(ri(s), 1);
+}
+
+#[test]
+fn juxt_collects_results() {
+    let s = r#"
+        my $j = juxt(sub { $_[0] + 1 }, sub { $_[0] * 2 });
+        join ",", $j->(5);
+    "#;
+    assert_eq!(rs(s), "6,10");
+}
+
+#[test]
+fn memoize_caches() {
+    let s = r#"
+        my $f = memoize(sub { $_[0] * $_[0] });
+        my $a = $f->(5);
+        my $b = $f->(5);
+        my $c = $f->(3);
+        "$a,$b,$c";
+    "#;
+    assert_eq!(rs(s), "25,25,9");
+}
+
+#[test]
+fn curry_accumulates_args() {
+    let s = r#"
+        my $add = curry(sub { $_[0] + $_[1] }, 2);
+        my $add5 = $add->(5);
+        $add5->(3);
+    "#;
+    assert_eq!(ri(s), 8);
+}
+
+#[test]
+fn curry_immediate_when_enough_args() {
+    let s = r#"
+        my $add = curry(sub { $_[0] + $_[1] }, 2);
+        $add->(5, 3);
+    "#;
+    assert_eq!(ri(s), 8);
+}
+
+#[test]
+fn once_calls_only_once() {
+    let s = r#"
+        my $f = once(sub { 42 });
+        my $a = $f->();
+        my $b = $f->();
+        "$a,$b";
+    "#;
+    assert_eq!(rs(s), "42,42");
+}
+
+#[test]
+fn deep_clone_is_independent() {
+    let s = r#"
+        my $a = {x => [1, 2, 3]};
+        my $b = deep_clone($a);
+        $b->{x}[0] = 99;
+        $a->{x}[0];
+    "#;
+    assert_eq!(ri(s), 1);
+}
+
+#[test]
+fn deep_merge_recursive() {
+    let s = r#"
+        my $a = {a => 1, n => {x => 1, y => 2}};
+        my $b = {b => 2, n => {y => 9, z => 3}};
+        my $m = deep_merge($a, $b);
+        join ",", $m->{a}, $m->{b}, $m->{n}{x}, $m->{n}{y}, $m->{n}{z};
+    "#;
+    assert_eq!(rs(s), "1,2,1,9,3");
+}
+
+#[test]
+fn deep_equal_match() {
+    assert_eq!(ri(r#"deep_equal([1,2,3], [1,2,3]);"#), 1);
+    assert_eq!(ri(r#"deep_equal([1,2,3], [1,2,4]);"#), 0);
+    assert_eq!(ri(r#"deep_equal({a=>1}, {a=>1});"#), 1);
+    assert_eq!(ri(r#"deep_equal({a=>1}, {a=>2});"#), 0);
+}
+
+#[test]
+fn tally_counts() {
+    let s = r#"
+        my $t = tally("a", "b", "a", "c", "a", "b");
+        join ",", $t->{a}, $t->{b}, $t->{c};
+    "#;
+    assert_eq!(rs(s), "3,2,1");
+}
