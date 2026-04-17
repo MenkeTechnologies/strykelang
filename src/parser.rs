@@ -6588,6 +6588,9 @@ impl Parser {
                 })
             }
             "chomp" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Chomp(Box::new(a)),
@@ -6595,6 +6598,9 @@ impl Parser {
                 })
             }
             "chop" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Chop(Box::new(a)),
@@ -6602,6 +6608,9 @@ impl Parser {
                 })
             }
             "length" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Length(Box::new(a)),
@@ -6609,6 +6618,9 @@ impl Parser {
                 })
             }
             "defined" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Defined(Box::new(a)),
@@ -6616,6 +6628,9 @@ impl Parser {
                 })
             }
             "ref" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Ref(Box::new(a)),
@@ -6635,6 +6650,9 @@ impl Parser {
                 })
             }
             "scalar" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::ScalarContext(Box::new(a)),
@@ -6642,6 +6660,9 @@ impl Parser {
                 })
             }
             "abs" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Abs(Box::new(a)),
@@ -6653,6 +6674,9 @@ impl Parser {
             // call with implicit `$_` rather than falling through to the
             // generic `Bareword` arm (which stringifies to `"inc"`).
             "inc" | "dec" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::FuncCall {
@@ -6663,6 +6687,9 @@ impl Parser {
                 })
             }
             "int" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Int(Box::new(a)),
@@ -6670,6 +6697,9 @@ impl Parser {
                 })
             }
             "sqrt" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Sqrt(Box::new(a)),
@@ -6677,6 +6707,9 @@ impl Parser {
                 })
             }
             "sin" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Sin(Box::new(a)),
@@ -6684,6 +6717,9 @@ impl Parser {
                 })
             }
             "cos" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Cos(Box::new(a)),
@@ -6691,6 +6727,9 @@ impl Parser {
                 })
             }
             "atan2" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 if args.len() != 2 {
                     return Err(self.syntax_err("atan2 requires two arguments", line));
@@ -6704,6 +6743,9 @@ impl Parser {
                 })
             }
             "exp" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Exp(Box::new(a)),
@@ -6711,6 +6753,9 @@ impl Parser {
                 })
             }
             "log" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Log(Box::new(a)),
@@ -6827,6 +6872,9 @@ impl Parser {
                 }
             }
             "hex" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Hex(Box::new(a)),
@@ -6834,6 +6882,9 @@ impl Parser {
                 })
             }
             "oct" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Oct(Box::new(a)),
@@ -6841,6 +6892,9 @@ impl Parser {
                 })
             }
             "chr" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Chr(Box::new(a)),
@@ -6848,6 +6902,9 @@ impl Parser {
                 })
             }
             "ord" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Ord(Box::new(a)),
@@ -6855,6 +6912,9 @@ impl Parser {
                 })
             }
             "lc" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Lc(Box::new(a)),
@@ -6862,6 +6922,9 @@ impl Parser {
                 })
             }
             "uc" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Uc(Box::new(a)),
@@ -6869,6 +6932,9 @@ impl Parser {
                 })
             }
             "lcfirst" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Lcfirst(Box::new(a)),
@@ -6876,6 +6942,9 @@ impl Parser {
                 })
             }
             "ucfirst" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Ucfirst(Box::new(a)),
@@ -6883,6 +6952,9 @@ impl Parser {
                 })
             }
             "fc" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Fc(Box::new(a)),
@@ -6890,6 +6962,9 @@ impl Parser {
                 })
             }
             "crypt" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 if args.len() != 2 {
                     return Err(self.syntax_err("crypt requires two arguments", line));
@@ -6976,6 +7051,9 @@ impl Parser {
                 }
             }
             "study" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Study(Box::new(a)),
@@ -6983,6 +7061,9 @@ impl Parser {
                 })
             }
             "push" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 let (first, rest) = args
                     .split_first()
@@ -6996,6 +7077,9 @@ impl Parser {
                 })
             }
             "pop" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_argv()?;
                 Ok(Expr {
                     kind: ExprKind::Pop(Box::new(a)),
@@ -7003,6 +7087,9 @@ impl Parser {
                 })
             }
             "shift" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_argv()?;
                 Ok(Expr {
                     kind: ExprKind::Shift(Box::new(a)),
@@ -7010,6 +7097,9 @@ impl Parser {
                 })
             }
             "unshift" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 let (first, rest) = args
                     .split_first()
@@ -7023,6 +7113,9 @@ impl Parser {
                 })
             }
             "splice" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 let mut iter = args.into_iter();
                 let array = Box::new(
@@ -7043,6 +7136,9 @@ impl Parser {
                 })
             }
             "delete" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_postfix()?;
                 Ok(Expr {
                     kind: ExprKind::Delete(Box::new(a)),
@@ -7050,6 +7146,9 @@ impl Parser {
                 })
             }
             "exists" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_postfix()?;
                 Ok(Expr {
                     kind: ExprKind::Exists(Box::new(a)),
@@ -7057,6 +7156,9 @@ impl Parser {
                 })
             }
             "keys" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg()?;
                 Ok(Expr {
                     kind: ExprKind::Keys(Box::new(a)),
@@ -7064,6 +7166,9 @@ impl Parser {
                 })
             }
             "values" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg()?;
                 Ok(Expr {
                     kind: ExprKind::Values(Box::new(a)),
@@ -7071,6 +7176,9 @@ impl Parser {
                 })
             }
             "each" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 // `each(%hash)` / `each(@array)` — hash/array iterator
                 let a = self.parse_one_arg()?;
                 Ok(Expr {
@@ -7174,6 +7282,9 @@ impl Parser {
                 })
             }
             "join" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 if args.is_empty() {
                     return Err(self.syntax_err("join requires separator and list", line));
@@ -7194,6 +7305,9 @@ impl Parser {
                 })
             }
             "split" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 let pattern = args.first().cloned().unwrap_or(Expr {
                     kind: ExprKind::String(" ".into()),
@@ -7214,6 +7328,9 @@ impl Parser {
                 })
             }
             "substr" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::Substr {
@@ -7226,6 +7343,9 @@ impl Parser {
                 })
             }
             "index" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::Index {
@@ -7237,6 +7357,9 @@ impl Parser {
                 })
             }
             "rindex" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::Rindex {
@@ -7248,6 +7371,9 @@ impl Parser {
                 })
             }
             "sprintf" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 let (first, rest) = args
                     .split_first()
@@ -7943,6 +8069,9 @@ impl Parser {
                 })
             }
             "await" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 // `await` defaults to `$_` so `map { await } @tasks` works
                 // (Perl-style topic-defaulting unary).
                 let a = self.parse_one_arg_or_default()?;
@@ -7952,6 +8081,9 @@ impl Parser {
                 })
             }
             "slurp" | "cat" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Slurp(Box::new(a)),
@@ -7959,6 +8091,9 @@ impl Parser {
                 })
             }
             "capture" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg()?;
                 Ok(Expr {
                     kind: ExprKind::Capture(Box::new(a)),
@@ -7966,6 +8101,9 @@ impl Parser {
                 })
             }
             "fetch_url" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg()?;
                 Ok(Expr {
                     kind: ExprKind::FetchUrl(Box::new(a)),
@@ -8268,6 +8406,9 @@ impl Parser {
             // Defaults to `$_` when no arg is given, like `length`. See
             // `builtin_file_size` in builtins.rs for the runtime behavior.
             "size" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 if self.pipe_supplies_slurped_list_operand() {
                     return Ok(Expr {
                         kind: ExprKind::FuncCall {
@@ -8287,6 +8428,9 @@ impl Parser {
                 })
             }
             "list_count" | "list_size" | "count" | "len" | "cnt" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 if self.pipe_supplies_slurped_list_operand() {
                     return Ok(Expr {
                         kind: ExprKind::FuncCall {
@@ -8312,6 +8456,9 @@ impl Parser {
                 })
             }
             "shuffle" | "shuffled" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 if self.pipe_supplies_slurped_list_operand() {
                     return Ok(Expr {
                         kind: ExprKind::FuncCall {
@@ -8702,6 +8849,9 @@ impl Parser {
                 }
             }
             "close" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Close(Box::new(a)),
@@ -8709,6 +8859,9 @@ impl Parser {
                 })
             }
             "opendir" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 if args.len() != 2 {
                     return Err(self.syntax_err("opendir requires two arguments", line));
@@ -8722,6 +8875,9 @@ impl Parser {
                 })
             }
             "readdir" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg()?;
                 Ok(Expr {
                     kind: ExprKind::Readdir(Box::new(a)),
@@ -8729,6 +8885,9 @@ impl Parser {
                 })
             }
             "closedir" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg()?;
                 Ok(Expr {
                     kind: ExprKind::Closedir(Box::new(a)),
@@ -8736,6 +8895,9 @@ impl Parser {
                 })
             }
             "rewinddir" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg()?;
                 Ok(Expr {
                     kind: ExprKind::Rewinddir(Box::new(a)),
@@ -8743,6 +8905,9 @@ impl Parser {
                 })
             }
             "telldir" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg()?;
                 Ok(Expr {
                     kind: ExprKind::Telldir(Box::new(a)),
@@ -8750,6 +8915,9 @@ impl Parser {
                 })
             }
             "seekdir" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 if args.len() != 2 {
                     return Err(self.syntax_err("seekdir requires two arguments", line));
@@ -8763,6 +8931,9 @@ impl Parser {
                 })
             }
             "eof" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 if matches!(self.peek(), Token::LParen) {
                     self.advance();
                     if matches!(self.peek(), Token::RParen) {
@@ -8787,6 +8958,9 @@ impl Parser {
                 }
             }
             "system" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::System(args),
@@ -8794,6 +8968,9 @@ impl Parser {
                 })
             }
             "exec" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::Exec(args),
@@ -8801,6 +8978,9 @@ impl Parser {
                 })
             }
             "eval" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = if matches!(self.peek(), Token::LBrace) {
                     let block = self.parse_block()?;
                     Expr {
@@ -8819,6 +8999,9 @@ impl Parser {
                 })
             }
             "do" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg()?;
                 Ok(Expr {
                     kind: ExprKind::Do(Box::new(a)),
@@ -8826,6 +9009,9 @@ impl Parser {
                 })
             }
             "require" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg()?;
                 Ok(Expr {
                     kind: ExprKind::Require(Box::new(a)),
@@ -8833,6 +9019,9 @@ impl Parser {
                 })
             }
             "exit" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 if matches!(
                     self.peek(),
                     Token::Semicolon | Token::RBrace | Token::Eof | Token::PipeForward
@@ -8850,6 +9039,9 @@ impl Parser {
                 }
             }
             "chdir" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Chdir(Box::new(a)),
@@ -8857,6 +9049,9 @@ impl Parser {
                 })
             }
             "mkdir" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::Mkdir {
@@ -8867,6 +9062,9 @@ impl Parser {
                 })
             }
             "unlink" | "rm" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::Unlink(args),
@@ -8874,6 +9072,9 @@ impl Parser {
                 })
             }
             "rename" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 if args.len() != 2 {
                     return Err(self.syntax_err("rename requires two arguments", line));
@@ -8887,6 +9088,9 @@ impl Parser {
                 })
             }
             "chmod" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 if args.len() < 2 {
                     return Err(self.syntax_err("chmod requires mode and at least one file", line));
@@ -8897,6 +9101,9 @@ impl Parser {
                 })
             }
             "chown" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 if args.len() < 3 {
                     return Err(
@@ -8909,6 +9116,9 @@ impl Parser {
                 })
             }
             "stat" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 let arg = if args.len() == 1 {
                     args[0].clone()
@@ -8926,6 +9136,9 @@ impl Parser {
                 })
             }
             "lstat" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 let arg = if args.len() == 1 {
                     args[0].clone()
@@ -8943,6 +9156,9 @@ impl Parser {
                 })
             }
             "link" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 if args.len() != 2 {
                     return Err(self.syntax_err("link requires two arguments", line));
@@ -8956,6 +9172,9 @@ impl Parser {
                 })
             }
             "symlink" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 if args.len() != 2 {
                     return Err(self.syntax_err("symlink requires two arguments", line));
@@ -8969,6 +9188,9 @@ impl Parser {
                 })
             }
             "readlink" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 let arg = if args.len() == 1 {
                     args[0].clone()
@@ -8986,6 +9208,9 @@ impl Parser {
                 })
             }
             "files" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::Files(args),
@@ -8993,6 +9218,9 @@ impl Parser {
                 })
             }
             "filesf" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::Filesf(args),
@@ -9007,6 +9235,9 @@ impl Parser {
                 })
             }
             "dirs" | "d" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::Dirs(args),
@@ -9014,6 +9245,9 @@ impl Parser {
                 })
             }
             "dr" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::DirsRecursive(args),
@@ -9021,6 +9255,9 @@ impl Parser {
                 })
             }
             "sym_links" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::SymLinks(args),
@@ -9028,6 +9265,9 @@ impl Parser {
                 })
             }
             "sockets" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::Sockets(args),
@@ -9035,6 +9275,9 @@ impl Parser {
                 })
             }
             "pipes" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::Pipes(args),
@@ -9042,6 +9285,9 @@ impl Parser {
                 })
             }
             "block_devices" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::BlockDevices(args),
@@ -9049,6 +9295,9 @@ impl Parser {
                 })
             }
             "char_devices" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::CharDevices(args),
@@ -9056,6 +9305,9 @@ impl Parser {
                 })
             }
             "glob" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::Glob(args),
@@ -9063,6 +9315,9 @@ impl Parser {
                 })
             }
             "glob_par" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let (args, progress) = self.parse_glob_par_or_par_sed_args()?;
                 Ok(Expr {
                     kind: ExprKind::GlobPar { args, progress },
@@ -9070,6 +9325,9 @@ impl Parser {
                 })
             }
             "par_sed" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let (args, progress) = self.parse_glob_par_or_par_sed_args()?;
                 Ok(Expr {
                     kind: ExprKind::ParSed { args, progress },
@@ -9077,6 +9335,9 @@ impl Parser {
                 })
             }
             "bless" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::Bless {
@@ -10566,6 +10827,21 @@ impl Parser {
             Ok(args)
         } else {
             self.parse_list_until_terminator()
+        }
+    }
+
+    /// Check if the next token is `=>` (fat arrow). If so, the preceding bareword
+    /// should be treated as an auto-quoted string (hash key), not a function call.
+    /// Returns `Some(Expr::String(name))` if fat arrow follows, `None` otherwise.
+    #[inline]
+    fn fat_arrow_autoquote(&self, name: &str, line: usize) -> Option<Expr> {
+        if matches!(self.peek(), Token::FatArrow) {
+            Some(Expr {
+                kind: ExprKind::String(name.to_string()),
+                line,
+            })
+        } else {
+            None
         }
     }
 

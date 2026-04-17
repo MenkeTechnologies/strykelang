@@ -325,6 +325,18 @@ p $p->x;       # 1.5 — getter
 $p->x(3.0);    # setter
 p $p->x;       # 3.0
 
+# User-defined methods
+struct Circle {
+    radius => Float,
+    fn area { 3.14159 * $self->radius ** 2 }
+    fn scale($factor: Float) {
+        Circle(radius => $self->radius * $factor)
+    }
+}
+my $c = Circle(radius => 5);
+p $c->area;                          # 78.53975
+p $c->scale(2);                      # Circle(radius => 10)
+
 # Built-in methods
 my $q = $p->with(y => 5);            # functional update — new instance
 my $h = $p->to_hash;                 # { x => 3.0, y => 5 }
