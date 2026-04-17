@@ -1365,22 +1365,22 @@ impl Parser {
             ExprKind::FuncCall {
                 ref name,
                 ref mut args,
-            } if args.is_empty() => {
-                if Self::is_known_bareword(name) || Self::is_try_builtin_name(name) {
-                    args.push(topic_arg());
-                }
+            } if args.is_empty()
+                && (Self::is_known_bareword(name) || Self::is_try_builtin_name(name)) =>
+            {
+                args.push(topic_arg());
             }
             // Lone bareword (the parser sometimes keeps a bareword as a
             // `Bareword` node instead of a zero-arg `FuncCall` —
             // e.g. `{ to_json }`, `{ ddump }`). Promote to a call.
-            ExprKind::Bareword(ref name) => {
-                if Self::is_known_bareword(name) || Self::is_try_builtin_name(name) {
-                    let n = name.clone();
-                    expr.kind = ExprKind::FuncCall {
-                        name: n,
-                        args: vec![topic_arg()],
-                    };
-                }
+            ExprKind::Bareword(ref name)
+                if (Self::is_known_bareword(name) || Self::is_try_builtin_name(name)) =>
+            {
+                let n = name.clone();
+                expr.kind = ExprKind::FuncCall {
+                    name: n,
+                    args: vec![topic_arg()],
+                };
             }
             _ => {}
         }
@@ -2007,6 +2007,13 @@ impl Parser {
             }),
             "reduce" | "rd" => Ok(Expr {
                 kind: ExprKind::ReduceExpr {
+                    block,
+                    list: Box::new(placeholder),
+                },
+                line,
+            }),
+            "fore" | "e" => Ok(Expr {
+                kind: ExprKind::ForEachExpr {
                     block,
                     list: Box::new(placeholder),
                 },
@@ -9618,7 +9625,7 @@ impl Parser {
     fn is_try_builtin_name(name: &str) -> bool {
         crate::builtins::BUILTIN_ARMS
             .iter()
-            .any(|arm| arm.iter().any(|n| *n == name))
+            .any(|arm| arm.contains(&name))
     }
 
     /// True iff `name` is a Perl 5 core keyword/builtin (as shipped in stock
@@ -9777,6 +9784,204 @@ impl Parser {
             | "__perlrs_rust_compile"
             // ── short aliases ───────────────────────────────────────────────
             | "p" | "rev"
+            // ── trivial numeric / predicate builtins ────────────────────────
+            | "even" | "odd" | "zero" | "nonzero"
+            | "positive" | "pos_n" | "negative" | "neg_n"
+            | "sign" | "negate" | "double" | "triple" | "half"
+            | "identity" | "id"
+            | "round" | "floor" | "ceil" | "ceiling" | "trunc" | "truncn"
+            | "gcd" | "lcm" | "min2" | "max2"
+            | "log2" | "log10" | "hypot"
+            | "rad_to_deg" | "r2d" | "deg_to_rad" | "d2r"
+            | "pow2" | "abs_diff"
+            | "factorial" | "fact" | "fibonacci" | "fib"
+            | "is_prime" | "is_square" | "is_power_of_two" | "is_pow2"
+            | "cbrt" | "exp2" | "percent" | "pct" | "inverse"
+            | "median" | "mode_val" | "variance"
+            // ── trivial string ops ──────────────────────────────────────────
+            | "is_empty" | "is_blank" | "is_numeric"
+            | "is_upper" | "is_lower" | "is_alpha" | "is_digit" | "is_alnum"
+            | "is_space" | "is_whitespace"
+            | "starts_with" | "sw" | "ends_with" | "ew" | "contains"
+            | "capitalize" | "cap" | "swap_case" | "repeat"
+            | "title_case" | "title" | "squish"
+            | "pad_left" | "lpad" | "pad_right" | "rpad" | "center"
+            | "truncate_at" | "shorten" | "reverse_str" | "rev_str"
+            | "char_count" | "word_count" | "wc" | "line_count" | "lc_lines"
+            // ── trivial type predicates ─────────────────────────────────────
+            | "is_array" | "is_arrayref" | "is_hash" | "is_hashref"
+            | "is_code" | "is_coderef" | "is_ref"
+            | "is_undef" | "is_defined" | "is_def"
+            | "is_string" | "is_str" | "is_int" | "is_integer" | "is_float"
+            // ── hash helpers ────────────────────────────────────────────────
+            | "invert" | "merge_hash"
+            | "has_key" | "hk" | "has_any_key" | "has_all_keys"
+            // ── boolean combinators ─────────────────────────────────────────
+            | "both" | "either" | "neither" | "xor_bool" | "bool_to_int" | "b2i"
+            // ── collection helpers (trivial) ────────────────────────────────
+            | "riffle" | "intersperse" | "every_nth"
+            | "drop_n" | "take_n" | "rotate" | "swap_pairs"
+            // ── base conversion ─────────────────────────────────────────────
+            | "to_bin" | "bin_of" | "to_hex" | "hex_of" | "to_oct" | "oct_of"
+            | "from_bin" | "from_hex" | "from_oct" | "to_base" | "from_base"
+            | "bits_count" | "popcount" | "leading_zeros" | "lz"
+            | "trailing_zeros" | "tz" | "bit_length" | "bitlen"
+            // ── bit ops ─────────────────────────────────────────────────────
+            | "bit_and" | "bit_or" | "bit_xor" | "bit_not"
+            | "shift_left" | "shl" | "shift_right" | "shr"
+            | "bit_set" | "bit_clear" | "bit_toggle" | "bit_test"
+            // ── unit conversions: temperature ───────────────────────────────
+            | "c_to_f" | "f_to_c" | "c_to_k" | "k_to_c" | "f_to_k" | "k_to_f"
+            // ── unit conversions: distance ──────────────────────────────────
+            | "miles_to_km" | "km_to_miles" | "miles_to_m" | "m_to_miles"
+            | "feet_to_m" | "m_to_feet" | "inches_to_cm" | "cm_to_inches"
+            | "yards_to_m" | "m_to_yards"
+            // ── unit conversions: mass ──────────────────────────────────────
+            | "kg_to_lbs" | "lbs_to_kg" | "g_to_oz" | "oz_to_g"
+            | "stone_to_kg" | "kg_to_stone"
+            // ── unit conversions: digital ───────────────────────────────────
+            | "bytes_to_kb" | "b_to_kb" | "kb_to_bytes" | "kb_to_b"
+            | "bytes_to_mb" | "mb_to_bytes" | "bytes_to_gb" | "gb_to_bytes"
+            | "kb_to_mb" | "mb_to_gb"
+            | "bits_to_bytes" | "bytes_to_bits"
+            // ── unit conversions: time ──────────────────────────────────────
+            | "seconds_to_minutes" | "s_to_m" | "minutes_to_seconds" | "m_to_s"
+            | "seconds_to_hours" | "hours_to_seconds"
+            | "seconds_to_days" | "days_to_seconds"
+            | "minutes_to_hours" | "hours_to_minutes"
+            | "hours_to_days" | "days_to_hours"
+            // ── date helpers ────────────────────────────────────────────────
+            | "is_leap_year" | "is_leap" | "days_in_month"
+            | "month_name" | "month_short"
+            | "weekday_name" | "weekday_short" | "quarter_of"
+            // ── now / timestamp ─────────────────────────────────────────────
+            | "now_ms" | "now_us" | "now_ns"
+            | "unix_epoch" | "epoch" | "unix_epoch_ms" | "epoch_ms"
+            // ── color / ANSI ────────────────────────────────────────────────
+            | "rgb_to_hex" | "hex_to_rgb"
+            | "ansi_red" | "ansi_green" | "ansi_yellow" | "ansi_blue"
+            | "ansi_magenta" | "ansi_cyan" | "ansi_white" | "ansi_black"
+            | "ansi_bold" | "ansi_dim" | "ansi_underline" | "ansi_reverse"
+            | "strip_ansi"
+            // ── network / validation ────────────────────────────────────────
+            | "ipv4_to_int" | "int_to_ipv4"
+            | "is_valid_ipv4" | "is_valid_ipv6" | "is_valid_email" | "is_valid_url"
+            // ── path helpers ────────────────────────────────────────────────
+            | "path_ext" | "path_stem" | "path_parent" | "path_join" | "path_split"
+            | "strip_prefix" | "strip_suffix" | "ensure_prefix" | "ensure_suffix"
+            // ── functional primitives ───────────────────────────────────────
+            | "const_fn" | "always_true" | "always_false"
+            | "flip_args" | "first_arg" | "second_arg" | "last_arg"
+            // ── more list helpers ───────────────────────────────────────────
+            | "count_eq" | "count_ne" | "all_eq"
+            | "all_distinct" | "all_unique" | "has_duplicates"
+            | "sum_of" | "product_of" | "max_of" | "min_of" | "range_of"
+            // ── string quote / escape ───────────────────────────────────────
+            | "quote" | "single_quote" | "unquote"
+            | "extract_between" | "ellipsis"
+            // ── random ──────────────────────────────────────────────────────
+            | "coin_flip" | "dice_roll"
+            | "random_int" | "random_float" | "random_bool"
+            | "random_choice" | "random_between"
+            | "random_string" | "random_alpha" | "random_digit"
+            // ── system introspection ────────────────────────────────────────
+            | "os_name" | "os_arch" | "num_cpus"
+            | "pid" | "ppid" | "uid" | "gid"
+            | "username" | "home_dir" | "temp_dir"
+            // ── collection more ─────────────────────────────────────────────
+            | "transpose" | "unzip"
+            | "run_length_encode" | "rle" | "run_length_decode" | "rld"
+            | "sliding_pairs" | "consecutive_eq" | "flatten_deep"
+            // ── trig / math (batch 2) ───────────────────────────────────────
+            | "tan" | "asin" | "acos" | "atan"
+            | "sinh" | "cosh" | "tanh" | "asinh" | "acosh" | "atanh"
+            | "sqr" | "cube_fn"
+            | "mod_op" | "ceil_div" | "floor_div"
+            | "is_finite" | "is_infinite" | "is_inf" | "is_nan"
+            | "degrees" | "radians"
+            | "min_abs" | "max_abs"
+            | "saturate" | "sat01" | "wrap_around"
+            // ── string (batch 2) ────────────────────────────────────────────
+            | "rot13" | "rot47" | "caesar_shift" | "reverse_words"
+            | "count_vowels" | "count_consonants" | "is_vowel" | "is_consonant"
+            | "first_word" | "last_word"
+            | "left_str" | "head_str" | "right_str" | "tail_str" | "mid_str"
+            | "lowercase" | "uppercase"
+            | "pascal_case" | "pc_case"
+            | "constant_case" | "upper_snake" | "dot_case" | "path_case"
+            | "is_palindrome" | "hamming_distance"
+            | "longest_common_prefix" | "lcp"
+            | "ascii_ord" | "ascii_chr" | "count_char" | "indexes_of"
+            | "replace_first" | "replace_all_str"
+            | "contains_any" | "contains_all"
+            | "starts_with_any" | "ends_with_any"
+            // ── predicates (batch 2) ────────────────────────────────────────
+            | "is_pair" | "is_triple"
+            | "is_sorted" | "is_asc" | "is_sorted_desc" | "is_desc"
+            | "is_empty_arr" | "is_empty_hash"
+            | "is_subset" | "is_superset" | "is_permutation"
+            // ── collection (batch 2) ────────────────────────────────────────
+            | "first_eq" | "last_eq"
+            | "index_of" | "last_index_of" | "positions_of"
+            | "batch" | "binary_search" | "bsearch" | "linear_search" | "lsearch"
+            | "distinct_count" | "longest" | "shortest"
+            | "array_union" | "list_union"
+            | "array_intersection" | "list_intersection"
+            | "array_difference" | "list_difference"
+            | "symmetric_diff" | "group_of_n" | "chunk_n"
+            | "repeat_list" | "cycle_n" | "random_sample" | "sample_n"
+            // ── hash ops (batch 2) ──────────────────────────────────────────
+            | "pick_keys" | "pick" | "omit_keys" | "omit"
+            | "map_keys_fn" | "map_values_fn"
+            | "hash_size" | "hash_from_pairs" | "pairs_from_hash"
+            | "hash_eq" | "keys_sorted" | "values_sorted" | "remove_keys"
+            // ── date (batch 2) ──────────────────────────────────────────────
+            | "today" | "yesterday" | "tomorrow" | "is_weekend" | "is_weekday"
+            // ── json helpers ────────────────────────────────────────────────
+            | "json_pretty" | "json_minify" | "escape_json" | "json_escape"
+            // ── process / env ───────────────────────────────────────────────
+            | "cmd_exists" | "env_get" | "env_has" | "env_keys"
+            | "argc" | "script_name"
+            | "has_stdin_tty" | "has_stdout_tty" | "has_stderr_tty"
+            // ── id helpers ──────────────────────────────────────────────────
+            | "uuid_v4" | "nanoid" | "short_id" | "is_uuid" | "token"
+            // ── url / email parts ───────────────────────────────────────────
+            | "email_domain" | "email_local"
+            | "url_host" | "url_path" | "url_query" | "url_scheme"
+            // ── file stat / path ────────────────────────────────────────────
+            | "file_size" | "fsize" | "file_mtime" | "mtime"
+            | "file_atime" | "atime" | "file_ctime" | "ctime"
+            | "is_symlink" | "is_readable" | "is_writable" | "is_executable"
+            | "path_is_abs" | "path_is_rel"
+            // ── stats / sort / array / format / cmp / regex / time conv / volume / force ──
+            | "min_max" | "percentile" | "harmonic_mean" | "geometric_mean" | "zscore"
+            | "sorted" | "sorted_desc" | "sorted_nums" | "sorted_by_length"
+            | "reverse_list" | "list_reverse"
+            | "without" | "without_nth" | "take_last" | "drop_last"
+            | "pairwise" | "zipmap"
+            | "format_bytes" | "human_bytes"
+            | "format_duration" | "human_duration"
+            | "format_number" | "group_number"
+            | "format_percent" | "pad_number"
+            | "spaceship" | "cmp_num" | "cmp_str"
+            | "compare_versions" | "version_cmp"
+            | "hash_insert" | "hash_update" | "hash_delete"
+            | "matches_regex" | "re_match"
+            | "count_regex_matches" | "regex_extract"
+            | "regex_split_str" | "regex_replace_str"
+            | "shuffle_chars" | "random_char" | "nth_word"
+            | "head_lines" | "tail_lines" | "count_substring"
+            | "is_valid_hex" | "hex_upper" | "hex_lower"
+            | "ms_to_s" | "s_to_ms" | "ms_to_ns" | "ns_to_ms"
+            | "us_to_ns" | "ns_to_us"
+            | "liters_to_gallons" | "gallons_to_liters"
+            | "liters_to_ml" | "ml_to_liters"
+            | "cups_to_ml" | "ml_to_cups"
+            | "newtons_to_lbf" | "lbf_to_newtons"
+            | "joules_to_cal" | "cal_to_joules"
+            | "watts_to_hp" | "hp_to_watts"
+            | "pascals_to_psi" | "psi_to_pascals"
+            | "bar_to_pascals" | "pascals_to_bar"
             // ── algebraic match ─────────────────────────────────────────────
             | "match"
             => Some(name),
