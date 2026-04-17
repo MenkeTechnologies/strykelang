@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/perlrs" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">perlrs v0.4.16 · 2043 topics · 24 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">perlrs v0.5.0 · 2252 topics · 24 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -190,7 +190,7 @@
         <li><a href="#ch-process">Process</a> <span class="chapter-count">20</span></li>
         <li><a href="#ch-pack-binary">Pack / Binary</a> <span class="chapter-count">3</span></li>
         <li><a href="#ch-logging">Logging</a> <span class="chapter-count">7</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">1625</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">1834</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -4545,7 +4545,7 @@ log_info(&quot;hidden&quot;);    # not printed
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">1625 topics</p>
+      <p class="chapter-meta">1834 topics</p>
       <article class="doc-entry" id="doc-perlrs-rust-compile">
         <h3><a class="doc-anchor" href="#doc-perlrs-rust-compile">#</a> <code>__perlrs_rust_compile</code></h3>
         <p><code>__perlrs_rust_compile</code> — internal builtin.</p>
@@ -4586,6 +4586,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map abs_floor |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-abundant-numbers">
+        <h3><a class="doc-anchor" href="#doc-abundant-numbers">#</a> <code>abundant_numbers</code></h3>
+        <p><code>abundant_numbers</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = abundant_numbers $x 
+# or in a pipeline:
+@list |&gt; map abundant_numbers |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-accum">
         <h3><a class="doc-anchor" href="#doc-accum">#</a> <code>accum</code></h3>
         <p><code>accum</code> — python/ruby stdlib builtin. Alias for <code>accumulate</code>.</p>
@@ -4616,6 +4624,14 @@ log_info(&quot;hidden&quot;);    # not printed
         <pre><code class="lang-perl">my $result = acosh $x 
 # or in a pipeline:
 @list |&gt; map acosh |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-acronym">
+        <h3><a class="doc-anchor" href="#doc-acronym">#</a> <code>acronym</code></h3>
+        <p><code>acronym</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = acronym $x 
+# or in a pipeline:
+@list |&gt; map acronym |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-add-days">
@@ -4738,6 +4754,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map ain |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-aliquot-sum">
+        <h3><a class="doc-anchor" href="#doc-aliquot-sum">#</a> <code>aliquot_sum</code></h3>
+        <p><code>aliquot_sum</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = aliquot_sum $x 
+# or in a pipeline:
+@list |&gt; map aliquot_sum |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-all-distinct">
         <h3><a class="doc-anchor" href="#doc-all-distinct">#</a> <code>all_distinct</code></h3>
         <p><code>all_distinct</code> — more list helpers builtin.</p>
@@ -4850,6 +4874,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map angle_bracket |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-ansi-256">
+        <h3><a class="doc-anchor" href="#doc-ansi-256">#</a> <code>ansi_256</code></h3>
+        <p><code>ansi_256</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = ansi_256 $x 
+# or in a pipeline:
+@list |&gt; map ansi_256 |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-ansi-black">
         <h3><a class="doc-anchor" href="#doc-ansi-black">#</a> <code>ansi_black</code></h3>
         <p><code>ansi_black</code> — color / ansi builtin.</p>
@@ -4920,6 +4952,14 @@ log_info(&quot;hidden&quot;);    # not printed
         <pre><code class="lang-perl">my $result = ansi_reverse $x 
 # or in a pipeline:
 @list |&gt; map ansi_reverse |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ansi-truecolor">
+        <h3><a class="doc-anchor" href="#doc-ansi-truecolor">#</a> <code>ansi_truecolor</code></h3>
+        <p><code>ansi_truecolor</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = ansi_truecolor $x 
+# or in a pipeline:
+@list |&gt; map ansi_truecolor |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-ansi-underline">
@@ -5000,6 +5040,46 @@ log_info(&quot;hidden&quot;);    # not printed
         <pre><code class="lang-perl">my $result = arange $x 
 # or in a pipeline:
 @list |&gt; map arange |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-area-circle">
+        <h3><a class="doc-anchor" href="#doc-area-circle">#</a> <code>area_circle</code></h3>
+        <p><code>area_circle</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = area_circle $x 
+# or in a pipeline:
+@list |&gt; map area_circle |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-area-ellipse">
+        <h3><a class="doc-anchor" href="#doc-area-ellipse">#</a> <code>area_ellipse</code></h3>
+        <p><code>area_ellipse</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = area_ellipse $x 
+# or in a pipeline:
+@list |&gt; map area_ellipse |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-area-rectangle">
+        <h3><a class="doc-anchor" href="#doc-area-rectangle">#</a> <code>area_rectangle</code></h3>
+        <p><code>area_rectangle</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = area_rectangle $x 
+# or in a pipeline:
+@list |&gt; map area_rectangle |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-area-trapezoid">
+        <h3><a class="doc-anchor" href="#doc-area-trapezoid">#</a> <code>area_trapezoid</code></h3>
+        <p><code>area_trapezoid</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = area_trapezoid $x 
+# or in a pipeline:
+@list |&gt; map area_trapezoid |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-area-triangle">
+        <h3><a class="doc-anchor" href="#doc-area-triangle">#</a> <code>area_triangle</code></h3>
+        <p><code>area_triangle</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = area_triangle $x 
+# or in a pipeline:
+@list |&gt; map area_triangle |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-argc">
@@ -5170,6 +5250,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map atanh |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-atbash">
+        <h3><a class="doc-anchor" href="#doc-atbash">#</a> <code>atbash</code></h3>
+        <p><code>atbash</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = atbash $x 
+# or in a pipeline:
+@list |&gt; map atbash |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-ati">
         <h3><a class="doc-anchor" href="#doc-ati">#</a> <code>ati</code></h3>
         <p><code>ati</code> — javascript array/object methods builtin. Alias for <code>at_index</code>.</p>
@@ -5192,6 +5280,14 @@ log_info(&quot;hidden&quot;);    # not printed
         <pre><code class="lang-perl">my $result = attempt $x 
 # or in a pipeline:
 @list |&gt; map attempt |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-autocorrelation">
+        <h3><a class="doc-anchor" href="#doc-autocorrelation">#</a> <code>autocorrelation</code></h3>
+        <p><code>autocorrelation</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = autocorrelation $x 
+# or in a pipeline:
+@list |&gt; map autocorrelation |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-average">
@@ -5218,6 +5314,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map avogadro |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-avogadro-number">
+        <h3><a class="doc-anchor" href="#doc-avogadro-number">#</a> <code>avogadro_number</code></h3>
+        <p><code>avogadro_number</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = avogadro_number $x 
+# or in a pipeline:
+@list |&gt; map avogadro_number |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-b2i">
         <h3><a class="doc-anchor" href="#doc-b2i">#</a> <code>b2i</code></h3>
         <p><code>b2i</code> — boolean combinators builtin. Alias for <code>bool_to_int</code>.</p>
@@ -5232,10 +5336,26 @@ log_info(&quot;hidden&quot;);    # not printed
         <pre><code class="lang-perl">my $result = b_to_kb $input 
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-bac-estimate">
+        <h3><a class="doc-anchor" href="#doc-bac-estimate">#</a> <code>bac_estimate</code></h3>
+        <p><code>bac_estimate</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = bac_estimate $x 
+# or in a pipeline:
+@list |&gt; map bac_estimate |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-bar-to-pascals">
         <h3><a class="doc-anchor" href="#doc-bar-to-pascals">#</a> <code>bar_to_pascals</code></h3>
         <p><code>bar_to_pascals</code> — file stat / path builtin.</p>
         <pre><code class="lang-perl">my $result = bar_to_pascals $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-base-convert">
+        <h3><a class="doc-anchor" href="#doc-base-convert">#</a> <code>base_convert</code></h3>
+        <p><code>base_convert</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = base_convert $x 
+# or in a pipeline:
+@list |&gt; map base_convert |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-batch">
@@ -5262,12 +5382,28 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map bcount |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-bearing">
+        <h3><a class="doc-anchor" href="#doc-bearing">#</a> <code>bearing</code></h3>
+        <p><code>bearing</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = bearing $x 
+# or in a pipeline:
+@list |&gt; map bearing |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-before-n">
         <h3><a class="doc-anchor" href="#doc-before-n">#</a> <code>before_n</code></h3>
         <p><code>before_n</code> — functional combinators builtin.</p>
         <pre><code class="lang-perl">my $result = before_n $x 
 # or in a pipeline:
 @list |&gt; map before_n |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-bell-number">
+        <h3><a class="doc-anchor" href="#doc-bell-number">#</a> <code>bell_number</code></h3>
+        <p><code>bell_number</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = bell_number $x 
+# or in a pipeline:
+@list |&gt; map bell_number |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-between">
@@ -5294,6 +5430,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map bfs_traverse |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-bigrams">
+        <h3><a class="doc-anchor" href="#doc-bigrams">#</a> <code>bigrams</code></h3>
+        <p><code>bigrams</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = bigrams $x 
+# or in a pipeline:
+@list |&gt; map bigrams |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-bin-of">
         <h3><a class="doc-anchor" href="#doc-bin-of">#</a> <code>bin_of</code></h3>
         <p><code>bin_of</code> — base conversion builtin. Alias for <code>to_bin</code>.</p>
@@ -5302,12 +5446,26 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map bin_of |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-binary-insert">
+        <h3><a class="doc-anchor" href="#doc-binary-insert">#</a> <code>binary_insert</code></h3>
+        <p><code>binary_insert</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = binary_insert $x 
+# or in a pipeline:
+@list |&gt; map binary_insert |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-binary-search">
         <h3><a class="doc-anchor" href="#doc-binary-search">#</a> <code>binary_search</code></h3>
         <p><code>binary_search</code> — collection (batch 2) builtin.</p>
         <pre><code class="lang-perl">my $result = binary_search $x 
 # or in a pipeline:
 @list |&gt; map binary_search |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-binary-to-gray">
+        <h3><a class="doc-anchor" href="#doc-binary-to-gray">#</a> <code>binary_to_gray</code></h3>
+        <p><code>binary_to_gray</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = binary_to_gray $input 
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-binom">
@@ -5468,6 +5626,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map block_devices |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-bmi">
+        <h3><a class="doc-anchor" href="#doc-bmi">#</a> <code>bmi</code></h3>
+        <p><code>bmi</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = bmi $x 
+# or in a pipeline:
+@list |&gt; map bmi |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-bmi-calc">
         <h3><a class="doc-anchor" href="#doc-bmi-calc">#</a> <code>bmi_calc</code></h3>
         <p><code>bmi_calc</code> — physics formulas builtin.</p>
@@ -5482,6 +5648,14 @@ log_info(&quot;hidden&quot;);    # not printed
         <pre><code class="lang-perl">my $result = boltzmann $x 
 # or in a pipeline:
 @list |&gt; map boltzmann |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-boltzmann-constant">
+        <h3><a class="doc-anchor" href="#doc-boltzmann-constant">#</a> <code>boltzmann_constant</code></h3>
+        <p><code>boltzmann_constant</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = boltzmann_constant $x 
+# or in a pipeline:
+@list |&gt; map boltzmann_constant |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-bool-each">
@@ -5512,6 +5686,22 @@ log_info(&quot;hidden&quot;);    # not printed
         <pre><code class="lang-perl">my $result = bracket $x 
 # or in a pipeline:
 @list |&gt; map bracket |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-braille-encode">
+        <h3><a class="doc-anchor" href="#doc-braille-encode">#</a> <code>braille_encode</code></h3>
+        <p><code>braille_encode</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = braille_encode $x 
+# or in a pipeline:
+@list |&gt; map braille_encode |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-break-even">
+        <h3><a class="doc-anchor" href="#doc-break-even">#</a> <code>break_even</code></h3>
+        <p><code>break_even</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = break_even $x 
+# or in a pipeline:
+@list |&gt; map break_even |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-break-fn">
@@ -5546,6 +5736,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map btch |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-bucket">
+        <h3><a class="doc-anchor" href="#doc-bucket">#</a> <code>bucket</code></h3>
+        <p><code>bucket</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = bucket $x 
+# or in a pipeline:
+@list |&gt; map bucket |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-butlast">
         <h3><a class="doc-anchor" href="#doc-butlast">#</a> <code>butlast</code></h3>
         <p><code>butlast</code> — algebraic match builtin.</p>
@@ -5560,6 +5758,14 @@ log_info(&quot;hidden&quot;);    # not printed
         <pre><code class="lang-perl">my $result = byte_length $x 
 # or in a pipeline:
 @list |&gt; map byte_length |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-byte-size">
+        <h3><a class="doc-anchor" href="#doc-byte-size">#</a> <code>byte_size</code></h3>
+        <p><code>byte_size</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = byte_size $x 
+# or in a pipeline:
+@list |&gt; map byte_size |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-bytes-to-bits">
@@ -5612,10 +5818,24 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map caesar_shift |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-cagr">
+        <h3><a class="doc-anchor" href="#doc-cagr">#</a> <code>cagr</code></h3>
+        <p><code>cagr</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = cagr $x 
+# or in a pipeline:
+@list |&gt; map cagr |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-cal-to-joules">
         <h3><a class="doc-anchor" href="#doc-cal-to-joules">#</a> <code>cal_to_joules</code></h3>
         <p><code>cal_to_joules</code> — file stat / path builtin.</p>
         <pre><code class="lang-perl">my $result = cal_to_joules $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-camel-to-snake">
+        <h3><a class="doc-anchor" href="#doc-camel-to-snake">#</a> <code>camel_to_snake</code></h3>
+        <p><code>camel_to_snake</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = camel_to_snake $input 
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-camel-words">
@@ -5802,6 +6022,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map char_devices |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-char-frequencies">
+        <h3><a class="doc-anchor" href="#doc-char-frequencies">#</a> <code>char_frequencies</code></h3>
+        <p><code>char_frequencies</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = char_frequencies $x 
+# or in a pipeline:
+@list |&gt; map char_frequencies |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-char-length">
         <h3><a class="doc-anchor" href="#doc-char-length">#</a> <code>char_length</code></h3>
         <p><code>char_length</code> — string helpers (batch 4) builtin.</p>
@@ -5888,6 +6116,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map chunk_n |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-chunk-string">
+        <h3><a class="doc-anchor" href="#doc-chunk-string">#</a> <code>chunk_string</code></h3>
+        <p><code>chunk_string</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = chunk_string $x 
+# or in a pipeline:
+@list |&gt; map chunk_string |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-chunk-while">
         <h3><a class="doc-anchor" href="#doc-chunk-while">#</a> <code>chunk_while</code></h3>
         <p><code>chunk_while</code> — ruby enumerable extras builtin.</p>
@@ -5902,6 +6138,22 @@ log_info(&quot;hidden&quot;);    # not printed
         <pre><code class="lang-perl">my $result = cinv $x 
 # or in a pipeline:
 @list |&gt; map cinv |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-circumference">
+        <h3><a class="doc-anchor" href="#doc-circumference">#</a> <code>circumference</code></h3>
+        <p><code>circumference</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = circumference $x 
+# or in a pipeline:
+@list |&gt; map circumference |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-clamp-array">
+        <h3><a class="doc-anchor" href="#doc-clamp-array">#</a> <code>clamp_array</code></h3>
+        <p><code>clamp_array</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = clamp_array $x 
+# or in a pipeline:
+@list |&gt; map clamp_array |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-clamp-each">
@@ -6026,12 +6278,100 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map code_point_at |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-coeff-of-variation">
+        <h3><a class="doc-anchor" href="#doc-coeff-of-variation">#</a> <code>coeff_of_variation</code></h3>
+        <p><code>coeff_of_variation</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = coeff_of_variation $x 
+# or in a pipeline:
+@list |&gt; map coeff_of_variation |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-coin-flip">
         <h3><a class="doc-anchor" href="#doc-coin-flip">#</a> <code>coin_flip</code></h3>
         <p><code>coin_flip</code> — random builtin.</p>
         <pre><code class="lang-perl">my $result = coin_flip $x 
 # or in a pipeline:
 @list |&gt; map coin_flip |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-collapse-whitespace">
+        <h3><a class="doc-anchor" href="#doc-collapse-whitespace">#</a> <code>collapse_whitespace</code></h3>
+        <p><code>collapse_whitespace</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = collapse_whitespace $x 
+# or in a pipeline:
+@list |&gt; map collapse_whitespace |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-collatz-length">
+        <h3><a class="doc-anchor" href="#doc-collatz-length">#</a> <code>collatz_length</code></h3>
+        <p><code>collatz_length</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = collatz_length $x 
+# or in a pipeline:
+@list |&gt; map collatz_length |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-collatz-sequence">
+        <h3><a class="doc-anchor" href="#doc-collatz-sequence">#</a> <code>collatz_sequence</code></h3>
+        <p><code>collatz_sequence</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = collatz_sequence $x 
+# or in a pipeline:
+@list |&gt; map collatz_sequence |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-color-blend">
+        <h3><a class="doc-anchor" href="#doc-color-blend">#</a> <code>color_blend</code></h3>
+        <p><code>color_blend</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = color_blend $x 
+# or in a pipeline:
+@list |&gt; map color_blend |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-color-complement">
+        <h3><a class="doc-anchor" href="#doc-color-complement">#</a> <code>color_complement</code></h3>
+        <p><code>color_complement</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = color_complement $x 
+# or in a pipeline:
+@list |&gt; map color_complement |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-color-darken">
+        <h3><a class="doc-anchor" href="#doc-color-darken">#</a> <code>color_darken</code></h3>
+        <p><code>color_darken</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = color_darken $x 
+# or in a pipeline:
+@list |&gt; map color_darken |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-color-distance">
+        <h3><a class="doc-anchor" href="#doc-color-distance">#</a> <code>color_distance</code></h3>
+        <p><code>color_distance</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = color_distance $x 
+# or in a pipeline:
+@list |&gt; map color_distance |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-color-grayscale">
+        <h3><a class="doc-anchor" href="#doc-color-grayscale">#</a> <code>color_grayscale</code></h3>
+        <p><code>color_grayscale</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = color_grayscale $x 
+# or in a pipeline:
+@list |&gt; map color_grayscale |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-color-invert">
+        <h3><a class="doc-anchor" href="#doc-color-invert">#</a> <code>color_invert</code></h3>
+        <p><code>color_invert</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = color_invert $x 
+# or in a pipeline:
+@list |&gt; map color_invert |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-color-lighten">
+        <h3><a class="doc-anchor" href="#doc-color-lighten">#</a> <code>color_lighten</code></h3>
+        <p><code>color_lighten</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = color_lighten $x 
+# or in a pipeline:
+@list |&gt; map color_lighten |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-comb">
@@ -6112,6 +6452,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = concat_map $x 
 # or in a pipeline:
 @list |&gt; map concat_map |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cone-volume">
+        <h3><a class="doc-anchor" href="#doc-cone-volume">#</a> <code>cone_volume</code></h3>
+        <p><code>cone_volume</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = cone_volume $x 
+# or in a pipeline:
+@list |&gt; map cone_volume |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-conj">
@@ -6208,6 +6556,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = converge $x 
 # or in a pipeline:
 @list |&gt; map converge |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-convolution">
+        <h3><a class="doc-anchor" href="#doc-convolution">#</a> <code>convolution</code></h3>
+        <p><code>convolution</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = convolution $x 
+# or in a pipeline:
+@list |&gt; map convolution |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-copy-sign">
@@ -6530,6 +6886,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map cpyw |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-cross-entropy">
+        <h3><a class="doc-anchor" href="#doc-cross-entropy">#</a> <code>cross_entropy</code></h3>
+        <p><code>cross_entropy</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = cross_entropy $x 
+# or in a pipeline:
+@list |&gt; map cross_entropy |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-cross-product">
         <h3><a class="doc-anchor" href="#doc-cross-product">#</a> <code>cross_product</code></h3>
         <p><code>cross_product</code> — extended stdlib builtin.</p>
@@ -6656,6 +7020,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map cycle_n |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-cylinder-volume">
+        <h3><a class="doc-anchor" href="#doc-cylinder-volume">#</a> <code>cylinder_volume</code></h3>
+        <p><code>cylinder_volume</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = cylinder_volume $x 
+# or in a pipeline:
+@list |&gt; map cylinder_volume |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-d">
         <h3><a class="doc-anchor" href="#doc-d">#</a> <code>d</code></h3>
         <p><code>d</code> — filesystem extensions builtin.</p>
@@ -6772,6 +7144,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map dedent |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-dedent-text">
+        <h3><a class="doc-anchor" href="#doc-dedent-text">#</a> <code>dedent_text</code></h3>
+        <p><code>dedent_text</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = dedent_text $x 
+# or in a pipeline:
+@list |&gt; map dedent_text |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-default-to">
         <h3><a class="doc-anchor" href="#doc-default-to">#</a> <code>default_to</code></h3>
         <p><code>default_to</code> — functional combinators builtin.</p>
@@ -6786,6 +7166,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = defaultdict $x 
 # or in a pipeline:
 @list |&gt; map defaultdict |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-deficient-numbers">
+        <h3><a class="doc-anchor" href="#doc-deficient-numbers">#</a> <code>deficient_numbers</code></h3>
+        <p><code>deficient_numbers</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = deficient_numbers $x 
+# or in a pipeline:
+@list |&gt; map deficient_numbers |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-defined-count">
@@ -6808,6 +7196,12 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = degrees $x 
 # or in a pipeline:
 @list |&gt; map degrees |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-degrees-to-compass">
+        <h3><a class="doc-anchor" href="#doc-degrees-to-compass">#</a> <code>degrees_to_compass</code></h3>
+        <p><code>degrees_to_compass</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = degrees_to_compass $input 
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-dela">
@@ -6864,6 +7258,22 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = dense_rank $x 
 # or in a pipeline:
 @list |&gt; map dense_rank |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-depreciation-double">
+        <h3><a class="doc-anchor" href="#doc-depreciation-double">#</a> <code>depreciation_double</code></h3>
+        <p><code>depreciation_double</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = depreciation_double $x 
+# or in a pipeline:
+@list |&gt; map depreciation_double |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-depreciation-linear">
+        <h3><a class="doc-anchor" href="#doc-depreciation-linear">#</a> <code>depreciation_linear</code></h3>
+        <p><code>depreciation_linear</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = depreciation_linear $x 
+# or in a pipeline:
+@list |&gt; map depreciation_linear |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-detect">
@@ -7034,6 +7444,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map dirs |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-discount">
+        <h3><a class="doc-anchor" href="#doc-discount">#</a> <code>discount</code></h3>
+        <p><code>discount</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = discount $x 
+# or in a pipeline:
+@list |&gt; map discount |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-discount-amount">
         <h3><a class="doc-anchor" href="#doc-discount-amount">#</a> <code>discount_amount</code></h3>
         <p><code>discount_amount</code> — physics formulas builtin.</p>
@@ -7088,6 +7506,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = distinct_count $x 
 # or in a pipeline:
 @list |&gt; map distinct_count |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-divisors">
+        <h3><a class="doc-anchor" href="#doc-divisors">#</a> <code>divisors</code></h3>
+        <p><code>divisors</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = divisors $x 
+# or in a pipeline:
+@list |&gt; map divisors |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-divmod">
@@ -7152,6 +7578,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = double_each $x 
 # or in a pipeline:
 @list |&gt; map double_each |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-double-metaphone">
+        <h3><a class="doc-anchor" href="#doc-double-metaphone">#</a> <code>double_metaphone</code></h3>
+        <p><code>double_metaphone</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = double_metaphone $x 
+# or in a pipeline:
+@list |&gt; map double_metaphone |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-downcase-each">
@@ -7282,6 +7716,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map either |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-electron-mass">
+        <h3><a class="doc-anchor" href="#doc-electron-mass">#</a> <code>electron_mass</code></h3>
+        <p><code>electron_mass</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = electron_mass $x 
+# or in a pipeline:
+@list |&gt; map electron_mass |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-elem-at">
         <h3><a class="doc-anchor" href="#doc-elem-at">#</a> <code>elem_at</code></h3>
         <p><code>elem_at</code> — list helpers (batch 4) builtin.</p>
@@ -7312,6 +7754,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = elem_of $x 
 # or in a pipeline:
 @list |&gt; map elem_of |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-elementary-charge">
+        <h3><a class="doc-anchor" href="#doc-elementary-charge">#</a> <code>elementary_charge</code></h3>
+        <p><code>elementary_charge</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = elementary_charge $x 
+# or in a pipeline:
+@list |&gt; map elementary_charge |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-elidx">
@@ -7554,6 +8004,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map epoch_ms |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-epsilon">
+        <h3><a class="doc-anchor" href="#doc-epsilon">#</a> <code>epsilon</code></h3>
+        <p><code>epsilon</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = epsilon $x 
+# or in a pipeline:
+@list |&gt; map epsilon |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-eqidx">
         <h3><a class="doc-anchor" href="#doc-eqidx">#</a> <code>eqidx</code></h3>
         <p><code>eqidx</code> — extended stdlib batch 3 builtin. Alias for <code>equilibrium_index</code>.</p>
@@ -7610,12 +8068,36 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map etot |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-euclidean-distance">
+        <h3><a class="doc-anchor" href="#doc-euclidean-distance">#</a> <code>euclidean_distance</code></h3>
+        <p><code>euclidean_distance</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = euclidean_distance $x 
+# or in a pipeline:
+@list |&gt; map euclidean_distance |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-euler-number">
+        <h3><a class="doc-anchor" href="#doc-euler-number">#</a> <code>euler_number</code></h3>
+        <p><code>euler_number</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = euler_number $x 
+# or in a pipeline:
+@list |&gt; map euler_number |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-euler-totient">
         <h3><a class="doc-anchor" href="#doc-euler-totient">#</a> <code>euler_totient</code></h3>
         <p><code>euler_totient</code> — extended stdlib batch 3 builtin.</p>
         <pre><code class="lang-perl">my $result = euler_totient $x 
 # or in a pipeline:
 @list |&gt; map euler_totient |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-eval-rpn">
+        <h3><a class="doc-anchor" href="#doc-eval-rpn">#</a> <code>eval_rpn</code></h3>
+        <p><code>eval_rpn</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = eval_rpn $x 
+# or in a pipeline:
+@list |&gt; map eval_rpn |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-even">
@@ -7658,6 +8140,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map exp2 |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-exponential-moving-average">
+        <h3><a class="doc-anchor" href="#doc-exponential-moving-average">#</a> <code>exponential_moving_average</code></h3>
+        <p><code>exponential_moving_average</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = exponential_moving_average $x 
+# or in a pipeline:
+@list |&gt; map exponential_moving_average |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-extract-between">
         <h3><a class="doc-anchor" href="#doc-extract-between">#</a> <code>extract_between</code></h3>
         <p><code>extract_between</code> — string quote / escape builtin.</p>
@@ -7680,6 +8170,22 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = f $x 
 # or in a pipeline:
 @list |&gt; map f |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-f64-max">
+        <h3><a class="doc-anchor" href="#doc-f64-max">#</a> <code>f64_max</code></h3>
+        <p><code>f64_max</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = f64_max $x 
+# or in a pipeline:
+@list |&gt; map f64_max |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-f64-min">
+        <h3><a class="doc-anchor" href="#doc-f64-min">#</a> <code>f64_min</code></h3>
+        <p><code>f64_min</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = f64_min $x 
+# or in a pipeline:
+@list |&gt; map f64_min |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-f-to-c">
@@ -7786,6 +8292,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = ffs $x 
 # or in a pipeline:
 @list |&gt; map ffs |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-fft-magnitude">
+        <h3><a class="doc-anchor" href="#doc-fft-magnitude">#</a> <code>fft_magnitude</code></h3>
+        <p><code>fft_magnitude</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = fft_magnitude $x 
+# or in a pipeline:
+@list |&gt; map fft_magnitude |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-fib">
@@ -8026,6 +8540,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = first_word $x 
 # or in a pipeline:
 @list |&gt; map first_word |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-fizzbuzz">
+        <h3><a class="doc-anchor" href="#doc-fizzbuzz">#</a> <code>fizzbuzz</code></h3>
+        <p><code>fizzbuzz</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = fizzbuzz $x 
+# or in a pipeline:
+@list |&gt; map fizzbuzz |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-flat-depth">
@@ -8464,6 +8986,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = gallons_to_liters $input 
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-game-of-life-step">
+        <h3><a class="doc-anchor" href="#doc-game-of-life-step">#</a> <code>game_of_life_step</code></h3>
+        <p><code>game_of_life_step</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = game_of_life_step $x 
+# or in a pipeline:
+@list |&gt; map game_of_life_step |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-gb-to-bytes">
         <h3><a class="doc-anchor" href="#doc-gb-to-bytes">#</a> <code>gb_to_bytes</code></h3>
         <p><code>gb_to_bytes</code> — unit conversions builtin.</p>
@@ -8572,6 +9102,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = glob_to_regex $input 
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-goldbach">
+        <h3><a class="doc-anchor" href="#doc-goldbach">#</a> <code>goldbach</code></h3>
+        <p><code>goldbach</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = goldbach $x 
+# or in a pipeline:
+@list |&gt; map goldbach |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-golden-ratio">
         <h3><a class="doc-anchor" href="#doc-golden-ratio">#</a> <code>golden_ratio</code></h3>
         <p><code>golden_ratio</code> — math / physics constants builtin.</p>
@@ -8588,12 +9126,34 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map goto |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-gravitational-constant">
+        <h3><a class="doc-anchor" href="#doc-gravitational-constant">#</a> <code>gravitational_constant</code></h3>
+        <p><code>gravitational_constant</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = gravitational_constant $x 
+# or in a pipeline:
+@list |&gt; map gravitational_constant |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-gravity">
         <h3><a class="doc-anchor" href="#doc-gravity">#</a> <code>gravity</code></h3>
         <p><code>gravity</code> — math / physics constants builtin.</p>
         <pre><code class="lang-perl">my $result = gravity $x 
 # or in a pipeline:
 @list |&gt; map gravity |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gray-code-sequence">
+        <h3><a class="doc-anchor" href="#doc-gray-code-sequence">#</a> <code>gray_code_sequence</code></h3>
+        <p><code>gray_code_sequence</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = gray_code_sequence $x 
+# or in a pipeline:
+@list |&gt; map gray_code_sequence |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gray-to-binary">
+        <h3><a class="doc-anchor" href="#doc-gray-to-binary">#</a> <code>gray_to_binary</code></h3>
+        <p><code>gray_to_binary</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = gray_to_binary $input 
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-group-by">
@@ -8626,6 +9186,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = group_consecutive $x 
 # or in a pipeline:
 @list |&gt; map group_consecutive |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-group-consecutive-by">
+        <h3><a class="doc-anchor" href="#doc-group-consecutive-by">#</a> <code>group_consecutive_by</code></h3>
+        <p><code>group_consecutive_by</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = group_consecutive_by $x 
+# or in a pipeline:
+@list |&gt; map group_consecutive_by |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-group-number">
@@ -8914,6 +9482,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map heat_index |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-heron-area">
+        <h3><a class="doc-anchor" href="#doc-heron-area">#</a> <code>heron_area</code></h3>
+        <p><code>heron_area</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = heron_area $x 
+# or in a pipeline:
+@list |&gt; map heron_area |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-hex-lower">
         <h3><a class="doc-anchor" href="#doc-hex-lower">#</a> <code>hex_lower</code></h3>
         <p><code>hex_lower</code> — file stat / path builtin.</p>
@@ -8948,6 +9524,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = hex_upper $x 
 # or in a pipeline:
 @list |&gt; map hex_upper |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-histogram">
+        <h3><a class="doc-anchor" href="#doc-histogram">#</a> <code>histogram</code></h3>
+        <p><code>histogram</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = histogram $x 
+# or in a pipeline:
+@list |&gt; map histogram |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-histogram-bins">
@@ -9006,6 +9590,18 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = hp_to_watts $input 
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-hsl-to-rgb">
+        <h3><a class="doc-anchor" href="#doc-hsl-to-rgb">#</a> <code>hsl_to_rgb</code></h3>
+        <p><code>hsl_to_rgb</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = hsl_to_rgb $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hsv-to-rgb">
+        <h3><a class="doc-anchor" href="#doc-hsv-to-rgb">#</a> <code>hsv_to_rgb</code></h3>
+        <p><code>hsv_to_rgb</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = hsv_to_rgb $input 
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-html-decode">
         <h3><a class="doc-anchor" href="#doc-html-decode">#</a> <code>html_decode</code></h3>
         <p><code>html_decode</code> — extended stdlib builtin.</p>
@@ -9060,6 +9656,22 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = hypot $x 
 # or in a pipeline:
 @list |&gt; map hypot |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-i64-max">
+        <h3><a class="doc-anchor" href="#doc-i64-max">#</a> <code>i64_max</code></h3>
+        <p><code>i64_max</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = i64_max $x 
+# or in a pipeline:
+@list |&gt; map i64_max |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-i64-min">
+        <h3><a class="doc-anchor" href="#doc-i64-min">#</a> <code>i64_min</code></h3>
+        <p><code>i64_min</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = i64_min $x 
+# or in a pipeline:
+@list |&gt; map i64_min |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-ical">
@@ -9180,6 +9792,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map indent |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-indent-text">
+        <h3><a class="doc-anchor" href="#doc-indent-text">#</a> <code>indent_text</code></h3>
+        <p><code>indent_text</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = indent_text $x 
+# or in a pipeline:
+@list |&gt; map indent_text |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-index-by">
         <h3><a class="doc-anchor" href="#doc-index-by">#</a> <code>index_by</code></h3>
         <p><code>index_by</code> — go/general functional utilities builtin.</p>
@@ -9218,6 +9838,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = init_list $x 
 # or in a pipeline:
 @list |&gt; map init_list |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-initials">
+        <h3><a class="doc-anchor" href="#doc-initials">#</a> <code>initials</code></h3>
+        <p><code>initials</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = initials $x 
+# or in a pipeline:
+@list |&gt; map initials |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-inits">
@@ -9312,6 +9940,12 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <h3><a class="doc-anchor" href="#doc-int-to-ipv4">#</a> <code>int_to_ipv4</code></h3>
         <p><code>int_to_ipv4</code> — network / validation builtin.</p>
         <pre><code class="lang-perl">my $result = int_to_ipv4 $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-int-to-roman">
+        <h3><a class="doc-anchor" href="#doc-int-to-roman">#</a> <code>int_to_roman</code></h3>
+        <p><code>int_to_roman</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = int_to_roman $input 
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-intercalate">
@@ -9448,6 +10082,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map iqr |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-is-abundant">
+        <h3><a class="doc-anchor" href="#doc-is-abundant">#</a> <code>is_abundant</code></h3>
+        <p><code>is_abundant</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = is_abundant $x 
+# or in a pipeline:
+@list |&gt; map is_abundant |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-is-alnum">
         <h3><a class="doc-anchor" href="#doc-is-alnum">#</a> <code>is_alnum</code></h3>
         <p><code>is_alnum</code> — trivial string ops builtin.</p>
@@ -9462,6 +10104,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = is_alpha $x 
 # or in a pipeline:
 @list |&gt; map is_alpha |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-is-anagram">
+        <h3><a class="doc-anchor" href="#doc-is-anagram">#</a> <code>is_anagram</code></h3>
+        <p><code>is_anagram</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = is_anagram $x 
+# or in a pipeline:
+@list |&gt; map is_anagram |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-is-array">
@@ -9494,6 +10144,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = is_ascii $x 
 # or in a pipeline:
 @list |&gt; map is_ascii |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-is-balanced-parens">
+        <h3><a class="doc-anchor" href="#doc-is-balanced-parens">#</a> <code>is_balanced_parens</code></h3>
+        <p><code>is_balanced_parens</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = is_balanced_parens $x 
+# or in a pipeline:
+@list |&gt; map is_balanced_parens |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-is-base64">
@@ -9576,6 +10234,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map is_consonant |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-is-control">
+        <h3><a class="doc-anchor" href="#doc-is-control">#</a> <code>is_control</code></h3>
+        <p><code>is_control</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = is_control $x 
+# or in a pipeline:
+@list |&gt; map is_control |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-is-coprime">
         <h3><a class="doc-anchor" href="#doc-is-coprime">#</a> <code>is_coprime</code></h3>
         <p><code>is_coprime</code> — extended stdlib batch 3 builtin.</p>
@@ -9598,6 +10264,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = is_def $x 
 # or in a pipeline:
 @list |&gt; map is_def |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-is-deficient">
+        <h3><a class="doc-anchor" href="#doc-is-deficient">#</a> <code>is_deficient</code></h3>
+        <p><code>is_deficient</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = is_deficient $x 
+# or in a pipeline:
+@list |&gt; map is_deficient |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-is-defined">
@@ -10024,6 +10698,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map is_numeric |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-is-numeric-string">
+        <h3><a class="doc-anchor" href="#doc-is-numeric-string">#</a> <code>is_numeric_string</code></h3>
+        <p><code>is_numeric_string</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = is_numeric_string $x 
+# or in a pipeline:
+@list |&gt; map is_numeric_string |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-is-octal-str">
         <h3><a class="doc-anchor" href="#doc-is-octal-str">#</a> <code>is_octal_str</code></h3>
         <p><code>is_octal_str</code> — extended stdlib builtin.</p>
@@ -10062,6 +10744,30 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = is_palindrome $x 
 # or in a pipeline:
 @list |&gt; map is_palindrome |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-is-pangram">
+        <h3><a class="doc-anchor" href="#doc-is-pangram">#</a> <code>is_pangram</code></h3>
+        <p><code>is_pangram</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = is_pangram $x 
+# or in a pipeline:
+@list |&gt; map is_pangram |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-is-pentagonal">
+        <h3><a class="doc-anchor" href="#doc-is-pentagonal">#</a> <code>is_pentagonal</code></h3>
+        <p><code>is_pentagonal</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = is_pentagonal $x 
+# or in a pipeline:
+@list |&gt; map is_pentagonal |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-is-perfect">
+        <h3><a class="doc-anchor" href="#doc-is-perfect">#</a> <code>is_perfect</code></h3>
+        <p><code>is_perfect</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = is_perfect $x 
+# or in a pipeline:
+@list |&gt; map is_perfect |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-is-perfect-square">
@@ -10160,6 +10866,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map is_prime |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-is-printable">
+        <h3><a class="doc-anchor" href="#doc-is-printable">#</a> <code>is_printable</code></h3>
+        <p><code>is_printable</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = is_printable $x 
+# or in a pipeline:
+@list |&gt; map is_printable |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-is-readable">
         <h3><a class="doc-anchor" href="#doc-is-readable">#</a> <code>is_readable</code></h3>
         <p><code>is_readable</code> — file stat / path builtin.</p>
@@ -10206,6 +10920,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = is_slug $x 
 # or in a pipeline:
 @list |&gt; map is_slug |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-is-smith">
+        <h3><a class="doc-anchor" href="#doc-is-smith">#</a> <code>is_smith</code></h3>
+        <p><code>is_smith</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = is_smith $x 
+# or in a pipeline:
+@list |&gt; map is_smith |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-is-sorted">
@@ -10392,6 +11114,22 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map is_uuid |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-is-valid-cidr">
+        <h3><a class="doc-anchor" href="#doc-is-valid-cidr">#</a> <code>is_valid_cidr</code></h3>
+        <p><code>is_valid_cidr</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = is_valid_cidr $x 
+# or in a pipeline:
+@list |&gt; map is_valid_cidr |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-is-valid-cron">
+        <h3><a class="doc-anchor" href="#doc-is-valid-cron">#</a> <code>is_valid_cron</code></h3>
+        <p><code>is_valid_cron</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = is_valid_cron $x 
+# or in a pipeline:
+@list |&gt; map is_valid_cron |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-is-valid-date">
         <h3><a class="doc-anchor" href="#doc-is-valid-date">#</a> <code>is_valid_date</code></h3>
         <p><code>is_valid_date</code> — extended stdlib batch 3 builtin.</p>
@@ -10416,6 +11154,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map is_valid_hex |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-is-valid-hex-color">
+        <h3><a class="doc-anchor" href="#doc-is-valid-hex-color">#</a> <code>is_valid_hex_color</code></h3>
+        <p><code>is_valid_hex_color</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = is_valid_hex_color $x 
+# or in a pipeline:
+@list |&gt; map is_valid_hex_color |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-is-valid-ipv4">
         <h3><a class="doc-anchor" href="#doc-is-valid-ipv4">#</a> <code>is_valid_ipv4</code></h3>
         <p><code>is_valid_ipv4</code> — network / validation builtin.</p>
@@ -10430,6 +11176,30 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = is_valid_ipv6 $x 
 # or in a pipeline:
 @list |&gt; map is_valid_ipv6 |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-is-valid-latitude">
+        <h3><a class="doc-anchor" href="#doc-is-valid-latitude">#</a> <code>is_valid_latitude</code></h3>
+        <p><code>is_valid_latitude</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = is_valid_latitude $x 
+# or in a pipeline:
+@list |&gt; map is_valid_latitude |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-is-valid-longitude">
+        <h3><a class="doc-anchor" href="#doc-is-valid-longitude">#</a> <code>is_valid_longitude</code></h3>
+        <p><code>is_valid_longitude</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = is_valid_longitude $x 
+# or in a pipeline:
+@list |&gt; map is_valid_longitude |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-is-valid-mime">
+        <h3><a class="doc-anchor" href="#doc-is-valid-mime">#</a> <code>is_valid_mime</code></h3>
+        <p><code>is_valid_mime</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = is_valid_mime $x 
+# or in a pipeline:
+@list |&gt; map is_valid_mime |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-is-valid-url">
@@ -11166,6 +11936,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map kths |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-kurtosis">
+        <h3><a class="doc-anchor" href="#doc-kurtosis">#</a> <code>kurtosis</code></h3>
+        <p><code>kurtosis</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = kurtosis $x 
+# or in a pipeline:
+@list |&gt; map kurtosis |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-last-arg">
         <h3><a class="doc-anchor" href="#doc-last-arg">#</a> <code>last_arg</code></h3>
         <p><code>last_arg</code> — functional primitives builtin.</p>
@@ -11314,6 +12092,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map least_common |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-leetspeak">
+        <h3><a class="doc-anchor" href="#doc-leetspeak">#</a> <code>leetspeak</code></h3>
+        <p><code>leetspeak</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = leetspeak $x 
+# or in a pipeline:
+@list |&gt; map leetspeak |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-left-str">
         <h3><a class="doc-anchor" href="#doc-left-str">#</a> <code>left_str</code></h3>
         <p><code>left_str</code> — string (batch 2) builtin.</p>
@@ -11391,6 +12177,14 @@ slurp(&quot;README.md&quot;) |&gt; pager
         <pre><code class="lang-perl">my $result = line_count $x 
 # or in a pipeline:
 @list |&gt; map line_count |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-linear-regression">
+        <h3><a class="doc-anchor" href="#doc-linear-regression">#</a> <code>linear_regression</code></h3>
+        <p><code>linear_regression</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = linear_regression $x 
+# or in a pipeline:
+@list |&gt; map linear_regression |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-linear-search">
@@ -11639,6 +12433,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map longest_run |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-look-and-say">
+        <h3><a class="doc-anchor" href="#doc-look-and-say">#</a> <code>look_and_say</code></h3>
+        <p><code>look_and_say</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = look_and_say $x 
+# or in a pipeline:
+@list |&gt; map look_and_say |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-lookup-assoc">
         <h3><a class="doc-anchor" href="#doc-lookup-assoc">#</a> <code>lookup_assoc</code></h3>
         <p><code>lookup_assoc</code> — haskell list functions builtin.</p>
@@ -11701,6 +12503,22 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = lstat $x 
 # or in a pipeline:
 @list |&gt; map lstat |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-lucas">
+        <h3><a class="doc-anchor" href="#doc-lucas">#</a> <code>lucas</code></h3>
+        <p><code>lucas</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = lucas $x 
+# or in a pipeline:
+@list |&gt; map lucas |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-luhn-check">
+        <h3><a class="doc-anchor" href="#doc-luhn-check">#</a> <code>luhn_check</code></h3>
+        <p><code>luhn_check</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = luhn_check $x 
+# or in a pipeline:
+@list |&gt; map luhn_check |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-lz">
@@ -11791,6 +12609,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map mall |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-mandelbrot-char">
+        <h3><a class="doc-anchor" href="#doc-mandelbrot-char">#</a> <code>mandelbrot_char</code></h3>
+        <p><code>mandelbrot_char</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = mandelbrot_char $x 
+# or in a pipeline:
+@list |&gt; map mandelbrot_char |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-manhattan-distance">
         <h3><a class="doc-anchor" href="#doc-manhattan-distance">#</a> <code>manhattan_distance</code></h3>
         <p><code>manhattan_distance</code> — extended stdlib builtin.</p>
@@ -11863,6 +12689,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map mapw |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-margin">
+        <h3><a class="doc-anchor" href="#doc-margin">#</a> <code>margin</code></h3>
+        <p><code>margin</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = margin $x 
+# or in a pipeline:
+@list |&gt; map margin |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-margin-price">
         <h3><a class="doc-anchor" href="#doc-margin-price">#</a> <code>margin_price</code></h3>
         <p><code>margin_price</code> — physics formulas builtin.</p>
@@ -11871,12 +12705,28 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map margin_price |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-markup">
+        <h3><a class="doc-anchor" href="#doc-markup">#</a> <code>markup</code></h3>
+        <p><code>markup</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = markup $x 
+# or in a pipeline:
+@list |&gt; map markup |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-markup-price">
         <h3><a class="doc-anchor" href="#doc-markup-price">#</a> <code>markup_price</code></h3>
         <p><code>markup_price</code> — physics formulas builtin.</p>
         <pre><code class="lang-perl">my $result = markup_price $x 
 # or in a pipeline:
 @list |&gt; map markup_price |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mask-string">
+        <h3><a class="doc-anchor" href="#doc-mask-string">#</a> <code>mask_string</code></h3>
+        <p><code>mask_string</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = mask_string $x 
+# or in a pipeline:
+@list |&gt; map mask_string |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-mat-mul">
@@ -11943,12 +12793,68 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map matrix_diag |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-matrix-flatten">
+        <h3><a class="doc-anchor" href="#doc-matrix-flatten">#</a> <code>matrix_flatten</code></h3>
+        <p><code>matrix_flatten</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = matrix_flatten $x 
+# or in a pipeline:
+@list |&gt; map matrix_flatten |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-matrix-from-rows">
+        <h3><a class="doc-anchor" href="#doc-matrix-from-rows">#</a> <code>matrix_from_rows</code></h3>
+        <p><code>matrix_from_rows</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = matrix_from_rows $x 
+# or in a pipeline:
+@list |&gt; map matrix_from_rows |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-matrix-hadamard">
+        <h3><a class="doc-anchor" href="#doc-matrix-hadamard">#</a> <code>matrix_hadamard</code></h3>
+        <p><code>matrix_hadamard</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = matrix_hadamard $x 
+# or in a pipeline:
+@list |&gt; map matrix_hadamard |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-matrix-identity">
         <h3><a class="doc-anchor" href="#doc-matrix-identity">#</a> <code>matrix_identity</code></h3>
         <p><code>matrix_identity</code> — extended stdlib builtin.</p>
         <pre><code class="lang-perl">my $result = matrix_identity $x 
 # or in a pipeline:
 @list |&gt; map matrix_identity |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-matrix-inverse">
+        <h3><a class="doc-anchor" href="#doc-matrix-inverse">#</a> <code>matrix_inverse</code></h3>
+        <p><code>matrix_inverse</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = matrix_inverse $x 
+# or in a pipeline:
+@list |&gt; map matrix_inverse |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-matrix-map">
+        <h3><a class="doc-anchor" href="#doc-matrix-map">#</a> <code>matrix_map</code></h3>
+        <p><code>matrix_map</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = matrix_map $x 
+# or in a pipeline:
+@list |&gt; map matrix_map |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-matrix-max">
+        <h3><a class="doc-anchor" href="#doc-matrix-max">#</a> <code>matrix_max</code></h3>
+        <p><code>matrix_max</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = matrix_max $x 
+# or in a pipeline:
+@list |&gt; map matrix_max |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-matrix-min">
+        <h3><a class="doc-anchor" href="#doc-matrix-min">#</a> <code>matrix_min</code></h3>
+        <p><code>matrix_min</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = matrix_min $x 
+# or in a pipeline:
+@list |&gt; map matrix_min |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-matrix-mult">
@@ -11973,6 +12879,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = matrix_ones $x 
 # or in a pipeline:
 @list |&gt; map matrix_ones |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-matrix-power">
+        <h3><a class="doc-anchor" href="#doc-matrix-power">#</a> <code>matrix_power</code></h3>
+        <p><code>matrix_power</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = matrix_power $x 
+# or in a pipeline:
+@list |&gt; map matrix_power |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-matrix-row">
@@ -12015,12 +12929,28 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map matrix_sub |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-matrix-sum">
+        <h3><a class="doc-anchor" href="#doc-matrix-sum">#</a> <code>matrix_sum</code></h3>
+        <p><code>matrix_sum</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = matrix_sum $x 
+# or in a pipeline:
+@list |&gt; map matrix_sum |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-matrix-trace">
         <h3><a class="doc-anchor" href="#doc-matrix-trace">#</a> <code>matrix_trace</code></h3>
         <p><code>matrix_trace</code> — extended stdlib builtin.</p>
         <pre><code class="lang-perl">my $result = matrix_trace $x 
 # or in a pipeline:
 @list |&gt; map matrix_trace |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-matrix-transpose">
+        <h3><a class="doc-anchor" href="#doc-matrix-transpose">#</a> <code>matrix_transpose</code></h3>
+        <p><code>matrix_transpose</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = matrix_transpose $x 
+# or in a pipeline:
+@list |&gt; map matrix_transpose |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-matrix-zeros">
@@ -12171,12 +13101,28 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map mdist |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-mean-absolute-error">
+        <h3><a class="doc-anchor" href="#doc-mean-absolute-error">#</a> <code>mean_absolute_error</code></h3>
+        <p><code>mean_absolute_error</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = mean_absolute_error $x 
+# or in a pipeline:
+@list |&gt; map mean_absolute_error |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-mean-list">
         <h3><a class="doc-anchor" href="#doc-mean-list">#</a> <code>mean_list</code></h3>
         <p><code>mean_list</code> — list helpers (batch 4) builtin.</p>
         <pre><code class="lang-perl">my $result = mean_list $x 
 # or in a pipeline:
 @list |&gt; map mean_list |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mean-squared-error">
+        <h3><a class="doc-anchor" href="#doc-mean-squared-error">#</a> <code>mean_squared_error</code></h3>
+        <p><code>mean_squared_error</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = mean_squared_error $x 
+# or in a pipeline:
+@list |&gt; map mean_squared_error |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-measure">
@@ -12187,12 +13133,36 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map measure |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-median-absolute-deviation">
+        <h3><a class="doc-anchor" href="#doc-median-absolute-deviation">#</a> <code>median_absolute_deviation</code></h3>
+        <p><code>median_absolute_deviation</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = median_absolute_deviation $x 
+# or in a pipeline:
+@list |&gt; map median_absolute_deviation |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-merge-hash">
         <h3><a class="doc-anchor" href="#doc-merge-hash">#</a> <code>merge_hash</code></h3>
         <p><code>merge_hash</code> — hash helpers builtin.</p>
         <pre><code class="lang-perl">my $result = merge_hash $x 
 # or in a pipeline:
 @list |&gt; map merge_hash |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-merge-sorted">
+        <h3><a class="doc-anchor" href="#doc-merge-sorted">#</a> <code>merge_sorted</code></h3>
+        <p><code>merge_sorted</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = merge_sorted $x 
+# or in a pipeline:
+@list |&gt; map merge_sorted |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-metaphone">
+        <h3><a class="doc-anchor" href="#doc-metaphone">#</a> <code>metaphone</code></h3>
+        <p><code>metaphone</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = metaphone $x 
+# or in a pipeline:
+@list |&gt; map metaphone |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-mid-str">
@@ -12209,6 +13179,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = mident $x 
 # or in a pipeline:
 @list |&gt; map mident |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-midpoint">
+        <h3><a class="doc-anchor" href="#doc-midpoint">#</a> <code>midpoint</code></h3>
+        <p><code>midpoint</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = midpoint $x 
+# or in a pipeline:
+@list |&gt; map midpoint |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-midpoint-of">
@@ -12309,6 +13287,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = minimum_by $x 
 # or in a pipeline:
 @list |&gt; map minimum_by |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-minkowski-distance">
+        <h3><a class="doc-anchor" href="#doc-minkowski-distance">#</a> <code>minkowski_distance</code></h3>
+        <p><code>minkowski_distance</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = minkowski_distance $x 
+# or in a pipeline:
+@list |&gt; map minkowski_distance |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-minmax">
@@ -12455,6 +13441,22 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map month_short |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-morse-decode">
+        <h3><a class="doc-anchor" href="#doc-morse-decode">#</a> <code>morse_decode</code></h3>
+        <p><code>morse_decode</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = morse_decode $x 
+# or in a pipeline:
+@list |&gt; map morse_decode |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-morse-encode">
+        <h3><a class="doc-anchor" href="#doc-morse-encode">#</a> <code>morse_encode</code></h3>
+        <p><code>morse_encode</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = morse_encode $x 
+# or in a pipeline:
+@list |&gt; map morse_encode |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-mortgage-payment">
         <h3><a class="doc-anchor" href="#doc-mortgage-payment">#</a> <code>mortgage_payment</code></h3>
         <p><code>mortgage_payment</code> — physics formulas builtin.</p>
@@ -12469,6 +13471,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = most_common $x 
 # or in a pipeline:
 @list |&gt; map most_common |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-moving-average">
+        <h3><a class="doc-anchor" href="#doc-moving-average">#</a> <code>moving_average</code></h3>
+        <p><code>moving_average</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = moving_average $x 
+# or in a pipeline:
+@list |&gt; map moving_average |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-mrow">
@@ -12579,6 +13589,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map mtrace |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-multinomial">
+        <h3><a class="doc-anchor" href="#doc-multinomial">#</a> <code>multinomial</code></h3>
+        <p><code>multinomial</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = multinomial $x 
+# or in a pipeline:
+@list |&gt; map multinomial |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-mzeros">
         <h3><a class="doc-anchor" href="#doc-mzeros">#</a> <code>mzeros</code></h3>
         <p><code>mzeros</code> — extended stdlib builtin. Alias for <code>matrix_zeros</code>.</p>
@@ -12593,6 +13611,20 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = nanoid $x 
 # or in a pipeline:
 @list |&gt; map nanoid |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-nato-phonetic">
+        <h3><a class="doc-anchor" href="#doc-nato-phonetic">#</a> <code>nato_phonetic</code></h3>
+        <p><code>nato_phonetic</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = nato_phonetic $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-neg-inf">
+        <h3><a class="doc-anchor" href="#doc-neg-inf">#</a> <code>neg_inf</code></h3>
+        <p><code>neg_inf</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = neg_inf $x 
+# or in a pipeline:
+@list |&gt; map neg_inf |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-neg-n">
@@ -12641,6 +13673,22 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = newtons_to_lbf $input 
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-next-permutation">
+        <h3><a class="doc-anchor" href="#doc-next-permutation">#</a> <code>next_permutation</code></h3>
+        <p><code>next_permutation</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = next_permutation $x 
+# or in a pipeline:
+@list |&gt; map next_permutation |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-next-prime">
+        <h3><a class="doc-anchor" href="#doc-next-prime">#</a> <code>next_prime</code></h3>
+        <p><code>next_prime</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = next_prime $x 
+# or in a pipeline:
+@list |&gt; map next_prime |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-nfirst">
         <h3><a class="doc-anchor" href="#doc-nfirst">#</a> <code>nfirst</code></h3>
         <p><code>nfirst</code> — algebraic match builtin.</p>
@@ -12655,6 +13703,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = nfs $x 
 # or in a pipeline:
 @list |&gt; map nfs |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ngrams">
+        <h3><a class="doc-anchor" href="#doc-ngrams">#</a> <code>ngrams</code></h3>
+        <p><code>ngrams</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = ngrams $x 
+# or in a pipeline:
+@list |&gt; map ngrams |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-nne">
@@ -12721,12 +13777,28 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map nop |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-normalize-array">
+        <h3><a class="doc-anchor" href="#doc-normalize-array">#</a> <code>normalize_array</code></h3>
+        <p><code>normalize_array</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = normalize_array $x 
+# or in a pipeline:
+@list |&gt; map normalize_array |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-normalize-list">
         <h3><a class="doc-anchor" href="#doc-normalize-list">#</a> <code>normalize_list</code></h3>
         <p><code>normalize_list</code> — functional combinators builtin.</p>
         <pre><code class="lang-perl">my $result = normalize_list $x 
 # or in a pipeline:
 @list |&gt; map normalize_list |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-normalize-range">
+        <h3><a class="doc-anchor" href="#doc-normalize-range">#</a> <code>normalize_range</code></h3>
+        <p><code>normalize_range</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = normalize_range $x 
+# or in a pipeline:
+@list |&gt; map normalize_range |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-normalize-spaces">
@@ -12809,6 +13881,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map now_us |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-npv">
+        <h3><a class="doc-anchor" href="#doc-npv">#</a> <code>npv</code></h3>
+        <p><code>npv</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = npv $x 
+# or in a pipeline:
+@list |&gt; map npv |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-nrmsp">
         <h3><a class="doc-anchor" href="#doc-nrmsp">#</a> <code>nrmsp</code></h3>
         <p><code>nrmsp</code> — extended stdlib builtin. Alias for <code>normalize_spaces</code>.</p>
@@ -12851,6 +13931,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = ntelm $x 
 # or in a pipeline:
 @list |&gt; map ntelm |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-nth-prime">
+        <h3><a class="doc-anchor" href="#doc-nth-prime">#</a> <code>nth_prime</code></h3>
+        <p><code>nth_prime</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = nth_prime $x 
+# or in a pipeline:
+@list |&gt; map nth_prime |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-nth-root">
@@ -12907,6 +13995,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = num_cpus $x 
 # or in a pipeline:
 @list |&gt; map num_cpus |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-num-divisors">
+        <h3><a class="doc-anchor" href="#doc-num-divisors">#</a> <code>num_divisors</code></h3>
+        <p><code>num_divisors</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = num_divisors $x 
+# or in a pipeline:
+@list |&gt; map num_divisors |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-numeric-count">
@@ -13307,6 +14403,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map partition_n |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-partition-number">
+        <h3><a class="doc-anchor" href="#doc-partition-number">#</a> <code>partition_number</code></h3>
+        <p><code>partition_number</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = partition_number $x 
+# or in a pipeline:
+@list |&gt; map partition_number |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-partition-point">
         <h3><a class="doc-anchor" href="#doc-partition-point">#</a> <code>partition_point</code></h3>
         <p><code>partition_point</code> — extended stdlib builtin.</p>
@@ -13357,6 +14461,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <h3><a class="doc-anchor" href="#doc-pascals-to-psi">#</a> <code>pascals_to_psi</code></h3>
         <p><code>pascals_to_psi</code> — file stat / path builtin.</p>
         <pre><code class="lang-perl">my $result = pascals_to_psi $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pascals-triangle">
+        <h3><a class="doc-anchor" href="#doc-pascals-triangle">#</a> <code>pascals_triangle</code></h3>
+        <p><code>pascals_triangle</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = pascals_triangle $x 
+# or in a pipeline:
+@list |&gt; map pascals_triangle |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pascrow">
@@ -13471,6 +14583,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map pct |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-peak-detect">
+        <h3><a class="doc-anchor" href="#doc-peak-detect">#</a> <code>peak_detect</code></h3>
+        <p><code>peak_detect</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = peak_detect $x 
+# or in a pipeline:
+@list |&gt; map peak_detect |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-peek-clj">
         <h3><a class="doc-anchor" href="#doc-peek-clj">#</a> <code>peek_clj</code></h3>
         <p><code>peek_clj</code> — algebraic match builtin.</p>
@@ -13487,6 +14607,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map peith |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-pentagonal-number">
+        <h3><a class="doc-anchor" href="#doc-pentagonal-number">#</a> <code>pentagonal_number</code></h3>
+        <p><code>pentagonal_number</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = pentagonal_number $x 
+# or in a pipeline:
+@list |&gt; map pentagonal_number |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-percent">
         <h3><a class="doc-anchor" href="#doc-percent">#</a> <code>percent</code></h3>
         <p><code>percent</code> — trivial numeric / predicate builtins builtin.</p>
@@ -13501,6 +14629,30 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = percentile $x 
 # or in a pipeline:
 @list |&gt; map percentile |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-perfect-numbers">
+        <h3><a class="doc-anchor" href="#doc-perfect-numbers">#</a> <code>perfect_numbers</code></h3>
+        <p><code>perfect_numbers</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = perfect_numbers $x 
+# or in a pipeline:
+@list |&gt; map perfect_numbers |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-perimeter-rectangle">
+        <h3><a class="doc-anchor" href="#doc-perimeter-rectangle">#</a> <code>perimeter_rectangle</code></h3>
+        <p><code>perimeter_rectangle</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = perimeter_rectangle $x 
+# or in a pipeline:
+@list |&gt; map perimeter_rectangle |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-perimeter-triangle">
+        <h3><a class="doc-anchor" href="#doc-perimeter-triangle">#</a> <code>perimeter_triangle</code></h3>
+        <p><code>perimeter_triangle</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = perimeter_triangle $x 
+# or in a pipeline:
+@list |&gt; map perimeter_triangle |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-perlrs-aliases">
@@ -13601,6 +14753,30 @@ keys %p |&gt; grep { scalar @{$p{$_}} } |&gt; sort |&gt; p
 @list |&gt; map pflt |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-phi">
+        <h3><a class="doc-anchor" href="#doc-phi">#</a> <code>phi</code></h3>
+        <p><code>phi</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = phi $x 
+# or in a pipeline:
+@list |&gt; map phi |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-phonetic-digit">
+        <h3><a class="doc-anchor" href="#doc-phonetic-digit">#</a> <code>phonetic_digit</code></h3>
+        <p><code>phonetic_digit</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = phonetic_digit $x 
+# or in a pipeline:
+@list |&gt; map phonetic_digit |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pi">
+        <h3><a class="doc-anchor" href="#doc-pi">#</a> <code>pi</code></h3>
+        <p><code>pi</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = pi $x 
+# or in a pipeline:
+@list |&gt; map pi |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-pick">
         <h3><a class="doc-anchor" href="#doc-pick">#</a> <code>pick</code></h3>
         <p><code>pick</code> — hash ops (batch 2) builtin. Alias for <code>pick_keys</code>.</p>
@@ -13623,6 +14799,14 @@ keys %p |&gt; grep { scalar @{$p{$_}} } |&gt; sort |&gt; p
         <pre><code class="lang-perl">my $result = pid $x 
 # or in a pipeline:
 @list |&gt; map pid |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pig-latin">
+        <h3><a class="doc-anchor" href="#doc-pig-latin">#</a> <code>pig_latin</code></h3>
+        <p><code>pig_latin</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = pig_latin $x 
+# or in a pipeline:
+@list |&gt; map pig_latin |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pint">
@@ -13671,6 +14855,14 @@ p $msg;   # hello from child
 @list |&gt; map planck |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-planck-constant">
+        <h3><a class="doc-anchor" href="#doc-planck-constant">#</a> <code>planck_constant</code></h3>
+        <p><code>planck_constant</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = planck_constant $x 
+# or in a pipeline:
+@list |&gt; map planck_constant |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-plur">
         <h3><a class="doc-anchor" href="#doc-plur">#</a> <code>plur</code></h3>
         <p><code>plur</code> — extended stdlib builtin. Alias for <code>pluralize</code>.</p>
@@ -13685,6 +14877,22 @@ p $msg;   # hello from child
         <pre><code class="lang-perl">my $result = pluralize $x 
 # or in a pipeline:
 @list |&gt; map pluralize |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-point-distance">
+        <h3><a class="doc-anchor" href="#doc-point-distance">#</a> <code>point_distance</code></h3>
+        <p><code>point_distance</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = point_distance $x 
+# or in a pipeline:
+@list |&gt; map point_distance |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-polygon-area">
+        <h3><a class="doc-anchor" href="#doc-polygon-area">#</a> <code>polygon_area</code></h3>
+        <p><code>polygon_area</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = polygon_area $x 
+# or in a pipeline:
+@list |&gt; map polygon_area |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pop-clj">
@@ -13823,12 +15031,44 @@ p $msg;   # hello from child
 @list |&gt; map present_value |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-prev-prime">
+        <h3><a class="doc-anchor" href="#doc-prev-prime">#</a> <code>prev_prime</code></h3>
+        <p><code>prev_prime</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = prev_prime $x 
+# or in a pipeline:
+@list |&gt; map prev_prime |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-prime-factors">
+        <h3><a class="doc-anchor" href="#doc-prime-factors">#</a> <code>prime_factors</code></h3>
+        <p><code>prime_factors</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = prime_factors $x 
+# or in a pipeline:
+@list |&gt; map prime_factors |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-prime-pi">
+        <h3><a class="doc-anchor" href="#doc-prime-pi">#</a> <code>prime_pi</code></h3>
+        <p><code>prime_pi</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = prime_pi $x 
+# or in a pipeline:
+@list |&gt; map prime_pi |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-primes-seq">
         <h3><a class="doc-anchor" href="#doc-primes-seq">#</a> <code>primes_seq</code></h3>
         <p><code>primes_seq</code> — sequences builtin.</p>
         <pre><code class="lang-perl">my $result = primes_seq $x 
 # or in a pipeline:
 @list |&gt; map primes_seq |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-primes-up-to">
+        <h3><a class="doc-anchor" href="#doc-primes-up-to">#</a> <code>primes_up_to</code></h3>
+        <p><code>primes_up_to</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = primes_up_to $x 
+# or in a pipeline:
+@list |&gt; map primes_up_to |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-product-list">
@@ -13845,6 +15085,14 @@ p $msg;   # hello from child
         <pre><code class="lang-perl">my $result = product_of $x 
 # or in a pipeline:
 @list |&gt; map product_of |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-proton-mass">
+        <h3><a class="doc-anchor" href="#doc-proton-mass">#</a> <code>proton_mass</code></h3>
+        <p><code>proton_mass</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = proton_mass $x 
+# or in a pipeline:
+@list |&gt; map proton_mass |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-psi-to-pascals">
@@ -14003,6 +15251,14 @@ p $msg;   # hello from child
 @list |&gt; map random_choice |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-random-color">
+        <h3><a class="doc-anchor" href="#doc-random-color">#</a> <code>random_color</code></h3>
+        <p><code>random_color</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = random_color $x 
+# or in a pipeline:
+@list |&gt; map random_color |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-random-digit">
         <h3><a class="doc-anchor" href="#doc-random-digit">#</a> <code>random_digit</code></h3>
         <p><code>random_digit</code> — random builtin.</p>
@@ -14043,12 +15299,28 @@ p $msg;   # hello from child
 @list |&gt; map random_string |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-range-compress">
+        <h3><a class="doc-anchor" href="#doc-range-compress">#</a> <code>range_compress</code></h3>
+        <p><code>range_compress</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = range_compress $x 
+# or in a pipeline:
+@list |&gt; map range_compress |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-range-exclusive">
         <h3><a class="doc-anchor" href="#doc-range-exclusive">#</a> <code>range_exclusive</code></h3>
         <p><code>range_exclusive</code> — conversion / utility (batch 4) builtin.</p>
         <pre><code class="lang-perl">my $result = range_exclusive $x 
 # or in a pipeline:
 @list |&gt; map range_exclusive |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-range-expand">
+        <h3><a class="doc-anchor" href="#doc-range-expand">#</a> <code>range_expand</code></h3>
+        <p><code>range_expand</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = range_expand $x 
+# or in a pipeline:
+@list |&gt; map range_expand |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-range-inclusive">
@@ -14267,6 +15539,14 @@ p $msg;   # hello from child
 @list |&gt; map remove_clj |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-remove-consonants">
+        <h3><a class="doc-anchor" href="#doc-remove-consonants">#</a> <code>remove_consonants</code></h3>
+        <p><code>remove_consonants</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = remove_consonants $x 
+# or in a pipeline:
+@list |&gt; map remove_consonants |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-remove-elem">
         <h3><a class="doc-anchor" href="#doc-remove-elem">#</a> <code>remove_elem</code></h3>
         <p><code>remove_elem</code> — list helpers (batch 4) builtin.</p>
@@ -14297,6 +15577,14 @@ p $msg;   # hello from child
         <pre><code class="lang-perl">my $result = remove_str $x 
 # or in a pipeline:
 @list |&gt; map remove_str |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-remove-vowels">
+        <h3><a class="doc-anchor" href="#doc-remove-vowels">#</a> <code>remove_vowels</code></h3>
+        <p><code>remove_vowels</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = remove_vowels $x 
+# or in a pipeline:
+@list |&gt; map remove_vowels |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-remove-whitespace">
@@ -14427,6 +15715,14 @@ p $msg;   # hello from child
 @list |&gt; map repv |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-reservoir-sample">
+        <h3><a class="doc-anchor" href="#doc-reservoir-sample">#</a> <code>reservoir_sample</code></h3>
+        <p><code>reservoir_sample</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = reservoir_sample $x 
+# or in a pipeline:
+@list |&gt; map reservoir_sample |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-reset">
         <h3><a class="doc-anchor" href="#doc-reset">#</a> <code>reset</code></h3>
         <p><code>reset</code> — process / system builtin.</p>
@@ -14467,6 +15763,14 @@ p $msg;   # hello from child
 @list |&gt; map reverse_each |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-reverse-each-word">
+        <h3><a class="doc-anchor" href="#doc-reverse-each-word">#</a> <code>reverse_each_word</code></h3>
+        <p><code>reverse_each_word</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = reverse_each_word $x 
+# or in a pipeline:
+@list |&gt; map reverse_each_word |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-reverse-list">
         <h3><a class="doc-anchor" href="#doc-reverse-list">#</a> <code>reverse_list</code></h3>
         <p><code>reverse_list</code> — file stat / path builtin.</p>
@@ -14495,6 +15799,18 @@ p $msg;   # hello from child
         <h3><a class="doc-anchor" href="#doc-rgb-to-hex">#</a> <code>rgb_to_hex</code></h3>
         <p><code>rgb_to_hex</code> — color / ansi builtin.</p>
         <pre><code class="lang-perl">my $result = rgb_to_hex $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rgb-to-hsl">
+        <h3><a class="doc-anchor" href="#doc-rgb-to-hsl">#</a> <code>rgb_to_hsl</code></h3>
+        <p><code>rgb_to_hsl</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = rgb_to_hsl $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rgb-to-hsv">
+        <h3><a class="doc-anchor" href="#doc-rgb-to-hsv">#</a> <code>rgb_to_hsv</code></h3>
+        <p><code>rgb_to_hsv</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = rgb_to_hsv $input 
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-ridx">
@@ -14609,6 +15925,36 @@ p $msg;   # hello from child
 @list |&gt; map rnk |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-roi">
+        <h3><a class="doc-anchor" href="#doc-roi">#</a> <code>roi</code></h3>
+        <p><code>roi</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = roi $x 
+# or in a pipeline:
+@list |&gt; map roi |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-roman-add">
+        <h3><a class="doc-anchor" href="#doc-roman-add">#</a> <code>roman_add</code></h3>
+        <p><code>roman_add</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = roman_add $x 
+# or in a pipeline:
+@list |&gt; map roman_add |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-roman-numeral-list">
+        <h3><a class="doc-anchor" href="#doc-roman-numeral-list">#</a> <code>roman_numeral_list</code></h3>
+        <p><code>roman_numeral_list</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = roman_numeral_list $x 
+# or in a pipeline:
+@list |&gt; map roman_numeral_list |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-roman-to-int">
+        <h3><a class="doc-anchor" href="#doc-roman-to-int">#</a> <code>roman_to_int</code></h3>
+        <p><code>roman_to_int</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = roman_to_int $input 
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-rot13">
         <h3><a class="doc-anchor" href="#doc-rot13">#</a> <code>rot13</code></h3>
         <p><code>rot13</code> — string (batch 2) builtin.</p>
@@ -14697,12 +16043,28 @@ p $msg;   # hello from child
 @list |&gt; map run_length_decode |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-run-length-decode-str">
+        <h3><a class="doc-anchor" href="#doc-run-length-decode-str">#</a> <code>run_length_decode_str</code></h3>
+        <p><code>run_length_decode_str</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = run_length_decode_str $x 
+# or in a pipeline:
+@list |&gt; map run_length_decode_str |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-run-length-encode">
         <h3><a class="doc-anchor" href="#doc-run-length-encode">#</a> <code>run_length_encode</code></h3>
         <p><code>run_length_encode</code> — collection more builtin.</p>
         <pre><code class="lang-perl">my $result = run_length_encode $x 
 # or in a pipeline:
 @list |&gt; map run_length_encode |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-run-length-encode-str">
+        <h3><a class="doc-anchor" href="#doc-run-length-encode-str">#</a> <code>run_length_encode_str</code></h3>
+        <p><code>run_length_encode_str</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = run_length_encode_str $x 
+# or in a pipeline:
+@list |&gt; map run_length_encode_str |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-running-max">
@@ -15143,6 +16505,14 @@ p $msg;   # hello from child
 @list |&gt; map shuffled |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-sierpinski">
+        <h3><a class="doc-anchor" href="#doc-sierpinski">#</a> <code>sierpinski</code></h3>
+        <p><code>sierpinski</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = sierpinski $x 
+# or in a pipeline:
+@list |&gt; map sierpinski |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-sigmoid">
         <h3><a class="doc-anchor" href="#doc-sigmoid">#</a> <code>sigmoid</code></h3>
         <p><code>sigmoid</code> — math functions builtin.</p>
@@ -15229,6 +16599,14 @@ p $msg;   # hello from child
         <pre><code class="lang-perl">p size &quot;Cargo.toml&quot;;                   # 2013
 f |&gt; map +{ $_ =&gt; size } |&gt; tj |&gt; p;   # [{name =&gt; bytes}, ...]
 f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-skewness">
+        <h3><a class="doc-anchor" href="#doc-skewness">#</a> <code>skewness</code></h3>
+        <p><code>skewness</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = skewness $x 
+# or in a pipeline:
+@list |&gt; map skewness |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-skip-while">
@@ -15319,6 +16697,14 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
 @list |&gt; map sliding_window |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-slope">
+        <h3><a class="doc-anchor" href="#doc-slope">#</a> <code>slope</code></h3>
+        <p><code>slope</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = slope $x 
+# or in a pipeline:
+@list |&gt; map slope |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-slug">
         <h3><a class="doc-anchor" href="#doc-slug">#</a> <code>slug</code></h3>
         <p><code>slug</code> — extended stdlib builtin. Alias for <code>slugify</code>.</p>
@@ -15357,6 +16743,12 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
         <pre><code class="lang-perl">my $result = smst $x 
 # or in a pipeline:
 @list |&gt; map smst |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-snake-to-camel">
+        <h3><a class="doc-anchor" href="#doc-snake-to-camel">#</a> <code>snake_to_camel</code></h3>
+        <p><code>snake_to_camel</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = snake_to_camel $input 
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-snd">
@@ -15407,6 +16799,14 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
 @list |&gt; map soh |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-sol">
+        <h3><a class="doc-anchor" href="#doc-sol">#</a> <code>sol</code></h3>
+        <p><code>sol</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = sol $x 
+# or in a pipeline:
+@list |&gt; map sol |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-sole">
         <h3><a class="doc-anchor" href="#doc-sole">#</a> <code>sole</code></h3>
         <p><code>sole</code> — ruby enumerable extras builtin.</p>
@@ -15445,6 +16845,14 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
         <pre><code class="lang-perl">my $result = sort_on $x 
 # or in a pipeline:
 @list |&gt; map sort_on |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sort-words">
+        <h3><a class="doc-anchor" href="#doc-sort-words">#</a> <code>sort_words</code></h3>
+        <p><code>sort_words</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = sort_words $x 
+# or in a pipeline:
+@list |&gt; map sort_words |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-sorted">
@@ -15549,6 +16957,22 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
         <pre><code class="lang-perl">my $result = speed_of_light $x 
 # or in a pipeline:
 @list |&gt; map speed_of_light |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sphere-surface">
+        <h3><a class="doc-anchor" href="#doc-sphere-surface">#</a> <code>sphere_surface</code></h3>
+        <p><code>sphere_surface</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = sphere_surface $x 
+# or in a pipeline:
+@list |&gt; map sphere_surface |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sphere-volume">
+        <h3><a class="doc-anchor" href="#doc-sphere-volume">#</a> <code>sphere_volume</code></h3>
+        <p><code>sphere_volume</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = sphere_volume $x 
+# or in a pipeline:
+@list |&gt; map sphere_volume |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-split-at">
@@ -15679,6 +17103,14 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
 @list |&gt; map stack_new |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-standard-error">
+        <h3><a class="doc-anchor" href="#doc-standard-error">#</a> <code>standard_error</code></h3>
+        <p><code>standard_error</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = standard_error $x 
+# or in a pipeline:
+@list |&gt; map standard_error |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-starmap">
         <h3><a class="doc-anchor" href="#doc-starmap">#</a> <code>starmap</code></h3>
         <p><code>starmap</code> — python/ruby stdlib builtin.</p>
@@ -15749,6 +17181,22 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
 @list |&gt; map string_count |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-string-distance">
+        <h3><a class="doc-anchor" href="#doc-string-distance">#</a> <code>string_distance</code></h3>
+        <p><code>string_distance</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = string_distance $x 
+# or in a pipeline:
+@list |&gt; map string_distance |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-string-multiply">
+        <h3><a class="doc-anchor" href="#doc-string-multiply">#</a> <code>string_multiply</code></h3>
+        <p><code>string_multiply</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = string_multiply $x 
+# or in a pipeline:
+@list |&gt; map string_multiply |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-string-sort">
         <h3><a class="doc-anchor" href="#doc-string-sort">#</a> <code>string_sort</code></h3>
         <p><code>string_sort</code> — string helpers (batch 4) builtin.</p>
@@ -15779,6 +17227,14 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
 @list |&gt; map strip_ansi |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-strip-html">
+        <h3><a class="doc-anchor" href="#doc-strip-html">#</a> <code>strip_html</code></h3>
+        <p><code>strip_html</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = strip_html $x 
+# or in a pipeline:
+@list |&gt; map strip_html |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-strip-prefix">
         <h3><a class="doc-anchor" href="#doc-strip-prefix">#</a> <code>strip_prefix</code></h3>
         <p><code>strip_prefix</code> — path helpers builtin.</p>
@@ -15793,6 +17249,22 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
         <pre><code class="lang-perl">my $result = strip_suffix $x 
 # or in a pipeline:
 @list |&gt; map strip_suffix |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-subfactorial">
+        <h3><a class="doc-anchor" href="#doc-subfactorial">#</a> <code>subfactorial</code></h3>
+        <p><code>subfactorial</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = subfactorial $x 
+# or in a pipeline:
+@list |&gt; map subfactorial |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-subscript">
+        <h3><a class="doc-anchor" href="#doc-subscript">#</a> <code>subscript</code></h3>
+        <p><code>subscript</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = subscript $x 
+# or in a pipeline:
+@list |&gt; map subscript |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-subseqs">
@@ -15843,6 +17315,14 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
 @list |&gt; map sum_by |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-sum-divisors">
+        <h3><a class="doc-anchor" href="#doc-sum-divisors">#</a> <code>sum_divisors</code></h3>
+        <p><code>sum_divisors</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = sum_divisors $x 
+# or in a pipeline:
+@list |&gt; map sum_divisors |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-sum-list">
         <h3><a class="doc-anchor" href="#doc-sum-list">#</a> <code>sum_list</code></h3>
         <p><code>sum_list</code> — list helpers (batch 4) builtin.</p>
@@ -15881,6 +17361,14 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
         <pre><code class="lang-perl">my $result = sumsq $x 
 # or in a pipeline:
 @list |&gt; map sumsq |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-superscript">
+        <h3><a class="doc-anchor" href="#doc-superscript">#</a> <code>superscript</code></h3>
+        <p><code>superscript</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = superscript $x 
+# or in a pipeline:
+@list |&gt; map superscript |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-sw">
@@ -16027,6 +17515,22 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
 @list |&gt; map tap_val |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-tau">
+        <h3><a class="doc-anchor" href="#doc-tau">#</a> <code>tau</code></h3>
+        <p><code>tau</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = tau $x 
+# or in a pipeline:
+@list |&gt; map tau |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-tax">
+        <h3><a class="doc-anchor" href="#doc-tax">#</a> <code>tax</code></h3>
+        <p><code>tax</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = tax $x 
+# or in a pipeline:
+@list |&gt; map tax |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-tax-amount">
         <h3><a class="doc-anchor" href="#doc-tax-amount">#</a> <code>tax_amount</code></h3>
         <p><code>tax_amount</code> — physics formulas builtin.</p>
@@ -16155,6 +17659,14 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
 @list |&gt; map timf |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-tip">
+        <h3><a class="doc-anchor" href="#doc-tip">#</a> <code>tip</code></h3>
+        <p><code>tip</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = tip $x 
+# or in a pipeline:
+@list |&gt; map tip |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-tip-amount">
         <h3><a class="doc-anchor" href="#doc-tip-amount">#</a> <code>tip_amount</code></h3>
         <p><code>tip_amount</code> — physics formulas builtin.</p>
@@ -16221,6 +17733,12 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
         <h3><a class="doc-anchor" href="#doc-to-csv-line">#</a> <code>to_csv_line</code></h3>
         <p><code>to_csv_line</code> — string helpers (batch 4) builtin.</p>
         <pre><code class="lang-perl">my $result = to_csv_line $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-to-emoji-num">
+        <h3><a class="doc-anchor" href="#doc-to-emoji-num">#</a> <code>to_emoji_num</code></h3>
+        <p><code>to_emoji_num</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = to_emoji_num $input 
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-to-float">
@@ -16308,6 +17826,12 @@ p $allowed-&gt;contains(&quot;foo&quot;)
         <pre><code class="lang-perl">my $result = to_string $input 
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-to-string-val">
+        <h3><a class="doc-anchor" href="#doc-to-string-val">#</a> <code>to_string_val</code></h3>
+        <p><code>to_string_val</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = to_string_val $input 
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-toasc">
         <h3><a class="doc-anchor" href="#doc-toasc">#</a> <code>toasc</code></h3>
         <p><code>toasc</code> — extended stdlib builtin. Alias for <code>to_ascii</code>.</p>
@@ -16364,12 +17888,28 @@ p $allowed-&gt;contains(&quot;foo&quot;)
 @list |&gt; map toposort |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-totient-sum">
+        <h3><a class="doc-anchor" href="#doc-totient-sum">#</a> <code>totient_sum</code></h3>
+        <p><code>totient_sum</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = totient_sum $x 
+# or in a pipeline:
+@list |&gt; map totient_sum |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-touch">
         <h3><a class="doc-anchor" href="#doc-touch">#</a> <code>touch</code></h3>
         <p><code>touch</code> — filesystem extensions builtin.</p>
         <pre><code class="lang-perl">my $result = touch $x 
 # or in a pipeline:
 @list |&gt; map touch |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-tower-of-hanoi">
+        <h3><a class="doc-anchor" href="#doc-tower-of-hanoi">#</a> <code>tower_of_hanoi</code></h3>
+        <p><code>tower_of_hanoi</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = tower_of_hanoi $x 
+# or in a pipeline:
+@list |&gt; map tower_of_hanoi |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-trailing-zeros">
@@ -16412,12 +17952,44 @@ p $allowed-&gt;contains(&quot;foo&quot;)
 @list |&gt; map trev |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-triangle-hypotenuse">
+        <h3><a class="doc-anchor" href="#doc-triangle-hypotenuse">#</a> <code>triangle_hypotenuse</code></h3>
+        <p><code>triangle_hypotenuse</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = triangle_hypotenuse $x 
+# or in a pipeline:
+@list |&gt; map triangle_hypotenuse |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-triangular-number">
+        <h3><a class="doc-anchor" href="#doc-triangular-number">#</a> <code>triangular_number</code></h3>
+        <p><code>triangular_number</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = triangular_number $x 
+# or in a pipeline:
+@list |&gt; map triangular_number |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-triangular-seq">
         <h3><a class="doc-anchor" href="#doc-triangular-seq">#</a> <code>triangular_seq</code></h3>
         <p><code>triangular_seq</code> — sequences builtin.</p>
         <pre><code class="lang-perl">my $result = triangular_seq $x 
 # or in a pipeline:
 @list |&gt; map triangular_seq |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-tribonacci">
+        <h3><a class="doc-anchor" href="#doc-tribonacci">#</a> <code>tribonacci</code></h3>
+        <p><code>tribonacci</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = tribonacci $x 
+# or in a pipeline:
+@list |&gt; map tribonacci |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-trigrams">
+        <h3><a class="doc-anchor" href="#doc-trigrams">#</a> <code>trigrams</code></h3>
+        <p><code>trigrams</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = trigrams $x 
+# or in a pipeline:
+@list |&gt; map trigrams |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-trim-each">
@@ -16484,6 +18056,14 @@ p $allowed-&gt;contains(&quot;foo&quot;)
 @list |&gt; map truncn |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-truth-table">
+        <h3><a class="doc-anchor" href="#doc-truth-table">#</a> <code>truth_table</code></h3>
+        <p><code>truth_table</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = truth_table $x 
+# or in a pipeline:
+@list |&gt; map truth_table |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-truthy-count">
         <h3><a class="doc-anchor" href="#doc-truthy-count">#</a> <code>truthy_count</code></h3>
         <p><code>truthy_count</code> — counters (batch 4) builtin.</p>
@@ -16532,6 +18112,14 @@ p $allowed-&gt;contains(&quot;foo&quot;)
 @list |&gt; map tvals |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-twin-primes">
+        <h3><a class="doc-anchor" href="#doc-twin-primes">#</a> <code>twin_primes</code></h3>
+        <p><code>twin_primes</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = twin_primes $x 
+# or in a pipeline:
+@list |&gt; map twin_primes |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-txaft">
         <h3><a class="doc-anchor" href="#doc-txaft">#</a> <code>txaft</code></h3>
         <p><code>txaft</code> — extended stdlib builtin. Alias for <code>text_after</code>.</p>
@@ -16578,6 +18166,14 @@ p $allowed-&gt;contains(&quot;foo&quot;)
         <pre><code class="lang-perl">my $result = type_each $x 
 # or in a pipeline:
 @list |&gt; map type_each |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-type-of">
+        <h3><a class="doc-anchor" href="#doc-type-of">#</a> <code>type_of</code></h3>
+        <p><code>type_of</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = type_of $x 
+# or in a pipeline:
+@list |&gt; map type_of |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-tz">
@@ -16674,6 +18270,14 @@ p $allowed-&gt;contains(&quot;foo&quot;)
         <pre><code class="lang-perl">my $result = unique_count_of $x 
 # or in a pipeline:
 @list |&gt; map unique_count_of |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-unique-words">
+        <h3><a class="doc-anchor" href="#doc-unique-words">#</a> <code>unique_words</code></h3>
+        <p><code>unique_words</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = unique_words $x 
+# or in a pipeline:
+@list |&gt; map unique_words |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-unit-vec">
@@ -17064,6 +18668,14 @@ p $allowed-&gt;contains(&quot;foo&quot;)
 @list |&gt; map weekday_short |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-weighted-mean">
+        <h3><a class="doc-anchor" href="#doc-weighted-mean">#</a> <code>weighted_mean</code></h3>
+        <p><code>weighted_mean</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = weighted_mean $x 
+# or in a pipeline:
+@list |&gt; map weighted_mean |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-weighted-sample">
         <h3><a class="doc-anchor" href="#doc-weighted-sample">#</a> <code>weighted_sample</code></h3>
         <p><code>weighted_sample</code> — extended stdlib builtin.</p>
@@ -17145,6 +18757,14 @@ p scalar wha(&quot;perl&quot;);        # number of perls on PATH
 @list |&gt; map winn |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-winsorize">
+        <h3><a class="doc-anchor" href="#doc-winsorize">#</a> <code>winsorize</code></h3>
+        <p><code>winsorize</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = winsorize $x 
+# or in a pipeline:
+@list |&gt; map winsorize |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-without">
         <h3><a class="doc-anchor" href="#doc-without">#</a> <code>without</code></h3>
         <p><code>without</code> — file stat / path builtin.</p>
@@ -17167,6 +18787,14 @@ p scalar wha(&quot;perl&quot;);        # number of perls on PATH
         <pre><code class="lang-perl">my $result = word_count $x 
 # or in a pipeline:
 @list |&gt; map word_count |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-word-frequencies">
+        <h3><a class="doc-anchor" href="#doc-word-frequencies">#</a> <code>word_frequencies</code></h3>
+        <p><code>word_frequencies</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = word_frequencies $x 
+# or in a pipeline:
+@list |&gt; map word_frequencies |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-word-wrap-text">
@@ -17287,6 +18915,14 @@ p scalar wha(&quot;perl&quot;);        # number of perls on PATH
 @list |&gt; map yesterday |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-zalgo">
+        <h3><a class="doc-anchor" href="#doc-zalgo">#</a> <code>zalgo</code></h3>
+        <p><code>zalgo</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = zalgo $x 
+# or in a pipeline:
+@list |&gt; map zalgo |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-zall">
         <h3><a class="doc-anchor" href="#doc-zall">#</a> <code>zall</code></h3>
         <p><code>zall</code> — go/general functional utilities builtin. Alias for <code>zip_all</code>.</p>
@@ -17301,6 +18937,14 @@ p scalar wha(&quot;perl&quot;);        # number of perls on PATH
         <pre><code class="lang-perl">my $result = zero $x 
 # or in a pipeline:
 @list |&gt; map zero |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-zero-crossings">
+        <h3><a class="doc-anchor" href="#doc-zero-crossings">#</a> <code>zero_crossings</code></h3>
+        <p><code>zero_crossings</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = zero_crossings $x 
+# or in a pipeline:
+@list |&gt; map zero_crossings |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-zeros">
