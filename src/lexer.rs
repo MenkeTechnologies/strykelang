@@ -1584,6 +1584,8 @@ impl Lexer {
                 // Keywords that expect a variable next should not set last_was_term
                 // so that % is parsed as hash sigil, not modulo
                 self.last_was_term = match ident.as_str() {
+                    // Keywords/builtins that always expect arguments — never a term,
+                    // so the next `/` is always a regex start.
                     "my"
                     | "mysync"
                     | "frozen"
@@ -1779,18 +1781,11 @@ impl Lexer {
                     | "flat_map"
                     | "group_by"
                     | "chunk_by"
-                    | "bench"
-                    | "thread"
-                    | "t" => {
-                        // After an operator (last_was_term = false), these are regular
-                        // identifiers acting as operands (e.g., `$x / t / 2` — `t` is
-                        // a variable, not the thread keyword). In this case, after `t`
-                        // we're after a term: return true.
-                        // At statement start (last_was_term = true means prior statement
-                        // ended), `t` is the thread keyword expecting arguments, so
-                        // return false to allow regex next.
-                        !self.last_was_term
-                    }
+                    | "bench" => false,
+                    // `thread`/`t` are ambiguous: at statement start they're the
+                    // thread keyword (expect args → false), but after an operator
+                    // they could be variable names (e.g., `$x / t / 2` → true).
+                    "thread" | "t" => !self.last_was_term,
                     _ => matches!(tok, Token::Ident(_)),
                 };
                 Ok(tok)

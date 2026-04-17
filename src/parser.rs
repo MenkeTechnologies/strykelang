@@ -1682,7 +1682,6 @@ impl Parser {
                             && matches!(self.peek_at(1), Token::Regex(..))
                         {
                             // The `m` (or s/tr/y/qr) is our pattern, the Regex token was misparsed
-                            let pattern = ident_s.clone();
                             self.advance(); // consume the ident
                                             // The Token::Regex after it was a misparsed `m/...` - we need to
                                             // extract what would have been the closing `/` situation.
