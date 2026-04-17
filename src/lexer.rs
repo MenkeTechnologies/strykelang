@@ -17,6 +17,10 @@ pub struct Lexer {
     last_was_term: bool,
     /// Source path for [`PerlError`] (e.g. real script or required `.pm` path).
     error_file: String,
+    /// When > 0, the lexer treats `m` followed by `/` as a plain identifier
+    /// instead of `m//` regex syntax. Used in thread/pipeline stages where
+    /// `/m/` should be a regex grep filter, not `m//`.
+    pub suppress_m_regex: u32,
 }
 
 impl Lexer {
@@ -31,6 +35,7 @@ impl Lexer {
             line: 1,
             last_was_term: false,
             error_file: file.into(),
+            suppress_m_regex: 0,
         }
     }
 
@@ -1393,37 +1398,55 @@ impl Lexer {
                         return Ok(Token::Regex(pattern, flags, delim));
                     }
                     "m" => {
-                        // m/pattern/flags
-                        if let Some(delim) = self.peek() {
-                            if !delim.is_alphanumeric() && delim != '_' {
-                                self.advance();
-                                let close = match delim {
-                                    '(' => ')',
-                                    '[' => ']',
-                                    '{' => '}',
-                                    '<' => '>',
-                                    c => c,
-                                };
-                                let mut pattern = String::new();
-                                loop {
-                                    match self.advance() {
-                                        Some('\\') => {
-                                            pattern.push('\\');
-                                            if let Some(c) = self.advance() {
-                                                pattern.push(c);
+                        // m/pattern/flags — try parsing as regex, but backtrack if
+                        // unterminated (handles thread stages where `/m/` is a grep filter)
+                        if self.suppress_m_regex == 0 {
+                            if let Some(delim) = self.peek() {
+                                if !delim.is_alphanumeric() && delim != '_' {
+                                    // Save state for backtracking
+                                    let saved_pos = self.pos;
+                                    let saved_line = self.line;
+                                    self.advance(); // consume delimiter
+                                    let close = match delim {
+                                        '(' => ')',
+                                        '[' => ']',
+                                        '{' => '}',
+                                        '<' => '>',
+                                        c => c,
+                                    };
+                                    let mut pattern = String::new();
+                                    let mut terminated = true;
+                                    loop {
+                                        match self.advance() {
+                                            Some('\\') => {
+                                                pattern.push('\\');
+                                                if let Some(c) = self.advance() {
+                                                    pattern.push(c);
+                                                }
+                                            }
+                                            Some(c) if c == close => break,
+                                            Some(c) if c == '\n' && close == '/' => {
+                                                // Newline before closing / — not a valid m//
+                                                terminated = false;
+                                                break;
+                                            }
+                                            Some(c) => pattern.push(c),
+                                            None => {
+                                                terminated = false;
+                                                break;
                                             }
                                         }
-                                        Some(c) if c == close => break,
-                                        Some(c) => pattern.push(c),
-                                        None => {
-                                            return Err(self
-                                                .syntax_err("Unterminated m// pattern", self.line))
-                                        }
                                     }
+                                    if terminated {
+                                        let flags =
+                                            self.read_while(|c| REGEX_FLAG_CHARS.contains(c));
+                                        self.last_was_term = true;
+                                        return Ok(Token::Regex(pattern, flags, delim));
+                                    }
+                                    // Backtrack: treat `m` as a plain identifier
+                                    self.pos = saved_pos;
+                                    self.line = saved_line;
                                 }
-                                let flags = self.read_while(|c| REGEX_FLAG_CHARS.contains(c));
-                                self.last_was_term = true;
-                                return Ok(Token::Regex(pattern, flags, delim));
                             }
                         }
                         // Just the identifier 'm'
