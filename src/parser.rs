@@ -10315,7 +10315,7 @@ impl Parser {
             | "cons" | "conj"
             | "peek_clj" | "pkc" | "pop_clj" | "popc"
             | "some" | "not_any" | "not_every"
-            | "comp" | "compose" | "partial" | "constantly" | "const" | "complement" | "compl"
+            | "comp" | "compose" | "partial" | "constantly" | "complement" | "compl"
             | "fnil" | "juxt"
             | "memoize" | "memo" | "curry" | "once"
             | "deep_clone" | "dclone" | "deep_merge" | "dmerge" | "deep_equal" | "deq"

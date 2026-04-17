@@ -3475,171 +3475,6 @@ EOF
     );
 }
 
-#[test]
-fn struct_basic_decl_and_named_construct() {
-    let s = r#"
-        struct Point { x => Float, y => Float };
-        my $p = Point(x => 1.5, y => 2.0);
-        $p->x + $p->y;
-    "#;
-    assert_eq!(rf(s), 3.5);
-}
-
-#[test]
-fn struct_positional_construct() {
-    let s = r#"
-        struct Point { x => Float, y => Float };
-        my $p = Point(10.0, 20.0);
-        $p->x . "," . $p->y;
-    "#;
-    assert_eq!(rs(s), "10,20");
-}
-
-#[test]
-fn struct_default_values() {
-    let s = r#"
-        struct Config { timeout => Int = 30, retries => Int = 3 };
-        my $c = Config(retries => 5);
-        $c->timeout . "," . $c->retries;
-    "#;
-    assert_eq!(rs(s), "30,5");
-}
-
-#[test]
-fn struct_field_setter() {
-    let s = r#"
-        struct Point { x => Float, y => Float };
-        my $p = Point(1.0, 2.0);
-        $p->x(5.5);
-        $p->x;
-    "#;
-    assert_eq!(rf(s), 5.5);
-}
-
-#[test]
-fn struct_functional_update_with() {
-    let s = r#"
-        struct Point { x => Float, y => Float };
-        my $p1 = Point(1.0, 2.0);
-        my $p2 = $p1->with(y => 10.0);
-        $p1->y . "," . $p2->y;
-    "#;
-    assert_eq!(rs(s), "2,10");
-}
-
-#[test]
-fn struct_user_defined_method() {
-    let s = r#"
-        struct Circle {
-            radius => Float,
-            fn area { 3 * $self->radius ** 2 }
-        };
-        my $c = Circle(radius => 5);
-        $c->area;
-    "#;
-    assert_eq!(ri(s), 75);
-}
-
-#[test]
-fn struct_structural_equality() {
-    let s = r#"
-        struct Point { x => Int, y => Int };
-        my $a = Point(1, 2);
-        my $b = Point(1, 2);
-        my $c = Point(1, 3);
-        ($a == $b) . "," . ($a == $c);
-    "#;
-    assert_eq!(rs(s), "1,0");
-}
-
-#[test]
-fn struct_to_hash() {
-    let s = r#"
-        struct Point { x => Int, y => Int };
-        my $p = Point(10, 20);
-        my $h = $p->to_hash;
-        $h->{x} + $h->{y};
-    "#;
-    assert_eq!(ri(s), 30);
-}
-
-#[test]
-fn struct_fields_method() {
-    let s = r#"
-        struct Point { x, y, z };
-        join ",", Point()->fields;
-    "#;
-    assert_eq!(rs(s), "x,y,z");
-}
-
-#[test]
-fn struct_type_checking_at_construction() {
-    let s = r#"
-        struct Point { x => Int };
-        Point(x => "not an int");
-    "#;
-    let res = run(s);
-    assert!(res.is_err());
-    assert!(format!("{}", res.unwrap_err()).contains("expected Int"));
-}
-
-#[test]
-fn struct_type_checking_at_mutation() {
-    let s = r#"
-        struct Point { x => Int };
-        my $p = Point(x => 1);
-        $p->x("oops");
-    "#;
-    let res = run(s);
-    assert!(res.is_err());
-}
-
-#[test]
-fn struct_nested() {
-    let s = r#"
-        struct Point { x => Int, y => Int };
-        struct Rect { top_left => Point, bottom_right => Point };
-        my $r = Rect(
-            top_left => Point(0, 0),
-            bottom_right => Point(10, 10)
-        );
-        $r->bottom_right->x;
-    "#;
-    assert_eq!(ri(s), 10);
-}
-
-#[test]
-fn struct_oo_style_new() {
-    let s = r#"
-        struct Point { x => Int, y => Int };
-        my $p = Point->new(x => 5, y => 10);
-        $p->x;
-    "#;
-    assert_eq!(ri(s), 5);
-}
-
-#[test]
-fn struct_clone() {
-    let s = r#"
-        struct Point { x => Int };
-        my $p1 = Point(1);
-        my $p2 = $p1->clone;
-        $p2->x(2);
-        $p1->x;
-    "#;
-    assert_eq!(ri(s), 1);
-}
-
-#[test]
-fn struct_stringify_and_eval() {
-    let s = r#"
-        struct Point { x => Int, y => Int };
-        my $p = Point(1, 2);
-        "$p";
-    "#;
-    assert_eq!(rs(s), "Point(x => 1, y => 2)");
-}
-
 // ── Higher-order function wrappers ─────────────────────────────────────
 
 #[test]
@@ -3777,4 +3612,216 @@ fn tally_counts() {
         join ",", $t->{a}, $t->{b}, $t->{c};
     "#;
     assert_eq!(rs(s), "3,2,1");
+}
+
+#[test]
+fn struct_basic_decl_and_named_construct() {
+    let s = r#"
+        struct Point { x => Float, y => Float };
+        my $p = Point(x => 1.5, y => 2.0);
+        $p->x + $p->y;
+    "#;
+    assert_eq!(rf(s), 3.5);
+}
+
+#[test]
+fn struct_positional_construct() {
+    let s = r#"
+        struct Point { x => Float, y => Float };
+        my $p = Point(10.0, 20.0);
+        $p->x . "," . $p->y;
+    "#;
+    assert_eq!(rs(s), "10,20");
+}
+
+#[test]
+fn struct_default_values() {
+    let s = r#"
+        struct Config { timeout => Int = 30, retries => Int = 3 };
+        my $c = Config(retries => 5);
+        $c->timeout . "," . $c->retries;
+    "#;
+    assert_eq!(rs(s), "30,5");
+}
+
+#[test]
+fn struct_field_setter() {
+    let s = r#"
+        struct Point { x => Float, y => Float };
+        my $p = Point(1.0, 2.0);
+        $p->x(5.5);
+        $p->x;
+    "#;
+    assert_eq!(rf(s), 5.5);
+}
+
+#[test]
+fn struct_functional_update_with() {
+    let s = r#"
+        struct Point { x => Float, y => Float };
+        my $p1 = Point(1.0, 2.0);
+        my $p2 = $p1->with(y => 10.0);
+        $p1->y . "," . $p2->y;
+    "#;
+    assert_eq!(rs(s), "2,10");
+}
+
+#[test]
+fn struct_user_defined_method() {
+    let s = r#"
+        struct Circle {
+            radius => Float,
+            fn area { 3 * $self->radius ** 2 }
+        };
+        my $c = Circle(radius => 5);
+        $c->area;
+    "#;
+    assert_eq!(ri(s), 75);
+}
+
+#[test]
+fn struct_structural_equality() {
+    let s = r#"
+        struct Point { x => Int, y => Int };
+        my $a = Point(1, 2);
+        my $b = Point(1, 2);
+        my $c = Point(1, 3);
+        ($a == $b) . "," . ($a == $c);
+    "#;
+    assert_eq!(rs(s), "1,0");
+}
+
+#[test]
+fn struct_to_hash() {
+    let s = r#"
+        struct Point { x => Int, y => Int };
+        my $p = Point(10, 20);
+        my $h = $p->to_hash;
+        $h->{x} + $h->{y};
+    "#;
+    assert_eq!(ri(s), 30);
+}
+
+#[test]
+fn struct_fields_method() {
+    let s = r#"
+        struct Point { x=0, y=0, z=0 };
+        join ",", Point()->fields;
+    "#;
+    assert_eq!(rs(s), "x,y,z");
+}
+
+#[test]
+fn struct_type_checking_at_construction() {
+    let s = r#"
+        struct Point { x => Int };
+        Point(x => "not an int");
+    "#;
+    let res = run(s);
+    assert!(res.is_err());
+    assert!(format!("{}", res.unwrap_err()).contains("expected Int"));
+}
+
+#[test]
+fn struct_type_checking_at_mutation() {
+    let s = r#"
+        struct Point { x => Int };
+        my $p = Point(x => 1);
+        $p->x("oops");
+    "#;
+    let res = run(s);
+    assert!(res.is_err());
+}
+
+#[test]
+fn struct_nested() {
+    let s = r#"
+        struct Point { x => Int, y => Int };
+        struct Rect { top_left => Point, bottom_right => Point };
+        my $r = Rect(
+            top_left => Point(0, 0),
+            bottom_right => Point(10, 10)
+        );
+        $r->bottom_right->x;
+    "#;
+    assert_eq!(ri(s), 10);
+}
+
+#[test]
+fn struct_oo_style_new() {
+    let s = r#"
+        struct Point { x => Int, y => Int };
+        my $p = Point->new(x => 5, y => 10);
+        $p->x;
+    "#;
+    assert_eq!(ri(s), 5);
+}
+
+#[test]
+fn struct_clone() {
+    let s = r#"
+        struct Point { x => Int };
+        my $p1 = Point(1);
+        my $p2 = $p1->clone;
+        $p2->x(2);
+        $p1->x;
+    "#;
+    assert_eq!(ri(s), 1);
+}
+
+#[test]
+fn struct_stringify_and_eval() {
+    let s = r#"
+        struct Point { x => Int, y => Int };
+        my $p = Point(1, 2);
+        my $s = str $p;
+        my $p2 = eval $s;
+        $p == $p2;
+    "#;
+    assert_eq!(ri(s), 1);
+}
+
+#[test]
+fn compat_mode_udf_shadowing() {
+    use crate::set_compat_mode;
+    set_compat_mode(true);
+    // In compat mode, extension names are syntax errors UNLESS declared as UDF
+    let res1 = run("collect(1, 2, 3);");
+    assert!(res1.is_err());
+    assert!(format!("{}", res1.unwrap_err()).contains("perlrs extension"));
+
+    let res2 = run("sub collect { 42 } collect();");
+    assert_eq!(res2.unwrap().to_int(), 42);
+
+    set_compat_mode(false);
+}
+
+#[test]
+fn pipeline_filter_alias_to_grep() {
+    let s = r#"
+        my @r = pipeline(1, 2, 3, 4, 5)->filter(sub { $_ % 2 == 1 })->collect();
+        join ",", @r;
+    "#;
+    assert_eq!(rs(s), "1,3,5");
+}
+
+#[test]
+fn dataframe_filter_alias() {
+    let s = r#"
+        my $df = df [{a => 1}, {a => 2}, {a => 3}];
+        my $df2 = $df->filter(sub { $_->{a} > 1 });
+        $df2->nrow;
+    "#;
+    assert_eq!(ri(s), 2);
+}
+
+#[test]
+fn pipeline_f_alias_removed() {
+    let s = r#"
+        my @r = pipeline(1, 2)->f(sub { 1 })->collect();
+    "#;
+    let res = run(s);
+    assert!(res.is_err());
+    // Should be an undefined method error since 'f' is no longer special
+    assert!(format!("{}", res.unwrap_err()).contains("undefined method"));
 }

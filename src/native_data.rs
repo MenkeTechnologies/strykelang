@@ -45,6 +45,61 @@ pub(crate) fn par_csv_read(path: &str) -> PerlResult<PerlValue> {
 }
 
 /// Columnar dataframe from a CSV path (header row + string cells; use `sum` etc. with numeric strings).
+pub(crate) fn dataframe_from_elements(val: &PerlValue) -> PerlResult<PerlValue> {
+    let rows = val.map_flatten_outputs(true);
+    if rows.is_empty() {
+        return Ok(PerlValue::dataframe(Arc::new(Mutex::new(PerlDataFrame {
+            columns: vec![],
+            cols: vec![],
+            group_by: None,
+        }))));
+    }
+
+    // Detect format: list of hashrefs or list of arrayrefs
+    let first_row = &rows[0];
+    if let Some(first_row_map) = first_row.as_hash_ref() {
+        // List of hashrefs: use keys of the first row as columns
+        let columns: Vec<String> = first_row_map.read().keys().cloned().collect();
+        let mut cols: Vec<Vec<PerlValue>> = (0..columns.len()).map(|_| Vec::new()).collect();
+        for row_val in rows {
+            if let Some(row_lock) = row_val.as_hash_ref() {
+                let row_map = row_lock.read();
+                for (i, col_name) in columns.iter().enumerate() {
+                    cols[i].push(row_map.get(col_name).cloned().unwrap_or(PerlValue::UNDEF));
+                }
+            }
+        }
+        return Ok(PerlValue::dataframe(Arc::new(Mutex::new(PerlDataFrame {
+            columns,
+            cols,
+            group_by: None,
+        }))));
+    } else if let Some(first_row_lock) = first_row.as_array_ref() {
+        // List of arrayrefs: first row is headers
+        let first_row_arr = first_row_lock.read();
+        let columns: Vec<String> = first_row_arr.iter().map(|v| v.to_string()).collect();
+        let mut cols: Vec<Vec<PerlValue>> = (0..columns.len()).map(|_| Vec::new()).collect();
+        for row_val in rows.iter().skip(1) {
+            if let Some(row_lock) = row_val.as_array_ref() {
+                let row_arr = row_lock.read();
+                for (i, col) in cols.iter_mut().enumerate().take(columns.len()) {
+                    col.push(row_arr.get(i).cloned().unwrap_or(PerlValue::UNDEF));
+                }
+            }
+        }
+        return Ok(PerlValue::dataframe(Arc::new(Mutex::new(PerlDataFrame {
+            columns,
+            cols,
+            group_by: None,
+        }))));
+    }
+
+    Err(PerlError::runtime(
+        "dataframe expects a file path or a list of hashrefs/arrayrefs",
+        0,
+    ))
+}
+
 pub(crate) fn dataframe_from_path(path: &str) -> PerlResult<PerlValue> {
     let mut rdr = csv::Reader::from_path(path)
         .map_err(|e| PerlError::runtime(format!("dataframe: {}: {}", path, e), 0))?;

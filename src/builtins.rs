@@ -1551,7 +1551,7 @@ pub(crate) fn try_builtin(
         "not_every" => Some(builtin_not_every(interp, args, line)),
         "comp" | "compose" => Some(builtin_comp(args, line)),
         "partial" => Some(builtin_partial(args, line)),
-        "constantly" | "const" => Some(builtin_constantly(args)),
+        "constantly" => Some(builtin_constantly(args)),
         "complement" | "compl" => Some(builtin_complement(args, line)),
         "fnil" => Some(builtin_fnil(args, line)),
         "juxt" => Some(builtin_juxt(args, line)),
@@ -2142,7 +2142,17 @@ fn builtin_log_level(
 
 /// `dataframe` — Dataframe.
 fn builtin_dataframe(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let path = args.first().map(|v| v.to_string()).unwrap_or_default();
+    if args.is_empty() {
+        return Err(PerlError::runtime(
+            "dataframe needs a file path or a list",
+            0,
+        ));
+    }
+    let a = &args[0];
+    if a.as_array_vec().is_some() || a.as_array_ref().is_some() {
+        return crate::native_data::dataframe_from_elements(a);
+    }
+    let path = a.to_string();
     if path.is_empty() {
         return Err(PerlError::runtime("dataframe needs a file path", 0));
     }
@@ -2544,6 +2554,20 @@ fn stringify_value(buf: &mut String, val: &PerlValue) {
         let _ = write!(buf, "bless(");
         stringify_value(buf, &data);
         let _ = write!(buf, ", \"{}\")", blessed.class);
+        return;
+    }
+
+    if let Some(s) = val.as_struct_inst() {
+        let _ = write!(buf, "{}(", s.def.name);
+        let values = s.get_values();
+        for (i, field) in s.def.fields.iter().enumerate() {
+            if i > 0 {
+                buf.push_str(", ");
+            }
+            let _ = write!(buf, "{} => ", field.name);
+            stringify_value(buf, &values[i]);
+        }
+        buf.push(')');
         return;
     }
 
@@ -18140,6 +18164,23 @@ fn ddump_value(buf: &mut String, val: &PerlValue, depth: usize) {
         let inner_val = sr.read().clone();
         buf.push('\\');
         ddump_value(buf, &inner_val, depth);
+        return;
+    }
+
+    if let Some(s) = val.as_struct_inst() {
+        let _ = write!(buf, "{}(\n", s.def.name);
+        let values = s.get_values();
+        for (i, field) in s.def.fields.iter().enumerate() {
+            buf.push_str(&inner);
+            let _ = write!(buf, "{} => ", field.name);
+            ddump_value(buf, &values[i], depth + 1);
+            if i + 1 < s.def.fields.len() {
+                buf.push(',');
+            }
+            buf.push('\n');
+        }
+        buf.push_str(&indent);
+        buf.push(')');
         return;
     }
 

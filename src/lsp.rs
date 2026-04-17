@@ -1687,6 +1687,23 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
 
         "perlrs::primaries" => "`%perlrs::primaries` (short: `%p`) — primary dispatcher name → arrayref of its aliases.\n\nInverted `%aliases`. Primaries with no aliases still have an entry (empty arrayref), so `exists $p{foo}` reliably answers \"is foo a dispatch primary?\" O(1).\n\n```perl\n$p{to_json} |> e p;              # [\"tj\"]\np scalar @{ $p{basename} };      # how many aliases does basename have?\n# find every primary that has at least one alias:\nkeys %p |> grep { scalar @{$p{$_}} } |> sort |> p;\n```",
 
+        // ── Higher-order function wrappers ──
+        "compose" | "comp" => "`compose` (alias `comp`) creates a right-to-left function composition. Given `compose(\\&f, \\&g)`, calling the result with `x` computes `f(g(x))`. Chain any number of functions — they apply from right to left (last argument first). This is the standard mathematical function composition found in Haskell, Clojure, and Ramda. The returned code ref can be stored, passed around, or used in pipelines.\n\n```perl\nmy $double = sub { $_[0] * 2 };\nmy $inc    = sub { $_[0] + 1 };\nmy $f = compose($inc, $double);\np $f->(5);   # 11  (double 5 → 10, inc 10 → 11)\n\nmy $pipeline = compose(\n    sub { join \",\", @{$_[0]} },\n    sub { [sort @{$_[0]}] },\n    sub { [grep { $_ > 2 } @{$_[0]}] },\n);\np $pipeline->([3,1,4,1,5]);  # 3,4,5\n```",
+        "partial" => "`partial` returns a partially applied function — the bound arguments are prepended to any arguments supplied at call time. `partial(\\&f, @bound)->(x)` is equivalent to `f(@bound, x)`. This is the standard partial application from functional programming, useful for creating specialized versions of general functions without closures.\n\n```perl\nmy $add = sub { $_[0] + $_[1] };\nmy $add5 = partial($add, 5);\np $add5->(3);   # 8\n\nmy $log = sub { say \"[$_[0]] $_[1]\" };\nmy $warn_log = partial($log, \"WARN\");\n$warn_log->(\"disk full\");   # [WARN] disk full\n```",
+        "curry" => "`curry` auto-curries a function with a given arity. The curried function accumulates arguments across calls and invokes the original only when enough have been collected. `curry(\\&f, N)->(a)->(b)` calls `f(a, b)` when N=2. If all arguments are supplied at once, it calls immediately.\n\n```perl\nmy $add = curry(sub { $_[0] + $_[1] }, 2);\nmy $add5 = $add->(5);\np $add5->(3);       # 8\np $add->(10, 20);   # 30  (enough args — calls immediately)\n```",
+        "memoize" | "memo" => "`memoize` (alias `memo`) wraps a function so that repeated calls with the same arguments return a cached result instead of re-executing the function. Arguments are stringified and joined as the cache key. This is essential for expensive pure functions like recursive algorithms, API lookups with stable results, or any computation where the same inputs always produce the same output.\n\n```perl\nmy $fib = memoize(sub {\n    my $n = $_[0];\n    $n < 2 ? $n : $fib->($n-1) + $fib->($n-2);\n});\np $fib->(30);   # instant (without memoize: ~1B calls)\n\nmy $fetch_user = memo(sub { fetch_json(\"https://api/users/$_[0]\") });\n$fetch_user->(42);   # hits API\n$fetch_user->(42);   # returns cached\n```",
+        "once" => "`once` wraps a function so it is called at most once. The first invocation executes the function and caches the result; all subsequent calls return the cached value without re-executing. This is ideal for lazy initialization, one-time setup, or singleton patterns.\n\n```perl\nmy $init = once(sub { say \"initializing...\"; 42 });\np $init->();   # prints \"initializing...\" → 42\np $init->();   # 42 (no print — cached)\np $init->();   # 42 (still cached)\n```",
+        "constantly" => "`constantly` (alias `const`) returns a function that ignores all arguments and always returns the given value. Useful as a default callback, a stub in higher-order function pipelines, or anywhere a function is required but a fixed value suffices.\n\n```perl\nmy $zero = constantly(0);\np $zero->(\"anything\");   # 0\nmy @defaults = map { constantly(0)->() } 1..5;   # [0,0,0,0,0]\n```",
+        "complement" | "compl" => "`complement` (alias `compl`) wraps a predicate function and returns a new function that negates its boolean result. `complement(\\&even?)->(3)` returns true. This is the functional equivalent of `!f(x)` without creating a closure.\n\n```perl\nmy $even = sub { $_[0] % 2 == 0 };\nmy $odd = complement($even);\np $odd->(3);   # 1\np $odd->(4);   # 0\n1..10 |> grep { complement($even)->($_) } |> e p;  # 1 3 5 7 9\n```",
+        "juxt" => "`juxt` (juxtapose) takes multiple functions and returns a new function that calls each one with the same arguments and collects the results into an array. This is useful for computing multiple derived values from the same input in a single pass.\n\n```perl\nmy $stats = juxt(sub { min @_ }, sub { max @_ }, sub { avg @_ });\nmy @r = $stats->(3, 1, 4, 1, 5);\np \"@r\";   # 1 5 2.8\n```",
+        "fnil" => "`fnil` wraps a function so that any `undef` arguments are replaced with the given defaults before the function is called. This eliminates repetitive `// $default` patterns inside function bodies.\n\n```perl\nmy $greet = fnil(sub { \"Hello, $_[0]!\" }, \"World\");\np $greet->(undef);    # Hello, World!\np $greet->(\"Alice\");  # Hello, Alice!\n```",
+
+        // ── Deep structure utilities ──
+        "deep_clone" | "dclone" => "`deep_clone` (alias `dclone`) performs a recursive deep copy of a nested data structure. Array refs, hash refs, and scalar refs are cloned recursively so that the result shares no references with the original. Modifications to the clone never affect the source. This is the perlrs equivalent of JavaScript's `structuredClone` or Perl's `Storable::dclone`.\n\n```perl\nmy $orig = {users => [{name => \"Alice\"}], meta => {v => 1}};\nmy $copy = deep_clone($orig);\n$copy->{users}[0]{name} = \"Bob\";\np $orig->{users}[0]{name};   # Alice (unchanged)\n```",
+        "deep_merge" | "dmerge" => "`deep_merge` (alias `dmerge`) recursively merges two hash references. When both sides have a hash ref for the same key, they are merged recursively; otherwise the right-hand value wins. This is the standard deep merge from Lodash, Ruby's `deep_merge`, and config-file overlay patterns. Returns a new hash ref — neither input is modified.\n\n```perl\nmy $defaults = {db => {host => \"localhost\", port => 5432}, debug => 0};\nmy $overrides = {db => {port => 3306}, debug => 1};\nmy $cfg = deep_merge($defaults, $overrides);\np $cfg->{db}{host};   # localhost (from defaults)\np $cfg->{db}{port};   # 3306 (overridden)\np $cfg->{debug};      # 1 (overridden)\n```",
+        "deep_equal" | "deq" => "`deep_equal` (alias `deq`) performs structural equality comparison of two values, recursively descending into array refs, hash refs, and scalar refs. Returns 1 if the structures are identical, 0 otherwise. This is the perlrs equivalent of Node's `assert.deepStrictEqual`, Lodash `isEqual`, or Python's `==` on nested dicts/lists.\n\n```perl\np deep_equal([1, {a => 2}], [1, {a => 2}]);   # 1\np deep_equal([1, {a => 2}], [1, {a => 3}]);   # 0\np deq({x => [1,2]}, {x => [1,2]});            # 1\n```",
+        "tally" => "`tally` counts how many times each distinct element appears in a list and returns a hash ref mapping element → count. This is the same as Ruby's `Enumerable#tally` or Python's `Counter`. Similar to `frequencies` but follows the Ruby naming convention.\n\n```perl\nmy $t = tally(\"a\", \"b\", \"a\", \"c\", \"a\", \"b\");\np $t->{a};   # 3\np $t->{b};   # 2\nqw(red blue red green blue red) |> tally |> dd;\n```",
+
         _ => return None,
     };
     Some(md)
@@ -1904,12 +1921,25 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
             "mesh_shortest",
             "partition",
             "frequencies",
+            "tally",
             "interleave",
             "pluck",
             "grep_v",
             "select_keys",
             "clamp",
             "normalize",
+            "compose",
+            "partial",
+            "curry",
+            "memoize",
+            "once",
+            "constantly",
+            "complement",
+            "juxt",
+            "fnil",
+            "deep_clone",
+            "deep_merge",
+            "deep_equal",
         ],
     ),
     (
