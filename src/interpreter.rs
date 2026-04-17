@@ -824,6 +824,64 @@ fn expand_perl_regex_quotemeta(pat: &str) -> String {
     out
 }
 
+/// Normalise Perl replacement backreferences for the Rust `regex` / `fancy_regex` crates.
+///
+/// 1. `\1`..`\9` → `${1}`..`${9}` (Perl backslash syntax).
+/// 2. `$1`..`$9`  → `${1}`..`${9}` (prevents the regex crate from treating `$1X` as the
+///    named capture group `1X` — Perl stops numeric backrefs at the first non-digit).
+pub(crate) fn normalize_replacement_backrefs(replacement: &str) -> String {
+    let mut out = String::with_capacity(replacement.len() + 8);
+    let mut it = replacement.chars().peekable();
+    while let Some(c) = it.next() {
+        if c == '\\' {
+            match it.peek() {
+                Some(&d) if d.is_ascii_digit() => {
+                    it.next();
+                    out.push_str("${");
+                    out.push(d);
+                    while let Some(&d2) = it.peek() {
+                        if !d2.is_ascii_digit() {
+                            break;
+                        }
+                        it.next();
+                        out.push(d2);
+                    }
+                    out.push('}');
+                }
+                Some(&'\\') => {
+                    it.next();
+                    out.push('\\');
+                }
+                _ => out.push('\\'),
+            }
+        } else if c == '$' {
+            match it.peek() {
+                Some(&d) if d.is_ascii_digit() => {
+                    it.next();
+                    out.push_str("${");
+                    out.push(d);
+                    while let Some(&d2) = it.peek() {
+                        if !d2.is_ascii_digit() {
+                            break;
+                        }
+                        it.next();
+                        out.push(d2);
+                    }
+                    out.push('}');
+                }
+                Some(&'{') => {
+                    // already braced — pass through as-is
+                    out.push('$');
+                }
+                _ => out.push('$'),
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
 /// Copy a Perl character class `[` … `]` from `chars[i]` (must be `'['`) into `out`; return index
 /// past the closing `]`.
 fn copy_regex_char_class(chars: &[char], mut i: usize, out: &mut String) -> usize {
@@ -4756,6 +4814,10 @@ impl Interpreter {
     }
 
     /// Shared `s///` for tree-walker and VM.
+    ///
+    /// Perl replacement strings accept both `\1` and `$1` for back-references.
+    /// The Rust `regex` / `fancy_regex` crates (and our PCRE2 shim) only
+    /// understand `$N`, so we normalise here.
     pub(crate) fn regex_subst_execute(
         &mut self,
         s: String,
@@ -4771,7 +4833,8 @@ impl Interpreter {
         if flags.contains('e') {
             return self.regex_subst_execute_eval(s, re.as_ref(), replacement, flags, target, line);
         }
-        let replacement = self.expand_env_braces_in_subst(replacement, line)?;
+        let replacement =
+            normalize_replacement_backrefs(&self.expand_env_braces_in_subst(replacement, line)?);
         let last_caps = if flags.contains('g') {
             let mut rows = Vec::new();
             let mut last = None;
@@ -9101,7 +9164,7 @@ impl Interpreter {
                         crate::map_stream::SubstStreamIterator::new(
                             source,
                             re,
-                            replacement.clone(),
+                            normalize_replacement_backrefs(replacement),
                             global,
                         ),
                     )));
@@ -11062,6 +11125,12 @@ impl Interpreter {
                         vals.push(v);
                     }
                 }
+                eprintln!(
+                    "DEBUG List: ctx={:?} vals.len={} exprs.len={}",
+                    ctx,
+                    vals.len(),
+                    exprs.len()
+                );
                 if vals.len() == 1 {
                     Ok(vals.pop().unwrap())
                 } else {
@@ -16637,7 +16706,7 @@ impl Interpreter {
                 let sep = self.field_separator.as_deref().unwrap_or(" ");
                 let re = regex::Regex::new(sep).unwrap_or_else(|_| regex::Regex::new(" ").unwrap());
                 let fields: Vec<PerlValue> = re
-                    .split(line_str.trim_end_matches('\n'))
+                    .split(line_str)
                     .map(|s| PerlValue::string(s.to_string()))
                     .collect();
                 self.scope.set_array("F", fields)?;

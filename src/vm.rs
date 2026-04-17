@@ -4596,7 +4596,9 @@ impl<'a> VM<'a> {
                                 crate::map_stream::SubstStreamIterator::new(
                                     source,
                                     re,
-                                    replacement.to_string(),
+                                    crate::interpreter::normalize_replacement_backrefs(
+                                        &replacement,
+                                    ),
                                     global,
                                 ),
                             )));
