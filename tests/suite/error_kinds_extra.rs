@@ -35,7 +35,7 @@ fn die_string_runtime_die_kind() {
 
 #[test]
 fn die_bare_is_die_kind() {
-    assert_eq!(eval_err_kind("die;"), ErrorKind::Die);
+    assert_eq!(eval_err_kind("die"), ErrorKind::Die);
 }
 
 #[test]
@@ -50,13 +50,13 @@ fn exit_negative_is_exit_kind() {
 
 #[test]
 fn bare_exit_statement_is_exit_zero_kind() {
-    assert_eq!(eval_err_kind("exit;"), ErrorKind::Exit(0));
+    assert_eq!(eval_err_kind("exit"), ErrorKind::Exit(0));
 }
 
 #[test]
 fn undefined_bare_subroutine_call_is_runtime_kind() {
     assert_eq!(
-        eval_err_kind("lib_api_undefined_sub_xyz999();"),
+        eval_err_kind("lib_api_undefined_sub_xyz999()"),
         ErrorKind::Runtime
     );
 }

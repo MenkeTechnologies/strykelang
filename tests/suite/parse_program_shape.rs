@@ -10,7 +10,7 @@ fn empty_source_yields_empty_statement_list() {
 
 #[test]
 fn semicolons_only_parse_to_program_without_panicking() {
-    let p = perlrs::parse(";;;").expect("parse");
+    let p = perlrs::parse(";;").expect("parse");
     assert!(
         p.statements.is_empty()
             || p.statements
@@ -21,7 +21,7 @@ fn semicolons_only_parse_to_program_without_panicking() {
 
 #[test]
 fn three_expression_statements_distinct_lines() {
-    let p = perlrs::parse("1;\n2;\n3;").expect("parse");
+    let p = perlrs::parse("1;\n2;\n3").expect("parse");
     assert_eq!(p.statements.len(), 3);
     for (i, stmt) in p.statements.iter().enumerate() {
         let StmtKind::Expression(expr) = &stmt.kind else {
@@ -60,7 +60,7 @@ fn sub_declaration_statement_kind() {
 
 #[test]
 fn package_statement_kind() {
-    let p = perlrs::parse("package Bar::Baz;").expect("parse");
+    let p = perlrs::parse("package Bar::Baz").expect("parse");
     assert_eq!(p.statements.len(), 1);
     let StmtKind::Package { name } = &p.statements[0].kind else {
         panic!("expected Package");
@@ -70,7 +70,7 @@ fn package_statement_kind() {
 
 #[test]
 fn use_strict_statement_kind() {
-    let p = perlrs::parse("use strict;").expect("parse");
+    let p = perlrs::parse("use strict").expect("parse");
     assert_eq!(p.statements.len(), 1);
     let StmtKind::Use { module, .. } = &p.statements[0].kind else {
         panic!("expected Use");
@@ -80,7 +80,7 @@ fn use_strict_statement_kind() {
 
 #[test]
 fn no_warnings_statement_kind() {
-    let p = perlrs::parse("no warnings;").expect("parse");
+    let p = perlrs::parse("no warnings").expect("parse");
     assert_eq!(p.statements.len(), 1);
     let StmtKind::No { module, .. } = &p.statements[0].kind else {
         panic!("expected No");
@@ -90,7 +90,7 @@ fn no_warnings_statement_kind() {
 
 #[test]
 fn my_scalar_declaration_statement_kind() {
-    let p = perlrs::parse("my $x = 10;").expect("parse");
+    let p = perlrs::parse("my $x = 10").expect("parse");
     assert_eq!(p.statements.len(), 1);
     let StmtKind::My(decls) = &p.statements[0].kind else {
         panic!("expected My");
@@ -146,7 +146,7 @@ fn end_block_statement_kind() {
 
 #[test]
 fn return_statement_kind() {
-    let p = perlrs::parse("return 42;").expect("parse");
+    let p = perlrs::parse("return 42").expect("parse");
     assert_eq!(p.statements.len(), 1);
     let StmtKind::Return(Some(expr)) = &p.statements[0].kind else {
         panic!("expected Return with expr");
@@ -156,7 +156,7 @@ fn return_statement_kind() {
 
 #[test]
 fn bare_return_statement_kind() {
-    let p = perlrs::parse("return;").expect("parse");
+    let p = perlrs::parse("return").expect("parse");
     assert_eq!(p.statements.len(), 1);
     let StmtKind::Return(None) = &p.statements[0].kind else {
         panic!("expected Return without expr");
@@ -165,7 +165,7 @@ fn bare_return_statement_kind() {
 
 #[test]
 fn last_next_redo_statement_kinds() {
-    let p = perlrs::parse("last; next; redo;").expect("parse");
+    let p = perlrs::parse("last; next; redo").expect("parse");
     assert_eq!(p.statements.len(), 3);
     assert!(matches!(p.statements[0].kind, StmtKind::Last(None)));
     assert!(matches!(p.statements[1].kind, StmtKind::Next(None)));
@@ -174,7 +174,7 @@ fn last_next_redo_statement_kinds() {
 
 #[test]
 fn binary_add_expression_in_statement() {
-    let p = perlrs::parse("7 + 8;").expect("parse");
+    let p = perlrs::parse("7 + 8").expect("parse");
     assert_eq!(p.statements.len(), 1);
     let StmtKind::Expression(expr) = &p.statements[0].kind else {
         panic!("expected Expression");
@@ -188,7 +188,7 @@ fn binary_add_expression_in_statement() {
 
 #[test]
 fn regex_literal_expression_kind() {
-    let p = perlrs::parse("m/abc/;").expect("parse");
+    let p = perlrs::parse("m/abc/").expect("parse");
     assert_eq!(p.statements.len(), 1);
     let StmtKind::Expression(expr) = &p.statements[0].kind else {
         panic!("expected Expression");

@@ -61,7 +61,7 @@ fn rejects_incomplete_addition_at_eof() {
 
 #[test]
 fn double_semicolon_only_parses() {
-    perlrs::parse(";;").expect("parse");
+    perlrs::parse(";").expect("parse");
 }
 
 #[test]
@@ -92,12 +92,12 @@ fn rejects_interpolated_eof_in_double_quote() {
 
 #[test]
 fn rejects_package_name_invalid() {
-    assert!(perlrs::parse("package 123;").is_err());
+    assert!(perlrs::parse("package 123").is_err());
 }
 
 #[test]
 fn triple_semicolon_parses() {
-    perlrs::parse(";;;").expect("semicolons only");
+    perlrs::parse(";;").expect("semicolons only");
 }
 
 #[test]

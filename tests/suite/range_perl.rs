@@ -24,25 +24,25 @@ use crate::common::{eval_int, eval_string};
 #[test]
 fn list_range_three_dot_numeric_same_expansion_as_two_dot() {
     assert_eq!(
-        eval_string(r#"join ",", (1...5);"#),
-        eval_string(r#"join ",", (1..5);"#)
+        eval_string(r#"join ",", (1...5)"#),
+        eval_string(r#"join ",", (1..5)"#)
     );
-    assert_eq!(eval_string(r#"join ",", (1...5);"#), "1,2,3,4,5");
+    assert_eq!(eval_string(r#"join ",", (1...5)"#), "1,2,3,4,5");
 }
 
 #[test]
 fn list_range_uppercase_letters() {
-    assert_eq!(eval_string(r#"join ",", ("A".."C");"#), "A,B,C");
+    assert_eq!(eval_string(r#"join ",", ("A".."C")"#), "A,B,C");
 }
 
 #[test]
 fn list_range_magic_increment_z_to_aa_inclusive() {
-    assert_eq!(eval_string(r#"join ",", ("z".."aa");"#), "z,aa");
+    assert_eq!(eval_string(r#"join ",", ("z".."aa")"#), "z,aa");
 }
 
 #[test]
 fn list_range_undef_left_uses_zero_numeric() {
-    assert_eq!(eval_string(r#"join ",", (undef..3);"#), "0,1,2,3");
+    assert_eq!(eval_string(r#"join ",", (undef..3)"#), "0,1,2,3");
 }
 
 #[test]
@@ -52,8 +52,8 @@ fn list_range_undef_right_yields_empty_numeric() {
 
 #[test]
 fn list_range_mixed_int_and_numeric_string_endpoints() {
-    assert_eq!(eval_string(r#"join ",", (1 .. "03");"#), "1,2,3");
-    assert_eq!(eval_string(r#"join ",", ("02" .. 4);"#), "2,3,4");
+    assert_eq!(eval_string(r#"join ",", (1 .. "03")"#), "1,2,3");
+    assert_eq!(eval_string(r#"join ",", ("02" .. 4)"#), "2,3,4");
 }
 
 /// Descending **numeric** range is empty; descending **string** endpoints still magic-walk forward.

@@ -2599,7 +2599,7 @@ fn falsey_strings_and_zero_in_boolean_ternary() {
 
 #[test]
 fn ord_chr_round_trip_for_ascii_printable() {
-    assert_eq!(eval_string(r#"my $c = "M"; chr(ord($c));"#), "M");
+    assert_eq!(eval_string(r#"my $c = "M"; chr(ord($c))"#), "M");
 }
 
 #[test]
@@ -2720,7 +2720,7 @@ fn regex_digit_class_global_match_joins_all_digits() {
 #[test]
 fn regex_capture_plus_quantifier_takes_longest_digit_run() {
     assert_eq!(
-        eval_string(r#"my $s = "foo123bar"; $s =~ /(\d+)/; $1;"#),
+        eval_string(r#"my $s = "foo123bar"; $s =~ /(\d+)/; $1"#),
         "123"
     );
 }
@@ -2922,7 +2922,7 @@ fn list_util_fold_alias_concatenates_like_reduce() {
 #[test]
 fn grep_block_logical_not_selects_even_numbers() {
     assert_eq!(
-        eval_string(r#"join "", grep { !($_ % 2) } 1, 2, 3, 4;"#),
+        eval_string(r#"join "", grep { !($_ % 2) } 1, 2, 3, 4"#),
         "24"
     );
 }
@@ -3118,7 +3118,7 @@ fn regex_possessive_star_matches_minimal_then_literal() {
 
 #[test]
 fn map_block_multiplies_numeric_strings_from_qw() {
-    assert_eq!(eval_string(r#"join "", map { $_ * 2 } qw(1 2);"#), "24");
+    assert_eq!(eval_string(r#"join "", map { $_ * 2 } qw(1 2)"#), "24");
 }
 
 #[test]
@@ -3143,7 +3143,7 @@ fn regex_brace_delimiter_allows_slash_in_pattern() {
 
 #[test]
 fn sort_block_lexical_cmp_orders_pair() {
-    assert_eq!(eval_string(r#"join "", sort { $a cmp $b } qw(z y);"#), "yz");
+    assert_eq!(eval_string(r#"join "", sort { $a cmp $b } qw(z y)"#), "yz");
 }
 
 // ── `\R` / `\K`, named capture, `sleep`/`srand`, `oct`, `join`, `\p{}`, slices, `index`/`rindex`, `$|`, `m!` ──
@@ -3229,7 +3229,7 @@ fn rindex_with_max_position_finds_last_at_or_before() {
 
 #[test]
 fn output_autoflush_scalar_one_when_enabled() {
-    assert_eq!(eval_int(r#"$| = 1; $| ? 1 : 0;"#), 1);
+    assert_eq!(eval_int(r#"$| = 1; $| ? 1 : 0"#), 1);
 }
 
 #[test]
