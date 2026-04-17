@@ -18168,7 +18168,7 @@ fn ddump_value(buf: &mut String, val: &PerlValue, depth: usize) {
     }
 
     if let Some(s) = val.as_struct_inst() {
-        let _ = write!(buf, "{}(\n", s.def.name);
+        let _ = writeln!(buf, "{}(", s.def.name);
         let values = s.get_values();
         for (i, field) in s.def.fields.iter().enumerate() {
             buf.push_str(&inner);
@@ -21002,7 +21002,7 @@ fn deep_eq(a: &PerlValue, b: &PerlValue) -> bool {
         }
         return ah
             .iter()
-            .all(|(k, v)| bh.get(k).map_or(false, |bv| deep_eq(v, bv)));
+            .all(|(k, v)| bh.get(k).is_some_and(|bv| deep_eq(v, bv)));
     }
     // Plain arrays
     if let (Some(aa), Some(ba)) = (a.as_array_vec(), b.as_array_vec()) {

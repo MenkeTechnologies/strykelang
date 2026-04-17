@@ -2887,4 +2887,27 @@ mod completion_tests {
         let h = highlights_for_identifier(src, "xx");
         assert_eq!(h.len(), 1);
     }
+
+    #[test]
+    fn new_functional_utility_docs_exist() {
+        use super::doc_text_for;
+        let ops = [
+            "compose",
+            "partial",
+            "curry",
+            "memoize",
+            "once",
+            "constantly",
+            "complement",
+            "juxt",
+            "fnil",
+            "deep_clone",
+            "deep_merge",
+            "deep_equal",
+            "tally",
+        ];
+        for op in ops {
+            assert!(doc_text_for(op).is_some(), "Doc for '{}' should exist", op);
+        }
+    }
 }
