@@ -1738,6 +1738,7 @@ impl Lexer {
                     | "yield"
                     | "match"
                     | "filter"
+                    | "f"
                     | "reject"
                     | "collect"
                     | "compact"
