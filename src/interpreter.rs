@@ -14487,7 +14487,7 @@ impl Interpreter {
         line: usize,
     ) -> PerlResult<PerlValue> {
         match method {
-            "filter" | "grep" => {
+            "filter" | "f" | "grep" => {
                 if args.len() != 1 {
                     return Err(PerlError::runtime(
                         "pipeline filter/grep expects 1 argument (sub)",
