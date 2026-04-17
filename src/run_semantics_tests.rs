@@ -3816,12 +3816,10 @@ fn dataframe_filter_alias() {
 }
 
 #[test]
-fn pipeline_f_alias_removed() {
+fn pipeline_f_alias_for_filter() {
     let s = r#"
-        my @r = pipeline(1, 2)->f(sub { 1 })->collect();
+        my @r = pipeline(1, 2, 3, 4)->f(sub { $_ > 2 })->collect();
+        join ",", @r;
     "#;
-    let res = run(s);
-    assert!(res.is_err());
-    // Should be an unknown method error since 'f' is no longer a pipeline alias
-    assert!(format!("{}", res.unwrap_err()).contains("Unknown method for pipeline"));
+    assert_eq!(rs(s), "3,4");
 }
