@@ -1,25 +1,32 @@
 #!/usr/bin/env bash
 # Compare stock perl(1) vs pe(1) on parity/cases/*.pl (exact stdout+stderr bytes).
-# Usage: from repo root —  bash parity/run_parity.sh [--summary] [--json OUT]
+# Usage: from repo root —  bash parity/run_parity.sh [--summary] [--json OUT] [--fail-log PATH]
 # Env:   PERL=perl  PE=path/to/pe  (optional)
 #
 # Flags:
-#   --summary        Suppress per-case OK/FAIL lines; print the totals line only.
-#                    Failed cases still emit their diff to stderr so `--summary
-#                    2>/dev/null` gives a clean single-line stdout.
-#   --json PATH      Write a JSON summary to PATH (default: parity/parity_summary.json).
-#                    Committable: the docs site generator (`gen-docs`) reads it
-#                    to stamp the parity badge on docs/index.html.
+#   --summary            Suppress per-case OK/FAIL lines on stdout; the totals
+#                        line still prints. Short `parity FAIL: NAME` still
+#                        goes to stderr so progress is visible.
+#   --json PATH          Write a JSON summary to PATH
+#                        (default: parity/parity_summary.json). Committable:
+#                        `gen-docs` reads it to stamp the hub's parity badge.
+#   --fail-log PATH      Write per-case failure details (both outputs + diff)
+#                        to PATH. Use `-` to emit to stderr (pre-flag
+#                        behavior). Default: parity/parity_failures.log.
+#                        The file is truncated at the start of each run.
 
 set -euo pipefail
 
 SUMMARY_ONLY=0
 JSON_OUT=""
+FAIL_LOG=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --summary) SUMMARY_ONLY=1; shift ;;
-    --json)    JSON_OUT="${2:-}"; shift 2 ;;
-    --json=*)  JSON_OUT="${1#--json=}"; shift ;;
+    --summary)      SUMMARY_ONLY=1; shift ;;
+    --json)         JSON_OUT="${2:-}"; shift 2 ;;
+    --json=*)       JSON_OUT="${1#--json=}"; shift ;;
+    --fail-log)     FAIL_LOG="${2:-}"; shift 2 ;;
+    --fail-log=*)   FAIL_LOG="${1#--fail-log=}"; shift ;;
     *) echo "parity: unknown flag: $1" >&2; exit 2 ;;
   esac
 done
@@ -53,6 +60,19 @@ if [[ ${#cases[@]} -eq 0 ]]; then
   exit 2
 fi
 
+# Failure log destination: `-` = stderr (pre-flag behavior); empty = default
+# path `parity/parity_failures.log`; anything else = that path. Truncate at
+# run-start so each run produces a clean, self-contained log.
+if [[ -z "$FAIL_LOG" ]]; then
+  FAIL_LOG="$ROOT/parity/parity_failures.log"
+fi
+if [[ "$FAIL_LOG" = "-" ]]; then
+  exec 7>&2
+else
+  : >"$FAIL_LOG"
+  exec 7>"$FAIL_LOG"
+fi
+
 total="${#cases[@]}"
 passed=0
 failed=0
@@ -65,13 +85,19 @@ for f in "${cases[@]}"; do
   "$PE" --compat "$f" >"$r_out" 2>&1 || true
 
   if ! cmp -s "$p_out" "$r_out"; then
+    # Short progress line always hits stderr so the user sees forward motion.
     echo "parity FAIL: $base" >&2
-    echo "--- perl $base ---" >&2
-    command cat "$p_out" >&2
-    echo "--- pe $base ---" >&2
-    command cat "$r_out" >&2
-    echo "--- diff (perl vs pe) ---" >&2
-    diff -u "$p_out" "$r_out" >&2 || true
+    # Full details → fail-log stream (fd 7).
+    {
+      echo "==== $base ===="
+      echo "--- perl $base ---"
+      command cat "$p_out"
+      echo "--- pe $base ---"
+      command cat "$r_out"
+      echo "--- diff (perl vs pe) ---"
+      diff -u "$p_out" "$r_out" || true
+      echo
+    } >&7
     failed=$((failed + 1))
   else
     [[ "$SUMMARY_ONLY" -eq 0 ]] && echo "parity OK:   $base"
@@ -80,6 +106,9 @@ for f in "${cases[@]}"; do
 
   command rm -f "$p_out" "$r_out"
 done
+
+# Close the fail-log fd so summaries can't interleave into it.
+exec 7>&-
 
 # Percent to two decimals via awk (BSD /bin/sh doesn't do floats).
 pct=$(awk -v p="$passed" -v t="$total" 'BEGIN{ if (t==0) print "0.00"; else printf "%.2f", 100*p/t }')
@@ -92,14 +121,20 @@ generated=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 printf 'parity: %d/%d passed (%s%%) · failed %d · perlrs v%s\n' \
   "$passed" "$total" "$pct" "$failed" "$version"
 
-# Write JSON summary (committable; `gen-docs` reads this to stamp docs).
-if [[ -z "$JSON_OUT" ]]; then
-  JSON_OUT="$ROOT/parity/parity_summary.json"
+# Point the user at the failure log when there were any and it's not stderr.
+if [[ "$failed" -gt 0 && "$FAIL_LOG" != "-" ]]; then
+  echo "parity: failure details in $FAIL_LOG" >&2
 fi
-tmp_json=$(mktemp "${TMPDIR:-/tmp}/parity.summary.$$.XXXXXX")
-printf '{\n  "total": %d,\n  "passed": %d,\n  "failed": %d,\n  "percent": %s,\n  "perlrs_version": "%s",\n  "generated_at": "%s"\n}\n' \
-  "$total" "$passed" "$failed" "$pct" "$version" "$generated" >"$tmp_json"
-command mv "$tmp_json" "$JSON_OUT"
+
+# Optional JSON summary — only written when explicitly requested via
+# `--json PATH`. Not auto-generated: exit code is the binary pass/fail
+# signal, the log file has the triage detail, so a third artifact is noise.
+if [[ -n "$JSON_OUT" ]]; then
+  tmp_json=$(mktemp "${TMPDIR:-/tmp}/parity.summary.$$.XXXXXX")
+  printf '{\n  "total": %d,\n  "passed": %d,\n  "failed": %d,\n  "percent": %s,\n  "perlrs_version": "%s",\n  "generated_at": "%s"\n}\n' \
+    "$total" "$passed" "$failed" "$pct" "$version" "$generated" >"$tmp_json"
+  command mv "$tmp_json" "$JSON_OUT"
+fi
 
 if [[ "$failed" -ne 0 ]]; then
   exit 1

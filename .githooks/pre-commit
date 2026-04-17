@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Pre-commit: auto-format staged Rust files with `cargo fmt` so CI's fmt
+# check never fails on style. Fast (~100ms even cold) — every commit gets
+# this treatment. Slow checks (clippy) live in the pre-push hook so they
+# only run once per push, not per commit.
+#
+# To bypass (emergency, e.g. partial fixes mid-rebase):
+#   git commit --no-verify
+
+set -euo pipefail
+
+# Only run when Rust files are actually staged — don't format on pure
+# doc/test/script commits.
+staged_rust=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.rs$' || true)
+if [[ -z "$staged_rust" ]]; then
+  exit 0
+fi
+
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "pre-commit: cargo not found — install Rust and retry (or --no-verify to skip)" >&2
+  exit 1
+fi
+
+# Format every staged file AND re-stage so the committed snapshot matches
+# the formatted source. `cargo fmt --` accepts paths and respects rustfmt.toml.
+echo "pre-commit: cargo fmt on $(echo "$staged_rust" | wc -l | tr -d ' ') staged .rs file(s)…"
+# shellcheck disable=SC2086
+cargo fmt -- $staged_rust
+# shellcheck disable=SC2086
+git add -- $staged_rust

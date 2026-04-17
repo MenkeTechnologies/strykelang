@@ -1352,7 +1352,9 @@ impl Parser {
     /// content are untouched.
     fn default_topic_for_sole_bareword(stmts: &mut [Statement]) {
         let [only] = stmts else { return };
-        let StmtKind::Expression(ref mut expr) = only.kind else { return };
+        let StmtKind::Expression(ref mut expr) = only.kind else {
+            return;
+        };
         let topic_line = expr.line;
         let topic_arg = || Expr {
             kind: ExprKind::ScalarVar("_".to_string()),
@@ -1360,7 +1362,10 @@ impl Parser {
         };
         match expr.kind {
             // Zero-arg FuncCall whose name is a known builtin → inject `$_`.
-            ExprKind::FuncCall { ref name, ref mut args } if args.is_empty() => {
+            ExprKind::FuncCall {
+                ref name,
+                ref mut args,
+            } if args.is_empty() => {
                 if Self::is_known_bareword(name) || Self::is_try_builtin_name(name) {
                     args.push(topic_arg());
                 }

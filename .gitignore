@@ -2,3 +2,8 @@
 
 # CPAN local-lib from parity/cpan_topn/install_deps.sh (reproducible via MODULES.txt + cpanm).
 /parity/cpan_topn/local/
+
+# Per-run parity failure log — truncated on each `bash parity/run_parity.sh`.
+# Noisy diff content; upload as CI artifact instead of committing.
+# `parity_summary.json` stays tracked — it feeds the docs badge.
+/parity/parity_failures.log
