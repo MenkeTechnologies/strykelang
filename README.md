@@ -513,9 +513,22 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 | Sockets | `socket`, `bind`, `listen`, `accept`, `connect`, `send`, `recv`, `shutdown`, `socketpair` |
 | Network | `gethostbyname`, `gethostbyaddr`, `getpwnam`, `getpwuid`, `getpwent`/`setpwent`/`endpwent`, `getgrnam`, `getgrgid`, `getgrent`/`setgrent`/`endgrent`, `getprotobyname`, `getprotobynumber`, `getservbyname`, `getservbyport` |
 | SysV IPC | `msgctl`, `msgget`, `msgsnd`, `msgrcv`, `semctl`, `semget`, `semop`, `shmctl`, `shmget`, `shmread`, `shmwrite` (stubs — runtime error) |
-| Type | `defined`, `undef`, `ref`, `bless`, `tied`, `untie` |
+| Type | `defined`, `undef`, `ref`, `bless`, `tied`, `untie`, `type_of`, `byte_size` |
 | Serialization | `to_json`, `to_csv`, `to_toml`, `to_yaml`, `to_xml`, `ddump`, `stringify`/`str`, `json_encode`/`json_decode` |
 | Control | `die`, `warn`, `eval`, `do`, `require`, `caller`, `wantarray`, `goto LABEL`, `continue { }` on loops, `prototype` |
+| Number Theory | `prime_factors`, `divisors`, `num_divisors`, `sum_divisors`, `is_perfect`, `is_abundant`, `is_deficient`, `collatz_length`, `collatz_sequence`, `lucas`, `tribonacci`, `nth_prime`, `primes_up_to`/`sieve`, `next_prime`, `prev_prime`, `triangular_number`, `pentagonal_number`, `is_pentagonal`, `perfect_numbers`, `twin_primes`, `goldbach`, `prime_pi`, `totient_sum`, `subfactorial`, `bell_number`, `partition_number`, `multinomial`, `is_smith`, `aliquot_sum`, `abundant_numbers`, `deficient_numbers` |
+| Statistics | `skewness`, `kurtosis`, `linear_regression`, `moving_average`, `exponential_moving_average`, `coeff_of_variation`, `standard_error`, `normalize_array`, `cross_entropy`, `euclidean_distance`, `minkowski_distance`, `mean_absolute_error`, `mean_squared_error`, `median_absolute_deviation`, `winsorize`, `weighted_mean` |
+| Geometry | `area_circle`, `area_triangle`, `area_rectangle`, `area_trapezoid`, `area_ellipse`, `circumference`, `perimeter_rectangle`, `perimeter_triangle`, `polygon_area`, `sphere_volume`, `sphere_surface`, `cylinder_volume`, `cone_volume`, `heron_area`, `point_distance`, `midpoint`, `slope`, `triangle_hypotenuse`, `degrees_to_compass` |
+| Financial | `npv`, `depreciation_linear`, `depreciation_double`, `cagr`, `roi`, `break_even`, `markup`, `margin`, `discount`, `tax`, `tip` |
+| Encoding | `morse_encode`/`morse`, `morse_decode`, `nato_phonetic`, `int_to_roman`, `roman_to_int`, `binary_to_gray`, `gray_to_binary`, `pig_latin`, `atbash`, `braille_encode`, `phonetic_digit`, `to_emoji_num` |
+| Color | `hsl_to_rgb`, `rgb_to_hsl`, `hsv_to_rgb`, `rgb_to_hsv`, `color_blend`, `color_lighten`, `color_darken`, `color_complement`, `color_invert`, `color_grayscale`, `random_color`, `ansi_256`, `ansi_truecolor`, `color_distance` |
+| Constants | `pi`, `tau`, `phi`, `epsilon`, `speed_of_light`, `gravitational_constant`, `planck_constant`, `avogadro_number`, `boltzmann_constant`, `elementary_charge`, `electron_mass`, `proton_mass`, `i64_max`, `i64_min`, `f64_max`, `f64_min` |
+| Matrix | `matrix_transpose`, `matrix_inverse`, `matrix_hadamard`, `matrix_power`, `matrix_flatten`, `matrix_from_rows`, `matrix_map`, `matrix_sum`, `matrix_max`, `matrix_min` |
+| DSP / Signal | `convolution`, `autocorrelation`, `fft_magnitude`, `zero_crossings`, `peak_detect` |
+| Algorithms | `next_permutation`, `is_balanced_parens`, `eval_rpn`, `merge_sorted`, `binary_insert`, `reservoir_sample`, `run_length_encode_str`, `run_length_decode_str`, `range_expand`, `range_compress`, `group_consecutive_by`, `histogram`, `bucket`, `clamp_array`, `normalize_range` |
+| Validation | `luhn_check`, `is_valid_hex_color`, `is_valid_cidr`, `is_valid_mime`, `is_valid_cron`, `is_valid_latitude`, `is_valid_longitude` |
+| Text | `ngrams`, `bigrams`, `trigrams`, `char_frequencies`, `is_anagram`, `is_pangram`, `mask_string`, `chunk_string`, `camel_to_snake`, `snake_to_camel`, `collapse_whitespace`, `remove_vowels`, `remove_consonants`, `strip_html`, `metaphone`, `double_metaphone`, `initials`, `acronym`, `superscript`, `subscript`, `leetspeak`, `zalgo`, `sort_words`, `unique_words`, `word_frequencies`, `string_distance`, `string_multiply` |
+| Misc | `fizzbuzz`, `roman_numeral_list`, `look_and_say`, `gray_code_sequence`, `sierpinski`, `mandelbrot_char`, `game_of_life_step`, `tower_of_hanoi`, `pascals_triangle`, `truth_table`, `base_convert`, `roman_add`, `haversine`, `bearing`, `bmi`, `bac_estimate` |
 
 #### Perl-compat highlights
 
