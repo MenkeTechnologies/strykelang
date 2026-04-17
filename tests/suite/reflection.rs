@@ -117,8 +117,12 @@ fn descriptions_cover_documented_names() {
         0,
     );
     let n_desc = eval_int(r#"scalar keys %perlrs::descriptions"#);
-    let n_built = eval_int(r#"scalar keys %perlrs::builtins"#);
-    assert!(n_desc > 0 && n_desc <= n_built);
+    let n_all = eval_int(r#"scalar keys %perlrs::all"#);
+    assert!(
+        n_desc > 0 && n_desc <= n_all,
+        "%descriptions ({n_desc}) should be between 1 and |%all| ({n_all}) — \
+         it includes both primaries and aliases when the LSP arm is shared",
+    );
 }
 
 /// `%categories` is the inverted `%builtins`: category → arrayref of names.
@@ -204,6 +208,32 @@ fn short_aliases_mirror_long_names() {
     assert!(eval_int(r#"length($d{pmap}) > 0 ? 1 : 0"#) == 1);
     assert!(eval_int(r#"scalar @{ $c{parallel} } > 0 ? 1 : 0"#) == 1);
     assert!(eval_int(r#"scalar @{ $p{to_json} } > 0 ? 1 : 0"#) == 1);
+}
+
+/// Every `try_builtin` dispatch primary must land in either `is_perl5_core`
+/// or `perlrs_extension_name` — otherwise `--compat` mode silently accepts
+/// it (bypasses the `perlrs_extension_name` gate) and `%builtins` tags it
+/// `"uncategorized"` instead of a real category.
+///
+/// On failure, the message lists every offender so the fix is mechanical:
+/// add each name to the appropriate `// ── category ──` section in
+/// `src/parser.rs`. Rebuild the test to confirm.
+#[test]
+fn every_dispatch_primary_is_categorized() {
+    let out = eval_string(
+        r#"
+        my @bad;
+        for my $name (sort keys %perlrs::builtins) {
+            push @bad, $name if $perlrs::builtins{$name} eq "uncategorized";
+        }
+        join ",", @bad
+        "#,
+    );
+    assert!(
+        out.is_empty(),
+        "uncategorized dispatch primaries — add each to a `// ── category ──`\n\
+         section in parser.rs (is_perl5_core or perlrs_extension_name):\n    {out}",
+    );
 }
 
 /// Catastrophic-regression floors on each hash.

@@ -159,7 +159,11 @@ fn main() {
 }
 
 /// Scan the `match name` block inside `pub(crate) fn try_builtin` and
-/// return each arm's quoted names in source order.
+/// return each arm's quoted names in source order. Skips `CORE::` and
+/// `builtin::` prefixed forms — those are qualifier aliases of the plain
+/// name already present in the same arm and would otherwise show up as
+/// bogus uncategorized "primaries" when an arm starts with the qualified
+/// spelling.
 fn extract_try_builtin_arms(src: &str) -> Vec<Vec<String>> {
     let fn_pos = src
         .find("pub(crate) fn try_builtin")
@@ -196,6 +200,10 @@ fn extract_try_builtin_arms(src: &str) -> Vec<Vec<String>> {
             b'=' if inner == 0 && bb.get(i + 1) == Some(&b'>') => {
                 let mut names = Vec::new();
                 extract_quoted(&body[arm_start..i], &mut names);
+                // Drop qualifier-prefixed spellings (`CORE::eof`, `builtin::tell`) —
+                // they're duplicate dispatch entries for the plain name already
+                // in the same arm and pollute reflection with pseudo-primaries.
+                names.retain(|n| !n.contains("::"));
                 if !names.is_empty() {
                     arms.push(names);
                 }

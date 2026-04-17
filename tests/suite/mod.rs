@@ -18,6 +18,7 @@ mod control_flow;
 mod control_try_given;
 mod data_structures;
 mod error_kinds_extra;
+mod error_parity;
 mod errors;
 mod eval_errors;
 mod expressions;
