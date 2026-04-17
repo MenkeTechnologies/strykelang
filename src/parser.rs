@@ -1643,18 +1643,37 @@ impl Parser {
                         result = self.thread_apply_bare_func(&func_name, result, stage_line)?;
                     }
                 }
-                // `/pattern/flags` — regex match (from `m/…/` which forces regex context)
+                // `/pattern/flags` — grep filter (desugar to `grep { /pattern/flags }`)
                 Token::Regex(ref pattern, ref flags, delim) => {
                     let pattern = pattern.clone();
                     let flags = flags.clone();
                     self.advance();
-                    let stage = Expr {
+                    // Build: grep { $_ =~ /pattern/flags } LIST
+                    // The block contains a match against $_ (the topic variable).
+                    let topic = Expr {
+                        kind: ExprKind::ScalarVar("_".to_string()),
+                        line: stage_line,
+                    };
+                    let match_expr = Expr {
                         kind: ExprKind::Match {
-                            expr: Box::new(result.clone()),
+                            expr: Box::new(topic),
                             pattern,
                             flags,
                             scalar_g: false,
                             delim,
+                        },
+                        line: stage_line,
+                    };
+                    let block = vec![Statement {
+                        label: None,
+                        kind: StmtKind::Expression(match_expr),
+                        line: stage_line,
+                    }];
+                    let stage = Expr {
+                        kind: ExprKind::GrepExpr {
+                            block,
+                            list: Box::new(result.clone()),
+                            keyword: crate::ast::GrepBuiltinKeyword::Grep,
                         },
                         line: stage_line,
                     };
@@ -1966,6 +1985,25 @@ impl Parser {
             "print" | "pr" => ExprKind::Print {
                 handle: None,
                 args: vec![arg],
+            },
+            // Bare `e` / `fore` in thread context: foreach element, say it.
+            // `t @list e` == `@list |> e p` == foreach (@list) { say }
+            "e" | "fore" => ExprKind::ForEachExpr {
+                block: vec![Statement {
+                    label: None,
+                    kind: StmtKind::Expression(Expr {
+                        kind: ExprKind::Say {
+                            handle: None,
+                            args: vec![Expr {
+                                kind: ExprKind::ScalarVar("_".into()),
+                                line,
+                            }],
+                        },
+                        line,
+                    }),
+                    line,
+                }],
+                list: Box::new(arg),
             },
             // Default: generic function call
             _ => ExprKind::FuncCall {
