@@ -447,6 +447,8 @@ pub struct Interpreter {
     pub eval_error: String,
     /// Numeric side of `$@` dualvar (`0` when cleared; `1` for typical exception strings; or explicit code from assignment / dualvar).
     pub eval_error_code: i32,
+    /// When `die` is called with a ref argument, the ref value is preserved here.
+    pub eval_error_value: Option<PerlValue>,
     /// @ARGV
     pub argv: Vec<String>,
     /// %ENV (mirrors `scope` hash `"ENV"` after [`Self::materialize_env_if_needed`])
@@ -800,6 +802,45 @@ fn piped_shell_command(cmd: &str) -> Command {
 }
 
 /// Expands Perl `\Q...\E` spans to escaped text for the Rust [`regex`] crate.
+/// Convert Perl octal escapes (`\0`, `\00`, `\000`, `\012`, etc.) to `\xHH`
+/// so the Rust `regex` crate can match them.
+/// Convert Perl octal escapes starting with `\0` (e.g. `\0`, `\012`, `\077`) to `\xHH`
+/// so the Rust regex crate can match NUL and other octal-specified bytes.
+/// Only `\0`-prefixed sequences are octal; `\1`–`\9` are backreferences.
+fn expand_perl_regex_octal_escapes(pat: &str) -> String {
+    let mut out = String::with_capacity(pat.len());
+    let mut it = pat.chars().peekable();
+    while let Some(c) = it.next() {
+        if c == '\\' {
+            if let Some(&'0') = it.peek() {
+                // Collect up to 3 octal digits starting with '0'
+                let mut oct = String::new();
+                while oct.len() < 3 {
+                    if let Some(&d) = it.peek() {
+                        if d >= '0' && d <= '7' {
+                            oct.push(d);
+                            it.next();
+                        } else {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                if let Ok(val) = u8::from_str_radix(&oct, 8) {
+                    out.push_str(&format!("\\x{:02x}", val));
+                } else {
+                    out.push('\\');
+                    out.push_str(&oct);
+                }
+                continue;
+            }
+        }
+        out.push(c);
+    }
+    out
+}
+
 fn expand_perl_regex_quotemeta(pat: &str) -> String {
     let mut out = String::with_capacity(pat.len().saturating_mul(2));
     let mut it = pat.chars().peekable();
@@ -1236,6 +1277,7 @@ impl Interpreter {
             errno_code: 0,
             eval_error: String::new(),
             eval_error_code: 0,
+            eval_error_value: None,
             argv: Vec::new(),
             env: IndexMap::new(),
             env_materialized: false,
@@ -1409,6 +1451,7 @@ impl Interpreter {
             errno_code: self.errno_code,
             eval_error: self.eval_error.clone(),
             eval_error_code: self.eval_error_code,
+            eval_error_value: self.eval_error_value.clone(),
             argv: self.argv.clone(),
             env: self.env.clone(),
             env_materialized: self.env_materialized,
@@ -1713,11 +1756,19 @@ impl Interpreter {
     pub(crate) fn set_eval_error(&mut self, msg: String) {
         self.eval_error = msg;
         self.eval_error_code = if self.eval_error.is_empty() { 0 } else { 1 };
+        self.eval_error_value = None;
+    }
+
+    pub(crate) fn set_eval_error_from_perl_error(&mut self, e: &PerlError) {
+        self.eval_error = e.to_string();
+        self.eval_error_code = if self.eval_error.is_empty() { 0 } else { 1 };
+        self.eval_error_value = e.die_value.clone();
     }
 
     pub(crate) fn clear_eval_error(&mut self) {
         self.eval_error = String::new();
         self.eval_error_code = 0;
+        self.eval_error_value = None;
     }
 
     /// Advance `$.` bookkeeping for the handle that produced the last `readline` line.
@@ -1834,7 +1885,7 @@ impl Interpreter {
             .collect()
     }
 
-    fn mro_linearize(&self, class: &str) -> Vec<String> {
+    pub(crate) fn mro_linearize(&self, class: &str) -> Vec<String> {
         let p = |c: &str| self.parents_of_class(c);
         linearize_c3(class, &p, 0)
     }
@@ -2364,7 +2415,12 @@ impl Interpreter {
     }
 
     fn check_strict_hash_var(&self, name: &str, line: usize) -> Result<(), FlowOrError> {
-        if !self.strict_vars || name.contains("::") || self.scope.hash_binding_exists(name) {
+        // `%+`, `%-`, `%ENV`, `%SIG` etc. are special hashes, not subject to strict.
+        if !self.strict_vars
+            || name.contains("::")
+            || self.scope.hash_binding_exists(name)
+            || matches!(name, "+" | "-" | "ENV" | "SIG" | "!" | "^H")
+        {
             return Ok(());
         }
         Err(PerlError::runtime(
@@ -4318,7 +4374,16 @@ impl Interpreter {
                 named.insert(name.to_string(), PerlValue::string(m.text.to_string()));
             }
         }
-        self.scope.set_hash("+", named)?;
+        self.scope.set_hash("+", named.clone())?;
+        // `%-` maps each named capture to an arrayref of values (for multiple matches of the same name).
+        let mut named_minus = IndexMap::new();
+        for (name, val) in &named {
+            named_minus.insert(
+                name.clone(),
+                PerlValue::array_ref(Arc::new(RwLock::new(vec![val.clone()]))),
+            );
+        }
+        self.scope.set_hash("-", named_minus)?;
         let cap_flat = crate::perl_regex::numbered_capture_flat(caps);
         self.scope.set_array("^CAPTURE", cap_flat.clone())?;
         match capture_all {
@@ -7604,7 +7669,7 @@ impl Interpreter {
 
     /// Process Perl case escapes: \U (uppercase), \L (lowercase), \u (ucfirst),
     /// \l (lcfirst), \Q (quotemeta), \E (end modifier).
-    fn process_case_escapes(s: &str) -> String {
+    pub(crate) fn process_case_escapes(s: &str) -> String {
         // Quick check: if no backslash, nothing to do
         if !s.contains('\\') {
             return s.to_string();
@@ -7652,37 +7717,38 @@ impl Interpreter {
                 }
             }
 
-            let mut ch = c;
+            let ch = c;
 
-            // Apply one-shot modifier first
+            // One-shot modifier (`\u` / `\l`) overrides the ongoing mode for this character.
             if let Some(m) = next_char_mod.take() {
-                ch = match m {
+                let transformed = match m {
                     'u' => ch.to_uppercase().next().unwrap_or(ch),
                     'l' => ch.to_lowercase().next().unwrap_or(ch),
                     _ => ch,
                 };
-            }
-
-            // Apply ongoing mode
-            match mode {
-                Some('U') => {
-                    for uc in ch.to_uppercase() {
-                        result.push(uc);
+                result.push(transformed);
+            } else {
+                // Apply ongoing mode
+                match mode {
+                    Some('U') => {
+                        for uc in ch.to_uppercase() {
+                            result.push(uc);
+                        }
                     }
-                }
-                Some('L') => {
-                    for lc in ch.to_lowercase() {
-                        result.push(lc);
+                    Some('L') => {
+                        for lc in ch.to_lowercase() {
+                            result.push(lc);
+                        }
                     }
-                }
-                Some('Q') => {
-                    if !ch.is_ascii_alphanumeric() && ch != '_' {
-                        result.push('\\');
+                    Some('Q') => {
+                        if !ch.is_ascii_alphanumeric() && ch != '_' {
+                            result.push('\\');
+                        }
+                        result.push(ch);
                     }
-                    result.push(ch);
-                }
-                None | Some(_) => {
-                    result.push(ch);
+                    None | Some(_) => {
+                        result.push(ch);
+                    }
                 }
             }
         }
@@ -7987,9 +8053,20 @@ impl Interpreter {
                 // so `{ a => [1..3] }` and `{ key => grep/sort/... }` flatten through.
                 let mut map = IndexMap::new();
                 for (k, v) in pairs {
-                    let key = self.eval_expr(k)?.to_string();
-                    let val = self.eval_expr_ctx(v, WantarrayCtx::List)?;
-                    map.insert(key, val);
+                    let key_str = self.eval_expr(k)?.to_string();
+                    if key_str == "__HASH_SPREAD__" {
+                        // Hash spread: `{ %hash }` — flatten hash into key-value pairs
+                        let spread = self.eval_expr_ctx(v, WantarrayCtx::List)?;
+                        let items = spread.to_list();
+                        let mut i = 0;
+                        while i + 1 < items.len() {
+                            map.insert(items[i].to_string(), items[i + 1].clone());
+                            i += 2;
+                        }
+                    } else {
+                        let val = self.eval_expr_ctx(v, WantarrayCtx::List)?;
+                        map.insert(key_str, val);
+                    }
                 }
                 Ok(PerlValue::hash_ref(Arc::new(RwLock::new(map))))
             }
@@ -9048,6 +9125,44 @@ impl Interpreter {
                         return Ok(ver);
                     }
                 }
+                // UNIVERSAL methods: isa, can, DOES
+                if !*super_call {
+                    match method.as_str() {
+                        "isa" => {
+                            let target = arg_vals.get(1).map(|v| v.to_string()).unwrap_or_default();
+                            let mro = self.mro_linearize(&class);
+                            let result = mro.iter().any(|c| c == &target);
+                            return Ok(PerlValue::integer(if result { 1 } else { 0 }));
+                        }
+                        "can" => {
+                            let target_method =
+                                arg_vals.get(1).map(|v| v.to_string()).unwrap_or_default();
+                            let found = self
+                                .resolve_method_full_name(&class, &target_method, false)
+                                .and_then(|fq| self.subs.get(&fq))
+                                .is_some();
+                            if found {
+                                return Ok(PerlValue::code_ref(Arc::new(PerlSub {
+                                    name: target_method,
+                                    params: vec![],
+                                    body: vec![],
+                                    closure_env: None,
+                                    prototype: None,
+                                    fib_like: None,
+                                })));
+                            } else {
+                                return Ok(PerlValue::UNDEF);
+                            }
+                        }
+                        "DOES" => {
+                            let target = arg_vals.get(1).map(|v| v.to_string()).unwrap_or_default();
+                            let mro = self.mro_linearize(&class);
+                            let result = mro.iter().any(|c| c == &target);
+                            return Ok(PerlValue::integer(if result { 1 } else { 0 }));
+                        }
+                        _ => {}
+                    }
+                }
                 let full_name = self
                     .resolve_method_full_name(&class, method, *super_call)
                     .ok_or_else(|| {
@@ -9087,6 +9202,31 @@ impl Interpreter {
             ExprKind::Say { handle, args } => self.exec_print(handle.as_deref(), args, true, line),
             ExprKind::Printf { handle, args } => self.exec_printf(handle.as_deref(), args, line),
             ExprKind::Die(args) => {
+                if args.is_empty() {
+                    // `die` with no args: re-die with current $@ or "Died"
+                    let current = self.scope.get_scalar("@");
+                    let msg = if current.is_undef() || current.to_string().is_empty() {
+                        let mut m = "Died".to_string();
+                        m.push_str(&self.die_warn_at_suffix(line));
+                        m.push('\n');
+                        m
+                    } else {
+                        current.to_string()
+                    };
+                    return Err(PerlError::die(msg, line).into());
+                }
+                // Single ref argument: store the ref value in $@
+                if args.len() == 1 {
+                    let v = self.eval_expr(&args[0])?;
+                    if v.as_hash_ref().is_some()
+                        || v.as_blessed_ref().is_some()
+                        || v.as_array_ref().is_some()
+                        || v.as_code_ref().is_some()
+                    {
+                        let msg = v.to_string();
+                        return Err(PerlError::die_with_value(v, msg, line).into());
+                    }
+                }
                 let mut msg = String::new();
                 for a in args {
                     let v = self.eval_expr(a)?;
@@ -10834,7 +10974,7 @@ impl Interpreter {
                             Ok(v)
                         }
                         Err(FlowOrError::Error(e)) => {
-                            self.set_eval_error(e.to_string());
+                            self.set_eval_error_from_perl_error(&e);
                             Ok(PerlValue::UNDEF)
                         }
                         Err(FlowOrError::Flow(f)) => Err(FlowOrError::Flow(f)),
@@ -11116,6 +11256,18 @@ impl Interpreter {
             }),
 
             ExprKind::List(exprs) => {
+                // In scalar context, the comma operator evaluates to the last element.
+                if ctx == WantarrayCtx::Scalar {
+                    if let Some(last) = exprs.last() {
+                        // Evaluate earlier expressions for side effects
+                        for e in &exprs[..exprs.len() - 1] {
+                            self.eval_expr(e)?;
+                        }
+                        return self.eval_expr(last);
+                    } else {
+                        return Ok(PerlValue::UNDEF);
+                    }
+                }
                 let mut vals = Vec::new();
                 for e in exprs {
                     let v = self.eval_expr(e)?;
@@ -11125,12 +11277,6 @@ impl Interpreter {
                         vals.push(v);
                     }
                 }
-                eprintln!(
-                    "DEBUG List: ctx={:?} vals.len={} exprs.len={}",
-                    ctx,
-                    vals.len(),
-                    exprs.len()
-                );
                 if vals.len() == 1 {
                     Ok(vals.pop().unwrap())
                 } else {
@@ -12757,7 +12903,13 @@ impl Interpreter {
             "^LAST_SUBMATCH_RESULT" => PerlValue::string(self.last_paren_match.clone()),
             "0" => PerlValue::string(self.program_name.clone()),
             "!" => PerlValue::errno_dual(self.errno_code, self.errno.clone()),
-            "@" => PerlValue::errno_dual(self.eval_error_code, self.eval_error.clone()),
+            "@" => {
+                if let Some(ref v) = self.eval_error_value {
+                    v.clone()
+                } else {
+                    PerlValue::errno_dual(self.eval_error_code, self.eval_error.clone())
+                }
+            }
             "/" => match &self.irs {
                 Some(s) => PerlValue::string(s.clone()),
                 None => PerlValue::UNDEF,
@@ -14045,7 +14197,7 @@ impl Interpreter {
         })
     }
 
-    pub(crate) fn anon_coderef_from_block(&self, block: &Block) -> Arc<PerlSub> {
+    pub(crate) fn anon_coderef_from_block(&mut self, block: &Block) -> Arc<PerlSub> {
         let captured = self.scope.capture();
         Arc::new(PerlSub {
             name: "__ANON__".into(),
@@ -16591,12 +16743,71 @@ impl Interpreter {
         .map_err(FlowOrError::Error)
     }
 
+    /// Interpolate `$var` / `@var` in regex patterns (Perl double-quote-like interpolation).
+    fn interpolate_regex_pattern(&self, pattern: &str) -> String {
+        let mut out = String::with_capacity(pattern.len());
+        let chars: Vec<char> = pattern.chars().collect();
+        let mut i = 0;
+        while i < chars.len() {
+            if chars[i] == '\\' && i + 1 < chars.len() {
+                // Preserve escape sequences (including \$ which is literal $)
+                out.push(chars[i]);
+                out.push(chars[i + 1]);
+                i += 2;
+                continue;
+            }
+            if chars[i] == '$' && i + 1 < chars.len() {
+                i += 1;
+                // `$` at end of pattern is an anchor, not a variable
+                if i >= chars.len()
+                    || (!chars[i].is_alphanumeric() && chars[i] != '_' && chars[i] != '{')
+                {
+                    out.push('$');
+                    continue;
+                }
+                let mut name = String::new();
+                if chars[i] == '{' {
+                    i += 1;
+                    while i < chars.len() && chars[i] != '}' {
+                        name.push(chars[i]);
+                        i += 1;
+                    }
+                    if i < chars.len() {
+                        i += 1;
+                    } // skip }
+                } else {
+                    while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
+                        name.push(chars[i]);
+                        i += 1;
+                    }
+                }
+                if !name.is_empty() {
+                    let val = self.scope.get_scalar(&name);
+                    out.push_str(&val.to_string());
+                } else {
+                    out.push('$');
+                }
+                continue;
+            }
+            out.push(chars[i]);
+            i += 1;
+        }
+        out
+    }
+
     pub(crate) fn compile_regex(
         &mut self,
         pattern: &str,
         flags: &str,
         line: usize,
     ) -> Result<Arc<PerlCompiledRegex>, FlowOrError> {
+        // Interpolate variables in the pattern: `$var`, `${var}`, `@var`
+        let pattern = if pattern.contains('$') || pattern.contains('@') {
+            std::borrow::Cow::Owned(self.interpolate_regex_pattern(pattern))
+        } else {
+            std::borrow::Cow::Borrowed(pattern)
+        };
+        let pattern = pattern.as_ref();
         // Fast path: same regex as last call (common in loops).
         // Arc clone is cheap (ref-count increment) AND preserves the lazy DFA cache.
         let multiline = self.multiline_match;
@@ -16617,6 +16828,7 @@ impl Interpreter {
             return Ok(cached.clone());
         }
         let expanded = expand_perl_regex_quotemeta(pattern);
+        let expanded = expand_perl_regex_octal_escapes(&expanded);
         let expanded = rewrite_perl_regex_dollar_end_anchor(&expanded, flags.contains('m'));
         let mut re_str = String::new();
         if flags.contains('i') {

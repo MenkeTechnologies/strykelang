@@ -723,7 +723,7 @@ impl Compiler {
     fn strict_hash_exempt(name: &str) -> bool {
         matches!(
             name,
-            "ENV" | "INC" | "SIG" | "EXPORT_TAGS" | "ISA" | "OVERLOAD"
+            "ENV" | "INC" | "SIG" | "EXPORT_TAGS" | "ISA" | "OVERLOAD" | "+" | "-" | "!" | "^H"
         )
     }
 
@@ -2160,9 +2160,11 @@ impl Compiler {
                     // `return` whose expression could behave differently in list vs scalar
                     // context (Range / flip-flop today) falls back to the tree walker which
                     // evaluates via `self.wantarray_kind`.
-                    if matches!(expr.kind, ExprKind::Range { .. }) {
+                    if matches!(expr.kind, ExprKind::Range { .. })
+                        || expr_tail_is_list_sensitive(expr)
+                    {
                         return Err(CompileError::Unsupported(
-                            "return of `..` needs caller-context dispatch (tree interpreter)"
+                            "return of list/range needs caller-context dispatch (tree interpreter)"
                                 .into(),
                         ));
                     }
@@ -2612,6 +2614,12 @@ impl Compiler {
                 }
             }
             StmtKind::Expression(expr) => {
+                if expr_tail_is_list_sensitive(expr) {
+                    return Err(CompileError::Unsupported(
+                        "implicit return of list-sensitive expr needs caller-context dispatch"
+                            .into(),
+                    ));
+                }
                 for stmt in &body[..last_idx] {
                     self.compile_statement(stmt)?;
                 }
@@ -2705,7 +2713,8 @@ impl Compiler {
                 self.emit_op(Op::LoadFloat(*f), line, Some(root));
             }
             ExprKind::String(s) => {
-                let idx = self.chunk.add_constant(PerlValue::string(s.clone()));
+                let processed = Interpreter::process_case_escapes(s);
+                let idx = self.chunk.add_constant(PerlValue::string(processed));
                 self.emit_op(Op::LoadConst(idx), line, Some(root));
             }
             ExprKind::Bareword(name) => {
@@ -6389,6 +6398,20 @@ impl Compiler {
 
             // ── Interpolated strings ──
             ExprKind::InterpolatedString(parts) => {
+                // Check if any literal part contains case-escape sequences.
+                let has_case_escapes = parts.iter().any(|p| {
+                    if let StringPart::Literal(s) = p {
+                        s.contains('\\')
+                            && (s.contains("\\U")
+                                || s.contains("\\L")
+                                || s.contains("\\u")
+                                || s.contains("\\l")
+                                || s.contains("\\Q")
+                                || s.contains("\\E"))
+                    } else {
+                        false
+                    }
+                });
                 if parts.is_empty() {
                     let idx = self.chunk.add_constant(PerlValue::string(String::new()));
                     self.emit_op(Op::LoadConst(idx), line, Some(root));
@@ -6407,6 +6430,9 @@ impl Compiler {
                     if !matches!(&parts[0], StringPart::Literal(_)) {
                         self.emit_op(Op::Concat, line, Some(root));
                     }
+                }
+                if has_case_escapes {
+                    self.emit_op(Op::ProcessCaseEscapes, line, Some(root));
                 }
             }
 

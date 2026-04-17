@@ -1,11 +1,16 @@
 use std::fmt;
 
+use crate::value::PerlValue;
+
 #[derive(Debug, Clone)]
 pub struct PerlError {
     pub kind: ErrorKind,
     pub message: String,
     pub line: usize,
     pub file: String,
+    /// When `die` is called with a ref argument, the original value is preserved here
+    /// so that `$@` can hold the ref (not just its stringification).
+    pub die_value: Option<PerlValue>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -35,6 +40,7 @@ impl PerlError {
             message: message.into(),
             line,
             file: file.into(),
+            die_value: None,
         }
     }
 
@@ -58,6 +64,12 @@ impl PerlError {
 
     pub fn die(message: impl Into<String>, line: usize) -> Self {
         Self::new(ErrorKind::Die, message, line, "-e")
+    }
+
+    pub fn die_with_value(value: PerlValue, message: String, line: usize) -> Self {
+        let mut e = Self::new(ErrorKind::Die, message, line, "-e");
+        e.die_value = Some(value);
+        e
     }
 }
 

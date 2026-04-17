@@ -1079,11 +1079,11 @@ fn dunder_sub_in_named_sub() {
 
 #[test]
 fn defer_basic_runs() {
-    // defer block executes when scope exits
-    // Returns captured value + 1 to prove defer ran
+    // defer block executes when scope exits; closures share the enclosing
+    // variable binding, so the assignment inside defer modifies the outer $x.
     assert_eq!(
         eval_int(r#"my $x = 5; { defer { $x = 100 } } $x"#),
-        5 // Captured value stays 5 due to closure semantics
+        100 // Perl: defer modifies shared $x
     );
 }
 

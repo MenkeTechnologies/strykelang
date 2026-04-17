@@ -10728,6 +10728,30 @@ impl Parser {
             } else {
                 self.parse_assign_expr()?
             };
+            // If the key expression is a hash/array variable and is followed by `}` or `,`
+            // with no `=>`, treat the whole thing as a hash-from-expression construction.
+            // This handles `{ %a }`, `{ %a, key => val }`, etc.
+            if matches!(self.peek(), Token::RBrace | Token::Comma)
+                && matches!(
+                    key.kind,
+                    ExprKind::HashVar(_)
+                        | ExprKind::Deref {
+                            kind: Sigil::Hash,
+                            ..
+                        }
+                )
+            {
+                // Synthesize a pair whose key/value is spread from the hash expression.
+                // Use a sentinel "spread" pair: key=the hash expr, value=undef.
+                // The evaluator will flatten this.
+                let sentinel_key = Expr {
+                    kind: ExprKind::String("__HASH_SPREAD__".into()),
+                    line,
+                };
+                pairs.push((sentinel_key, key));
+                self.eat(&Token::Comma);
+                continue;
+            }
             // Expect => or , after key
             if self.eat(&Token::FatArrow) || self.eat(&Token::Comma) {
                 let val = self.parse_assign_expr()?;
@@ -11230,8 +11254,63 @@ impl Parser {
                     if Interpreter::is_special_scalar_name_for_get(&probe)
                         || matches!(c, '\'' | '`')
                     {
-                        parts.push(StringPart::ScalarVar(probe));
                         i += 1;
+                        // Check for hash element access: `$+{key}`, `$-{key}`, etc.
+                        if i < chars.len() && chars[i] == '{' {
+                            i += 1; // skip {
+                            let mut key = String::new();
+                            let mut depth = 1;
+                            while i < chars.len() && depth > 0 {
+                                if chars[i] == '{' {
+                                    depth += 1;
+                                } else if chars[i] == '}' {
+                                    depth -= 1;
+                                    if depth == 0 {
+                                        break;
+                                    }
+                                }
+                                key.push(chars[i]);
+                                i += 1;
+                            }
+                            if i < chars.len() {
+                                i += 1;
+                            } // skip }
+                            let key_expr = if let Some(rest) = key.strip_prefix('$') {
+                                Expr {
+                                    kind: ExprKind::ScalarVar(rest.to_string()),
+                                    line,
+                                }
+                            } else {
+                                Expr {
+                                    kind: ExprKind::String(key),
+                                    line,
+                                }
+                            };
+                            let mut base = Expr {
+                                kind: ExprKind::HashElement {
+                                    hash: probe,
+                                    key: Box::new(key_expr),
+                                },
+                                line,
+                            };
+                            base = self.interp_chain_subscripts(&chars, &mut i, base, line);
+                            parts.push(StringPart::Expr(base));
+                        } else {
+                            // Check for arrow deref chain: `$@->{key}`, etc.
+                            let mut base = Expr {
+                                kind: ExprKind::ScalarVar(probe),
+                                line,
+                            };
+                            base = self.interp_chain_subscripts(&chars, &mut i, base, line);
+                            if matches!(base.kind, ExprKind::ScalarVar(_)) {
+                                // No chain extension — use the simpler ScalarVar part
+                                if let ExprKind::ScalarVar(name) = base.kind {
+                                    parts.push(StringPart::ScalarVar(name));
+                                }
+                            } else {
+                                parts.push(StringPart::Expr(base));
+                            }
+                        }
                     } else {
                         literal.push('$');
                         literal.push(c);

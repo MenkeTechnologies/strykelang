@@ -1058,6 +1058,26 @@ impl PerlValue {
         nanbox::is_imm_undef(self.0)
     }
 
+    /// True for simple scalar values (integer, float, string, undef, bytes) that should be
+    /// wrapped in ScalarRef for closure variable sharing. Complex heap objects like
+    /// refs, blessed objects, code refs, etc. should NOT be wrapped because they already
+    /// share state via Arc and wrapping breaks type detection.
+    pub fn is_simple_scalar(&self) -> bool {
+        if self.is_undef() {
+            return true;
+        }
+        if !nanbox::is_heap(self.0) {
+            return true; // immediate int32
+        }
+        matches!(
+            unsafe { self.heap_ref() },
+            HeapObject::Integer(_)
+                | HeapObject::Float(_)
+                | HeapObject::String(_)
+                | HeapObject::Bytes(_)
+        )
+    }
+
     /// Immediate `int32` or heap `Integer` (not float / string).
     #[inline]
     pub fn as_integer(&self) -> Option<i64> {

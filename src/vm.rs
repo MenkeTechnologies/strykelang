@@ -1266,6 +1266,49 @@ impl<'a> VM<'a> {
                 return Ok(());
             }
         }
+        // UNIVERSAL methods: isa, can, DOES
+        if !super_call {
+            match method {
+                "isa" => {
+                    let target = args.first().map(|v| v.to_string()).unwrap_or_default();
+                    let mro = self.interp.mro_linearize(&class);
+                    let result = mro.iter().any(|c| c == &target);
+                    self.push(PerlValue::integer(if result { 1 } else { 0 }));
+                    return Ok(());
+                }
+                "can" => {
+                    let target_method = args.first().map(|v| v.to_string()).unwrap_or_default();
+                    let found = self
+                        .interp
+                        .resolve_method_full_name(&class, &target_method, false)
+                        .and_then(|fq| self.interp.subs.get(&fq))
+                        .is_some();
+                    if found {
+                        self.push(PerlValue::code_ref(std::sync::Arc::new(
+                            crate::value::PerlSub {
+                                name: target_method,
+                                params: vec![],
+                                body: vec![],
+                                closure_env: None,
+                                prototype: None,
+                                fib_like: None,
+                            },
+                        )));
+                    } else {
+                        self.push(PerlValue::UNDEF);
+                    }
+                    return Ok(());
+                }
+                "DOES" => {
+                    let target = args.first().map(|v| v.to_string()).unwrap_or_default();
+                    let mro = self.interp.mro_linearize(&class);
+                    let result = mro.iter().any(|c| c == &target);
+                    self.push(PerlValue::integer(if result { 1 } else { 0 }));
+                    return Ok(());
+                }
+                _ => {}
+            }
+        }
         let mut all_args = vec![obj];
         all_args.extend(args);
         let full_name = match self
@@ -3173,6 +3216,13 @@ impl<'a> VM<'a> {
                         let n = self.pop().to_int().max(0) as usize;
                         let val = self.pop();
                         self.push(PerlValue::string(val.to_string().repeat(n)));
+                        Ok(())
+                    }
+                    Op::ProcessCaseEscapes => {
+                        let val = self.pop();
+                        let s = val.to_string();
+                        let processed = Interpreter::process_case_escapes(&s);
+                        self.push(PerlValue::string(processed));
                         Ok(())
                     }
 
@@ -6147,7 +6197,7 @@ impl<'a> VM<'a> {
                                 self.push(v);
                             }
                             Err(crate::interpreter::FlowOrError::Error(e)) => {
-                                self.interp.set_eval_error(e.to_string());
+                                self.interp.set_eval_error_from_perl_error(&e);
                                 self.push(PerlValue::UNDEF);
                             }
                             Err(_) => self.push(PerlValue::UNDEF),
@@ -6165,7 +6215,7 @@ impl<'a> VM<'a> {
                                 self.push(v);
                             }
                             Err(FlowOrError::Error(e)) => {
-                                self.interp.set_eval_error(e.to_string());
+                                self.interp.set_eval_error_from_perl_error(&e);
                                 self.push(PerlValue::UNDEF);
                             }
                             Err(_) => self.push(PerlValue::UNDEF),
@@ -6184,7 +6234,7 @@ impl<'a> VM<'a> {
                                 v
                             }
                             Err(FlowOrError::Error(e)) => {
-                                self.interp.set_eval_error(e.to_string());
+                                self.interp.set_eval_error_from_perl_error(&e);
                                 PerlValue::UNDEF
                             }
                             Err(_) => PerlValue::UNDEF,
@@ -8536,7 +8586,7 @@ impl<'a> VM<'a> {
                             Ok(v)
                         }
                         Err(crate::interpreter::FlowOrError::Error(e)) => {
-                            self.interp.set_eval_error(e.to_string());
+                            self.interp.set_eval_error_from_perl_error(&e);
                             Ok(PerlValue::UNDEF)
                         }
                         Err(crate::interpreter::FlowOrError::Flow(_)) => {
@@ -8552,7 +8602,7 @@ impl<'a> VM<'a> {
                             Ok(v)
                         }
                         Err(e) => {
-                            self.interp.set_eval_error(e.to_string());
+                            self.interp.set_eval_error_from_perl_error(&e);
                             Ok(PerlValue::UNDEF)
                         }
                     }

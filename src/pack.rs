@@ -503,12 +503,13 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<PerlValue>, String> {
                 let slice = &data[pos..end];
                 pos = end;
                 let s = if t.op == 'A' {
+                    // A: strip trailing spaces and NULs
                     String::from_utf8_lossy(slice)
                         .trim_end_matches([' ', '\0'])
                         .to_string()
                 } else {
-                    let endz = slice.iter().position(|&b| b == 0).unwrap_or(slice.len());
-                    String::from_utf8_lossy(&slice[..endz]).to_string()
+                    // a: return raw bytes including NULs
+                    String::from_utf8_lossy(slice).to_string()
                 };
                 out.push(PerlValue::string(s));
             }

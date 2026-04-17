@@ -1784,21 +1784,31 @@ impl Scope {
         out
     }
 
-    pub fn capture(&self) -> Vec<(String, PerlValue)> {
+    pub fn capture(&mut self) -> Vec<(String, PerlValue)> {
         let mut captured = Vec::new();
-        for frame in &self.frames {
-            for (k, v) in &frame.scalars {
+        for frame in &mut self.frames {
+            for (k, v) in &mut frame.scalars {
                 // Wrap scalar in ScalarRef so the closure shares the same memory cell.
                 // If it's already a ScalarRef, just clone it (shares the same Arc).
-                let wrapped = if v.as_scalar_ref().is_some() {
-                    v.clone()
+                // Only wrap simple scalars (integers, floats, strings, undef); complex values
+                // like refs, blessed objects, atomics, etc. already share via Arc and wrapping
+                // them in ScalarRef breaks type detection (as_ppool, as_blessed_ref, etc.).
+                if v.as_scalar_ref().is_some() {
+                    captured.push((format!("${}", k), v.clone()));
+                } else if v.is_simple_scalar() {
+                    let wrapped = PerlValue::scalar_ref(Arc::new(RwLock::new(v.clone())));
+                    // Update the original scope variable to point to the same ScalarRef
+                    // so that subsequent closures share the same reference.
+                    *v = wrapped.clone();
+                    captured.push((format!("${}", k), wrapped));
                 } else {
-                    PerlValue::scalar_ref(Arc::new(RwLock::new(v.clone())))
-                };
-                captured.push((format!("${}", k), wrapped));
+                    captured.push((format!("${}", k), v.clone()));
+                }
             }
             for (i, v) in frame.scalar_slots.iter().enumerate() {
                 if let Some(Some(name)) = frame.scalar_slot_names.get(i) {
+                    // Scalar slots are used by the VM; don't modify them in-place.
+                    // Wrap in ScalarRef for the captured closure environment only.
                     let wrapped = if v.as_scalar_ref().is_some() {
                         v.clone()
                     } else {

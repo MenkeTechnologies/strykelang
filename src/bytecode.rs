@@ -155,6 +155,8 @@ pub enum Op {
     /// [`Interpreter::list_separator`] (`$"`), push one string. Used for `@a` in `"` / `qq`.
     ArrayStringifyListSep,
     StringRepeat,
+    /// Pop string, apply `\U` / `\L` / `\u` / `\l` / `\Q` / `\E` case escapes, push result.
+    ProcessCaseEscapes,
 
     // ── Comparison (numeric) ──
     NumEq,
