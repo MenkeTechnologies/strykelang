@@ -2577,11 +2577,7 @@ fn stringify_value(buf: &mut String, val: &PerlValue) {
                         let _ = write!(buf, "${}", name);
                         if let Some(t) = ty {
                             buf.push_str(": ");
-                            buf.push_str(match t {
-                                crate::ast::PerlTypeName::Int => "Int",
-                                crate::ast::PerlTypeName::Str => "Str",
-                                crate::ast::PerlTypeName::Float => "Float",
-                            });
+                            buf.push_str(&t.display_name());
                         }
                     }
                     crate::ast::SubSigParam::ArrayDestruct(_) => buf.push_str("[...]"),

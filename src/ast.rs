@@ -234,50 +234,101 @@ pub enum TieTarget {
 }
 
 /// Optional type for `typed my $x : Int` — enforced at assignment time (runtime).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PerlTypeName {
     Int,
     Str,
     Float,
+    Bool,
+    Array,
+    Hash,
+    Ref,
+    /// Struct-typed field: `field => Point` where Point is a struct name.
+    Struct(String),
+    /// Accepts any value (no runtime type check).
+    Any,
+}
+
+/// Single field in a struct definition.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StructField {
+    pub name: String,
+    pub ty: PerlTypeName,
+    /// Optional default value expression (evaluated at construction time if field not provided).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default: Option<Expr>,
 }
 
 /// Compile-time record type: `struct Name { field => Type, ... }`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StructDef {
     pub name: String,
-    pub fields: Vec<(String, PerlTypeName)>,
+    pub fields: Vec<StructField>,
 }
 
 impl StructDef {
     #[inline]
     pub fn field_index(&self, name: &str) -> Option<usize> {
-        self.fields.iter().position(|(n, _)| n == name)
+        self.fields.iter().position(|f| f.name == name)
+    }
+
+    /// Get field type by name.
+    #[inline]
+    pub fn field_type(&self, name: &str) -> Option<&PerlTypeName> {
+        self.fields.iter().find(|f| f.name == name).map(|f| &f.ty)
     }
 }
 
 impl PerlTypeName {
-    /// Bytecode encoding for `DeclareScalarTyped` / VM.
+    /// Bytecode encoding for `DeclareScalarTyped` / VM (only simple types; struct types use name pool).
     #[inline]
     pub fn from_byte(b: u8) -> Option<Self> {
         match b {
             0 => Some(Self::Int),
             1 => Some(Self::Str),
             2 => Some(Self::Float),
+            3 => Some(Self::Bool),
+            4 => Some(Self::Array),
+            5 => Some(Self::Hash),
+            6 => Some(Self::Ref),
+            7 => Some(Self::Any),
             _ => None,
         }
     }
 
+    /// Bytecode encoding (simple types only; `Struct(name)` requires separate name pool lookup).
     #[inline]
-    pub fn as_byte(self) -> u8 {
+    pub fn as_byte(&self) -> Option<u8> {
         match self {
-            Self::Int => 0,
-            Self::Str => 1,
-            Self::Float => 2,
+            Self::Int => Some(0),
+            Self::Str => Some(1),
+            Self::Float => Some(2),
+            Self::Bool => Some(3),
+            Self::Array => Some(4),
+            Self::Hash => Some(5),
+            Self::Ref => Some(6),
+            Self::Any => Some(7),
+            Self::Struct(_) => None,
+        }
+    }
+
+    /// Display name for error messages.
+    pub fn display_name(&self) -> String {
+        match self {
+            Self::Int => "Int".to_string(),
+            Self::Str => "Str".to_string(),
+            Self::Float => "Float".to_string(),
+            Self::Bool => "Bool".to_string(),
+            Self::Array => "Array".to_string(),
+            Self::Hash => "Hash".to_string(),
+            Self::Ref => "Ref".to_string(),
+            Self::Any => "Any".to_string(),
+            Self::Struct(name) => name.clone(),
         }
     }
 
     /// Strict runtime check: `Int` only integer-like [`PerlValue`](crate::value::PerlValue), `Str` only string, `Float` allows int or float.
-    pub fn check_value(self, v: &crate::value::PerlValue) -> Result<(), String> {
+    pub fn check_value(&self, v: &crate::value::PerlValue) -> Result<(), String> {
         match self {
             Self::Int => {
                 if v.is_integer_like() {
@@ -303,6 +354,47 @@ impl PerlTypeName {
                     ))
                 }
             }
+            Self::Bool => Ok(()),
+            Self::Array => {
+                if v.as_array_vec().is_some() || v.as_array_ref().is_some() {
+                    Ok(())
+                } else {
+                    Err(format!("expected Array, got {}", v.type_name()))
+                }
+            }
+            Self::Hash => {
+                if v.as_hash_map().is_some() || v.as_hash_ref().is_some() {
+                    Ok(())
+                } else {
+                    Err(format!("expected Hash, got {}", v.type_name()))
+                }
+            }
+            Self::Ref => {
+                if v.as_scalar_ref().is_some()
+                    || v.as_array_ref().is_some()
+                    || v.as_hash_ref().is_some()
+                    || v.as_code_ref().is_some()
+                {
+                    Ok(())
+                } else {
+                    Err(format!("expected Ref, got {}", v.type_name()))
+                }
+            }
+            Self::Struct(name) => {
+                if let Some(s) = v.as_struct_inst() {
+                    if s.def.name == *name {
+                        Ok(())
+                    } else {
+                        Err(format!(
+                            "expected struct {}, got struct {}",
+                            name, s.def.name
+                        ))
+                    }
+                } else {
+                    Err(format!("expected struct {}, got {}", name, v.type_name()))
+                }
+            }
+            Self::Any => Ok(()),
         }
     }
 }

@@ -107,6 +107,8 @@ pub struct Parser {
     next_desugar_tmp: u32,
     /// Source path for [`PerlError`] (matches lexer / `parse_with_file`).
     error_file: String,
+    /// User-declared sub names (for allowing UDF to shadow perlrs extensions in compat mode).
+    declared_subs: std::collections::HashSet<String>,
 }
 
 impl Parser {
@@ -125,6 +127,7 @@ impl Parser {
             suppress_scalar_hash_brace: 0,
             next_desugar_tmp: 0,
             error_file: file.into(),
+            declared_subs: std::collections::HashSet::new(),
         }
     }
 
@@ -2956,17 +2959,17 @@ impl Parser {
                             Token::Ident(ref tname) => {
                                 let tname = tname.clone();
                                 self.advance();
-                                match tname.as_str() {
-                                    "Int" => Some(PerlTypeName::Int),
-                                    "Str" => Some(PerlTypeName::Str),
-                                    "Float" => Some(PerlTypeName::Float),
-                                    _ => {
-                                        return Err(self.syntax_err(
-                                            format!("unknown type `{tname}` in sub signature (supported: Int, Str, Float)"),
-                                            self.peek_line(),
-                                        ));
-                                    }
-                                }
+                                Some(match tname.as_str() {
+                                    "Int" => PerlTypeName::Int,
+                                    "Str" => PerlTypeName::Str,
+                                    "Float" => PerlTypeName::Float,
+                                    "Bool" => PerlTypeName::Bool,
+                                    "Array" => PerlTypeName::Array,
+                                    "Hash" => PerlTypeName::Hash,
+                                    "Ref" => PerlTypeName::Ref,
+                                    "Any" => PerlTypeName::Any,
+                                    _ => PerlTypeName::Struct(tname),
+                                })
                             }
                             _ => {
                                 return Err(self.syntax_err(
@@ -3098,6 +3101,7 @@ impl Parser {
         match self.peek().clone() {
             Token::Ident(_) => {
                 let name = self.parse_package_qualified_identifier()?;
+                self.declared_subs.insert(name.clone());
                 let (params, prototype) = self.parse_sub_sig_or_prototype_opt()?;
                 self.parse_sub_attributes()?;
                 let body = self.parse_block()?;
@@ -3133,7 +3137,7 @@ impl Parser {
         }
     }
 
-    /// `struct Name { field => Type, ... }`
+    /// `struct Name { field => Type, ... }` or `struct Name { field => Type = default, ... }`
     fn parse_struct_decl(&mut self) -> PerlResult<Statement> {
         let line = self.peek_line();
         self.advance(); // struct
@@ -3158,7 +3162,16 @@ impl Parser {
             };
             self.expect(&Token::FatArrow)?;
             let ty = self.parse_type_name()?;
-            fields.push((field_name, ty));
+            let default = if self.eat(&Token::Assign) {
+                Some(self.parse_expression()?)
+            } else {
+                None
+            };
+            fields.push(StructField {
+                name: field_name,
+                ty,
+                default,
+            });
             if !self.eat(&Token::Comma) {
                 break;
             }
@@ -3732,20 +3745,22 @@ impl Parser {
     }
 
     fn parse_type_name(&mut self) -> PerlResult<PerlTypeName> {
-        let line = self.peek_line();
         match self.advance() {
             (Token::Ident(name), _) => match name.as_str() {
                 "Int" => Ok(PerlTypeName::Int),
                 "Str" => Ok(PerlTypeName::Str),
                 "Float" => Ok(PerlTypeName::Float),
-                _ => Err(self.syntax_err(
-                    format!("unknown type `{name}` (supported: Int, Str, Float)"),
-                    line,
-                )),
+                "Bool" => Ok(PerlTypeName::Bool),
+                "Array" => Ok(PerlTypeName::Array),
+                "Hash" => Ok(PerlTypeName::Hash),
+                "Ref" => Ok(PerlTypeName::Ref),
+                "Any" => Ok(PerlTypeName::Any),
+                _ => Ok(PerlTypeName::Struct(name)),
             },
-            (tok, line) => {
-                Err(self.syntax_err(format!("Expected type name after `:`, got {:?}", tok), line))
-            }
+            (tok, err_line) => Err(self.syntax_err(
+                format!("Expected type name after `:`, got {:?}", tok),
+                err_line,
+            )),
         }
     }
 
@@ -6451,10 +6466,12 @@ impl Parser {
 
         if crate::compat_mode() {
             if let Some(ext) = Self::perlrs_extension_name(&name) {
-                return Err(self.syntax_err(
-                    format!("`{ext}` is a perlrs extension (disabled by --compat)"),
-                    line,
-                ));
+                if !self.declared_subs.contains(&name) {
+                    return Err(self.syntax_err(
+                        format!("`{ext}` is a perlrs extension (disabled by --compat)"),
+                        line,
+                    ));
+                }
             }
         }
 

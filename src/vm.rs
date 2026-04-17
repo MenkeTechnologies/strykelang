@@ -1356,8 +1356,30 @@ impl<'a> VM<'a> {
                 self.push(crate::value::set_from_elements(
                     all_args.into_iter().skip(1),
                 ));
-            } else if let Some(def) = self.interp.struct_defs.get(&class) {
-                let v = crate::native_data::struct_new(def, &all_args, self.line())?;
+            } else if let Some(def) = self.interp.struct_defs.get(&class).cloned() {
+                let line = self.line();
+                let mut provided = Vec::new();
+                let mut i = 1;
+                while i + 1 < all_args.len() {
+                    let k = all_args[i].to_string();
+                    let v = all_args[i + 1].clone();
+                    provided.push((k, v));
+                    i += 2;
+                }
+                let mut defaults = Vec::with_capacity(def.fields.len());
+                for field in &def.fields {
+                    if let Some(ref expr) = field.default {
+                        let val = self.interp.eval_expr(expr).map_err(|e| match e {
+                            crate::interpreter::FlowOrError::Error(pe) => pe,
+                            _ => PerlError::runtime("default evaluation flow", line),
+                        })?;
+                        defaults.push(Some(val));
+                    } else {
+                        defaults.push(None);
+                    }
+                }
+                let v =
+                    crate::native_data::struct_new_with_defaults(&def, &provided, &defaults, line)?;
                 self.push(v);
             } else {
                 let mut map = IndexMap::new();

@@ -828,14 +828,44 @@ impl Drop for BlessedRef {
 #[derive(Debug)]
 pub struct StructInstance {
     pub def: Arc<StructDef>,
-    pub values: Vec<PerlValue>,
+    pub values: RwLock<Vec<PerlValue>>,
+}
+
+impl StructInstance {
+    /// Create a new struct instance with the given definition and values.
+    pub fn new(def: Arc<StructDef>, values: Vec<PerlValue>) -> Self {
+        Self {
+            def,
+            values: RwLock::new(values),
+        }
+    }
+
+    /// Get a field value by index (clones the value).
+    #[inline]
+    pub fn get_field(&self, idx: usize) -> Option<PerlValue> {
+        self.values.read().get(idx).cloned()
+    }
+
+    /// Set a field value by index.
+    #[inline]
+    pub fn set_field(&self, idx: usize, val: PerlValue) {
+        if let Some(slot) = self.values.write().get_mut(idx) {
+            *slot = val;
+        }
+    }
+
+    /// Get all field values (clones the vector).
+    #[inline]
+    pub fn get_values(&self) -> Vec<PerlValue> {
+        self.values.read().clone()
+    }
 }
 
 impl Clone for StructInstance {
     fn clone(&self) -> Self {
         Self {
             def: Arc::clone(&self.def),
-            values: self.values.clone(),
+            values: RwLock::new(self.values.read().clone()),
         }
     }
 }

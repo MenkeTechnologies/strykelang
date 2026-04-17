@@ -260,48 +260,55 @@ fn sqlite_value_to_perl(v: Value) -> PerlValue {
     }
 }
 
-/// Build a struct instance from `Class->new(k => v, ...)` arguments (pairs after class name).
-pub(crate) fn struct_new(
+/// Build a struct instance with defaults evaluated by the interpreter.
+/// Called from interpreter when constructing structs so default expressions can be evaluated.
+pub(crate) fn struct_new_with_defaults(
     def: &Arc<StructDef>,
-    args: &[PerlValue],
+    provided: &[(String, PerlValue)],
+    defaults: &[Option<PerlValue>],
     line: usize,
 ) -> PerlResult<PerlValue> {
     let mut values = vec![PerlValue::UNDEF; def.fields.len()];
-    let mut i = 1;
-    while i + 1 < args.len() {
-        let k = args[i].to_string();
-        let v = args[i + 1].clone();
-        let idx = def.field_index(&k).ok_or_else(|| {
+    for (k, v) in provided {
+        let idx = def.field_index(k).ok_or_else(|| {
             PerlError::runtime(format!("struct {}: unknown field `{}`", def.name, k), line)
         })?;
-        let ty = def.fields[idx].1;
-        ty.check_value(&v).map_err(|msg| {
+        let field = &def.fields[idx];
+        field.ty.check_value(v).map_err(|msg| {
             PerlError::type_error(format!("struct {} field `{}`: {}", def.name, k, msg), line)
         })?;
-        values[idx] = v;
-        i += 2;
+        values[idx] = v.clone();
     }
-    for ((name, ty), val) in def.fields.iter().zip(values.iter()) {
-        if val.is_undef() {
-            return Err(PerlError::runtime(
-                format!(
-                    "struct {}: missing field `{}` ({})",
-                    def.name,
-                    name,
-                    match ty {
-                        crate::ast::PerlTypeName::Int => "Int",
-                        crate::ast::PerlTypeName::Str => "Str",
-                        crate::ast::PerlTypeName::Float => "Float",
-                    }
-                ),
-                line,
-            ));
+    for (idx, field) in def.fields.iter().enumerate() {
+        if values[idx].is_undef() {
+            if let Some(dv) = defaults.get(idx).and_then(|o| o.as_ref()) {
+                field.ty.check_value(dv).map_err(|msg| {
+                    PerlError::type_error(
+                        format!(
+                            "struct {} field `{}` default: {}",
+                            def.name, field.name, msg
+                        ),
+                        line,
+                    )
+                })?;
+                values[idx] = dv.clone();
+            } else if field.default.is_none() {
+                return Err(PerlError::runtime(
+                    format!(
+                        "struct {}: missing field `{}` ({})",
+                        def.name,
+                        field.name,
+                        field.ty.display_name()
+                    ),
+                    line,
+                ));
+            }
         }
     }
-    Ok(PerlValue::struct_inst(Arc::new(StructInstance {
-        def: Arc::clone(def),
+    Ok(PerlValue::struct_inst(Arc::new(StructInstance::new(
+        Arc::clone(def),
         values,
-    })))
+    ))))
 }
 
 /// GET `url` and return the response body as a UTF-8 string (invalid UTF-8 is lossy).
@@ -661,9 +668,10 @@ pub(crate) fn perl_to_json_value(v: &PerlValue) -> PerlResult<JsonValue> {
     }
     if let Some(si) = v.as_struct_inst() {
         let mut m = serde_json::Map::new();
-        for (i, (fname, _)) in si.def.fields.iter().enumerate() {
-            if let Some(fv) = si.values.get(i) {
-                m.insert(fname.clone(), perl_to_json_value(fv)?);
+        let values = si.get_values();
+        for (i, field) in si.def.fields.iter().enumerate() {
+            if let Some(fv) = values.get(i) {
+                m.insert(field.name.clone(), perl_to_json_value(fv)?);
             }
         }
         return Ok(JsonValue::Object(m));

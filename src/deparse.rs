@@ -460,11 +460,11 @@ fn deparse_stmt_into(buf: &mut String, stmt: &Statement, indent: usize) {
         }
         StmtKind::StructDecl { def } => {
             let _ = write!(buf, "struct {} {{ ", def.name);
-            for (i, (name, _ty)) in def.fields.iter().enumerate() {
+            for (i, field) in def.fields.iter().enumerate() {
                 if i > 0 {
                     buf.push_str(", ");
                 }
-                buf.push_str(name);
+                let _ = write!(buf, "{} => {}", field.name, field.ty.display_name());
             }
             buf.push_str(" }");
         }
@@ -600,11 +600,7 @@ fn deparse_params(buf: &mut String, params: &[SubSigParam]) {
                 let _ = write!(buf, "${}", name);
                 if let Some(t) = ty {
                     buf.push_str(": ");
-                    buf.push_str(match t {
-                        PerlTypeName::Int => "Int",
-                        PerlTypeName::Str => "Str",
-                        PerlTypeName::Float => "Float",
-                    });
+                    buf.push_str(&t.display_name());
                 }
             }
             SubSigParam::ArrayDestruct(elems) => {

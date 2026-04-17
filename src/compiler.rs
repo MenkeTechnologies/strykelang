@@ -1411,17 +1411,23 @@ impl Compiler {
                         self.chunk.emit(Op::GetArrayElem(tmp_name), line);
                         if is_my {
                             let name_idx = self.chunk.intern_name(&decl.name);
-                            if let Some(ty) = decl.type_annotation {
+                            if let Some(ref ty) = decl.type_annotation {
+                                let ty_byte = ty.as_byte().ok_or_else(|| {
+                                    CompileError::Unsupported(format!(
+                                        "typed my with struct type `{}` (use tree-walker)",
+                                        ty.display_name()
+                                    ))
+                                })?;
                                 let name = self.chunk.names[name_idx as usize].clone();
                                 self.register_declare(Sigil::Scalar, &name, frozen);
                                 if frozen {
                                     self.chunk.emit(
-                                        Op::DeclareScalarTypedFrozen(name_idx, ty.as_byte()),
+                                        Op::DeclareScalarTypedFrozen(name_idx, ty_byte),
                                         line,
                                     );
                                 } else {
                                     self.chunk
-                                        .emit(Op::DeclareScalarTyped(name_idx, ty.as_byte()), line);
+                                        .emit(Op::DeclareScalarTyped(name_idx, ty_byte), line);
                                 }
                             } else {
                                 self.emit_declare_scalar(name_idx, line, frozen);
@@ -1464,17 +1470,23 @@ impl Compiler {
                         }
                         if is_my {
                             let name_idx = self.chunk.intern_name(&decl.name);
-                            if let Some(ty) = decl.type_annotation {
+                            if let Some(ref ty) = decl.type_annotation {
+                                let ty_byte = ty.as_byte().ok_or_else(|| {
+                                    CompileError::Unsupported(format!(
+                                        "typed my with struct type `{}` (use tree-walker)",
+                                        ty.display_name()
+                                    ))
+                                })?;
                                 let name = self.chunk.names[name_idx as usize].clone();
                                 self.register_declare(Sigil::Scalar, &name, frozen);
                                 if frozen {
                                     self.chunk.emit(
-                                        Op::DeclareScalarTypedFrozen(name_idx, ty.as_byte()),
+                                        Op::DeclareScalarTypedFrozen(name_idx, ty_byte),
                                         line,
                                     );
                                 } else {
                                     self.chunk
-                                        .emit(Op::DeclareScalarTyped(name_idx, ty.as_byte()), line);
+                                        .emit(Op::DeclareScalarTyped(name_idx, ty_byte), line);
                                 }
                             } else {
                                 self.emit_declare_scalar(name_idx, line, frozen);

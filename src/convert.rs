@@ -415,7 +415,7 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
             let fields = def
                 .fields
                 .iter()
-                .map(|(n, t)| format!("{} => {:?}", n, t))
+                .map(|f| format!("{} => {}", f.name, f.ty.display_name()))
                 .collect::<Vec<_>>()
                 .join(", ");
             format!("struct {} {{ {} }}", def.name, fields)
@@ -531,8 +531,8 @@ fn convert_var_decls(decls: &[VarDecl]) -> String {
                 Sigil::Typeglob => "*",
             };
             let mut s = format!("{}{}", sig, d.name);
-            if let Some(t) = d.type_annotation {
-                s.push_str(&format!(" : {:?}", t));
+            if let Some(ref t) = d.type_annotation {
+                s.push_str(&format!(" : {}", t.display_name()));
             }
             if let Some(ref init) = d.initializer {
                 s.push_str(&format!(" = {}", convert_expr_top(init)));

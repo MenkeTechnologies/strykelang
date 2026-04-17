@@ -759,7 +759,7 @@ impl Scope {
         frozen: bool,
         ty: Option<PerlTypeName>,
     ) -> Result<(), PerlError> {
-        if let Some(t) = ty {
+        if let Some(ref t) = ty {
             t.check_value(&val)
                 .map_err(|msg| PerlError::type_error(format!("`${}`: {}", name, msg), 0))?;
         }
@@ -1016,7 +1016,7 @@ impl Scope {
                 }
             }
             if frame.has_scalar(name) {
-                if let Some(ty) = frame.typed_scalars.get(name).copied() {
+                if let Some(ty) = frame.typed_scalars.get(name) {
                     ty.check_value(&val)
                         .map_err(|msg| PerlError::type_error(format!("`${}`: {}", name, msg), 0))?;
                 }

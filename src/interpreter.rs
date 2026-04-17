@@ -6797,7 +6797,7 @@ impl Interpreter {
                                     &skey,
                                     v,
                                     decl.frozen,
-                                    decl.type_annotation,
+                                    decl.type_annotation.clone(),
                                 )?;
                                 self.english_note_lexical_scalar(&decl.name);
                                 if is_our {
@@ -6865,7 +6865,7 @@ impl Interpreter {
                                         &skey,
                                         PerlValue::UNDEF,
                                         decl.frozen,
-                                        decl.type_annotation,
+                                        decl.type_annotation.clone(),
                                     )?;
                                     self.english_note_lexical_scalar(&decl.name);
                                     if is_our {
@@ -6924,7 +6924,7 @@ impl Interpreter {
                                     &skey,
                                     val,
                                     decl.frozen,
-                                    decl.type_annotation,
+                                    decl.type_annotation.clone(),
                                 )?;
                                 self.english_note_lexical_scalar(&decl.name);
                                 if is_our {
@@ -13703,13 +13703,33 @@ impl Interpreter {
         }
         if let Some(s) = receiver.as_struct_inst() {
             if let Some(idx) = s.def.field_index(method) {
-                if !args.is_empty() {
-                    return Some(Err(PerlError::runtime(
-                        format!("struct field `{}` takes no arguments", method),
-                        line,
-                    )));
+                match args.len() {
+                    0 => {
+                        return Some(Ok(s.get_field(idx).unwrap_or(PerlValue::UNDEF)));
+                    }
+                    1 => {
+                        let field = &s.def.fields[idx];
+                        let new_val = args[0].clone();
+                        if let Err(msg) = field.ty.check_value(&new_val) {
+                            return Some(Err(PerlError::type_error(
+                                format!("struct {} field `{}`: {}", s.def.name, field.name, msg),
+                                line,
+                            )));
+                        }
+                        s.set_field(idx, new_val.clone());
+                        return Some(Ok(new_val));
+                    }
+                    _ => {
+                        return Some(Err(PerlError::runtime(
+                            format!(
+                                "struct field `{}` takes 0 arguments (getter) or 1 argument (setter), got {}",
+                                method,
+                                args.len()
+                            ),
+                            line,
+                        )));
+                    }
                 }
-                return Some(Ok(s.values[idx].clone()));
             }
             return None;
         }
@@ -15658,8 +15678,27 @@ impl Interpreter {
         if class == "Set" {
             return Ok(crate::value::set_from_elements(args.into_iter().skip(1)));
         }
-        if let Some(def) = self.struct_defs.get(class) {
-            return Ok(crate::native_data::struct_new(def, &args, line)?);
+        if let Some(def) = self.struct_defs.get(class).cloned() {
+            let mut provided = Vec::new();
+            let mut i = 1;
+            while i + 1 < args.len() {
+                let k = args[i].to_string();
+                let v = args[i + 1].clone();
+                provided.push((k, v));
+                i += 2;
+            }
+            let mut defaults = Vec::with_capacity(def.fields.len());
+            for field in &def.fields {
+                if let Some(ref expr) = field.default {
+                    let val = self.eval_expr(expr)?;
+                    defaults.push(Some(val));
+                } else {
+                    defaults.push(None);
+                }
+            }
+            return Ok(crate::native_data::struct_new_with_defaults(
+                &def, &provided, &defaults, line,
+            )?);
         }
         // Default OO constructor: Class->new(%args) → bless {%args}, class
         let mut map = IndexMap::new();
