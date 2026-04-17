@@ -88,7 +88,7 @@ fn puniq_distinct_first_occurrence_order() {
 
 #[test]
 fn pfirst_returns_first_matching_value_in_order() {
-    assert_eq!(eval(r#"pfirst { $_ > 2 } (1, 2, 5, 4, 3);"#).to_int(), 5);
+    assert_eq!(eval(r#"pfirst { $_ > 2 } (1, 2, 5, 4, 3)"#).to_int(), 5);
 }
 
 #[test]
@@ -98,8 +98,8 @@ fn pfirst_empty_list_yields_undef_in_numeric_context() {
 
 #[test]
 fn pany_short_circuit_truth() {
-    assert_eq!(eval_int(r#"pany { $_ == 5 } (1, 2, 3);"#), 0);
-    assert_eq!(eval_int(r#"pany { $_ == 5 } (1, 2, 5, 3);"#), 1);
+    assert_eq!(eval_int(r#"pany { $_ == 5 } (1, 2, 3)"#), 0);
+    assert_eq!(eval_int(r#"pany { $_ == 5 } (1, 2, 5, 3)"#), 1);
 }
 
 #[test]
@@ -130,7 +130,7 @@ fn flatten_one_level_peels_arrays_and_arefs() {
         eval_string(r#"(1, [2, 3]) |> flatten |> join ','"#),
         "1,2,3"
     );
-    assert_eq!(eval_int(r#"scalar flatten(1, [2, 3]);"#), 3);
+    assert_eq!(eval_int(r#"scalar flatten(1, [2, 3])"#), 3);
 }
 
 #[test]
@@ -428,11 +428,11 @@ fn fold_reduce_undef_on_empty_list_and_fold_max() {
 #[test]
 fn chunked_windowed_reject_legacy_multi_arg_at_parse() {
     assert!(matches!(
-        parse_err_kind("chunked(1, 2, 3, 4, 2);"),
+        parse_err_kind("chunked(1, 2, 3, 4, 2)"),
         perlrs::error::ErrorKind::Syntax
     ));
     assert!(matches!(
-        parse_err_kind("windowed(1, 2, 3, 2);"),
+        parse_err_kind("windowed(1, 2, 3, 2)"),
         perlrs::error::ErrorKind::Syntax
     ));
 }
@@ -455,12 +455,12 @@ fn readme_chunked_windowed_join_shapes() {
 
 #[test]
 fn bare_any_all_none_list_util_semantics() {
-    assert_eq!(eval_int(r#"any { $_ > 2 } (1, 2, 3);"#), 1);
-    assert_eq!(eval_int(r#"any { $_ > 5 } (1, 2, 3);"#), 0);
-    assert_eq!(eval_int(r#"all { $_ > 0 } (1, 2, 3);"#), 1);
-    assert_eq!(eval_int(r#"all { $_ < 3 } (1, 2, 3);"#), 0);
-    assert_eq!(eval_int(r#"none { $_ < 0 } (1, 2, 3);"#), 1);
-    assert_eq!(eval_int(r#"none { $_ > 0 } (1, 2, 3);"#), 0);
+    assert_eq!(eval_int(r#"any { $_ > 2 } (1, 2, 3)"#), 1);
+    assert_eq!(eval_int(r#"any { $_ > 5 } (1, 2, 3)"#), 0);
+    assert_eq!(eval_int(r#"all { $_ > 0 } (1, 2, 3)"#), 1);
+    assert_eq!(eval_int(r#"all { $_ < 3 } (1, 2, 3)"#), 0);
+    assert_eq!(eval_int(r#"none { $_ < 0 } (1, 2, 3)"#), 1);
+    assert_eq!(eval_int(r#"none { $_ > 0 } (1, 2, 3)"#), 0);
 }
 
 #[test]

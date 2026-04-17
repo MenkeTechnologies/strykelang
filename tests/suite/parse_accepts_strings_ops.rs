@@ -6,88 +6,88 @@ fn p(src: &str) {
 
 #[test]
 fn str_eq() {
-    p(r#""a" eq "b";"#);
+    p(r#""a" eq "b""#);
 }
 
 #[test]
 fn str_ne() {
-    p(r#""a" ne "b";"#);
+    p(r#""a" ne "b""#);
 }
 
 #[test]
 fn str_lt() {
-    p(r#""a" lt "b";"#);
+    p(r#""a" lt "b""#);
 }
 
 #[test]
 fn str_gt() {
-    p(r#""b" gt "a";"#);
+    p(r#""b" gt "a""#);
 }
 
 #[test]
 fn str_le() {
-    p(r#""a" le "b";"#);
+    p(r#""a" le "b""#);
 }
 
 #[test]
 fn str_ge() {
-    p(r#""b" ge "a";"#);
+    p(r#""b" ge "a""#);
 }
 
 #[test]
 fn str_cmp() {
-    p(r#""a" cmp "b";"#);
+    p(r#""a" cmp "b""#);
 }
 
 #[test]
 fn num_eq_ne_lt() {
-    p("1 == 2;");
-    p("1 != 2;");
-    p("1 < 2;");
+    p("1 == 2");
+    p("1 != 2");
+    p("1 < 2");
 }
 
 #[test]
 fn num_gt_le_ge() {
-    p("2 > 1;");
-    p("1 <= 2;");
-    p("2 >= 2;");
+    p("2 > 1");
+    p("1 <= 2");
+    p("2 >= 2");
 }
 
 #[test]
 fn spaceship_pair() {
-    p("1 <=> 2;");
-    p("2 <=> 2;");
+    p("1 <=> 2");
+    p("2 <=> 2");
 }
 
 #[test]
 fn concat_two_literals() {
-    p(r#""x" . "y";"#);
+    p(r#""x" . "y""#);
 }
 
 #[test]
 fn concat_assign_expanded() {
-    p(r#"my $s = "a"; $s = $s . "b";"#);
+    p(r#"my $s = "a"; $s = $s . "b""#);
 }
 
 #[test]
 fn lc_uc_pair() {
-    p("lc 'HELLO';");
-    p("uc 'hello';");
+    p("lc 'HELLO'");
+    p("uc 'hello'");
 }
 
 #[test]
 fn lcfirst_ucfirst_pair() {
-    p("lcfirst 'Hello';");
-    p("ucfirst 'hello';");
+    p("lcfirst 'Hello'");
+    p("ucfirst 'hello'");
 }
 
 #[test]
 fn index_rindex_pair() {
-    p("index 'abc', 'b';");
-    p("rindex 'aba', 'a';");
+    p("index 'abc', 'b'");
+    p("rindex 'aba', 'a'");
 }
 
 #[test]
 fn sprintf_two_args() {
-    p(r#"sprintf "%d-%s", 1, "x";"#);
+    p(r#"sprintf "%d-%s", 1, "x""#);
 }

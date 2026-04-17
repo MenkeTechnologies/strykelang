@@ -123,7 +123,7 @@ fn parse_with_file_threads_path_into_syntax_error() {
 
 #[test]
 fn format_program_output_reparses() {
-    let p = parse("my $fmt_y = 2; $fmt_y + 2;").expect("parse");
+    let p = parse("my $fmt_y = 2; $fmt_y + 2").expect("parse");
     let out = format_program(&p);
     let _ = parse(&out).expect("formatted source should parse");
     assert!(!out.trim().is_empty());
@@ -131,7 +131,7 @@ fn format_program_output_reparses() {
 
 #[test]
 fn lint_program_ok_for_simple_vm_compilable_program() {
-    let p = parse("my $lint_x = 1; $lint_x + 1;").expect("parse");
+    let p = parse("my $lint_x = 1; $lint_x + 1").expect("parse");
     let mut interp = Interpreter::new();
     lint_program(&p, &mut interp).expect("lint");
 }

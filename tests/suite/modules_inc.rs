@@ -16,7 +16,7 @@ fn require_loads_pm_and_sets_inc() {
         "INC",
         vec![PerlValue::string(d), PerlValue::string(".".to_string())],
     );
-    let p = parse("require Trivial; Trivial::trivial_answer();").expect("parse");
+    let p = parse("require Trivial; Trivial::trivial_answer()").expect("parse");
     let v = interp.execute(&p).expect("run");
     assert_eq!(v.to_int(), 42);
     assert!(interp.scope.exists_hash_element("INC", "Trivial.pm"));
@@ -47,7 +47,7 @@ fn use_loads_module_and_second_require_is_noop() {
             PerlValue::string(".".to_string()),
         ],
     );
-    let p2 = parse("require Trivial; require Trivial; 7;").expect("parse");
+    let p2 = parse("require Trivial; require Trivial; 7").expect("parse");
     let v2 = interp2.execute(&p2).expect("run");
     assert_eq!(v2.to_int(), 7);
 }
@@ -62,7 +62,7 @@ fn use_trivial_qw_imports_symbol() {
             PerlValue::string(".".to_string()),
         ],
     );
-    let p = parse("use Trivial qw(trivial_answer); trivial_answer() + 1;").expect("parse");
+    let p = parse("use Trivial qw(trivial_answer); trivial_answer() + 1").expect("parse");
     let v = interp.execute(&p).expect("run");
     assert_eq!(v.to_int(), 43);
 }
@@ -77,7 +77,7 @@ fn use_trivial_empty_list_does_not_import() {
             PerlValue::string(".".to_string()),
         ],
     );
-    let p = parse("use Trivial qw(); trivial_answer();").expect("parse");
+    let p = parse("use Trivial qw(); trivial_answer()").expect("parse");
     assert!(interp.execute(&p).is_err());
 }
 

@@ -30,7 +30,7 @@ fn typeglob_assign_glob_copies_subroutine_slot() {
 
 #[test]
 fn typeglob_parse_simple_glob_assign_statement() {
-    let p = perlrs::parse("*a = *b;").expect("parse");
+    let p = perlrs::parse("*a = *b").expect("parse");
     assert!(!p.statements.is_empty());
 }
 
@@ -42,14 +42,14 @@ fn typeglob_parse_package_qualified_name() {
 
 #[test]
 fn typeglob_parse_qualified_glob_assign() {
-    let p = perlrs::parse("*Foo::x = *Foo::y;").expect("parse");
+    let p = perlrs::parse("*Foo::x = *Foo::y").expect("parse");
     assert!(!p.statements.is_empty());
 }
 
 #[test]
 fn typeglob_assign_anonymous_sub_empty_prototype_parses() {
     // Carp.pm-style: *NAME = sub () { 1 };
-    let p = perlrs::parse("no strict; *x = sub () { 1 };").expect("parse");
+    let p = perlrs::parse("no strict; *x = sub () { 1 }").expect("parse");
     assert!(!p.statements.is_empty());
 }
 
