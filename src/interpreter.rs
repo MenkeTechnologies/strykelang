@@ -11688,7 +11688,18 @@ impl Interpreter {
                 PerlValue::string(s)
             }
             BinOp::NumEq => {
-                if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
+                // Struct equality: compare all fields
+                if let (Some(a), Some(b)) = (lv.as_struct_inst(), rv.as_struct_inst()) {
+                    if a.def.name != b.def.name {
+                        PerlValue::integer(0)
+                    } else {
+                        let av = a.get_values();
+                        let bv = b.get_values();
+                        let eq = av.len() == bv.len()
+                            && av.iter().zip(bv.iter()).all(|(x, y)| x.struct_field_eq(y));
+                        PerlValue::integer(if eq { 1 } else { 0 })
+                    }
+                } else if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
                     PerlValue::integer(if a == b { 1 } else { 0 })
                 } else {
                     PerlValue::integer(if lv.to_number() == rv.to_number() {
@@ -13437,6 +13448,10 @@ impl Interpreter {
                 Ok(PerlValue::remote_cluster(Arc::new(c)))
             }
             _ => {
+                // Check for struct constructor: Point(x => 1, y => 2) or Point(1, 2)
+                if let Some(def) = self.struct_defs.get(name).cloned() {
+                    return self.struct_construct(&def, args, line);
+                }
                 let args = self.with_topic_default_args(args);
                 if let Some(r) = self.try_autoload_call(name, args, line, want, None) {
                     return r;
@@ -13444,6 +13459,58 @@ impl Interpreter {
                 Err(PerlError::runtime(self.undefined_subroutine_call_message(name), line).into())
             }
         }
+    }
+
+    /// Construct a struct instance from function-call syntax: Point(x => 1, y => 2) or Point(1, 2).
+    pub(crate) fn struct_construct(
+        &mut self,
+        def: &Arc<StructDef>,
+        args: Vec<PerlValue>,
+        line: usize,
+    ) -> ExecResult {
+        // Detect if args are named (key => value pairs) or positional
+        // Named: even count and every odd index (0, 2, 4...) looks like a string field name
+        let is_named = args.len() >= 2
+            && args.len() % 2 == 0
+            && args.iter().step_by(2).all(|v| {
+                let s = v.to_string();
+                def.field_index(&s).is_some()
+            });
+
+        let provided = if is_named {
+            // Named construction: Point(x => 1, y => 2)
+            let mut pairs = Vec::new();
+            let mut i = 0;
+            while i + 1 < args.len() {
+                let k = args[i].to_string();
+                let v = args[i + 1].clone();
+                pairs.push((k, v));
+                i += 2;
+            }
+            pairs
+        } else {
+            // Positional construction: Point(1, 2) fills fields in declaration order
+            def.fields
+                .iter()
+                .zip(args.iter())
+                .map(|(f, v)| (f.name.clone(), v.clone()))
+                .collect()
+        };
+
+        // Evaluate default expressions
+        let mut defaults = Vec::with_capacity(def.fields.len());
+        for field in &def.fields {
+            if let Some(ref expr) = field.default {
+                let val = self.eval_expr(expr)?;
+                defaults.push(Some(val));
+            } else {
+                defaults.push(None);
+            }
+        }
+
+        Ok(crate::native_data::struct_new_with_defaults(
+            def, &provided, &defaults, line,
+        )?)
     }
 
     /// True if `name` is a registered or standard process-global handle.
@@ -13709,6 +13776,7 @@ impl Interpreter {
             return Some(crate::native_data::sqlite_dispatch(&c, method, args, line));
         }
         if let Some(s) = receiver.as_struct_inst() {
+            // Field access: $p->x or $p->x(value)
             if let Some(idx) = s.def.field_index(method) {
                 match args.len() {
                     0 => {
@@ -13737,6 +13805,104 @@ impl Interpreter {
                         )));
                     }
                 }
+            }
+            // Built-in struct methods
+            match method {
+                "with" => {
+                    // Functional update: $p->with(x => 5) returns new instance with changed field
+                    let mut new_values = s.get_values();
+                    let mut i = 0;
+                    while i + 1 < args.len() {
+                        let k = args[i].to_string();
+                        let v = args[i + 1].clone();
+                        if let Some(idx) = s.def.field_index(&k) {
+                            let field = &s.def.fields[idx];
+                            if let Err(msg) = field.ty.check_value(&v) {
+                                return Some(Err(PerlError::type_error(
+                                    format!(
+                                        "struct {} field `{}`: {}",
+                                        s.def.name, field.name, msg
+                                    ),
+                                    line,
+                                )));
+                            }
+                            new_values[idx] = v;
+                        } else {
+                            return Some(Err(PerlError::runtime(
+                                format!("struct {}: unknown field `{}`", s.def.name, k),
+                                line,
+                            )));
+                        }
+                        i += 2;
+                    }
+                    return Some(Ok(PerlValue::struct_inst(Arc::new(
+                        crate::value::StructInstance::new(Arc::clone(&s.def), new_values),
+                    ))));
+                }
+                "to_hash" => {
+                    // Destructure to hash: $p->to_hash returns { x => ..., y => ... }
+                    if !args.is_empty() {
+                        return Some(Err(PerlError::runtime(
+                            "struct to_hash takes no arguments",
+                            line,
+                        )));
+                    }
+                    let mut map = IndexMap::new();
+                    let values = s.get_values();
+                    for (i, field) in s.def.fields.iter().enumerate() {
+                        map.insert(field.name.clone(), values[i].clone());
+                    }
+                    return Some(Ok(PerlValue::hash_ref(Arc::new(RwLock::new(map)))));
+                }
+                "fields" => {
+                    // Field list: $p->fields returns field names
+                    if !args.is_empty() {
+                        return Some(Err(PerlError::runtime(
+                            "struct fields takes no arguments",
+                            line,
+                        )));
+                    }
+                    let names: Vec<PerlValue> = s
+                        .def
+                        .fields
+                        .iter()
+                        .map(|f| PerlValue::string(f.name.clone()))
+                        .collect();
+                    return Some(Ok(PerlValue::array(names)));
+                }
+                "clone" => {
+                    // Clone: $p->clone deep copies
+                    if !args.is_empty() {
+                        return Some(Err(PerlError::runtime(
+                            "struct clone takes no arguments",
+                            line,
+                        )));
+                    }
+                    let new_values = s.get_values().iter().map(|v| v.deep_clone()).collect();
+                    return Some(Ok(PerlValue::struct_inst(Arc::new(
+                        crate::value::StructInstance::new(Arc::clone(&s.def), new_values),
+                    ))));
+                }
+                _ => {}
+            }
+            // User-defined struct method
+            if let Some(m) = s.def.method(method) {
+                let body = m.body.clone();
+                let params = m.params.clone();
+                // Build args: $self is the receiver, then the passed args
+                let mut call_args = vec![receiver.clone()];
+                call_args.extend(args.iter().cloned());
+                return Some(
+                    match self.call_struct_method(&body, &params, call_args, line) {
+                        Ok(v) => Ok(v),
+                        Err(FlowOrError::Error(e)) => Err(e),
+                        Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
+                        Err(FlowOrError::Flow(_)) => Err(PerlError::runtime(
+                            "unexpected control flow in struct method",
+                            line,
+                        )),
+                    },
+                );
             }
             return None;
         }
@@ -15679,6 +15845,111 @@ impl Interpreter {
             }
             Err(e) => Err(e),
         }
+    }
+
+    /// Call a user-defined struct method: `$p->distance()` where `fn distance { }` is in struct.
+    fn call_struct_method(
+        &mut self,
+        body: &Block,
+        params: &[SubSigParam],
+        args: Vec<PerlValue>,
+        line: usize,
+    ) -> ExecResult {
+        self.scope_push_hook();
+        self.scope.declare_array("_", args.clone());
+        // Bind $self to first arg (the receiver)
+        if let Some(self_val) = args.first() {
+            self.scope.declare_scalar("self", self_val.clone());
+        }
+        // Set $_0, $_1, etc. for all args
+        self.scope.set_closure_args(&args);
+        // Apply signature if provided - skip the first arg ($self) for user params
+        let user_args: Vec<PerlValue> = args.iter().skip(1).cloned().collect();
+        self.apply_params_to_argv(params, &user_args, line)?;
+        let result = self.exec_block_no_scope(body);
+        self.scope_pop_hook();
+        match result {
+            Ok(v) => Ok(v),
+            Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Apply SubSigParam bindings without the full PerlSub machinery.
+    fn apply_params_to_argv(
+        &mut self,
+        params: &[SubSigParam],
+        argv: &[PerlValue],
+        line: usize,
+    ) -> PerlResult<()> {
+        let mut i = 0;
+        for param in params {
+            match param {
+                SubSigParam::Scalar(name, ty_opt) => {
+                    let v = argv.get(i).cloned().unwrap_or(PerlValue::UNDEF);
+                    i += 1;
+                    if let Some(ty) = ty_opt {
+                        ty.check_value(&v).map_err(|msg| {
+                            PerlError::type_error(
+                                format!("method parameter ${}: {}", name, msg),
+                                line,
+                            )
+                        })?;
+                    }
+                    let n = self.english_scalar_name(name);
+                    self.scope.declare_scalar(n, v);
+                }
+                SubSigParam::ArrayDestruct(elems) => {
+                    let arg = argv.get(i).cloned().unwrap_or(PerlValue::UNDEF);
+                    i += 1;
+                    let Some(arr) = self.match_subject_as_array(&arg) else {
+                        return Err(PerlError::runtime(
+                            format!("method parameter: expected ARRAY, got {}", arg.ref_type()),
+                            line,
+                        ));
+                    };
+                    let binds = self
+                        .match_array_pattern_elems(&arr, elems, line)
+                        .map_err(|e| match e {
+                            FlowOrError::Error(pe) => pe,
+                            FlowOrError::Flow(_) => {
+                                PerlError::runtime("unexpected flow in method array destruct", line)
+                            }
+                        })?;
+                    let Some(binds) = binds else {
+                        return Err(PerlError::runtime(
+                            format!(
+                                "method parameter: array destructure failed at position {}",
+                                i
+                            ),
+                            line,
+                        ));
+                    };
+                    for b in binds {
+                        match b {
+                            PatternBinding::Scalar(name, v) => {
+                                let n = self.english_scalar_name(&name);
+                                self.scope.declare_scalar(n, v);
+                            }
+                            PatternBinding::Array(name, elems) => {
+                                self.scope.declare_array(&name, elems);
+                            }
+                        }
+                    }
+                }
+                SubSigParam::HashDestruct(pairs) => {
+                    let arg = argv.get(i).cloned().unwrap_or(PerlValue::UNDEF);
+                    i += 1;
+                    let map = self.hash_for_signature_destruct(&arg, line)?;
+                    for (key, varname) in pairs {
+                        let v = map.get(key).cloned().unwrap_or(PerlValue::UNDEF);
+                        let n = self.english_scalar_name(varname);
+                        self.scope.declare_scalar(n, v);
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     fn builtin_new(&mut self, class: &str, args: Vec<PerlValue>, line: usize) -> ExecResult {

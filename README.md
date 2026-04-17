@@ -288,7 +288,7 @@ For `mysync` scalars holding a `Set`, `|`/`&` are union/intersection. Without `m
 | **Crypto** | `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `md5`, `hmac`, `hmac_sha256`, `crc32`, `uuid`, `base64_encode/decode`, `hex_encode/decode` |
 | **Compression** ([`flate2`](https://crates.io/crates/flate2), [`zstd`](https://crates.io/crates/zstd)) | `gzip`, `gunzip`, `zstd`, `zstd_decode` |
 | **Time** ([`chrono`](https://crates.io/crates/chrono), [`chrono-tz`](https://crates.io/crates/chrono-tz)) | `datetime_utc`, `datetime_from_epoch`, `datetime_parse_rfc3339`, `datetime_strftime`, `datetime_now_tz`, `datetime_format_tz`, `datetime_parse_local`, `datetime_add_seconds`, `elapsed` |
-| **Structs / Types** | `struct Name { x => Float, y => Int }; Name->new(...)`; `typed my $x : Int\|Str\|Float`; typed sub params `fn ($a: Int, $b: Str) { }` |
+| **Structs / Types** | `struct Name { x => Float, y => Int }; Name(x => 1, y => 2)`; `typed my $x : Int\|Str\|Float`; typed sub params `fn ($a: Int, $b: Str) { }` |
 
 ```perl
 my $data = "https://api.example.com/users/1" |> fetch_json;
@@ -308,9 +308,38 @@ my $df   = "data.csv" |> dataframe;
 my $db   = "app.db" |> sqlite;
 $db->exec("CREATE TABLE t (id INTEGER, name TEXT)");
 
+# ─── Structs ────────────────────────────────────────────────────────
+# Declaration: typed fields, optional defaults, or bare (Any type)
 struct Point { x => Float, y => Float };
-my $p = Point->new(x => 1.5, y => 2.0);
-p $p->x;
+struct Point { x => Float = 0.0, y => Float = 0.0 };   # with defaults
+struct Pair { key, value };                             # untyped (Any)
+
+# Construction: function-call, positional, or traditional ->new
+my $p = Point(x => 1.5, y => 2.0);   # function-call with named args
+my $p = Point(1.5, 2.0);             # positional (declaration order)
+my $p = Point->new(x => 1.5, y => 2.0); # traditional OO style
+my $p = Point();                     # uses defaults if defined
+
+# Field access: getter (0 args) or setter (1 arg)
+p $p->x;       # 1.5 — getter
+$p->x(3.0);    # setter
+p $p->x;       # 3.0
+
+# Built-in methods
+my $q = $p->with(y => 5);            # functional update — new instance
+my $h = $p->to_hash;                 # { x => 3.0, y => 5 }
+my @f = $p->fields;                  # (x, y)
+my $c = $p->clone;                   # deep copy
+
+# Smart stringify — print shows struct name and fields
+p $p;                                # Point(x => 3, y => 2)
+
+# Structural equality — compares all fields
+my $a = Point(1, 2);
+my $b = Point(1, 2);
+p $a == $b;                          # 1 (equal)
+# ────────────────────────────────────────────────────────────────────
+
 typed my $n : Int = 42;
 
 # Typed sub parameters — runtime type checking on call
