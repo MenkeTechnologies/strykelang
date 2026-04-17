@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/perlrs" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">perlrs v0.4.13 · 2038 topics · 24 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">perlrs v0.4.13 · 2043 topics · 24 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -171,7 +171,7 @@
         <li><a href="#ch-shared-state-concurrency">Shared State &amp; Concurrency</a> <span class="chapter-count">11</span></li>
         <li><a href="#ch-pipeline-pipe-forward">Pipeline &amp; Pipe-Forward</a> <span class="chapter-count">6</span></li>
         <li><a href="#ch-streaming-iterators">Streaming Iterators</a> <span class="chapter-count">24</span></li>
-        <li><a href="#ch-list-operations">List Operations</a> <span class="chapter-count">49</span></li>
+        <li><a href="#ch-list-operations">List Operations</a> <span class="chapter-count">62</span></li>
         <li><a href="#ch-perlrs-extensions">perlrs Extensions</a> <span class="chapter-count">18</span></li>
         <li><a href="#ch-data-serialization">Data &amp; Serialization</a> <span class="chapter-count">20</span></li>
         <li><a href="#ch-http-networking">HTTP &amp; Networking</a> <span class="chapter-count">23</span></li>
@@ -190,7 +190,7 @@
         <li><a href="#ch-process">Process</a> <span class="chapter-count">20</span></li>
         <li><a href="#ch-pack-binary">Pack / Binary</a> <span class="chapter-count">3</span></li>
         <li><a href="#ch-logging">Logging</a> <span class="chapter-count">7</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">1633</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">1625</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -769,7 +769,7 @@ stdin |&gt; nth 0 |&gt; p;                   # first line
     </section>
     <section class="tutorial-section" id="ch-list-operations">
       <h2>List Operations</h2>
-      <p class="chapter-meta">49 topics</p>
+      <p class="chapter-meta">62 topics</p>
       <article class="doc-entry" id="doc-map">
         <h3><a class="doc-anchor" href="#doc-map">#</a> <code>map</code></h3>
         <p><code>map { BLOCK } LIST</code> — evaluates the block for each element of the list, setting <code>$_</code> to the current element, and returns a new list of all the block&#39;s return values. This is the eager version: it consumes the entire input list and produces the entire output list before returning. Use <code>map</code> when you need the full result array or when the input is small. For large or infinite sequences, prefer <code>maps</code> (the streaming variant). The block can return zero, one, or multiple values per element, making <code>map</code> useful for both transformation and flattening.</p>
@@ -1124,6 +1124,15 @@ my @rolls = map { 1 + int(rand 6) } 1..1000;
 frq(@rolls) |&gt; to_json |&gt; p;
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-tally">
+        <h3><a class="doc-anchor" href="#doc-tally">#</a> <code>tally</code></h3>
+        <p><code>tally</code> counts how many times each distinct element appears in a list and returns a hash ref mapping element → count. This is the same as Ruby&#39;s <code>Enumerable#tally</code> or Python&#39;s <code>Counter</code>. Similar to <code>frequencies</code> but follows the Ruby naming convention.</p>
+        <pre><code class="lang-perl">my $t = tally(&quot;a&quot;, &quot;b&quot;, &quot;a&quot;, &quot;c&quot;, &quot;a&quot;, &quot;b&quot;);
+p $t-&gt;{a};   # 3
+p $t-&gt;{b};   # 2
+qw(red blue red green blue red) |&gt; tally |&gt; dd;
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-interleave">
         <h3><a class="doc-anchor" href="#doc-interleave">#</a> <code>interleave</code></h3>
         <p><code>interleave</code> (alias <code>il</code>) merges two or more arrays by alternating their elements: first element of each array, then second element of each, and so on. If the arrays have different lengths, shorter arrays contribute <code>undef</code> for their missing positions. This is useful for building key-value pair lists from separate key and value arrays, creating round-robin schedules, or weaving parallel data streams together.</p>
@@ -1180,6 +1189,128 @@ my @normed = nrm @temps;
 p @normed;   # 0, 0.2, 0.377..., 1
 my @pixels = nrm @raw_intensities;
 @pixels |&gt; map { int($_ * 255) } |&gt; e p;  # scale to 0-255
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-compose">
+        <h3><a class="doc-anchor" href="#doc-compose">#</a> <code>compose</code></h3>
+        <p><code>compose</code> (alias <code>comp</code>) creates a right-to-left function composition. Given <code>compose(\&amp;f, \&amp;g)</code>, calling the result with <code>x</code> computes <code>f(g(x))</code>. Chain any number of functions — they apply from right to left (last argument first). This is the standard mathematical function composition found in Haskell, Clojure, and Ramda. The returned code ref can be stored, passed around, or used in pipelines.</p>
+        <pre><code class="lang-perl">my $double = sub { $_[0] * 2 };
+my $inc    = sub { $_[0] + 1 };
+my $f = compose($inc, $double);
+p $f-&gt;(5);   # 11  (double 5 → 10, inc 10 → 11)
+
+my $pipeline = compose(
+    sub { join &quot;,&quot;, @{$_[0]} },
+    sub { [sort @{$_[0]}] },
+    sub { [grep { $_ &gt; 2 } @{$_[0]}] },
+);
+p $pipeline-&gt;([3,1,4,1,5]);  # 3,4,5
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-partial">
+        <h3><a class="doc-anchor" href="#doc-partial">#</a> <code>partial</code></h3>
+        <p><code>partial</code> returns a partially applied function — the bound arguments are prepended to any arguments supplied at call time. <code>partial(\&amp;f, @bound)-&gt;(x)</code> is equivalent to <code>f(@bound, x)</code>. This is the standard partial application from functional programming, useful for creating specialized versions of general functions without closures.</p>
+        <pre><code class="lang-perl">my $add = sub { $_[0] + $_[1] };
+my $add5 = partial($add, 5);
+p $add5-&gt;(3);   # 8
+
+my $log = sub { say &quot;[$_[0]] $_[1]&quot; };
+my $warn_log = partial($log, &quot;WARN&quot;);
+$warn_log-&gt;(&quot;disk full&quot;);   # [WARN] disk full
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-curry">
+        <h3><a class="doc-anchor" href="#doc-curry">#</a> <code>curry</code></h3>
+        <p><code>curry</code> auto-curries a function with a given arity. The curried function accumulates arguments across calls and invokes the original only when enough have been collected. <code>curry(\&amp;f, N)-&gt;(a)-&gt;(b)</code> calls <code>f(a, b)</code> when N=2. If all arguments are supplied at once, it calls immediately.</p>
+        <pre><code class="lang-perl">my $add = curry(sub { $_[0] + $_[1] }, 2);
+my $add5 = $add-&gt;(5);
+p $add5-&gt;(3);       # 8
+p $add-&gt;(10, 20);   # 30  (enough args — calls immediately)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-memoize">
+        <h3><a class="doc-anchor" href="#doc-memoize">#</a> <code>memoize</code></h3>
+        <p><code>memoize</code> (alias <code>memo</code>) wraps a function so that repeated calls with the same arguments return a cached result instead of re-executing the function. Arguments are stringified and joined as the cache key. This is essential for expensive pure functions like recursive algorithms, API lookups with stable results, or any computation where the same inputs always produce the same output.</p>
+        <pre><code class="lang-perl">my $fib = memoize(sub {
+    my $n = $_[0];
+    $n &lt; 2 ? $n : $fib-&gt;($n-1) + $fib-&gt;($n-2);
+});
+p $fib-&gt;(30);   # instant (without memoize: ~1B calls)
+
+my $fetch_user = memo(sub { fetch_json(&quot;https://api/users/$_[0]&quot;) });
+$fetch_user-&gt;(42);   # hits API
+$fetch_user-&gt;(42);   # returns cached
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-once">
+        <h3><a class="doc-anchor" href="#doc-once">#</a> <code>once</code></h3>
+        <p><code>once</code> wraps a function so it is called at most once. The first invocation executes the function and caches the result; all subsequent calls return the cached value without re-executing. This is ideal for lazy initialization, one-time setup, or singleton patterns.</p>
+        <pre><code class="lang-perl">my $init = once(sub { say &quot;initializing...&quot;; 42 });
+p $init-&gt;();   # prints &quot;initializing...&quot; → 42
+p $init-&gt;();   # 42 (no print — cached)
+p $init-&gt;();   # 42 (still cached)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-constantly">
+        <h3><a class="doc-anchor" href="#doc-constantly">#</a> <code>constantly</code></h3>
+        <p><code>constantly</code> (alias <code>const</code>) returns a function that ignores all arguments and always returns the given value. Useful as a default callback, a stub in higher-order function pipelines, or anywhere a function is required but a fixed value suffices.</p>
+        <pre><code class="lang-perl">my $zero = constantly(0);
+p $zero-&gt;(&quot;anything&quot;);   # 0
+my @defaults = map { constantly(0)-&gt;() } 1..5;   # [0,0,0,0,0]
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-complement">
+        <h3><a class="doc-anchor" href="#doc-complement">#</a> <code>complement</code></h3>
+        <p><code>complement</code> (alias <code>compl</code>) wraps a predicate function and returns a new function that negates its boolean result. <code>complement(\&amp;even?)-&gt;(3)</code> returns true. This is the functional equivalent of <code>!f(x)</code> without creating a closure.</p>
+        <pre><code class="lang-perl">my $even = sub { $_[0] % 2 == 0 };
+my $odd = complement($even);
+p $odd-&gt;(3);   # 1
+p $odd-&gt;(4);   # 0
+1..10 |&gt; grep { complement($even)-&gt;($_) } |&gt; e p;  # 1 3 5 7 9
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-juxt">
+        <h3><a class="doc-anchor" href="#doc-juxt">#</a> <code>juxt</code></h3>
+        <p><code>juxt</code> (juxtapose) takes multiple functions and returns a new function that calls each one with the same arguments and collects the results into an array. This is useful for computing multiple derived values from the same input in a single pass.</p>
+        <pre><code class="lang-perl">my $stats = juxt(sub { min @_ }, sub { max @_ }, sub { avg @_ });
+my @r = $stats-&gt;(3, 1, 4, 1, 5);
+p &quot;@r&quot;;   # 1 5 2.8
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-fnil">
+        <h3><a class="doc-anchor" href="#doc-fnil">#</a> <code>fnil</code></h3>
+        <p><code>fnil</code> wraps a function so that any <code>undef</code> arguments are replaced with the given defaults before the function is called. This eliminates repetitive <code>// $default</code> patterns inside function bodies.</p>
+        <pre><code class="lang-perl">my $greet = fnil(sub { &quot;Hello, $_[0]!&quot; }, &quot;World&quot;);
+p $greet-&gt;(undef);    # Hello, World!
+p $greet-&gt;(&quot;Alice&quot;);  # Hello, Alice!
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-deep-clone">
+        <h3><a class="doc-anchor" href="#doc-deep-clone">#</a> <code>deep_clone</code></h3>
+        <p><code>deep_clone</code> (alias <code>dclone</code>) performs a recursive deep copy of a nested data structure. Array refs, hash refs, and scalar refs are cloned recursively so that the result shares no references with the original. Modifications to the clone never affect the source. This is the perlrs equivalent of JavaScript&#39;s <code>structuredClone</code> or Perl&#39;s <code>Storable::dclone</code>.</p>
+        <pre><code class="lang-perl">my $orig = {users =&gt; [{name =&gt; &quot;Alice&quot;}], meta =&gt; {v =&gt; 1}};
+my $copy = deep_clone($orig);
+$copy-&gt;{users}[0]{name} = &quot;Bob&quot;;
+p $orig-&gt;{users}[0]{name};   # Alice (unchanged)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-deep-merge">
+        <h3><a class="doc-anchor" href="#doc-deep-merge">#</a> <code>deep_merge</code></h3>
+        <p><code>deep_merge</code> (alias <code>dmerge</code>) recursively merges two hash references. When both sides have a hash ref for the same key, they are merged recursively; otherwise the right-hand value wins. This is the standard deep merge from Lodash, Ruby&#39;s <code>deep_merge</code>, and config-file overlay patterns. Returns a new hash ref — neither input is modified.</p>
+        <pre><code class="lang-perl">my $defaults = {db =&gt; {host =&gt; &quot;localhost&quot;, port =&gt; 5432}, debug =&gt; 0};
+my $overrides = {db =&gt; {port =&gt; 3306}, debug =&gt; 1};
+my $cfg = deep_merge($defaults, $overrides);
+p $cfg-&gt;{db}{host};   # localhost (from defaults)
+p $cfg-&gt;{db}{port};   # 3306 (overridden)
+p $cfg-&gt;{debug};      # 1 (overridden)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-deep-equal">
+        <h3><a class="doc-anchor" href="#doc-deep-equal">#</a> <code>deep_equal</code></h3>
+        <p><code>deep_equal</code> (alias <code>deq</code>) performs structural equality comparison of two values, recursively descending into array refs, hash refs, and scalar refs. Returns 1 if the structures are identical, 0 otherwise. This is the perlrs equivalent of Node&#39;s <code>assert.deepStrictEqual</code>, Lodash <code>isEqual</code>, or Python&#39;s <code>==</code> on nested dicts/lists.</p>
+        <pre><code class="lang-perl">p deep_equal([1, {a =&gt; 2}], [1, {a =&gt; 2}]);   # 1
+p deep_equal([1, {a =&gt; 2}], [1, {a =&gt; 3}]);   # 0
+p deq({x =&gt; [1,2]}, {x =&gt; [1,2]});            # 1
 </code></pre>
       </article>
     </section>
@@ -4414,7 +4545,7 @@ log_info(&quot;hidden&quot;);    # not printed
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">1633 topics</p>
+      <p class="chapter-meta">1625 topics</p>
       <article class="doc-entry" id="doc-perlrs-rust-compile">
         <h3><a class="doc-anchor" href="#doc-perlrs-rust-compile">#</a> <code>__perlrs_rust_compile</code></h3>
         <p><code>__perlrs_rust_compile</code> — internal builtin.</p>
@@ -5951,36 +6082,12 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map { common_suffix } |&gt; p;
 </code></pre>
       </article>
-      <article class="doc-entry" id="doc-comp">
-        <h3><a class="doc-anchor" href="#doc-comp">#</a> <code>comp</code></h3>
-        <p><code>comp</code> — algebraic match builtin.</p>
-        <pre><code class="lang-perl">my $result = comp($x);
-# or in a pipeline:
-@list |&gt; map { comp } |&gt; p;
-</code></pre>
-      </article>
       <article class="doc-entry" id="doc-compare-versions">
         <h3><a class="doc-anchor" href="#doc-compare-versions">#</a> <code>compare_versions</code></h3>
         <p><code>compare_versions</code> — file stat / path builtin.</p>
         <pre><code class="lang-perl">my $result = compare_versions($x);
 # or in a pipeline:
 @list |&gt; map { compare_versions } |&gt; p;
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-compl">
-        <h3><a class="doc-anchor" href="#doc-compl">#</a> <code>compl</code></h3>
-        <p><code>compl</code> — algebraic match builtin. Alias for <code>complement</code>.</p>
-        <pre><code class="lang-perl">my $result = compl($x);
-# or in a pipeline:
-@list |&gt; map { compl } |&gt; p;
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-complement">
-        <h3><a class="doc-anchor" href="#doc-complement">#</a> <code>complement</code></h3>
-        <p><code>complement</code> — algebraic match builtin.</p>
-        <pre><code class="lang-perl">my $result = complement($x);
-# or in a pipeline:
-@list |&gt; map { complement } |&gt; p;
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-compound-interest">
@@ -6061,14 +6168,6 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = constant_case($x);
 # or in a pipeline:
 @list |&gt; map { constant_case } |&gt; p;
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-constantly">
-        <h3><a class="doc-anchor" href="#doc-constantly">#</a> <code>constantly</code></h3>
-        <p><code>constantly</code> — algebraic match builtin.</p>
-        <pre><code class="lang-perl">my $result = constantly($x);
-# or in a pipeline:
-@list |&gt; map { constantly } |&gt; p;
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-contains">
@@ -8151,14 +8250,6 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = fnext($x);
 # or in a pipeline:
 @list |&gt; map { fnext } |&gt; p;
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-fnil">
-        <h3><a class="doc-anchor" href="#doc-fnil">#</a> <code>fnil</code></h3>
-        <p><code>fnil</code> — algebraic match builtin.</p>
-        <pre><code class="lang-perl">my $result = fnil($x);
-# or in a pipeline:
-@list |&gt; map { fnil } |&gt; p;
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-fnv1a">
@@ -10939,14 +11030,6 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map { json_pretty } |&gt; p;
 </code></pre>
       </article>
-      <article class="doc-entry" id="doc-juxt">
-        <h3><a class="doc-anchor" href="#doc-juxt">#</a> <code>juxt</code></h3>
-        <p><code>juxt</code> — algebraic match builtin.</p>
-        <pre><code class="lang-perl">my $result = juxt($x);
-# or in a pipeline:
-@list |&gt; map { juxt } |&gt; p;
-</code></pre>
-      </article>
       <article class="doc-entry" id="doc-juxt2">
         <h3><a class="doc-anchor" href="#doc-juxt2">#</a> <code>juxt2</code></h3>
         <p><code>juxt2</code> — functional combinators builtin.</p>
@@ -13190,14 +13273,6 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = parse_int($x);
 # or in a pipeline:
 @list |&gt; map { parse_int } |&gt; p;
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-partial">
-        <h3><a class="doc-anchor" href="#doc-partial">#</a> <code>partial</code></h3>
-        <p><code>partial</code> — algebraic match builtin.</p>
-        <pre><code class="lang-perl">my $result = partial($x);
-# or in a pipeline:
-@list |&gt; map { partial } |&gt; p;
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-partition-all">
@@ -15910,14 +15985,6 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
         <pre><code class="lang-perl">my $result = talb($x);
 # or in a pipeline:
 @list |&gt; map { talb } |&gt; p;
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-tally">
-        <h3><a class="doc-anchor" href="#doc-tally">#</a> <code>tally</code></h3>
-        <p><code>tally</code> — functional / iterator builtin.</p>
-        <pre><code class="lang-perl">my $result = tally($x);
-# or in a pipeline:
-@list |&gt; map { tally } |&gt; p;
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-tally-by">

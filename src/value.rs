@@ -1968,7 +1968,7 @@ impl PerlValue {
             (HeapObject::Hash(a), HeapObject::Hash(b)) => {
                 a.len() == b.len()
                     && a.iter()
-                        .all(|(k, v)| b.get(k).map_or(false, |bv| v.struct_field_eq(bv)))
+                        .all(|(k, v)| b.get(k).is_some_and(|bv| v.struct_field_eq(bv)))
             }
             (HeapObject::HashRef(a), HeapObject::HashRef(b)) => {
                 let ag = a.read();
@@ -1976,7 +1976,7 @@ impl PerlValue {
                 ag.len() == bg.len()
                     && ag
                         .iter()
-                        .all(|(k, v)| bg.get(k).map_or(false, |bv| v.struct_field_eq(bv)))
+                        .all(|(k, v)| bg.get(k).is_some_and(|bv| v.struct_field_eq(bv)))
             }
             (HeapObject::StructInst(a), HeapObject::StructInst(b)) => {
                 if a.def.name != b.def.name {

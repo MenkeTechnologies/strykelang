@@ -817,7 +817,7 @@ fn expand_perl_regex_octal_escapes(pat: &str) -> String {
                 let mut oct = String::new();
                 while oct.len() < 3 {
                     if let Some(&d) = it.peek() {
-                        if d >= '0' && d <= '7' {
+                        if ('0'..='7').contains(&d) {
                             oct.push(d);
                             it.next();
                         } else {
@@ -13483,7 +13483,7 @@ impl Interpreter {
         // Detect if args are named (key => value pairs) or positional
         // Named: even count and every odd index (0, 2, 4...) looks like a string field name
         let is_named = args.len() >= 2
-            && args.len() % 2 == 0
+            && args.len().is_multiple_of(2)
             && args.iter().step_by(2).all(|v| {
                 let s = v.to_string();
                 def.field_index(&s).is_some()

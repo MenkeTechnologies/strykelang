@@ -4,6 +4,7 @@ mod algebraic_match;
 mod aot_build;
 mod bare_regex_slash;
 mod builtins;
+mod cli_compat_mode;
 mod cli_inplace;
 mod cli_line_mode_eof;
 mod cli_line_mode_stdin_readline;
