@@ -7539,12 +7539,102 @@ impl Interpreter {
         Err(PerlError::runtime("Can't make hash reference from value", line).into())
     }
 
+    /// Process Perl case escapes: \U (uppercase), \L (lowercase), \u (ucfirst),
+    /// \l (lcfirst), \Q (quotemeta), \E (end modifier).
+    fn process_case_escapes(s: &str) -> String {
+        // Quick check: if no backslash, nothing to do
+        if !s.contains('\\') {
+            return s.to_string();
+        }
+        let mut result = String::with_capacity(s.len());
+        let mut chars = s.chars().peekable();
+        let mut mode: Option<char> = None; // 'U', 'L', or 'Q'
+        let mut next_char_mod: Option<char> = None; // 'u' or 'l'
+
+        while let Some(c) = chars.next() {
+            if c == '\\' {
+                match chars.peek() {
+                    Some(&'U') => {
+                        chars.next();
+                        mode = Some('U');
+                        continue;
+                    }
+                    Some(&'L') => {
+                        chars.next();
+                        mode = Some('L');
+                        continue;
+                    }
+                    Some(&'Q') => {
+                        chars.next();
+                        mode = Some('Q');
+                        continue;
+                    }
+                    Some(&'E') => {
+                        chars.next();
+                        mode = None;
+                        next_char_mod = None;
+                        continue;
+                    }
+                    Some(&'u') => {
+                        chars.next();
+                        next_char_mod = Some('u');
+                        continue;
+                    }
+                    Some(&'l') => {
+                        chars.next();
+                        next_char_mod = Some('l');
+                        continue;
+                    }
+                    _ => {}
+                }
+            }
+
+            let mut ch = c;
+
+            // Apply one-shot modifier first
+            if let Some(m) = next_char_mod.take() {
+                ch = match m {
+                    'u' => ch.to_uppercase().next().unwrap_or(ch),
+                    'l' => ch.to_lowercase().next().unwrap_or(ch),
+                    _ => ch,
+                };
+            }
+
+            // Apply ongoing mode
+            match mode {
+                Some('U') => {
+                    for uc in ch.to_uppercase() {
+                        result.push(uc);
+                    }
+                }
+                Some('L') => {
+                    for lc in ch.to_lowercase() {
+                        result.push(lc);
+                    }
+                }
+                Some('Q') => {
+                    if !ch.is_ascii_alphanumeric() && ch != '_' {
+                        result.push('\\');
+                    }
+                    result.push(ch);
+                }
+                None | Some(_) => {
+                    result.push(ch);
+                }
+            }
+        }
+        result
+    }
+
     pub(crate) fn eval_expr_ctx(&mut self, expr: &Expr, ctx: WantarrayCtx) -> ExecResult {
         let line = expr.line;
         match &expr.kind {
             ExprKind::Integer(n) => Ok(PerlValue::integer(*n)),
             ExprKind::Float(f) => Ok(PerlValue::float(*f)),
-            ExprKind::String(s) => Ok(PerlValue::string(s.clone())),
+            ExprKind::String(s) => {
+                let processed = Self::process_case_escapes(s);
+                Ok(PerlValue::string(processed))
+            }
             ExprKind::Bareword(s) => {
                 if s == "__PACKAGE__" {
                     return Ok(PerlValue::string(self.current_package()));
@@ -7581,15 +7671,15 @@ impl Interpreter {
 
             // Interpolated strings
             ExprKind::InterpolatedString(parts) => {
-                let mut result = String::new();
+                let mut raw_result = String::new();
                 for part in parts {
                     match part {
-                        StringPart::Literal(s) => result.push_str(s),
+                        StringPart::Literal(s) => raw_result.push_str(s),
                         StringPart::ScalarVar(name) => {
                             self.check_strict_scalar_var(name, line)?;
                             let val = self.get_special_var(name);
                             let s = self.stringify_value(val, line)?;
-                            result.push_str(&s);
+                            raw_result.push_str(&s);
                         }
                         StringPart::ArrayVar(name) => {
                             self.check_strict_array_var(name, line)?;
@@ -7600,7 +7690,7 @@ impl Interpreter {
                                 parts.push(self.stringify_value(v.clone(), line)?);
                             }
                             let sep = self.list_separator.clone();
-                            result.push_str(&parts.join(&sep));
+                            raw_result.push_str(&parts.join(&sep));
                         }
                         StringPart::Expr(e) => {
                             if let ExprKind::ArraySlice { array, .. } = &e.kind {
@@ -7613,7 +7703,7 @@ impl Interpreter {
                                 for v in list {
                                     parts.push(self.stringify_value(v, line)?);
                                 }
-                                result.push_str(&parts.join(&sep));
+                                raw_result.push_str(&parts.join(&sep));
                             } else if let ExprKind::Deref {
                                 kind: Sigil::Array, ..
                             } = &e.kind
@@ -7626,15 +7716,16 @@ impl Interpreter {
                                 for v in list {
                                     parts.push(self.stringify_value(v, line)?);
                                 }
-                                result.push_str(&parts.join(&sep));
+                                raw_result.push_str(&parts.join(&sep));
                             } else {
                                 let val = self.eval_expr(e)?;
                                 let s = self.stringify_value(val, line)?;
-                                result.push_str(&s);
+                                raw_result.push_str(&s);
                             }
                         }
                     }
                 }
+                let result = Self::process_case_escapes(&raw_result);
                 Ok(PerlValue::string(result))
             }
 
@@ -8822,6 +8913,12 @@ impl Interpreter {
                 // Builtins read [`Self::wantarray_kind`] (VM sets it too); thread `ctx` through.
                 let saved_wa = self.wantarray_kind;
                 self.wantarray_kind = ctx;
+                // User-defined subs shadow builtins (correct Perl semantics).
+                if let Some(sub) = self.resolve_sub_by_name(name) {
+                    self.wantarray_kind = saved_wa;
+                    let args = self.with_topic_default_args(arg_vals);
+                    return self.call_sub(&sub, args, ctx, line);
+                }
                 if matches!(
                     name.as_str(),
                     "take_while" | "drop_while" | "skip_while" | "reject" | "tap" | "peek"
@@ -15290,7 +15387,8 @@ impl Interpreter {
         if let Some(p) = &mut self.profiler {
             p.enter_sub(&sub.name);
         }
-        let result = self.exec_block_no_scope(&sub.body);
+        // Pass wantarray context for the implicit return (last expression in block).
+        let result = self.exec_block_no_scope_with_tail(&sub.body, self.wantarray_kind);
         if let (Some(p), Some(t0)) = (&mut self.profiler, t0) {
             p.exit_sub(t0.elapsed());
         }

@@ -1692,19 +1692,95 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
     Some(md)
 }
 
+/// Auto-generate a stub doc from the reflection `CATEGORY_MAP` for any
+/// builtin that doesn't have a hand-written entry in `doc_for_label_text`.
+/// Returns `"name — category builtin."` so every name has hover text.
+fn doc_stub_for(label: &str) -> Option<String> {
+    // Check if alias → resolve to primary for better stub
+    let primary = crate::builtins::BUILTIN_ARMS.iter().find_map(|arm| {
+        if arm.contains(&label) {
+            arm.first().copied()
+        } else {
+            None
+        }
+    });
+    let canonical = primary.unwrap_or(label);
+
+    for &(name, category) in crate::builtins::CATEGORY_MAP {
+        if name == canonical {
+            let alias_note = if canonical != label {
+                format!(" Alias for `{}`.", canonical)
+            } else {
+                String::new()
+            };
+            return Some(format!(
+                "`{}` — {} builtin.{}\n\n```perl\n{}\n```",
+                label,
+                category,
+                alias_note,
+                if label.contains("_to_") || label.contains("to_") {
+                    format!("my $result = {}($input);", label)
+                } else {
+                    format!(
+                        "my $result = {}($x);\n# or in a pipeline:\n@list |> map {{ {} }} |> p;",
+                        label, label
+                    )
+                }
+            ));
+        }
+    }
+    None
+}
+
+// Thread-local cache for auto-generated stub docs so they have 'static lifetime.
+thread_local! {
+    static STUB_CACHE: std::cell::RefCell<std::collections::HashMap<String, &'static str>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
 /// Public entry point for `pe docs TOPIC` — returns raw markdown doc text.
+/// Checks hand-written docs first, then falls back to auto-generated stubs
+/// from the reflection `CATEGORY_MAP` so every builtin has at least a
+/// one-liner hover.
 pub fn doc_text_for(label: &str) -> Option<&'static str> {
-    doc_for_label_text(label)
+    // Hand-written entry takes priority.
+    if let Some(md) = doc_for_label_text(label) {
+        return Some(md);
+    }
+    // Auto-generated stub, cached with 'static lifetime via leak.
+    STUB_CACHE.with(|cache| {
+        let mut map = cache.borrow_mut();
+        if let Some(&cached) = map.get(label) {
+            return Some(cached);
+        }
+        let stub = doc_stub_for(label)?;
+        let leaked: &'static str = Box::leak(stub.into_boxed_str());
+        map.insert(label.to_string(), leaked);
+        Some(leaked)
+    })
 }
 
 /// List all documented topic names (sorted, deduplicated).
+/// Now includes auto-stubbed names from `CATEGORY_MAP` in addition to
+/// the hand-written completion words.
 pub fn doc_topics() -> Vec<&'static str> {
-    include_str!("lsp_completion_words.txt")
+    let mut topics: Vec<&'static str> = include_str!("lsp_completion_words.txt")
         .lines()
         .map(str::trim)
         .filter(|l| !l.is_empty() && !l.starts_with('#'))
-        .filter(|l| doc_for_label_text(l).is_some())
-        .collect()
+        .filter(|l| doc_text_for(l).is_some())
+        .collect();
+    // Add every CATEGORY_MAP name that has a stub but isn't in the
+    // completion-words file (the bulk of the ~1700 builtins).
+    let existing: std::collections::HashSet<&str> = topics.iter().copied().collect();
+    for &(name, _) in crate::builtins::CATEGORY_MAP {
+        if !existing.contains(name) && doc_text_for(name).is_some() {
+            topics.push(name);
+        }
+    }
+    topics.sort();
+    topics.dedup();
+    topics
 }
 
 /// Grouped category list for the `pe docs` book view and the static-site

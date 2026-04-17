@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use indexmap::IndexMap;
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 
 use crate::ast::PerlTypeName;
 use crate::error::PerlError;
@@ -841,6 +841,10 @@ impl Scope {
                 if let Some(arc) = val.as_atomic_arc() {
                     return arc.lock().clone();
                 }
+                // Transparently unwrap ScalarRef (captured closure variable) — read through the lock
+                if let Some(arc) = val.as_scalar_ref() {
+                    return arc.read().clone();
+                }
                 return val.clone();
             }
         }
@@ -1003,6 +1007,11 @@ impl Scope {
                     let old = guard.clone();
                     *guard = val.clone();
                     crate::parallel_trace::emit_scalar_mutation(name, &old, &val);
+                    return Ok(());
+                }
+                // If the existing value is ScalarRef (captured closure variable), write through it
+                if let Some(arc) = v.as_scalar_ref() {
+                    *arc.write() = val;
                     return Ok(());
                 }
             }
@@ -1779,11 +1788,23 @@ impl Scope {
         let mut captured = Vec::new();
         for frame in &self.frames {
             for (k, v) in &frame.scalars {
-                captured.push((format!("${}", k), v.clone()));
+                // Wrap scalar in ScalarRef so the closure shares the same memory cell.
+                // If it's already a ScalarRef, just clone it (shares the same Arc).
+                let wrapped = if v.as_scalar_ref().is_some() {
+                    v.clone()
+                } else {
+                    PerlValue::scalar_ref(Arc::new(RwLock::new(v.clone())))
+                };
+                captured.push((format!("${}", k), wrapped));
             }
             for (i, v) in frame.scalar_slots.iter().enumerate() {
                 if let Some(Some(name)) = frame.scalar_slot_names.get(i) {
-                    captured.push((format!("$slot:{}:{}", i, name), v.clone()));
+                    let wrapped = if v.as_scalar_ref().is_some() {
+                        v.clone()
+                    } else {
+                        PerlValue::scalar_ref(Arc::new(RwLock::new(v.clone())))
+                    };
+                    captured.push((format!("$slot:{}:{}", i, name), wrapped));
                 }
             }
             for (k, v) in &frame.arrays {
