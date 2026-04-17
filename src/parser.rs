@@ -3137,7 +3137,7 @@ impl Parser {
         }
     }
 
-    /// `struct Name { field => Type, ... }` or `struct Name { field => Type = default, ... }`
+    /// `struct Name { field => Type, ... ; fn method { } }`
     fn parse_struct_decl(&mut self) -> PerlResult<Statement> {
         let line = self.peek_line();
         self.advance(); // struct
@@ -3151,7 +3151,43 @@ impl Parser {
         };
         self.expect(&Token::LBrace)?;
         let mut fields = Vec::new();
+        let mut methods = Vec::new();
         while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            // Check for method definition: `fn name { }` or `sub name { }`
+            let is_method = match self.peek() {
+                Token::Ident(s) => s == "fn" || s == "sub",
+                _ => false,
+            };
+            if is_method {
+                self.advance(); // fn/sub
+                let method_name = match self.advance() {
+                    (Token::Ident(n), _) => n,
+                    (tok, err_line) => {
+                        return Err(self
+                            .syntax_err(format!("Expected method name, got {:?}", tok), err_line))
+                    }
+                };
+                // Parse optional signature: `($self, $arg: Type, ...)`
+                let params = if self.eat(&Token::LParen) {
+                    let p = self.parse_sub_signature_param_list()?;
+                    self.expect(&Token::RParen)?;
+                    p
+                } else {
+                    Vec::new()
+                };
+                // parse_block handles its own { } delimiters
+                let body = self.parse_block()?;
+                methods.push(crate::ast::StructMethod {
+                    name: method_name,
+                    params,
+                    body,
+                });
+                // Optional trailing comma/semicolon after method
+                self.eat(&Token::Comma);
+                self.eat(&Token::Semicolon);
+                continue;
+            }
+
             let field_name = match self.advance() {
                 (Token::Ident(n), _) => n,
                 (tok, err_line) => {
@@ -3160,10 +3196,15 @@ impl Parser {
                     )
                 }
             };
-            self.expect(&Token::FatArrow)?;
-            let ty = self.parse_type_name()?;
+            // Support both `field => Type` and bare `field` (implies Any type)
+            let ty = if self.eat(&Token::FatArrow) {
+                self.parse_type_name()?
+            } else {
+                crate::ast::PerlTypeName::Any
+            };
             let default = if self.eat(&Token::Assign) {
-                Some(self.parse_expression()?)
+                // Use parse_ternary to avoid consuming commas (next field separator)
+                Some(self.parse_ternary()?)
             } else {
                 None
             };
@@ -3173,7 +3214,8 @@ impl Parser {
                 default,
             });
             if !self.eat(&Token::Comma) {
-                break;
+                // Also allow semicolons as field separators
+                self.eat(&Token::Semicolon);
             }
         }
         self.expect(&Token::RBrace)?;
@@ -3181,7 +3223,11 @@ impl Parser {
         Ok(Statement {
             label: None,
             kind: StmtKind::StructDecl {
-                def: StructDef { name, fields },
+                def: StructDef {
+                    name,
+                    fields,
+                    methods,
+                },
             },
             line,
         })

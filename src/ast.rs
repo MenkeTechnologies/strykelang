@@ -259,11 +259,22 @@ pub struct StructField {
     pub default: Option<Expr>,
 }
 
-/// Compile-time record type: `struct Name { field => Type, ... }`.
+/// Method defined inside a struct: `fn name { ... }` or `fn name($self, ...) { ... }`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StructMethod {
+    pub name: String,
+    pub params: Vec<SubSigParam>,
+    pub body: Block,
+}
+
+/// Compile-time record type: `struct Name { field => Type, ... ; fn method { } }`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StructDef {
     pub name: String,
     pub fields: Vec<StructField>,
+    /// User-defined methods: `fn name { }` inside struct body.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub methods: Vec<StructMethod>,
 }
 
 impl StructDef {
@@ -276,6 +287,12 @@ impl StructDef {
     #[inline]
     pub fn field_type(&self, name: &str) -> Option<&PerlTypeName> {
         self.fields.iter().find(|f| f.name == name).map(|f| &f.ty)
+    }
+
+    /// Get method by name.
+    #[inline]
+    pub fn method(&self, name: &str) -> Option<&StructMethod> {
+        self.methods.iter().find(|m| m.name == name)
     }
 }
 

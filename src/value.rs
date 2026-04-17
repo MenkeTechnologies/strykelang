@@ -1939,6 +1939,95 @@ impl PerlValue {
         self.to_string().cmp(&other.to_string())
     }
 
+    /// Deep equality for struct fields (recursive).
+    pub fn struct_field_eq(&self, other: &PerlValue) -> bool {
+        if nanbox::is_imm_undef(self.0) && nanbox::is_imm_undef(other.0) {
+            return true;
+        }
+        if let (Some(a), Some(b)) = (nanbox::as_imm_int32(self.0), nanbox::as_imm_int32(other.0)) {
+            return a == b;
+        }
+        if nanbox::is_raw_float_bits(self.0) && nanbox::is_raw_float_bits(other.0) {
+            return f64::from_bits(self.0) == f64::from_bits(other.0);
+        }
+        if !nanbox::is_heap(self.0) || !nanbox::is_heap(other.0) {
+            return self.to_number() == other.to_number();
+        }
+        match (unsafe { self.heap_ref() }, unsafe { other.heap_ref() }) {
+            (HeapObject::String(a), HeapObject::String(b)) => a == b,
+            (HeapObject::Integer(a), HeapObject::Integer(b)) => a == b,
+            (HeapObject::Float(a), HeapObject::Float(b)) => a == b,
+            (HeapObject::Array(a), HeapObject::Array(b)) => {
+                a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| x.struct_field_eq(y))
+            }
+            (HeapObject::ArrayRef(a), HeapObject::ArrayRef(b)) => {
+                let ag = a.read();
+                let bg = b.read();
+                ag.len() == bg.len() && ag.iter().zip(bg.iter()).all(|(x, y)| x.struct_field_eq(y))
+            }
+            (HeapObject::Hash(a), HeapObject::Hash(b)) => {
+                a.len() == b.len()
+                    && a.iter()
+                        .all(|(k, v)| b.get(k).map_or(false, |bv| v.struct_field_eq(bv)))
+            }
+            (HeapObject::HashRef(a), HeapObject::HashRef(b)) => {
+                let ag = a.read();
+                let bg = b.read();
+                ag.len() == bg.len()
+                    && ag
+                        .iter()
+                        .all(|(k, v)| bg.get(k).map_or(false, |bv| v.struct_field_eq(bv)))
+            }
+            (HeapObject::StructInst(a), HeapObject::StructInst(b)) => {
+                if a.def.name != b.def.name {
+                    false
+                } else {
+                    let av = a.get_values();
+                    let bv = b.get_values();
+                    av.len() == bv.len()
+                        && av.iter().zip(bv.iter()).all(|(x, y)| x.struct_field_eq(y))
+                }
+            }
+            _ => self.to_string() == other.to_string(),
+        }
+    }
+
+    /// Deep clone a value (used for struct clone).
+    pub fn deep_clone(&self) -> PerlValue {
+        if !nanbox::is_heap(self.0) {
+            return self.clone();
+        }
+        match unsafe { self.heap_ref() } {
+            HeapObject::Array(a) => PerlValue::array(a.iter().map(|v| v.deep_clone()).collect()),
+            HeapObject::ArrayRef(a) => {
+                let cloned: Vec<PerlValue> = a.read().iter().map(|v| v.deep_clone()).collect();
+                PerlValue::array_ref(Arc::new(RwLock::new(cloned)))
+            }
+            HeapObject::Hash(h) => {
+                let mut cloned = IndexMap::new();
+                for (k, v) in h.iter() {
+                    cloned.insert(k.clone(), v.deep_clone());
+                }
+                PerlValue::hash(cloned)
+            }
+            HeapObject::HashRef(h) => {
+                let mut cloned = IndexMap::new();
+                for (k, v) in h.read().iter() {
+                    cloned.insert(k.clone(), v.deep_clone());
+                }
+                PerlValue::hash_ref(Arc::new(RwLock::new(cloned)))
+            }
+            HeapObject::StructInst(s) => {
+                let new_values = s.get_values().iter().map(|v| v.deep_clone()).collect();
+                PerlValue::struct_inst(Arc::new(StructInstance::new(
+                    Arc::clone(&s.def),
+                    new_values,
+                )))
+            }
+            _ => self.clone(),
+        }
+    }
+
     pub fn to_list(&self) -> Vec<PerlValue> {
         if nanbox::is_imm_undef(self.0) {
             return vec![];
@@ -2058,7 +2147,23 @@ impl fmt::Display for PerlValue {
             HeapObject::RemoteCluster(c) => write!(f, "Cluster({} slots)", c.slots.len()),
             HeapObject::Barrier(_) => f.write_str("Barrier"),
             HeapObject::SqliteConn(_) => f.write_str("SqliteConn"),
-            HeapObject::StructInst(s) => write!(f, "{}=STRUCT(...)", s.def.name),
+            HeapObject::StructInst(s) => {
+                // Smart stringify: Point(x => 1.5, y => 2.0)
+                write!(f, "{}(", s.def.name)?;
+                let values = s.values.read();
+                for (i, field) in s.def.fields.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(
+                        f,
+                        "{} => {}",
+                        field.name,
+                        values.get(i).cloned().unwrap_or(PerlValue::UNDEF)
+                    )?;
+                }
+                f.write_str(")")
+            }
             HeapObject::DataFrame(d) => {
                 let g = d.lock();
                 write!(f, "DataFrame({} rows)", g.nrows())

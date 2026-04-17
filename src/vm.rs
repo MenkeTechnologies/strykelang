@@ -2098,7 +2098,7 @@ impl<'a> VM<'a> {
                     }
                 } else if let Some(result) = self.interp.try_autoload_call(
                     name,
-                    self.interp.with_topic_default_args(args),
+                    self.interp.with_topic_default_args(args.clone()),
                     self.line(),
                     want,
                     None,
@@ -2122,6 +2122,14 @@ impl<'a> VM<'a> {
                     }
                     if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
                         p.exit_sub(t0.elapsed());
+                    }
+                } else if let Some(def) = self.interp.struct_defs.get(name).cloned() {
+                    // Struct constructor: Point(x => 1, y => 2) or Point(1, 2)
+                    let result = self.interp.struct_construct(&def, args, self.line());
+                    match result {
+                        Ok(v) => self.push(v),
+                        Err(crate::interpreter::FlowOrError::Error(e)) => return Err(e),
+                        _ => self.push(PerlValue::UNDEF),
                     }
                 } else {
                     return Err(PerlError::runtime(
@@ -3252,8 +3260,20 @@ impl<'a> VM<'a> {
                     Op::NumEq => {
                         let b = self.pop();
                         let a = self.pop();
-                        self.push_binop_with_overload(BinOp::NumEq, a, b, |a, b| {
-                            Ok(int_cmp(a, b, |x, y| x == y, |x, y| x == y))
+                        self.push_binop_with_overload(BinOp::NumEq, a.clone(), b.clone(), |a, b| {
+                            // Struct equality: compare all fields
+                            if let (Some(sa), Some(sb)) = (a.as_struct_inst(), b.as_struct_inst()) {
+                                if sa.def.name != sb.def.name {
+                                    return Ok(PerlValue::integer(0));
+                                }
+                                let av = sa.get_values();
+                                let bv = sb.get_values();
+                                let eq = av.len() == bv.len()
+                                    && av.iter().zip(bv.iter()).all(|(x, y)| x.struct_field_eq(y));
+                                Ok(PerlValue::integer(if eq { 1 } else { 0 }))
+                            } else {
+                                Ok(int_cmp(a, b, |x, y| x == y, |x, y| x == y))
+                            }
                         })
                     }
                     Op::NumNe => {
