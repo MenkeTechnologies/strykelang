@@ -1549,7 +1549,7 @@ pub(crate) fn try_builtin(
         "every" => Some(builtin_every(interp, args, line)),
         "not_any" => Some(builtin_not_any(interp, args, line)),
         "not_every" => Some(builtin_not_every(interp, args, line)),
-        "comp" => Some(builtin_comp(args, line)),
+        "comp" | "compose" => Some(builtin_comp(args, line)),
         "partial" => Some(builtin_partial(args, line)),
         "constantly" | "const" => Some(builtin_constantly(args)),
         "complement" | "compl" => Some(builtin_complement(args, line)),
@@ -1913,6 +1913,14 @@ pub(crate) fn try_builtin(
         "days_in_month_fn" | "daysinmo" => Some(builtin_days_in_month_fn(args)),
         "is_valid_date" | "isvdate" => Some(builtin_is_valid_date(args)),
         "age_in_years" | "ageyrs" => Some(builtin_age_in_years(args)),
+        // ── Higher-order & deep-structure utilities ─────────────────────────
+        "memoize" | "memo" => Some(builtin_memoize(args, line)),
+        "curry" => Some(builtin_curry(args, line)),
+        "once" => Some(builtin_once(args, line)),
+        "deep_clone" | "dclone" => Some(builtin_deep_clone(args)),
+        "deep_merge" | "dmerge" => Some(builtin_deep_merge(args, line)),
+        "deep_equal" | "deq" => Some(builtin_deep_equal(args)),
+        "tally" => Some(builtin_tally(args)),
         _ => crate::rust_ffi::try_call(name, args, line),
     }
 }
@@ -7210,19 +7218,18 @@ fn builtin_not_every(
     Ok(bool_iv(false))
 }
 
-/// `comp FN1, FN2, ...` — returns a function composition. For now, returns the first fn
-/// (full composition requires special runtime support).
+/// `compose \&f, \&g, ...` / `comp \&f, \&g, ...` — right-to-left function composition.
+/// `compose(\&f, \&g)->(x)` == `f(g(x))`.
 fn builtin_comp(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     if args.is_empty() {
         return Err(PerlError::runtime(
-            "comp: requires at least one function",
+            "compose: requires at least one function",
             line,
         ));
     }
-    let fns: Vec<Arc<PerlSub>> = args.iter().filter_map(|v| v.as_code_ref()).collect();
-    if fns.is_empty() {
+    if args.iter().any(|v| v.as_code_ref().is_none()) {
         return Err(PerlError::runtime(
-            "comp: all arguments must be code references",
+            "compose: all arguments must be code references",
             line,
         ));
     }
@@ -7240,8 +7247,7 @@ fn builtin_comp(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     Ok(PerlValue::code_ref(Arc::new(composed)))
 }
 
-/// `partial FN, ARGS...` — returns a partially applied function. For now returns the fn
-/// with bound args stored in closure_env.
+/// `partial \&f, @bound` — partial application: `partial(\&add, 1)->(2)` == `add(1, 2)`.
 fn builtin_partial(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     if args.is_empty() {
         return Err(PerlError::runtime(
@@ -7250,22 +7256,23 @@ fn builtin_partial(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
         ));
     }
     let f = args[0].clone();
-    let Some(sub) = f.as_code_ref() else {
+    if f.as_code_ref().is_none() {
         return Err(PerlError::runtime(
             "partial: first argument must be a code reference",
             line,
         ));
-    };
+    }
     let bound_args: Vec<PerlValue> = args[1..].to_vec();
-    let mut new_env = sub.closure_env.clone().unwrap_or_default();
-    new_env.push(("__partial_args__".to_string(), PerlValue::array(bound_args)));
     let partial_sub = PerlSub {
-        name: format!("__partial_{}__", sub.name),
-        params: sub.params.clone(),
-        body: sub.body.clone(),
-        closure_env: Some(new_env),
-        prototype: sub.prototype.clone(),
-        fib_like: sub.fib_like.clone(),
+        name: "__partial__".to_string(),
+        params: vec![],
+        body: vec![],
+        closure_env: Some(vec![
+            ("__partial_fn__".to_string(), f),
+            ("__partial_args__".to_string(), PerlValue::array(bound_args)),
+        ]),
+        prototype: None,
+        fib_like: None,
     };
     Ok(PerlValue::code_ref(Arc::new(partial_sub)))
 }
@@ -7284,30 +7291,30 @@ fn builtin_constantly(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::code_ref(Arc::new(const_sub)))
 }
 
-/// `complement FN` — returns a function that returns the opposite truth value.
+/// `complement \&f` — returns a function that negates the boolean result of `f`.
 fn builtin_complement(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     if args.is_empty() {
         return Err(PerlError::runtime("complement: requires a function", line));
     }
     let f = args[0].clone();
-    let Some(sub) = f.as_code_ref() else {
+    if f.as_code_ref().is_none() {
         return Err(PerlError::runtime(
             "complement: argument must be a code reference",
             line,
         ));
-    };
+    }
     let compl_sub = PerlSub {
-        name: format!("__complement_{}__", sub.name),
-        params: sub.params.clone(),
-        body: sub.body.clone(),
+        name: "__complement__".to_string(),
+        params: vec![],
+        body: vec![],
         closure_env: Some(vec![("__complement_fn__".to_string(), f)]),
-        prototype: sub.prototype.clone(),
+        prototype: None,
         fib_like: None,
     };
     Ok(PerlValue::code_ref(Arc::new(compl_sub)))
 }
 
-/// `fnil FN, DEFAULT...` — returns a function that replaces nil args with defaults.
+/// `fnil \&f, @defaults` — returns a function that replaces undef args with defaults.
 fn builtin_fnil(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     if args.is_empty() {
         return Err(PerlError::runtime(
@@ -7316,22 +7323,22 @@ fn builtin_fnil(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
         ));
     }
     let f = args[0].clone();
-    let Some(sub) = f.as_code_ref() else {
+    if f.as_code_ref().is_none() {
         return Err(PerlError::runtime(
             "fnil: first argument must be a code reference",
             line,
         ));
-    };
+    }
     let defaults: Vec<PerlValue> = args[1..].to_vec();
     let fnil_sub = PerlSub {
-        name: format!("__fnil_{}__", sub.name),
-        params: sub.params.clone(),
-        body: sub.body.clone(),
+        name: "__fnil__".to_string(),
+        params: vec![],
+        body: vec![],
         closure_env: Some(vec![
             ("__fnil_fn__".to_string(), f),
             ("__fnil_defaults__".to_string(), PerlValue::array(defaults)),
         ]),
-        prototype: sub.prototype.clone(),
+        prototype: None,
         fib_like: None,
     };
     Ok(PerlValue::code_ref(Arc::new(fnil_sub)))
@@ -20784,6 +20791,206 @@ fn serve_format_response(val: PerlValue) -> (u16, Vec<(String, String)>, String)
         return (404, vec![], "Not Found".into());
     }
     (200, vec![], val.to_string())
+}
+
+// ── Higher-order & deep-structure utilities ─────────────────────────────
+
+/// `memoize \&f` — returns a memoized version: results cached by stringified args.
+fn builtin_memoize(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Err(PerlError::runtime("memoize: requires a function", line));
+    }
+    let f = args[0].clone();
+    if f.as_code_ref().is_none() {
+        return Err(PerlError::runtime(
+            "memoize: argument must be a code reference",
+            line,
+        ));
+    }
+    let cache = PerlValue::hash_ref(Arc::new(RwLock::new(indexmap::IndexMap::new())));
+    let memo_sub = PerlSub {
+        name: "__memoize__".to_string(),
+        params: vec![],
+        body: vec![],
+        closure_env: Some(vec![
+            ("__memoize_fn__".to_string(), f),
+            ("__memoize_cache__".to_string(), cache),
+        ]),
+        prototype: None,
+        fib_like: None,
+    };
+    Ok(PerlValue::code_ref(Arc::new(memo_sub)))
+}
+
+/// `curry \&f, $arity` — auto-curry: `curry(\&add, 2)->(1)->(2)` == `add(1, 2)`.
+/// If arity is omitted, uses the sub's parameter count.
+fn builtin_curry(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Err(PerlError::runtime("curry: requires a function", line));
+    }
+    let f = args[0].clone();
+    let sub = f.as_code_ref().ok_or_else(|| {
+        PerlError::runtime("curry: first argument must be a code reference", line)
+    })?;
+    let arity = if args.len() > 1 {
+        args[1].to_int() as usize
+    } else {
+        sub.params.len().max(2)
+    };
+    let curry_sub = PerlSub {
+        name: "__curry__".to_string(),
+        params: vec![],
+        body: vec![],
+        closure_env: Some(vec![
+            ("__curry_fn__".to_string(), f),
+            (
+                "__curry_arity__".to_string(),
+                PerlValue::integer(arity as i64),
+            ),
+            ("__curry_bound__".to_string(), PerlValue::array(vec![])),
+        ]),
+        prototype: None,
+        fib_like: None,
+    };
+    Ok(PerlValue::code_ref(Arc::new(curry_sub)))
+}
+
+/// `once \&f` — returns a function that calls `f` once and caches the result forever.
+fn builtin_once(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Err(PerlError::runtime("once: requires a function", line));
+    }
+    let f = args[0].clone();
+    if f.as_code_ref().is_none() {
+        return Err(PerlError::runtime(
+            "once: argument must be a code reference",
+            line,
+        ));
+    }
+    let cache = PerlValue::hash_ref(Arc::new(RwLock::new(indexmap::IndexMap::new())));
+    let once_sub = PerlSub {
+        name: "__once__".to_string(),
+        params: vec![],
+        body: vec![],
+        closure_env: Some(vec![
+            ("__once_fn__".to_string(), f),
+            ("__once_cache__".to_string(), cache),
+        ]),
+        prototype: None,
+        fib_like: None,
+    };
+    Ok(PerlValue::code_ref(Arc::new(once_sub)))
+}
+
+/// `deep_clone $ref` / `dclone $ref` — recursive deep copy of nested refs/structures.
+fn builtin_deep_clone(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(args
+        .first()
+        .cloned()
+        .unwrap_or(PerlValue::UNDEF)
+        .deep_clone())
+}
+
+/// `deep_merge \%a, \%b` / `dmerge \%a, \%b` — recursive hash merge.
+/// Nested hashes are merged recursively; non-hash values from `%b` override `%a`.
+fn builtin_deep_merge(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    if args.len() < 2 {
+        return Err(PerlError::runtime(
+            "deep_merge: requires two hash references",
+            line,
+        ));
+    }
+    let a = args[0]
+        .as_hash_ref()
+        .ok_or_else(|| PerlError::runtime("deep_merge: first argument must be a hashref", line))?;
+    let b = args[1]
+        .as_hash_ref()
+        .ok_or_else(|| PerlError::runtime("deep_merge: second argument must be a hashref", line))?;
+    let merged = deep_merge_maps(&a.read(), &b.read());
+    Ok(PerlValue::hash_ref(Arc::new(RwLock::new(merged))))
+}
+
+fn deep_merge_maps(
+    a: &indexmap::IndexMap<String, PerlValue>,
+    b: &indexmap::IndexMap<String, PerlValue>,
+) -> indexmap::IndexMap<String, PerlValue> {
+    let mut result = a.clone();
+    for (k, bv) in b.iter() {
+        let merged_val = if let Some(av) = result.get(k) {
+            if let (Some(ah), Some(bh)) = (av.as_hash_ref(), bv.as_hash_ref()) {
+                let inner = deep_merge_maps(&ah.read(), &bh.read());
+                PerlValue::hash_ref(Arc::new(RwLock::new(inner)))
+            } else {
+                bv.clone()
+            }
+        } else {
+            bv.clone()
+        };
+        result.insert(k.clone(), merged_val);
+    }
+    result
+}
+
+/// `deep_equal $a, $b` / `deq $a, $b` — structural equality of nested structures.
+fn builtin_deep_equal(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let b = args.get(1).cloned().unwrap_or(PerlValue::UNDEF);
+    Ok(PerlValue::integer(if deep_eq(&a, &b) { 1 } else { 0 }))
+}
+
+fn deep_eq(a: &PerlValue, b: &PerlValue) -> bool {
+    // Both undef
+    if a.is_undef() && b.is_undef() {
+        return true;
+    }
+    if a.is_undef() || b.is_undef() {
+        return false;
+    }
+    // Array refs
+    if let (Some(ar), Some(br)) = (a.as_array_ref(), b.as_array_ref()) {
+        let aa = ar.read();
+        let ba = br.read();
+        return aa.len() == ba.len() && aa.iter().zip(ba.iter()).all(|(x, y)| deep_eq(x, y));
+    }
+    // Hash refs
+    if let (Some(ar), Some(br)) = (a.as_hash_ref(), b.as_hash_ref()) {
+        let ah = ar.read();
+        let bh = br.read();
+        if ah.len() != bh.len() {
+            return false;
+        }
+        return ah
+            .iter()
+            .all(|(k, v)| bh.get(k).map_or(false, |bv| deep_eq(v, bv)));
+    }
+    // Plain arrays
+    if let (Some(aa), Some(ba)) = (a.as_array_vec(), b.as_array_vec()) {
+        return aa.len() == ba.len() && aa.iter().zip(ba.iter()).all(|(x, y)| deep_eq(x, y));
+    }
+    // Scalar ref
+    if let (Some(ar), Some(br)) = (a.as_scalar_ref(), b.as_scalar_ref()) {
+        return deep_eq(&ar.read(), &br.read());
+    }
+    // Numeric comparison for numbers, string for everything else
+    if a.is_integer_like() && b.is_integer_like() {
+        return a.to_int() == b.to_int();
+    }
+    if a.is_float_like() && b.is_float_like() {
+        return a.to_number() == b.to_number();
+    }
+    a.to_string() == b.to_string()
+}
+
+/// `tally @list` — count occurrences of each element, returns hashref.
+/// `tally("a", "b", "a", "c", "a")` → `{a => 3, b => 1, c => 1}`.
+fn builtin_tally(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let mut counts: indexmap::IndexMap<String, PerlValue> = indexmap::IndexMap::new();
+    for item in args {
+        let key = item.to_string();
+        let count = counts.get(&key).map(|v| v.to_int()).unwrap_or(0);
+        counts.insert(key, PerlValue::integer(count + 1));
+    }
+    Ok(PerlValue::hash_ref(Arc::new(RwLock::new(counts))))
 }
 
 #[cfg(test)]

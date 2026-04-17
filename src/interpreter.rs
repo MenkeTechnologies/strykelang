@@ -15740,6 +15740,158 @@ impl Interpreter {
         Ok(())
     }
 
+    /// Dispatch higher-order function wrappers (`comp`, `partial`, `constantly`,
+    /// `complement`, `fnil`, `juxt`, `memoize`, `curry`, `once`).
+    /// These are `PerlSub`s with empty bodies and magic keys in `closure_env`.
+    pub(crate) fn try_hof_dispatch(
+        &mut self,
+        sub: &PerlSub,
+        args: &[PerlValue],
+        want: WantarrayCtx,
+        line: usize,
+    ) -> Option<ExecResult> {
+        let env = sub.closure_env.as_ref()?;
+        fn env_get<'a>(env: &'a [(String, PerlValue)], key: &str) -> Option<&'a PerlValue> {
+            env.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+        }
+
+        match sub.name.as_str() {
+            // ── compose: right-to-left function application ──
+            "__comp__" => {
+                let fns = env_get(env, "__comp_fns__")?.to_list();
+                let mut val = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+                for f in fns.iter().rev() {
+                    match self.dispatch_indirect_call(f.clone(), vec![val], want, line) {
+                        Ok(v) => val = v,
+                        Err(e) => return Some(Err(e)),
+                    }
+                }
+                Some(Ok(val))
+            }
+            // ── constantly: always return the captured value ──
+            "__constantly__" => Some(Ok(env_get(env, "__const_val__")?.clone())),
+            // ── juxt: call each fn with same args, collect results ──
+            "__juxt__" => {
+                let fns = env_get(env, "__juxt_fns__")?.to_list();
+                let mut results = Vec::with_capacity(fns.len());
+                for f in &fns {
+                    match self.dispatch_indirect_call(f.clone(), args.to_vec(), want, line) {
+                        Ok(v) => results.push(v),
+                        Err(e) => return Some(Err(e)),
+                    }
+                }
+                Some(Ok(PerlValue::array(results)))
+            }
+            // ── partial: prepend bound args ──
+            "__partial__" => {
+                let fn_val = env_get(env, "__partial_fn__")?.clone();
+                let bound = env_get(env, "__partial_args__")?.to_list();
+                let mut all_args = bound;
+                all_args.extend_from_slice(args);
+                Some(self.dispatch_indirect_call(fn_val, all_args, want, line))
+            }
+            // ── complement: negate the result ──
+            "__complement__" => {
+                let fn_val = env_get(env, "__complement_fn__")?.clone();
+                match self.dispatch_indirect_call(fn_val, args.to_vec(), want, line) {
+                    Ok(v) => Some(Ok(PerlValue::integer(if v.is_true() { 0 } else { 1 }))),
+                    Err(e) => Some(Err(e)),
+                }
+            }
+            // ── fnil: replace undef args with defaults ──
+            "__fnil__" => {
+                let fn_val = env_get(env, "__fnil_fn__")?.clone();
+                let defaults = env_get(env, "__fnil_defaults__")?.to_list();
+                let mut patched = args.to_vec();
+                for (i, d) in defaults.iter().enumerate() {
+                    if i < patched.len() {
+                        if patched[i].is_undef() {
+                            patched[i] = d.clone();
+                        }
+                    } else {
+                        patched.push(d.clone());
+                    }
+                }
+                Some(self.dispatch_indirect_call(fn_val, patched, want, line))
+            }
+            // ── memoize: cache by stringified args ──
+            "__memoize__" => {
+                let fn_val = env_get(env, "__memoize_fn__")?.clone();
+                let cache_ref = env_get(env, "__memoize_cache__")?.clone();
+                let key = args
+                    .iter()
+                    .map(|a| a.to_string())
+                    .collect::<Vec<_>>()
+                    .join("\x00");
+                if let Some(href) = cache_ref.as_hash_ref() {
+                    if let Some(cached) = href.read().get(&key) {
+                        return Some(Ok(cached.clone()));
+                    }
+                }
+                match self.dispatch_indirect_call(fn_val, args.to_vec(), want, line) {
+                    Ok(v) => {
+                        if let Some(href) = cache_ref.as_hash_ref() {
+                            href.write().insert(key, v.clone());
+                        }
+                        Some(Ok(v))
+                    }
+                    Err(e) => Some(Err(e)),
+                }
+            }
+            // ── curry: accumulate args until arity reached ──
+            "__curry__" => {
+                let fn_val = env_get(env, "__curry_fn__")?.clone();
+                let arity = env_get(env, "__curry_arity__")?.to_int() as usize;
+                let bound = env_get(env, "__curry_bound__")?.to_list();
+                let mut all = bound;
+                all.extend_from_slice(args);
+                if all.len() >= arity {
+                    Some(self.dispatch_indirect_call(fn_val, all, want, line))
+                } else {
+                    let curry_sub = PerlSub {
+                        name: "__curry__".to_string(),
+                        params: vec![],
+                        body: vec![],
+                        closure_env: Some(vec![
+                            ("__curry_fn__".to_string(), fn_val),
+                            (
+                                "__curry_arity__".to_string(),
+                                PerlValue::integer(arity as i64),
+                            ),
+                            ("__curry_bound__".to_string(), PerlValue::array(all)),
+                        ]),
+                        prototype: None,
+                        fib_like: None,
+                    };
+                    Some(Ok(PerlValue::code_ref(Arc::new(curry_sub))))
+                }
+            }
+            // ── once: call once, cache forever ──
+            "__once__" => {
+                let cache_ref = env_get(env, "__once_cache__")?.clone();
+                if let Some(href) = cache_ref.as_hash_ref() {
+                    let r = href.read();
+                    if r.contains_key("done") {
+                        return Some(Ok(r.get("val").cloned().unwrap_or(PerlValue::UNDEF)));
+                    }
+                }
+                let fn_val = env_get(env, "__once_fn__")?.clone();
+                match self.dispatch_indirect_call(fn_val, args.to_vec(), want, line) {
+                    Ok(v) => {
+                        if let Some(href) = cache_ref.as_hash_ref() {
+                            let mut w = href.write();
+                            w.insert("done".to_string(), PerlValue::integer(1));
+                            w.insert("val".to_string(), v.clone());
+                        }
+                        Some(Ok(v))
+                    }
+                    Err(e) => Some(Err(e)),
+                }
+            }
+            _ => None,
+        }
+    }
+
     pub(crate) fn call_sub(
         &mut self,
         sub: &PerlSub,
@@ -15767,6 +15919,16 @@ impl Interpreter {
         let saved = self.wantarray_kind;
         self.wantarray_kind = want;
         if let Some(r) = crate::list_util::native_dispatch(self, sub, &argv, want) {
+            self.wantarray_kind = saved;
+            self.scope_pop_hook();
+            self.current_sub_stack.pop();
+            return match r {
+                Ok(v) => Ok(v),
+                Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
+                Err(e) => Err(e),
+            };
+        }
+        if let Some(r) = self.try_hof_dispatch(sub, &argv, want, _line) {
             self.wantarray_kind = saved;
             self.scope_pop_hook();
             self.current_sub_stack.pop();

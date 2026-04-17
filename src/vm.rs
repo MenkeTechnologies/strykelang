@@ -5639,6 +5639,17 @@ impl<'a> VM<'a> {
                         let r = self.pop();
                         let args = args_val.to_list();
                         if let Some(sub) = r.as_code_ref() {
+                            // Higher-order function wrappers (comp, partial, memoize, etc.)
+                            // have empty bodies + magic closure_env keys. Dispatch them via
+                            // the interpreter's try_hof_dispatch before falling through to
+                            // the normal body execution path.
+                            if let Some(hof_result) =
+                                self.interp.try_hof_dispatch(&sub, &args, want, self.line())
+                            {
+                                let v = vm_interp_result(hof_result, self.line())?;
+                                self.push(v);
+                                return Ok(());
+                            }
                             self.interp.current_sub_stack.push(sub.clone());
                             let saved_wa = self.interp.wantarray_kind;
                             self.interp.wantarray_kind = want;
@@ -5687,6 +5698,16 @@ impl<'a> VM<'a> {
                             args
                         };
                         let target = self.pop();
+                        // HOF wrapper fast path (comp, partial, memoize, etc.)
+                        if let Some(sub) = target.as_code_ref() {
+                            if let Some(hof_result) =
+                                self.interp.try_hof_dispatch(&sub, &arg_vals, want, line)
+                            {
+                                let v = vm_interp_result(hof_result, line)?;
+                                self.push(v);
+                                return Ok(());
+                            }
+                        }
                         let r = self
                             .interp
                             .dispatch_indirect_call(target, arg_vals, want, line);
