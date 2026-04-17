@@ -6,7 +6,7 @@ use std::process::Command;
 fn pe_profile_stderr_has_vm_report_sections() {
     let exe = env!("CARGO_BIN_EXE_pe");
     let out = Command::new(exe)
-        .args(["--profile", "-e", "sub f { 1 } f();"])
+        .args(["--profile", "-e", "sub foo { 1 } foo();"])
         .output()
         .expect("spawn pe");
 

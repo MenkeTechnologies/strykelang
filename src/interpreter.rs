@@ -2066,12 +2066,19 @@ impl Interpreter {
         if !self.scope.can_pop_frame() {
             return;
         }
-        // Execute deferred blocks in LIFO order before popping the frame
+        // Execute deferred blocks in LIFO order before popping the frame.
+        // Important: defer blocks run in the CURRENT scope (not a new frame),
+        // so they can modify variables in the enclosing scope.
         let defers = self.scope.take_defers();
         for coderef in defers {
             if let Some(sub) = coderef.as_code_ref() {
-                // Defers run in void context, errors are silently ignored
-                let _ = self.call_sub(&sub, vec![], WantarrayCtx::Void, 0);
+                // Execute the defer block body directly in the current scope,
+                // without creating a new frame or restoring closure captures.
+                // This allows defer { $x = 100 } to modify the outer $x.
+                let saved_wa = self.wantarray_kind;
+                self.wantarray_kind = WantarrayCtx::Void;
+                let _ = self.exec_block_no_scope(&sub.body);
+                self.wantarray_kind = saved_wa;
             }
         }
         // Save state variable values back before popping the frame

@@ -320,10 +320,10 @@ impl Scope {
         matches!(name, "-" | "+" | "^CAPTURE" | "^CAPTURE_ALL")
     }
 
-    /// `%ENV`, `%INC`, and regex named-capture hash `"+"` — same outer-frame issue as internal arrays.
+    /// `%ENV`, `%INC`, and regex named-capture hashes `"+"` / `"-"` — same outer-frame issue as internal arrays.
     #[inline]
     fn parallel_allowed_internal_hash(name: &str) -> bool {
-        matches!(name, "+" | "ENV" | "INC")
+        matches!(name, "+" | "-" | "ENV" | "INC")
     }
 
     fn check_parallel_scalar_write(&self, name: &str) -> Result<(), PerlError> {

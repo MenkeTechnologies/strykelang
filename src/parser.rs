@@ -1984,11 +1984,11 @@ impl Parser {
                     line,
                 })
             }
-            "grep" | "greps" | "filter" | "find_all" | "gr" => {
+            "grep" | "greps" | "filter" | "f" | "find_all" | "gr" => {
                 let keyword = match name {
                     "grep" | "gr" => crate::ast::GrepBuiltinKeyword::Grep,
                     "greps" => crate::ast::GrepBuiltinKeyword::Greps,
-                    "filter" => crate::ast::GrepBuiltinKeyword::Filter,
+                    "filter" | "f" => crate::ast::GrepBuiltinKeyword::Filter,
                     "find_all" => crate::ast::GrepBuiltinKeyword::FindAll,
                     _ => unreachable!(),
                 };
@@ -7275,11 +7275,11 @@ impl Parser {
                 }
                 self.parse_algebraic_match_expr(line)
             }
-            "grep" | "greps" | "filter" | "find_all" => {
+            "grep" | "greps" | "filter" | "f" | "find_all" => {
                 let keyword = match name.as_str() {
                     "grep" => crate::ast::GrepBuiltinKeyword::Grep,
                     "greps" => crate::ast::GrepBuiltinKeyword::Greps,
-                    "filter" => crate::ast::GrepBuiltinKeyword::Filter,
+                    "filter" | "f" => crate::ast::GrepBuiltinKeyword::Filter,
                     "find_all" => crate::ast::GrepBuiltinKeyword::FindAll,
                     _ => unreachable!(),
                 };
@@ -8946,7 +8946,7 @@ impl Parser {
                     line,
                 })
             }
-            "filesf" | "f" => {
+            "filesf" => {
                 let args = self.parse_builtin_args()?;
                 Ok(Expr {
                     kind: ExprKind::Filesf(args),
@@ -9735,7 +9735,7 @@ impl Parser {
             | "par_find_files" | "par_line_count" | "pwatch" | "par_pipeline_stream"
             | "glob_par" | "ppool" | "barrier" | "pipeline" | "cluster"
             // ── functional / iterator ───────────────────────────────────────
-            | "fore" | "e" | "flat_map" | "flat_maps" | "maps" | "filter" | "find_all" | "reduce" | "fold"
+            | "fore" | "e" | "flat_map" | "flat_maps" | "maps" | "filter" | "f" | "find_all" | "reduce" | "fold"
             | "inject" | "collect" | "uniq" | "distinct" | "any" | "all" | "none"
             | "first" | "detect" | "find" | "compact" | "concat" | "chain" | "reject" | "flatten" | "set"
             | "min_by" | "max_by" | "sort_by" | "tally" | "find_index"
@@ -9757,7 +9757,7 @@ impl Parser {
             | "dedup" | "nth" | "tail" | "take" | "drop" | "tee" | "range"
             | "inc" | "dec" | "elapsed"
             // ── filesystem extensions ───────────────────────────────────────
-            | "files" | "filesf" | "f" | "fr" | "dirs" | "d" | "dr" | "sym_links"
+            | "files" | "filesf" | "fr" | "dirs" | "d" | "dr" | "sym_links"
             | "sockets" | "pipes" | "block_devices" | "char_devices"
             | "basename" | "dirname" | "fileparse" | "realpath" | "canonpath"
             | "copy" | "move" | "spurt" | "read_bytes" | "which"
@@ -10207,6 +10207,74 @@ impl Parser {
             | "stack_new" | "queue_new" | "lru_new"
             | "counter" | "counter_most_common" | "defaultdict" | "ordered_set"
             | "bitset_new" | "bitset_set" | "bitset_test" | "bitset_clear"
+            // ── trivial numeric helpers (batch 4) ─────────────────────────────
+            | "abs_ceil" | "abs_each" | "abs_floor" | "ceil_each" | "dec_each"
+            | "double_each" | "floor_each" | "half_each" | "inc_each" | "length_each"
+            | "negate_each" | "not_each" | "offset_each" | "reverse_each" | "round_each"
+            | "scale_each" | "sqrt_each" | "square_each" | "to_float_each" | "to_int_each"
+            | "trim_each" | "type_each" | "upcase_each" | "downcase_each" | "bool_each"
+            // ── math / physics constants ──────────────────────────────────────
+            | "avogadro" | "boltzmann" | "golden_ratio" | "gravity" | "ln10" | "ln2"
+            | "planck" | "speed_of_light" | "sqrt2"
+            // ── physics formulas ──────────────────────────────────────────────
+            | "bmi_calc" | "compound_interest" | "dew_point" | "discount_amount"
+            | "force_mass_acc" | "freq_wavelength" | "future_value" | "haversine"
+            | "heat_index" | "kinetic_energy" | "margin_price" | "markup_price"
+            | "mortgage_payment" | "ohms_law_i" | "ohms_law_r" | "ohms_law_v"
+            | "potential_energy" | "present_value" | "simple_interest" | "speed_distance_time"
+            | "tax_amount" | "tip_amount" | "wavelength_freq" | "wind_chill"
+            // ── math functions ────────────────────────────────────────────────
+            | "angle_between_deg" | "approx_eq" | "chebyshev_distance" | "copysign"
+            | "cosine_similarity" | "cube_root" | "entropy" | "float_bits" | "fma"
+            | "int_bits" | "jaccard_similarity" | "log_base" | "mae" | "mse" | "nth_root"
+            | "r_squared" | "reciprocal" | "relu" | "rmse" | "rotate_point" | "round_to"
+            | "sigmoid" | "signum" | "square_root"
+            // ── sequences ─────────────────────────────────────────────────────
+            | "cubes_seq" | "fibonacci_seq" | "powers_of_seq" | "primes_seq"
+            | "squares_seq" | "triangular_seq"
+            // ── string helpers (batch 4) ──────────────────────────────────────
+            | "alternate_case" | "angle_bracket" | "bracket" | "byte_length"
+            | "bytes_to_hex_str" | "camel_words" | "char_length" | "chars_to_string"
+            | "chomp_str" | "chop_str" | "filter_chars" | "from_csv_line" | "hex_to_bytes"
+            | "insert_str" | "intersperse_char" | "ljust" | "map_chars" | "mirror_string"
+            | "normalize_whitespace" | "only_alnum" | "only_alpha" | "only_ascii"
+            | "only_digits" | "parenthesize" | "remove_str" | "repeat_string" | "rjust"
+            | "sentence_case" | "string_count" | "string_sort" | "string_to_chars"
+            | "string_unique_chars" | "substring" | "to_csv_line" | "trim_left" | "trim_right"
+            | "xor_strings"
+            // ── list helpers (batch 4) ─────────────────────────────────────────
+            | "adjacent_difference" | "append_elem" | "consecutive_pairs" | "contains_elem"
+            | "count_elem" | "drop_every" | "duplicate_count" | "elem_at" | "find_first"
+            | "first_elem" | "flatten_once" | "fold_left" | "from_digits" | "from_pairs"
+            | "group_by_size" | "hash_filter_keys" | "hash_from_list" | "hash_map_values"
+            | "hash_merge_deep" | "hash_to_list" | "hash_zip" | "head_n" | "histogram_bins"
+            | "index_of_elem" | "init_list" | "interleave_lists" | "last_elem" | "least_common"
+            | "list_compact" | "list_eq" | "list_flatten_deep" | "max_list" | "mean_list"
+            | "min_list" | "mode_list" | "most_common" | "partition_two" | "prefix_sums"
+            | "prepend" | "product_list" | "remove_at" | "remove_elem" | "remove_first_elem"
+            | "repeat_elem" | "running_max" | "running_min" | "sample_one" | "scan_left"
+            | "second_elem" | "span" | "suffix_sums" | "sum_list" | "tail_n" | "take_every"
+            | "third_elem" | "to_array" | "to_pairs" | "trimmed_mean" | "unique_count_of"
+            | "wrap_index" | "digits_of"
+            // ── predicates (batch 4) ──────────────────────────────────────────
+            | "all_match" | "any_match" | "is_between" | "is_blank_or_nil" | "is_divisible_by"
+            | "is_email" | "is_even" | "is_falsy" | "is_fibonacci" | "is_hex_color"
+            | "is_in_range" | "is_ipv4" | "is_multiple_of" | "is_negative" | "is_nil"
+            | "is_nonzero" | "is_odd" | "is_perfect_square" | "is_positive" | "is_power_of"
+            | "is_prefix" | "is_present" | "is_strictly_decreasing" | "is_strictly_increasing"
+            | "is_suffix" | "is_triangular" | "is_truthy" | "is_url" | "is_whole" | "is_zero"
+            // ── counters (batch 4) ────────────────────────────────────────────
+            | "count_digits" | "count_letters" | "count_lower" | "count_match"
+            | "count_punctuation" | "count_spaces" | "count_upper" | "defined_count"
+            | "empty_count" | "falsy_count" | "nonempty_count" | "numeric_count"
+            | "truthy_count" | "undef_count"
+            // ── conversion / utility (batch 4) ────────────────────────────────
+            | "assert_type" | "between" | "clamp_each" | "die_if" | "die_unless"
+            | "join_colons" | "join_commas" | "join_dashes" | "join_dots" | "join_lines"
+            | "join_pipes" | "join_slashes" | "join_spaces" | "join_tabs" | "measure"
+            | "max_float" | "min_float" | "noop_val" | "nop" | "pass" | "pred" | "succ"
+            | "tap_debug" | "to_bool" | "to_float" | "to_int" | "to_string" | "void"
+            | "range_exclusive" | "range_inclusive"
             => Some(name),
             _ => None,
         }
