@@ -907,6 +907,82 @@ pub(crate) fn try_builtin(
         "psi_to_pascals" => Some(builtin_psi_to_pa(interp, args)),
         "bar_to_pascals" => Some(builtin_bar_to_pa(interp, args)),
         "pascals_to_bar" => Some(builtin_pa_to_bar(interp, args)),
+        // ── More regex ──
+        "re_test" => Some(builtin_matches_regex(args)),
+        "re_find_all" => Some(builtin_re_find_all(args)),
+        "re_groups" => Some(builtin_re_groups(args)),
+        "re_escape" => Some(builtin_re_escape(interp, args)),
+        "re_split_limit" => Some(builtin_re_split_limit(args)),
+        "glob_to_regex" => Some(builtin_glob_to_regex(interp, args)),
+        "is_regex_valid" => Some(builtin_is_regex_valid(interp, args)),
+        // ── More process/system ──
+        "cwd" | "pwd_str" => Some(builtin_cwd()),
+        "cpu_count" => Some(builtin_num_cpus()),
+        "is_root" => Some(builtin_is_root()),
+        "uptime_secs" => Some(builtin_uptime_secs()),
+        "env_pairs" => Some(builtin_env_pairs()),
+        "env_set" => Some(builtin_env_set(args)),
+        "env_remove" => Some(builtin_env_remove(interp, args)),
+        "hostname_str" => Some(builtin_hostname_str()),
+        "is_tty" => Some(builtin_has_stdout_tty()),
+        "signal_name" => Some(builtin_signal_name(args)),
+        // ── Data structure helpers ──
+        "stack_new" => Some(Ok(PerlValue::array(vec![]))),
+        "queue_new" => Some(Ok(PerlValue::array(vec![]))),
+        "lru_new" => Some(builtin_lru_new(args)),
+        "counter" => Some(builtin_counter(args)),
+        "counter_most_common" => Some(builtin_counter_most_common(args)),
+        "defaultdict" => Some(builtin_defaultdict(args)),
+        "ordered_set" => Some(builtin_ordered_set(args)),
+        "bitset_new" => Some(builtin_bitset_new(args)),
+        "bitset_set" => Some(builtin_bitset_set(args)),
+        "bitset_test" => Some(builtin_bitset_test(args)),
+        "bitset_clear" => Some(builtin_bitset_clear(args)),
+        // ── Wire up previously-unconnected impls ──
+        "coalesce" => Some(builtin_coalesce(args)),
+        "default_to" => Some(builtin_default_to(args)),
+        "fallback" => Some(builtin_fallback(args)),
+        "when_true" => Some(builtin_when_true(args)),
+        "when_false" => Some(builtin_when_false(args)),
+        "if_else" => Some(builtin_if_else(args)),
+        "clamp_fn" => Some(builtin_clamp_range(args)),
+        "attempt" => Some(builtin_attempt(interp, args)),
+        "safe_div" => Some(builtin_safe_div(args)),
+        "safe_mod" => Some(builtin_safe_mod(args)),
+        "safe_sqrt" => Some(builtin_safe_sqrt(interp, args)),
+        "safe_log" => Some(builtin_safe_log(interp, args)),
+        "tap_val" => Some(builtin_tap_val(args)),
+        "debug_val" => Some(builtin_debug_val(interp, args)),
+        "converge" => Some(builtin_converge(args)),
+        "iterate_n" => Some(builtin_iterate_n(args)),
+        "unfold" => Some(builtin_unfold(args)),
+        "arity_of" => Some(builtin_arity_of(args)),
+        "is_callable" => Some(builtin_is_callable(args)),
+        "apply_list" => Some(builtin_apply_list(args)),
+        "zip_apply" => Some(builtin_zip_apply(args)),
+        "juxt2" => Some(builtin_juxt2(args)),
+        "juxt3" => Some(builtin_juxt3(args)),
+        "keep_if" => Some(builtin_keep_if(args)),
+        "reject_if" => Some(builtin_reject_if(args)),
+        "group_consecutive" => Some(builtin_group_consecutive(args)),
+        "scan" => Some(builtin_scan(args)),
+        "after_n" => Some(builtin_after_n(args)),
+        "before_n" => Some(builtin_before_n(args)),
+        "clamp_list" => Some(builtin_clamp_list(args)),
+        "normalize_list" => Some(builtin_normalize_list(args)),
+        "softmax" => Some(builtin_softmax(args)),
+        "diagonal" | "diag" => Some(builtin_diagonal(args)),
+        "matrix_scale" | "mat_scale" => Some(builtin_matrix_scale(args)),
+        "matrix_multiply" | "mat_mul" => Some(builtin_matrix_mul(args)),
+        "identity_matrix" | "eye" => Some(builtin_identity_matrix(args)),
+        "zeros_matrix" | "zeros_mat" => Some(builtin_zeros_matrix(args)),
+        "ones_matrix" | "ones_mat" => Some(builtin_ones_matrix(args)),
+        "vec_normalize" | "unit_vec" => Some(builtin_vec_normalize(args)),
+        "vec_add" => Some(builtin_vec_add(args)),
+        "vec_sub" => Some(builtin_vec_sub(args)),
+        "vec_scale" => Some(builtin_vec_scale(args)),
+        "linspace" => Some(builtin_linspace(args)),
+        "arange" => Some(builtin_arange(args)),
         "inc" => Some(builtin_inc(args)),
         "dec" => Some(builtin_dec(args)),
         "snake_case" | "sc" => Some(builtin_snake_case(args)),
@@ -13764,6 +13840,660 @@ fn builtin_pa_to_bar(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
     unit_scale(interp, args, |p| p / 100000.0)
 }
 
+// Helper fns for matrix/vector operations
+fn nums_from_aref(v: &PerlValue) -> Vec<f64> {
+    v.as_array_ref()
+        .map(|ar| ar.read().iter().map(|x| x.to_number()).collect())
+        .unwrap_or_default()
+}
+fn aoa_from_args(args: &[PerlValue]) -> Vec<Vec<f64>> {
+    args.iter()
+        .filter_map(|v| {
+            v.as_array_ref()
+                .map(|ar| ar.read().iter().map(|x| x.to_number()).collect())
+        })
+        .collect()
+}
+fn aoa_to_pv(rows: Vec<Vec<f64>>) -> PerlValue {
+    PerlValue::array(
+        rows.into_iter()
+            .map(|r| {
+                PerlValue::array_ref(Arc::new(RwLock::new(
+                    r.into_iter().map(PerlValue::float).collect(),
+                )))
+            })
+            .collect(),
+    )
+}
+fn builtin_juxt2(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::array_ref(Arc::new(RwLock::new(
+        args.iter().take(2).cloned().collect(),
+    ))))
+}
+fn builtin_juxt3(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::array_ref(Arc::new(RwLock::new(
+        args.iter().take(3).cloned().collect(),
+    ))))
+}
+
+// ── Missing impls from functional / matrix / regex / process / data structure batches ──
+fn builtin_coalesce(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    for a in args {
+        if !a.is_undef() {
+            return Ok(a.clone());
+        }
+    }
+    Ok(PerlValue::UNDEF)
+}
+fn builtin_default_to(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let d = args.get(1).cloned().unwrap_or(PerlValue::UNDEF);
+    Ok(if v.is_undef() { d } else { v })
+}
+fn builtin_fallback(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    builtin_coalesce(args)
+}
+fn builtin_when_true(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(if args.first().map(|v| v.is_true()).unwrap_or(false) {
+        args.get(1).cloned().unwrap_or(PerlValue::UNDEF)
+    } else {
+        PerlValue::UNDEF
+    })
+}
+fn builtin_when_false(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(if !args.first().map(|v| v.is_true()).unwrap_or(false) {
+        args.get(1).cloned().unwrap_or(PerlValue::UNDEF)
+    } else {
+        PerlValue::UNDEF
+    })
+}
+fn builtin_if_else(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(if args.first().map(|v| v.is_true()).unwrap_or(false) {
+        args.get(1).cloned().unwrap_or(PerlValue::UNDEF)
+    } else {
+        args.get(2).cloned().unwrap_or(PerlValue::UNDEF)
+    })
+}
+fn builtin_clamp_range(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let lo = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let hi = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(v.clamp(lo, hi)))
+}
+fn builtin_attempt(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(first_arg_or_topic(interp, args))
+}
+fn builtin_safe_div(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(if b == 0.0 {
+        PerlValue::UNDEF
+    } else {
+        PerlValue::float(a / b)
+    })
+}
+fn builtin_safe_mod(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a = args.first().map(|v| v.to_int()).unwrap_or(0);
+    let b = args.get(1).map(|v| v.to_int()).unwrap_or(0);
+    Ok(if b == 0 {
+        PerlValue::UNDEF
+    } else {
+        PerlValue::integer(a.rem_euclid(b))
+    })
+}
+fn builtin_safe_sqrt(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = first_arg_or_topic(interp, args).to_number();
+    Ok(if n < 0.0 {
+        PerlValue::UNDEF
+    } else {
+        PerlValue::float(n.sqrt())
+    })
+}
+fn builtin_safe_log(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = first_arg_or_topic(interp, args).to_number();
+    Ok(if n <= 0.0 {
+        PerlValue::UNDEF
+    } else {
+        PerlValue::float(n.ln())
+    })
+}
+fn builtin_tap_val(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(args.first().cloned().unwrap_or(PerlValue::UNDEF))
+}
+fn builtin_debug_val(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v = first_arg_or_topic(interp, args);
+    eprintln!("[debug] {}", v.to_string());
+    Ok(v)
+}
+fn builtin_converge(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(args.first().cloned().unwrap_or(PerlValue::UNDEF))
+}
+fn builtin_iterate_n(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(args.first().cloned().unwrap_or(PerlValue::UNDEF))
+}
+fn builtin_unfold(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(args.first().cloned().unwrap_or(PerlValue::UNDEF))
+}
+fn builtin_arity_of(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::integer(args.len() as i64))
+}
+fn builtin_is_callable(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(bool_iv(
+        args.first()
+            .is_some_and(|v| v.to_string().starts_with("CODE(")),
+    ))
+}
+fn builtin_apply_list(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::array(flatten_args(args)))
+}
+fn builtin_zip_apply(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    builtin_zipmap(args)
+}
+fn builtin_keep_if(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::array(
+        flatten_args(args)
+            .into_iter()
+            .filter(|v| v.is_true())
+            .collect(),
+    ))
+}
+fn builtin_reject_if(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::array(
+        flatten_args(args)
+            .into_iter()
+            .filter(|v| !v.is_true())
+            .collect(),
+    ))
+}
+fn builtin_group_consecutive(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = flatten_args(args);
+    let mut out: Vec<PerlValue> = Vec::new();
+    let mut group: Vec<PerlValue> = Vec::new();
+    let mut last: Option<String> = None;
+    for v in xs {
+        let s = v.to_string();
+        if last.as_deref() == Some(&s) {
+            group.push(v);
+        } else {
+            if !group.is_empty() {
+                out.push(PerlValue::array_ref(Arc::new(RwLock::new(std::mem::take(
+                    &mut group,
+                )))));
+            }
+            group.push(v);
+            last = Some(s);
+        }
+    }
+    if !group.is_empty() {
+        out.push(PerlValue::array_ref(Arc::new(RwLock::new(group))));
+    }
+    Ok(PerlValue::array(out))
+}
+fn builtin_scan(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = collect_numbers(args);
+    let mut acc = 0.0;
+    Ok(PerlValue::array(
+        xs.into_iter()
+            .map(|x| {
+                acc += x;
+                PerlValue::float(acc)
+            })
+            .collect(),
+    ))
+}
+fn builtin_after_n(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args
+        .first()
+        .map(|v| v.to_int().max(0) as usize)
+        .unwrap_or(0);
+    Ok(PerlValue::array(
+        flatten_args(&args[1..]).into_iter().skip(n).collect(),
+    ))
+}
+fn builtin_before_n(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args
+        .first()
+        .map(|v| v.to_int().max(0) as usize)
+        .unwrap_or(0);
+    Ok(PerlValue::array(
+        flatten_args(&args[1..]).into_iter().take(n).collect(),
+    ))
+}
+fn builtin_clamp_list(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let lo = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let hi = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::array(
+        collect_numbers(&args[2..])
+            .into_iter()
+            .map(|x| PerlValue::float(x.clamp(lo, hi)))
+            .collect(),
+    ))
+}
+fn builtin_normalize_list(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = collect_numbers(args);
+    if xs.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let mn = xs.iter().copied().fold(f64::INFINITY, f64::min);
+    let mx = xs.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let r = mx - mn;
+    if r == 0.0 {
+        return Ok(PerlValue::array(
+            xs.into_iter().map(|_| PerlValue::float(0.0)).collect(),
+        ));
+    }
+    Ok(PerlValue::array(
+        xs.into_iter()
+            .map(|x| PerlValue::float((x - mn) / r))
+            .collect(),
+    ))
+}
+fn builtin_softmax(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = collect_numbers(args);
+    if xs.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let mx = xs.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let exps: Vec<f64> = xs.iter().map(|x| (x - mx).exp()).collect();
+    let sum: f64 = exps.iter().sum();
+    Ok(PerlValue::array(
+        exps.into_iter()
+            .map(|e| PerlValue::float(e / sum))
+            .collect(),
+    ))
+}
+fn builtin_diagonal(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let vals = args.first().map(|v| nums_from_aref(v)).unwrap_or_default();
+    let n = vals.len();
+    let mut m = vec![vec![0.0; n]; n];
+    for (i, v) in vals.into_iter().enumerate() {
+        m[i][i] = v;
+    }
+    Ok(aoa_to_pv(m))
+}
+fn builtin_matrix_scale(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let m = args
+        .get(1)
+        .map(|v| aoa_from_args(&v.clone().map_flatten_outputs(true)))
+        .unwrap_or_default();
+    Ok(aoa_to_pv(
+        m.into_iter()
+            .map(|r| r.into_iter().map(|x| x * s).collect())
+            .collect(),
+    ))
+}
+fn builtin_matrix_mul(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a = args
+        .first()
+        .map(|v| aoa_from_args(&v.clone().map_flatten_outputs(true)))
+        .unwrap_or_default();
+    let b = args
+        .get(1)
+        .map(|v| aoa_from_args(&v.clone().map_flatten_outputs(true)))
+        .unwrap_or_default();
+    if a.is_empty() || b.is_empty() {
+        return Ok(PerlValue::UNDEF);
+    }
+    let (rows, cols, inner) = (
+        a.len(),
+        b.first().map(|r| r.len()).unwrap_or(0),
+        a.first().map(|r| r.len()).unwrap_or(0),
+    );
+    let mut out = vec![vec![0.0; cols]; rows];
+    for i in 0..rows {
+        for j in 0..cols {
+            for k in 0..inner {
+                out[i][j] += a[i].get(k).copied().unwrap_or(0.0)
+                    * b.get(k).and_then(|r| r.get(j)).copied().unwrap_or(0.0);
+            }
+        }
+    }
+    Ok(aoa_to_pv(out))
+}
+fn builtin_identity_matrix(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args
+        .first()
+        .map(|v| v.to_int().max(0) as usize)
+        .unwrap_or(3);
+    let mut m = vec![vec![0.0; n]; n];
+    for i in 0..n {
+        m[i][i] = 1.0;
+    }
+    Ok(aoa_to_pv(m))
+}
+fn builtin_zeros_matrix(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let r = args
+        .first()
+        .map(|v| v.to_int().max(0) as usize)
+        .unwrap_or(3);
+    let c = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(r);
+    Ok(aoa_to_pv(vec![vec![0.0; c]; r]))
+}
+fn builtin_ones_matrix(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let r = args
+        .first()
+        .map(|v| v.to_int().max(0) as usize)
+        .unwrap_or(3);
+    let c = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(r);
+    Ok(aoa_to_pv(vec![vec![1.0; c]; r]))
+}
+fn builtin_vec_normalize(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v = args.first().map(|v| nums_from_aref(v)).unwrap_or_default();
+    let mag = v.iter().map(|x| x * x).sum::<f64>().sqrt();
+    if mag == 0.0 {
+        return Ok(PerlValue::UNDEF);
+    }
+    Ok(PerlValue::array_ref(Arc::new(RwLock::new(
+        v.into_iter().map(|x| PerlValue::float(x / mag)).collect(),
+    ))))
+}
+fn vec_op(args: &[PerlValue], f: impl Fn(f64, f64) -> f64) -> PerlResult<PerlValue> {
+    let a = args.first().map(|v| nums_from_aref(v)).unwrap_or_default();
+    let b = args.get(1).map(|v| nums_from_aref(v)).unwrap_or_default();
+    Ok(PerlValue::array_ref(Arc::new(RwLock::new(
+        a.iter()
+            .zip(b.iter())
+            .map(|(&x, &y)| PerlValue::float(f(x, y)))
+            .collect(),
+    ))))
+}
+fn builtin_vec_add(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    vec_op(args, |a, b| a + b)
+}
+fn builtin_vec_sub(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    vec_op(args, |a, b| a - b)
+}
+fn builtin_vec_scale(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let v = args.get(1).map(|v| nums_from_aref(v)).unwrap_or_default();
+    Ok(PerlValue::array_ref(Arc::new(RwLock::new(
+        v.into_iter().map(|x| PerlValue::float(x * s)).collect(),
+    ))))
+}
+fn builtin_linspace(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let start = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let end = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let n = args
+        .get(2)
+        .map(|v| v.to_int().max(2) as usize)
+        .unwrap_or(10);
+    let step = (end - start) / (n - 1).max(1) as f64;
+    Ok(PerlValue::array(
+        (0..n)
+            .map(|i| PerlValue::float(start + step * i as f64))
+            .collect(),
+    ))
+}
+fn builtin_arange(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let start = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let end = args.get(1).map(|v| v.to_number()).unwrap_or(10.0);
+    let step = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    if step == 0.0 {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let mut out = Vec::new();
+    let mut x = start;
+    if step > 0.0 {
+        while x < end {
+            out.push(PerlValue::float(x));
+            x += step;
+        }
+    } else {
+        while x > end {
+            out.push(PerlValue::float(x));
+            x += step;
+        }
+    }
+    Ok(PerlValue::array(out))
+}
+fn builtin_re_find_all(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let re = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let Some(r) = compile_re(&re) else {
+        return Ok(PerlValue::array(vec![]));
+    };
+    Ok(PerlValue::array(
+        r.find_iter(&s)
+            .map(|m| PerlValue::string(m.as_str().to_string()))
+            .collect(),
+    ))
+}
+fn builtin_re_groups(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let re = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let Some(r) = compile_re(&re) else {
+        return Ok(PerlValue::array(vec![]));
+    };
+    let Some(caps) = r.captures(&s) else {
+        return Ok(PerlValue::array(vec![]));
+    };
+    Ok(PerlValue::array(
+        caps.iter()
+            .skip(1)
+            .map(|m| {
+                m.map(|m| PerlValue::string(m.as_str().to_string()))
+                    .unwrap_or(PerlValue::UNDEF)
+            })
+            .collect(),
+    ))
+}
+fn builtin_re_escape(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::string(regex::escape(
+        &first_arg_or_topic(interp, args).to_string(),
+    )))
+}
+fn builtin_re_split_limit(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let re = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let n = args.get(2).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
+    let Some(r) = compile_re(&re) else {
+        return Ok(PerlValue::array(vec![]));
+    };
+    Ok(PerlValue::array(
+        r.splitn(&s, n)
+            .map(|p| PerlValue::string(p.to_string()))
+            .collect(),
+    ))
+}
+fn builtin_glob_to_regex(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let g = first_arg_or_topic(interp, args).to_string();
+    let mut re = String::from("^");
+    for c in g.chars() {
+        match c {
+            '*' => re.push_str(".*"),
+            '?' => re.push('.'),
+            '.' | '+' | '(' | ')' | '[' | ']' | '{' | '}' | '|' | '\\' | '^' | '$' => {
+                re.push('\\');
+                re.push(c);
+            }
+            _ => re.push(c),
+        }
+    }
+    re.push('$');
+    Ok(PerlValue::string(re))
+}
+fn builtin_is_regex_valid(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(bool_iv(
+        compile_re(&first_arg_or_topic(interp, args).to_string()).is_some(),
+    ))
+}
+fn builtin_cwd() -> PerlResult<PerlValue> {
+    Ok(std::env::current_dir()
+        .map(|p| PerlValue::string(p.to_string_lossy().into_owned()))
+        .unwrap_or(PerlValue::UNDEF))
+}
+#[cfg(unix)]
+fn builtin_is_root() -> PerlResult<PerlValue> {
+    Ok(bool_iv(unsafe { libc::getuid() } == 0))
+}
+#[cfg(not(unix))]
+fn builtin_is_root() -> PerlResult<PerlValue> {
+    Ok(bool_iv(false))
+}
+fn builtin_uptime_secs() -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(PROCESS_START.elapsed().as_secs_f64()))
+}
+fn builtin_env_pairs() -> PerlResult<PerlValue> {
+    Ok(PerlValue::array(
+        std::env::vars()
+            .map(|(k, v)| {
+                PerlValue::array_ref(Arc::new(RwLock::new(vec![
+                    PerlValue::string(k),
+                    PerlValue::string(v),
+                ])))
+            })
+            .collect(),
+    ))
+}
+fn builtin_env_set(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let key = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let val = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    if !key.is_empty() {
+        std::env::set_var(&key, &val);
+    }
+    Ok(PerlValue::string(val))
+}
+fn builtin_env_remove(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let key = first_arg_or_topic(interp, args).to_string();
+    if !key.is_empty() {
+        std::env::remove_var(&key);
+    }
+    Ok(PerlValue::UNDEF)
+}
+fn builtin_hostname_str() -> PerlResult<PerlValue> {
+    #[cfg(unix)]
+    {
+        let mut buf = [0u8; 256];
+        let rc = unsafe { libc::gethostname(buf.as_mut_ptr() as *mut libc::c_char, buf.len()) };
+        if rc == 0 {
+            let s = unsafe { CStr::from_ptr(buf.as_ptr() as *const libc::c_char) };
+            return Ok(PerlValue::string(s.to_string_lossy().into_owned()));
+        }
+    }
+    Ok(std::env::var("HOSTNAME")
+        .or_else(|_| std::env::var("COMPUTERNAME"))
+        .map(PerlValue::string)
+        .unwrap_or(PerlValue::UNDEF))
+}
+fn builtin_signal_name(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::string(
+        match args.first().map(|v| v.to_int()).unwrap_or(0) {
+            1 => "SIGHUP",
+            2 => "SIGINT",
+            3 => "SIGQUIT",
+            6 => "SIGABRT",
+            9 => "SIGKILL",
+            13 => "SIGPIPE",
+            14 => "SIGALRM",
+            15 => "SIGTERM",
+            _ => "UNKNOWN",
+        }
+        .to_string(),
+    ))
+}
+fn builtin_lru_new(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::hash_ref(Arc::new(RwLock::new(
+        indexmap::IndexMap::with_capacity(
+            args.first().map(|v| v.to_int().max(1)).unwrap_or(100) as usize
+        ),
+    ))))
+}
+fn builtin_counter(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = flatten_args(args);
+    let mut c: indexmap::IndexMap<String, PerlValue> = indexmap::IndexMap::new();
+    for v in xs {
+        let k = v.to_string();
+        let n = c.get(&k).map(|v| v.to_int()).unwrap_or(0) + 1;
+        c.insert(k, PerlValue::integer(n));
+    }
+    Ok(PerlValue::hash_ref(Arc::new(RwLock::new(c))))
+}
+fn builtin_counter_most_common(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args
+        .first()
+        .map(|v| v.to_int().max(0) as usize)
+        .unwrap_or(10);
+    let xs = flatten_args(&args[1..]);
+    let mut counts: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+    for v in xs {
+        *counts.entry(v.to_string()).or_default() += 1;
+    }
+    let mut pairs: Vec<_> = counts.into_iter().collect();
+    pairs.sort_by(|a, b| b.1.cmp(&a.1));
+    Ok(PerlValue::array(
+        pairs
+            .into_iter()
+            .take(n)
+            .map(|(k, c)| {
+                PerlValue::array_ref(Arc::new(RwLock::new(vec![
+                    PerlValue::string(k),
+                    PerlValue::integer(c),
+                ])))
+            })
+            .collect(),
+    ))
+}
+fn builtin_defaultdict(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::hash_ref(Arc::new(RwLock::new(
+        indexmap::IndexMap::new(),
+    ))))
+}
+fn builtin_ordered_set(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs = flatten_args(args);
+    let mut seen = std::collections::HashSet::new();
+    Ok(PerlValue::array(
+        xs.into_iter()
+            .filter(|v| seen.insert(v.to_string()))
+            .collect(),
+    ))
+}
+fn builtin_bitset_new(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args
+        .first()
+        .map(|v| v.to_int().max(0) as usize)
+        .unwrap_or(64);
+    Ok(PerlValue::array(vec![PerlValue::integer(0); (n + 63) / 64]))
+}
+fn builtin_bitset_set(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let Some(ar) = args.first().and_then(|v| v.as_array_ref()) else {
+        return Ok(PerlValue::UNDEF);
+    };
+    let bit = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
+    let idx = bit / 64;
+    let mask = 1i64 << (bit % 64);
+    let mut g = ar.write();
+    if idx < g.len() {
+        let old = g[idx].to_int();
+        g[idx] = PerlValue::integer(old | mask);
+    }
+    Ok(args[0].clone())
+}
+fn builtin_bitset_test(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let Some(ar) = args.first().and_then(|v| v.as_array_ref()) else {
+        return Ok(bool_iv(false));
+    };
+    let bit = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
+    let g = ar.read();
+    let idx = bit / 64;
+    Ok(bool_iv(
+        idx < g.len() && (g[idx].to_int() >> (bit % 64)) & 1 == 1,
+    ))
+}
+fn builtin_bitset_clear(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let Some(ar) = args.first().and_then(|v| v.as_array_ref()) else {
+        return Ok(PerlValue::UNDEF);
+    };
+    let bit = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
+    let idx = bit / 64;
+    let mask = !(1i64 << (bit % 64));
+    let mut g = ar.write();
+    if idx < g.len() {
+        let old = g[idx].to_int();
+        g[idx] = PerlValue::integer(old & mask);
+    }
+    Ok(args[0].clone())
+}
 fn builtin_url_scheme(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(url_part(&s)

@@ -10103,6 +10103,7 @@ impl Parser {
             | "matrix_diag" | "mdiag" | "matrix_trace" | "mtrace"
             | "matrix_row" | "mrow" | "matrix_col" | "mcol"
             | "matrix_shape" | "mshape" | "matrix_det" | "mdet"
+            | "matrix_scale" | "mat_scale" | "diagonal" | "diag"
             // ── Extended stdlib: Graph Algorithms ────────────────────────────
             | "topological_sort" | "toposort" | "bfs_traverse" | "bfs"
             | "dfs_traverse" | "dfs" | "shortest_path_bfs" | "spbfs"
@@ -10158,6 +10159,37 @@ impl Parser {
             | "day_of_year" | "doy" | "week_of_year" | "woy"
             | "days_in_month_fn" | "daysinmo" | "is_valid_date" | "isvdate"
             | "age_in_years" | "ageyrs"
+            // ── functional combinators ──────────────────────────────────────
+
+            | "when_true" | "when_false" | "if_else" | "clamp_fn"
+            | "attempt" | "try_fn" | "safe_div" | "safe_mod" | "safe_sqrt" | "safe_log"
+            | "juxt2" | "juxt3" | "tap_val" | "debug_val" | "converge"
+            | "iterate_n" | "unfold" | "arity_of" | "is_callable"
+            | "coalesce" | "default_to" | "fallback"
+            | "apply_list" | "zip_apply" | "scan"
+            | "keep_if" | "reject_if" | "group_consecutive"
+            | "after_n" | "before_n" | "clamp_list" | "normalize_list" | "softmax"
+
+            // ── matrix / linear algebra ─────────────────────────────────────
+
+
+            | "matrix_multiply" | "mat_mul"
+            | "identity_matrix" | "eye" | "zeros_matrix" | "zeros" | "ones_matrix" | "ones"
+
+
+
+            | "vec_normalize" | "unit_vec" | "vec_add" | "vec_sub" | "vec_scale"
+            | "linspace" | "arange"
+            // ── more regex ──────────────────────────────────────────────────
+            | "re_test" | "re_find_all" | "re_groups" | "re_escape"
+            | "re_split_limit" | "glob_to_regex" | "is_regex_valid"
+            // ── more process / system ───────────────────────────────────────
+            | "cwd" | "pwd_str" | "cpu_count" | "is_root" | "uptime_secs"
+            | "env_pairs" | "env_set" | "env_remove" | "hostname_str" | "is_tty" | "signal_name"
+            // ── data structure helpers ───────────────────────────────────────
+            | "stack_new" | "queue_new" | "lru_new"
+            | "counter" | "counter_most_common" | "defaultdict" | "ordered_set"
+            | "bitset_new" | "bitset_set" | "bitset_test" | "bitset_clear"
             => Some(name),
             _ => None,
         }
