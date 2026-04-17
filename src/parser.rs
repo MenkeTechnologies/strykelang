@@ -109,6 +109,13 @@ pub struct Parser {
     error_file: String,
     /// User-declared sub names (for allowing UDF to shadow perlrs extensions in compat mode).
     declared_subs: std::collections::HashSet<String>,
+    /// When > 0, `parse_named_expr` will not consume following barewords as paren-less
+    /// function arguments. Used by thread macro to prevent `t Color::Red p` from
+    /// interpreting `p` as an argument to the enum constructor instead of a stage.
+    suppress_parenless_call: u32,
+    /// When > 0, `parse_multiplication` will not consume `Token::Slash` as division.
+    /// Used by thread macro so `/pattern/` is left for the stage parser to handle.
+    suppress_slash_as_div: u32,
 }
 
 impl Parser {
@@ -128,6 +135,8 @@ impl Parser {
             next_desugar_tmp: 0,
             error_file: file.into(),
             declared_subs: std::collections::HashSet::new(),
+            suppress_parenless_call: 0,
+            suppress_slash_as_div: 0,
         }
     }
 
@@ -1489,7 +1498,12 @@ impl Parser {
                 line: _line,
             }
         } else {
-            self.parse_unary()?
+            // Suppress paren-less function calls so `t Color::Red p` parses
+            // the enum variant without consuming `p` as an argument.
+            self.suppress_parenless_call = self.suppress_parenless_call.saturating_add(1);
+            let expr = self.parse_thread_input();
+            self.suppress_parenless_call = self.suppress_parenless_call.saturating_sub(1);
+            expr?
         };
 
         // Parse stages until we hit a statement terminator
@@ -1648,36 +1662,112 @@ impl Parser {
                     let pattern = pattern.clone();
                     let flags = flags.clone();
                     self.advance();
-                    // Build: grep { $_ =~ /pattern/flags } LIST
-                    // The block contains a match against $_ (the topic variable).
-                    let topic = Expr {
-                        kind: ExprKind::ScalarVar("_".to_string()),
-                        line: stage_line,
-                    };
-                    let match_expr = Expr {
-                        kind: ExprKind::Match {
-                            expr: Box::new(topic),
-                            pattern,
-                            flags,
-                            scalar_g: false,
-                            delim,
-                        },
-                        line: stage_line,
-                    };
-                    let block = vec![Statement {
-                        label: None,
-                        kind: StmtKind::Expression(match_expr),
-                        line: stage_line,
-                    }];
-                    let stage = Expr {
-                        kind: ExprKind::GrepExpr {
-                            block,
-                            list: Box::new(result.clone()),
-                            keyword: crate::ast::GrepBuiltinKeyword::Grep,
-                        },
-                        line: stage_line,
-                    };
-                    result = stage;
+                    result =
+                        self.thread_regex_grep_stage(result, pattern, flags, delim, stage_line);
+                }
+                // Handle `/` that was lexed as Slash (division) because it followed a term.
+                // In thread stage context, `/pattern/` should be a regex filter.
+                Token::Slash => {
+                    self.advance(); // consume opening /
+                                    // Manually parse the regex pattern from tokens until we hit another Slash
+                    let mut pattern = String::new();
+                    loop {
+                        match self.peek().clone() {
+                            Token::Slash => {
+                                self.advance(); // consume closing /
+                                break;
+                            }
+                            Token::Eof | Token::Semicolon | Token::Newline => {
+                                return Err(self
+                                    .syntax_err("Unterminated regex in thread stage", stage_line));
+                            }
+                            Token::Ident(ref s) => {
+                                pattern.push_str(s);
+                                self.advance();
+                            }
+                            Token::Integer(n) => {
+                                pattern.push_str(&n.to_string());
+                                self.advance();
+                            }
+                            Token::ScalarVar(ref v) => {
+                                pattern.push('$');
+                                pattern.push_str(v);
+                                self.advance();
+                            }
+                            Token::Dot => {
+                                pattern.push('.');
+                                self.advance();
+                            }
+                            Token::Star => {
+                                pattern.push('*');
+                                self.advance();
+                            }
+                            Token::Plus => {
+                                pattern.push('+');
+                                self.advance();
+                            }
+                            Token::Question => {
+                                pattern.push('?');
+                                self.advance();
+                            }
+                            Token::LParen => {
+                                pattern.push('(');
+                                self.advance();
+                            }
+                            Token::RParen => {
+                                pattern.push(')');
+                                self.advance();
+                            }
+                            Token::LBracket => {
+                                pattern.push('[');
+                                self.advance();
+                            }
+                            Token::RBracket => {
+                                pattern.push(']');
+                                self.advance();
+                            }
+                            Token::Backslash => {
+                                pattern.push('\\');
+                                self.advance();
+                            }
+                            Token::BitOr => {
+                                pattern.push('|');
+                                self.advance();
+                            }
+                            Token::Power => {
+                                pattern.push_str("**");
+                                self.advance();
+                            }
+                            Token::BitXor => {
+                                pattern.push('^');
+                                self.advance();
+                            }
+                            Token::Minus => {
+                                pattern.push('-');
+                                self.advance();
+                            }
+                            _ => {
+                                return Err(self.syntax_err(
+                                    format!("Unexpected token in regex pattern: {:?}", self.peek()),
+                                    stage_line,
+                                ));
+                            }
+                        }
+                    }
+                    // Parse optional flags (sequence of letters after closing /)
+                    // Be careful: single letters like 'e' could be regex flags OR thread
+                    // stages like `fore`/`e`. If followed by `{`, it's a stage, not a flag.
+                    let mut flags = String::new();
+                    if let Token::Ident(ref s) = self.peek().clone() {
+                        let is_flag_only =
+                            s.chars().all(|c| "gimsxecor".contains(c)) && s.len() <= 6;
+                        let followed_by_brace = matches!(self.peek_at(1), Token::LBrace);
+                        if is_flag_only && !followed_by_brace {
+                            flags.push_str(s);
+                            self.advance();
+                        }
+                    }
+                    result = self.thread_regex_grep_stage(result, pattern, flags, '/', stage_line);
                 }
                 tok => {
                     return Err(self.syntax_err(
@@ -1708,6 +1798,44 @@ impl Parser {
             });
         }
         Ok(result)
+    }
+
+    /// Build a grep filter stage from a regex pattern for the thread macro.
+    fn thread_regex_grep_stage(
+        &self,
+        list: Expr,
+        pattern: String,
+        flags: String,
+        delim: char,
+        line: usize,
+    ) -> Expr {
+        let topic = Expr {
+            kind: ExprKind::ScalarVar("_".to_string()),
+            line,
+        };
+        let match_expr = Expr {
+            kind: ExprKind::Match {
+                expr: Box::new(topic),
+                pattern,
+                flags,
+                scalar_g: false,
+                delim,
+            },
+            line,
+        };
+        let block = vec![Statement {
+            label: None,
+            kind: StmtKind::Expression(match_expr),
+            line,
+        }];
+        Expr {
+            kind: ExprKind::GrepExpr {
+                block,
+                list: Box::new(list),
+                keyword: crate::ast::GrepBuiltinKeyword::Grep,
+            },
+            line,
+        }
     }
 
     /// Check whether an expression contains a `$_` reference anywhere in its sub-tree.
@@ -5265,7 +5393,7 @@ impl Parser {
         loop {
             let op = match self.peek() {
                 Token::Star => BinOp::Mul,
-                Token::Slash => BinOp::Div,
+                Token::Slash if self.suppress_slash_as_div == 0 => BinOp::Div,
                 Token::Percent => BinOp::Mod,
                 Token::X => {
                     let line = left.line;
@@ -5446,6 +5574,15 @@ impl Parser {
             }
             _ => Ok(left),
         }
+    }
+
+    /// Parse thread macro input. Like `parse_range` but suppresses `/` as division
+    /// so that `/pattern/` is left for the thread stage parser to handle as regex filter.
+    fn parse_thread_input(&mut self) -> PerlResult<Expr> {
+        self.suppress_slash_as_div = self.suppress_slash_as_div.saturating_add(1);
+        let result = self.parse_range();
+        self.suppress_slash_as_div = self.suppress_slash_as_div.saturating_sub(1);
+        result
     }
 
     /// Perl `..` / `...` operator — precedence sits between `?:` and `||` (`perlop`), so
@@ -9576,10 +9713,15 @@ impl Parser {
                 } else if self.peek().is_term_start()
                     && !(matches!(self.peek(), Token::Ident(ref kw) if kw == "sub")
                         && matches!(self.peek_at(1), Token::Ident(_)))
+                    && !(self.suppress_parenless_call > 0 && matches!(self.peek(), Token::Ident(_)))
                 {
                     // Perl allows func arg without parens
                     // Guard: `sub <name> { }` is a named sub declaration (new
                     // statement), not an argument to the preceding call.
+                    // Guard: suppress_parenless_call > 0 with Ident prevents consuming
+                    // barewords (used by thread macro so `t Color::Red p` treats
+                    // `p` as a stage, not an argument to the enum variant), but
+                    // still allows `{` for struct/hash literals like `t Foo { x => 1 } p`.
                     let args = self.parse_list_until_terminator()?;
                     Ok(Expr {
                         kind: ExprKind::FuncCall { name, args },

@@ -1758,7 +1758,16 @@ impl Lexer {
                     | "chunk_by"
                     | "bench"
                     | "thread"
-                    | "t" => false,
+                    | "t" => {
+                        // After an operator (last_was_term = false), these are regular
+                        // identifiers acting as operands (e.g., `$x / t / 2` — `t` is
+                        // a variable, not the thread keyword). In this case, after `t`
+                        // we're after a term: return true.
+                        // At statement start (last_was_term = true means prior statement
+                        // ended), `t` is the thread keyword expecting arguments, so
+                        // return false to allow regex next.
+                        !self.last_was_term
+                    }
                     _ => matches!(tok, Token::Ident(_)),
                 };
                 Ok(tok)
