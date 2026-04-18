@@ -188,6 +188,10 @@ pub(crate) struct Cli {
     #[arg(long = "compat")]
     compat: bool,
 
+    /// Force argument to be treated as a script file (skip code detection)
+    #[arg(long = "script")]
+    force_script: bool,
+
     /// Script file to execute
     #[arg(value_name = "SCRIPT")]
     script: Option<String>,
@@ -369,6 +373,7 @@ fn print_cyberpunk_help() {
     println!("  'CODE'                 {G}//{N} Inline code — no -e needed if arg looks like code");
     println!("  -e CODE                {G}//{N} Explicit inline (required with -n/-p/-l/-a)");
     println!("  -E CODE                {G}//{N} Like -e, but enables all optional features");
+    println!("  --script               {G}//{N} Force arg to be a file (skip code detection)");
     println!("  -c                     {G}//{N} Check syntax only (parse; no compile/run)");
     println!("  --lint / --check       {G}//{N} Parse + compile bytecode without running");
     println!(
@@ -1227,7 +1232,7 @@ fn main() {
             };
             match read_file_text_perl_compat(&script_path) {
                 Ok(content) => (content, script_path),
-                Err(_) if looks_like_code(&script_path) => {
+                Err(_) if !cli.force_script && looks_like_code(&script_path) => {
                     // One-liner-first: `pe 'p 1+2'` works without `-e`
                     (script_path, "-e".to_string())
                 }
