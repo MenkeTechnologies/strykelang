@@ -958,6 +958,11 @@ pub enum ExprKind {
         body: Block,
         times: Box<Expr>,
     },
+    /// `spinner "msg" { BLOCK }` — animated spinner on stderr while block runs.
+    Spinner {
+        message: Box<Expr>,
+        body: Block,
+    },
     /// `await EXPR` — join an async task, or return EXPR unchanged.
     Await(Box<Expr>),
     /// Read entire file as UTF-8 (`slurp $path`).

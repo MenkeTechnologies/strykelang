@@ -423,6 +423,8 @@ pub(crate) fn try_builtin(
         "sparkline" | "spark" => Some(builtin_sparkline(args)),
         "bar_chart" | "bars" => Some(builtin_bar_chart(interp, args)),
         "flame" | "flamechart" => Some(builtin_flame(interp, args)),
+        "histo" => Some(builtin_histo(args)),
+        "gauge" => Some(builtin_gauge(interp, args)),
         "grep_v" => Some(builtin_grep_v(args, line)),
         "select_keys" => Some(builtin_select_keys(args)),
         "pluck" => Some(builtin_pluck(args)),
@@ -637,17 +639,16 @@ pub(crate) fn try_builtin(
         "strip_ansi" => Some(builtin_strip_ansi(interp, args)),
         // Raw ANSI escape codes for string interpolation
         "red" | "green" | "yellow" | "blue" | "magenta" | "purple" | "cyan" | "white" | "black"
-        | "bold" | "dim" | "italic" | "underline" | "strikethrough" | "ansi_off" | "blink"
-        | "rapid_blink" | "reverse" | "hidden" | "overline" | "gray" | "grey" | "bright_red"
-        | "bright_green" | "bright_yellow" | "bright_blue" | "bright_magenta" | "bright_cyan"
-        | "bright_white" | "bg_red" | "bg_green" | "bg_yellow" | "bg_blue" | "bg_magenta"
-        | "bg_cyan" | "bg_white" | "bg_black" | "bg_bright_red" | "bg_bright_green"
-        | "bg_bright_yellow" | "bg_bright_blue" | "bg_bright_magenta" | "bg_bright_cyan"
-        | "bg_bright_white" | "red_bold" | "bold_red" | "green_bold" | "bold_green"
-        | "yellow_bold" | "bold_yellow" | "blue_bold" | "bold_blue" | "magenta_bold"
-        | "bold_magenta" | "cyan_bold" | "bold_cyan" | "white_bold" | "bold_white" => {
-            Some(Ok(builtin_ansi_code(name)))
-        }
+        | "bold" | "dim" | "italic" | "underline" | "strikethrough" | "ansi_off" | "off"
+        | "blink" | "rapid_blink" | "reverse" | "hidden" | "overline" | "gray" | "grey"
+        | "bright_red" | "bright_green" | "bright_yellow" | "bright_blue" | "bright_magenta"
+        | "bright_cyan" | "bright_white" | "bg_red" | "bg_green" | "bg_yellow" | "bg_blue"
+        | "bg_magenta" | "bg_cyan" | "bg_white" | "bg_black" | "bg_bright_red"
+        | "bg_bright_green" | "bg_bright_yellow" | "bg_bright_blue" | "bg_bright_magenta"
+        | "bg_bright_cyan" | "bg_bright_white" | "red_bold" | "bold_red" | "green_bold"
+        | "bold_green" | "yellow_bold" | "bold_yellow" | "blue_bold" | "bold_blue"
+        | "magenta_bold" | "bold_magenta" | "cyan_bold" | "bold_cyan" | "white_bold"
+        | "bold_white" => Some(Ok(builtin_ansi_code(name))),
         // True color: rgb(r,g,b) foreground, bg_rgb(r,g,b) background
         "rgb" => Some(builtin_rgb_ansi(args, true)),
         "bg_rgb" => Some(builtin_bg_rgb_ansi(args, true)),
@@ -3434,6 +3435,163 @@ fn flame_render_level(
     }
 }
 
+/// `histo LIST` — vertical histogram from numbers. Buckets data into bins
+/// and renders vertical bars with counts.
+fn builtin_histo(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let vals = normalize_serialize_root(args);
+    let nums: Vec<f64> = if let Some(ar) = vals.as_array_ref() {
+        ar.read().iter().map(|v| v.to_number()).collect()
+    } else if let Some(hr) = vals.as_hash_ref() {
+        // hashref: treat as label→count, render like bar_chart but vertical
+        let guard = hr.read();
+        let max_val = guard
+            .values()
+            .map(|v| v.to_number())
+            .fold(0.0_f64, f64::max);
+        let bar_height = 10usize;
+        let label_w = guard.keys().map(|k| k.len()).max().unwrap_or(1);
+        let col_w = label_w.max(3);
+        let mut rows: Vec<String> = Vec::new();
+        // Build rows top to bottom
+        for row in (1..=bar_height).rev() {
+            let threshold = (row as f64 / bar_height as f64) * max_val;
+            let mut line = String::new();
+            for (i, (_k, v)) in guard.iter().enumerate() {
+                let n = v.to_number();
+                let block = if n >= threshold { "█" } else { " " };
+                let colors = [
+                    "\x1b[36m", "\x1b[32m", "\x1b[33m", "\x1b[35m", "\x1b[34m", "\x1b[31m",
+                ];
+                let color = colors[i % colors.len()];
+                line.push_str(&format!(
+                    " {}{:^w$}\x1b[0m",
+                    color,
+                    block.repeat(col_w),
+                    w = col_w
+                ));
+            }
+            rows.push(line);
+        }
+        // Separator
+        let sep: String = guard
+            .keys()
+            .map(|_| format!("─{}", "─".repeat(col_w)))
+            .collect::<Vec<_>>()
+            .join("");
+        rows.push(sep);
+        // Labels
+        let mut labels = String::new();
+        for (k, _) in guard.iter() {
+            labels.push_str(&format!(" {:^w$}", k, w = col_w));
+        }
+        rows.push(labels);
+        // Counts
+        let mut counts = String::new();
+        for (_, v) in guard.iter() {
+            counts.push_str(&format!(" {:^w$}", v.to_string(), w = col_w));
+        }
+        rows.push(counts);
+        return Ok(PerlValue::string(rows.join("\n") + "\n"));
+    } else {
+        vec![vals.to_number()]
+    };
+    if nums.is_empty() {
+        return Ok(PerlValue::string(String::new()));
+    }
+    // Auto-bin numeric data
+    let min = nums.iter().cloned().fold(f64::INFINITY, f64::min);
+    let max = nums.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let n_bins = 10usize.min(nums.len());
+    if n_bins == 0 || max == min {
+        return Ok(PerlValue::string(format!("all values = {}\n", min)));
+    }
+    let bin_width = (max - min) / n_bins as f64;
+    let mut counts = vec![0usize; n_bins];
+    for &v in &nums {
+        let idx = ((v - min) / bin_width).floor() as usize;
+        counts[idx.min(n_bins - 1)] += 1;
+    }
+    let max_count = *counts.iter().max().unwrap_or(&1);
+    let bar_height = 10usize;
+    let col_w = 6;
+    let colors = [
+        "\x1b[36m", "\x1b[32m", "\x1b[33m", "\x1b[35m", "\x1b[34m", "\x1b[31m",
+    ];
+    let mut rows: Vec<String> = Vec::new();
+    for row in (1..=bar_height).rev() {
+        let threshold = (row as f64 / bar_height as f64) * max_count as f64;
+        let mut line = String::new();
+        for (i, &c) in counts.iter().enumerate() {
+            let block = if c as f64 >= threshold { "█" } else { " " };
+            let color = colors[i % colors.len()];
+            line.push_str(&format!(" {}{}\x1b[0m", color, block.repeat(col_w)));
+        }
+        rows.push(line);
+    }
+    let sep: String = (0..n_bins)
+        .map(|_| format!("─{}", "─".repeat(col_w)))
+        .collect::<Vec<_>>()
+        .join("");
+    rows.push(sep);
+    let mut labels = String::new();
+    for i in 0..n_bins {
+        let lo = min + i as f64 * bin_width;
+        let label = if bin_width >= 1.0 {
+            format!("{:.0}", lo)
+        } else {
+            format!("{:.1}", lo)
+        };
+        labels.push_str(&format!(" {:^w$}", label, w = col_w));
+    }
+    rows.push(labels);
+    let mut count_row = String::new();
+    for c in &counts {
+        count_row.push_str(&format!(" {:^w$}", c, w = col_w));
+    }
+    rows.push(count_row);
+    Ok(PerlValue::string(rows.join("\n") + "\n"))
+}
+
+/// `gauge VALUE` or `gauge(VALUE, MAX)` — single-value horizontal gauge bar.
+/// `gauge(0.73)` → `[███████░░░] 73%`
+/// `gauge(45, 100)` → `[████░░░░░░] 45%`
+fn builtin_gauge(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let (val, max_val) = if args.len() >= 2 {
+        (args[0].to_number(), args[1].to_number())
+    } else {
+        let v = first_arg_or_topic(interp, args).to_number();
+        if v > 1.0 {
+            (v, 100.0) // assume percentage out of 100
+        } else {
+            (v, 1.0) // assume 0.0–1.0 fraction
+        }
+    };
+    let pct = if max_val > 0.0 {
+        (val / max_val).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let width = 30usize;
+    let filled = (pct * width as f64).round() as usize;
+    let empty = width - filled;
+    let color = if pct >= 0.8 {
+        "\x1b[32m" // green
+    } else if pct >= 0.5 {
+        "\x1b[33m" // yellow
+    } else if pct >= 0.25 {
+        "\x1b[35m" // magenta
+    } else {
+        "\x1b[31m" // red
+    };
+    Ok(PerlValue::string(format!(
+        "[{}{}{}░\x1b[0m] {:.0}%",
+        color,
+        "█".repeat(filled),
+        "░".repeat(empty.saturating_sub(1)),
+        pct * 100.0
+    )))
+}
+
 fn builtin_pager(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
     use std::io::Write as _;
     use std::process::{Command, Stdio};
@@ -5589,7 +5747,7 @@ fn builtin_hex_to_rgb(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
 fn builtin_ansi_code(name: &str) -> PerlValue {
     let code = match name {
         // reset
-        "ansi_off" => "\x1b[0m",
+        "ansi_off" | "off" => "\x1b[0m",
         // styles
         "bold" => "\x1b[1m",
         "dim" => "\x1b[2m",
