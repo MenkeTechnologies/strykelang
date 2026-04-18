@@ -1051,7 +1051,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   | `cpt` | `compact` | `shuf` | `shuffle` | `tmd` | `to_markdown` |
   | | | | | `dd` | `ddump` |
   | | | | | `xo` | `xopen` |
-  | `cat` | `concat` | | | **Deserialize** | |
+  | `cat` | `slurp` | | | **Deserialize** | |
   | `il` | `interleave` | **Stats** | | `jd` | `json_decode` |
   | `en` | `enumerate` | `sq` | `sqrt` | `yd` | `yaml_decode` |
   | `wi` | `with_index` | `med` | `median` | `td` | `toml_decode` |
@@ -1079,6 +1079,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   | `hn` | `gethostname` | `pcr` | `par_csv_read` | `dte` | `datetime_from_epoch` |
   | `el` | `elapsed` | `df` | `dataframe` | `dtf` | `datetime_strftime` |
   | `def` | `defined` | `sql` | `sqlite` | | |
+  | `rss` | `proc_mem` | | | | |
 
 - **`fn` keyword** — alias for `sub`. Both `fn name { }` and `fn { }` work identically to `sub`.
 
