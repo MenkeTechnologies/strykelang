@@ -26,7 +26,17 @@ fn bytes_from_value(v: &PerlValue) -> Vec<u8> {
     if let Some(b) = v.as_bytes_arc() {
         return b.as_ref().clone();
     }
-    v.to_string().into_bytes()
+    let s = v.to_string();
+    // File-aware: if the string is a path to an existing file, hash its contents
+    if !s.is_empty() && !s.contains('\n') {
+        let p = std::path::Path::new(&s);
+        if p.is_file() {
+            if let Ok(data) = std::fs::read(p) {
+                return data;
+            }
+        }
+    }
+    s.into_bytes()
 }
 
 /// SHA-256 digest of the argument as UTF-8 bytes; returns lowercase hex (64 chars).

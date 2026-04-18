@@ -91,7 +91,7 @@ autoload -Uz compinit && compinit
 | Print hello world | `pe 'p "hello world"'` **21c** | `perl -e 'print "hello world\n"'` 32c | `ruby -e 'puts "hello world"'` 29c | `python3 -c 'print("hello world")'` 34c | `echo \| awk '{print "hello world"}'` 36c |
 | Sum 1..100 | `pe 'p sum 1..100'` **19c** | `perl -MList::Util=sum -e 'print sum 1..100'` 45c | `ruby -e 'puts (1..100).sum'` 28c | `python3 -c 'print(sum(range(1,101)))'` 38c | — |
 | Word frequencies | `pe -an 'freq(@F) \|> dd'` **25c** | `perl -ane '$h{$_}++ for @F}{print "$_ $h{$_}\n" for keys %h'` 61c | — | — | `awk '{for(i=1;i<=NF;i++) a[$i]++} END{...}'` 65c+ |
-| SHA256 of file | `pe 'p sha256 cat "f"'` **23c** | `perl -MDigest::SHA=sha256_hex -e '...'` 70c+ | — | `python3 -c 'import hashlib;...'` 80c+ | `shasum -a 256 f` 16c |
+| SHA256 of file | `pe 'p s256"f"'` **14c** | `perl -MDigest::SHA=sha256_hex -e '...'` 70c+ | — | `python3 -c 'import hashlib;...'` 80c+ | `shasum -a 256 f` 15c |
 | Fetch JSON API | `pe 'fetch_json(URL) \|> dd'` **~50c** | needs `LWP` + `JSON` modules | needs `net/http` + `json` | needs `urllib` + `json` | `curl -s URL \| jq .` ~40c |
 | CSV → JSON | `pe 'csv_read("f") \|> tj \|> p'` **33c** | needs `Text::CSV` + `JSON` | needs `csv` + `json` | needs `csv` + `json` imports | — |
 | Parallel map | `pe '1..1e6 \|> pmap { $_ * 2 }'` **33c** | not built in | not built in | not built in | `xargs -P8` 50c+ |
