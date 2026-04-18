@@ -729,6 +729,25 @@ pub(crate) fn try_builtin(
         "username" => Some(builtin_username()),
         "home_dir" => Some(builtin_home_dir()),
         "temp_dir" => Some(builtin_temp_dir()),
+        // ── System stats ──
+        "mem_total" => Some(builtin_mem_total()),
+        "mem_free" => Some(builtin_mem_free()),
+        "mem_used" => Some(builtin_mem_used()),
+        "swap_total" => Some(builtin_swap_total()),
+        "swap_free" => Some(builtin_swap_free()),
+        "swap_used" => Some(builtin_swap_used()),
+        "disk_total" => Some(builtin_disk_total(interp, args)),
+        "disk_free" => Some(builtin_disk_free(interp, args)),
+        "disk_avail" => Some(builtin_disk_avail(interp, args)),
+        "disk_used" => Some(builtin_disk_used(interp, args)),
+        "load_avg" => Some(builtin_load_avg()),
+        "sys_uptime" => Some(builtin_sys_uptime()),
+        "page_size" => Some(builtin_page_size()),
+        "os_version" => Some(builtin_os_version()),
+        "os_family" => Some(builtin_os_family()),
+        "endianness" => Some(builtin_endianness()),
+        "pointer_width" => Some(builtin_pointer_width()),
+        "proc_mem" | "rss" => Some(builtin_proc_mem()),
         // ── Collection: more ──
         "transpose" => Some(builtin_transpose(args)),
         "unzip" => Some(builtin_unzip(args)),
@@ -6760,6 +6779,452 @@ fn builtin_temp_dir() -> PerlResult<PerlValue> {
     Ok(PerlValue::string(
         std::env::temp_dir().to_string_lossy().into_owned(),
     ))
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// System stats
+// ─────────────────────────────────────────────────────────────────────────
+
+// ── Memory stats ────────────────────────────────────────────────────────
+
+#[cfg(target_os = "linux")]
+fn read_meminfo_field(field: &str) -> Option<i64> {
+    let data = std::fs::read_to_string("/proc/meminfo").ok()?;
+    for line in data.lines() {
+        if line.starts_with(field) {
+            // Format: "MemTotal:       16384000 kB"
+            let kb: i64 = line.split_whitespace().nth(1)?.parse().ok()?;
+            return Some(kb * 1024);
+        }
+    }
+    None
+}
+
+/// `mem_total` — Total physical RAM in bytes.
+#[cfg(target_os = "linux")]
+fn builtin_mem_total() -> PerlResult<PerlValue> {
+    Ok(read_meminfo_field("MemTotal:")
+        .map(PerlValue::integer)
+        .unwrap_or(PerlValue::UNDEF))
+}
+#[cfg(target_os = "macos")]
+fn builtin_mem_total() -> PerlResult<PerlValue> {
+    let mut val: u64 = 0;
+    let mut len = std::mem::size_of::<u64>();
+    let name = b"hw.memsize\0";
+    let rc = unsafe {
+        libc::sysctlbyname(
+            name.as_ptr() as *const libc::c_char,
+            &mut val as *mut u64 as *mut libc::c_void,
+            &mut len,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    Ok(if rc == 0 {
+        PerlValue::integer(val as i64)
+    } else {
+        PerlValue::UNDEF
+    })
+}
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn builtin_mem_total() -> PerlResult<PerlValue> {
+    Ok(PerlValue::UNDEF)
+}
+
+/// `mem_free` — Free physical RAM in bytes.
+#[cfg(target_os = "linux")]
+fn builtin_mem_free() -> PerlResult<PerlValue> {
+    Ok(read_meminfo_field("MemAvailable:")
+        .or_else(|| read_meminfo_field("MemFree:"))
+        .map(PerlValue::integer)
+        .unwrap_or(PerlValue::UNDEF))
+}
+#[cfg(target_os = "macos")]
+fn builtin_mem_free() -> PerlResult<PerlValue> {
+    let mut page_size: u64 = 0;
+    let mut len = std::mem::size_of::<u64>();
+    let name = b"hw.pagesize\0";
+    let rc = unsafe {
+        libc::sysctlbyname(
+            name.as_ptr() as *const libc::c_char,
+            &mut page_size as *mut u64 as *mut libc::c_void,
+            &mut len,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    if rc != 0 {
+        return Ok(PerlValue::UNDEF);
+    }
+    // Use vm.page_free_count which is a simple sysctl
+    let mut free_pages: u32 = 0;
+    len = std::mem::size_of::<u32>();
+    let name2 = b"vm.page_free_count\0";
+    let rc2 = unsafe {
+        libc::sysctlbyname(
+            name2.as_ptr() as *const libc::c_char,
+            &mut free_pages as *mut u32 as *mut libc::c_void,
+            &mut len,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    Ok(if rc2 == 0 {
+        PerlValue::integer(free_pages as i64 * page_size as i64)
+    } else {
+        PerlValue::UNDEF
+    })
+}
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn builtin_mem_free() -> PerlResult<PerlValue> {
+    Ok(PerlValue::UNDEF)
+}
+
+/// `mem_used` — Used physical RAM in bytes (total - free).
+fn builtin_mem_used() -> PerlResult<PerlValue> {
+    let total = builtin_mem_total()?;
+    let free = builtin_mem_free()?;
+    match (total.as_integer(), free.as_integer()) {
+        (Some(t), Some(f)) => Ok(PerlValue::integer(t - f)),
+        _ => Ok(PerlValue::UNDEF),
+    }
+}
+
+/// `swap_total` — Total swap space in bytes.
+#[cfg(target_os = "linux")]
+fn builtin_swap_total() -> PerlResult<PerlValue> {
+    Ok(read_meminfo_field("SwapTotal:")
+        .map(PerlValue::integer)
+        .unwrap_or(PerlValue::UNDEF))
+}
+#[cfg(target_os = "macos")]
+fn macos_swap_usage() -> Option<(i64, i64, i64)> {
+    // xsw_usage is { xsu_total: u64, xsu_avail: u64, xsu_used: u64 }
+    #[repr(C)]
+    struct XswUsage {
+        total: u64,
+        avail: u64,
+        used: u64,
+    }
+    let mut usage: XswUsage = unsafe { std::mem::zeroed() };
+    let mut len = std::mem::size_of::<XswUsage>();
+    let name = b"vm.swapusage\0";
+    let rc = unsafe {
+        libc::sysctlbyname(
+            name.as_ptr() as *const libc::c_char,
+            &mut usage as *mut XswUsage as *mut libc::c_void,
+            &mut len,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    if rc == 0 {
+        Some((usage.total as i64, usage.avail as i64, usage.used as i64))
+    } else {
+        None
+    }
+}
+#[cfg(target_os = "macos")]
+fn builtin_swap_total() -> PerlResult<PerlValue> {
+    Ok(macos_swap_usage()
+        .map(|(t, _, _)| PerlValue::integer(t))
+        .unwrap_or(PerlValue::UNDEF))
+}
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn builtin_swap_total() -> PerlResult<PerlValue> {
+    Ok(PerlValue::UNDEF)
+}
+
+/// `swap_free` — Free swap space in bytes.
+#[cfg(target_os = "linux")]
+fn builtin_swap_free() -> PerlResult<PerlValue> {
+    Ok(read_meminfo_field("SwapFree:")
+        .map(PerlValue::integer)
+        .unwrap_or(PerlValue::UNDEF))
+}
+#[cfg(target_os = "macos")]
+fn builtin_swap_free() -> PerlResult<PerlValue> {
+    Ok(macos_swap_usage()
+        .map(|(_, a, _)| PerlValue::integer(a))
+        .unwrap_or(PerlValue::UNDEF))
+}
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn builtin_swap_free() -> PerlResult<PerlValue> {
+    Ok(PerlValue::UNDEF)
+}
+
+/// `swap_used` — Used swap space in bytes.
+fn builtin_swap_used() -> PerlResult<PerlValue> {
+    let total = builtin_swap_total()?;
+    let free = builtin_swap_free()?;
+    match (total.as_integer(), free.as_integer()) {
+        (Some(t), Some(f)) => Ok(PerlValue::integer(t - f)),
+        _ => Ok(PerlValue::UNDEF),
+    }
+}
+
+// ── Disk stats ──────────────────────────────────────────────────────────
+
+#[cfg(unix)]
+fn statvfs_for(path: &str) -> Option<libc::statvfs> {
+    let c_path = CString::new(path).ok()?;
+    let mut buf: libc::statvfs = unsafe { std::mem::zeroed() };
+    let rc = unsafe { libc::statvfs(c_path.as_ptr(), &mut buf) };
+    if rc == 0 {
+        Some(buf)
+    } else {
+        None
+    }
+}
+
+/// `disk_total PATH` — Total disk space in bytes (default path `/`).
+#[cfg(unix)]
+fn builtin_disk_total(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let path = if args.is_empty() {
+        first_arg_or_topic(interp, args).to_string()
+    } else {
+        args[0].to_string()
+    };
+    let path = if path.is_empty() {
+        "/".to_string()
+    } else {
+        path
+    };
+    Ok(statvfs_for(&path)
+        .map(|s| PerlValue::integer(s.f_blocks as i64 * s.f_frsize as i64))
+        .unwrap_or(PerlValue::UNDEF))
+}
+#[cfg(not(unix))]
+fn builtin_disk_total(_interp: &Interpreter, _args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::UNDEF)
+}
+
+/// `disk_free PATH` — Free disk space in bytes (superuser, default `/`).
+#[cfg(unix)]
+fn builtin_disk_free(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let path = if args.is_empty() {
+        first_arg_or_topic(interp, args).to_string()
+    } else {
+        args[0].to_string()
+    };
+    let path = if path.is_empty() {
+        "/".to_string()
+    } else {
+        path
+    };
+    Ok(statvfs_for(&path)
+        .map(|s| PerlValue::integer(s.f_bfree as i64 * s.f_frsize as i64))
+        .unwrap_or(PerlValue::UNDEF))
+}
+#[cfg(not(unix))]
+fn builtin_disk_free(_interp: &Interpreter, _args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::UNDEF)
+}
+
+/// `disk_avail PATH` — Available disk space in bytes (non-root, default `/`).
+#[cfg(unix)]
+fn builtin_disk_avail(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let path = if args.is_empty() {
+        first_arg_or_topic(interp, args).to_string()
+    } else {
+        args[0].to_string()
+    };
+    let path = if path.is_empty() {
+        "/".to_string()
+    } else {
+        path
+    };
+    Ok(statvfs_for(&path)
+        .map(|s| PerlValue::integer(s.f_bavail as i64 * s.f_frsize as i64))
+        .unwrap_or(PerlValue::UNDEF))
+}
+#[cfg(not(unix))]
+fn builtin_disk_avail(_interp: &Interpreter, _args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::UNDEF)
+}
+
+/// `disk_used PATH` — Used disk space in bytes (default `/`).
+#[cfg(unix)]
+fn builtin_disk_used(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let path = if args.is_empty() {
+        first_arg_or_topic(interp, args).to_string()
+    } else {
+        args[0].to_string()
+    };
+    let path = if path.is_empty() {
+        "/".to_string()
+    } else {
+        path
+    };
+    Ok(statvfs_for(&path)
+        .map(|s| PerlValue::integer((s.f_blocks - s.f_bfree) as i64 * s.f_frsize as i64))
+        .unwrap_or(PerlValue::UNDEF))
+}
+#[cfg(not(unix))]
+fn builtin_disk_used(_interp: &Interpreter, _args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::UNDEF)
+}
+
+// ── Load average ────────────────────────────────────────────────────────
+
+/// `load_avg` — System load averages [1m, 5m, 15m] as arrayref.
+#[cfg(unix)]
+fn builtin_load_avg() -> PerlResult<PerlValue> {
+    let mut loads = [0f64; 3];
+    let n = unsafe { libc::getloadavg(loads.as_mut_ptr(), 3) };
+    if n < 3 {
+        return Ok(PerlValue::UNDEF);
+    }
+    Ok(PerlValue::array_ref(Arc::new(RwLock::new(vec![
+        PerlValue::float(loads[0]),
+        PerlValue::float(loads[1]),
+        PerlValue::float(loads[2]),
+    ]))))
+}
+#[cfg(not(unix))]
+fn builtin_load_avg() -> PerlResult<PerlValue> {
+    Ok(PerlValue::UNDEF)
+}
+
+// ── System uptime ───────────────────────────────────────────────────────
+
+/// `sys_uptime` — System uptime in seconds (float).
+#[cfg(target_os = "linux")]
+fn builtin_sys_uptime() -> PerlResult<PerlValue> {
+    if let Ok(data) = std::fs::read_to_string("/proc/uptime") {
+        if let Some(secs) = data
+            .split_whitespace()
+            .next()
+            .and_then(|s| s.parse::<f64>().ok())
+        {
+            return Ok(PerlValue::float(secs));
+        }
+    }
+    Ok(PerlValue::UNDEF)
+}
+#[cfg(target_os = "macos")]
+fn builtin_sys_uptime() -> PerlResult<PerlValue> {
+    // kern.boottime returns struct timeval { tv_sec, tv_usec }
+    let mut boottime = libc::timeval {
+        tv_sec: 0,
+        tv_usec: 0,
+    };
+    let mut len = std::mem::size_of::<libc::timeval>();
+    let name = b"kern.boottime\0";
+    let rc = unsafe {
+        libc::sysctlbyname(
+            name.as_ptr() as *const libc::c_char,
+            &mut boottime as *mut libc::timeval as *mut libc::c_void,
+            &mut len,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    if rc != 0 {
+        return Ok(PerlValue::UNDEF);
+    }
+    let mut now = libc::timeval {
+        tv_sec: 0,
+        tv_usec: 0,
+    };
+    unsafe { libc::gettimeofday(&mut now, std::ptr::null_mut()) };
+    let secs = (now.tv_sec - boottime.tv_sec) as f64
+        + (now.tv_usec - boottime.tv_usec) as f64 / 1_000_000.0;
+    Ok(PerlValue::float(secs))
+}
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn builtin_sys_uptime() -> PerlResult<PerlValue> {
+    Ok(PerlValue::UNDEF)
+}
+
+// ── Page size ───────────────────────────────────────────────────────────
+
+/// `page_size` — Memory page size in bytes.
+#[cfg(unix)]
+fn builtin_page_size() -> PerlResult<PerlValue> {
+    Ok(PerlValue::integer(
+        unsafe { libc::sysconf(libc::_SC_PAGESIZE) } as i64,
+    ))
+}
+#[cfg(not(unix))]
+fn builtin_page_size() -> PerlResult<PerlValue> {
+    Ok(PerlValue::integer(4096))
+}
+
+// ── OS metadata ─────────────────────────────────────────────────────────
+
+/// `os_version` — OS kernel version/release string.
+fn builtin_os_version() -> PerlResult<PerlValue> {
+    #[cfg(unix)]
+    {
+        let mut uts: libc::utsname = unsafe { std::mem::zeroed() };
+        if unsafe { libc::uname(&mut uts) } == 0 {
+            let s = unsafe { CStr::from_ptr(uts.release.as_ptr()) };
+            return Ok(PerlValue::string(s.to_string_lossy().into_owned()));
+        }
+    }
+    Ok(PerlValue::UNDEF)
+}
+
+/// `os_family` — OS family string ("unix" or "windows").
+fn builtin_os_family() -> PerlResult<PerlValue> {
+    Ok(PerlValue::string(std::env::consts::FAMILY.to_string()))
+}
+
+/// `endianness` — "little" or "big".
+fn builtin_endianness() -> PerlResult<PerlValue> {
+    Ok(PerlValue::string(
+        if cfg!(target_endian = "little") {
+            "little"
+        } else {
+            "big"
+        }
+        .to_string(),
+    ))
+}
+
+/// `pointer_width` — Pointer width in bits (32 or 64).
+fn builtin_pointer_width() -> PerlResult<PerlValue> {
+    Ok(PerlValue::integer(
+        (std::mem::size_of::<usize>() * 8) as i64,
+    ))
+}
+
+// ── Process memory ──────────────────────────────────────────────────────
+
+/// `proc_mem` — Current process RSS (resident set size) in bytes.
+#[cfg(target_os = "linux")]
+fn builtin_proc_mem() -> PerlResult<PerlValue> {
+    if let Ok(data) = std::fs::read_to_string("/proc/self/status") {
+        for line in data.lines() {
+            if line.starts_with("VmRSS:") {
+                if let Some(kb) = line
+                    .split_whitespace()
+                    .nth(1)
+                    .and_then(|s| s.parse::<i64>().ok())
+                {
+                    return Ok(PerlValue::integer(kb * 1024));
+                }
+            }
+        }
+    }
+    Ok(PerlValue::UNDEF)
+}
+#[cfg(target_os = "macos")]
+fn builtin_proc_mem() -> PerlResult<PerlValue> {
+    // Use rusage for RSS on macOS (ru_maxrss is in bytes on macOS)
+    let mut usage: libc::rusage = unsafe { std::mem::zeroed() };
+    let rc = unsafe { libc::getrusage(libc::RUSAGE_SELF, &mut usage) };
+    Ok(if rc == 0 {
+        PerlValue::integer(usage.ru_maxrss)
+    } else {
+        PerlValue::UNDEF
+    })
+}
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn builtin_proc_mem() -> PerlResult<PerlValue> {
+    Ok(PerlValue::UNDEF)
 }
 
 // ─────────────────────────────────────────────────────────────────────────

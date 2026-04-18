@@ -10725,6 +10725,12 @@ impl Parser {
             | "os_name" | "os_arch" | "num_cpus"
             | "pid" | "ppid" | "uid" | "gid"
             | "username" | "home_dir" | "temp_dir"
+            | "mem_total" | "mem_free" | "mem_used"
+            | "swap_total" | "swap_free" | "swap_used"
+            | "disk_total" | "disk_free" | "disk_avail" | "disk_used"
+            | "load_avg" | "sys_uptime" | "page_size"
+            | "os_version" | "os_family" | "endianness" | "pointer_width"
+            | "proc_mem" | "rss"
             // ── collection more ─────────────────────────────────────────────
             | "transpose" | "unzip"
             | "run_length_encode" | "rle" | "run_length_decode" | "rld"
