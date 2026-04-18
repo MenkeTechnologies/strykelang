@@ -699,8 +699,8 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   $cfg |> to_toml |> p;                         # TOML with [package] table
   $data |> to_yaml |> p;                        # YAML with --- header
   $data |> to_xml  |> p;                        # XML with <root> wrapper
-  fr |> map { my $h = {name => $_, size => size |> format_bytes}; $h } |> th |> to_file("report.html")  # cyberpunk HTML table
-  fr |> map { my $h = {name => $_, size => size |> format_bytes}; $h } |> tmd |> to_file("report.md")  # GFM Markdown table
+  fr |> map +{name => $_, size => format_bytes(size)} |> th |> to_file("report.html")   # cyberpunk HTML table
+  fr |> map +{name => $_, size => format_bytes(size)} |> tmd |> to_file("report.md")   # GFM Markdown table
 
   # ── stringify / str — parseable perlrs literals ──────────────────────
   $data |> str |> p;                            # +{a => 1, b => [2, 3]}
