@@ -2999,6 +2999,103 @@ fn builtin_words(_interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVa
     )))
 }
 
+/// `digits STRING` — extract all digit characters from a string.
+fn builtin_digits(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let out: Vec<PerlValue> = s
+        .chars()
+        .filter(|c| c.is_ascii_digit())
+        .map(|c| PerlValue::string(c.to_string()))
+        .collect();
+    Ok(PerlValue::array(out))
+}
+
+/// `sentences STRING` — split text on sentence boundaries (`.` `!` `?` followed by whitespace or end).
+fn builtin_sentences(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let mut out: Vec<PerlValue> = Vec::new();
+    let mut start = 0;
+    let bytes = s.as_bytes();
+    let len = bytes.len();
+    let mut i = 0;
+    while i < len {
+        if (bytes[i] == b'.' || bytes[i] == b'!' || bytes[i] == b'?')
+            && (i + 1 >= len || bytes[i + 1].is_ascii_whitespace())
+        {
+            // Include the punctuation, skip trailing whitespace
+            let mut end = i + 1;
+            while end < len && bytes[end].is_ascii_whitespace() {
+                end += 1;
+            }
+            let sentence = s[start..i + 1].trim().to_string();
+            if !sentence.is_empty() {
+                out.push(PerlValue::string(sentence));
+            }
+            start = end;
+            i = end;
+        } else {
+            i += 1;
+        }
+    }
+    // Remainder
+    let rest = s[start..].trim().to_string();
+    if !rest.is_empty() {
+        out.push(PerlValue::string(rest));
+    }
+    Ok(PerlValue::array(out))
+}
+
+/// `paragraphs STRING` — split text on blank lines (one or more empty lines).
+fn builtin_paragraphs(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let out: Vec<PerlValue> = s
+        .split("\n\n")
+        .map(|p| p.trim())
+        .filter(|p| !p.is_empty())
+        .map(|p| PerlValue::string(p.to_string()))
+        .collect();
+    Ok(PerlValue::array(out))
+}
+
+/// `sections STRING` — split text on markdown-style headers (`# ...`, `## ...`, etc.)
+/// or lines of `===`/`---`. Returns arrayrefs of `[heading, body]`.
+fn builtin_sections(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let mut out: Vec<PerlValue> = Vec::new();
+    let mut current_heading = String::new();
+    let mut current_body = String::new();
+    for line in s.lines() {
+        let trimmed = line.trim();
+        let is_heading = trimmed.starts_with('#')
+            || (trimmed.len() >= 3
+                && (trimmed.chars().all(|c| c == '=') || trimmed.chars().all(|c| c == '-')));
+        if is_heading {
+            // Flush previous section
+            if !current_heading.is_empty() || !current_body.trim().is_empty() {
+                out.push(PerlValue::array_ref(Arc::new(RwLock::new(vec![
+                    PerlValue::string(current_heading.clone()),
+                    PerlValue::string(current_body.trim().to_string()),
+                ]))));
+            }
+            current_heading = trimmed.to_string();
+            current_body = String::new();
+        } else {
+            if !current_body.is_empty() {
+                current_body.push('\n');
+            }
+            current_body.push_str(line);
+        }
+    }
+    // Flush last section
+    if !current_heading.is_empty() || !current_body.trim().is_empty() {
+        out.push(PerlValue::array_ref(Arc::new(RwLock::new(vec![
+            PerlValue::string(current_heading),
+            PerlValue::string(current_body.trim().to_string()),
+        ]))));
+    }
+    Ok(PerlValue::array(out))
+}
+
 /// `chars STRING` — split into individual characters (no empty leading element).
 /// `chars ITERATOR` — flat-map each element's characters (streaming).
 /// Returns a streaming iterator for lazy consumption.
