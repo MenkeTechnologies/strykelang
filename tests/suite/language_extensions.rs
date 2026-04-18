@@ -139,7 +139,7 @@ fn bare_shuffle_list_context_permutation() {
         eval_int(
             r#"no strict 'vars';
             my @s = shuffle(7, 8, 9, 10);
-            scalar @s;"#
+            scalar @s"#
         ),
         4
     );
@@ -148,7 +148,7 @@ fn bare_shuffle_list_context_permutation() {
             r#"no strict 'vars';
             my @in = (7, 8, 9, 10);
             my @s = shuffle @in;
-            scalar @s;"#
+            scalar @s"#
         ),
         4
     );
@@ -169,7 +169,7 @@ fn bare_chunked_list_context_and_last_arg_is_size() {
         eval_int(
             r#"no strict 'vars';
             my @in = (1, 2, 3, 4, 5);
-            scalar (@in |> chunked 2);"#
+            scalar (@in |> chunked 2)"#
         ),
         3
     );
@@ -200,7 +200,7 @@ fn chunked_edge_cases_pipe_multi_array_and_n_zero() {
             r#"no strict 'vars';
             my @a = (1, 2);
             my @b = (3, 4);
-            scalar ((@a, @b) |> chunked 2);"#
+            scalar ((@a, @b) |> chunked 2)"#
         ),
         2
     );

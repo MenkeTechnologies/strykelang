@@ -7646,7 +7646,7 @@ impl Parser {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
-                let a = self.parse_one_arg()?;
+                let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Keys(Box::new(a)),
                     line,
@@ -7656,7 +7656,7 @@ impl Parser {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
-                let a = self.parse_one_arg()?;
+                let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Values(Box::new(a)),
                     line,
@@ -7666,8 +7666,7 @@ impl Parser {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
-                // `each(%hash)` / `each(@array)` — hash/array iterator
-                let a = self.parse_one_arg()?;
+                let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Each(Box::new(a)),
                     line,

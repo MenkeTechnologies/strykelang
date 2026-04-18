@@ -31,7 +31,7 @@ fn dataframe_sum_and_filter() {
             {{ region => "west", amount => "200" }});
         my $df = dataframe("{ps}");
         my $f = $df->filter(sub {{ $_->{{amount}} > 60 }});
-        "" . $df->sum("amount") . ":" . $f->nrows;"#
+        "" . $df->sum("amount") . ":" . $f->nrows"#
     );
     let got = eval_string(&code);
     let _ = fs::remove_file(&path);
@@ -50,7 +50,7 @@ fn dataframe_group_by_sum() {
             {{ region => "west", amount => "200" }});
         my $df = dataframe("{ps}");
         my $g = $df->group_by("region")->sum("amount");
-        $g->nrows;"#
+        $g->nrows"#
     );
     let got = eval_string(&code);
     let _ = fs::remove_file(&path);

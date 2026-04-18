@@ -152,80 +152,55 @@ Each parallel block runs in its own interpreter context with **captured lexical 
 #   pmap { $_ * 2 } @list              # block form  ($_ = element)
 #   pmap $_ * 2, @list                 # expression form
 #   pmap double, @list                 # bare-fn form (sub double { $_0 * 2 })
-my @doubled = @data |> pmap $_ * 2 , progress => 1;
-my @evens   = @data |> pgrep $_ % 2 == 0;
-my @sorted  = @data |> psort { $a <=> $b };
-my $sum     = @numbers |> preduce { $a + $b };
-pfor process, @items;
-my @hashes  = pmap sha256, @blobs, progress => 1;     # bare-fn
+my @doubled = @data |> pmap $_ * 2 , progress => 1my @evens   = @data |> pgrep $_ % 2 == 0my @sorted  = @data |> psort { $a <=> $b }my $sum     = @numbers |> preduce { $a + $b }pfor process, @itemsmy @hashes  = pmap sha256, @blobs, progress => 1     # bare-fn
 
 # fused map+reduce, chunked map, memoized map, init fold
-my $sum2     = @nums |> pmap_reduce { $_ * 2 } { $a + $b };
-my @squared  = @million |> pmap_chunked 1000 { $_ ** 2 };
-my @once     = @inputs |> pcache expensive;
-my $hist     = @words |> preduce_init {}, { my ($acc, $x) = @_; $acc->{$x}++; $acc };
-
+my $sum2     = @nums |> pmap_reduce { $_ * 2 } { $a + $b }my @squared  = @million |> pmap_chunked 1000 { $_ ** 2 }my @once     = @inputs |> pcache expensivemy $hist     = @words |> preduce_init {}, { my ($acc, $x) = @_; $acc->{$x}++; $acc }
 # fan — run a block or fn N times in parallel ($_/$_0 = index 0..N-1)
-fan 8, work;                       # bare-fn form: fan N, FUNC
-fan work, progress => 1;           # uses rayon pool size (`pe -j`)
-fan 8 { work($_) };                # block form
-fan { work($_) };                  # block form, pool-sized
-my @r = fan_cap 8, compute;        # capture results in index order
-my @r = fan_cap 8 { $_ * $_ };     # block form, capture
+fan 8, work                       # bare-fn form: fan N, FUNC
+fan work, progress => 1           # uses rayon pool size (`pe -j`)
+fan 8 { work($_) }                # block form
+fan { work($_) }                  # block form, pool-sized
+my @r = fan_cap 8, compute        # capture results in index order
+my @r = fan_cap 8 { $_ * $_ }     # block form, capture
 
 # pipelines — sequential or rayon-backed; same chain methods
-my @r = (@data |> pipeline)->filter({ $_ > 10 })->map({ $_ * 2 })->take(100)->collect;
-### or 
-my @r = @data |> pipeline |> filter $_ > 10 |> map $_ * 2 |> take 100 |> collect;
-my @r = @data |> par_pipeline |> filter  $_ > 10 |> map $_ * 2 |> collect;
-
+my @r = (@data |> pipeline)->filter({ $_ > 10 })->map({ $_ * 2 })->take(100)->collect### or 
+my @r = @data |> pipeline |> filter $_ > 10 |> map $_ * 2 |> take 100 |> collectmy @r = @data |> par_pipeline |> filter  $_ > 10 |> map $_ * 2 |> collect
 # multi-stage: batch (each stage drains list before next)
 my $n = par_pipeline(
     source  => { readline(STDIN) },
     stages  => [ parse_json, transform ],
     workers => [4, 2],
     buffer  => 256,
-);
-
+)
 # multi-stage: streaming (bounded crossbeam channels, concurrent stages, order NOT preserved)
-my @r = ((1..1_000) |> par_pipeline_stream)->filter({ $_ > 500 })->map({ $_ * 2 })->collect();
-## or
-my @r = (1..1_000) |> par_pipeline_stream |> filter $_ > 500 |> map $_ * 2 |> collect;
-
+my @r = ((1..1_000) |> par_pipeline_stream)->filter({ $_ > 500 })->map({ $_ * 2 })->collect()## or
+my @r = (1..1_000) |> par_pipeline_stream |> filter $_ > 500 |> map $_ * 2 |> collect
 # channels + Go-style select
-my ($tx, $rx) = pchannel(128);           # bounded; pchannel() is unbounded
-my ($val, $idx) = pselect($rx1, $rx2);
-my ($v, $i)     = pselect($rx1, $rx2, timeout => 0.5);   # $i == -1 on timeout
+my ($tx, $rx) = pchannel(128)           # bounded; pchannel() is unbounded
+my ($val, $idx) = pselect($rx1, $rx2)my ($v, $i)     = pselect($rx1, $rx2, timeout => 0.5)   # $i == -1 on timeout
 
 # barrier — N workers rendezvous
-my $sync = barrier(3);
-# p is alias to say
-fan 3 { $sync->wait; p "all arrived" };
-
+my $sync = barrier(3)# p is alias to say
+fan 3 { $sync->wait; p "all arrived" }
 # persistent thread pool (avoids per-task spawn from pmap/pfor)
-my $pool = ppool(4);
-$pool->submit({ heavy_work($_) }) for @tasks;
-my @results = $pool->collect();
-
+my $pool = ppool(4)$pool->submit({ heavy_work($_) }) for @tasksmy @results = $pool->collect()
 # parallel file IO
-my @logs = "**/*.log" |> glob_par;              # rayon recursive glob
-par_lines "./big.log", { p if /ERROR/ };  # mmap + chunked line scan
-par_walk  ".", { p if /\.rs$/ };              # parallel directory walk
-par_sed qr/\bfoo\b/, "bar", @paths;             # parallel in-place sed (returns # changed)
-my @rs = par_find_files "src", "*.rs";           # parallel recursive file search by glob
-my $n  = par_line_count @rs;                     # parallel line count across files
+my @logs = "**/*.log" |> glob_par              # rayon recursive glob
+par_lines "./big.log", { p if /ERROR/ }  # mmap + chunked line scan
+par_walk  ".", { p if /\.rs$/ }              # parallel directory walk
+par_sed qr/\bfoo\b/, "bar", @paths             # parallel in-place sed (returns # changed)
+my @rs = par_find_files "src", "*.rs"           # parallel recursive file search by glob
+my $n  = par_line_count @rs                     # parallel line count across files
 
 # native file watcher (notify crate: inotify/kqueue/FSEvents)
-watch  "/tmp/x", p;
-pwatch "logs/*", heavy;
-
+watch  "/tmp/x", ppwatch "logs/*", heavy
 # control thread count
 pe -j 8 -e '@data |> pmap heavy'
 
 # distributed pmap over an SSH worker pool — see [0x10] for details
-my $cluster = cluster(["build1:8", "build2:16"]);
-my @r = @huge |> pmap_on $cluster heavy;
-```
+my $cluster = cluster(["build1:8", "build2:16"])my @r = @huge |> pmap_on $cluster heavy```
 
 **Parallel capture safety** — workers set `Scope::parallel_guard` after restoring captured lexicals. Assignments to captured non-`mysync` aggregates are rejected at runtime; `mysync`, package-qualified names, and topics (`$_`/`$a`/`$b`) are allowed. `pmap`/`pgrep` treat block failures as `undef`/false; use `pfor` when failures must abort.
 
@@ -234,20 +209,17 @@ my @r = @huge |> pmap_on $cluster heavy;
 ```perl
 t 10 >{fan `say "outer topic is $_< and inner topic is $_"`}
 
-$_ = 100;
-my @r = fan_cap 3 { $_< };               # each worker sees outer topic → (100, 100, 100)
+$_ = 100my @r = fan_cap 3 { $_< }               # each worker sees outer topic → (100, 100, 100)
 
-$_ = 100;
-my @r = fan_cap 2 {
-    my $outer = $_<;                      # 100
-    my $cr = sub { $outer + $_< };        # $_< inside sub = caller's $_
-    $cr->($_);                            # fan sets $_ = 0, 1
-};                                        # @r = (100, 101)
+$_ = 100my @r = fan_cap 2 {
+    my $outer = $_<                      # 100
+    my $cr = sub { $outer + $_< }        # $_< inside sub = caller's $_
+    $cr->($_)                            # fan sets $_ = 0, 1
+}                                        # @r = (100, 101)
 
-$_ = 50; t 10 >{ $_ + $_< };             # 60 — thread sub stage accesses outer topic
+$_ = 50; t 10 >{ $_ + $_< }             # 60 — thread sub stage accesses outer topic
 
-$_ = "outer";
-fan_cap 1 { $_ = "inner"; "$_< $_" };    # "outer inner" — interpolation works
+$_ = "outer"fan_cap 1 { $_ = "inner"; "$_< $_" }    # "outer inner" — interpolation works
 ```
 
 ---
@@ -257,20 +229,12 @@ fan_cap 1 { $_ = "inner"; "$_< $_" };    # "outer inner" — interpolation works
 `mysync` declares variables backed by `Arc<Mutex>` shared across parallel blocks. Compound ops (`++`, `+=`, `.=`, `|=`, `&=`) hold the lock for the full read-modify-write cycle — fully atomic.
 
 ```perl
-mysync $counter = 0;
-fan 10000 { $counter++ };               # always exactly 10000
-print $counter;
-
-mysync @results;
-(1..100) |> pfor { push @results, $_ * $_ };
-
-mysync %histogram;
-(0..999) |> pfor { $histogram{$_ % 10} += 1 };
-
+mysync $counter = 0fan 10000 { $counter++ }               # always exactly 10000
+print $counter
+mysync @results(1..100) |> pfor { push @results, $_ * $_ }
+mysync %histogram(0..999) |> pfor { $histogram{$_ % 10} += 1 }
 # deque() and heap(...) already use Arc<Mutex<...>> internally
-mysync $q  = deque();
-mysync $pq = heap { $a <=> $b };
-```
+mysync $q  = deque()mysync $pq = heap { $a <=> $b }```
 
 For `mysync` scalars holding a `Set`, `|`/`&` are union/intersection. Without `mysync`, each thread gets an independent copy.
 
@@ -292,39 +256,29 @@ For `mysync` scalars holding a `Set`, `|`/`&` are union/intersection. Without `m
 | **Structs / Enums / Types** | `struct Name { x => Float, y => Int }; Name(x => 1, y => 2)`; `enum Color { Red, Green, Blue }; Color::Red()`; `typed my $x : Int\|Str\|Float`; typed sub params `fn ($a: Int, $b: Str) { }` |
 
 ```perl
-my $data = "https://api.example.com/users/1" |> fetch_json;
-p $data->{name};
-
+my $data = "https://api.example.com/users/1" |> fetch_jsonp $data->{name}
 # Built-in HTTP server — one-liner web API
 serve 8080, fn ($req) {
     # $req = { method, path, query, headers, body, peer }
-    my $data = +{ path => $req->{path}, method => $req->{method} };
-    status => 200, body => json_encode($data)
-};
-# or with workers: serve 8080, $handler, { workers => 16 };
-# JSON content-type auto-detected; undef returns 404
+    my $data = +{ path => $req->{path}, method => $req->{method} }    status => 200, body => json_encode($data)
+}# or with workers: serve 8080, $handler, { workers => 16 }# JSON content-type auto-detected; undef returns 404
 
-my @rows = "data.csv" |> csv_read;
-my $df   = "data.csv" |> dataframe;
-my $db   = "app.db" |> sqlite;
-$db->exec("CREATE TABLE t (id INTEGER, name TEXT)");
-
+my @rows = "data.csv" |> csv_readmy $df   = "data.csv" |> dataframemy $db   = "app.db" |> sqlite$db->exec("CREATE TABLE t (id INTEGER, name TEXT)")
 # ─── Structs ────────────────────────────────────────────────────────
 # Declaration: typed fields, optional defaults, or bare (Any type)
-struct Point { x => Float, y => Float };
-struct Point { x => Float = 0.0, y => Float = 0.0 };   # with defaults
-struct Pair { key, value };                             # untyped (Any)
+struct Point { x => Float, y => Float }struct Point { x => Float = 0.0, y => Float = 0.0 }   # with defaults
+struct Pair { key, value }                             # untyped (Any)
 
 # Construction: function-call, positional, or traditional ->new
-my $p = Point(x => 1.5, y => 2.0);   # function-call with named args
-my $p = Point(1.5, 2.0);             # positional (declaration order)
-my $p = Point->new(x => 1.5, y => 2.0); # traditional OO style
-my $p = Point();                     # uses defaults if defined
+my $p = Point(x => 1.5, y => 2.0)   # function-call with named args
+my $p = Point(1.5, 2.0)             # positional (declaration order)
+my $p = Point->new(x => 1.5, y => 2.0) # traditional OO style
+my $p = Point()                     # uses defaults if defined
 
 # Field access: getter (0 args) or setter (1 arg)
-p $p->x;       # 1.5 — getter
-$p->x(3.0);    # setter
-p $p->x;       # 3.0
+p $p->x       # 1.5 — getter
+$p->x(3.0)    # setter
+p $p->x       # 3.0
 
 # User-defined methods
 struct Circle {
@@ -334,68 +288,61 @@ struct Circle {
         Circle(radius => $self->radius * $factor)
     }
 }
-my $c = Circle(radius => 5);
-p $c->area;                          # 78.53975
-p $c->scale(2);                      # Circle(radius => 10)
+my $c = Circle(radius => 5)p $c->area                          # 78.53975
+p $c->scale(2)                      # Circle(radius => 10)
 
 # Built-in methods
-my $q = $p->with(y => 5);            # functional update — new instance
-my $h = $p->to_hash;                 # { x => 3.0, y => 5 }
-my @f = $p->fields;                  # (x, y)
-my $c = $p->clone;                   # deep copy
+my $q = $p->with(y => 5)            # functional update — new instance
+my $h = $p->to_hash                 # { x => 3.0, y => 5 }
+my @f = $p->fields                  # (x, y)
+my $c = $p->clone                   # deep copy
 
 # Smart stringify — print shows struct name and fields
-p $p;                                # Point(x => 3, y => 2)
+p $p                                # Point(x => 3, y => 2)
 
 # Structural equality — compares all fields
-my $a = Point(1, 2);
-my $b = Point(1, 2);
-p $a == $b;                          # 1 (equal)
+my $a = Point(1, 2)my $b = Point(1, 2)p $a == $b                          # 1 (equal)
 # ────────────────────────────────────────────────────────────────────
 
 # ─── Enums (algebraic data types) ───────────────────────────────────
 # Declaration: variants with optional typed data
-enum Color { Red, Green, Blue };              # unit variants (no data)
-enum Maybe { None, Some => Any };             # Some carries any value
-enum Result { Ok => Int, Err => Str };        # typed data per variant
+enum Color { Red, Green, Blue }              # unit variants (no data)
+enum Maybe { None, Some => Any }             # Some carries any value
+enum Result { Ok => Int, Err => Str }        # typed data per variant
 
 # Construction: Enum::Variant() syntax
-my $c = Color::Red();                         # unit variant
-my $m = Maybe::Some(42);                      # variant with data
-my $r = Result::Err("not found");             # typed variant
+my $c = Color::Red()                         # unit variant
+my $m = Maybe::Some(42)                      # variant with data
+my $r = Result::Err("not found")             # typed variant
 
 # Smart stringify — shows enum name, variant, and data
-p $c;                                # Color::Red
-p $m;                                # Maybe::Some(42)
-p $r;                                # Result::Err(not found)
+p $c                                # Color::Red
+p $m                                # Maybe::Some(42)
+p $r                                # Result::Err(not found)
 
 # Type checking on variants with data
-# Result::Ok("bad");                 # ERROR: expected Int
-# Maybe::Some();                     # ERROR: requires data
-# Color::Red(42);                    # ERROR: does not take data
+# Result::Ok("bad")                 # ERROR: expected Int
+# Maybe::Some()                     # ERROR: requires data
+# Color::Red(42)                    # ERROR: does not take data
 # ────────────────────────────────────────────────────────────────────
 
-typed my $n : Int = 42;
-
+typed my $n : Int = 42
 # Typed sub parameters — runtime type checking on call
-my $add = fn ($a: Int, $b: Int) { $a + $b };
-p $add->(3, 4);                              # 7
-# $add->("x", 1);                            # ERROR: sub parameter $a: expected Int
+my $add = fn ($a: Int, $b: Int) { $a + $b }p $add->(3, 4)                              # 7
+# $add->("x", 1)                            # ERROR: sub parameter $a: expected Int
 
 sub greet ($name: Str) { "Hello, $name!" }
-p greet("world");                            # Hello, world!
+p greet("world")                            # Hello, world!
 
 # stringify/str — convert any value to a parseable perlrs literal
-my $data = {a => [1, 2], b => "hello"};
-my $s = str $data;                           # +{a => [1, 2], b => "hello"}
-my $copy = eval $s;                          # round-trip via eval
-p $copy->{a}[0];                             # 1
+my $data = {a => [1, 2], b => "hello"}my $s = str $data                           # +{a => [1, 2], b => "hello"}
+my $copy = eval $s                          # round-trip via eval
+p $copy->{a}[0]                             # 1
 
 # stringify works with functions (first-class serialization)
-my $f = fn ($x: Int) { $x * 2 };
-p str $f;                                    # sub ($x: Int) { $x * 2; }
-my $f2 = eval str $f;                        # round-trip: deserialize back to callable
-p $f2->(21);                                 # 42
+my $f = fn ($x: Int) { $x * 2 }p str $f                                    # sub ($x: Int) { $x * 2; }
+my $f2 = eval str $f                        # round-trip: deserialize back to callable
+p $f2->(21)                                 # 42
 
 # streaming range — bidirectional lazy iterator
 range(1, 5) |> e p                          # 1 2 3 4 5
@@ -407,13 +354,12 @@ range(5, 1) |> e p                          # 5 4 3 2 1
 Native sets deduplicate by value (internal canonical keys; insertion order preserved for `->values`). Use the **`set(LIST)`** builtin or **`Set->new(LIST)`**; **`|>`** can supply the list. **`|`** / **`&`** are union / intersection when either side is a set (otherwise bitwise int ops).
 
 ```perl
-my $s = set(1, 2, 2, 3);                 # 3 members
-my $t = (1, 1, 2, 4) |> set;
-my $u = $s | $t;                         # union
-my $i = $s & $t;                         # intersection
-$s->has(2);                              # 1 / 0  (also ->contains / ->member)
-$s->size;                                # count (->len / ->count)
-my @v = $s->values; # array in insertion order
+my $s = set(1, 2, 2, 3)                 # 3 members
+my $t = (1, 1, 2, 4) |> setmy $u = $s | $t                         # union
+my $i = $s & $t                         # intersection
+$s->has(2)                              # 1 / 0  (also ->contains / ->member)
+$s->size                                # count (->len / ->count)
+my @v = $s->values # array in insertion order
 
 # mysync: compound |= and &= update shared sets (see [0x04])
 ```
@@ -424,29 +370,17 @@ my @v = $s->values; # array in insertion order
 
 ```perl
 # async / spawn / await — lightweight structured concurrency
-my $data = async { "https://example.com/" |> fetch };
-my $file = spawn { "big.csv" |> \&slurp };
-print await($data), await($file);
-
+my $data = async { "https://example.com/" |> fetch }my $file = spawn { "big.csv" |> \&slurp }print await($data), await($file)
 # trace mysync mutations to stderr (under fan, lines tagged with worker index)
-mysync $counter = 0;
-trace { fan 10 { $counter++ } };
-
+mysync $counter = 0trace { fan 10 { $counter++ } }
 # timer / bench — wall-clock millis; bench returns "min/mean/p99"
-my $ms     = timer heavy_work;
-my $report = bench heavy_work 1000;
-
+my $ms     = timer heavy_workmy $report = bench heavy_work 1000
 # eval_timeout — runs block on a worker thread; recv_timeout on main
-eval_timeout 5 slow;
-
+eval_timeout 5 slow
 # retry / rate_limit / every (tree interpreter only)
-retry http_call times => 3, backoff => exponential;
-rate_limit(10, "1s") hit_api;
-every "500ms" tick;
-
+retry http_call times => 3, backoff => exponentialrate_limit(10, "1s") hit_apievery "500ms" tick
 # generators — lazy `yield` values
-my $g = gen { yield $_ for 1..5 };
-my $next = $g->next;                    # [value, more]
+my $g = gen { yield $_ for 1..5 }my $next = $g->next                    # [value, more]
 ```
 
 ---
@@ -547,12 +481,11 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **`chunked` / `windowed` / `fold`** — Use **pipe-forward**: **`LIST |> chunked(N)`**, **`LIST |> windowed(N)`**, **`LIST |> fold { BLOCK }`** (same for **`reduce`**). `List::Util::fold` / **`qw(...) |> List::Util::fold { }`** alias **`List::Util::reduce`**. List context → arrayrefs per chunk/window or the folded value; scalar context → chunk/window count where applicable.
 
   ```perl
-  my @pairs = (1, 2, 3, 4) |> chunked(2);           # ([1,2], [3,4])
-  my @slide = (1, 2, 3) |> windowed(2);             # ([1,2], [2,3])
-  my @pipe  = (10, 20, 30) |> chunked(2);           # ([10,20], [30])
-  my $sum   = (1, 2, 3, 4) |> fold { $a + $b };     # same as reduce
-  my $cat   = qw(a b c) |> fold { $a . $b };
-  ```
+  my @pairs = (1, 2, 3, 4) |> chunked(2)           # ([1,2], [3,4])
+  my @slide = (1, 2, 3) |> windowed(2)             # ([1,2], [2,3])
+  my @pipe  = (10, 20, 30) |> chunked(2)           # ([10,20], [30])
+  my $sum   = (1, 2, 3, 4) |> fold { $a + $b }     # same as reduce
+  my $cat   = qw(a b c) |> fold { $a . $b }  ```
 - **`use strict`** — refs/subs/vars modes (per-mode `use strict 'refs'` etc.). `strict refs` rejects symbolic derefs at runtime; `strict vars` requires a visible binding.
 - **`BEGIN` / `UNITCHECK` / `CHECK` / `INIT` / `END`** — Perl order; `${^GLOBAL_PHASE}` matches Perl in tree-walker and VM.
 - **String interpolation** — `$var` `#{23 * 52}`, `$h{k}`, `$a[i]`, `@a`, `@a[slice]` (joined with `$"`), `$#a` in slice indices, `$0`, `$1..$n`. Escapes: `\n \r \t \a \b \f \e \0`, `\x{hex}`, `\xHH`, `\u{hex}`, `\o{oct}`, `\NNN` (octal), `\cX` (control), `\N{U+hex}`, `\N{UNICODE NAME}`, `\U..\E`, `\L..\E`, `\u`, `\l`, `\Q..\E`.
@@ -576,25 +509,22 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **Functional composition** — `compose`, `partial`, `curry`, `memoize`, `once`, `constantly`, `complement`, `juxt`, `fnil`:
 
   ```perl
-  my $f = compose(sub { $_ + 1 }, sub { $_ * 2 });
-  $f->(5);                                            # 11 (double then inc)
+  my $f = compose(sub { $_ + 1 }, sub { $_ * 2 })  $f->(5)                                            # 11 (double then inc)
 
-  my $add5 = partial(sub { $_[0] + $_[1] }, 5);
-  $add5->(3);                                         # 8
+  my $add5 = partial(sub { $_[0] + $_[1] }, 5)  $add5->(3)                                         # 8
 
-  my $cadd = curry(sub { $_[0] + $_[1] }, 2);
-  $cadd->(1)->(2);                                    # 3
+  my $cadd = curry(sub { $_[0] + $_[1] }, 2)  $cadd->(1)->(2)                                    # 3
 
-  my $fib = memoize(sub { ... });                     # cached by args
-  my $init = once(sub { expensive_setup() });         # called at most once
+  my $fib = memoize(sub { ... })                     # cached by args
+  my $init = once(sub { expensive_setup() })         # called at most once
   ```
 - **Deep structure utilities** — `deep_clone`/`dclone`, `deep_merge`/`dmerge`, `deep_equal`/`deq`, `tally`:
 
   ```perl
-  my $b = deep_clone($a);                             # recursive deep copy
-  my $m = deep_merge(\%a, \%b);                       # recursive hash merge
-  deep_equal([1,2,{x=>3}], [1,2,{x=>3}]);            # 1 (structural eq)
-  my $t = tally("a","b","a");                         # {a => 2, b => 1}
+  my $b = deep_clone($a)                             # recursive deep copy
+  my $m = deep_merge(\%a, \%b)                       # recursive hash merge
+  deep_equal([1,2,{x=>3}], [1,2,{x=>3}])            # 1 (structural eq)
+  my $t = tally("a","b","a")                         # {a => 2, b => 1}
   ```
 - **Outer topic `$_<`** — access the enclosing scope's `$_` from nested blocks; up to 4 levels (`$_<` through `$_<<<<`). See [\[0x03\]](#0x03-parallel-primitives).
 - **`fore`** (`e`) — side-effect-only list iterator (like `map` but void, returns item count). Works with `{ BLOCK } LIST`, blockless `e EXPR, LIST`, and pipe-forward `|> e say`. Use for print/log/accumulator loops.
@@ -602,23 +532,22 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   ```perl
   # chain HTTP fetch → JSON decode → jq filter
-  my @titles = $url |> fetch_json |> json_decode |> json_jq '.articles[].title';
-
+  my @titles = $url |> fetch_json |> json_decode |> json_jq '.articles[].title'
   # blockless list pipelines — no braces needed for simple expressions
   files |> filter /[a-e]/ |> e -f $_ && system("cat $_")
   "a".."z" |> map uc |> e p                      # A B C … Z
   "a".."z" |> grep /[aeiou]/ |> e p              # a e i o u
   "a".."z" |> filter 't' |> e p                  # t  (literal = equality test)
   1..10 |> filter $_ > 5 |> sort |> e p      # blocks still work
-  1..5 |> map $_ * $_ |> join "," |> p;         # 1,4,9,16,25
+  1..5 |> map $_ * $_ |> join "," |> p         # 1,4,9,16,25
 
   # e — side-effect-only iteration (like map but void, returns count)
   qw(apple banana cherry) |> grep /^a/ |> map uc |> e p  # APPLE
 
   # unary builtins — `x |> length`, `x |> uc`, `x |> sqrt`, etc.
-  "hello" |> length |> p;                            # 5
-  16 |> sqrt |> p;                                   # 4
-  "ff" |> hex |> p;                                  # 255
+  "hello" |> length |> p                            # 5
+  16 |> sqrt |> p                                   # 4
+  "ff" |> hex |> p                                  # 255
 
   # bareword on RHS becomes a unary call: `x |> f` → `f(x)`
   # call on RHS prepends: `x |> f(a, b)` → `f(x, a, b)`
@@ -628,11 +557,11 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   # regex ops in pipelines — s///, tr///, and m// work as RHS of |>
   # s/// and tr/// auto-inject /r so the modified string flows through:
-  "hello world" |> s/world/perl/  |> p;              # hello perl
-  "hello world" |> tr/a-z/A-Z/   |> p;              # HELLO WORLD
+  "hello world" |> s/world/perl/  |> p              # hello perl
+  "hello world" |> tr/a-z/A-Z/   |> p              # HELLO WORLD
 
   # m//g extracts all matches as an array:
-  "foo123bar456" |> /\d+/g |> p;                     # 123 456
+  "foo123bar456" |> /\d+/g |> p                     # 123 456
 
   # full pipeline: read input, strip newlines, split, count word frequencies
   # man ls | pe -e 'input |> s@\n@@g |> split |> frequencies |> ddump |> p'
@@ -641,8 +570,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   # cat log.txt | pe -e 'input |> /[\w.]+@[\w.]+/g |> distinct |> e p'
 
   # capture groups with /g:
-  "a=1 b=2" |> /(\w+)=(\w+)/g |> ddump |> p;
-  ```
+  "a=1 b=2" |> /(\w+)=(\w+)/g |> ddump |> p  ```
 
   **Pipeline builtins** — designed for `|>` chains:
 
@@ -653,53 +581,46 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   # cat data.txt | pe -e 'input |> lines |> e p'
 
   # ── string → list ──────────────────────────────────────────────────
-  "hello\nworld" |> lines |> ddump |> p;       # ("hello", "world")
-  "foo bar baz"  |> words |> ddump |> p;       # ("foo", "bar", "baz")
-  "hello"        |> chars |> ddump |> p;       # ("h","e","l","l","o")
-  "  hello  "    |> trim  |> p;                # "hello"
+  "hello\nworld" |> lines |> ddump |> p       # ("hello", "world")
+  "foo bar baz"  |> words |> ddump |> p       # ("foo", "bar", "baz")
+  "hello"        |> chars |> ddump |> p       # ("h","e","l","l","o")
+  "  hello  "    |> trim  |> p                # "hello"
 
   # ── case conversion ────────────────────────────────────────────────
-  "helloWorld"     |> snake_case  |> p;   # hello_world
-  "hello_world"    |> camel_case  |> p;   # helloWorld
-  "Hello World"    |> kebab_case  |> p;   # hello-world
+  "helloWorld"     |> snake_case  |> p   # hello_world
+  "hello_world"    |> camel_case  |> p   # helloWorld
+  "Hello World"    |> kebab_case  |> p   # hello-world
 
   # ── aggregation / stats ────────────────────────────────────────────
-  1 .. 100 |> avg    |> p;                # 50.5
-  1 .. 100 |> stddev |> p;                # 28.86607…
-  "hello"  |> chars  |> frequencies |> ddump |> p;
-  # { h => 1, e => 1, l => 2, o => 1 }
+  1 .. 100 |> avg    |> p                # 50.5
+  1 .. 100 |> stddev |> p                # 28.86607…
+  "hello"  |> chars  |> frequencies |> ddump |> p  # { h => 1, e => 1, l => 2, o => 1 }
 
   # ── frequencies + top ──────────────────────────────────────────────
-  "the quick brown fox" |> chars |> frequencies |> top 3 |> ddump |> p;
-  # top 3 chars by count
+  "the quick brown fox" |> chars |> frequencies |> top 3 |> ddump |> p  # top 3 chars by count
 
   # ── count_by { BLOCK } LIST ────────────────────────────────────────
-  1 .. 20 |> count_by { $_ % 2 == 0 ? "even" : "odd" } |> ddump |> p;
-  # { odd => 10, even => 10 }
+  1 .. 20 |> count_by { $_ % 2 == 0 ? "even" : "odd" } |> ddump |> p  # { odd => 10, even => 10 }
 
   # ── numeric transforms ─────────────────────────────────────────────
-  1 .. 10  |> clamp 3, 7    |> ddump |> p;   # 3 3 3 4 5 6 7 7 7 7
-  1 .. 5   |> normalize     |> ddump |> p;   # 0 0.25 0.5 0.75 1
+  1 .. 10  |> clamp 3, 7    |> ddump |> p   # 3 3 3 4 5 6 7 7 7 7
+  1 .. 5   |> normalize     |> ddump |> p   # 0 0.25 0.5 0.75 1
 
   # ── inverse grep (regex) ───────────────────────────────────────────
-  1 .. 10 |> grep_v "^[35]$" |> ddump |> p;  # removes 3 and 5
+  1 .. 10 |> grep_v "^[35]$" |> ddump |> p  # removes 3 and 5
 
   # ── hash manipulation ──────────────────────────────────────────────
-  my $h = {a => 1, b => 2, c => 3};
-  $h |> select_keys "a", "c" |> ddump |> p;  # { a => 1, c => 3 }
+  my $h = {a => 1, b => 2, c => 3}  $h |> select_keys "a", "c" |> ddump |> p  # { a => 1, c => 3 }
 
   # ── pluck key from list of hashrefs ────────────────────────────────
-  my @people = ({name=>"Alice",age=>30}, {name=>"Bob",age=>25});
-  @people |> pluck "name" |> ddump |> p;      # ("Alice", "Bob")
+  my @people = ({name=>"Alice",age=>30}, {name=>"Bob",age=>25})  @people |> pluck "name" |> ddump |> p      # ("Alice", "Bob")
 
   # ── serialization ──────────────────────────────────────────────────
-  my $data = {a => 1, b => [2,3]};
-  $data |> to_json |> p;                        # {"a":1,"b":[2,3]}
-  @people |> to_csv |> p;                      # CSV with headers
-  my $cfg = {title => "My App", package => {name => "myapp", version => "1.0"}};
-  $cfg |> to_toml |> p;                         # TOML with [package] table
-  $data |> to_yaml |> p;                        # YAML with --- header
-  $data |> to_xml  |> p;                        # XML with <root> wrapper
+  my $data = {a => 1, b => [2,3]}  $data |> to_json |> p                        # {"a":1,"b":[2,3]}
+  @people |> to_csv |> p                      # CSV with headers
+  my $cfg = {title => "My App", package => {name => "myapp", version => "1.0"}}  $cfg |> to_toml |> p                         # TOML with [package] table
+  $data |> to_yaml |> p                        # YAML with --- header
+  $data |> to_xml  |> p                        # XML with <root> wrapper
   fr |> map +{name => $_, size => format_bytes(size)} |> th |> to_file("report.html") |> xopen  # cyberpunk HTML table → browser
   fr |> map +{name => $_, size => format_bytes(size)} |> tmd |> to_file("report.md") |> xopen  # GFM Markdown table → viewer
   # same pipelines in thread syntax:
@@ -710,51 +631,47 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   # ── data visualization ─────────────────────────────────────────────
   # sparkline — inline Unicode trend line from numbers
-  (3,7,1,9,4,2,8,5) |> spark |> p;                                      # ▃▆▁█▄▂▇▅
-  map { int(rand(100)) } 1..20 |> spark |> p;                            # random sparkline
+  (3,7,1,9,4,2,8,5) |> spark |> p                                      # ▃▆▁█▄▂▇▅
+  map { int(rand(100)) } 1..20 |> spark |> p                            # random sparkline
 
   # bar_chart (bars) — horizontal colored bars from hashref
-  qw(a b a c a b) |> freq |> bars |> p;                                  # word frequency bars
-  cat("Cargo.toml") |> words |> freq |> bars |> p;                       # word freq from file
-  fr |> map { path_ext($_) } |> freq |> bars |> p;                       # file extension breakdown
+  qw(a b a c a b) |> freq |> bars |> p                                  # word frequency bars
+  cat("Cargo.toml") |> words |> freq |> bars |> p                       # word freq from file
+  fr |> map { path_ext($_) } |> freq |> bars |> p                       # file extension breakdown
 
   # histo — vertical histogram, top N by count
-  cat("Cargo.toml") |> chars |> freq |> histo |> p;                      # character distribution
-  map { int(rand(10)) } 1..100 |> freq |> histo |> p;                    # dice roll distribution
+  cat("Cargo.toml") |> chars |> freq |> histo |> p                      # character distribution
+  map { int(rand(10)) } 1..100 |> freq |> histo |> p                    # dice roll distribution
 
   # to_table (tbl) — plain-text column-aligned table with box drawing
-  qw(a b a c a b) |> freq |> tbl |> p;                                   # freq as table
-  fr |> map +{name => $_, size => format_bytes(size)} |> tbl |> p;        # file listing table
-  fr |> map +{name => $_, ext => path_ext($_)} |> tbl |> p;               # files with extensions
+  qw(a b a c a b) |> freq |> tbl |> p                                   # freq as table
+  fr |> map +{name => $_, size => format_bytes(size)} |> tbl |> p        # file listing table
+  fr |> map +{name => $_, ext => path_ext($_)} |> tbl |> p               # files with extensions
 
   # flame — terminal flamechart from nested hashrefs
   flame({main => {parse => 30, eval => {compile => 15, run => 45}}, init => 10}) |> p
-  cat("Cargo.toml") |> chars |> freq |> flame |> p;                      # flat flame from char freq
+  cat("Cargo.toml") |> chars |> freq |> flame |> p                      # flat flame from char freq
 
   # gauge — single-value progress bar with color coding
-  p gauge(0.73);                                      # [██████████████████████░░░░░░░░] 73%
-  p gauge(45, 100);                                   # value/max form
-  fr |> cnt |> gauge($_, 500) |> p;                   # file count vs target
+  p gauge(0.73)                                      # [██████████████████████░░░░░░░░] 73%
+  p gauge(45, 100)                                   # value/max form
+  fr |> cnt |> gauge($_, 500) |> p                   # file count vs target
 
   # spinner — animated braille spinner while block runs
-  my $r = spinner "loading" { sleep 2; 42 };          # returns block result
-  my $data = spinner "fetching" { fetch_json($url) }; # wrap any slow operation
+  my $r = spinner "loading" { sleep 2; 42 }          # returns block result
+  my $data = spinner "fetching" { fetch_json($url) } # wrap any slow operation
   # spinner_start / spinner_stop — manual control for multi-step work
-  my $s = spinner_start("processing");
-  do_step1(); do_step2(); do_step3();
-  spinner_stop($s);
-
+  my $s = spinner_start("processing")  do_step1(); do_step2(); do_step3()  spinner_stop($s)
   # clip — copy pipeline output to clipboard
-  fr |> map +{name => $_, size => format_bytes(size)} |> tmd |> clip;    # markdown table → clipboard
-  cat("Cargo.toml") |> words |> freq |> tbl |> clip;                     # table → clipboard
+  fr |> map +{name => $_, size => format_bytes(size)} |> tmd |> clip    # markdown table → clipboard
+  cat("Cargo.toml") |> words |> freq |> tbl |> clip                     # table → clipboard
 
   # combine charts: same data, multiple views
-  my %f = %{cat("Cargo.toml") |> words |> freq};
-  %f |> bars |> p;                                    # horizontal bars
-  %f |> histo |> p;                                   # vertical histogram
-  %f |> tbl |> p;                                     # aligned table
-  %f |> flame |> p;                                   # flamechart
-  values %f |> spark |> p;                            # inline sparkline
+  my %f = %{cat("Cargo.toml") |> words |> freq}  %f |> bars |> p                                    # horizontal bars
+  %f |> histo |> p                                   # vertical histogram
+  %f |> tbl |> p                                     # aligned table
+  %f |> flame |> p                                   # flamechart
+  values %f |> spark |> p                            # inline sparkline
 
   # thread syntax equivalents — no |> needed
   t qw(a b a c a b) freq bars p
@@ -763,50 +680,40 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   t (3,7,1,9,4) spark p
 
   # ── inline ANSI colors ─────────────────────────────────────────────
-  p "#{red}ERROR#{off} #{green_bold}OK#{off}";              # color names as #{} builtins
-  p "#{rgb(255,100,0)}ORANGE#{off}";                      # true color (24-bit)
-  p "#{color256(196)}RED#{off}";                          # 256-color palette
+  p "#{red}ERROR#{off} #{green_bold}OK#{off}"              # color names as #{} builtins
+  p "#{rgb(255,100,0)}ORANGE#{off}"                      # true color (24-bit)
+  p "#{color256(196)}RED#{off}"                          # 256-color palette
 
   # ── stringify / str — parseable perlrs literals ──────────────────────
-  $data |> str |> p;                            # +{a => 1, b => [2, 3]}
-  my $fn = fn { $_ * 2 };
-  $fn |> str |> p;                              # sub { $_ * 2; }
-  range(1, 3) |> str |> p;                      # (1, 2, 3)
+  $data |> str |> p                            # +{a => 1, b => [2, 3]}
+  my $fn = fn { $_ * 2 }  $fn |> str |> p                              # sub { $_ * 2; }
+  range(1, 3) |> str |> p                      # (1, 2, 3)
   # round-trip: str -> eval -> callable
-  my $f = fn ($x: Int) { $x + 1 };
-  my $f2 = $f |> str |> eval;
-  $f2->(5) |> p;                                # 6
+  my $f = fn ($x: Int) { $x + 1 }  my $f2 = $f |> str |> eval  $f2->(5) |> p                                # 6
 
   # ── partition / min_by / max_by / zip_with ─────────────────────────
-  my ($yes, $no) = partition { $_ > 5 } 1..10;
-  my $smallest = min_by { length } @words;
-  my $largest  = max_by { length } @words;
-  my @sums = zip_with { $_0 + $_1 } [1,2,3], [10,20,30];  # 11 22 33
+  my ($yes, $no) = partition { $_ > 5 } 1..10  my $smallest = min_by { length } @words  my $largest  = max_by { length } @words  my @sums = zip_with { $_0 + $_1 } [1,2,3], [10,20,30]  # 11 22 33
 
   # ── pretty-print (Data::Dumper style) ──────────────────────────────
-  my $nested = {key => [1, {nested => "val"}]};
-  $nested |> ddump |> p;
-
+  my $nested = {key => [1, {nested => "val"}]}  $nested |> ddump |> p
   # ── write to file (returns content for further piping) ─────────────
-  my $text = "hello\nworld\n";
-  $text |> to_file "/tmp/out.txt";
-
+  my $text = "hello\nworld\n"  $text |> to_file "/tmp/out.txt"
   # ── file I/O helpers ────────────────────────────────────────────────
-  my @lines = read_lines "/tmp/out.txt";        # slurp file → list of lines
-  append_file "/tmp/out.txt", "extra\n";         # append to file
-  my $tmp = tempfile();                          # create temp file, returns path
-  my $dir = tempdir();                           # create temp directory, returns path
+  my @lines = read_lines "/tmp/out.txt"        # slurp file → list of lines
+  append_file "/tmp/out.txt", "extra\n"         # append to file
+  my $tmp = tempfile()                          # create temp file, returns path
+  my $dir = tempdir()                           # create temp directory, returns path
 
   # ── JSON file I/O ──────────────────────────────────────────────────
-  write_json "/tmp/data.json", {a => 1, b => 2}; # write hash as JSON file
-  my $obj = read_json "/tmp/data.json";           # read JSON file → hashref
+  write_json "/tmp/data.json", {a => 1, b => 2} # write hash as JSON file
+  my $obj = read_json "/tmp/data.json"           # read JSON file → hashref
 
   # ── interleave ─────────────────────────────────────────────────────
-  my @merged = interleave [1,2,3], [10,20,30];  # (1,10,2,20,3,30)
+  my @merged = interleave [1,2,3], [10,20,30]  # (1,10,2,20,3,30)
 
   # ── glob_match / which_all ──────────────────────────────────────────
-  p glob_match "*.txt", "readme.txt";          # 1 (matches)
-  my @bins = which_all "perl";                   # all paths for "perl" in $PATH
+  p glob_match "*.txt", "readme.txt"          # 1 (matches)
+  my @bins = which_all "perl"                   # all paths for "perl" in $PATH
   ```
 
   **Blockless `|>` rules for `grep`/`filter`**: string literals test `$_ eq EXPR`, numbers test `$_ == EXPR`, regexes test `$_ =~ EXPR`, anything else (e.g. `defined`) uses standard Perl grep semantics (sets `$_`, evaluates expression).
@@ -952,39 +859,16 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   ```perl
   # Perl 5: needs CPAN modules, verbose method chains
-  use String::CamelCase qw(camelize decamelize);
-  use JSON;
-  my $s = " hello world ";
-  $s =~ s/^\s+|\s+$//g;                    # trim
-  $s = uc($s);
-  $s = reverse($s);
-  $s = lc($s);
-  $s = ucfirst($s);
-  $s =~ s/([A-Z])/_\l$1/g; $s =~ s/^_//;   # snake_case (manual)
-  $s = camelize($s);                        # camel_case (CPAN)
-  $s =~ s/([A-Z])/-\l$1/g; $s =~ s/^-//;   # kebab_case (manual)
-  print encode_json($s), "\n";
-  ```
+  use String::CamelCase qw(camelize decamelize)  use JSON  my $s = " hello world "  $s =~ s/^\s+|\s+$//g                    # trim
+  $s = uc($s)  $s = reverse($s)  $s = lc($s)  $s = ucfirst($s)  $s =~ s/([A-Z])/_\l$1/g; $s =~ s/^_//   # snake_case (manual)
+  $s = camelize($s)                        # camel_case (CPAN)
+  $s =~ s/([A-Z])/-\l$1/g; $s =~ s/^-//   # kebab_case (manual)
+  print encode_json($s), "\n"  ```
 
   ```javascript
   // JavaScript: no built-in case converters, needs helper functions
-  const snakeCase = s => s.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '');
-  const camelCase = s => s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
-  const kebabCase = s => s.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, '');
-  const ucfirst = s => s.charAt(0).toUpperCase() + s.slice(1);
-  const rev = s => s.split('').reverse().join('');
-
-  let s = " hello world ";
-  s = s.trim();
-  s = s.toUpperCase();
-  s = rev(s);
-  s = s.toLowerCase();
-  s = ucfirst(s);
-  s = snakeCase(s);
-  s = camelCase(s);
-  s = kebabCase(s);
-  console.log(JSON.stringify(s));
-  ```
+  const snakeCase = s => s.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '')  const camelCase = s => s.replace(/_([a-z])/g, (_, c) => c.toUpperCase())  const kebabCase = s => s.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, '')  const ucfirst = s => s.charAt(0).toUpperCase() + s.slice(1)  const rev = s => s.split('').reverse().join('')
+  let s = " hello world "  s = s.trim()  s = s.toUpperCase()  s = rev(s)  s = s.toLowerCase()  s = ucfirst(s)  s = snakeCase(s)  s = camelCase(s)  s = kebabCase(s)  console.log(JSON.stringify(s))  ```
 
   ```python
   # Python 3: no built-in case converters, needs helper functions
@@ -1110,35 +994,26 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   thread (1..10) grep { $_0 % 2 == 0 } map { $_0 * $_0 } sum p  # 220
 
   # Multi-arg anonymous subs: $_0, $_1, ... $_N
-  my $add3 = fn { $_0 + $_1 + $_2 };
-  p $add3->(1, 2, 3);                        # 6
+  my $add3 = fn { $_0 + $_1 + $_2 }  p $add3->(1, 2, 3)                        # 6
 
-  my $mul5 = fn { $_0 * $_1 * $_2 * $_3 * $_4 };
-  p $mul5->(1, 2, 3, 4, 5);                  # 120
+  my $mul5 = fn { $_0 * $_1 * $_2 * $_3 * $_4 }  p $mul5->(1, 2, 3, 4, 5)                  # 120
 
-  my $concat = fn { "$_0-$_1-$_2-$_3" };
-  p $concat->("a", "b", "c", "d");           # a-b-c-d
+  my $concat = fn { "$_0-$_1-$_2-$_3" }  p $concat->("a", "b", "c", "d")           # a-b-c-d
 
   # Direct access via @_ still works
-  my $join_args = fn { join("-", @_) };
-  p $join_args->("x", "y", "z");             # x-y-z
+  my $join_args = fn { join("-", @_) }  p $join_args->("x", "y", "z")             # x-y-z
 
   # Using $_0 closures with |> pipes
-  my $double = fn { $_0 * 2 };
-  my $triple = fn { $_0 * 3 };
-  5 |> $double |> $triple |> p               # 30
+  my $double = fn { $_0 * 2 }  my $triple = fn { $_0 * 3 }  5 |> $double |> $triple |> p               # 30
 
   # Using $_0/$_1 closures in reduce
-  my $add = fn { $_0 + $_1 };
-  (1..5) |> reduce { $add->($_0, $_1) } |> p # 15
+  my $add = fn { $_0 + $_1 }  (1..5) |> reduce { $add->($_0, $_1) } |> p # 15
 
   # Using $_0/$_1/$_2 closure
-  my $mul3 = fn { $_0 * $_1 * $_2 };
-  p $mul3->(2, 3, 4);                        # 24
+  my $mul3 = fn { $_0 * $_1 * $_2 }  p $mul3->(2, 3, 4)                        # 24
 
   # Using $_0/$_1 closure as comparator
-  my $cmp = fn { $_0 <=> $_1 };
-  (5,2,8,1) |> sort { $cmp->($_0, $_1) } |> join "," |> p  # 1,2,5,8
+  my $cmp = fn { $_0 <=> $_1 }  (5,2,8,1) |> sort { $cmp->($_0, $_1) } |> join "," |> p  # 1,2,5,8
 
   # User-defined functions in thread (bare stage, no block needed)
   sub double { $_0 * 2 }
@@ -1339,8 +1214,7 @@ rust {
     pub extern "C" fn add(a: i64, b: i64) -> i64 { a + b }
     pub extern "C" fn mul3(x: f64, y: f64, z: f64) -> f64 { x * y * z }
     pub extern "C" fn fib(n: i64) -> i64 {
-        let (mut a, mut b) = (0i64, 1i64);
-        for _ in 0..n { let t = a + b; a = b; b = t; }
+        let (mut a, mut b) = (0i64, 1i64)        for _ in 0..n { let t = a + b; a = b; b = t; }
         a
     }
 }
@@ -1425,13 +1299,10 @@ my $cluster = cluster([
     "build3:4:/usr/local/bin/pe",        # 4 slots, custom remote pe path
     { host => "data1", slots => 12, pe => "/opt/pe" },  # hashref form
     { timeout => 30, retries => 2, connect_timeout => 5 },  # trailing tunables
-]);
-
-my @hashes = @big_files |> pmap_on $cluster { slurp_raw |> sha_256) };
-
+])
+my @hashes = @big_files |> pmap_on $cluster { slurp_raw |> sha_256) }
 # pflat_map_on for one-to-many mapping
-my @lines = @log_paths |> pflat_map_on $cluster { split /\n/, slurp };
-```
+my @lines = @log_paths |> pflat_map_on $cluster { split /\n/, slurp }```
 
 #### Cluster syntax
 

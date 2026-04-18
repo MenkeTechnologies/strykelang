@@ -276,7 +276,7 @@ fn splice_aref_insert_with_zero_length() {
             r#"no strict 'vars';
             my $v = [1, 2, 3];
             splice @$v, 1, 0, 9;
-            join "-", @$v;"#
+            join "-", @$v"#
         ),
         "1-9-2-3"
     );
@@ -289,7 +289,7 @@ fn splice_aref_replace_all_elems() {
             r#"no strict 'vars';
             my $v = [1, 2];
             splice @$v, 0, 2, 7, 8, 9;
-            join "", @$v;"#
+            join "", @$v"#
         ),
         "789"
     );
@@ -302,7 +302,7 @@ fn splice_aref_void_removes_without_returning_list() {
             r#"no strict 'vars';
             my $v = [10, 20, 30];
             splice @$v, 1, 1;
-            join "-", @$v;"#
+            join "-", @$v"#
         ),
         "10-30"
     );
@@ -351,7 +351,7 @@ fn scalar_splice_aref_returns_last_removed_element() {
         eval_int(
             r#"no strict 'vars';
             my $a = [3, 4, 5];
-            scalar splice @$a, 0, 2;"#
+            scalar splice @$a, 0, 2"#
         ),
         4
     );
@@ -364,7 +364,7 @@ fn splice_aref_no_length_removes_tail_and_returns_removed_list_stringified() {
             r#"no strict 'vars';
             my $v = [1, 2, 3, 4, 5];
             my @r = splice @$v, 3;
-            join "-", @r;"#
+            join "-", @r"#
         ),
         "4-5"
     );
@@ -373,7 +373,7 @@ fn splice_aref_no_length_removes_tail_and_returns_removed_list_stringified() {
             r#"no strict 'vars';
             my $v = [1, 2, 3, 4, 5];
             splice @$v, 3;
-            join "-", @$v;"#
+            join "-", @$v"#
         ),
         "1-2-3"
     );
@@ -441,7 +441,7 @@ fn hash_slice_through_hashref_list_context_has_two_elements() {
             r#"no strict 'vars';
             my %h = (x => 3, y => 4);
             my $r = \%h;
-            scalar @$r{'x', 'y'};"#
+            scalar @$r{'x', 'y'}"#
         ),
         2
     );
@@ -467,7 +467,7 @@ fn array_slice_through_arrayref_reads_indices() {
         eval_string(
             r#"no strict 'vars';
             my $v = [10, 20, 30, 40];
-            join "-", @$v[1, 3];"#
+            join "-", @$v[1, 3]"#
         ),
         "20-40"
     );
@@ -529,7 +529,7 @@ fn do_block_list_context_assigns_to_my_array() {
     assert_eq!(
         eval_string(
             r#"my @x = do { (1, 2, 3) };
-            join "", @x;"#
+            join "", @x"#
         ),
         "123"
     );
@@ -540,7 +540,7 @@ fn do_block_list_context_assigns_to_my_hash() {
     assert_eq!(
         eval_int(
             r#"my %h = do { ("u", 5, "v", 6) };
- $h{u} + $h{v};"#
+ $h{u} + $h{v}"#
         ),
         11
     );
@@ -595,7 +595,7 @@ fn splice_aref_omit_length_removes_rest_default() {
             r#"no strict 'vars';
             my $v = [1, 2, 3, 4];
             my @t = splice @$v, 1;
-            join ":", @t, "", join "-", @$v;"#
+            join ":", @t, "", join "-", @$v"#
         ),
         "2:3:4::1"
     );
@@ -608,7 +608,7 @@ fn splice_aref_zero_length_noop_keeps_order() {
             r#"no strict 'vars';
             my $v = [8, 9];
             my @r = splice @$v, 1, 0;
-            (scalar @r) . "|" . join "-", @$v;"#
+            (scalar @r) . "|" . join "-", @$v"#
         ),
         "0|8-9"
     );
@@ -649,7 +649,7 @@ fn array_slice_deref_compound_plus_eq_updates_last_index_only() {
             r#"no strict 'vars';
             my $r = [1, 2, 3];
             @$r[0, 2] += 5;
-            join " ", @$r;"#
+            join " ", @$r"#
         ),
         "1 2 8"
     );
@@ -667,7 +667,7 @@ fn push_unshift_pop_shift_on_array_ref_mutates_one_array() {
             unshift @$r, 5;
             my $t = pop @$r;
             my $h = shift @$r;
-            join "-", $h, @$r, $t;"#
+            join "-", $h, @$r, $t"#
         ),
         "5-10-20-30"
     );
@@ -680,7 +680,7 @@ fn delete_and_exists_on_hash_through_ref() {
             r#"no strict 'vars';
             my $r = { u => 1, v => 2 };
             delete $r->{u};
-            (exists $r->{v} && !exists $r->{u} && $r->{v} == 2) ? 1 : 0;"#
+            (exists $r->{v} && !exists $r->{u} && $r->{v} == 2) ? 1 : 0"#
         ),
         1
     );
@@ -727,7 +727,7 @@ fn logical_and_skips_rhs_when_false() {
         eval_int(
             r#"my $ran = 0;
             (0 && ($ran = 1));
-            $ran;"#
+            $ran"#
         ),
         0
     );
@@ -739,7 +739,7 @@ fn logical_or_skips_rhs_when_true() {
         eval_int(
             r#"my $ran = 0;
             (1 || ($ran = 1));
-            $ran;"#
+            $ran"#
         ),
         0
     );
@@ -753,7 +753,7 @@ fn scalar_array_deref_is_length() {
         eval_int(
             r#"no strict 'vars';
             my $r = [7, 8, 9];
-            scalar @$r;"#
+            scalar @$r"#
         ),
         3
     );
@@ -765,7 +765,7 @@ fn scalar_keys_on_named_hash_counts_entries() {
         eval_int(
             r#"no strict 'vars';
             my %h = (x => 1, y => 2, z => 3);
-            scalar keys %h;"#
+            scalar keys %h"#
         ),
         3
     );
@@ -790,7 +790,7 @@ fn eval_block_sees_outer_lexical() {
     assert_eq!(
         eval_int(
             r#"my $x = 5;
-            eval { $x + 1 };"#
+            eval { $x + 1 }"#
         ),
         6
     );
@@ -820,7 +820,7 @@ fn splice_empty_aref_insert_still_inserts() {
             r#"no strict 'vars';
             my $r = [];
             splice @$r, 0, 0, 9, 8;
-            join "-", @$r;"#
+            join "-", @$r"#
         ),
         "9-8"
     );
@@ -1020,7 +1020,7 @@ fn for_my_iterates_lexical_list() {
         eval_int(
             r#"my $s = 0;
             for my $n (1, 2, 3, 4) { $s += $n; }
-            $s;"#
+            $s"#
         ),
         10
     );
@@ -1037,7 +1037,7 @@ fn last_exits_loop_early() {
                 $i++;
                 if ($i == 4) { last; }
             }
-            $i;"#
+            $i"#
         ),
         4
     );
@@ -1054,7 +1054,7 @@ fn next_skips_remaining_iteration() {
                 next if $k == 2;
                 $s += $k;
             }
-            $s;"#
+            $s"#
         ),
         13
     );
@@ -1068,7 +1068,7 @@ fn until_runs_until_condition_true() {
             until ($n >= 4) {
                 $n++;
             }
-            $n;"#
+            $n"#
         ),
         4
     );
@@ -1097,7 +1097,7 @@ fn sub_params_via_at_underscore() {
                 my ($a, $b) = @_;
                 $a + $b;
             }
-            add2(30, 12);"#
+            add2(30, 12)"#
         ),
         42
     );
@@ -1112,7 +1112,7 @@ fn wantarray_distinct_scalar_vs_list_return_single_value() {
             }
             my @v = ctx();
             my $s = ctx();
-            $v[0] + $s;"#
+            $v[0] + $s"#
         ),
         42
     );
@@ -1125,7 +1125,7 @@ fn wantarray_false_in_scalar_context() {
             r#"sub ctx {
                 wantarray ? ("aa", "bb") : "scalar";
             }
-            ctx();"#
+            ctx()"#
         ),
         "scalar"
     );
@@ -1176,7 +1176,7 @@ fn values_in_scalar_context_counts_hash_entries() {
         eval_int(
             r#"no strict 'vars';
             my %t = (a => 1, b => 2, c => 3);
-            scalar values %t;"#
+            scalar values %t"#
         ),
         3
     );
@@ -1192,7 +1192,7 @@ fn split_with_no_pattern_splits_whitespace_on_topic() {
     assert_eq!(
         eval_string(
             r#"$_ = "x y z";
-            join "-", split;"#
+            join "-", split"#
         ),
         "x-y-z"
     );
@@ -1246,7 +1246,7 @@ fn array_negative_index_counts_from_end() {
         eval_int(
             r#"no strict 'vars';
             my @d = (10, 20, 30);
-            $d[-1] + $d[-2];"#
+            $d[-1] + $d[-2]"#
         ),
         50
     );
@@ -1259,7 +1259,7 @@ fn array_slice_assign_sets_multiple_indices() {
             r#"no strict 'vars';
             my @b = (0, 1, 2);
             @b[0, 2] = (9, 8);
-            join "-", @b;"#
+            join "-", @b"#
         ),
         "9-1-8"
     );
@@ -1273,7 +1273,7 @@ fn postfix_if_runs_statement_when_condition_true() {
         eval_int(
             r#"my $n = 0;
             $n = 15 if 1;
-            $n;"#
+            $n"#
         ),
         15
     );
@@ -1285,7 +1285,7 @@ fn postfix_if_skips_when_condition_false() {
         eval_int(
             r#"my $n = 3;
             $n = 99 if 0;
-            $n;"#
+            $n"#
         ),
         3
     );
@@ -1299,7 +1299,7 @@ fn substr_four_arg_splices_replacement_into_string() {
         eval_string(
             r#"my $s = "abcde";
             substr($s, 1, 2, "XX");
-            $s;"#
+            $s"#
         ),
         "aXXde"
     );
@@ -1311,7 +1311,7 @@ fn transliterate_tr_maps_character_set() {
         eval_string(
             r#"my $s = "abc";
             $s =~ tr/abc/ABC/;
-            $s;"#
+            $s"#
         ),
         "ABC"
     );
@@ -1325,7 +1325,7 @@ fn hash_literal_duplicate_key_keeps_last_value() {
         eval_int(
             r#"no strict 'vars';
             my %g = (x => 1, x => 2);
-            $g{x};"#
+            $g{x}"#
         ),
         2
     );
@@ -1339,7 +1339,7 @@ fn logical_or_assign_sets_when_falsy() {
         eval_int(
             r#"my $u = 0;
             $u ||= 40;
-            $u;"#
+            $u"#
         ),
         40
     );
@@ -1351,7 +1351,7 @@ fn logical_and_assign_short_circuits_on_falsy() {
         eval_int(
             r#"my $v = 5;
             $v &&= 0;
-            $v;"#
+            $v"#
         ),
         0
     );
@@ -1495,7 +1495,7 @@ fn keys_sorted_lexically_joined() {
         eval_string(
             r#"no strict 'vars';
             my %h = (z => 1, a => 2, u => 3);
-            join "", sort keys %h;"#
+            join "", sort keys %h"#
         ),
         "auz"
     );
@@ -1537,7 +1537,7 @@ fn bless_sets_ref_type_name() {
     assert_eq!(
         eval_string(
             r#"no strict 'vars';
-            ref(bless({}, "Zeta"));"#
+            ref(bless({}, "Zeta"))"#
         ),
         "Zeta"
     );
@@ -1551,7 +1551,7 @@ fn return_short_circuits_sub_rest() {
                 return 7 if 1;
                 99;
             }
-            early();"#
+            early()"#
         ),
         7
     );
@@ -1643,7 +1643,7 @@ fn splice_named_array_removes_middle_element() {
             r#"no strict 'vars';
             my @n = (1, 2, 3);
             splice @n, 1, 1;
-            join "-", @n;"#
+            join "-", @n"#
         ),
         "1-3"
     );
@@ -1735,7 +1735,7 @@ fn list_util_zip_pairs_first_row_snapshot() {
         eval_int(
             r#"no strict 'vars';
             my @z = List::Util::zip(1, 2, 10, 20);
-            $z[0]->[0] + $z[0]->[1];"#
+            $z[0]->[0] + $z[0]->[1]"#
         ),
         3
     );
@@ -1748,7 +1748,7 @@ fn use_constant_defines_bareword() {
     assert_eq!(
         eval_int(
             r#"use constant CIX => 99;
-            CIX;"#
+            CIX"#
         ),
         99
     );
@@ -1760,7 +1760,7 @@ fn regex_global_match_in_list_context() {
         eval_int(
             r#"no strict 'vars';
             my @hits = ("aba" =~ /a/g);
-            scalar @hits;"#
+            scalar @hits"#
         ),
         2
     );
@@ -1783,7 +1783,7 @@ fn substitution_global_flag_replaces_every_occurrence() {
         eval_string(
             r#"my $t = "aaa";
             $t =~ s/a/b/g;
-            $t;"#
+            $t"#
         ),
         "bbb"
     );
@@ -1805,7 +1805,7 @@ fn shuffle_returns_permutation_of_same_length() {
         eval_int(
             r#"no strict 'vars';
             my @s = List::Util::shuffle(7, 8, 9, 10);
-            scalar @s;"#
+            scalar @s"#
         ),
         4
     );
@@ -1831,7 +1831,7 @@ fn unshift_returns_new_array_length() {
         eval_int(
             r#"no strict 'vars';
             my @st;
-            unshift @st, 40, 50;"#
+            unshift @st, 40, 50"#
         ),
         2
     );
@@ -1843,7 +1843,7 @@ fn array_dollar_hash_last_index() {
         eval_int(
             r#"no strict 'vars';
             my @ix = (100, 200, 300);
-            $#ix;"#
+            $#ix"#
         ),
         2
     );
@@ -1856,7 +1856,7 @@ fn split_on_escaped_metachar_pattern() {
     assert_eq!(
         eval_string(
             r#"my $row = "x|y|z";
-            join "-", split /\|/, $row;"#
+            join "-", split /\|/, $row"#
         ),
         "x-y-z"
     );
@@ -1920,7 +1920,7 @@ fn values_sorted_join_numeric_strings() {
         eval_string(
             r#"no strict 'vars';
             my %n = (x => 30, y => 10, z => 20);
-            join "", sort { $a <=> $b } values %n;"#
+            join "", sort { $a <=> $b } values %n"#
         ),
         "102030"
     );
@@ -1934,7 +1934,7 @@ fn list_util_zip_shortest_first_row_snapshot() {
         eval_int(
             r#"no strict 'vars';
             my @z = List::Util::zip_shortest(1, 2, 3, 10, 20);
-            $z[0]->[0] + $z[0]->[1];"#
+            $z[0]->[0] + $z[0]->[1]"#
         ),
         3
     );
@@ -1966,7 +1966,7 @@ fn list_util_pairs_returns_one_pair_object_per_kv() {
         eval_int(
             r#"no strict 'vars';
             my @pr = List::Util::pairs(1, 10, 2, 20);
-            scalar @pr;"#
+            scalar @pr"#
         ),
         2
     );
@@ -2073,7 +2073,7 @@ fn glob_expands_star_pattern_in_directory() {
     let p = dir.to_str().expect("utf-8");
     let out = eval_string(&format!(
         r#"my $pat = "{p}" . "/*.g";
-        join "|", sort glob $pat;"#
+        join "|", sort glob $pat"#
     ));
     let mut parts: Vec<&str> = out.split('|').collect();
     parts.sort();
@@ -2121,7 +2121,7 @@ fn sub_return_list_in_scalar_context_yields_last_element() {
         eval_int(
             r#"sub trip { return (10, 20, 30) }
             my $x = trip();
-            $x;"#
+            $x"#
         ),
         30
     );
@@ -2133,7 +2133,7 @@ fn join_inserts_empty_between_defined_elements_when_slot_is_undef() {
         eval_string(
             r#"no strict 'vars';
             my @a = (1, undef, 2);
-            join "-", @a;"#
+            join "-", @a"#
         ),
         "1--2"
     );
@@ -2197,7 +2197,7 @@ fn postincrement_in_array_subscript_uses_then_advances_index() {
             my @x = (1, 2, 3);
             my $i = 0;
             $x[$i++] = 9;
-            join "-", @x;"#
+            join "-", @x"#
         ),
         "9-2-3"
     );
@@ -2275,7 +2275,7 @@ fn delete_array_element_leaves_undef_slot() {
             r#"no strict 'vars';
             my @a = (1, 2, 3);
             delete $a[1];
-            join "-", map { defined($_) ? $_ : "u" } @a;"#
+            join "-", map { defined($_) ? $_ : "u" } @a"#
         ),
         "1-u-3"
     );
@@ -2300,7 +2300,7 @@ fn sort_block_numeric_descending() {
             r#"no strict 'vars';
             my @a = (9, 8, 7);
             @a = sort { $b <=> $a } @a;
-            join "", @a;"#
+            join "", @a"#
         ),
         "987"
     );
@@ -2313,7 +2313,7 @@ fn splice_removes_middle_element_from_named_array() {
             r#"no strict 'vars';
             my @a = (1, 2, 3);
             splice @a, 1, 1;
-            join "", @a;"#
+            join "", @a"#
         ),
         "13"
     );
@@ -2326,7 +2326,7 @@ fn splice_replaces_one_element_with_two() {
             r#"no strict 'vars';
             my @a = (1, 2, 3);
             splice @a, 1, 1, 9, 8;
-            join "", @a;"#
+            join "", @a"#
         ),
         "1983"
     );
@@ -2344,7 +2344,7 @@ fn unshift_prepends_multiple_values() {
             r#"no strict 'vars';
             my @a = (1);
             unshift @a, 9, 8;
-            join "", @a;"#
+            join "", @a"#
         ),
         "981"
     );
@@ -2382,7 +2382,7 @@ fn list_assign_unpacks_lexical_pair_from_rhs() {
         eval_int(
             r#"no strict 'vars';
             my ($a, $b) = (2, 3);
-            $a + $b;"#
+            $a + $b"#
         ),
         5
     );
@@ -2394,7 +2394,7 @@ fn hash_slice_list_context_reads_quoted_keys() {
         eval_string(
             r#"no strict 'vars';
             my %h = ("x", 1, "y", 2);
-            join "-", @h{"x", "y"};"#
+            join "-", @h{"x", "y"}"#
         ),
         "1-2"
     );
@@ -2406,7 +2406,7 @@ fn array_slice_list_context_non_contiguous_indices() {
         eval_string(
             r#"no strict 'vars';
             my @a = (1, 2, 3);
-            join "", @a[0, 2];"#
+            join "", @a[0, 2]"#
         ),
         "13"
     );
@@ -2443,7 +2443,7 @@ fn bless_scalar_reference_sets_package_name() {
             r#"no strict 'vars';
             my $x = 1;
             my $r = bless \$x, "PkgZ";
-            ref $r;"#
+            ref $r"#
         ),
         "PkgZ"
     );
@@ -2456,7 +2456,7 @@ fn array_max_index_dollar_hash_after_sparse_tail_assign() {
             r#"no strict 'vars';
             my @a = (1, 2);
             $a[5] = 1;
-            $#a;"#
+            $#a"#
         ),
         5
     );
@@ -2469,7 +2469,7 @@ fn scalar_array_counts_past_max_index_including_holes() {
             r#"no strict 'vars';
             my @a = (1, 2);
             $a[5] = 1;
-            scalar @a;"#
+            scalar @a"#
         ),
         6
     );
@@ -2483,7 +2483,7 @@ fn regex_prematch_match_and_capture_concatenate() {
         eval_string(
             r#"my $s = "abc";
             $s =~ /(b)/;
-            ${^PREMATCH} . "-" . $& . "-" . $1;"#
+            ${^PREMATCH} . "-" . $& . "-" . $1"#
         ),
         "a-b-b"
     );
@@ -2502,7 +2502,7 @@ fn postfix_if_skips_statement_when_condition_false() {
             r#"no strict 'vars';
             my $x;
             $x = 5 if 0;
-            defined($x) ? 1 : 0;"#
+            defined($x) ? 1 : 0"#
         ),
         0
     );
@@ -2515,7 +2515,7 @@ fn postfix_if_skips_postincrement_when_condition_false() {
             r#"no strict 'vars';
             my $x = 0;
             $x++ if 0;
-            $x;"#
+            $x"#
         ),
         0
     );
@@ -2527,7 +2527,7 @@ fn join_uses_subfield_separator_for_interpolation() {
         eval_string(
             r#"no strict 'vars';
             my @a = (1, 2);
-            join $", @a;"#
+            join $", @a"#
         ),
         "1 2"
     );
@@ -2550,7 +2550,7 @@ fn array_element_lookup_truncates_float_subscript_toward_zero() {
         eval_int(
             r#"no strict 'vars';
             my @a = (10, 20, 30);
-            $a[1.9];"#
+            $a[1.9]"#
         ),
         20
     );
@@ -2584,7 +2584,7 @@ fn dot_equal_appends_to_scalar() {
             r#"no strict 'vars';
             my $x = 1;
             $x .= 2;
-            $x;"#
+            $x"#
         ),
         "12"
     );
@@ -2626,7 +2626,7 @@ fn for_list_topic_undefined_after_bare_for_loop() {
             my $ok;
             for $_ (4, 5, 6) { }
             $ok = defined($_) ? 0 : 1;
-            $ok;"#
+            $ok"#
         ),
         1
     );
@@ -2638,7 +2638,7 @@ fn sort_block_orders_by_string_length() {
         eval_string(
             r#"no strict 'vars';
             my @a = sort { length($a) <=> length($b) } qw(xx x xxx);
-            join "", @a;"#
+            join "", @a"#
         ),
         "xxxxxx"
     );
@@ -2651,7 +2651,7 @@ fn push_evaluates_arithmetic_before_append() {
             r#"no strict 'vars';
             my @a;
             push @a, 1 + 2 * 3;
-            $a[0];"#
+            $a[0]"#
         ),
         7
     );
@@ -2701,7 +2701,7 @@ fn postfix_unless_runs_statement_when_condition_is_false() {
             r#"no strict 'vars';
             my $x;
             $x = 7 unless 0;
-            $x;"#
+            $x"#
         ),
         7
     );
@@ -2761,7 +2761,7 @@ fn array_index_slice_with_dot_dot_range_in_list_context() {
         eval_string(
             r#"no strict 'vars';
             my @a = (10, 20, 30);
-            join "-", @a[0 .. 2];"#
+            join "-", @a[0 .. 2]"#
         ),
         "10-20-30"
     );
@@ -2858,7 +2858,7 @@ fn dollar_plus_is_string_value_of_last_paren_capture() {
         eval_string(
             r#"my $s = "abc";
             $s =~ /(b)/;
-            $+;"#
+            $+"#
         ),
         "b"
     );
@@ -2875,7 +2875,7 @@ fn regex_non_capturing_group_omits_slot_between_numbered_groups() {
         eval_string(
             r#"my $s = "aba";
             $s =~ /(a)(?:b)(a)/;
-            $1 . "-" . $2;"#
+            $1 . "-" . $2"#
         ),
         "a-a"
     );
@@ -2964,7 +2964,7 @@ fn substitution_global_in_scalar_context_counts_replacements() {
     assert_eq!(
         eval_int(
             r#"my $s = "aba";
-            $s =~ s/b/_/g;"#
+            $s =~ s/b/_/g"#
         ),
         1
     );
@@ -2978,7 +2978,7 @@ fn array_list_assignment_copies_elements_for_independent_scalars() {
             my @a = (1, 2, 3);
             my @b = @a;
             $b[0] = 9;
-            join "", @a;"#
+            join "", @a"#
         ),
         "123"
     );
@@ -2990,7 +2990,7 @@ fn anon_hash_ref_arrow_access_reads_value() {
         eval_int(
             r#"no strict 'vars';
             my $r = { "x", 1 };
-            $r->{"x"};"#
+            $r->{"x"}"#
         ),
         1
     );
@@ -3002,7 +3002,7 @@ fn anon_array_ref_arrow_access_reads_index() {
         eval_int(
             r#"no strict 'vars';
             my $r = [10, 20];
-            $r->[1];"#
+            $r->[1]"#
         ),
         20
     );
@@ -3022,7 +3022,7 @@ fn regex_postmatch_is_suffix_after_match() {
         eval_string(
             r#"my $s = "abc";
             $s =~ /b/;
-            ${^POSTMATCH};"#
+            ${^POSTMATCH}"#
         ),
         "c"
     );
@@ -3038,14 +3038,14 @@ fn named_sub_prototypes_empty_and_scalar_snapshot() {
     assert_eq!(
         eval_int(
             r#"sub empty_proto { 1 }
-            (prototype(\&empty_proto) eq "") ? 1 : 0;"#
+            (prototype(\&empty_proto) eq "") ? 1 : 0"#
         ),
         1
     );
     assert_eq!(
         eval_string(
             r#"sub one_scalar ($) { 1 }
-            prototype(\&one_scalar);"#
+            prototype(\&one_scalar)"#
         ),
         "$"
     );
@@ -3057,7 +3057,7 @@ fn substr_four_arg_empty_replacement_removes_span() {
         eval_string(
             r#"my $s = "hello";
             substr($s, 1, 2, "");
-            $s;"#
+            $s"#
         ),
         "hlo"
     );
@@ -3081,7 +3081,7 @@ fn push_flattens_list_repeat_operand() {
             r#"no strict 'vars';
             my @a = (1);
             push @a, (0) x 3;
-            join "", @a;"#
+            join "", @a"#
         ),
         "1000"
     );
@@ -3093,7 +3093,7 @@ fn list_assign_from_empty_list_leaves_scalar_undef() {
         eval_int(
             r#"no strict 'vars';
             my ($u) = ();
-            defined($u) ? 1 : 0;"#
+            defined($u) ? 1 : 0"#
         ),
         0
     );
@@ -3105,7 +3105,7 @@ fn coderef_invoked_with_arrow_operator() {
         eval_int(
             r#"no strict 'vars';
             my $f = sub { 9 };
-            $f->();"#
+            $f->()"#
         ),
         9
     );
@@ -3164,7 +3164,7 @@ fn regex_named_capture_accessible_via_plus_brace_hash() {
         eval_string(
             r#"my $s = "ab";
             $s =~ /(?<vx>a)b/;
-            $+{vx};"#
+            $+{vx}"#
         ),
         "a"
     );
@@ -3183,7 +3183,7 @@ fn srand_makes_rand_repeatable_for_same_seed() {
             my $a = rand();
             srand 42;
             my $b = rand();
-            ($a == $b) ? 1 : 0;"#
+            ($a == $b) ? 1 : 0"#
         ),
         1
     );
@@ -3211,7 +3211,7 @@ fn array_slice_assign_replaces_contiguous_prefix_elements() {
             r#"no strict 'vars';
             my @a = (1, 2, 3);
             @a[0, 1] = (9, 8);
-            join "", @a;"#
+            join "", @a"#
         ),
         "983"
     );
@@ -3266,7 +3266,7 @@ fn push_returns_new_length_when_starting_nonempty() {
         eval_int(
             r#"no strict 'vars';
             my @a = (10, 20);
-            push @a, 30;"#
+            push @a, 30"#
         ),
         3
     );
@@ -3279,7 +3279,7 @@ fn chop_empty_string_leaves_operand_empty() {
             r#"no strict 'vars';
             my $s = "";
             chop $s;
-            $s;"#
+            $s"#
         ),
         ""
     );
@@ -3302,7 +3302,7 @@ fn splice_returns_removed_elements_and_inserts_qw_list() {
             r#"no strict 'vars';
             my @a = qw(a b c);
             my @r = splice @a, 1, 1, qw(x y);
-            join("", @r) . ":" . join("", @a);"#
+            join("", @r) . ":" . join("", @a)"#
         ),
         "b:axyc"
     );
@@ -3377,7 +3377,7 @@ fn list_assign_with_short_rhs_leaves_trailing_lexical_undef() {
         eval_int(
             r#"no strict 'vars';
             my ($x, $y) = (1);
-            defined($y) ? 1 : 0;"#
+            defined($y) ? 1 : 0"#
         ),
         0
     );
@@ -3416,7 +3416,7 @@ fn splice_zero_length_insert_inserts_before_index_without_removal() {
             r#"no strict 'vars';
             my @a = (1, 2, 3);
             splice @a, 1, 0, 9;
-            join "", @a;"#
+            join "", @a"#
         ),
         "1923"
     );
@@ -3438,7 +3438,7 @@ fn repeat_undef_as_empty_string_yields_empty() {
         eval_string(
             r#"no strict 'vars';
             my $u;
-            $u x 4;"#
+            $u x 4"#
         ),
         ""
     );
@@ -3451,7 +3451,7 @@ fn for_statement_topic_accumulates_range_sum() {
             r#"no strict 'vars';
             my $t = 0;
             $t += $_ for 1..3;
-            $t;"#
+            $t"#
         ),
         6
     );
@@ -3468,7 +3468,7 @@ fn defined_or_keeps_string_zero_without_coercing_to_fallback() {
         eval_string(
             r#"no strict 'vars';
             my $z = "0";
-            $z // "seven";"#
+            $z // "seven""#
         ),
         "0"
     );
@@ -3480,7 +3480,7 @@ fn string_ne_distinguishes_empty_from_single_digit_zero() {
         eval_int(
             r#"no strict 'vars';
             my $e = "";
-            ($e ne "0") ? 1 : 0;"#
+            ($e ne "0") ? 1 : 0"#
         ),
         1
     );
@@ -3492,7 +3492,7 @@ fn keys_on_hash_through_scalar_ref_sorted_join() {
         eval_string(
             r#"no strict 'vars';
             my $r = { b => 2, a => 1 };
-            join "", sort keys %$r;"#
+            join "", sort keys %$r"#
         ),
         "ab"
     );
@@ -3510,7 +3510,7 @@ fn scalar_postdecrement_returns_prior_then_leaves_one_less() {
             r#"no strict 'vars';
             my $n = 5;
             $n--;
-            $n;"#
+            $n"#
         ),
         4
     );
@@ -3522,7 +3522,7 @@ fn string_concatenation_sees_postincrement_value_after_concat() {
         eval_string(
             r#"no strict 'vars';
             my $i = 0;
-            "" . $i++ . $i;"#
+            "" . $i++ . $i"#
         ),
         "01"
     );
@@ -3556,7 +3556,7 @@ fn substitution_hash_delimiters_replace_middle_character() {
         eval_string(
             r#"my $t = "aba";
             $t =~ s#b#B#;
-            $t;"#
+            $t"#
         ),
         "aBa"
     );
@@ -3574,7 +3574,7 @@ fn preincrement_pure_digit_string_carries_like_iv() {
             r#"no strict 'vars';
             my $d = "9";
             ++$d;
-            $d;"#
+            $d"#
         ),
         "10"
     );
@@ -3597,7 +3597,7 @@ fn array_element_star_eq_multiplies_slot_in_place() {
             r#"no strict 'vars';
             my @v = (4);
             $v[0] *= 3;
-            $v[0];"#
+            $v[0]"#
         ),
         12
     );
@@ -3613,7 +3613,7 @@ fn do_block_in_scalar_context_returns_last_expression() {
     assert_eq!(
         eval_int(
             r#"my $x = do { 10; 20 };
-            $x;"#
+            $x"#
         ),
         20
     );
@@ -3626,7 +3626,7 @@ fn unless_else_runs_first_block_when_condition_is_false() {
             r#"no strict 'vars';
             my $o = "";
             unless (0) { $o = "ok" } else { $o = "no" }
-            $o;"#
+            $o"#
         ),
         "ok"
     );
@@ -3639,7 +3639,7 @@ fn foreach_topic_concatenates_dot_dot_range() {
             r#"no strict 'vars';
             my $s = "";
             $s .= $_ for 1..3;
-            $s;"#
+            $s"#
         ),
         "123"
     );
@@ -3662,7 +3662,7 @@ fn last_label_exits_outer_loop_from_inner() {
                     last OUTL;
                 }
             }
-            $c;"#
+            $c"#
         ),
         1
     );
@@ -3680,7 +3680,7 @@ fn next_label_advances_outer_for_from_inner() {
                     next OUTN;
                 }
             }
-            $s;"#
+            $s"#
         ),
         "1111"
     );
@@ -3693,7 +3693,7 @@ fn unshift_prepends_literal_before_qw_elements() {
             r#"no strict 'vars';
             my @w = qw(a b);
             unshift @w, "z";
-            join "", @w;"#
+            join "", @w"#
         ),
         "zab"
     );
@@ -3705,7 +3705,7 @@ fn array_ref_elem_via_dollar_dollar_bracket() {
         eval_int(
             r#"no strict 'vars';
             my $r = [10, 20, 30];
-            $$r[1];"#
+            $$r[1]"#
         ),
         20
     );
@@ -3745,7 +3745,7 @@ fn substitution_alternation_strips_leading_and_trailing_space_runs() {
             r#"no strict 'vars';
             my $s = "  hi  ";
             $s =~ s/^\s+|\s+$//g;
-            $s;"#
+            $s"#
         ),
         "hi"
     );
@@ -3768,7 +3768,7 @@ fn hash_value_postincrement_updates_slot() {
             r#"no strict 'vars';
             my %h = (k => 4);
             $h{k}++;
-            $h{k};"#
+            $h{k}"#
         ),
         5
     );
@@ -3780,7 +3780,7 @@ fn defined_or_assign_returns_assigned_value_in_expression() {
         eval_int(
             r#"no strict 'vars';
             my $z;
-            ($z //= 17);"#
+            ($z //= 17)"#
         ),
         17
     );
@@ -3793,7 +3793,7 @@ fn array_negative_one_subscript_assigns_tail_element() {
             r#"no strict 'vars';
             my @t = (1, 2);
             $t[-1] = 9;
-            join "", @t;"#
+            join "", @t"#
         ),
         "19"
     );
@@ -3833,7 +3833,7 @@ fn push_appends_range_list_as_separate_elements() {
             r#"no strict 'vars';
             my @p;
             push @p, 1..3;
-            join "", @p;"#
+            join "", @p"#
         ),
         "123"
     );
@@ -3845,7 +3845,7 @@ fn substitution_global_counts_digit_span_replacements() {
         eval_int(
             r#"no strict 'vars';
             my $s = "a1b2";
-            $s =~ s/\d+/*/g;"#
+            $s =~ s/\d+/*/g"#
         ),
         2
     );
@@ -3863,7 +3863,7 @@ fn sort_default_uses_lexical_string_order_for_digit_prefixes() {
             r#"no strict 'vars';
             my @n = (10, 2, 1);
             @n = sort @n;
-            join "", @n;"#
+            join "", @n"#
         ),
         "1102"
     );
@@ -3881,7 +3881,7 @@ fn local_restores_prior_package_scalar_after_block() {
             r#"no strict 'vars';
             $FixregLoc01 = 7;
             { local $FixregLoc01 = 100; }
-            $FixregLoc01;"#
+            $FixregLoc01"#
         ),
         7
     );
@@ -3894,7 +3894,7 @@ fn substitution_eval_flag_re_evaluates_replacement_expression() {
             r#"no strict 'vars';
             my $s = "2";
             $s =~ s/(\d)/$1 + 7/e;
-            $s;"#
+            $s"#
         ),
         "9"
     );
@@ -3907,7 +3907,7 @@ fn substitution_stacked_eval_ee_second_pass_evals_interpolated_string() {
             r#"no strict 'vars';
             my $x = "a2";
             $x =~ s/(\d)/q{$1+1}/ee;
-            $x;"#
+            $x"#
         ),
         "a3"
     );
@@ -3920,7 +3920,7 @@ fn substitution_triple_eval_eeg_parity_194() {
             r#"no strict 'vars';
             my $x = "a2";
             $x =~ s/(\d)/$1+1/eeg;
-            $x;"#
+            $x"#
         ),
         "a3"
     );
@@ -3933,7 +3933,7 @@ fn reverse_list_assigns_back_into_named_array() {
             r#"no strict 'vars';
             my @r = (1, 2, 3);
             @r = reverse @r;
-            join "", @r;"#
+            join "", @r"#
         ),
         "321"
     );
@@ -3945,7 +3945,7 @@ fn our_declares_package_alias_readable_in_expression() {
         eval_int(
             r#"no strict 'vars';
             our $FixregOur01 = 55;
-            $FixregOur01;"#
+            $FixregOur01"#
         ),
         55
     );
@@ -3958,7 +3958,7 @@ fn map_block_replacement_rebuilds_array_from_prior_contents() {
             r#"no strict 'vars';
             my @m = (2, 3, 4);
             @m = map { $_ * 3 } @m;
-            join "", @m;"#
+            join "", @m"#
         ),
         "6912"
     );
@@ -3986,7 +3986,7 @@ fn use_constant_float_participates_in_arithmetic() {
     assert_eq!(
         eval_string(
             r#"use constant FIXREG_PI_FRAC => 3.14;
-            sprintf "%.2f", FIXREG_PI_FRAC * 2;"#
+            sprintf "%.2f", FIXREG_PI_FRAC * 2"#
         ),
         "6.28"
     );
@@ -4012,7 +4012,7 @@ fn substitution_global_replaces_literal_dots_with_underscores() {
             r#"no strict 'vars';
             my $p = "A.B.C";
             $p =~ s/\./_/g;
-            $p;"#
+            $p"#
         ),
         "A_B_C"
     );
@@ -4025,7 +4025,7 @@ fn dollar_hash_reports_last_index_with_leading_gap() {
             r#"no strict 'vars';
             my @g = (1);
             $g[3] = 9;
-            $#g;"#
+            $#g"#
         ),
         3
     );
@@ -4052,7 +4052,7 @@ fn subroutine_bare_return_yields_undef_in_scalar_context() {
         eval_int(
             r#"no strict 'vars';
             sub fixreg_empty_ret { return; }
-            defined(fixreg_empty_ret()) ? 1 : 0;"#
+            defined(fixreg_empty_ret()) ? 1 : 0"#
         ),
         0
     );
@@ -4064,7 +4064,7 @@ fn exists_index_zero_is_false_on_unused_array() {
         eval_int(
             r#"no strict 'vars';
             my @z;
-            exists $z[0] ? 1 : 0;"#
+            exists $z[0] ? 1 : 0"#
         ),
         0
     );
@@ -4084,7 +4084,7 @@ fn hash_slice_assign_empty_list_clears_multiple_keys() {
             r#"no strict 'vars';
             my %h = (a => 1, b => 2, c => 3);
             @h{qw(a b)} = ();
-            (!defined($h{a}) && !defined($h{b}) && $h{c} == 3) ? 1 : 0;"#
+            (!defined($h{a}) && !defined($h{b}) && $h{c} == 3) ? 1 : 0"#
         ),
         1
     );
@@ -4107,7 +4107,7 @@ fn splice_negative_offset_removes_element_before_tail() {
             r#"no strict 'vars';
             my @s = (1, 2, 3, 4, 5);
             splice @s, -2, 1;
-            join "", @s;"#
+            join "", @s"#
         ),
         "1235"
     );
@@ -4121,7 +4121,7 @@ fn postfix_while_repeats_statement_until_condition_fails() {
             my $i = 0;
             my $out = "";
             $out .= $i while ++$i < 4;
-            $out;"#
+            $out"#
         ),
         "123"
     );
@@ -4139,7 +4139,7 @@ fn defined_or_assign_rhs_visible_in_chained_lexical_assignment() {
             r#"no strict 'vars';
             my ($u, $v);
             $u = $v //= 11;
-            join ":", $u, $v;"#
+            join ":", $u, $v"#
         ),
         "11:11"
     );
@@ -4164,7 +4164,7 @@ fn defined_or_assign_on_missing_hash_slot_inserts_value() {
             r#"no strict 'vars';
             my %h = (fixreg_hk1 => 1);
             $h{fixreg_hk2} //= 42;
-            $h{fixreg_hk2};"#
+            $h{fixreg_hk2}"#
         ),
         42
     );
@@ -4187,7 +4187,7 @@ fn postfix_for_statement_increments_once_per_range_element() {
             r#"no strict 'vars';
             my $c = 0;
             $c++ for 1..3;
-            $c;"#
+            $c"#
         ),
         3
     );
@@ -4200,7 +4200,7 @@ fn shift_removes_leading_array_element_and_shortens() {
             r#"no strict 'vars';
             my @q = (7, 8, 9);
             shift @q;
-            scalar @q;"#
+            scalar @q"#
         ),
         2
     );
@@ -4213,7 +4213,7 @@ fn pop_drops_trailing_element_leaving_prior_joined() {
             r#"no strict 'vars';
             my @q = (7, 8, 9);
             pop @q;
-            join "", @q;"#
+            join "", @q"#
         ),
         "78"
     );
@@ -4241,7 +4241,7 @@ fn sort_default_lexical_orders_single_digit_strings() {
             r#"no strict 'vars';
             my @d = (9, 8, 7);
             @d = sort @d;
-            join "", @d;"#
+            join "", @d"#
         ),
         "789"
     );
@@ -4266,7 +4266,7 @@ fn substitution_inserts_prefix_before_start_of_string() {
             r#"no strict 'vars';
             my $s = "abc";
             $s =~ s/^/X/;
-            $s;"#
+            $s"#
         ),
         "Xabc"
     );
@@ -4279,7 +4279,7 @@ fn substitution_inserts_suffix_after_end_of_string() {
             r#"no strict 'vars';
             my $s = "abc";
             $s =~ s/$/Z/;
-            $s;"#
+            $s"#
         ),
         "abcZ"
     );
@@ -4297,7 +4297,7 @@ fn scalar_array_counts_through_highest_assigned_index() {
             r#"no strict 'vars';
             my @w = (1);
             $w[10] = 0;
-            scalar @w;"#
+            scalar @w"#
         ),
         11
     );
@@ -4320,7 +4320,7 @@ fn dot_concatenation_interleaves_scalar_string_and_number() {
             r#"no strict 'vars';
             my $x = 4;
             $x = $x . "5" . 6;
-            $x;"#
+            $x"#
         ),
         "456"
     );
@@ -4343,7 +4343,7 @@ fn slice_assign_after_pair_extends_array_with_two_new_slots() {
             r#"no strict 'vars';
             my @v = (1, 2);
             @v[2, 3] = (9, 8);
-            join "", @v;"#
+            join "", @v"#
         ),
         "1298"
     );
@@ -4377,7 +4377,7 @@ fn undef_lexical_is_string_equal_to_empty() {
         eval_int(
             r#"no strict 'vars';
             my $u;
-            ($u eq "") ? 1 : 0;"#
+            ($u eq "") ? 1 : 0"#
         ),
         1
     );
@@ -4395,7 +4395,7 @@ fn splice_zero_length_at_start_prepends_on_named_array() {
             r#"no strict 'vars';
             my @t = (1, 2, 3);
             splice @t, 0, 0, 9;
-            join "", @t;"#
+            join "", @t"#
         ),
         "9123"
     );
@@ -4407,7 +4407,7 @@ fn scalar_splice_removing_two_returns_last_removed_value() {
         eval_int(
             r#"no strict 'vars';
             my @t = (1, 2, 3, 4);
-            scalar splice @t, 1, 2;"#
+            scalar splice @t, 1, 2"#
         ),
         3
     );
@@ -4436,7 +4436,7 @@ fn chomp_crlf_pair_leaves_two_code_units() {
             r#"no strict 'vars';
             my $s = "a\r\n";
             chomp $s;
-            length $s;"#
+            length $s"#
         ),
         2
     );
@@ -4461,7 +4461,7 @@ fn push_with_empty_list_argument_is_noop() {
             r#"no strict 'vars';
             my @p = (9);
             push @p, ();
-            scalar @p;"#
+            scalar @p"#
         ),
         1
     );
@@ -4474,7 +4474,7 @@ fn array_slice_range_assign_replaces_interior_pair() {
             r#"no strict 'vars';
             my @t = (1, 2, 3);
             @t[1 .. 2] = (7, 6);
-            join "", @t;"#
+            join "", @t"#
         ),
         "176"
     );
@@ -4496,7 +4496,7 @@ fn undef_plus_zero_coerces_to_numeric_zero() {
         eval_int(
             r#"no strict 'vars';
             my $u;
-            $u + 0;"#
+            $u + 0"#
         ),
         0
     );
@@ -4509,7 +4509,7 @@ fn dot_equal_appends_repeated_pattern_from_string_repeat() {
             r#"no strict 'vars';
             my $s = "x";
             $s .= "y" x 2;
-            $s;"#
+            $s"#
         ),
         "xyy"
     );
@@ -4532,7 +4532,7 @@ fn substitution_without_g_removes_first_match_only() {
             r#"no strict 'vars';
             my $s = "abc";
             $s =~ s/b//;
-            $s;"#
+            $s"#
         ),
         "ac"
     );
@@ -4545,7 +4545,7 @@ fn substitution_with_g_removes_every_occurrence_of_char() {
             r#"no strict 'vars';
             my $s = "aba";
             $s =~ s/a//g;
-            $s;"#
+            $s"#
         ),
         "b"
     );
@@ -4575,7 +4575,7 @@ fn hash_slice_list_assign_rewrites_single_key() {
             r#"no strict 'vars';
             my %h = (fixreg_hs_x => 1);
             @h{qw(fixreg_hs_x)} = (44);
-            $h{fixreg_hs_x};"#
+            $h{fixreg_hs_x}"#
         ),
         44
     );
@@ -4587,7 +4587,7 @@ fn parenthesized_assignment_used_as_numeric_operand() {
         eval_int(
             r#"no strict 'vars';
             my $v;
-            ($v = 3) * 4;"#
+            ($v = 3) * 4"#
         ),
         12
     );
@@ -4623,7 +4623,7 @@ fn list_assign_to_two_lexicals_drops_extra_rhs_values() {
         eval_string(
             r#"no strict 'vars';
             my ($p, $q) = (1, 2, 3);
-            join "", $p, $q;"#
+            join "", $p, $q"#
         ),
         "12"
     );
@@ -4653,7 +4653,7 @@ fn array_subscript_slice_in_scalar_context_yields_last_indexed_element() {
         eval_int(
             r#"no strict 'vars';
             my @z = (1, 2, 3);
-            $z[1, 2, 0];"#
+            $z[1, 2, 0]"#
         ),
         1
     );
@@ -4678,7 +4678,7 @@ fn array_copy_from_slice_indices_preserves_gaps_in_list() {
             r#"no strict 'vars';
             my @i = (1, 2, 3);
             my @j = @i[0, 2];
-            join "", @j;"#
+            join "", @j"#
         ),
         "13"
     );
@@ -4691,7 +4691,7 @@ fn delete_middle_element_does_not_shrink_scalar_array_length() {
             r#"no strict 'vars';
             my @g = (1, 2, 3);
             delete $g[1];
-            scalar @g;"#
+            scalar @g"#
         ),
         3
     );
@@ -4704,7 +4704,7 @@ fn splice_replaces_two_elements_with_singleton_list() {
             r#"no strict 'vars';
             my @f = (1, 2, 3, 4);
             my $n = scalar splice @f, 1, 2, (9);
-            join "", $n, ":", @f;"#
+            join "", $n, ":", @f"#
         ),
         "3:194"
     );
@@ -4716,7 +4716,7 @@ fn sort_values_joins_hash_values_lexicographically() {
         eval_string(
             r#"no strict 'vars';
             my %h = (fr_sv_a => 3, fr_sv_b => 4);
-            join "", sort values %h;"#
+            join "", sort values %h"#
         ),
         "34"
     );
@@ -4734,7 +4734,7 @@ fn postincrement_value_concatenated_before_increment_visible() {
         eval_string(
             r#"no strict 'vars';
             my $m = 2;
-            $m++ . $m;"#
+            $m++ . $m"#
         ),
         "23"
     );
@@ -4747,7 +4747,7 @@ fn chop_removes_last_byte_when_no_trailing_newline() {
             r#"no strict 'vars';
             my $s = "abcd";
             chop $s;
-            $s;"#
+            $s"#
         ),
         "abc"
     );
@@ -4770,7 +4770,7 @@ fn unshift_inserts_list_before_existing_head() {
             r#"no strict 'vars';
             my @h = (1);
             unshift @h, (2, 3);
-            join "", @h;"#
+            join "", @h"#
         ),
         "231"
     );
@@ -4782,7 +4782,7 @@ fn scalar_array_subscript_slice_is_last_slice_element() {
         eval_int(
             r#"no strict 'vars';
             my @c = (10, 20, 30);
-            $c[1, 2];"#
+            $c[1, 2]"#
         ),
         30
     );
@@ -4805,7 +4805,7 @@ fn xor_eq_from_one_bit_pattern() {
             r#"no strict 'vars';
             my $t = 1;
             $t ^= 3;
-            $t;"#
+            $t"#
         ),
         2
     );
@@ -4822,7 +4822,7 @@ fn last_index_special_minus_one_on_empty_array() {
         eval_int(
             r#"no strict 'vars';
             my @b = ();
-            $#b;"#
+            $#b"#
         ),
         -1
     );
@@ -4840,7 +4840,7 @@ fn reverse_assign_back_mutates_named_array() {
             r#"no strict 'vars';
             my @m = (1, 2, 3);
             @m = reverse @m;
-            join "", @m;"#
+            join "", @m"#
         ),
         "321"
     );
@@ -4872,7 +4872,7 @@ fn scalar_keys_on_cleared_hash_counts_zero() {
         eval_int(
             r#"no strict 'vars';
             my %h = ();
-            scalar keys %h;"#
+            scalar keys %h"#
         ),
         0
     );
@@ -4885,7 +4885,7 @@ fn logical_or_assign_replaces_empty_string() {
             r#"no strict 'vars';
             my $b = "";
             $b ||= 8;
-            $b;"#
+            $b"#
         ),
         8
     );
@@ -4926,7 +4926,7 @@ fn push_flattens_rhs_array_onto_tail() {
             r#"no strict 'vars';
             my @a = (1, 2);
             push @a, @a;
-            join "", @a;"#
+            join "", @a"#
         ),
         "1212"
     );
@@ -4939,7 +4939,7 @@ fn delete_hash_key_drops_exists() {
             r#"no strict 'vars';
             my %h = (fr_del_k => 1);
             delete $h{fr_del_k};
-            exists $h{fr_del_k} ? 1 : 0;"#
+            exists $h{fr_del_k} ? 1 : 0"#
         ),
         0
     );
@@ -4960,7 +4960,7 @@ fn defined_or_falls_back_only_for_undef_not_zero() {
             r#"no strict 'vars';
             my $u;
             my $z = 0;
-            join "", ($u // "m"), ($z // "n");"#
+            join "", ($u // "m"), ($z // "n")"#
         ),
         "m0"
     );
@@ -4973,7 +4973,7 @@ fn splice_with_negative_offset_removes_last_element() {
             r#"no strict 'vars';
             my @y = (1, 2, 3);
             my $t = splice @y, -1, 1;
-            join ":", $t, (join "", @y);"#
+            join ":", $t, (join "", @y)"#
         ),
         "3:12"
     );
@@ -4986,7 +4986,7 @@ fn splice_at_zero_removes_head_element() {
             r#"no strict 'vars';
             my @x = (1, 2, 3);
             my $h = splice @x, 0, 1;
-            join ":", $h, (join "", @x);"#
+            join ":", $h, (join "", @x)"#
         ),
         "1:23"
     );
@@ -5013,7 +5013,7 @@ fn array_last_element_via_max_index_subscript() {
         eval_int(
             r#"no strict 'vars';
             my @a = (1, 2, 3);
-            $a[$#a];"#
+            $a[$#a]"#
         ),
         3
     );
@@ -5025,7 +5025,7 @@ fn max_index_of_singleton_list_is_zero() {
         eval_int(
             r#"no strict 'vars';
             my @a = (9);
-            $#a;"#
+            $#a"#
         ),
         0
     );
@@ -5046,7 +5046,7 @@ fn divide_eq_leaves_float_on_int_rhs() {
             r#"no strict 'vars';
             my $w = 7;
             $w /= 2;
-            "$w";"#
+            "$w""#
         ),
         "3.5"
     );
@@ -5059,7 +5059,7 @@ fn modulo_eq_reduces_modulus() {
             r#"no strict 'vars';
             my $v = 10;
             $v %= 3;
-            $v;"#
+            $v"#
         ),
         1
     );
@@ -5072,7 +5072,7 @@ fn slice_assign_short_rhs_leaves_trailing_elements() {
             r#"no strict 'vars';
             my @a = (4, 5, 6);
             @a[0, 1] = (9);
-            join "", @a;"#
+            join "", @a"#
         ),
         "96"
     );
@@ -5085,7 +5085,7 @@ fn range_slice_assign_replaces_interior_run() {
             r#"no strict 'vars';
             my @b = (1, 2, 3, 4);
             @b[1 .. 2] = (7, 8);
-            join "", @b;"#
+            join "", @b"#
         ),
         "1784"
     );
@@ -5105,7 +5105,7 @@ fn repeat_scalar_duplicates_stringified_number() {
         eval_string(
             r#"no strict 'vars';
             my $n = 3;
-            $n x 2;"#
+            $n x 2"#
         ),
         "33"
     );
@@ -5136,7 +5136,7 @@ fn coderef_call_ampersand_and_arrow() {
             r#"no strict 'vars';
             my $f = sub { return 3; };
             my $g = sub { 5 };
-            join "", &$f(), $g->();"#
+            join "", &$f(), $g->()"#
         ),
         "35"
     );
@@ -5166,7 +5166,7 @@ fn splice_remove_one_without_insert_returns_removed_in_scalar_context() {
             r#"no strict 'vars';
             my @a = (1, 2, 3);
             my $r = scalar splice @a, 1, 1, ();
-            join ":", $r, (join "", @a);"#
+            join ":", $r, (join "", @a)"#
         ),
         "2:13"
     );
@@ -5179,7 +5179,7 @@ fn and_eq_masks_bits_in_place() {
             r#"no strict 'vars';
             my $u = 1;
             $u &= 3;
-            $u;"#
+            $u"#
         ),
         1
     );
@@ -5192,7 +5192,7 @@ fn or_eq_combines_bits_in_place() {
             r#"no strict 'vars';
             my $v = 1;
             $v |= 2;
-            $v;"#
+            $v"#
         ),
         3
     );
@@ -5219,7 +5219,7 @@ fn sort_keys_joins_lexicographically() {
         eval_string(
             r#"no strict 'vars';
             my %h = (fr3_zz => 1, fr3_aa => 2);
-            join "", sort keys %h;"#
+            join "", sort keys %h"#
         ),
         "fr3_aafr3_zz"
     );
@@ -5247,7 +5247,7 @@ fn scalar_assign_from_paren_list_keeps_last_element() {
             r#"no strict 'vars';
             my $z;
             $z = (1, 2, 3);
-            $z;"#
+            $z"#
         ),
         3
     );
@@ -5276,7 +5276,7 @@ fn push_appends_two_scalar_arguments() {
             r#"no strict 'vars';
             my @m = (1, 2);
             push @m, 3, 4;
-            join "", @m;"#
+            join "", @m"#
         ),
         "1234"
     );
@@ -5298,7 +5298,7 @@ fn abs_coerces_numeric_string() {
         eval_string(
             r#"no strict 'vars';
             my $s = abs "-3.5";
-            "$s";"#
+            "$s""#
         ),
         "3.5"
     );
@@ -5316,7 +5316,7 @@ fn scalar_subscript_slice_with_repeated_index_yields_last_list_slot() {
         eval_int(
             r#"no strict 'vars';
             my @a = (5, 6, 7);
-            $a[1, 2, 1];"#
+            $a[1, 2, 1]"#
         ),
         6
     );
@@ -5328,7 +5328,7 @@ fn sqrt_reads_radicand_from_scalar() {
         eval_int(
             r#"no strict 'vars';
             my $x = 9;
-            sqrt $x;"#
+            sqrt $x"#
         ),
         3
     );
@@ -5353,7 +5353,7 @@ fn anon_hash_arrow_reads_slot() {
         eval_int(
             r#"no strict 'vars';
             my $r = { fr3_slot => 42 };
-            $r->{fr3_slot};"#
+            $r->{fr3_slot}"#
         ),
         42
     );
@@ -5392,7 +5392,7 @@ fn scalar_grep_counts_matches_on_named_array() {
         eval_int(
             r#"no strict 'vars';
             my @a = (1, 2, 3);
-            scalar grep { $_ > 1 } @a;"#
+            scalar grep { $_ > 1 } @a"#
         ),
         2
     );
@@ -5404,7 +5404,7 @@ fn scalar_map_counts_elements_on_named_array() {
         eval_int(
             r#"no strict 'vars';
             my @a = (1, 2, 3);
-            scalar map { $_ * 2 } @a;"#
+            scalar map { $_ * 2 } @a"#
         ),
         3
     );
@@ -5417,7 +5417,7 @@ fn do_block_scalar_assign_is_last_statement() {
             r#"no strict 'vars';
             my $x;
             $x = do { 1; 2; 3 };
-            $x;"#
+            $x"#
         ),
         3
     );
@@ -5430,7 +5430,7 @@ fn sort_rebinds_named_array_to_sorted_order() {
             r#"no strict 'vars';
             my @b = (9, 8);
             @b = sort @b;
-            join "", @b;"#
+            join "", @b"#
         ),
         "89"
     );
@@ -5448,7 +5448,7 @@ fn substitution_global_replaces_each_match() {
             r#"no strict 'vars';
             my $s = "aba";
             $s =~ s/a/x/g;
-            $s;"#
+            $s"#
         ),
         "xbx"
     );
@@ -5460,7 +5460,7 @@ fn substitution_global_count_in_scalar_context() {
         eval_int(
             r#"no strict 'vars';
             my $t = "aba";
-            scalar ($t =~ s/a/x/g);"#
+            scalar ($t =~ s/a/x/g)"#
         ),
         2
     );
@@ -5476,7 +5476,7 @@ fn pack_unpack_a2_round_trips_ascii_pair() {
     assert_eq!(
         eval_string(
             r#"my $p = pack("a2", "XY");
-            unpack("a2", $p);"#
+            unpack("a2", $p)"#
         ),
         "XY"
     );
@@ -5489,7 +5489,7 @@ fn and_assign_preserves_rhs_when_lhs_true() {
             r#"no strict 'vars';
             my $f = 1;
             $f &&= 2;
-            $f;"#
+            $f"#
         ),
         2
     );
@@ -5502,7 +5502,7 @@ fn plus_assign_coerces_quoted_numeral() {
             r#"no strict 'vars';
             my $k = "5";
             $k += 2;
-            $k;"#
+            $k"#
         ),
         7
     );
@@ -5515,7 +5515,7 @@ fn plus_assign_strips_whitespace_from_numeric_string() {
             r#"no strict 'vars';
             my $m = " 8 ";
             $m += 0;
-            $m;"#
+            $m"#
         ),
         8
     );
@@ -5527,7 +5527,7 @@ fn exists_false_on_array_index_beyond_current_tail() {
         eval_int(
             r#"no strict 'vars';
             my @h = (1, 2, 3);
-            exists $h[5] ? 1 : 0;"#
+            exists $h[5] ? 1 : 0"#
         ),
         0
     );
@@ -5540,7 +5540,7 @@ fn exists_true_after_assign_past_end_of_array() {
             r#"no strict 'vars';
             my @h = (1, 2, 3);
             $h[5] = 0;
-            exists $h[5] ? 1 : 0;"#
+            exists $h[5] ? 1 : 0"#
         ),
         1
     );
@@ -5558,7 +5558,7 @@ fn splice_removes_tail_pair_and_returns_it() {
             r#"no strict 'vars';
             my @a = (1, 2, 3, 4);
             my @r = splice @a, 2, 2;
-            join "", @r, ":", join "", @a;"#
+            join "", @r, ":", join "", @a"#
         ),
         "34:12"
     );
@@ -5571,7 +5571,7 @@ fn multiply_eq_scales_scalar() {
             r#"no strict 'vars';
             my $v = 6;
             $v *= 2;
-            $v;"#
+            $v"#
         ),
         12
     );
@@ -5584,7 +5584,7 @@ fn subtract_eq_reduces_scalar() {
             r#"no strict 'vars';
             my $w = 7;
             $w -= 3;
-            $w;"#
+            $w"#
         ),
         4
     );
@@ -5602,7 +5602,7 @@ fn dot_equal_appends_to_lexical_string() {
             r#"no strict 'vars';
             my $s = "hi";
             $s .= " there";
-            $s;"#
+            $s"#
         ),
         "hi there"
     );
@@ -5615,7 +5615,7 @@ fn comma_list_flattens_adjacent_arrays() {
             r#"no strict 'vars';
             my @x = (1, 2);
             my @y = (3, 4);
-            join "", (@x, @y);"#
+            join "", (@x, @y)"#
         ),
         "1234"
     );
@@ -5635,7 +5635,7 @@ fn defined_or_assign_sets_only_when_lexical_undef() {
             my $q;
             $p //= 3;
             $q //= 8;
-            $p + $q;"#
+            $p + $q"#
         ),
         15
     );
@@ -5672,7 +5672,7 @@ fn sort_joins_keys_and_values_of_named_hash() {
         eval_string(
             r#"no strict 'vars';
             my %h = (fr6_u2 => 20, fr6_u1 => 10);
-            join "", (join "", sort keys %h), ":", (join "", sort values %h);"#
+            join "", (join "", sort keys %h), ":", (join "", sort values %h)"#
         ),
         "fr6_u1fr6_u2:1020"
     );
@@ -5692,7 +5692,7 @@ fn max_index_three_element_array_is_two() {
         eval_int(
             r#"no strict 'vars';
             my @t = (1, 2, 3);
-            $#t;"#
+            $#t"#
         ),
         2
     );
@@ -5708,7 +5708,7 @@ fn ref_brace_constructor_yields_hash() {
     assert_eq!(
         eval_string(
             r#"no strict 'vars';
-            ref { fr6_hk => 1 };"#
+            ref { fr6_hk => 1 }"#
         ),
         "HASH"
     );
@@ -5720,7 +5720,7 @@ fn array_ref_arrow_subscript_reads_element() {
         eval_int(
             r#"no strict 'vars';
             my $r = [10, 20, 30];
-            $r->[1];"#
+            $r->[1]"#
         ),
         20
     );
@@ -5752,7 +5752,7 @@ fn splice_inserts_before_index_without_removal() {
             r#"no strict 'vars';
             my @c = (1, 2, 3, 4, 5);
             splice @c, 1, 0, 9;
-            join "", @c;"#
+            join "", @c"#
         ),
         "192345"
     );
@@ -5765,7 +5765,7 @@ fn defined_or_assign_leaves_defined_positive_unchanged() {
             r#"no strict 'vars';
             my $z = 1;
             $z //= 0;
-            $z;"#
+            $z"#
         ),
         1
     );
@@ -5791,7 +5791,7 @@ fn shift_returns_head_and_shortens_array() {
             r#"no strict 'vars';
             my @d = (1, 2, 3);
             my $h = shift @d;
-            join ":", $h, (join "", @d);"#
+            join ":", $h, (join "", @d)"#
         ),
         "1:23"
     );
@@ -5804,7 +5804,7 @@ fn pop_returns_tail_and_shortens_array() {
             r#"no strict 'vars';
             my @e = (1, 2, 3);
             my $t = pop @e;
-            join ":", $t, (join "", @e);"#
+            join ":", $t, (join "", @e)"#
         ),
         "3:12"
     );
@@ -5825,7 +5825,7 @@ fn statement_modifier_for_multiplies_accumulator() {
             r#"no strict 'vars';
             my $g = 1;
             $g *= $_ for 1 .. 2;
-            $g;"#
+            $g"#
         ),
         2
     );
@@ -5838,7 +5838,7 @@ fn unshift_prepends_single_scalar_element() {
             r#"no strict 'vars';
             my @f = (1, 2, 3);
             unshift @f, 0;
-            join "", @f;"#
+            join "", @f"#
         ),
         "0123"
     );
@@ -5855,7 +5855,7 @@ fn repeat_operator_triples_digit_string() {
         eval_string(
             r#"no strict 'vars';
             my $i = "2";
-            $i x 3;"#
+            $i x 3"#
         ),
         "222"
     );
@@ -5884,7 +5884,7 @@ fn map_rebind_doubles_each_array_element() {
             r#"no strict 'vars';
             my @a = (1, 2, 3);
             @a = map { $_ * 2 } @a;
-            join "", @a;"#
+            join "", @a"#
         ),
         "246"
     );
@@ -5896,7 +5896,7 @@ fn array_slice_noncontiguous_indices_join() {
         eval_string(
             r#"no strict 'vars';
             my @b = (1, 2, 3, 4);
-            join "", @b[0, 3];"#
+            join "", @b[0, 3]"#
         ),
         "14"
     );
@@ -5914,7 +5914,7 @@ fn index_finds_multi_character_substring() {
         eval_int(
             r#"no strict 'vars';
             my $s = "fr6_abc";
-            index $s, "bc";"#
+            index $s, "bc""#
         ),
         5
     );
@@ -5956,7 +5956,7 @@ fn array_slice_reorders_non_contiguous_indices() {
         eval_string(
             r#"no strict 'vars';
             my @a = (1, 2, 3);
-            join "", @a[2, 0, 1];"#
+            join "", @a[2, 0, 1]"#
         ),
         "312"
     );
@@ -5968,7 +5968,7 @@ fn spaceship_orders_one_before_two() {
         eval_int(
             r#"no strict 'vars';
             my $x = 1;
-            $x <=> 2;"#
+            $x <=> 2"#
         ),
         -1
     );
@@ -5990,7 +5990,7 @@ fn array_range_slice_selects_interior_run() {
         eval_string(
             r#"no strict 'vars';
             my @b = (1, 2, 3, 4);
-            join "", @b[1 .. 3];"#
+            join "", @b[1 .. 3]"#
         ),
         "234"
     );
@@ -6003,7 +6003,7 @@ fn transliterate_replaces_class_with_single_replacement_char() {
             r#"no strict 'vars';
             my $s = "abc";
             $s =~ tr/a/b/;
-            $s;"#
+            $s"#
         ),
         "bbc"
     );
@@ -6016,7 +6016,7 @@ fn substitution_global_strips_digit_runs() {
             r#"no strict 'vars';
             my $t = "a1b2";
             $t =~ s/\d+//g;
-            $t;"#
+            $t"#
         ),
         "ab"
     );
@@ -6029,7 +6029,7 @@ fn substitution_global_replaces_repeated_literal_char() {
             r#"no strict 'vars';
             my $s = "axay";
             $s =~ s/x/y/g;
-            $s;"#
+            $s"#
         ),
         "ayay"
     );
@@ -6055,7 +6055,7 @@ fn hash_keys_sorted_after_new_key_insertion() {
             r#"no strict 'vars';
             my %h = (fr8_k2 => 3);
             $h{fr8_k1} = 2;
-            join "", sort keys %h;"#
+            join "", sort keys %h"#
         ),
         "fr8_k1fr8_k2"
     );
@@ -6073,7 +6073,7 @@ fn push_flattens_parenthesized_list_and_trailing_scalar() {
             r#"no strict 'vars';
             my @c = (1, 2);
             push @c, (3, 4), 5;
-            join "", @c;"#
+            join "", @c"#
         ),
         "12345"
     );
@@ -6086,7 +6086,7 @@ fn array_subscript_uses_arithmetic_on_index_variable() {
             r#"no strict 'vars';
             my @d = (1, 2, 3);
             my $x = 2;
-            $d[$x - 1];"#
+            $d[$x - 1]"#
         ),
         2
     );
@@ -6104,7 +6104,7 @@ fn substitution_backref_prefixes_each_digit() {
             r#"no strict 'vars';
             my $h = "123";
             $h =~ s/(\d)/x$1/g;
-            $h;"#
+            $h"#
         ),
         "x1x2x3"
     );
@@ -6117,7 +6117,7 @@ fn scalar_length_includes_trailing_index_after_sparse_assign() {
             r#"no strict 'vars';
             my @f = (1);
             $f[3] = 9;
-            scalar @f;"#
+            scalar @f"#
         ),
         4
     );
@@ -6130,7 +6130,7 @@ fn max_index_after_assign_to_fifth_slot_from_pair() {
             r#"no strict 'vars';
             my @g = (1, 2);
             $g[5] = 0;
-            $#g;"#
+            $#g"#
         ),
         5
     );
@@ -6143,7 +6143,7 @@ fn single_element_assign_defines_array_length_one() {
             r#"no strict 'vars';
             my @x;
             $x[0] = 1;
-            scalar @x;"#
+            scalar @x"#
         ),
         1
     );
@@ -6156,7 +6156,7 @@ fn scalar_division_yields_float_for_odd_numerator() {
             r#"no strict 'vars';
             my $a = 5;
             $a = $a / 2;
-            "$a";"#
+            "$a""#
         ),
         "2.5"
     );
@@ -6180,7 +6180,7 @@ fn grep_filters_named_array_by_numeric_comparison() {
         eval_string(
             r#"no strict 'vars';
             my @a = (1, 2, 3, 4);
-            join "", grep { $_ < 3 } @a;"#
+            join "", grep { $_ < 3 } @a"#
         ),
         "12"
     );
@@ -6230,7 +6230,7 @@ fn array_element_assign_through_slice_subscript() {
             r#"no strict 'vars';
             my @b = (5, 6, 7);
             $b[1] = 8;
-            join "", @b;"#
+            join "", @b"#
         ),
         "587"
     );
@@ -6244,7 +6244,7 @@ fn delete_hash_key_leaves_other_sorted_key() {
             my %h = (fr9_del_a => 1);
             $h{fr9_del_b} = 2;
             delete $h{fr9_del_a};
-            join "", sort keys %h;"#
+            join "", sort keys %h"#
         ),
         "fr9_del_b"
     );
@@ -6257,7 +6257,7 @@ fn array_name_in_scalar_yields_element_count() {
             r#"no strict 'vars';
             my @c = (1, 2, 3);
             my $n = @c;
-            $n;"#
+            $n"#
         ),
         3
     );
@@ -6275,7 +6275,7 @@ fn negative_one_subscript_reads_last_element() {
         eval_int(
             r#"no strict 'vars';
             my @a = (1, 2, 3);
-            $a[-1];"#
+            $a[-1]"#
         ),
         3
     );
@@ -6288,7 +6288,7 @@ fn negative_one_subscript_assigns_last_element() {
             r#"no strict 'vars';
             my @b = (1, 2, 3);
             $b[-1] = 9;
-            join "", @b;"#
+            join "", @b"#
         ),
         "129"
     );
@@ -6300,7 +6300,7 @@ fn map_preincrement_copies_array_topics() {
         eval_string(
             r#"no strict 'vars';
             my @t = (1, 2);
-            join "", map { ++$_ } @t;"#
+            join "", map { ++$_ } @t"#
         ),
         "23"
     );
@@ -6318,7 +6318,7 @@ fn or_eq_combines_bit_flags() {
             r#"no strict 'vars';
             my $v = 1;
             $v |= 4;
-            $v;"#
+            $v"#
         ),
         5
     );
@@ -6331,7 +6331,7 @@ fn and_mask_keeps_intersection_bits() {
             r#"no strict 'vars';
             my $w = 7;
             $w &= 5;
-            $w;"#
+            $w"#
         ),
         5
     );
@@ -6348,7 +6348,7 @@ fn grep_modulo_selects_evens_from_named_array() {
         eval_string(
             r#"no strict 'vars';
             my @a = (1, 2, 3, 4);
-            join "", grep { $_ % 2 == 0 } @a;"#
+            join "", grep { $_ % 2 == 0 } @a"#
         ),
         "24"
     );
@@ -6369,7 +6369,7 @@ fn undef_lexical_assigns_numeric() {
             r#"no strict 'vars';
             my $x = undef;
             $x = 3;
-            $x;"#
+            $x"#
         ),
         3
     );
@@ -6382,7 +6382,7 @@ fn defined_or_assign_sets_undef_lexical_once() {
             r#"no strict 'vars';
             my $y;
             $y //= 7;
-            $y;"#
+            $y"#
         ),
         7
     );
@@ -6394,7 +6394,7 @@ fn exists_true_for_initialized_array_index() {
         eval_int(
             r#"no strict 'vars';
             my @d = (1, 2, 3);
-            exists $d[1] ? 1 : 0;"#
+            exists $d[1] ? 1 : 0"#
         ),
         1
     );
@@ -6407,7 +6407,7 @@ fn delete_array_slot_joins_defined_or_placeholder() {
             r#"no strict 'vars';
             my @e = (1, 2, 3);
             delete $e[1];
-            join "", map { $_ // "x" } @e;"#
+            join "", map { $_ // "x" } @e"#
         ),
         "1x3"
     );
@@ -6426,7 +6426,7 @@ fn substitution_capture_rotates_three_letters() {
             my $z = "abc";
             $z =~ /^(.)(.)(.)$/;
             $z = "$3$2$1";
-            $z;"#
+            $z"#
         ),
         "cba"
     );
@@ -6444,7 +6444,7 @@ fn scalar_splice_removing_head_returns_removed_element() {
         eval_int(
             r#"no strict 'vars';
             my @f = (1, 2, 3);
-            scalar splice @f, 0, 1;"#
+            scalar splice @f, 0, 1"#
         ),
         1
     );
@@ -6457,7 +6457,7 @@ fn splice_removing_head_leaves_tail_joined() {
             r#"no strict 'vars';
             my @g = (1, 2, 3);
             splice @g, 0, 1;
-            join "", @g;"#
+            join "", @g"#
         ),
         "23"
     );
@@ -6491,7 +6491,7 @@ fn string_eq_same_ascii_digit_is_true() {
         eval_int(
             r#"no strict 'vars';
             my $x = "3";
-            $x eq "3" ? 1 : 0;"#
+            $x eq "3" ? 1 : 0"#
         ),
         1
     );
@@ -6503,7 +6503,7 @@ fn scalar_array_subscript_slice_is_last_indexed_value() {
         eval_int(
             r#"no strict 'vars';
             my @b = (1, 2, 3);
-            $b[0, 1];"#
+            $b[0, 1]"#
         ),
         2
     );
@@ -6516,7 +6516,7 @@ fn hash_slice_list_assign_overwrites_single_named_key() {
             r#"no strict 'vars';
             my %h = (fr11_slot => 1);
             @h{qw(fr11_slot)} = (9);
-            $h{fr11_slot};"#
+            $h{fr11_slot}"#
         ),
         9
     );
@@ -6528,7 +6528,7 @@ fn split_pipe_pattern_joins_with_hyphen() {
         eval_string(
             r#"no strict 'vars';
             my $s = "fr11_a|fr11_b|fr11_c";
-            join "-", split /\|/, $s;"#
+            join "-", split /\|/, $s"#
         ),
         "fr11_a-fr11_b-fr11_c"
     );
@@ -6540,7 +6540,7 @@ fn split_comma_pattern_joins_fields_without_separator() {
         eval_string(
             r#"no strict 'vars';
             my $t = "fr11_x,fr11_y,fr11_z";
-            join "", split /,/, $t;"#
+            join "", split /,/, $t"#
         ),
         "fr11_xfr11_yfr11_z"
     );
@@ -6552,7 +6552,7 @@ fn array_range_slice_joins_interior_pair() {
         eval_string(
             r#"no strict 'vars';
             my @c = (1, 2, 3, 4);
-            join "", @c[1 .. 2];"#
+            join "", @c[1 .. 2]"#
         ),
         "23"
     );
@@ -6565,7 +6565,7 @@ fn scalar_plus_fractional_half_from_integer() {
             r#"no strict 'vars';
             my $u = 1;
             $u = $u + 0.5;
-            "$u";"#
+            "$u""#
         ),
         "1.5"
     );
@@ -6588,7 +6588,7 @@ fn scalar_array_counts_elements_and_empty_is_zero() {
             r#"no strict 'vars';
             my @d = (1, 2, 3);
             my @e;
-            scalar @d + scalar @e;"#
+            scalar @d + scalar @e"#
         ),
         3
     );
@@ -6601,7 +6601,7 @@ fn defined_or_shows_nil_only_for_undef_lexical() {
             r#"no strict 'vars';
             my $v;
             my $w = 0;
-            ($v // "fr11_nil") . ":" . $w;"#
+            ($v // "fr11_nil") . ":" . $w"#
         ),
         "fr11_nil:0"
     );
@@ -6619,7 +6619,7 @@ fn lc_and_uc_round_trip_ascii_triple_letters() {
             r#"no strict 'vars';
             my $p = "FR11_ABC";
             my $q = "fr11_xyz";
-            lc($p) . ":" . uc($q);"#
+            lc($p) . ":" . uc($q)"#
         ),
         "fr11_abc:FR11_XYZ"
     );
@@ -6638,7 +6638,7 @@ fn array_three_index_slice_takes_first_third_fifth() {
         eval_string(
             r#"no strict 'vars';
             my @f = (1, 2, 3, 4, 5);
-            join "", @f[0, 2, 4];"#
+            join "", @f[0, 2, 4]"#
         ),
         "135"
     );
@@ -6659,7 +6659,7 @@ fn substitution_global_replaces_each_char_with_lowercase_x() {
             r#"no strict 'vars';
             my $t = "fr11_ab";
             $t =~ s/./x/g;
-            $t;"#
+            $t"#
         ),
         "xxxxxxx"
     );
@@ -6677,7 +6677,7 @@ fn hash_defined_or_assigns_missing_slot_only() {
             r#"no strict 'vars';
             my %h = (fr11_a => 1);
             $h{fr11_b} //= 2;
-            $h{fr11_b};"#
+            $h{fr11_b}"#
         ),
         2
     );
@@ -6690,7 +6690,7 @@ fn hash_defined_or_leaves_existing_slot_unchanged() {
             r#"no strict 'vars';
             my %i = (fr11_c => 1);
             $i{fr11_c} //= 9;
-            $i{fr11_c};"#
+            $i{fr11_c}"#
         ),
         1
     );
@@ -6715,7 +6715,7 @@ fn scalar_reverse_list_stringifies_concatenated_digits() {
         eval_string(
             r#"no strict 'vars';
             my @c = (1, 2, 3);
-            scalar reverse @c;"#
+            scalar reverse @c"#
         ),
         "321"
     );
@@ -6733,7 +6733,7 @@ fn multiply_eq_flips_sign_with_negative_one() {
             r#"no strict 'vars';
             my $k = 1;
             $k *= -1;
-            $k;"#
+            $k"#
         ),
         -1
     );
@@ -6762,7 +6762,7 @@ fn scalar_grep_counts_equality_hits_on_named_array() {
         eval_int(
             r#"no strict 'vars';
             my @a = (1, 2, 3);
-            scalar grep { $_ == 2 } @a;"#
+            scalar grep { $_ == 2 } @a"#
         ),
         1
     );
@@ -6784,7 +6784,7 @@ fn substr_from_negative_offset_with_length() {
         eval_string(
             r#"no strict 'vars';
             my $s = "hello";
-            substr $s, -3, 2;"#
+            substr $s, -3, 2"#
         ),
         "ll"
     );
@@ -6812,7 +6812,7 @@ fn array_element_compound_multiplies_in_place() {
             r#"no strict 'vars';
             my @b = (1, 2, 3);
             $b[1] *= 2;
-            join "", @b;"#
+            join "", @b"#
         ),
         "143"
     );
@@ -6830,7 +6830,7 @@ fn hash_slot_plus_eq_accumulates() {
             r#"no strict 'vars';
             my %h = (fr12_acc => 1);
             $h{fr12_acc} += 4;
-            $h{fr12_acc};"#
+            $h{fr12_acc}"#
         ),
         5
     );
@@ -6843,7 +6843,7 @@ fn transliterate_swaps_one_letter_class() {
             r#"no strict 'vars';
             my $t = "abc";
             $t =~ tr/b/c/;
-            $t;"#
+            $t"#
         ),
         "acc"
     );
@@ -6856,7 +6856,7 @@ fn substitution_global_rewrites_digits_to_underscores() {
             r#"no strict 'vars';
             my $u = "a1c2";
             $u =~ s/\d/_/g;
-            $u;"#
+            $u"#
         ),
         "a_c_"
     );
@@ -6873,7 +6873,7 @@ fn array_subscript_uses_grep_values_as_index_list() {
         eval_string(
             r#"no strict 'vars';
             my @c = (1, 2, 3, 4);
-            join "", @c[grep { $_ % 2 == 0 } @c];"#
+            join "", @c[grep { $_ % 2 == 0 } @c]"#
         ),
         "3"
     );
@@ -6895,7 +6895,7 @@ fn sum_first_and_last_array_element_via_negative_index() {
         eval_int(
             r#"no strict 'vars';
             my @d = (10, 20, 30);
-            $d[0] + $d[-1];"#
+            $d[0] + $d[-1]"#
         ),
         40
     );
@@ -6915,7 +6915,7 @@ fn map_flips_case_per_ascii_letter_class_on_split() {
         eval_string(
             r#"no strict 'vars';
             my $z = "AbCd";
-            join "", map { $_ =~ /[A-Z]/ ? lc $_ : uc $_ } split //, $z;"#
+            join "", map { $_ =~ /[A-Z]/ ? lc $_ : uc $_ } split //, $z"#
         ),
         "aBcD"
     );
@@ -7385,7 +7385,7 @@ fn array_sparse_assign_leaves_intermediate_slots_undef() {
             r#"no strict 'vars';
             my @g = (1, 2);
             $g[3] = 9;
-            join "-", map { defined($_) ? $_ : "x" } @g;"#
+            join "-", map { defined($_) ? $_ : "x" } @g"#
         ),
         "1-2-x-9"
     );

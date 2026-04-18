@@ -1238,6 +1238,10 @@ impl Interpreter {
         scope.declare_hash("perlrs::categories", categories_map.clone());
         scope.declare_hash("perlrs::primaries", primaries_map.clone());
         scope.declare_hash("perlrs::all", all_map.clone());
+        scope.declare_scalar(
+            "perlrs::VERSION",
+            PerlValue::string(env!("CARGO_PKG_VERSION").to_string()),
+        );
         scope.declare_hash("b", builtins_map);
         scope.declare_hash("pc", perl_compats_map);
         scope.declare_hash("e", extensions_map);
