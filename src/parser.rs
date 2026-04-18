@@ -8579,7 +8579,7 @@ impl Parser {
                     line,
                 })
             }
-            "slurp" | "cat" => {
+            "slurp" | "cat" | "c" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
@@ -10601,7 +10601,7 @@ impl Parser {
             | "eval_timeout" | "retry" | "rate_limit" | "every"
             | "gen" | "watch"
             // ── I/O extensions ──────────────────────────────────────────────
-            | "slurp" | "cat" | "capture" | "pager" | "pg" | "less"
+            | "slurp" | "cat" | "c" | "capture" | "pager" | "pg" | "less"
             | "stdin"
             // ── internal ────────────────────────────────────────────────────
             | "__perlrs_rust_compile"
