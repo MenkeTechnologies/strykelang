@@ -516,7 +516,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 | SysV IPC | `msgctl`, `msgget`, `msgsnd`, `msgrcv`, `semctl`, `semget`, `semop`, `shmctl`, `shmget`, `shmread`, `shmwrite` (stubs — runtime error) |
 | Type | `defined`, `undef`, `ref`, `bless`, `tied`, `untie`, `type_of`, `byte_size` |
 | Serialization | `to_json`, `to_csv`, `to_toml`, `to_yaml`, `to_xml`, `to_html`, `to_markdown`, `to_table`/`tbl`, `ddump`, `stringify`/`str`, `json_encode`/`json_decode` |
-| Visualization | `sparkline`/`spark`, `bar_chart`/`bars` |
+| Visualization | `sparkline`/`spark`, `bar_chart`/`bars`, `flame`/`flamechart` |
 | Control | `die`, `warn`, `eval`, `do`, `require`, `caller`, `wantarray`, `goto LABEL`, `continue { }` on loops, `prototype` |
 | Number Theory | `prime_factors`, `divisors`, `num_divisors`, `sum_divisors`, `is_perfect`, `is_abundant`, `is_deficient`, `collatz_length`, `collatz_sequence`, `lucas`, `tribonacci`, `nth_prime`, `primes_up_to`/`sieve`, `next_prime`, `prev_prime`, `triangular_number`, `pentagonal_number`, `is_pentagonal`, `perfect_numbers`, `twin_primes`, `goldbach`, `prime_pi`, `totient_sum`, `subfactorial`, `bell_number`, `partition_number`, `multinomial`, `is_smith`, `aliquot_sum`, `abundant_numbers`, `deficient_numbers` |
 | Statistics | `skewness`, `kurtosis`, `linear_regression`, `moving_average`, `exponential_moving_average`, `coeff_of_variation`, `standard_error`, `normalize_array`, `cross_entropy`, `euclidean_distance`, `minkowski_distance`, `mean_absolute_error`, `mean_squared_error`, `median_absolute_deviation`, `winsorize`, `weighted_mean` |
@@ -712,11 +712,12 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   (3,7,1,9,4,2,8,5) |> spark |> p;              # ▃▆▁█▄▂▇▅ — sparkline
   qw(a b a c a b) |> freq |> bars |> p;          # colored horizontal bar chart
   qw(a b a c a b) |> freq |> tbl |> p;           # plain-text table
+  flame({main => {parse => 30, eval => {compile => 15, run => 45}}, init => 10}) |> p  # flamechart
 
   # ── inline ANSI colors ─────────────────────────────────────────────
-  p "#{red}ERROR#{rst} #{green_bold}OK#{rst}";    # color names as #{} builtins
-  p "#{rgb(255,100,0)}ORANGE#{rst}";              # true color (24-bit)
-  p "#{color256(196)}RED#{rst}";                  # 256-color palette
+  p "#{red}ERROR#{ansi_off} #{green_bold}OK#{ansi_off}";  # color names as #{} builtins
+  p "#{rgb(255,100,0)}ORANGE#{ansi_off}";                 # true color (24-bit)
+  p "#{color256(196)}RED#{ansi_off}";                     # 256-color palette
 
   # ── stringify / str — parseable perlrs literals ──────────────────────
   $data |> str |> p;                            # +{a => 1, b => [2, 3]}
