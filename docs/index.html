@@ -203,7 +203,7 @@ pe -e 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
           <li><strong>Values</strong> — <code>PerlValue</code> is a NaN-boxed <code>u64</code>: immediates (<code>undef</code>, <code>i32</code>, raw <code>f64</code> bits) and tagged <code>Arc&lt;HeapObject&gt;</code> pointers for big ints, strings, arrays, hashes, refs, regexes, atomics, channels.</li>
           <li><strong>Regex</strong> — three-tier engine: Rust <code>regex</code> → <code>fancy-regex</code> (backrefs) → <code>pcre2</code> (PCRE-only verbs).</li>
           <li><strong>Parallelism</strong> — every parallel builtin uses rayon work-stealing across all cores. See <code>pmap</code>, <code>pflat_map</code>, <code>pgrep</code>, <code>pfor</code>, <code>psort</code>, <code>preduce</code>, <code>pcache</code>, <code>ppool</code>, <code>fan</code>, <code>pipeline</code>, <code>par_pipeline_stream</code>, <code>pchannel</code>, <code>pselect</code>, <code>par_walk</code>, <code>par_lines</code>, <code>par_sed</code>.</li>
-          <li><strong>Binary size</strong> — ~10 MB stripped with LTO + O3.</li>
+          <li><strong>Binary size</strong> — ~17 MB stripped with LTO + O3.</li>
         </ul>
       </section>
 

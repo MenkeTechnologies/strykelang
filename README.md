@@ -55,7 +55,7 @@ A Perl 5 compatible interpreter in Rust with native parallel primitives, NaN-box
 - **Three-tier regex** — Rust [`regex`](https://docs.rs/regex) → [`fancy-regex`](https://docs.rs/fancy-regex) (backrefs) → [`pcre2`](https://docs.rs/pcre2) (PCRE-only verbs).
 - **Bytecode VM + JIT** — match-dispatch interpreter with Cranelift block + linear-sub JIT (`src/vm.rs`, `src/jit.rs`).
 - **Rayon parallelism** — every parallel builtin uses work-stealing across all cores.
-- **Binary size** ~10 MB stripped (LTO + O3).
+- **Binary size** ~17 MB stripped (LTO + O3).
 
 ---
 
