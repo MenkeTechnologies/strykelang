@@ -715,11 +715,11 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   # bar_chart (bars) — horizontal colored bars from hashref
   qw(a b a c a b) |> freq |> bars |> p;                                  # word frequency bars
-  slurp("Cargo.toml") |> words |> freq |> bars |> p;                     # word freq from file
+  cat("Cargo.toml") |> words |> freq |> bars |> p;                       # word freq from file
   fr |> map { path_ext($_) } |> freq |> bars |> p;                       # file extension breakdown
 
   # histo — vertical histogram, top N by count
-  slurp("Cargo.toml") |> chars |> freq |> histo |> p;                    # character distribution
+  cat("Cargo.toml") |> chars |> freq |> histo |> p;                      # character distribution
   map { int(rand(10)) } 1..100 |> freq |> histo |> p;                    # dice roll distribution
 
   # to_table (tbl) — plain-text column-aligned table with box drawing
@@ -729,7 +729,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   # flame — terminal flamechart from nested hashrefs
   flame({main => {parse => 30, eval => {compile => 15, run => 45}}, init => 10}) |> p
-  slurp("Cargo.toml") |> chars |> freq |> flame |> p;                    # flat flame from char freq
+  cat("Cargo.toml") |> chars |> freq |> flame |> p;                      # flat flame from char freq
 
   # gauge — single-value progress bar with color coding
   p gauge(0.73);                                      # [██████████████████████░░░░░░░░] 73%
@@ -742,10 +742,10 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   # clip — copy pipeline output to clipboard
   fr |> map +{name => $_, size => format_bytes(size)} |> tmd |> clip;    # markdown table → clipboard
-  slurp("Cargo.toml") |> words |> freq |> tbl |> clip;                   # table → clipboard
+  cat("Cargo.toml") |> words |> freq |> tbl |> clip;                     # table → clipboard
 
   # combine charts: same data, multiple views
-  my %f = %{slurp("Cargo.toml") |> words |> freq};
+  my %f = %{cat("Cargo.toml") |> words |> freq};
   %f |> bars |> p;                                    # horizontal bars
   %f |> histo |> p;                                   # vertical histogram
   %f |> tbl |> p;                                     # aligned table
