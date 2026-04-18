@@ -362,10 +362,12 @@ fn print_cyberpunk_help() {
     println!();
     println!("A highly parallel Perl 5 interpreter written in Rust");
     println!();
-    println!("{Y}  USAGE:{N} {bin} [switches] [--] [programfile] [arguments]");
+    println!("{Y}  USAGE:{N} {bin} 'CODE'                     {G}//{N} -e is optional");
+    println!("{Y}        {N} {bin} [switches] [--] [programfile] [arguments]");
     println!();
     println!("{C}  ── EXECUTION ──────────────────────────────────────────{N}");
-    println!("  -e CODE                {G}//{N} One line of program (several -e's allowed)");
+    println!("  'CODE'                 {G}//{N} Inline code — no -e needed if arg looks like code");
+    println!("  -e CODE                {G}//{N} Explicit inline (required with -n/-p/-l/-a)");
     println!("  -E CODE                {G}//{N} Like -e, but enables all optional features");
     println!("  -c                     {G}//{N} Check syntax only (parse; no compile/run)");
     println!("  --lint / --check       {G}//{N} Parse + compile bytecode without running");

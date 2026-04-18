@@ -149,7 +149,7 @@
             <span class="sep">/</span>
             <a href="https://docs.rs/perlrs" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line" id="perlrsBuildLine">perlrs v0.5.8 · Rust-powered · Rayon work-stealing · Cranelift JIT · Perl 5 compat surface + pipe-forward sugar</p>
+          <p class="docs-build-line" id="perlrsBuildLine">perlrs v0.6.0 · Rust-powered · Rayon work-stealing · Cranelift JIT · Perl 5 compat surface + pipe-forward sugar</p>
         </div>
         <div class="tutorial-toolbar">
           <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -184,15 +184,15 @@ git clone https://github.com/MenkeTechnologies/perlrs
 cd perlrs &amp;&amp; cargo build --release
 
 # one-liners
-pe -e 'p "hello, world"'
-pe -e '1..20 |&gt; grep { $_ % 2 == 0 } |&gt; map { $_ * $_ } |&gt; sum |&gt; p'
-pe -e 'qw(a b c) |&gt; map uc |&gt; join "," |&gt; p'
+pe 'p "hello, world"'
+pe '1..20 |&gt; grep { $_ % 2 == 0 } |&gt; map { $_ * $_ } |&gt; sum |&gt; p'
+pe 'qw(a b c) |&gt; map uc |&gt; join "," |&gt; p'
 
 # parallel primitives
-pe -e '(1..8) |&gt; pmap { expensive($_) } |&gt; p'
+pe '(1..8) |&gt; pmap { expensive($_) } |&gt; p'
 
 # read + parse JSON
-pe -e 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
+pe 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
         <p>Full install + usage live in the <a href="https://github.com/MenkeTechnologies/perlrs#readme">README</a>.</p>
       </section>
 
@@ -238,21 +238,21 @@ pe -e 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
         </table>
 
         <h3>Examples</h3>
-        <div class="oneliner">pe -e 'p $b{pmap}'                              <span class="comment"># "parallel"</span></div>
-        <div class="oneliner">pe -e 'p $b{to_json}'                           <span class="comment"># "serialization"</span></div>
-        <div class="oneliner">pe -e 'p $all{tj}'                              <span class="comment"># "serialization"  (alias resolves via %all)</span></div>
-        <div class="oneliner">pe -e 'p scalar keys %all'                      <span class="comment"># total callable spellings (primaries + aliases)</span></div>
-        <div class="oneliner">pe -e 'p $pc{map}'                              <span class="comment"># "array / list"   (Perl core only)</span></div>
-        <div class="oneliner">pe -e 'p $e{pmap}'                              <span class="comment"># "parallel"       (extensions only)</span></div>
-        <div class="oneliner">pe -e 'p $a{tj}'                                <span class="comment"># "to_json"</span></div>
-        <div class="oneliner">pe -e 'p $d{pmap}'                              <span class="comment"># LSP one-liner</span></div>
-        <div class="oneliner">pe -e '$c{parallel} |&gt; e p'                      <span class="comment"># every parallel op, O(1) reverse-lookup</span></div>
-        <div class="oneliner">pe -e '$p{to_json} |&gt; e p'                       <span class="comment"># every alias of to_json</span></div>
-        <div class="oneliner">pe -e 'keys %pc |&gt; sort |&gt; p'                    <span class="comment"># every Perl compat, sorted</span></div>
-        <div class="oneliner">pe -e 'keys %e  |&gt; sort |&gt; p'                    <span class="comment"># every perlrs extension</span></div>
-        <div class="oneliner">pe -e 'keys %all |&gt; less'                       <span class="comment"># browse every spelling in $PAGER</span></div>
-        <div class="oneliner">pe -e 'my %f; $f{$b{$_}}++ for keys %b; dd \%f'  <span class="comment"># per-category frequency</span></div>
-        <div class="oneliner">pe -e 'for my $h (qw(b all pc e a d c p)) { printf "%%%-4s %d\n", $h, scalar keys %$h }'  <span class="comment"># catalog</span></div>
+        <div class="oneliner">pe 'p $b{pmap}'                              <span class="comment"># "parallel"</span></div>
+        <div class="oneliner">pe 'p $b{to_json}'                           <span class="comment"># "serialization"</span></div>
+        <div class="oneliner">pe 'p $all{tj}'                              <span class="comment"># "serialization"  (alias resolves via %all)</span></div>
+        <div class="oneliner">pe 'p scalar keys %all'                      <span class="comment"># total callable spellings (primaries + aliases)</span></div>
+        <div class="oneliner">pe 'p $pc{map}'                              <span class="comment"># "array / list"   (Perl core only)</span></div>
+        <div class="oneliner">pe 'p $e{pmap}'                              <span class="comment"># "parallel"       (extensions only)</span></div>
+        <div class="oneliner">pe 'p $a{tj}'                                <span class="comment"># "to_json"</span></div>
+        <div class="oneliner">pe 'p $d{pmap}'                              <span class="comment"># LSP one-liner</span></div>
+        <div class="oneliner">pe '$c{parallel} |&gt; e p'                      <span class="comment"># every parallel op, O(1) reverse-lookup</span></div>
+        <div class="oneliner">pe '$p{to_json} |&gt; e p'                       <span class="comment"># every alias of to_json</span></div>
+        <div class="oneliner">pe 'keys %pc |&gt; sort |&gt; p'                    <span class="comment"># every Perl compat, sorted</span></div>
+        <div class="oneliner">pe 'keys %e  |&gt; sort |&gt; p'                    <span class="comment"># every perlrs extension</span></div>
+        <div class="oneliner">pe 'keys %all |&gt; less'                       <span class="comment"># browse every spelling in $PAGER</span></div>
+        <div class="oneliner">pe 'my %f; $f{$b{$_}}++ for keys %b; dd \%f'  <span class="comment"># per-category frequency</span></div>
+        <div class="oneliner">pe 'for my $h (qw(b all pc e a d c p)) { printf "%%%-4s %d\n", $h, scalar keys %$h }'  <span class="comment"># catalog</span></div>
 
         <h3>Notes</h3>
         <ul>
@@ -288,7 +288,7 @@ f("*.txt") |&gt; map { [$_, slurp($_) |&gt; split(/\s+/) |&gt; scalar] }
 
       <section class="tutorial-section">
         <h2>Builtin categories</h2>
-        <p>2,001 operations across 2,093 spellings. Query them via <code>keys %perlrs::builtins</code> — the table below is a navigational overview, not a full index. Run <code>pe -e 'p scalar keys %b'</code> for the live count.</p>
+        <p>2,001 operations across 2,093 spellings. Query them via <code>keys %perlrs::builtins</code> — the table below is a navigational overview, not a full index. Run <code>pe 'p scalar keys %b'</code> for the live count.</p>
         <div class="cat-grid">
           <div class="cat-card"><h4>Array / List (134+)</h4><p><code>map maps flat_map grep sort reverse push pop shift unshift splice reduce fold fore e first any all none take take_while drop skip_while partition min_by max_by zip zip_with interleave frequencies count_by chunk windowed enumerate shuffle uniq dedup compact flatten concat pluck grep_v with_index sorted sorted_desc sorted_nums without take_last drop_last pairwise batch rotate swap_pairs sliding_pairs run_length_encode group_consecutive permutations combinations power_set cartesian_product</code> &hellip;</p></div>
           <div class="cat-card"><h4>String (129+)</h4><p><code>chomp chop length substr index rindex split join uc lc ucfirst lcfirst chr ord trim lines words chars snake_case camel_case kebab_case pascal_case constant_case capitalize swap_case title_case squish pad_left pad_right center truncate_at reverse_str rot13 rot47 caesar_shift count_vowels count_consonants first_word last_word left_str right_str wrap_text dedent indent strip_html levenshtein soundex extract_numbers extract_emails extract_urls</code> &hellip;</p></div>

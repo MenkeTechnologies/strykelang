@@ -83,9 +83,10 @@ autoload -Uz compinit && compinit
 ## [0x02] USAGE
 
 ```sh
-pe -e 'print "Hello, world!\n"'         # inline code
+pe 'p "Hello, world!"'                 # inline code — no -e needed
+pe 'p 1 + 2'                           # just quote and go
 pe script.pl arg1 arg2                  # script + args
-pe -lane 'print $F[0]'                  # bundled short switches
+pe -lane 'p $F[0]'                     # bundled short switches
 pe -c script.pl                         # syntax check
 pe --lint script.pl                     # parse + compile (no run)
 pe --disasm script.pl                   # bytecode listing on stderr
@@ -101,11 +102,13 @@ pe docs --toc                            # table of contents
 pe docs --search parallel                # search all pages
 pe serve 8080                           # static file server for $PWD
 pe serve 8080 app.pr                    # HTTP server with handler script
-pe serve 3000 -e '"hello " . $req->{path}'  # one-liner HTTP server
+pe serve 3000 '"hello " . $req->{path}'  # one-liner HTTP server
 pe build script.pl -o myapp             # bake into a standalone binary ([0x0D])
 pe --lsp                                # language server over stdio ([0x11])
 PERLRS_BC_CACHE=1 pe app.pl             # warm starts skip parse + compile ([0x0F])
 ```
+
+> **`-e` is optional.** If the first argument isn't a file on disk and looks like code, `pe` runs it directly. `pe 'p 42'` and `pe -e 'p 42'` are equivalent. Use `-e` when combining with `-n`/`-p`/`-l`/`-a` (e.g. `pe -lane 'p $F[0]'`).
 
 #### Semicolons
 
@@ -120,7 +123,7 @@ my $x = 1; my $y = 2; p $x + $y # 3 — same line needs `;` between statements
 
 #### Interactive REPL
 
-Run `pe` in a terminal with no script and no `-e`/`-n`/`-p`/etc. to enter a readline session: line editing, history (`~/.perlrs_history`), tab completion for keywords, lexicals in scope, sub names, methods after `->` on blessed objects, and file paths. `exit`/`quit`/Ctrl-D leaves. Non-TTY stdin is read as a complete program.
+Run `pe` with no arguments to enter a readline session: line editing, history (`~/.perlrs_history`), tab completion for keywords, lexicals in scope, sub names, methods after `->` on blessed objects, and file paths. `exit`/`quit`/Ctrl-D leaves. Non-TTY stdin is read as a complete program.
 
 #### `__DATA__`
 
@@ -636,10 +639,10 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   "foo123bar456" |> /\d+/g |> p  # 123 456
 
   # full pipeline: read input, strip newlines, split, count word frequencies
-  # man ls | pe -e 'input |> s@\n@@g |> split |> frequencies |> ddump |> p'
+  # man ls | pe 'input |> s@\n@@g |> split |> frequencies |> ddump |> p'
 
   # extract all emails from text, deduplicate
-  # cat log.txt | pe -e 'input |> /[\w.]+@[\w.]+/g |> distinct |> e p'
+  # cat log.txt | pe 'input |> /[\w.]+@[\w.]+/g |> distinct |> e p'
 
   # capture groups with /g:
   "a=1 b=2" |> /(\w+)=(\w+)/g |> ddump |> p
@@ -651,7 +654,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   # ── input / output ─────────────────────────────────────────────────
   input                                # slurp all of stdin as one string
   input($fh)                           # slurp a filehandle
-  # cat data.txt | pe -e 'input |> lines |> e p'
+  # cat data.txt | pe 'input |> lines |> e p'
 
   # ── string → list ──────────────────────────────────────────────────
   "hello\nworld" |> lines |> ddump |> p  # ("hello", "world")
@@ -1229,7 +1232,7 @@ pe examples/fibonacci.pr
 
 ```sh
 # sets: dedupe + union / intersection (`scalar` gives member count, like `scalar @array`)
-pe -e 'my $a = set(1,2,2,3); my $b = set(2,3,4); p scalar($a | $b), " ", scalar($a & $b)'
+pe 'my $a = set(1,2,2,3); my $b = set(2,3,4); p scalar($a | $b), " ", scalar($a & $b)'
 ```
 
 ---
@@ -1579,40 +1582,40 @@ Inverted indexes for constant-time reverse queries:
 
 ```sh
 # O(1) direct lookups
-pe -e 'p $b{pmap}'              # "parallel"
-pe -e 'p $b{to_json}'           # "serialization"
-pe -e 'p $pc{map}'              # "array / list"
-pe -e 'p $e{pmap}'              # "parallel"
-pe -e 'p $a{tj}'                # "to_json"
-pe -e 'p $d{pmap}'              # LSP one-liner
-pe -e 'p $all{tj}'              # "serialization"  (alias resolved via %all)
-pe -e 'p scalar @{$c{parallel}}'  # number of parallel ops
-pe -e '$p{to_json} |> e p'        # every alias of to_json
+pe 'p $b{pmap}'              # "parallel"
+pe 'p $b{to_json}'           # "serialization"
+pe 'p $pc{map}'              # "array / list"
+pe 'p $e{pmap}'              # "parallel"
+pe 'p $a{tj}'                # "to_json"
+pe 'p $d{pmap}'              # LSP one-liner
+pe 'p $all{tj}'              # "serialization"  (alias resolved via %all)
+pe 'p scalar @{$c{parallel}}'  # number of parallel ops
+pe '$p{to_json} |> e p'        # every alias of to_json
 
 # total callable spellings (primaries + aliases), one direct count
-pe -e 'p scalar keys %all'
+pe 'p scalar keys %all'
 
 # see just Perl compats
-pe -e 'keys %pc |> sort |> p'
+pe 'keys %pc |> sort |> p'
 
 # see just perlrs extensions
-pe -e 'keys %e |> sort |> p'
+pe 'keys %e |> sort |> p'
 
 # enumerate a whole category in O(1)
-pe -e '$c{parallel} |> e p'
-pe -e '$c{"array / list"} |> e p'
+pe '$c{parallel} |> e p'
+pe '$c{"array / list"} |> e p'
 
 # browse any of them interactively via the pager
-pe -e 'keys %all |> less'
+pe 'keys %all |> less'
 
 # frequency table: how many ops per category?
-pe -e 'my %f; $f{$b{$_}}++ for keys %b; dd \%f'
+pe 'my %f; $f{$b{$_}}++ for keys %b; dd \%f'
 
 # find every documented op mentioning "parallel"
-pe -e 'keys %d |> grep { $d{$_} =~ /parallel/i } |> sort |> p'
+pe 'keys %d |> grep { $d{$_} =~ /parallel/i } |> sort |> p'
 
 # catalog the full reflection surface
-pe -e 'for my $h (qw(b all pc e a d c p)) {
+pe 'for my $h (qw(b all pc e a d c p)) {
          printf "%%%-4s %d\n", $h, scalar keys %$h
        }'
 ```
