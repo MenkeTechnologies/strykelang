@@ -515,7 +515,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 | Network | `gethostbyname`, `gethostbyaddr`, `getpwnam`, `getpwuid`, `getpwent`/`setpwent`/`endpwent`, `getgrnam`, `getgrgid`, `getgrent`/`setgrent`/`endgrent`, `getprotobyname`, `getprotobynumber`, `getservbyname`, `getservbyport` |
 | SysV IPC | `msgctl`, `msgget`, `msgsnd`, `msgrcv`, `semctl`, `semget`, `semop`, `shmctl`, `shmget`, `shmread`, `shmwrite` (stubs — runtime error) |
 | Type | `defined`, `undef`, `ref`, `bless`, `tied`, `untie`, `type_of`, `byte_size` |
-| Serialization | `to_json`, `to_csv`, `to_toml`, `to_yaml`, `to_xml`, `ddump`, `stringify`/`str`, `json_encode`/`json_decode` |
+| Serialization | `to_json`, `to_csv`, `to_toml`, `to_yaml`, `to_xml`, `to_html`, `to_markdown`, `ddump`, `stringify`/`str`, `json_encode`/`json_decode` |
 | Control | `die`, `warn`, `eval`, `do`, `require`, `caller`, `wantarray`, `goto LABEL`, `continue { }` on loops, `prototype` |
 | Number Theory | `prime_factors`, `divisors`, `num_divisors`, `sum_divisors`, `is_perfect`, `is_abundant`, `is_deficient`, `collatz_length`, `collatz_sequence`, `lucas`, `tribonacci`, `nth_prime`, `primes_up_to`/`sieve`, `next_prime`, `prev_prime`, `triangular_number`, `pentagonal_number`, `is_pentagonal`, `perfect_numbers`, `twin_primes`, `goldbach`, `prime_pi`, `totient_sum`, `subfactorial`, `bell_number`, `partition_number`, `multinomial`, `is_smith`, `aliquot_sum`, `abundant_numbers`, `deficient_numbers` |
 | Statistics | `skewness`, `kurtosis`, `linear_regression`, `moving_average`, `exponential_moving_average`, `coeff_of_variation`, `standard_error`, `normalize_array`, `cross_entropy`, `euclidean_distance`, `minkowski_distance`, `mean_absolute_error`, `mean_squared_error`, `median_absolute_deviation`, `winsorize`, `weighted_mean` |
@@ -979,8 +979,9 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   | `hd` | `head/take` | | | `tt` | `to_toml` |
   | `tl` | `tail` | **Unique/Dedup** | | `tc` | `to_csv` |
   | `drp` | `drop/skip` | `uq` | `uniq` | `tx` | `to_xml` |
-  | `fl` | `flatten` | `dup` | `dedup` | `dd` | `ddump` |
-  | `cpt` | `compact` | `shuf` | `shuffle` | | |
+  | `fl` | `flatten` | `dup` | `dedup` | `th` | `to_html` |
+  | `cpt` | `compact` | `shuf` | `shuffle` | `tmd` | `to_markdown` |
+  | | | | | `dd` | `ddump` |
   | `cat` | `concat` | | | **Deserialize** | |
   | `il` | `interleave` | **Stats** | | `jd` | `json_decode` |
   | `en` | `enumerate` | `sq` | `sqrt` | `yd` | `yaml_decode` |

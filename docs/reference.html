@@ -1597,6 +1597,28 @@ p tx \%doc
 tx(\%doc) |&gt; spurt &quot;doc.xml&quot;
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-to-html">
+        <h3><a class="doc-anchor" href="#doc-to-html">#</a> <code>to_html</code></h3>
+        <p><code>to_html</code> (alias <code>th</code>) serializes a perlrs data structure into a self-contained HTML document with cyberpunk styling (dark background, neon cyan/magenta accents, monospace fonts). Arrays of hashrefs render as full tables with headers, plain arrays as bullet lists, single hashes as key-value tables, and scalars as styled text blocks. Pipe to a file and open in a browser for instant data visualization.</p>
+        <pre><code class="lang-perl">my @rows = ({name =&gt; &quot;Alice&quot;, age =&gt; 30}, {name =&gt; &quot;Bob&quot;, age =&gt; 25})
+th(\@rows) |&gt; spurt &quot;people.html&quot;
+my %cfg = (host =&gt; &quot;localhost&quot;, port =&gt; 5432)
+p th \%cfg;   # full HTML page to stdout
+@data |&gt; th |&gt; spurt &quot;report.html&quot;
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-to-markdown">
+        <h3><a class="doc-anchor" href="#doc-to-markdown">#</a> <code>to_markdown</code></h3>
+        <p><code>to_markdown</code> (aliases <code>to_md</code>, <code>tmd</code>) serializes a perlrs data structure into Markdown text. Arrays of hashrefs render as GFM tables with headers and separator rows, plain arrays as bullet lists, single hashes as 2-column key-value tables, and scalars as plain text. The output is valid GitHub-Flavored Markdown suitable for README files, issue comments, or any Markdown renderer.</p>
+        <pre><code class="lang-perl">my @rows = ({name =&gt; &quot;Alice&quot;, age =&gt; 30}, {name =&gt; &quot;Bob&quot;, age =&gt; 25})
+p tmd \@rows
+# | name | age |
+# | --- | --- |
+# | Alice | 30 |
+# | Bob | 25 |
+tmd(\@rows) |&gt; spurt &quot;table.md&quot;
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-csv-read">
         <h3><a class="doc-anchor" href="#doc-csv-read">#</a> <code>csv_read</code></h3>
         <p><code>csv_read</code> (alias <code>cr</code>) reads CSV data from a file path or string and returns an array of arrayrefs, where each inner arrayref represents one row. The parser handles RFC 4180 CSV correctly — quoted fields with embedded commas, newlines inside quotes, and escaped double quotes are all supported. The first row is treated as data (not a header) unless you process it separately. This is the fastest way to ingest tabular data in perlrs.</p>
