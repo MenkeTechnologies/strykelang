@@ -3664,10 +3664,14 @@ fn builtin_spinner_start(interp: &Interpreter, args: &[PerlValue]) -> PerlResult
         let stderr = std::io::stderr();
         while !done2.load(std::sync::atomic::Ordering::Relaxed) {
             {
+                // Lock both stderr AND stdout so prints can't interleave
+                // with the spinner redraw within the same frame.
+                let stdout = std::io::stdout();
+                let _stdout_lock = stdout.lock();
                 let mut err = stderr.lock();
                 let _ = write!(
                     err,
-                    "\r\x1b[36m{}\x1b[0m {} ",
+                    "\r\x1b[2K\x1b[36m{}\x1b[0m {} ",
                     frames[i % frames.len()],
                     msg
                 );

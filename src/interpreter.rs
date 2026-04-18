@@ -10063,10 +10063,12 @@ impl Interpreter {
                     let stderr = std::io::stderr();
                     while !done2.load(std::sync::atomic::Ordering::Relaxed) {
                         {
+                            let stdout = std::io::stdout();
+                            let _stdout_lock = stdout.lock();
                             let mut err = stderr.lock();
                             let _ = write!(
                                 err,
-                                "\r\x1b[36m{}\x1b[0m {} ",
+                                "\r\x1b[2K\x1b[36m{}\x1b[0m {} ",
                                 frames[i % frames.len()],
                                 msg
                             );
