@@ -1225,6 +1225,10 @@ fn main() {
             };
             match read_file_text_perl_compat(&script_path) {
                 Ok(content) => (content, script_path),
+                Err(_) if looks_like_code(&script_path) => {
+                    // One-liner-first: `pe 'p 1+2'` works without `-e`
+                    (script_path, "-e".to_string())
+                }
                 Err(e) => {
                     eprintln!("Can't open perl script \"{}\": {}", script_path, e);
                     process::exit(2);
@@ -2871,6 +2875,20 @@ fn strip_shebang_and_extract(content: &str, extract: bool) -> String {
     } else {
         content.to_string()
     }
+}
+
+/// Heuristic: does this string look like inline code rather than a filename?
+/// Used for `pe 'p 1+2'` (no `-e` needed).
+fn looks_like_code(s: &str) -> bool {
+    // Contains whitespace, Perl operators, or known statement starters
+    s.contains(' ')
+        || s.contains(';')
+        || s.contains('|')
+        || s.contains('{')
+        || s.contains('(')
+        || s.contains('$')
+        || s.contains('@')
+        || s.contains('>')
 }
 
 /// Look for a script file in PATH (-S flag).
