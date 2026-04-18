@@ -1191,6 +1191,9 @@ impl PerlValue {
                 return r.read().clone();
             }
         }
+        if self.is_iterator() {
+            return self.into_iterator().collect_all();
+        }
         vec![self.clone()]
     }
 
