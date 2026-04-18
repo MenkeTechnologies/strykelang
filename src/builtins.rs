@@ -414,6 +414,8 @@ pub(crate) fn try_builtin(
         "to_file" => Some(builtin_to_file(args, line)),
         "to_json" | "tj" => Some(builtin_to_json(args)),
         "to_csv" | "tc" => Some(builtin_to_csv(args)),
+        "to_html" | "th" => Some(builtin_to_html(args)),
+        "to_markdown" | "to_md" | "tmd" => Some(builtin_to_markdown(args)),
         "grep_v" => Some(builtin_grep_v(args, line)),
         "select_keys" => Some(builtin_select_keys(args)),
         "pluck" => Some(builtin_pluck(args)),
@@ -18346,6 +18348,301 @@ fn xml_escape(s: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&apos;")
+}
+
+// ── to_html ─────────────────────────────────────────────────────────────
+
+/// `to_html VALUE` — serialize a PerlValue to a styled HTML document.
+/// Output is a self-contained cyberpunk-themed page (dark bg, neon accents,
+/// monospace font) suitable for piping to a file and opening in a browser.
+fn builtin_to_html(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let val = normalize_serialize_root(args);
+    let mut buf = String::with_capacity(2048);
+    buf.push_str(
+        "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
+         <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n\
+         <title>perlrs — to_html</title>\n<style>\n\
+         *{margin:0;padding:0;box-sizing:border-box}\n\
+         :root{--bg:#05050a;--bg2:#0a0a14;--card:#0d0d1a;--cyan:#05d9e8;\
+         --accent:#ff2a6d;--accent-lt:#ff6b9d;--text:#e0f0ff;--dim:#7a8ba8;\
+         --border:#1a1a3e;--green:#39ff14}\n\
+         body{font-family:'Share Tech Mono','SF Mono','Fira Code',monospace;\
+         background:var(--bg);color:var(--text);line-height:1.55;\
+         padding:2rem 1.25rem}\n\
+         .wrap{max-width:68rem;margin:0 auto}\n\
+         h1{font-family:'Orbitron',sans-serif;font-size:14px;font-weight:900;\
+         letter-spacing:3px;text-transform:uppercase;color:var(--cyan);\
+         margin:0 0 1rem;padding-bottom:10px;border-bottom:1px solid var(--border)}\n\
+         table{border-collapse:collapse;width:100%;margin:0.6rem 0}\n\
+         th{background:var(--bg2);color:var(--cyan);font-family:'Orbitron',sans-serif;\
+         font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;\
+         text-align:left;padding:6px 10px;border:1px solid var(--border)}\n\
+         td{padding:6px 10px;border:1px solid var(--border);color:var(--dim);\
+         vertical-align:top;font-size:12px}\n\
+         tr:hover td{background:rgba(5,217,232,0.06)}\n\
+         .scalar{padding:1rem;border-left:2px solid var(--cyan);background:var(--card);\
+         font-size:13px;color:var(--text);white-space:pre-wrap;word-break:break-word}\n\
+         .null{color:var(--accent-lt);font-style:italic}\n\
+         ul{list-style:none;padding:0}\n\
+         ul li{padding:4px 10px;border-bottom:1px solid var(--border);font-size:12px;\
+         color:var(--dim)}\n\
+         ul li:hover{background:rgba(5,217,232,0.06)}\n\
+         ul li::before{content:'▸ ';color:var(--cyan)}\n\
+         .nested{margin:0.4rem 0 0.4rem 1rem;border-left:2px solid var(--border);\
+         padding-left:0.8rem}\n\
+         </style>\n</head>\n<body>\n<div class=\"wrap\">\n\
+         <h1>// PERLRS DATA</h1>\n",
+    );
+    html_value(&mut buf, &val, 0);
+    buf.push_str("</div>\n</body>\n</html>\n");
+    Ok(PerlValue::string(buf))
+}
+
+fn html_value(buf: &mut String, val: &PerlValue, depth: usize) {
+    if val.is_undef() {
+        buf.push_str("<span class=\"null\">undef</span>\n");
+        return;
+    }
+    if let Some(hr) = val.as_hash_ref() {
+        let guard = hr.read();
+        if guard.is_empty() {
+            buf.push_str("<span class=\"null\">{}</span>\n");
+            return;
+        }
+        // Array-of-hashes at top level → full table
+        buf.push_str("<table>\n<thead><tr>");
+        for k in guard.keys() {
+            buf.push_str("<th>");
+            html_escape_into(buf, k);
+            buf.push_str("</th>");
+        }
+        buf.push_str("</tr></thead>\n<tbody><tr>");
+        for v in guard.values() {
+            buf.push_str("<td>");
+            html_cell(buf, v, depth + 1);
+            buf.push_str("</td>");
+        }
+        buf.push_str("</tr></tbody>\n</table>\n");
+        return;
+    }
+    if let Some(ar) = val.as_array_ref() {
+        let guard = ar.read();
+        if guard.is_empty() {
+            buf.push_str("<span class=\"null\">[]</span>\n");
+            return;
+        }
+        // Check if AoH → render as a full table
+        if guard.iter().all(|v| v.as_hash_ref().is_some()) {
+            // Collect union of keys preserving first-seen order
+            let mut headers: Vec<String> = Vec::new();
+            let mut seen = std::collections::HashSet::new();
+            for row in guard.iter() {
+                if let Some(rh) = row.as_hash_ref() {
+                    for k in rh.read().keys() {
+                        if seen.insert(k.clone()) {
+                            headers.push(k.clone());
+                        }
+                    }
+                }
+            }
+            buf.push_str("<table>\n<thead><tr>");
+            for h in &headers {
+                buf.push_str("<th>");
+                html_escape_into(buf, h);
+                buf.push_str("</th>");
+            }
+            buf.push_str("</tr></thead>\n<tbody>\n");
+            for row in guard.iter() {
+                buf.push_str("<tr>");
+                if let Some(rh) = row.as_hash_ref() {
+                    let rg = rh.read();
+                    for h in &headers {
+                        buf.push_str("<td>");
+                        if let Some(v) = rg.get(h) {
+                            html_cell(buf, v, depth + 1);
+                        }
+                        buf.push_str("</td>");
+                    }
+                }
+                buf.push_str("</tr>\n");
+            }
+            buf.push_str("</tbody>\n</table>\n");
+            return;
+        }
+        // Plain array → unordered list
+        buf.push_str("<ul>\n");
+        for item in guard.iter() {
+            buf.push_str("<li>");
+            html_cell(buf, item, depth + 1);
+            buf.push_str("</li>\n");
+        }
+        buf.push_str("</ul>\n");
+        return;
+    }
+    // Scalar
+    buf.push_str("<div class=\"scalar\">");
+    html_escape_into(buf, &val.to_string());
+    buf.push_str("</div>\n");
+}
+
+fn html_cell(buf: &mut String, val: &PerlValue, depth: usize) {
+    if val.is_undef() {
+        buf.push_str("<span class=\"null\">undef</span>");
+        return;
+    }
+    if val.as_hash_ref().is_some() || val.as_array_ref().is_some() {
+        buf.push_str("<div class=\"nested\">");
+        html_value(buf, val, depth);
+        buf.push_str("</div>");
+        return;
+    }
+    html_escape_into(buf, &val.to_string());
+}
+
+fn html_escape_into(buf: &mut String, s: &str) {
+    for c in s.chars() {
+        match c {
+            '&' => buf.push_str("&amp;"),
+            '<' => buf.push_str("&lt;"),
+            '>' => buf.push_str("&gt;"),
+            '"' => buf.push_str("&quot;"),
+            '\'' => buf.push_str("&#39;"),
+            _ => buf.push(c),
+        }
+    }
+}
+
+// ── to_markdown ─────────────────────────────────────────────────────────
+
+/// `to_markdown VALUE` — serialize a PerlValue to a Markdown string.
+/// Hashes render as tables, arrays as bullet lists, AoH as full tables,
+/// and scalars as plain text.
+fn builtin_to_markdown(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let val = normalize_serialize_root(args);
+    let mut buf = String::with_capacity(512);
+    md_value(&mut buf, &val, 0);
+    Ok(PerlValue::string(buf))
+}
+
+fn md_value(buf: &mut String, val: &PerlValue, depth: usize) {
+    if val.is_undef() {
+        buf.push_str("*undef*\n");
+        return;
+    }
+    if let Some(hr) = val.as_hash_ref() {
+        let guard = hr.read();
+        if guard.is_empty() {
+            buf.push_str("*{}*\n");
+            return;
+        }
+        // Single hash → 2-column table
+        buf.push_str("| Key | Value |\n| --- | --- |\n");
+        for (k, v) in guard.iter() {
+            buf.push_str("| ");
+            md_escape_into(buf, k);
+            buf.push_str(" | ");
+            md_cell(buf, v);
+            buf.push_str(" |\n");
+        }
+        return;
+    }
+    if let Some(ar) = val.as_array_ref() {
+        let guard = ar.read();
+        if guard.is_empty() {
+            buf.push_str("*[]*\n");
+            return;
+        }
+        // AoH → full table
+        if guard.iter().all(|v| v.as_hash_ref().is_some()) {
+            let mut headers: Vec<String> = Vec::new();
+            let mut seen = std::collections::HashSet::new();
+            for row in guard.iter() {
+                if let Some(rh) = row.as_hash_ref() {
+                    for k in rh.read().keys() {
+                        if seen.insert(k.clone()) {
+                            headers.push(k.clone());
+                        }
+                    }
+                }
+            }
+            buf.push_str("| ");
+            for (i, h) in headers.iter().enumerate() {
+                if i > 0 {
+                    buf.push_str(" | ");
+                }
+                md_escape_into(buf, h);
+            }
+            buf.push_str(" |\n| ");
+            for i in 0..headers.len() {
+                if i > 0 {
+                    buf.push_str(" | ");
+                }
+                buf.push_str("---");
+            }
+            buf.push_str(" |\n");
+            for row in guard.iter() {
+                buf.push_str("| ");
+                if let Some(rh) = row.as_hash_ref() {
+                    let rg = rh.read();
+                    for (i, h) in headers.iter().enumerate() {
+                        if i > 0 {
+                            buf.push_str(" | ");
+                        }
+                        if let Some(v) = rg.get(h) {
+                            md_cell(buf, v);
+                        }
+                    }
+                }
+                buf.push_str(" |\n");
+            }
+            return;
+        }
+        // Plain array → bullet list
+        let prefix = "  ".repeat(depth);
+        for item in guard.iter() {
+            buf.push_str(&prefix);
+            buf.push_str("- ");
+            if item.as_hash_ref().is_some() || item.as_array_ref().is_some() {
+                buf.push('\n');
+                md_value(buf, item, depth + 1);
+            } else {
+                md_cell(buf, item);
+                buf.push('\n');
+            }
+        }
+        return;
+    }
+    // Scalar
+    buf.push_str(&val.to_string());
+    buf.push('\n');
+}
+
+fn md_cell(buf: &mut String, val: &PerlValue) {
+    if val.is_undef() {
+        buf.push_str("*undef*");
+        return;
+    }
+    if val.is_integer_like() {
+        buf.push_str(&val.to_int().to_string());
+        return;
+    }
+    if val.is_float_like() {
+        buf.push_str(&val.to_number().to_string());
+        return;
+    }
+    md_escape_into(buf, &val.to_string());
+}
+
+fn md_escape_into(buf: &mut String, s: &str) {
+    for c in s.chars() {
+        match c {
+            '|' | '\\' | '*' | '_' | '`' | '[' | ']' | '#' => {
+                buf.push('\\');
+                buf.push(c);
+            }
+            _ => buf.push(c),
+        }
+    }
 }
 
 fn ddump_value(buf: &mut String, val: &PerlValue, depth: usize) {

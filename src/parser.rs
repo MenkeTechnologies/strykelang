@@ -1216,6 +1216,8 @@ impl Parser {
                 | "to_toml"
                 | "to_yaml"
                 | "to_xml"
+                | "to_html"
+                | "to_markdown"
                 | "set"
                 | "list_count"
                 | "list_size"
@@ -2060,6 +2062,14 @@ impl Parser {
             },
             "to_xml" | "tx" => ExprKind::FuncCall {
                 name: "to_xml".to_string(),
+                args: vec![arg],
+            },
+            "to_html" | "th" => ExprKind::FuncCall {
+                name: "to_html".to_string(),
+                args: vec![arg],
+            },
+            "to_markdown" | "to_md" | "tmd" => ExprKind::FuncCall {
+                name: "to_markdown".to_string(),
                 args: vec![arg],
             },
             "ddump" | "dd" => ExprKind::FuncCall {
@@ -4628,9 +4638,9 @@ impl Parser {
                     | "list_size" | "count" | "size" | "cnt" | "len" | "with_index" | "shuffle"
                     | "shuffled" | "frequencies" | "freq" | "interleave" | "ddump"
                     | "stringify" | "str" | "lines" | "words" | "chars" | "trim" | "avg"
-                    | "to_json" | "to_csv" | "to_toml" | "to_yaml" | "to_xml" | "stddev"
-                    | "squared" | "sq" | "square" | "cubed" | "cb" | "cube" | "normalize"
-                    | "snake_case" | "camel_case" | "kebab_case" => {
+                    | "to_json" | "to_csv" | "to_toml" | "to_yaml" | "to_xml" | "to_html"
+                    | "to_markdown" | "stddev" | "squared" | "sq" | "square" | "cubed" | "cb"
+                    | "cube" | "normalize" | "snake_case" | "camel_case" | "kebab_case" => {
                         if args.is_empty() {
                             args.push(lhs);
                         } else {
@@ -10456,6 +10466,7 @@ impl Parser {
             | "normalize" | "snake_case" | "camel_case" | "kebab_case"
             | "frequencies" | "freq" | "interleave" | "ddump" | "stringify" | "str" | "top"
             | "to_json" | "to_csv" | "to_toml" | "to_yaml" | "to_xml"
+            | "to_html" | "to_markdown"
             | "to_hash" | "to_set"
             | "to_file" | "read_lines" | "append_file" | "write_json" | "read_json"
             | "tempfile" | "tempdir" | "list_count" | "list_size" | "size"
