@@ -242,7 +242,7 @@ pe 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
           <tbody>
             <tr><td>Sum 1..100</td><td style="color:#0f0;"><code>pe 'p sum 1..100'</code> <b>19c</b></td><td>45c</td><td>28c</td><td>38c</td></tr>
             <tr><td>Word freq</td><td style="color:#0f0;"><code>pe -an 'freq(@F) |&gt; dd'</code> <b>25c</b></td><td>61c</td><td>—</td><td>—</td></tr>
-            <tr><td>SHA256 file</td><td style="color:#0f0;"><code>pe 'p sha256 cat "f"'</code> <b>23c</b></td><td>70c+</td><td>—</td><td>80c+</td></tr>
+            <tr><td>SHA256 file</td><td style="color:#0f0;"><code>pe 'p s256"f"'</code> <b>14c</b></td><td>70c+</td><td>—</td><td>80c+</td></tr>
             <tr><td>CSV → JSON</td><td style="color:#0f0;"><code>pe 'csv_read("f") |&gt; tj |&gt; p'</code> <b>33c</b></td><td>needs modules</td><td>needs modules</td><td>90c</td></tr>
             <tr><td>Parallel map</td><td style="color:#0f0;"><code>pe '1..1e6 |&gt; pmap { $_ * 2 }'</code> <b>33c</b></td><td>—</td><td>—</td><td>—</td></tr>
           </tbody>
