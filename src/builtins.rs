@@ -425,6 +425,8 @@ pub(crate) fn try_builtin(
         "flame" | "flamechart" => Some(builtin_flame(interp, args)),
         "histo" => Some(builtin_histo(args)),
         "gauge" => Some(builtin_gauge(interp, args)),
+        "spinner_start" => Some(builtin_spinner_start(interp, args)),
+        "spinner_stop" => Some(builtin_spinner_stop(interp, args)),
         "grep_v" => Some(builtin_grep_v(args, line)),
         "select_keys" => Some(builtin_select_keys(args)),
         "pluck" => Some(builtin_pluck(args)),
@@ -3638,6 +3640,58 @@ fn builtin_gauge(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVal
         "░".repeat(empty.saturating_sub(1)),
         pct * 100.0
     )))
+}
+
+/// Global registry of active spinners: ID → stop flag.
+static SPINNER_REGISTRY: std::sync::LazyLock<
+    std::sync::Mutex<std::collections::HashMap<u64, std::sync::Arc<std::sync::atomic::AtomicBool>>>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+
+static SPINNER_NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
+/// `spinner_start("msg")` — start an animated spinner on stderr.
+/// Returns an integer handle to pass to `spinner_stop`.
+fn builtin_spinner_start(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    use std::io::Write as _;
+    let msg = first_arg_or_topic(interp, args).to_string();
+    let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let done2 = done.clone();
+    let id = SPINNER_NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    SPINNER_REGISTRY.lock().unwrap().insert(id, done.clone());
+    std::thread::spawn(move || {
+        let frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+        let mut i = 0;
+        let stderr = std::io::stderr();
+        while !done2.load(std::sync::atomic::Ordering::Relaxed) {
+            {
+                let mut err = stderr.lock();
+                let _ = write!(
+                    err,
+                    "\r\x1b[36m{}\x1b[0m {} ",
+                    frames[i % frames.len()],
+                    msg
+                );
+                let _ = err.flush();
+            }
+            std::thread::sleep(std::time::Duration::from_millis(80));
+            i += 1;
+        }
+        let mut err = stderr.lock();
+        let _ = write!(err, "\r\x1b[2K");
+        let _ = err.flush();
+    });
+    Ok(PerlValue::integer(id as i64))
+}
+
+/// `spinner_stop($handle)` — stop a spinner started with `spinner_start`.
+fn builtin_spinner_stop(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let id = first_arg_or_topic(interp, args).to_int() as u64;
+    if let Some(done) = SPINNER_REGISTRY.lock().unwrap().remove(&id) {
+        done.store(true, std::sync::atomic::Ordering::Relaxed);
+        // Give the spinner thread time to clear the line
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    Ok(PerlValue::integer(1))
 }
 
 fn builtin_pager(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {

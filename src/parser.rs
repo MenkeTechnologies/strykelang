@@ -10559,7 +10559,7 @@ impl Parser {
             | "to_html" | "to_markdown" | "to_table" | "xopen"
             | "clip" | "clipboard" | "paste" | "pbcopy" | "pbpaste"
             | "sparkline" | "spark" | "bar_chart" | "bars" | "flame" | "flamechart"
-            | "histo" | "gauge" | "spinner"
+            | "histo" | "gauge" | "spinner" | "spinner_start" | "spinner_stop"
             | "to_hash" | "to_set"
             | "to_file" | "read_lines" | "append_file" | "write_json" | "read_json"
             | "tempfile" | "tempdir" | "list_count" | "list_size" | "size"
