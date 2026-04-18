@@ -3458,32 +3458,37 @@ fn builtin_histo(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let nums: Vec<f64> = if let Some(ar) = vals.as_array_ref() {
         ar.read().iter().map(|v| v.to_number()).collect()
     } else if let Some(hr) = vals.as_hash_ref() {
-        // hashref: treat as label→count, render like bar_chart but vertical
         let guard = hr.read();
-        let escaped: Vec<(String, f64)> = guard
+        let mut escaped: Vec<(String, f64)> = guard
             .iter()
             .map(|(k, v)| (display_escape(k), v.to_number()))
             .collect();
+        // Sort by count descending, cap at 20 columns for readability
+        escaped.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let max_cols = 20;
+        let truncated = escaped.len() > max_cols;
+        escaped.truncate(max_cols);
         let max_val = escaped.iter().map(|(_, n)| *n).fold(0.0_f64, f64::max);
         let bar_height = 10usize;
+        // Column width: at least label width, at least count width, at least 3
         let label_w = escaped.iter().map(|(k, _)| k.len()).max().unwrap_or(1);
-        let col_w = label_w.max(3);
+        let count_w = escaped
+            .iter()
+            .map(|(_, n)| format!("{}", n).len())
+            .max()
+            .unwrap_or(1);
+        let col_w = label_w.max(count_w).max(3);
         let mut rows: Vec<String> = Vec::new();
+        let colors = [
+            "\x1b[36m", "\x1b[32m", "\x1b[33m", "\x1b[35m", "\x1b[34m", "\x1b[31m",
+        ];
         for row in (1..=bar_height).rev() {
             let threshold = (row as f64 / bar_height as f64) * max_val;
             let mut line = String::new();
-            let colors = [
-                "\x1b[36m", "\x1b[32m", "\x1b[33m", "\x1b[35m", "\x1b[34m", "\x1b[31m",
-            ];
             for (i, (_, n)) in escaped.iter().enumerate() {
                 let block = if *n >= threshold { "█" } else { " " };
                 let color = colors[i % colors.len()];
-                line.push_str(&format!(
-                    " {}{:^w$}\x1b[0m",
-                    color,
-                    block.repeat(col_w),
-                    w = col_w
-                ));
+                line.push_str(&format!(" {}{}\x1b[0m", color, block.repeat(col_w)));
             }
             rows.push(line);
         }
@@ -3503,6 +3508,9 @@ fn builtin_histo(args: &[PerlValue]) -> PerlResult<PerlValue> {
             counts.push_str(&format!(" {:^w$}", n, w = col_w));
         }
         rows.push(counts);
+        if truncated {
+            rows.push(format!("(showing top {} of {})", max_cols, guard.len()));
+        }
         return Ok(PerlValue::string(rows.join("\n") + "\n"));
     } else {
         vec![vals.to_number()]
