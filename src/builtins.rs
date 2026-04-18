@@ -3169,7 +3169,10 @@ fn builtin_to_table(args: &[PerlValue]) -> PerlResult<PerlValue> {
                 if let Some(rh) = row.as_hash_ref() {
                     let rg = rh.read();
                     for (i, h) in headers.iter().enumerate() {
-                        let cell = rg.get(h).map(|v| v.to_string()).unwrap_or_default();
+                        let cell = rg
+                            .get(h)
+                            .map(|v| display_escape(&v.to_string()))
+                            .unwrap_or_default();
                         if cell.len() > widths[i] {
                             widths[i] = cell.len();
                         }
@@ -3204,18 +3207,13 @@ fn builtin_to_table(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
     if let Some(hr) = val.as_hash_ref() {
         let guard = hr.read();
-        let key_w = guard.keys().map(|k| k.len()).max().unwrap_or(3).max(3);
-        let val_w = guard
-            .values()
-            .map(|v| v.to_string().len())
-            .max()
-            .unwrap_or(5)
-            .max(5);
-        let headers = vec!["key".to_string(), "value".to_string()];
         let rows: Vec<Vec<String>> = guard
             .iter()
-            .map(|(k, v)| vec![k.clone(), v.to_string()])
+            .map(|(k, v)| vec![display_escape(k), display_escape(&v.to_string())])
             .collect();
+        let key_w = rows.iter().map(|r| r[0].len()).max().unwrap_or(3).max(3);
+        let val_w = rows.iter().map(|r| r[1].len()).max().unwrap_or(5).max(5);
+        let headers = vec!["key".to_string(), "value".to_string()];
         return Ok(PerlValue::string(table_render(
             &headers,
             &rows,
@@ -3223,6 +3221,23 @@ fn builtin_to_table(args: &[PerlValue]) -> PerlResult<PerlValue> {
         )));
     }
     Ok(PerlValue::string(val.to_string()))
+}
+
+/// Escape control characters for display in tables/charts.
+/// `\n` → `\n`, `\t` → `\t`, `\r` → `\r`, other controls → `\xNN`.
+fn display_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '\n' => out.push_str("\\n"),
+            '\t' => out.push_str("\\t"),
+            '\r' => out.push_str("\\r"),
+            '\0' => out.push_str("\\0"),
+            c if c.is_control() => out.push_str(&format!("\\x{:02x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out
 }
 
 fn table_render(headers: &[String], rows: &[Vec<String>], widths: &[usize]) -> String {
@@ -3311,20 +3326,20 @@ fn builtin_bar_chart(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
     if guard.is_empty() {
         return Ok(PerlValue::string(String::new()));
     }
-    let label_w = guard.keys().map(|k| k.len()).max().unwrap_or(0);
-    let max_val = guard
-        .values()
-        .map(|v| v.to_number())
-        .fold(0.0_f64, f64::max);
+    let escaped: Vec<(String, f64)> = guard
+        .iter()
+        .map(|(k, v)| (display_escape(k), v.to_number()))
+        .collect();
+    let label_w = escaped.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
+    let max_val = escaped.iter().map(|(_, n)| *n).fold(0.0_f64, f64::max);
     let bar_max = 40usize;
     let colors = [
         "\x1b[36m", "\x1b[32m", "\x1b[33m", "\x1b[35m", "\x1b[34m", "\x1b[31m",
     ];
     let mut buf = String::new();
-    for (i, (k, v)) in guard.iter().enumerate() {
-        let n = v.to_number();
+    for (i, (k, n)) in escaped.iter().enumerate() {
         let bar_len = if max_val > 0.0 {
-            ((n / max_val) * bar_max as f64).round() as usize
+            ((*n / max_val) * bar_max as f64).round() as usize
         } else {
             0
         };
@@ -3334,7 +3349,7 @@ fn builtin_bar_chart(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
             k,
             color,
             "█".repeat(bar_len),
-            v.to_string(),
+            n,
             w = label_w
         ));
     }
@@ -3408,12 +3423,13 @@ fn flame_render_level(
         };
         let block_w = block_w.max(1).min(width - used);
         let color = colors[(depth + i) % colors.len()];
+        let ek = display_escape(k);
         // Truncate label to fit block
-        let label = if k.len() + 2 <= block_w {
-            format!(" {} ", k)
+        let label = if ek.len() + 2 <= block_w {
+            format!(" {} ", ek)
         } else if block_w >= 3 {
             let trunc = block_w - 2;
-            format!(" {}… ", &k[..trunc.min(k.len())])
+            format!(" {}… ", &ek[..trunc.min(ek.len())])
         } else {
             " ".repeat(block_w)
         };
@@ -3444,24 +3460,23 @@ fn builtin_histo(args: &[PerlValue]) -> PerlResult<PerlValue> {
     } else if let Some(hr) = vals.as_hash_ref() {
         // hashref: treat as label→count, render like bar_chart but vertical
         let guard = hr.read();
-        let max_val = guard
-            .values()
-            .map(|v| v.to_number())
-            .fold(0.0_f64, f64::max);
+        let escaped: Vec<(String, f64)> = guard
+            .iter()
+            .map(|(k, v)| (display_escape(k), v.to_number()))
+            .collect();
+        let max_val = escaped.iter().map(|(_, n)| *n).fold(0.0_f64, f64::max);
         let bar_height = 10usize;
-        let label_w = guard.keys().map(|k| k.len()).max().unwrap_or(1);
+        let label_w = escaped.iter().map(|(k, _)| k.len()).max().unwrap_or(1);
         let col_w = label_w.max(3);
         let mut rows: Vec<String> = Vec::new();
-        // Build rows top to bottom
         for row in (1..=bar_height).rev() {
             let threshold = (row as f64 / bar_height as f64) * max_val;
             let mut line = String::new();
-            for (i, (_k, v)) in guard.iter().enumerate() {
-                let n = v.to_number();
-                let block = if n >= threshold { "█" } else { " " };
-                let colors = [
-                    "\x1b[36m", "\x1b[32m", "\x1b[33m", "\x1b[35m", "\x1b[34m", "\x1b[31m",
-                ];
+            let colors = [
+                "\x1b[36m", "\x1b[32m", "\x1b[33m", "\x1b[35m", "\x1b[34m", "\x1b[31m",
+            ];
+            for (i, (_, n)) in escaped.iter().enumerate() {
+                let block = if *n >= threshold { "█" } else { " " };
                 let color = colors[i % colors.len()];
                 line.push_str(&format!(
                     " {}{:^w$}\x1b[0m",
@@ -3472,23 +3487,20 @@ fn builtin_histo(args: &[PerlValue]) -> PerlResult<PerlValue> {
             }
             rows.push(line);
         }
-        // Separator
-        let sep: String = guard
-            .keys()
+        let sep: String = escaped
+            .iter()
             .map(|_| format!("─{}", "─".repeat(col_w)))
             .collect::<Vec<_>>()
             .join("");
         rows.push(sep);
-        // Labels
         let mut labels = String::new();
-        for (k, _) in guard.iter() {
+        for (k, _) in &escaped {
             labels.push_str(&format!(" {:^w$}", k, w = col_w));
         }
         rows.push(labels);
-        // Counts
         let mut counts = String::new();
-        for (_, v) in guard.iter() {
-            counts.push_str(&format!(" {:^w$}", v.to_string(), w = col_w));
+        for (_, n) in &escaped {
+            counts.push_str(&format!(" {:^w$}", n, w = col_w));
         }
         rows.push(counts);
         return Ok(PerlValue::string(rows.join("\n") + "\n"));
