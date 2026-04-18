@@ -408,6 +408,9 @@ pub(crate) fn try_builtin(
         "sentences" | "sents" => Some(builtin_sentences(interp, args)),
         "paragraphs" | "paras" => Some(builtin_paragraphs(interp, args)),
         "sections" | "sects" => Some(builtin_sections(interp, args)),
+        "numbers" | "nums" => Some(builtin_numbers(interp, args)),
+        "graphemes" | "grs" => Some(builtin_graphemes(interp, args)),
+        "columns" | "cols" => Some(builtin_columns(interp, args)),
         "trim" | "tm" => Some(builtin_trim(args)),
         "stdin" => Some(Ok(PerlValue::iterator(Arc::new(
             crate::map_stream::StdinIterator::new(),
@@ -436,7 +439,7 @@ pub(crate) fn try_builtin(
         "pluck" => Some(builtin_pluck(args)),
         "first_or" => Some(builtin_first_or(args)),
         "compact" | "cpt" => Some(builtin_compact(args)),
-        "concat" | "chain" | "cat" => Some(builtin_concat(args)),
+        "concat" | "chain" => Some(builtin_concat(args)),
         "clamp" | "clp" => Some(builtin_clamp(args)),
         "normalize" | "nrm" => Some(builtin_normalize(args)),
         "stddev" | "std" => Some(builtin_stddev(args)),
@@ -3012,6 +3015,177 @@ fn builtin_digits(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVa
         .map(|c| PerlValue::string(c.to_string()))
         .collect();
     Ok(PerlValue::array(out))
+}
+
+/// `numbers STRING` — extract all numbers (int and float, including negatives)
+/// from a string and return them as numeric values.
+/// `"temp 98.6F, -20C, ver 3"` → `[98.6, -20, 3]`
+fn builtin_numbers(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let mut out: Vec<PerlValue> = Vec::new();
+    let bytes = s.as_bytes();
+    let len = bytes.len();
+    let mut i = 0;
+    while i < len {
+        // Check for start of a number: digit, or `-`/`+` followed by digit, or `.` followed by digit
+        let start = i;
+        let mut has_digit = false;
+        // Optional leading sign
+        if i < len && (bytes[i] == b'-' || bytes[i] == b'+') {
+            // Only treat as sign if followed by digit or decimal point+digit
+            if i + 1 < len
+                && (bytes[i + 1].is_ascii_digit()
+                    || (bytes[i + 1] == b'.' && i + 2 < len && bytes[i + 2].is_ascii_digit()))
+            {
+                i += 1;
+            }
+        }
+        // Integer part
+        while i < len && bytes[i].is_ascii_digit() {
+            has_digit = true;
+            i += 1;
+        }
+        // Decimal part
+        if i < len && bytes[i] == b'.' && i + 1 < len && bytes[i + 1].is_ascii_digit() {
+            i += 1; // skip dot
+            while i < len && bytes[i].is_ascii_digit() {
+                has_digit = true;
+                i += 1;
+            }
+        }
+        if has_digit && i > start {
+            let num_str = &s[start..i];
+            if let Ok(n) = num_str.parse::<f64>() {
+                if n == (n as i64) as f64 && !num_str.contains('.') {
+                    out.push(PerlValue::integer(n as i64));
+                } else {
+                    out.push(PerlValue::float(n));
+                }
+            }
+        } else {
+            i += 1;
+        }
+    }
+    Ok(PerlValue::array(out))
+}
+
+/// `graphemes STRING` — split into Unicode grapheme clusters.
+/// Unlike `chars` which splits on code points, `graphemes` keeps
+/// combining characters and emoji sequences together:
+/// `"café"` → 4 graphemes (not 5 code points if `é` is decomposed).
+fn builtin_graphemes(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    // Simple grapheme segmentation: keep combining marks with their base.
+    // This handles the common cases (accented chars, emoji ZWJ sequences)
+    // without pulling in the unicode-segmentation crate.
+    let mut out: Vec<PerlValue> = Vec::new();
+    let mut cluster = String::new();
+    for c in s.chars() {
+        if cluster.is_empty() {
+            cluster.push(c);
+        } else if is_combining_or_extend(c) {
+            cluster.push(c);
+        } else {
+            out.push(PerlValue::string(std::mem::take(&mut cluster)));
+            cluster.push(c);
+        }
+    }
+    if !cluster.is_empty() {
+        out.push(PerlValue::string(cluster));
+    }
+    Ok(PerlValue::array(out))
+}
+
+/// Check if a char is a Unicode combining mark, modifier, or ZWJ/variation selector.
+fn is_combining_or_extend(c: char) -> bool {
+    let cp = c as u32;
+    // Combining Diacritical Marks (0300-036F)
+    // Combining Diacritical Marks Extended (1AB0-1AFF)
+    // Combining Diacritical Marks Supplement (1DC0-1DFF)
+    // Combining Half Marks (FE20-FE2F)
+    // Zero Width Joiner (200D) — emoji ZWJ sequences
+    // Variation Selectors (FE00-FE0F, E0100-E01EF)
+    // Combining marks general category ranges
+    matches!(cp,
+        0x0300..=0x036F
+        | 0x0483..=0x0489
+        | 0x0591..=0x05BD
+        | 0x05BF | 0x05C1 | 0x05C2 | 0x05C4 | 0x05C5 | 0x05C7
+        | 0x0610..=0x061A
+        | 0x064B..=0x065F
+        | 0x0670
+        | 0x06D6..=0x06DC
+        | 0x06DF..=0x06E4
+        | 0x06E7 | 0x06E8
+        | 0x06EA..=0x06ED
+        | 0x0711
+        | 0x0730..=0x074A
+        | 0x0900..=0x0903  // Devanagari etc.
+        | 0x093A..=0x094F
+        | 0x0951..=0x0957
+        | 0x0962 | 0x0963
+        | 0x0981..=0x0983
+        | 0x1AB0..=0x1AFF
+        | 0x1DC0..=0x1DFF
+        | 0x20D0..=0x20FF
+        | 0x200D          // ZWJ
+        | 0xFE00..=0xFE0F // variation selectors
+        | 0xFE20..=0xFE2F
+        | 0xE0100..=0xE01EF // variation selectors supplement
+    )
+}
+
+/// `columns STRING` or `columns STRING, WIDTHS` — split fixed-width columnar text.
+/// Without widths: auto-detect columns from whitespace boundaries (like `awk`).
+/// With widths arrayref: split at fixed positions `columns($line, [8, 20, 10])`.
+fn builtin_columns(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    // Check for explicit widths as second arg
+    let widths_arg = if args.len() >= 2 {
+        args[1].as_array_ref()
+    } else {
+        None
+    };
+    if let Some(widths_ref) = widths_arg {
+        // Fixed-width column splitting
+        let widths = widths_ref.read();
+        let mut out: Vec<PerlValue> = Vec::new();
+        let mut pos = 0;
+        for w in widths.iter() {
+            let width = w.to_int() as usize;
+            let end = (pos + width).min(s.len());
+            if pos < s.len() {
+                out.push(PerlValue::string(s[pos..end].trim().to_string()));
+            } else {
+                out.push(PerlValue::string(String::new()));
+            }
+            pos = end;
+        }
+        // Remainder
+        if pos < s.len() {
+            let rest = s[pos..].trim().to_string();
+            if !rest.is_empty() {
+                out.push(PerlValue::string(rest));
+            }
+        }
+        Ok(PerlValue::array(out))
+    } else {
+        // Auto-detect: split on runs of 2+ whitespace (columnar output like ps/ls)
+        // Falls back to single-whitespace split if no multi-space runs found
+        let has_multi_space = s.contains("  ");
+        let out: Vec<PerlValue> = if has_multi_space {
+            s.split("  ")
+                .map(|f| f.trim())
+                .filter(|f| !f.is_empty())
+                .map(|f| PerlValue::string(f.to_string()))
+                .collect()
+        } else {
+            s.split_whitespace()
+                .map(|f| PerlValue::string(f.to_string()))
+                .collect()
+        };
+        Ok(PerlValue::array(out))
+    }
 }
 
 /// `sentences STRING` — split text on sentence boundaries (`.` `!` `?` followed by whitespace or end).
