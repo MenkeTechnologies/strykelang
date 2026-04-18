@@ -3240,6 +3240,25 @@ fn display_escape(s: &str) -> String {
     out
 }
 
+/// Terminal width from $COLUMNS or ioctl, defaulting to 80.
+fn term_width() -> usize {
+    if let Ok(s) = std::env::var("COLUMNS") {
+        if let Ok(n) = s.parse::<usize>() {
+            return n.clamp(40, 400);
+        }
+    }
+    #[cfg(unix)]
+    {
+        unsafe {
+            let mut ws: libc::winsize = std::mem::zeroed();
+            if libc::ioctl(1, libc::TIOCGWINSZ, &mut ws) == 0 && ws.ws_col > 0 {
+                return (ws.ws_col as usize).clamp(40, 400);
+            }
+        }
+    }
+    80
+}
+
 fn table_render(headers: &[String], rows: &[Vec<String>], widths: &[usize]) -> String {
     let mut buf = String::new();
     let sep: String = widths
@@ -3332,7 +3351,15 @@ fn builtin_bar_chart(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
         .collect();
     let label_w = escaped.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
     let max_val = escaped.iter().map(|(_, n)| *n).fold(0.0_f64, f64::max);
-    let bar_max = 40usize;
+    // " label │ ████... count\n" — reserve label + " │ " (3) + count digits + space
+    let max_count_w = escaped
+        .iter()
+        .map(|(_, n)| format!("{}", n).len())
+        .max()
+        .unwrap_or(1);
+    let bar_max = term_width()
+        .saturating_sub(label_w + 4 + max_count_w)
+        .clamp(10, 60);
     let colors = [
         "\x1b[36m", "\x1b[32m", "\x1b[33m", "\x1b[35m", "\x1b[34m", "\x1b[31m",
     ];
@@ -3372,7 +3399,7 @@ fn builtin_flame(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVal
             }
         }
     };
-    let term_width = 80usize;
+    let term_width = term_width();
     let mut buf = String::new();
     flame_render_level(&mut buf, &hr.read(), 0, term_width);
     Ok(PerlValue::string(buf))
@@ -3463,21 +3490,21 @@ fn builtin_histo(args: &[PerlValue]) -> PerlResult<PerlValue> {
             .iter()
             .map(|(k, v)| (display_escape(k), v.to_number()))
             .collect();
-        // Sort by count descending, cap at 20 columns for readability
+        // Sort by count descending, cap columns to fit terminal width
         escaped.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        let max_cols = 20;
-        let truncated = escaped.len() > max_cols;
-        escaped.truncate(max_cols);
-        let max_val = escaped.iter().map(|(_, n)| *n).fold(0.0_f64, f64::max);
-        let bar_height = 10usize;
-        // Column width: at least label width, at least count width, at least 3
-        let label_w = escaped.iter().map(|(k, _)| k.len()).max().unwrap_or(1);
-        let count_w = escaped
+        let term_w = term_width();
+        let label_w_all = escaped.iter().map(|(k, _)| k.len()).max().unwrap_or(1);
+        let count_w_all = escaped
             .iter()
             .map(|(_, n)| format!("{}", n).len())
             .max()
             .unwrap_or(1);
-        let col_w = label_w.max(count_w).max(3);
+        let col_w = label_w_all.max(count_w_all).max(3);
+        let max_cols = (term_w / (col_w + 1)).max(1);
+        let truncated = escaped.len() > max_cols;
+        escaped.truncate(max_cols);
+        let max_val = escaped.iter().map(|(_, n)| *n).fold(0.0_f64, f64::max);
+        let bar_height = 10usize;
         let mut rows: Vec<String> = Vec::new();
         let colors = [
             "\x1b[36m", "\x1b[32m", "\x1b[33m", "\x1b[35m", "\x1b[34m", "\x1b[31m",
@@ -3591,7 +3618,8 @@ fn builtin_gauge(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVal
     } else {
         0.0
     };
-    let width = 30usize;
+    // "[████░░░] 100%" — reserve brackets (2) + space + "100%" (4) = 7
+    let width = term_width().saturating_sub(7).clamp(10, 50);
     let filled = (pct * width as f64).round() as usize;
     let empty = width - filled;
     let color = if pct >= 0.8 {
