@@ -709,13 +709,54 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   fr |> map +{name => $_, size => format_bytes(size)} |> tmd |> clip                   # markdown table → clipboard
 
   # ── data visualization ─────────────────────────────────────────────
-  (3,7,1,9,4,2,8,5) |> spark |> p;              # ▃▆▁█▄▂▇▅ — sparkline
-  qw(a b a c a b) |> freq |> bars |> p;          # colored horizontal bar chart
-  qw(a b a c a b) |> freq |> tbl |> p;           # plain-text table
-  flame({main => {parse => 30, eval => {compile => 15, run => 45}}, init => 10}) |> p  # flamechart
-  qw(a b a c a b) |> freq |> histo |> p;          # vertical histogram
-  p gauge(0.73);                                   # [██████████████████████░░░░░░░░] 73%
-  my $r = spinner "loading" { sleep 2; 42 };       # animated spinner while block runs
+  # sparkline — inline Unicode trend line from numbers
+  (3,7,1,9,4,2,8,5) |> spark |> p;                                      # ▃▆▁█▄▂▇▅
+  map { int(rand(100)) } 1..20 |> spark |> p;                            # random sparkline
+
+  # bar_chart (bars) — horizontal colored bars from hashref
+  qw(a b a c a b) |> freq |> bars |> p;                                  # word frequency bars
+  slurp("Cargo.toml") |> words |> freq |> bars |> p;                     # word freq from file
+  fr |> map { path_ext($_) } |> freq |> bars |> p;                       # file extension breakdown
+
+  # histo — vertical histogram, top N by count
+  slurp("Cargo.toml") |> chars |> freq |> histo |> p;                    # character distribution
+  map { int(rand(10)) } 1..100 |> freq |> histo |> p;                    # dice roll distribution
+
+  # to_table (tbl) — plain-text column-aligned table with box drawing
+  qw(a b a c a b) |> freq |> tbl |> p;                                   # freq as table
+  fr |> map +{name => $_, size => format_bytes(size)} |> tbl |> p;        # file listing table
+  fr |> map +{name => $_, ext => path_ext($_)} |> tbl |> p;               # files with extensions
+
+  # flame — terminal flamechart from nested hashrefs
+  flame({main => {parse => 30, eval => {compile => 15, run => 45}}, init => 10}) |> p
+  slurp("Cargo.toml") |> chars |> freq |> flame |> p;                    # flat flame from char freq
+
+  # gauge — single-value progress bar with color coding
+  p gauge(0.73);                                      # [██████████████████████░░░░░░░░] 73%
+  p gauge(45, 100);                                   # value/max form
+  fr |> cnt |> gauge($_, 500) |> p;                   # file count vs target
+
+  # spinner — animated braille spinner while block runs
+  my $r = spinner "loading" { sleep 2; 42 };          # returns block result
+  my $data = spinner "fetching" { fetch_json($url) }; # wrap any slow operation
+
+  # clip — copy pipeline output to clipboard
+  fr |> map +{name => $_, size => format_bytes(size)} |> tmd |> clip;    # markdown table → clipboard
+  slurp("Cargo.toml") |> words |> freq |> tbl |> clip;                   # table → clipboard
+
+  # combine charts: same data, multiple views
+  my %f = %{slurp("Cargo.toml") |> words |> freq};
+  %f |> bars |> p;                                    # horizontal bars
+  %f |> histo |> p;                                   # vertical histogram
+  %f |> tbl |> p;                                     # aligned table
+  %f |> flame |> p;                                   # flamechart
+  values %f |> spark |> p;                            # inline sparkline
+
+  # thread syntax equivalents — no |> needed
+  t qw(a b a c a b) freq bars p
+  t qw(a b a c a b) freq histo p
+  t qw(a b a c a b) freq tbl p
+  t (3,7,1,9,4) spark p
 
   # ── inline ANSI colors ─────────────────────────────────────────────
   p "#{red}ERROR#{off} #{green_bold}OK#{off}";              # color names as #{} builtins
