@@ -522,6 +522,15 @@ mod tests {
 }
 
 #[cfg(test)]
+mod builtins_extended_tests;
+
+#[cfg(test)]
+mod lib_api_extended_tests;
+
+#[cfg(test)]
+mod parallel_api_tests;
+
+#[cfg(test)]
 mod parse_smoke_extended;
 
 #[cfg(test)]

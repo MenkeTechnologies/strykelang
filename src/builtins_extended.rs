@@ -1711,7 +1711,7 @@ fn builtin_matrix_transpose(args: &[PerlValue]) -> PerlResult<PerlValue> {
         }
         result.push(PerlValue::array_ref(Arc::new(RwLock::new(row))));
     }
-    Ok(PerlValue::array(result))
+    Ok(PerlValue::array_ref(Arc::new(RwLock::new(result))))
 }
 fn builtin_matrix_inverse(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));

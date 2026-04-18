@@ -8248,80 +8248,45 @@ impl Parser {
                     line,
                 })
             }
-            "par_lines" => {
-                // Use assign-level parsing so `par_lines $path, $cb` does not treat `$path, $cb`
-                // as a single comma-list (`parse_expression` / comma-expr).
-                let path = self.parse_assign_expr()?;
-                self.expect(&Token::Comma)?;
-                let callback = self.parse_assign_expr()?;
-                let progress = if self.eat(&Token::Comma) {
-                    match self.peek() {
-                        Token::Ident(ref kw)
-                            if kw == "progress" && matches!(self.peek_at(1), Token::FatArrow) =>
-                        {
-                            self.advance();
-                            self.expect(&Token::FatArrow)?;
-                            Some(Box::new(self.parse_assign_expr()?))
-                        }
-                        _ => {
-                            return Err(self.syntax_err(
-                                "par_lines: expected `progress => EXPR` after comma",
-                                line,
-                            ));
-                        }
-                    }
+            "par_lines" | "par_walk" => {
+                let args = self.parse_builtin_args()?;
+                if args.len() < 2 {
+                    return Err(
+                        self.syntax_err(format!("{} requires at least two arguments", name), line)
+                    );
+                }
+
+                if name == "par_lines" {
+                    Ok(Expr {
+                        kind: ExprKind::ParLinesExpr {
+                            path: Box::new(args[0].clone()),
+                            callback: Box::new(args[1].clone()),
+                            progress: None,
+                        },
+                        line,
+                    })
                 } else {
-                    None
-                };
-                Ok(Expr {
-                    kind: ExprKind::ParLinesExpr {
-                        path: Box::new(path),
-                        callback: Box::new(callback),
-                        progress,
-                    },
-                    line,
-                })
+                    Ok(Expr {
+                        kind: ExprKind::ParWalkExpr {
+                            path: Box::new(args[0].clone()),
+                            callback: Box::new(args[1].clone()),
+                            progress: None,
+                        },
+                        line,
+                    })
+                }
             }
-            "par_walk" => {
-                let path = self.parse_assign_expr()?;
-                self.expect(&Token::Comma)?;
-                let callback = self.parse_assign_expr()?;
-                let progress = if self.eat(&Token::Comma) {
-                    match self.peek() {
-                        Token::Ident(ref kw)
-                            if kw == "progress" && matches!(self.peek_at(1), Token::FatArrow) =>
-                        {
-                            self.advance();
-                            self.expect(&Token::FatArrow)?;
-                            Some(Box::new(self.parse_assign_expr()?))
-                        }
-                        _ => {
-                            return Err(self.syntax_err(
-                                "par_walk: expected `progress => EXPR` after comma",
-                                line,
-                            ));
-                        }
-                    }
-                } else {
-                    None
-                };
-                Ok(Expr {
-                    kind: ExprKind::ParWalkExpr {
-                        path: Box::new(path),
-                        callback: Box::new(callback),
-                        progress,
-                    },
-                    line,
-                })
-            }
-            "pwatch" => {
-                let path = self.parse_assign_expr()?;
-                self.expect(&Token::Comma)?;
-                let callback = self.parse_assign_expr()?;
+            "pwatch" | "watch" => {
+                let args = self.parse_builtin_args()?;
+                if args.len() < 2 {
+                    return Err(
+                        self.syntax_err(format!("{} requires at least two arguments", name), line)
+                    );
+                }
                 Ok(Expr {
                     kind: ExprKind::PwatchExpr {
-                        path: Box::new(path),
-                        callback: Box::new(callback),
+                        path: Box::new(args[0].clone()),
+                        callback: Box::new(args[1].clone()),
                     },
                     line,
                 })
@@ -9275,18 +9240,6 @@ impl Parser {
                     kind: ExprKind::PselectExpr {
                         receivers,
                         timeout: timeout.map(Box::new),
-                    },
-                    line,
-                })
-            }
-            "watch" => {
-                let path = self.parse_assign_expr()?;
-                self.expect(&Token::Comma)?;
-                let callback = self.parse_assign_expr()?;
-                Ok(Expr {
-                    kind: ExprKind::PwatchExpr {
-                        path: Box::new(path),
-                        callback: Box::new(callback),
                     },
                     line,
                 })
