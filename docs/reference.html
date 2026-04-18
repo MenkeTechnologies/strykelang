@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/perlrs" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">perlrs v0.5.6 · 2555 topics · 24 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">perlrs v0.5.6 · 2559 topics · 24 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -173,7 +173,7 @@
         <li><a href="#ch-streaming-iterators">Streaming Iterators</a> <span class="chapter-count">24</span></li>
         <li><a href="#ch-list-operations">List Operations</a> <span class="chapter-count">62</span></li>
         <li><a href="#ch-perlrs-extensions">perlrs Extensions</a> <span class="chapter-count">19</span></li>
-        <li><a href="#ch-data-serialization">Data &amp; Serialization</a> <span class="chapter-count">32</span></li>
+        <li><a href="#ch-data-serialization">Data &amp; Serialization</a> <span class="chapter-count">36</span></li>
         <li><a href="#ch-http-networking">HTTP &amp; Networking</a> <span class="chapter-count">23</span></li>
         <li><a href="#ch-crypto-encoding">Crypto &amp; Encoding</a> <span class="chapter-count">21</span></li>
         <li><a href="#ch-parallel-i-o">Parallel I/O</a> <span class="chapter-count">8</span></li>
@@ -1511,7 +1511,7 @@ p $r-&gt;stdout, $r-&gt;stderr, $r-&gt;exit
     </section>
     <section class="tutorial-section" id="ch-data-serialization">
       <h2>Data &amp; Serialization</h2>
-      <p class="chapter-meta">32 topics</p>
+      <p class="chapter-meta">36 topics</p>
       <article class="doc-entry" id="doc-json-encode">
         <h3><a class="doc-anchor" href="#doc-json-encode">#</a> <code>json_encode</code></h3>
         <p><code>json_encode</code> serializes any Perl data structure — hashrefs, arrayrefs, nested combinations, numbers, strings, booleans, and undef — into a compact JSON string. It uses a fast Rust-backed serializer so it is significantly faster than <code>JSON::XS</code> for large payloads. The output is always valid UTF-8 JSON suitable for writing to files, sending over HTTP, or piping to other tools. Use <code>json_decode</code> to round-trip back.</p>
@@ -1740,6 +1740,38 @@ sqlite(&quot;app.db&quot;, &quot;INSERT INTO users VALUES (?, ?)&quot;, &quot;Al
 my @rows = sqlite(&quot;app.db&quot;, &quot;SELECT * FROM users WHERE age &gt; ?&quot;, 20)
 @rows |&gt; e { p $_-&gt;{name} }
 sqlite(&quot;app.db&quot;, &quot;SELECT count(*) as n FROM users&quot;) |&gt; dd
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-digits">
+        <h3><a class="doc-anchor" href="#doc-digits">#</a> <code>digits</code></h3>
+        <p><code>digits</code> (alias <code>dg</code>) extracts all digit characters from a string and returns them as a list. This is a quick way to pull numbers out of mixed text without writing a regex. Pairs naturally with <code>join</code> to reconstruct the numeric string, or <code>freq</code> for digit distribution analysis.</p>
+        <pre><code class="lang-perl">p join &quot;&quot;, digits(&quot;phone: 555-1234&quot;)     # 5551234
+&quot;abc123def456&quot; |&gt; digits |&gt; cnt |&gt; p     # 6
+cat(&quot;log.txt&quot;) |&gt; digits |&gt; freq |&gt; bars |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sentences">
+        <h3><a class="doc-anchor" href="#doc-sentences">#</a> <code>sentences</code></h3>
+        <p><code>sentences</code> (alias <code>sents</code>) splits text on sentence boundaries (<code>.</code> <code>!</code> <code>?</code> followed by whitespace or end of string). Returns a list of trimmed sentences. Useful for NLP pipelines, text analysis, or splitting prose into processable units.</p>
+        <pre><code class="lang-perl">&quot;Hello world. How are you? Fine!&quot; |&gt; sentences |&gt; e p
+# Hello world.
+# How are you?
+# Fine!
+cat(&quot;essay.txt&quot;) |&gt; sentences |&gt; cnt |&gt; p    # sentence count
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-paragraphs">
+        <h3><a class="doc-anchor" href="#doc-paragraphs">#</a> <code>paragraphs</code></h3>
+        <p><code>paragraphs</code> (alias <code>paras</code>) splits text on blank lines (one or more consecutive newlines). Returns a list of trimmed paragraph strings. Useful for processing structured documents, README files, or any text with paragraph breaks.</p>
+        <pre><code class="lang-perl">cat(&quot;README.md&quot;) |&gt; paragraphs |&gt; cnt |&gt; p   # paragraph count
+cat(&quot;essay.txt&quot;) |&gt; paragraphs |&gt; map { sentences |&gt; cnt } |&gt; spark |&gt; p  # sentences per paragraph
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sections">
+        <h3><a class="doc-anchor" href="#doc-sections">#</a> <code>sections</code></h3>
+        <p><code>sections</code> (alias <code>sects</code>) splits text on markdown-style headers (<code># ...</code>, <code>## ...</code>) or lines of <code>===</code>/<code>---</code>. Returns a list of arrayrefs <code>[heading, body]</code> where each section&#39;s heading and body are separated. Useful for parsing structured documents.</p>
+        <pre><code class="lang-perl">cat(&quot;README.md&quot;) |&gt; sections |&gt; cnt |&gt; p     # section count
+cat(&quot;README.md&quot;) |&gt; sections |&gt; map { $_-&gt;[0] } |&gt; e p  # list all headings
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-stringify">

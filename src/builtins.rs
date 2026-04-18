@@ -404,6 +404,10 @@ pub(crate) fn try_builtin(
         "lines" | "ln" => Some(builtin_lines(interp, args)),
         "words" | "wd" => Some(builtin_words(interp, args)),
         "chars" | "ch" => Some(builtin_chars(interp, args)),
+        "digits" | "dg" => Some(builtin_digits(interp, args)),
+        "sentences" | "sents" => Some(builtin_sentences(interp, args)),
+        "paragraphs" | "paras" => Some(builtin_paragraphs(interp, args)),
+        "sections" | "sects" => Some(builtin_sections(interp, args)),
         "trim" | "tm" => Some(builtin_trim(args)),
         "stdin" => Some(Ok(PerlValue::iterator(Arc::new(
             crate::map_stream::StdinIterator::new(),
