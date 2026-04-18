@@ -2174,9 +2174,9 @@ impl Parser {
                 handle: None,
                 args: vec![arg],
             },
-            // Bare `e` / `fore` in thread context: foreach element, say it.
-            // `t @list e` == `@list |> e p` == foreach (@list) { say }
-            "e" | "fore" => ExprKind::ForEachExpr {
+            // Bare `e` / `fore` / `ep` in thread context: foreach element, say it.
+            // `t @list e` == `@list |> e p` == `@list |> ep` == foreach (@list) { say }
+            "e" | "fore" | "ep" => ExprKind::ForEachExpr {
                 block: vec![Statement {
                     label: None,
                     kind: StmtKind::Expression(Expr {
@@ -2254,7 +2254,7 @@ impl Parser {
                 },
                 line,
             }),
-            "fore" | "e" => Ok(Expr {
+            "fore" | "e" | "ep" => Ok(Expr {
                 kind: ExprKind::ForEachExpr {
                     block,
                     list: Box::new(placeholder),
@@ -7554,8 +7554,8 @@ impl Parser {
                     line,
                 })
             }
-            "fore" | "e" => {
-                // `fore { BLOCK } LIST` — forEach expression (pipe-forward friendly)
+            "fore" | "e" | "ep" => {
+                // `fore { BLOCK } LIST` / `ep` — forEach expression (pipe-forward friendly)
                 if matches!(self.peek(), Token::LBrace) {
                     let (block, list) = self.parse_block_list()?;
                     Ok(Expr {
@@ -10415,7 +10415,7 @@ impl Parser {
             | "par_find_files" | "par_line_count" | "pwatch" | "par_pipeline_stream"
             | "glob_par" | "ppool" | "barrier" | "pipeline" | "cluster"
             // ── functional / iterator ───────────────────────────────────────
-            | "fore" | "e" | "flat_map" | "flat_maps" | "maps" | "filter" | "f" | "find_all" | "reduce" | "fold"
+            | "fore" | "e" | "ep" | "flat_map" | "flat_maps" | "maps" | "filter" | "f" | "find_all" | "reduce" | "fold"
             | "inject" | "collect" | "uniq" | "distinct" | "any" | "all" | "none"
             | "first" | "detect" | "find" | "compact" | "concat" | "chain" | "reject" | "flatten" | "set"
             | "min_by" | "max_by" | "sort_by" | "tally" | "find_index"
