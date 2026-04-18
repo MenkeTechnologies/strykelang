@@ -1191,6 +1191,9 @@ impl Parser {
                 | "sentences"
                 | "paragraphs"
                 | "sections"
+                | "numbers"
+                | "graphemes"
+                | "columns"
                 | "trim"
                 | "avg"
                 | "top"
@@ -2064,6 +2067,18 @@ impl Parser {
             },
             "sections" | "sects" => ExprKind::FuncCall {
                 name: "sections".to_string(),
+                args: vec![arg],
+            },
+            "numbers" | "nums" => ExprKind::FuncCall {
+                name: "numbers".to_string(),
+                args: vec![arg],
+            },
+            "graphemes" | "grs" => ExprKind::FuncCall {
+                name: "graphemes".to_string(),
+                args: vec![arg],
+            },
+            "columns" | "cols" => ExprKind::FuncCall {
+                name: "columns".to_string(),
                 args: vec![arg],
             },
             // File functions
@@ -4725,12 +4740,12 @@ impl Parser {
                     "puniq" | "uniq" | "distinct" | "flatten" | "set" | "list_count"
                     | "list_size" | "count" | "size" | "cnt" | "len" | "with_index" | "shuffle"
                     | "shuffled" | "frequencies" | "freq" | "interleave" | "ddump"
-                    | "stringify" | "str" | "lines" | "words" | "chars" | "digits"
-                    | "sentences" | "paragraphs" | "sections" | "trim" | "avg" | "to_json"
-                    | "to_csv" | "to_toml" | "to_yaml" | "to_xml" | "to_html" | "to_markdown"
-                    | "to_table" | "xopen" | "clip" | "sparkline" | "bar_chart" | "flame"
-                    | "stddev" | "squared" | "sq" | "square" | "cubed" | "cb" | "cube"
-                    | "normalize" | "snake_case" | "camel_case" | "kebab_case" => {
+                    | "stringify" | "str" | "lines" | "words" | "chars" | "digits" | "numbers"
+                    | "graphemes" | "columns" | "sentences" | "paragraphs" | "sections"
+                    | "trim" | "avg" | "to_json" | "to_csv" | "to_toml" | "to_yaml" | "to_xml"
+                    | "to_html" | "to_markdown" | "to_table" | "xopen" | "clip" | "sparkline"
+                    | "bar_chart" | "flame" | "stddev" | "squared" | "sq" | "square" | "cubed"
+                    | "cb" | "cube" | "normalize" | "snake_case" | "camel_case" | "kebab_case" => {
                         if args.is_empty() {
                             args.push(lhs);
                         } else {
@@ -6830,6 +6845,10 @@ impl Parser {
             }
 
             // Named functions / builtins
+            Token::ThreadArrow => {
+                self.advance();
+                return self.parse_thread_macro(line);
+            }
             Token::Ident(ref name) => {
                 let name = name.clone();
                 // Handle s///
@@ -10526,7 +10545,9 @@ impl Parser {
             | "zip_with" | "count_by" | "skip" | "first_or"
             // ── pipeline / string helpers ───────────────────────────────────
             | "input" | "lines" | "words" | "chars" | "digits" | "sentences" | "sents"
-            | "paragraphs" | "paras" | "sections" | "sects" | "trim" | "avg" | "stddev"
+            | "paragraphs" | "paras" | "sections" | "sects"
+            | "numbers" | "nums" | "graphemes" | "grs" | "columns" | "cols"
+            | "trim" | "avg" | "stddev"
             | "squared" | "sq" | "square" | "cubed" | "cb" | "cube" | "expt" | "pow" | "pw"
             | "normalize" | "snake_case" | "camel_case" | "kebab_case"
             | "frequencies" | "freq" | "interleave" | "ddump" | "stringify" | "str" | "top"
