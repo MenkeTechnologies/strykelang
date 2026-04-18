@@ -3495,13 +3495,13 @@ fn builtin_histo(args: &[PerlValue]) -> PerlResult<PerlValue> {
         // Sort by count descending, cap columns to fit terminal width
         escaped.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         let term_w = term_width();
-        let label_w_all = escaped.iter().map(|(k, _)| k.len()).max().unwrap_or(1);
-        let count_w_all = escaped
+        // Column width: just enough for the bar block (3 min). Labels truncate to fit.
+        let count_w = escaped
             .iter()
             .map(|(_, n)| format!("{}", n).len())
             .max()
             .unwrap_or(1);
-        let col_w = label_w_all.max(count_w_all).max(3);
+        let col_w = count_w.max(3);
         let max_cols = (term_w / (col_w + 1)).max(1);
         let truncated = escaped.len() > max_cols;
         escaped.truncate(max_cols);
@@ -3529,7 +3529,8 @@ fn builtin_histo(args: &[PerlValue]) -> PerlResult<PerlValue> {
         rows.push(sep);
         let mut labels = String::new();
         for (k, _) in &escaped {
-            labels.push_str(&format!(" {:^w$}", k, w = col_w));
+            let trunc = if k.len() > col_w { &k[..col_w] } else { k };
+            labels.push_str(&format!(" {:^w$}", trunc, w = col_w));
         }
         rows.push(labels);
         let mut counts = String::new();
