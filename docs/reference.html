@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/perlrs" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">perlrs v0.5.0 · 2253 topics · 24 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">perlrs v0.5.0 · 2480 topics · 24 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -173,7 +173,7 @@
         <li><a href="#ch-streaming-iterators">Streaming Iterators</a> <span class="chapter-count">24</span></li>
         <li><a href="#ch-list-operations">List Operations</a> <span class="chapter-count">62</span></li>
         <li><a href="#ch-perlrs-extensions">perlrs Extensions</a> <span class="chapter-count">19</span></li>
-        <li><a href="#ch-data-serialization">Data &amp; Serialization</a> <span class="chapter-count">20</span></li>
+        <li><a href="#ch-data-serialization">Data &amp; Serialization</a> <span class="chapter-count">23</span></li>
         <li><a href="#ch-http-networking">HTTP &amp; Networking</a> <span class="chapter-count">23</span></li>
         <li><a href="#ch-crypto-encoding">Crypto &amp; Encoding</a> <span class="chapter-count">21</span></li>
         <li><a href="#ch-parallel-i-o">Parallel I/O</a> <span class="chapter-count">8</span></li>
@@ -190,7 +190,7 @@
         <li><a href="#ch-process">Process</a> <span class="chapter-count">20</span></li>
         <li><a href="#ch-pack-binary">Pack / Binary</a> <span class="chapter-count">3</span></li>
         <li><a href="#ch-logging">Logging</a> <span class="chapter-count">7</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">1834</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">2058</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -1511,7 +1511,7 @@ p $r-&gt;stdout, $r-&gt;stderr, $r-&gt;exit
     </section>
     <section class="tutorial-section" id="ch-data-serialization">
       <h2>Data &amp; Serialization</h2>
-      <p class="chapter-meta">20 topics</p>
+      <p class="chapter-meta">23 topics</p>
       <article class="doc-entry" id="doc-json-encode">
         <h3><a class="doc-anchor" href="#doc-json-encode">#</a> <code>json_encode</code></h3>
         <p><code>json_encode</code> serializes any Perl data structure — hashrefs, arrayrefs, nested combinations, numbers, strings, booleans, and undef — into a compact JSON string. It uses a fast Rust-backed serializer so it is significantly faster than <code>JSON::XS</code> for large payloads. The output is always valid UTF-8 JSON suitable for writing to files, sending over HTTP, or piping to other tools. Use <code>json_decode</code> to round-trip back.</p>
@@ -1600,23 +1600,30 @@ tx(\%doc) |&gt; spurt &quot;doc.xml&quot;
       <article class="doc-entry" id="doc-to-html">
         <h3><a class="doc-anchor" href="#doc-to-html">#</a> <code>to_html</code></h3>
         <p><code>to_html</code> (alias <code>th</code>) serializes a perlrs data structure into a self-contained HTML document with cyberpunk styling (dark background, neon cyan/magenta accents, monospace fonts). Arrays of hashrefs render as full tables with headers, plain arrays as bullet lists, single hashes as key-value tables, and scalars as styled text blocks. Pipe to a file and open in a browser for instant data visualization.</p>
-        <pre><code class="lang-perl">my @rows = ({name =&gt; &quot;Alice&quot;, age =&gt; 30}, {name =&gt; &quot;Bob&quot;, age =&gt; 25})
-th(\@rows) |&gt; spurt &quot;people.html&quot;
-my %cfg = (host =&gt; &quot;localhost&quot;, port =&gt; 5432)
-p th \%cfg;   # full HTML page to stdout
-@data |&gt; th |&gt; spurt &quot;report.html&quot;
+        <pre><code class="lang-perl">fr |&gt; map +{name =&gt; $_, size =&gt; format_bytes(size)} |&gt; th |&gt; to_file(&quot;report.html&quot;)
+my @rows = ({name =&gt; &quot;Alice&quot;, age =&gt; 30}, {name =&gt; &quot;Bob&quot;, age =&gt; 25})
+@rows |&gt; th |&gt; to_file(&quot;people.html&quot;)
+th({host =&gt; &quot;localhost&quot;, port =&gt; 5432}) |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-to-markdown">
         <h3><a class="doc-anchor" href="#doc-to-markdown">#</a> <code>to_markdown</code></h3>
         <p><code>to_markdown</code> (aliases <code>to_md</code>, <code>tmd</code>) serializes a perlrs data structure into Markdown text. Arrays of hashrefs render as GFM tables with headers and separator rows, plain arrays as bullet lists, single hashes as 2-column key-value tables, and scalars as plain text. The output is valid GitHub-Flavored Markdown suitable for README files, issue comments, or any Markdown renderer.</p>
-        <pre><code class="lang-perl">my @rows = ({name =&gt; &quot;Alice&quot;, age =&gt; 30}, {name =&gt; &quot;Bob&quot;, age =&gt; 25})
-p tmd \@rows
+        <pre><code class="lang-perl">fr |&gt; map +{name =&gt; $_, size =&gt; format_bytes(size)} |&gt; tmd |&gt; to_file(&quot;report.md&quot;)
+my @rows = ({name =&gt; &quot;Alice&quot;, age =&gt; 30}, {name =&gt; &quot;Bob&quot;, age =&gt; 25})
+@rows |&gt; tmd |&gt; p
 # | name | age |
 # | --- | --- |
 # | Alice | 30 |
 # | Bob | 25 |
-tmd(\@rows) |&gt; spurt &quot;table.md&quot;
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-xopen">
+        <h3><a class="doc-anchor" href="#doc-xopen">#</a> <code>xopen</code></h3>
+        <p><code>xopen</code> (alias <code>xo</code>) opens a file or URL with the system default handler — <code>open</code> on macOS, <code>xdg-open</code> on Linux, <code>start</code> on Windows. Returns the path unchanged so it can sit transparently in a pipeline. This is the missing link between generating output files and viewing them: pipe the path through <code>xopen</code> and the OS opens it in the appropriate app (browser for HTML, viewer for PDF, editor for text).</p>
+        <pre><code class="lang-perl">fr |&gt; map +{name =&gt; $_, size =&gt; format_bytes(size)} |&gt; th |&gt; to_file(&quot;report.html&quot;) |&gt; xopen
+xopen &quot;https://github.com/MenkeTechnologies/perlrs&quot;
+xopen &quot;output.pdf&quot;
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-csv-read">
@@ -4575,13 +4582,21 @@ log_info(&quot;hidden&quot;);    # not printed
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">1834 topics</p>
+      <p class="chapter-meta">2058 topics</p>
       <article class="doc-entry" id="doc-perlrs-rust-compile">
         <h3><a class="doc-anchor" href="#doc-perlrs-rust-compile">#</a> <code>__perlrs_rust_compile</code></h3>
         <p><code>__perlrs_rust_compile</code> — internal builtin.</p>
         <pre><code class="lang-perl">my $result = __perlrs_rust_compile $x 
 # or in a pipeline:
 @list |&gt; map __perlrs_rust_compile |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-a256">
+        <h3><a class="doc-anchor" href="#doc-a256">#</a> <code>a256</code></h3>
+        <p><code>a256</code> — color operations builtin. Alias for <code>ansi_256</code>.</p>
+        <pre><code class="lang-perl">my $result = a256 $x 
+# or in a pipeline:
+@list |&gt; map a256 |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-abs-ceil">
@@ -4624,6 +4639,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map abundant_numbers |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-abunnums">
+        <h3><a class="doc-anchor" href="#doc-abunnums">#</a> <code>abunnums</code></h3>
+        <p><code>abunnums</code> — number theory / primes builtin. Alias for <code>abundant_numbers</code>.</p>
+        <pre><code class="lang-perl">my $result = abunnums $x 
+# or in a pipeline:
+@list |&gt; map abunnums |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-accum">
         <h3><a class="doc-anchor" href="#doc-accum">#</a> <code>accum</code></h3>
         <p><code>accum</code> — python/ruby stdlib builtin. Alias for <code>accumulate</code>.</p>
@@ -4640,6 +4663,22 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map accumulate |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-acirc">
+        <h3><a class="doc-anchor" href="#doc-acirc">#</a> <code>acirc</code></h3>
+        <p><code>acirc</code> — geometry / physics builtin. Alias for <code>area_circle</code>.</p>
+        <pre><code class="lang-perl">my $result = acirc $x 
+# or in a pipeline:
+@list |&gt; map acirc |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-acorr">
+        <h3><a class="doc-anchor" href="#doc-acorr">#</a> <code>acorr</code></h3>
+        <p><code>acorr</code> — math / numeric (uncategorized batch) builtin. Alias for <code>autocorrelation</code>.</p>
+        <pre><code class="lang-perl">my $result = acorr $x 
+# or in a pipeline:
+@list |&gt; map acorr |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-acos">
         <h3><a class="doc-anchor" href="#doc-acos">#</a> <code>acos</code></h3>
         <p><code>acos</code> — trig / math (batch 2) builtin.</p>
@@ -4654,6 +4693,14 @@ log_info(&quot;hidden&quot;);    # not printed
         <pre><code class="lang-perl">my $result = acosh $x 
 # or in a pipeline:
 @list |&gt; map acosh |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-acro">
+        <h3><a class="doc-anchor" href="#doc-acro">#</a> <code>acro</code></h3>
+        <p><code>acro</code> — string processing (uncategorized batch) builtin. Alias for <code>acronym</code>.</p>
+        <pre><code class="lang-perl">my $result = acro $x 
+# or in a pipeline:
+@list |&gt; map acro |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-acronym">
@@ -4752,6 +4799,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map adler32 |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-aellip">
+        <h3><a class="doc-anchor" href="#doc-aellip">#</a> <code>aellip</code></h3>
+        <p><code>aellip</code> — geometry / physics builtin. Alias for <code>area_ellipse</code>.</p>
+        <pre><code class="lang-perl">my $result = aellip $x 
+# or in a pipeline:
+@list |&gt; map aellip |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-after-n">
         <h3><a class="doc-anchor" href="#doc-after-n">#</a> <code>after_n</code></h3>
         <p><code>after_n</code> — functional combinators builtin.</p>
@@ -4782,6 +4837,14 @@ log_info(&quot;hidden&quot;);    # not printed
         <pre><code class="lang-perl">my $result = ain $x 
 # or in a pipeline:
 @list |&gt; map ain |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-aliquot">
+        <h3><a class="doc-anchor" href="#doc-aliquot">#</a> <code>aliquot</code></h3>
+        <p><code>aliquot</code> — math / numeric (uncategorized batch) builtin. Alias for <code>aliquot_sum</code>.</p>
+        <pre><code class="lang-perl">my $result = aliquot $x 
+# or in a pipeline:
+@list |&gt; map aliquot |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-aliquot-sum">
@@ -5112,6 +5175,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map area_triangle |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-arect">
+        <h3><a class="doc-anchor" href="#doc-arect">#</a> <code>arect</code></h3>
+        <p><code>arect</code> — geometry / physics builtin. Alias for <code>area_rectangle</code>.</p>
+        <pre><code class="lang-perl">my $result = arect $x 
+# or in a pipeline:
+@list |&gt; map arect |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-argc">
         <h3><a class="doc-anchor" href="#doc-argc">#</a> <code>argc</code></h3>
         <p><code>argc</code> — process / env builtin.</p>
@@ -5288,6 +5359,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map atbash |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-atc">
+        <h3><a class="doc-anchor" href="#doc-atc">#</a> <code>atc</code></h3>
+        <p><code>atc</code> — color operations builtin. Alias for <code>ansi_truecolor</code>.</p>
+        <pre><code class="lang-perl">my $result = atc $x 
+# or in a pipeline:
+@list |&gt; map atc |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-ati">
         <h3><a class="doc-anchor" href="#doc-ati">#</a> <code>ati</code></h3>
         <p><code>ati</code> — javascript array/object methods builtin. Alias for <code>at_index</code>.</p>
@@ -5302,6 +5381,22 @@ log_info(&quot;hidden&quot;);    # not printed
         <pre><code class="lang-perl">my $result = atime $x 
 # or in a pipeline:
 @list |&gt; map atime |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-atrap">
+        <h3><a class="doc-anchor" href="#doc-atrap">#</a> <code>atrap</code></h3>
+        <p><code>atrap</code> — geometry / physics builtin. Alias for <code>area_trapezoid</code>.</p>
+        <pre><code class="lang-perl">my $result = atrap $x 
+# or in a pipeline:
+@list |&gt; map atrap |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-atri">
+        <h3><a class="doc-anchor" href="#doc-atri">#</a> <code>atri</code></h3>
+        <p><code>atri</code> — geometry / physics builtin. Alias for <code>area_triangle</code>.</p>
+        <pre><code class="lang-perl">my $result = atri $x 
+# or in a pipeline:
+@list |&gt; map atri |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-attempt">
@@ -5352,6 +5447,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map avogadro_number |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-b2gray">
+        <h3><a class="doc-anchor" href="#doc-b2gray">#</a> <code>b2gray</code></h3>
+        <p><code>b2gray</code> — base / gray code builtin. Alias for <code>binary_to_gray</code>.</p>
+        <pre><code class="lang-perl">my $result = b2gray $x 
+# or in a pipeline:
+@list |&gt; map b2gray |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-b2i">
         <h3><a class="doc-anchor" href="#doc-b2i">#</a> <code>b2i</code></h3>
         <p><code>b2i</code> — boolean combinators builtin. Alias for <code>bool_to_int</code>.</p>
@@ -5360,10 +5463,34 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map b2i |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-b64d">
+        <h3><a class="doc-anchor" href="#doc-b64d">#</a> <code>b64d</code></h3>
+        <p><code>b64d</code> — crypto / encoding builtin. Alias for <code>base64_decode</code>.</p>
+        <pre><code class="lang-perl">my $result = b64d $x 
+# or in a pipeline:
+@list |&gt; map b64d |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-b64e">
+        <h3><a class="doc-anchor" href="#doc-b64e">#</a> <code>b64e</code></h3>
+        <p><code>b64e</code> — crypto / encoding builtin. Alias for <code>base64_encode</code>.</p>
+        <pre><code class="lang-perl">my $result = b64e $x 
+# or in a pipeline:
+@list |&gt; map b64e |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-b-to-kb">
         <h3><a class="doc-anchor" href="#doc-b-to-kb">#</a> <code>b_to_kb</code></h3>
         <p><code>b_to_kb</code> — unit conversions builtin. Alias for <code>bytes_to_kb</code>.</p>
         <pre><code class="lang-perl">my $result = b_to_kb $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-bac">
+        <h3><a class="doc-anchor" href="#doc-bac">#</a> <code>bac</code></h3>
+        <p><code>bac</code> — finance builtin. Alias for <code>bac_estimate</code>.</p>
+        <pre><code class="lang-perl">my $result = bac $x 
+# or in a pipeline:
+@list |&gt; map bac |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-bac-estimate">
@@ -5404,6 +5531,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map batched |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-bconv">
+        <h3><a class="doc-anchor" href="#doc-bconv">#</a> <code>bconv</code></h3>
+        <p><code>bconv</code> — base / gray code builtin. Alias for <code>base_convert</code>.</p>
+        <pre><code class="lang-perl">my $result = bconv $x 
+# or in a pipeline:
+@list |&gt; map bconv |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-bcount">
         <h3><a class="doc-anchor" href="#doc-bcount">#</a> <code>bcount</code></h3>
         <p><code>bcount</code> — extended stdlib batch 3 builtin. Alias for <code>count_bytes</code>.</p>
@@ -5436,6 +5571,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map bell_number |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-belln">
+        <h3><a class="doc-anchor" href="#doc-belln">#</a> <code>belln</code></h3>
+        <p><code>belln</code> — math / numeric (uncategorized batch) builtin. Alias for <code>bell_number</code>.</p>
+        <pre><code class="lang-perl">my $result = belln $x 
+# or in a pipeline:
+@list |&gt; map belln |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-between">
         <h3><a class="doc-anchor" href="#doc-between">#</a> <code>between</code></h3>
         <p><code>between</code> — conversion / utility (batch 4) builtin.</p>
@@ -5458,6 +5601,14 @@ log_info(&quot;hidden&quot;);    # not printed
         <pre><code class="lang-perl">my $result = bfs_traverse $x 
 # or in a pipeline:
 @list |&gt; map bfs_traverse |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-bigram">
+        <h3><a class="doc-anchor" href="#doc-bigram">#</a> <code>bigram</code></h3>
+        <p><code>bigram</code> — string processing (uncategorized batch) builtin. Alias for <code>bigrams</code>.</p>
+        <pre><code class="lang-perl">my $result = bigram $x 
+# or in a pipeline:
+@list |&gt; map bigram |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-bigrams">
@@ -5512,6 +5663,14 @@ log_info(&quot;hidden&quot;);    # not printed
         <pre><code class="lang-perl">my $result = binomial $x 
 # or in a pipeline:
 @list |&gt; map binomial |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-binsert">
+        <h3><a class="doc-anchor" href="#doc-binsert">#</a> <code>binsert</code></h3>
+        <p><code>binsert</code> — matrix operations (uncategorized batch) builtin. Alias for <code>binary_insert</code>.</p>
+        <pre><code class="lang-perl">my $result = binsert $x 
+# or in a pipeline:
+@list |&gt; map binsert |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-bit-and">
@@ -5640,6 +5799,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map bitset_test |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-bkt">
+        <h3><a class="doc-anchor" href="#doc-bkt">#</a> <code>bkt</code></h3>
+        <p><code>bkt</code> — matrix operations (uncategorized batch) builtin. Alias for <code>bucket</code>.</p>
+        <pre><code class="lang-perl">my $result = bkt $x 
+# or in a pipeline:
+@list |&gt; map bkt |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-bl">
         <h3><a class="doc-anchor" href="#doc-bl">#</a> <code>bl</code></h3>
         <p><code>bl</code> — algebraic match builtin. Alias for <code>butlast</code>.</p>
@@ -5670,6 +5837,14 @@ log_info(&quot;hidden&quot;);    # not printed
         <pre><code class="lang-perl">my $result = bmi_calc $x 
 # or in a pipeline:
 @list |&gt; map bmi_calc |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-boltz">
+        <h3><a class="doc-anchor" href="#doc-boltz">#</a> <code>boltz</code></h3>
+        <p><code>boltz</code> — constants builtin. Alias for <code>boltzmann_constant</code>.</p>
+        <pre><code class="lang-perl">my $result = boltz $x 
+# or in a pipeline:
+@list |&gt; map boltz |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-boltzmann">
@@ -5718,6 +5893,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map bracket |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-braille">
+        <h3><a class="doc-anchor" href="#doc-braille">#</a> <code>braille</code></h3>
+        <p><code>braille</code> — encoding / phonetics builtin. Alias for <code>braille_encode</code>.</p>
+        <pre><code class="lang-perl">my $result = braille $x 
+# or in a pipeline:
+@list |&gt; map braille |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-braille-encode">
         <h3><a class="doc-anchor" href="#doc-braille-encode">#</a> <code>braille_encode</code></h3>
         <p><code>braille_encode</code> — encoding / phonetics builtin.</p>
@@ -5742,6 +5925,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map break_fn |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-breakeven">
+        <h3><a class="doc-anchor" href="#doc-breakeven">#</a> <code>breakeven</code></h3>
+        <p><code>breakeven</code> — finance builtin. Alias for <code>break_even</code>.</p>
+        <pre><code class="lang-perl">my $result = breakeven $x 
+# or in a pipeline:
+@list |&gt; map breakeven |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-brkf">
         <h3><a class="doc-anchor" href="#doc-brkf">#</a> <code>brkf</code></h3>
         <p><code>brkf</code> — haskell list functions builtin. Alias for <code>break_fn</code>.</p>
@@ -5756,6 +5947,14 @@ log_info(&quot;hidden&quot;);    # not printed
         <pre><code class="lang-perl">my $result = bsearch $x 
 # or in a pipeline:
 @list |&gt; map bsearch |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-bsize">
+        <h3><a class="doc-anchor" href="#doc-bsize">#</a> <code>bsize</code></h3>
+        <p><code>bsize</code> — misc / utility builtin. Alias for <code>byte_size</code>.</p>
+        <pre><code class="lang-perl">my $result = bsize $x 
+# or in a pipeline:
+@list |&gt; map bsize |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-btch">
@@ -5826,6 +6025,14 @@ log_info(&quot;hidden&quot;);    # not printed
         <h3><a class="doc-anchor" href="#doc-bytes-to-mb">#</a> <code>bytes_to_mb</code></h3>
         <p><code>bytes_to_mb</code> — unit conversions builtin.</p>
         <pre><code class="lang-perl">my $result = bytes_to_mb $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-c2s">
+        <h3><a class="doc-anchor" href="#doc-c2s">#</a> <code>c2s</code></h3>
+        <p><code>c2s</code> — string processing (uncategorized batch) builtin. Alias for <code>camel_to_snake</code>.</p>
+        <pre><code class="lang-perl">my $result = c2s $x 
+# or in a pipeline:
+@list |&gt; map c2s |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-c-to-f">
@@ -5948,6 +6155,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map catn |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-cblend">
+        <h3><a class="doc-anchor" href="#doc-cblend">#</a> <code>cblend</code></h3>
+        <p><code>cblend</code> — color operations builtin. Alias for <code>color_blend</code>.</p>
+        <pre><code class="lang-perl">my $result = cblend $x 
+# or in a pipeline:
+@list |&gt; map cblend |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-cbrt">
         <h3><a class="doc-anchor" href="#doc-cbrt">#</a> <code>cbrt</code></h3>
         <p><code>cbrt</code> — trivial numeric / predicate builtins builtin.</p>
@@ -5964,12 +6179,36 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map ccgraph |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-ccompl">
+        <h3><a class="doc-anchor" href="#doc-ccompl">#</a> <code>ccompl</code></h3>
+        <p><code>ccompl</code> — color operations builtin. Alias for <code>color_complement</code>.</p>
+        <pre><code class="lang-perl">my $result = ccompl $x 
+# or in a pipeline:
+@list |&gt; map ccompl |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-ccount">
         <h3><a class="doc-anchor" href="#doc-ccount">#</a> <code>ccount</code></h3>
         <p><code>ccount</code> — extended stdlib batch 3 builtin. Alias for <code>count_chars</code>.</p>
         <pre><code class="lang-perl">my $result = ccount $x 
 # or in a pipeline:
 @list |&gt; map ccount |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cdarken">
+        <h3><a class="doc-anchor" href="#doc-cdarken">#</a> <code>cdarken</code></h3>
+        <p><code>cdarken</code> — color operations builtin. Alias for <code>color_darken</code>.</p>
+        <pre><code class="lang-perl">my $result = cdarken $x 
+# or in a pipeline:
+@list |&gt; map cdarken |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cdist">
+        <h3><a class="doc-anchor" href="#doc-cdist">#</a> <code>cdist</code></h3>
+        <p><code>cdist</code> — color operations builtin. Alias for <code>color_distance</code>.</p>
+        <pre><code class="lang-perl">my $result = cdist $x 
+# or in a pipeline:
+@list |&gt; map cdist |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-ceil">
@@ -6020,6 +6259,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map center_text |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-cgray">
+        <h3><a class="doc-anchor" href="#doc-cgray">#</a> <code>cgray</code></h3>
+        <p><code>cgray</code> — color operations builtin. Alias for <code>color_grayscale</code>.</p>
+        <pre><code class="lang-perl">my $result = cgray $x 
+# or in a pipeline:
+@list |&gt; map cgray |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-chain-from">
         <h3><a class="doc-anchor" href="#doc-chain-from">#</a> <code>chain_from</code></h3>
         <p><code>chain_from</code> — python/ruby stdlib builtin.</p>
@@ -6068,6 +6315,14 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map char_length |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-charfreq">
+        <h3><a class="doc-anchor" href="#doc-charfreq">#</a> <code>charfreq</code></h3>
+        <p><code>charfreq</code> — string processing (uncategorized batch) builtin. Alias for <code>char_frequencies</code>.</p>
+        <pre><code class="lang-perl">my $result = charfreq $x 
+# or in a pipeline:
+@list |&gt; map charfreq |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-chars-to-string">
         <h3><a class="doc-anchor" href="#doc-chars-to-string">#</a> <code>chars_to_string</code></h3>
         <p><code>chars_to_string</code> — string helpers (batch 4) builtin.</p>
@@ -6096,6 +6351,14 @@ log_info(&quot;hidden&quot;);    # not printed
         <pre><code class="lang-perl">my $result = chfr $x 
 # or in a pipeline:
 @list |&gt; map chfr |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-chkstr">
+        <h3><a class="doc-anchor" href="#doc-chkstr">#</a> <code>chkstr</code></h3>
+        <p><code>chkstr</code> — string processing (uncategorized batch) builtin. Alias for <code>chunk_string</code>.</p>
+        <pre><code class="lang-perl">my $result = chkstr $x 
+# or in a pipeline:
+@list |&gt; map chkstr |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-chkw">
@@ -6170,6 +6433,22 @@ log_info(&quot;hidden&quot;);    # not printed
 @list |&gt; map cinv |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-cinvert">
+        <h3><a class="doc-anchor" href="#doc-cinvert">#</a> <code>cinvert</code></h3>
+        <p><code>cinvert</code> — color operations builtin. Alias for <code>color_invert</code>.</p>
+        <pre><code class="lang-perl">my $result = cinvert $x 
+# or in a pipeline:
+@list |&gt; map cinvert |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-circum">
+        <h3><a class="doc-anchor" href="#doc-circum">#</a> <code>circum</code></h3>
+        <p><code>circum</code> — geometry / physics builtin. Alias for <code>circumference</code>.</p>
+        <pre><code class="lang-perl">my $result = circum $x 
+# or in a pipeline:
+@list |&gt; map circum |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-circumference">
         <h3><a class="doc-anchor" href="#doc-circumference">#</a> <code>circumference</code></h3>
         <p><code>circumference</code> — geometry / physics builtin.</p>
@@ -6216,6 +6495,22 @@ log_info(&quot;hidden&quot;);    # not printed
         <pre><code class="lang-perl">my $result = clamp_list $x 
 # or in a pipeline:
 @list |&gt; map clamp_list |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-clarr">
+        <h3><a class="doc-anchor" href="#doc-clarr">#</a> <code>clarr</code></h3>
+        <p><code>clarr</code> — matrix operations (uncategorized batch) builtin. Alias for <code>clamp_array</code>.</p>
+        <pre><code class="lang-perl">my $result = clarr $x 
+# or in a pipeline:
+@list |&gt; map clarr |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-clighten">
+        <h3><a class="doc-anchor" href="#doc-clighten">#</a> <code>clighten</code></h3>
+        <p><code>clighten</code> — color operations builtin. Alias for <code>color_lighten</code>.</p>
+        <pre><code class="lang-perl">my $result = clighten $x 
+# or in a pipeline:
+@list |&gt; map clighten |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-clpi">
@@ -6332,6 +6627,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map collapse_whitespace |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-collatz">
+        <h3><a class="doc-anchor" href="#doc-collatz">#</a> <code>collatz</code></h3>
+        <p><code>collatz</code> — math / numeric (uncategorized batch) builtin. Alias for <code>collatz_length</code>.</p>
+        <pre><code class="lang-perl">my $result = collatz $x 
+# or in a pipeline:
+@list |&gt; map collatz |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-collatz-length">
         <h3><a class="doc-anchor" href="#doc-collatz-length">#</a> <code>collatz_length</code></h3>
         <p><code>collatz_length</code> — math / numeric (uncategorized batch) builtin.</p>
@@ -6346,6 +6649,22 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = collatz_sequence $x 
 # or in a pipeline:
 @list |&gt; map collatz_sequence |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-collatzseq">
+        <h3><a class="doc-anchor" href="#doc-collatzseq">#</a> <code>collatzseq</code></h3>
+        <p><code>collatzseq</code> — math / numeric (uncategorized batch) builtin. Alias for <code>collatz_sequence</code>.</p>
+        <pre><code class="lang-perl">my $result = collatzseq $x 
+# or in a pipeline:
+@list |&gt; map collatzseq |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-collws">
+        <h3><a class="doc-anchor" href="#doc-collws">#</a> <code>collws</code></h3>
+        <p><code>collws</code> — string processing (uncategorized batch) builtin. Alias for <code>collapse_whitespace</code>.</p>
+        <pre><code class="lang-perl">my $result = collws $x 
+# or in a pipeline:
+@list |&gt; map collws |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-color-blend">
@@ -6492,6 +6811,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map cone_volume |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-conevol">
+        <h3><a class="doc-anchor" href="#doc-conevol">#</a> <code>conevol</code></h3>
+        <p><code>conevol</code> — geometry / physics builtin. Alias for <code>cone_volume</code>.</p>
+        <pre><code class="lang-perl">my $result = conevol $x 
+# or in a pipeline:
+@list |&gt; map conevol |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-conj">
         <h3><a class="doc-anchor" href="#doc-conj">#</a> <code>conj</code></h3>
         <p><code>conj</code> — algebraic match builtin.</p>
@@ -6578,6 +6905,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = contains_elem $x 
 # or in a pipeline:
 @list |&gt; map contains_elem |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-conv">
+        <h3><a class="doc-anchor" href="#doc-conv">#</a> <code>conv</code></h3>
+        <p><code>conv</code> — math / numeric (uncategorized batch) builtin. Alias for <code>convolution</code>.</p>
+        <pre><code class="lang-perl">my $result = conv $x 
+# or in a pipeline:
+@list |&gt; map conv |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-converge">
@@ -6916,6 +7251,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map cpyw |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-cr">
+        <h3><a class="doc-anchor" href="#doc-cr">#</a> <code>cr</code></h3>
+        <p><code>cr</code> — data / network builtin. Alias for <code>csv_read</code>.</p>
+        <pre><code class="lang-perl">my $result = cr $x 
+# or in a pipeline:
+@list |&gt; map cr |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-cross-entropy">
         <h3><a class="doc-anchor" href="#doc-cross-entropy">#</a> <code>cross_entropy</code></h3>
         <p><code>cross_entropy</code> — math / numeric (uncategorized batch) builtin.</p>
@@ -7018,6 +7361,22 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = cups_to_ml $input 
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-cv">
+        <h3><a class="doc-anchor" href="#doc-cv">#</a> <code>cv</code></h3>
+        <p><code>cv</code> — math / numeric (uncategorized batch) builtin. Alias for <code>coeff_of_variation</code>.</p>
+        <pre><code class="lang-perl">my $result = cv $x 
+# or in a pipeline:
+@list |&gt; map cv |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cw">
+        <h3><a class="doc-anchor" href="#doc-cw">#</a> <code>cw</code></h3>
+        <p><code>cw</code> — data / network builtin. Alias for <code>csv_write</code>.</p>
+        <pre><code class="lang-perl">my $result = cw $x 
+# or in a pipeline:
+@list |&gt; map cw |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-cwd">
         <h3><a class="doc-anchor" href="#doc-cwd">#</a> <code>cwd</code></h3>
         <p><code>cwd</code> — more process / system builtin.</p>
@@ -7058,12 +7417,28 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map cylinder_volume |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-cylvol">
+        <h3><a class="doc-anchor" href="#doc-cylvol">#</a> <code>cylvol</code></h3>
+        <p><code>cylvol</code> — geometry / physics builtin. Alias for <code>cylinder_volume</code>.</p>
+        <pre><code class="lang-perl">my $result = cylvol $x 
+# or in a pipeline:
+@list |&gt; map cylvol |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-d">
         <h3><a class="doc-anchor" href="#doc-d">#</a> <code>d</code></h3>
         <p><code>d</code> — filesystem extensions builtin.</p>
         <pre><code class="lang-perl">my $result = d $x 
 # or in a pipeline:
 @list |&gt; map d |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-d2comp">
+        <h3><a class="doc-anchor" href="#doc-d2comp">#</a> <code>d2comp</code></h3>
+        <p><code>d2comp</code> — misc / utility builtin. Alias for <code>degrees_to_compass</code>.</p>
+        <pre><code class="lang-perl">my $result = d2comp $x 
+# or in a pipeline:
+@list |&gt; map d2comp |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-d2r">
@@ -7214,6 +7589,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map defined_count |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-definums">
+        <h3><a class="doc-anchor" href="#doc-definums">#</a> <code>definums</code></h3>
+        <p><code>definums</code> — number theory / primes builtin. Alias for <code>deficient_numbers</code>.</p>
+        <pre><code class="lang-perl">my $result = definums $x 
+# or in a pipeline:
+@list |&gt; map definums |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-deg-to-rad">
         <h3><a class="doc-anchor" href="#doc-deg-to-rad">#</a> <code>deg_to_rad</code></h3>
         <p><code>deg_to_rad</code> — trivial numeric / predicate builtins builtin.</p>
@@ -7282,12 +7665,36 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map delfst |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-demorse">
+        <h3><a class="doc-anchor" href="#doc-demorse">#</a> <code>demorse</code></h3>
+        <p><code>demorse</code> — encoding / phonetics builtin. Alias for <code>morse_decode</code>.</p>
+        <pre><code class="lang-perl">my $result = demorse $x 
+# or in a pipeline:
+@list |&gt; map demorse |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-dense-rank">
         <h3><a class="doc-anchor" href="#doc-dense-rank">#</a> <code>dense_rank</code></h3>
         <p><code>dense_rank</code> — extended stdlib builtin.</p>
         <pre><code class="lang-perl">my $result = dense_rank $x 
 # or in a pipeline:
 @list |&gt; map dense_rank |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-depdbl">
+        <h3><a class="doc-anchor" href="#doc-depdbl">#</a> <code>depdbl</code></h3>
+        <p><code>depdbl</code> — math / numeric (uncategorized batch) builtin. Alias for <code>depreciation_double</code>.</p>
+        <pre><code class="lang-perl">my $result = depdbl $x 
+# or in a pipeline:
+@list |&gt; map depdbl |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-deplin">
+        <h3><a class="doc-anchor" href="#doc-deplin">#</a> <code>deplin</code></h3>
+        <p><code>deplin</code> — math / numeric (uncategorized batch) builtin. Alias for <code>depreciation_linear</code>.</p>
+        <pre><code class="lang-perl">my $result = deplin $x 
+# or in a pipeline:
+@list |&gt; map deplin |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-depreciation-double">
@@ -7306,6 +7713,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map depreciation_linear |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-deroman">
+        <h3><a class="doc-anchor" href="#doc-deroman">#</a> <code>deroman</code></h3>
+        <p><code>deroman</code> — roman numerals builtin. Alias for <code>roman_to_int</code>.</p>
+        <pre><code class="lang-perl">my $result = deroman $x 
+# or in a pipeline:
+@list |&gt; map deroman |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-detect">
         <h3><a class="doc-anchor" href="#doc-detect">#</a> <code>detect</code></h3>
         <p><code>detect</code> — functional / iterator builtin.</p>
@@ -7320,6 +7735,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = dew_point $x 
 # or in a pipeline:
 @list |&gt; map dew_point |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-df">
+        <h3><a class="doc-anchor" href="#doc-df">#</a> <code>df</code></h3>
+        <p><code>df</code> — data / network builtin. Alias for <code>dataframe</code>.</p>
+        <pre><code class="lang-perl">my $result = df $x 
+# or in a pipeline:
+@list |&gt; map df |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-dfs">
@@ -7554,6 +7977,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map divmod |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-divs">
+        <h3><a class="doc-anchor" href="#doc-divs">#</a> <code>divs</code></h3>
+        <p><code>divs</code> — math / numeric (uncategorized batch) builtin. Alias for <code>divisors</code>.</p>
+        <pre><code class="lang-perl">my $result = divs $x 
+# or in a pipeline:
+@list |&gt; map divs |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-djb2">
         <h3><a class="doc-anchor" href="#doc-djb2">#</a> <code>djb2</code></h3>
         <p><code>djb2</code> — extended stdlib builtin.</p>
@@ -7568,6 +7999,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = dm $x 
 # or in a pipeline:
 @list |&gt; map dm |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-dmetph">
+        <h3><a class="doc-anchor" href="#doc-dmetph">#</a> <code>dmetph</code></h3>
+        <p><code>dmetph</code> — encoding / phonetics builtin. Alias for <code>double_metaphone</code>.</p>
+        <pre><code class="lang-perl">my $result = dmetph $x 
+# or in a pipeline:
+@list |&gt; map dmetph |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-dot-case">
@@ -7682,6 +8121,22 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map drop_n |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-dte">
+        <h3><a class="doc-anchor" href="#doc-dte">#</a> <code>dte</code></h3>
+        <p><code>dte</code> — date / time builtin. Alias for <code>datetime_from_epoch</code>.</p>
+        <pre><code class="lang-perl">my $result = dte $x 
+# or in a pipeline:
+@list |&gt; map dte |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-dtf">
+        <h3><a class="doc-anchor" href="#doc-dtf">#</a> <code>dtf</code></h3>
+        <p><code>dtf</code> — date / time builtin. Alias for <code>datetime_strftime</code>.</p>
+        <pre><code class="lang-perl">my $result = dtf $x 
+# or in a pipeline:
+@list |&gt; map dtf |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-dump">
         <h3><a class="doc-anchor" href="#doc-dump">#</a> <code>dump</code></h3>
         <p><code>dump</code> — process / system builtin.</p>
@@ -7728,6 +8183,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = each_with_object $x 
 # or in a pipeline:
 @list |&gt; map each_with_object |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-echarge">
+        <h3><a class="doc-anchor" href="#doc-echarge">#</a> <code>echarge</code></h3>
+        <p><code>echarge</code> — constants builtin. Alias for <code>elementary_charge</code>.</p>
+        <pre><code class="lang-perl">my $result = echarge $x 
+# or in a pipeline:
+@list |&gt; map echarge |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-econs">
@@ -7840,6 +8303,30 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = email_local $x 
 # or in a pipeline:
 @list |&gt; map email_local |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-emass">
+        <h3><a class="doc-anchor" href="#doc-emass">#</a> <code>emass</code></h3>
+        <p><code>emass</code> — constants builtin. Alias for <code>electron_mass</code>.</p>
+        <pre><code class="lang-perl">my $result = emass $x 
+# or in a pipeline:
+@list |&gt; map emass |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-emavg">
+        <h3><a class="doc-anchor" href="#doc-emavg">#</a> <code>emavg</code></h3>
+        <p><code>emavg</code> — math / numeric (uncategorized batch) builtin. Alias for <code>exponential_moving_average</code>.</p>
+        <pre><code class="lang-perl">my $result = emavg $x 
+# or in a pipeline:
+@list |&gt; map emavg |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-emojinum">
+        <h3><a class="doc-anchor" href="#doc-emojinum">#</a> <code>emojinum</code></h3>
+        <p><code>emojinum</code> — encoding / phonetics builtin. Alias for <code>to_emoji_num</code>.</p>
+        <pre><code class="lang-perl">my $result = emojinum $x 
+# or in a pipeline:
+@list |&gt; map emojinum |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-empc">
@@ -8034,6 +8521,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map epoch_ms |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-eps">
+        <h3><a class="doc-anchor" href="#doc-eps">#</a> <code>eps</code></h3>
+        <p><code>eps</code> — math / numeric (uncategorized batch) builtin. Alias for <code>epsilon</code>.</p>
+        <pre><code class="lang-perl">my $result = eps $x 
+# or in a pipeline:
+@list |&gt; map eps |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-epsilon">
         <h3><a class="doc-anchor" href="#doc-epsilon">#</a> <code>epsilon</code></h3>
         <p><code>epsilon</code> — math / numeric (uncategorized batch) builtin.</p>
@@ -8098,12 +8593,28 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map etot |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-eucdist">
+        <h3><a class="doc-anchor" href="#doc-eucdist">#</a> <code>eucdist</code></h3>
+        <p><code>eucdist</code> — math / numeric (uncategorized batch) builtin. Alias for <code>euclidean_distance</code>.</p>
+        <pre><code class="lang-perl">my $result = eucdist $x 
+# or in a pipeline:
+@list |&gt; map eucdist |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-euclidean-distance">
         <h3><a class="doc-anchor" href="#doc-euclidean-distance">#</a> <code>euclidean_distance</code></h3>
         <p><code>euclidean_distance</code> — math / numeric (uncategorized batch) builtin.</p>
         <pre><code class="lang-perl">my $result = euclidean_distance $x 
 # or in a pipeline:
 @list |&gt; map euclidean_distance |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-euler-e">
+        <h3><a class="doc-anchor" href="#doc-euler-e">#</a> <code>euler_e</code></h3>
+        <p><code>euler_e</code> — math / numeric (uncategorized batch) builtin. Alias for <code>euler_number</code>.</p>
+        <pre><code class="lang-perl">my $result = euler_e $x 
+# or in a pipeline:
+@list |&gt; map euler_e |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-euler-number">
@@ -8270,6 +8781,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map falsy_count |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-fb">
+        <h3><a class="doc-anchor" href="#doc-fb">#</a> <code>fb</code></h3>
+        <p><code>fb</code> — algorithms / puzzles builtin. Alias for <code>fizzbuzz</code>.</p>
+        <pre><code class="lang-perl">my $result = fb $x 
+# or in a pipeline:
+@list |&gt; map fb |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-fcntl">
         <h3><a class="doc-anchor" href="#doc-fcntl">#</a> <code>fcntl</code></h3>
         <p><code>fcntl</code> — ipc builtin.</p>
@@ -8330,6 +8849,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = fft_magnitude $x 
 # or in a pipeline:
 @list |&gt; map fft_magnitude |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-fftmag">
+        <h3><a class="doc-anchor" href="#doc-fftmag">#</a> <code>fftmag</code></h3>
+        <p><code>fftmag</code> — math / numeric (uncategorized batch) builtin. Alias for <code>fft_magnitude</code>.</p>
+        <pre><code class="lang-perl">my $result = fftmag $x 
+# or in a pipeline:
+@list |&gt; map fftmag |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-fib">
@@ -8980,6 +9507,38 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map fst |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-ft">
+        <h3><a class="doc-anchor" href="#doc-ft">#</a> <code>ft</code></h3>
+        <p><code>ft</code> — data / network builtin. Alias for <code>fetch</code>.</p>
+        <pre><code class="lang-perl">my $result = ft $x 
+# or in a pipeline:
+@list |&gt; map ft |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-fta">
+        <h3><a class="doc-anchor" href="#doc-fta">#</a> <code>fta</code></h3>
+        <p><code>fta</code> — data / network builtin. Alias for <code>fetch_async</code>.</p>
+        <pre><code class="lang-perl">my $result = fta $x 
+# or in a pipeline:
+@list |&gt; map fta |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ftaj">
+        <h3><a class="doc-anchor" href="#doc-ftaj">#</a> <code>ftaj</code></h3>
+        <p><code>ftaj</code> — data / network builtin. Alias for <code>fetch_async_json</code>.</p>
+        <pre><code class="lang-perl">my $result = ftaj $x 
+# or in a pipeline:
+@list |&gt; map ftaj |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ftj">
+        <h3><a class="doc-anchor" href="#doc-ftj">#</a> <code>ftj</code></h3>
+        <p><code>ftj</code> — data / network builtin. Alias for <code>fetch_json</code>.</p>
+        <pre><code class="lang-perl">my $result = ftj $x 
+# or in a pipeline:
+@list |&gt; map ftj |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-fused-mul-add">
         <h3><a class="doc-anchor" href="#doc-fused-mul-add">#</a> <code>fused_mul_add</code></h3>
         <p><code>fused_mul_add</code> — extended stdlib builtin.</p>
@@ -9046,12 +9605,28 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map gbi |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-gcby">
+        <h3><a class="doc-anchor" href="#doc-gcby">#</a> <code>gcby</code></h3>
+        <p><code>gcby</code> — matrix operations (uncategorized batch) builtin. Alias for <code>group_consecutive_by</code>.</p>
+        <pre><code class="lang-perl">my $result = gcby $x 
+# or in a pipeline:
+@list |&gt; map gcby |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-gcd">
         <h3><a class="doc-anchor" href="#doc-gcd">#</a> <code>gcd</code></h3>
         <p><code>gcd</code> — trivial numeric / predicate builtins builtin.</p>
         <pre><code class="lang-perl">my $result = gcd $x 
 # or in a pipeline:
 @list |&gt; map gcd |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gconst">
+        <h3><a class="doc-anchor" href="#doc-gconst">#</a> <code>gconst</code></h3>
+        <p><code>gconst</code> — constants builtin. Alias for <code>gravitational_constant</code>.</p>
+        <pre><code class="lang-perl">my $result = gconst $x 
+# or in a pipeline:
+@list |&gt; map gconst |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-geometric-mean">
@@ -9132,6 +9707,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = glob_to_regex $input 
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-goldb">
+        <h3><a class="doc-anchor" href="#doc-goldb">#</a> <code>goldb</code></h3>
+        <p><code>goldb</code> — math / numeric (uncategorized batch) builtin. Alias for <code>goldbach</code>.</p>
+        <pre><code class="lang-perl">my $result = goldb $x 
+# or in a pipeline:
+@list |&gt; map goldb |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-goldbach">
         <h3><a class="doc-anchor" href="#doc-goldbach">#</a> <code>goldbach</code></h3>
         <p><code>goldbach</code> — math / numeric (uncategorized batch) builtin.</p>
@@ -9146,6 +9729,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = golden_ratio $x 
 # or in a pipeline:
 @list |&gt; map golden_ratio |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-golstep">
+        <h3><a class="doc-anchor" href="#doc-golstep">#</a> <code>golstep</code></h3>
+        <p><code>golstep</code> — algorithms / puzzles builtin. Alias for <code>game_of_life_step</code>.</p>
+        <pre><code class="lang-perl">my $result = golstep $x 
+# or in a pipeline:
+@list |&gt; map golstep |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-goto">
@@ -9172,6 +9763,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map gravity |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-gray2b">
+        <h3><a class="doc-anchor" href="#doc-gray2b">#</a> <code>gray2b</code></h3>
+        <p><code>gray2b</code> — base / gray code builtin. Alias for <code>gray_to_binary</code>.</p>
+        <pre><code class="lang-perl">my $result = gray2b $x 
+# or in a pipeline:
+@list |&gt; map gray2b |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-gray-code-sequence">
         <h3><a class="doc-anchor" href="#doc-gray-code-sequence">#</a> <code>gray_code_sequence</code></h3>
         <p><code>gray_code_sequence</code> — base / gray code builtin.</p>
@@ -9184,6 +9783,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <h3><a class="doc-anchor" href="#doc-gray-to-binary">#</a> <code>gray_to_binary</code></h3>
         <p><code>gray_to_binary</code> — base / gray code builtin.</p>
         <pre><code class="lang-perl">my $result = gray_to_binary $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-grayseq">
+        <h3><a class="doc-anchor" href="#doc-grayseq">#</a> <code>grayseq</code></h3>
+        <p><code>grayseq</code> — base / gray code builtin. Alias for <code>gray_code_sequence</code>.</p>
+        <pre><code class="lang-perl">my $result = grayseq $x 
+# or in a pipeline:
+@list |&gt; map grayseq |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-group-by">
@@ -9266,6 +9873,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map gruns |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-gz">
+        <h3><a class="doc-anchor" href="#doc-gz">#</a> <code>gz</code></h3>
+        <p><code>gz</code> — crypto / encoding builtin. Alias for <code>gzip</code>.</p>
+        <pre><code class="lang-perl">my $result = gz $x 
+# or in a pipeline:
+@list |&gt; map gz |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-half">
         <h3><a class="doc-anchor" href="#doc-half">#</a> <code>half</code></h3>
         <p><code>half</code> — trivial numeric / predicate builtins builtin.</p>
@@ -9296,6 +9911,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = hamming_distance $x 
 # or in a pipeline:
 @list |&gt; map hamming_distance |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hanoi">
+        <h3><a class="doc-anchor" href="#doc-hanoi">#</a> <code>hanoi</code></h3>
+        <p><code>hanoi</code> — algorithms / puzzles builtin. Alias for <code>tower_of_hanoi</code>.</p>
+        <pre><code class="lang-perl">my $result = hanoi $x 
+# or in a pipeline:
+@list |&gt; map hanoi |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-harmonic-mean">
@@ -9512,6 +10135,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map heat_index |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-heron">
+        <h3><a class="doc-anchor" href="#doc-heron">#</a> <code>heron</code></h3>
+        <p><code>heron</code> — geometry / physics builtin. Alias for <code>heron_area</code>.</p>
+        <pre><code class="lang-perl">my $result = heron $x 
+# or in a pipeline:
+@list |&gt; map heron |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-heron-area">
         <h3><a class="doc-anchor" href="#doc-heron-area">#</a> <code>heron_area</code></h3>
         <p><code>heron_area</code> — geometry / physics builtin.</p>
@@ -9554,6 +10185,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = hex_upper $x 
 # or in a pipeline:
 @list |&gt; map hex_upper |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hist">
+        <h3><a class="doc-anchor" href="#doc-hist">#</a> <code>hist</code></h3>
+        <p><code>hist</code> — matrix operations (uncategorized batch) builtin. Alias for <code>histogram</code>.</p>
+        <pre><code class="lang-perl">my $result = hist $x 
+# or in a pipeline:
+@list |&gt; map hist |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-histogram">
@@ -9620,10 +10259,34 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = hp_to_watts $input 
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-hr">
+        <h3><a class="doc-anchor" href="#doc-hr">#</a> <code>hr</code></h3>
+        <p><code>hr</code> — data / network builtin. Alias for <code>http_request</code>.</p>
+        <pre><code class="lang-perl">my $result = hr $x 
+# or in a pipeline:
+@list |&gt; map hr |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hsl2rgb">
+        <h3><a class="doc-anchor" href="#doc-hsl2rgb">#</a> <code>hsl2rgb</code></h3>
+        <p><code>hsl2rgb</code> — color operations builtin. Alias for <code>hsl_to_rgb</code>.</p>
+        <pre><code class="lang-perl">my $result = hsl2rgb $x 
+# or in a pipeline:
+@list |&gt; map hsl2rgb |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-hsl-to-rgb">
         <h3><a class="doc-anchor" href="#doc-hsl-to-rgb">#</a> <code>hsl_to_rgb</code></h3>
         <p><code>hsl_to_rgb</code> — color operations builtin.</p>
         <pre><code class="lang-perl">my $result = hsl_to_rgb $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hsv2rgb">
+        <h3><a class="doc-anchor" href="#doc-hsv2rgb">#</a> <code>hsv2rgb</code></h3>
+        <p><code>hsv2rgb</code> — color operations builtin. Alias for <code>hsv_to_rgb</code>.</p>
+        <pre><code class="lang-perl">my $result = hsv2rgb $x 
+# or in a pipeline:
+@list |&gt; map hsv2rgb |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-hsv-to-rgb">
@@ -9678,6 +10341,30 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = human_duration $x 
 # or in a pipeline:
 @list |&gt; map human_duration |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hxd">
+        <h3><a class="doc-anchor" href="#doc-hxd">#</a> <code>hxd</code></h3>
+        <p><code>hxd</code> — crypto / encoding builtin. Alias for <code>hex_decode</code>.</p>
+        <pre><code class="lang-perl">my $result = hxd $x 
+# or in a pipeline:
+@list |&gt; map hxd |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hxe">
+        <h3><a class="doc-anchor" href="#doc-hxe">#</a> <code>hxe</code></h3>
+        <p><code>hxe</code> — crypto / encoding builtin. Alias for <code>hex_encode</code>.</p>
+        <pre><code class="lang-perl">my $result = hxe $x 
+# or in a pipeline:
+@list |&gt; map hxe |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hyp">
+        <h3><a class="doc-anchor" href="#doc-hyp">#</a> <code>hyp</code></h3>
+        <p><code>hyp</code> — geometry / physics builtin. Alias for <code>triangle_hypotenuse</code>.</p>
+        <pre><code class="lang-perl">my $result = hyp $x 
+# or in a pipeline:
+@list |&gt; map hyp |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-hypot">
@@ -9884,6 +10571,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = inits $x 
 # or in a pipeline:
 @list |&gt; map inits |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-inits-str">
+        <h3><a class="doc-anchor" href="#doc-inits-str">#</a> <code>inits_str</code></h3>
+        <p><code>inits_str</code> — string processing (uncategorized batch) builtin. Alias for <code>initials</code>.</p>
+        <pre><code class="lang-perl">my $result = inits_str $x 
+# or in a pipeline:
+@list |&gt; map inits_str |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-inject">
@@ -11312,6 +12007,22 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map is_zero_num |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-isabun">
+        <h3><a class="doc-anchor" href="#doc-isabun">#</a> <code>isabun</code></h3>
+        <p><code>isabun</code> — number theory / primes builtin. Alias for <code>is_abundant</code>.</p>
+        <pre><code class="lang-perl">my $result = isabun $x 
+# or in a pipeline:
+@list |&gt; map isabun |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-isanag">
+        <h3><a class="doc-anchor" href="#doc-isanag">#</a> <code>isanag</code></h3>
+        <p><code>isanag</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_anagram</code>.</p>
+        <pre><code class="lang-perl">my $result = isanag $x 
+# or in a pipeline:
+@list |&gt; map isanag |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-isasc">
         <h3><a class="doc-anchor" href="#doc-isasc">#</a> <code>isasc</code></h3>
         <p><code>isasc</code> — extended stdlib builtin. Alias for <code>is_ascii</code>.</p>
@@ -11326,6 +12037,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = isb64 $x 
 # or in a pipeline:
 @list |&gt; map isb64 |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-isbalp">
+        <h3><a class="doc-anchor" href="#doc-isbalp">#</a> <code>isbalp</code></h3>
+        <p><code>isbalp</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_balanced_parens</code>.</p>
+        <pre><code class="lang-perl">my $result = isbalp $x 
+# or in a pipeline:
+@list |&gt; map isbalp |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-isbin">
@@ -11368,12 +12087,44 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map iscc |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-iscidr">
+        <h3><a class="doc-anchor" href="#doc-iscidr">#</a> <code>iscidr</code></h3>
+        <p><code>iscidr</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_valid_cidr</code>.</p>
+        <pre><code class="lang-perl">my $result = iscidr $x 
+# or in a pipeline:
+@list |&gt; map iscidr |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-iscopr">
         <h3><a class="doc-anchor" href="#doc-iscopr">#</a> <code>iscopr</code></h3>
         <p><code>iscopr</code> — extended stdlib batch 3 builtin. Alias for <code>is_coprime</code>.</p>
         <pre><code class="lang-perl">my $result = iscopr $x 
 # or in a pipeline:
 @list |&gt; map iscopr |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-iscron">
+        <h3><a class="doc-anchor" href="#doc-iscron">#</a> <code>iscron</code></h3>
+        <p><code>iscron</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_valid_cron</code>.</p>
+        <pre><code class="lang-perl">my $result = iscron $x 
+# or in a pipeline:
+@list |&gt; map iscron |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-isctrl">
+        <h3><a class="doc-anchor" href="#doc-isctrl">#</a> <code>isctrl</code></h3>
+        <p><code>isctrl</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_control</code>.</p>
+        <pre><code class="lang-perl">my $result = isctrl $x 
+# or in a pipeline:
+@list |&gt; map isctrl |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-isdefi">
+        <h3><a class="doc-anchor" href="#doc-isdefi">#</a> <code>isdefi</code></h3>
+        <p><code>isdefi</code> — number theory / primes builtin. Alias for <code>is_deficient</code>.</p>
+        <pre><code class="lang-perl">my $result = isdefi $x 
+# or in a pipeline:
+@list |&gt; map isdefi |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-iseven">
@@ -11406,6 +12157,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = ishex $x 
 # or in a pipeline:
 @list |&gt; map ishex |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ishexc">
+        <h3><a class="doc-anchor" href="#doc-ishexc">#</a> <code>ishexc</code></h3>
+        <p><code>ishexc</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_valid_hex_color</code>.</p>
+        <pre><code class="lang-perl">my $result = ishexc $x 
+# or in a pipeline:
+@list |&gt; map ishexc |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-ishost">
@@ -11496,12 +12255,28 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map isl |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-islat">
+        <h3><a class="doc-anchor" href="#doc-islat">#</a> <code>islat</code></h3>
+        <p><code>islat</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_valid_latitude</code>.</p>
+        <pre><code class="lang-perl">my $result = islat $x 
+# or in a pipeline:
+@list |&gt; map islat |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-islice">
         <h3><a class="doc-anchor" href="#doc-islice">#</a> <code>islice</code></h3>
         <p><code>islice</code> — python/ruby stdlib builtin.</p>
         <pre><code class="lang-perl">my $result = islice $x 
 # or in a pipeline:
 @list |&gt; map islice |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-islon">
+        <h3><a class="doc-anchor" href="#doc-islon">#</a> <code>islon</code></h3>
+        <p><code>islon</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_valid_longitude</code>.</p>
+        <pre><code class="lang-perl">my $result = islon $x 
+# or in a pipeline:
+@list |&gt; map islon |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-ism">
@@ -11518,6 +12293,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = ismac $x 
 # or in a pipeline:
 @list |&gt; map ismac |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ismime">
+        <h3><a class="doc-anchor" href="#doc-ismime">#</a> <code>ismime</code></h3>
+        <p><code>ismime</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_valid_mime</code>.</p>
+        <pre><code class="lang-perl">my $result = ismime $x 
+# or in a pipeline:
+@list |&gt; map ismime |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-ismono">
@@ -11544,6 +12327,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map isneg |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-isnumstr">
+        <h3><a class="doc-anchor" href="#doc-isnumstr">#</a> <code>isnumstr</code></h3>
+        <p><code>isnumstr</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_numeric_string</code>.</p>
+        <pre><code class="lang-perl">my $result = isnumstr $x 
+# or in a pipeline:
+@list |&gt; map isnumstr |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-isoct">
         <h3><a class="doc-anchor" href="#doc-isoct">#</a> <code>isoct</code></h3>
         <p><code>isoct</code> — extended stdlib builtin. Alias for <code>is_octal_str</code>.</p>
@@ -11566,6 +12357,30 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = isp $x 
 # or in a pipeline:
 @list |&gt; map isp |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ispang">
+        <h3><a class="doc-anchor" href="#doc-ispang">#</a> <code>ispang</code></h3>
+        <p><code>ispang</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_pangram</code>.</p>
+        <pre><code class="lang-perl">my $result = ispang $x 
+# or in a pipeline:
+@list |&gt; map ispang |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ispent">
+        <h3><a class="doc-anchor" href="#doc-ispent">#</a> <code>ispent</code></h3>
+        <p><code>ispent</code> — number theory / primes builtin. Alias for <code>is_pentagonal</code>.</p>
+        <pre><code class="lang-perl">my $result = ispent $x 
+# or in a pipeline:
+@list |&gt; map ispent |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-isperf">
+        <h3><a class="doc-anchor" href="#doc-isperf">#</a> <code>isperf</code></h3>
+        <p><code>isperf</code> — number theory / primes builtin. Alias for <code>is_perfect</code>.</p>
+        <pre><code class="lang-perl">my $result = isperf $x 
+# or in a pipeline:
+@list |&gt; map isperf |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-isphone">
@@ -11592,6 +12407,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map ispos |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-isprint">
+        <h3><a class="doc-anchor" href="#doc-isprint">#</a> <code>isprint</code></h3>
+        <p><code>isprint</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_printable</code>.</p>
+        <pre><code class="lang-perl">my $result = isprint $x 
+# or in a pipeline:
+@list |&gt; map isprint |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-ispw">
         <h3><a class="doc-anchor" href="#doc-ispw">#</a> <code>ispw</code></h3>
         <p><code>ispw</code> — additional missing stdlib functions builtin. Alias for <code>intersperse_with</code>.</p>
@@ -11606,6 +12429,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = isslug $x 
 # or in a pipeline:
 @list |&gt; map isslug |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-issmith">
+        <h3><a class="doc-anchor" href="#doc-issmith">#</a> <code>issmith</code></h3>
+        <p><code>issmith</code> — number theory / primes builtin. Alias for <code>is_smith</code>.</p>
+        <pre><code class="lang-perl">my $result = issmith $x 
+# or in a pipeline:
+@list |&gt; map issmith |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-issqfr">
@@ -11726,6 +12557,22 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
         <pre><code class="lang-perl">my $result = jarosim $x 
 # or in a pipeline:
 @list |&gt; map jarosim |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-jd">
+        <h3><a class="doc-anchor" href="#doc-jd">#</a> <code>jd</code></h3>
+        <p><code>jd</code> — data / network builtin. Alias for <code>json_decode</code>.</p>
+        <pre><code class="lang-perl">my $result = jd $x 
+# or in a pipeline:
+@list |&gt; map jd |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-je">
+        <h3><a class="doc-anchor" href="#doc-je">#</a> <code>je</code></h3>
+        <p><code>je</code> — data / network builtin. Alias for <code>json_encode</code>.</p>
+        <pre><code class="lang-perl">my $result = je $x 
+# or in a pipeline:
+@list |&gt; map je |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-join-colons">
@@ -11966,6 +12813,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map kths |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-kurt">
+        <h3><a class="doc-anchor" href="#doc-kurt">#</a> <code>kurt</code></h3>
+        <p><code>kurt</code> — math / numeric (uncategorized batch) builtin. Alias for <code>kurtosis</code>.</p>
+        <pre><code class="lang-perl">my $result = kurt $x 
+# or in a pipeline:
+@list |&gt; map kurt |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-kurtosis">
         <h3><a class="doc-anchor" href="#doc-kurtosis">#</a> <code>kurtosis</code></h3>
         <p><code>kurtosis</code> — math / numeric (uncategorized batch) builtin.</p>
@@ -12122,6 +12977,14 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p;  # line count
 @list |&gt; map least_common |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-leet">
+        <h3><a class="doc-anchor" href="#doc-leet">#</a> <code>leet</code></h3>
+        <p><code>leet</code> — string processing (uncategorized batch) builtin. Alias for <code>leetspeak</code>.</p>
+        <pre><code class="lang-perl">my $result = leet $x 
+# or in a pipeline:
+@list |&gt; map leet |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-leetspeak">
         <h3><a class="doc-anchor" href="#doc-leetspeak">#</a> <code>leetspeak</code></h3>
         <p><code>leetspeak</code> — string processing (uncategorized batch) builtin.</p>
@@ -12231,6 +13094,14 @@ slurp(&quot;README.md&quot;) |&gt; pager
         <pre><code class="lang-perl">my $result = lines_from $x 
 # or in a pipeline:
 @list |&gt; map lines_from |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-linreg">
+        <h3><a class="doc-anchor" href="#doc-linreg">#</a> <code>linreg</code></h3>
+        <p><code>linreg</code> — math / numeric (uncategorized batch) builtin. Alias for <code>linear_regression</code>.</p>
+        <pre><code class="lang-perl">my $result = linreg $x 
+# or in a pipeline:
+@list |&gt; map linreg |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-linspace">
@@ -12365,6 +13236,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = ln2 $x 
 # or in a pipeline:
 @list |&gt; map ln2 |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-lns">
+        <h3><a class="doc-anchor" href="#doc-lns">#</a> <code>lns</code></h3>
+        <p><code>lns</code> — math / numeric (uncategorized batch) builtin. Alias for <code>look_and_say</code>.</p>
+        <pre><code class="lang-perl">my $result = lns $x 
+# or in a pipeline:
+@list |&gt; map lns |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-log10">
@@ -12543,6 +13422,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map lucas |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-luhn">
+        <h3><a class="doc-anchor" href="#doc-luhn">#</a> <code>luhn</code></h3>
+        <p><code>luhn</code> — math / numeric (uncategorized batch) builtin. Alias for <code>luhn_check</code>.</p>
+        <pre><code class="lang-perl">my $result = luhn $x 
+# or in a pipeline:
+@list |&gt; map luhn |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-luhn-check">
         <h3><a class="doc-anchor" href="#doc-luhn-check">#</a> <code>luhn_check</code></h3>
         <p><code>luhn_check</code> — math / numeric (uncategorized batch) builtin.</p>
@@ -12557,6 +13444,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = lz $x 
 # or in a pipeline:
 @list |&gt; map lz |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-m5">
+        <h3><a class="doc-anchor" href="#doc-m5">#</a> <code>m5</code></h3>
+        <p><code>m5</code> — crypto / encoding builtin. Alias for <code>md5</code>.</p>
+        <pre><code class="lang-perl">my $result = m5 $x 
+# or in a pipeline:
+@list |&gt; map m5 |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-m-to-feet">
@@ -12581,6 +13476,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <h3><a class="doc-anchor" href="#doc-m-to-yards">#</a> <code>m_to_yards</code></h3>
         <p><code>m_to_yards</code> — unit conversions builtin.</p>
         <pre><code class="lang-perl">my $result = m_to_yards $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mad">
+        <h3><a class="doc-anchor" href="#doc-mad">#</a> <code>mad</code></h3>
+        <p><code>mad</code> — math / numeric (uncategorized batch) builtin. Alias for <code>median_absolute_deviation</code>.</p>
+        <pre><code class="lang-perl">my $result = mad $x 
+# or in a pipeline:
+@list |&gt; map mad |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-madd">
@@ -12637,6 +13540,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = mall $x 
 # or in a pipeline:
 @list |&gt; map mall |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mandel">
+        <h3><a class="doc-anchor" href="#doc-mandel">#</a> <code>mandel</code></h3>
+        <p><code>mandel</code> — algorithms / puzzles builtin. Alias for <code>mandelbrot_char</code>.</p>
+        <pre><code class="lang-perl">my $result = mandel $x 
+# or in a pipeline:
+@list |&gt; map mandel |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-mandelbrot-char">
@@ -12749,6 +13660,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = markup_price $x 
 # or in a pipeline:
 @list |&gt; map markup_price |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mask">
+        <h3><a class="doc-anchor" href="#doc-mask">#</a> <code>mask</code></h3>
+        <p><code>mask</code> — string processing (uncategorized batch) builtin. Alias for <code>mask_string</code>.</p>
+        <pre><code class="lang-perl">my $result = mask $x 
+# or in a pipeline:
+@list |&gt; map mask |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-mask-string">
@@ -13195,6 +14114,38 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map metaphone |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-metph">
+        <h3><a class="doc-anchor" href="#doc-metph">#</a> <code>metph</code></h3>
+        <p><code>metph</code> — encoding / phonetics builtin. Alias for <code>metaphone</code>.</p>
+        <pre><code class="lang-perl">my $result = metph $x 
+# or in a pipeline:
+@list |&gt; map metph |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mflat">
+        <h3><a class="doc-anchor" href="#doc-mflat">#</a> <code>mflat</code></h3>
+        <p><code>mflat</code> — matrix operations (uncategorized batch) builtin. Alias for <code>matrix_flatten</code>.</p>
+        <pre><code class="lang-perl">my $result = mflat $x 
+# or in a pipeline:
+@list |&gt; map mflat |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mfromr">
+        <h3><a class="doc-anchor" href="#doc-mfromr">#</a> <code>mfromr</code></h3>
+        <p><code>mfromr</code> — matrix operations (uncategorized batch) builtin. Alias for <code>matrix_from_rows</code>.</p>
+        <pre><code class="lang-perl">my $result = mfromr $x 
+# or in a pipeline:
+@list |&gt; map mfromr |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mhad">
+        <h3><a class="doc-anchor" href="#doc-mhad">#</a> <code>mhad</code></h3>
+        <p><code>mhad</code> — matrix operations (uncategorized batch) builtin. Alias for <code>matrix_hadamard</code>.</p>
+        <pre><code class="lang-perl">my $result = mhad $x 
+# or in a pipeline:
+@list |&gt; map mhad |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-mid-str">
         <h3><a class="doc-anchor" href="#doc-mid-str">#</a> <code>mid_str</code></h3>
         <p><code>mid_str</code> — string (batch 2) builtin.</p>
@@ -13209,6 +14160,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = mident $x 
 # or in a pipeline:
 @list |&gt; map mident |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-midpnt">
+        <h3><a class="doc-anchor" href="#doc-midpnt">#</a> <code>midpnt</code></h3>
+        <p><code>midpnt</code> — geometry / physics builtin. Alias for <code>midpoint</code>.</p>
+        <pre><code class="lang-perl">my $result = midpnt $x 
+# or in a pipeline:
+@list |&gt; map midpnt |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-midpoint">
@@ -13319,6 +14278,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map minimum_by |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-minkdist">
+        <h3><a class="doc-anchor" href="#doc-minkdist">#</a> <code>minkdist</code></h3>
+        <p><code>minkdist</code> — math / numeric (uncategorized batch) builtin. Alias for <code>minkowski_distance</code>.</p>
+        <pre><code class="lang-perl">my $result = minkdist $x 
+# or in a pipeline:
+@list |&gt; map minkdist |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-minkowski-distance">
         <h3><a class="doc-anchor" href="#doc-minkowski-distance">#</a> <code>minkowski_distance</code></h3>
         <p><code>minkowski_distance</code> — math / numeric (uncategorized batch) builtin.</p>
@@ -13355,6 +14322,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = minutes_to_seconds $input 
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-minv">
+        <h3><a class="doc-anchor" href="#doc-minv">#</a> <code>minv</code></h3>
+        <p><code>minv</code> — matrix operations (uncategorized batch) builtin. Alias for <code>matrix_inverse</code>.</p>
+        <pre><code class="lang-perl">my $result = minv $x 
+# or in a pipeline:
+@list |&gt; map minv |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-mirror-string">
         <h3><a class="doc-anchor" href="#doc-mirror-string">#</a> <code>mirror_string</code></h3>
         <p><code>mirror_string</code> — string helpers (batch 4) builtin.</p>
@@ -13373,6 +14348,30 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <h3><a class="doc-anchor" href="#doc-ml-to-liters">#</a> <code>ml_to_liters</code></h3>
         <p><code>ml_to_liters</code> — file stat / path builtin.</p>
         <pre><code class="lang-perl">my $result = ml_to_liters $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mmap">
+        <h3><a class="doc-anchor" href="#doc-mmap">#</a> <code>mmap</code></h3>
+        <p><code>mmap</code> — matrix operations (uncategorized batch) builtin. Alias for <code>matrix_map</code>.</p>
+        <pre><code class="lang-perl">my $result = mmap $x 
+# or in a pipeline:
+@list |&gt; map mmap |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mmax">
+        <h3><a class="doc-anchor" href="#doc-mmax">#</a> <code>mmax</code></h3>
+        <p><code>mmax</code> — matrix operations (uncategorized batch) builtin. Alias for <code>matrix_max</code>.</p>
+        <pre><code class="lang-perl">my $result = mmax $x 
+# or in a pipeline:
+@list |&gt; map mmax |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mmin">
+        <h3><a class="doc-anchor" href="#doc-mmin">#</a> <code>mmin</code></h3>
+        <p><code>mmin</code> — matrix operations (uncategorized batch) builtin. Alias for <code>matrix_min</code>.</p>
+        <pre><code class="lang-perl">my $result = mmin $x 
+# or in a pipeline:
+@list |&gt; map mmin |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-mmult">
@@ -13471,6 +14470,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map month_short |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-morse">
+        <h3><a class="doc-anchor" href="#doc-morse">#</a> <code>morse</code></h3>
+        <p><code>morse</code> — encoding / phonetics builtin. Alias for <code>morse_encode</code>.</p>
+        <pre><code class="lang-perl">my $result = morse $x 
+# or in a pipeline:
+@list |&gt; map morse |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-morse-decode">
         <h3><a class="doc-anchor" href="#doc-morse-decode">#</a> <code>morse_decode</code></h3>
         <p><code>morse_decode</code> — encoding / phonetics builtin.</p>
@@ -13503,12 +14510,28 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map most_common |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-movavg">
+        <h3><a class="doc-anchor" href="#doc-movavg">#</a> <code>movavg</code></h3>
+        <p><code>movavg</code> — math / numeric (uncategorized batch) builtin. Alias for <code>moving_average</code>.</p>
+        <pre><code class="lang-perl">my $result = movavg $x 
+# or in a pipeline:
+@list |&gt; map movavg |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-moving-average">
         <h3><a class="doc-anchor" href="#doc-moving-average">#</a> <code>moving_average</code></h3>
         <p><code>moving_average</code> — math / numeric (uncategorized batch) builtin.</p>
         <pre><code class="lang-perl">my $result = moving_average $x 
 # or in a pipeline:
 @list |&gt; map moving_average |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mpow">
+        <h3><a class="doc-anchor" href="#doc-mpow">#</a> <code>mpow</code></h3>
+        <p><code>mpow</code> — matrix operations (uncategorized batch) builtin. Alias for <code>matrix_power</code>.</p>
+        <pre><code class="lang-perl">my $result = mpow $x 
+# or in a pipeline:
+@list |&gt; map mpow |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-mrow">
@@ -13587,6 +14610,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map mshape |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-msorted">
+        <h3><a class="doc-anchor" href="#doc-msorted">#</a> <code>msorted</code></h3>
+        <p><code>msorted</code> — matrix operations (uncategorized batch) builtin. Alias for <code>merge_sorted</code>.</p>
+        <pre><code class="lang-perl">my $result = msorted $x 
+# or in a pipeline:
+@list |&gt; map msorted |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-mstat">
         <h3><a class="doc-anchor" href="#doc-mstat">#</a> <code>mstat</code></h3>
         <p><code>mstat</code> — extended stdlib builtin. Alias for <code>mode_stat</code>.</p>
@@ -13603,6 +14634,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map msub |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-msum">
+        <h3><a class="doc-anchor" href="#doc-msum">#</a> <code>msum</code></h3>
+        <p><code>msum</code> — matrix operations (uncategorized batch) builtin. Alias for <code>matrix_sum</code>.</p>
+        <pre><code class="lang-perl">my $result = msum $x 
+# or in a pipeline:
+@list |&gt; map msum |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-mtime">
         <h3><a class="doc-anchor" href="#doc-mtime">#</a> <code>mtime</code></h3>
         <p><code>mtime</code> — file stat / path builtin. Alias for <code>file_mtime</code>.</p>
@@ -13617,6 +14656,22 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = mtrace $x 
 # or in a pipeline:
 @list |&gt; map mtrace |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mtrans">
+        <h3><a class="doc-anchor" href="#doc-mtrans">#</a> <code>mtrans</code></h3>
+        <p><code>mtrans</code> — matrix operations (uncategorized batch) builtin. Alias for <code>matrix_transpose</code>.</p>
+        <pre><code class="lang-perl">my $result = mtrans $x 
+# or in a pipeline:
+@list |&gt; map mtrans |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-multinom">
+        <h3><a class="doc-anchor" href="#doc-multinom">#</a> <code>multinom</code></h3>
+        <p><code>multinom</code> — math / numeric (uncategorized batch) builtin. Alias for <code>multinomial</code>.</p>
+        <pre><code class="lang-perl">my $result = multinom $x 
+# or in a pipeline:
+@list |&gt; map multinom |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-multinomial">
@@ -13643,10 +14698,26 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map nanoid |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-nato">
+        <h3><a class="doc-anchor" href="#doc-nato">#</a> <code>nato</code></h3>
+        <p><code>nato</code> — encoding / phonetics builtin. Alias for <code>nato_phonetic</code>.</p>
+        <pre><code class="lang-perl">my $result = nato $x 
+# or in a pipeline:
+@list |&gt; map nato |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-nato-phonetic">
         <h3><a class="doc-anchor" href="#doc-nato-phonetic">#</a> <code>nato_phonetic</code></h3>
         <p><code>nato_phonetic</code> — encoding / phonetics builtin.</p>
         <pre><code class="lang-perl">my $result = nato_phonetic $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ndivs">
+        <h3><a class="doc-anchor" href="#doc-ndivs">#</a> <code>ndivs</code></h3>
+        <p><code>ndivs</code> — math / numeric (uncategorized batch) builtin. Alias for <code>num_divisors</code>.</p>
+        <pre><code class="lang-perl">my $result = ndivs $x 
+# or in a pipeline:
+@list |&gt; map ndivs |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-neg-inf">
@@ -13735,6 +14806,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map nfs |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-ngram">
+        <h3><a class="doc-anchor" href="#doc-ngram">#</a> <code>ngram</code></h3>
+        <p><code>ngram</code> — string processing (uncategorized batch) builtin. Alias for <code>ngrams</code>.</p>
+        <pre><code class="lang-perl">my $result = ngram $x 
+# or in a pipeline:
+@list |&gt; map ngram |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-ngrams">
         <h3><a class="doc-anchor" href="#doc-ngrams">#</a> <code>ngrams</code></h3>
         <p><code>ngrams</code> — string processing (uncategorized batch) builtin.</p>
@@ -13757,6 +14836,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = nnext $x 
 # or in a pipeline:
 @list |&gt; map nnext |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-nohtml">
+        <h3><a class="doc-anchor" href="#doc-nohtml">#</a> <code>nohtml</code></h3>
+        <p><code>nohtml</code> — string processing (uncategorized batch) builtin. Alias for <code>strip_html</code>.</p>
+        <pre><code class="lang-perl">my $result = nohtml $x 
+# or in a pipeline:
+@list |&gt; map nohtml |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-none-match">
@@ -13855,6 +14942,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map normalize_whitespace |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-normarr">
+        <h3><a class="doc-anchor" href="#doc-normarr">#</a> <code>normarr</code></h3>
+        <p><code>normarr</code> — matrix operations (uncategorized batch) builtin. Alias for <code>normalize_array</code>.</p>
+        <pre><code class="lang-perl">my $result = normarr $x 
+# or in a pipeline:
+@list |&gt; map normarr |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-not-any">
         <h3><a class="doc-anchor" href="#doc-not-any">#</a> <code>not_any</code></h3>
         <p><code>not_any</code> — algebraic match builtin.</p>
@@ -13887,6 +14982,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map not_every |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-now">
+        <h3><a class="doc-anchor" href="#doc-now">#</a> <code>now</code></h3>
+        <p><code>now</code> — date / time builtin. Alias for <code>datetime_now_tz</code>.</p>
+        <pre><code class="lang-perl">my $result = now $x 
+# or in a pipeline:
+@list |&gt; map now |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-now-ms">
         <h3><a class="doc-anchor" href="#doc-now-ms">#</a> <code>now_ms</code></h3>
         <p><code>now_ms</code> — now / timestamp builtin.</p>
@@ -13917,6 +15020,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = npv $x 
 # or in a pipeline:
 @list |&gt; map npv |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-nrmrng">
+        <h3><a class="doc-anchor" href="#doc-nrmrng">#</a> <code>nrmrng</code></h3>
+        <p><code>nrmrng</code> — matrix operations (uncategorized batch) builtin. Alias for <code>normalize_range</code>.</p>
+        <pre><code class="lang-perl">my $result = nrmrng $x 
+# or in a pipeline:
+@list |&gt; map nrmrng |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-nrmsp">
@@ -13995,6 +15106,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map nth_word |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-nthp">
+        <h3><a class="doc-anchor" href="#doc-nthp">#</a> <code>nthp</code></h3>
+        <p><code>nthp</code> — number theory / primes builtin. Alias for <code>nth_prime</code>.</p>
+        <pre><code class="lang-perl">my $result = nthp $x 
+# or in a pipeline:
+@list |&gt; map nthp |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-nub">
         <h3><a class="doc-anchor" href="#doc-nub">#</a> <code>nub</code></h3>
         <p><code>nub</code> — haskell list functions builtin.</p>
@@ -14041,6 +15160,22 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = numeric_count $x 
 # or in a pipeline:
 @list |&gt; map numeric_count |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-nxtp">
+        <h3><a class="doc-anchor" href="#doc-nxtp">#</a> <code>nxtp</code></h3>
+        <p><code>nxtp</code> — number theory / primes builtin. Alias for <code>next_prime</code>.</p>
+        <pre><code class="lang-perl">my $result = nxtp $x 
+# or in a pipeline:
+@list |&gt; map nxtp |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-nxtperm">
+        <h3><a class="doc-anchor" href="#doc-nxtperm">#</a> <code>nxtperm</code></h3>
+        <p><code>nxtperm</code> — matrix operations (uncategorized batch) builtin. Alias for <code>next_permutation</code>.</p>
+        <pre><code class="lang-perl">my $result = nxtperm $x 
+# or in a pipeline:
+@list |&gt; map nxtperm |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-object-entries">
@@ -14177,6 +15312,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = ones $x 
 # or in a pipeline:
 @list |&gt; map ones |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ones-mat">
+        <h3><a class="doc-anchor" href="#doc-ones-mat">#</a> <code>ones_mat</code></h3>
+        <p><code>ones_mat</code> — matrix / linear algebra builtin. Alias for <code>ones_matrix</code>.</p>
+        <pre><code class="lang-perl">my $result = ones_mat $x 
+# or in a pipeline:
+@list |&gt; map ones_mat |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-ones-matrix">
@@ -14465,6 +15608,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map partn |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-partn-num">
+        <h3><a class="doc-anchor" href="#doc-partn-num">#</a> <code>partn_num</code></h3>
+        <p><code>partn_num</code> — math / numeric (uncategorized batch) builtin. Alias for <code>partition_number</code>.</p>
+        <pre><code class="lang-perl">my $result = partn_num $x 
+# or in a pipeline:
+@list |&gt; map partn_num |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-pascal-case">
         <h3><a class="doc-anchor" href="#doc-pascal-case">#</a> <code>pascal_case</code></h3>
         <p><code>pascal_case</code> — string (batch 2) builtin.</p>
@@ -14507,6 +15658,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = pascrow $x 
 # or in a pipeline:
 @list |&gt; map pascrow |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pasctri">
+        <h3><a class="doc-anchor" href="#doc-pasctri">#</a> <code>pasctri</code></h3>
+        <p><code>pasctri</code> — math / numeric (uncategorized batch) builtin. Alias for <code>pascals_triangle</code>.</p>
+        <pre><code class="lang-perl">my $result = pasctri $x 
+# or in a pipeline:
+@list |&gt; map pasctri |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pass">
@@ -14605,6 +15764,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map pc_case |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-pcr">
+        <h3><a class="doc-anchor" href="#doc-pcr">#</a> <code>pcr</code></h3>
+        <p><code>pcr</code> — data / network builtin. Alias for <code>par_csv_read</code>.</p>
+        <pre><code class="lang-perl">my $result = pcr $x 
+# or in a pipeline:
+@list |&gt; map pcr |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-pct">
         <h3><a class="doc-anchor" href="#doc-pct">#</a> <code>pct</code></h3>
         <p><code>pct</code> — trivial numeric / predicate builtins builtin. Alias for <code>percent</code>.</p>
@@ -14619,6 +15786,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = peak_detect $x 
 # or in a pipeline:
 @list |&gt; map peak_detect |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-peaks">
+        <h3><a class="doc-anchor" href="#doc-peaks">#</a> <code>peaks</code></h3>
+        <p><code>peaks</code> — matrix operations (uncategorized batch) builtin. Alias for <code>peak_detect</code>.</p>
+        <pre><code class="lang-perl">my $result = peaks $x 
+# or in a pipeline:
+@list |&gt; map peaks |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-peek-clj">
@@ -14645,6 +15820,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
 @list |&gt; map pentagonal_number |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-pentnum">
+        <h3><a class="doc-anchor" href="#doc-pentnum">#</a> <code>pentnum</code></h3>
+        <p><code>pentnum</code> — number theory / primes builtin. Alias for <code>pentagonal_number</code>.</p>
+        <pre><code class="lang-perl">my $result = pentnum $x 
+# or in a pipeline:
+@list |&gt; map pentnum |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-percent">
         <h3><a class="doc-anchor" href="#doc-percent">#</a> <code>percent</code></h3>
         <p><code>percent</code> — trivial numeric / predicate builtins builtin.</p>
@@ -14667,6 +15850,14 @@ p list_count 1, 2, 3;   # 3  (flat list works too)
         <pre><code class="lang-perl">my $result = perfect_numbers $x 
 # or in a pipeline:
 @list |&gt; map perfect_numbers |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-perfnums">
+        <h3><a class="doc-anchor" href="#doc-perfnums">#</a> <code>perfnums</code></h3>
+        <p><code>perfnums</code> — number theory / primes builtin. Alias for <code>perfect_numbers</code>.</p>
+        <pre><code class="lang-perl">my $result = perfnums $x 
+# or in a pipeline:
+@list |&gt; map perfnums |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-perimeter-rectangle">
@@ -14775,6 +15966,14 @@ keys %p |&gt; grep { scalar @{$p{$_}} } |&gt; sort |&gt; p
 @list |&gt; map permutations |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-pfact">
+        <h3><a class="doc-anchor" href="#doc-pfact">#</a> <code>pfact</code></h3>
+        <p><code>pfact</code> — number theory / primes builtin. Alias for <code>prime_factors</code>.</p>
+        <pre><code class="lang-perl">my $result = pfact $x 
+# or in a pipeline:
+@list |&gt; map pfact |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-pflt">
         <h3><a class="doc-anchor" href="#doc-pflt">#</a> <code>pflt</code></h3>
         <p><code>pflt</code> — extended stdlib builtin. Alias for <code>parse_float</code>.</p>
@@ -14783,12 +15982,28 @@ keys %p |&gt; grep { scalar @{$p{$_}} } |&gt; sort |&gt; p
 @list |&gt; map pflt |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-pft">
+        <h3><a class="doc-anchor" href="#doc-pft">#</a> <code>pft</code></h3>
+        <p><code>pft</code> — data / network builtin. Alias for <code>par_fetch</code>.</p>
+        <pre><code class="lang-perl">my $result = pft $x 
+# or in a pipeline:
+@list |&gt; map pft |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-phi">
         <h3><a class="doc-anchor" href="#doc-phi">#</a> <code>phi</code></h3>
         <p><code>phi</code> — constants builtin.</p>
         <pre><code class="lang-perl">my $result = phi $x 
 # or in a pipeline:
 @list |&gt; map phi |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-phonedigit">
+        <h3><a class="doc-anchor" href="#doc-phonedigit">#</a> <code>phonedigit</code></h3>
+        <p><code>phonedigit</code> — encoding / phonetics builtin. Alias for <code>phonetic_digit</code>.</p>
+        <pre><code class="lang-perl">my $result = phonedigit $x 
+# or in a pipeline:
+@list |&gt; map phonedigit |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-phonetic-digit">
@@ -14837,6 +16052,14 @@ keys %p |&gt; grep { scalar @{$p{$_}} } |&gt; sort |&gt; p
         <pre><code class="lang-perl">my $result = pig_latin $x 
 # or in a pipeline:
 @list |&gt; map pig_latin |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-piglat">
+        <h3><a class="doc-anchor" href="#doc-piglat">#</a> <code>piglat</code></h3>
+        <p><code>piglat</code> — string processing (uncategorized batch) builtin. Alias for <code>pig_latin</code>.</p>
+        <pre><code class="lang-perl">my $result = piglat $x 
+# or in a pipeline:
+@list |&gt; map piglat |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pint">
@@ -14909,12 +16132,28 @@ p $msg;   # hello from child
 @list |&gt; map pluralize |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-pmass">
+        <h3><a class="doc-anchor" href="#doc-pmass">#</a> <code>pmass</code></h3>
+        <p><code>pmass</code> — constants builtin. Alias for <code>proton_mass</code>.</p>
+        <pre><code class="lang-perl">my $result = pmass $x 
+# or in a pipeline:
+@list |&gt; map pmass |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-point-distance">
         <h3><a class="doc-anchor" href="#doc-point-distance">#</a> <code>point_distance</code></h3>
         <p><code>point_distance</code> — geometry / physics builtin.</p>
         <pre><code class="lang-perl">my $result = point_distance $x 
 # or in a pipeline:
 @list |&gt; map point_distance |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-polyarea">
+        <h3><a class="doc-anchor" href="#doc-polyarea">#</a> <code>polyarea</code></h3>
+        <p><code>polyarea</code> — geometry / physics builtin. Alias for <code>polygon_area</code>.</p>
+        <pre><code class="lang-perl">my $result = polyarea $x 
+# or in a pipeline:
+@list |&gt; map polyarea |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-polygon-area">
@@ -15013,6 +16252,14 @@ p $msg;   # hello from child
 @list |&gt; map powerset |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-ppi">
+        <h3><a class="doc-anchor" href="#doc-ppi">#</a> <code>ppi</code></h3>
+        <p><code>ppi</code> — number theory / primes builtin. Alias for <code>prime_pi</code>.</p>
+        <pre><code class="lang-perl">my $result = ppi $x 
+# or in a pipeline:
+@list |&gt; map ppi |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-ppid">
         <h3><a class="doc-anchor" href="#doc-ppid">#</a> <code>ppid</code></h3>
         <p><code>ppid</code> — system introspection builtin.</p>
@@ -15027,6 +16274,14 @@ p $msg;   # hello from child
         <pre><code class="lang-perl">my $result = ppt $x 
 # or in a pipeline:
 @list |&gt; map ppt |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-prect">
+        <h3><a class="doc-anchor" href="#doc-prect">#</a> <code>prect</code></h3>
+        <p><code>prect</code> — geometry / physics builtin. Alias for <code>perimeter_rectangle</code>.</p>
+        <pre><code class="lang-perl">my $result = prect $x 
+# or in a pipeline:
+@list |&gt; map prect |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pred">
@@ -15125,10 +16380,34 @@ p $msg;   # hello from child
 @list |&gt; map proton_mass |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-prvp">
+        <h3><a class="doc-anchor" href="#doc-prvp">#</a> <code>prvp</code></h3>
+        <p><code>prvp</code> — number theory / primes builtin. Alias for <code>prev_prime</code>.</p>
+        <pre><code class="lang-perl">my $result = prvp $x 
+# or in a pipeline:
+@list |&gt; map prvp |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-psi-to-pascals">
         <h3><a class="doc-anchor" href="#doc-psi-to-pascals">#</a> <code>psi_to_pascals</code></h3>
         <p><code>psi_to_pascals</code> — file stat / path builtin.</p>
         <pre><code class="lang-perl">my $result = psi_to_pascals $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ptdist">
+        <h3><a class="doc-anchor" href="#doc-ptdist">#</a> <code>ptdist</code></h3>
+        <p><code>ptdist</code> — geometry / physics builtin. Alias for <code>point_distance</code>.</p>
+        <pre><code class="lang-perl">my $result = ptdist $x 
+# or in a pipeline:
+@list |&gt; map ptdist |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ptri">
+        <h3><a class="doc-anchor" href="#doc-ptri">#</a> <code>ptri</code></h3>
+        <p><code>ptri</code> — geometry / physics builtin. Alias for <code>perimeter_triangle</code>.</p>
+        <pre><code class="lang-perl">my $result = ptri $x 
+# or in a pipeline:
+@list |&gt; map ptri |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pwd-str">
@@ -15153,6 +16432,14 @@ p $msg;   # hello from child
         <pre><code class="lang-perl">my $result = q $x 
 # or in a pipeline:
 @list |&gt; map q |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-qm">
+        <h3><a class="doc-anchor" href="#doc-qm">#</a> <code>qm</code></h3>
+        <p><code>qm</code> — string builtin. Alias for <code>quotemeta</code>.</p>
+        <pre><code class="lang-perl">my $result = qm $x 
+# or in a pipeline:
+@list |&gt; map qm |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-qntl">
@@ -15231,6 +16518,14 @@ p $msg;   # hello from child
         <h3><a class="doc-anchor" href="#doc-rad-to-deg">#</a> <code>rad_to_deg</code></h3>
         <p><code>rad_to_deg</code> — trivial numeric / predicate builtins builtin.</p>
         <pre><code class="lang-perl">my $result = rad_to_deg $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-radd">
+        <h3><a class="doc-anchor" href="#doc-radd">#</a> <code>radd</code></h3>
+        <p><code>radd</code> — roman numerals builtin. Alias for <code>roman_add</code>.</p>
+        <pre><code class="lang-perl">my $result = radd $x 
+# or in a pipeline:
+@list |&gt; map radd |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-radians">
@@ -15375,6 +16670,22 @@ p $msg;   # hello from child
         <pre><code class="lang-perl">my $result = rank $x 
 # or in a pipeline:
 @list |&gt; map rank |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rb">
+        <h3><a class="doc-anchor" href="#doc-rb">#</a> <code>rb</code></h3>
+        <p><code>rb</code> — filesystem extensions builtin. Alias for <code>read_bytes</code>.</p>
+        <pre><code class="lang-perl">my $result = rb $x 
+# or in a pipeline:
+@list |&gt; map rb |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rcolor">
+        <h3><a class="doc-anchor" href="#doc-rcolor">#</a> <code>rcolor</code></h3>
+        <p><code>rcolor</code> — color operations builtin. Alias for <code>random_color</code>.</p>
+        <pre><code class="lang-perl">my $result = rcolor $x 
+# or in a pipeline:
+@list |&gt; map rcolor |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-rdcs">
@@ -15825,6 +17136,30 @@ p $msg;   # hello from child
 @list |&gt; map reverse_words |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-revwords">
+        <h3><a class="doc-anchor" href="#doc-revwords">#</a> <code>revwords</code></h3>
+        <p><code>revwords</code> — string processing (uncategorized batch) builtin. Alias for <code>reverse_each_word</code>.</p>
+        <pre><code class="lang-perl">my $result = revwords $x 
+# or in a pipeline:
+@list |&gt; map revwords |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rgb2hsl">
+        <h3><a class="doc-anchor" href="#doc-rgb2hsl">#</a> <code>rgb2hsl</code></h3>
+        <p><code>rgb2hsl</code> — color operations builtin. Alias for <code>rgb_to_hsl</code>.</p>
+        <pre><code class="lang-perl">my $result = rgb2hsl $x 
+# or in a pipeline:
+@list |&gt; map rgb2hsl |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rgb2hsv">
+        <h3><a class="doc-anchor" href="#doc-rgb2hsv">#</a> <code>rgb2hsv</code></h3>
+        <p><code>rgb2hsv</code> — color operations builtin. Alias for <code>rgb_to_hsv</code>.</p>
+        <pre><code class="lang-perl">my $result = rgb2hsv $x 
+# or in a pipeline:
+@list |&gt; map rgb2hsv |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-rgb-to-hex">
         <h3><a class="doc-anchor" href="#doc-rgb-to-hex">#</a> <code>rgb_to_hex</code></h3>
         <p><code>rgb_to_hex</code> — color / ansi builtin.</p>
@@ -15907,6 +17242,14 @@ p $msg;   # hello from child
 @list |&gt; map rld |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-rld-str">
+        <h3><a class="doc-anchor" href="#doc-rld-str">#</a> <code>rld_str</code></h3>
+        <p><code>rld_str</code> — matrix operations (uncategorized batch) builtin. Alias for <code>run_length_decode_str</code>.</p>
+        <pre><code class="lang-perl">my $result = rld_str $x 
+# or in a pipeline:
+@list |&gt; map rld_str |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-rle">
         <h3><a class="doc-anchor" href="#doc-rle">#</a> <code>rle</code></h3>
         <p><code>rle</code> — collection more builtin. Alias for <code>run_length_encode</code>.</p>
@@ -15915,12 +17258,28 @@ p $msg;   # hello from child
 @list |&gt; map rle |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-rle-str">
+        <h3><a class="doc-anchor" href="#doc-rle-str">#</a> <code>rle_str</code></h3>
+        <p><code>rle_str</code> — matrix operations (uncategorized batch) builtin. Alias for <code>run_length_encode_str</code>.</p>
+        <pre><code class="lang-perl">my $result = rle_str $x 
+# or in a pipeline:
+@list |&gt; map rle_str |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-rmall">
         <h3><a class="doc-anchor" href="#doc-rmall">#</a> <code>rmall</code></h3>
         <p><code>rmall</code> — extended stdlib builtin. Alias for <code>remove_all_str</code>.</p>
         <pre><code class="lang-perl">my $result = rmall $x 
 # or in a pipeline:
 @list |&gt; map rmall |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rmcons">
+        <h3><a class="doc-anchor" href="#doc-rmcons">#</a> <code>rmcons</code></h3>
+        <p><code>rmcons</code> — string processing (uncategorized batch) builtin. Alias for <code>remove_consonants</code>.</p>
+        <pre><code class="lang-perl">my $result = rmcons $x 
+# or in a pipeline:
+@list |&gt; map rmcons |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-rms">
@@ -15939,12 +17298,36 @@ p $msg;   # hello from child
 @list |&gt; map rmse |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-rmvowel">
+        <h3><a class="doc-anchor" href="#doc-rmvowel">#</a> <code>rmvowel</code></h3>
+        <p><code>rmvowel</code> — string processing (uncategorized batch) builtin. Alias for <code>remove_vowels</code>.</p>
+        <pre><code class="lang-perl">my $result = rmvowel $x 
+# or in a pipeline:
+@list |&gt; map rmvowel |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-rmws">
         <h3><a class="doc-anchor" href="#doc-rmws">#</a> <code>rmws</code></h3>
         <p><code>rmws</code> — extended stdlib builtin. Alias for <code>remove_whitespace</code>.</p>
         <pre><code class="lang-perl">my $result = rmws $x 
 # or in a pipeline:
 @list |&gt; map rmws |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rngcmp">
+        <h3><a class="doc-anchor" href="#doc-rngcmp">#</a> <code>rngcmp</code></h3>
+        <p><code>rngcmp</code> — matrix operations (uncategorized batch) builtin. Alias for <code>range_compress</code>.</p>
+        <pre><code class="lang-perl">my $result = rngcmp $x 
+# or in a pipeline:
+@list |&gt; map rngcmp |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rngexp">
+        <h3><a class="doc-anchor" href="#doc-rngexp">#</a> <code>rngexp</code></h3>
+        <p><code>rngexp</code> — matrix operations (uncategorized batch) builtin. Alias for <code>range_expand</code>.</p>
+        <pre><code class="lang-perl">my $result = rngexp $x 
+# or in a pipeline:
+@list |&gt; map rngexp |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-rnk">
@@ -15961,6 +17344,14 @@ p $msg;   # hello from child
         <pre><code class="lang-perl">my $result = roi $x 
 # or in a pipeline:
 @list |&gt; map roi |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-roman">
+        <h3><a class="doc-anchor" href="#doc-roman">#</a> <code>roman</code></h3>
+        <p><code>roman</code> — roman numerals builtin. Alias for <code>int_to_roman</code>.</p>
+        <pre><code class="lang-perl">my $result = roman $x 
+# or in a pipeline:
+@list |&gt; map roman |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-roman-add">
@@ -15983,6 +17374,14 @@ p $msg;   # hello from child
         <h3><a class="doc-anchor" href="#doc-roman-to-int">#</a> <code>roman_to_int</code></h3>
         <p><code>roman_to_int</code> — roman numerals builtin.</p>
         <pre><code class="lang-perl">my $result = roman_to_int $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-romanlist">
+        <h3><a class="doc-anchor" href="#doc-romanlist">#</a> <code>romanlist</code></h3>
+        <p><code>romanlist</code> — roman numerals builtin. Alias for <code>roman_numeral_list</code>.</p>
+        <pre><code class="lang-perl">my $result = romanlist $x 
+# or in a pipeline:
+@list |&gt; map romanlist |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-rot13">
@@ -16049,12 +17448,28 @@ p $msg;   # hello from child
 @list |&gt; map rpad |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-rpn">
+        <h3><a class="doc-anchor" href="#doc-rpn">#</a> <code>rpn</code></h3>
+        <p><code>rpn</code> — algorithms / puzzles builtin. Alias for <code>eval_rpn</code>.</p>
+        <pre><code class="lang-perl">my $result = rpn $x 
+# or in a pipeline:
+@list |&gt; map rpn |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-rptd">
         <h3><a class="doc-anchor" href="#doc-rptd">#</a> <code>rptd</code></h3>
         <p><code>rptd</code> — algebraic match builtin. Alias for <code>repeatedly</code>.</p>
         <pre><code class="lang-perl">my $result = rptd $x 
 # or in a pipeline:
 @list |&gt; map rptd |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rsamp">
+        <h3><a class="doc-anchor" href="#doc-rsamp">#</a> <code>rsamp</code></h3>
+        <p><code>rsamp</code> — matrix operations (uncategorized batch) builtin. Alias for <code>reservoir_sample</code>.</p>
+        <pre><code class="lang-perl">my $result = rsamp $x 
+# or in a pipeline:
+@list |&gt; map rsamp |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-rst">
@@ -16127,6 +17542,54 @@ p $msg;   # hello from child
         <pre><code class="lang-perl">my $result = runred $x 
 # or in a pipeline:
 @list |&gt; map runred |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-s1">
+        <h3><a class="doc-anchor" href="#doc-s1">#</a> <code>s1</code></h3>
+        <p><code>s1</code> — crypto / encoding builtin. Alias for <code>sha1</code>.</p>
+        <pre><code class="lang-perl">my $result = s1 $x 
+# or in a pipeline:
+@list |&gt; map s1 |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-s224">
+        <h3><a class="doc-anchor" href="#doc-s224">#</a> <code>s224</code></h3>
+        <p><code>s224</code> — crypto / encoding builtin. Alias for <code>sha224</code>.</p>
+        <pre><code class="lang-perl">my $result = s224 $x 
+# or in a pipeline:
+@list |&gt; map s224 |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-s256">
+        <h3><a class="doc-anchor" href="#doc-s256">#</a> <code>s256</code></h3>
+        <p><code>s256</code> — crypto / encoding builtin. Alias for <code>sha256</code>.</p>
+        <pre><code class="lang-perl">my $result = s256 $x 
+# or in a pipeline:
+@list |&gt; map s256 |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-s2c">
+        <h3><a class="doc-anchor" href="#doc-s2c">#</a> <code>s2c</code></h3>
+        <p><code>s2c</code> — string processing (uncategorized batch) builtin. Alias for <code>snake_to_camel</code>.</p>
+        <pre><code class="lang-perl">my $result = s2c $x 
+# or in a pipeline:
+@list |&gt; map s2c |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-s384">
+        <h3><a class="doc-anchor" href="#doc-s384">#</a> <code>s384</code></h3>
+        <p><code>s384</code> — crypto / encoding builtin. Alias for <code>sha384</code>.</p>
+        <pre><code class="lang-perl">my $result = s384 $x 
+# or in a pipeline:
+@list |&gt; map s384 |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-s512">
+        <h3><a class="doc-anchor" href="#doc-s512">#</a> <code>s512</code></h3>
+        <p><code>s512</code> — crypto / encoding builtin. Alias for <code>sha512</code>.</p>
+        <pre><code class="lang-perl">my $result = s512 $x 
+# or in a pipeline:
+@list |&gt; map s512 |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-s-to-m">
@@ -16259,6 +17722,14 @@ p $msg;   # hello from child
         <pre><code class="lang-perl">my $result = script_name $x 
 # or in a pipeline:
 @list |&gt; map script_name |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sdivs">
+        <h3><a class="doc-anchor" href="#doc-sdivs">#</a> <code>sdivs</code></h3>
+        <p><code>sdivs</code> — math / numeric (uncategorized batch) builtin. Alias for <code>sum_divisors</code>.</p>
+        <pre><code class="lang-perl">my $result = sdivs $x 
+# or in a pipeline:
+@list |&gt; map sdivs |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-sdx">
@@ -16535,12 +18006,28 @@ p $msg;   # hello from child
 @list |&gt; map shuffled |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-sierp">
+        <h3><a class="doc-anchor" href="#doc-sierp">#</a> <code>sierp</code></h3>
+        <p><code>sierp</code> — algorithms / puzzles builtin. Alias for <code>sierpinski</code>.</p>
+        <pre><code class="lang-perl">my $result = sierp $x 
+# or in a pipeline:
+@list |&gt; map sierp |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-sierpinski">
         <h3><a class="doc-anchor" href="#doc-sierpinski">#</a> <code>sierpinski</code></h3>
         <p><code>sierpinski</code> — algorithms / puzzles builtin.</p>
         <pre><code class="lang-perl">my $result = sierpinski $x 
 # or in a pipeline:
 @list |&gt; map sierpinski |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sieve">
+        <h3><a class="doc-anchor" href="#doc-sieve">#</a> <code>sieve</code></h3>
+        <p><code>sieve</code> — number theory / primes builtin. Alias for <code>primes_up_to</code>.</p>
+        <pre><code class="lang-perl">my $result = sieve $x 
+# or in a pipeline:
+@list |&gt; map sieve |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-sigmoid">
@@ -16629,6 +18116,14 @@ p $msg;   # hello from child
         <pre><code class="lang-perl">p size &quot;Cargo.toml&quot;;                   # 2013
 f |&gt; map +{ $_ =&gt; size } |&gt; tj |&gt; p;   # [{name =&gt; bytes}, ...]
 f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-skew">
+        <h3><a class="doc-anchor" href="#doc-skew">#</a> <code>skew</code></h3>
+        <p><code>skew</code> — math / numeric (uncategorized batch) builtin. Alias for <code>skewness</code>.</p>
+        <pre><code class="lang-perl">my $result = skew $x 
+# or in a pipeline:
+@list |&gt; map skew |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-skewness">
@@ -16917,6 +18412,14 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
 @list |&gt; map sorted_nums |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-sortw">
+        <h3><a class="doc-anchor" href="#doc-sortw">#</a> <code>sortw</code></h3>
+        <p><code>sortw</code> — string processing (uncategorized batch) builtin. Alias for <code>sort_words</code>.</p>
+        <pre><code class="lang-perl">my $result = sortw $x 
+# or in a pipeline:
+@list |&gt; map sortw |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-soundex">
         <h3><a class="doc-anchor" href="#doc-soundex">#</a> <code>soundex</code></h3>
         <p><code>soundex</code> — extended stdlib builtin.</p>
@@ -17005,6 +18508,22 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
 @list |&gt; map sphere_volume |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-sphsurf">
+        <h3><a class="doc-anchor" href="#doc-sphsurf">#</a> <code>sphsurf</code></h3>
+        <p><code>sphsurf</code> — geometry / physics builtin. Alias for <code>sphere_surface</code>.</p>
+        <pre><code class="lang-perl">my $result = sphsurf $x 
+# or in a pipeline:
+@list |&gt; map sphsurf |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sphvol">
+        <h3><a class="doc-anchor" href="#doc-sphvol">#</a> <code>sphvol</code></h3>
+        <p><code>sphvol</code> — geometry / physics builtin. Alias for <code>sphere_volume</code>.</p>
+        <pre><code class="lang-perl">my $result = sphvol $x 
+# or in a pipeline:
+@list |&gt; map sphvol |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-split-at">
         <h3><a class="doc-anchor" href="#doc-split-at">#</a> <code>split_at</code></h3>
         <p><code>split_at</code> — algebraic match builtin.</p>
@@ -17059,6 +18578,14 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
         <pre><code class="lang-perl">my $result = spw $x 
 # or in a pipeline:
 @list |&gt; map spw |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sql">
+        <h3><a class="doc-anchor" href="#doc-sql">#</a> <code>sql</code></h3>
+        <p><code>sql</code> — data / network builtin. Alias for <code>sqlite</code>.</p>
+        <pre><code class="lang-perl">my $result = sql $x 
+# or in a pipeline:
+@list |&gt; map sql |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-sqr">
@@ -17189,6 +18716,14 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
 @list |&gt; map starts_with_any |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-stderr-stat">
+        <h3><a class="doc-anchor" href="#doc-stderr-stat">#</a> <code>stderr_stat</code></h3>
+        <p><code>stderr_stat</code> — math / numeric (uncategorized batch) builtin. Alias for <code>standard_error</code>.</p>
+        <pre><code class="lang-perl">my $result = stderr_stat $x 
+# or in a pipeline:
+@list |&gt; map stderr_stat |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-step">
         <h3><a class="doc-anchor" href="#doc-step">#</a> <code>step</code></h3>
         <p><code>step</code> — python/ruby stdlib builtin.</p>
@@ -17201,6 +18736,14 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
         <h3><a class="doc-anchor" href="#doc-stone-to-kg">#</a> <code>stone_to_kg</code></h3>
         <p><code>stone_to_kg</code> — unit conversions builtin.</p>
         <pre><code class="lang-perl">my $result = stone_to_kg $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-strdist">
+        <h3><a class="doc-anchor" href="#doc-strdist">#</a> <code>strdist</code></h3>
+        <p><code>strdist</code> — string processing (uncategorized batch) builtin. Alias for <code>string_distance</code>.</p>
+        <pre><code class="lang-perl">my $result = strdist $x 
+# or in a pipeline:
+@list |&gt; map strdist |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-string-count">
@@ -17279,6 +18822,30 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
         <pre><code class="lang-perl">my $result = strip_suffix $x 
 # or in a pipeline:
 @list |&gt; map strip_suffix |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-strmul">
+        <h3><a class="doc-anchor" href="#doc-strmul">#</a> <code>strmul</code></h3>
+        <p><code>strmul</code> — string processing (uncategorized batch) builtin. Alias for <code>string_multiply</code>.</p>
+        <pre><code class="lang-perl">my $result = strmul $x 
+# or in a pipeline:
+@list |&gt; map strmul |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sub-script">
+        <h3><a class="doc-anchor" href="#doc-sub-script">#</a> <code>sub_script</code></h3>
+        <p><code>sub_script</code> — encoding / phonetics builtin. Alias for <code>subscript</code>.</p>
+        <pre><code class="lang-perl">my $result = sub_script $x 
+# or in a pipeline:
+@list |&gt; map sub_script |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-subfact">
+        <h3><a class="doc-anchor" href="#doc-subfact">#</a> <code>subfact</code></h3>
+        <p><code>subfact</code> — math / numeric (uncategorized batch) builtin. Alias for <code>subfactorial</code>.</p>
+        <pre><code class="lang-perl">my $result = subfact $x 
+# or in a pipeline:
+@list |&gt; map subfact |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-subfactorial">
@@ -17391,6 +18958,14 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
         <pre><code class="lang-perl">my $result = sumsq $x 
 # or in a pipeline:
 @list |&gt; map sumsq |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sup">
+        <h3><a class="doc-anchor" href="#doc-sup">#</a> <code>sup</code></h3>
+        <p><code>sup</code> — encoding / phonetics builtin. Alias for <code>superscript</code>.</p>
+        <pre><code class="lang-perl">my $result = sup $x 
+# or in a pipeline:
+@list |&gt; map sup |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-superscript">
@@ -17567,6 +19142,22 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p;    # files larger than 1 KiB
         <pre><code class="lang-perl">my $result = tax_amount $x 
 # or in a pipeline:
 @list |&gt; map tax_amount |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-td">
+        <h3><a class="doc-anchor" href="#doc-td">#</a> <code>td</code></h3>
+        <p><code>td</code> — serialization (perlrs-only encoders) builtin. Alias for <code>toml_decode</code>.</p>
+        <pre><code class="lang-perl">my $result = td $x 
+# or in a pipeline:
+@list |&gt; map td |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-te">
+        <h3><a class="doc-anchor" href="#doc-te">#</a> <code>te</code></h3>
+        <p><code>te</code> — serialization (perlrs-only encoders) builtin. Alias for <code>toml_encode</code>.</p>
+        <pre><code class="lang-perl">my $result = te $x 
+# or in a pipeline:
+@list |&gt; map te |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-tee-iter">
@@ -17926,6 +19517,14 @@ p $allowed-&gt;contains(&quot;foo&quot;)
 @list |&gt; map totient_sum |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-totsum">
+        <h3><a class="doc-anchor" href="#doc-totsum">#</a> <code>totsum</code></h3>
+        <p><code>totsum</code> — math / numeric (uncategorized batch) builtin. Alias for <code>totient_sum</code>.</p>
+        <pre><code class="lang-perl">my $result = totsum $x 
+# or in a pipeline:
+@list |&gt; map totsum |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-touch">
         <h3><a class="doc-anchor" href="#doc-touch">#</a> <code>touch</code></h3>
         <p><code>touch</code> — filesystem extensions builtin.</p>
@@ -18006,12 +19605,28 @@ p $allowed-&gt;contains(&quot;foo&quot;)
 @list |&gt; map triangular_seq |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-trib">
+        <h3><a class="doc-anchor" href="#doc-trib">#</a> <code>trib</code></h3>
+        <p><code>trib</code> — math / numeric (uncategorized batch) builtin. Alias for <code>tribonacci</code>.</p>
+        <pre><code class="lang-perl">my $result = trib $x 
+# or in a pipeline:
+@list |&gt; map trib |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-tribonacci">
         <h3><a class="doc-anchor" href="#doc-tribonacci">#</a> <code>tribonacci</code></h3>
         <p><code>tribonacci</code> — math / numeric (uncategorized batch) builtin.</p>
         <pre><code class="lang-perl">my $result = tribonacci $x 
 # or in a pipeline:
 @list |&gt; map tribonacci |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-trigram">
+        <h3><a class="doc-anchor" href="#doc-trigram">#</a> <code>trigram</code></h3>
+        <p><code>trigram</code> — string processing (uncategorized batch) builtin. Alias for <code>trigrams</code>.</p>
+        <pre><code class="lang-perl">my $result = trigram $x 
+# or in a pipeline:
+@list |&gt; map trigram |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-trigrams">
@@ -18052,6 +19667,14 @@ p $allowed-&gt;contains(&quot;foo&quot;)
         <pre><code class="lang-perl">my $result = trimmed_mean $x 
 # or in a pipeline:
 @list |&gt; map trimmed_mean |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-trinum">
+        <h3><a class="doc-anchor" href="#doc-trinum">#</a> <code>trinum</code></h3>
+        <p><code>trinum</code> — number theory / primes builtin. Alias for <code>triangular_number</code>.</p>
+        <pre><code class="lang-perl">my $result = trinum $x 
+# or in a pipeline:
+@list |&gt; map trinum |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-triple">
@@ -18134,6 +19757,22 @@ p $allowed-&gt;contains(&quot;foo&quot;)
 @list |&gt; map tsrt |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-tstr">
+        <h3><a class="doc-anchor" href="#doc-tstr">#</a> <code>tstr</code></h3>
+        <p><code>tstr</code> — misc / utility builtin. Alias for <code>to_string_val</code>.</p>
+        <pre><code class="lang-perl">my $result = tstr $x 
+# or in a pipeline:
+@list |&gt; map tstr |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ttable">
+        <h3><a class="doc-anchor" href="#doc-ttable">#</a> <code>ttable</code></h3>
+        <p><code>ttable</code> — algorithms / puzzles builtin. Alias for <code>truth_table</code>.</p>
+        <pre><code class="lang-perl">my $result = ttable $x 
+# or in a pipeline:
+@list |&gt; map ttable |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-tvals">
         <h3><a class="doc-anchor" href="#doc-tvals">#</a> <code>tvals</code></h3>
         <p><code>tvals</code> — python/ruby stdlib builtin. Alias for <code>transform_values</code>.</p>
@@ -18148,6 +19787,14 @@ p $allowed-&gt;contains(&quot;foo&quot;)
         <pre><code class="lang-perl">my $result = twin_primes $x 
 # or in a pipeline:
 @list |&gt; map twin_primes |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-twinp">
+        <h3><a class="doc-anchor" href="#doc-twinp">#</a> <code>twinp</code></h3>
+        <p><code>twinp</code> — number theory / primes builtin. Alias for <code>twin_primes</code>.</p>
+        <pre><code class="lang-perl">my $result = twinp $x 
+# or in a pipeline:
+@list |&gt; map twinp |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-txaft">
@@ -18206,6 +19853,14 @@ p $allowed-&gt;contains(&quot;foo&quot;)
 @list |&gt; map type_of |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-typeof">
+        <h3><a class="doc-anchor" href="#doc-typeof">#</a> <code>typeof</code></h3>
+        <p><code>typeof</code> — misc / utility builtin. Alias for <code>type_of</code>.</p>
+        <pre><code class="lang-perl">my $result = typeof $x 
+# or in a pipeline:
+@list |&gt; map typeof |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-tz">
         <h3><a class="doc-anchor" href="#doc-tz">#</a> <code>tz</code></h3>
         <p><code>tz</code> — base conversion builtin. Alias for <code>trailing_zeros</code>.</p>
@@ -18220,6 +19875,30 @@ p $allowed-&gt;contains(&quot;foo&quot;)
         <pre><code class="lang-perl">my $result = ubound $x 
 # or in a pipeline:
 @list |&gt; map ubound |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ud">
+        <h3><a class="doc-anchor" href="#doc-ud">#</a> <code>ud</code></h3>
+        <p><code>ud</code> — crypto / encoding builtin. Alias for <code>url_decode</code>.</p>
+        <pre><code class="lang-perl">my $result = ud $x 
+# or in a pipeline:
+@list |&gt; map ud |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ue">
+        <h3><a class="doc-anchor" href="#doc-ue">#</a> <code>ue</code></h3>
+        <p><code>ue</code> — crypto / encoding builtin. Alias for <code>url_encode</code>.</p>
+        <pre><code class="lang-perl">my $result = ue $x 
+# or in a pipeline:
+@list |&gt; map ue |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ugz">
+        <h3><a class="doc-anchor" href="#doc-ugz">#</a> <code>ugz</code></h3>
+        <p><code>ugz</code> — crypto / encoding builtin. Alias for <code>gunzip</code>.</p>
+        <pre><code class="lang-perl">my $result = ugz $x 
+# or in a pipeline:
+@list |&gt; map ugz |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-uid">
@@ -18308,6 +19987,14 @@ p $allowed-&gt;contains(&quot;foo&quot;)
         <pre><code class="lang-perl">my $result = unique_words $x 
 # or in a pipeline:
 @list |&gt; map unique_words |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-uniqw">
+        <h3><a class="doc-anchor" href="#doc-uniqw">#</a> <code>uniqw</code></h3>
+        <p><code>uniqw</code> — string processing (uncategorized batch) builtin. Alias for <code>unique_words</code>.</p>
+        <pre><code class="lang-perl">my $result = uniqw $x 
+# or in a pipeline:
+@list |&gt; map uniqw |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-unit-vec">
@@ -18540,6 +20227,14 @@ p $allowed-&gt;contains(&quot;foo&quot;)
 @list |&gt; map username |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-utc">
+        <h3><a class="doc-anchor" href="#doc-utc">#</a> <code>utc</code></h3>
+        <p><code>utc</code> — date / time builtin. Alias for <code>datetime_utc</code>.</p>
+        <pre><code class="lang-perl">my $result = utc $x 
+# or in a pipeline:
+@list |&gt; map utc |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-uuid-v4">
         <h3><a class="doc-anchor" href="#doc-uuid-v4">#</a> <code>uuid_v4</code></h3>
         <p><code>uuid_v4</code> — id helpers builtin.</p>
@@ -18554,6 +20249,14 @@ p $allowed-&gt;contains(&quot;foo&quot;)
         <pre><code class="lang-perl">my $result = uzp $x 
 # or in a pipeline:
 @list |&gt; map uzp |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-uzst">
+        <h3><a class="doc-anchor" href="#doc-uzst">#</a> <code>uzst</code></h3>
+        <p><code>uzst</code> — crypto / encoding builtin. Alias for <code>zstd_decode</code>.</p>
+        <pre><code class="lang-perl">my $result = uzst $x 
+# or in a pipeline:
+@list |&gt; map uzst |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-values-at">
@@ -18722,6 +20425,23 @@ p $allowed-&gt;contains(&quot;foo&quot;)
 @list |&gt; map wfrm |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-wh">
+        <h3><a class="doc-anchor" href="#doc-wh">#</a> <code>wh</code></h3>
+        <p><code>wh</code> — filesystem extensions builtin. Alias for <code>which</code>.</p>
+        <pre><code class="lang-perl">my $result = wh $x 
+# or in a pipeline:
+@list |&gt; map wh |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-wha">
+        <h3><a class="doc-anchor" href="#doc-wha">#</a> <code>wha</code></h3>
+        <p>Return a list of all absolute paths matching the given command name across every directory in <code>PATH</code>, not just the first match. The short alias <code>wha</code> keeps things concise. This is useful for detecting shadowed executables or auditing which versions of a tool are installed.</p>
+        <pre><code class="lang-perl">my @all = which_all(&quot;python3&quot;)
+@all |&gt; e p;                # /usr/local/bin/python3
+                             # /usr/bin/python3
+p scalar wha(&quot;perl&quot;);        # number of perls on PATH
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-when-false">
         <h3><a class="doc-anchor" href="#doc-when-false">#</a> <code>when_false</code></h3>
         <p><code>when_false</code> — functional combinators builtin.</p>
@@ -18736,15 +20456,6 @@ p $allowed-&gt;contains(&quot;foo&quot;)
         <pre><code class="lang-perl">my $result = when_true $x 
 # or in a pipeline:
 @list |&gt; map when_true |&gt; p
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-which-all">
-        <h3><a class="doc-anchor" href="#doc-which-all">#</a> <code>which_all</code></h3>
-        <p>Return a list of all absolute paths matching the given command name across every directory in <code>PATH</code>, not just the first match. The short alias <code>wha</code> keeps things concise. This is useful for detecting shadowed executables or auditing which versions of a tool are installed.</p>
-        <pre><code class="lang-perl">my @all = which_all(&quot;python3&quot;)
-@all |&gt; e p;                # /usr/local/bin/python3
-                             # /usr/bin/python3
-p scalar wha(&quot;perl&quot;);        # number of perls on PATH
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-wincirc">
@@ -18787,6 +20498,14 @@ p scalar wha(&quot;perl&quot;);        # number of perls on PATH
 @list |&gt; map winn |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-winsor">
+        <h3><a class="doc-anchor" href="#doc-winsor">#</a> <code>winsor</code></h3>
+        <p><code>winsor</code> — math / numeric (uncategorized batch) builtin. Alias for <code>winsorize</code>.</p>
+        <pre><code class="lang-perl">my $result = winsor $x 
+# or in a pipeline:
+@list |&gt; map winsor |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-winsorize">
         <h3><a class="doc-anchor" href="#doc-winsorize">#</a> <code>winsorize</code></h3>
         <p><code>winsorize</code> — math / numeric (uncategorized batch) builtin.</p>
@@ -18811,6 +20530,14 @@ p scalar wha(&quot;perl&quot;);        # number of perls on PATH
 @list |&gt; map without_nth |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-wmean">
+        <h3><a class="doc-anchor" href="#doc-wmean">#</a> <code>wmean</code></h3>
+        <p><code>wmean</code> — math / numeric (uncategorized batch) builtin. Alias for <code>weighted_mean</code>.</p>
+        <pre><code class="lang-perl">my $result = wmean $x 
+# or in a pipeline:
+@list |&gt; map wmean |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-word-count">
         <h3><a class="doc-anchor" href="#doc-word-count">#</a> <code>word_count</code></h3>
         <p><code>word_count</code> — trivial string ops builtin.</p>
@@ -18833,6 +20560,14 @@ p scalar wha(&quot;perl&quot;);        # number of perls on PATH
         <pre><code class="lang-perl">my $result = word_wrap_text $x 
 # or in a pipeline:
 @list |&gt; map word_wrap_text |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-wordfreq">
+        <h3><a class="doc-anchor" href="#doc-wordfreq">#</a> <code>wordfreq</code></h3>
+        <p><code>wordfreq</code> — string processing (uncategorized batch) builtin. Alias for <code>word_frequencies</code>.</p>
+        <pre><code class="lang-perl">my $result = wordfreq $x 
+# or in a pipeline:
+@list |&gt; map wordfreq |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-words-from">
@@ -18915,6 +20650,30 @@ p scalar wha(&quot;perl&quot;);        # number of perls on PATH
 @list |&gt; map wwrap |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-xd">
+        <h3><a class="doc-anchor" href="#doc-xd">#</a> <code>xd</code></h3>
+        <p><code>xd</code> — serialization (perlrs-only encoders) builtin. Alias for <code>xml_decode</code>.</p>
+        <pre><code class="lang-perl">my $result = xd $x 
+# or in a pipeline:
+@list |&gt; map xd |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-xe">
+        <h3><a class="doc-anchor" href="#doc-xe">#</a> <code>xe</code></h3>
+        <p><code>xe</code> — serialization (perlrs-only encoders) builtin. Alias for <code>xml_encode</code>.</p>
+        <pre><code class="lang-perl">my $result = xe $x 
+# or in a pipeline:
+@list |&gt; map xe |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-xentropy">
+        <h3><a class="doc-anchor" href="#doc-xentropy">#</a> <code>xentropy</code></h3>
+        <p><code>xentropy</code> — math / numeric (uncategorized batch) builtin. Alias for <code>cross_entropy</code>.</p>
+        <pre><code class="lang-perl">my $result = xentropy $x 
+# or in a pipeline:
+@list |&gt; map xentropy |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-xor-bool">
         <h3><a class="doc-anchor" href="#doc-xor-bool">#</a> <code>xor_bool</code></h3>
         <p><code>xor_bool</code> — boolean combinators builtin.</p>
@@ -18935,6 +20694,22 @@ p scalar wha(&quot;perl&quot;);        # number of perls on PATH
         <h3><a class="doc-anchor" href="#doc-yards-to-m">#</a> <code>yards_to_m</code></h3>
         <p><code>yards_to_m</code> — unit conversions builtin.</p>
         <pre><code class="lang-perl">my $result = yards_to_m $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-yd">
+        <h3><a class="doc-anchor" href="#doc-yd">#</a> <code>yd</code></h3>
+        <p><code>yd</code> — serialization (perlrs-only encoders) builtin. Alias for <code>yaml_decode</code>.</p>
+        <pre><code class="lang-perl">my $result = yd $x 
+# or in a pipeline:
+@list |&gt; map yd |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ye">
+        <h3><a class="doc-anchor" href="#doc-ye">#</a> <code>ye</code></h3>
+        <p><code>ye</code> — serialization (perlrs-only encoders) builtin. Alias for <code>yaml_encode</code>.</p>
+        <pre><code class="lang-perl">my $result = ye $x 
+# or in a pipeline:
+@list |&gt; map ye |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-yesterday">
@@ -18961,6 +20736,14 @@ p scalar wha(&quot;perl&quot;);        # number of perls on PATH
 @list |&gt; map zall |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-zcross">
+        <h3><a class="doc-anchor" href="#doc-zcross">#</a> <code>zcross</code></h3>
+        <p><code>zcross</code> — matrix operations (uncategorized batch) builtin. Alias for <code>zero_crossings</code>.</p>
+        <pre><code class="lang-perl">my $result = zcross $x 
+# or in a pipeline:
+@list |&gt; map zcross |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-zero">
         <h3><a class="doc-anchor" href="#doc-zero">#</a> <code>zero</code></h3>
         <p><code>zero</code> — trivial numeric / predicate builtins builtin.</p>
@@ -18983,6 +20766,14 @@ p scalar wha(&quot;perl&quot;);        # number of perls on PATH
         <pre><code class="lang-perl">my $result = zeros $x 
 # or in a pipeline:
 @list |&gt; map zeros |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-zeros-mat">
+        <h3><a class="doc-anchor" href="#doc-zeros-mat">#</a> <code>zeros_mat</code></h3>
+        <p><code>zeros_mat</code> — matrix / linear algebra builtin. Alias for <code>zeros_matrix</code>.</p>
+        <pre><code class="lang-perl">my $result = zeros_mat $x 
+# or in a pipeline:
+@list |&gt; map zeros_mat |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-zeros-matrix">
@@ -19055,6 +20846,14 @@ p scalar wha(&quot;perl&quot;);        # number of perls on PATH
         <pre><code class="lang-perl">my $result = zscore $x 
 # or in a pipeline:
 @list |&gt; map zscore |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-zst">
+        <h3><a class="doc-anchor" href="#doc-zst">#</a> <code>zst</code></h3>
+        <p><code>zst</code> — crypto / encoding builtin. Alias for <code>zstd</code>.</p>
+        <pre><code class="lang-perl">my $result = zst $x 
+# or in a pipeline:
+@list |&gt; map zst |&gt; p
 </code></pre>
       </article>
     </section>
