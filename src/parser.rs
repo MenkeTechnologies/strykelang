@@ -1959,7 +1959,11 @@ impl Parser {
             "fc" => ExprKind::Fc(Box::new(arg)),
             "chomp" => ExprKind::Chomp(Box::new(arg)),
             "chop" => ExprKind::Chop(Box::new(arg)),
-            "length" | "len" => ExprKind::Length(Box::new(arg)),
+            "length" => ExprKind::Length(Box::new(arg)),
+            "len" | "cnt" => ExprKind::FuncCall {
+                name: "count".to_string(),
+                args: vec![arg],
+            },
             "quotemeta" | "qm" => ExprKind::FuncCall {
                 name: "quotemeta".to_string(),
                 args: vec![arg],
