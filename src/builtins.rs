@@ -417,6 +417,11 @@ pub(crate) fn try_builtin(
         "to_html" | "th" => Some(builtin_to_html(args)),
         "to_markdown" | "to_md" | "tmd" => Some(builtin_to_markdown(args)),
         "xopen" | "xo" => Some(builtin_xopen(interp, args, line)),
+        "clip" | "clipboard" | "pbcopy" => Some(builtin_clip(interp, args, line)),
+        "paste" | "pbpaste" => Some(builtin_paste(line)),
+        "to_table" | "table" | "tbl" => Some(builtin_to_table(args)),
+        "sparkline" | "spark" => Some(builtin_sparkline(args)),
+        "bar_chart" | "bars" => Some(builtin_bar_chart(interp, args)),
         "grep_v" => Some(builtin_grep_v(args, line)),
         "select_keys" => Some(builtin_select_keys(args)),
         "pluck" => Some(builtin_pluck(args)),
@@ -631,7 +636,7 @@ pub(crate) fn try_builtin(
         "strip_ansi" => Some(builtin_strip_ansi(interp, args)),
         // Raw ANSI escape codes for string interpolation
         "red" | "green" | "yellow" | "blue" | "magenta" | "purple" | "cyan" | "white" | "black"
-        | "bold" | "dim" | "italic" | "underline" | "strikethrough" | "reset" | "blink"
+        | "bold" | "dim" | "italic" | "underline" | "strikethrough" | "rst" | "blink"
         | "rapid_blink" | "reverse" | "hidden" | "overline" | "gray" | "grey" | "bright_red"
         | "bright_green" | "bright_yellow" | "bright_blue" | "bright_magenta" | "bright_cyan"
         | "bright_white" | "bg_red" | "bg_green" | "bg_yellow" | "bg_blue" | "bg_magenta"
@@ -3081,6 +3086,259 @@ fn builtin_xopen(interp: &Interpreter, args: &[PerlValue], line: usize) -> PerlR
     Ok(PerlValue::string(path))
 }
 
+/// `clip VALUE` — copy text to system clipboard. Returns the text unchanged
+/// for pipeline chaining. Uses `pbcopy` on macOS, `xclip`/`xsel` on Linux.
+fn builtin_clip(interp: &Interpreter, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    use std::io::Write as _;
+    use std::process::{Command, Stdio};
+    let text = first_arg_or_topic(interp, args).to_string();
+    #[cfg(target_os = "macos")]
+    let (cmd, extra): (&str, &[&str]) = ("pbcopy", &[]);
+    #[cfg(target_os = "linux")]
+    let (cmd, extra): (&str, &[&str]) = if Command::new("xclip").arg("--version").output().is_ok() {
+        ("xclip", &["-selection", "clipboard"])
+    } else {
+        ("xsel", &["--clipboard", "--input"])
+    };
+    #[cfg(target_os = "windows")]
+    let (cmd, extra): (&str, &[&str]) = ("clip", &[]);
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    let (cmd, extra): (&str, &[&str]) = ("xclip", &["-selection", "clipboard"]);
+    let mut child = Command::new(cmd)
+        .args(extra)
+        .stdin(Stdio::piped())
+        .spawn()
+        .map_err(|e| PerlError::runtime(format!("clip: {}: {}", cmd, e), line))?;
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(text.as_bytes());
+    }
+    let _ = child.wait();
+    Ok(PerlValue::string(text))
+}
+
+/// `paste` — read text from system clipboard.
+fn builtin_paste(line: usize) -> PerlResult<PerlValue> {
+    use std::process::Command;
+    #[cfg(target_os = "macos")]
+    let (cmd, extra): (&str, &[&str]) = ("pbpaste", &[]);
+    #[cfg(target_os = "linux")]
+    let (cmd, extra): (&str, &[&str]) = if Command::new("xclip").arg("--version").output().is_ok() {
+        ("xclip", &["-selection", "clipboard", "-o"])
+    } else {
+        ("xsel", &["--clipboard", "--output"])
+    };
+    #[cfg(target_os = "windows")]
+    let (cmd, extra): (&str, &[&str]) = ("powershell", &["-command", "Get-Clipboard"]);
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    let (cmd, extra): (&str, &[&str]) = ("xclip", &["-selection", "clipboard", "-o"]);
+    let output = Command::new(cmd)
+        .args(extra)
+        .output()
+        .map_err(|e| PerlError::runtime(format!("paste: {}: {}", cmd, e), line))?;
+    Ok(PerlValue::string(
+        String::from_utf8_lossy(&output.stdout).into_owned(),
+    ))
+}
+
+/// `to_table VALUE` — plain-text column-aligned table with box-drawing borders.
+fn builtin_to_table(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let val = normalize_serialize_root(args);
+    if val.is_undef() {
+        return Ok(PerlValue::string(String::new()));
+    }
+    if let Some(ar) = val.as_array_ref() {
+        let guard = ar.read();
+        if !guard.is_empty() && guard.iter().all(|v| v.as_hash_ref().is_some()) {
+            let mut headers: Vec<String> = Vec::new();
+            let mut seen = std::collections::HashSet::new();
+            for row in guard.iter() {
+                if let Some(rh) = row.as_hash_ref() {
+                    for k in rh.read().keys() {
+                        if seen.insert(k.clone()) {
+                            headers.push(k.clone());
+                        }
+                    }
+                }
+            }
+            let mut widths: Vec<usize> = headers.iter().map(|h| h.len()).collect();
+            let mut rows_str: Vec<Vec<String>> = Vec::new();
+            for row in guard.iter() {
+                let mut cells = Vec::new();
+                if let Some(rh) = row.as_hash_ref() {
+                    let rg = rh.read();
+                    for (i, h) in headers.iter().enumerate() {
+                        let cell = rg.get(h).map(|v| v.to_string()).unwrap_or_default();
+                        if cell.len() > widths[i] {
+                            widths[i] = cell.len();
+                        }
+                        cells.push(cell);
+                    }
+                }
+                rows_str.push(cells);
+            }
+            return Ok(PerlValue::string(table_render(
+                &headers, &rows_str, &widths,
+            )));
+        }
+        // Plain array → numbered rows
+        let idx_w = guard.len().to_string().len().max(1);
+        let val_w = guard
+            .iter()
+            .map(|v| v.to_string().len())
+            .max()
+            .unwrap_or(0)
+            .max(5);
+        let headers = vec!["#".to_string(), "value".to_string()];
+        let rows: Vec<Vec<String>> = guard
+            .iter()
+            .enumerate()
+            .map(|(i, v)| vec![i.to_string(), v.to_string()])
+            .collect();
+        return Ok(PerlValue::string(table_render(
+            &headers,
+            &rows,
+            &[idx_w, val_w],
+        )));
+    }
+    if let Some(hr) = val.as_hash_ref() {
+        let guard = hr.read();
+        let key_w = guard.keys().map(|k| k.len()).max().unwrap_or(3).max(3);
+        let val_w = guard
+            .values()
+            .map(|v| v.to_string().len())
+            .max()
+            .unwrap_or(5)
+            .max(5);
+        let headers = vec!["key".to_string(), "value".to_string()];
+        let rows: Vec<Vec<String>> = guard
+            .iter()
+            .map(|(k, v)| vec![k.clone(), v.to_string()])
+            .collect();
+        return Ok(PerlValue::string(table_render(
+            &headers,
+            &rows,
+            &[key_w, val_w],
+        )));
+    }
+    Ok(PerlValue::string(val.to_string()))
+}
+
+fn table_render(headers: &[String], rows: &[Vec<String>], widths: &[usize]) -> String {
+    let mut buf = String::new();
+    let sep: String = widths
+        .iter()
+        .map(|w| "─".repeat(w + 2))
+        .collect::<Vec<_>>()
+        .join("┼");
+    let top: String = widths
+        .iter()
+        .map(|w| "─".repeat(w + 2))
+        .collect::<Vec<_>>()
+        .join("┬");
+    let bot: String = widths
+        .iter()
+        .map(|w| "─".repeat(w + 2))
+        .collect::<Vec<_>>()
+        .join("┴");
+    buf.push_str(&format!("┌{}┐\n", top));
+    let hdr: String = headers
+        .iter()
+        .zip(widths)
+        .map(|(h, w)| format!(" {:w$} ", h, w = w))
+        .collect::<Vec<_>>()
+        .join("│");
+    buf.push_str(&format!("│{}│\n", hdr));
+    buf.push_str(&format!("├{}┤\n", sep));
+    for row in rows {
+        let cells: String = row
+            .iter()
+            .zip(widths)
+            .map(|(c, w)| format!(" {:w$} ", c, w = w))
+            .collect::<Vec<_>>()
+            .join("│");
+        buf.push_str(&format!("│{}│\n", cells));
+    }
+    buf.push_str(&format!("└{}┘\n", bot));
+    buf
+}
+
+/// `sparkline LIST` — render numbers as a Unicode sparkline.
+/// `(3,7,1,9,4) |> spark` → `▃▆▁█▄`
+fn builtin_sparkline(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    const TICKS: &[char] = &['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+    let vals = normalize_serialize_root(args);
+    let nums: Vec<f64> = if let Some(ar) = vals.as_array_ref() {
+        ar.read().iter().map(|v| v.to_number()).collect()
+    } else {
+        vec![vals.to_number()]
+    };
+    if nums.is_empty() {
+        return Ok(PerlValue::string(String::new()));
+    }
+    let min = nums.iter().cloned().fold(f64::INFINITY, f64::min);
+    let max = nums.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let range = max - min;
+    let s: String = nums
+        .iter()
+        .map(|&v| {
+            let idx = if range == 0.0 {
+                3
+            } else {
+                (((v - min) / range * 7.0).round() as usize).min(7)
+            };
+            TICKS[idx]
+        })
+        .collect();
+    Ok(PerlValue::string(s))
+}
+
+/// `bar_chart HASHREF` — horizontal bar chart with colored bars.
+fn builtin_bar_chart(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let val = first_arg_or_topic(interp, args);
+    let hr = match val.as_hash_ref() {
+        Some(h) => h,
+        None => {
+            let val2 = normalize_serialize_root(args);
+            match val2.as_hash_ref() {
+                Some(h) => h,
+                None => return Ok(PerlValue::string(String::new())),
+            }
+        }
+    };
+    let guard = hr.read();
+    if guard.is_empty() {
+        return Ok(PerlValue::string(String::new()));
+    }
+    let label_w = guard.keys().map(|k| k.len()).max().unwrap_or(0);
+    let max_val = guard
+        .values()
+        .map(|v| v.to_number())
+        .fold(0.0_f64, f64::max);
+    let bar_max = 40usize;
+    let colors = [
+        "\x1b[36m", "\x1b[32m", "\x1b[33m", "\x1b[35m", "\x1b[34m", "\x1b[31m",
+    ];
+    let mut buf = String::new();
+    for (i, (k, v)) in guard.iter().enumerate() {
+        let n = v.to_number();
+        let bar_len = if max_val > 0.0 {
+            ((n / max_val) * bar_max as f64).round() as usize
+        } else {
+            0
+        };
+        let color = colors[i % colors.len()];
+        buf.push_str(&format!(
+            " {:>w$} │ {}{}\x1b[0m {}\n",
+            k,
+            color,
+            "█".repeat(bar_len),
+            v.to_string(),
+            w = label_w
+        ));
+    }
+    Ok(PerlValue::string(buf))
+}
+
 fn builtin_pager(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
     use std::io::Write as _;
     use std::process::{Command, Stdio};
@@ -5236,7 +5494,7 @@ fn builtin_hex_to_rgb(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
 fn builtin_ansi_code(name: &str) -> PerlValue {
     let code = match name {
         // reset
-        "reset" => "\x1b[0m",
+        "rst" => "\x1b[0m",
         // styles
         "bold" => "\x1b[1m",
         "dim" => "\x1b[2m",
