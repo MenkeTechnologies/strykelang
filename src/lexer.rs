@@ -1432,8 +1432,10 @@ impl Lexer {
                                             }
                                             Some(c) => pattern.push(c),
                                             None => {
-                                                terminated = false;
-                                                break;
+                                                return Err(self.syntax_err(
+                                                    "Search pattern not terminated",
+                                                    saved_line,
+                                                ));
                                             }
                                         }
                                     }
@@ -1443,7 +1445,7 @@ impl Lexer {
                                         self.last_was_term = true;
                                         return Ok(Token::Regex(pattern, flags, delim));
                                     }
-                                    // Backtrack: treat `m` as a plain identifier
+                                    // Newline before closing / — backtrack and treat `m` as identifier
                                     self.pos = saved_pos;
                                     self.line = saved_line;
                                 }

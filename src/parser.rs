@@ -10957,6 +10957,73 @@ impl Parser {
             | "max_float" | "min_float" | "noop_val" | "nop" | "pass" | "pred" | "succ"
             | "tap_debug" | "to_bool" | "to_float" | "to_int" | "to_string" | "void"
             | "range_exclusive" | "range_inclusive"
+            // ── math / numeric (uncategorized batch) ────────────────────────────
+            | "aliquot_sum" | "autocorrelation" | "bell_number" | "cagr" | "coeff_of_variation"
+            | "collatz_length" | "collatz_sequence" | "convolution" | "cross_entropy"
+            | "depreciation_double" | "depreciation_linear" | "discount" | "divisors"
+            | "epsilon" | "euclidean_distance" | "euler_number" | "exponential_moving_average"
+            | "f64_max" | "f64_min" | "fft_magnitude" | "goldbach" | "i64_max" | "i64_min"
+            | "kurtosis" | "linear_regression" | "look_and_say" | "lucas" | "luhn_check"
+            | "mean_absolute_error" | "mean_squared_error" | "median_absolute_deviation"
+            | "minkowski_distance" | "moving_average" | "multinomial" | "neg_inf" | "npv"
+            | "num_divisors" | "partition_number" | "pascals_triangle" | "skewness"
+            | "standard_error" | "subfactorial" | "sum_divisors" | "totient_sum"
+            | "tribonacci" | "weighted_mean" | "winsorize"
+            // ── number theory / primes ──────────────────────────────────────────
+            | "abundant_numbers" | "deficient_numbers" | "is_abundant" | "is_deficient"
+            | "is_pentagonal" | "is_perfect" | "is_smith" | "next_prime" | "nth_prime"
+            | "pentagonal_number" | "perfect_numbers" | "prev_prime" | "prime_factors"
+            | "prime_pi" | "primes_up_to" | "triangular_number" | "twin_primes"
+            // ── geometry / physics ──────────────────────────────────────────────
+            | "area_circle" | "area_ellipse" | "area_rectangle" | "area_trapezoid" | "area_triangle"
+            | "bearing" | "circumference" | "cone_volume" | "cylinder_volume" | "heron_area"
+            | "midpoint" | "perimeter_rectangle" | "perimeter_triangle" | "point_distance"
+            | "polygon_area" | "slope" | "sphere_surface" | "sphere_volume" | "triangle_hypotenuse"
+            // ── constants ───────────────────────────────────────────────────────
+            | "avogadro_number" | "boltzmann_constant" | "electron_mass" | "elementary_charge"
+            | "gravitational_constant" | "phi" | "pi" | "planck_constant" | "proton_mass"
+            | "sol" | "tau"
+            // ── finance ─────────────────────────────────────────────────────────
+            | "bac_estimate" | "bmi" | "break_even" | "margin" | "markup" | "roi" | "tax" | "tip"
+            // ── string processing (uncategorized batch) ─────────────────────────
+            | "acronym" | "atbash" | "bigrams" | "camel_to_snake" | "char_frequencies"
+            | "chunk_string" | "collapse_whitespace" | "dedent_text" | "indent_text"
+            | "initials" | "leetspeak" | "mask_string" | "ngrams" | "pig_latin"
+            | "remove_consonants" | "remove_vowels" | "reverse_each_word" | "snake_to_camel"
+            | "sort_words" | "string_distance" | "string_multiply" | "strip_html"
+            | "trigrams" | "unique_words" | "word_frequencies" | "zalgo"
+            // ── encoding / phonetics ────────────────────────────────────────────
+            | "braille_encode" | "double_metaphone" | "metaphone" | "morse_decode"
+            | "morse_encode" | "nato_phonetic" | "phonetic_digit" | "subscript" | "superscript"
+            | "to_emoji_num"
+            // ── roman numerals ──────────────────────────────────────────────────
+            | "int_to_roman" | "roman_add" | "roman_numeral_list" | "roman_to_int"
+            // ── base / gray code ────────────────────────────────────────────────
+            | "base_convert" | "binary_to_gray" | "gray_code_sequence" | "gray_to_binary"
+            // ── color operations ────────────────────────────────────────────────
+            | "ansi_256" | "ansi_truecolor" | "color_blend" | "color_complement"
+            | "color_darken" | "color_distance" | "color_grayscale" | "color_invert"
+            | "color_lighten" | "hsl_to_rgb" | "hsv_to_rgb" | "random_color"
+            | "rgb_to_hsl" | "rgb_to_hsv"
+            // ── matrix operations (uncategorized batch) ─────────────────────────
+            | "matrix_flatten" | "matrix_from_rows" | "matrix_hadamard" | "matrix_inverse"
+            | "matrix_map" | "matrix_max" | "matrix_min" | "matrix_power" | "matrix_sum"
+            | "matrix_transpose"
+            // ── array / list operations (uncategorized batch) ───────────────────
+            | "binary_insert" | "bucket" | "clamp_array" | "group_consecutive_by"
+            | "histogram" | "merge_sorted" | "next_permutation" | "normalize_array"
+            | "normalize_range" | "peak_detect" | "range_compress" | "range_expand"
+            | "reservoir_sample" | "run_length_decode_str" | "run_length_encode_str"
+            | "zero_crossings"
+            // ── validation predicates (uncategorized batch) ─────────────────────
+            | "is_anagram" | "is_balanced_parens" | "is_control" | "is_numeric_string"
+            | "is_pangram" | "is_printable" | "is_valid_cidr" | "is_valid_cron"
+            | "is_valid_hex_color" | "is_valid_latitude" | "is_valid_longitude" | "is_valid_mime"
+            // ── algorithms / puzzles ────────────────────────────────────────────
+            | "eval_rpn" | "fizzbuzz" | "game_of_life_step" | "mandelbrot_char"
+            | "sierpinski" | "tower_of_hanoi" | "truth_table"
+            // ── misc / utility ──────────────────────────────────────────────────
+            | "byte_size" | "degrees_to_compass" | "to_string_val" | "type_of"
             => Some(name),
             _ => None,
         }
