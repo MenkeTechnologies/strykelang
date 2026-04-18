@@ -4107,3 +4107,36 @@ fn pipeline_f_alias_for_filter() {
     "#;
     assert_eq!(rs(s), "3,4");
 }
+
+#[test]
+fn core_builtins_hex_oct() {
+    assert_eq!(ri("hex('10')"), 16);
+    assert_eq!(ri("hex('0x10')"), 16);
+    assert_eq!(ri("hex('0X10')"), 16);
+    assert_eq!(ri("oct('10')"), 8);
+    assert_eq!(ri("oct('010')"), 8);
+    assert_eq!(ri("oct('0x10')"), 16);
+    assert_eq!(ri("oct('0b10')"), 2);
+}
+
+#[test]
+fn core_builtins_case_mapping() {
+    assert_eq!(rs("lc('HELLO')"), "hello");
+    assert_eq!(rs("uc('hello')"), "HELLO");
+    assert_eq!(rs("lcfirst('HELLO')"), "hELLO");
+    assert_eq!(rs("ucfirst('hello')"), "Hello");
+}
+
+#[test]
+fn core_builtins_reverse() {
+    assert_eq!(rs("scalar reverse('abc')"), "cba");
+    assert_eq!(rs("join('', reverse('a', 'b', 'c'))"), "cba");
+}
+
+#[test]
+fn core_builtins_abs_chr_ord() {
+    assert_eq!(ri("abs(-42)"), 42);
+    assert_eq!(ri("abs(42)"), 42);
+    assert_eq!(ri("ord(chr(65))"), 65);
+    assert_eq!(rs("chr(65)"), "A");
+}

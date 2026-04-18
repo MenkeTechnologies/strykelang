@@ -12987,17 +12987,21 @@ impl Interpreter {
     }
 
     pub(crate) fn get_special_var(&self, name: &str) -> PerlValue {
-        // AWK-style aliases always available (no `-MEnglish` needed)
-        let name = match name {
-            "NR" => ".",
-            "RS" => "/",
-            "OFS" => ",",
-            "ORS" => "\\",
-            "NF" => {
-                let len = self.scope.array_len("F");
-                return PerlValue::integer(len as i64);
+        // AWK-style aliases always available (no `-MEnglish` needed) — disabled in --compat
+        let name = if !crate::compat_mode() {
+            match name {
+                "NR" => ".",
+                "RS" => "/",
+                "OFS" => ",",
+                "ORS" => "\\",
+                "NF" => {
+                    let len = self.scope.array_len("F");
+                    return PerlValue::integer(len as i64);
+                }
+                _ => self.english_scalar_name(name),
             }
-            _ => self.english_scalar_name(name),
+        } else {
+            self.english_scalar_name(name)
         };
         match name {
             "$$" => PerlValue::integer(std::process::id() as i64),
