@@ -175,4 +175,160 @@ fn test_misc_builtins() {
     );
     assert_eq!(run("base_convert('A', 16, 10)").expect("run").to_int(), 10);
     assert_eq!(run("bearing(0, 0, 0, 1)").expect("run").to_number(), 90.0);
+    assert_eq!(
+        run("fizzbuzz(15)->[14]").expect("run").to_string(),
+        "FizzBuzz"
+    );
+    assert_eq!(run("fizzbuzz(3)->[2]").expect("run").to_string(), "Fizz");
+    assert_eq!(run("fizzbuzz(5)->[4]").expect("run").to_string(), "Buzz");
+    assert_eq!(run("fizzbuzz(2)->[1]").expect("run").to_int(), 2);
+}
+
+#[test]
+fn test_more_number_theory() {
+    assert_eq!(run("is_smith(22)").expect("run").to_int(), 1);
+    assert_eq!(run("aliquot_sum(12)").expect("run").to_int(), 16);
+    assert_eq!(run("prime_pi(10)").expect("run").to_int(), 4);
+    assert_eq!(run("bell_number(3)").expect("run").to_int(), 5);
+    assert_eq!(run("subfactorial(3)").expect("run").to_int(), 2);
+    assert_eq!(
+        run("join(',', collatz_sequence(6))")
+            .expect("run")
+            .to_string(),
+        "6,3,10,5,16,8,4,2,1"
+    );
+}
+
+#[test]
+fn test_more_geometry() {
+    assert_eq!(
+        run("sphere_volume(1)").expect("run").to_number(),
+        (4.0 / 3.0) * std::f64::consts::PI
+    );
+    assert_eq!(
+        run("cylinder_volume(1, 1)").expect("run").to_number(),
+        std::f64::consts::PI
+    );
+    assert_eq!(
+        run("cone_volume(1, 1)").expect("run").to_number(),
+        std::f64::consts::PI / 3.0
+    );
+    assert_eq!(
+        run("point_distance(0, 0, 3, 4)").expect("run").to_number(),
+        5.0
+    );
+}
+
+#[test]
+fn test_more_string_processing() {
+    assert_eq!(
+        run("camel_to_snake('CamelCase')").expect("run").to_string(),
+        "camel_case"
+    );
+    assert_eq!(
+        run("snake_to_camel('snake_case')")
+            .expect("run")
+            .to_string(),
+        "snakeCase"
+    );
+    assert_eq!(
+        run("collapse_whitespace('  a   b  ')")
+            .expect("run")
+            .to_string(),
+        " a b "
+    );
+    assert_eq!(
+        run("remove_vowels('hello')").expect("run").to_string(),
+        "hll"
+    );
+    assert_eq!(
+        run("remove_consonants('hello')").expect("run").to_string(),
+        "eo"
+    );
+    assert_eq!(
+        run("string_distance('kitten', 'sitting')")
+            .expect("run")
+            .to_int(),
+        3
+    );
+}
+
+#[test]
+fn test_jwt_builtins() {
+    let code = r#"
+        my $payload = { sub => "1234567890", name => "John Doe", admin => 1 };
+        my $secret = "secret";
+        my $token = jwt_encode($payload, $secret);
+        my $decoded = jwt_decode($token, $secret);
+        $decoded->{name};
+    "#;
+    assert_eq!(run(code).expect("run").to_string(), "John Doe");
+
+    let code_unsafe = r#"
+        my $payload = { sub => "1234567890" };
+        my $secret = "secret";
+        my $token = jwt_encode($payload, $secret);
+        my $decoded = jwt_decode_unsafe($token);
+        $decoded->{sub};
+    "#;
+    assert_eq!(run(code_unsafe).expect("run").to_string(), "1234567890");
+}
+
+#[test]
+fn test_more_color_builtins() {
+    assert_eq!(
+        run("join(',', color_blend(255, 0, 0, 0, 0, 255, 0.5))")
+            .expect("run")
+            .to_string(),
+        "128,0,128"
+    );
+}
+
+#[test]
+fn test_list_util_builtins() {
+    // List::Util functions are available globally in perlrs
+    assert_eq!(run("sum(1, 2, 3)").expect("run").to_int(), 6);
+    assert_eq!(run("product(2, 3, 4)").expect("run").to_int(), 24);
+    assert_eq!(run("min(10, 5, 20)").expect("run").to_int(), 5);
+    assert_eq!(run("max(10, 5, 20)").expect("run").to_int(), 20);
+    assert_eq!(run("all { $_ > 0 } (1, 2, 3)").expect("run").to_int(), 1);
+    assert_eq!(run("any { $_ > 2 } (1, 2, 3)").expect("run").to_int(), 1);
+    assert_eq!(run("none { $_ > 5 } (1, 2, 3)").expect("run").to_int(), 1);
+    assert_eq!(
+        run("join(',', uniq(1, 1, 2, 2, 3))")
+            .expect("run")
+            .to_string(),
+        "1,2,3"
+    );
+    assert_eq!(
+        run("join(',', head(1, 2, 3, 4, 2))")
+            .expect("run")
+            .to_string(),
+        "1,2"
+    );
+    assert_eq!(
+        run("join(',', tail(1, 2, 3, 4, 2))")
+            .expect("run")
+            .to_string(),
+        "3,4"
+    );
+    assert_eq!(
+        run("my @p = pairs(a => 1, b => 2); $p[0]->[0] . ':' . $p[0]->[1]")
+            .expect("run")
+            .to_string(),
+        "a:1"
+    );
+    assert_eq!(
+        run("join(',', mesh([1, 2], [3, 4]))")
+            .expect("run")
+            .to_string(),
+        "1,3,2,4"
+    );
+    assert_eq!(run("sum0()").expect("run").to_int(), 0);
+    assert_eq!(
+        run("join(',', reductions sub { $_[0] + $_[1] }, (1, 2, 3))")
+            .expect("run")
+            .to_string(),
+        "1,3,6"
+    );
 }
