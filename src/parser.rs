@@ -6990,7 +6990,8 @@ impl Parser {
 
         // Single-letter keyword aliases (d/f/p) must yield to fat-arrow auto-quoting
         // so that `(d => 4)`, `{f => 1}`, etc. keep working as bareword hash keys.
-        if matches!(name.as_str(), "d" | "f" | "p") && matches!(self.peek(), Token::FatArrow) {
+        if matches!(name.as_str(), "c" | "d" | "f" | "p") && matches!(self.peek(), Token::FatArrow)
+        {
             return Ok(Expr {
                 kind: ExprKind::String(name),
                 line,
