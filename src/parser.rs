@@ -10701,7 +10701,7 @@ impl Parser {
             | "yellow_bold" | "bold_yellow" | "blue_bold" | "bold_blue"
             | "magenta_bold" | "bold_magenta" | "cyan_bold" | "bold_cyan"
             | "white_bold" | "bold_white"
-            | "blink" | "rapid_blink" | "reverse" | "hidden" | "overline"
+            | "blink" | "rapid_blink" | "hidden" | "overline"
             | "bg_bright_red" | "bg_bright_green" | "bg_bright_yellow" | "bg_bright_blue"
             | "bg_bright_magenta" | "bg_bright_cyan" | "bg_bright_white"
             | "rgb" | "bg_rgb" | "color256" | "c256" | "bg_color256" | "bg_c256"

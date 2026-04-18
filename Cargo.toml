@@ -1,6 +1,6 @@
 [package]
 name = "perlrs"
-version = "0.5.5"
+version = "0.5.6"
 edition = "2021"
 description = "A highly parallel Perl 5 interpreter written in Rust"
 license = "MIT"

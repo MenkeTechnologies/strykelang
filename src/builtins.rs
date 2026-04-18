@@ -642,15 +642,16 @@ pub(crate) fn try_builtin(
         // Raw ANSI escape codes for string interpolation
         "red" | "green" | "yellow" | "blue" | "magenta" | "purple" | "cyan" | "white" | "black"
         | "bold" | "dim" | "italic" | "underline" | "strikethrough" | "ansi_off" | "off"
-        | "blink" | "rapid_blink" | "reverse" | "hidden" | "overline" | "gray" | "grey"
-        | "bright_red" | "bright_green" | "bright_yellow" | "bright_blue" | "bright_magenta"
-        | "bright_cyan" | "bright_white" | "bg_red" | "bg_green" | "bg_yellow" | "bg_blue"
-        | "bg_magenta" | "bg_cyan" | "bg_white" | "bg_black" | "bg_bright_red"
-        | "bg_bright_green" | "bg_bright_yellow" | "bg_bright_blue" | "bg_bright_magenta"
-        | "bg_bright_cyan" | "bg_bright_white" | "red_bold" | "bold_red" | "green_bold"
-        | "bold_green" | "yellow_bold" | "bold_yellow" | "blue_bold" | "bold_blue"
-        | "magenta_bold" | "bold_magenta" | "cyan_bold" | "bold_cyan" | "white_bold"
-        | "bold_white" => Some(Ok(builtin_ansi_code(name))),
+        | "blink" | "rapid_blink" | "hidden" | "overline" | "gray" | "grey" | "bright_red"
+        | "bright_green" | "bright_yellow" | "bright_blue" | "bright_magenta" | "bright_cyan"
+        | "bright_white" | "bg_red" | "bg_green" | "bg_yellow" | "bg_blue" | "bg_magenta"
+        | "bg_cyan" | "bg_white" | "bg_black" | "bg_bright_red" | "bg_bright_green"
+        | "bg_bright_yellow" | "bg_bright_blue" | "bg_bright_magenta" | "bg_bright_cyan"
+        | "bg_bright_white" | "red_bold" | "bold_red" | "green_bold" | "bold_green"
+        | "yellow_bold" | "bold_yellow" | "blue_bold" | "bold_blue" | "magenta_bold"
+        | "bold_magenta" | "cyan_bold" | "bold_cyan" | "white_bold" | "bold_white" => {
+            Some(Ok(builtin_ansi_code(name)))
+        }
         // True color: rgb(r,g,b) foreground, bg_rgb(r,g,b) background
         "rgb" => Some(builtin_rgb_ansi(args, true)),
         "bg_rgb" => Some(builtin_bg_rgb_ansi(args, true)),
@@ -5862,7 +5863,7 @@ fn builtin_ansi_code(name: &str) -> PerlValue {
         "underline" => "\x1b[4m",
         "blink" => "\x1b[5m",
         "rapid_blink" => "\x1b[6m",
-        "reverse" => "\x1b[7m",
+        // Note: "reverse" is Perl's list reverse — use ansi_reverse for ANSI SGR 7
         "hidden" => "\x1b[8m",
         "strikethrough" => "\x1b[9m",
         "overline" => "\x1b[53m",
