@@ -416,6 +416,7 @@ pub(crate) fn try_builtin(
         "to_csv" | "tc" => Some(builtin_to_csv(args)),
         "to_html" | "th" => Some(builtin_to_html(args)),
         "to_markdown" | "to_md" | "tmd" => Some(builtin_to_markdown(args)),
+        "xopen" | "xo" => Some(builtin_xopen(interp, args, line)),
         "grep_v" => Some(builtin_grep_v(args, line)),
         "select_keys" => Some(builtin_select_keys(args)),
         "pluck" => Some(builtin_pluck(args)),
@@ -3040,6 +3041,27 @@ fn builtin_avg(args: &[PerlValue]) -> PerlResult<PerlValue> {
 /// stage terminates pipelines cleanly.
 ///
 /// Aliases: `pager`, `pg`.
+/// `xopen PATH` — open a file/URL with the system handler (`open` on macOS,
+/// `xdg-open` on Linux, `start` on Windows). Returns the path unchanged so
+/// it can sit in a pipeline: `... |> to_file("r.html") |> xopen`.
+fn builtin_xopen(interp: &Interpreter, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    use std::process::Command;
+    let path = first_arg_or_topic(interp, args).to_string();
+    #[cfg(target_os = "macos")]
+    let cmd = "open";
+    #[cfg(target_os = "linux")]
+    let cmd = "xdg-open";
+    #[cfg(target_os = "windows")]
+    let cmd = "start";
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    let cmd = "xdg-open";
+    Command::new(cmd)
+        .arg(&path)
+        .spawn()
+        .map_err(|e| PerlError::runtime(format!("xopen: {}: {}", path, e), line))?;
+    Ok(PerlValue::string(path))
+}
+
 fn builtin_pager(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
     use std::io::Write as _;
     use std::process::{Command, Stdio};
@@ -3160,7 +3182,7 @@ fn builtin_to_file(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     };
     std::fs::write(&path, &content)
         .map_err(|e| PerlError::runtime(format!("to_file: {}: {}", path, e), line))?;
-    Ok(PerlValue::string(content))
+    Ok(PerlValue::string(path))
 }
 
 /// Pipeline `LHS |> to_X` spreads LHS as individual args. For the encoders
