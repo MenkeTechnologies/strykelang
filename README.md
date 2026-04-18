@@ -80,6 +80,48 @@ autoload -Uz compinit && compinit
 
 ---
 
+## [0x01b] WHY PERLRS — ONE-LINER COMPARISON
+
+`pe` is a **one-liner-first** language. No `-e` flag needed, everything built in, shortest syntax wins.
+
+### Character count — real tasks
+
+| Task | `pe` | `perl` | `ruby` | `python` | `awk` / other |
+|---|---|---|---|---|---|
+| Print hello world | `pe 'p "hello world"'` **21c** | `perl -e 'print "hello world\n"'` 32c | `ruby -e 'puts "hello world"'` 29c | `python3 -c 'print("hello world")'` 34c | `echo \| awk '{print "hello world"}'` 36c |
+| Sum 1..100 | `pe 'p sum 1..100'` **19c** | `perl -MList::Util=sum -e 'print sum 1..100'` 45c | `ruby -e 'puts (1..100).sum'` 28c | `python3 -c 'print(sum(range(1,101)))'` 38c | — |
+| Word frequencies | `pe -an 'freq(@F) \|> dd'` **25c** | `perl -ane '$h{$_}++ for @F}{print "$_ $h{$_}\n" for keys %h'` 61c | — | — | `awk '{for(i=1;i<=NF;i++) a[$i]++} END{...}'` 65c+ |
+| SHA256 of file | `pe 'p sha256 cat "f"'` **23c** | `perl -MDigest::SHA=sha256_hex -e '...'` 70c+ | — | `python3 -c 'import hashlib;...'` 80c+ | `shasum -a 256 f` 16c |
+| Fetch JSON API | `pe 'fetch_json(URL) \|> dd'` **~50c** | needs `LWP` + `JSON` modules | needs `net/http` + `json` | needs `urllib` + `json` | `curl -s URL \| jq .` ~40c |
+| CSV → JSON | `pe 'csv_read("f") \|> tj \|> p'` **33c** | needs `Text::CSV` + `JSON` | needs `csv` + `json` | needs `csv` + `json` imports | — |
+| Parallel map | `pe '1..1e6 \|> pmap { $_ * 2 }'` **33c** | not built in | not built in | not built in | `xargs -P8` 50c+ |
+| Sparkline | `pe '(3,7,1,9) \|> spark \|> p'` **31c** | not built in | not built in | not built in | not built in |
+| In-place sed (parallel) | `pe -i -pe 's/foo/bar/g' *.txt` **31c** | `perl -i -pe 's/foo/bar/g' *.txt` 33c (sequential) | `ruby -i -pe '$_.gsub!(...)'` 35c+ | — | `sed -i '' 's/foo/bar/g' *.txt` 31c (sequential) |
+
+### Feature matrix
+
+| Feature | pe | perl5 | ruby | python | awk | jq | nushell |
+|---|---|---|---|---|---|---|---|
+| No `-e` flag needed | **yes** | no | no | no (`-c`) | — | — | — |
+| No semicolons | **yes** | no | yes | yes | yes | yes | yes |
+| Built-in HTTP | **yes** | no | no | no | no | no | yes |
+| Built-in JSON | **yes** | no | no | yes | no | **yes** | yes |
+| Built-in CSV | **yes** | no | no | yes | no | `@csv` | yes |
+| Built-in SQLite | **yes** | no | no | yes | no | no | yes |
+| Parallel map/grep | **yes** | no | no | no | no | no | `par-each` |
+| Pipe-forward `\|>` | **yes** | no | no | no | no | `\|` | `\|` |
+| Thread macro `t`/`~>` | **yes** | no | no | no | no | no | no |
+| In-place edit `-i` | **parallel** | sequential | sequential | no | no | no | no |
+| Regex engine | **3-tier** | PCRE | Onigmo | `re` | ERE | PCRE | — |
+| Data viz (spark/bars/flame) | **yes** | no | no | no | no | no | no |
+| Clipboard (clip/paste) | **yes** | no | no | no | no | no | `clip` |
+| `$NR`/`$NF` AWK compat | **yes** | `-MEnglish` | no | no | native | no | no |
+| Typed structs/enums | **yes** | no | native | native | no | no | native |
+| JIT compiler | **Cranelift** | no | YJIT | no | no | no | no |
+| Single binary | **17MB** | system pkg | system pkg | system pkg | system pkg | 3MB | 50MB+ |
+
+---
+
 ## [0x02] USAGE
 
 ```sh
