@@ -10052,6 +10052,38 @@ impl Interpreter {
                 crate::parallel_trace::trace_leave();
                 out
             }
+            ExprKind::Spinner { message, body } => {
+                use std::io::Write as _;
+                let msg = self.eval_expr(message)?.to_string();
+                let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+                let done2 = done.clone();
+                let handle = std::thread::spawn(move || {
+                    let frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+                    let mut i = 0;
+                    let stderr = std::io::stderr();
+                    while !done2.load(std::sync::atomic::Ordering::Relaxed) {
+                        {
+                            let mut err = stderr.lock();
+                            let _ = write!(
+                                err,
+                                "\r\x1b[36m{}\x1b[0m {} ",
+                                frames[i % frames.len()],
+                                msg
+                            );
+                            let _ = err.flush();
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(80));
+                        i += 1;
+                    }
+                    let mut err = stderr.lock();
+                    let _ = write!(err, "\r\x1b[2K");
+                    let _ = err.flush();
+                });
+                let result = self.exec_block(body);
+                done.store(true, std::sync::atomic::Ordering::Relaxed);
+                let _ = handle.join();
+                result
+            }
             ExprKind::Timer { body } => {
                 let start = std::time::Instant::now();
                 self.exec_block(body)?;

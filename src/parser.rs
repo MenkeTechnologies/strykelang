@@ -8402,6 +8402,27 @@ impl Parser {
                     line,
                 })
             }
+            "spinner" => {
+                // `spinner "msg" { BLOCK }` or `spinner { BLOCK }`
+                let (message, body) = if matches!(self.peek(), Token::LBrace) {
+                    let body = self.parse_block()?;
+                    (
+                        Box::new(Expr {
+                            kind: ExprKind::String("working".to_string()),
+                            line,
+                        }),
+                        body,
+                    )
+                } else {
+                    let msg = self.parse_assign_expr()?;
+                    let body = self.parse_block()?;
+                    (Box::new(msg), body)
+                };
+                Ok(Expr {
+                    kind: ExprKind::Spinner { message, body },
+                    line,
+                })
+            }
             "thread" | "t" => {
                 // `thread EXPR stage1 stage2 ...` — threading macro (like Clojure's ->>)
                 // `t` is a short alias for `thread`
@@ -10538,6 +10559,7 @@ impl Parser {
             | "to_html" | "to_markdown" | "to_table" | "xopen"
             | "clip" | "clipboard" | "paste" | "pbcopy" | "pbpaste"
             | "sparkline" | "spark" | "bar_chart" | "bars" | "flame" | "flamechart"
+            | "histo" | "gauge" | "spinner"
             | "to_hash" | "to_set"
             | "to_file" | "read_lines" | "append_file" | "write_json" | "read_json"
             | "tempfile" | "tempdir" | "list_count" | "list_size" | "size"
@@ -10670,7 +10692,7 @@ impl Parser {
             | "strip_ansi"
             | "red" | "green" | "yellow" | "blue" | "magenta" | "purple" | "cyan"
             | "white" | "black" | "bold" | "dim" | "italic" | "underline"
-            | "strikethrough" | "ansi_off" | "gray" | "grey"
+            | "strikethrough" | "ansi_off" | "off" | "gray" | "grey"
             | "bright_red" | "bright_green" | "bright_yellow" | "bright_blue"
             | "bright_magenta" | "bright_cyan" | "bright_white"
             | "bg_red" | "bg_green" | "bg_yellow" | "bg_blue"

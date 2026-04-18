@@ -1520,6 +1520,16 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::Yield(e) => {
             format!("yield {}", format_expr(e))
         }
+        ExprKind::Spinner { message, body } => {
+            format!(
+                "spinner {} {{ {} }}",
+                format_expr(message),
+                body.iter()
+                    .map(|s| format_statement(s))
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            )
+        }
         ExprKind::MyExpr { keyword, decls } => {
             // Render `my $x = …` etc. inline. Single-decl is the common case
             // (e.g. `if (my $x = …)`); list-decl reuses the same formatter.

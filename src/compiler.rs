@@ -7119,7 +7119,8 @@ impl Compiler {
             | ExprKind::RateLimitBlock { .. }
             | ExprKind::EveryBlock { .. }
             | ExprKind::GenBlock { .. }
-            | ExprKind::Yield(_) => {
+            | ExprKind::Yield(_)
+            | ExprKind::Spinner { .. } => {
                 return Err(CompileError::Unsupported(
                     "retry/rate_limit/every/gen/yield (tree interpreter only)".into(),
                 ));
