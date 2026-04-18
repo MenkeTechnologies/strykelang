@@ -701,6 +701,9 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   $data |> to_xml  |> p;                        # XML with <root> wrapper
   fr |> map +{name => $_, size => format_bytes(size)} |> th |> to_file("report.html") |> xopen  # cyberpunk HTML table → browser
   fr |> map +{name => $_, size => format_bytes(size)} |> tmd |> to_file("report.md") |> xopen  # GFM Markdown table → viewer
+  # same pipelines in thread syntax:
+  t fr map +{name => $_, size => format_bytes(size)} th to_file($_, "report.html") xopen
+  t fr map +{name => $_, size => format_bytes(size)} tmd to_file($_, "report.md") xopen
 
   # ── stringify / str — parseable perlrs literals ──────────────────────
   $data |> str |> p;                            # +{a => 1, b => [2, 3]}

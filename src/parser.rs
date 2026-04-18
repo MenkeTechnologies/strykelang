@@ -1605,8 +1605,41 @@ impl Parser {
                         );
                     }
 
+                    // `map +{ ... }` — hashref expression form (not a code block).
+                    // The `+` disambiguates: `+{` is always a hashref constructor.
+                    // Desugars to `MapExprComma` so pipe_forward_apply threads the
+                    // list correctly: `t LIST map +{k => $_}` → `map +{k => $_}, LIST`.
+                    if matches!(self.peek(), Token::Plus)
+                        && matches!(self.peek_at(1), Token::LBrace)
+                    {
+                        self.advance(); // consume `+`
+                        self.expect(&Token::LBrace)?;
+                        // try_parse_hash_ref consumes the closing `}`
+                        let pairs = self.try_parse_hash_ref()?;
+                        let hashref_expr = Expr {
+                            kind: ExprKind::HashRef(pairs),
+                            line: stage_line,
+                        };
+                        let flatten_array_refs =
+                            matches!(func_name.as_str(), "flat_map" | "flat_maps");
+                        let stream = matches!(func_name.as_str(), "maps" | "flat_maps");
+                        // Placeholder list — pipe_forward_apply replaces it with `result`.
+                        let placeholder = Expr {
+                            kind: ExprKind::Undef,
+                            line: stage_line,
+                        };
+                        let map_node = Expr {
+                            kind: ExprKind::MapExprComma {
+                                expr: Box::new(hashref_expr),
+                                list: Box::new(placeholder),
+                                flatten_array_refs,
+                                stream,
+                            },
+                            line: stage_line,
+                        };
+                        result = self.pipe_forward_apply(result, map_node, stage_line)?;
                     // Check if followed by a block (like `filter { }`, `sort { }`, `map { }`)
-                    if matches!(self.peek(), Token::LBrace) {
+                    } else if matches!(self.peek(), Token::LBrace) {
                         // Parse as a block-taking builtin
                         self.pipe_rhs_depth = self.pipe_rhs_depth.saturating_add(1);
                         let stage = self.parse_thread_stage_with_block(&func_name, stage_line)?;
