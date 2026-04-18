@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/perlrs" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">perlrs v0.5.0 · 2252 topics · 24 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">perlrs v0.5.0 · 2253 topics · 24 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -172,7 +172,7 @@
         <li><a href="#ch-pipeline-pipe-forward">Pipeline &amp; Pipe-Forward</a> <span class="chapter-count">6</span></li>
         <li><a href="#ch-streaming-iterators">Streaming Iterators</a> <span class="chapter-count">24</span></li>
         <li><a href="#ch-list-operations">List Operations</a> <span class="chapter-count">62</span></li>
-        <li><a href="#ch-perlrs-extensions">perlrs Extensions</a> <span class="chapter-count">18</span></li>
+        <li><a href="#ch-perlrs-extensions">perlrs Extensions</a> <span class="chapter-count">19</span></li>
         <li><a href="#ch-data-serialization">Data &amp; Serialization</a> <span class="chapter-count">20</span></li>
         <li><a href="#ch-http-networking">HTTP &amp; Networking</a> <span class="chapter-count">23</span></li>
         <li><a href="#ch-crypto-encoding">Crypto &amp; Encoding</a> <span class="chapter-count">21</span></li>
@@ -1316,7 +1316,7 @@ p deq({x =&gt; [1,2]}, {x =&gt; [1,2]});            # 1
     </section>
     <section class="tutorial-section" id="ch-perlrs-extensions">
       <h2>perlrs Extensions</h2>
-      <p class="chapter-meta">18 topics</p>
+      <p class="chapter-meta">19 topics</p>
       <article class="doc-entry" id="doc-fn">
         <h3><a class="doc-anchor" href="#doc-fn">#</a> <code>fn</code></h3>
         <p>Alias for <code>sub</code> — define a function.</p>
@@ -1412,6 +1412,14 @@ frozen my @primes = (2, 3, 5, 7, 11)
         <p>Side-effect-only list iterator (like <code>map</code> but void, returns item count).</p>
         <pre><code class="lang-perl">qw(a b c) |&gt; e p;           # prints a, b, c; returns 3
 1..5 |&gt; map $_ * 2 |&gt; e p;  # prints 2,4,6,8,10
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ep">
+        <h3><a class="doc-anchor" href="#doc-ep">#</a> <code>ep</code></h3>
+        <p><code>ep</code> — shorthand for <code>e { p }</code> (foreach + print). Iterates the list and prints each element.</p>
+        <pre><code class="lang-perl">qw(a b c) |&gt; ep;            # prints a, b, c (one per line)
+filef |&gt; sorted |&gt; ep;      # print sorted file list
+1..5 |&gt; map $_ * 2 |&gt; ep;   # prints 2,4,6,8,10
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-p">
