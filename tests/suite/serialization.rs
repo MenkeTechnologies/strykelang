@@ -313,31 +313,19 @@ fn to_xml_undef_self_closes() {
 }
 
 // ── xopen ───────────────────────────────────────────────────────────────
+// Note: xopen actually invokes the system `open`/`xdg-open` command,
+// so we only test that it parses and is recognized as a builtin.
+// Functional tests would open the browser, which is unusable in CI.
 
 #[test]
-fn xopen_returns_path_unchanged() {
-    // Write a file first, then xopen returns the path for pipeline chaining
-    let path = eval_string(
-        r#"th("test") |> to_file("/tmp/perlrs_xopen_ret.html");
-           xopen("/tmp/perlrs_xopen_ret.html")"#,
-    );
-    assert_eq!(path, "/tmp/perlrs_xopen_ret.html");
+fn xopen_is_recognized_as_extension() {
+    // xopen is registered in the extensions reflection hash
+    assert_eq!(eval_string(r#"$e{xopen}"#), "pipeline / string helpers");
 }
 
 #[test]
-fn xopen_alias_xo() {
-    let path = eval_string(
-        r#"th("test") |> to_file("/tmp/perlrs_xo_ret.html");
-           xo("/tmp/perlrs_xo_ret.html")"#,
-    );
-    assert_eq!(path, "/tmp/perlrs_xo_ret.html");
-}
-
-#[test]
-fn xopen_in_pipeline_chains() {
-    // to_file returns path, xopen opens it and passes path through
-    let result = eval_string(r#"th("test") |> to_file("/tmp/perlrs_xopen_chain.html") |> xopen"#);
-    assert_eq!(result, "/tmp/perlrs_xopen_chain.html");
+fn xopen_alias_xo_resolves() {
+    assert_eq!(eval_string(r#"$a{xo}"#), "xopen");
 }
 
 // ── to_file returns path ────────────────────────────────────────────────
