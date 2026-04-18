@@ -7796,6 +7796,10 @@ impl Interpreter {
                 if let Some(sub) = self.resolve_sub_by_name(s) {
                     return self.call_sub(&sub, vec![], ctx, line);
                 }
+                // Try zero-arg builtins so `"#{red}"` resolves color codes etc.
+                if let Some(r) = crate::builtins::try_builtin(self, s, &[], line) {
+                    return r.map_err(Into::into);
+                }
                 Ok(PerlValue::string(s.clone()))
             }
             ExprKind::Undef => Ok(PerlValue::UNDEF),
@@ -12251,6 +12255,10 @@ impl Interpreter {
         }
         if let Some(sub) = self.resolve_sub_by_name(name) {
             return self.call_sub(&sub, vec![], want, line);
+        }
+        // Try zero-arg builtins so `"#{red}"` resolves color codes etc.
+        if let Some(r) = crate::builtins::try_builtin(self, name, &[], line) {
+            return r.map_err(Into::into);
         }
         Ok(PerlValue::string(name.to_string()))
     }
