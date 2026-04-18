@@ -19,6 +19,7 @@
 
 A Perl 5 compatible interpreter in Rust with native parallel primitives, NaN-boxed values, three-tier regex, bytecode VM + Cranelift JIT, and rayon work-stealing across all cores.
 
+### [`Read the Docs`](https://menketechnologies.github.io/perlrs/)
 ---
 
 ## Table of Contents

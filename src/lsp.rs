@@ -1963,6 +1963,7 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
             "match",
             "frozen",
             "fore",
+            "e",
             "ep",
             "p",
             "gen",

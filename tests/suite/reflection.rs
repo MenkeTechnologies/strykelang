@@ -161,8 +161,8 @@ fn primaries_inverted_index_returns_alias_arrayrefs() {
     // `to_json` has `tj` as an alias.
     let tj_in = eval_int(
         r#"
-        my $aliases = $perlrs::primaries{to_json};
-        my $found = 0;
+        my $aliases = $perlrs::primaries{to_json}
+        my $found = 0
         for my $a (@$aliases) { $found = 1 if $a eq "tj"; }
         $found
         "#,
@@ -172,8 +172,8 @@ fn primaries_inverted_index_returns_alias_arrayrefs() {
     // `basename` has `bn` as an alias.
     let bn_in = eval_int(
         r#"
-        my $aliases = $perlrs::primaries{basename};
-        my $found = 0;
+        my $aliases = $perlrs::primaries{basename}
+        my $found = 0
         for my $a (@$aliases) { $found = 1 if $a eq "bn"; }
         $found
         "#,
@@ -184,7 +184,7 @@ fn primaries_inverted_index_returns_alias_arrayrefs() {
     // not required — primaries can be any dispatch first-name).
     let dangling = eval_int(
         r#"
-        my $n = 0;
+        my $n = 0
         for my $primary (keys %perlrs::primaries) {
             $n++ unless exists $perlrs::builtins{$primary};
         }
@@ -222,9 +222,9 @@ fn short_aliases_mirror_long_names() {
 fn every_dispatch_primary_is_categorized() {
     let out = eval_string(
         r#"
-        my @bad;
+        my @bad
         for my $name (sort keys %perlrs::builtins) {
-            push @bad, $name if $perlrs::builtins{$name} eq "uncategorized";
+            push @bad, $name if $perlrs::builtins{$name} eq "uncategorized"
         }
         join ",", @bad
         "#,

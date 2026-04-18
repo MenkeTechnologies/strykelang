@@ -7566,14 +7566,40 @@ impl Parser {
                         line,
                     })
                 } else if self.in_pipe_rhs() {
-                    // `|> fore say` — blockless pipe form: wrap EXPR into a synthetic block
-                    let expr = self.parse_assign_expr_stop_at_pipe()?;
-                    let expr = Self::lift_bareword_to_topic_call(expr);
-                    let block = vec![Statement {
-                        label: None,
-                        kind: StmtKind::Expression(expr),
-                        line,
-                    }];
+                    // `|> ep` — bare ep at end of pipe: default to `say $_`
+                    // `|> fore say` / `|> e say` — blockless pipe form: wrap EXPR into a synthetic block
+                    let is_terminal = matches!(
+                        self.peek(),
+                        Token::Semicolon
+                            | Token::RParen
+                            | Token::Eof
+                            | Token::PipeForward
+                            | Token::RBrace
+                    );
+                    let block = if name == "ep" && is_terminal {
+                        vec![Statement {
+                            label: None,
+                            kind: StmtKind::Expression(Expr {
+                                kind: ExprKind::Say {
+                                    handle: None,
+                                    args: vec![Expr {
+                                        kind: ExprKind::ScalarVar("_".into()),
+                                        line,
+                                    }],
+                                },
+                                line,
+                            }),
+                            line,
+                        }]
+                    } else {
+                        let expr = self.parse_assign_expr_stop_at_pipe()?;
+                        let expr = Self::lift_bareword_to_topic_call(expr);
+                        vec![Statement {
+                            label: None,
+                            kind: StmtKind::Expression(expr),
+                            line,
+                        }]
+                    };
                     let list = self.pipe_placeholder_list(line);
                     Ok(Expr {
                         kind: ExprKind::ForEachExpr {
@@ -11267,6 +11293,10 @@ impl Parser {
             let args = self.parse_arg_list()?;
             self.expect(&Token::RParen)?;
             Ok(args)
+        } else if self.suppress_parenless_call > 0 && matches!(self.peek(), Token::Ident(_)) {
+            // In thread context, don't consume barewords as arguments
+            // so `t filesf sorted ep` parses `sorted` as a stage, not an arg to filesf
+            Ok(vec![])
         } else {
             self.parse_list_until_terminator()
         }
