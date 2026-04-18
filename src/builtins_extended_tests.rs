@@ -674,3 +674,108 @@ fn test_itertools_builtins() {
         "1,a;1,b;2,a;2,b"
     );
 }
+
+#[test]
+fn test_more_geometry_builtins_extended() {
+    assert_eq!(
+        run("area_trapezoid(10, 20, 5)").expect("run").to_number(),
+        75.0
+    );
+    assert!(
+        (run("area_ellipse(10, 5)").expect("run").to_number() - 10.0 * 5.0 * std::f64::consts::PI)
+            .abs()
+            < 1e-9
+    );
+    assert!(
+        (run("circumference(5)").expect("run").to_number() - 10.0 * std::f64::consts::PI).abs()
+            < 1e-9
+    );
+    assert_eq!(
+        run("perimeter_triangle(3, 4, 5)").expect("run").to_number(),
+        12.0
+    );
+}
+
+#[test]
+fn test_more_string_builtins_extended() {
+    assert_eq!(
+        run("reverse_each_word('hello world')")
+            .expect("run")
+            .to_string(),
+        "olleh dlrow"
+    );
+    assert_eq!(
+        run("string_multiply('abc', 3)").expect("run").to_string(),
+        "abcabcabc"
+    );
+    assert_eq!(
+        run("acronym('Application Programming Interface')")
+            .expect("run")
+            .to_string(),
+        "API"
+    );
+    assert_eq!(
+        run("join(',', chunk_string(2, 'abcdef'))")
+            .expect("run")
+            .to_string(),
+        "ab,cd,ef"
+    );
+    assert_eq!(
+        run("camel_to_snake('CamelCase')").expect("run").to_string(),
+        "camel_case"
+    );
+    assert_eq!(
+        run("snake_to_camel('snake_case')")
+            .expect("run")
+            .to_string(),
+        "snakeCase"
+    );
+}
+
+#[test]
+fn test_more_math_builtins_extended() {
+    assert_eq!(run("is_even(42)").expect("run").to_int(), 1);
+    assert_eq!(run("is_even(43)").expect("run").to_int(), 0);
+    assert_eq!(run("is_odd(42)").expect("run").to_int(), 0);
+    assert_eq!(run("is_odd(43)").expect("run").to_int(), 1);
+    assert_eq!(run("binary_to_gray(10)").expect("run").to_int(), 15);
+    assert_eq!(run("gray_to_binary(15)").expect("run").to_int(), 10);
+}
+
+#[test]
+fn test_validation_builtins_extended() {
+    assert_eq!(run("luhn_check('79927398713')").expect("run").to_int(), 1);
+    assert_eq!(run("luhn_check('79927398710')").expect("run").to_int(), 0);
+}
+
+#[test]
+fn test_encoding_builtins_more() {
+    assert_eq!(
+        run("run_length_encode_str('AAABBC')")
+            .expect("run")
+            .to_string(),
+        "3A2B1C"
+    );
+    assert_eq!(
+        run("run_length_decode_str('3A2B1C')")
+            .expect("run")
+            .to_string(),
+        "AAABBC"
+    );
+}
+
+#[test]
+fn test_advanced_algorithms_extended() {
+    assert_eq!(
+        run("join(';', map { join(',', @$_) } pascals_triangle(3))")
+            .expect("run")
+            .to_string(),
+        "1;1,1;1,2,1"
+    );
+    assert_eq!(
+        run("join(';', map { join('', @$_) } truth_table(2))")
+            .expect("run")
+            .to_string(),
+        "00;01;10;11"
+    );
+}
