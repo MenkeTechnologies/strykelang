@@ -4140,3 +4140,202 @@ fn core_builtins_abs_chr_ord() {
     assert_eq!(ri("ord(chr(65))"), 65);
     assert_eq!(rs("chr(65)"), "A");
 }
+
+#[test]
+fn core_builtins_string_alignment() {
+    assert_eq!(rs("ljust('abc', 5)"), "abc  ");
+    assert_eq!(rs("rjust('abc', 5)"), "  abc");
+    assert_eq!(rs("zfill('123', 5)"), "00123");
+    assert_eq!(rs("zfill('12345', 3)"), "12345");
+}
+
+#[test]
+fn core_builtins_quotemeta() {
+    assert_eq!(rs("quotemeta('a.b*c')"), "a\\.b\\*c");
+    assert_eq!(rs("qm('a.b*c')"), "a\\.b\\*c");
+}
+
+#[test]
+fn core_builtins_index_rindex() {
+    assert_eq!(ri("index('hello world', 'o')"), 4);
+    assert_eq!(ri("index('hello world', 'o', 5)"), 7);
+    assert_eq!(ri("index('hello world', 'x')"), -1);
+    assert_eq!(ri("rindex('hello world', 'o')"), 7);
+    assert_eq!(ri("rindex('hello world', 'o', 6)"), 4);
+}
+
+#[test]
+fn core_builtins_splice_basic() {
+    let s = r#"
+        my @a = (1, 2, 3, 4, 5);
+        my @r = splice(@a, 1, 2, 8, 9);
+        join(',', @a) . ';' . join(',', @r);
+    "#;
+    assert_eq!(rs(s), "1,8,9,4,5;2,3");
+}
+
+#[test]
+fn core_builtins_defined_ref_variations() {
+    assert_eq!(ri("defined(undef)"), 0);
+    assert_eq!(ri("defined(0)"), 1);
+    assert_eq!(ri("defined('')"), 1);
+    assert_eq!(rs("ref([])"), "ARRAY");
+    assert_eq!(rs("ref({})"), "HASH");
+    assert_eq!(rs("ref(sub {})"), "CODE");
+}
+
+#[test]
+fn core_builtins_more_math() {
+    assert_eq!(ri("floor(3.9)"), 3);
+    assert_eq!(ri("ceil(3.1)"), 4);
+    assert_eq!(ri("pow2(3)"), 8);
+    assert_eq!(ri("pow2(10)"), 1024);
+    assert!((run("exp2(3)").expect("run").to_number() - 8.0).abs() < 1e-9);
+    assert!((run("log2(8)").expect("run").to_number() - 3.0).abs() < 1e-9);
+    assert!((run("log10(100)").expect("run").to_number() - 2.0).abs() < 1e-9);
+}
+
+#[test]
+fn core_builtins_hyperbolic() {
+    // sinh(0) = 0, cosh(0) = 1
+    assert_eq!(ri("sinh(0)"), 0);
+    assert_eq!(ri("cosh(0)"), 1);
+}
+
+#[test]
+fn core_builtins_math_each() {
+    assert_eq!(rs("join(',', floor_each(1.1, 2.9, 3.5))"), "1,2,3");
+    assert_eq!(rs("join(',', ceil_each(1.1, 2.9, 3.1))"), "2,3,4");
+}
+
+#[test]
+fn core_builtins_path_helpers() {
+    assert_eq!(rs("path_ext('test.txt')"), "txt");
+    assert_eq!(rs("path_ext('no_ext')"), "");
+    assert_eq!(rs("path_join('usr', 'local', 'bin')"), "usr/local/bin");
+    assert_eq!(
+        rs("join(',', @{path_split('usr/local/bin')})"),
+        "usr,local,bin"
+    );
+}
+
+#[test]
+fn core_builtins_string_utilities() {
+    assert_eq!(rs("strip_prefix('foobar', 'foo')"), "bar");
+    assert_eq!(rs("strip_suffix('foobar', 'bar')"), "foo");
+    assert_eq!(rs("trim('  hello  ')"), "hello");
+    assert_eq!(ri("contains('hello world', 'world')"), 1);
+    assert_eq!(ri("contains('hello world', 'mars')"), 0);
+}
+
+#[test]
+fn core_builtins_list_collection() {
+    assert_eq!(rs("join(',', take(1, 2, 3, 4, 2))"), "1,2");
+    assert_eq!(rs("join(',', drop(1, 2, 3, 4, 2))"), "3,4");
+    assert_eq!(rs("join(',', tail(1, 2, 3, 4, 2))"), "3,4");
+    assert_eq!(
+        rs("join(',', map { join(':', @$_) } collect(enumerate('a', 'b')))"),
+        "0:a,1:b"
+    );
+    assert_eq!(
+        rs("join(',', map { join(':', @$_) } zip([1, 2], ['a', 'b']))"),
+        "1:a,2:b"
+    );
+    assert_eq!(
+        rs("join(',', map { join(':', @$_) } zip_all([1, 2, 3], ['a', 'b']))"),
+        "1:a,2:b"
+    );
+}
+
+#[test]
+fn core_builtins_predicates() {
+    assert_eq!(ri("all_eq(1, 1, 1)"), 1);
+    assert_eq!(ri("all_eq(1, 2, 1)"), 0);
+    assert_eq!(ri("all_distinct(1, 2, 3)"), 1);
+    assert_eq!(ri("all_distinct(1, 2, 1)"), 0);
+}
+
+#[test]
+fn core_builtins_aggregates_more() {
+    assert_eq!(ri("sum_of(1, 2, 3)"), 6);
+    assert_eq!(ri("product_of(2, 3, 4)"), 24);
+    assert_eq!(ri("max_of(1, 10, 5)"), 10);
+    assert_eq!(ri("min_of(1, 10, 5)"), 1);
+}
+
+#[test]
+fn core_builtins_list_util_more() {
+    // uniq
+    assert_eq!(rs("join(',', uniq(1, 2, 2, 3, 1, 4))"), "1,2,3,4");
+    // sample(N, LIST)
+    assert_eq!(rs("my @s = sample(2, 1, 2, 3); scalar @s"), "2");
+    // shuffle
+    assert!(run("defined(shuffle(1, 2, 3))").expect("run").is_true());
+}
+
+#[test]
+fn core_builtins_list_util_pairs() {
+    // pairs
+    assert_eq!(
+        rs("my @p = pairs(a => 1, b => 2); join(',', map { $_->[0] . ':' . $_->[1] } @p)"),
+        "a:1,b:2"
+    );
+    // unpairs
+    assert_eq!(
+        rs("my @p = pairs(a => 1, b => 2); join(',', unpairs(@p))"),
+        "a,1,b,2"
+    );
+    // pairkeys
+    assert_eq!(rs("join(',', pairkeys(a => 1, b => 2))"), "a,b");
+    // pairvalues
+    assert_eq!(rs("join(',', pairvalues(a => 1, b => 2))"), "1,2");
+    // pairmap
+    assert_eq!(
+        rs("join(',', pairmap sub { $a . $b }, (a => 1, b => 2))"),
+        "a1,b2"
+    );
+}
+
+#[test]
+fn core_builtins_validation() {
+    assert_eq!(ri("is_valid_ipv4('127.0.0.1')"), 1);
+    assert_eq!(ri("is_valid_ipv4('256.0.0.1')"), 0);
+    assert_eq!(ri("is_valid_ipv6('::1')"), 1);
+    assert_eq!(ri("is_valid_email('test@example.com')"), 1);
+    assert_eq!(ri("is_valid_email('invalid-email')"), 0);
+    assert_eq!(ri("is_valid_url('https://google.com')"), 1);
+    assert_eq!(ri("is_valid_url('not-a-url')"), 0);
+}
+
+#[test]
+fn core_builtins_stats_more_means() {
+    // harmonic mean of 1, 4 is 2/(1/1 + 1/4) = 2/1.25 = 1.6
+    assert_eq!(run("harmonic_mean(1, 4)").expect("run").to_number(), 1.6);
+    // geometric mean of 2, 8 is sqrt(16) = 4
+    assert_eq!(run("geometric_mean(2, 8)").expect("run").to_number(), 4.0);
+}
+
+#[test]
+fn core_builtins_crypto_encoding() {
+    assert_eq!(rs("md5('')"), "d41d8cd98f00b204e9800998ecf8427e");
+    assert_eq!(
+        rs("sha256('abc')"),
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    );
+    assert_eq!(rs("base64_encode('hello')"), "aGVsbG8=");
+    assert_eq!(rs("base64_decode('aGVsbG8=')"), "hello");
+    assert_eq!(rs("hex_encode('ABC')"), "414243");
+    assert_eq!(rs("hex_decode('414243')"), "ABC");
+}
+
+#[test]
+fn core_builtins_pack_unpack_extended() {
+    // Big-endian 32-bit
+    assert_eq!(rs("unpack('H*', pack('N', 0x12345678))"), "12345678");
+    // Little-endian 32-bit
+    assert_eq!(rs("unpack('H*', pack('V', 0x12345678))"), "78563412");
+    // C-style string
+    assert_eq!(rs("unpack('Z*', pack('Z*', 'hello'))"), "hello");
+    // Repeating C
+    assert_eq!(rs("join(',', unpack('C3', pack('C3', 1, 2, 3)))"), "1,2,3");
+}

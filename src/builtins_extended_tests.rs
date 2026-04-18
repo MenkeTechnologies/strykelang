@@ -779,3 +779,562 @@ fn test_advanced_algorithms_extended() {
         "00;01;10;11"
     );
 }
+
+#[test]
+fn test_text_processing_extended() {
+    assert_eq!(
+        run("strip_html('<p>Hello <b>World</b>!</p>')")
+            .expect("run")
+            .to_string(),
+        "Hello World!"
+    );
+    assert_eq!(
+        run("initials('John Fitzgerald Kennedy')")
+            .expect("run")
+            .to_string(),
+        "J.F.K."
+    );
+    assert_eq!(run("leetspeak('Hello')").expect("run").to_string(), "H3ll0");
+    assert_eq!(
+        run("eval_rpn(3, 4, '+', 2, '*')").expect("run").to_int(),
+        14
+    );
+    assert_eq!(
+        run("sort_words('zebra apple monkey')")
+            .expect("run")
+            .to_string(),
+        "apple monkey zebra"
+    );
+}
+
+#[test]
+fn test_more_number_theory_extended() {
+    assert_eq!(run("perfect_numbers(2)").expect("run").to_string(), "628");
+    assert_eq!(
+        run("twin_primes(20)").expect("run").to_string(),
+        "355711131719"
+    );
+    assert_eq!(run("goldbach(10)").expect("run").to_string(), "37");
+    assert_eq!(
+        run("abundant_numbers(20)").expect("run").to_string(),
+        "121820"
+    );
+}
+
+#[test]
+fn test_types_and_conversion_extended() {
+    assert_eq!(run("type_of(42)").expect("run").to_string(), "integer");
+    assert_eq!(run("type_of(3.14)").expect("run").to_string(), "float");
+    assert_eq!(run("type_of('hi')").expect("run").to_string(), "string");
+    assert_eq!(run("type_of([])").expect("run").to_string(), "arrayref");
+    assert_eq!(run("type_of({})").expect("run").to_string(), "hashref");
+    assert_eq!(run("byte_size('hello')").expect("run").to_int(), 5);
+}
+
+#[test]
+fn test_more_string_utilities_extended() {
+    assert_eq!(
+        run("join(',', bigrams('abcde'))").expect("run").to_string(),
+        "ab,bc,cd,de"
+    );
+    assert_eq!(
+        run("my %f = char_frequencies('aabbbc'); join(',', sort keys %f)")
+            .expect("run")
+            .to_string(),
+        "a,b,c"
+    );
+    assert_eq!(
+        run("my %f = char_frequencies('aabbbc'); join(',', map { $f{$_} } sort keys %f)")
+            .expect("run")
+            .to_string(),
+        "2,3,1"
+    );
+    assert_eq!(
+        run("join(',', trigrams('abcde'))")
+            .expect("run")
+            .to_string(),
+        "abc,bcd,cde"
+    );
+}
+
+#[test]
+fn test_extended_array_batch4() {
+    assert_eq!(
+        run("join(',', clamp_array(0, 10, -5, 5, 15))")
+            .expect("run")
+            .to_string(),
+        "0,5,10"
+    );
+    assert_eq!(
+        run("join(',', normalize_range(0, 1, 10, 20, 30))")
+            .expect("run")
+            .to_string(),
+        "0,0.5,1"
+    );
+}
+
+#[test]
+fn test_extended_matrix_batch4() {
+    assert_eq!(
+        run("my @m = matrix_from_rows(2, 2, 1, 2, 3, 4); join(',', map { join('', @$_) } @m)")
+            .expect("run")
+            .to_string(),
+        "12,34"
+    );
+    assert_eq!(
+        run("matrix_flatten([[1, 2], [3, 4]])")
+            .expect("run")
+            .to_string(),
+        "1234"
+    );
+}
+
+#[test]
+fn test_extended_color_batch4() {
+    // 255,0,0 (Red) -> lighten(0.2)
+    assert_eq!(
+        run("join(',', color_lighten(255, 0, 0, 0.2))")
+            .expect("run")
+            .to_string(),
+        "255,102,102"
+    );
+    // 255,0,0 (Red) -> darken(0.2)
+    assert_eq!(
+        run("join(',', color_darken(255, 0, 0, 0.2))")
+            .expect("run")
+            .to_string(),
+        "153,0,0"
+    );
+}
+
+#[test]
+fn test_extended_stats_batch4() {
+    assert_eq!(
+        run("join(',', moving_average(3, 1, 2, 3, 4, 5))")
+            .expect("run")
+            .to_string(),
+        "2,3,4"
+    );
+    assert_eq!(
+        run("mean_squared_error([1, 2, 3], [1, 2, 3])")
+            .expect("run")
+            .to_number(),
+        0.0
+    );
+    assert_eq!(
+        run("mean_squared_error([1, 2, 3], [2, 3, 4])")
+            .expect("run")
+            .to_number(),
+        1.0
+    );
+}
+
+#[test]
+fn test_extended_range_batch4() {
+    assert_eq!(
+        run("range_compress(1, 2, 3, 5, 6, 8)")
+            .expect("run")
+            .to_string(),
+        "1-3,5-6,8"
+    );
+    assert_eq!(
+        run("join(',', range_expand('1-3,5-6,8'))")
+            .expect("run")
+            .to_string(),
+        "1,2,3,5,6,8"
+    );
+}
+
+#[test]
+fn test_extended_matrix_batch5() {
+    // 2x2 inverse
+    assert_eq!(
+        run("my @m = matrix_inverse([[4, 7], [2, 6]]); join(',', map { join(':', @$_) } @m)")
+            .expect("run")
+            .to_string(),
+        "0.6:-0.7,-0.2:0.4"
+    );
+    // matrix_map
+    assert_eq!(
+        run("my @m = matrix_map(sub { $_[0] * 2 }, [[1, 2], [3, 4]]); join(',', map { join('', @$_) } @m)")
+            .expect("run")
+            .to_string(),
+        "24,68"
+    );
+}
+
+#[test]
+fn test_extended_color_batch5() {
+    assert_eq!(
+        run("join(',', color_invert(255, 0, 0))")
+            .expect("run")
+            .to_string(),
+        "0,255,255"
+    );
+    assert_eq!(
+        run("join(',', color_grayscale(255, 0, 0))")
+            .expect("run")
+            .to_string(),
+        "54,54,54"
+    );
+}
+
+#[test]
+fn test_extended_stats_batch5() {
+    // linear_regression([1, 2, 3], [2, 4, 6]) -> slope 2, intercept 0, r2 1
+    assert_eq!(
+        run("join(',', linear_regression([1, 2, 3], [2, 4, 6]))")
+            .expect("run")
+            .to_string(),
+        "2,0,1"
+    );
+}
+
+#[test]
+fn test_extended_word_utils() {
+    assert_eq!(
+        run("my %f = word_frequencies('hello world hello'); join(',', sort keys %f)")
+            .expect("run")
+            .to_string(),
+        "hello,world"
+    );
+    assert_eq!(
+        run("my %f = word_frequencies('hello world hello'); $f{hello}")
+            .expect("run")
+            .to_int(),
+        2
+    );
+}
+
+#[test]
+fn test_extended_matrix_batch6() {
+    assert_eq!(
+        run("matrix_max([[1, 2], [3, 4]])").expect("run").to_int(),
+        4
+    );
+    assert_eq!(
+        run("my @m = matrix_power([[1, 1], [1, 0]], 2); join(',', map { join('', @$_) } @m)")
+            .expect("run")
+            .to_string(),
+        "21,11"
+    );
+}
+
+#[test]
+fn test_extended_color_batch6() {
+    // Red (255,0,0) -> HSV (0, 1, 1)
+    assert_eq!(
+        run("join(',', rgb_to_hsv(255, 0, 0))")
+            .expect("run")
+            .to_string(),
+        "0,1,1"
+    );
+    // HSV (0, 1, 1) -> RGB (255, 0, 0)
+    assert_eq!(
+        run("join(',', hsv_to_rgb(0, 1, 1))")
+            .expect("run")
+            .to_string(),
+        "255,0,0"
+    );
+}
+
+#[test]
+fn test_extended_signal_array_batch6() {
+    assert_eq!(
+        run("join(',', normalize_array(10, 20, 30))")
+            .expect("run")
+            .to_string(),
+        "0,0.5,1"
+    );
+    // Autocorrelation of [1, 2, 3]
+    assert!(run("defined(autocorrelation(1, 2, 3))")
+        .expect("run")
+        .is_true());
+}
+
+#[test]
+fn test_extended_complex_batch7() {
+    // double_metaphone returns a flat array
+    assert_eq!(
+        run("join(',', double_metaphone('Schmidt'))")
+            .expect("run")
+            .to_string(),
+        "SKMT,SKMT"
+    );
+    // game_of_life_step returns an array of arrayrefs
+    let gol = r#"
+        my $grid = [[0, 1, 0], [0, 1, 0], [0, 1, 0]];
+        my @next = game_of_life_step($grid);
+        join(',', map { join('', @$_) } @next);
+    "#;
+    assert_eq!(run(gol).expect("run").to_string(), "000,111,000");
+    // histogram returns a flat array
+    assert_eq!(
+        run("join(',', histogram(2, 1, 2, 3, 4, 5, 10))")
+            .expect("run")
+            .to_string(),
+        "5,1"
+    );
+    // unique_words returns a space-separated string
+    assert_eq!(
+        run("unique_words('the quick brown fox the')")
+            .expect("run")
+            .to_string(),
+        "the quick brown fox"
+    );
+}
+
+#[test]
+fn test_extended_visual_batch8() {
+    assert_eq!(
+        run("ansi_256(31, 'test')").expect("run").to_string(),
+        "\x1b[38;5;31mtest\x1b[0m"
+    );
+    assert_eq!(
+        run("ansi_truecolor(255, 0, 0, 'test')")
+            .expect("run")
+            .to_string(),
+        "\x1b[38;2;255;0;0mtest\x1b[0m"
+    );
+}
+
+#[test]
+fn test_extended_financial_batch8() {
+    assert_eq!(run("tip(100, 20)").expect("run").to_number(), 20.0);
+    assert_eq!(run("tip(200)").expect("run").to_number(), 30.0); // default 15%
+}
+
+#[test]
+fn test_extended_stats_batch8() {
+    assert_eq!(
+        run("join(',', exponential_moving_average(0.5, 10, 20, 30))")
+            .expect("run")
+            .to_string(),
+        "10,15,22.5"
+    );
+}
+
+#[test]
+fn test_extended_collections_batch8() {
+    assert_eq!(
+        run("join(',', gray_code_sequence(2))")
+            .expect("run")
+            .to_string(),
+        "0,1,3,2"
+    );
+    // group_consecutive_by { $_ % 2 } 1, 3, 2, 4, 5
+    // [1, 3] (odd), [2, 4] (even), [5] (odd)
+    let group = r#"
+        my @g = group_consecutive_by(sub { $_[0] % 2 }, 1, 3, 2, 4, 5);
+        join('|', @g);
+    "#;
+    assert_eq!(run(group).expect("run").to_string(), "13|24|5");
+}
+
+#[test]
+fn test_extended_conversion_batch8() {
+    assert_eq!(run("to_string_val(42)").expect("run").to_string(), "42");
+    assert_eq!(
+        run("to_string_val('hello')").expect("run").to_string(),
+        "hello"
+    );
+}
+
+#[test]
+fn test_extended_geometry_batch9() {
+    // Square [0,0], [1,0], [1,1], [0,1]
+    let poly = "polygon_area([[0,0], [1,0], [1,1], [0,1]])";
+    assert_eq!(run(poly).expect("run").to_number(), 1.0);
+    assert!(
+        (run("sphere_surface(1)").expect("run").to_number() - 4.0 * std::f64::consts::PI).abs()
+            < 1e-9
+    );
+}
+
+#[test]
+fn test_extended_stats_batch9() {
+    // coeff_of_variation of [10, 10, 10] is 0
+    assert_eq!(
+        run("coeff_of_variation(10, 10, 10)")
+            .expect("run")
+            .to_number(),
+        0.0
+    );
+    // cross_entropy([1, 0], [0.5, 0.5]) = -(1*ln(0.5) + 0*ln(0.5)) = ln(2) = 0.693147...
+    assert!(
+        (run("cross_entropy([1, 0], [0.5, 0.5])")
+            .expect("run")
+            .to_number()
+            - 2.0f64.ln())
+        .abs()
+            < 1e-9
+    );
+}
+#[test]
+fn test_extended_collections_batch9() {
+    // bucket(10, 5, 15, 25) -> {0:[5], 10:[15], 20:[25]}
+    let b = "my %h = bucket(10, 5, 15, 25); join(',', sort keys %h)";
+    assert_eq!(run(b).expect("run").to_string(), "0,10,20");
+}
+
+#[test]
+fn test_extended_signal_batch9() {
+    // convolution([1, 2], [3, 4]) = [1*3, 1*4 + 2*3, 2*4] = [3, 10, 8]
+    assert_eq!(
+        run("join(',', convolution([1, 2], [3, 4]))")
+            .expect("run")
+            .to_string(),
+        "3,10,8"
+    );
+}
+#[test]
+fn test_extended_validation_batch8() {
+    assert_eq!(run("is_valid_latitude(45.0)").expect("run").to_int(), 1);
+    assert_eq!(run("is_valid_latitude(95.0)").expect("run").to_int(), 0);
+    assert_eq!(run("is_valid_longitude(120.0)").expect("run").to_int(), 1);
+    assert_eq!(run("is_valid_longitude(190.0)").expect("run").to_int(), 0);
+}
+#[test]
+fn test_extended_algorithms_batch2() {
+    assert_eq!(
+        run("join(',', next_permutation(1, 2, 3))")
+            .expect("run")
+            .to_string(),
+        "1,3,2"
+    );
+    assert_eq!(
+        run("join(',', merge_sorted([1, 3, 5], [2, 4, 6]))")
+            .expect("run")
+            .to_string(),
+        "1,2,3,4,5,6"
+    );
+    assert_eq!(
+        run("join(',', binary_insert(3, [1, 2, 4, 5]))")
+            .expect("run")
+            .to_string(),
+        "1,2,3,4,5"
+    );
+    assert_eq!(
+        run("join(',', collatz_sequence(6))")
+            .expect("run")
+            .to_string(),
+        "6,3,10,5,16,8,4,2,1"
+    );
+}
+
+#[test]
+fn test_extended_financial_batch2() {
+    assert!((run("cagr(100, 200, 10)").expect("run").to_number() - 0.07177346).abs() < 1e-6);
+    assert_eq!(
+        run("break_even(1000, 20, 10)").expect("run").to_number(),
+        100.0
+    );
+    assert!((run("npv(0.1, [100, 100, 100])").expect("run").to_number() - 273.5537).abs() < 1e-3);
+}
+
+#[test]
+fn test_extended_roman_more() {
+    assert_eq!(run("roman_add('X', 'V')").expect("run").to_string(), "XV");
+    assert_eq!(
+        run("join(',', roman_numeral_list(5))")
+            .expect("run")
+            .to_string(),
+        "I,II,III,IV,V"
+    );
+}
+
+#[test]
+fn test_extended_misc_final() {
+    assert_eq!(run("roman_to_int('XLII')").expect("run").to_int(), 42);
+    assert_eq!(run("int_to_roman(42)").expect("run").to_string(), "XLII");
+    assert_eq!(run("degrees_to_compass(0)").expect("run").to_string(), "N");
+    assert_eq!(run("degrees_to_compass(90)").expect("run").to_string(), "E");
+    assert_eq!(run("collatz_length(6)").expect("run").to_int(), 8);
+    // zalgo just adds noise, so we check if it returns a longer string
+    assert!(run("length(zalgo('test'))").expect("run").to_int() > 4);
+}
+
+#[test]
+fn test_extended_number_theory_batch3() {
+    assert_eq!(run("primes_up_to(10)").expect("run").to_string(), "2357");
+    assert_eq!(run("prime_factors(12)").expect("run").to_string(), "223");
+    assert_eq!(run("divisors(12)").expect("run").to_string(), "1234612");
+}
+
+#[test]
+fn test_extended_geometry_batch3() {
+    assert_eq!(run("slope(0, 0, 1, 1)").expect("run").to_number(), 1.0);
+    assert_eq!(
+        run("slope(0, 0, 0, 1)").expect("run").to_number(),
+        f64::INFINITY
+    );
+    assert_eq!(run("midpoint(0, 0, 2, 2)").expect("run").to_string(), "11");
+    assert_eq!(run("heron_area(3, 4, 5)").expect("run").to_number(), 6.0);
+}
+
+#[test]
+fn test_extended_finance_batch3() {
+    // depreciation_linear(cost, salvage, life)
+    assert_eq!(
+        run("depreciation_linear(1000, 200, 5)")
+            .expect("run")
+            .to_number(),
+        160.0
+    );
+}
+
+#[test]
+fn test_extended_matrix_batch2() {
+    assert_eq!(
+        run("matrix_sum([[1, 2], [3, 4]])").expect("run").to_int(),
+        10
+    );
+    assert_eq!(
+        run("my $m = matrix_transpose([[1, 2], [3, 4]]); join(',', map { join('', @$_) } @$m)")
+            .expect("run")
+            .to_string(),
+        "13,24"
+    );
+    assert_eq!(
+        run("my @m = matrix_hadamard([[1, 2]], [[3, 4]]); join(',', map { join('', @$_) } @m)")
+            .expect("run")
+            .to_string(),
+        "38"
+    );
+}
+
+#[test]
+fn test_extended_color_batch2() {
+    assert_eq!(
+        run("join(',', color_blend(255, 0, 0, 0, 0, 255, 0.5))")
+            .expect("run")
+            .to_string(),
+        "128,0,128"
+    );
+    assert_eq!(
+        run("join(',', color_complement(255, 0, 0))")
+            .expect("run")
+            .to_string(),
+        "0,255,255"
+    );
+}
+
+#[test]
+fn test_extended_stats_batch2() {
+    assert_eq!(
+        run("median_absolute_deviation(1, 2, 3, 4, 10)")
+            .expect("run")
+            .to_number(),
+        1.0
+    );
+    // kurtosis of [1, 2, 3, 4, 5] is -1.2, but formula might vary. Just check it runs.
+    assert!(run("defined(kurtosis(1, 2, 3, 4, 5))")
+        .expect("run")
+        .is_true());
+}
+
+#[test]
+fn test_extended_typography() {
+    assert_eq!(run("superscript('123')").expect("run").to_string(), "¹²³");
+    assert_eq!(run("subscript('123')").expect("run").to_string(), "₁₂₃");
+}

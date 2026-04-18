@@ -89,6 +89,7 @@ _perlrs() {
     '--remote-worker[persistent cluster worker over stdio]' \
     '--remote-worker-v1[legacy one-shot cluster worker over stdio]' \
     '--compat[Perl 5 strict-compat: disable all perlrs extensions]' \
+    '--script[force arg to be a script file (skip code detection)]' \
     '*-e+[one line of program (several allowed)]:code:' \
     '*-E+[like -e but enables all optional features]:code:' \
     '-c[check syntax only (parse; does not compile or run)]' \
