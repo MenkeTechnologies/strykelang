@@ -629,6 +629,25 @@ pub(crate) fn try_builtin(
         "ansi_underline" => Some(builtin_ansi_wrap(interp, args, 4)),
         "ansi_reverse" => Some(builtin_ansi_wrap(interp, args, 7)),
         "strip_ansi" => Some(builtin_strip_ansi(interp, args)),
+        // Raw ANSI escape codes for string interpolation
+        "red" | "green" | "yellow" | "blue" | "magenta" | "purple" | "cyan" | "white" | "black"
+        | "bold" | "dim" | "italic" | "underline" | "strikethrough" | "reset" | "blink"
+        | "rapid_blink" | "reverse" | "hidden" | "overline" | "gray" | "grey" | "bright_red"
+        | "bright_green" | "bright_yellow" | "bright_blue" | "bright_magenta" | "bright_cyan"
+        | "bright_white" | "bg_red" | "bg_green" | "bg_yellow" | "bg_blue" | "bg_magenta"
+        | "bg_cyan" | "bg_white" | "bg_black" | "bg_bright_red" | "bg_bright_green"
+        | "bg_bright_yellow" | "bg_bright_blue" | "bg_bright_magenta" | "bg_bright_cyan"
+        | "bg_bright_white" | "red_bold" | "bold_red" | "green_bold" | "bold_green"
+        | "yellow_bold" | "bold_yellow" | "blue_bold" | "bold_blue" | "magenta_bold"
+        | "bold_magenta" | "cyan_bold" | "bold_cyan" | "white_bold" | "bold_white" => {
+            Some(Ok(builtin_ansi_code(name)))
+        }
+        // True color: rgb(r,g,b) foreground, bg_rgb(r,g,b) background
+        "rgb" => Some(builtin_rgb_ansi(args, true)),
+        "bg_rgb" => Some(builtin_bg_rgb_ansi(args, true)),
+        // 256-color: color256(n) foreground, bg_color256(n) background
+        "color256" | "c256" => Some(builtin_color256(args, true)),
+        "bg_color256" | "bg_c256" => Some(builtin_color256(args, false)),
         // ── Network / validation ──
         "ipv4_to_int" => Some(builtin_ipv4_to_int(interp, args)),
         "int_to_ipv4" => Some(builtin_int_to_ipv4(interp, args)),
@@ -5212,6 +5231,121 @@ fn builtin_hex_to_rgb(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
     Ok(PerlValue::array_ref(Arc::new(RwLock::new(arr))))
 }
 /// `ansi_wrap` — Ansi wrap. Returns a string. Defaults to `$_` when called with no args.
+/// Zero-arg color builtins: `red`, `green`, `reset`, etc.
+/// Return the raw ANSI escape code so `"#{red}text#{reset}"` works.
+fn builtin_ansi_code(name: &str) -> PerlValue {
+    let code = match name {
+        // reset
+        "reset" => "\x1b[0m",
+        // styles
+        "bold" => "\x1b[1m",
+        "dim" => "\x1b[2m",
+        "italic" => "\x1b[3m",
+        "underline" => "\x1b[4m",
+        "blink" => "\x1b[5m",
+        "rapid_blink" => "\x1b[6m",
+        "reverse" => "\x1b[7m",
+        "hidden" => "\x1b[8m",
+        "strikethrough" => "\x1b[9m",
+        "overline" => "\x1b[53m",
+        // foreground
+        "black" => "\x1b[30m",
+        "red" => "\x1b[31m",
+        "green" => "\x1b[32m",
+        "yellow" => "\x1b[33m",
+        "blue" => "\x1b[34m",
+        "magenta" | "purple" => "\x1b[35m",
+        "cyan" => "\x1b[36m",
+        "white" => "\x1b[37m",
+        // bright foreground
+        "gray" | "grey" => "\x1b[90m",
+        "bright_red" => "\x1b[91m",
+        "bright_green" => "\x1b[92m",
+        "bright_yellow" => "\x1b[93m",
+        "bright_blue" => "\x1b[94m",
+        "bright_magenta" => "\x1b[95m",
+        "bright_cyan" => "\x1b[96m",
+        "bright_white" => "\x1b[97m",
+        // background
+        "bg_black" => "\x1b[40m",
+        "bg_red" => "\x1b[41m",
+        "bg_green" => "\x1b[42m",
+        "bg_yellow" => "\x1b[43m",
+        "bg_blue" => "\x1b[44m",
+        "bg_magenta" => "\x1b[45m",
+        "bg_cyan" => "\x1b[46m",
+        "bg_white" => "\x1b[47m",
+        // bright background
+        "bg_bright_red" => "\x1b[101m",
+        "bg_bright_green" => "\x1b[102m",
+        "bg_bright_yellow" => "\x1b[103m",
+        "bg_bright_blue" => "\x1b[104m",
+        "bg_bright_magenta" => "\x1b[105m",
+        "bg_bright_cyan" => "\x1b[106m",
+        "bg_bright_white" => "\x1b[107m",
+        // bold + color combos
+        "red_bold" | "bold_red" => "\x1b[1;31m",
+        "green_bold" | "bold_green" => "\x1b[1;32m",
+        "yellow_bold" | "bold_yellow" => "\x1b[1;33m",
+        "blue_bold" | "bold_blue" => "\x1b[1;34m",
+        "magenta_bold" | "bold_magenta" => "\x1b[1;35m",
+        "cyan_bold" | "bold_cyan" => "\x1b[1;36m",
+        "white_bold" | "bold_white" => "\x1b[1;37m",
+        _ => "",
+    };
+    PerlValue::string(code.to_string())
+}
+
+/// `rgb(r, g, b)` — true color (24-bit) foreground escape code.
+fn builtin_rgb_ansi(args: &[PerlValue], _fg: bool) -> PerlResult<PerlValue> {
+    let (r, g, b) = match args.len() {
+        3 => (args[0].to_int(), args[1].to_int(), args[2].to_int()),
+        1 => {
+            // Single hex string: rgb("#ff5500") or rgb("ff5500")
+            let s = args[0].to_string();
+            let hex = s.trim_start_matches('#');
+            if hex.len() == 6 {
+                let r = i64::from_str_radix(&hex[0..2], 16).unwrap_or(0);
+                let g = i64::from_str_radix(&hex[2..4], 16).unwrap_or(0);
+                let b = i64::from_str_radix(&hex[4..6], 16).unwrap_or(0);
+                (r, g, b)
+            } else {
+                (0, 0, 0)
+            }
+        }
+        _ => (0, 0, 0),
+    };
+    Ok(PerlValue::string(format!("\x1b[38;2;{};{};{}m", r, g, b)))
+}
+
+/// `bg_rgb(r, g, b)` — true color (24-bit) background escape code.
+fn builtin_bg_rgb_ansi(args: &[PerlValue], _fg: bool) -> PerlResult<PerlValue> {
+    let (r, g, b) = match args.len() {
+        3 => (args[0].to_int(), args[1].to_int(), args[2].to_int()),
+        1 => {
+            let s = args[0].to_string();
+            let hex = s.trim_start_matches('#');
+            if hex.len() == 6 {
+                let r = i64::from_str_radix(&hex[0..2], 16).unwrap_or(0);
+                let g = i64::from_str_radix(&hex[2..4], 16).unwrap_or(0);
+                let b = i64::from_str_radix(&hex[4..6], 16).unwrap_or(0);
+                (r, g, b)
+            } else {
+                (0, 0, 0)
+            }
+        }
+        _ => (0, 0, 0),
+    };
+    Ok(PerlValue::string(format!("\x1b[48;2;{};{};{}m", r, g, b)))
+}
+
+/// `color256(n)` / `bg_color256(n)` — 256-color palette escape code.
+fn builtin_color256(args: &[PerlValue], fg: bool) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_int()).unwrap_or(0);
+    let layer = if fg { 38 } else { 48 };
+    Ok(PerlValue::string(format!("\x1b[{};5;{}m", layer, n)))
+}
+
 fn builtin_ansi_wrap(interp: &Interpreter, args: &[PerlValue], code: u8) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(format!("\x1b[{}m{}\x1b[0m", code, s)))
