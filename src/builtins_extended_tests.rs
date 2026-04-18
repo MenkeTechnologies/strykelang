@@ -427,6 +427,143 @@ fn test_more_core_string_builtins() {
 }
 
 #[test]
+fn test_dsp_signal_builtins() {
+    assert_eq!(
+        run("join(',', convolution([1, 2], [3, 4]))")
+            .expect("run")
+            .to_string(),
+        "3,10,8"
+    );
+    assert_eq!(
+        run("zero_crossings(1, -1, 1, -1)").expect("run").to_int(),
+        3
+    );
+    assert_eq!(
+        run("join(',', peak_detect(1, 5, 2, 8, 3))")
+            .expect("run")
+            .to_string(),
+        "1,3"
+    );
+}
+
+#[test]
+fn test_more_misc_algorithms() {
+    assert_eq!(run("tower_of_hanoi(3)").expect("run").to_int(), 7);
+    assert_eq!(run("look_and_say('11')").expect("run").to_string(), "21");
+    assert_eq!(
+        run("join(',', gray_code_sequence(2))")
+            .expect("run")
+            .to_string(),
+        "0,1,3,2"
+    );
+    let pascal = r#"
+        my $rows = pascals_triangle(3);
+        join(',', @{$rows->[2]});
+    "#;
+    assert_eq!(run(pascal).expect("run").to_string(), "1,2,1");
+}
+
+#[test]
+fn test_more_list_processing_builtins() {
+    assert_eq!(
+        run("join(',', flatten([1, 2], [3, 4]))")
+            .expect("run")
+            .to_string(),
+        "1,2,3,4"
+    );
+    assert_eq!(
+        run("join(',', compact(1, undef, 2, 0, 3))")
+            .expect("run")
+            .to_string(),
+        "1,2,0,3"
+    );
+    assert_eq!(
+        run("join(',', map { @$_ } enumerate('a', 'b'))")
+            .expect("run")
+            .to_string(),
+        "0,a,1,b"
+    );
+    assert_eq!(
+        run("join(',', dedup(1, 2, 2, 3, 3))")
+            .expect("run")
+            .to_string(),
+        "1,2,3"
+    );
+    assert_eq!(
+        run("join(',', range(1, 5))").expect("run").to_string(),
+        "1,2,3,4,5"
+    );
+}
+
+#[test]
+fn test_advanced_number_theory() {
+    assert_eq!(run("partition_number(5)").expect("run").to_int(), 7);
+    assert_eq!(run("multinomial(3, 1, 1, 1)").expect("run").to_int(), 6);
+}
+
+#[test]
+fn test_extra_statistics() {
+    assert_eq!(
+        run("skewness(1, 2, 3, 4, 5)").expect("run").to_number(),
+        0.0
+    );
+    assert_eq!(
+        run("standard_error(1, 2, 3, 4, 5)")
+            .expect("run")
+            .to_number(),
+        0.6324555320336759
+    );
+    assert_eq!(
+        run("join(',', moving_average(2, 1, 2, 3, 4))")
+            .expect("run")
+            .to_string(),
+        "1.5,2.5,3.5"
+    );
+}
+
+#[test]
+fn test_extra_misc_algorithms() {
+    assert_eq!(run("look_and_say('1')").expect("run").to_string(), "11");
+    // truth_table(1) -> [[0], [1]]
+    let tt = r#"
+            my $t = truth_table(1);
+            $t->[0]->[0] . ',' . $t->[1]->[0];
+        "#;
+    assert_eq!(run(tt).expect("run").to_string(), "0,1");
+}
+#[test]
+fn test_human_builtins() {
+    // weight 70kg, height 1.75m -> bmi ~ 22.85
+    let bmi_val = run("bmi(70, 1.75)").expect("run").to_number();
+    assert!((bmi_val - 22.85).abs() < 0.1);
+
+    // 2 drinks, 70kg, 1 hour, male
+    let bac = run("bac_estimate(2, 70, 1, 'm')").expect("run").to_number();
+    assert!(bac > 0.04 && bac < 0.06);
+}
+
+#[test]
+fn test_visual_builtins() {
+    // sierpinski(0) is just "*"
+    assert_eq!(run("sierpinski(0)").expect("run").to_string(), "*");
+    // mandelbrot_char(0, 0) should be ' ' (inside set)
+    assert_eq!(run("mandelbrot_char(0, 0)").expect("run").to_string(), " ");
+    // mandelbrot_char(2, 2) should be something else (outside set)
+    assert_eq!(run("mandelbrot_char(2, 2)").expect("run").to_string(), ".");
+}
+
+#[test]
+fn test_automata_builtins() {
+    // Game of Life: block (stable)
+    let gol = r#"
+        my $grid = [[1, 1], [1, 1]];
+        my $next = game_of_life_step($grid);
+        $next->[0]->[0] . $next->[0]->[1] . $next->[1]->[0] . $next->[1]->[1];
+    "#;
+    assert_eq!(run(gol).expect("run").to_string(), "1111");
+}
+
+#[test]
 fn test_jwt_builtins() {
     let code = r#"
         my $payload = { sub => "1234567890", name => "John Doe", admin => 1 };
@@ -503,5 +640,37 @@ fn test_list_util_builtins() {
             .expect("run")
             .to_string(),
         "1,3,6"
+    );
+}
+
+#[test]
+fn test_extra_boolean_logic() {
+    assert_eq!(run("both(1, 1)").expect("run").to_int(), 1);
+    assert_eq!(run("both(1, 0)").expect("run").to_int(), 0);
+    assert_eq!(run("either(1, 0)").expect("run").to_int(), 1);
+    assert_eq!(run("either(0, 0)").expect("run").to_int(), 0);
+    assert_eq!(run("neither(0, 0)").expect("run").to_int(), 1);
+    assert_eq!(run("neither(1, 0)").expect("run").to_int(), 0);
+}
+
+#[test]
+fn test_itertools_builtins() {
+    assert_eq!(
+        run("join(',', compress([1, 2, 3], [1, 0, 1]))")
+            .expect("run")
+            .to_string(),
+        "1,3"
+    );
+    assert_eq!(
+        run("join(',', islice(1, 4, [0, 1, 2, 3, 4, 5]))")
+            .expect("run")
+            .to_string(),
+        "1,2,3"
+    );
+    assert_eq!(
+        run("my @p = cartesian_product([1, 2], ['a', 'b']); join(';', map { join(',', @$_) } @p)")
+            .expect("run")
+            .to_string(),
+        "1,a;1,b;2,a;2,b"
     );
 }

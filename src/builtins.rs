@@ -2083,7 +2083,7 @@ pub(crate) fn try_builtin(
         "avogadro_number" => Some(Ok(PerlValue::float(6.022_140_76e23))),
         "boltzmann_constant" | "boltz" => Some(Ok(PerlValue::float(1.380_649e-23))),
         "elementary_charge" | "echarge" => Some(Ok(PerlValue::float(1.602_176_634e-19))),
-        "electron_mass" | "emass" => Some(Ok(PerlValue::float(9.109_383_7015e-31))),
+        "electron_mass" | "emass" => Some(Ok(PerlValue::float(9.109_383_701_5e-31))),
         "proton_mass" | "pmass" => Some(Ok(PerlValue::float(1.672_621_923_69e-27))),
         "phi" => Some(Ok(PerlValue::float(1.618_033_988_749_895))),
         "euler_number" | "euler_e" => Some(Ok(PerlValue::float(std::f64::consts::E))),
@@ -2982,6 +2982,11 @@ fn builtin_lines(_interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVa
                 crate::map_stream::LinesFlatMapIterator::new(source),
             )));
         }
+        if let Some(cap) = v.as_capture() {
+            return Ok(PerlValue::iterator(Arc::new(
+                crate::map_stream::LinesIterator::new(&cap.stdout),
+            )));
+        }
     }
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     Ok(PerlValue::iterator(Arc::new(
@@ -2997,6 +3002,11 @@ fn builtin_words(_interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVa
             let source = v.clone().into_iterator();
             return Ok(PerlValue::iterator(Arc::new(
                 crate::map_stream::WordsFlatMapIterator::new(source),
+            )));
+        }
+        if let Some(cap) = v.as_capture() {
+            return Ok(PerlValue::iterator(Arc::new(
+                crate::map_stream::WordsIterator::new(&cap.stdout),
             )));
         }
     }
@@ -3081,9 +3091,7 @@ fn builtin_graphemes(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
     let mut out: Vec<PerlValue> = Vec::new();
     let mut cluster = String::new();
     for c in s.chars() {
-        if cluster.is_empty() {
-            cluster.push(c);
-        } else if is_combining_or_extend(c) {
+        if cluster.is_empty() || is_combining_or_extend(c) {
             cluster.push(c);
         } else {
             out.push(PerlValue::string(std::mem::take(&mut cluster)));

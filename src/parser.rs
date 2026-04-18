@@ -6847,7 +6847,7 @@ impl Parser {
             // Named functions / builtins
             Token::ThreadArrow => {
                 self.advance();
-                return self.parse_thread_macro(line);
+                self.parse_thread_macro(line)
             }
             Token::Ident(ref name) => {
                 let name = name.clone();

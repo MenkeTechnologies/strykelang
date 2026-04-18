@@ -106,7 +106,7 @@ fn builtin_divisors(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Perl
     let mut divs = Vec::new();
     let mut i = 1u64;
     while i * i <= n {
-        if n % i == 0 {
+        if n.is_multiple_of(i) {
             divs.push(i as i64);
             if i != n / i {
                 divs.push((n / i) as i64);
@@ -129,7 +129,7 @@ fn builtin_num_divisors(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
     let mut count = 0i64;
     let mut i = 1u64;
     while i * i <= n {
-        if n % i == 0 {
+        if n.is_multiple_of(i) {
             count += if i == n / i { 1 } else { 2 };
         }
         i += 1;
@@ -2117,11 +2117,11 @@ fn builtin_string_distance(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let (ac, bc): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
     let (m, n) = (ac.len(), bc.len());
     let mut dp = vec![vec![0usize; n + 1]; m + 1];
-    for i in 0..=m {
-        dp[i][0] = i;
+    for (i, row) in dp.iter_mut().enumerate() {
+        row[0] = i;
     }
-    for j in 0..=n {
-        dp[0][j] = j;
+    for (j, cell) in dp[0].iter_mut().enumerate() {
+        *cell = j;
     }
     for i in 1..=m {
         for j in 1..=n {
@@ -2184,7 +2184,7 @@ fn builtin_metaphone(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
             _ => None,
         };
         if let Some(mc) = code {
-            if result.is_empty() || result.chars().last() != Some(mc) {
+            if result.is_empty() || !result.ends_with(mc) {
                 result.push(mc);
             }
         }
@@ -2371,7 +2371,7 @@ fn builtin_luhn_check(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
             sum += d;
         }
     }
-    Ok(bool_iv(sum % 10 == 0))
+    Ok(bool_iv(sum.is_multiple_of(10)))
 }
 fn builtin_is_valid_hex_color(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
@@ -2466,20 +2466,14 @@ fn builtin_is_balanced_parens(interp: &Interpreter, args: &[PerlValue]) -> PerlR
     for c in s.chars() {
         match c {
             '(' | '[' | '{' => stack.push(c),
-            ')' => {
-                if stack.pop() != Some('(') {
-                    return Ok(bool_iv(false));
-                }
+            ')' if stack.pop() != Some('(') => {
+                return Ok(bool_iv(false));
             }
-            ']' => {
-                if stack.pop() != Some('[') {
-                    return Ok(bool_iv(false));
-                }
+            ']' if stack.pop() != Some('[') => {
+                return Ok(bool_iv(false));
             }
-            '}' => {
-                if stack.pop() != Some('{') {
-                    return Ok(bool_iv(false));
-                }
+            '}' if stack.pop() != Some('{') => {
+                return Ok(bool_iv(false));
             }
             _ => {}
         }
@@ -2562,10 +2556,10 @@ fn builtin_reservoir_sample(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
     let mut reservoir: Vec<PerlValue> = xs[..k].to_vec();
     let mut rng = rand::thread_rng();
-    for i in k..xs.len() {
+    for (i, item) in xs.iter().enumerate().skip(k) {
         let j = rng.gen_range(0..=i);
         if j < k {
-            reservoir[j] = xs[i].clone();
+            reservoir[j] = item.clone();
         }
     }
     Ok(PerlValue::array(reservoir))
@@ -2990,7 +2984,7 @@ fn builtin_look_and_say(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
     Ok(PerlValue::string(result))
 }
 fn builtin_gray_code_sequence(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let n = first_arg_or_topic(interp, args).to_int().max(0).min(20) as u32;
+    let n = first_arg_or_topic(interp, args).to_int().clamp(0, 20) as u32;
     Ok(PerlValue::array(
         (0..1u64 << n)
             .map(|i| PerlValue::integer((i ^ (i >> 1)) as i64))
@@ -2998,7 +2992,7 @@ fn builtin_gray_code_sequence(interp: &Interpreter, args: &[PerlValue]) -> PerlR
     ))
 }
 fn builtin_sierpinski(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let n = first_arg_or_topic(interp, args).to_int().max(0).min(8) as u32;
+    let n = first_arg_or_topic(interp, args).to_int().clamp(0, 8) as u32;
     let size = 1usize << n;
     let mut lines = Vec::with_capacity(size);
     for y in 0..size {
@@ -3101,7 +3095,7 @@ fn builtin_pascals_triangle(interp: &Interpreter, args: &[PerlValue]) -> PerlRes
     ))
 }
 fn builtin_truth_table(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let n = first_arg_or_topic(interp, args).to_int().max(0).min(20) as u32;
+    let n = first_arg_or_topic(interp, args).to_int().clamp(0, 20) as u32;
     Ok(PerlValue::array(
         (0..1u64 << n)
             .map(|i| {

@@ -398,8 +398,8 @@ my $f2 = eval str $f;                        # round-trip: deserialize back to c
 p $f2->(21);                                 # 42
 
 # streaming range — bidirectional lazy iterator
-range(1, 5) |> e p;                          # 1 2 3 4 5
-range(5, 1) |> e p;                          # 5 4 3 2 1
+range(1, 5) |> e p                          # 1 2 3 4 5
+range(5, 1) |> e p                          # 5 4 3 2 1
 ```
 
 #### Sets
@@ -555,7 +555,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   ```
 - **`use strict`** — refs/subs/vars modes (per-mode `use strict 'refs'` etc.). `strict refs` rejects symbolic derefs at runtime; `strict vars` requires a visible binding.
 - **`BEGIN` / `UNITCHECK` / `CHECK` / `INIT` / `END`** — Perl order; `${^GLOBAL_PHASE}` matches Perl in tree-walker and VM.
-- **String interpolation** — `$var` `#{23 * 52}`, `$h{k}`, `$a[i]`, `@a`, `@a[slice]` (joined with `$"`), `$#a` in slice indices, `$0`, `$1..$n`. `\x{hex}` and unbraced `\x`.
+- **String interpolation** — `$var` `#{23 * 52}`, `$h{k}`, `$a[i]`, `@a`, `@a[slice]` (joined with `$"`), `$#a` in slice indices, `$0`, `$1..$n`. Escapes: `\n \r \t \a \b \f \e \0`, `\x{hex}`, `\xHH`, `\u{hex}`, `\o{oct}`, `\NNN` (octal), `\cX` (control), `\N{U+hex}`, `\N{UNICODE NAME}`, `\U..\E`, `\L..\E`, `\u`, `\l`, `\Q..\E`.
 - **`__FILE__` / `__LINE__`** — compile-time literals.
 - Heredocs `<<EOF`, POD skipping, shebang handling, `qw()/q()/qq()` with paired delimiters.
 - **Special variables** — large set of `${^NAME}` scalars pre-seeded; see [`SPECIAL_VARIABLES.md`](parity/SPECIAL_VARIABLES.md). Still missing vs Perl 5: `English`, full `$^V` as a version object.
@@ -606,14 +606,14 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   # blockless list pipelines — no braces needed for simple expressions
   files |> filter /[a-e]/ |> e -f $_ && system("cat $_")
-  "a".."z" |> map uc |> e p;                      # A B C … Z
-  "a".."z" |> grep /[aeiou]/ |> e p;              # a e i o u
-  "a".."z" |> filter 't' |> e p;                  # t  (literal = equality test)
-  1..10 |> filter $_ > 5 |> sort |> e p;      # blocks still work
+  "a".."z" |> map uc |> e p                      # A B C … Z
+  "a".."z" |> grep /[aeiou]/ |> e p              # a e i o u
+  "a".."z" |> filter 't' |> e p                  # t  (literal = equality test)
+  1..10 |> filter $_ > 5 |> sort |> e p      # blocks still work
   1..5 |> map $_ * $_ |> join "," |> p;         # 1,4,9,16,25
 
   # e — side-effect-only iteration (like map but void, returns count)
-  qw(apple banana cherry) |> grep /^a/ |> map uc |> e p;  # APPLE
+  qw(apple banana cherry) |> grep /^a/ |> map uc |> e p  # APPLE
 
   # unary builtins — `x |> length`, `x |> uc`, `x |> sqrt`, etc.
   "hello" |> length |> p;                            # 5

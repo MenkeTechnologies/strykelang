@@ -1525,7 +1525,7 @@ pub fn format_expr(e: &Expr) -> String {
                 "spinner {} {{ {} }}",
                 format_expr(message),
                 body.iter()
-                    .map(|s| format_statement(s))
+                    .map(format_statement)
                     .collect::<Vec<_>>()
                     .join("; ")
             )

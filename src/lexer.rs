@@ -5,6 +5,16 @@ use crate::token::{keyword_or_ident, Token};
 /// The parser maps this to `$` without variable interpolation (CPAN `eval qq/…/` code generators).
 pub const LITERAL_DOLLAR_IN_DQUOTE: char = '\u{E000}';
 
+/// Resolve `\N{U+XXXX}` hex codepoints and `\N{LATIN SMALL LETTER E}` Unicode character names.
+fn parse_unicode_name(name: &str) -> Option<char> {
+    if let Some(hex) = name.strip_prefix("U+") {
+        let val = u32::from_str_radix(hex, 16).ok()?;
+        char::from_u32(val)
+    } else {
+        unicode_names2::character(name)
+    }
+}
+
 /// Flag letters after `m//`, `qr//`, etc. (`c` = `/gc`, `o` = compile once; CPAN uses both).
 const REGEX_FLAG_CHARS: &str = "gimsxecor";
 
@@ -244,12 +254,53 @@ impl Lexer {
                     Some('t') => s.push('\t'),
                     Some('r') => s.push('\r'),
                     Some('\\') => s.push('\\'),
-                    Some('0') => s.push('\0'),
+                    Some(c @ '0'..='7') => {
+                        let mut oct = String::new();
+                        oct.push(c);
+                        for _ in 0..2 {
+                            match self.peek() {
+                                Some(d) if ('0'..='7').contains(&d) => {
+                                    oct.push(self.advance().unwrap());
+                                }
+                                _ => break,
+                            }
+                        }
+                        let val = u32::from_str_radix(&oct, 8).unwrap();
+                        let ch = char::from_u32(val)
+                            .ok_or_else(|| self.syntax_err("Invalid octal escape", self.line))?;
+                        s.push(ch);
+                    }
                     Some('a') => s.push('\x07'),
                     Some('b') => s.push('\x08'),
                     Some('f') => s.push('\x0C'),
                     Some('e') => s.push('\x1B'),
                     Some('$') => s.push(LITERAL_DOLLAR_IN_DQUOTE),
+                    Some('c') => {
+                        let ch = self
+                            .advance()
+                            .ok_or_else(|| self.syntax_err("Unterminated \\c escape", self.line))?;
+                        s.push(char::from(ch.to_ascii_uppercase() as u8 ^ 0x40));
+                    }
+                    Some('o') if self.peek() == Some('{') => {
+                        self.advance(); // '{'
+                        let oct = self.read_while(|c| c != '}');
+                        if self.peek() != Some('}') {
+                            return Err(
+                                self.syntax_err("Unterminated \\o{...} in string", self.line)
+                            );
+                        }
+                        self.advance(); // '}'
+                        if oct.is_empty() {
+                            return Err(self.syntax_err("Empty \\o{} in string", self.line));
+                        }
+                        let val = u32::from_str_radix(&oct, 8).map_err(|_| {
+                            self.syntax_err("Invalid octal digits in \\o{...}", self.line)
+                        })?;
+                        let c = char::from_u32(val).ok_or_else(|| {
+                            self.syntax_err("Invalid Unicode scalar value in \\o{...}", self.line)
+                        })?;
+                        s.push(c);
+                    }
                     Some('u') if self.peek() == Some('{') => {
                         self.advance(); // '{'
                         let hex = self.read_while(|c| c != '}');
@@ -267,6 +318,26 @@ impl Lexer {
                         })?;
                         let c = char::from_u32(val).ok_or_else(|| {
                             self.syntax_err("Invalid Unicode scalar value in \\u{...}", self.line)
+                        })?;
+                        s.push(c);
+                    }
+                    Some('N') if self.peek() == Some('{') => {
+                        self.advance(); // '{'
+                        let name = self.read_while(|c| c != '}');
+                        if self.peek() != Some('}') {
+                            return Err(
+                                self.syntax_err("Unterminated \\N{...} in string", self.line)
+                            );
+                        }
+                        self.advance(); // '}'
+                        if name.is_empty() {
+                            return Err(self.syntax_err("Empty \\N{} in string", self.line));
+                        }
+                        let c = parse_unicode_name(&name).ok_or_else(|| {
+                            self.syntax_err(
+                                format!("Unknown Unicode character name: {name}"),
+                                self.line,
+                            )
                         })?;
                         s.push(c);
                     }
@@ -354,12 +425,60 @@ impl Lexer {
                             Some('t') => s.push('\t'),
                             Some('r') => s.push('\r'),
                             Some('\\') => s.push('\\'),
-                            Some('0') => s.push('\0'),
+                            Some(c @ '0'..='7') => {
+                                let mut oct = String::new();
+                                oct.push(c);
+                                for _ in 0..2 {
+                                    match self.peek() {
+                                        Some(d) if ('0'..='7').contains(&d) => {
+                                            oct.push(self.advance().unwrap());
+                                        }
+                                        _ => break,
+                                    }
+                                }
+                                let val = u32::from_str_radix(&oct, 8).unwrap();
+                                let ch = char::from_u32(val).ok_or_else(|| {
+                                    self.syntax_err("Invalid octal escape", self.line)
+                                })?;
+                                s.push(ch);
+                            }
                             Some('a') => s.push('\x07'),
                             Some('b') => s.push('\x08'),
                             Some('f') => s.push('\x0C'),
                             Some('e') => s.push('\x1B'),
                             Some('$') => s.push(LITERAL_DOLLAR_IN_DQUOTE),
+                            Some('c') => {
+                                let ch = self.advance().ok_or_else(|| {
+                                    self.syntax_err("Unterminated \\c escape", self.line)
+                                })?;
+                                s.push(char::from(ch.to_ascii_uppercase() as u8 ^ 0x40));
+                            }
+                            Some('o') if self.peek() == Some('{') => {
+                                self.advance();
+                                let oct = self.read_while(|c| c != '}');
+                                if self.peek() != Some('}') {
+                                    return Err(self.syntax_err(
+                                        "Unterminated \\o{...} in qq string",
+                                        self.line,
+                                    ));
+                                }
+                                self.advance();
+                                if oct.is_empty() {
+                                    return Err(
+                                        self.syntax_err("Empty \\o{} in qq string", self.line)
+                                    );
+                                }
+                                let val = u32::from_str_radix(&oct, 8).map_err(|_| {
+                                    self.syntax_err("Invalid octal digits in \\o{...}", self.line)
+                                })?;
+                                let c = char::from_u32(val).ok_or_else(|| {
+                                    self.syntax_err(
+                                        "Invalid Unicode scalar value in \\o{...}",
+                                        self.line,
+                                    )
+                                })?;
+                                s.push(c);
+                            }
                             Some('u') if self.peek() == Some('{') => {
                                 self.advance();
                                 let hex = self.read_while(|c| c != '}');
@@ -381,6 +500,29 @@ impl Lexer {
                                 let c = char::from_u32(val).ok_or_else(|| {
                                     self.syntax_err(
                                         "Invalid Unicode scalar value in \\u{...}",
+                                        self.line,
+                                    )
+                                })?;
+                                s.push(c);
+                            }
+                            Some('N') if self.peek() == Some('{') => {
+                                self.advance();
+                                let name = self.read_while(|c| c != '}');
+                                if self.peek() != Some('}') {
+                                    return Err(self.syntax_err(
+                                        "Unterminated \\N{...} in qq string",
+                                        self.line,
+                                    ));
+                                }
+                                self.advance();
+                                if name.is_empty() {
+                                    return Err(
+                                        self.syntax_err("Empty \\N{} in qq string", self.line)
+                                    );
+                                }
+                                let c = parse_unicode_name(&name).ok_or_else(|| {
+                                    self.syntax_err(
+                                        format!("Unknown Unicode character name: {name}"),
                                         self.line,
                                     )
                                 })?;
@@ -1950,6 +2092,41 @@ mod tests {
         let mut l = Lexer::new(r#""\u{0041}\u{00E9}\u{1F600}""#);
         let t = l.tokenize().expect("tokenize");
         assert!(matches!(t[0].0, Token::DoubleString(ref s) if s == "Aé😀"));
+    }
+
+    #[test]
+    fn tokenize_double_string_octal_escape() {
+        let mut l = Lexer::new(r#""\101""#);
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[0].0, Token::DoubleString(ref s) if s == "A"));
+    }
+
+    #[test]
+    fn tokenize_double_string_braced_octal_escape() {
+        let mut l = Lexer::new(r#""\o{101}""#);
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[0].0, Token::DoubleString(ref s) if s == "A"));
+    }
+
+    #[test]
+    fn tokenize_double_string_control_char_escape() {
+        let mut l = Lexer::new(r#""\cA""#);
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[0].0, Token::DoubleString(ref s) if s == "\x01"));
+    }
+
+    #[test]
+    fn tokenize_double_string_named_unicode_escape() {
+        let mut l = Lexer::new(r#""\N{SNOWMAN}""#);
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[0].0, Token::DoubleString(ref s) if s == "☃"));
+    }
+
+    #[test]
+    fn tokenize_double_string_named_unicode_u_plus() {
+        let mut l = Lexer::new(r#""\N{U+2603}""#);
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[0].0, Token::DoubleString(ref s) if s == "☃"));
     }
 
     #[test]

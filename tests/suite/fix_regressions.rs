@@ -3337,6 +3337,41 @@ fn double_quoted_u_escape_without_brace_is_case_modifier() {
 }
 
 #[test]
+fn octal_escape_unbraced() {
+    assert_eq!(eval_string(r#""\101""#), "A"); // octal 101 = 65 = 'A'
+    assert_eq!(eval_string(r#""\012""#), "\n"); // octal 012 = 10 = newline
+    assert_eq!(eval_string(r#""\0""#), "\0"); // bare \0 = NUL
+    assert_eq!(eval_string(r#""\177""#), "\x7F"); // octal 177 = 127 = DEL
+}
+
+#[test]
+fn octal_escape_braced() {
+    assert_eq!(eval_string(r#""\o{101}""#), "A");
+    assert_eq!(eval_string(r#""\o{12}""#), "\n");
+    assert_eq!(eval_string(r#""\o{360}""#), "\u{F0}"); // octal 360 = 240 = U+00F0
+}
+
+#[test]
+fn control_char_escape() {
+    assert_eq!(eval_string(r#""\cA""#), "\x01");
+    assert_eq!(eval_string(r#""\cZ""#), "\x1A");
+    assert_eq!(eval_string(r#""\ca""#), "\x01"); // case-insensitive
+    assert_eq!(eval_string(r#""\c[""#), "\x1B"); // ESC
+}
+
+#[test]
+fn unicode_name_escape_u_plus() {
+    assert_eq!(eval_string(r#""\N{U+0041}""#), "A");
+    assert_eq!(eval_string(r#""\N{U+00E9}""#), "é");
+}
+
+#[test]
+fn unicode_name_escape_by_name() {
+    assert_eq!(eval_string(r#""\N{LATIN SMALL LETTER E WITH ACUTE}""#), "é");
+    assert_eq!(eval_string(r#""\N{SNOWMAN}""#), "☃");
+}
+
+#[test]
 fn list_assign_with_short_rhs_leaves_trailing_lexical_undef() {
     assert_eq!(
         eval_int(
