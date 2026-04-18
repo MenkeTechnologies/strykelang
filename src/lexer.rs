@@ -250,6 +250,26 @@ impl Lexer {
                     Some('f') => s.push('\x0C'),
                     Some('e') => s.push('\x1B'),
                     Some('$') => s.push(LITERAL_DOLLAR_IN_DQUOTE),
+                    Some('u') if self.peek() == Some('{') => {
+                        self.advance(); // '{'
+                        let hex = self.read_while(|c| c != '}');
+                        if self.peek() != Some('}') {
+                            return Err(
+                                self.syntax_err("Unterminated \\u{...} in string", self.line)
+                            );
+                        }
+                        self.advance(); // '}'
+                        if hex.is_empty() {
+                            return Err(self.syntax_err("Empty \\u{} in string", self.line));
+                        }
+                        let val = u32::from_str_radix(&hex, 16).map_err(|_| {
+                            self.syntax_err("Invalid hex digits in \\u{...}", self.line)
+                        })?;
+                        let c = char::from_u32(val).ok_or_else(|| {
+                            self.syntax_err("Invalid Unicode scalar value in \\u{...}", self.line)
+                        })?;
+                        s.push(c);
+                    }
                     Some('x') => {
                         if self.peek() == Some('{') {
                             self.advance(); // '{'
@@ -340,6 +360,32 @@ impl Lexer {
                             Some('f') => s.push('\x0C'),
                             Some('e') => s.push('\x1B'),
                             Some('$') => s.push(LITERAL_DOLLAR_IN_DQUOTE),
+                            Some('u') if self.peek() == Some('{') => {
+                                self.advance();
+                                let hex = self.read_while(|c| c != '}');
+                                if self.peek() != Some('}') {
+                                    return Err(self.syntax_err(
+                                        "Unterminated \\u{...} in qq string",
+                                        self.line,
+                                    ));
+                                }
+                                self.advance();
+                                if hex.is_empty() {
+                                    return Err(
+                                        self.syntax_err("Empty \\u{} in qq string", self.line)
+                                    );
+                                }
+                                let val = u32::from_str_radix(&hex, 16).map_err(|_| {
+                                    self.syntax_err("Invalid hex digits in \\u{...}", self.line)
+                                })?;
+                                let c = char::from_u32(val).ok_or_else(|| {
+                                    self.syntax_err(
+                                        "Invalid Unicode scalar value in \\u{...}",
+                                        self.line,
+                                    )
+                                })?;
+                                s.push(c);
+                            }
                             Some('x') => {
                                 if self.peek() == Some('{') {
                                     self.advance();
@@ -1888,6 +1934,22 @@ mod tests {
         let t = l.tokenize().expect("tokenize");
         let want: String = ['\u{1215}'].into_iter().collect();
         assert!(matches!(t[0].0, Token::DoubleString(ref s) if *s == want));
+    }
+
+    #[test]
+    fn tokenize_double_string_braced_unicode_u_escape() {
+        let mut l = Lexer::new(r#""\u{0301}""#);
+        let t = l.tokenize().expect("tokenize");
+        let want: String = ['\u{0301}'].into_iter().collect();
+        assert!(matches!(t[0].0, Token::DoubleString(ref s) if *s == want));
+    }
+
+    #[test]
+    fn tokenize_double_string_braced_unicode_u_escape_multi() {
+        // \u{0041} = 'A', \u{00E9} = 'é', \u{1F600} = '😀'
+        let mut l = Lexer::new(r#""\u{0041}\u{00E9}\u{1F600}""#);
+        let t = l.tokenize().expect("tokenize");
+        assert!(matches!(t[0].0, Token::DoubleString(ref s) if s == "Aé😀"));
     }
 
     #[test]

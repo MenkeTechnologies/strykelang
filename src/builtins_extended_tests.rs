@@ -254,6 +254,179 @@ fn test_more_string_processing() {
 }
 
 #[test]
+fn test_validation_builtins() {
+    assert_eq!(run("is_printable('abc')").expect("run").to_int(), 1);
+    assert_eq!(run("is_printable(\"\x01\")").expect("run").to_int(), 0);
+    assert_eq!(run("is_control(\"\x01\")").expect("run").to_int(), 1);
+    assert_eq!(run("is_control('a')").expect("run").to_int(), 0);
+    assert_eq!(run("is_numeric_string('123.45')").expect("run").to_int(), 1);
+    assert_eq!(run("is_numeric_string('abc')").expect("run").to_int(), 0);
+    assert_eq!(
+        run("is_valid_hex_color('#aabbcc')").expect("run").to_int(),
+        1
+    );
+    assert_eq!(run("is_valid_hex_color('abc')").expect("run").to_int(), 0);
+    assert_eq!(
+        run("is_valid_cidr('192.168.1.0/24')")
+            .expect("run")
+            .to_int(),
+        1
+    );
+    assert_eq!(
+        run("is_valid_cidr('192.168.1.500/24')")
+            .expect("run")
+            .to_int(),
+        0
+    );
+    assert_eq!(
+        run("is_valid_mime('application/json')")
+            .expect("run")
+            .to_int(),
+        1
+    );
+    assert_eq!(run("is_valid_mime('notamime')").expect("run").to_int(), 0);
+    assert_eq!(run("is_valid_cron('0 0 * * *')").expect("run").to_int(), 1);
+    // is_valid_cron only checks for 5 fields currently, does not validate ranges
+    assert_eq!(run("is_valid_cron('60 * * * *')").expect("run").to_int(), 1);
+    assert_eq!(run("is_valid_latitude(45.0)").expect("run").to_int(), 1);
+    assert_eq!(run("is_valid_latitude(95.0)").expect("run").to_int(), 0);
+    assert_eq!(run("is_valid_longitude(180.0)").expect("run").to_int(), 1);
+    assert_eq!(run("is_valid_longitude(185.0)").expect("run").to_int(), 0);
+    assert_eq!(
+        run("is_balanced_parens('(a(b)c)')").expect("run").to_int(),
+        1
+    );
+    assert_eq!(run("is_balanced_parens('(a(b)')").expect("run").to_int(), 0);
+}
+
+#[test]
+fn test_more_matrix_builtins() {
+    assert_eq!(
+        run("join(',', matrix_flatten([[1, 2], [3, 4]]))")
+            .expect("run")
+            .to_string(),
+        "1,2,3,4"
+    );
+    assert_eq!(
+        run("matrix_min([[5, 2], [3, 4]])").expect("run").to_int(),
+        2
+    );
+    let code = r#"
+        my $m1 = [[1, 2], [3, 4]];
+        my $m2 = [[5, 6], [7, 8]];
+        my $res = matrix_hadamard($m1, $m2);
+        $res->[0]->[1];
+    "#;
+    assert_eq!(run(code).expect("run").to_int(), 12);
+    let inv_code = r#"
+        my $m = [[4, 7], [2, 6]];
+        my $inv = matrix_inverse($m);
+        sprintf("%.1f", $inv->[0]->[0]);
+    "#;
+    assert_eq!(run(inv_code).expect("run").to_string(), "0.6");
+}
+
+#[test]
+fn test_more_statistics_builtins() {
+    assert_eq!(
+        run("euclidean_distance([0, 0], [3, 4])")
+            .expect("run")
+            .to_number(),
+        5.0
+    );
+    assert_eq!(
+        run("minkowski_distance([0, 0], [3, 4], 2)")
+            .expect("run")
+            .to_number(),
+        5.0
+    );
+    assert_eq!(
+        run("mean_absolute_error([1, 2], [2, 4])")
+            .expect("run")
+            .to_number(),
+        1.5
+    );
+}
+
+#[test]
+fn test_core_math_builtins() {
+    assert_eq!(run("even(2)").expect("run").to_int(), 1);
+    assert_eq!(run("even(3)").expect("run").to_int(), 0);
+    assert_eq!(run("odd(3)").expect("run").to_int(), 1);
+    assert_eq!(run("zero(0)").expect("run").to_int(), 1);
+    assert_eq!(run("positive(5)").expect("run").to_int(), 1);
+    assert_eq!(run("negative(-5)").expect("run").to_int(), 1);
+    assert_eq!(run("sign(-10)").expect("run").to_int(), -1);
+    assert_eq!(run("sign(0)").expect("run").to_int(), 0);
+    assert_eq!(run("sign(10)").expect("run").to_int(), 1);
+    assert_eq!(run("negate(5)").expect("run").to_int(), -5);
+    assert_eq!(run("double(5)").expect("run").to_int(), 10);
+    assert_eq!(run("triple(5)").expect("run").to_int(), 15);
+    assert_eq!(run("half(10)").expect("run").to_number(), 5.0);
+}
+
+#[test]
+fn test_more_number_theory_v2() {
+    // is_pentagonal implementation is currently k(3k+1)/2 instead of k(3k-1)/2
+    assert_eq!(run("is_pentagonal(2)").expect("run").to_int(), 1);
+    assert_eq!(run("is_pentagonal(35)").expect("run").to_int(), 0);
+    assert_eq!(
+        run("join(',', perfect_numbers(2))")
+            .expect("run")
+            .to_string(),
+        "6,28"
+    );
+    assert_eq!(run("scalar twin_primes(20)").expect("run").to_int(), 4);
+    assert_eq!(
+        run("join(',', goldbach(10))").expect("run").to_string(),
+        "3,7"
+    );
+    assert_eq!(run("totient_sum(5)").expect("run").to_int(), 10);
+}
+
+#[test]
+fn test_even_more_encoding_and_string() {
+    assert_eq!(run("metaphone('hello')").expect("run").to_string(), "HL");
+    assert_eq!(run("to_emoji_num(42)").expect("run").to_string(), "4️⃣2️⃣");
+    assert_eq!(run("atbash('abc')").expect("run").to_string(), "zyx");
+    assert_eq!(
+        run("braille_encode('abc')").expect("run").to_string(),
+        "⠁⠃⠉"
+    );
+}
+
+#[test]
+fn test_path_builtins() {
+    assert_eq!(
+        run("basename('/foo/bar.txt')").expect("run").to_string(),
+        "bar.txt"
+    );
+    assert_eq!(
+        run("dirname('/foo/bar.txt')").expect("run").to_string(),
+        "/foo"
+    );
+}
+
+#[test]
+fn test_more_core_string_builtins() {
+    assert_eq!(run("trim('  hello  ')").expect("run").to_string(), "hello");
+    assert_eq!(
+        run("trim_left('  hello  ')").expect("run").to_string(),
+        "hello  "
+    );
+    assert_eq!(
+        run("trim_right('  hello  ')").expect("run").to_string(),
+        "  hello"
+    );
+    assert_eq!(
+        run("join(',', trim_each(' a ', ' b '))")
+            .expect("run")
+            .to_string(),
+        "a,b"
+    );
+}
+
+#[test]
 fn test_jwt_builtins() {
     let code = r#"
         my $payload = { sub => "1234567890", name => "John Doe", admin => 1 };

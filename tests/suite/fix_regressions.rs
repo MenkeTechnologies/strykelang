@@ -3324,6 +3324,19 @@ fn double_quoted_braced_hex_escape_yields_codepoint() {
 }
 
 #[test]
+fn double_quoted_braced_u_escape_yields_codepoint() {
+    assert_eq!(eval_string(r#""\u{0301}""#), "\u{0301}");
+    assert_eq!(eval_string(r#""\u{0041}""#), "A");
+    assert_eq!(eval_string(r#""\u{1F600}""#), "\u{1F600}");
+}
+
+#[test]
+fn double_quoted_u_escape_without_brace_is_case_modifier() {
+    // \u without braces is ucfirst, not a Unicode escape
+    assert_eq!(eval_string(r#""\uhello""#), "Hello");
+}
+
+#[test]
 fn list_assign_with_short_rhs_leaves_trailing_lexical_undef() {
     assert_eq!(
         eval_int(
