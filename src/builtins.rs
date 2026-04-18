@@ -422,6 +422,7 @@ pub(crate) fn try_builtin(
         "to_table" | "table" | "tbl" => Some(builtin_to_table(args)),
         "sparkline" | "spark" => Some(builtin_sparkline(args)),
         "bar_chart" | "bars" => Some(builtin_bar_chart(interp, args)),
+        "flame" | "flamechart" => Some(builtin_flame(interp, args)),
         "grep_v" => Some(builtin_grep_v(args, line)),
         "select_keys" => Some(builtin_select_keys(args)),
         "pluck" => Some(builtin_pluck(args)),
@@ -636,7 +637,7 @@ pub(crate) fn try_builtin(
         "strip_ansi" => Some(builtin_strip_ansi(interp, args)),
         // Raw ANSI escape codes for string interpolation
         "red" | "green" | "yellow" | "blue" | "magenta" | "purple" | "cyan" | "white" | "black"
-        | "bold" | "dim" | "italic" | "underline" | "strikethrough" | "rst" | "blink"
+        | "bold" | "dim" | "italic" | "underline" | "strikethrough" | "ansi_off" | "blink"
         | "rapid_blink" | "reverse" | "hidden" | "overline" | "gray" | "grey" | "bright_red"
         | "bright_green" | "bright_yellow" | "bright_blue" | "bright_magenta" | "bright_cyan"
         | "bright_white" | "bg_red" | "bg_green" | "bg_yellow" | "bg_blue" | "bg_magenta"
@@ -3339,6 +3340,100 @@ fn builtin_bar_chart(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
     Ok(PerlValue::string(buf))
 }
 
+/// `flame HASHREF` — render a terminal flamechart from hierarchical data.
+/// Nested hashes represent call stacks; leaf values are weights.
+/// Flat hashrefs render like a single-level flame. Width is proportional
+/// to weight relative to the total at each level.
+fn builtin_flame(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let val = first_arg_or_topic(interp, args);
+    let hr = match val.as_hash_ref() {
+        Some(h) => h,
+        None => {
+            let val2 = normalize_serialize_root(args);
+            match val2.as_hash_ref() {
+                Some(h) => h,
+                None => return Ok(PerlValue::string(String::new())),
+            }
+        }
+    };
+    let term_width = 80usize;
+    let mut buf = String::new();
+    flame_render_level(&mut buf, &hr.read(), 0, term_width);
+    Ok(PerlValue::string(buf))
+}
+
+/// Compute the total weight of a node: if it's a number, that's the weight;
+/// if it's a nested hash, sum its children recursively.
+fn flame_weight(val: &PerlValue) -> f64 {
+    if let Some(hr) = val.as_hash_ref() {
+        hr.read().values().map(flame_weight).sum()
+    } else {
+        val.to_number()
+    }
+}
+
+fn flame_render_level(
+    buf: &mut String,
+    map: &indexmap::IndexMap<String, PerlValue>,
+    depth: usize,
+    width: usize,
+) {
+    let colors = [
+        "\x1b[41m\x1b[97m", // red bg, white text
+        "\x1b[43m\x1b[30m", // yellow bg, black text
+        "\x1b[42m\x1b[30m", // green bg, black text
+        "\x1b[44m\x1b[97m", // blue bg, white text
+        "\x1b[45m\x1b[97m", // magenta bg, white text
+        "\x1b[46m\x1b[30m", // cyan bg, black text
+    ];
+    if map.is_empty() || width < 2 {
+        return;
+    }
+    let total: f64 = map.values().map(flame_weight).sum();
+    if total <= 0.0 {
+        return;
+    }
+    // Render this level as a single row of adjacent colored blocks
+    let mut row = String::new();
+    let mut children: Vec<(&str, &PerlValue, usize)> = Vec::new();
+    let mut used = 0usize;
+    let entries: Vec<_> = map.iter().collect();
+    for (i, (k, v)) in entries.iter().enumerate() {
+        let w = flame_weight(v);
+        let block_w = if i == entries.len() - 1 {
+            width - used // last block gets remaining width to avoid rounding gaps
+        } else {
+            ((w / total) * width as f64).round() as usize
+        };
+        let block_w = block_w.max(1).min(width - used);
+        let color = colors[(depth + i) % colors.len()];
+        // Truncate label to fit block
+        let label = if k.len() + 2 <= block_w {
+            format!(" {} ", k)
+        } else if block_w >= 3 {
+            let trunc = block_w - 2;
+            format!(" {}… ", &k[..trunc.min(k.len())])
+        } else {
+            " ".repeat(block_w)
+        };
+        let padded = format!("{:w$}", label, w = block_w);
+        row.push_str(&format!("{}{}\x1b[0m", color, padded));
+        children.push((k, v, block_w));
+        used += block_w;
+    }
+    buf.push_str(&row);
+    buf.push('\n');
+    // Recurse into children that are nested hashes
+    for (_k, v, block_w) in &children {
+        if let Some(child_hr) = v.as_hash_ref() {
+            let child_guard = child_hr.read();
+            if !child_guard.is_empty() {
+                flame_render_level(buf, &child_guard, depth + 1, *block_w);
+            }
+        }
+    }
+}
+
 fn builtin_pager(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
     use std::io::Write as _;
     use std::process::{Command, Stdio};
@@ -5494,7 +5589,7 @@ fn builtin_hex_to_rgb(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
 fn builtin_ansi_code(name: &str) -> PerlValue {
     let code = match name {
         // reset
-        "rst" => "\x1b[0m",
+        "ansi_off" => "\x1b[0m",
         // styles
         "bold" => "\x1b[1m",
         "dim" => "\x1b[2m",

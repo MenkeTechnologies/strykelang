@@ -1224,6 +1224,7 @@ impl Parser {
                 | "to_table"
                 | "sparkline"
                 | "bar_chart"
+                | "flame"
                 | "set"
                 | "list_count"
                 | "list_size"
@@ -2133,6 +2134,10 @@ impl Parser {
             },
             "bar_chart" | "bars" => ExprKind::FuncCall {
                 name: "bar_chart".to_string(),
+                args: vec![arg],
+            },
+            "flame" | "flamechart" => ExprKind::FuncCall {
+                name: "flame".to_string(),
                 args: vec![arg],
             },
             "ddump" | "dd" => ExprKind::FuncCall {
@@ -4703,8 +4708,8 @@ impl Parser {
                     | "stringify" | "str" | "lines" | "words" | "chars" | "trim" | "avg"
                     | "to_json" | "to_csv" | "to_toml" | "to_yaml" | "to_xml" | "to_html"
                     | "to_markdown" | "to_table" | "xopen" | "clip" | "sparkline" | "bar_chart"
-                    | "stddev" | "squared" | "sq" | "square" | "cubed" | "cb" | "cube"
-                    | "normalize" | "snake_case" | "camel_case" | "kebab_case" => {
+                    | "flame" | "stddev" | "squared" | "sq" | "square" | "cubed" | "cb"
+                    | "cube" | "normalize" | "snake_case" | "camel_case" | "kebab_case" => {
                         if args.is_empty() {
                             args.push(lhs);
                         } else {
@@ -10532,7 +10537,7 @@ impl Parser {
             | "to_json" | "to_csv" | "to_toml" | "to_yaml" | "to_xml"
             | "to_html" | "to_markdown" | "to_table" | "xopen"
             | "clip" | "clipboard" | "paste" | "pbcopy" | "pbpaste"
-            | "sparkline" | "spark" | "bar_chart" | "bars"
+            | "sparkline" | "spark" | "bar_chart" | "bars" | "flame" | "flamechart"
             | "to_hash" | "to_set"
             | "to_file" | "read_lines" | "append_file" | "write_json" | "read_json"
             | "tempfile" | "tempdir" | "list_count" | "list_size" | "size"
@@ -10665,7 +10670,7 @@ impl Parser {
             | "strip_ansi"
             | "red" | "green" | "yellow" | "blue" | "magenta" | "purple" | "cyan"
             | "white" | "black" | "bold" | "dim" | "italic" | "underline"
-            | "strikethrough" | "rst" | "gray" | "grey"
+            | "strikethrough" | "ansi_off" | "gray" | "grey"
             | "bright_red" | "bright_green" | "bright_yellow" | "bright_blue"
             | "bright_magenta" | "bright_cyan" | "bright_white"
             | "bg_red" | "bg_green" | "bg_yellow" | "bg_blue"
