@@ -341,7 +341,7 @@ f("*.txt") |&gt; map { [$_, slurp($_) |&gt; split(/\s+/) |&gt; scalar] }
 
       <section class="tutorial-section">
         <h2>Builtin categories</h2>
-        <p>2,001 operations across 2,093 spellings. Query them via <code>keys %stryke::builtins</code> — the table below is a navigational overview, not a full index. Run <code>st 'p scalar keys %b'</code> for the live count.</p>
+        <p>2,568 operations across 2,843 spellings. Query them via <code>keys %stryke::builtins</code> — the table below is a navigational overview, not a full index. Run <code>st 'p scalar keys %b'</code> for the live count.</p>
         <div class="cat-grid">
           <div class="cat-card"><h4>Array / List (134+)</h4><p><code>map maps flat_map grep sort reverse push pop shift unshift splice reduce fold fore e first any all none take take_while drop skip_while partition min_by max_by zip zip_with interleave frequencies count_by chunk windowed enumerate shuffle uniq dedup compact flatten concat pluck grep_v with_index sorted sorted_desc sorted_nums without take_last drop_last pairwise batch rotate swap_pairs sliding_pairs run_length_encode group_consecutive permutations combinations power_set cartesian_product</code> &hellip;</p></div>
           <div class="cat-card"><h4>String (129+)</h4><p><code>chomp chop length substr index rindex split join uc lc ucfirst lcfirst chr ord trim lines words chars snake_case camel_case kebab_case pascal_case constant_case capitalize swap_case title_case squish pad_left pad_right center truncate_at reverse_str rot13 rot47 caesar_shift count_vowels count_consonants first_word last_word left_str right_str wrap_text dedent indent strip_html levenshtein soundex extract_numbers extract_emails extract_urls</code> &hellip;</p></div>
@@ -418,6 +418,230 @@ par_pipeline_stream([\&amp;stage1, \&amp;stage2, \&amp;stage3], \@input);</pre>
           <li><strong>Strict / modules</strong> — per-mode <code>use strict 'refs'</code> etc., <code>@INC</code> built from <code>-I</code>, <code>vendor/perl</code>, system Perl's <code>@INC</code>, script dir, <code>STRYKE_INC</code>. <code>List::Util</code> is native Rust.</li>
         </ul>
         <p>Full list in the <a href="https://github.com/MenkeTechnologies/stryke#0x08-supported-perl-features">README §0x08</a>.</p>
+      </section>
+
+      <section class="tutorial-section" id="oop">
+        <h2>Object-Oriented Programming</h2>
+        <p>Stryke supports both Perl 5 OOP (<code>bless</code>, <code>@ISA</code>, <code>tie</code>, <code>use overload</code>) and a native <code>class</code> syntax with inheritance, traits, visibility, static fields, operator overloading, and full reflection.</p>
+
+        <h3>Class basics</h3>
+        <p>Declare classes with typed fields, defaults, and instance methods. Fields get auto-generated getters/setters. <code>$self</code> is implicit in methods.</p>
+<pre>class Dog {
+    name: Str
+    breed: Str = "Mixed"
+    fn bark { "Woof from " . $self-&gt;name }
+}
+
+my $d = Dog(name =&gt; "Rex");          <span class="comment"># named construction</span>
+my $d = Dog("Rex", "Lab");            <span class="comment"># positional construction</span>
+p $d-&gt;name;                           <span class="comment"># getter → "Rex"</span>
+$d-&gt;name("Max");                      <span class="comment"># setter</span>
+p $d-&gt;bark();                         <span class="comment"># "Woof from Max"</span></pre>
+
+        <h3>Methods with parameters</h3>
+<pre>class Calculator {
+    value: Int = 0
+    fn add($n) { $self-&gt;value + $n }
+}
+my $c = Calculator(value =&gt; 10);
+p $c-&gt;add(5);                         <span class="comment"># 15</span></pre>
+
+        <h3>Static methods</h3>
+<pre>class Math {
+    fn Self.add($a, $b) { $a + $b }
+    fn Self.pi { 3.14159 }
+}
+p Math::add(3, 4);                     <span class="comment"># 7</span>
+p Math::pi();                          <span class="comment"># 3.14159</span></pre>
+
+        <h3>Inheritance (<code>extends</code>)</h3>
+        <p>Single and multiple inheritance. Parent fields and methods are inherited. C3 MRO for diamond resolution.</p>
+<pre>class Animal {
+    name: Str
+    fn speak { "Animal: " . $self-&gt;name }
+}
+class Dog extends Animal {
+    fn speak { "Woof from " . $self-&gt;name }  <span class="comment"># override</span>
+}
+my $d = Dog(name =&gt; "Rex");
+p $d-&gt;speak();                        <span class="comment"># "Woof from Rex"</span>
+
+<span class="comment"># multiple inheritance</span>
+class A { a: Int = 1 }
+class B { b: Int = 2 }
+class C extends A, B { c: Int = 3 }
+my $c = C();
+p $c-&gt;a . "," . $c-&gt;b . "," . $c-&gt;c; <span class="comment"># "1,2,3"</span></pre>
+
+        <h3>Abstract classes</h3>
+        <p>Cannot be instantiated directly. Subclasses must implement abstract methods.</p>
+<pre>abstract class Shape {
+    name: Str
+    fn describe { "Shape: " . $self-&gt;name }
+}
+
+<span class="comment"># Shape(name =&gt; "x")  → ERROR: cannot instantiate abstract class</span>
+
+class Circle extends Shape { radius: Int }
+my $c = Circle(name =&gt; "ring", radius =&gt; 5);
+p $c-&gt;describe();                     <span class="comment"># "Shape: ring"</span></pre>
+
+        <h3>Final classes and methods</h3>
+        <p><code>final class</code> prevents subclassing. <code>final fn</code> prevents method override in subclasses. Both checked at declaration time.</p>
+<pre>final class Config { value: Int = 42 }
+<span class="comment"># class Bad extends Config { }  → ERROR: cannot extend final class</span>
+
+class Base {
+    final fn id { 42 }
+    fn label { "base" }                <span class="comment"># can be overridden</span>
+}
+class Child extends Base { }
+my $c = Child();
+p $c-&gt;id();                           <span class="comment"># 42 (inherited, cannot override)</span></pre>
+
+        <h3>Visibility (<code>pub</code> / <code>prot</code> / <code>priv</code>)</h3>
+        <p>Applies to both fields and methods. Runtime enforcement on access.</p>
+<pre>class Secret {
+    pub visible: Int = 1               <span class="comment"># public (default)</span>
+    priv hidden: Int = 42              <span class="comment"># own class only</span>
+    prot internal: Int = 99            <span class="comment"># class + subclasses</span>
+
+    fn get_hidden { $self-&gt;hidden }    <span class="comment"># internal access ok</span>
+}
+class Child extends Secret {
+    fn get_internal { $self-&gt;internal } <span class="comment"># prot: ok from subclass</span>
+}
+my $s = Secret();
+p $s-&gt;get_hidden();                   <span class="comment"># 42</span>
+<span class="comment"># $s-&gt;hidden  → ERROR: private field</span>
+
+my $c = Child();
+p $c-&gt;get_internal();                 <span class="comment"># 99</span>
+<span class="comment"># $c-&gt;internal  → ERROR: protected field (outside class hierarchy)</span></pre>
+
+        <h3>Static fields</h3>
+        <p>Shared across all instances. Access via <code>ClassName::field()</code> (getter) / <code>ClassName::field(value)</code> (setter).</p>
+<pre>class Tracker {
+    static total: Int = 0
+    name: Str
+    fn BUILD { Tracker::total(Tracker::total() + 1) }
+}
+my $a = Tracker(name =&gt; "a");
+my $b = Tracker(name =&gt; "b");
+p Tracker::total();                    <span class="comment"># 2</span></pre>
+
+        <h3>BUILD / DESTROY hooks</h3>
+        <p><code>BUILD</code> runs after field init (parent first, then child). <code>DESTROY</code> runs in reverse (child first, then parent).</p>
+<pre>class Base {
+    log: Str = ""
+    fn BUILD { $self-&gt;log("base") }
+}
+class Child extends Base {
+    fn BUILD { $self-&gt;log($self-&gt;log . "+child") }
+}
+my $c = Child();
+p $c-&gt;log;                            <span class="comment"># "base+child"</span>
+
+<span class="comment"># DESTROY — child runs first</span>
+class Base {
+    static log: Str = ""
+    fn DESTROY { Base::log(Base::log() . "base,") }
+}
+class Child extends Base {
+    fn DESTROY { Base::log(Base::log() . "child,") }
+}
+my $c = Child();
+$c-&gt;destroy();
+p Base::log();                         <span class="comment"># "child,base,"</span></pre>
+
+        <h3>Traits</h3>
+        <p>Interface contracts with required and default methods. Enforced at class declaration.</p>
+<pre>trait Loggable {
+    fn log_prefix { "LOG" }            <span class="comment"># default (optional to implement)</span>
+    fn log_msg                         <span class="comment"># required (no body)</span>
+}
+
+class Event impl Loggable {
+    msg: Str
+    fn log_msg { $self-&gt;msg }
+}
+my $e = Event(msg =&gt; "hello");
+p $e-&gt;log_msg();                      <span class="comment"># "hello"</span>
+p $e-&gt;does("Loggable");              <span class="comment"># 1</span>
+
+<span class="comment"># Missing required method → compile-time error</span>
+<span class="comment"># class Bad impl Loggable { }  → ERROR: missing required method 'log_msg'</span></pre>
+
+        <h3>Late static binding (<code>static::</code>)</h3>
+        <p>Resolves to the runtime class of <code>$self</code>, unlike <code>SUPER::</code> which is compile-time.</p>
+<pre>class Base {
+    fn class_name { static::identify() }
+    fn identify { "Base" }
+}
+class Child extends Base {
+    fn identify { "Child" }
+}
+my $c = Child();
+p $c-&gt;class_name();                   <span class="comment"># "Child" (not "Base")</span></pre>
+
+        <h3>Operator overloading</h3>
+        <p>Define <code>op_add</code>, <code>op_sub</code>, <code>op_mul</code>, <code>op_div</code>, <code>op_mod</code>, <code>op_pow</code>, <code>op_eq</code>, <code>op_ne</code>, <code>op_lt</code>, <code>op_gt</code>, <code>op_le</code>, <code>op_ge</code>, <code>op_spaceship</code>, <code>op_neg</code>, <code>op_bool</code>, <code>op_abs</code>, <code>op_concat</code>, <code>stringify</code>, and more.</p>
+<pre>class Vec2 {
+    x: Int; y: Int
+    fn op_add($other) {
+        Vec2(x =&gt; $self-&gt;x + $other-&gt;x, y =&gt; $self-&gt;y + $other-&gt;y)
+    }
+    fn op_neg { Vec2(x =&gt; -$self-&gt;x, y =&gt; -$self-&gt;y) }
+    fn stringify { "(" . $self-&gt;x . "," . $self-&gt;y . ")" }
+}
+my $a = Vec2(x =&gt; 1, y =&gt; 2);
+my $b = Vec2(x =&gt; 3, y =&gt; 4);
+my $c = $a + $b;
+p "$c";                                <span class="comment"># "(4,6)"</span>
+my $d = -$a;
+p "$d";                                <span class="comment"># "(-1,-2)"</span></pre>
+
+        <h3>Reflection / introspection</h3>
+<pre>class Animal { name: Str; fn speak { "..." }; fn eat { "nom" } }
+class Dog extends Animal { breed: Str }
+my $d = Dog(name =&gt; "Rex", breed =&gt; "Lab");
+
+p join(",", $d-&gt;fields());            <span class="comment"># "name,breed"</span>
+p join(",", $d-&gt;methods());           <span class="comment"># "speak,eat"  (inherited)</span>
+p join(",", $d-&gt;superclass());        <span class="comment"># "Animal"</span>
+p $d-&gt;isa("Dog");                     <span class="comment"># 1</span>
+p $d-&gt;isa("Animal");                  <span class="comment"># 1  (inherited)</span>
+p $d-&gt;isa("Cat");                     <span class="comment"># ""  (false)</span></pre>
+
+        <h3>Built-in instance methods</h3>
+        <table class="reflection-table">
+          <thead>
+            <tr><th>Method</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>$obj-&gt;fields()</code></td><td>List of all field names (including inherited)</td></tr>
+            <tr><td><code>$obj-&gt;methods()</code></td><td>List of all method names (including inherited)</td></tr>
+            <tr><td><code>$obj-&gt;superclass()</code></td><td>List of parent class names</td></tr>
+            <tr><td><code>$obj-&gt;isa("Class")</code></td><td>Checks inheritance chain</td></tr>
+            <tr><td><code>$obj-&gt;does("Trait")</code></td><td>Checks trait implementation</td></tr>
+            <tr><td><code>$obj-&gt;clone()</code></td><td>Deep copy (independent instance)</td></tr>
+            <tr><td><code>$obj-&gt;with(k =&gt; v)</code></td><td>Functional update — returns new instance with changed fields</td></tr>
+            <tr><td><code>$obj-&gt;to_hash()</code></td><td>Convert to hash reference</td></tr>
+            <tr><td><code>$obj-&gt;destroy()</code></td><td>Explicit destructor call (triggers DESTROY chain)</td></tr>
+            <tr><td><code>"$obj"</code></td><td>Stringify — <code>Class(field =&gt; val, ...)</code> or custom <code>stringify</code></td></tr>
+          </tbody>
+        </table>
+
+        <h3>Field types</h3>
+        <p>Runtime validation on setter. <code>Float</code> accepts both int and float. Custom types (struct/enum names) also work.</p>
+<pre>class Typed {
+    count: Int               <span class="comment"># integer</span>
+    name: Str                <span class="comment"># string</span>
+    ratio: Float             <span class="comment"># int or float</span>
+    items: Array             <span class="comment"># array reference</span>
+    map: Hash                <span class="comment"># hash reference</span>
+    any_val                  <span class="comment"># untyped (Any)</span>
+}</pre>
       </section>
 
       <section class="tutorial-section">

@@ -2353,6 +2353,21 @@ impl<'a> VM<'a> {
             let line = self.lines.get(ip_before).copied().unwrap_or(0);
             let op = &ops[self.ip];
             self.ip += 1;
+
+            // Debugger hook: check if we should stop at this line
+            if let Some(ref mut dbg) = self.interp.debugger {
+                if dbg.should_stop(line) {
+                    let call_stack = self.interp.debug_call_stack.clone();
+                    match dbg.prompt(line, &self.interp.scope, &call_stack) {
+                        crate::debugger::DebugAction::Quit => {
+                            return Err(PerlError::runtime("debugger: quit", line));
+                        }
+                        crate::debugger::DebugAction::Continue => {}
+                        crate::debugger::DebugAction::Prompt => {}
+                    }
+                }
+            }
+
             let op_prof_t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
             // Closure: `?` / `return Err` inside `match op` must not return from
             // `run_main_dispatch_loop` — they must become `__op_res` so `try_recover_from_exception`

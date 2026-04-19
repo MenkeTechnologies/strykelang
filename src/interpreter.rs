@@ -694,6 +694,10 @@ pub struct Interpreter {
     /// Stack of currently-executing subroutines for `__SUB__` (anonymous recursion).
     /// Pushed on `call_sub` entry, popped on exit.
     pub(crate) current_sub_stack: Vec<Arc<PerlSub>>,
+    /// Interactive debugger state (`-d` flag).
+    pub debugger: Option<crate::debugger::Debugger>,
+    /// Call stack for debugger: (sub_name, call_line).
+    pub(crate) debug_call_stack: Vec<(String, usize)>,
 }
 
 /// Snapshot of stash + `@ISA` for REPL `$obj->method` tab-completion (no `Interpreter` handle needed).
@@ -1401,6 +1405,8 @@ impl Interpreter {
             rate_limit_slots: Vec::new(),
             log_level_override: None,
             current_sub_stack: Vec::new(),
+            debugger: None,
+            debug_call_stack: Vec::new(),
         };
         s.install_overload_pragma_stubs();
         crate::list_util::install_scalar_util(&mut s);
@@ -1572,6 +1578,8 @@ impl Interpreter {
             rate_limit_slots: Vec::new(),
             log_level_override: self.log_level_override,
             current_sub_stack: Vec::new(),
+            debugger: None,
+            debug_call_stack: Vec::new(),
         }
     }
 
@@ -13910,17 +13918,23 @@ impl Interpreter {
                 .collect()
         };
 
-        // Build values array for all fields (inherited + own)
+        // Build values array for all fields (inherited + own) with type checking
         let mut values = Vec::with_capacity(all_fields.len());
-        for (name, default, _) in &all_fields {
-            if let Some((_, val)) = provided.iter().find(|(k, _)| k == name) {
-                values.push(val.clone());
+        for (name, default, ty) in &all_fields {
+            let val = if let Some((_, val)) = provided.iter().find(|(k, _)| k == name) {
+                val.clone()
             } else if let Some(ref expr) = default {
-                let val = self.eval_expr(expr)?;
-                values.push(val);
+                self.eval_expr(expr)?
             } else {
-                values.push(PerlValue::UNDEF);
-            }
+                PerlValue::UNDEF
+            };
+            ty.check_value(&val).map_err(|msg| {
+                PerlError::type_error(
+                    format!("class {} field `{}`: {}", def.name, name, msg),
+                    _line,
+                )
+            })?;
+            values.push(val);
         }
 
         let instance = PerlValue::class_inst(Arc::new(ClassInstance::new(Arc::clone(def), values)));

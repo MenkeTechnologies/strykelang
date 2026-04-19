@@ -856,3 +856,67 @@ fn class_generic_basic() {
         "hello"
     );
 }
+
+// ── Field type checking at construction ──────────────────────────────
+
+#[test]
+fn class_field_type_check_at_construction() {
+    assert_eq!(
+        eval_err_kind(r#"class Point { x: Int; y: Int }; Point(x => "bad", y => 1)"#),
+        ErrorKind::Type,
+    );
+}
+
+#[test]
+fn class_field_type_check_positional() {
+    assert_eq!(
+        eval_err_kind(r#"class Point { x: Int; y: Int }; Point("oops", 1)"#),
+        ErrorKind::Type,
+    );
+}
+
+#[test]
+fn class_field_type_check_at_setter() {
+    assert_eq!(
+        eval_err_kind(
+            r#"class Counter { n: Int = 0 }
+            my $c = Counter();
+            $c->n("wrong")"#
+        ),
+        ErrorKind::Type,
+    );
+}
+
+#[test]
+fn class_field_type_check_allows_correct_types() {
+    assert_eq!(
+        eval_int(r#"class Point { x: Int; y: Int }; my $p = Point(1, 2); $p->x + $p->y"#),
+        3
+    );
+}
+
+#[test]
+fn class_field_type_check_inherited() {
+    assert_eq!(
+        eval_err_kind(
+            r#"class Base { val: Int }
+            class Child extends Base { extra: Str }
+            Child(val => "wrong", extra => "ok")"#
+        ),
+        ErrorKind::Type,
+    );
+}
+
+#[test]
+fn class_field_any_allows_anything() {
+    assert_eq!(
+        eval_string(
+            r#"class Wrapper { data }
+            my $w = Wrapper(data => undef);
+            $w->data(42);
+            $w->data("hello");
+            $w->data"#
+        ),
+        "hello"
+    );
+}

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Compare stock perl(1) vs fo(1) on parity/cases/*.pl (exact stdout+stderr bytes).
+# Compare stock perl(1) vs st(1) on parity/cases/*.pl (exact stdout+stderr bytes).
 # Usage: from repo root —  bash parity/run_parity.sh [--summary] [--json OUT] [--fail-log PATH]
-# Env:   PERL=perl  FO=path/to/fo  (optional)
+# Env:   PERL=perl  ST=path/to/st  (optional)
 #
 # Flags:
 #   --summary            Suppress per-case OK/FAIL lines on stdout; the totals
@@ -36,20 +36,20 @@ export LC_ALL=C
 export LANG=C
 
 PERL="${PERL:-perl}"
-FO="${FO:-$ROOT/target/release/fo}"
+ST="${ST:-$ROOT/target/release/st}"
 
 if ! command -v "$PERL" >/dev/null 2>&1; then
   echo "parity: '$PERL' not found on PATH" >&2
   exit 2
 fi
 
-if [[ ! -x "$FO" ]]; then
-  echo "parity: building release fo (cargo build --release)…" >&2
+if [[ ! -x "$ST" ]]; then
+  echo "parity: building release st (cargo build --release)…" >&2
   (builtin cd "$ROOT" && cargo build --release --locked -q)
 fi
 
-if [[ ! -x "$FO" ]]; then
-  echo "parity: no executable at FO=$FO" >&2
+if [[ ! -x "$ST" ]]; then
+  echo "parity: no executable at ST=$ST" >&2
   exit 2
 fi
 
@@ -79,10 +79,10 @@ failed=0
 for f in "${cases[@]}"; do
   base=$(basename "$f")
   p_out=$(mktemp "${TMPDIR:-/tmp}/parity.pl.$$.XXXXXX")
-  r_out=$(mktemp "${TMPDIR:-/tmp}/parity.fo.$$.XXXXXX")
+  r_out=$(mktemp "${TMPDIR:-/tmp}/parity.st.$$.XXXXXX")
 
   "$PERL" "$f" >"$p_out" 2>&1 || true
-  "$FO" --compat "$f" >"$r_out" 2>&1 || true
+  "$ST" --compat "$f" >"$r_out" 2>&1 || true
 
   if ! cmp -s "$p_out" "$r_out"; then
     # Short progress line always hits stderr so the user sees forward motion.
@@ -92,9 +92,9 @@ for f in "${cases[@]}"; do
       echo "==== $base ===="
       echo "--- perl $base ---"
       command cat "$p_out"
-      echo "--- fo $base ---"
+      echo "--- st $base ---"
       command cat "$r_out"
-      echo "--- diff (perl vs fo) ---"
+      echo "--- diff (perl vs st) ---"
       diff -u "$p_out" "$r_out" || true
       echo
     } >&7

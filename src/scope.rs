@@ -862,6 +862,26 @@ impl Scope {
         false
     }
 
+    /// Collect all scalar variable names across all frames (for debugger).
+    pub fn all_scalar_names(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        for frame in &self.frames {
+            for (name, _) in &frame.scalars {
+                if !names.contains(name) {
+                    names.push(name.clone());
+                }
+            }
+            for opt_name in &frame.scalar_slot_names {
+                if let Some(name) = opt_name {
+                    if !names.contains(name) {
+                        names.push(name.clone());
+                    }
+                }
+            }
+        }
+        names
+    }
+
     /// True if any frame or atomic slot holds an array named `name`.
     #[inline]
     pub fn array_binding_exists(&self, name: &str) -> bool {
