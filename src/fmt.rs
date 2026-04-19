@@ -392,6 +392,37 @@ fn format_statement_indent(s: &Statement, depth: usize) -> String {
                 .join(", ");
             format!("enum {} {{ {} }}", def.name, variants)
         }
+        StmtKind::ClassDecl { def } => {
+            let mut header = format!("class {}", def.name);
+            if !def.extends.is_empty() {
+                header.push_str(&format!(" extends {}", def.extends.join(", ")));
+            }
+            if !def.implements.is_empty() {
+                header.push_str(&format!(" impl {}", def.implements.join(", ")));
+            }
+            let fields = def
+                .fields
+                .iter()
+                .map(|f| {
+                    let vis = match f.visibility {
+                        crate::ast::Visibility::Private => "priv ",
+                        crate::ast::Visibility::Public => "",
+                    };
+                    format!("{}{}: {}", vis, f.name, f.ty.display_name())
+                })
+                .collect::<Vec<_>>()
+                .join("; ");
+            format!("{} {{ {} }}", header, fields)
+        }
+        StmtKind::TraitDecl { def } => {
+            let methods = def
+                .methods
+                .iter()
+                .map(|m| format!("fn {}", m.name))
+                .collect::<Vec<_>>()
+                .join("; ");
+            format!("trait {} {{ {} }}", def.name, methods)
+        }
         StmtKind::EvalTimeout { timeout, body } => {
             format!(
                 "eval_timeout {} {{\n{}\n{}}}",

@@ -546,6 +546,26 @@ fn walk_stmt(
                 container,
             ));
         }
+        StmtKind::ClassDecl { def } => {
+            symbols.push(sym(
+                format!("class {}", def.name),
+                SymbolKind::CLASS,
+                uri,
+                source,
+                stmt.line,
+                container,
+            ));
+        }
+        StmtKind::TraitDecl { def } => {
+            symbols.push(sym(
+                format!("trait {}", def.name),
+                SymbolKind::INTERFACE,
+                uri,
+                source,
+                stmt.line,
+                container,
+            ));
+        }
         StmtKind::FormatDecl { name, .. } => {
             symbols.push(sym(
                 format!("format {name}"),
@@ -733,6 +753,8 @@ fn collect_sub_fqns_stmt(stmt: &Statement, pkg: &mut String, m: &mut HashMap<Str
         | StmtKind::Empty
         | StmtKind::StructDecl { .. }
         | StmtKind::EnumDecl { .. }
+        | StmtKind::ClassDecl { .. }
+        | StmtKind::TraitDecl { .. }
         | StmtKind::FormatDecl { .. } => {}
         StmtKind::Foreach {
             body,

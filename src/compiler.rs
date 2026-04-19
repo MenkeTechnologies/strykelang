@@ -2332,6 +2332,24 @@ impl Compiler {
                 }
                 self.chunk.enum_defs.push(def.clone());
             }
+            StmtKind::ClassDecl { def } => {
+                if self.chunk.class_defs.iter().any(|d| d.name == def.name) {
+                    return Err(CompileError::Unsupported(format!(
+                        "duplicate class `{}`",
+                        def.name
+                    )));
+                }
+                self.chunk.class_defs.push(def.clone());
+            }
+            StmtKind::TraitDecl { def } => {
+                if self.chunk.trait_defs.iter().any(|d| d.name == def.name) {
+                    return Err(CompileError::Unsupported(format!(
+                        "duplicate trait `{}`",
+                        def.name
+                    )));
+                }
+                self.chunk.trait_defs.push(def.clone());
+            }
             StmtKind::TryCatch {
                 try_block,
                 catch_var,

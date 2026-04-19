@@ -2131,16 +2131,58 @@ impl<'a> VM<'a> {
                         Err(crate::interpreter::FlowOrError::Error(e)) => return Err(e),
                         _ => self.push(PerlValue::UNDEF),
                     }
-                } else if let Some((enum_name, variant_name)) = name.rsplit_once("::") {
+                } else if let Some(def) = self.interp.class_defs.get(name).cloned() {
+                    // Class constructor: Dog(name => "Rex") or Dog("Rex", 5)
+                    let result = self.interp.class_construct(&def, args, self.line());
+                    match result {
+                        Ok(v) => self.push(v),
+                        Err(crate::interpreter::FlowOrError::Error(e)) => return Err(e),
+                        _ => self.push(PerlValue::UNDEF),
+                    }
+                } else if let Some((prefix, suffix)) = name.rsplit_once("::") {
                     // Enum variant constructor: Color::Red or Maybe::Some(value)
-                    if let Some(def) = self.interp.enum_defs.get(enum_name).cloned() {
-                        let result =
-                            self.interp
-                                .enum_construct(&def, variant_name, args, self.line());
+                    if let Some(def) = self.interp.enum_defs.get(prefix).cloned() {
+                        let result = self.interp.enum_construct(&def, suffix, args, self.line());
                         match result {
                             Ok(v) => self.push(v),
                             Err(crate::interpreter::FlowOrError::Error(e)) => return Err(e),
                             _ => self.push(PerlValue::UNDEF),
+                        }
+                    // Static class method: Math::add(...)
+                    } else if let Some(def) = self.interp.class_defs.get(prefix).cloned() {
+                        if let Some(m) = def.method(suffix) {
+                            if m.is_static {
+                                if let Some(ref body) = m.body {
+                                    let params = m.params.clone();
+                                    match self.interp.call_static_class_method(
+                                        body,
+                                        &params,
+                                        args.clone(),
+                                        self.line(),
+                                    ) {
+                                        Ok(v) => self.push(v),
+                                        Err(crate::interpreter::FlowOrError::Error(e)) => {
+                                            return Err(e)
+                                        }
+                                        Err(crate::interpreter::FlowOrError::Flow(
+                                            crate::interpreter::Flow::Return(v),
+                                        )) => self.push(v),
+                                        _ => self.push(PerlValue::UNDEF),
+                                    }
+                                } else {
+                                    self.push(PerlValue::UNDEF);
+                                }
+                            } else {
+                                return Err(PerlError::runtime(
+                                    format!("method `{}` is not static", suffix),
+                                    self.line(),
+                                ));
+                            }
+                        } else {
+                            return Err(PerlError::runtime(
+                                self.interp.undefined_subroutine_call_message(name),
+                                self.line(),
+                            ));
                         }
                     } else {
                         return Err(PerlError::runtime(

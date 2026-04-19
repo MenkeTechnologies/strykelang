@@ -595,6 +595,10 @@ pub struct Interpreter {
     pub struct_defs: HashMap<String, Arc<StructDef>>,
     /// `enum Name { ... }` definitions (merged from VM chunks and tree-walker).
     pub enum_defs: HashMap<String, Arc<EnumDef>>,
+    /// `class Name extends ... impl ... { ... }` definitions.
+    pub class_defs: HashMap<String, Arc<ClassDef>>,
+    /// `trait Name { ... }` definitions.
+    pub trait_defs: HashMap<String, Arc<TraitDef>>,
     /// When set, `pe --profile` records timings: VM path uses per-opcode line samples and sub
     /// call/return (JIT disabled); tree-walker fallback uses per-statement lines and subs.
     pub profiler: Option<Profiler>,
@@ -1274,6 +1278,8 @@ impl Interpreter {
             subs: HashMap::new(),
             struct_defs: HashMap::new(),
             enum_defs: HashMap::new(),
+            class_defs: HashMap::new(),
+            trait_defs: HashMap::new(),
             file: "-e".to_string(),
             output_handles: HashMap::new(),
             input_handles: HashMap::new(),
@@ -1449,6 +1455,8 @@ impl Interpreter {
             subs: self.subs.clone(),
             struct_defs: self.struct_defs.clone(),
             enum_defs: self.enum_defs.clone(),
+            class_defs: self.class_defs.clone(),
+            trait_defs: self.trait_defs.clone(),
             file: self.file.clone(),
             output_handles: HashMap::new(),
             input_handles: HashMap::new(),
@@ -6799,6 +6807,30 @@ impl Interpreter {
                     .into());
                 }
                 self.enum_defs
+                    .insert(def.name.clone(), Arc::new(def.clone()));
+                Ok(PerlValue::UNDEF)
+            }
+            StmtKind::ClassDecl { def } => {
+                if self.class_defs.contains_key(&def.name) {
+                    return Err(PerlError::runtime(
+                        format!("duplicate class `{}`", def.name),
+                        stmt.line,
+                    )
+                    .into());
+                }
+                self.class_defs
+                    .insert(def.name.clone(), Arc::new(def.clone()));
+                Ok(PerlValue::UNDEF)
+            }
+            StmtKind::TraitDecl { def } => {
+                if self.trait_defs.contains_key(&def.name) {
+                    return Err(PerlError::runtime(
+                        format!("duplicate trait `{}`", def.name),
+                        stmt.line,
+                    )
+                    .into());
+                }
+                self.trait_defs
                     .insert(def.name.clone(), Arc::new(def.clone()));
                 Ok(PerlValue::UNDEF)
             }
@@ -13543,10 +13575,37 @@ impl Interpreter {
                 if let Some(def) = self.struct_defs.get(name).cloned() {
                     return self.struct_construct(&def, args, line);
                 }
+                // Check for class constructor: Dog(name => "Rex") or Dog("Rex", 5)
+                if let Some(def) = self.class_defs.get(name).cloned() {
+                    return self.class_construct(&def, args, line);
+                }
                 // Check for enum variant constructor: Color::Red or Maybe::Some(value)
                 if let Some((enum_name, variant_name)) = name.rsplit_once("::") {
                     if let Some(def) = self.enum_defs.get(enum_name).cloned() {
                         return self.enum_construct(&def, variant_name, args, line);
+                    }
+                }
+                // Check for static class method: Math::add(...)
+                if let Some((class_name, method_name)) = name.rsplit_once("::") {
+                    if let Some(def) = self.class_defs.get(class_name).cloned() {
+                        if let Some(m) = def.method(method_name) {
+                            if m.is_static {
+                                if let Some(ref body) = m.body {
+                                    let params = m.params.clone();
+                                    return match self.call_static_class_method(
+                                        body,
+                                        &params,
+                                        args.clone(),
+                                        line,
+                                    ) {
+                                        Ok(v) => Ok(v),
+                                        Err(FlowOrError::Error(e)) => Err(e.into()),
+                                        Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
+                                        Err(e) => Err(e),
+                                    };
+                                }
+                            }
+                        }
                     }
                 }
                 let args = self.with_topic_default_args(args);
@@ -13608,6 +13667,103 @@ impl Interpreter {
         Ok(crate::native_data::struct_new_with_defaults(
             def, &provided, &defaults, line,
         )?)
+    }
+
+    /// Construct a class instance from function-call syntax: Dog(name => "Rex") or Dog("Rex", 5).
+    pub(crate) fn class_construct(
+        &mut self,
+        def: &Arc<ClassDef>,
+        args: Vec<PerlValue>,
+        _line: usize,
+    ) -> ExecResult {
+        use crate::value::ClassInstance;
+
+        // Collect all fields from inheritance chain (parent fields first)
+        let all_fields = self.collect_class_fields(def);
+
+        // Check if args are named
+        let is_named = args.len() >= 2
+            && args.len().is_multiple_of(2)
+            && args.iter().step_by(2).all(|v| {
+                let s = v.to_string();
+                all_fields.iter().any(|(name, _, _)| name == &s)
+            });
+
+        let provided: Vec<(String, PerlValue)> = if is_named {
+            let mut pairs = Vec::new();
+            let mut i = 0;
+            while i + 1 < args.len() {
+                let k = args[i].to_string();
+                let v = args[i + 1].clone();
+                pairs.push((k, v));
+                i += 2;
+            }
+            pairs
+        } else {
+            all_fields
+                .iter()
+                .zip(args.iter())
+                .map(|((name, _, _), v)| (name.clone(), v.clone()))
+                .collect()
+        };
+
+        // Build values array for all fields (inherited + own)
+        let mut values = Vec::with_capacity(all_fields.len());
+        for (name, default, _) in &all_fields {
+            if let Some((_, val)) = provided.iter().find(|(k, _)| k == name) {
+                values.push(val.clone());
+            } else if let Some(ref expr) = default {
+                let val = self.eval_expr(expr)?;
+                values.push(val);
+            } else {
+                values.push(PerlValue::UNDEF);
+            }
+        }
+
+        Ok(PerlValue::class_inst(Arc::new(ClassInstance::new(
+            Arc::clone(def),
+            values,
+        ))))
+    }
+
+    /// Collect all fields from a class and its parent hierarchy (parent fields first).
+    fn collect_class_fields(
+        &self,
+        def: &ClassDef,
+    ) -> Vec<(String, Option<Expr>, crate::ast::PerlTypeName)> {
+        let mut all_fields = Vec::new();
+
+        // First, collect parent fields
+        for parent_name in &def.extends {
+            if let Some(parent_def) = self.class_defs.get(parent_name) {
+                let parent_fields = self.collect_class_fields(parent_def);
+                all_fields.extend(parent_fields);
+            }
+        }
+
+        // Then add own fields
+        for field in &def.fields {
+            all_fields.push((field.name.clone(), field.default.clone(), field.ty.clone()));
+        }
+
+        all_fields
+    }
+
+    /// Find a method in a class or its parent hierarchy (child methods override parent).
+    fn find_class_method(&self, def: &ClassDef, method: &str) -> Option<(ClassMethod, String)> {
+        // First check the current class
+        if let Some(m) = def.method(method) {
+            return Some((m.clone(), def.name.clone()));
+        }
+        // Then check parent classes
+        for parent_name in &def.extends {
+            if let Some(parent_def) = self.class_defs.get(parent_name) {
+                if let Some(result) = self.find_class_method(parent_def, method) {
+                    return Some(result);
+                }
+            }
+        }
+        None
     }
 
     /// Construct an enum variant: `Enum::Variant` or `Enum::Variant(data)`.
@@ -14048,6 +14204,153 @@ impl Interpreter {
                         )),
                     },
                 );
+            }
+            return None;
+        }
+        // Class instance method dispatch
+        if let Some(c) = receiver.as_class_inst() {
+            // Collect all fields from inheritance chain
+            let all_fields = self.collect_class_fields(&c.def);
+
+            // Field access: $obj->name or $obj->name(value)
+            if let Some(idx) = all_fields.iter().position(|(name, _, _)| name == method) {
+                match args.len() {
+                    0 => {
+                        return Some(Ok(c.get_field(idx).unwrap_or(PerlValue::UNDEF)));
+                    }
+                    1 => {
+                        let (_, _, ty) = &all_fields[idx];
+                        let new_val = args[0].clone();
+                        if let Err(msg) = ty.check_value(&new_val) {
+                            return Some(Err(PerlError::type_error(
+                                format!("class {} field `{}`: {}", c.def.name, method, msg),
+                                line,
+                            )));
+                        }
+                        c.set_field(idx, new_val.clone());
+                        return Some(Ok(new_val));
+                    }
+                    _ => {
+                        return Some(Err(PerlError::runtime(
+                            format!(
+                                "class field `{}` takes 0 arguments (getter) or 1 argument (setter), got {}",
+                                method,
+                                args.len()
+                            ),
+                            line,
+                        )));
+                    }
+                }
+            }
+            // Built-in class methods (use all_fields for inheritance)
+            match method {
+                "with" => {
+                    let mut new_values = c.get_values();
+                    let mut i = 0;
+                    while i + 1 < args.len() {
+                        let k = args[i].to_string();
+                        let v = args[i + 1].clone();
+                        if let Some(idx) = all_fields.iter().position(|(name, _, _)| name == &k) {
+                            let (_, _, ref ty) = all_fields[idx];
+                            if let Err(msg) = ty.check_value(&v) {
+                                return Some(Err(PerlError::type_error(
+                                    format!("class {} field `{}`: {}", c.def.name, k, msg),
+                                    line,
+                                )));
+                            }
+                            new_values[idx] = v;
+                        } else {
+                            return Some(Err(PerlError::runtime(
+                                format!("class {}: unknown field `{}`", c.def.name, k),
+                                line,
+                            )));
+                        }
+                        i += 2;
+                    }
+                    return Some(Ok(PerlValue::class_inst(Arc::new(
+                        crate::value::ClassInstance::new(Arc::clone(&c.def), new_values),
+                    ))));
+                }
+                "to_hash" => {
+                    if !args.is_empty() {
+                        return Some(Err(PerlError::runtime(
+                            "class to_hash takes no arguments",
+                            line,
+                        )));
+                    }
+                    let mut map = IndexMap::new();
+                    let values = c.get_values();
+                    for (i, (name, _, _)) in all_fields.iter().enumerate() {
+                        if let Some(v) = values.get(i) {
+                            map.insert(name.clone(), v.clone());
+                        }
+                    }
+                    return Some(Ok(PerlValue::hash_ref(Arc::new(RwLock::new(map)))));
+                }
+                "fields" => {
+                    if !args.is_empty() {
+                        return Some(Err(PerlError::runtime(
+                            "class fields takes no arguments",
+                            line,
+                        )));
+                    }
+                    let names: Vec<PerlValue> = all_fields
+                        .iter()
+                        .map(|(name, _, _)| PerlValue::string(name.clone()))
+                        .collect();
+                    return Some(Ok(PerlValue::array(names)));
+                }
+                "clone" => {
+                    if !args.is_empty() {
+                        return Some(Err(PerlError::runtime(
+                            "class clone takes no arguments",
+                            line,
+                        )));
+                    }
+                    let new_values = c.get_values().iter().map(|v| v.deep_clone()).collect();
+                    return Some(Ok(PerlValue::class_inst(Arc::new(
+                        crate::value::ClassInstance::new(Arc::clone(&c.def), new_values),
+                    ))));
+                }
+                "isa" => {
+                    if args.len() != 1 {
+                        return Some(Err(PerlError::runtime("isa requires one argument", line)));
+                    }
+                    let class_name = args[0].to_string();
+                    let is_a = c.def.name == class_name || c.def.extends.contains(&class_name);
+                    return Some(Ok(if is_a {
+                        PerlValue::integer(1)
+                    } else {
+                        PerlValue::string(String::new())
+                    }));
+                }
+                _ => {}
+            }
+            // User-defined class method (search inheritance chain)
+            if let Some((m, _class_name)) = self.find_class_method(&c.def, method) {
+                // Check visibility for private methods
+                if matches!(m.visibility, crate::ast::Visibility::Private) {
+                    return Some(Err(PerlError::runtime(
+                        format!("method `{}` of class {} is private", method, c.def.name),
+                        line,
+                    )));
+                }
+                if let Some(ref body) = m.body {
+                    let params = m.params.clone();
+                    let mut call_args = vec![receiver.clone()];
+                    call_args.extend(args.iter().cloned());
+                    return Some(
+                        match self.call_class_method(body, &params, call_args, line) {
+                            Ok(v) => Ok(v),
+                            Err(FlowOrError::Error(e)) => Err(e),
+                            Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
+                            Err(FlowOrError::Flow(_)) => Err(PerlError::runtime(
+                                "unexpected control flow in class method",
+                                line,
+                            )),
+                        },
+                    );
+                }
             }
             return None;
         }
@@ -16172,6 +16475,62 @@ impl Interpreter {
         self.scope.set_closure_args(&args);
         // Apply signature if provided - skip the first arg ($self) for user params
         let user_args: Vec<PerlValue> = args.iter().skip(1).cloned().collect();
+        self.apply_params_to_argv(params, &user_args, line)?;
+        let result = self.exec_block_no_scope(body);
+        self.scope_pop_hook();
+        match result {
+            Ok(v) => Ok(v),
+            Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Call a user-defined class method: `$dog->bark()` where `fn bark { }` is in class.
+    pub fn call_class_method(
+        &mut self,
+        body: &Block,
+        params: &[SubSigParam],
+        args: Vec<PerlValue>,
+        line: usize,
+    ) -> ExecResult {
+        self.call_class_method_inner(body, params, args, line, false)
+    }
+
+    /// Call a static class method: `Math::add(...)`.
+    pub fn call_static_class_method(
+        &mut self,
+        body: &Block,
+        params: &[SubSigParam],
+        args: Vec<PerlValue>,
+        line: usize,
+    ) -> ExecResult {
+        self.call_class_method_inner(body, params, args, line, true)
+    }
+
+    fn call_class_method_inner(
+        &mut self,
+        body: &Block,
+        params: &[SubSigParam],
+        args: Vec<PerlValue>,
+        line: usize,
+        is_static: bool,
+    ) -> ExecResult {
+        self.scope_push_hook();
+        self.scope.declare_array("_", args.clone());
+        if !is_static {
+            // Bind $self to first arg (the receiver) for instance methods
+            if let Some(self_val) = args.first() {
+                self.scope.declare_scalar("self", self_val.clone());
+            }
+        }
+        // Set $_0, $_1, etc. for all args
+        self.scope.set_closure_args(&args);
+        // Apply signature: skip first arg ($self) only for instance methods
+        let user_args: Vec<PerlValue> = if is_static {
+            args.clone()
+        } else {
+            args.iter().skip(1).cloned().collect()
+        };
         self.apply_params_to_argv(params, &user_args, line)?;
         let result = self.exec_block_no_scope(body);
         self.scope_pop_hook();
