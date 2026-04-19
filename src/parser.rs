@@ -1231,6 +1231,10 @@ impl Parser {
                 | "words"
                 | "chars"
                 | "digits"
+                | "letters"
+                | "letters_uc"
+                | "letters_lc"
+                | "punctuation"
                 | "sentences"
                 | "paragraphs"
                 | "sections"
@@ -2197,6 +2201,22 @@ impl Parser {
             },
             "digits" | "dg" => ExprKind::FuncCall {
                 name: "digits".to_string(),
+                args: vec![arg],
+            },
+            "letters" | "lt" => ExprKind::FuncCall {
+                name: "letters".to_string(),
+                args: vec![arg],
+            },
+            "letters_uc" => ExprKind::FuncCall {
+                name: "letters_uc".to_string(),
+                args: vec![arg],
+            },
+            "letters_lc" => ExprKind::FuncCall {
+                name: "letters_lc".to_string(),
+                args: vec![arg],
+            },
+            "punctuation" | "punct" => ExprKind::FuncCall {
+                name: "punctuation".to_string(),
                 args: vec![arg],
             },
             "sentences" | "sents" => ExprKind::FuncCall {
@@ -5208,12 +5228,13 @@ impl Parser {
                     "puniq" | "uniq" | "distinct" | "flatten" | "set" | "list_count"
                     | "list_size" | "count" | "size" | "cnt" | "len" | "with_index" | "shuffle"
                     | "shuffled" | "frequencies" | "freq" | "interleave" | "ddump"
-                    | "stringify" | "str" | "lines" | "words" | "chars" | "digits" | "numbers"
-                    | "graphemes" | "columns" | "sentences" | "paragraphs" | "sections"
-                    | "trim" | "avg" | "to_json" | "to_csv" | "to_toml" | "to_yaml" | "to_xml"
-                    | "to_html" | "to_markdown" | "to_table" | "xopen" | "clip" | "sparkline"
-                    | "bar_chart" | "flame" | "stddev" | "squared" | "sq" | "square" | "cubed"
-                    | "cb" | "cube" | "normalize" | "snake_case" | "camel_case" | "kebab_case" => {
+                    | "stringify" | "str" | "lines" | "words" | "chars" | "digits" | "letters"
+                    | "letters_uc" | "letters_lc" | "punctuation" | "numbers" | "graphemes"
+                    | "columns" | "sentences" | "paragraphs" | "sections" | "trim" | "avg"
+                    | "to_json" | "to_csv" | "to_toml" | "to_yaml" | "to_xml" | "to_html"
+                    | "to_markdown" | "to_table" | "xopen" | "clip" | "sparkline" | "bar_chart"
+                    | "flame" | "stddev" | "squared" | "sq" | "square" | "cubed" | "cb"
+                    | "cube" | "normalize" | "snake_case" | "camel_case" | "kebab_case" => {
                         if args.is_empty() {
                             args.push(lhs);
                         } else {
@@ -11012,7 +11033,9 @@ impl Parser {
             | "take_while" | "drop_while" | "skip_while" | "tap" | "peek" | "partition"
             | "zip_with" | "count_by" | "skip" | "first_or"
             // ── pipeline / string helpers ───────────────────────────────────
-            | "input" | "lines" | "words" | "chars" | "digits" | "sentences" | "sents"
+            | "input" | "lines" | "words" | "chars" | "digits" | "letters" | "letters_uc" | "letters_lc"
+            | "punctuation" | "punct"
+            | "sentences" | "sents"
             | "paragraphs" | "paras" | "sections" | "sects"
             | "numbers" | "nums" | "graphemes" | "grs" | "columns" | "cols"
             | "trim" | "avg" | "stddev"

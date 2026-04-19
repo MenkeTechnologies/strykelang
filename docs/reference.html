@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.7.1 · 3090 topics · 25 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.7.2 · 3094 topics · 25 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -191,7 +191,7 @@
         <li><a href="#ch-process">Process</a> <span class="chapter-count">20</span></li>
         <li><a href="#ch-pack-binary">Pack / Binary</a> <span class="chapter-count">3</span></li>
         <li><a href="#ch-logging">Logging</a> <span class="chapter-count">7</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">2528</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">2532</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -5624,7 +5624,7 @@ log_info(&quot;hidden&quot;)    # not printed
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">2528 topics</p>
+      <p class="chapter-meta">2532 topics</p>
       <article class="doc-entry" id="doc-stryke-rust-compile">
         <h3><a class="doc-anchor" href="#doc-stryke-rust-compile">#</a> <code>__stryke_rust_compile</code></h3>
         <p><code>__stryke_rust_compile</code> — internal builtin.</p>
@@ -15735,6 +15735,25 @@ keys %b |&gt; grep { $b{$_} eq &quot;parallel&quot; } |&gt; pager
 slurp(&quot;README.md&quot;) |&gt; pager
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-letters">
+        <h3><a class="doc-anchor" href="#doc-letters">#</a> <code>letters</code></h3>
+        <p><code>letters</code> (alias <code>lt</code>) extracts all alphabetic characters from a string and returns them as a list. Filters out digits, punctuation, whitespace — keeps only letters.</p>
+        <pre><code class="lang-perl">p join &quot;&quot;, letters(&quot;h3ll0 w0rld!&quot;)   # hllwrld
+&quot;abc123DEF&quot; |&gt; letters |&gt; cnt |&gt; p   # 6
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-letters-lc">
+        <h3><a class="doc-anchor" href="#doc-letters-lc">#</a> <code>letters_lc</code></h3>
+        <p><code>letters_lc</code> extracts only lowercase letters from a string.</p>
+        <pre><code class="lang-perl">p join &quot;&quot;, letters_lc(&quot;Hello World 123&quot;)  # elloorld
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-letters-uc">
+        <h3><a class="doc-anchor" href="#doc-letters-uc">#</a> <code>letters_uc</code></h3>
+        <p><code>letters_uc</code> extracts only uppercase letters from a string.</p>
+        <pre><code class="lang-perl">p join &quot;&quot;, letters_uc(&quot;Hello World 123&quot;)  # HW
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-lev">
         <h3><a class="doc-anchor" href="#doc-lev">#</a> <code>lev</code></h3>
         <p><code>lev</code> — extended stdlib builtin. Alias for <code>levenshtein</code>.</p>
@@ -19679,6 +19698,13 @@ p projrange(100, 30)   # ~884 m
         <pre><code class="lang-perl">my $result = ptri $x 
 # or in a pipeline:
 @list |&gt; map ptri |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-punct">
+        <h3><a class="doc-anchor" href="#doc-punct">#</a> <code>punct</code></h3>
+        <p><code>punctuation</code> (alias <code>punct</code>) extracts all ASCII punctuation characters from a string and returns them as a list. Filters out letters, digits, whitespace — keeps only punctuation.</p>
+        <pre><code class="lang-perl">p join &quot;&quot;, punctuation(&quot;Hello, world!&quot;)  # ,!
+&quot;a.b-c&quot; |&gt; punct |&gt; cnt |&gt; p             # 2
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-punif">
