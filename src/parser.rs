@@ -1797,6 +1797,56 @@ impl Parser {
                             line: stage_line,
                         };
                         result = self.pipe_forward_apply(result, map_node, stage_line)?;
+                    // `pmap_chunked CHUNK_SIZE { BLOCK }` — parallel chunked map
+                    } else if func_name == "pmap_chunked" {
+                        let chunk_size = self.parse_assign_expr()?;
+                        let block = self.parse_block_or_bareword_block()?;
+                        let placeholder = self.pipe_placeholder_list(stage_line);
+                        let stage = Expr {
+                            kind: ExprKind::PMapChunkedExpr {
+                                chunk_size: Box::new(chunk_size),
+                                block,
+                                list: Box::new(placeholder),
+                                progress: None,
+                            },
+                            line: stage_line,
+                        };
+                        result = self.pipe_forward_apply(result, stage, stage_line)?;
+                    // `preduce_init INIT { BLOCK }` — parallel reduce with init value
+                    } else if func_name == "preduce_init" {
+                        let init = self.parse_assign_expr()?;
+                        let block = self.parse_block_or_bareword_block()?;
+                        let placeholder = self.pipe_placeholder_list(stage_line);
+                        let stage = Expr {
+                            kind: ExprKind::PReduceInitExpr {
+                                init: Box::new(init),
+                                block,
+                                list: Box::new(placeholder),
+                                progress: None,
+                            },
+                            line: stage_line,
+                        };
+                        result = self.pipe_forward_apply(result, stage, stage_line)?;
+                    // `pmap_reduce { MAP } { REDUCE }` — parallel map-reduce
+                    } else if func_name == "pmap_reduce" {
+                        let map_block = self.parse_block_or_bareword_block()?;
+                        let reduce_block = if matches!(self.peek(), Token::LBrace) {
+                            self.parse_block()?
+                        } else {
+                            self.expect(&Token::Comma)?;
+                            self.parse_block_or_bareword_cmp_block()?
+                        };
+                        let placeholder = self.pipe_placeholder_list(stage_line);
+                        let stage = Expr {
+                            kind: ExprKind::PMapReduceExpr {
+                                map_block,
+                                reduce_block,
+                                list: Box::new(placeholder),
+                                progress: None,
+                            },
+                            line: stage_line,
+                        };
+                        result = self.pipe_forward_apply(result, stage, stage_line)?;
                     // Check if followed by a block (like `filter { }`, `sort { }`, `map { }`)
                     } else if matches!(self.peek(), Token::LBrace) {
                         // Parse as a block-taking builtin
@@ -2533,6 +2583,56 @@ impl Parser {
                 kind: ExprKind::ForEachExpr {
                     block,
                     list: Box::new(placeholder),
+                },
+                line,
+            }),
+            "pmap" | "pflat_map" => Ok(Expr {
+                kind: ExprKind::PMapExpr {
+                    block,
+                    list: Box::new(placeholder),
+                    progress: None,
+                    flat_outputs: name == "pflat_map",
+                    on_cluster: None,
+                },
+                line,
+            }),
+            "pgrep" => Ok(Expr {
+                kind: ExprKind::PGrepExpr {
+                    block,
+                    list: Box::new(placeholder),
+                    progress: None,
+                },
+                line,
+            }),
+            "pfor" => Ok(Expr {
+                kind: ExprKind::PForExpr {
+                    block,
+                    list: Box::new(placeholder),
+                    progress: None,
+                },
+                line,
+            }),
+            "preduce" => Ok(Expr {
+                kind: ExprKind::PReduceExpr {
+                    block,
+                    list: Box::new(placeholder),
+                    progress: None,
+                },
+                line,
+            }),
+            "pcache" => Ok(Expr {
+                kind: ExprKind::PcacheExpr {
+                    block,
+                    list: Box::new(placeholder),
+                    progress: None,
+                },
+                line,
+            }),
+            "psort" => Ok(Expr {
+                kind: ExprKind::PSortExpr {
+                    cmp: Some(block),
+                    list: Box::new(placeholder),
+                    progress: None,
                 },
                 line,
             }),
