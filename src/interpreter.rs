@@ -652,6 +652,9 @@ pub struct Interpreter {
     /// state (`self.irs` / `self.ofs` / etc.) restores when a `{ local $X = … }` block exits.
     pub(crate) special_var_restore_frames: Vec<Vec<(String, PerlValue)>>,
     /// `use English` — long names ([`crate::english::scalar_alias`]) map to short special scalars.
+    /// Lazy-init flag: reflection hashes (`%b`, `%stryke::builtins`, etc.)
+    /// are only built on first access to avoid startup cost.
+    pub(crate) reflection_hashes_ready: bool,
     pub(crate) english_enabled: bool,
     /// `use English qw(-no_match_vars)` — suppress `$MATCH`/`$PREMATCH`/`$POSTMATCH` aliases.
     pub(crate) english_no_match_vars: bool,
@@ -1230,34 +1233,13 @@ impl Interpreter {
         // `keys %perl_compats ∩ keys %extensions == ∅` by construction;
         // together they cover `keys %builtins`. Short aliases use the
         // hash-sigil namespace (no collision with `$a`/`$b`/`e` sub).
-        let builtins_map = crate::builtins::builtins_hash_map();
-        let perl_compats_map = crate::builtins::perl_compats_hash_map();
-        let extensions_map = crate::builtins::extensions_hash_map();
-        let aliases_map = crate::builtins::aliases_hash_map();
-        let descriptions_map = crate::builtins::descriptions_hash_map();
-        let categories_map = crate::builtins::categories_hash_map();
-        let primaries_map = crate::builtins::primaries_hash_map();
-        let all_map = crate::builtins::all_hash_map();
-        scope.declare_hash("stryke::builtins", builtins_map.clone());
-        scope.declare_hash("stryke::perl_compats", perl_compats_map.clone());
-        scope.declare_hash("stryke::extensions", extensions_map.clone());
-        scope.declare_hash("stryke::aliases", aliases_map.clone());
-        scope.declare_hash("stryke::descriptions", descriptions_map.clone());
-        scope.declare_hash("stryke::categories", categories_map.clone());
-        scope.declare_hash("stryke::primaries", primaries_map.clone());
-        scope.declare_hash("stryke::all", all_map.clone());
+        // Reflection hashes are lazily initialized on first access
+        // (see `ensure_reflection_hashes`). Only declare the version scalar
+        // eagerly since it's trivial.
         scope.declare_scalar(
             "stryke::VERSION",
             PerlValue::string(env!("CARGO_PKG_VERSION").to_string()),
         );
-        scope.declare_hash("b", builtins_map);
-        scope.declare_hash("pc", perl_compats_map);
-        scope.declare_hash("e", extensions_map);
-        scope.declare_hash("a", aliases_map);
-        scope.declare_hash("d", descriptions_map);
-        scope.declare_hash("c", categories_map);
-        scope.declare_hash("p", primaries_map);
-        scope.declare_hash("all", all_map);
         scope.declare_array("-", vec![]);
         scope.declare_array("+", vec![]);
         scope.declare_array("^CAPTURE", vec![]);
@@ -1383,6 +1365,7 @@ impl Interpreter {
             glob_handle_alias: HashMap::new(),
             glob_restore_frames: vec![Vec::new()],
             special_var_restore_frames: vec![Vec::new()],
+            reflection_hashes_ready: false,
             english_enabled: false,
             english_no_match_vars: false,
             english_match_vars_ever_enabled: false,
@@ -1430,6 +1413,47 @@ impl Interpreter {
                 fib_like: None,
             }),
         );
+    }
+
+    /// Lazily populate the reflection hashes (`%b`, `%stryke::builtins`, etc.)
+    /// on first access. This avoids building ~12k hash entries on startup for
+    /// one-liners that never touch introspection.
+    pub(crate) fn ensure_reflection_hashes(&mut self) {
+        if self.reflection_hashes_ready {
+            return;
+        }
+        self.reflection_hashes_ready = true;
+        let builtins_map = crate::builtins::builtins_hash_map();
+        let perl_compats_map = crate::builtins::perl_compats_hash_map();
+        let extensions_map = crate::builtins::extensions_hash_map();
+        let aliases_map = crate::builtins::aliases_hash_map();
+        let descriptions_map = crate::builtins::descriptions_hash_map();
+        let categories_map = crate::builtins::categories_hash_map();
+        let primaries_map = crate::builtins::primaries_hash_map();
+        let all_map = crate::builtins::all_hash_map();
+        self.scope
+            .declare_hash("stryke::builtins", builtins_map.clone());
+        self.scope
+            .declare_hash("stryke::perl_compats", perl_compats_map.clone());
+        self.scope
+            .declare_hash("stryke::extensions", extensions_map.clone());
+        self.scope
+            .declare_hash("stryke::aliases", aliases_map.clone());
+        self.scope
+            .declare_hash("stryke::descriptions", descriptions_map.clone());
+        self.scope
+            .declare_hash("stryke::categories", categories_map.clone());
+        self.scope
+            .declare_hash("stryke::primaries", primaries_map.clone());
+        self.scope.declare_hash("stryke::all", all_map.clone());
+        self.scope.declare_hash("b", builtins_map);
+        self.scope.declare_hash("pc", perl_compats_map);
+        self.scope.declare_hash("e", extensions_map);
+        self.scope.declare_hash("a", aliases_map);
+        self.scope.declare_hash("d", descriptions_map);
+        self.scope.declare_hash("c", categories_map);
+        self.scope.declare_hash("p", primaries_map);
+        self.scope.declare_hash("all", all_map);
     }
 
     /// `overload::import` / `overload::unimport` — core stubs used by CPAN modules (e.g.
@@ -1561,6 +1585,7 @@ impl Interpreter {
             glob_handle_alias: self.glob_handle_alias.clone(),
             glob_restore_frames: self.glob_restore_frames.clone(),
             special_var_restore_frames: self.special_var_restore_frames.clone(),
+            reflection_hashes_ready: self.reflection_hashes_ready,
             english_enabled: self.english_enabled,
             english_no_match_vars: self.english_no_match_vars,
             english_match_vars_ever_enabled: self.english_match_vars_ever_enabled,
@@ -2248,6 +2273,28 @@ impl Interpreter {
     pub(crate) fn touch_env_hash(&mut self, hash_name: &str) {
         if hash_name == "ENV" {
             self.materialize_env_if_needed();
+        } else if !self.reflection_hashes_ready {
+            match hash_name {
+                "b"
+                | "pc"
+                | "e"
+                | "a"
+                | "d"
+                | "c"
+                | "p"
+                | "all"
+                | "stryke::builtins"
+                | "stryke::perl_compats"
+                | "stryke::extensions"
+                | "stryke::aliases"
+                | "stryke::descriptions"
+                | "stryke::categories"
+                | "stryke::primaries"
+                | "stryke::all" => {
+                    self.ensure_reflection_hashes();
+                }
+                _ => {}
+            }
         }
     }
 
