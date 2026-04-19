@@ -57,6 +57,7 @@ A Perl 5 compatible interpreter in Rust with native parallel primitives, NaN-box
 - **Bytecode VM + JIT** — match-dispatch interpreter with Cranelift block + linear-sub JIT (`src/vm.rs`, `src/jit.rs`).
 - **Rayon parallelism** — every parallel builtin uses work-stealing across all cores.
 - **Binary size** ~18 MB stripped (LTO + O3).
+- **Over 2300 standard library functions**
 
 ---
 

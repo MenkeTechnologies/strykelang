@@ -437,7 +437,7 @@ fn print_cyberpunk_help() {
         "  build SCRIPT [-o OUT]  {G}//{N} AOT: copy this binary with SCRIPT embedded (standalone exe)"
     );
     println!("  docs [TOPIC]           {G}//{N} Built-in docs (pe docs pmap, pe docs |>, pe docs)");
-    println!("  serve PORT SCRIPT      {G}//{N} HTTP server (pe serve 8080 app.pr)");
+    println!("  serve [PORT] [SCRIPT]  {G}//{N} HTTP server (pe serve, pe serve 8080 app.pr)");
     println!(
         "  --remote-worker        {G}//{N} Persistent cluster worker (stdio); only arg after {bin}"
     );
@@ -1716,13 +1716,14 @@ fn run_convert_subcommand(args: &[String]) -> i32 {
     }
 }
 
-/// `pe serve PORT SCRIPT` or `pe serve PORT -e CODE` — start an HTTP server.
+/// `pe serve [PORT] [SCRIPT]` or `pe serve [PORT] -e CODE` — start an HTTP server (default port 8000).
 ///
 /// Wraps the user's handler in `serve(PORT, fn ($req) { ... })`.
 fn run_serve_subcommand(args: &[String]) -> i32 {
-    if args.is_empty() || args[0] == "-h" || args[0] == "--help" {
-        eprintln!("usage: pe serve PORT [SCRIPT | -e CODE]");
+    if !args.is_empty() && (args[0] == "-h" || args[0] == "--help") {
+        eprintln!("usage: pe serve [PORT] [SCRIPT | -e CODE]");
         eprintln!();
+        eprintln!("  pe serve                   serve $PWD on port 8000");
         eprintln!("  pe serve PORT              serve $PWD as static files");
         eprintln!("  pe serve PORT SCRIPT       run script (must call serve())");
         eprintln!("  pe serve PORT -e CODE      one-liner handler");
@@ -1731,6 +1732,9 @@ fn run_serve_subcommand(args: &[String]) -> i32 {
         eprintln!("  and returns: string (200 OK), key-value pairs, hashref, or undef (404).");
         eprintln!();
         eprintln!("examples:");
+        eprintln!(
+            "  pe serve                                              # static file server on 8000"
+        );
         eprintln!("  pe serve 8080                                         # static file server");
         eprintln!("  pe serve 8080 app.pr                                  # script handler");
         eprintln!("  pe serve 3000 -e '\"hello \" . $req->{{path}}'           # one-liner");
@@ -1738,24 +1742,25 @@ fn run_serve_subcommand(args: &[String]) -> i32 {
         return 0;
     }
 
-    let port = &args[0];
-    if port.parse::<u16>().is_err() {
-        eprintln!("pe serve: invalid port '{}'", port);
-        return 1;
-    }
+    // If first arg is a valid port number, consume it; otherwise default to 8000.
+    let (port, rest) = if !args.is_empty() && args[0].parse::<u16>().is_ok() {
+        (args[0].clone(), &args[1..])
+    } else {
+        ("8000".to_string(), &args[..])
+    };
 
     // Detect mode: no arg or directory = static file server, -e = one-liner, else = script
-    let static_dir = if args.len() < 2 {
+    let static_dir = if rest.is_empty() {
         Some(
             std::env::current_dir()
                 .unwrap_or_default()
                 .to_string_lossy()
                 .to_string(),
         )
-    } else if args[1] != "-e" && Path::new(&args[1]).is_dir() {
+    } else if rest[0] != "-e" && Path::new(&rest[0]).is_dir() {
         Some(
-            std::fs::canonicalize(&args[1])
-                .unwrap_or_else(|_| PathBuf::from(&args[1]))
+            std::fs::canonicalize(&rest[0])
+                .unwrap_or_else(|_| PathBuf::from(&rest[0]))
                 .to_string_lossy()
                 .to_string(),
         )
@@ -1786,8 +1791,8 @@ serve {port}, fn ($req) {{
             $url_path .= "/" unless $url_path =~ m|/$|;
             my @entries;
             push @entries, ".." unless $url_path eq "/";
-            my @all = sort((dirs($fs_path)), (filesf($fs_path)));
-            push @entries, @all;
+            push @entries, dirs($fs_path);
+            push @entries, filesf($fs_path);
             my $html = "<!DOCTYPE html><html><head><meta charset=\"utf-8\">";
             $html .= "<title>Directory listing for $url_path</title>";
             $html .= "<style>body{{font-family:monospace;margin:2em}}a{{text-decoration:none}}a:hover{{text-decoration:underline}}li{{padding:2px 0}}.dir{{font-weight:bold}}</style>";
@@ -1846,17 +1851,17 @@ serve {port}, fn ($req) {{
 }};
 "#
         )
-    } else if args[1] == "-e" {
-        if args.len() < 3 {
+    } else if rest[0] == "-e" {
+        if rest.len() < 2 {
             eprintln!("pe serve: -e requires an argument");
             return 1;
         }
-        let handler_body = args[2..].join(" ");
+        let handler_body = rest[1..].join(" ");
         format!("serve {}, fn ($req) {{ {} }}", port, handler_body)
     } else {
         // Script file — the script must call serve() itself.
         // PORT is injected as $ENV{PERLRS_PORT} for convenience.
-        let script_path = &args[1];
+        let script_path = &rest[0];
         match std::fs::read_to_string(script_path) {
             Ok(src) => {
                 format!("$ENV{{PERLRS_PORT}} = {};\n{}", port, src)
