@@ -1746,7 +1746,7 @@ fn run_serve_subcommand(args: &[String]) -> i32 {
     let (port, rest) = if !args.is_empty() && args[0].parse::<u16>().is_ok() {
         (args[0].clone(), &args[1..])
     } else {
-        ("8000".to_string(), &args[..])
+        ("8000".to_string(), args)
     };
 
     // Detect mode: no arg or directory = static file server, -e = one-liner, else = script

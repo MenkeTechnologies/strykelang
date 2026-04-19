@@ -1482,6 +1482,435 @@ pub(crate) fn try_builtin(
             let msg = args.get(1).unwrap_or(&undef);
             crate::native_codec::hmac_sha256(key, msg)
         }),
+        // ── BLAKE2 / BLAKE3 ──────────────────────────────────────────────────
+        "blake2b" | "b2b" => Some(crate::native_codec::blake2b(args.first().unwrap_or(&undef))),
+        "blake2s" | "b2s" => Some(crate::native_codec::blake2s(args.first().unwrap_or(&undef))),
+        "blake3" | "b3" => Some(crate::native_codec::blake3_hash(
+            args.first().unwrap_or(&undef),
+        )),
+        // ── SHA-3 / Keccak ───────────────────────────────────────────────────
+        "sha3_256" | "s3_256" => Some(crate::native_codec::sha3_256(
+            args.first().unwrap_or(&undef),
+        )),
+        "sha3_512" | "s3_512" => Some(crate::native_codec::sha3_512(
+            args.first().unwrap_or(&undef),
+        )),
+        "shake128" => Some(crate::native_codec::shake128(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&PerlValue::integer(32)),
+        )),
+        "shake256" => Some(crate::native_codec::shake256(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&PerlValue::integer(64)),
+        )),
+        // ── RIPEMD-160 ───────────────────────────────────────────────────────
+        "ripemd160" | "rmd160" => Some(crate::native_codec::ripemd160(
+            args.first().unwrap_or(&undef),
+        )),
+        // ── MD4 (legacy) ─────────────────────────────────────────────────────
+        "md4" => Some(crate::native_codec::md4_digest(
+            args.first().unwrap_or(&undef),
+        )),
+        // ── xxHash ───────────────────────────────────────────────────────────
+        "xxh32" | "xxhash32" => Some(crate::native_codec::xxh32(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "xxh64" | "xxhash64" => Some(crate::native_codec::xxh64(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "xxh3" | "xxhash3" => Some(crate::native_codec::xxh3(args.first().unwrap_or(&undef))),
+        "xxh3_128" | "xxhash3_128" => Some(crate::native_codec::xxh3_128(
+            args.first().unwrap_or(&undef),
+        )),
+        // ── MurmurHash ───────────────────────────────────────────────────────
+        "murmur3" | "murmur3_32" => Some(crate::native_codec::murmur3_32(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "murmur3_128" => Some(crate::native_codec::murmur3_128(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        // ── SipHash ──────────────────────────────────────────────────────────
+        "siphash" => Some(crate::native_codec::siphash(args.first().unwrap_or(&undef))),
+        "siphash_keyed" => Some(crate::native_codec::siphash_keyed(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+            args.get(2).unwrap_or(&undef),
+        )),
+        // ── HMAC Variants ────────────────────────────────────────────────────
+        "hmac_sha1" => Some(crate::native_codec::hmac_sha1(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "hmac_sha384" => Some(crate::native_codec::hmac_sha384(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "hmac_sha512" => Some(crate::native_codec::hmac_sha512(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "hmac_md5" => Some(crate::native_codec::hmac_md5(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        // ── HKDF Key Derivation ──────────────────────────────────────────────
+        "hkdf_sha256" | "hkdf" => Some(crate::native_codec::hkdf_sha256(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+            args.get(2).unwrap_or(&undef),
+            args.get(3).unwrap_or(&PerlValue::integer(32)),
+        )),
+        "hkdf_sha512" => Some(crate::native_codec::hkdf_sha512(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+            args.get(2).unwrap_or(&undef),
+            args.get(3).unwrap_or(&PerlValue::integer(64)),
+        )),
+        // ── Base32 / Base58 Encoding ────────────────────────────────────────────
+        "base32_encode" | "b32e" => Some(crate::native_codec::base32_encode(
+            args.first().unwrap_or(&undef),
+        )),
+        "base32_decode" | "b32d" => Some(crate::native_codec::base32_decode(
+            args.first().unwrap_or(&undef),
+        )),
+        "base58_encode" | "b58e" => Some(crate::native_codec::base58_encode(
+            args.first().unwrap_or(&undef),
+        )),
+        "base58_decode" | "b58d" => Some(crate::native_codec::base58_decode(
+            args.first().unwrap_or(&undef),
+        )),
+        // ── TOTP / HOTP ─────────────────────────────────────────────────────────
+        "totp" | "totp_generate" => Some(crate::native_codec::totp_generate(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+            args.get(2).unwrap_or(&undef),
+        )),
+        "totp_verify" => Some(crate::native_codec::totp_verify(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+            args.get(2).unwrap_or(&undef),
+        )),
+        "hotp" | "hotp_generate" => Some(crate::native_codec::hotp_generate(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+            args.get(2).unwrap_or(&undef),
+        )),
+        // ── AES-CBC ─────────────────────────────────────────────────────────────
+        "aes_cbc_encrypt" | "aes_cbc_enc" => Some(crate::native_codec::aes_cbc_encrypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+            args.get(2).unwrap_or(&undef),
+        )),
+        "aes_cbc_decrypt" | "aes_cbc_dec" => Some(crate::native_codec::aes_cbc_decrypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        // ── Blowfish ────────────────────────────────────────────────────────
+        "blowfish_encrypt" | "bf_enc" => Some(crate::native_codec::blowfish_encrypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+            args.get(2).unwrap_or(&undef),
+        )),
+        "blowfish_decrypt" | "bf_dec" => Some(crate::native_codec::blowfish_decrypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        // ── Triple DES (3DES) ───────────────────────────────────────────────
+        "des3_encrypt" | "3des_enc" | "tdes_enc" => Some(crate::native_codec::des3_encrypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+            args.get(2).unwrap_or(&undef),
+        )),
+        "des3_decrypt" | "3des_dec" | "tdes_dec" => Some(crate::native_codec::des3_decrypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        // ── Twofish ─────────────────────────────────────────────────────────
+        "twofish_encrypt" | "tf_enc" => Some(crate::native_codec::twofish_encrypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+            args.get(2).unwrap_or(&undef),
+        )),
+        "twofish_decrypt" | "tf_dec" => Some(crate::native_codec::twofish_decrypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        // ── Camellia ────────────────────────────────────────────────────────
+        "camellia_encrypt" | "cam_enc" => Some(crate::native_codec::camellia_encrypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+            args.get(2).unwrap_or(&undef),
+        )),
+        "camellia_decrypt" | "cam_dec" => Some(crate::native_codec::camellia_decrypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        // ── CAST5 ───────────────────────────────────────────────────────────
+        "cast5_encrypt" | "cast5_enc" => Some(crate::native_codec::cast5_encrypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+            args.get(2).unwrap_or(&undef),
+        )),
+        "cast5_decrypt" | "cast5_dec" => Some(crate::native_codec::cast5_decrypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        // ── Salsa20 / XSalsa20 ──────────────────────────────────────────────
+        "salsa20" | "salsa20_encrypt" => Some(crate::native_codec::salsa20_crypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "salsa20_decrypt" => Some(crate::native_codec::salsa20_decrypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "xsalsa20" | "xsalsa20_encrypt" => Some(crate::native_codec::xsalsa20_crypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "xsalsa20_decrypt" => Some(crate::native_codec::xsalsa20_decrypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        // ── NaCl secretbox / box ────────────────────────────────────────────
+        "secretbox" | "secretbox_seal" => Some(crate::native_codec::secretbox_seal(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "secretbox_open" => Some(crate::native_codec::secretbox_open(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "nacl_box_keygen" | "box_keygen" => Some(crate::native_codec::nacl_box_keygen()),
+        "nacl_box" | "nacl_box_seal" | "box_seal" => Some(crate::native_codec::nacl_box_seal(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+            args.get(2).unwrap_or(&undef),
+        )),
+        "nacl_box_open" | "box_open" => Some(crate::native_codec::nacl_box_open(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+            args.get(2).unwrap_or(&undef),
+        )),
+        // ── QR Code ─────────────────────────────────────────────────────────────
+        "qr_ascii" | "qr" => Some(crate::native_codec::qr_ascii(
+            args.first().unwrap_or(&undef),
+        )),
+        "qr_png" => Some(crate::native_codec::qr_png(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "qr_svg" => Some(crate::native_codec::qr_svg(args.first().unwrap_or(&undef))),
+        // ── Barcode ─────────────────────────────────────────────────────────────
+        "barcode_code128" | "code128" => Some(crate::native_codec::barcode_code128(
+            args.first().unwrap_or(&undef),
+        )),
+        "barcode_code39" | "code39" => Some(crate::native_codec::barcode_code39(
+            args.first().unwrap_or(&undef),
+        )),
+        "barcode_ean13" | "ean13" => Some(crate::native_codec::barcode_ean13(
+            args.first().unwrap_or(&undef),
+        )),
+        "barcode_svg" => Some(crate::native_codec::barcode_svg(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        // ── Poly1305 Standalone MAC ──────────────────────────────────────────
+        "poly1305" | "poly1305_mac" => Some(crate::native_codec::poly1305_mac(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        // ── RSA ──────────────────────────────────────────────────────────────
+        "rsa_keygen" => Some(crate::native_codec::rsa_keygen(
+            args.first().unwrap_or(&PerlValue::integer(2048)),
+        )),
+        "rsa_encrypt" | "rsa_enc" => Some(crate::native_codec::rsa_encrypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "rsa_decrypt" | "rsa_dec" => Some(crate::native_codec::rsa_decrypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "rsa_encrypt_pkcs1" => Some(crate::native_codec::rsa_encrypt_pkcs1(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "rsa_decrypt_pkcs1" => Some(crate::native_codec::rsa_decrypt_pkcs1(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "rsa_sign" => Some(crate::native_codec::rsa_sign(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "rsa_verify" => Some(crate::native_codec::rsa_verify(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+            args.get(2).unwrap_or(&undef),
+        )),
+        // ── ECDSA (P-256, P-384, secp256k1) ──────────────────────────────────
+        "ecdsa_p256_keygen" | "p256_keygen" => Some(crate::native_codec::ecdsa_p256_keygen()),
+        "ecdsa_p256_sign" | "p256_sign" => Some(crate::native_codec::ecdsa_p256_sign(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "ecdsa_p256_verify" | "p256_verify" => Some(crate::native_codec::ecdsa_p256_verify(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+            args.get(2).unwrap_or(&undef),
+        )),
+        "ecdsa_p384_keygen" | "p384_keygen" => Some(crate::native_codec::ecdsa_p384_keygen()),
+        "ecdsa_p384_sign" | "p384_sign" => Some(crate::native_codec::ecdsa_p384_sign(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "ecdsa_p384_verify" | "p384_verify" => Some(crate::native_codec::ecdsa_p384_verify(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+            args.get(2).unwrap_or(&undef),
+        )),
+        "ecdsa_secp256k1_keygen" | "secp256k1_keygen" => {
+            Some(crate::native_codec::ecdsa_secp256k1_keygen())
+        }
+        "ecdsa_secp256k1_sign" | "secp256k1_sign" => {
+            Some(crate::native_codec::ecdsa_secp256k1_sign(
+                args.first().unwrap_or(&undef),
+                args.get(1).unwrap_or(&undef),
+            ))
+        }
+        "ecdsa_secp256k1_verify" | "secp256k1_verify" => {
+            Some(crate::native_codec::ecdsa_secp256k1_verify(
+                args.first().unwrap_or(&undef),
+                args.get(1).unwrap_or(&undef),
+                args.get(2).unwrap_or(&undef),
+            ))
+        }
+        // ── ECDH (P-256, P-384) ──────────────────────────────────────────────
+        "ecdh_p256" | "p256_dh" => Some(crate::native_codec::ecdh_p256(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "ecdh_p384" | "p384_dh" => Some(crate::native_codec::ecdh_p384(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        // ── Password Hashing (KDFs) ──────────────────────────────────────────
+        "argon2_hash" | "argon2" => Some(crate::native_codec::argon2_hash(
+            args.first().unwrap_or(&undef),
+        )),
+        "argon2_verify" => Some(crate::native_codec::argon2_verify(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "bcrypt_hash" | "bcrypt" => Some(crate::native_codec::bcrypt_hash(
+            args.first().unwrap_or(&undef),
+        )),
+        "bcrypt_verify" => Some(crate::native_codec::bcrypt_verify(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "scrypt_hash" | "scrypt" => Some(crate::native_codec::scrypt_hash(
+            args.first().unwrap_or(&undef),
+        )),
+        "scrypt_verify" => Some(crate::native_codec::scrypt_verify(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "pbkdf2" | "pbkdf2_derive" => Some(crate::native_codec::pbkdf2_derive(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+            args.get(2).unwrap_or(&undef),
+        )),
+        // ── Secure Random ────────────────────────────────────────────────────
+        "random_bytes" | "randbytes" => Some(crate::native_codec::random_bytes(
+            args.first().unwrap_or(&undef),
+        )),
+        "random_bytes_hex" | "randhex" => Some(crate::native_codec::random_bytes_hex(
+            args.first().unwrap_or(&undef),
+        )),
+        // ── Symmetric Encryption ─────────────────────────────────────────────
+        "aes_encrypt" | "aes_enc" => Some(crate::native_codec::aes_encrypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "aes_decrypt" | "aes_dec" => Some(crate::native_codec::aes_decrypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "chacha_encrypt" | "chacha_enc" => Some(crate::native_codec::chacha_encrypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "chacha_decrypt" | "chacha_dec" => Some(crate::native_codec::chacha_decrypt(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        // ── Asymmetric Crypto ────────────────────────────────────────────────
+        "ed25519_keygen" | "ed_keygen" => Some(crate::native_codec::ed25519_keygen()),
+        "ed25519_sign" | "ed_sign" => Some(crate::native_codec::ed25519_sign(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "ed25519_verify" | "ed_verify" => Some(crate::native_codec::ed25519_verify(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+            args.get(2).unwrap_or(&undef),
+        )),
+        "x25519_keygen" | "x_keygen" => Some(crate::native_codec::x25519_keygen()),
+        "x25519_dh" | "x_dh" => Some(crate::native_codec::x25519_dh(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        // ── Special Math Functions ───────────────────────────────────────────
+        "erf" => Some(crate::native_codec::math_erf(
+            args.first().unwrap_or(&undef),
+        )),
+        "erfc" => Some(crate::native_codec::math_erfc(
+            args.first().unwrap_or(&undef),
+        )),
+        "gamma" | "tgamma" => Some(crate::native_codec::math_gamma(
+            args.first().unwrap_or(&undef),
+        )),
+        "lgamma" | "ln_gamma" => Some(crate::native_codec::math_lgamma(
+            args.first().unwrap_or(&undef),
+        )),
+        "digamma" | "psi" => Some(crate::native_codec::math_digamma(
+            args.first().unwrap_or(&undef),
+        )),
+        "beta_fn" => Some(crate::native_codec::math_beta(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "lbeta" | "ln_beta" => Some(crate::native_codec::math_lbeta(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "betainc" | "beta_reg" => Some(crate::native_codec::math_betainc(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+            args.get(2).unwrap_or(&undef),
+        )),
+        "gammainc" | "gamma_li" => Some(crate::native_codec::math_gammainc(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "gammaincc" | "gamma_ui" => Some(crate::native_codec::math_gammaincc(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "gammainc_reg" | "gamma_lr" => Some(crate::native_codec::math_gammainc_reg(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "gammaincc_reg" | "gamma_ur" => Some(crate::native_codec::math_gammaincc_reg(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
         "uuid" => Some(crate::native_codec::uuid_v4()),
         "base64_encode" | "b64e" => Some(crate::native_codec::base64_encode(
             args.first().unwrap_or(&undef),
@@ -1501,6 +1930,77 @@ pub(crate) fn try_builtin(
             args.first().unwrap_or(&undef),
         )),
         "zstd_decode" | "uzst" => Some(crate::native_codec::zstd_decode(
+            args.first().unwrap_or(&undef),
+        )),
+        // ── Brotli ──────────────────────────────────────────────────────────────
+        "brotli" | "br" => Some(crate::native_codec::brotli_compress(
+            args.first().unwrap_or(&undef),
+        )),
+        "brotli_decode" | "ubr" => Some(crate::native_codec::brotli_decompress(
+            args.first().unwrap_or(&undef),
+        )),
+        // ── XZ / LZMA ───────────────────────────────────────────────────────────
+        "xz" | "lzma" => Some(crate::native_codec::xz_compress(
+            args.first().unwrap_or(&undef),
+        )),
+        "xz_decode" | "unxz" | "unlzma" => Some(crate::native_codec::xz_decompress(
+            args.first().unwrap_or(&undef),
+        )),
+        // ── Bzip2 ───────────────────────────────────────────────────────────────
+        "bzip2" | "bz2" => Some(crate::native_codec::bzip2_compress(
+            args.first().unwrap_or(&undef),
+        )),
+        "bzip2_decode" | "bunzip2" | "ubz2" => Some(crate::native_codec::bzip2_decompress(
+            args.first().unwrap_or(&undef),
+        )),
+        // ── LZ4 ─────────────────────────────────────────────────────────────────
+        "lz4" => Some(crate::native_codec::lz4_compress(
+            args.first().unwrap_or(&undef),
+        )),
+        "lz4_decode" | "unlz4" => Some(crate::native_codec::lz4_decompress(
+            args.first().unwrap_or(&undef),
+        )),
+        // ── Snappy ──────────────────────────────────────────────────────────────
+        "snappy" | "snp" => Some(crate::native_codec::snappy_compress(
+            args.first().unwrap_or(&undef),
+        )),
+        "snappy_decode" | "unsnappy" => Some(crate::native_codec::snappy_decompress(
+            args.first().unwrap_or(&undef),
+        )),
+        // ── LZW ─────────────────────────────────────────────────────────────────
+        "lzw" => Some(crate::native_codec::lzw_compress(
+            args.first().unwrap_or(&undef),
+        )),
+        "lzw_decode" | "unlzw" => Some(crate::native_codec::lzw_decompress(
+            args.first().unwrap_or(&undef),
+        )),
+        // ── Tar Archive ─────────────────────────────────────────────────────────
+        "tar_create" | "tar" => Some(crate::native_codec::tar_create(
+            args.first().unwrap_or(&undef),
+        )),
+        "tar_extract" | "untar" => Some(crate::native_codec::tar_extract(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "tar_list" => Some(crate::native_codec::tar_list(
+            args.first().unwrap_or(&undef),
+        )),
+        "tar_gz_create" | "tgz" => Some(crate::native_codec::tar_gz_create(
+            args.first().unwrap_or(&undef),
+        )),
+        "tar_gz_extract" | "untgz" => Some(crate::native_codec::tar_gz_extract(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        // ── ZIP Archive ─────────────────────────────────────────────────────────
+        "zip_create" | "zip_archive" => Some(crate::native_codec::zip_create(
+            args.first().unwrap_or(&undef),
+        )),
+        "zip_extract" | "unzip_archive" => Some(crate::native_codec::zip_extract(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "zip_list" => Some(crate::native_codec::zip_list(
             args.first().unwrap_or(&undef),
         )),
         "datetime_utc" | "utc" => Some(crate::native_codec::datetime_utc()),
