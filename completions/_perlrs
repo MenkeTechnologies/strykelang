@@ -48,7 +48,7 @@ _perlrs_build() {
 # `pe docs [TOPIC]` — built-in documentation browser
 _perlrs_docs() {
   local -a _topics
-  _topics=(${(f)"$(pe docs 2>/dev/null | sed -n '/^  [a-z]/p' | tr -s ' ' '\n' | grep .)"})
+  _topics=(${(f)"$(pe docs --list 2>/dev/null | sed 's/^ *[0-9]*\. //')"})
   _describe 'docs topic' _topics
 }
 
