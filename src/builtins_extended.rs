@@ -10375,3 +10375,1281 @@ fn builtin_heatmap_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
     svg += svg_footer();
     Ok(PerlValue::string(svg))
 }
+
+// ── Cyberpunk Terminal Art ─────────────────────────────────────────────
+
+/// Simple seeded RNG for deterministic art (xorshift64).
+struct CyberRng(u64);
+
+impl CyberRng {
+    fn new(seed: u64) -> Self {
+        Self(seed.wrapping_add(1))
+    }
+    fn next(&mut self) -> u64 {
+        let mut x = self.0;
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        self.0 = x;
+        x
+    }
+    fn range(&mut self, lo: u64, hi: u64) -> u64 {
+        lo + self.next() % (hi - lo + 1)
+    }
+    fn pick<'a>(&mut self, items: &'a [&str]) -> &'a str {
+        items[self.next() as usize % items.len()]
+    }
+}
+
+/// ANSI 256-color foreground.
+fn fg256(c: u8) -> String {
+    format!("\x1b[38;5;{}m", c)
+}
+
+/// ANSI RGB foreground.
+fn fg_rgb(r: u8, g: u8, b: u8) -> String {
+    format!("\x1b[38;2;{};{};{}m", r, g, b)
+}
+
+const RESET: &str = "\x1b[0m";
+const BOLD: &str = "\x1b[1m";
+
+/// Neon color palette: cyan, magenta, hot pink, electric blue, lime, orange.
+const NEON_COLORS: &[(u8, u8, u8)] = &[
+    (0, 255, 255), // cyan
+    (255, 0, 255), // magenta
+    (255, 0, 128), // hot pink
+    (0, 128, 255), // electric blue
+    (128, 255, 0), // lime
+    (255, 128, 0), // orange
+    (255, 255, 0), // yellow
+    (0, 255, 128), // mint
+];
+
+fn neon(rng: &mut CyberRng) -> String {
+    let (r, g, b) = NEON_COLORS[rng.next() as usize % NEON_COLORS.len()];
+    fg_rgb(r, g, b)
+}
+
+/// `cyber_city [width, height, seed]` — procedural neon cityscape with buildings and stars.
+pub(crate) fn builtin_cyber_city(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let w = args.first().map(|v| v.to_int().max(20)).unwrap_or(80) as usize;
+    let h = args.get(1).map(|v| v.to_int().max(8)).unwrap_or(24) as usize;
+    let seed = args.get(2).map(|v| v.to_int() as u64).unwrap_or(42);
+    let mut rng = CyberRng::new(seed);
+    let mut grid = vec![vec![(' ', String::new()); w]; h];
+
+    // Stars in the sky (top 40%)
+    let sky_h = h * 2 / 5;
+    for _ in 0..w {
+        let sx = rng.range(0, w as u64 - 1) as usize;
+        let sy = rng.range(0, sky_h as u64) as usize;
+        if sy < h {
+            let star = rng.pick(&["·", "✦", "✧", "⋆", "∗", "."]);
+            let dim = rng.range(232, 255) as u8;
+            grid[sy][sx] = (star.chars().next().unwrap_or('.'), fg256(dim));
+        }
+    }
+
+    // Buildings
+    let num_buildings = w / 3;
+    for _ in 0..num_buildings {
+        let bw = rng.range(2, 6) as usize;
+        let bh = rng.range(h as u64 / 4, h as u64 * 3 / 4) as usize;
+        let bx = rng.range(0, w.saturating_sub(bw + 1) as u64) as usize;
+        let by = h.saturating_sub(bh);
+        let color = neon(&mut rng);
+
+        // Building body
+        for y in by..h {
+            for x in bx..bx + bw {
+                if x < w {
+                    if y == by {
+                        grid[y][x] = ('▄', color.clone());
+                    } else if x == bx || x == bx + bw - 1 {
+                        grid[y][x] = ('│', color.clone());
+                    } else {
+                        // Windows — alternating lit/unlit
+                        if y % 2 == 0 && x % 2 == 1 {
+                            let lit = rng.range(0, 3) > 0;
+                            if lit {
+                                let wc = fg_rgb(255, 255, 200);
+                                grid[y][x] = ('▪', wc);
+                            } else {
+                                grid[y][x] = ('▪', fg256(236));
+                            }
+                        } else {
+                            grid[y][x] = (' ', color.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        // Antenna on some buildings
+        if rng.range(0, 2) == 0 && by > 0 {
+            let ax = bx + bw / 2;
+            if ax < w && by > 0 {
+                let ah = rng.range(1, 3) as usize;
+                for dy in 1..=ah {
+                    if by >= dy {
+                        grid[by - dy][ax] = ('│', fg_rgb(255, 0, 0));
+                    }
+                }
+                if by > ah {
+                    grid[by - ah - 1][ax] = ('◆', fg_rgb(255, 0, 0));
+                }
+            }
+        }
+    }
+
+    // Ground line
+    let ground_color = fg_rgb(0, 255, 255);
+    for x in 0..w {
+        if grid[h - 1][x].0 == ' ' {
+            grid[h - 1][x] = ('▔', ground_color.clone());
+        }
+    }
+
+    // Render
+    let mut out = String::with_capacity(w * h * 6);
+    for row in &grid {
+        for (ch, color) in row {
+            if color.is_empty() {
+                out.push(*ch);
+            } else {
+                out += color;
+                out.push(*ch);
+                out += RESET;
+            }
+        }
+        out.push('\n');
+    }
+    Ok(PerlValue::string(out))
+}
+
+/// `cyber_grid [width, height]` — perspective grid with vanishing point and neon glow.
+pub(crate) fn builtin_cyber_grid(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let w = args.first().map(|v| v.to_int().max(20)).unwrap_or(80) as usize;
+    let h = args.get(1).map(|v| v.to_int().max(8)).unwrap_or(24) as usize;
+    let horizon = h / 3;
+
+    let mut out = String::with_capacity(w * h * 6);
+
+    // Sun/moon at horizon center
+    let sun_color = fg_rgb(255, 0, 128);
+    let _grid_color_near = fg_rgb(0, 255, 255);
+    let grid_color_far = fg_rgb(0, 80, 128);
+
+    for y in 0..h {
+        let mut line = String::new();
+        for x in 0..w {
+            if y < horizon {
+                // Sky with horizontal scan lines
+                if y % 3 == 0 {
+                    let intensity = 40 + (y * 3) as u8;
+                    line += &fg_rgb(intensity, 0, intensity.saturating_mul(2));
+                    line += "─";
+                    line += RESET;
+                } else {
+                    line.push(' ');
+                }
+            } else if y == horizon {
+                // Horizon line with sun
+                let cx = w / 2;
+                let dist = (x as isize - cx as isize).unsigned_abs();
+                if dist < 4 {
+                    line += &sun_color;
+                    line += BOLD;
+                    line += if dist < 2 { "█" } else { "▓" };
+                    line += RESET;
+                } else {
+                    line += &grid_color_far;
+                    line += "═";
+                    line += RESET;
+                }
+            } else {
+                // Grid below horizon — perspective lines
+                let depth = y - horizon;
+                let total_depth = h - horizon;
+                let t = depth as f64 / total_depth as f64;
+
+                // Vertical grid lines converging to center
+                let cx = w as f64 / 2.0;
+                let spread = t * (w as f64 / 2.0);
+                let rel = (x as f64 - cx).abs();
+                let spacing = (3.0 + t * 8.0).max(1.0);
+                let on_vline = rel < spread && (rel % spacing) < 1.0;
+
+                // Horizontal grid lines
+                let on_hline = depth % (1 + depth / 4) == 0;
+
+                // Color interpolation
+                let r = (0.0 + t * 0.0) as u8;
+                let g = (255.0 - t * 175.0) as u8;
+                let b = (255.0 - t * 127.0) as u8;
+
+                if on_vline && on_hline {
+                    line += &fg_rgb(r, g, b);
+                    line += "┼";
+                    line += RESET;
+                } else if on_vline {
+                    line += &fg_rgb(r, g, b);
+                    line += "│";
+                    line += RESET;
+                } else if on_hline {
+                    line += &fg_rgb(r, g, b);
+                    line += "─";
+                    line += RESET;
+                } else {
+                    line.push(' ');
+                }
+            }
+        }
+        out += &line;
+        out.push('\n');
+    }
+    // Attribution line
+    out += &fg_rgb(80, 80, 80);
+    let tag = "▸ S T R Y K E  G R I D ◂";
+    let pad = w.saturating_sub(tag.len()) / 2;
+    for _ in 0..pad {
+        out.push(' ');
+    }
+    out += tag;
+    out += RESET;
+    out.push('\n');
+
+    Ok(PerlValue::string(out))
+}
+
+/// `cyber_rain [width, height, seed]` — matrix-style digital rain columns.
+pub(crate) fn builtin_cyber_rain(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let w = args.first().map(|v| v.to_int().max(10)).unwrap_or(80) as usize;
+    let h = args.get(1).map(|v| v.to_int().max(5)).unwrap_or(24) as usize;
+    let seed = args.get(2).map(|v| v.to_int() as u64).unwrap_or(1337);
+    let mut rng = CyberRng::new(seed);
+
+    let glyphs: Vec<char> = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン01234567890:.;=<>+*#@$%&"
+        .chars()
+        .collect();
+
+    let mut grid = vec![vec![(' ', 0u8, 0u8, 0u8); w]; h];
+
+    // Create rain columns
+    let num_streams = w * 2 / 3;
+    for _ in 0..num_streams {
+        let col = rng.range(0, w as u64 - 1) as usize;
+        let stream_len = rng.range(3, h as u64) as usize;
+        let start = rng.range(0, h as u64 - 1) as usize;
+
+        for i in 0..stream_len {
+            let row = start + i;
+            if row >= h {
+                break;
+            }
+            let ch = glyphs[rng.next() as usize % glyphs.len()];
+            let brightness = if i == 0 {
+                255 // head is brightest (white/green)
+            } else {
+                (200 - (i * 180 / stream_len).min(180)) as u8
+            };
+            // Brighter streams are green-white, dimmer are pure green
+            let (r, g, b) = if i == 0 {
+                (200, 255, 200)
+            } else {
+                (0, brightness, brightness / 4)
+            };
+            grid[row][col] = (ch, r, g, b);
+        }
+    }
+
+    let mut out = String::with_capacity(w * h * 12);
+    for row in &grid {
+        for &(ch, r, g, b) in row {
+            if ch == ' ' {
+                out.push(' ');
+            } else {
+                out += &fg_rgb(r, g, b);
+                out.push(ch);
+                out += RESET;
+            }
+        }
+        out.push('\n');
+    }
+    Ok(PerlValue::string(out))
+}
+
+/// `cyber_glitch text [, intensity]` — glitch-distort text with ANSI corruption effects.
+pub(crate) fn builtin_cyber_glitch(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let text = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let intensity = args.get(1).map(|v| v.to_int().clamp(1, 10)).unwrap_or(5) as usize;
+    let mut rng = CyberRng::new(text.len() as u64 * 31 + intensity as u64);
+
+    let glitch_chars = "░▒▓█▀▄▌▐╳╱╲╳≡≋≈∷";
+    let gchars: Vec<char> = glitch_chars.chars().collect();
+
+    let mut out = String::new();
+    let lines: Vec<&str> = text.lines().collect();
+    let num_lines = lines.len().max(1);
+
+    // Produce glitch lines above
+    for _ in 0..intensity / 2 {
+        let c = neon(&mut rng);
+        out += &c;
+        for _ in 0..text.lines().next().map(|l| l.len()).unwrap_or(20) {
+            out.push(gchars[rng.next() as usize % gchars.len()]);
+        }
+        out += RESET;
+        out.push('\n');
+    }
+
+    // Main text with random glitch insertions
+    for (li, line) in lines.iter().enumerate() {
+        let chars: Vec<char> = line.chars().collect();
+        // Offset some lines
+        let offset = if rng.range(0, 10) < intensity as u64 {
+            rng.range(0, 4) as usize
+        } else {
+            0
+        };
+        for _ in 0..offset {
+            out.push(' ');
+        }
+
+        for (i, &ch) in chars.iter().enumerate() {
+            let glitch_here = rng.range(0, 20) < intensity as u64;
+            if glitch_here {
+                // Random neon color on the character
+                out += &neon(&mut rng);
+                out += BOLD;
+                if rng.range(0, 3) == 0 {
+                    out.push(gchars[rng.next() as usize % gchars.len()]);
+                } else {
+                    out.push(ch);
+                }
+                out += RESET;
+            } else {
+                // Gradient from cyan to magenta across the line
+                let t = if chars.is_empty() {
+                    0.0
+                } else {
+                    i as f64 / chars.len() as f64
+                };
+                let r = (t * 255.0) as u8;
+                let g = ((1.0 - t) * 255.0) as u8;
+                let b = 255u8;
+                out += &fg_rgb(r, g, b);
+                out.push(ch);
+                out += RESET;
+            }
+        }
+        out.push('\n');
+
+        // Occasional duplicate line with offset (screen tear effect)
+        if li < num_lines - 1 && rng.range(0, 10) < (intensity as u64) / 2 {
+            let tear_offset = rng.range(1, 6) as usize;
+            out += &fg_rgb(255, 0, 128);
+            for _ in 0..tear_offset {
+                out.push(' ');
+            }
+            for &ch in &chars {
+                if rng.range(0, 4) == 0 {
+                    out.push(gchars[rng.next() as usize % gchars.len()]);
+                } else {
+                    out.push(ch);
+                }
+            }
+            out += RESET;
+            out.push('\n');
+        }
+    }
+
+    // Glitch lines below
+    for _ in 0..intensity / 2 {
+        let c = neon(&mut rng);
+        out += &c;
+        for _ in 0..text.lines().next().map(|l| l.len()).unwrap_or(20) {
+            out.push(gchars[rng.next() as usize % gchars.len()]);
+        }
+        out += RESET;
+        out.push('\n');
+    }
+
+    Ok(PerlValue::string(out))
+}
+
+/// `cyber_banner text [, style]` — large neon block-letter banner.
+/// style: "block" (default), "slim"
+pub(crate) fn builtin_cyber_banner(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let text = args
+        .first()
+        .map(|v| v.to_string().to_uppercase())
+        .unwrap_or_default();
+    let _style = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "block".into());
+
+    // 5-row font using block characters (only A-Z, 0-9, space, punctuation)
+    fn glyph(ch: char) -> [&'static str; 5] {
+        match ch {
+            'A' => ["▄█▄", "█▀█", "███", "█ █", "█ █"],
+            'B' => ["██▄", "█▄█", "██▀", "█▀█", "██▄"],
+            'C' => ["▄██", "█  ", "█  ", "█  ", "▀██"],
+            'D' => ["██▄", "█ █", "█ █", "█ █", "██▀"],
+            'E' => ["███", "█  ", "██ ", "█  ", "███"],
+            'F' => ["███", "█  ", "██ ", "█  ", "█  "],
+            'G' => ["▄██", "█  ", "█▄█", "█ █", "▀██"],
+            'H' => ["█ █", "█ █", "███", "█ █", "█ █"],
+            'I' => ["███", " █ ", " █ ", " █ ", "███"],
+            'J' => ["███", "  █", "  █", "█ █", "▀█▀"],
+            'K' => ["█▄█", "██ ", "██ ", "█▀▄", "█ █"],
+            'L' => ["█  ", "█  ", "█  ", "█  ", "███"],
+            'M' => ["█▄█", "███", "█▀█", "█ █", "█ █"],
+            'N' => ["█ █", "██▄", "█▀█", "█ █", "█ █"],
+            'O' => ["▄█▄", "█ █", "█ █", "█ █", "▀█▀"],
+            'P' => ["██▄", "█ █", "██▀", "█  ", "█  "],
+            'Q' => ["▄█▄", "█ █", "█ █", "█▄█", "▀█▄"],
+            'R' => ["██▄", "█ █", "██▀", "█▀▄", "█ █"],
+            'S' => ["▄██", "█  ", "▀█▄", "  █", "██▀"],
+            'T' => ["███", " █ ", " █ ", " █ ", " █ "],
+            'U' => ["█ █", "█ █", "█ █", "█ █", "▀█▀"],
+            'V' => ["█ █", "█ █", "█ █", "▀▄▀", " █ "],
+            'W' => ["█ █", "█ █", "█▄█", "███", "█▀█"],
+            'X' => ["█ █", "▀▄▀", " █ ", "▄▀▄", "█ █"],
+            'Y' => ["█ █", "▀▄▀", " █ ", " █ ", " █ "],
+            'Z' => ["███", "  █", " █ ", "█  ", "███"],
+            '0' => ["▄█▄", "█▄█", "█ █", "█▀█", "▀█▀"],
+            '1' => ["▄█ ", " █ ", " █ ", " █ ", "███"],
+            '2' => ["▄█▄", "  █", "▄█▀", "█  ", "███"],
+            '3' => ["▄█▄", "  █", " █▄", "  █", "▀█▀"],
+            '4' => ["█ █", "█ █", "███", "  █", "  █"],
+            '5' => ["███", "█  ", "██▄", "  █", "██▀"],
+            '6' => ["▄██", "█  ", "██▄", "█ █", "▀█▀"],
+            '7' => ["███", "  █", " █ ", " █ ", " █ "],
+            '8' => ["▄█▄", "█ █", "▀█▀", "█ █", "▀█▀"],
+            '9' => ["▄█▄", "█ █", "▀██", "  █", "██▀"],
+            '!' => [" █ ", " █ ", " █ ", "   ", " █ "],
+            '?' => ["▄█▄", "  █", " █▀", "   ", " █ "],
+            '.' => ["   ", "   ", "   ", "   ", " █ "],
+            ':' => ["   ", " █ ", "   ", " █ ", "   "],
+            '-' => ["   ", "   ", "███", "   ", "   "],
+            '_' => ["   ", "   ", "   ", "   ", "███"],
+            ' ' => ["   ", "   ", "   ", "   ", "   "],
+            _ => ["   ", " ? ", "   ", " ? ", "   "],
+        }
+    }
+
+    let chars: Vec<char> = text.chars().collect();
+    let mut out = String::new();
+    let mut rng = CyberRng::new(text.len() as u64 * 7);
+
+    // Top border
+    let total_w = chars.len() * 4;
+    out += &fg_rgb(0, 255, 255);
+    out += "╔";
+    for _ in 0..total_w {
+        out += "═";
+    }
+    out += "╗\n";
+    out += RESET;
+
+    // Render 5 rows of block letters
+    for row in 0..5 {
+        out += &fg_rgb(0, 255, 255);
+        out += "║";
+        out += RESET;
+        for (ci, &ch) in chars.iter().enumerate() {
+            let g = glyph(ch);
+            let row_str = g[row];
+            // Color gradient across banner: cyan → magenta → yellow
+            let t = if chars.is_empty() {
+                0.0
+            } else {
+                ci as f64 / chars.len() as f64
+            };
+            let (r, g, b) = if t < 0.5 {
+                let u = t * 2.0;
+                ((u * 255.0) as u8, ((1.0 - u) * 255.0) as u8, 255u8)
+            } else {
+                let u = (t - 0.5) * 2.0;
+                (255u8, (u * 255.0) as u8, ((1.0 - u) * 255.0) as u8)
+            };
+            out += BOLD;
+            out += &fg_rgb(r, g, b);
+            out += row_str;
+            out += RESET;
+            out.push(' ');
+        }
+        out += &fg_rgb(0, 255, 255);
+        out += "║\n";
+        out += RESET;
+    }
+
+    // Bottom border
+    out += &fg_rgb(0, 255, 255);
+    out += "╚";
+    for _ in 0..total_w {
+        out += "═";
+    }
+    out += "╝\n";
+    out += RESET;
+
+    // Tagline
+    let _ = rng.next();
+    let tagline = "⚡ SYSTEM ONLINE ⚡";
+    let pad = total_w.saturating_sub(tagline.chars().count()) / 2;
+    out += &fg_rgb(255, 0, 128);
+    for _ in 0..pad + 1 {
+        out.push(' ');
+    }
+    out += BOLD;
+    out += tagline;
+    out += RESET;
+    out.push('\n');
+
+    Ok(PerlValue::string(out))
+}
+
+/// `cyber_circuit [width, height, seed]` — circuit board pattern with traces and nodes.
+pub(crate) fn builtin_cyber_circuit(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let w = args.first().map(|v| v.to_int().max(10)).unwrap_or(60) as usize;
+    let h = args.get(1).map(|v| v.to_int().max(5)).unwrap_or(20) as usize;
+    let seed = args.get(2).map(|v| v.to_int() as u64).unwrap_or(2077);
+    let mut rng = CyberRng::new(seed);
+
+    let mut grid = vec![vec![' '; w]; h];
+
+    // Lay down horizontal and vertical traces
+    let num_traces = (w * h) / 15;
+    for _ in 0..num_traces {
+        let horizontal = rng.range(0, 1) == 0;
+        if horizontal {
+            let y = rng.range(0, h as u64 - 1) as usize;
+            let x_start = rng.range(0, w as u64 / 2) as usize;
+            let length = rng.range(3, w as u64 / 2) as usize;
+            for x in x_start..(x_start + length).min(w) {
+                if grid[y][x] == ' ' {
+                    grid[y][x] = '─';
+                } else if grid[y][x] == '│' {
+                    grid[y][x] = '┼';
+                }
+            }
+        } else {
+            let x = rng.range(0, w as u64 - 1) as usize;
+            let y_start = rng.range(0, h as u64 / 2) as usize;
+            let length = rng.range(2, h as u64 / 2) as usize;
+            for y in y_start..(y_start + length).min(h) {
+                if grid[y][x] == ' ' {
+                    grid[y][x] = '│';
+                } else if grid[y][x] == '─' {
+                    grid[y][x] = '┼';
+                }
+            }
+        }
+    }
+
+    // Place nodes at intersections and random spots
+    let num_nodes = (w * h) / 30;
+    let node_chars = ['◉', '◎', '●', '○', '◆', '▣', '⬡'];
+    for _ in 0..num_nodes {
+        let x = rng.range(0, w as u64 - 1) as usize;
+        let y = rng.range(0, h as u64 - 1) as usize;
+        grid[y][x] = node_chars[rng.next() as usize % node_chars.len()];
+    }
+
+    // Place corner pieces
+    for y in 0..h {
+        for x in 0..w {
+            if grid[y][x] == '┼' && rng.range(0, 3) == 0 {
+                grid[y][x] = *rng
+                    .pick(&["┤", "├", "┬", "┴"])
+                    .chars()
+                    .collect::<Vec<_>>()
+                    .first()
+                    .unwrap_or(&'┼');
+            }
+        }
+    }
+
+    // Render with color
+    let mut out = String::with_capacity(w * h * 12);
+    let trace_colors: &[(u8, u8, u8)] = &[(0, 200, 200), (0, 255, 128), (0, 180, 255)];
+
+    for (y, row) in grid.iter().enumerate() {
+        for (x, &ch) in row.iter().enumerate() {
+            if ch == ' ' {
+                out.push(' ');
+            } else {
+                let is_node = "◉◎●○◆▣⬡".contains(ch);
+                if is_node {
+                    let (r, g, b) = NEON_COLORS[rng.next() as usize % NEON_COLORS.len()];
+                    out += BOLD;
+                    out += &fg_rgb(r, g, b);
+                    out.push(ch);
+                    out += RESET;
+                } else {
+                    let ci = (x + y) % trace_colors.len();
+                    let (r, g, b) = trace_colors[ci];
+                    out += &fg_rgb(r, g, b);
+                    out.push(ch);
+                    out += RESET;
+                }
+            }
+        }
+        out.push('\n');
+    }
+    Ok(PerlValue::string(out))
+}
+
+/// `cyber_skull [size]` — neon skull ASCII art. Size: "small" (default), "large".
+pub(crate) fn builtin_cyber_skull(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let large = args
+        .first()
+        .map(|v| {
+            let s = v.to_string();
+            s == "large" || s == "lg" || v.to_int() > 1
+        })
+        .unwrap_or(false);
+
+    let skull_small = vec![
+        "     ▄▄████▄▄     ",
+        "   ▄██▀▀▀▀▀▀██▄   ",
+        "  ███  ▄▀▀▄  ███  ",
+        "  ██  █ ◉◉ █  ██  ",
+        "  ██  ▀▄▄▄▄▀  ██  ",
+        "  ▀██   ▄▄   ██▀  ",
+        "   ▀██ ║██║ ██▀   ",
+        "    ▀█▄▀▀▀▀▄█▀    ",
+        "      ▀████▀      ",
+        "     ░▒▓██▓▒░     ",
+    ];
+
+    let skull_large = vec![
+        "        ▄▄▄▄▄▄██████▄▄▄▄▄▄        ",
+        "      ▄██▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀██▄      ",
+        "    ▄██▀                    ▀██▄    ",
+        "   ███    ▄▄▄▄▄    ▄▄▄▄▄    ███   ",
+        "  ███   ██▀▀▀██  ██▀▀▀██   ███  ",
+        "  ██    ██ ◉◉ ██  ██ ◉◉ ██    ██  ",
+        "  ██    ██▄▄▄██  ██▄▄▄██    ██  ",
+        "  ███    ▀▀▀▀▀    ▀▀▀▀▀    ███  ",
+        "   ███        ▄██▄        ███   ",
+        "    ▀██▄     ▀████▀     ▄██▀    ",
+        "      ▀██▄  ║██████║  ▄██▀      ",
+        "        ▀██▄▄▀▀▀▀▀▀▄▄██▀        ",
+        "          ▀▀████████▀▀          ",
+        "         ░░▒▒▓▓████▓▓▒▒░░       ",
+        "        ▄▀ D E A D C O D E ▀▄   ",
+    ];
+
+    let skull = if large { &skull_large } else { &skull_small };
+    let mut out = String::new();
+    let mut rng = CyberRng::new(if large { 666 } else { 13 });
+
+    for (i, line) in skull.iter().enumerate() {
+        // Alternate between cyan and magenta for each row
+        let (r, g, b) = if i % 3 == 0 {
+            (0, 255, 255) // cyan
+        } else if i % 3 == 1 {
+            (255, 0, 255) // magenta
+        } else {
+            (255, 0, 128) // hot pink
+        };
+        out += BOLD;
+        out += &fg_rgb(r, g, b);
+
+        // Occasional glitch on a character
+        for ch in line.chars() {
+            if ch == '◉' {
+                out += &fg_rgb(255, 0, 0);
+                out.push('◉');
+                out += &fg_rgb(r, g, b);
+            } else if rng.range(0, 40) == 0 {
+                out += &fg_rgb(255, 255, 0);
+                out.push(ch);
+                out += &fg_rgb(r, g, b);
+            } else {
+                out.push(ch);
+            }
+        }
+        out += RESET;
+        out.push('\n');
+    }
+    Ok(PerlValue::string(out))
+}
+
+/// `cyber_eye [size]` — cyberpunk all-seeing eye motif.
+pub(crate) fn builtin_cyber_eye(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let large = args
+        .first()
+        .map(|v| {
+            let s = v.to_string();
+            s == "large" || s == "lg" || v.to_int() > 1
+        })
+        .unwrap_or(false);
+
+    let eye_small = vec![
+        "        ▄▄▀▀▀▀▀▀▄▄        ",
+        "     ▄▀▀   ▄▄▄▄   ▀▀▄     ",
+        "   ▄▀   ▄██████▄   ▀▄   ",
+        "  ▄▀  ▄█▀▀ ◉◉ ▀▀█▄  ▀▄  ",
+        " █▀  ██  ▄████▄  ██  ▀█ ",
+        " █   ██ █▀▀██▀▀█ ██   █ ",
+        " █▄  ██  ▀▄▄▄▄▀  ██  ▄█ ",
+        "  ▀▄  ▀█▄▄    ▄▄█▀  ▄▀  ",
+        "   ▀▄   ▀██████▀   ▄▀   ",
+        "     ▀▄▄   ▀▀   ▄▄▀     ",
+        "        ▀▀▄▄▄▄▀▀        ",
+    ];
+
+    let eye_large = vec![
+        "           ▄▄▄▀▀▀▀▀▀▀▀▀▄▄▄           ",
+        "        ▄▀▀     ▄▄▄▄▄▄     ▀▀▄        ",
+        "      ▄▀    ▄▄██████████▄▄    ▀▄      ",
+        "    ▄▀   ▄██▀▀          ▀▀██▄   ▀▄    ",
+        "   █▀  ▄█▀   ▄▄██████▄▄   ▀█▄  ▀█   ",
+        "  █▀  ██   ▄██▀▀ ◉◉ ▀▀██▄   ██  ▀█  ",
+        " ██  ██  ▄█▀  ▄██████▄  ▀█▄  ██  ██ ",
+        " ██  ██  ██  ██▀▀██▀▀██  ██  ██  ██ ",
+        " ██  ██  ▀█▄  ▀██████▀  ▄█▀  ██  ██ ",
+        "  █▄  ██   ▀██▄▄    ▄▄██▀   ██  ▄█  ",
+        "   █▄  ▀█▄   ▀▀██████▀▀   ▄█▀  ▄█   ",
+        "    ▀▄   ▀██▄▄        ▄▄██▀   ▄▀    ",
+        "      ▀▄    ▀▀██████████▀▀    ▄▀      ",
+        "        ▀▀▄▄     ▀▀▀▀     ▄▄▀▀        ",
+        "           ▀▀▀▄▄▄▄▄▄▄▄▄▀▀▀           ",
+        "          ◄ ALL SEEING EYE ►          ",
+    ];
+
+    let eye = if large { &eye_large } else { &eye_small };
+    let mut out = String::new();
+    let mut rng = CyberRng::new(if large { 99 } else { 7 });
+
+    // Top glow line
+    let eye_w = eye.first().map(|l| l.chars().count()).unwrap_or(0);
+    out += &fg_rgb(0, 80, 128);
+    for _ in 0..eye_w {
+        out += "▁";
+    }
+    out += RESET;
+    out.push('\n');
+
+    for (i, line) in eye.iter().enumerate() {
+        // Color: outer is electric blue, iris is cyan, pupil is red
+        let base_t = (i as f64 / eye.len() as f64 - 0.5).abs() * 2.0; // 0 at center, 1 at edges
+        let (br, bg, bb) = (
+            (base_t * 0.0 + (1.0 - base_t) * 0.0) as u8,
+            (base_t * 128.0 + (1.0 - base_t) * 255.0) as u8,
+            (base_t * 255.0 + (1.0 - base_t) * 255.0) as u8,
+        );
+
+        out += BOLD;
+        for ch in line.chars() {
+            if ch == '◉' {
+                out += &fg_rgb(255, 0, 0);
+                out.push('◉');
+            } else if "█▓▒░".contains(ch) {
+                out += &fg_rgb(0, 200, 255);
+                out.push(ch);
+            } else if rng.range(0, 30) == 0 {
+                let (nr, ng, nb) = NEON_COLORS[rng.next() as usize % NEON_COLORS.len()];
+                out += &fg_rgb(nr, ng, nb);
+                out.push(ch);
+            } else {
+                out += &fg_rgb(br, bg, bb);
+                out.push(ch);
+            }
+        }
+        out += RESET;
+        out.push('\n');
+    }
+
+    // Bottom glow line
+    out += &fg_rgb(0, 80, 128);
+    for _ in 0..eye_w {
+        out += "▔";
+    }
+    out += RESET;
+    out.push('\n');
+
+    Ok(PerlValue::string(out))
+}
+
+#[cfg(test)]
+mod extended_tests {
+    use super::*;
+
+    #[test]
+    fn prime_factorize_basic() {
+        assert_eq!(prime_factorize(1), Vec::<i64>::new());
+        assert_eq!(prime_factorize(2), vec![2i64]);
+        assert_eq!(prime_factorize(12), vec![2i64, 2, 3]);
+        assert_eq!(prime_factorize(60), vec![2i64, 2, 3, 5]);
+        assert_eq!(prime_factorize(97), vec![97i64]);
+    }
+
+    #[test]
+    fn is_prime_check_basic() {
+        assert!(!is_prime_check(0));
+        assert!(!is_prime_check(1));
+        assert!(is_prime_check(2));
+        assert!(is_prime_check(3));
+        assert!(!is_prime_check(4));
+        assert!(is_prime_check(5));
+        assert!(is_prime_check(97));
+        assert!(!is_prime_check(100));
+    }
+
+    #[test]
+    fn aliquot_sum_basic() {
+        assert_eq!(aliquot(1), 0);
+        assert_eq!(aliquot(6), 6);
+        assert_eq!(aliquot(12), 16);
+        assert_eq!(aliquot(28), 28);
+    }
+
+    #[test]
+    fn euler_phi_basic() {
+        assert_eq!(euler_phi(1), 1);
+        assert_eq!(euler_phi(2), 1);
+        assert_eq!(euler_phi(10), 4);
+        assert_eq!(euler_phi(12), 4);
+    }
+
+    #[test]
+    fn builtin_divisors_returns_sorted() {
+        let interp = Interpreter::new();
+        let result = builtin_divisors(&interp, &[PerlValue::integer(12)]).unwrap();
+        let arr = result.to_list();
+        let vals: Vec<i64> = arr.iter().map(|v| v.to_int()).collect();
+        assert_eq!(vals, vec![1, 2, 3, 4, 6, 12]);
+    }
+
+    #[test]
+    fn builtin_divisors_zero() {
+        let interp = Interpreter::new();
+        let result = builtin_divisors(&interp, &[PerlValue::integer(0)]).unwrap();
+        let arr = result.to_list();
+        assert!(arr.is_empty());
+    }
+
+    #[test]
+    fn builtin_num_divisors_basic() {
+        let interp = Interpreter::new();
+        let result = builtin_num_divisors(&interp, &[PerlValue::integer(12)]).unwrap();
+        assert_eq!(result.to_int(), 6);
+    }
+
+    #[test]
+    fn builtin_is_perfect_detects_perfect_numbers() {
+        let interp = Interpreter::new();
+        assert_eq!(
+            builtin_is_perfect(&interp, &[PerlValue::integer(6)])
+                .unwrap()
+                .to_int(),
+            1
+        );
+        assert_eq!(
+            builtin_is_perfect(&interp, &[PerlValue::integer(28)])
+                .unwrap()
+                .to_int(),
+            1
+        );
+        assert_eq!(
+            builtin_is_perfect(&interp, &[PerlValue::integer(12)])
+                .unwrap()
+                .to_int(),
+            0
+        );
+    }
+
+    #[test]
+    fn builtin_is_abundant_basic() {
+        let interp = Interpreter::new();
+        assert_eq!(
+            builtin_is_abundant(&interp, &[PerlValue::integer(12)])
+                .unwrap()
+                .to_int(),
+            1
+        );
+        assert_eq!(
+            builtin_is_abundant(&interp, &[PerlValue::integer(6)])
+                .unwrap()
+                .to_int(),
+            0
+        );
+    }
+
+    #[test]
+    fn builtin_is_deficient_basic() {
+        let interp = Interpreter::new();
+        assert_eq!(
+            builtin_is_deficient(&interp, &[PerlValue::integer(8)])
+                .unwrap()
+                .to_int(),
+            1
+        );
+        assert_eq!(
+            builtin_is_deficient(&interp, &[PerlValue::integer(6)])
+                .unwrap()
+                .to_int(),
+            0
+        );
+    }
+
+    #[test]
+    fn builtin_collatz_length_basic() {
+        let interp = Interpreter::new();
+        assert_eq!(
+            builtin_collatz_length(&interp, &[PerlValue::integer(1)])
+                .unwrap()
+                .to_int(),
+            0
+        );
+        assert_eq!(
+            builtin_collatz_length(&interp, &[PerlValue::integer(6)])
+                .unwrap()
+                .to_int(),
+            8
+        );
+    }
+
+    #[test]
+    fn builtin_collatz_sequence_basic() {
+        let interp = Interpreter::new();
+        let result = builtin_collatz_sequence(&interp, &[PerlValue::integer(6)]).unwrap();
+        let arr = result.to_list();
+        let vals: Vec<i64> = arr.iter().map(|v| v.to_int()).collect();
+        assert_eq!(vals, vec![6, 3, 10, 5, 16, 8, 4, 2, 1]);
+    }
+
+    #[test]
+    fn builtin_lucas_basic() {
+        let interp = Interpreter::new();
+        assert_eq!(
+            builtin_lucas(&interp, &[PerlValue::integer(0)])
+                .unwrap()
+                .to_int(),
+            2
+        );
+        assert_eq!(
+            builtin_lucas(&interp, &[PerlValue::integer(1)])
+                .unwrap()
+                .to_int(),
+            1
+        );
+        assert_eq!(
+            builtin_lucas(&interp, &[PerlValue::integer(5)])
+                .unwrap()
+                .to_int(),
+            11
+        );
+    }
+
+    #[test]
+    fn builtin_tribonacci_basic() {
+        let interp = Interpreter::new();
+        assert_eq!(
+            builtin_tribonacci(&interp, &[PerlValue::integer(0)])
+                .unwrap()
+                .to_int(),
+            0
+        );
+        assert_eq!(
+            builtin_tribonacci(&interp, &[PerlValue::integer(3)])
+                .unwrap()
+                .to_int(),
+            1
+        );
+        assert_eq!(
+            builtin_tribonacci(&interp, &[PerlValue::integer(5)])
+                .unwrap()
+                .to_int(),
+            4
+        );
+    }
+
+    #[test]
+    fn builtin_nth_prime_basic() {
+        let interp = Interpreter::new();
+        assert_eq!(
+            builtin_nth_prime(&interp, &[PerlValue::integer(1)])
+                .unwrap()
+                .to_int(),
+            2
+        );
+        assert_eq!(
+            builtin_nth_prime(&interp, &[PerlValue::integer(5)])
+                .unwrap()
+                .to_int(),
+            11
+        );
+    }
+
+    #[test]
+    fn builtin_primes_up_to_basic() {
+        let interp = Interpreter::new();
+        let result = builtin_primes_up_to(&interp, &[PerlValue::integer(20)]).unwrap();
+        let arr = result.to_list();
+        let vals: Vec<i64> = arr.iter().map(|v| v.to_int()).collect();
+        assert_eq!(vals, vec![2, 3, 5, 7, 11, 13, 17, 19]);
+    }
+
+    #[test]
+    fn builtin_next_prime_basic() {
+        let interp = Interpreter::new();
+        assert_eq!(
+            builtin_next_prime(&interp, &[PerlValue::integer(10)])
+                .unwrap()
+                .to_int(),
+            11
+        );
+        assert_eq!(
+            builtin_next_prime(&interp, &[PerlValue::integer(11)])
+                .unwrap()
+                .to_int(),
+            13
+        );
+    }
+
+    #[test]
+    fn builtin_prev_prime_basic() {
+        let interp = Interpreter::new();
+        assert_eq!(
+            builtin_prev_prime(&interp, &[PerlValue::integer(10)])
+                .unwrap()
+                .to_int(),
+            7
+        );
+        assert_eq!(
+            builtin_prev_prime(&interp, &[PerlValue::integer(2)])
+                .unwrap()
+                .to_int(),
+            0
+        );
+    }
+
+    #[test]
+    fn builtin_triangular_number_basic() {
+        let interp = Interpreter::new();
+        assert_eq!(
+            builtin_triangular_number(&interp, &[PerlValue::integer(5)])
+                .unwrap()
+                .to_int(),
+            15
+        );
+    }
+
+    #[test]
+    fn builtin_is_pentagonal_runs() {
+        let interp = Interpreter::new();
+        let result = builtin_is_pentagonal(&interp, &[PerlValue::integer(5)]);
+        assert!(result.is_ok());
+        let result2 = builtin_is_pentagonal(&interp, &[PerlValue::integer(0)]);
+        assert_eq!(result2.unwrap().to_int(), 0);
+    }
+
+    #[test]
+    fn builtin_pentagonal_number_basic() {
+        let interp = Interpreter::new();
+        assert_eq!(
+            builtin_pentagonal_number(&interp, &[PerlValue::integer(3)])
+                .unwrap()
+                .to_int(),
+            12
+        );
+    }
+
+    #[test]
+    fn builtin_area_circle_basic() {
+        let interp = Interpreter::new();
+        let result = builtin_area_circle(&interp, &[PerlValue::integer(1)]).unwrap();
+        let area = result.as_float().unwrap_or(0.0);
+        assert!((area - std::f64::consts::PI).abs() < 1e-10);
+    }
+
+    #[test]
+    fn builtin_area_triangle_basic() {
+        let result =
+            builtin_area_triangle(&[PerlValue::integer(6), PerlValue::integer(4)]).unwrap();
+        assert_eq!(result.to_int(), 12);
+    }
+
+    #[test]
+    fn builtin_area_rectangle_basic() {
+        let result =
+            builtin_area_rectangle(&[PerlValue::integer(5), PerlValue::integer(3)]).unwrap();
+        assert_eq!(result.to_int(), 15);
+    }
+
+    #[test]
+    fn builtin_circumference_basic() {
+        let interp = Interpreter::new();
+        let result = builtin_circumference(&interp, &[PerlValue::integer(1)]).unwrap();
+        let circ = result.as_float().unwrap_or(0.0);
+        assert!((circ - 2.0 * std::f64::consts::PI).abs() < 1e-10);
+    }
+
+    #[test]
+    fn builtin_point_distance_basic() {
+        let result = builtin_point_distance(&[
+            PerlValue::integer(0),
+            PerlValue::integer(0),
+            PerlValue::integer(3),
+            PerlValue::integer(4),
+        ])
+        .unwrap();
+        assert_eq!(result.to_int(), 5);
+    }
+
+    #[test]
+    fn builtin_midpoint_basic() {
+        let result = builtin_midpoint(&[
+            PerlValue::integer(0),
+            PerlValue::integer(0),
+            PerlValue::integer(4),
+            PerlValue::integer(6),
+        ])
+        .unwrap();
+        let arr = result.to_list();
+        assert_eq!(arr.len(), 2);
+        assert_eq!(arr[0].to_int(), 2);
+        assert_eq!(arr[1].to_int(), 3);
+    }
+
+    #[test]
+    fn builtin_slope_basic() {
+        let result = builtin_slope(&[
+            PerlValue::integer(0),
+            PerlValue::integer(0),
+            PerlValue::integer(2),
+            PerlValue::integer(4),
+        ])
+        .unwrap();
+        assert_eq!(result.to_int(), 2);
+    }
+
+    #[test]
+    fn builtin_triangle_hypotenuse_basic() {
+        let result =
+            builtin_triangle_hypotenuse(&[PerlValue::integer(3), PerlValue::integer(4)]).unwrap();
+        assert_eq!(result.to_int(), 5);
+    }
+
+    #[test]
+    fn builtin_sphere_volume_basic() {
+        let interp = Interpreter::new();
+        let result = builtin_sphere_volume(&interp, &[PerlValue::integer(1)]).unwrap();
+        let vol = result.as_float().unwrap_or(0.0);
+        let expected = 4.0 / 3.0 * std::f64::consts::PI;
+        assert!((vol - expected).abs() < 1e-10);
+    }
+
+    #[test]
+    fn builtin_cylinder_volume_basic() {
+        let result =
+            builtin_cylinder_volume(&[PerlValue::integer(1), PerlValue::integer(2)]).unwrap();
+        let vol = result.as_float().unwrap_or(0.0);
+        let expected = std::f64::consts::PI * 2.0;
+        assert!((vol - expected).abs() < 1e-10);
+    }
+
+    #[test]
+    fn builtin_cone_volume_basic() {
+        let result = builtin_cone_volume(&[PerlValue::integer(1), PerlValue::integer(3)]).unwrap();
+        let vol = result.as_float().unwrap_or(0.0);
+        let expected = std::f64::consts::PI * 3.0 / 3.0;
+        assert!((vol - expected).abs() < 1e-10);
+    }
+
+    #[test]
+    fn builtin_heron_area_basic() {
+        let result = builtin_heron_area(&[
+            PerlValue::integer(3),
+            PerlValue::integer(4),
+            PerlValue::integer(5),
+        ])
+        .unwrap();
+        assert_eq!(result.to_int(), 6);
+    }
+
+    #[test]
+    fn builtin_skewness_symmetric() {
+        let result = builtin_skewness(&[PerlValue::array(vec![
+            PerlValue::integer(1),
+            PerlValue::integer(2),
+            PerlValue::integer(3),
+            PerlValue::integer(4),
+            PerlValue::integer(5),
+        ])])
+        .unwrap();
+        let skew = result.as_float().unwrap_or(99.0);
+        assert!(skew.abs() < 0.01);
+    }
+
+    #[test]
+    fn builtin_euclidean_distance_basic() {
+        let result = builtin_euclidean_distance(&[
+            PerlValue::array(vec![PerlValue::integer(0), PerlValue::integer(0)]),
+            PerlValue::array(vec![PerlValue::integer(3), PerlValue::integer(4)]),
+        ])
+        .unwrap();
+        assert_eq!(result.to_int(), 5);
+    }
+
+    #[test]
+    fn builtin_normalize_array_basic() {
+        let result = builtin_normalize_array(&[PerlValue::array(vec![
+            PerlValue::integer(1),
+            PerlValue::integer(2),
+            PerlValue::integer(3),
+        ])])
+        .unwrap();
+        let arr = result.to_list();
+        assert_eq!(arr.len(), 3);
+        assert!((arr[0].as_float().unwrap_or(99.0) - 0.0).abs() < 1e-10);
+        assert!((arr[2].as_float().unwrap_or(0.0) - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn builtin_weighted_mean_basic() {
+        let result = builtin_weighted_mean(&[
+            PerlValue::array(vec![PerlValue::integer(2), PerlValue::integer(4)]),
+            PerlValue::array(vec![PerlValue::integer(1), PerlValue::integer(1)]),
+        ])
+        .unwrap();
+        assert_eq!(result.to_int(), 3);
+    }
+
+    #[test]
+    fn builtin_quartiles_basic() {
+        let result = builtin_quartiles(&[PerlValue::array(vec![
+            PerlValue::integer(1),
+            PerlValue::integer(2),
+            PerlValue::integer(3),
+            PerlValue::integer(4),
+            PerlValue::integer(5),
+        ])])
+        .unwrap();
+        let arr = result.to_list();
+        assert_eq!(arr.len(), 3);
+    }
+
+    #[test]
+    fn builtin_five_number_summary_basic() {
+        let result = builtin_five_number_summary(&[PerlValue::array(vec![
+            PerlValue::integer(1),
+            PerlValue::integer(2),
+            PerlValue::integer(3),
+            PerlValue::integer(4),
+            PerlValue::integer(5),
+        ])])
+        .unwrap();
+        let arr = result.to_list();
+        assert_eq!(arr.len(), 5);
+        assert_eq!(arr[0].to_int(), 1);
+        assert_eq!(arr[4].to_int(), 5);
+    }
+}

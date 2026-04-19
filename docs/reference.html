@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.7.0 · 3082 topics · 25 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.7.0 · 3090 topics · 25 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -191,7 +191,7 @@
         <li><a href="#ch-process">Process</a> <span class="chapter-count">20</span></li>
         <li><a href="#ch-pack-binary">Pack / Binary</a> <span class="chapter-count">3</span></li>
         <li><a href="#ch-logging">Logging</a> <span class="chapter-count">7</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">2520</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">2528</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -5624,7 +5624,7 @@ log_info(&quot;hidden&quot;)    # not printed
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">2520 topics</p>
+      <p class="chapter-meta">2528 topics</p>
       <article class="doc-entry" id="doc-stryke-rust-compile">
         <h3><a class="doc-anchor" href="#doc-stryke-rust-compile">#</a> <code>__stryke_rust_compile</code></h3>
         <p><code>__stryke_rust_compile</code> — internal builtin.</p>
@@ -9302,6 +9302,62 @@ my @F = @{cumtrapz(\@y)}  # [0, 1.5, 4.0, 7.5]
         <pre><code class="lang-perl">my $result = cyan_bold $x 
 # or in a pipeline:
 @list |&gt; map cyan_bold |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cyber-banner">
+        <h3><a class="doc-anchor" href="#doc-cyber-banner">#</a> <code>cyber_banner</code></h3>
+        <p><code>cyber_banner</code> (alias <code>neon_banner</code>) — large neon block-letter banner with gradient coloring and border. Args: text.</p>
+        <pre><code class="lang-perl">say cyber_banner(&quot;STRYKE&quot;)
+say cyber_banner(&quot;HACK THE PLANET&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cyber-circuit">
+        <h3><a class="doc-anchor" href="#doc-cyber-circuit">#</a> <code>cyber_circuit</code></h3>
+        <p><code>cyber_circuit</code> — circuit board pattern with traces, intersections, and glowing nodes. Args: [width, height, seed].</p>
+        <pre><code class="lang-perl">say cyber_circuit()             # 60x20 default
+say cyber_circuit(80, 30, 42)   # custom
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cyber-city">
+        <h3><a class="doc-anchor" href="#doc-cyber-city">#</a> <code>cyber_city</code></h3>
+        <p><code>cyber_city</code> — procedural neon cityscape with buildings, windows, stars, and antennas. Args: [width, height, seed]. Output: ANSI-colored string for terminal.</p>
+        <pre><code class="lang-perl">say cyber_city()              # 80x24 default
+say cyber_city(120, 40, 99)   # custom size and seed
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cyber-eye">
+        <h3><a class="doc-anchor" href="#doc-cyber-eye">#</a> <code>cyber_eye</code></h3>
+        <p><code>cyber_eye</code> — cyberpunk all-seeing eye motif with layered glow. Args: [size]. Size: &quot;small&quot; (default) or &quot;large&quot;.</p>
+        <pre><code class="lang-perl">say cyber_eye()          # small eye
+say cyber_eye(&quot;large&quot;)   # large eye
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cyber-glitch">
+        <h3><a class="doc-anchor" href="#doc-cyber-glitch">#</a> <code>cyber_glitch</code></h3>
+        <p><code>cyber_glitch</code> (alias <code>glitch_text</code>) — glitch-distort text with ANSI corruption, screen tears, and neon color bleeding. Args: text [, intensity 1-10].</p>
+        <pre><code class="lang-perl">say cyber_glitch(&quot;SYSTEM BREACH&quot;, 7)
+say cyber_glitch(&quot;hello world&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cyber-grid">
+        <h3><a class="doc-anchor" href="#doc-cyber-grid">#</a> <code>cyber_grid</code></h3>
+        <p><code>cyber_grid</code> — retro perspective grid with vanishing point and neon glow (Tron/synthwave style). Args: [width, height].</p>
+        <pre><code class="lang-perl">say cyber_grid()           # 80x24 default
+say cyber_grid(120, 30)    # wider grid
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cyber-rain">
+        <h3><a class="doc-anchor" href="#doc-cyber-rain">#</a> <code>cyber_rain</code></h3>
+        <p><code>cyber_rain</code> (alias <code>matrix_rain</code>) — matrix-style digital rain with Japanese katakana and green phosphor glow. Args: [width, height, seed].</p>
+        <pre><code class="lang-perl">say cyber_rain()              # 80x24 default
+say cyber_rain(120, 40, 42)   # custom
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cyber-skull">
+        <h3><a class="doc-anchor" href="#doc-cyber-skull">#</a> <code>cyber_skull</code></h3>
+        <p><code>cyber_skull</code> — neon skull ASCII art with glitch effects. Args: [size]. Size: &quot;small&quot; (default) or &quot;large&quot;.</p>
+        <pre><code class="lang-perl">say cyber_skull()          # small skull
+say cyber_skull(&quot;large&quot;)   # large skull
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-cyc">

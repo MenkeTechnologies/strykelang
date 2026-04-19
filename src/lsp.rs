@@ -2345,6 +2345,16 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "pie_svg" | "pie_chart" => "`pie_svg` (alias `pie_chart`) — SVG pie chart with percentage labels. Args: labels, values [, title].\n\n```perl\npie_svg([\"A\",\"B\",\"C\"], [50,30,20]) |> to_file(\"pie.svg\")\n```",
         "heatmap_svg" | "heatmap" => "`heatmap_svg` (alias `heatmap`) — SVG heatmap with blue-cyan-yellow-red colormap. Args: matrix [, title].\n\n```perl\nheatmap_svg(cor_mat($data), \"Correlation\") |> to_file(\"heat.svg\")\n```",
 
+        // ── Cyberpunk Terminal Art ─────────────────────────────────────
+        "cyber_city" => "`cyber_city` — procedural neon cityscape with buildings, windows, stars, and antennas. Args: [width, height, seed]. Output: ANSI-colored string for terminal.\n\n```perl\nsay cyber_city()              # 80x24 default\nsay cyber_city(120, 40, 99)   # custom size and seed\n```",
+        "cyber_grid" => "`cyber_grid` — retro perspective grid with vanishing point and neon glow (Tron/synthwave style). Args: [width, height].\n\n```perl\nsay cyber_grid()           # 80x24 default\nsay cyber_grid(120, 30)    # wider grid\n```",
+        "cyber_rain" | "matrix_rain" => "`cyber_rain` (alias `matrix_rain`) — matrix-style digital rain with Japanese katakana and green phosphor glow. Args: [width, height, seed].\n\n```perl\nsay cyber_rain()              # 80x24 default\nsay cyber_rain(120, 40, 42)   # custom\n```",
+        "cyber_glitch" | "glitch_text" => "`cyber_glitch` (alias `glitch_text`) — glitch-distort text with ANSI corruption, screen tears, and neon color bleeding. Args: text [, intensity 1-10].\n\n```perl\nsay cyber_glitch(\"SYSTEM BREACH\", 7)\nsay cyber_glitch(\"hello world\")\n```",
+        "cyber_banner" | "neon_banner" => "`cyber_banner` (alias `neon_banner`) — large neon block-letter banner with gradient coloring and border. Args: text.\n\n```perl\nsay cyber_banner(\"STRYKE\")\nsay cyber_banner(\"HACK THE PLANET\")\n```",
+        "cyber_circuit" => "`cyber_circuit` — circuit board pattern with traces, intersections, and glowing nodes. Args: [width, height, seed].\n\n```perl\nsay cyber_circuit()             # 60x20 default\nsay cyber_circuit(80, 30, 42)   # custom\n```",
+        "cyber_skull" => "`cyber_skull` — neon skull ASCII art with glitch effects. Args: [size]. Size: \"small\" (default) or \"large\".\n\n```perl\nsay cyber_skull()          # small skull\nsay cyber_skull(\"large\")   # large skull\n```",
+        "cyber_eye" => "`cyber_eye` — cyberpunk all-seeing eye motif with layered glow. Args: [size]. Size: \"small\" (default) or \"large\".\n\n```perl\nsay cyber_eye()          # small eye\nsay cyber_eye(\"large\")   # large eye\n```",
+
         _ => return None,
     };
     Some(md)
@@ -3701,6 +3711,114 @@ mod completion_tests {
         ];
         for op in ops {
             assert!(doc_text_for(op).is_some(), "Doc for '{}' should exist", op);
+        }
+    }
+
+    #[test]
+    fn utf16_col_to_byte_ascii() {
+        let s = "hello";
+        assert_eq!(utf16_col_to_byte_idx(s, 0), 0);
+        assert_eq!(utf16_col_to_byte_idx(s, 3), 3);
+        assert_eq!(utf16_col_to_byte_idx(s, 5), 5);
+        assert_eq!(utf16_col_to_byte_idx(s, 10), 5);
+    }
+
+    #[test]
+    fn utf16_col_to_byte_multibyte() {
+        let s = "héllo";
+        assert_eq!(utf16_col_to_byte_idx(s, 0), 0);
+        assert_eq!(utf16_col_to_byte_idx(s, 1), 1);
+        assert_eq!(utf16_col_to_byte_idx(s, 2), 3);
+    }
+
+    #[test]
+    fn utf16_col_to_byte_emoji() {
+        let s = "a😀b";
+        assert_eq!(utf16_col_to_byte_idx(s, 0), 0);
+        assert_eq!(utf16_col_to_byte_idx(s, 1), 1);
+        assert_eq!(utf16_col_to_byte_idx(s, 3), 5);
+    }
+
+    #[test]
+    fn identifier_span_scalar() {
+        let line = "my $foo = 1;";
+        let (s, e) = identifier_span_bytes(line, 4).unwrap();
+        assert_eq!(&line[s..e], "foo");
+    }
+
+    #[test]
+    fn identifier_span_at_start() {
+        let line = "print hello";
+        let (s, e) = identifier_span_bytes(line, 0).unwrap();
+        assert_eq!(&line[s..e], "print");
+    }
+
+    #[test]
+    fn identifier_span_at_end() {
+        let line = "hello world";
+        let (s, e) = identifier_span_bytes(line, 9).unwrap();
+        assert_eq!(&line[s..e], "world");
+    }
+
+    #[test]
+    fn identifier_span_at_space_edge() {
+        let line = "hello world";
+        let result = identifier_span_bytes(line, 5);
+        if let Some((s, e)) = result {
+            assert!(&line[s..e] == "hello" || &line[s..e] == "world");
+        }
+    }
+
+    #[test]
+    fn resolve_sub_decl_exact_match() {
+        let mut m = HashMap::new();
+        m.insert("main::foo".to_string(), 10usize);
+        m.insert("Pkg::foo".to_string(), 20usize);
+        assert_eq!(resolve_sub_decl_line(&m, "main::foo"), Some(10));
+        assert_eq!(resolve_sub_decl_line(&m, "Pkg::foo"), Some(20));
+    }
+
+    #[test]
+    fn resolve_sub_decl_ambiguous() {
+        let mut m = HashMap::new();
+        m.insert("A::foo".to_string(), 1usize);
+        m.insert("B::foo".to_string(), 2usize);
+        assert!(resolve_sub_decl_line(&m, "foo").is_none());
+    }
+
+    #[test]
+    fn highlights_multiple_occurrences() {
+        let src = "$x = 1; $x = 2; $x = 3;";
+        let h = highlights_for_identifier(src, "x");
+        assert_eq!(h.len(), 3);
+    }
+
+    #[test]
+    fn highlights_different_sigils() {
+        let src = "@arr = (1); push @arr, 2;";
+        let h = highlights_for_identifier(src, "arr");
+        assert_eq!(h.len(), 2);
+    }
+
+    #[test]
+    fn bare_completion_qualified() {
+        let (_, s) = raw_at("Foo::Bar::baz", 13);
+        assert!(s.contains("baz") || s.contains("Foo"));
+    }
+
+    #[test]
+    fn completion_at_sigil_only() {
+        let (m, s) = raw_at("$", 1);
+        assert!(matches!(m, LineCompletionMode::Scalar(_)));
+        assert_eq!(s, "");
+    }
+
+    #[test]
+    fn builtin_docs_exist() {
+        use super::doc_text_for;
+        let builtins = ["print", "say", "chomp", "length", "substr", "split", "join"];
+        for b in builtins {
+            assert!(doc_text_for(b).is_some(), "Doc for '{}' should exist", b);
         }
     }
 }

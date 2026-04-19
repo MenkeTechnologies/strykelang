@@ -3170,6 +3170,16 @@ pub(crate) fn try_builtin(
         "pie_svg" | "pie_chart" => Some(builtin_pie_svg(args)),
         "heatmap_svg" | "heatmap" => Some(builtin_heatmap_svg(args)),
 
+        // ── Cyberpunk Terminal Art ───────────────────────────────────────
+        "cyber_city" => Some(builtin_cyber_city(args)),
+        "cyber_grid" => Some(builtin_cyber_grid(args)),
+        "cyber_rain" | "matrix_rain" => Some(builtin_cyber_rain(args)),
+        "cyber_glitch" | "glitch_text" => Some(builtin_cyber_glitch(args)),
+        "cyber_banner" | "neon_banner" => Some(builtin_cyber_banner(args)),
+        "cyber_circuit" => Some(builtin_cyber_circuit(args)),
+        "cyber_skull" => Some(builtin_cyber_skull(args)),
+        "cyber_eye" => Some(builtin_cyber_eye(args)),
+
         _ => crate::rust_ffi::try_call(name, args, line),
     }
 }

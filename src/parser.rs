@@ -11885,6 +11885,10 @@ impl Parser {
             | "plot_svg" | "hist_svg" | "histogram_svg"
             | "boxplot_svg" | "box_plot" | "bar_svg" | "barchart_svg"
             | "pie_svg" | "pie_chart" | "heatmap_svg" | "heatmap"
+            // ── Cyberpunk terminal art ────────────────────────────────
+            | "cyber_city" | "cyber_grid" | "cyber_rain" | "matrix_rain"
+            | "cyber_glitch" | "glitch_text" | "cyber_banner" | "neon_banner"
+            | "cyber_circuit" | "cyber_skull" | "cyber_eye"
             => Some(name),
             _ => None,
         }
@@ -13386,4 +13390,500 @@ pub fn parse_format_value_line(line: &str) -> PerlResult<Vec<Expr>> {
         break;
     }
     Ok(exprs)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_ok(code: &str) -> Program {
+        let mut lexer = Lexer::new(code);
+        let tokens = lexer.tokenize().expect("tokenize");
+        let mut parser = Parser::new(tokens);
+        parser.parse_program().expect("parse")
+    }
+
+    fn parse_err(code: &str) -> String {
+        let mut lexer = Lexer::new(code);
+        let tokens = match lexer.tokenize() {
+            Ok(t) => t,
+            Err(e) => return e.message,
+        };
+        let mut parser = Parser::new(tokens);
+        parser.parse_program().unwrap_err().message
+    }
+
+    #[test]
+    fn parse_empty_program() {
+        let p = parse_ok("");
+        assert!(p.statements.is_empty());
+    }
+
+    #[test]
+    fn parse_semicolons_only() {
+        let p = parse_ok(";;;");
+        assert!(p.statements.len() <= 3);
+    }
+
+    #[test]
+    fn parse_simple_scalar_assignment() {
+        let p = parse_ok("$x = 1;");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_simple_array_assignment() {
+        let p = parse_ok("@arr = (1, 2, 3);");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_simple_hash_assignment() {
+        let p = parse_ok("%h = (a => 1, b => 2);");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_subroutine_decl() {
+        let p = parse_ok("sub foo { 1 }");
+        assert_eq!(p.statements.len(), 1);
+        match &p.statements[0].kind {
+            StmtKind::SubDecl { name, .. } => assert_eq!(name, "foo"),
+            _ => panic!("expected SubDecl"),
+        }
+    }
+
+    #[test]
+    fn parse_subroutine_with_prototype() {
+        let p = parse_ok("sub foo ($$) { 1 }");
+        assert_eq!(p.statements.len(), 1);
+        match &p.statements[0].kind {
+            StmtKind::SubDecl { prototype, .. } => {
+                assert!(prototype.is_some());
+            }
+            _ => panic!("expected SubDecl"),
+        }
+    }
+
+    #[test]
+    fn parse_anonymous_sub() {
+        let p = parse_ok("my $f = sub { 1 };");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_if_statement() {
+        let p = parse_ok("if (1) { 2 }");
+        assert_eq!(p.statements.len(), 1);
+        matches!(&p.statements[0].kind, StmtKind::If { .. });
+    }
+
+    #[test]
+    fn parse_if_elsif_else() {
+        let p = parse_ok("if (0) { 1 } elsif (1) { 2 } else { 3 }");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_unless_statement() {
+        let p = parse_ok("unless (0) { 1 }");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_while_loop() {
+        let p = parse_ok("while ($x) { $x-- }");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_until_loop() {
+        let p = parse_ok("until ($x) { $x++ }");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_for_c_style() {
+        let p = parse_ok("for (my $i=0; $i<10; $i++) { 1 }");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_foreach_loop() {
+        let p = parse_ok("foreach my $x (@arr) { 1 }");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_loop_with_label() {
+        let p = parse_ok("OUTER: for my $i (1..10) { last OUTER }");
+        assert_eq!(p.statements.len(), 1);
+        assert_eq!(p.statements[0].label.as_deref(), Some("OUTER"));
+    }
+
+    #[test]
+    fn parse_begin_block() {
+        let p = parse_ok("BEGIN { 1 }");
+        assert_eq!(p.statements.len(), 1);
+        matches!(&p.statements[0].kind, StmtKind::Begin(_));
+    }
+
+    #[test]
+    fn parse_end_block() {
+        let p = parse_ok("END { 1 }");
+        assert_eq!(p.statements.len(), 1);
+        matches!(&p.statements[0].kind, StmtKind::End(_));
+    }
+
+    #[test]
+    fn parse_package_statement() {
+        let p = parse_ok("package Foo::Bar;");
+        assert_eq!(p.statements.len(), 1);
+        match &p.statements[0].kind {
+            StmtKind::Package { name } => assert_eq!(name, "Foo::Bar"),
+            _ => panic!("expected Package"),
+        }
+    }
+
+    #[test]
+    fn parse_use_statement() {
+        let p = parse_ok("use strict;");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_no_statement() {
+        let p = parse_ok("no warnings;");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_require_bareword() {
+        let p = parse_ok("require Foo::Bar;");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_require_string() {
+        let p = parse_ok(r#"require "foo.pl";"#);
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_eval_block() {
+        let p = parse_ok("eval { 1 };");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_eval_string() {
+        let p = parse_ok(r#"eval "1 + 2";"#);
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_qw_word_list() {
+        let p = parse_ok("my @a = qw(foo bar baz);");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_q_string() {
+        let p = parse_ok("my $s = q{hello};");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_qq_string() {
+        let p = parse_ok(r#"my $s = qq(hello $x);"#);
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_regex_match() {
+        let p = parse_ok(r#"$x =~ /foo/;"#);
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_regex_substitution() {
+        let p = parse_ok(r#"$x =~ s/foo/bar/g;"#);
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_transliterate() {
+        let p = parse_ok(r#"$x =~ tr/a-z/A-Z/;"#);
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_ternary_operator() {
+        let p = parse_ok("my $x = $a ? 1 : 2;");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_arrow_method_call() {
+        let p = parse_ok("$obj->method();");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_arrow_deref_hash() {
+        let p = parse_ok("$r->{key};");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_arrow_deref_array() {
+        let p = parse_ok("$r->[0];");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_chained_arrow_deref() {
+        let p = parse_ok("$r->{a}[0]{b};");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_my_multiple_vars() {
+        let p = parse_ok("my ($a, $b, $c) = (1, 2, 3);");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_our_scalar() {
+        let p = parse_ok("our $VERSION = '1.0';");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_local_scalar() {
+        let p = parse_ok("local $/ = undef;");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_state_variable() {
+        let p = parse_ok("sub counter { state $n = 0; $n++ }");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_postfix_if() {
+        let p = parse_ok("print 1 if $x;");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_postfix_unless() {
+        let p = parse_ok("die 'error' unless $ok;");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_postfix_while() {
+        let p = parse_ok("$x++ while $x < 10;");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_postfix_for() {
+        let p = parse_ok("print for @arr;");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_last_next_redo() {
+        let p = parse_ok("for (@a) { next if $_ < 0; last if $_ > 10 }");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_return_statement() {
+        let p = parse_ok("sub foo { return 42 }");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_wantarray() {
+        let p = parse_ok("sub foo { wantarray ? @a : $a }");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_caller_builtin() {
+        let p = parse_ok("my @c = caller;");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_ref_to_array() {
+        let p = parse_ok("my $r = \\@arr;");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_ref_to_hash() {
+        let p = parse_ok("my $r = \\%hash;");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_ref_to_scalar() {
+        let p = parse_ok("my $r = \\$x;");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_deref_scalar() {
+        let p = parse_ok("my $v = $$r;");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_deref_array() {
+        let p = parse_ok("my @a = @$r;");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_deref_hash() {
+        let p = parse_ok("my %h = %$r;");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_blessed_ref() {
+        let p = parse_ok("bless $r, 'Foo';");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_heredoc_basic() {
+        let p = parse_ok("my $s = <<END;\nfoo\nEND");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_heredoc_quoted() {
+        let p = parse_ok("my $s = <<'END';\nfoo\nEND");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_do_block() {
+        let p = parse_ok("my $x = do { 1 + 2 };");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_do_file() {
+        let p = parse_ok(r#"do "foo.pl";"#);
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_map_expression() {
+        let p = parse_ok("my @b = map { $_ * 2 } @a;");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_grep_expression() {
+        let p = parse_ok("my @b = grep { $_ > 0 } @a;");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_sort_expression() {
+        let p = parse_ok("my @b = sort { $a <=> $b } @a;");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_pipe_forward() {
+        let p = parse_ok("@a |> map { $_ * 2 };");
+        assert_eq!(p.statements.len(), 1);
+    }
+
+    #[test]
+    fn parse_expression_from_str_simple() {
+        let e = parse_expression_from_str("$x + 1", "-e").unwrap();
+        assert!(matches!(e.kind, ExprKind::BinOp { .. }));
+    }
+
+    #[test]
+    fn parse_expression_from_str_extra_tokens_error() {
+        let err = parse_expression_from_str("$x; $y", "-e").unwrap_err();
+        assert!(err.message.contains("Extra tokens"));
+    }
+
+    #[test]
+    fn parse_slice_indices_from_str_basic() {
+        let indices = parse_slice_indices_from_str("0, 1, 2", "-e").unwrap();
+        assert_eq!(indices.len(), 3);
+    }
+
+    #[test]
+    fn parse_format_value_line_empty() {
+        let exprs = parse_format_value_line("").unwrap();
+        assert!(exprs.is_empty());
+    }
+
+    #[test]
+    fn parse_format_value_line_single() {
+        let exprs = parse_format_value_line("$x").unwrap();
+        assert_eq!(exprs.len(), 1);
+    }
+
+    #[test]
+    fn parse_format_value_line_multiple() {
+        let exprs = parse_format_value_line("$a, $b, $c").unwrap();
+        assert_eq!(exprs.len(), 3);
+    }
+
+    #[test]
+    fn parse_unclosed_brace_error() {
+        let err = parse_err("sub foo {");
+        assert!(!err.is_empty());
+    }
+
+    #[test]
+    fn parse_unclosed_paren_error() {
+        let err = parse_err("print (1, 2");
+        assert!(!err.is_empty());
+    }
+
+    #[test]
+    fn parse_invalid_statement_error() {
+        let err = parse_err("???");
+        assert!(!err.is_empty());
+    }
+
+    #[test]
+    fn merge_expr_list_single() {
+        let e = Expr {
+            kind: ExprKind::Integer(1),
+            line: 1,
+        };
+        let merged = merge_expr_list(vec![e.clone()]);
+        matches!(merged.kind, ExprKind::Integer(1));
+    }
+
+    #[test]
+    fn merge_expr_list_multiple() {
+        let e1 = Expr {
+            kind: ExprKind::Integer(1),
+            line: 1,
+        };
+        let e2 = Expr {
+            kind: ExprKind::Integer(2),
+            line: 1,
+        };
+        let merged = merge_expr_list(vec![e1, e2]);
+        matches!(merged.kind, ExprKind::List(_));
+    }
 }

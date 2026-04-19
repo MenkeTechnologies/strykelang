@@ -492,3 +492,168 @@ fn format_value(val: &PerlValue) -> String {
         val.type_name()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn debugger_new_defaults() {
+        let dbg = Debugger::new();
+        assert!(dbg.breakpoints.is_empty());
+        assert!(dbg.sub_breakpoints.is_empty());
+        assert!(dbg.step_mode);
+        assert!(dbg.enabled);
+        assert!(dbg.watches.is_empty());
+        assert_eq!(dbg.call_depth, 0);
+    }
+
+    #[test]
+    fn debugger_load_source_splits_lines() {
+        let mut dbg = Debugger::new();
+        dbg.load_source("line1\nline2\nline3");
+        assert_eq!(dbg.source_lines.len(), 3);
+        assert_eq!(dbg.source_lines[0], "line1");
+        assert_eq!(dbg.source_lines[2], "line3");
+    }
+
+    #[test]
+    fn debugger_set_file() {
+        let mut dbg = Debugger::new();
+        dbg.set_file("test.pl");
+        assert_eq!(dbg.file, "test.pl");
+    }
+
+    #[test]
+    fn debugger_should_stop_at_breakpoint() {
+        let mut dbg = Debugger::new();
+        dbg.step_mode = false;
+        dbg.breakpoints.insert(10);
+        assert!(dbg.should_stop(10));
+        assert!(!dbg.should_stop(11));
+    }
+
+    #[test]
+    fn debugger_should_stop_in_step_mode() {
+        let mut dbg = Debugger::new();
+        dbg.step_mode = true;
+        assert!(dbg.should_stop(1));
+        assert!(dbg.should_stop(999));
+    }
+
+    #[test]
+    fn debugger_should_stop_disabled() {
+        let mut dbg = Debugger::new();
+        dbg.enabled = false;
+        dbg.step_mode = true;
+        assert!(!dbg.should_stop(1));
+    }
+
+    #[test]
+    fn debugger_should_stop_at_sub() {
+        let mut dbg = Debugger::new();
+        dbg.sub_breakpoints.insert("foo".to_string());
+        assert!(dbg.should_stop_at_sub("foo"));
+        assert!(!dbg.should_stop_at_sub("bar"));
+    }
+
+    #[test]
+    fn debugger_enter_leave_sub_tracks_depth() {
+        let mut dbg = Debugger::new();
+        assert_eq!(dbg.call_depth, 0);
+        dbg.enter_sub("foo");
+        assert_eq!(dbg.call_depth, 1);
+        dbg.enter_sub("bar");
+        assert_eq!(dbg.call_depth, 2);
+        dbg.leave_sub();
+        assert_eq!(dbg.call_depth, 1);
+        dbg.leave_sub();
+        assert_eq!(dbg.call_depth, 0);
+        dbg.leave_sub();
+        assert_eq!(dbg.call_depth, 0);
+    }
+
+    #[test]
+    fn debugger_step_over_depth() {
+        let mut dbg = Debugger::new();
+        dbg.step_mode = false;
+        dbg.enter_sub("outer");
+        dbg.step_over_depth = Some(1);
+        dbg.enter_sub("inner");
+        assert!(!dbg.should_stop(5));
+        dbg.leave_sub();
+        assert!(dbg.should_stop(6));
+        assert!(dbg.step_over_depth.is_none());
+    }
+
+    #[test]
+    fn debugger_step_out_depth() {
+        let mut dbg = Debugger::new();
+        dbg.step_mode = false;
+        dbg.enter_sub("outer");
+        dbg.enter_sub("inner");
+        dbg.step_out_depth = Some(2);
+        assert!(!dbg.should_stop(5));
+        dbg.leave_sub();
+        assert!(dbg.should_stop(6));
+        assert!(dbg.step_out_depth.is_none());
+    }
+
+    #[test]
+    fn debugger_avoids_repeated_stops_on_same_line() {
+        let mut dbg = Debugger::new();
+        dbg.step_mode = false;
+        dbg.breakpoints.insert(10);
+        assert!(dbg.should_stop(10));
+        dbg.last_stop_line = Some(10);
+        assert!(!dbg.should_stop(10));
+    }
+
+    #[test]
+    fn format_value_undef() {
+        assert_eq!(format_value(&PerlValue::UNDEF), "undef");
+    }
+
+    #[test]
+    fn format_value_integer() {
+        assert_eq!(format_value(&PerlValue::integer(42)), "42");
+        assert_eq!(format_value(&PerlValue::integer(-100)), "-100");
+    }
+
+    #[test]
+    fn format_value_float() {
+        let f = format_value(&PerlValue::float(3.14));
+        assert!(f.starts_with("3.14"));
+    }
+
+    #[test]
+    fn format_value_string() {
+        assert_eq!(
+            format_value(&PerlValue::string("hello".into())),
+            "\"hello\""
+        );
+    }
+
+    #[test]
+    fn format_value_numeric_string() {
+        assert_eq!(format_value(&PerlValue::string("42".into())), "42");
+        assert_eq!(format_value(&PerlValue::string("3.14".into())), "3.14");
+    }
+
+    #[test]
+    fn format_value_array() {
+        let arr = PerlValue::array(vec![
+            PerlValue::integer(1),
+            PerlValue::integer(2),
+            PerlValue::integer(3),
+        ]);
+        assert_eq!(format_value(&arr), "[1, 2, 3]");
+    }
+
+    #[test]
+    fn debug_action_eq() {
+        assert_eq!(DebugAction::Continue, DebugAction::Continue);
+        assert_ne!(DebugAction::Continue, DebugAction::Quit);
+        assert_ne!(DebugAction::Quit, DebugAction::Prompt);
+    }
+}

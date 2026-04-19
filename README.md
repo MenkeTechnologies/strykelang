@@ -335,7 +335,8 @@ For `mysync` scalars holding a `Set`, `|`/`&` are union/intersection. Without `m
 | **Crypto** | `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `md5`, `hmac`, `hmac_sha256`, `crc32`, `uuid`, `base64_encode/decode`, `hex_encode/decode` |
 | **Compression** ([`flate2`](https://crates.io/crates/flate2), [`zstd`](https://crates.io/crates/zstd)) | `gzip`, `gunzip`, `zstd`, `zstd_decode` |
 | **Time** ([`chrono`](https://crates.io/crates/chrono), [`chrono-tz`](https://crates.io/crates/chrono-tz)) | `datetime_utc`, `datetime_from_epoch`, `datetime_parse_rfc3339`, `datetime_strftime`, `datetime_now_tz`, `datetime_format_tz`, `datetime_parse_local`, `datetime_add_seconds`, `elapsed` |
-| **Structs / Enums / Classes / Types** | `struct Point { x => Float }`, `enum Color { Red, Green }`, `class Dog extends Animal { breed: Str; fn bark { } }`, `abstract class`/`final class`, `trait Printable { fn to_str }` (enforced), `pub`/`priv`/`prot` visibility, `static count: Int`, `BUILD`/`DESTROY`, `final fn`, `methods()`/`superclass()`/`does()`, `static::method()`, `typed my $x : Int` |
+| **Structs / Enums / Classes / Types** | `struct Point { x => Float }`, `enum Color { Red, Green }` (exhaustive `match`), `class Dog extends Animal { breed: Str; fn bark { } }`, `abstract class`/`final class`, `trait Printable { fn to_str }` (enforced, default method inheritance), `pub`/`priv`/`prot` visibility, `static count: Int`, `BUILD`/`DESTROY`, `final fn`, `methods()`/`superclass()`/`does()`, `static::method()`, `typed my $x : Int` |
+| **Cyberpunk Terminal Art** | `cyber_city` (neon cityscape), `cyber_grid` (synthwave perspective grid), `cyber_rain`/`matrix_rain` (digital rain), `cyber_glitch`/`glitch_text` (text corruption), `cyber_banner`/`neon_banner` (block-letter banners), `cyber_circuit` (circuit board), `cyber_skull`, `cyber_eye` — all output ANSI-colored Unicode art |
 
 ```perl
 my $data = "https://api.example.com/users/1" |> fetch_json
@@ -419,6 +420,15 @@ p $r  # Result::Err(not found)
 # Result::Ok("bad")  # ERROR: expected Int
 # Maybe::Some()  # ERROR: requires data
 # Color::Red(42)  # ERROR: does not take data
+
+# Exhaustive enum matching — all variants must be covered or use `_` catch-all
+my $light = Light::On()
+my $s = match ($light) {
+    Light::On()  => "on",
+    Light::Off() => "off",
+}
+# Missing a variant without `_` → error:
+# match ($c) { Color::Red() => "r" }  # ERROR: missing variant(s) Green, Blue
 # ────────────────────────────────────────────────────────────────────
 
 # ─── Classes (full OOP) ────────────────────────────────────────────
@@ -492,16 +502,18 @@ class Child extends Secret {
     fn get_internal { $self->internal }  # prot: ok from subclass
 }
 
-# Abstract classes — cannot be instantiated directly
+# Abstract classes — cannot be instantiated; abstract methods enforced
 abstract class Shape {
     name: Str
-    fn area        # subclasses must implement
+    fn area            # abstract method (no body) — subclasses must implement
+    fn kind { "shape" } # concrete method — inherited by subclasses
 }
 class Circle extends Shape {
     radius: Float
     fn area { 3.14159 * $self->radius * $self->radius }
 }
 # Shape() → error!  Circle(name => "c", radius => 5) → ok
+# class BadShape extends Shape { }  # → error: must implement abstract method `area`
 
 # Static fields (class variables) — shared across all instances
 class Counter {
@@ -533,6 +545,22 @@ class Box impl Drawable {
     fn draw { "drawn" }    # satisfies trait contract
 }
 p Box()->does("Drawable")  # 1
+
+# Trait default methods — inherited by implementing classes, overridable
+trait Greetable {
+    fn greeting { "Hello" }  # default method (has body)
+    fn name                  # required method (no body)
+}
+class Person impl Greetable {
+    n: Str
+    fn name { $self->n }
+    # greeting inherited from trait — Person()->greeting() returns "Hello"
+}
+class FormalPerson impl Greetable {
+    n: Str
+    fn name { $self->n }
+    fn greeting { "Good day" }  # override the default
+}
 
 # Final classes — cannot be extended
 final class Singleton { value: Int = 1 }
@@ -685,7 +713,7 @@ stryke-specific long flags:
 Scalars `$x`, arrays `@a`, hashes `%h`, refs `\$x`/`\@a`/`\%h`/`\&sub`, anon `[...]`/`{...}`, code refs / closures (capture enclosing lexicals), `qr//` regex objects, blessed references, native sets (`set(LIST)` / `Set->new(...)`), `deque()`, `heap()`.
 
 #### Control flow
-`if`/`elsif`/`else`/`unless`, `while`/`until`, `do { } while/until`, C-style `for`, `foreach`, `last`/`next`/`redo` with labels, postfix `if`/`unless`/`while`/`until`/`for`, ternary, `try { } catch ($err) { } finally { }`, `given`/`when`/`default`, algebraic `match (EXPR) { PATTERN [if EXPR] => EXPR, ... }` (regex, array, hash, wildcard, literal patterns; bindings scoped per arm), `eval_timeout SECS { ... }`.
+`if`/`elsif`/`else`/`unless`, `while`/`until`, `do { } while/until`, C-style `for`, `foreach`, `last`/`next`/`redo` with labels, postfix `if`/`unless`/`while`/`until`/`for`, ternary, `try { } catch ($err) { } finally { }`, `given`/`when`/`default`, algebraic `match (EXPR) { PATTERN [if EXPR] => EXPR, ... }` (regex, array, hash, wildcard, literal patterns; bindings scoped per arm; exhaustive enum variant checking), `eval_timeout SECS { ... }`.
 
 #### Operators
 Arithmetic, string `.`/`x`, comparison, `eq`/`ne`/`lt`/`gt`/`cmp`, logical `&&`/`||`/`//`/`!`/`and`/`or`/`not`, bitwise (`|`/`&` are set ops on native `Set`), assignment + compound (`+=`, `.=`, `//=`, …), regex `=~`/`!~`, range `..` / `...` (incl. flip-flop with `eof`), arrow `->`, **pipe-forward `|>`** (stryke extension — threads the LHS as the **first** argument of the RHS call; see [Extensions beyond stock Perl 5](#extensions-beyond-stock-perl-5)).
