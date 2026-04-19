@@ -317,7 +317,7 @@ def _species_table() -> tuple:
         "my $v%(n)d_L%(s)d = unpack(\"H*\", pack(\"n\", %(u)d %% 65535));",
         # time
         "my $v%(n)d_L%(s)d = $^T ^ %(u)d;",
-        # localtime/gmtime not in forge yet; deterministic stand-ins (same on perl and pe).
+        # localtime/gmtime not in forge yet; deterministic stand-ins (same on perl and fo).
         "my $v%(n)d_L%(s)d = (%(n)d + %(s)d) %% 7;",
         "my $v%(n)d_L%(s)d = (%(hh)d %% 100000) %% 28 + 1;",
         # introspection
@@ -325,7 +325,7 @@ def _species_table() -> tuple:
         "my $v%(n)d_L%(s)d = __FILE__;",
         "my $v%(n)d_L%(s)d = __PACKAGE__;",
         "my $v%(n)d_L%(s)d = wantarray;",
-        # prototype/CORE::GV introspection differs or dies under pe; use portable builtins.
+        # prototype/CORE::GV introspection differs or dies under fo; use portable builtins.
         "my $v%(n)d_L%(s)d = scalar split /::/, __PACKAGE__ . \"::p%(n)d\", -1;",
         "my $v%(n)d_L%(s)d = (lc(\"Ab%(u)d\") =~ /^ab/) + 0;",
         "my $v%(n)d_L%(s)d = (%(n)d ^ %(s)d) & 255;",
@@ -337,7 +337,7 @@ def _species_table() -> tuple:
         "my $v%(n)d_L%(s)d = (`true` eq \"\") + 0;",
         "my $v%(n)d_L%(s)d = select(STDOUT);",
         "my $v%(n)d_L%(s)d = fileno STDIN;",
-        # tell() not wired as callable in pe; keep syntax, execute only fileno(STDOUT).
+        # tell() not wired as callable in fo; keep syntax, execute only fileno(STDOUT).
         "my $v%(n)d_L%(s)d = do { tell STDOUT if 0; fileno STDOUT };",
         "my $v%(n)d_L%(s)d = eof STDIN;",
         "my $v%(n)d_L%(s)d = binmode STDIN;",

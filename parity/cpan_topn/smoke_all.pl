@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# Smoke tests for Top-N modules (parity/cpan_topn). Run via: pe smoke_all.pl
+# Smoke tests for Top-N modules (parity/cpan_topn). Run via: fo smoke_all.pl
 use strict;
 use warnings;
 
