@@ -1448,17 +1448,44 @@ fo 'my $a = set(1,2,2,3); my $b = set(2,3,4); p scalar($a | $b), " ", scalar($a 
 
 ## [0x0B] BENCHMARKS
 
-`bash bench/run_bench.sh` — stryke vs perl 5.42.2 on Apple M5 18-core. Mean of 10 hyperfine runs with 3 warmups; **includes process startup** (not steady-state).
+### stryke vs perl5 vs python3 vs ruby
+
+`bash bench/run_bench_all.sh` — stryke vs perl 5.42.2 vs Python 3.14.4 vs Ruby 4.0.2 on Apple M5 18-core. Mean of 10 hyperfine runs with 3 warmups; **includes process startup** (not steady-state). Values <1.0x mean stryke is faster.
 
 ```
- stryke benchmark harness (honest mode)
- ---------------------------------------
-  perl5:   perl 5, version 42, subversion 2 (v5.42.2) built for darwin-thread-multi-2level
-  stryke:  This is stryke v0.1.41 — A highly parallel Perl 5 interpreter (Rust)
+ stryke benchmark harness (4-way)
+ ──────────────────────────────────────────────
+  stryke:  stryke v0.6.7
+  perl5:   perl 5.42.2 (darwin-thread-multi-2level)
+  python:  Python 3.14.4
+  ruby:    ruby 4.0.2 +PRISM [arm64-darwin25]
   cores:   18
   warmup:  3 runs
   measure: hyperfine (min 10 runs)
 
+  bench         stryke ms    perl5 ms  python3 ms     ruby ms    vs perl5   vs python     vs ruby
+  ---------     ---------    --------  ----------     -------    --------   ---------     -------
+  startup             6.6         2.7        15.4        25.3       2.44x       0.43x       0.26x
+  fib                 9.9       187.7        61.3        58.5       0.05x       0.16x       0.17x
+  loop                6.3        90.8       205.9        76.8       0.07x       0.03x       0.08x
+  string              6.9        10.4      1808.0        47.6       0.66x       0.00x       0.14x
+  hash               10.2        27.6        27.4        35.2       0.37x       0.37x       0.29x
+  array              13.4        25.7        24.5        33.1       0.52x       0.55x       0.40x
+  regex              15.9        91.9       268.1       240.3       0.17x       0.06x       0.07x
+  map_grep           18.0        50.5        39.0        52.8       0.36x       0.46x       0.34x
+```
+
+**stryke vs perl5** — faster on 7 of 8 benches: `fib` 19x, `loop` 14x, `regex` 5.8x, `string` 1.5x, `hash` 2.7x, `array` 1.9x, `map_grep` 2.8x. Only `startup` is slower (2.4x — Rust binary load overhead).
+
+**stryke vs python3** — faster on all 8 benches: `string` 262x (Python's `+=` on strings is O(n²)), `loop` 33x, `regex` 17x, `fib` 6.2x, `startup` 2.3x, `hash` 2.7x, `map_grep` 2.2x, `array` 1.8x.
+
+**stryke vs ruby** — faster on all 8 benches: `startup` 3.8x, `loop` 12x, `fib` 5.9x, `string` 6.9x, `hash` 3.5x, `regex` 15x, `array` 2.5x, `map_grep` 2.9x.
+
+### stryke vs perl5 (detailed)
+
+`bash bench/run_bench.sh` — includes noJIT and perturbation columns for honesty verification.
+
+```
   bench          perl5 ms   stryke ms    noJit ms  perturb ms  rs/perl5  jit/noJit
   ---------      --------   ---------    --------   ---------  --------  ---------
   startup             2.7         3.7         4.0         3.5     1.37x     1.08x
@@ -1469,15 +1496,7 @@ fo 'my $a = set(1,2,2,3); my $b = set(2,3,4); p scalar($a | $b), " ", scalar($a 
   array              26.1        10.3        10.5        10.5     0.39x     1.02x
   regex              91.8        13.3        13.0        13.1     0.14x     0.98x
   map_grep           51.9        15.3        15.3        15.8     0.29x     1.00x
-
-  pmap vs map (stryke only, 50k items with per-item work)
-  bench            map ms     pmap ms     speedup
-  ---------      --------    --------    --------
-  pmap              272.7       684.8       0.40x
-
 ```
-
-**stryke beats perl5 on 7 of 8 benches** — `fib` and `loop` ~26x, `string` 2.6x, `array` 2.4x, `map_grep` 3.5x. Losses: `hash` 1.46x (Perl 5 hash access is heavily tuned), `regex` 1.08x (effectively a tie), `startup` 1.36x (~900 µs Rust binary load).
 
 **JIT impact is essentially zero on this suite** (`jit/noJit` within ±6%). The wins over Perl 5 come from the **bytecode interpreter**, not the JIT — the current Cranelift block JIT only covers a narrow band of frame-slot numeric hot loops.
 
@@ -1502,7 +1521,8 @@ Pull requests and pushes to `main` run [`.github/workflows/ci.yml`](.github/work
 cargo test --lib                # parser smoke, lexer/value/error/scope, interpreter, vm, jit
 cargo test --test integration   # tests/suite/* (runtime, readline list context, line-mode stdin, …)
 cargo bench --bench jit_compare # JIT vs interpreter on the same bytecode
-bash bench/run_bench.sh         # full perl5 vs stryke suite (needs hyperfine)
+bash bench/run_bench.sh         # perl5 vs stryke suite (needs hyperfine)
+bash bench/run_bench_all.sh     # stryke vs perl5 vs python3 vs ruby (needs hyperfine)
 bash parity/run_parity.sh       # exact stdout/stderr parity vs system perl (20 000+ cases)
 ```
 
