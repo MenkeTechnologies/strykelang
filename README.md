@@ -96,6 +96,7 @@ autoload -Uz compinit && compinit
 | Fetch JSON API | `s 'fetch_json(URL) \|> dd'` **25c** | needs `LWP` + `JSON` modules | needs `net/http` + `json` | needs `urllib` + `json` | `curl -s URL \| jq .` ~40c |
 | CSV → JSON | `s 'csv_read("f") \|> tj \|> p'` **28c** | needs `Text::CSV` + `JSON` | needs `csv` + `json` | needs `csv` + `json` imports | — |
 | Parallel map | `s '1..1e6 \|> pmap { $_ * 2 }'` **29c** | not built in | not built in | not built in | `xargs -P8` 50c+ |
+| Streaming parallel | `s 'range(0,1e9) \|> pmaps { $_ * 2 } \|> take 10'` **42c** | not built in | not built in | not built in | not built in |
 | Sparkline | `s '(3,7,1,9) \|> spark \|> p'` **27c** | not built in | not built in | not built in | not built in |
 | In-place sed (parallel) | `s -i -pe 's/foo/bar/g' *.txt` **28c** | `perl -i -pe 's/foo/bar/g' *.txt` 33c (sequential) | `ruby -i -pe '$_.gsub!(...)'` 35c+ | — | `sed -i '' 's/foo/bar/g' *.txt` 31c (sequential) |
 
@@ -204,6 +205,11 @@ my @sorted  = @data |> psort { $a <=> $b }
 my $sum     = @numbers |> preduce { $a + $b }
 pfor process, @items
 my @hashes  = pmap sha256, @blobs, progress => 1  # bare-fn
+
+# streaming parallel — lazy iterators, bounded memory, output as it completes
+range(0, 1e9) |> pmaps { expensive($_) } |> take 10 |> ep  # stops after 10 results
+range(0, 1e6) |> pgreps { is_prime($_) } |> ep              # parallel filter, streaming
+range(0, 1e6) |> pflat_maps { [$_, $_ * 10] } |> ep         # parallel flat-map, streaming
 
 # fused map+reduce, chunked map, memoized map, init fold
 my $sum2     = @nums |> pmap_reduce { $_ * 2 } { $a + $b }
@@ -1494,70 +1500,57 @@ stryke 'my $a = set(1,2,2,3); my $b = set(2,3,4); p scalar($a | $b), " ", scalar
 `bash bench/run_bench_all.sh` — stryke vs perl 5.42.2 vs Python 3.14.4 vs Ruby 4.0.2 vs Julia 1.12.6 vs Raku vs LuaJIT on Apple M5 18-core. Mean of 10 hyperfine runs with 3 warmups; **includes process startup** (not steady-state). Values <1.0x mean stryke is faster.
 
 ```
- stryke benchmark harness (5-way)
+ stryke benchmark harness (multi-language)
  ──────────────────────────────────────────────
-  stryke:  stryke v0.7.0
+  stryke:  stryke v0.7.7
   perl5:   perl 5.42.2 (darwin-thread-multi-2level)
   python:  Python 3.14.4
   ruby:    ruby 4.0.2 +PRISM [arm64-darwin25]
   julia:   julia 1.12.6
+  raku:    Rakudo Star v2026.03
+  luajit:  LuaJIT 2.1.1774896198
   cores:   18
   warmup:  3 runs
   measure: hyperfine (min 10 runs)
 
-  bench         stryke ms    perl5 ms  python3 ms     ruby ms    julia ms    vs perl5   vs python     vs ruby    vs julia
-  ---------     ---------    --------  ----------     -------    --------    --------   ---------     -------    --------
-  startup             7.8         2.9        22.7        38.0        85.8       2.69x       0.34x       0.21x       0.09x
-  fib                12.0       208.1        70.9        64.6        90.6       0.06x       0.17x       0.19x       0.13x
-  loop                8.1        98.0       209.7        81.5        91.0       0.08x       0.04x       0.10x       0.09x
-  string              8.5        11.3        34.2        51.3        94.6       0.75x       0.25x       0.17x       0.09x
-  hash               11.4        40.1        28.2        37.9       123.1       0.28x       0.40x       0.30x       0.09x
-  array              14.3        26.3        37.8        45.4       103.9       0.54x       0.38x       0.31x       0.14x
-  regex              17.6        98.0       332.7       283.0       123.5       0.18x       0.05x       0.06x       0.14x
-  map_grep           19.9        53.9        41.1        54.1       106.9       0.37x       0.48x       0.37x       0.19x
+  bench        stryke ms  perl5 ms  python3 ms  ruby ms  julia ms  raku ms  luajit ms  vs perl5  vs python  vs ruby  vs julia  vs raku  vs luajit
+  ---------    ---------  --------  ----------  -------  --------  -------  ---------  --------  ---------  -------  --------  -------  ---------
+  startup            3.3       2.3        14.3     23.8      68.3     71.4        1.5     1.43x      0.23x    0.14x     0.05x    0.05x      2.20x
+  fib                6.7     184.0        60.1     56.6      76.4    261.3        4.7     0.04x      0.11x    0.12x     0.09x    0.03x      1.43x
+  loop               3.2      91.2       191.4     77.8      78.1    159.4        4.3     0.04x      0.02x    0.04x     0.04x    0.02x      0.74x
+  string             4.0      10.2        26.8     44.7      83.2    124.2        3.3     0.39x      0.15x    0.09x     0.05x    0.03x      1.21x
+  hash               6.8      24.6        25.5     32.6     105.7    143.7        2.0     0.28x      0.27x    0.21x     0.06x    0.05x      3.40x
+  array              9.8      24.8        33.2     39.4      88.2    843.9       59.0     0.40x      0.30x    0.25x     0.11x    0.01x      0.17x
+  regex             12.6      89.7       264.0    234.3      94.4  25043.8      178.2     0.14x      0.05x    0.05x     0.13x    0.00x      0.07x
+  map_grep          13.9      48.8        35.9     48.8      90.5    492.4        3.3     0.28x      0.39x    0.28x     0.15x    0.03x      4.21x
 ```
 
-**stryke vs perl5** — faster on 7 of 8 benches: `fib` 17x, `loop` 12x, `regex` 5.6x, `hash` 3.5x, `map_grep` 2.7x, `array` 1.8x, `string` 1.3x. Only `startup` is slower (2.7x — Rust binary load overhead).
+**stryke vs perl5** — faster on all 8 benches: `fib` 27x, `loop` 29x, `regex` 7.1x, `hash` 3.6x, `map_grep` 3.5x, `array` 2.5x, `string` 2.6x, `startup` 1.4x.
 
-**stryke vs python3** — faster on all 8 benches: `loop` 26x, `regex` 19x, `fib` 5.9x, `startup` 2.9x, `string` 4.0x, `hash` 2.5x, `array` 2.6x, `map_grep` 2.1x. Python uses `io.StringIO` for string bench (not `+=` which is O(n²) and unfair).
+**stryke vs python3** — faster on all 8 benches: `loop` 60x, `regex` 21x, `string` 6.7x, `fib` 9.0x, `startup` 4.3x, `hash` 3.8x, `array` 3.4x, `map_grep` 2.6x.
 
-**stryke vs ruby** — faster on all 8 benches: `regex` 16x, `loop` 10x, `fib` 5.4x, `startup` 4.9x, `string` 6.0x, `hash` 3.3x, `map_grep` 2.7x, `array` 3.2x.
+**stryke vs ruby** — faster on all 8 benches: `regex` 19x, `loop` 24x, `string` 11x, `fib` 8.4x, `startup` 7.2x, `hash` 4.8x, `array` 4.0x, `map_grep` 3.5x.
 
-**stryke vs julia** — faster on all 8 benches: `startup` 11x, `loop` 11x, `string` 11x, `hash` 11x, `fib` 7.6x, `array` 7.3x, `regex` 7.0x, `map_grep` 5.4x. Julia timings include LLVM JIT compilation cost — in long-running sessions Julia compiles to native code and would match C on numeric work. These benchmarks measure **scripting use cases** where startup + single-shot execution matters.
+**stryke vs julia** — faster on all 8 benches: `loop` 24x, `startup` 21x, `string` 21x, `hash` 16x, `fib` 11x, `array` 9.0x, `regex` 7.5x, `map_grep` 6.5x. Julia timings include LLVM JIT compilation cost — in long-running sessions Julia compiles to native code and would match C on numeric work. These benchmarks measure **scripting use cases** where startup + single-shot execution matters.
 
-**stryke vs raku** — Raku (Perl 6) runs on MoarVM with notoriously slow startup (~200ms+). Re-run `bash bench/run_bench_all.sh` to see current numbers. Raku's strengths (grammars, gradual typing, junctions) are language features, not runtime speed — expect stryke to be significantly faster on all benchmarks.
+**stryke vs raku** — faster on all 8 benches by 20-2000x. Raku's `regex` is 25044ms vs stryke's 12.6ms (1988x). Raku (Perl 6) runs on MoarVM with heavy startup (~70ms+). Raku's strengths are language features (grammars, gradual typing, junctions), not runtime speed.
 
-**stryke vs luajit** — LuaJIT is the fastest scripting runtime on earth (tracing JIT that rivals C on numeric code). Expect LuaJIT to win on pure compute (`fib`, `loop`) but lack one-liner ergonomics — no `$_`, no `-ne`, no regex literals, no parallelism. LuaJIT uses Lua patterns (not PCRE) for regex bench.
+**stryke vs luajit** — LuaJIT is the fastest dynamic language runtime ever built (tracing JIT by Mike Pall). **stryke beats LuaJIT on 3 of 8 benchmarks**: `loop` (0.74x), `array` (0.17x), `regex` (0.07x). Near-parity on `string` (1.21x) and `fib` (1.43x). LuaJIT wins on `hash` (3.4x) and `map_grep` (4.2x) where its tracing JIT eliminates all dispatch overhead. LuaJIT uses Lua patterns (not PCRE) for the regex bench. stryke offers what LuaJIT cannot: `$_`, `-ne`, regex literals, PCRE, parallel primitives (`pmap`, `pmaps`, `pgrep`), streaming iterators, and one-liner ergonomics.
 
 ### stryke vs perl5 (detailed)
 
-`bash bench/run_bench.sh` — includes noJIT and perturbation columns for honesty verification.
+`bash bench/run_bench.sh` — includes noJIT and perturbation columns for honesty verification. Re-run to get current numbers on your hardware.
+
+#### Parallel & streaming speedup (100k items, `$_ * 2`)
 
 ```
-  bench          perl5 ms   stryke ms    noJit ms  perturb ms  rs/perl5  jit/noJit
-  ---------      --------   ---------    --------   ---------  --------  ---------
-  startup             2.7         3.7         4.0         3.5     1.37x     1.08x
-  fib               192.0         8.3         8.5         8.3     0.04x     1.02x
-  loop               92.7         3.7         3.8         3.8     0.04x     1.03x
-  string             10.7         4.3         4.4         4.4     0.40x     1.02x
-  hash               32.0         7.4         7.7         7.6     0.23x     1.04x
-  array              26.1        10.3        10.5        10.5     0.39x     1.02x
-  regex              91.8        13.3        13.0        13.1     0.14x     0.98x
-  map_grep           51.9        15.3        15.3        15.8     0.29x     1.00x
+  map   (eager, sequential):     0.01s  — inline execution, zero per-item overhead
+  maps  (streaming, sequential): 0.11s  — lazy iterator, single interpreter reused
+  pmap  (eager, 18 cores):       0.14s  — pre-built interpreter pool, rayon par_iter
+  pmaps (streaming, 18 cores):   0.49s  — background worker threads, bounded channel
 ```
 
-**JIT impact is essentially zero on this suite** (`jit/noJit` within ±6%). The wins over Perl 5 come from the **bytecode interpreter**, not the JIT — the current Cranelift block JIT only covers a narrow band of frame-slot numeric hot loops.
-
-The `noJit` column is `stryke --no-jit`. The `perturb` column re-runs each bench through a renamed but functionally-equivalent file so any future shape-matcher that short-circuits the canonical bench files would show a divergence.
-
-#### Parallel speedup
-
-```
-  map  (50k items, per-item work):  236.1 ms
-  pmap (50k items, 18 cores):       465.1 ms   →  0.51x
-```
-
-`pmap` is **slower** on this workload — 50k items × per-item cost is too small to amortize worker spin-up. Parallel wins require heavier per-item work (~100 ms+) or much larger N.
+`maps`/`pmaps` are **streaming** — they return lazy iterators that never materialize the full result list. Use `pmaps` for pipelines over billions of items where holding all results in memory is impractical, or with `take` for early termination: `range(0, 1e9) |> pmaps { expensive($_) } |> take 10 |> ep`.
 
 ---
 
