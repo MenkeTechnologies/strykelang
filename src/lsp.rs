@@ -2335,6 +2335,16 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "weighted_var" | "wvar" => "`weighted_var` — weighted variance. Args: values, weights.\n\n```perl\np wvar([1,2,3,4], [1,1,1,1])  # same as var\n```",
         "cov2cor" => "`cov2cor` — convert covariance matrix to correlation matrix. Like R's cov2cor().\n\n```perl\nmy $cor = cov2cor(cov_mat($data))\n```",
 
+        // ── SVG Plotting ─────────────────────────────────────────────────
+        "scatter_svg" | "scatter_plot" => "`scatter_svg` (alias `scatter_plot`) — generate an SVG scatter plot. Args: xs, ys [, title]. Dark theme, auto-scaled axes.\n\n```perl\nscatter_svg([1,2,3,4], [1,4,9,16], \"Squares\") |> to_file(\"scatter.svg\")\n```",
+        "line_svg" | "line_plot" => "`line_svg` (alias `line_plot`) — generate an SVG line plot. Args: xs, ys [, title].\n\n```perl\nmy @x = map { $_ * 0.1 } 0..100\nmy @y = map { sin($_) } @x\nline_svg(\\@x, \\@y, \"Sine\") |> to_file(\"sine.svg\")\n```",
+        "plot_svg" => "`plot_svg` — SVG line plot with auto X axis (0..n-1). Args: ys [, title].\n\n```perl\nplot_svg([map { $_ ** 2 } 0..50], \"Parabola\") |> to_file(\"plot.svg\")\n```",
+        "hist_svg" | "histogram_svg" => "`hist_svg` (alias `histogram_svg`) — SVG histogram with auto-binning (sqrt rule). Args: data [, bins, title].\n\n```perl\nrnorm(1000) |> hist_svg(30, \"Normal\") |> to_file(\"hist.svg\")\n```",
+        "boxplot_svg" | "box_plot" => "`boxplot_svg` (alias `box_plot`) — SVG box-and-whisker plot with IQR whiskers and outlier detection. Args: groups [, title]. Groups is array of arrays.\n\n```perl\nboxplot_svg([[1,2,3,4,5], [3,4,5,6,20]], \"Compare\") |> to_file(\"box.svg\")\n```",
+        "bar_svg" | "barchart_svg" => "`bar_svg` (alias `barchart_svg`) — SVG bar chart with labeled bars and value annotations. Args: labels, values [, title].\n\n```perl\nbar_svg([\"Rust\",\"Go\",\"C++\"], [45,30,25], \"Languages\") |> to_file(\"bar.svg\")\n```",
+        "pie_svg" | "pie_chart" => "`pie_svg` (alias `pie_chart`) — SVG pie chart with percentage labels. Args: labels, values [, title].\n\n```perl\npie_svg([\"A\",\"B\",\"C\"], [50,30,20]) |> to_file(\"pie.svg\")\n```",
+        "heatmap_svg" | "heatmap" => "`heatmap_svg` (alias `heatmap`) — SVG heatmap with blue-cyan-yellow-red colormap. Args: matrix [, title].\n\n```perl\nheatmap_svg(cor_mat($data), \"Correlation\") |> to_file(\"heat.svg\")\n```",
+
         _ => return None,
     };
     Some(md)

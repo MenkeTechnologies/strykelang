@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.7.0 · 3074 topics · 25 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.7.0 · 3082 topics · 25 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -191,7 +191,7 @@
         <li><a href="#ch-process">Process</a> <span class="chapter-count">20</span></li>
         <li><a href="#ch-pack-binary">Pack / Binary</a> <span class="chapter-count">3</span></li>
         <li><a href="#ch-logging">Logging</a> <span class="chapter-count">7</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">2512</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">2520</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -5624,7 +5624,7 @@ log_info(&quot;hidden&quot;)    # not printed
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">2512 topics</p>
+      <p class="chapter-meta">2520 topics</p>
       <article class="doc-entry" id="doc-stryke-rust-compile">
         <h3><a class="doc-anchor" href="#doc-stryke-rust-compile">#</a> <code>__stryke_rust_compile</code></h3>
         <p><code>__stryke_rust_compile</code> — internal builtin.</p>
@@ -6689,6 +6689,12 @@ p au / 1000      # ~149.6 million km
         <pre><code class="lang-perl">my $filtered = bpf(\@signal, 0.1, 0.3)
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-bar-svg">
+        <h3><a class="doc-anchor" href="#doc-bar-svg">#</a> <code>bar_svg</code></h3>
+        <p><code>bar_svg</code> (alias <code>barchart_svg</code>) — SVG bar chart with labeled bars and value annotations. Args: labels, values [, title].</p>
+        <pre><code class="lang-perl">bar_svg([&quot;Rust&quot;,&quot;Go&quot;,&quot;C++&quot;], [45,30,25], &quot;Languages&quot;) |&gt; to_file(&quot;bar.svg&quot;)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-bar-to-pascals">
         <h3><a class="doc-anchor" href="#doc-bar-to-pascals">#</a> <code>bar_to_pascals</code></h3>
         <p><code>bar_to_pascals</code> — file stat / path builtin.</p>
@@ -7416,6 +7422,12 @@ p bond_price(1000, 0.05, 0.06, 10)   # ~926 (discount)
         <pre><code class="lang-perl">my $result = both $x 
 # or in a pipeline:
 @list |&gt; map both |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-box-plot">
+        <h3><a class="doc-anchor" href="#doc-box-plot">#</a> <code>box_plot</code></h3>
+        <p><code>boxplot_svg</code> (alias <code>box_plot</code>) — SVG box-and-whisker plot with IQR whiskers and outlier detection. Args: groups [, title]. Groups is array of arrays.</p>
+        <pre><code class="lang-perl">boxplot_svg([[1,2,3,4,5], [3,4,5,6,20]], &quot;Compare&quot;) |&gt; to_file(&quot;box.svg&quot;)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-bracket">
@@ -12568,6 +12580,12 @@ p haversine(40.7128, -74.0060, 34.0522, -118.2437)
 @list |&gt; map heat_index |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-heatmap">
+        <h3><a class="doc-anchor" href="#doc-heatmap">#</a> <code>heatmap</code></h3>
+        <p><code>heatmap_svg</code> (alias <code>heatmap</code>) — SVG heatmap with blue-cyan-yellow-red colormap. Args: matrix [, title].</p>
+        <pre><code class="lang-perl">heatmap_svg(cor_mat($data), &quot;Correlation&quot;) |&gt; to_file(&quot;heat.svg&quot;)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-heron">
         <h3><a class="doc-anchor" href="#doc-heron">#</a> <code>heron</code></h3>
         <p><code>heron</code> — geometry / physics builtin. Alias for <code>heron_area</code>.</p>
@@ -12641,6 +12659,12 @@ my $ac_only = hpf(\@with_dc, 0.1)
         <pre><code class="lang-perl">my $result = hist $x 
 # or in a pipeline:
 @list |&gt; map hist |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hist-svg">
+        <h3><a class="doc-anchor" href="#doc-hist-svg">#</a> <code>hist_svg</code></h3>
+        <p><code>hist_svg</code> (alias <code>histogram_svg</code>) — SVG histogram with auto-binning (sqrt rule). Args: data [, bins, title].</p>
+        <pre><code class="lang-perl">rnorm(1000) |&gt; hist_svg(30, &quot;Normal&quot;) |&gt; to_file(&quot;hist.svg&quot;)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-histogram">
@@ -15707,6 +15731,14 @@ p ly / au        # ~63241 AU
         <p><code>line_intersection($x1, $y1, $x2, $y2, $x3, $y3, $x4, $y4)</code> — finds the intersection point of two lines defined by points (x1,y1)-(x2,y2) and (x3,y3)-(x4,y4). Returns [$x, $y] or undef if parallel.</p>
         <pre><code class="lang-perl">my $pt = line_intersection(0, 0, 1, 1, 0, 1, 1, 0)
 p @$pt   # (0.5, 0.5)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-line-plot">
+        <h3><a class="doc-anchor" href="#doc-line-plot">#</a> <code>line_plot</code></h3>
+        <p><code>line_svg</code> (alias <code>line_plot</code>) — generate an SVG line plot. Args: xs, ys [, title].</p>
+        <pre><code class="lang-perl">my @x = map { $_ * 0.1 } 0..100
+my @y = map { sin($_) } @x
+line_svg(\@x, \@y, &quot;Sine&quot;) |&gt; to_file(&quot;sine.svg&quot;)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-linear-regression">
@@ -19042,6 +19074,12 @@ p pexp(5, 0.5)   # P(wait ≤ 5 with avg wait 2)
 @list |&gt; map pid |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-pie-chart">
+        <h3><a class="doc-anchor" href="#doc-pie-chart">#</a> <code>pie_chart</code></h3>
+        <p><code>pie_svg</code> (alias <code>pie_chart</code>) — SVG pie chart with percentage labels. Args: labels, values [, title].</p>
+        <pre><code class="lang-perl">pie_svg([&quot;A&quot;,&quot;B&quot;,&quot;C&quot;], [50,30,20]) |&gt; to_file(&quot;pie.svg&quot;)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-pig-latin">
         <h3><a class="doc-anchor" href="#doc-pig-latin">#</a> <code>pig_latin</code></h3>
         <p><code>pig_latin</code> — string processing (uncategorized batch) builtin.</p>
@@ -19162,6 +19200,12 @@ p $msg   # hello from child
         <h3><a class="doc-anchor" href="#doc-plnorm">#</a> <code>plnorm</code></h3>
         <p><code>plnorm</code> — log-normal CDF. P(X ≤ x) for LogN(mu, sigma). Args: x, mu, sigma.</p>
         <pre><code class="lang-perl">p plnorm(1, 0, 1)   # 0.5 (median of LogN(0,1))
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-plot-svg">
+        <h3><a class="doc-anchor" href="#doc-plot-svg">#</a> <code>plot_svg</code></h3>
+        <p><code>plot_svg</code> — SVG line plot with auto X axis (0..n-1). Args: ys [, title].</p>
+        <pre><code class="lang-perl">plot_svg([map { $_ ** 2 } 0..50], &quot;Parabola&quot;) |&gt; to_file(&quot;plot.svg&quot;)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-plur">
@@ -21321,6 +21365,12 @@ p @$p   # (4, 6)
         <pre><code class="lang-perl">my $result = scanr $x 
 # or in a pipeline:
 @list |&gt; map scanr |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-scatter-plot">
+        <h3><a class="doc-anchor" href="#doc-scatter-plot">#</a> <code>scatter_plot</code></h3>
+        <p><code>scatter_svg</code> (alias <code>scatter_plot</code>) — generate an SVG scatter plot. Args: xs, ys [, title]. Dark theme, auto-scaled axes.</p>
+        <pre><code class="lang-perl">scatter_svg([1,2,3,4], [1,4,9,16], &quot;Squares&quot;) |&gt; to_file(&quot;scatter.svg&quot;)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-scentroid">
