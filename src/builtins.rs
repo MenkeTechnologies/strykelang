@@ -3030,6 +3030,64 @@ pub(crate) fn try_builtin(
         "base85_encode" | "b85e" | "ascii85_encode" | "a85e" => Some(builtin_base85_encode(args)),
         "base85_decode" | "b85d" | "ascii85_decode" | "a85d" => Some(builtin_base85_decode(args)),
 
+        // ── R base: distribution CDFs ────────────────────────────────────
+        "pnorm" => Some(builtin_pnorm(args)),
+        "qnorm" => Some(builtin_qnorm(args)),
+        "pbinom" => Some(builtin_pbinom(args)),
+        "dbinom" => Some(builtin_dbinom(args)),
+        "ppois" => Some(builtin_ppois(args)),
+        "punif" => Some(builtin_punif(args)),
+        "pexp" => Some(builtin_pexp(args)),
+        "pweibull" => Some(builtin_pweibull(args)),
+        "plnorm" => Some(builtin_plnorm(args)),
+        "pcauchy" => Some(builtin_pcauchy(args)),
+
+        // ── R base: matrix ops ───────────────────────────────────────────
+        "rbind" => Some(builtin_rbind(args)),
+        "cbind" => Some(builtin_cbind(args)),
+        "row_sums" | "rowSums" => Some(builtin_row_sums(args)),
+        "col_sums" | "colSums" => Some(builtin_col_sums(args)),
+        "row_means" | "rowMeans" => Some(builtin_row_means(args)),
+        "col_means" | "colMeans" => Some(builtin_col_means(args)),
+        "outer_product" | "outer" => Some(builtin_outer(args)),
+        "crossprod" => Some(builtin_crossprod(args)),
+        "tcrossprod" => Some(builtin_tcrossprod(args)),
+        "nrow" => Some(builtin_nrow(args)),
+        "ncol" => Some(builtin_ncol(args)),
+        "prop_table" | "proptable" => Some(builtin_prop_table(args)),
+
+        // ── R base: vector ops ───────────────────────────────────────────
+        "cummax" => Some(builtin_cummax(args)),
+        "cummin" => Some(builtin_cummin(args)),
+        "scale_vec" | "scale" => Some(builtin_scale(args)),
+        "which_fn" => Some(builtin_which_val(interp, args, line)),
+        "tabulate" => Some(builtin_tabulate(args)),
+        "duplicated" | "duped" => Some(builtin_duplicated(args)),
+        "rev_vec" => Some(builtin_rev_vec(args)),
+        "seq_fn" => Some(builtin_seq_fn(args)),
+        "rep_fn" | "rep" => Some(builtin_rep_fn(args)),
+        "cut_bins" | "cut" => Some(builtin_cut(args)),
+        "find_interval" | "findInterval" => Some(builtin_find_interval(args)),
+        "ecdf_fn" | "ecdf" => Some(builtin_ecdf(args)),
+        "density_est" | "density" => Some(builtin_density(args)),
+        "embed_ts" | "embed" => Some(builtin_embed(args)),
+
+        // ── R base: stats tests ──────────────────────────────────────────
+        "shapiro_test" | "shapiro" => Some(builtin_shapiro_test(args)),
+        "ks_test" | "ks" => Some(builtin_ks_test(args)),
+        "wilcox_test" | "wilcox" | "mann_whitney" => Some(builtin_wilcox_test(args)),
+        "prop_test" | "proptest" => Some(builtin_prop_test(args)),
+        "binom_test" | "binomtest" => Some(builtin_binom_test(args)),
+
+        // ── R base: apply family ─────────────────────────────────────────
+        "sapply" => Some(builtin_sapply(interp, args, line)),
+        "tapply" => Some(builtin_tapply(interp, args, line)),
+        "do_call" | "docall" => Some(builtin_do_call(interp, args, line)),
+
+        // ── R base: ML / clustering ──────────────────────────────────────
+        "kmeans" => Some(builtin_kmeans(args)),
+        "prcomp" | "pca" => Some(builtin_prcomp(args)),
+
         _ => crate::rust_ffi::try_call(name, args, line),
     }
 }

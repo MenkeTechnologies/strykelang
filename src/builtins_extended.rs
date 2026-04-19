@@ -7649,3 +7649,922 @@ fn builtin_base85_decode(args: &[PerlValue]) -> PerlResult<PerlValue> {
         String::from_utf8_lossy(&bytes).to_string(),
     ))
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// R base package — distribution CDFs, quantiles, matrix ops, stats tests
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Distribution CDFs (p-functions) ──────────────────────────────────────────
+
+/// `pnorm x [, mu, sigma]` — normal CDF.
+fn builtin_pnorm(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let sigma = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let z = (x - mu) / sigma;
+    Ok(PerlValue::float(norm_cdf(z)))
+}
+
+/// `qnorm p [, mu, sigma]` — normal quantile (inverse CDF) via rational approximation.
+fn builtin_qnorm(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
+    let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let sigma = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    // Beasley-Springer-Moro approximation
+    let z = if p <= 0.0 {
+        f64::NEG_INFINITY
+    } else if p >= 1.0 {
+        f64::INFINITY
+    } else if p == 0.5 {
+        0.0
+    } else {
+        let t = if p < 0.5 {
+            (-2.0 * p.ln()).sqrt()
+        } else {
+            (-2.0 * (1.0 - p).ln()).sqrt()
+        };
+        let c = [2.515517, 0.802853, 0.010328];
+        let d = [1.432788, 0.189269, 0.001308];
+        let num = c[0] + t * (c[1] + t * c[2]);
+        let den = 1.0 + t * (d[0] + t * (d[1] + t * d[2]));
+        let z = t - num / den;
+        if p < 0.5 {
+            -z
+        } else {
+            z
+        }
+    };
+    Ok(PerlValue::float(mu + sigma * z))
+}
+
+/// `pbinom k, n, p` — binomial CDF P(X <= k).
+fn builtin_pbinom(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let k = args.first().map(|v| v.to_number() as i64).unwrap_or(0);
+    let n = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
+    let p = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
+    let mut cdf = 0.0;
+    for i in 0..=k.min(n) {
+        let mut binom = 1.0;
+        for j in 0..i {
+            binom *= (n - j) as f64 / (j + 1) as f64;
+        }
+        cdf += binom * p.powi(i as i32) * (1.0 - p).powi((n - i) as i32);
+    }
+    Ok(PerlValue::float(cdf))
+}
+
+/// `dbinom k, n, p` — binomial PMF P(X = k).
+fn builtin_dbinom(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let k = args.first().map(|v| v.to_number() as i64).unwrap_or(0);
+    let n = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
+    let p = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
+    let mut binom = 1.0;
+    for j in 0..k {
+        binom *= (n - j) as f64 / (j + 1) as f64;
+    }
+    Ok(PerlValue::float(
+        binom * p.powi(k as i32) * (1.0 - p).powi((n - k) as i32),
+    ))
+}
+
+/// `ppois k, lambda` — Poisson CDF P(X <= k).
+fn builtin_ppois(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let k = args.first().map(|v| v.to_number() as i64).unwrap_or(0);
+    let lambda = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let mut cdf = 0.0;
+    let mut term = (-lambda).exp();
+    cdf += term;
+    for i in 1..=k {
+        term *= lambda / i as f64;
+        cdf += term;
+    }
+    Ok(PerlValue::float(cdf))
+}
+
+/// `punif x, a, b` — uniform CDF.
+fn builtin_punif(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(((x - a) / (b - a)).max(0.0).min(1.0)))
+}
+
+/// `pexp x, rate` — exponential CDF.
+fn builtin_pexp(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let rate = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    if x < 0.0 {
+        return Ok(PerlValue::float(0.0));
+    }
+    Ok(PerlValue::float(1.0 - (-rate * x).exp()))
+}
+
+/// `pweibull x, shape, scale` — Weibull CDF.
+fn builtin_pweibull(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let k = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let lambda = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    if x < 0.0 {
+        return Ok(PerlValue::float(0.0));
+    }
+    Ok(PerlValue::float(1.0 - (-(x / lambda).powf(k)).exp()))
+}
+
+/// `plnorm x, mu, sigma` — log-normal CDF.
+fn builtin_plnorm(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let sigma = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    if x <= 0.0 {
+        return Ok(PerlValue::float(0.0));
+    }
+    Ok(PerlValue::float(norm_cdf((x.ln() - mu) / sigma)))
+}
+
+/// `pcauchy x, x0, gamma` — Cauchy CDF.
+fn builtin_pcauchy(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let x0 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let gamma = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(
+        0.5 + ((x - x0) / gamma).atan() / std::f64::consts::PI,
+    ))
+}
+
+// ── Matrix ops (R style) ────────────────────────────────────────────────────
+
+/// `rbind M1, M2, ...` — bind matrices by rows (vertical stack).
+fn builtin_rbind(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let mut rows = Vec::new();
+    for a in args {
+        let m = arg_to_vec(a);
+        for row in m {
+            rows.push(row);
+        }
+    }
+    Ok(PerlValue::array(rows))
+}
+
+/// `cbind M1, M2, ...` — bind matrices by columns (horizontal join).
+fn builtin_cbind(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if args.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let mats: Vec<Vec<Vec<f64>>> = args.iter().map(|a| args_to_matrix(a)).collect();
+    let nrows = mats.iter().map(|m| m.len()).max().unwrap_or(0);
+    let mut result = Vec::with_capacity(nrows);
+    for i in 0..nrows {
+        let mut row = Vec::new();
+        for m in &mats {
+            if i < m.len() {
+                row.extend_from_slice(&m[i]);
+            }
+        }
+        result.push(PerlValue::array(
+            row.iter().map(|&v| PerlValue::float(v)).collect(),
+        ));
+    }
+    Ok(PerlValue::array(result))
+}
+
+/// `row_sums M` — sum of each row.
+fn builtin_row_sums(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = args_to_matrix(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    Ok(vec_to_perl(
+        &m.iter().map(|r| r.iter().sum()).collect::<Vec<f64>>(),
+    ))
+}
+
+/// `col_sums M` — sum of each column.
+fn builtin_col_sums(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = args_to_matrix(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    if m.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let nc = m[0].len();
+    let mut sums = vec![0.0; nc];
+    for row in &m {
+        for (j, &v) in row.iter().enumerate() {
+            sums[j] += v;
+        }
+    }
+    Ok(vec_to_perl(&sums))
+}
+
+/// `row_means M` — mean of each row.
+fn builtin_row_means(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = args_to_matrix(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let means: Vec<f64> = m
+        .iter()
+        .map(|r| {
+            if r.is_empty() {
+                0.0
+            } else {
+                r.iter().sum::<f64>() / r.len() as f64
+            }
+        })
+        .collect();
+    Ok(vec_to_perl(&means))
+}
+
+/// `col_means M` — mean of each column.
+fn builtin_col_means(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = args_to_matrix(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    if m.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let nr = m.len() as f64;
+    let nc = m[0].len();
+    let mut means = vec![0.0; nc];
+    for row in &m {
+        for (j, &v) in row.iter().enumerate() {
+            means[j] += v;
+        }
+    }
+    for j in 0..nc {
+        means[j] /= nr;
+    }
+    Ok(vec_to_perl(&means))
+}
+
+/// `outer V1, V2` — outer product of two vectors. Returns matrix.
+fn builtin_outer(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v1: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let v2: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let m: Vec<Vec<f64>> = v1
+        .iter()
+        .map(|&a| v2.iter().map(|&b| a * b).collect())
+        .collect();
+    Ok(matrix_to_perl(&m))
+}
+
+/// `crossprod M` — cross product: t(M) %*% M (equivalent to M^T * M).
+fn builtin_crossprod(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a = args_to_matrix(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let nr = a.len();
+    if nr == 0 {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let nc = a[0].len();
+    let mut result = vec![vec![0.0; nc]; nc];
+    for i in 0..nc {
+        for j in 0..nc {
+            for k in 0..nr {
+                result[i][j] += a[k][i] * a[k][j];
+            }
+        }
+    }
+    Ok(matrix_to_perl(&result))
+}
+
+/// `tcrossprod M` — M %*% t(M).
+fn builtin_tcrossprod(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a = args_to_matrix(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let nr = a.len();
+    if nr == 0 {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let nc = a[0].len();
+    let mut result = vec![vec![0.0; nr]; nr];
+    for i in 0..nr {
+        for j in 0..nr {
+            for k in 0..nc {
+                result[i][j] += a[i][k] * a[j][k];
+            }
+        }
+    }
+    Ok(matrix_to_perl(&result))
+}
+
+/// `nrow M` — number of rows.
+fn builtin_nrow(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    Ok(PerlValue::integer(m.len() as i64))
+}
+
+/// `ncol M` — number of columns.
+fn builtin_ncol(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let nc = if m.is_empty() {
+        0
+    } else {
+        arg_to_vec(&m[0]).len()
+    };
+    Ok(PerlValue::integer(nc as i64))
+}
+
+// ── R vector ops ────────────────────────────────────────────────────────────
+
+/// `cummax VEC` — cumulative maximum.
+fn builtin_cummax(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let mut max = f64::NEG_INFINITY;
+    let result: Vec<PerlValue> = v
+        .iter()
+        .map(|&x| {
+            max = max.max(x);
+            PerlValue::float(max)
+        })
+        .collect();
+    Ok(PerlValue::array(result))
+}
+
+/// `cummin VEC` — cumulative minimum.
+fn builtin_cummin(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let mut min = f64::INFINITY;
+    let result: Vec<PerlValue> = v
+        .iter()
+        .map(|&x| {
+            min = min.min(x);
+            PerlValue::float(min)
+        })
+        .collect();
+    Ok(PerlValue::array(result))
+}
+
+/// `scale VEC [, center, scale_flag]` — standardize: (x - mean) / sd. R's scale().
+fn builtin_scale(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let n = v.len() as f64;
+    if n < 2.0 {
+        return Ok(args.first().cloned().unwrap_or(PerlValue::UNDEF).clone());
+    }
+    let mean: f64 = v.iter().sum::<f64>() / n;
+    let sd: f64 = (v.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1.0)).sqrt();
+    let result: Vec<PerlValue> = v
+        .iter()
+        .map(|&x| PerlValue::float(if sd > 0.0 { (x - mean) / sd } else { 0.0 }))
+        .collect();
+    Ok(PerlValue::array(result))
+}
+
+/// `which_val VEC, pred` — indices where predicate is true (R's which()).
+fn builtin_which_val(
+    interp: &mut crate::interpreter::Interpreter,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<PerlValue> {
+    let v = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let pred = args.get(1).cloned().unwrap_or(PerlValue::UNDEF);
+    let sub = pred
+        .as_code_ref()
+        .ok_or_else(|| PerlError::runtime("which: expected code ref", line))?;
+    let mut indices = Vec::new();
+    for (i, x) in v.iter().enumerate() {
+        let r = exec_to_perl_result(
+            interp.call_sub(&sub, vec![x.clone()], WantarrayCtx::Scalar, line),
+            "which",
+            line,
+        )?;
+        if r.is_true() {
+            indices.push(PerlValue::integer(i as i64));
+        }
+    }
+    Ok(PerlValue::array(indices))
+}
+
+/// `tabulate VEC` — frequency table (R's table()). Returns hash of value => count.
+fn builtin_tabulate(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let mut counts = indexmap::IndexMap::new();
+    for x in &v {
+        let key = x.to_string();
+        let entry = counts.entry(key).or_insert(PerlValue::integer(0));
+        *entry = PerlValue::integer(entry.to_number() as i64 + 1);
+    }
+    Ok(PerlValue::hash(counts))
+}
+
+/// `duplicated VEC` — boolean array: true if element appeared earlier.
+fn builtin_duplicated(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let mut seen = std::collections::HashSet::new();
+    let result: Vec<PerlValue> = v
+        .iter()
+        .map(|x| {
+            let key = x.to_string();
+            if seen.contains(&key) {
+                PerlValue::integer(1)
+            } else {
+                seen.insert(key);
+                PerlValue::integer(0)
+            }
+        })
+        .collect();
+    Ok(PerlValue::array(result))
+}
+
+/// `rev_vec VEC` — reverse a vector (R's rev()).
+fn builtin_rev_vec(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let mut v = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    v.reverse();
+    Ok(PerlValue::array(v))
+}
+
+/// `seq_fn from, to [, by]` — generate sequence (R's seq()).
+fn builtin_seq_fn(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let from = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let to = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let by = args
+        .get(2)
+        .map(|v| v.to_number())
+        .unwrap_or(if to >= from { 1.0 } else { -1.0 });
+    let mut result = Vec::new();
+    let mut x = from;
+    if by > 0.0 {
+        while x <= to + 1e-10 {
+            result.push(PerlValue::float(x));
+            x += by;
+        }
+    } else if by < 0.0 {
+        while x >= to - 1e-10 {
+            result.push(PerlValue::float(x));
+            x += by;
+        }
+    }
+    Ok(PerlValue::array(result))
+}
+
+/// `rep_fn VAL, times` — repeat a value (R's rep()).
+fn builtin_rep_fn(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let val = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let times = args.get(1).map(|v| v.to_number() as usize).unwrap_or(1);
+    Ok(PerlValue::array(vec![val; times]))
+}
+
+/// `cut VEC, breaks` — bin values into intervals (R's cut()). Returns integer bin indices.
+fn builtin_cut(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let breaks: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let result: Vec<PerlValue> = v
+        .iter()
+        .map(|&x| {
+            let mut bin = 0i64;
+            for (i, w) in breaks.windows(2).enumerate() {
+                if x >= w[0] && x < w[1] {
+                    bin = (i + 1) as i64;
+                    break;
+                }
+                if i == breaks.len() - 2 && x == w[1] {
+                    bin = (i + 1) as i64;
+                }
+            }
+            PerlValue::integer(bin)
+        })
+        .collect();
+    Ok(PerlValue::array(result))
+}
+
+/// `find_interval X, breaks` — find interval indices (R's findInterval()).
+fn builtin_find_interval(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let breaks: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let result: Vec<PerlValue> = x
+        .iter()
+        .map(|&xi| {
+            let mut idx = 0i64;
+            for (i, &b) in breaks.iter().enumerate() {
+                if xi >= b {
+                    idx = (i + 1) as i64;
+                } else {
+                    break;
+                }
+            }
+            PerlValue::integer(idx)
+        })
+        .collect();
+    Ok(PerlValue::array(result))
+}
+
+/// `ecdf VEC, x` — empirical CDF: proportion of elements <= x.
+fn builtin_ecdf(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let x = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let n = v.len() as f64;
+    let count = v.iter().filter(|&&xi| xi <= x).count() as f64;
+    Ok(PerlValue::float(count / n))
+}
+
+/// `density VEC [, n_points]` — kernel density estimation (Gaussian kernel). Returns [[x],[y]].
+fn builtin_density(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let data: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let n_pts = args.get(1).map(|v| v.to_number() as usize).unwrap_or(512);
+    let n = data.len() as f64;
+    if n < 2.0 {
+        return Err(PerlError::runtime("density: need >= 2 data points", 0));
+    }
+    let mean: f64 = data.iter().sum::<f64>() / n;
+    let sd: f64 = (data.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1.0)).sqrt();
+    let bw = 1.06 * sd * n.powf(-0.2); // Silverman's rule
+    let min = data.iter().cloned().fold(f64::INFINITY, f64::min) - 3.0 * bw;
+    let max = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max) + 3.0 * bw;
+    let step = (max - min) / (n_pts - 1) as f64;
+    let mut xs = Vec::with_capacity(n_pts);
+    let mut ys = Vec::with_capacity(n_pts);
+    let pi2 = (2.0 * std::f64::consts::PI).sqrt();
+    for i in 0..n_pts {
+        let x = min + i as f64 * step;
+        let y: f64 = data
+            .iter()
+            .map(|&d| (-0.5 * ((x - d) / bw).powi(2)).exp() / (bw * pi2))
+            .sum::<f64>()
+            / n;
+        xs.push(PerlValue::float(x));
+        ys.push(PerlValue::float(y));
+    }
+    Ok(PerlValue::array(vec![
+        PerlValue::array(xs),
+        PerlValue::array(ys),
+    ]))
+}
+
+// ── R stats tests ───────────────────────────────────────────────────────────
+
+/// `shapiro_test VEC` — Shapiro-Wilk W statistic (simplified). Returns W.
+fn builtin_shapiro_test(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let mut x: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let n = x.len();
+    if n < 3 {
+        return Err(PerlError::runtime("shapiro_test: need >= 3 samples", 0));
+    }
+    x.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let mean: f64 = x.iter().sum::<f64>() / n as f64;
+    let ss: f64 = x.iter().map(|v| (v - mean).powi(2)).sum();
+    // Approximate W using normal order statistics
+    let mut a_sum = 0.0;
+    for i in 0..n / 2 {
+        let ai = (2.0 * (i + 1) as f64 - 1.0) / (2.0 * n as f64);
+        let expected = qnorm_approx(ai);
+        a_sum += expected * (x[n - 1 - i] - x[i]);
+    }
+    let w = (a_sum * a_sum) / ss;
+    Ok(PerlValue::float(w.min(1.0)))
+}
+
+fn qnorm_approx(p: f64) -> f64 {
+    if p <= 0.0 {
+        return f64::NEG_INFINITY;
+    }
+    if p >= 1.0 {
+        return f64::INFINITY;
+    }
+    let t = if p < 0.5 {
+        (-2.0 * p.ln()).sqrt()
+    } else {
+        (-2.0 * (1.0 - p).ln()).sqrt()
+    };
+    let c = [2.515517, 0.802853, 0.010328];
+    let d = [1.432788, 0.189269, 0.001308];
+    let z = t - (c[0] + t * (c[1] + t * c[2])) / (1.0 + t * (d[0] + t * (d[1] + t * d[2])));
+    if p < 0.5 {
+        -z
+    } else {
+        z
+    }
+}
+
+/// `ks_test SAMPLE1, SAMPLE2` — two-sample Kolmogorov-Smirnov test statistic D.
+fn builtin_ks_test(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let mut s1: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let mut s2: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    s1.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    s2.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let n1 = s1.len() as f64;
+    let n2 = s2.len() as f64;
+    let mut i = 0usize;
+    let mut j = 0usize;
+    let mut d = 0.0f64;
+    while i < s1.len() && j < s2.len() {
+        if s1[i] <= s2[j] {
+            i += 1;
+        } else {
+            j += 1;
+        }
+        let diff = (i as f64 / n1 - j as f64 / n2).abs();
+        d = d.max(diff);
+    }
+    Ok(PerlValue::float(d))
+}
+
+/// `wilcox_test SAMPLE1, SAMPLE2` — Wilcoxon rank-sum (Mann-Whitney U) test statistic.
+fn builtin_wilcox_test(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s1: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let s2: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let n1 = s1.len();
+    let n2 = s2.len();
+    let mut u = 0i64;
+    for &x in &s1 {
+        for &y in &s2 {
+            if x > y {
+                u += 1;
+            } else if (x - y).abs() < 1e-12 { /* tie: add 0.5, skip for integer */
+            }
+        }
+    }
+    Ok(PerlValue::integer(u))
+}
+
+/// `prop_test x, n [, p0]` — one-sample proportion test (z-test). Returns [z, p_value].
+fn builtin_prop_test(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let p0 = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
+    let p_hat = x / n;
+    let z = (p_hat - p0) / (p0 * (1.0 - p0) / n).sqrt();
+    let p_val = 2.0 * (1.0 - norm_cdf(z.abs()));
+    Ok(PerlValue::array(vec![
+        PerlValue::float(z),
+        PerlValue::float(p_val),
+    ]))
+}
+
+/// `binom_test x, n [, p]` — exact binomial test. Returns p-value (two-sided, summing small tails).
+fn builtin_binom_test(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number() as i64).unwrap_or(0);
+    let n = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
+    let p = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
+    // P(X = k)
+    let pmf = |k: i64| -> f64 {
+        let mut b = 1.0;
+        for j in 0..k {
+            b *= (n - j) as f64 / (j + 1) as f64;
+        }
+        b * p.powi(k as i32) * (1.0 - p).powi((n - k) as i32)
+    };
+    let px = pmf(x);
+    let mut pval = 0.0;
+    for k in 0..=n {
+        let pk = pmf(k);
+        if pk <= px + 1e-12 {
+            pval += pk;
+        }
+    }
+    Ok(PerlValue::float(pval.min(1.0)))
+}
+
+// ── R apply family / functional ─────────────────────────────────────────────
+
+/// `sapply VEC, FN` — apply function to each element, return vector (R's sapply).
+fn builtin_sapply(
+    interp: &mut crate::interpreter::Interpreter,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<PerlValue> {
+    let v = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let f = args.get(1).cloned().unwrap_or(PerlValue::UNDEF);
+    let sub = f
+        .as_code_ref()
+        .ok_or_else(|| PerlError::runtime("sapply: expected code ref", line))?;
+    let mut result = Vec::with_capacity(v.len());
+    for x in v {
+        let r = exec_to_perl_result(
+            interp.call_sub(&sub, vec![x], WantarrayCtx::Scalar, line),
+            "sapply",
+            line,
+        )?;
+        result.push(r);
+    }
+    Ok(PerlValue::array(result))
+}
+
+/// `tapply VEC, GROUPS, FN` — apply function by group (R's tapply). Returns hash.
+fn builtin_tapply(
+    interp: &mut crate::interpreter::Interpreter,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<PerlValue> {
+    let v = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let groups = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF));
+    let f = args.get(2).cloned().unwrap_or(PerlValue::UNDEF);
+    let sub = f
+        .as_code_ref()
+        .ok_or_else(|| PerlError::runtime("tapply: expected code ref", line))?;
+    let mut grouped: indexmap::IndexMap<String, Vec<PerlValue>> = indexmap::IndexMap::new();
+    for (i, x) in v.iter().enumerate() {
+        let key = if i < groups.len() {
+            groups[i].to_string()
+        } else {
+            "NA".to_string()
+        };
+        grouped.entry(key).or_default().push(x.clone());
+    }
+    let mut result = indexmap::IndexMap::new();
+    for (k, vals) in grouped {
+        let r = exec_to_perl_result(
+            interp.call_sub(
+                &sub,
+                vec![PerlValue::array(vals)],
+                WantarrayCtx::Scalar,
+                line,
+            ),
+            "tapply",
+            line,
+        )?;
+        result.insert(k, r);
+    }
+    Ok(PerlValue::hash(result))
+}
+
+/// `do_call FN, ARGS` — call function with args from a list (R's do.call).
+fn builtin_do_call(
+    interp: &mut crate::interpreter::Interpreter,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<PerlValue> {
+    let f = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let call_args = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF));
+    let sub = f
+        .as_code_ref()
+        .ok_or_else(|| PerlError::runtime("do_call: expected code ref", line))?;
+    exec_to_perl_result(
+        interp.call_sub(&sub, call_args, WantarrayCtx::Scalar, line),
+        "do_call",
+        line,
+    )
+}
+
+/// `embed VEC, dimension` — time-delay embedding (R's embed). Returns matrix.
+fn builtin_embed(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let dim = args.get(1).map(|v| v.to_number() as usize).unwrap_or(2);
+    if v.len() < dim {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let nrows = v.len() - dim + 1;
+    let mut result = Vec::with_capacity(nrows);
+    for i in 0..nrows {
+        let row: Vec<PerlValue> = (0..dim)
+            .map(|j| PerlValue::float(v[i + dim - 1 - j]))
+            .collect();
+        result.push(PerlValue::array(row));
+    }
+    Ok(PerlValue::array(result))
+}
+
+/// `prop_table M` — proportions table: each cell divided by total (R's prop.table).
+fn builtin_prop_table(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = args_to_matrix(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let total: f64 = m.iter().flat_map(|r| r.iter()).sum();
+    if total == 0.0 {
+        return Ok(matrix_to_perl(&m));
+    }
+    let result: Vec<Vec<f64>> = m
+        .iter()
+        .map(|r| r.iter().map(|&v| v / total).collect())
+        .collect();
+    Ok(matrix_to_perl(&result))
+}
+
+/// `kmeans DATA, k [, max_iter]` — k-means clustering. DATA is array of [x,y,...] points. Returns cluster assignments.
+fn builtin_kmeans(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let data_raw = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let k = args.get(1).map(|v| v.to_number() as usize).unwrap_or(2);
+    let max_iter = args.get(2).map(|v| v.to_number() as usize).unwrap_or(100);
+    let data: Vec<Vec<f64>> = data_raw
+        .iter()
+        .map(|v| arg_to_vec(v).iter().map(|x| x.to_number()).collect())
+        .collect();
+    let n = data.len();
+    if n == 0 || k == 0 {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let dim = data[0].len();
+    // Initialize centroids to first k points
+    let mut centroids: Vec<Vec<f64>> = data.iter().take(k).cloned().collect();
+    let mut assignments = vec![0usize; n];
+    for _ in 0..max_iter {
+        // Assign
+        let mut changed = false;
+        for i in 0..n {
+            let mut best = 0;
+            let mut best_dist = f64::INFINITY;
+            for c in 0..k {
+                let d: f64 = (0..dim)
+                    .map(|j| (data[i][j] - centroids[c][j]).powi(2))
+                    .sum();
+                if d < best_dist {
+                    best_dist = d;
+                    best = c;
+                }
+            }
+            if assignments[i] != best {
+                changed = true;
+                assignments[i] = best;
+            }
+        }
+        if !changed {
+            break;
+        }
+        // Update centroids
+        let mut counts = vec![0usize; k];
+        centroids = vec![vec![0.0; dim]; k];
+        for i in 0..n {
+            let c = assignments[i];
+            counts[c] += 1;
+            for j in 0..dim {
+                centroids[c][j] += data[i][j];
+            }
+        }
+        for c in 0..k {
+            if counts[c] > 0 {
+                for j in 0..dim {
+                    centroids[c][j] /= counts[c] as f64;
+                }
+            }
+        }
+    }
+    Ok(PerlValue::array(
+        assignments
+            .iter()
+            .map(|&c| PerlValue::integer(c as i64))
+            .collect(),
+    ))
+}
+
+/// `prcomp DATA [, n_components]` — PCA via eigendecomposition of covariance matrix. Returns [[scores], [loadings], [variance_explained]].
+fn builtin_prcomp(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let data_raw = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let data: Vec<Vec<f64>> = data_raw
+        .iter()
+        .map(|v| arg_to_vec(v).iter().map(|x| x.to_number()).collect())
+        .collect();
+    let n = data.len();
+    if n < 2 {
+        return Err(PerlError::runtime("prcomp: need >= 2 observations", 0));
+    }
+    let p = data[0].len();
+    let nf = n as f64;
+    // Center
+    let means: Vec<f64> = (0..p)
+        .map(|j| data.iter().map(|r| r[j]).sum::<f64>() / nf)
+        .collect();
+    let centered: Vec<Vec<f64>> = data
+        .iter()
+        .map(|r| (0..p).map(|j| r[j] - means[j]).collect())
+        .collect();
+    // Covariance matrix
+    let mut cov = vec![vec![0.0; p]; p];
+    for i in 0..p {
+        for j in 0..p {
+            let s: f64 = centered.iter().map(|r| r[i] * r[j]).sum();
+            cov[i][j] = s / (nf - 1.0);
+        }
+    }
+    // Eigenvalues via QR iteration
+    let eig_args = [matrix_to_perl(&cov)];
+    let eigs = builtin_matrix_eigenvalues(&eig_args)?;
+    let var_explained = eigs;
+    Ok(PerlValue::array(vec![var_explained]))
+}
