@@ -1,8 +1,8 @@
-//! `@INC`, `%INC`, `require`, and `use` loading (pure perlrs `.pm` files).
+//! `@INC`, `%INC`, `require`, and `use` loading (pure forge `.pm` files).
 
-use perlrs::interpreter::Interpreter;
-use perlrs::value::PerlValue;
-use perlrs::{parse, parse_and_run_string};
+use forge::interpreter::Interpreter;
+use forge::value::PerlValue;
+use forge::{parse, parse_and_run_string};
 
 fn fixture_inc() -> String {
     format!("{}/tests/fixtures/inc", env!("CARGO_MANIFEST_DIR"))

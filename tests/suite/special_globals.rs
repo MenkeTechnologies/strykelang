@@ -1,10 +1,10 @@
 //! High-impact Perl globals: `$]`, `$;`, `$^*`, `$ARGV` + `<>`, `@-` / `@+`, `$^S`, `%INC` / `%SIG`.
 
 use crate::common::*;
-use perlrs::interpreter::Interpreter;
-use perlrs::parse;
-use perlrs::perl_bracket_version;
-use perlrs::value::PerlValue;
+use forge::interpreter::Interpreter;
+use forge::parse;
+use forge::perl_bracket_version;
+use forge::value::PerlValue;
 
 #[test]
 fn bracket_version_matches_helper() {
@@ -45,7 +45,7 @@ fn match_arrays_minus_plus_offsets() {
 
 #[test]
 fn diamond_sets_argv_scalar() {
-    let base = std::env::temp_dir().join(format!("perlrs_diamond_{}.txt", std::process::id()));
+    let base = std::env::temp_dir().join(format!("forge_diamond_{}.txt", std::process::id()));
     std::fs::write(&base, "hello\n").expect("write temp");
     let path = base.to_string_lossy().into_owned();
 

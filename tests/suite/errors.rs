@@ -1,9 +1,9 @@
 use crate::common::*;
-use perlrs::error::ErrorKind;
+use forge::error::ErrorKind;
 
 #[test]
 fn parse_unclosed_brace_is_syntax_error() {
-    let err = perlrs::parse("sub f {").unwrap_err();
+    let err = forge::parse("sub f {").unwrap_err();
     assert_eq!(err.kind, ErrorKind::Syntax);
 }
 

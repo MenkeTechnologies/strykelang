@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Smoke-run ~/.zpwr/scripts/*.pl through pe (bounded time / non-interactive inputs).
-# Resolves `pe`: target/debug/pe, then target/release/pe (run `cargo build --bin pe`).
+# Smoke-run ~/.zpwr/scripts/*.pl through fo (bounded time / non-interactive inputs).
+# Resolves `fo`: target/debug/fo, then target/release/fo (run `cargo build --bin fo`).
 set -uo pipefail
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
@@ -10,15 +10,15 @@ resolve_pe() {
   if [[ -n "${PE:-}" && -x "$PE" ]]; then
     return 0
   fi
-  if [[ -x "$REPO_ROOT/target/debug/pe" ]]; then
-    PE=$REPO_ROOT/target/debug/pe
+  if [[ -x "$REPO_ROOT/target/debug/fo" ]]; then
+    PE=$REPO_ROOT/target/debug/fo
     return 0
   fi
-  if [[ -x "$REPO_ROOT/target/release/pe" ]]; then
-    PE=$REPO_ROOT/target/release/pe
+  if [[ -x "$REPO_ROOT/target/release/fo" ]]; then
+    PE=$REPO_ROOT/target/release/fo
     return 0
   fi
-  echo "No pe binary: run 'cargo build --bin pe' in $REPO_ROOT" >&2
+  echo "No fo binary: run 'cargo build --bin fo' in $REPO_ROOT" >&2
   return 1
 }
 
@@ -48,7 +48,7 @@ export COLUMNS="${COLUMNS:-80}"
 run "escapeRemover.pl" timeout 5 "$PE" "$SCRIPTS/escapeRemover.pl" \
   <<<"$(printf '\x1b]0;title\x07\n\x1b[31mhi\x1b[0m\n')"
 
-# 2–3: Getopt + box — `--` so pe does not swallow -h (script exits 1 from usage())
+# 2–3: Getopt + box — `--` so fo does not swallow -h (script exits 1 from usage())
 run "boxPrint.pl (-h)" bash -c 'timeout 5 "$1" -- "$2" -h; e=$?; exit $(( e == 0 || e == 1 ? 0 : e ))' _ "$PE" "$SCRIPTS/boxPrint.pl"
 
 run "boxPrint.pl (stdin)" timeout 5 "$PE" "$SCRIPTS/boxPrint.pl" <<<"hello"

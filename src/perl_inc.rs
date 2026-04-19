@@ -4,18 +4,18 @@ use std::path::PathBuf;
 use std::process::Command;
 
 /// If set (any value), do not append paths from `perl -e 'print join ... @INC'`.
-pub const ENV_SKIP_PERL_INC: &str = "PERLRS_NO_PERL_INC";
+pub const ENV_SKIP_PERL_INC: &str = "FORGE_NO_PERL_INC";
 
-/// Return the cache file path: `~/.cache/perlrs/perl_inc.txt`.
+/// Return the cache file path: `~/.cache/forge/perl_inc.txt`.
 fn cache_path() -> Option<PathBuf> {
     dirs_next().map(|d| d.join("perl_inc.txt"))
 }
 
 fn dirs_next() -> Option<PathBuf> {
-    std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".cache").join("perlrs"))
+    std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".cache").join("forge"))
 }
 
-/// Run `perl` and read its `@INC`. Caches the result to `~/.cache/perlrs/perl_inc.txt`
+/// Run `perl` and read its `@INC`. Caches the result to `~/.cache/forge/perl_inc.txt`
 /// to avoid spawning a perl subprocess on every startup (~3ms saved).
 /// Returns an empty vector if `perl` is missing, fails, or [`ENV_SKIP_PERL_INC`] is set.
 pub fn paths_from_system_perl() -> Vec<String> {

@@ -1,8 +1,8 @@
-//! Algebraic `match (EXPR) { PATTERN => EXPR, ... }` (perlrs extension; tree interpreter).
+//! Algebraic `match (EXPR) { PATTERN => EXPR, ... }` (forge extension; tree interpreter).
 
-use perlrs::ast::{ExprKind, MatchPattern, StmtKind};
-use perlrs::parse;
-use perlrs::run;
+use forge::ast::{ExprKind, MatchPattern, StmtKind};
+use forge::parse;
+use forge::run;
 
 #[test]
 fn parse_algebraic_match_shape() {

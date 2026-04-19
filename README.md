@@ -1,16 +1,16 @@
 ```
- ██████╗ ███████╗██████╗ ██╗     ██████╗ ███████╗
- ██╔══██╗██╔════╝██╔══██╗██║     ██╔══██╗██╔════╝
- ██████╔╝█████╗  ██████╔╝██║     ██████╔╝███████╗
- ██╔═══╝ ██╔══╝  ██╔══██╗██║     ██╔══██╗╚════██║
- ██║     ███████╗██║  ██║███████╗██║  ██║███████║
- ╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚══════╝
+ ███████╗ ██████╗ ██████╗  ██████╗ ███████╗
+ ██╔════╝██╔═══██╗██╔══██╗██╔════╝ ██╔════╝
+ █████╗  ██║   ██║██████╔╝██║  ███╗█████╗
+ ██╔══╝  ██║   ██║██╔══██╗██║   ██║██╔══╝
+ ██║     ╚██████╔╝██║  ██║╚██████╔╝███████╗
+ ╚═╝      ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝
 ```
 
-[![CI](https://github.com/MenkeTechnologies/perlrs/actions/workflows/ci.yml/badge.svg)](https://github.com/MenkeTechnologies/perlrs/actions/workflows/ci.yml)
-[![Crates.io](https://img.shields.io/crates/v/perlrs.svg)](https://crates.io/crates/perlrs)
-[![Downloads](https://img.shields.io/crates/d/perlrs.svg)](https://crates.io/crates/perlrs)
-[![Docs.rs](https://docs.rs/perlrs/badge.svg)](https://docs.rs/perlrs)
+[![CI](https://github.com/MenkeTechnologies/forge/actions/workflows/ci.yml/badge.svg)](https://github.com/MenkeTechnologies/forge/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/forge.svg)](https://crates.io/crates/forge)
+[![Downloads](https://img.shields.io/crates/d/forge.svg)](https://crates.io/crates/forge)
+[![Docs.rs](https://docs.rs/forge/badge.svg)](https://docs.rs/forge)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ### `[PARALLEL PERL5 INTERPRETER // RUST-POWERED EXECUTION ENGINE]`
@@ -19,7 +19,7 @@
 
 A Perl 5 compatible interpreter in Rust with native parallel primitives, NaN-boxed values, three-tier regex, bytecode VM + Cranelift JIT, and rayon work-stealing across all cores.
 
-### [`Read the Docs`](https://menketechnologies.github.io/perlrs/)
+### [`Read the Docs`](https://menketechnologies.github.io/forge/)
 ---
 
 ## Table of Contents
@@ -37,7 +37,7 @@ A Perl 5 compatible interpreter in Rust with native parallel primitives, NaN-box
 - [\[0x0A\] Examples](#0x0a-examples)
 - [\[0x0B\] Benchmarks](#0x0b-benchmarks)
 - [\[0x0C\] Development & CI](#0x0c-development--ci)
-- [\[0x0D\] Standalone Binaries (`pe build`)](#0x0d-standalone-binaries-pe-build)
+- [\[0x0D\] Standalone Binaries (`fo build`)](#0x0d-standalone-binaries-fo-build)
 - [\[0x0E\] Inline Rust FFI (`rust { ... }`)](#0x0e-inline-rust-ffi-rust-----)
 - [\[0x0F\] Bytecode Cache (`.pec`)](#0x0f-bytecode-cache-pec)
 - [\[0x10\] Distributed `pmap_on` over SSH (`cluster`)](#0x10-distributed-pmap_on-over-ssh-cluster)
@@ -49,7 +49,7 @@ A Perl 5 compatible interpreter in Rust with native parallel primitives, NaN-box
 
 ## [0x00] OVERVIEW
 
-`perlrs` parses and executes Perl 5 scripts with rayon-powered work-stealing primitives across every CPU core. Highlights:
+`forge` parses and executes Perl 5 scripts with rayon-powered work-stealing primitives across every CPU core. Highlights:
 
 - **New Parallel Subroutines and |> Pipeline Syntactic Sugar**
 - **Runtime values** — `PerlValue` is a NaN-boxed `u64`: immediates (`undef`, `i32`, raw `f64` bits) and tagged `Arc<HeapObject>` pointers for big ints, strings, arrays, hashes, refs, regexes, atomics, channels.
@@ -64,44 +64,44 @@ A Perl 5 compatible interpreter in Rust with native parallel primitives, NaN-box
 ## [0x01] INSTALL
 
 ```sh
-cargo install perlrs
+cargo install forge
 # or from source
-git clone https://github.com/MenkeTechnologies/perlrs && cd perlrs && cargo build --release
+git clone https://github.com/MenkeTechnologies/forge && cd forge && cargo build --release
 ```
 
 #### Zsh tab completion
 
 ```sh
-cp completions/_perlrs /usr/local/share/zsh/site-functions/_perlrs
-# or: fpath=(/path/to/perlrs/completions $fpath) in .zshrc
+cp completions/_forge /usr/local/share/zsh/site-functions/_forge
+# or: fpath=(/path/to/forge/completions $fpath) in .zshrc
 autoload -Uz compinit && compinit
 ```
 
-`pe <TAB>` then completes flags, options, and script files.
+`fo <TAB>` then completes flags, options, and script files.
 
 ---
 
-## [0x01b] WHY PERLRS — ONE-LINER COMPARISON
+## [0x01b] WHY FORGE — ONE-LINER COMPARISON
 
-`pe` is a **one-liner-first** language. No `-e` flag needed, everything built in, shortest syntax wins.
+`fo` is a **one-liner-first** language. No `-e` flag needed, everything built in, shortest syntax wins.
 
 ### Character count — real tasks
 
-| Task | `pe` | `perl` | `ruby` | `python` | `awk` / other |
+| Task | `fo` | `perl` | `ruby` | `python` | `awk` / other |
 |---|---|---|---|---|---|
-| Print hello world | `pe 'p "hello world"'` **21c** | `perl -e 'print "hello world\n"'` 32c | `ruby -e 'puts "hello world"'` 29c | `python3 -c 'print("hello world")'` 34c | `echo \| awk '{print "hello world"}'` 36c |
-| Sum 1..100 | `pe 'p sum 1..100'` **19c** | `perl -MList::Util=sum -e 'print sum 1..100'` 45c | `ruby -e 'puts (1..100).sum'` 28c | `python3 -c 'print(sum(range(1,101)))'` 38c | — |
-| Word frequencies | `pe -an 'freq(@F) \|> dd'` **25c** | `perl -ane '$h{$_}++ for @F}{print "$_ $h{$_}\n" for keys %h'` 61c | — | — | `awk '{for(i=1;i<=NF;i++) a[$i]++} END{...}'` 65c+ |
-| SHA256 of file | `pe 'p s256"f"'` **14c** | `perl -MDigest::SHA=sha256_hex -e '...'` 70c+ | — | `python3 -c 'import hashlib;...'` 80c+ | `shasum -a 256 f` 15c |
-| Fetch JSON API | `pe 'fetch_json(URL) \|> dd'` **~50c** | needs `LWP` + `JSON` modules | needs `net/http` + `json` | needs `urllib` + `json` | `curl -s URL \| jq .` ~40c |
-| CSV → JSON | `pe 'csv_read("f") \|> tj \|> p'` **33c** | needs `Text::CSV` + `JSON` | needs `csv` + `json` | needs `csv` + `json` imports | — |
-| Parallel map | `pe '1..1e6 \|> pmap { $_ * 2 }'` **33c** | not built in | not built in | not built in | `xargs -P8` 50c+ |
-| Sparkline | `pe '(3,7,1,9) \|> spark \|> p'` **31c** | not built in | not built in | not built in | not built in |
-| In-place sed (parallel) | `pe -i -pe 's/foo/bar/g' *.txt` **31c** | `perl -i -pe 's/foo/bar/g' *.txt` 33c (sequential) | `ruby -i -pe '$_.gsub!(...)'` 35c+ | — | `sed -i '' 's/foo/bar/g' *.txt` 31c (sequential) |
+| Print hello world | `fo 'p "hello world"'` **21c** | `perl -e 'print "hello world\n"'` 32c | `ruby -e 'puts "hello world"'` 29c | `python3 -c 'print("hello world")'` 34c | `echo \| awk '{print "hello world"}'` 36c |
+| Sum 1..100 | `fo 'p sum 1..100'` **19c** | `perl -MList::Util=sum -e 'print sum 1..100'` 45c | `ruby -e 'puts (1..100).sum'` 28c | `python3 -c 'print(sum(range(1,101)))'` 38c | — |
+| Word frequencies | `fo -an 'freq(@F) \|> dd'` **25c** | `perl -ane '$h{$_}++ for @F}{print "$_ $h{$_}\n" for keys %h'` 61c | — | — | `awk '{for(i=1;i<=NF;i++) a[$i]++} END{...}'` 65c+ |
+| SHA256 of file | `fo 'p s256"f"'` **14c** | `perl -MDigest::SHA=sha256_hex -e '...'` 70c+ | — | `python3 -c 'import hashlib;...'` 80c+ | `shasum -a 256 f` 15c |
+| Fetch JSON API | `fo 'fetch_json(URL) \|> dd'` **~50c** | needs `LWP` + `JSON` modules | needs `net/http` + `json` | needs `urllib` + `json` | `curl -s URL \| jq .` ~40c |
+| CSV → JSON | `fo 'csv_read("f") \|> tj \|> p'` **33c** | needs `Text::CSV` + `JSON` | needs `csv` + `json` | needs `csv` + `json` imports | — |
+| Parallel map | `fo '1..1e6 \|> pmap { $_ * 2 }'` **33c** | not built in | not built in | not built in | `xargs -P8` 50c+ |
+| Sparkline | `fo '(3,7,1,9) \|> spark \|> p'` **31c** | not built in | not built in | not built in | not built in |
+| In-place sed (parallel) | `fo -i -pe 's/foo/bar/g' *.txt` **31c** | `perl -i -pe 's/foo/bar/g' *.txt` 33c (sequential) | `ruby -i -pe '$_.gsub!(...)'` 35c+ | — | `sed -i '' 's/foo/bar/g' *.txt` 31c (sequential) |
 
 ### Feature matrix
 
-| Feature | pe | perl5 | ruby | python | awk | jq | nushell |
+| Feature | fo | perl5 | ruby | python | awk | jq | nushell |
 |---|---|---|---|---|---|---|---|
 | No `-e` flag needed | **yes** | no | no | no (`-c`) | — | — | — |
 | No semicolons | **yes** | no | yes | yes | yes | yes | yes |
@@ -126,32 +126,32 @@ autoload -Uz compinit && compinit
 ## [0x02] USAGE
 
 ```sh
-pe 'p "Hello, world!"'                 # inline code — no -e needed
-pe 'p 1 + 2'                           # just quote and go
-pe script.pl arg1 arg2                  # script + args
-pe -lane 'p $F[0]'                     # bundled short switches
-pe -c script.pl                         # syntax check
-pe --lint script.pl                     # parse + compile (no run)
-pe --disasm script.pl                   # bytecode listing on stderr
-pe --ast script.pl                      # AST as JSON
-pe --fmt script.pl                      # pretty-print parsed source
-pe --profile script.pl                  # folded stacks + per-line/per-sub ns
-pe --flame script.pr                    # colored flamegraph bars in terminal
-pe --flame script.pr > flame.svg        # interactive SVG flamegraph when piped
-pe --explain E0001                      # expanded hint for an error code
-pe docs                                  # interactive reference book (vim-style: j/k/]/[/t/q)
-pe docs pmap                             # jump straight to a topic
-pe docs --toc                            # table of contents
-pe docs --search parallel                # search all pages
-pe serve                                # static file server for $PWD on port 8000
-pe serve 8080 app.pr                    # HTTP server with handler script
-pe serve 3000 -e '"hello " . $req->{path}'  # one-liner HTTP server
-pe build script.pl -o myapp             # bake into a standalone binary ([0x0D])
-pe --lsp                                # language server over stdio ([0x11])
-PERLRS_BC_CACHE=1 pe app.pl             # warm starts skip parse + compile ([0x0F])
+fo 'p "Hello, world!"'                 # inline code — no -e needed
+fo 'p 1 + 2'                           # just quote and go
+fo script.pl arg1 arg2                  # script + args
+fo -lane 'p $F[0]'                     # bundled short switches
+fo -c script.pl                         # syntax check
+fo --lint script.pl                     # parse + compile (no run)
+fo --disasm script.pl                   # bytecode listing on stderr
+fo --ast script.pl                      # AST as JSON
+fo --fmt script.pl                      # pretty-print parsed source
+fo --profile script.pl                  # folded stacks + per-line/per-sub ns
+fo --flame script.pr                    # colored flamegraph bars in terminal
+fo --flame script.pr > flame.svg        # interactive SVG flamegraph when piped
+fo --explain E0001                      # expanded hint for an error code
+fo docs                                  # interactive reference book (vim-style: j/k/]/[/t/q)
+fo docs pmap                             # jump straight to a topic
+fo docs --toc                            # table of contents
+fo docs --search parallel                # search all pages
+fo serve                                # static file server for $PWD on port 8000
+fo serve 8080 app.pr                    # HTTP server with handler script
+fo serve 3000 -e '"hello " . $req->{path}'  # one-liner HTTP server
+fo build script.pl -o myapp             # bake into a standalone binary ([0x0D])
+fo --lsp                                # language server over stdio ([0x11])
+FORGE_BC_CACHE=1 fo app.pl             # warm starts skip parse + compile ([0x0F])
 ```
 
-> **`-e` is optional.** If the first argument isn't a file on disk and looks like code, `pe` runs it directly. `pe 'p 42'` and `pe -e 'p 42'` are equivalent. Use `-e` when combining with `-n`/`-p`/`-l`/`-a` (e.g. `pe -lane 'p $F[0]'`).
+> **`-e` is optional.** If the first argument isn't a file on disk and looks like code, `fo` runs it directly. `fo 'p 42'` and `fo -e 'p 42'` are equivalent. Use `-e` when combining with `-n`/`-p`/`-l`/`-a` (e.g. `fo -lane 'p $F[0]'`).
 
 #### Semicolons
 
@@ -166,7 +166,7 @@ my $x = 1; my $y = 2; p $x + $y # 3 — same line needs `;` between statements
 
 #### Interactive REPL
 
-Run `pe` with no arguments to enter a readline session: line editing, history (`~/.perlrs_history`), tab completion for keywords, lexicals in scope, sub names, methods after `->` on blessed objects, and file paths. `exit`/`quit`/Ctrl-D leaves. Non-TTY stdin is read as a complete program.
+Run `fo` with no arguments to enter a readline session: line editing, history (`~/.forge_history`), tab completion for keywords, lexicals in scope, sub names, methods after `->` on blessed objects, and file paths. `exit`/`quit`/Ctrl-D leaves. Non-TTY stdin is read as a complete program.
 
 #### `__DATA__`
 
@@ -175,11 +175,11 @@ A line whose trimmed text is exactly `__DATA__` ends the program; the trailing b
 #### Stdin / `-n` / `-p` / `-i`
 
 ```sh
-echo data | pe -ne 'print uc $_'        # line loop
-cat f.txt | pe -pe 's/foo/bar/g'        # auto-print like sed
-pe -i -pe 's/foo/bar/g' file1 file2     # in-place edit (parallel across files)
-pe -i.bak -pe 's/x/y/g' *.txt           # with backup suffix
-echo a:b:c | pe -aF: -ne 'print $F[1]'  # auto-split
+echo data | fo -ne 'print uc $_'        # line loop
+cat f.txt | fo -pe 's/foo/bar/g'        # auto-print like sed
+fo -i -pe 's/foo/bar/g' file1 file2     # in-place edit (parallel across files)
+fo -i.bak -pe 's/x/y/g' *.txt           # with backup suffix
+echo a:b:c | fo -aF: -ne 'print $F[1]'  # auto-split
 ```
 
 `-l` chomps each record and sets `$\`. `eof` with no args is true on the last line of stdin or each `@ARGV` file (Perl-compat).
@@ -213,7 +213,7 @@ my $hist     = @words |> preduce_init {}, { my ($acc, $x) = @_; $acc->{$x}++; $a
 
 # fan — run a block or fn N times in parallel ($_/$_0 = index 0..N-1)
 fan 8, work  # bare-fn form: fan N, FUNC
-fan work, progress => 1  # uses rayon pool size (`pe -j`)
+fan work, progress => 1  # uses rayon pool size (`fo -j`)
 fan 8 { work($_) }  # block form
 fan { work($_) }  # block form, pool-sized
 my @r = fan_cap 8, compute  # capture results in index order
@@ -266,7 +266,7 @@ watch  "/tmp/x", p
 pwatch "logs/*", heavy
 
 # control thread count
-pe -j 8 -e '@data |> pmap heavy'
+fo -j 8 -e '@data |> pmap heavy'
 
 # distributed pmap over an SSH worker pool — see [0x10] for details
 my $cluster = cluster(["build1:8", "build2:16"])
@@ -275,7 +275,7 @@ my @r = @huge |> pmap_on $cluster heavy
 
 **Parallel capture safety** — workers set `Scope::parallel_guard` after restoring captured lexicals. Assignments to captured non-`mysync` aggregates are rejected at runtime; `mysync`, package-qualified names, and topics (`$_`/`$a`/`$b`) are allowed. `pmap`/`pgrep` treat block failures as `undef`/false; use `pfor` when failures must abort.
 
-**Outer topic `$_<`** — inside nested blocks (`fan`, `fan_cap`, `map`, `grep`, `>{}`), `$_` is rebound per iteration. Use `$_<` to access the **previous** topic, `$_<<` for two levels up, up to `$_<<<<` (4 levels). This is a perlrs extension — stock Perl 5 has no equivalent.
+**Outer topic `$_<`** — inside nested blocks (`fan`, `fan_cap`, `map`, `grep`, `>{}`), `$_` is rebound per iteration. Use `$_<` to access the **previous** topic, `$_<<` for two levels up, up to `$_<<<<` (4 levels). This is a forge extension — stock Perl 5 has no equivalent.
 
 ```perl
 ~> 10 >{fan `say "outer topic is $_< and inner topic is $_"`}
@@ -499,7 +499,7 @@ p $add->(3, 4)  # 7
 fn greet ($name: Str) { "Hello, $name!" }
 p greet("world")  # Hello, world!
 
-# stringify/str — convert any value to a parseable perlrs literal
+# stringify/str — convert any value to a parseable forge literal
 my $data = {a => [1, 2], b => "hello"}
 my $s = str $data  # +{a => [1, 2], b => "hello"}
 my $copy = eval $s  # round-trip via eval
@@ -569,7 +569,7 @@ my $next = $g->next  # [value, more]
 
 All stock `perl` flags are supported: `-0`, `-a`, `-c`, `-C`, `-d`, `-D`, `-e`, `-E`, `-f`, `-F`, `-g`, `-h`, `-i`, `-I`, `-l`, `-m`, `-M`, `-n`, `-p`, `-s`, `-S`, `-t`, `-T`, `-u`, `-U`, `-v`, `-V`, `-w`, `-W`, `-x`, `-X`. Perl-style single-dash (`-version`, `-help`) and GNU-style double-dash (`--version`, `--help`) long forms work. Bundled switches are expanded: `-Mstrict` → `-M strict`, `-I/tmp` → `-I /tmp`, `-V:version` → `-V version`, `-lane` → `-l -a -n -e`.
 
-perlrs-specific long flags:
+forge-specific long flags:
 
 | Flag | Description |
 | --- | --- |
@@ -578,19 +578,19 @@ perlrs-specific long flags:
 | `--ast` | Dump parsed AST as JSON and exit |
 | `--fmt` | Pretty-print parsed Perl to stdout and exit |
 | `--profile` | Wall-clock profile: per-line + per-sub timings on stderr |
-| `--flame` | Flamegraph: colored terminal bars when interactive, SVG when piped (`pe --flame x.pr > flame.svg`) |
+| `--flame` | Flamegraph: colored terminal bars when interactive, SVG when piped (`fo --flame x.pr > flame.svg`) |
 | `--no-jit` | Disable Cranelift JIT (bytecode interpreter only) |
-| `--compat` | Perl 5 strict-compatibility mode: disable all perlrs extensions (`\|>`, `struct`, `enum`, `match`, `pmap`, `#{expr}`, etc.) |
+| `--compat` | Perl 5 strict-compatibility mode: disable all forge extensions (`\|>`, `struct`, `enum`, `match`, `pmap`, `#{expr}`, etc.) |
 | `--explain CODE` | Print expanded hint for an error code (e.g. `E0001`) |
 | `--lsp` | Language server over stdio ([\[0x11\]](#0x11-language-server---lsp)) |
 | `-j N` / `--threads N` | Set number of parallel threads (rayon) |
 | `--remote-worker` | Persistent cluster worker over stdio ([\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster)) |
 | `--remote-worker-v1` | Legacy one-shot cluster worker over stdio |
-| `build SCRIPT [-o OUT]` | AOT compile script to standalone binary ([\[0x0D\]](#0x0d-standalone-binaries-pe-build)) |
-| `doc [TOPIC]` | Interactive reference book with vim-style navigation (`pe doc`, `pe doc pmap`, `pe doc --toc`) |
-| `serve [PORT] [SCRIPT]` | HTTP server (default port 8000): static files (`pe serve`), script (`pe serve 8080 app.pr`), one-liner (`pe serve 3000 -e 'EXPR'`) |
+| `build SCRIPT [-o OUT]` | AOT compile script to standalone binary ([\[0x0D\]](#0x0d-standalone-binaries-fo-build)) |
+| `doc [TOPIC]` | Interactive reference book with vim-style navigation (`fo doc`, `fo doc pmap`, `fo doc --toc`) |
+| `serve [PORT] [SCRIPT]` | HTTP server (default port 8000): static files (`fo serve`), script (`fo serve 8080 app.pr`), one-liner (`fo serve 3000 -e 'EXPR'`) |
 
-![pe -h](img/pe-help.png)
+![fo -h](img/fo-help.png)
 
 ---
 
@@ -603,7 +603,7 @@ Scalars `$x`, arrays `@a`, hashes `%h`, refs `\$x`/`\@a`/`\%h`/`\&sub`, anon `[.
 `if`/`elsif`/`else`/`unless`, `while`/`until`, `do { } while/until`, C-style `for`, `foreach`, `last`/`next`/`redo` with labels, postfix `if`/`unless`/`while`/`until`/`for`, ternary, `try { } catch ($err) { } finally { }`, `given`/`when`/`default`, algebraic `match (EXPR) { PATTERN [if EXPR] => EXPR, ... }` (regex, array, hash, wildcard, literal patterns; bindings scoped per arm), `eval_timeout SECS { ... }`.
 
 #### Operators
-Arithmetic, string `.`/`x`, comparison, `eq`/`ne`/`lt`/`gt`/`cmp`, logical `&&`/`||`/`//`/`!`/`and`/`or`/`not`, bitwise (`|`/`&` are set ops on native `Set`), assignment + compound (`+=`, `.=`, `//=`, …), regex `=~`/`!~`, range `..` / `...` (incl. flip-flop with `eof`), arrow `->`, **pipe-forward `|>`** (perlrs extension — threads the LHS as the **first** argument of the RHS call; see [Extensions beyond stock Perl 5](#extensions-beyond-stock-perl-5)).
+Arithmetic, string `.`/`x`, comparison, `eq`/`ne`/`lt`/`gt`/`cmp`, logical `&&`/`||`/`//`/`!`/`and`/`or`/`not`, bitwise (`|`/`&` are set ops on native `Set`), assignment + compound (`+=`, `.=`, `//=`, …), regex `=~`/`!~`, range `..` / `...` (incl. flip-flop with `eof`), arrow `->`, **pipe-forward `|>`** (forge extension — threads the LHS as the **first** argument of the RHS call; see [Extensions beyond stock Perl 5](#extensions-beyond-stock-perl-5)).
 
 #### Regex engine
 Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anchor (no `/m`) is rewritten to `(?:\n?\z)`. Match `=~`, dynamic `$str =~ $pat`, substitution `s///`, transliteration `tr///`, flags `g`/`i`/`m`/`s`/`x`/`e`/`r`, captures `$1`…`$n`, named groups → `%+`/`$+{name}`, `\Q...\E`, `quotemeta`, `m//`/`qr//`. The `/r` flag (non-destructive) returns the modified string instead of the match count — auto-injected when `s///` or `tr///` appear as pipe-forward RHS. Bare `/pat/` in statement/boolean context is `$_ =~ /pat/`.
@@ -658,7 +658,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **Typeglobs** — `*foo = \&bar`, `*lhs = *rhs` copies sub/scalar/array/hash/IO slots; package-qualified `*Pkg::name` supported.
 - **`%SIG` (Unix)** — `SIGINT`/`SIGTERM`/`SIGALRM`/`SIGCHLD` as code refs; handlers run between statements/opcodes via `perl_signal::poll`. `IGNORE` and `DEFAULT` honored.
 - **`format` / `write`** — partial: `format NAME = ... .` registers a template; pictures `@<<<<`, `@>>>>`, `@||||`, `@####`, `@****`, literal `@@`. `formline` populates `$^A`. `write` (no args) uses `$~` to stdout. Not yet: `write FILEHANDLE`, `$^`.
-- **`@INC` / `%INC` / `require` / `use`** — `@INC` is built from `-I`, `vendor/perl`, system `perl`'s `@INC` (set `PERLRS_NO_PERL_INC` to skip), the script dir, `PERLRS_INC`, then `.`. `List::Util` is implemented natively in Rust (`src/list_util.rs`). `use Module qw(a b);` honors `@EXPORT_OK`/`@EXPORT`. Built-in pragmas (`strict`, `warnings`, `utf8`, `feature`, `open`, `Env`) do not load files.
+- **`@INC` / `%INC` / `require` / `use`** — `@INC` is built from `-I`, `vendor/perl`, system `perl`'s `@INC` (set `FORGE_NO_PERL_INC` to skip), the script dir, `FORGE_INC`, then `.`. `List::Util` is implemented natively in Rust (`src/list_util.rs`). `use Module qw(a b);` honors `@EXPORT_OK`/`@EXPORT`. Built-in pragmas (`strict`, `warnings`, `utf8`, `feature`, `open`, `Env`) do not load files.
 - **`chunked` / `windowed` / `fold`** — Use **pipe-forward**: **`LIST |> chunked(N)`**, **`LIST |> windowed(N)`**, **`LIST |> fold { BLOCK }`** (same for **`reduce`**). `List::Util::fold` / **`qw(...) |> List::Util::fold { }`** alias **`List::Util::reduce`**. List context → arrayrefs per chunk/window or the folded value; scalar context → chunk/window count where applicable.
 
   ```perl
@@ -682,10 +682,10 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - Crypto, compression, time, TOML, YAML helpers (see [\[0x05\]](#0x05-native-data-scripting)).
 - All parallel primitives in [\[0x03\]](#0x03-parallel-primitives) (`pmap`, `fan`, `pipeline`, `par_pipeline_stream`, `pchannel`, `pselect`, `barrier`, `ppool`, `glob_par`, `par_walk`, `par_lines`, `par_sed`, `par_find_files`, `par_line_count`, `pwatch`, `watch`).
 - **Distributed compute** ([\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster)): `cluster([...])` builds an SSH worker pool; `pmap_on $cluster { } @list` and `pflat_map_on $cluster { } @list` fan a map across persistent remote workers with fault tolerance and per-job retries.
-- **Standalone binaries** ([\[0x0D\]](#0x0d-standalone-binaries-pe-build)): `pe build SCRIPT -o OUT` bakes a script into a self-contained executable.
+- **Standalone binaries** ([\[0x0D\]](#0x0d-standalone-binaries-fo-build)): `fo build SCRIPT -o OUT` bakes a script into a self-contained executable.
 - **Inline Rust FFI** ([\[0x0E\]](#0x0e-inline-rust-ffi-rust-----)): `rust { pub extern "C" fn ... }` blocks compile to a cdylib on first run, dlopen + register as Perl-callable subs.
-- **Bytecode cache** ([\[0x0F\]](#0x0f-bytecode-cache-pec)): `PERLRS_BC_CACHE=1` skips parse + compile on warm starts via on-disk `.pec` bundles.
-- **Language server** ([\[0x11\]](#0x11-language-server---lsp)): `pe --lsp` runs an LSP server over stdio with diagnostics, hover, completion.
+- **Bytecode cache** ([\[0x0F\]](#0x0f-bytecode-cache-pec)): `FORGE_BC_CACHE=1` skips parse + compile on warm starts via on-disk `.pec` bundles.
+- **Language server** ([\[0x11\]](#0x11-language-server---lsp)): `fo --lsp` runs an LSP server over stdio with diagnostics, hover, completion.
 - `mysync` shared state ([\[0x04\]](#0x04-shared-state-mysync)).
 - `frozen my` (or `const my` — same thing, more familiar spelling), `typed my`, `struct`, `enum`, `class` (full OOP with `extends`/`impl`), `trait`, algebraic `match`, `try/catch/finally`, `eval_timeout`, `retry`, `rate_limit`, `every`, `gen { ... yield }`.
 - **Functional composition** — `compose`, `partial`, `curry`, `memoize`, `once`, `constantly`, `complement`, `juxt`, `fnil`:
@@ -750,10 +750,10 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   "foo123bar456" |> /\d+/g |> p  # 123 456
 
   # full pipeline: read input, strip newlines, split, count word frequencies
-  # man ls | pe 'input |> s@\n@@g |> split |> frequencies |> ddump |> p'
+  # man ls | fo 'input |> s@\n@@g |> split |> frequencies |> ddump |> p'
 
   # extract all emails from text, deduplicate
-  # cat log.txt | pe 'input |> /[\w.]+@[\w.]+/g |> distinct |> e p'
+  # cat log.txt | fo 'input |> /[\w.]+@[\w.]+/g |> distinct |> e p'
 
   # capture groups with /g:
   "a=1 b=2" |> /(\w+)=(\w+)/g |> ddump |> p
@@ -765,7 +765,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   # ── input / output ─────────────────────────────────────────────────
   input                                # slurp all of stdin as one string
   input($fh)                           # slurp a filehandle
-  # cat data.txt | pe 'input |> lines |> e p'
+  # cat data.txt | fo 'input |> lines |> e p'
 
   # ── string → list ──────────────────────────────────────────────────
   "hello\nworld" |> lines |> ddump |> p  # ("hello", "world")
@@ -882,7 +882,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   p "#{rgb(255,100,0)}ORANGE#{off}"  # true color (24-bit)
   p "#{color256(196)}RED#{off}"  # 256-color palette
 
-  # ── stringify / str — parseable perlrs literals ──────────────────────
+  # ── stringify / str — parseable forge literals ──────────────────────
   $data |> str |> p  # +{a => 1, b => [2, 3]}
   my $fn = fn { $_ * 2 }
   $fn |> str |> p  # fn { $_ * 2; }
@@ -1061,7 +1061,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   **Language comparison — the same 10-stage pipeline:**
 
   ```perl
-  # perlrs: 1 line, reads left-to-right, no noise
+  # forge: 1 line, reads left-to-right, no noise
   ~> " hello world " trim uc rev lc ucfirst snake_case camel_case kebab_case to_json p
   ```
 
@@ -1122,12 +1122,12 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   print(json.dumps(s))
   ```
 
-  **perlrs: 1 line. Perl 5: 10+ lines + CPAN. JavaScript: 15+ lines. Python: 15+ lines.**
+  **forge: 1 line. Perl 5: 10+ lines + CPAN. JavaScript: 15+ lines. Python: 15+ lines.**
 
   **Lisp hell** — without `|>`, the same pipeline becomes unreadable:
 
   ```perl
-  # perlrs with |> : reads left-to-right
+  # forge with |> : reads left-to-right
   " hello world " |> trim |> uc |> rev |> lc |> ucfirst |> rev |> snake_case |> camel_case |> kebab_case |> rev |> uc |> lc |> trim |> to_json |> p
   # "d-lrow-olleh"
 
@@ -1308,7 +1308,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   reduce { |$acc, $val| $acc + $val }, 1..10         # 55
   ```
 
-`perlrs` is **not** a full `perl` replacement: many real `.pm` files (especially XS modules) will not run. See [`PARITY_ROADMAP.md`](parity/PARITY_ROADMAP.md).
+`forge` is **not** a full `perl` replacement: many real `.pm` files (especially XS modules) will not run. See [`PARITY_ROADMAP.md`](parity/PARITY_ROADMAP.md).
 
 ---
 
@@ -1337,7 +1337,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **Lexer** ([`src/lexer.rs`](src/lexer.rs)) — context-sensitive tokenizer for Perl's ambiguous syntax (regex vs division, hash vs modulo, heredocs, interpolation).
 - **Parser** ([`src/parser.rs`](src/parser.rs)) — recursive descent + Pratt precedence climbing.
 - **Compiler / VM** ([`src/compiler.rs`](src/compiler.rs), [`src/vm.rs`](src/vm.rs)) — match-dispatch interpreter; `try_vm_execute` runs bytecode first then falls back to tree-walker on `CompileError::Unsupported` or unsupported ops. Compiled subs use slot ops for frame-local `my` scalars (O(1)). Lowering covers `BEGIN`/`UNITCHECK`/`CHECK`/`INIT`/`END` with `Op::SetGlobalPhase`, `mysync`, `tie`, scalar compound assigns via `Scope::atomic_mutate`, regex values, named-sub coderefs, folds, `pcache`, `pselect`, `par_lines`, `par_walk`, `par_sed`, `pwatch`, `each`, four-arg `substr`, dynamic `keys`/`values`/`delete`/`exists`, etc.
-- **JIT** ([`src/jit.rs`](src/jit.rs)) — Cranelift two-tier JIT (linear-sub + block) with cached `OwnedTargetIsa`, tiered after `PERLRS_JIT_SUB_INVOKES` (default 50) interpreter invocations. Block JIT validates a CFG, joins typed `i64`/`f64` slots at merges, and compiles straight-line numeric hot loops. Disable with `--no-jit` / `PERLRS_NO_JIT=1`.
+- **JIT** ([`src/jit.rs`](src/jit.rs)) — Cranelift two-tier JIT (linear-sub + block) with cached `OwnedTargetIsa`, tiered after `FORGE_JIT_SUB_INVOKES` (default 50) interpreter invocations. Block JIT validates a CFG, joins typed `i64`/`f64` slots at merges, and compiles straight-line numeric hot loops. Disable with `--no-jit` / `FORGE_NO_JIT=1`.
 - **Feature work policy** — prefer **new VM opcodes** in [`bytecode.rs`](src/bytecode.rs), lowering in [`compiler.rs`](src/compiler.rs), implementation in [`vm.rs`](src/vm.rs). Do **not** add new `ExprKind`/`StmtKind` variants for new behavior.
 - **Tree-walker** ([`src/interpreter.rs`](src/interpreter.rs)) — fallback execution with `Arc<RwLock>` for thread-safe ref types; `fib_like_tail.rs` specializes simple integer-base-case recursive `f(n-1)+f(n-2)` patterns to avoid nested scope frames.
 - **Parallelism** — each parallel block spawns an isolated interpreter with captured scope; rayon does work-stealing.
@@ -1347,34 +1347,34 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 ## [0x0A] EXAMPLES
 
 ```sh
-pe examples/fibonacci.pl
-pe examples/text_processing.pl
-pe examples/parallel_demo.pl
-pe convert examples/fibonacci.pl > examples/fibonacci.pr
-pe examples/fibonacci.pr
+fo examples/fibonacci.pl
+fo examples/text_processing.pl
+fo examples/parallel_demo.pl
+fo convert examples/fibonacci.pl > examples/fibonacci.pr
+fo examples/fibonacci.pr
 ```
 
 ```sh
 # sets: dedupe + union / intersection (`scalar` gives member count, like `scalar @array`)
-pe 'my $a = set(1,2,2,3); my $b = set(2,3,4); p scalar($a | $b), " ", scalar($a & $b)'
+fo 'my $a = set(1,2,2,3); my $b = set(2,3,4); p scalar($a | $b), " ", scalar($a & $b)'
 ```
 
 ---
 
 ## [0x0B] BENCHMARKS
 
-`bash bench/run_bench.sh` — perlrs vs perl 5.42.2 on Apple M5 18-core. Mean of 10 hyperfine runs with 3 warmups; **includes process startup** (not steady-state).
+`bash bench/run_bench.sh` — forge vs perl 5.42.2 on Apple M5 18-core. Mean of 10 hyperfine runs with 3 warmups; **includes process startup** (not steady-state).
 
 ```
- perlrs benchmark harness (honest mode)
+ forge benchmark harness (honest mode)
  ---------------------------------------
   perl5:   perl 5, version 42, subversion 2 (v5.42.2) built for darwin-thread-multi-2level
-  perlrs:  This is perlrs v0.1.41 — A highly parallel Perl 5 interpreter (Rust)
+  forge:  This is forge v0.1.41 — A highly parallel Perl 5 interpreter (Rust)
   cores:   18
   warmup:  3 runs
   measure: hyperfine (min 10 runs)
 
-  bench          perl5 ms   perlrs ms    noJit ms  perturb ms  rs/perl5  jit/noJit
+  bench          perl5 ms   forge ms    noJit ms  perturb ms  rs/perl5  jit/noJit
   ---------      --------   ---------    --------   ---------  --------  ---------
   startup             2.7         3.7         4.0         3.5     1.37x     1.08x
   fib               192.0         8.3         8.5         8.3     0.04x     1.02x
@@ -1385,18 +1385,18 @@ pe 'my $a = set(1,2,2,3); my $b = set(2,3,4); p scalar($a | $b), " ", scalar($a 
   regex              91.8        13.3        13.0        13.1     0.14x     0.98x
   map_grep           51.9        15.3        15.3        15.8     0.29x     1.00x
 
-  pmap vs map (perlrs only, 50k items with per-item work)
+  pmap vs map (forge only, 50k items with per-item work)
   bench            map ms     pmap ms     speedup
   ---------      --------    --------    --------
   pmap              272.7       684.8       0.40x
 
 ```
 
-**perlrs beats perl5 on 7 of 8 benches** — `fib` and `loop` ~26x, `string` 2.6x, `array` 2.4x, `map_grep` 3.5x. Losses: `hash` 1.46x (Perl 5 hash access is heavily tuned), `regex` 1.08x (effectively a tie), `startup` 1.36x (~900 µs Rust binary load).
+**forge beats perl5 on 7 of 8 benches** — `fib` and `loop` ~26x, `string` 2.6x, `array` 2.4x, `map_grep` 3.5x. Losses: `hash` 1.46x (Perl 5 hash access is heavily tuned), `regex` 1.08x (effectively a tie), `startup` 1.36x (~900 µs Rust binary load).
 
 **JIT impact is essentially zero on this suite** (`jit/noJit` within ±6%). The wins over Perl 5 come from the **bytecode interpreter**, not the JIT — the current Cranelift block JIT only covers a narrow band of frame-slot numeric hot loops.
 
-The `noJit` column is `perlrs --no-jit`. The `perturb` column re-runs each bench through a renamed but functionally-equivalent file so any future shape-matcher that short-circuits the canonical bench files would show a divergence.
+The `noJit` column is `forge --no-jit`. The `perturb` column re-runs each bench through a renamed but functionally-equivalent file so any future shape-matcher that short-circuits the canonical bench files would show a divergence.
 
 #### Parallel speedup
 
@@ -1417,40 +1417,40 @@ Pull requests and pushes to `main` run [`.github/workflows/ci.yml`](.github/work
 cargo test --lib                # parser smoke, lexer/value/error/scope, interpreter, vm, jit
 cargo test --test integration   # tests/suite/* (runtime, readline list context, line-mode stdin, …)
 cargo bench --bench jit_compare # JIT vs interpreter on the same bytecode
-bash bench/run_bench.sh         # full perl5 vs perlrs suite (needs hyperfine)
+bash bench/run_bench.sh         # full perl5 vs forge suite (needs hyperfine)
 bash parity/run_parity.sh       # exact stdout/stderr parity vs system perl (20 000+ cases)
 ```
 
 - `Cargo.lock` is committed (CI uses `--locked`). If your global gitignore strips it, force-add updates: `git add -f Cargo.lock`.
-- Disable JIT: `PERLRS_NO_JIT=1` or `pe --no-jit`.
+- Disable JIT: `FORGE_NO_JIT=1` or `fo --no-jit`.
 - Parity work is tracked in [`PARITY_ROADMAP.md`](parity/PARITY_ROADMAP.md).
 
 ---
 
-## [0x0D] STANDALONE BINARIES (`pe build`)
+## [0x0D] STANDALONE BINARIES (`fo build`)
 
-Compile any Perl script to a single self-contained native executable. The output is a copy of the `pe` binary with the script source embedded as a zstd-compressed trailer. `scp` it to any compatible machine and run it — **no `perl`, no `perlrs`, no `@INC`, no CPAN**.
+Compile any Perl script to a single self-contained native executable. The output is a copy of the `fo` binary with the script source embedded as a zstd-compressed trailer. `scp` it to any compatible machine and run it — **no `perl`, no `forge`, no `@INC`, no CPAN**.
 
 ```sh
-pe build app.pl                         # → ./app
-pe build app.pl -o /usr/local/bin/app   # explicit output path
+fo build app.pl                         # → ./app
+fo build app.pl -o /usr/local/bin/app   # explicit output path
 ./app --any --script --args             # all argv reach the embedded script's @ARGV
 ```
 
 **What's in the box:**
 
 - Parse / compile errors are surfaced **at build time**, not when users run the binary.
-- The embedded script is detected at startup by a 32-byte trailer sniff (~50 µs), then decompressed and executed by the embedded VM. A script with no trailer runs normally as `pe`.
-- Builds are idempotent: `pe build app.pl -o app` followed by `pe --exe app build other.pl -o other` strips the previous trailer first, so binaries never stack.
+- The embedded script is detected at startup by a 32-byte trailer sniff (~50 µs), then decompressed and executed by the embedded VM. A script with no trailer runs normally as `fo`.
+- Builds are idempotent: `fo build app.pl -o app` followed by `fo --exe app build other.pl -o other` strips the previous trailer first, so binaries never stack.
 - Unix: the output is marked `+x` automatically. macOS: unsigned — `codesign` before distribution if your environment requires it.
 - Current AOT runtime sets `@INC = (".")`; modules outside the embedded script have to be inlined. (`require` of a local `.pm` next to the running binary still works.)
 
-**Under the hood** ([`src/aot.rs`](src/aot.rs)): trailer layout is `[zstd payload][u64 compressed_len][u64 uncompressed_len][u32 version][u32 reserved][8B magic b"PERLRSBN"]`. ELF / Mach-O loaders ignore bytes past the mapped segments so the embedded payload is invisible to the OS loader. The `b"PERLRSBN"` magic plus version byte lets a future pre-compiled-bytecode payload ship alongside v1 without breaking already-shipped binaries.
+**Under the hood** ([`src/aot.rs`](src/aot.rs)): trailer layout is `[zstd payload][u64 compressed_len][u64 uncompressed_len][u32 version][u32 reserved][8B magic b"FORGEAOT"]`. ELF / Mach-O loaders ignore bytes past the mapped segments so the embedded payload is invisible to the OS loader. The `b"FORGEAOT"` magic plus version byte lets a future pre-compiled-bytecode payload ship alongside v1 without breaking already-shipped binaries.
 
 ```sh
 # 13 MB binary, no external runtime required:
-$ pe build hello.pl -o hello
-pe build: wrote hello
+$ fo build hello.pl -o hello
+fo build: wrote hello
 $ file hello
 hello: Mach-O 64-bit executable arm64
 $ ./hello alice
@@ -1461,7 +1461,7 @@ hi alice
 
 ## [0x0E] INLINE RUST FFI (`rust { ... }`)
 
-Drop a block of Rust directly into a Perl script. On first run, perlrs compiles it to a cdylib (cached at `~/.cache/perlrs/ffi/<hash>.{dylib,so}`), `dlopen`s it, and registers every exported function as a regular Perl-callable sub.
+Drop a block of Rust directly into a Perl script. On first run, forge compiles it to a cdylib (cached at `~/.cache/forge/ffi/<hash>.{dylib,so}`), `dlopen`s it, and registers every exported function as a regular Perl-callable sub.
 
 ```perl
 rust {
@@ -1490,9 +1490,9 @@ p fib 50             # 12586269025
 
 **Requirements**: `rustc` must be on `PATH`. First-run compile costs ~1 second; subsequent runs hit the cache and pay only `dlopen` (~10 ms). `#[no_mangle]` is auto-inserted by the wrapper — you don't need to write it. The body is `#![crate_type = "cdylib"]` with `use std::os::raw::c_char; use std::ffi::{CStr, CString};` already in scope.
 
-**How it works** ([`src/rust_sugar.rs`](src/rust_sugar.rs), [`src/rust_ffi.rs`](src/rust_ffi.rs)): the source-level pre-pass desugars every top-level `rust { ... }` into a `BEGIN { __perlrs_rust_compile("<base64 body>", $line); }` call. The `__perlrs_rust_compile` builtin hashes the body, compiles via `rustc --edition=2021 -O` if the cache is cold, `libc::dlopen`s the result, `dlsym`s each detected signature, and stores the raw symbol + arity/type tag in a process-global registry. Calls from Perl flow through a fallback arm in [`crate::builtins::try_builtin`] that dispatches on the signature tag via direct function-pointer transmute — no libffi dep, no per-call alloc, no marshalling overhead beyond the `PerlValue::to_int` / `to_number` / `to_string` calls you'd do for any builtin.
+**How it works** ([`src/rust_sugar.rs`](src/rust_sugar.rs), [`src/rust_ffi.rs`](src/rust_ffi.rs)): the source-level pre-pass desugars every top-level `rust { ... }` into a `BEGIN { __forge_rust_compile("<base64 body>", $line); }` call. The `__forge_rust_compile` builtin hashes the body, compiles via `rustc --edition=2021 -O` if the cache is cold, `libc::dlopen`s the result, `dlsym`s each detected signature, and stores the raw symbol + arity/type tag in a process-global registry. Calls from Perl flow through a fallback arm in [`crate::builtins::try_builtin`] that dispatches on the signature tag via direct function-pointer transmute — no libffi dep, no per-call alloc, no marshalling overhead beyond the `PerlValue::to_int` / `to_number` / `to_string` calls you'd do for any builtin.
 
-**Combine with AOT for zero-friction deployment:** `pe build script.pl -o prog` bakes the Perl source — which includes the `rust { ... }` block — into a standalone binary. The FFI compile still happens on first run of `./prog`, but the user only needs `rustc` once, then the `~/.cache/perlrs/ffi/` entry is permanent.
+**Combine with AOT for zero-friction deployment:** `fo build script.pl -o prog` bakes the Perl source — which includes the `rust { ... }` block — into a standalone binary. The FFI compile still happens on first run of `./prog`, but the user only needs `rustc` once, then the `~/.cache/forge/ffi/` entry is permanent.
 
 **Limitations (v1):**
 
@@ -1505,14 +1505,14 @@ p fib 50             # 12586269025
 
 ## [0x0F] BYTECODE CACHE (`.pec`)
 
-`PERLRS_BC_CACHE=1` enables the on-disk bytecode cache. The first run of a script parses + compiles + persists a `.pec` bundle to `~/.cache/perlrs/bc/<sha256>.pec`. Every subsequent run skips **both parse and compile** and feeds the cached chunk straight into the VM.
+`FORGE_BC_CACHE=1` enables the on-disk bytecode cache. The first run of a script parses + compiles + persists a `.pec` bundle to `~/.cache/forge/bc/<sha256>.pec`. Every subsequent run skips **both parse and compile** and feeds the cached chunk straight into the VM.
 
 ```sh
-PERLRS_BC_CACHE=1 pe my_app.pl              # cold: parse + compile + save
-PERLRS_BC_CACHE=1 pe my_app.pl              # warm: load + dispatch
+FORGE_BC_CACHE=1 fo my_app.pl              # cold: parse + compile + save
+FORGE_BC_CACHE=1 fo my_app.pl              # warm: load + dispatch
 ```
 
-**Measured impact** (Apple M5, 13 MB release `pe`, hyperfine `--warmup 5 -N`, mean ± σ):
+**Measured impact** (Apple M5, 13 MB release `fo`, hyperfine `--warmup 5 -N`, mean ± σ):
 
 | script              | cold (no cache) | warm (.pec)    | speedup       | `.pec` size |
 |---------------------|-----------------|----------------|---------------|-------------|
@@ -1524,35 +1524,35 @@ The toy-script result is the honest one to call out: for tiny scripts the cache 
 
 **Tuning knobs:**
 
-- `PERLRS_BC_CACHE=1` — opt-in. (V1 is opt-in to avoid surprising users with stray cache files; flip to opt-out once we have a `pe cache prune` subcommand and confidence in invalidation.)
-- `PERLRS_BC_DIR=/path/to/dir` — override the cache location. Useful for test isolation and CI.
+- `FORGE_BC_CACHE=1` — opt-in. (V1 is opt-in to avoid surprising users with stray cache files; flip to opt-out once we have a `fo cache prune` subcommand and confidence in invalidation.)
+- `FORGE_BC_DIR=/path/to/dir` — override the cache location. Useful for test isolation and CI.
 
 **Format** ([`src/pec.rs`](src/pec.rs)): `[4B magic b"PEC2"][zstd-compressed bincode of PecBundle]`. The `PecBundle` carries `format_version`, `pointer_width` (so a cache built on a 64-bit host is rejected on 32-bit), `strict_vars` (a mismatch is treated as a clean miss → re-compile), `source_fingerprint`, the parsed `Program`, and the compiled `Chunk`. Format version 2 introduced zstd compression — files dropped ~10× in size and warm-load latency dropped with them.
 
-**Cache key** ([`pec::source_fingerprint`](src/pec.rs)): SHA-256 of `(crate version, source filename, full source including -M prelude)`. Editing the script, upgrading perlrs, or changing the `-M` flags all force a recompile. The crate version is mixed in so a `cargo install perlrs` upgrade silently invalidates everyone's cache rather than risking a stale-bytecode mismatch.
+**Cache key** ([`pec::source_fingerprint`](src/pec.rs)): SHA-256 of `(crate version, source filename, full source including -M prelude)`. Editing the script, upgrading forge, or changing the `-M` flags all force a recompile. The crate version is mixed in so a `cargo install forge` upgrade silently invalidates everyone's cache rather than risking a stale-bytecode mismatch.
 
-**Pairs with [`pe build`](#0x0d-standalone-binaries-pe-build):** AOT binaries pick up the cache for free. The first run of a shipped binary parses and compiles the embedded source; every subsequent run on the same machine reuses the cached chunk. The cache key includes the script name baked into the trailer, so two binaries with different embedded scripts never collide.
+**Pairs with [`fo build`](#0x0d-standalone-binaries-fo-build):** AOT binaries pick up the cache for free. The first run of a shipped binary parses and compiles the embedded source; every subsequent run on the same machine reuses the cached chunk. The cache key includes the script name baked into the trailer, so two binaries with different embedded scripts never collide.
 
 **Limitations (v1):**
 
 - **Bypassed for `-e` / `-E` one-liners.** Measured: warm `.pec` is ~2-3× *slower* than cold for tiny scripts because the deserialize cost (~1-2 ms for fs read + zstd decode + bincode) dominates the parse+compile work it replaces (~500 µs). Each unique `-e` invocation would also pollute the cache directory with no GC. The break-even is around 1000 lines, so file-based scripts only.
 - Bypassed for `-n` / `-p` / `--lint` / `--check` / `--ast` / `--fmt` / `--profile` modes (those paths run a different driver loop).
-- No automatic eviction yet — old `.pec` files for edited scripts accumulate. `rm ~/.cache/perlrs/bc/*.pec` is a fine workaround until `pe cache prune` lands.
+- No automatic eviction yet — old `.pec` files for edited scripts accumulate. `rm ~/.cache/forge/bc/*.pec` is a fine workaround until `fo cache prune` lands.
 - Cache hit path cannot fall back to the tree walker mid-run — but this is unreachable in practice because `compile_program` only emits ops the VM implements before persisting.
 
 ---
 
 ## [0x10] DISTRIBUTED `pmap_on` OVER SSH (`cluster`)
 
-Distribute a `pmap`-style fan-out across many machines via SSH. The dispatcher spawns one persistent `pe --remote-worker` process per slot, performs a HELLO + SESSION_INIT handshake **once** per slot, then streams JOB frames over the same stdin/stdout. Pairs perfectly with `pe build`: ship one binary to N hosts, fan the workload across them.
+Distribute a `pmap`-style fan-out across many machines via SSH. The dispatcher spawns one persistent `fo --remote-worker` process per slot, performs a HELLO + SESSION_INIT handshake **once** per slot, then streams JOB frames over the same stdin/stdout. Pairs perfectly with `fo build`: ship one binary to N hosts, fan the workload across them.
 
 ```perl
 # Build the worker pool. Each spec maps to one or more `ssh HOST PE --remote-worker` lanes.
 my $cluster = cluster([
-    "build1:8",                          # 8 slots on build1, default `pe` from PATH
+    "build1:8",                          # 8 slots on build1, default `fo` from PATH
     "alice@build2:16",                   # 16 slots, ssh as alice
-    "build3:4:/usr/local/bin/pe",        # 4 slots, custom remote pe path
-    { host => "data1", slots => 12, pe => "/opt/pe" },  # hashref form
+    "build3:4:/usr/local/bin/fo",        # 4 slots, custom remote fo path
+    { host => "data1", slots => 12, fo => "/opt/fo" },  # hashref form
     { timeout => 30, retries => 2, connect_timeout => 5 },  # trailing tunables
 ])
 
@@ -1568,11 +1568,11 @@ Each list element to `cluster([...])` is one of:
 
 | Form | Meaning |
 |------|---------|
-| `"host"` | One slot on `host`, remote `pe` from `$PATH` |
+| `"host"` | One slot on `host`, remote `fo` from `$PATH` |
 | `"host:N"` | `N` slots on `host` |
-| `"host:N:/path/to/pe"` | `N` slots, custom remote `pe` binary |
+| `"host:N:/path/to/fo"` | `N` slots, custom remote `fo` binary |
 | `"user@host:N"` | `ssh` user override (kept verbatim, passed through to ssh) |
-| `{ host => "...", slots => N, pe => "..." }` | Hashref form with explicit fields |
+| `{ host => "...", slots => N, fo => "..." }` | Hashref form with explicit fields |
 | trailing `{ timeout => SECS, retries => N, connect_timeout => SECS }` | Cluster-wide tunables (must be the last argument; consumed only when **all** keys are tunable names) |
 
 **Tunables** (defaults shown):
@@ -1613,7 +1613,7 @@ Every message is `[u64 LE length][u8 kind][bincode payload]`. The single-byte `k
 dispatcher                    worker
     │                            │
     │── HELLO ─────────────────►│   (proto version, build id)
-    │◄───────────── HELLO_ACK ──│   (worker pe version, hostname)
+    │◄───────────── HELLO_ACK ──│   (worker fo version, hostname)
     │── SESSION_INIT ──────────►│   (subs prelude, block source, captured lexicals)
     │◄────────── SESSION_ACK ───│   (or ERROR)
     │── JOB(seq=0) ────────────►│   (item)
@@ -1631,13 +1631,13 @@ The basic v1 protocol shipped the entire subs prelude on **every** job and spawn
 
 When a slot's read or write fails (ssh died, network blip, remote crash, per-job timeout), the worker thread re-enqueues the in-flight job to the shared queue with `attempts++` and exits. Other living slots pick the job up. A job is permanently failed when its attempt count reaches `cluster.max_attempts`. The whole map fails only when **every** slot is dead or every queued job has exhausted its retry budget.
 
-#### `pe --remote-worker`
+#### `fo --remote-worker`
 
-The worker subprocess. Reads a HELLO frame from stdin, parses subs prelude + block source from SESSION_INIT exactly once, then handles JOB frames in a loop until SHUTDOWN or stdin EOF. Started by the dispatcher via `ssh HOST PE_PATH --remote-worker`. Also reachable directly for local testing:
+The worker subprocess. Reads a HELLO frame from stdin, parses subs prelude + block source from SESSION_INIT exactly once, then handles JOB frames in a loop until SHUTDOWN or stdin EOF. Started by the dispatcher via `ssh HOST FO_PATH --remote-worker`. Also reachable directly for local testing:
 
 ```sh
-echo "..." | pe --remote-worker      # reads framed wire protocol from stdin
-pe --remote-worker-v1                # legacy one-shot session for compat tests
+echo "..." | fo --remote-worker      # reads framed wire protocol from stdin
+fo --remote-worker-v1                # legacy one-shot session for compat tests
 ```
 
 #### Limitations (v1)
@@ -1652,20 +1652,20 @@ pe --remote-worker-v1                # legacy one-shot session for compat tests
 
 ## [0x11] LANGUAGE SERVER (`--lsp`)
 
-`pe --lsp` runs an LSP server over stdio. Hooks into the existing parser, lexer, and symbol table — no separate analyzer to maintain. Surfaces:
+`fo --lsp` runs an LSP server over stdio. Hooks into the existing parser, lexer, and symbol table — no separate analyzer to maintain. Surfaces:
 
 - **Diagnostics** on save (parse + compile errors with line / column / message)
 - **Hover docs** for builtins (`pmap`, `cluster`, `fetch_json`, `dataframe`, …) — including the parallel and cluster primitives from sections [\[0x03\]](#0x03-parallel-primitives) and [\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster)
 - **Symbol lookup** for subs and packages within the open file
 - **Completion** for built-in function names and the keywords listed in [\[0x08\]](#0x08-supported-perl-features)
 
-Wire it into VS Code, JetBrains, or any LSP-aware editor by pointing the client at `pe --lsp` as the language-server command. There is no `Cargo.toml`-style separate `perlrs-lsp` binary in v1 — the same `pe` you run scripts with also acts as its own language server when invoked with `--lsp`.
+Wire it into VS Code, JetBrains, or any LSP-aware editor by pointing the client at `fo --lsp` as the language-server command. There is no `Cargo.toml`-style separate `forge-lsp` binary in v1 — the same `fo` you run scripts with also acts as its own language server when invoked with `--lsp`.
 
 ```jsonc
 // .vscode/settings.json
 {
-  "perlrs.serverPath": "/usr/local/bin/pe",
-  "perlrs.serverArgs": ["--lsp"]
+  "forge.serverPath": "/usr/local/bin/fo",
+  "forge.serverArgs": ["--lsp"]
 }
 ```
 
@@ -1673,12 +1673,12 @@ Wire it into VS Code, JetBrains, or any LSP-aware editor by pointing the client 
 
 ## [0x12] LANGUAGE REFLECTION
 
-perlrs exposes its own parser and dispatcher state as plain Perl hashes, so
+forge exposes its own parser and dispatcher state as plain Perl hashes, so
 you can enumerate, look up, filter, and pipe over everything the interpreter
 knows about — no separate API surface to learn, just standard hash ops.
 
 The data is derived at compile time by `build.rs` from the source of truth:
-section-commented groups in `is_perl5_core` / `perlrs_extension_name` (for
+section-commented groups in `is_perl5_core` / `forge_extension_name` (for
 categories), `try_builtin` arm names (for aliases), and `doc_for_label_text`
 in `src/lsp.rs` (for descriptions). No hand-maintained list, no stale counts.
 
@@ -1688,58 +1688,58 @@ Eight hashes; every direct lookup (`$h{name}`) is **O(1)**. Forward maps:
 
 | Long name | Short | Key → Value |
 | --- | --- | --- |
-| `%perlrs::builtins` | `%b` | **primary** callable name → category (`"parallel"`, `"string"`, …). Primaries-only — clean unique-op count. |
-| `%perlrs::all` | `%all` | **every spelling** (primary + alias) → category. Aliases inherit their primary's tag. Use this for `scalar keys %all`. |
-| `%perlrs::perl_compats` | `%pc` | subset of `%b`: Perl 5 core only, name → category |
-| `%perlrs::extensions` | `%e` | subset of `%b`: perlrs-only, name → category |
-| `%perlrs::aliases` | `%a` | alias → canonical primary (`$a{tj}` → `"to_json"`) |
-| `%perlrs::descriptions` | `%d` | name → one-line LSP summary (**sparse**) |
+| `%forge::builtins` | `%b` | **primary** callable name → category (`"parallel"`, `"string"`, …). Primaries-only — clean unique-op count. |
+| `%forge::all` | `%all` | **every spelling** (primary + alias) → category. Aliases inherit their primary's tag. Use this for `scalar keys %all`. |
+| `%forge::perl_compats` | `%pc` | subset of `%b`: Perl 5 core only, name → category |
+| `%forge::extensions` | `%e` | subset of `%b`: forge-only, name → category |
+| `%forge::aliases` | `%a` | alias → canonical primary (`$a{tj}` → `"to_json"`) |
+| `%forge::descriptions` | `%d` | name → one-line LSP summary (**sparse**) |
 
 Inverted indexes for constant-time reverse queries:
 
 | Long name | Short | Key → Value |
 | --- | --- | --- |
-| `%perlrs::categories` | `%c` | category → arrayref of names (`$c{parallel}` → `[pmap, pgrep, …]`) |
-| `%perlrs::primaries` | `%p` | primary → arrayref of its aliases (`$p{to_json}` → `[tj]`) |
+| `%forge::categories` | `%c` | category → arrayref of names (`$c{parallel}` → `[pmap, pgrep, …]`) |
+| `%forge::primaries` | `%p` | primary → arrayref of its aliases (`$p{to_json}` → `[tj]`) |
 
 #### Examples
 
 ```sh
 # O(1) direct lookups
-pe 'p $b{pmap}'              # "parallel"
-pe 'p $b{to_json}'           # "serialization"
-pe 'p $pc{map}'              # "array / list"
-pe 'p $e{pmap}'              # "parallel"
-pe 'p $a{tj}'                # "to_json"
-pe 'p $d{pmap}'              # LSP one-liner
-pe 'p $all{tj}'              # "serialization"  (alias resolved via %all)
-pe 'p scalar @{$c{parallel}}'  # number of parallel ops
-pe '$p{to_json} |> e p'        # every alias of to_json
+fo 'p $b{pmap}'              # "parallel"
+fo 'p $b{to_json}'           # "serialization"
+fo 'p $pc{map}'              # "array / list"
+fo 'p $e{pmap}'              # "parallel"
+fo 'p $a{tj}'                # "to_json"
+fo 'p $d{pmap}'              # LSP one-liner
+fo 'p $all{tj}'              # "serialization"  (alias resolved via %all)
+fo 'p scalar @{$c{parallel}}'  # number of parallel ops
+fo '$p{to_json} |> e p'        # every alias of to_json
 
 # total callable spellings (primaries + aliases), one direct count
-pe 'p scalar keys %all'
+fo 'p scalar keys %all'
 
 # see just Perl compats
-pe 'keys %pc |> sort |> p'
+fo 'keys %pc |> sort |> p'
 
-# see just perlrs extensions
-pe 'keys %e |> sort |> p'
+# see just forge extensions
+fo 'keys %e |> sort |> p'
 
 # enumerate a whole category in O(1)
-pe '$c{parallel} |> e p'
-pe '$c{"array / list"} |> e p'
+fo '$c{parallel} |> e p'
+fo '$c{"array / list"} |> e p'
 
 # browse any of them interactively via the pager
-pe 'keys %all |> less'
+fo 'keys %all |> less'
 
 # frequency table: how many ops per category?
-pe 'my %f; $f{$b{$_}}++ for keys %b; dd \%f'
+fo 'my %f; $f{$b{$_}}++ for keys %b; dd \%f'
 
 # find every documented op mentioning "parallel"
-pe 'keys %d |> grep { $d{$_} =~ /parallel/i } |> sort |> p'
+fo 'keys %d |> grep { $d{$_} =~ /parallel/i } |> sort |> p'
 
 # catalog the full reflection surface
-pe 'for my $h (qw(b all pc e a d c p)) {
+fo 'for my $h (qw(b all pc e a d c p)) {
          printf "%%%-4s %d\n", $h, scalar keys %$h
        }'
 ```
@@ -1752,7 +1752,7 @@ pe 'for my $h (qw(b all pc e a d c p)) {
   queries.
 - Hash sigil namespace is separate from scalars and subs, so `%a`/`%b`/`%c`/`%d`/`%e`/`%p`/`%pc`
   don't collide with `$a`/`$b` sort specials or the `e` extension sub.
-- Short aliases are value copies of the long `%perlrs::*` names — currently
+- Short aliases are value copies of the long `%forge::*` names — currently
   read-only in practice, so the copy never diverges.
 - `%descriptions` is sparse: `exists $d{$name}` doubles as "is this
   documented in the LSP?". Undocumented ops still appear in `%builtins`

@@ -1,4 +1,4 @@
-# Test module for @INC / require / use (perlrs)
+# Test module for @INC / require / use (forge)
 package Trivial;
 our @EXPORT = qw(trivial_answer);
 our @EXPORT_OK = qw(trivial_answer);

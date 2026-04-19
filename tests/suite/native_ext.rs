@@ -1,7 +1,7 @@
 //! Native `csv_*`, `sqlite`, `struct`, and `typed my`.
 
 use crate::common::*;
-use perlrs::error::ErrorKind;
+use forge::error::ErrorKind;
 use std::fs;
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -9,7 +9,7 @@ use std::process::{Command, Stdio};
 #[test]
 fn csv_write_read_roundtrip_hash() {
     let dir = std::env::temp_dir();
-    let path = dir.join(format!("perlrs_tcsv_{}.csv", std::process::id()));
+    let path = dir.join(format!("forge_tcsv_{}.csv", std::process::id()));
     let ps = path.to_string_lossy().replace('\\', "/");
     let code = format!(
         r#"csv_write("{ps}", {{ name => "a", n => "1" }}); my @r = csv_read("{ps}"); $r[0]->{{name}}"#
@@ -22,7 +22,7 @@ fn csv_write_read_roundtrip_hash() {
 #[test]
 fn dataframe_sum_and_filter() {
     let dir = std::env::temp_dir();
-    let path = dir.join(format!("perlrs_tdf_{}.csv", std::process::id()));
+    let path = dir.join(format!("forge_tdf_{}.csv", std::process::id()));
     let ps = path.to_string_lossy().replace('\\', "/");
     let code = format!(
         r#"csv_write("{ps}",
@@ -41,7 +41,7 @@ fn dataframe_sum_and_filter() {
 #[test]
 fn dataframe_group_by_sum() {
     let dir = std::env::temp_dir();
-    let path = dir.join(format!("perlrs_tdfg_{}.csv", std::process::id()));
+    let path = dir.join(format!("forge_tdfg_{}.csv", std::process::id()));
     let ps = path.to_string_lossy().replace('\\', "/");
     let code = format!(
         r#"csv_write("{ps}",
@@ -60,7 +60,7 @@ fn dataframe_group_by_sum() {
 #[test]
 fn sqlite_exec_query() {
     let dir = std::env::temp_dir();
-    let path = dir.join(format!("perlrs_tsql_{}.db", std::process::id()));
+    let path = dir.join(format!("forge_tsql_{}.db", std::process::id()));
     let ps = path.to_string_lossy().replace('\\', "/");
     let code = format!(
         r#"
@@ -91,7 +91,7 @@ fn struct_new_and_field_access() {
 fn typed_my_rejects_wrong_type() {
     assert!(matches!(
         eval_err_kind(r#"typed my $n : Int; $n = "x""#),
-        perlrs::error::ErrorKind::Type
+        forge::error::ErrorKind::Type
     ));
 }
 
@@ -227,7 +227,7 @@ say $n;"#,
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn pe");
+        .expect("spawn fo");
 
     let mut stdin = child.stdin.take().expect("stdin");
     stdin.write_all(b"a\nb\n").unwrap();
@@ -376,7 +376,7 @@ fn crc32_binary_deterministic() {
 
 #[test]
 fn par_find_files_matches_glob_pattern() {
-    let dir = std::env::temp_dir().join(format!("perlrs_pff_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("forge_pff_{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(dir.join("sub")).unwrap();
     fs::write(dir.join("a.txt"), "1").unwrap();
@@ -390,7 +390,7 @@ fn par_find_files_matches_glob_pattern() {
 
 #[test]
 fn par_find_files_empty_on_no_match() {
-    let dir = std::env::temp_dir().join(format!("perlrs_pff2_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("forge_pff2_{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     fs::write(dir.join("a.txt"), "1").unwrap();
@@ -403,7 +403,7 @@ fn par_find_files_empty_on_no_match() {
 #[test]
 fn par_find_files_nonexistent_dir_returns_empty() {
     assert_eq!(
-        eval_int(r#"scalar par_find_files("/nonexistent_perlrs_test", "*.txt")"#),
+        eval_int(r#"scalar par_find_files("/nonexistent_forge_test", "*.txt")"#),
         0
     );
 }
@@ -412,7 +412,7 @@ fn par_find_files_nonexistent_dir_returns_empty() {
 
 #[test]
 fn par_line_count_single_file() {
-    let dir = std::env::temp_dir().join(format!("perlrs_plc_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("forge_plc_{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let f = dir.join("lines.txt");
@@ -425,7 +425,7 @@ fn par_line_count_single_file() {
 
 #[test]
 fn par_line_count_multiple_files() {
-    let dir = std::env::temp_dir().join(format!("perlrs_plc2_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("forge_plc2_{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let f1 = dir.join("a.txt");
@@ -442,7 +442,7 @@ fn par_line_count_multiple_files() {
 
 #[test]
 fn par_line_count_empty_file() {
-    let dir = std::env::temp_dir().join(format!("perlrs_plc3_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("forge_plc3_{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let f = dir.join("empty.txt");
@@ -457,9 +457,9 @@ fn par_line_count_empty_file() {
 #[test]
 fn par_pipeline_stream_rejects_psort() {
     let program =
-        perlrs::parse(r#"par_pipeline_stream((1..5))->psort(fn { $a <=> $b })->collect()"#)
+        forge::parse(r#"par_pipeline_stream((1..5))->psort(fn { $a <=> $b })->collect()"#)
             .expect("parse");
-    let mut interp = perlrs::interpreter::Interpreter::new();
+    let mut interp = forge::interpreter::Interpreter::new();
     let err = interp.execute(&program).unwrap_err();
     assert!(
         err.to_string().contains("cannot stream"),

@@ -1130,7 +1130,7 @@ mod tests {
 
     #[test]
     fn glob_par_matches_sequential_glob_set() {
-        let base = std::env::temp_dir().join(format!("perlrs_glob_par_{}", std::process::id()));
+        let base = std::env::temp_dir().join(format!("forge_glob_par_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base);
         std::fs::create_dir_all(base.join("a")).unwrap();
         std::fs::create_dir_all(base.join("b")).unwrap();
@@ -1200,7 +1200,7 @@ mod tests {
 
     #[test]
     fn read_file_text_perl_compat_maps_invalid_utf8_to_latin1_octets() {
-        let path = std::env::temp_dir().join(format!("perlrs_bad_utf8_{}.txt", std::process::id()));
+        let path = std::env::temp_dir().join(format!("forge_bad_utf8_{}.txt", std::process::id()));
         // Lone continuation bytes — invalid UTF-8 as a whole; per-line Latin-1.
         std::fs::write(&path, b"ok\xff\xfe\x80\n").unwrap();
         let s = read_file_text_perl_compat(&path).expect("read");

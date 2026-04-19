@@ -1,22 +1,22 @@
 [package]
-name = "perlrs"
+name = "forge"
 version = "0.6.3"
 edition = "2021"
 description = "A highly parallel Perl 5 interpreter written in Rust"
 license = "MIT"
 authors = ["MenkeTechnologies"]
-repository = "https://github.com/MenkeTechnologies/perlrs"
-documentation = "https://docs.rs/perlrs"
+repository = "https://github.com/MenkeTechnologies/forge"
+documentation = "https://docs.rs/forge"
 # `cargo package` uses the git file list; `exclude` drops paths from the tarball.
 # `vendor/perl` stays tracked and ships (e.g. `List/Util.pm`). `parity/` is local/CI only.
 exclude = ["/parity/", "/.github/"]
 
 [[bin]]
-name = "perlrs"
+name = "forge"
 path = "src/main.rs"
 
 [[bin]]
-name = "pe"
+name = "fo"
 path = "src/main.rs"
 
 # Offline tool: regenerate `docs/reference.html` from the LSP doc strings.

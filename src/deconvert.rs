@@ -1,6 +1,6 @@
-//! Deconvert perlrs .pr syntax back to standard Perl .pl syntax.
+//! Deconvert forge .pr syntax back to standard Perl .pl syntax.
 //!
-//! This is the inverse of [`crate::convert`]: takes a parsed perlrs program
+//! This is the inverse of [`crate::convert`]: takes a parsed forge program
 //! and emits valid Perl 5 source code that can run under stock `perl`.
 //!
 //! Transformations applied:
@@ -20,12 +20,12 @@ pub struct DeconvertOptions {
     pub output_delim: Option<char>,
 }
 
-/// Convert a parsed perlrs program to standard Perl syntax.
+/// Convert a parsed forge program to standard Perl syntax.
 pub fn deconvert_program(p: &Program) -> String {
     deconvert_program_with_options(p, &DeconvertOptions::default())
 }
 
-/// Convert a parsed perlrs program to standard Perl syntax with custom options.
+/// Convert a parsed forge program to standard Perl syntax with custom options.
 pub fn deconvert_program_with_options(p: &Program, opts: &DeconvertOptions) -> String {
     let body = if let Some(delim) = opts.output_delim {
         deparse::deparse_block_with_delim(&p.statements, delim)

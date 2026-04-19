@@ -1,4 +1,4 @@
-#!/usr/bin/env perlrs
+#!/usr/bin/env forge
 # Text processing demo — common Perl one-liner patterns
 
 use strict;

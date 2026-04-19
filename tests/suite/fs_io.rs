@@ -1,13 +1,13 @@
 //! Filesystem builtins with real temp paths (headless-safe, no network).
 
 use crate::common::*;
-use perlrs::interpreter::Interpreter;
+use forge::interpreter::Interpreter;
 use std::path::PathBuf;
 
 #[test]
 fn mkdir_creates_directory_and_file_test_sees_it() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("perlrs_itest_mkdir_{}", std::process::id()));
+        std::env::temp_dir().join(format!("forge_itest_mkdir_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     let p = dir.to_str().expect("temp path utf-8");
     let code = format!(r#"mkdir("{p}", 0755); (-e "{p}" ? 1 : 0)"#);
@@ -18,7 +18,7 @@ fn mkdir_creates_directory_and_file_test_sees_it() {
 #[test]
 fn unlink_returns_zero_for_missing_file() {
     assert_eq!(
-        eval_int(r#"unlink("/nonexistent_path_perlrs_itest_01234")"#),
+        eval_int(r#"unlink("/nonexistent_path_forge_itest_01234")"#),
         0
     );
 }
@@ -26,7 +26,7 @@ fn unlink_returns_zero_for_missing_file() {
 #[test]
 fn rename_moves_file() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("perlrs_itest_rename_{}", std::process::id()));
+        std::env::temp_dir().join(format!("forge_itest_rename_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let a = dir.join("a");
@@ -44,7 +44,7 @@ fn rename_moves_file() {
 #[test]
 fn filehandle_method_io_print_getline_close() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("perlrs_itest_fhmethods_{}", std::process::id()));
+        std::env::temp_dir().join(format!("forge_itest_fhmethods_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("out.txt");
@@ -77,7 +77,7 @@ fn filehandle_method_io_print_getline_close() {
 #[test]
 fn print_and_printf_no_args_use_topic() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("perlrs_itest_print_topic_{}", std::process::id()));
+        std::env::temp_dir().join(format!("forge_itest_print_topic_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("out.txt");
@@ -108,7 +108,7 @@ fn piped_open_readline_vm_matches_tree_walker() {
         close FH;
         $x;
     "#;
-    let program = perlrs::parse(code).expect("parse");
+    let program = forge::parse(code).expect("parse");
     let mut vm_interp = Interpreter::new();
     let v_vm = vm_interp.execute(&program).expect("execute vm");
     let mut tree_interp = Interpreter::new();
@@ -122,7 +122,7 @@ fn piped_open_readline_vm_matches_tree_walker() {
 fn chmod_sets_mode() {
     use std::os::unix::fs::PermissionsExt;
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("perlrs_itest_chmod_{}", std::process::id()));
+        std::env::temp_dir().join(format!("forge_itest_chmod_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let f = dir.join("f");
@@ -138,7 +138,7 @@ fn chmod_sets_mode() {
 #[test]
 fn rmdir_removes_empty_directory() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("perlrs_itest_rmdir_{}", std::process::id()));
+        std::env::temp_dir().join(format!("forge_itest_rmdir_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let p = dir.to_str().expect("utf-8");
@@ -150,7 +150,7 @@ fn rmdir_removes_empty_directory() {
 #[test]
 fn getcwd_contains_chdir_target() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("perlrs_itest_getcwd_{}", std::process::id()));
+        std::env::temp_dir().join(format!("forge_itest_getcwd_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let p = dir.to_str().expect("utf-8");
@@ -165,7 +165,7 @@ fn getcwd_contains_chdir_target() {
 #[test]
 fn utime_sets_times() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("perlrs_itest_utime_{}", std::process::id()));
+        std::env::temp_dir().join(format!("forge_itest_utime_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let f = dir.join("f");
@@ -204,7 +204,7 @@ fn pipe_builtin_rw_roundtrip_vm_matches_tree() {
         close RD;
         $x eq "ping\n" ? 1 : 0;
     "#;
-    let program = perlrs::parse(code).expect("parse");
+    let program = forge::parse(code).expect("parse");
     let mut vm_interp = Interpreter::new();
     let v_vm = vm_interp.execute(&program).expect("execute vm");
     let mut tree_interp = Interpreter::new();
@@ -216,7 +216,7 @@ fn pipe_builtin_rw_roundtrip_vm_matches_tree() {
 #[test]
 fn realpath_resolves_existing_file() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("perlrs_itest_realpath_{}", std::process::id()));
+        std::env::temp_dir().join(format!("forge_itest_realpath_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let f = dir.join("f.txt");
@@ -229,7 +229,7 @@ fn realpath_resolves_existing_file() {
 
 #[test]
 fn realpath_missing_returns_undef() {
-    let p = format!("/nonexistent_perlrs_realpath_{}", std::process::id());
+    let p = format!("/nonexistent_forge_realpath_{}", std::process::id());
     let code = format!(r#"defined(realpath("{p}")) ? 1 : 0"#);
     assert_eq!(eval_int(&code), 0);
 }
@@ -242,7 +242,7 @@ fn canonpath_collapses_dot_dot() {
 #[test]
 fn spurt_writes_bytes_round_trip_with_slurp() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("perlrs_itest_spurt_{}", std::process::id()));
+        std::env::temp_dir().join(format!("forge_itest_spurt_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let f = dir.join("out.txt");
@@ -255,7 +255,7 @@ fn spurt_writes_bytes_round_trip_with_slurp() {
 #[test]
 fn spurt_write_file_alias_mkdir_option() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("perlrs_itest_spurt_mkdir_{}", std::process::id()));
+        std::env::temp_dir().join(format!("forge_itest_spurt_mkdir_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     let nested = dir.join("a/b/c.txt");
     let pn = nested.to_str().expect("utf-8");
@@ -267,7 +267,7 @@ fn spurt_write_file_alias_mkdir_option() {
 #[test]
 fn copy_file_creates_destination() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("perlrs_itest_copy_{}", std::process::id()));
+        std::env::temp_dir().join(format!("forge_itest_copy_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let a = dir.join("src.txt");
@@ -285,7 +285,7 @@ fn copy_file_creates_destination() {
 fn copy_preserve_updates_mtime() {
     use std::os::unix::fs::MetadataExt;
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("perlrs_itest_copy_preserve_{}", std::process::id()));
+        std::env::temp_dir().join(format!("forge_itest_copy_preserve_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let a = dir.join("src.txt");
@@ -335,7 +335,7 @@ fn uname_sysname_nonempty() {
 #[test]
 fn read_bytes_preserves_raw_octets() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("perlrs_itest_rbytes_{}", std::process::id()));
+        std::env::temp_dir().join(format!("forge_itest_rbytes_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let f = dir.join("b.bin");
@@ -349,7 +349,7 @@ fn read_bytes_preserves_raw_octets() {
 #[test]
 fn move_renames_file_like_rename() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("perlrs_itest_move_{}", std::process::id()));
+        std::env::temp_dir().join(format!("forge_itest_move_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let a = dir.join("a");

@@ -2,9 +2,9 @@
 //! with frame slots (`$i`, `$sum`), same shape as `vm_chunk_block_jit_for_loop` in `src/jit.rs`.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use perlrs::bytecode::{Chunk, Op};
-use perlrs::interpreter::Interpreter;
-use perlrs::vm::VM;
+use forge::bytecode::{Chunk, Op};
+use forge::interpreter::Interpreter;
+use forge::vm::VM;
 
 /// `for ($i=0; $i<limit; $i++) { $sum += $i }` — returns sum of `0..limit-1`.
 fn block_jit_sum_chunk(limit: i64) -> Chunk {

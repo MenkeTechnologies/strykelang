@@ -210,7 +210,7 @@ enum PatternBinding {
 }
 
 /// Perl `$]` — numeric language level (`5 + minor/1000 + patch/1_000_000`).
-/// Emulated Perl 5.x level (not the `perlrs` crate semver).
+/// Emulated Perl 5.x level (not the `forge` crate semver).
 pub fn perl_bracket_version() -> f64 {
     const PERL_EMUL_MINOR: u32 = 38;
     const PERL_EMUL_PATCH: u32 = 0;
@@ -232,7 +232,7 @@ fn cached_executable_path() -> String {
         .get_or_init(|| {
             std::env::current_exe()
                 .map(|p| p.to_string_lossy().into_owned())
-                .unwrap_or_else(|_| "perlrs".to_string())
+                .unwrap_or_else(|_| "forge".to_string())
         })
         .clone()
 }
@@ -529,7 +529,7 @@ pub struct Interpreter {
     /// `$;` — hash subscript separator (multi-key join); Perl default `\034`.
     pub subscript_sep: String,
     /// `$^I` — in-place edit backup suffix (empty when no backup; also unset when `-i` was not passed).
-    /// The `pe` driver sets this from `-i` / `-i.ext`.
+    /// The `fo` driver sets this from `-i` / `-i.ext`.
     pub inplace_edit: String,
     /// `$^D` — debugging flags (integer; mostly ignored).
     pub debug_flags: i64,
@@ -599,7 +599,7 @@ pub struct Interpreter {
     pub class_defs: HashMap<String, Arc<ClassDef>>,
     /// `trait Name { ... }` definitions.
     pub trait_defs: HashMap<String, Arc<TraitDef>>,
-    /// When set, `pe --profile` records timings: VM path uses per-opcode line samples and sub
+    /// When set, `fo --profile` records timings: VM path uses per-opcode line samples and sub
     /// call/return (JIT disabled); tree-walker fallback uses per-statement lines and subs.
     pub profiler: Option<Profiler>,
     /// Per-module `our @EXPORT` / `our @EXPORT_OK` (Exporter-style). Absent key → legacy import-all.
@@ -630,7 +630,7 @@ pub struct Interpreter {
     pub accumulator_format: String,
     /// `$^F` — max system file descriptor (Perl default 2).
     pub max_system_fd: i64,
-    /// `$^M` — emergency memory buffer (no-op pool in perlrs).
+    /// `$^M` — emergency memory buffer (no-op pool in forge).
     pub emergency_memory: String,
     /// `$^N` — last opened named regexp capture name.
     pub last_subpattern_name: String,
@@ -664,7 +664,7 @@ pub struct Interpreter {
     /// Bare names from `our $x` per frame — same length as [`Self::english_lexical_scalars`].
     our_lexical_scalars: Vec<HashSet<String>>,
     /// When false, the bytecode VM runs without Cranelift (see [`crate::try_vm_execute`]). Disabled by
-    /// `PERLRS_NO_JIT=1` / `true` / `yes`, or `pe --no-jit` after [`Self::new`].
+    /// `FORGE_NO_JIT=1` / `true` / `yes`, or `fo --no-jit` after [`Self::new`].
     pub vm_jit_enabled: bool,
     /// When true, [`crate::try_vm_execute`] prints bytecode disassembly to stderr before running the VM.
     pub disasm_bytecode: bool,
@@ -1152,7 +1152,7 @@ fn pw_home_dir_for_current_uid() -> Option<std::ffi::OsString> {
     Some(std::ffi::OsString::from_vec(bytes.to_vec()))
 }
 
-/// Passwd home for a login name (e.g. **`SUDO_USER`** when `pe` runs under `sudo`).
+/// Passwd home for a login name (e.g. **`SUDO_USER`** when `fo` runs under `sudo`).
 #[cfg(unix)]
 fn pw_home_dir_for_login_name(login: &std::ffi::OsStr) -> Option<std::ffi::OsString> {
     use libc::getpwnam_r;
@@ -1214,14 +1214,14 @@ impl Interpreter {
         // Reflection hashes — populated from `build.rs`-generated tables so
         // they track the real parser/dispatcher/LSP without hand-maintenance.
         // Seven hashes; all lookups are O(1). Forward maps:
-        //   %b  / %perlrs::builtins      — name → category ("parallel", "string", …)
-        //   %pc / %perlrs::perl_compats  — subset: Perl 5 core only
-        //   %e  / %perlrs::extensions    — subset: perlrs-only
-        //   %a  / %perlrs::aliases       — alias → primary
-        //   %d  / %perlrs::descriptions  — name → LSP one-liner (sparse)
+        //   %b  / %forge::builtins      — name → category ("parallel", "string", …)
+        //   %pc / %forge::perl_compats  — subset: Perl 5 core only
+        //   %e  / %forge::extensions    — subset: forge-only
+        //   %a  / %forge::aliases       — alias → primary
+        //   %d  / %forge::descriptions  — name → LSP one-liner (sparse)
         // Inverted indexes for constant-time reverse queries:
-        //   %c  / %perlrs::categories    — category → arrayref of names
-        //   %p  / %perlrs::primaries     — primary → arrayref of aliases
+        //   %c  / %forge::categories    — category → arrayref of names
+        //   %p  / %forge::primaries     — primary → arrayref of aliases
         //
         // `keys %perl_compats ∩ keys %extensions == ∅` by construction;
         // together they cover `keys %builtins`. Short aliases use the
@@ -1234,16 +1234,16 @@ impl Interpreter {
         let categories_map = crate::builtins::categories_hash_map();
         let primaries_map = crate::builtins::primaries_hash_map();
         let all_map = crate::builtins::all_hash_map();
-        scope.declare_hash("perlrs::builtins", builtins_map.clone());
-        scope.declare_hash("perlrs::perl_compats", perl_compats_map.clone());
-        scope.declare_hash("perlrs::extensions", extensions_map.clone());
-        scope.declare_hash("perlrs::aliases", aliases_map.clone());
-        scope.declare_hash("perlrs::descriptions", descriptions_map.clone());
-        scope.declare_hash("perlrs::categories", categories_map.clone());
-        scope.declare_hash("perlrs::primaries", primaries_map.clone());
-        scope.declare_hash("perlrs::all", all_map.clone());
+        scope.declare_hash("forge::builtins", builtins_map.clone());
+        scope.declare_hash("forge::perl_compats", perl_compats_map.clone());
+        scope.declare_hash("forge::extensions", extensions_map.clone());
+        scope.declare_hash("forge::aliases", aliases_map.clone());
+        scope.declare_hash("forge::descriptions", descriptions_map.clone());
+        scope.declare_hash("forge::categories", categories_map.clone());
+        scope.declare_hash("forge::primaries", primaries_map.clone());
+        scope.declare_hash("forge::all", all_map.clone());
         scope.declare_scalar(
-            "perlrs::VERSION",
+            "forge::VERSION",
             PerlValue::string(env!("CARGO_PKG_VERSION").to_string()),
         );
         scope.declare_hash("b", builtins_map);
@@ -1294,7 +1294,7 @@ impl Interpreter {
             argv: Vec::new(),
             env: IndexMap::new(),
             env_materialized: false,
-            program_name: "perlrs".to_string(),
+            program_name: "forge".to_string(),
             line_number: 0,
             last_readline_handle: String::new(),
             last_stdin_die_bracket: "<STDIN>".to_string(),
@@ -1385,7 +1385,7 @@ impl Interpreter {
             english_lexical_scalars: vec![HashSet::new()],
             our_lexical_scalars: vec![HashSet::new()],
             vm_jit_enabled: !matches!(
-                std::env::var("PERLRS_NO_JIT"),
+                std::env::var("FORGE_NO_JIT"),
                 Ok(v)
                     if v == "1"
                         || v.eq_ignore_ascii_case("true")
@@ -1575,7 +1575,7 @@ impl Interpreter {
         }
     }
 
-    /// Rayon pool size (`pe -j`); lazily initialized from `rayon::current_num_threads()`.
+    /// Rayon pool size (`fo -j`); lazily initialized from `rayon::current_num_threads()`.
     pub(crate) fn parallel_thread_count(&mut self) -> usize {
         if self.num_threads == 0 {
             self.num_threads = rayon::current_num_threads();
@@ -2854,7 +2854,7 @@ impl Interpreter {
             "state" => FEAT_STATE,
             "switch" => FEAT_SWITCH,
             "unicode_strings" => FEAT_UNICODE_STRINGS,
-            // Features that perlrs accepts as known but tracks no separate bit for —
+            // Features that forge accepts as known but tracks no separate bit for —
             // either always-on, always-off, or syntactic sugar already enabled.
             // Keeps `use feature 'X'` from erroring on common Perl 5.20+ pragmas.
             "postderef"
@@ -9928,8 +9928,8 @@ impl Interpreter {
                     match local_interp.exec_block(&block) {
                         Ok(_) => {}
                         Err(e) => {
-                            let pe = match e {
-                                FlowOrError::Error(pe) => pe,
+                            let fo = match e {
+                                FlowOrError::Error(fo) => fo,
                                 FlowOrError::Flow(_) => PerlError::runtime(
                                     "return/last/next/redo not supported inside pfor block",
                                     line,
@@ -9937,7 +9937,7 @@ impl Interpreter {
                             };
                             let mut g = first_err.lock();
                             if g.is_none() {
-                                *g = Some(pe);
+                                *g = Some(fo);
                             }
                         }
                     }
@@ -10026,8 +10026,8 @@ impl Interpreter {
                     match local_interp.exec_block(&block) {
                         Ok(_) => {}
                         Err(e) => {
-                            let pe = match e {
-                                FlowOrError::Error(pe) => pe,
+                            let fo = match e {
+                                FlowOrError::Error(fo) => fo,
                                 FlowOrError::Flow(_) => PerlError::runtime(
                                     "return/last/next/redo not supported inside fan block",
                                     line,
@@ -10035,7 +10035,7 @@ impl Interpreter {
                             };
                             let mut g = first_err.lock();
                             if g.is_none() {
-                                *g = Some(pe);
+                                *g = Some(fo);
                             }
                         }
                     }
@@ -15436,8 +15436,8 @@ impl Interpreter {
                         match local_interp.exec_block_no_scope(&sub.body) {
                             Ok(_) => {}
                             Err(e) => {
-                                let pe = match e {
-                                    FlowOrError::Error(pe) => pe,
+                                let fo = match e {
+                                    FlowOrError::Error(fo) => fo,
                                     FlowOrError::Flow(_) => PerlError::runtime(
                                         "return/last/next/redo not supported inside pipeline pfor block",
                                         line,
@@ -15445,7 +15445,7 @@ impl Interpreter {
                                 };
                                 let mut g = first_err.lock();
                                 if g.is_none() {
-                                    *g = Some(pe);
+                                    *g = Some(fo);
                                 }
                             }
                         }
@@ -15913,7 +15913,7 @@ impl Interpreter {
                                         Ok(_) => {}
                                         Err(e) => {
                                             let msg = match e {
-                                                FlowOrError::Error(pe) => pe.to_string(),
+                                                FlowOrError::Error(fo) => fo.to_string(),
                                                 FlowOrError::Flow(_) => {
                                                     "unexpected control flow in par_pipeline_stream pfor".into()
                                                 }
@@ -15957,7 +15957,7 @@ impl Interpreter {
                                         Ok(_) => {}
                                         Err(e) => {
                                             let msg = match e {
-                                                FlowOrError::Error(pe) => pe.to_string(),
+                                                FlowOrError::Error(fo) => fo.to_string(),
                                                 FlowOrError::Flow(_) => {
                                                     "unexpected control flow in par_pipeline_stream tap"
                                                         .into()
@@ -16107,7 +16107,7 @@ impl Interpreter {
         Ok(m)
     }
 
-    /// Bind perlrs `sub name ($a, { k => $v })` parameters from `@_` before the body runs.
+    /// Bind forge `sub name ($a, { k => $v })` parameters from `@_` before the body runs.
     pub(crate) fn apply_sub_signature(
         &mut self,
         sub: &PerlSub,
@@ -16149,7 +16149,7 @@ impl Interpreter {
                     let binds = self
                         .match_array_pattern_elems(&arr, elems, line)
                         .map_err(|e| match e {
-                            FlowOrError::Error(pe) => pe,
+                            FlowOrError::Error(fo) => fo,
                             FlowOrError::Flow(_) => PerlError::runtime(
                                 "unexpected flow in sub signature array destruct",
                                 line,
@@ -16577,7 +16577,7 @@ impl Interpreter {
                     let binds = self
                         .match_array_pattern_elems(&arr, elems, line)
                         .map_err(|e| match e {
-                            FlowOrError::Error(pe) => pe,
+                            FlowOrError::Error(fo) => fo,
                             FlowOrError::Flow(_) => {
                                 PerlError::runtime("unexpected flow in method array destruct", line)
                             }

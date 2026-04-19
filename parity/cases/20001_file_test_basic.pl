@@ -3,7 +3,7 @@ use strict;
 use warnings;
 
 # Basic file test operators on a temp file
-my $f = "/tmp/perlrs_test_$$.tmp";
+my $f = "/tmp/forge_test_$$.tmp";
 open(WFH, '>', $f) or die "open: $!";
 print WFH "hello world\n";
 close(WFH);
@@ -17,14 +17,14 @@ print "-s: ", -s $f, "\n";
 print "-z: ", (-z $f ? 1 : 0), "\n";
 
 # Empty file test
-my $ef = "/tmp/perlrs_test_empty_$$.tmp";
+my $ef = "/tmp/forge_test_empty_$$.tmp";
 open(EFH, '>', $ef) or die;
 close(EFH);
 print "-z_empty: ", (-z $ef ? 1 : 0), "\n";
 print "-s_empty: ", -s $ef, "\n";
 
 # Non-existent
-my $nf = "/tmp/perlrs_test_noexist_$$.tmp";
+my $nf = "/tmp/forge_test_noexist_$$.tmp";
 print "-e_noexist: ", (-e $nf ? 1 : 0), "\n";
 
 unlink $f;

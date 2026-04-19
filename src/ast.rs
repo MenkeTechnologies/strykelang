@@ -59,7 +59,7 @@ impl GrepBuiltinKeyword {
     }
 }
 
-/// Named parameter in `sub name (SIG ...) { }` — perlrs extension (not Perl 5 prototype syntax).
+/// Named parameter in `sub name (SIG ...) { }` — forge extension (not Perl 5 prototype syntax).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SubSigParam {
     /// `$name` or `$name: Type` — one positional scalar from `@_`, optionally typed.
@@ -131,7 +131,7 @@ pub enum StmtKind {
         module: String,
         imports: Vec<Expr>,
     },
-    /// `use 5.008;` / `use 5;` — Perl version requirement (no-op at runtime in perlrs).
+    /// `use 5.008;` / `use 5;` — Perl version requirement (no-op at runtime in forge).
     UsePerlVersion {
         version: f64,
     },
@@ -590,7 +590,7 @@ pub enum SortComparator {
     Code(Box<Expr>),
 }
 
-// ── Algebraic `match` expression (perlrs extension) ──
+// ── Algebraic `match` expression (forge extension) ──
 
 /// One arm of [`ExprKind::AlgebraicMatch`]: `PATTERN [if EXPR] => EXPR`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -628,7 +628,7 @@ pub enum MatchPattern {
     /// `{ name => $n, ... }` — required keys; `$n` binds the value for the arm body.
     Hash(Vec<MatchHashPair>),
     /// `Some($x)` — matches array-like values with **at least two** elements where index `1` is
-    /// Perl-truthy (perlrs: `$gen->next` yields `[value, more]` with `more` truthy while iterating).
+    /// Perl-truthy (forge: `$gen->next` yields `[value, more]` with `more` truthy while iterating).
     OptionSome(String),
 }
 
@@ -872,9 +872,9 @@ pub enum ExprKind {
     MapExpr {
         block: Block,
         list: Box<Expr>,
-        /// `flat_map { }` — peel one ARRAY ref from each iteration (perlrs extension).
+        /// `flat_map { }` — peel one ARRAY ref from each iteration (forge extension).
         flatten_array_refs: bool,
-        /// `maps` / `flat_maps` — lazy iterator output (perlrs); `map` / `flat_map` use `false`.
+        /// `maps` / `flat_maps` — lazy iterator output (forge); `map` / `flat_map` use `false`.
         #[serde(default)]
         stream: bool,
     },
@@ -905,7 +905,7 @@ pub enum ExprKind {
         list: Box<Expr>,
     },
     ReverseExpr(Box<Expr>),
-    /// `rev EXPR` — always string-reverse (scalar reverse), perlrs extension.
+    /// `rev EXPR` — always string-reverse (scalar reverse), forge extension.
     ScalarReverse(Box<Expr>),
     JoinExpr {
         separator: Box<Expr>,
@@ -932,7 +932,7 @@ pub enum ExprKind {
         /// `pflat_map { }` — flatten each block result like [`ExprKind::MapExpr`] (arrays expand);
         /// parallel output is stitched in **input order** (unlike plain `pmap`, which is unordered).
         flat_outputs: bool,
-        /// `pmap_on $cluster { } @list` — fan out over SSH (`pe --remote-worker`); `None` = local rayon.
+        /// `pmap_on $cluster { } @list` — fan out over SSH (`fo --remote-worker`); `None` = local rayon.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         on_cluster: Option<Box<Expr>>,
     },

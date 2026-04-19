@@ -1,4 +1,4 @@
-//! End-to-end test for `pe build` AOT binaries: compile a Perl script to a standalone
+//! End-to-end test for `fo build` AOT binaries: compile a Perl script to a standalone
 //! executable, run the result in a separate process, and verify stdout + exit code.
 //!
 //! Does not require `rustc` (FFI is exercised in unit tests). Skips cleanly on Windows
@@ -12,7 +12,7 @@ use std::process::Command;
 
 fn tmp_path(tag: &str) -> PathBuf {
     std::env::temp_dir().join(format!(
-        "perlrs-aot-e2e-{}-{}-{}",
+        "forge-aot-e2e-{}-{}-{}",
         std::process::id(),
         tag,
         rand::random::<u32>()
@@ -31,17 +31,17 @@ fn aot_build_and_run_hello_script() {
     )
     .unwrap();
 
-    // Build the binary via `pe build`.
+    // Build the binary via `fo build`.
     let build = Command::new(exe)
         .arg("build")
         .arg(&script)
         .arg("-o")
         .arg(&bin)
         .output()
-        .expect("spawn pe build");
+        .expect("spawn fo build");
     assert!(
         build.status.success(),
-        "pe build failed: stderr={}",
+        "fo build failed: stderr={}",
         String::from_utf8_lossy(&build.stderr)
     );
     assert!(bin.exists(), "built binary missing at {}", bin.display());
@@ -79,10 +79,10 @@ fn aot_build_preserves_exit_code_from_die() {
         .arg("-o")
         .arg(&bin)
         .output()
-        .expect("spawn pe build");
+        .expect("spawn fo build");
     assert!(
         build.status.success(),
-        "pe build failed: stderr={}",
+        "fo build failed: stderr={}",
         String::from_utf8_lossy(&build.stderr)
     );
 
@@ -114,10 +114,10 @@ fn aot_build_rejects_syntax_error_at_build_time() {
         .arg("-o")
         .arg(&bin)
         .output()
-        .expect("spawn pe build");
+        .expect("spawn fo build");
     assert!(
         !build.status.success(),
-        "pe build should reject malformed source at build time"
+        "fo build should reject malformed source at build time"
     );
     assert!(
         !bin.exists() || fs::metadata(&bin).map(|m| m.len()).unwrap_or(0) < 1024,
@@ -135,7 +135,7 @@ fn aot_build_help_subcommand_prints_usage() {
         .arg("build")
         .arg("--help")
         .output()
-        .expect("spawn pe build --help");
+        .expect("spawn fo build --help");
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("usage:"), "no usage line: {}", stdout);

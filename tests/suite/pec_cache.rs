@@ -1,9 +1,9 @@
-//! End-to-end tests for the `.pec` bytecode cache: `PERLRS_BC_CACHE=1` should produce a
+//! End-to-end tests for the `.pec` bytecode cache: `FORGE_BC_CACHE=1` should produce a
 //! cache file on first run and successfully load it on the second.
 //!
-//! These run the real `pe` binary in a child process so the test exercises the same
+//! These run the real `fo` binary in a child process so the test exercises the same
 //! main.rs wiring users hit. Cache directory is per-test under `$TMPDIR` to keep runs
-//! isolated and avoid clobbering the developer's `~/.cache/perlrs/bc`.
+//! isolated and avoid clobbering the developer's `~/.cache/forge/bc`.
 
 #![cfg(unix)]
 
@@ -13,7 +13,7 @@ use std::process::Command;
 
 fn tmp_path(tag: &str) -> PathBuf {
     std::env::temp_dir().join(format!(
-        "perlrs-pec-{}-{}-{}",
+        "forge-pec-{}-{}-{}",
         std::process::id(),
         tag,
         rand::random::<u32>()
@@ -22,11 +22,11 @@ fn tmp_path(tag: &str) -> PathBuf {
 
 fn run_with_cache(exe: &str, cache_dir: &PathBuf, script: &PathBuf) -> std::process::Output {
     Command::new(exe)
-        .env("PERLRS_BC_CACHE", "1")
-        .env("PERLRS_BC_DIR", cache_dir)
+        .env("FORGE_BC_CACHE", "1")
+        .env("FORGE_BC_DIR", cache_dir)
         .arg(script)
         .output()
-        .expect("spawn pe")
+        .expect("spawn fo")
 }
 
 #[test]
@@ -131,17 +131,17 @@ fn pec_disabled_by_default_no_cache_writes() {
     fs::create_dir_all(&cache_dir).unwrap();
     fs::write(&script, "print \"hi\\n\";\n").unwrap();
 
-    // No `PERLRS_BC_CACHE=1` → cache must be inert.
+    // No `FORGE_BC_CACHE=1` → cache must be inert.
     let out = Command::new(exe)
-        .env("PERLRS_BC_DIR", &cache_dir)
+        .env("FORGE_BC_DIR", &cache_dir)
         .arg(&script)
         .output()
-        .expect("spawn pe");
+        .expect("spawn fo");
     assert!(out.status.success());
     let count = fs::read_dir(&cache_dir).unwrap().count();
     assert_eq!(
         count, 0,
-        "cache directory must stay empty when PERLRS_BC_CACHE is unset"
+        "cache directory must stay empty when FORGE_BC_CACHE is unset"
     );
 
     fs::remove_file(&script).ok();
@@ -158,12 +158,12 @@ fn pec_disabled_for_dash_e_oneliners() {
     fs::create_dir_all(&cache_dir).unwrap();
 
     let out = Command::new(exe)
-        .env("PERLRS_BC_CACHE", "1")
-        .env("PERLRS_BC_DIR", &cache_dir)
+        .env("FORGE_BC_CACHE", "1")
+        .env("FORGE_BC_DIR", &cache_dir)
         .arg("-e")
         .arg("print 7+8")
         .output()
-        .expect("spawn pe -e");
+        .expect("spawn fo -e");
     assert!(
         out.status.success(),
         "stderr={}",

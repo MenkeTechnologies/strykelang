@@ -3,7 +3,7 @@ use strict;
 use warnings;
 
 # read() builtin - reading specified bytes from a filehandle
-my $f = "/tmp/perlrs_test_read_$$.tmp";
+my $f = "/tmp/forge_test_read_$$.tmp";
 open(WFH, '>', $f) or die;
 print WFH "Hello, World!";
 close(WFH);

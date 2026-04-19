@@ -3,7 +3,7 @@
 
 use crate::common::*;
 
-use perlrs::error::ErrorKind;
+use forge::error::ErrorKind;
 
 #[test]
 fn sleep_zero_returns_quickly() {
@@ -27,10 +27,7 @@ fn json_decode_integer_roundtrip() {
 
 #[test]
 fn json_encode_decode_string_roundtrip() {
-    assert_eq!(
-        eval_string(r#"json_decode(json_encode("perlrs"))"#),
-        "perlrs"
-    );
+    assert_eq!(eval_string(r#"json_decode(json_encode("forge"))"#), "forge");
 }
 
 #[test]

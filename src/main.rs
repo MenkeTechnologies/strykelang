@@ -8,21 +8,21 @@ use clap::Parser;
 use rand::Rng;
 use rayon::prelude::*;
 
-use perlrs::ast::Program;
-use perlrs::error::{ErrorKind, PerlError};
-use perlrs::interpreter::Interpreter;
-use perlrs::perl_fs::{
+use forge::ast::Program;
+use forge::error::{ErrorKind, PerlError};
+use forge::interpreter::Interpreter;
+use forge::perl_fs::{
     decode_utf8_or_latin1, read_file_text_perl_compat, read_line_perl_compat,
     read_logical_line_perl_compat,
 };
 
 mod repl;
 
-/// perlrs — A highly parallel Perl 5 interpreter written in Rust
+/// forge — A highly parallel Perl 5 interpreter written in Rust
 #[derive(Parser, Debug, Default)]
-#[command(name = "perlrs", version, about, long_about = None)]
+#[command(name = "forge", version, about, long_about = None)]
 #[command(disable_version_flag = true, disable_help_flag = true)]
-#[command(override_usage = "perlrs [switches] [--] [programfile] [arguments]")]
+#[command(override_usage = "forge [switches] [--] [programfile] [arguments]")]
 pub(crate) struct Cli {
     /// Specify record separator (\0 if no argument); -0777 for slurp mode
     #[arg(short = '0', value_name = "OCTAL")]
@@ -60,7 +60,7 @@ pub(crate) struct Cli {
     #[arg(long = "profile")]
     profile: bool,
 
-    /// Flamegraph: colored terminal bars (TTY) or SVG to stdout (piped: pe --flame x.pr > flame.svg)
+    /// Flamegraph: colored terminal bars (TTY) or SVG to stdout (piped: fo --flame x.pr > flame.svg)
     #[arg(long = "flame")]
     flame: bool,
 
@@ -180,11 +180,11 @@ pub(crate) struct Cli {
     #[arg(short = 'h', long = "help")]
     help: bool,
 
-    /// Number of threads for parallel operations (perlrs extension)
+    /// Number of threads for parallel operations (forge extension)
     #[arg(short = 'j', long = "threads", value_name = "N")]
     threads: Option<usize>,
 
-    /// Perl 5 strict-compatibility mode: disable all perlrs extensions
+    /// Perl 5 strict-compatibility mode: disable all forge extensions
     #[arg(long = "compat")]
     compat: bool,
 
@@ -392,7 +392,7 @@ fn print_cyberpunk_help() {
     );
     println!("  --no-jit               {G}//{N} Disable Cranelift JIT (bytecode interpreter only)");
     println!(
-        "  --compat               {G}//{N} Perl 5 strict-compat: disable all perlrs extensions"
+        "  --compat               {G}//{N} Perl 5 strict-compat: disable all forge extensions"
     );
     println!("  -d[t][:MOD]            {G}//{N} Run program under debugger or module Devel::MOD");
     println!("  -D[number/letters]     {G}//{N} Set debugging flags");
@@ -436,20 +436,20 @@ fn print_cyberpunk_help() {
     println!(
         "  build SCRIPT [-o OUT]  {G}//{N} AOT: copy this binary with SCRIPT embedded (standalone exe)"
     );
-    println!("  docs [TOPIC]           {G}//{N} Built-in docs (pe docs pmap, pe docs |>, pe docs)");
-    println!("  serve [PORT] [SCRIPT]  {G}//{N} HTTP server (pe serve, pe serve 8080 app.pr)");
+    println!("  docs [TOPIC]           {G}//{N} Built-in docs (fo docs pmap, fo docs |>, fo docs)");
+    println!("  serve [PORT] [SCRIPT]  {G}//{N} HTTP server (fo serve, fo serve 8080 app.pr)");
     println!(
         "  --remote-worker        {G}//{N} Persistent cluster worker (stdio); only arg after {bin}"
     );
     println!(
         "  --remote-worker-v1     {G}//{N} Legacy one-shot worker (stdio); only arg after {bin}"
     );
-    if matches!(bin, "pe" | "perlrs") {
+    if matches!(bin, "fo" | "forge") {
         println!(
             "  (no switches, TTY stdin) {G}//{N} Interactive REPL (readline; exit with quit or EOF)"
         );
     }
-    println!("{C}  ── PARALLEL EXTENSIONS (perlrs) ─────────────────────{N}");
+    println!("{C}  ── PARALLEL EXTENSIONS (forge) ─────────────────────{N}");
     println!("  -j N                   {G}//{N} Set number of parallel threads (rayon)");
     println!(
         "  pmap  {{BLOCK}} @list [, progress => EXPR] {G}//{N} Parallel map; optional stderr progress bar"
@@ -507,16 +507,16 @@ fn print_cyberpunk_help() {
     println!(
         "  fan_cap [N] {{BLOCK}} [, progress => EXPR]  {G}//{N} Like fan; returns list of block return values (index order)"
     );
-    println!("{C}  ── TYPING (perlrs) ───────────────────────────────────{N}");
+    println!("{C}  ── TYPING (forge) ───────────────────────────────────{N}");
     println!(
         "  typed my \\$x : Int|Str|Float  {G}//{N} Optional scalar types; runtime checks on assign"
     );
     println!(
         "  fn (\\$a: Int, \\$b: Str) {{}}   {G}//{N} Typed sub params; runtime checks on call"
     );
-    println!("{C}  ── SERIALIZATION (perlrs) ───────────────────────────────{N}");
+    println!("{C}  ── SERIALIZATION (forge) ───────────────────────────────{N}");
     println!(
-        "  str \\$val / stringify \\$val  {G}//{N} Convert any value to parseable perlrs literal"
+        "  str \\$val / stringify \\$val  {G}//{N} Convert any value to parseable forge literal"
     );
     println!("  eval str \\$fn              {G}//{N} Round-trip: serialize + deserialize coderefs");
     println!("{C}  ── POSITIONAL ─────────────────────────────────────────{N}");
@@ -604,7 +604,7 @@ fn adjacent_temp_path(target: &Path) -> PathBuf {
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| "file".to_string());
     let rnd: u32 = rand::thread_rng().gen();
-    dir.join(format!("{name}.pe-tmp-{rnd}"))
+    dir.join(format!("{name}.fo-tmp-{rnd}"))
 }
 
 /// Write `new_content` to `path` in place; optional backup `path` + `inplace_edit` (Perl `$^I`).
@@ -935,7 +935,7 @@ pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut Interpreter, filenam
     }
 
     if (cli.taint_check || cli.taint_warn) && cli.warnings {
-        eprintln!("perlrs: taint mode acknowledged but not enforced");
+        eprintln!("forge: taint mode acknowledged but not enforced");
     }
 
     if let Some(ref ext_opt) = cli.inplace {
@@ -966,11 +966,11 @@ pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut Interpreter, filenam
                 if let Some((name, val)) = switch.split_once('=') {
                     let _ = interp
                         .scope
-                        .set_scalar(name, perlrs::value::PerlValue::string(val.to_string()));
+                        .set_scalar(name, forge::value::PerlValue::string(val.to_string()));
                 } else {
                     let _ = interp
                         .scope
-                        .set_scalar(switch, perlrs::value::PerlValue::integer(1));
+                        .set_scalar(switch, forge::value::PerlValue::integer(1));
                 }
             }
         }
@@ -981,49 +981,49 @@ pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut Interpreter, filenam
     interp.scope.declare_array(
         "ARGV",
         argv.into_iter()
-            .map(perlrs::value::PerlValue::string)
+            .map(forge::value::PerlValue::string)
             .collect(),
     );
 
     // Order: `-I`, in-tree `vendor/perl` (pure-Perl List::Util, …), system `perl`’s @INC, script
-    // dir, `PERLRS_INC`, then `.` (deduped).
+    // dir, `FORGE_INC`, then `.` (deduped).
     let mut inc_paths: Vec<String> = cli.include.clone();
-    let vendor = perlrs::vendor_perl_inc_path();
+    let vendor = forge::vendor_perl_inc_path();
     if vendor.is_dir() {
-        perlrs::perl_inc::push_unique_string_paths(
+        forge::perl_inc::push_unique_string_paths(
             &mut inc_paths,
             vec![vendor.to_string_lossy().into_owned()],
         );
     }
-    perlrs::perl_inc::push_unique_string_paths(
+    forge::perl_inc::push_unique_string_paths(
         &mut inc_paths,
-        perlrs::perl_inc::paths_from_system_perl(),
+        forge::perl_inc::paths_from_system_perl(),
     );
     if filename != "-e" && filename != "-" && filename != "repl" {
         if let Some(parent) = std::path::Path::new(filename).parent() {
             if !parent.as_os_str().is_empty() {
-                perlrs::perl_inc::push_unique_string_paths(
+                forge::perl_inc::push_unique_string_paths(
                     &mut inc_paths,
                     vec![parent.to_string_lossy().into_owned()],
                 );
             }
         }
     }
-    if let Ok(extra) = std::env::var("PERLRS_INC") {
+    if let Ok(extra) = std::env::var("FORGE_INC") {
         let extra: Vec<String> = std::env::split_paths(&extra)
             .map(|p| p.to_string_lossy().into_owned())
             .collect();
-        perlrs::perl_inc::push_unique_string_paths(&mut inc_paths, extra);
+        forge::perl_inc::push_unique_string_paths(&mut inc_paths, extra);
     }
-    perlrs::perl_inc::push_unique_string_paths(&mut inc_paths, vec![".".to_string()]);
-    let inc_dirs: Vec<perlrs::value::PerlValue> = inc_paths
+    forge::perl_inc::push_unique_string_paths(&mut inc_paths, vec![".".to_string()]);
+    let inc_dirs: Vec<forge::value::PerlValue> = inc_paths
         .into_iter()
-        .map(perlrs::value::PerlValue::string)
+        .map(forge::value::PerlValue::string)
         .collect();
     interp.scope.declare_array("INC", inc_dirs);
 
     if cli.debugger.is_some() {
-        eprintln!("perlrs: debugger not yet implemented, running normally");
+        eprintln!("forge: debugger not yet implemented, running normally");
     }
 }
 
@@ -1033,7 +1033,7 @@ pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut Interpreter, filenam
 /// `--flame` + TTY stdout  → colored terminal bars to stderr.
 /// `--profile` (no flame)  → plain text report to stderr.
 fn emit_profiler_report(
-    p: &mut perlrs::profiler::Profiler,
+    p: &mut forge::profiler::Profiler,
     flame_out: &Option<File>,
     flame_tty: bool,
 ) {
@@ -1041,7 +1041,7 @@ fn emit_profiler_report(
         // stdout was piped — write SVG to the saved fd
         let mut w = io::BufWriter::new(f);
         if let Err(e) = p.render_flame_svg(&mut w) {
-            eprintln!("perlrs --flame: {}", e);
+            eprintln!("forge --flame: {}", e);
         }
     } else if flame_tty {
         // stdout is a TTY — render colored bars to stderr
@@ -1058,7 +1058,7 @@ fn main() {
     // program: all command-line args become `@ARGV` for the embedded script. The probe
     // costs one file open + one 32-byte read (~50 µs) on the no-trailer path.
     if let Ok(exe) = std::env::current_exe() {
-        if let Some(embedded) = perlrs::aot::try_load_embedded(&exe) {
+        if let Some(embedded) = forge::aot::try_load_embedded(&exe) {
             let argv: Vec<String> = std::env::args().skip(1).collect();
             process::exit(run_embedded_script(embedded, argv));
         }
@@ -1070,43 +1070,43 @@ fn main() {
         // Persistent v3 session loop: HELLO → SESSION_INIT → many JOBs → SHUTDOWN.
         // The basic v1 one-shot loop is still reachable via `--remote-worker-v1` for the
         // round-trip integration test.
-        process::exit(perlrs::remote_wire::run_remote_worker_session());
+        process::exit(forge::remote_wire::run_remote_worker_session());
     }
     if args.len() == 2 && args[1] == "--remote-worker-v1" {
-        process::exit(perlrs::remote_wire::run_remote_worker_stdio());
+        process::exit(forge::remote_wire::run_remote_worker_stdio());
     }
 
     if args.len() == 2 && args[1] == "--lsp" {
-        process::exit(perlrs::run_lsp_stdio());
+        process::exit(forge::run_lsp_stdio());
     }
 
-    // `pe build SCRIPT -o OUT` subcommand: intercept before clap so `build` does not have
+    // `fo build SCRIPT -o OUT` subcommand: intercept before clap so `build` does not have
     // to be added to the main `Cli` struct (keeping the perl-compatible flag surface clean).
     if args.len() >= 2 && args[1] == "build" {
         process::exit(run_build_subcommand(&args[2..]));
     }
 
-    // `pe convert FILE...` subcommand: convert Perl source to perlrs syntax with |> pipes.
+    // `fo convert FILE...` subcommand: convert Perl source to forge syntax with |> pipes.
     if args.len() >= 2 && args[1] == "convert" {
         process::exit(run_convert_subcommand(&args[2..]));
     }
 
-    // `pe deconvert FILE...` subcommand: convert perlrs .pr files back to standard Perl .pl syntax.
+    // `fo deconvert FILE...` subcommand: convert forge .pr files back to standard Perl .pl syntax.
     if args.len() >= 2 && args[1] == "deconvert" {
         process::exit(run_deconvert_subcommand(&args[2..]));
     }
 
-    // `pe docs [TOPIC]` subcommand: built-in documentation browser.
+    // `fo docs [TOPIC]` subcommand: built-in documentation browser.
     if args.len() >= 2 && args[1] == "docs" {
         process::exit(run_doc_subcommand(&args[2..]));
     }
 
-    // `pe serve PORT SCRIPT` or `pe serve PORT -e CODE` subcommand.
+    // `fo serve PORT SCRIPT` or `fo serve PORT -e CODE` subcommand.
     if args.len() >= 2 && args[1] == "serve" {
         process::exit(run_serve_subcommand(&args[2..]));
     }
 
-    // Fast path: `perlrs SCRIPT [ARGS...]` with no dashes anywhere — the common case, and
+    // Fast path: `forge SCRIPT [ARGS...]` with no dashes anywhere — the common case, and
     // clap parsing is the dominant term on `print "hello\n"` (it knocks ~1ms off the
     // startup bench). We can't bypass clap when any flag is present, so fall through to the
     // full parser in that case.
@@ -1131,7 +1131,7 @@ fn main() {
 
     // Set global compat-mode flag before any parsing happens.
     if cli.compat {
-        perlrs::set_compat_mode(true);
+        forge::set_compat_mode(true);
     }
 
     if cli.help {
@@ -1141,7 +1141,7 @@ fn main() {
 
     if cli.show_version {
         println!(
-            "This is perlrs v{} — A highly parallel Perl 5 interpreter (Rust)\n",
+            "This is forge v{} — A highly parallel Perl 5 interpreter (Rust)\n",
             env!("CARGO_PKG_VERSION")
         );
         println!("Built with rayon for parallel map/grep/for/sort");
@@ -1165,10 +1165,10 @@ fn main() {
     }
 
     if let Some(code) = &cli.explain {
-        match perlrs::error::explain_error(code) {
+        match forge::error::explain_error(code) {
             Some(text) => println!("{}", text),
             None => {
-                eprintln!("perlrs: unknown explain code {:?}", code);
+                eprintln!("forge: unknown explain code {:?}", code);
                 process::exit(1);
             }
         }
@@ -1183,7 +1183,7 @@ fn main() {
             .ok();
     }
 
-    let is_repl = matches!(env!("CARGO_BIN_NAME"), "pe" | "perlrs")
+    let is_repl = matches!(env!("CARGO_BIN_NAME"), "fo" | "forge")
         && cli.script.is_none()
         && cli.execute.is_empty()
         && cli.execute_features.is_empty()
@@ -1233,7 +1233,7 @@ fn main() {
             match read_file_text_perl_compat(&script_path) {
                 Ok(content) => (content, script_path),
                 Err(_) if !cli.force_script && looks_like_code(&script_path) => {
-                    // One-liner-first: `pe 'p 1+2'` works without `-e`
+                    // One-liner-first: `fo 'p 1+2'` works without `-e`
                     (script_path, "-e".to_string())
                 }
                 Err(e) => {
@@ -1252,7 +1252,7 @@ fn main() {
         (code, "-".to_string())
     };
 
-    let (program_text, data_opt) = perlrs::data_section::split_data_section(&raw_script);
+    let (program_text, data_opt) = forge::data_section::split_data_section(&raw_script);
     let code = strip_shebang_and_extract(&program_text, cli.extract.is_some());
 
     let mut full_code = module_prelude(&cli);
@@ -1261,10 +1261,10 @@ fn main() {
     // `.pec` bytecode cache fast path — skip parse AND compile on warm starts.
     //
     // Keyed on (crate version, filename, full source including `-M` prelude). Enabled by
-    // `PERLRS_BC_CACHE=1` (opt-in for v1 — see [`perlrs::pec::cache_enabled`]). On a hit,
-    // the [`perlrs::pec::PecBundle`] carries both the AST `Program` and the compiled
+    // `FORGE_BC_CACHE=1` (opt-in for v1 — see [`forge::pec::cache_enabled`]). On a hit,
+    // the [`forge::pec::PecBundle`] carries both the AST `Program` and the compiled
     // `Chunk`; we hand the chunk to the interpreter via a sideband field that
-    // [`perlrs::try_vm_execute`] consumes. On a miss, we parse normally and stash the
+    // [`forge::try_vm_execute`] consumes. On a miss, we parse normally and stash the
     // fingerprint so the try-VM path persists the freshly-compiled chunk after run.
     //
     // **Disabled for `-e` / `-E` one-liners.** Measured: warm `.pec` is ~2-3× *slower* than
@@ -1273,7 +1273,7 @@ fn main() {
     // also pollute the cache directory with one entry per unique `-e` invocation, with no
     // GC in v1. The break-even is around 1000+ lines, so file-based scripts only.
     let is_one_liner = !cli.execute.is_empty() || !cli.execute_features.is_empty();
-    let pec_on = perlrs::pec::cache_enabled()
+    let pec_on = forge::pec::cache_enabled()
         && !cli.line_mode
         && !cli.print_mode
         && !cli.lint
@@ -1286,22 +1286,20 @@ fn main() {
         && !filename.is_empty();
     let pec_fp_opt: Option<[u8; 32]> = if pec_on {
         // `strict_vars` enters the fingerprint as `false` here; an eventual [`PecBundle::strict_vars`]
-        // mismatch at load time is treated as a miss (see [`perlrs::pec::try_load`]), so two strict
+        // mismatch at load time is treated as a miss (see [`forge::pec::try_load`]), so two strict
         // modes may collide in one slot without producing wrong answers.
-        Some(perlrs::pec::source_fingerprint(
-            false, &filename, &full_code,
-        ))
+        Some(forge::pec::source_fingerprint(false, &filename, &full_code))
     } else {
         None
     };
     let cached_bundle = pec_fp_opt
         .as_ref()
-        .and_then(|fp| perlrs::pec::try_load(fp, false).ok().flatten());
+        .and_then(|fp| forge::pec::try_load(fp, false).ok().flatten());
 
     let (program, pec_precompiled) = if let Some(bundle) = cached_bundle {
         (bundle.program, Some(bundle.chunk))
     } else {
-        let parsed = match perlrs::parse_with_file(&full_code, &filename) {
+        let parsed = match forge::parse_with_file(&full_code, &filename) {
             Ok(p) => p,
             Err(e) => {
                 eprintln!("{}", e);
@@ -1315,7 +1313,7 @@ fn main() {
         match serde_json::to_string_pretty(&program) {
             Ok(json) => println!("{}", json),
             Err(e) => {
-                eprintln!("perlrs: failed to serialize AST to JSON: {}", e);
+                eprintln!("forge: failed to serialize AST to JSON: {}", e);
                 process::exit(1);
             }
         }
@@ -1323,8 +1321,8 @@ fn main() {
     }
 
     if cli.format_source {
-        // Use convert_program for clean perlrs (.pr) syntax with pipes
-        println!("{}", perlrs::convert::convert_program(&program));
+        // Use convert_program for clean forge (.pr) syntax with pipes
+        println!("{}", forge::convert::convert_program(&program));
         return;
     }
 
@@ -1337,7 +1335,7 @@ fn main() {
         if let Some(data) = data_opt {
             interp.install_data_handle(data);
         }
-        match perlrs::lint_program(&program, &mut interp) {
+        match forge::lint_program(&program, &mut interp) {
             Ok(()) => {
                 eprintln!("{} compile OK", filename);
                 return;
@@ -1367,7 +1365,7 @@ fn main() {
         interp.disasm_bytecode = true;
     }
     if cli.profile || cli.flame {
-        interp.profiler = Some(perlrs::profiler::Profiler::new(filename.clone()));
+        interp.profiler = Some(forge::profiler::Profiler::new(filename.clone()));
     }
     // Hand the `.pec` sideband to the interpreter so `try_vm_execute` either runs the
     // pre-compiled chunk (cache hit) or saves the freshly-compiled one (cache miss).
@@ -1379,7 +1377,7 @@ fn main() {
     }
 
     // --flame: when stdout is piped to a file, save real stdout for the SVG and redirect
-    // script output to stderr so `pe --flame x.pr > flame.svg` captures a clean SVG.
+    // script output to stderr so `fo --flame x.pr > flame.svg` captures a clean SVG.
     // When stdout is a TTY, skip the redirect — we'll render colored bars to stderr instead.
     let flame_is_tty = cli.flame && io::stdout().is_terminal();
     #[cfg(unix)]
@@ -1480,19 +1478,19 @@ fn main() {
     }
 }
 
-/// Run an [`perlrs::aot::EmbeddedScript`] as if it were the primary program. Minimal
+/// Run an [`forge::aot::EmbeddedScript`] as if it were the primary program. Minimal
 /// `@INC` setup: current directory only — the AOT binary is meant to be self-contained, so
 /// the target machine's `perl` (which may not exist) is not consulted. `-I` at build time
 /// is not yet supported (v1); drop everything into the `rust { ... }` block instead.
-fn run_embedded_script(embedded: perlrs::aot::EmbeddedScript, argv: Vec<String>) -> i32 {
-    // AOT binaries pick up the `.pec` bytecode cache for free when `PERLRS_BC_CACHE=1` —
+fn run_embedded_script(embedded: forge::aot::EmbeddedScript, argv: Vec<String>) -> i32 {
+    // AOT binaries pick up the `.pec` bytecode cache for free when `FORGE_BC_CACHE=1` —
     // the first run of a shipped binary parses and compiles the embedded source, then
     // every subsequent run reuses the cached chunk. Cache key includes the script name
     // embedded in the trailer, so two binaries with different embedded scripts will not
     // collide.
-    let pec_on = perlrs::pec::cache_enabled();
+    let pec_on = forge::pec::cache_enabled();
     let pec_fp = if pec_on {
-        Some(perlrs::pec::source_fingerprint(
+        Some(forge::pec::source_fingerprint(
             false,
             &embedded.name,
             &embedded.source,
@@ -1502,11 +1500,11 @@ fn run_embedded_script(embedded: perlrs::aot::EmbeddedScript, argv: Vec<String>)
     };
     let cached = pec_fp
         .as_ref()
-        .and_then(|fp| perlrs::pec::try_load(fp, false).ok().flatten());
+        .and_then(|fp| forge::pec::try_load(fp, false).ok().flatten());
     let (program, pec_precompiled) = if let Some(bundle) = cached {
         (bundle.program, Some(bundle.chunk))
     } else {
-        let parsed = match perlrs::parse_with_file(&embedded.source, &embedded.name) {
+        let parsed = match forge::parse_with_file(&embedded.source, &embedded.name) {
             Ok(p) => p,
             Err(e) => {
                 eprintln!("{}", e);
@@ -1522,12 +1520,12 @@ fn run_embedded_script(embedded: perlrs::aot::EmbeddedScript, argv: Vec<String>)
     interp.scope.declare_array(
         "ARGV",
         argv.into_iter()
-            .map(perlrs::value::PerlValue::string)
+            .map(forge::value::PerlValue::string)
             .collect(),
     );
     interp.scope.declare_array(
         "INC",
-        vec![perlrs::value::PerlValue::string(".".to_string())],
+        vec![forge::value::PerlValue::string(".".to_string())],
     );
     interp.pec_precompiled_chunk = pec_precompiled;
     interp.pec_cache_fingerprint = pec_fp;
@@ -1551,8 +1549,8 @@ fn run_embedded_script(embedded: perlrs::aot::EmbeddedScript, argv: Vec<String>)
     }
 }
 
-/// `pe build SCRIPT [-o OUT]` — compile a Perl script into a standalone binary by
-/// copying the currently-running `pe` and appending a zstd-compressed source trailer.
+/// `fo build SCRIPT [-o OUT]` — compile a Perl script into a standalone binary by
+/// copying the currently-running `fo` and appending a zstd-compressed source trailer.
 /// The resulting file behaves as a native program: all CLI args go to the embedded script.
 fn run_build_subcommand(args: &[String]) -> i32 {
     let mut script: Option<String> = None;
@@ -1563,42 +1561,42 @@ fn run_build_subcommand(args: &[String]) -> i32 {
             "-o" | "--output" => {
                 i += 1;
                 if i >= args.len() {
-                    eprintln!("pe build: -o requires an argument");
+                    eprintln!("fo build: -o requires an argument");
                     return 2;
                 }
                 out = Some(args[i].clone());
             }
             "-h" | "--help" => {
-                println!("usage: pe build SCRIPT [-o OUTPUT]");
+                println!("usage: fo build SCRIPT [-o OUTPUT]");
                 println!();
                 println!(
                     "Compile a Perl script into a standalone executable binary. The output is"
                 );
                 println!(
-                    "a copy of this pe binary with the script source embedded as a compressed"
+                    "a copy of this fo binary with the script source embedded as a compressed"
                 );
                 println!(
                     "trailer. `scp` the result to any compatible machine and run it directly —"
                 );
-                println!("no perl, no perlrs, no @INC setup required.");
+                println!("no perl, no forge, no @INC setup required.");
                 println!();
                 println!("Examples:");
-                println!("  pe build app.pl                     # → ./app");
-                println!("  pe build app.pl -o /usr/local/bin/app");
+                println!("  fo build app.pl                     # → ./app");
+                println!("  fo build app.pl -o /usr/local/bin/app");
                 return 0;
             }
             s if script.is_none() && !s.starts_with('-') => script = Some(s.to_string()),
             other => {
-                eprintln!("pe build: unknown argument: {}", other);
-                eprintln!("usage: pe build SCRIPT [-o OUTPUT]");
+                eprintln!("fo build: unknown argument: {}", other);
+                eprintln!("usage: fo build SCRIPT [-o OUTPUT]");
                 return 2;
             }
         }
         i += 1;
     }
     let Some(script) = script else {
-        eprintln!("pe build: missing SCRIPT");
-        eprintln!("usage: pe build SCRIPT [-o OUTPUT]");
+        eprintln!("fo build: missing SCRIPT");
+        eprintln!("usage: fo build SCRIPT [-o OUTPUT]");
         return 2;
     };
     let script_path = PathBuf::from(&script);
@@ -1608,9 +1606,9 @@ fn run_build_subcommand(args: &[String]) -> i32 {
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_else(|| "a.out".to_string())
     }));
-    match perlrs::aot::build(&script_path, &out_path) {
+    match forge::aot::build(&script_path, &out_path) {
         Ok(p) => {
-            eprintln!("pe build: wrote {}", p.display());
+            eprintln!("fo build: wrote {}", p.display());
             0
         }
         Err(e) => {
@@ -1620,7 +1618,7 @@ fn run_build_subcommand(args: &[String]) -> i32 {
     }
 }
 
-/// `pe convert FILE...` — convert Perl source to idiomatic perlrs syntax.
+/// `fo convert FILE...` — convert Perl source to idiomatic forge syntax.
 fn run_convert_subcommand(args: &[String]) -> i32 {
     let mut files: Vec<String> = Vec::new();
     let mut in_place = false;
@@ -1632,13 +1630,13 @@ fn run_convert_subcommand(args: &[String]) -> i32 {
             "-d" | "--output-delim" => {
                 i += 1;
                 if i >= args.len() {
-                    eprintln!("pe convert: --output-delim requires an argument");
+                    eprintln!("fo convert: --output-delim requires an argument");
                     return 2;
                 }
                 let delim_str = &args[i];
                 if delim_str.chars().count() != 1 {
                     eprintln!(
-                        "pe convert: --output-delim must be a single character, got {:?}",
+                        "fo convert: --output-delim must be a single character, got {:?}",
                         delim_str
                     );
                     return 2;
@@ -1646,28 +1644,28 @@ fn run_convert_subcommand(args: &[String]) -> i32 {
                 output_delim = delim_str.chars().next();
             }
             "-h" | "--help" => {
-                println!("usage: pe convert [-i] [-d DELIM] FILE...");
+                println!("usage: fo convert [-i] [-d DELIM] FILE...");
                 println!();
-                println!("Convert standard Perl source to idiomatic perlrs syntax:");
+                println!("Convert standard Perl source to idiomatic forge syntax:");
                 println!("  - Nested calls → |> pipe-forward chains");
                 println!("  - map/grep/sort/join LIST → LIST |> map/grep/sort/join");
                 println!("  - No trailing semicolons");
                 println!("  - 4-space indentation");
-                println!("  - #!/usr/bin/env perlrs shebang");
+                println!("  - #!/usr/bin/env forge shebang");
                 println!();
                 println!("Options:");
                 println!("  -i, --in-place       Write .pr files alongside originals");
                 println!("  -d, --output-delim   Delimiter for s///, tr///, m// (default: preserve original)");
                 println!();
                 println!("Examples:");
-                println!("  pe convert app.pl              # print to stdout");
-                println!("  pe convert -i lib/*.pm         # write lib/*.pr");
-                println!("  pe convert -d '|' app.pl       # use | as delimiter: s|old|new|g");
+                println!("  fo convert app.pl              # print to stdout");
+                println!("  fo convert -i lib/*.pm         # write lib/*.pr");
+                println!("  fo convert -d '|' app.pl       # use | as delimiter: s|old|new|g");
                 return 0;
             }
             s if s.starts_with('-') => {
-                eprintln!("pe convert: unknown option: {}", s);
-                eprintln!("usage: pe convert [-i] [-d DELIM] FILE...");
+                eprintln!("fo convert: unknown option: {}", s);
+                eprintln!("usage: fo convert [-i] [-d DELIM] FILE...");
                 return 2;
             }
             s => files.push(s.to_string()),
@@ -1675,34 +1673,34 @@ fn run_convert_subcommand(args: &[String]) -> i32 {
         i += 1;
     }
     if files.is_empty() {
-        eprintln!("pe convert: no input files");
-        eprintln!("usage: pe convert [-i] [-d DELIM] FILE...");
+        eprintln!("fo convert: no input files");
+        eprintln!("usage: fo convert [-i] [-d DELIM] FILE...");
         return 2;
     }
-    let opts = perlrs::convert::ConvertOptions { output_delim };
+    let opts = forge::convert::ConvertOptions { output_delim };
     let mut errors = 0;
     for f in &files {
         let code = match std::fs::read_to_string(f) {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("pe convert: {}: {}", f, e);
+                eprintln!("fo convert: {}: {}", f, e);
                 errors += 1;
                 continue;
             }
         };
-        let program = match perlrs::parse_with_file(&code, f) {
+        let program = match forge::parse_with_file(&code, f) {
             Ok(p) => p,
             Err(e) => {
-                eprintln!("pe convert: {}: {}", f, e);
+                eprintln!("fo convert: {}: {}", f, e);
                 errors += 1;
                 continue;
             }
         };
-        let converted = perlrs::convert_to_perlrs_with_options(&program, &opts);
+        let converted = forge::convert_to_forge_with_options(&program, &opts);
         if in_place {
             let out_path = std::path::Path::new(f).with_extension("pr");
             if let Err(e) = std::fs::write(&out_path, &converted) {
-                eprintln!("pe convert: {}: {}", out_path.display(), e);
+                eprintln!("fo convert: {}: {}", out_path.display(), e);
                 errors += 1;
             }
         } else {
@@ -1716,29 +1714,29 @@ fn run_convert_subcommand(args: &[String]) -> i32 {
     }
 }
 
-/// `pe serve [PORT] [SCRIPT]` or `pe serve [PORT] -e CODE` — start an HTTP server (default port 8000).
+/// `fo serve [PORT] [SCRIPT]` or `fo serve [PORT] -e CODE` — start an HTTP server (default port 8000).
 ///
 /// Wraps the user's handler in `serve(PORT, fn ($req) { ... })`.
 fn run_serve_subcommand(args: &[String]) -> i32 {
     if !args.is_empty() && (args[0] == "-h" || args[0] == "--help") {
-        eprintln!("usage: pe serve [PORT] [SCRIPT | -e CODE]");
+        eprintln!("usage: fo serve [PORT] [SCRIPT | -e CODE]");
         eprintln!();
-        eprintln!("  pe serve                   serve $PWD on port 8000");
-        eprintln!("  pe serve PORT              serve $PWD as static files");
-        eprintln!("  pe serve PORT SCRIPT       run script (must call serve())");
-        eprintln!("  pe serve PORT -e CODE      one-liner handler");
+        eprintln!("  fo serve                   serve $PWD on port 8000");
+        eprintln!("  fo serve PORT              serve $PWD as static files");
+        eprintln!("  fo serve PORT SCRIPT       run script (must call serve())");
+        eprintln!("  fo serve PORT -e CODE      one-liner handler");
         eprintln!();
         eprintln!("  Handler receives $req (hashref: method, path, query, headers, body, peer)");
         eprintln!("  and returns: string (200 OK), key-value pairs, hashref, or undef (404).");
         eprintln!();
         eprintln!("examples:");
         eprintln!(
-            "  pe serve                                              # static file server on 8000"
+            "  fo serve                                              # static file server on 8000"
         );
-        eprintln!("  pe serve 8080                                         # static file server");
-        eprintln!("  pe serve 8080 app.pr                                  # script handler");
-        eprintln!("  pe serve 3000 -e '\"hello \" . $req->{{path}}'           # one-liner");
-        eprintln!("  pe serve 8080 -e 'status => 200, body => json_encode(+{{ok => 1}})'");
+        eprintln!("  fo serve 8080                                         # static file server");
+        eprintln!("  fo serve 8080 app.pr                                  # script handler");
+        eprintln!("  fo serve 3000 -e '\"hello \" . $req->{{path}}'           # one-liner");
+        eprintln!("  fo serve 8080 -e 'status => 200, body => json_encode(+{{ok => 1}})'");
         return 0;
     }
 
@@ -1770,7 +1768,7 @@ fn run_serve_subcommand(args: &[String]) -> i32 {
 
     let code = if let Some(dir) = static_dir {
         let dir_escaped = dir.replace('\\', "\\\\").replace('"', "\\\"");
-        eprintln!("perlrs: serving {} on http://0.0.0.0:{}", dir, port);
+        eprintln!("forge: serving {} on http://0.0.0.0:{}", dir, port);
         format!(
             r#"
 chdir "{dir_escaped}"
@@ -1839,7 +1837,7 @@ fn dir_listing($url_path, $fs_path) {{
     . "<style>body{{font-family:monospace;margin:2em}}a{{text-decoration:none}}a:hover{{text-decoration:underline}}li{{padding:2px 0}}.dir{{font-weight:bold}}</style>"
     . "</head><body><h1>Directory listing for $url_path</h1><hr><ul>"
     . $html
-    . "</ul><hr><p style=\"color:#888\">perlrs/{port}</p></body></html>"
+    . "</ul><hr><p style=\"color:#888\">forge/{port}</p></body></html>"
 }}
 
 serve {port}, fn ($req) {{
@@ -1865,31 +1863,31 @@ serve {port}, fn ($req) {{
         )
     } else if rest[0] == "-e" {
         if rest.len() < 2 {
-            eprintln!("pe serve: -e requires an argument");
+            eprintln!("fo serve: -e requires an argument");
             return 1;
         }
         let handler_body = rest[1..].join(" ");
         format!("serve {}, fn ($req) {{ {} }}", port, handler_body)
     } else {
         // Script file — the script must call serve() itself.
-        // PORT is injected as $ENV{PERLRS_PORT} for convenience.
+        // PORT is injected as $ENV{FORGE_PORT} for convenience.
         let script_path = &rest[0];
         match std::fs::read_to_string(script_path) {
             Ok(src) => {
-                format!("$ENV{{PERLRS_PORT}} = {}\n{}", port, src)
+                format!("$ENV{{FORGE_PORT}} = {}\n{}", port, src)
             }
             Err(e) => {
-                eprintln!("pe serve: {}: {}", script_path, e);
+                eprintln!("fo serve: {}: {}", script_path, e);
                 return 1;
             }
         }
     };
 
-    let mut interp = perlrs::interpreter::Interpreter::new();
-    match perlrs::parse_and_run_string(&code, &mut interp) {
+    let mut interp = forge::interpreter::Interpreter::new();
+    match forge::parse_and_run_string(&code, &mut interp) {
         Ok(_) => 0,
         Err(e) => {
-            if let perlrs::error::ErrorKind::Exit(code) = e.kind {
+            if let forge::error::ErrorKind::Exit(code) = e.kind {
                 return code;
             }
             eprintln!("{}", e);
@@ -1899,13 +1897,13 @@ serve {port}, fn ($req) {{
 }
 
 #[allow(non_snake_case)]
-/// `pe docs [TOPIC]` — interactive built-in documentation book.
+/// `fo docs [TOPIC]` — interactive built-in documentation book.
 ///
-/// - `pe docs`          → full-screen interactive book (vim-style navigation)
-/// - `pe docs TOPIC`    → single-topic lookup
-/// - `pe docs -t`       → table of contents
-/// - `pe docs -s PAT`   → search topics
-/// - `pe docs -h`       → help
+/// - `fo docs`          → full-screen interactive book (vim-style navigation)
+/// - `fo docs TOPIC`    → single-topic lookup
+/// - `fo docs -t`       → table of contents
+/// - `fo docs -s PAT`   → search topics
+/// - `fo docs -h`       → help
 fn run_doc_subcommand(args: &[String]) -> i32 {
     let theme = DocTheme {
         C: "\x1b[36m",
@@ -1931,9 +1929,9 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
     let mut entries: Vec<(&str, &str, String)> = Vec::new();
     let mut seen = std::collections::HashSet::new();
     let mut seen_text_ptrs = std::collections::HashSet::new();
-    for &(category, topics) in perlrs::lsp::DOC_CATEGORIES {
+    for &(category, topics) in forge::lsp::DOC_CATEGORIES {
         for &topic in topics {
-            if let Some(text) = perlrs::lsp::doc_text_for(topic) {
+            if let Some(text) = forge::lsp::doc_text_for(topic) {
                 let ptr = text.as_ptr() as usize;
                 if !seen_text_ptrs.insert(ptr) {
                     seen.insert(topic);
@@ -1946,11 +1944,11 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         }
     }
     // Pick up every documented topic not yet in a category
-    for topic in perlrs::lsp::doc_topics() {
+    for topic in forge::lsp::doc_topics() {
         if seen.contains(topic) {
             continue;
         }
-        if let Some(text) = perlrs::lsp::doc_text_for(topic) {
+        if let Some(text) = forge::lsp::doc_text_for(topic) {
             let ptr = text.as_ptr() as usize;
             if !seen_text_ptrs.insert(ptr) {
                 continue; // alias already rendered
@@ -1960,7 +1958,7 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         }
     }
     if entries.is_empty() {
-        eprintln!("pe docs: no documentation pages found");
+        eprintln!("fo docs: no documentation pages found");
         return 1;
     }
 
@@ -1971,12 +1969,12 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
 
     // Insert intro page at position 0
     let entry_count = entries.len();
-    let chapter_count = perlrs::lsp::DOC_CATEGORIES.len();
+    let chapter_count = forge::lsp::DOC_CATEGORIES.len();
     let mut intro = format!(
         "\
-  {D}>> THE PERLRS ENCYCLOPEDIA // INTERACTIVE REFERENCE SYSTEM <<{N}\n\
+  {D}>> THE FORGE ENCYCLOPEDIA // INTERACTIVE REFERENCE SYSTEM <<{N}\n\
 \n\
-  {B}A comprehensive reference for every perlrs builtin, keyword,{N}\n\
+  {B}A comprehensive reference for every forge builtin, keyword,{N}\n\
   {B}and extension. {G}{entry_count}{N} {B}topics across {G}{chapter_count}{N} {B}chapters.{N}\n\
 \n\
   {D}── GETTING STARTED ─────────────────────────────────────────────{N}\n\
@@ -1996,7 +1994,7 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
   {D}── CHAPTERS ───────────────────────────────────────────────────{N}\n\
 "
     );
-    for (i, &(cat, topics)) in perlrs::lsp::DOC_CATEGORIES.iter().enumerate() {
+    for (i, &(cat, topics)) in forge::lsp::DOC_CATEGORIES.iter().enumerate() {
         intro.push_str(&format!(
             "  {C}{:>2}.{N} {B}{:<32}{N} {D}{} topics{N}\n",
             i + 1,
@@ -2019,13 +2017,13 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         doc_print_banner(theme);
         doc_print_hline('┌', '┐', theme);
         doc_print_boxline(
-            &format!(" {G}STATUS: ONLINE{N}  {D}//{N} {C}SIGNAL: {G}████████{D}░░{N}  {D}//{N} {M}PERLRS DOCS{N}"),
+            &format!(" {G}STATUS: ONLINE{N}  {D}//{N} {C}SIGNAL: {G}████████{D}░░{N}  {D}//{N} {M}FORGE DOCS{N}"),
             theme,
         );
         doc_print_hline('└', '┘', theme);
-        println!("  {D}>> THE PERLRS ENCYCLOPEDIA // INTERACTIVE REFERENCE SYSTEM <<{N}");
+        println!("  {D}>> THE FORGE ENCYCLOPEDIA // INTERACTIVE REFERENCE SYSTEM <<{N}");
         println!();
-        println!("  {B}USAGE:{N} pe docs {D}[OPTIONS] [PAGE|TOPIC]{N}");
+        println!("  {B}USAGE:{N} fo docs {D}[OPTIONS] [PAGE|TOPIC]{N}");
         println!();
         doc_print_separator("OPTIONS", theme);
         println!("  {C}-h, --help{N}                          {D}// Show this help{N}");
@@ -2033,7 +2031,7 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         println!("  {C}-s, --search <pattern>{N}              {D}// Search pages{N}");
         println!("  {C}-l, --list{N}                          {D}// List all pages{N}");
         println!(
-            "  {C}TOPIC{N}                               {D}// Jump to topic (pe docs pmap){N}"
+            "  {C}TOPIC{N}                               {D}// Jump to topic (fo docs pmap){N}"
         );
         println!("  {C}PAGE{N}                                {D}// Jump to page number{N}");
         println!();
@@ -2054,11 +2052,11 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         println!("  {C}q{N}                                   {D}// Quit{N}");
         println!();
         doc_print_separator("EXAMPLES", theme);
-        println!("  {C}pe docs{N}                             {D}// start from page 1{N}");
-        println!("  {C}pe docs --toc{N}                       {D}// table of contents{N}");
-        println!("  {C}pe docs 42{N}                          {D}// jump to page 42{N}");
-        println!("  {C}pe docs pmap{N}                        {D}// jump to pmap{N}");
-        println!("  {C}pe docs --search parallel{N}           {D}// find parallel pages{N}");
+        println!("  {C}fo docs{N}                             {D}// start from page 1{N}");
+        println!("  {C}fo docs --toc{N}                       {D}// table of contents{N}");
+        println!("  {C}fo docs 42{N}                          {D}// jump to page 42{N}");
+        println!("  {C}fo docs pmap{N}                        {D}// jump to pmap{N}");
+        println!("  {C}fo docs --search parallel{N}           {D}// find parallel pages{N}");
         println!();
         return 0;
     }
@@ -2132,8 +2130,8 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
                         .unwrap_or(0);
                 }
                 None => {
-                    eprintln!("pe docs: no documentation for '{}'", arg);
-                    eprintln!("run 'pe docs -h' for help");
+                    eprintln!("fo docs: no documentation for '{}'", arg);
+                    eprintln!("run 'fo docs -h' for help");
                     return 1;
                 }
             }
@@ -2660,7 +2658,7 @@ fn doc_print_toc_entries(
     doc_print_hline('┌', '┐', theme);
     doc_print_boxline(
         &format!(
-            " {G}TABLE OF CONTENTS{N}  {D}//{N} {C}{topic_count} topics, {page_count} pages{N}  {D}//{N} {M}The perlrs Encyclopedia{N}"
+            " {G}TABLE OF CONTENTS{N}  {D}//{N} {C}{topic_count} topics, {page_count} pages{N}  {D}//{N} {M}The forge Encyclopedia{N}"
         ),
         theme,
     );
@@ -2773,7 +2771,7 @@ fn render_inline_code(line: &str, color: &str, reset: &str) -> String {
     out
 }
 
-/// `pe deconvert FILE...` — convert perlrs .pr files back to standard Perl .pl syntax.
+/// `fo deconvert FILE...` — convert forge .pr files back to standard Perl .pl syntax.
 fn run_deconvert_subcommand(args: &[String]) -> i32 {
     let mut files: Vec<String> = Vec::new();
     let mut in_place = false;
@@ -2785,13 +2783,13 @@ fn run_deconvert_subcommand(args: &[String]) -> i32 {
             "-d" | "--output-delim" => {
                 i += 1;
                 if i >= args.len() {
-                    eprintln!("pe deconvert: --output-delim requires an argument");
+                    eprintln!("fo deconvert: --output-delim requires an argument");
                     return 2;
                 }
                 let delim_str = &args[i];
                 if delim_str.chars().count() != 1 {
                     eprintln!(
-                        "pe deconvert: --output-delim must be a single character, got {:?}",
+                        "fo deconvert: --output-delim must be a single character, got {:?}",
                         delim_str
                     );
                     return 2;
@@ -2799,9 +2797,9 @@ fn run_deconvert_subcommand(args: &[String]) -> i32 {
                 output_delim = delim_str.chars().next();
             }
             "-h" | "--help" => {
-                println!("usage: pe deconvert [-i] [-d DELIM] FILE...");
+                println!("usage: fo deconvert [-i] [-d DELIM] FILE...");
                 println!();
-                println!("Convert perlrs .pr files back to standard Perl .pl syntax:");
+                println!("Convert forge .pr files back to standard Perl .pl syntax:");
                 println!("  - Pipe chains and thread macros → nested function calls");
                 println!("  - fn → sub");
                 println!("  - p → say");
@@ -2813,14 +2811,14 @@ fn run_deconvert_subcommand(args: &[String]) -> i32 {
                 println!("  -d, --output-delim   Delimiter for s///, tr///, m// (default: preserve original)");
                 println!();
                 println!("Examples:");
-                println!("  pe deconvert app.pr              # print to stdout");
-                println!("  pe deconvert -i lib/*.pr         # write lib/*.pl");
-                println!("  pe deconvert -d '|' app.pr       # use | as delimiter: s|old|new|g");
+                println!("  fo deconvert app.pr              # print to stdout");
+                println!("  fo deconvert -i lib/*.pr         # write lib/*.pl");
+                println!("  fo deconvert -d '|' app.pr       # use | as delimiter: s|old|new|g");
                 return 0;
             }
             s if s.starts_with('-') => {
-                eprintln!("pe deconvert: unknown option: {}", s);
-                eprintln!("usage: pe deconvert [-i] [-d DELIM] FILE...");
+                eprintln!("fo deconvert: unknown option: {}", s);
+                eprintln!("usage: fo deconvert [-i] [-d DELIM] FILE...");
                 return 2;
             }
             s => files.push(s.to_string()),
@@ -2828,34 +2826,34 @@ fn run_deconvert_subcommand(args: &[String]) -> i32 {
         i += 1;
     }
     if files.is_empty() {
-        eprintln!("pe deconvert: no input files");
-        eprintln!("usage: pe deconvert [-i] [-d DELIM] FILE...");
+        eprintln!("fo deconvert: no input files");
+        eprintln!("usage: fo deconvert [-i] [-d DELIM] FILE...");
         return 2;
     }
-    let opts = perlrs::deconvert::DeconvertOptions { output_delim };
+    let opts = forge::deconvert::DeconvertOptions { output_delim };
     let mut errors = 0;
     for f in &files {
         let code = match std::fs::read_to_string(f) {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("pe deconvert: {}: {}", f, e);
+                eprintln!("fo deconvert: {}: {}", f, e);
                 errors += 1;
                 continue;
             }
         };
-        let program = match perlrs::parse_with_file(&code, f) {
+        let program = match forge::parse_with_file(&code, f) {
             Ok(p) => p,
             Err(e) => {
-                eprintln!("pe deconvert: {}: {}", f, e);
+                eprintln!("fo deconvert: {}: {}", f, e);
                 errors += 1;
                 continue;
             }
         };
-        let deconverted = perlrs::deconvert_to_perl_with_options(&program, &opts);
+        let deconverted = forge::deconvert_to_perl_with_options(&program, &opts);
         if in_place {
             let out_path = std::path::Path::new(f).with_extension("pl");
             if let Err(e) = std::fs::write(&out_path, &deconverted) {
-                eprintln!("pe deconvert: {}: {}", out_path.display(), e);
+                eprintln!("fo deconvert: {}: {}", out_path.display(), e);
                 errors += 1;
             }
         } else {
@@ -2902,7 +2900,7 @@ fn strip_shebang_and_extract(content: &str, extract: bool) -> String {
 }
 
 /// Heuristic: does this string look like inline code rather than a filename?
-/// Used for `pe 'p 1+2'` (no `-e` needed).
+/// Used for `fo 'p 1+2'` (no `-e` needed).
 fn looks_like_code(s: &str) -> bool {
     // Contains whitespace, Perl operators, or known statement starters
     s.contains(' ')
@@ -2952,7 +2950,7 @@ fn print_config(configvar: Option<&str>) {
             "cc" => "rustc".to_string(),
             "optimize" => "-O3 -lto".to_string(),
             "prefix" | "installprefix" => "/usr/local".to_string(),
-            "perlpath" => "perlrs".to_string(),
+            "perlpath" => "forge".to_string(),
             _ => {
                 eprintln!("Unknown config variable: {}", var);
                 return;
@@ -2960,7 +2958,7 @@ fn print_config(configvar: Option<&str>) {
         };
         println!("{}='{}'", var, val);
     } else {
-        println!("Summary of perlrs v{} configuration:\n", version);
+        println!("Summary of forge v{} configuration:\n", version);
         println!("  Platform:");
         println!("    osname={}, archname={}-{}", os, arch, os);
         println!("  Compiler:");
@@ -2972,7 +2970,7 @@ fn print_config(configvar: Option<&str>) {
         println!("  Parallel extensions:");
         println!("    rayon=define, pmap=define, pmap_chunked=define, pipeline=define, par_pipeline=define, async=define, await=define, pgrep=define, pfor=define, psort=define, reduce=define, preduce=define, preduce_init=define, jit=define");
         println!("  Install:");
-        println!("    perlpath=perlrs");
+        println!("    perlpath=forge");
     }
 }
 
@@ -2987,7 +2985,7 @@ mod cli_argv_tests {
 
     #[test]
     fn prelude_inserts_double_dash_before_script_argv_long_flags() {
-        let a = args(&["perlrs", "s.pl", "--regex", "--foo"]);
+        let a = args(&["forge", "s.pl", "--regex", "--foo"]);
         let cli = parse_cli_prelude(&a).expect("expected prelude parse");
         assert_eq!(cli.script.as_deref(), Some("s.pl"));
         assert_eq!(cli.args, vec!["--regex".to_string(), "--foo".to_string()]);
@@ -2995,7 +2993,7 @@ mod cli_argv_tests {
 
     #[test]
     fn prelude_with_dash_w_before_script() {
-        let a = args(&["perlrs", "-w", "s.pl", "--regex"]);
+        let a = args(&["forge", "-w", "s.pl", "--regex"]);
         let cli = parse_cli_prelude(&a).expect("expected prelude parse");
         assert!(cli.warnings);
         assert_eq!(cli.script.as_deref(), Some("s.pl"));
@@ -3004,7 +3002,7 @@ mod cli_argv_tests {
 
     #[test]
     fn prelude_dash_e_then_argv_with_long_flag() {
-        let a = args(&["perlrs", "-e", "1", "foo", "--regex"]);
+        let a = args(&["forge", "-e", "1", "foo", "--regex"]);
         let mut cli = parse_cli_prelude(&a).expect("expected prelude parse");
         normalize_argv_after_dash_e(&mut cli);
         assert_eq!(cli.execute, vec!["1"]);
@@ -3014,7 +3012,7 @@ mod cli_argv_tests {
 
     #[test]
     fn explicit_user_double_dash_skips_prelude() {
-        let a = args(&["perlrs", "--", "s.pl", "x"]);
+        let a = args(&["forge", "--", "s.pl", "x"]);
         assert!(parse_cli_prelude(&a).is_none());
     }
 
@@ -3026,7 +3024,7 @@ mod cli_argv_tests {
             ("-lne", "print 3", false, true),
             ("-lnE", "say 4", false, true),
         ] {
-            let a = expand_perl_bundled_argv(args(&["perlrs", flag, code]));
+            let a = expand_perl_bundled_argv(args(&["forge", flag, code]));
             let cli = Cli::try_parse_from(&a).expect("parse bundled flags");
             assert!(
                 cli.line_ending.is_some(),
@@ -3046,7 +3044,7 @@ mod cli_argv_tests {
 
     #[test]
     fn bundled_lpe_preserves_print_mode() {
-        let a = expand_perl_bundled_argv(args(&["perlrs", "-lpe", "print 1"]));
+        let a = expand_perl_bundled_argv(args(&["forge", "-lpe", "print 1"]));
         let cli = Cli::try_parse_from(&a).expect("parse");
         assert!(cli.print_mode);
         assert_eq!(cli.execute, vec!["print 1"]);
@@ -3054,7 +3052,7 @@ mod cli_argv_tests {
 
     #[test]
     fn bundled_0777_not_split() {
-        let a = expand_perl_bundled_argv(args(&["perlrs", "-0777", "-e", "1"]));
+        let a = expand_perl_bundled_argv(args(&["forge", "-0777", "-e", "1"]));
         assert!(
             a.contains(&"-0777".to_string()),
             "expected -0777 kept intact: {a:?}"
@@ -3063,7 +3061,7 @@ mod cli_argv_tests {
 
     #[test]
     fn bundled_0ne_splits_like_perl() {
-        let a = expand_perl_bundled_argv(args(&["perlrs", "-0ne", "print 1"]));
+        let a = expand_perl_bundled_argv(args(&["forge", "-0ne", "print 1"]));
         let cli = Cli::try_parse_from(&a).expect("parse");
         assert_eq!(cli.execute, vec!["print 1"]);
         assert!(cli.line_mode);
@@ -3071,7 +3069,7 @@ mod cli_argv_tests {
 
     #[test]
     fn bundled_f_colon_takes_rest_of_token() {
-        let a = expand_perl_bundled_argv(args(&["perlrs", "-F:", "-anE", "say $F[0]"]));
+        let a = expand_perl_bundled_argv(args(&["forge", "-F:", "-anE", "say $F[0]"]));
         let cli = Cli::try_parse_from(&a).expect("parse");
         assert_eq!(cli.field_separator.as_deref(), Some(":"));
         assert!(cli.auto_split);
@@ -3081,14 +3079,14 @@ mod cli_argv_tests {
 
     #[test]
     fn bundled_f_comma_takes_rest_of_token() {
-        let a = expand_perl_bundled_argv(args(&["perlrs", "-F,", "-anE", "print 1"]));
+        let a = expand_perl_bundled_argv(args(&["forge", "-F,", "-anE", "print 1"]));
         let cli = Cli::try_parse_from(&a).expect("parse");
         assert_eq!(cli.field_separator.as_deref(), Some(","));
     }
 
     #[test]
     fn help_alias_not_bundled_as_h_e_l_p() {
-        let a = expand_perl_bundled_argv(args(&["perlrs", "-help"]));
+        let a = expand_perl_bundled_argv(args(&["forge", "-help"]));
         let cli = Cli::try_parse_from(&a).expect("parse");
         assert!(cli.help);
     }

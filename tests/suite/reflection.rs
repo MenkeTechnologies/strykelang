@@ -1,28 +1,28 @@
-//! Reflection hashes exposed under the `perlrs::` namespace plus short
+//! Reflection hashes exposed under the `forge::` namespace plus short
 //! one-char aliases. Seven hashes; every direct lookup is O(1).
 //!
-//!   %b  / %perlrs::builtins      — name → category
-//!   %pc / %perlrs::perl_compats  — subset: Perl 5 core only
-//!   %e  / %perlrs::extensions    — subset: perlrs-only
-//!   %a  / %perlrs::aliases       — alias → primary
-//!   %d  / %perlrs::descriptions  — name → LSP one-liner (sparse)
-//!   %c  / %perlrs::categories    — category → arrayref of names
-//!   %p  / %perlrs::primaries     — primary → arrayref of aliases
+//!   %b  / %forge::builtins      — name → category
+//!   %pc / %forge::perl_compats  — subset: Perl 5 core only
+//!   %e  / %forge::extensions    — subset: forge-only
+//!   %a  / %forge::aliases       — alias → primary
+//!   %d  / %forge::descriptions  — name → LSP one-liner (sparse)
+//!   %c  / %forge::categories    — category → arrayref of names
+//!   %p  / %forge::primaries     — primary → arrayref of aliases
 
 use crate::common::{eval_int, eval_string};
 
 /// `%builtins` values are category strings, not set placeholders.
 #[test]
 fn builtins_values_are_category_strings() {
-    assert_eq!(eval_string(r#"$perlrs::builtins{pmap}"#), "parallel");
-    assert_eq!(eval_string(r#"$perlrs::builtins{map}"#), "array / list");
-    assert_eq!(eval_string(r#"$perlrs::builtins{uc}"#), "string");
+    assert_eq!(eval_string(r#"$forge::builtins{pmap}"#), "parallel");
+    assert_eq!(eval_string(r#"$forge::builtins{map}"#), "array / list");
+    assert_eq!(eval_string(r#"$forge::builtins{uc}"#), "string");
 
     let empty = eval_int(
         r#"
         my $n = 0;
-        for my $k (keys %perlrs::builtins) {
-            $n++ if $perlrs::builtins{$k} eq "";
+        for my $k (keys %forge::builtins) {
+            $n++ if $forge::builtins{$k} eq "";
         }
         $n
         "#,
@@ -33,13 +33,13 @@ fn builtins_values_are_category_strings() {
     );
 }
 
-/// `%perl_compats` holds only Perl 5 core; `%extensions` only perlrs-only.
+/// `%perl_compats` holds only Perl 5 core; `%extensions` only forge-only.
 /// Together they partition `%builtins` exactly.
 #[test]
 fn perl_compats_and_extensions_partition_builtins() {
-    let n_b = eval_int(r#"scalar keys %perlrs::builtins"#);
-    let n_pc = eval_int(r#"scalar keys %perlrs::perl_compats"#);
-    let n_e = eval_int(r#"scalar keys %perlrs::extensions"#);
+    let n_b = eval_int(r#"scalar keys %forge::builtins"#);
+    let n_pc = eval_int(r#"scalar keys %forge::perl_compats"#);
+    let n_e = eval_int(r#"scalar keys %forge::extensions"#);
     assert_eq!(
         n_b,
         n_pc + n_e,
@@ -52,18 +52,18 @@ fn perl_compats_and_extensions_partition_builtins() {
 
     // Sample membership.
     assert_eq!(
-        eval_int(r#"exists $perlrs::perl_compats{keys} ? 1 : 0"#),
+        eval_int(r#"exists $forge::perl_compats{keys} ? 1 : 0"#),
         1,
         "keys must be in %perl_compats",
     );
     assert_eq!(
-        eval_int(r#"exists $perlrs::extensions{pmap} ? 1 : 0"#),
+        eval_int(r#"exists $forge::extensions{pmap} ? 1 : 0"#),
         1,
         "pmap must be in %extensions",
     );
     // Disjointness on a known name.
     assert_eq!(
-        eval_int(r#"exists $perlrs::extensions{keys} ? 1 : 0"#),
+        eval_int(r#"exists $forge::extensions{keys} ? 1 : 0"#),
         0,
         "keys is core, must not be in %extensions",
     );
@@ -74,12 +74,12 @@ fn perl_compats_and_extensions_partition_builtins() {
 #[test]
 fn subset_values_match_builtins() {
     assert_eq!(
-        eval_string(r#"$perlrs::perl_compats{map}"#),
-        eval_string(r#"$perlrs::builtins{map}"#),
+        eval_string(r#"$forge::perl_compats{map}"#),
+        eval_string(r#"$forge::builtins{map}"#),
     );
     assert_eq!(
-        eval_string(r#"$perlrs::extensions{pmap}"#),
-        eval_string(r#"$perlrs::builtins{pmap}"#),
+        eval_string(r#"$forge::extensions{pmap}"#),
+        eval_string(r#"$forge::builtins{pmap}"#),
     );
 }
 
@@ -87,15 +87,15 @@ fn subset_values_match_builtins() {
 /// `%builtins` entry (no dangling targets).
 #[test]
 fn aliases_resolve_short_form_to_primary() {
-    assert_eq!(eval_string(r#"$perlrs::aliases{tj}"#), "to_json");
-    assert_eq!(eval_int(r#"exists $perlrs::aliases{to_json} ? 1 : 0"#), 0);
+    assert_eq!(eval_string(r#"$forge::aliases{tj}"#), "to_json");
+    assert_eq!(eval_int(r#"exists $forge::aliases{to_json} ? 1 : 0"#), 0);
 
     let dangling = eval_int(
         r#"
         my $n = 0;
-        for my $alias (keys %perlrs::aliases) {
-            my $primary = $perlrs::aliases{$alias};
-            $n++ unless exists $perlrs::builtins{$primary};
+        for my $alias (keys %forge::aliases) {
+            my $primary = $forge::aliases{$alias};
+            $n++ unless exists $forge::builtins{$primary};
         }
         $n
         "#,
@@ -106,18 +106,18 @@ fn aliases_resolve_short_form_to_primary() {
 /// `%descriptions` is sparse — only documented names.
 #[test]
 fn descriptions_cover_documented_names() {
-    let d = eval_string(r#"$perlrs::descriptions{pmap}"#);
+    let d = eval_string(r#"$forge::descriptions{pmap}"#);
     assert!(
         d.len() > 10,
         "%d{{pmap}} should be real sentence, got {:?}",
         d
     );
     assert_eq!(
-        eval_int(r#"exists $perlrs::descriptions{definitely_not_a_builtin_xyz} ? 1 : 0"#),
+        eval_int(r#"exists $forge::descriptions{definitely_not_a_builtin_xyz} ? 1 : 0"#),
         0,
     );
-    let n_desc = eval_int(r#"scalar keys %perlrs::descriptions"#);
-    let n_all = eval_int(r#"scalar keys %perlrs::all"#);
+    let n_desc = eval_int(r#"scalar keys %forge::descriptions"#);
+    let n_all = eval_int(r#"scalar keys %forge::all"#);
     assert!(
         n_desc > 0 && n_desc <= n_all,
         "%descriptions ({n_desc}) should be between 1 and |%all| ({n_all}) — \
@@ -130,7 +130,7 @@ fn descriptions_cover_documented_names() {
 #[test]
 fn categories_inverted_index_returns_name_arrayrefs() {
     // Expected category tags from the section comments.
-    let n_parallel = eval_int(r#"scalar @{ $perlrs::categories{parallel} }"#);
+    let n_parallel = eval_int(r#"scalar @{ $forge::categories{parallel} }"#);
     assert!(
         n_parallel >= 20,
         "expected ≥20 parallel ops, got {n_parallel}",
@@ -139,8 +139,8 @@ fn categories_inverted_index_returns_name_arrayrefs() {
     // whose value is "string".
     let mismatch = eval_int(
         r#"
-        my %from_c = map { $_ => 1 } @{ $perlrs::categories{"string"} };
-        my @from_b = grep { $perlrs::builtins{$_} eq "string" } keys %perlrs::builtins;
+        my %from_c = map { $_ => 1 } @{ $forge::categories{"string"} };
+        my @from_b = grep { $forge::builtins{$_} eq "string" } keys %forge::builtins;
         my $n = 0;
         for my $k (@from_b) { $n++ unless $from_c{$k}; }
         $n += scalar(keys %from_c) - scalar(@from_b);
@@ -161,7 +161,7 @@ fn primaries_inverted_index_returns_alias_arrayrefs() {
     // `to_json` has `tj` as an alias.
     let tj_in = eval_int(
         r#"
-        my $aliases = $perlrs::primaries{to_json}
+        my $aliases = $forge::primaries{to_json}
         my $found = 0
         for my $a (@$aliases) { $found = 1 if $a eq "tj"; }
         $found
@@ -172,7 +172,7 @@ fn primaries_inverted_index_returns_alias_arrayrefs() {
     // `basename` has `bn` as an alias.
     let bn_in = eval_int(
         r#"
-        my $aliases = $perlrs::primaries{basename}
+        my $aliases = $forge::primaries{basename}
         my $found = 0
         for my $a (@$aliases) { $found = 1 if $a eq "bn"; }
         $found
@@ -185,8 +185,8 @@ fn primaries_inverted_index_returns_alias_arrayrefs() {
     let dangling = eval_int(
         r#"
         my $n = 0
-        for my $primary (keys %perlrs::primaries) {
-            $n++ unless exists $perlrs::builtins{$primary};
+        for my $primary (keys %forge::primaries) {
+            $n++ unless exists $forge::builtins{$primary};
         }
         $n
         "#,
@@ -211,8 +211,8 @@ fn short_aliases_mirror_long_names() {
 }
 
 /// Every `try_builtin` dispatch primary must land in either `is_perl5_core`
-/// or `perlrs_extension_name` — otherwise `--compat` mode silently accepts
-/// it (bypasses the `perlrs_extension_name` gate) and `%builtins` tags it
+/// or `forge_extension_name` — otherwise `--compat` mode silently accepts
+/// it (bypasses the `forge_extension_name` gate) and `%builtins` tags it
 /// `"uncategorized"` instead of a real category.
 ///
 /// On failure, the message lists every offender so the fix is mechanical:
@@ -223,8 +223,8 @@ fn every_dispatch_primary_is_categorized() {
     let out = eval_string(
         r#"
         my @bad
-        for my $name (sort keys %perlrs::builtins) {
-            push @bad, $name if $perlrs::builtins{$name} eq "uncategorized"
+        for my $name (sort keys %forge::builtins) {
+            push @bad, $name if $forge::builtins{$name} eq "uncategorized"
         }
         join ",", @bad
         "#,
@@ -232,18 +232,18 @@ fn every_dispatch_primary_is_categorized() {
     assert!(
         out.is_empty(),
         "uncategorized dispatch primaries — add each to a `// ── category ──`\n\
-         section in parser.rs (is_perl5_core or perlrs_extension_name):\n    {out}",
+         section in parser.rs (is_perl5_core or forge_extension_name):\n    {out}",
     );
 }
 
 /// Catastrophic-regression floors on each hash.
 #[test]
 fn reflection_hashes_have_reasonable_sizes() {
-    assert!(eval_int(r#"scalar keys %perlrs::builtins"#) >= 200);
-    assert!(eval_int(r#"scalar keys %perlrs::perl_compats"#) >= 80);
-    assert!(eval_int(r#"scalar keys %perlrs::extensions"#) >= 100);
-    assert!(eval_int(r#"scalar keys %perlrs::aliases"#) >= 100);
-    assert!(eval_int(r#"scalar keys %perlrs::descriptions"#) >= 10);
-    assert!(eval_int(r#"scalar keys %perlrs::categories"#) >= 10);
-    assert!(eval_int(r#"scalar keys %perlrs::primaries"#) >= 100);
+    assert!(eval_int(r#"scalar keys %forge::builtins"#) >= 200);
+    assert!(eval_int(r#"scalar keys %forge::perl_compats"#) >= 80);
+    assert!(eval_int(r#"scalar keys %forge::extensions"#) >= 100);
+    assert!(eval_int(r#"scalar keys %forge::aliases"#) >= 100);
+    assert!(eval_int(r#"scalar keys %forge::descriptions"#) >= 10);
+    assert!(eval_int(r#"scalar keys %forge::categories"#) >= 10);
+    assert!(eval_int(r#"scalar keys %forge::primaries"#) >= 100);
 }

@@ -1,6 +1,6 @@
 package Scalar::Util;
 
-# Minimal stub — core `Scalar/Util.pm` pulls XS and `builtin::` ops that perlrs does not parse yet.
+# Minimal stub — core `Scalar/Util.pm` pulls XS and `builtin::` ops that forge does not parse yet.
 # Subroutines are registered natively by `list_util::install_scalar_util` (see interpreter startup).
 
 use strict;

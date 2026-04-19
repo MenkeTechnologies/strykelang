@@ -1,18 +1,18 @@
 //! Program from stdin: a piped script must be read in full (not only the first line).
-//! `perl -` / `perlrs -` reads the program from stdin even when a TTY would otherwise start the REPL.
+//! `perl -` / `forge -` reads the program from stdin even when a TTY would otherwise start the REPL.
 
 use std::io::Write;
 use std::process::{Command, Stdio};
 
 #[test]
-fn perlrs_reads_full_multiline_script_from_stdin_pipe() {
-    let exe = env!("CARGO_BIN_EXE_perlrs");
+fn forge_reads_full_multiline_script_from_stdin_pipe() {
+    let exe = env!("CARGO_BIN_EXE_forge");
     let mut child = Command::new(exe)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn perlrs");
+        .expect("spawn forge");
 
     let script = "#!/usr/bin/env perl\nsay 1;\nsay 2;\n";
     let mut stdin = child.stdin.take().expect("stdin");
@@ -29,15 +29,15 @@ fn perlrs_reads_full_multiline_script_from_stdin_pipe() {
 }
 
 #[test]
-fn perlrs_dash_reads_program_from_stdin() {
-    let exe = env!("CARGO_BIN_EXE_perlrs");
+fn forge_dash_reads_program_from_stdin() {
+    let exe = env!("CARGO_BIN_EXE_forge");
     let mut child = Command::new(exe)
         .arg("-")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn perlrs -");
+        .expect("spawn forge -");
 
     let script = "print \"ok\\n\";";
     let mut stdin = child.stdin.take().expect("stdin");
@@ -61,7 +61,7 @@ fn pe_reads_full_multiline_script_from_stdin_pipe() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn pe");
+        .expect("spawn fo");
 
     let script = "#!/usr/bin/env perl\nsay 1;\nsay 2;\n";
     let mut stdin = child.stdin.take().expect("stdin");

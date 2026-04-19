@@ -1,4 +1,4 @@
-//! Extra `perlrs::run()` semantics: strings, builtins, aggregates, control flow.
+//! Extra `forge::run()` semantics: strings, builtins, aggregates, control flow.
 
 use crate::error::ErrorKind;
 use crate::run;
@@ -639,7 +639,7 @@ fn stat_returns_thirteen_fields_in_scalar_context() {
 
 #[test]
 fn stat_missing_path_is_empty_list() {
-    assert_eq!(ri(r#"scalar stat "/no/such/path/perlrs-test-xyz";"#), 0);
+    assert_eq!(ri(r#"scalar stat "/no/such/path/forge-test-xyz";"#), 0);
 }
 
 #[test]
@@ -744,7 +744,7 @@ fn opendir_readdir_returns_name() {
 
 #[test]
 fn readdir_list_context_returns_all_remaining_entries() {
-    let base = std::env::temp_dir().join(format!("perlrs_sem_rdl_{}", std::process::id()));
+    let base = std::env::temp_dir().join(format!("forge_sem_rdl_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     std::fs::create_dir_all(&base).expect("mkdir");
     std::fs::write(base.join("a.txt"), b"x").expect("write");
@@ -770,7 +770,7 @@ fn rewinddir_resets_read_position() {
 
 #[test]
 fn perl_compat_opendir_finds_known_entry_in_temp_dir() {
-    let base = std::env::temp_dir().join(format!("perlrs_sem_od_{}", std::process::id()));
+    let base = std::env::temp_dir().join(format!("forge_sem_od_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     std::fs::create_dir_all(&base).expect("mkdir");
     std::fs::write(base.join("mark.txt"), b"x").expect("write");
@@ -794,7 +794,7 @@ fn perl_compat_opendir_finds_known_entry_in_temp_dir() {
 #[test]
 fn perl_compat_readlink_symlink_target_string() {
     use std::os::unix::fs::symlink;
-    let base = std::env::temp_dir().join(format!("perlrs_sem_rl_{}", std::process::id()));
+    let base = std::env::temp_dir().join(format!("forge_sem_rl_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     std::fs::create_dir_all(&base).expect("mkdir");
     let link = base.join("rl");
@@ -811,8 +811,8 @@ fn perl_compat_readlink_symlink_target_string() {
 #[test]
 fn perl_compat_hard_link_reads_same_bytes() {
     let dir = std::env::temp_dir();
-    let a = dir.join(format!("perlrs_sem_hl_a_{}", std::process::id()));
-    let b = dir.join(format!("perlrs_sem_hl_b_{}", std::process::id()));
+    let a = dir.join(format!("forge_sem_hl_a_{}", std::process::id()));
+    let b = dir.join(format!("forge_sem_hl_b_{}", std::process::id()));
     let _ = std::fs::remove_file(&a);
     let _ = std::fs::remove_file(&b);
     std::fs::write(&a, b"hl").expect("write");
@@ -835,7 +835,7 @@ fn tell_stdout_unbuffered_slot_returns_negative_one() {
 #[test]
 fn tell_writable_open_file_reports_byte_offset() {
     let dir = std::env::temp_dir();
-    let path = dir.join("perlrs_tell_semantics_test");
+    let path = dir.join("forge_tell_semantics_test");
     let _ = std::fs::remove_file(&path);
     let ps = path.to_string_lossy();
     let script = format!(r#"open F, ">", "{ps}"; print F "abc"; my $p = tell F; close F; $p"#);
@@ -896,7 +896,7 @@ fn perl_compat_array_assign_flattens_hash_to_key_value_list() {
 #[test]
 fn perl_compat_getc_reads_bytes_from_open_file() {
     let dir = std::env::temp_dir();
-    let path = dir.join("perlrs_getc_semantics_test");
+    let path = dir.join("forge_getc_semantics_test");
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, b"mn").expect("write temp");
     let ps = path.to_string_lossy();
@@ -934,7 +934,7 @@ fn perl_compat_qq_array_with_custom_list_separator() {
 #[test]
 fn perl_compat_sysseek_then_tell_on_open_file() {
     let dir = std::env::temp_dir();
-    let path = dir.join("perlrs_sysseek_semantics_test");
+    let path = dir.join("forge_sysseek_semantics_test");
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, b"ABCDE").expect("write temp");
     let ps = path.to_string_lossy();
@@ -961,7 +961,7 @@ fn perl_compat_scalar_values_hash() {
 #[test]
 fn perl_compat_eof_string_handle_open_vs_closed() {
     let dir = std::env::temp_dir();
-    let path = dir.join("perlrs_eof_semantics_test");
+    let path = dir.join("forge_eof_semantics_test");
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, b"z").expect("write temp");
     let ps = path.to_string_lossy();
@@ -984,7 +984,7 @@ fn perl_compat_eof_string_handle_open_vs_closed() {
 #[test]
 fn perl_compat_truncate_shortens_file_by_path() {
     let dir = std::env::temp_dir();
-    let path = dir.join("perlrs_truncate_semantics_test");
+    let path = dir.join("forge_truncate_semantics_test");
     let _ = std::fs::remove_file(&path);
     let ps = path.to_string_lossy();
     let script = format!(
@@ -1032,8 +1032,8 @@ fn perl_compat_unpack_after_pack_byte() {
 #[test]
 fn perl_compat_filetest_s_nonempty_and_z_empty() {
     let dir = std::env::temp_dir();
-    let nonempty = dir.join("perlrs_sem_filetest_s");
-    let empty = dir.join("perlrs_sem_filetest_z");
+    let nonempty = dir.join("forge_sem_filetest_s");
+    let empty = dir.join("forge_sem_filetest_z");
     let _ = std::fs::remove_file(&nonempty);
     let _ = std::fs::remove_file(&empty);
     std::fs::write(&nonempty, b"x").expect("write");
@@ -1053,7 +1053,7 @@ fn perl_compat_sleep_zero() {
 
 #[test]
 fn perl_compat_glob_txt_in_directory() {
-    let base = std::env::temp_dir().join(format!("perlrs_sem_glob_{}", std::process::id()));
+    let base = std::env::temp_dir().join(format!("forge_sem_glob_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     std::fs::create_dir_all(&base).expect("mkdir");
     std::fs::write(base.join("p.txt"), b"1").expect("write");
@@ -1310,7 +1310,7 @@ fn perl_compat_scalar_percent_href_empty_zero() {
 #[test]
 fn perl_compat_slurp_and_unlink_temp_file() {
     let dir = std::env::temp_dir();
-    let path = dir.join("perlrs_slurp_unlink_semantics");
+    let path = dir.join("forge_slurp_unlink_semantics");
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, b"ok").expect("write temp");
     let ps = path.to_string_lossy();
@@ -1324,7 +1324,7 @@ fn perl_compat_slurp_and_unlink_temp_file() {
 #[test]
 fn perl_compat_stat_size_and_missing_list() {
     let dir = std::env::temp_dir();
-    let path = dir.join("perlrs_sem_stat_sz");
+    let path = dir.join("forge_sem_stat_sz");
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, b"abcdef").expect("write temp");
     let ps = path.to_string_lossy();
@@ -1334,7 +1334,7 @@ fn perl_compat_stat_size_and_missing_list() {
     );
     assert_eq!(ri(&sz), 6);
     assert_eq!(
-        ri(r#"my @st = stat("perlrs___no___stat___"); scalar @st;"#),
+        ri(r#"my @st = stat("forge___no___stat___"); scalar @st;"#),
         0
     );
     let _ = std::fs::remove_file(&path);
@@ -1343,7 +1343,7 @@ fn perl_compat_stat_size_and_missing_list() {
 #[test]
 fn perl_compat_readline_scalar_length_includes_newline() {
     let dir = std::env::temp_dir();
-    let path = dir.join("perlrs_sem_readline_scalar");
+    let path = dir.join("forge_sem_readline_scalar");
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, b"a\nbb\n").expect("write temp");
     let ps = path.to_string_lossy();
@@ -1359,7 +1359,7 @@ fn perl_compat_readline_scalar_length_includes_newline() {
 
 #[test]
 fn perl_compat_mkdir_and_d_test() {
-    let base = std::env::temp_dir().join(format!("perlrs_sem_mkdir_{}", std::process::id()));
+    let base = std::env::temp_dir().join(format!("forge_sem_mkdir_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     let pb = base.to_string_lossy();
     let script = format!(
@@ -1378,7 +1378,7 @@ fn perl_compat_capture_true_exitcode() {
 #[test]
 fn perl_compat_filetest_e_f_regular_file() {
     let dir = std::env::temp_dir();
-    let path = dir.join("perlrs_sem_ef");
+    let path = dir.join("forge_sem_ef");
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, b"x").expect("write");
     let ps = path.to_string_lossy();
@@ -1390,7 +1390,7 @@ fn perl_compat_filetest_e_f_regular_file() {
 #[test]
 fn perl_compat_lstat_symlink_st_size_not_followed() {
     use std::os::unix::fs::symlink;
-    let base = std::env::temp_dir().join(format!("perlrs_sem_lstat_{}", std::process::id()));
+    let base = std::env::temp_dir().join(format!("forge_sem_lstat_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     std::fs::create_dir_all(&base).expect("mkdir");
     let target = base.join("longtargetfilename");
@@ -1417,8 +1417,8 @@ fn perl_compat_wantarray_rename_lc_uc() {
         82
     );
     let dir = std::env::temp_dir();
-    let a = dir.join("perlrs_sem_rename_a");
-    let b = dir.join("perlrs_sem_rename_b");
+    let a = dir.join("forge_sem_rename_a");
+    let b = dir.join("forge_sem_rename_b");
     let _ = std::fs::remove_file(&a);
     let _ = std::fs::remove_file(&b);
     std::fs::write(&a, b"ok").expect("write");
@@ -3128,7 +3128,7 @@ fn perl_compat_arrow_preinc_and_named_array_blshift_assign() {
 #[test]
 fn perl_compat_local_typeglob_aliases_handle() {
     let out = rs(r#"
-        my $f = "/tmp/perlrs_tg_" . $$;
+        my $f = "/tmp/forge_tg_" . $$;
         open OUT, ">", $f;
         local *G = *OUT;
         print G "xyz";
@@ -3941,7 +3941,7 @@ fn struct_implicit_any() {
 
 #[test]
 fn struct_method_shadowing_field() {
-    // In perlrs, fields shadow methods because field check happens first in method dispatch.
+    // In forge, fields shadow methods because field check happens first in method dispatch.
     let s = r#"
         struct S { 
             foo => Int;
@@ -4043,7 +4043,7 @@ fn compat_mode_udf_shadowing() {
     // NOTE: compat mode uses a global AtomicBool. Setting it to `true` here
     // would poison every other test running in parallel (Rust runs `#[test]`
     // functions concurrently within the same process).  Instead, we test the
-    // compat-mode behavior via the CLI (`pe --compat`), not through the
+    // compat-mode behavior via the CLI (`fo --compat`), not through the
     // library API in parallel tests.
     //
     // Verify the flag API exists and round-trips without actually enabling it.

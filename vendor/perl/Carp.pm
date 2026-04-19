@@ -1,7 +1,7 @@
 package Carp;
 
 # Minimal pure-Perl stub — core `Carp.pm` uses `use warnings`, `${^WARNING_BITS}`, and
-# `$::{pkg}` introspection that perlrs does not parse yet. CPAN modules (e.g. JSON::PP)
+# `$::{pkg}` introspection that forge does not parse yet. CPAN modules (e.g. JSON::PP)
 # only need croak/carp/confess/cluck entry points.
 
 use strict;

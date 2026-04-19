@@ -86,9 +86,8 @@ fn to_html_nested_hash_in_array() {
 
 #[test]
 fn to_html_pipeline_to_file_returns_path() {
-    let html =
-        eval_string(r#"my $path = th("test") |> to_file("/tmp/perlrs_test_th.html"); $path"#);
-    assert_eq!(html, "/tmp/perlrs_test_th.html");
+    let html = eval_string(r#"my $path = th("test") |> to_file("/tmp/forge_test_th.html"); $path"#);
+    assert_eq!(html, "/tmp/forge_test_th.html");
 }
 
 #[test]
@@ -333,8 +332,8 @@ fn xopen_alias_xo_resolves() {
 #[test]
 fn to_file_returns_path_not_content() {
     // Use content with newlines so to_file's heuristic correctly identifies it as content
-    let result = eval_string(r#""line1\nline2" |> to_file("/tmp/perlrs_tf_test.txt")"#);
-    assert_eq!(result, "/tmp/perlrs_tf_test.txt");
+    let result = eval_string(r#""line1\nline2" |> to_file("/tmp/forge_tf_test.txt")"#);
+    assert_eq!(result, "/tmp/forge_tf_test.txt");
 }
 
 // ── thread syntax with map +{} ──────────────────────────────────────────

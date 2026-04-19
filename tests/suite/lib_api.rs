@@ -1,9 +1,9 @@
-//! Public crate API: `perlrs::run`, `parse`/`format_program`/`lint_program`, `try_vm_execute`,
+//! Public crate API: `forge::run`, `parse`/`format_program`/`lint_program`, `try_vm_execute`,
 //! `parse_and_run_string`, `parse_and_run_string_in_file`, and `parse_with_file` diagnostics.
 
-use perlrs::error::ErrorKind;
-use perlrs::interpreter::Interpreter;
-use perlrs::{
+use forge::error::ErrorKind;
+use forge::interpreter::Interpreter;
+use forge::{
     format_program, lint_program, parse, parse_and_run_string, parse_and_run_string_in_file,
     parse_with_file, run, try_vm_execute, vendor_perl_inc_path,
 };

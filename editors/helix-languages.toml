@@ -1,20 +1,20 @@
-# Helix editor configuration for perlrs
+# Helix editor configuration for forge
 # Add to ~/.config/helix/languages.toml
 
 [[language]]
-name = "perlrs"
+name = "forge"
 scope = "source.perl"
-injection-regex = "perlrs"
+injection-regex = "forge"
 file-types = ["pr"]
 comment-token = "#"
 indent = { tab-width = 4, unit = "    " }
-language-servers = ["perlrs"]
+language-servers = ["forge"]
 
-[language-server.perlrs]
-command = "pe"
+[language-server.forge]
+command = "fo"
 args = ["--lsp"]
 
-# Also use perlrs for regular .pl/.pm files
+# Also use forge for regular .pl/.pm files
 [[language]]
 name = "perl"
-language-servers = ["perlrs"]
+language-servers = ["forge"]

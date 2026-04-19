@@ -1,5 +1,5 @@
 use crate::common::*;
-use perlrs::error::ErrorKind;
+use forge::error::ErrorKind;
 
 #[test]
 fn parallel_map() {
@@ -222,7 +222,7 @@ fn parallel_for_runs() {
 
 #[test]
 fn par_lines_invokes_block_per_line_with_mysync_count() {
-    let dir = std::env::temp_dir().join(format!("perlrs_par_lines_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("forge_par_lines_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let p = dir.join("lines.txt");
@@ -236,7 +236,7 @@ fn par_lines_invokes_block_per_line_with_mysync_count() {
 /// Bare block + `if /re/` must not trip the parallel guard on regex capture scalars (`$&`, …).
 #[test]
 fn par_lines_bare_block_say_if_regex() {
-    let dir = std::env::temp_dir().join(format!("perlrs_par_lines_re_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("forge_par_lines_re_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let p = dir.join("big.log");
@@ -249,7 +249,7 @@ fn par_lines_bare_block_say_if_regex() {
 
 #[test]
 fn par_walk_visits_files_and_dirs_with_mysync_count() {
-    let dir = std::env::temp_dir().join(format!("perlrs_par_walk_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("forge_par_walk_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(dir.join("a")).unwrap();
     std::fs::write(dir.join("a/x.txt"), "1").unwrap();
@@ -263,7 +263,7 @@ fn par_walk_visits_files_and_dirs_with_mysync_count() {
 
 #[test]
 fn par_sed_rewrites_multiple_files_in_parallel() {
-    let dir = std::env::temp_dir().join(format!("perlrs_par_sed_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("forge_par_sed_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let f1 = dir.join("one.txt");
@@ -280,7 +280,7 @@ fn par_sed_rewrites_multiple_files_in_parallel() {
     std::fs::remove_dir_all(&dir).ok();
 }
 
-/// `fan { }` iterates `$_` from `0` to `rayon::current_num_threads() - 1` (same pool as `pe -j`).
+/// `fan { }` iterates `$_` from `0` to `rayon::current_num_threads() - 1` (same pool as `fo -j`).
 #[test]
 fn fan_default_count_matches_rayon_thread_pool() {
     let n = rayon::current_num_threads();

@@ -337,7 +337,7 @@ fn match_sets_digit_vars_for_groups() {
 
 #[test]
 fn hex_odd_length_errors_at_runtime() {
-    use perlrs::error::ErrorKind;
+    use forge::error::ErrorKind;
     assert_eq!(eval_err_kind(r#"pack 'H', "a""#), ErrorKind::Runtime);
 }
 
