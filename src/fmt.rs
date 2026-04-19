@@ -1023,6 +1023,7 @@ pub fn format_expr(e: &Expr) -> String {
             progress,
             flat_outputs,
             on_cluster,
+            stream: _,
         } => {
             let kw = match (flat_outputs, on_cluster.is_some()) {
                 (true, true) => "pflat_map_on",
@@ -1070,6 +1071,7 @@ pub fn format_expr(e: &Expr) -> String {
             block,
             list,
             progress,
+            stream: _,
         } => {
             let base = format!(
                 "pgrep {{ {} }} {}",

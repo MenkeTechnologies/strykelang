@@ -958,6 +958,10 @@ pub enum ExprKind {
         /// `pmap_on $cluster { } @list` — fan out over SSH (`stryke --remote-worker`); `None` = local rayon.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         on_cluster: Option<Box<Expr>>,
+        /// `pmaps` / `pflat_maps` — streaming variant: returns a lazy iterator that processes
+        /// chunks in parallel via rayon instead of eagerly collecting all results.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        stream: bool,
     },
     /// `pmap_chunked N { BLOCK } @list [, progress => EXPR]` — parallel map in batches of N.
     PMapChunkedExpr {
@@ -971,6 +975,9 @@ pub enum ExprKind {
         list: Box<Expr>,
         /// `pgrep { } @list, progress => EXPR` — stderr progress bar when truthy.
         progress: Option<Box<Expr>>,
+        /// `pgreps` — streaming variant: returns a lazy iterator.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        stream: bool,
     },
     /// `pfor { BLOCK } @list [, progress => EXPR]` — stderr progress bar when truthy.
     PForExpr {

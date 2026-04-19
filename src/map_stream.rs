@@ -1453,6 +1453,172 @@ impl PerlIterator for MatchGlobalStreamIterator {
     }
 }
 
+// ── Parallel streaming iterators (`pmaps`, `pflat_maps`, `pgreps`) ──────────
+//
+// Pull items from the source in chunks, process each chunk in parallel via
+// rayon, then yield results one at a time.  The chunk size auto-tunes to
+// `rayon::current_num_threads() * 4` so all cores stay busy without
+// materializing the full input.
+
+/// `pmaps { BLOCK } LIST` / `pflat_maps { BLOCK } LIST` — parallel map that
+/// returns a lazy iterator.  A background thread pulls items from the source,
+/// dispatches them to rayon, and pushes results through a bounded channel so
+/// the consumer sees output immediately.
+pub(crate) struct PMapStreamIterator {
+    rx: crossbeam::channel::Receiver<PerlValue>,
+    // Keep the handle so the background thread is joined on drop.
+    _handle: Option<std::thread::JoinHandle<()>>,
+}
+
+impl PMapStreamIterator {
+    pub(crate) fn new(
+        source: Arc<dyn PerlIterator>,
+        sub: Arc<PerlSub>,
+        subs: std::collections::HashMap<String, Arc<PerlSub>>,
+        capture: Vec<(String, PerlValue)>,
+        atomic_arrays: Vec<(String, AtomicArray)>,
+        atomic_hashes: Vec<(String, AtomicHash)>,
+        peel: bool,
+    ) -> Self {
+        let (tx, rx) = crossbeam::channel::bounded::<PerlValue>(256);
+        let handle = std::thread::spawn(move || {
+            // Persistent worker threads — each creates ONE Interpreter and
+            // reuses it, avoiding the Interpreter::new() cost per item.
+            let n_workers = rayon::current_num_threads().max(1);
+            let (work_tx, work_rx) = crossbeam::channel::bounded::<PerlValue>(n_workers * 2);
+            let work_rx = Arc::new(work_rx);
+
+            let mut workers = Vec::with_capacity(n_workers);
+            for _ in 0..n_workers {
+                let work_rx = Arc::clone(&work_rx);
+                let tx = tx.clone();
+                let subs = subs.clone();
+                let capture = capture.clone();
+                let atomic_arrays = atomic_arrays.clone();
+                let atomic_hashes = atomic_hashes.clone();
+                let sub = Arc::clone(&sub);
+                workers.push(std::thread::spawn(move || {
+                    let mut interp = Interpreter::new();
+                    while let Ok(item) = work_rx.recv() {
+                        interp.subs = subs.clone();
+                        interp.scope.restore_capture(&capture);
+                        interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
+                        interp.enable_parallel_guard();
+                        interp.scope.set_topic(item);
+                        match interp.exec_block_with_tail(&sub.body, WantarrayCtx::List) {
+                            Ok(val) => {
+                                for v in val.map_flatten_outputs(peel) {
+                                    if tx.send(v).is_err() {
+                                        return;
+                                    }
+                                }
+                            }
+                            Err(_) => {
+                                let _ = tx.send(PerlValue::UNDEF);
+                            }
+                        }
+                    }
+                }));
+            }
+            drop(tx); // workers own the result senders
+
+            while let Some(item) = source.next_item() {
+                if work_tx.send(item).is_err() {
+                    break;
+                }
+            }
+            drop(work_tx);
+            for w in workers {
+                let _ = w.join();
+            }
+        });
+        Self {
+            rx,
+            _handle: Some(handle),
+        }
+    }
+}
+
+impl PerlIterator for PMapStreamIterator {
+    fn next_item(&self) -> Option<PerlValue> {
+        self.rx.recv().ok()
+    }
+}
+
+/// `pgreps { BLOCK } LIST` — parallel grep that returns a lazy iterator.
+pub(crate) struct PGrepStreamIterator {
+    rx: crossbeam::channel::Receiver<PerlValue>,
+    _handle: Option<std::thread::JoinHandle<()>>,
+}
+
+impl PGrepStreamIterator {
+    pub(crate) fn new(
+        source: Arc<dyn PerlIterator>,
+        sub: Arc<PerlSub>,
+        subs: std::collections::HashMap<String, Arc<PerlSub>>,
+        capture: Vec<(String, PerlValue)>,
+        atomic_arrays: Vec<(String, AtomicArray)>,
+        atomic_hashes: Vec<(String, AtomicHash)>,
+    ) -> Self {
+        let (tx, rx) = crossbeam::channel::bounded::<PerlValue>(256);
+        let handle = std::thread::spawn(move || {
+            let n_workers = rayon::current_num_threads().max(1);
+            let (work_tx, work_rx) = crossbeam::channel::bounded::<PerlValue>(n_workers * 2);
+            let work_rx = Arc::new(work_rx);
+
+            let mut workers = Vec::with_capacity(n_workers);
+            for _ in 0..n_workers {
+                let work_rx = Arc::clone(&work_rx);
+                let tx = tx.clone();
+                let subs = subs.clone();
+                let capture = capture.clone();
+                let atomic_arrays = atomic_arrays.clone();
+                let atomic_hashes = atomic_hashes.clone();
+                let sub = Arc::clone(&sub);
+                workers.push(std::thread::spawn(move || {
+                    let mut interp = Interpreter::new();
+                    while let Ok(item) = work_rx.recv() {
+                        interp.subs = subs.clone();
+                        interp.scope.restore_capture(&capture);
+                        interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
+                        interp.enable_parallel_guard();
+                        interp.scope.set_topic(item.clone());
+                        match interp.exec_block(&sub.body) {
+                            Ok(v) if v.is_true() => {
+                                if tx.send(item).is_err() {
+                                    return;
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }));
+            }
+            drop(tx);
+
+            while let Some(item) = source.next_item() {
+                if work_tx.send(item).is_err() {
+                    break;
+                }
+            }
+            drop(work_tx);
+            for w in workers {
+                let _ = w.join();
+            }
+        });
+        Self {
+            rx,
+            _handle: Some(handle),
+        }
+    }
+}
+
+impl PerlIterator for PGrepStreamIterator {
+    fn next_item(&self) -> Option<PerlValue> {
+        self.rx.recv().ok()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

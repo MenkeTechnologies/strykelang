@@ -1425,8 +1425,11 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
 
         // ── Parallel extensions (stryke) ──
         "pmap" => "Parallel `map` powered by rayon's work-stealing thread pool. Every element of the input list is processed concurrently across all available CPU cores, and the output order is guaranteed to match the input order. This is the primary workhorse for CPU-bound transforms in stryke — use it whenever you have a pure function and a large list. Pass `progress => 1` to get a live progress bar on STDERR for long-running jobs.\n\nTwo equivalent surface syntaxes:\n  • Block form — `pmap BLOCK LIST` — element bound to `$_`\n  • Bare-fn form — `pmap FUNC, LIST` — single-arg function name as first argument\n\n```perl\n# Block form\nmy @out = pmap { $_ * 2 } 1..1_000_000\nmy @hashes = pmap sha256 @blobs, progress => 1\n1..100 |> pmap { fetch(\"https://api.example.com/item/$_\") } |> e p\n\n# Bare-fn form (works for builtins and user-defined subs)\nmy @hashes = pmap sha256, @blobs, progress => 1\nsub double { $_0 * 2 }\nmy @r = pmap double, (1..1_000_000)\n```",
+        "pmaps" => "Streaming parallel `map` — returns a lazy iterator that processes items across all CPU cores using a persistent worker-thread pool. Unlike `pmap` which eagerly collects all results into an array, `pmaps` yields results as they complete through a bounded channel, so downstream consumers see output immediately. Output order is non-deterministic (completion order). Each worker thread reuses a single interpreter instance, making it faster than `pmap` for large inputs.\n\nBest for:\n  • Pipelines with `take`/`head` — avoids processing the full list\n  • Very large inputs where holding all results in memory is impractical\n  • Streaming pipelines where you want progressive output\n\n```perl\nrange(0, 1e9) |> pmaps { $_ * 2 } |> take 10 |> ep\nt 1..1e6 pmaps { expensive($_) } ep\nrange(0, 1e6) |> pmaps { fetch(\"https://api/item/$_\") } |> pgreps { $_->{ok} } |> ep\n```",
+        "pflat_maps" => "Streaming parallel flat-map — like `pmaps` but flattens array results. Returns a lazy iterator.\n\n```perl\nrange(0, 1e6) |> pflat_maps { [$_, $_ * 10] } |> ep\n```",
         "pmap_chunked" => "Parallel map that groups input into contiguous batches of N elements before distributing to threads. This reduces per-item scheduling overhead when the per-element work is very cheap (e.g. a few arithmetic ops). Each thread receives a slice of N consecutive items, processes them sequentially within the batch, then returns the batch result. Use this instead of `pmap` when profiling shows rayon overhead dominates the actual computation.\n\n```perl\nmy @out = pmap_chunked 100, { $_ ** 2 } 1..1_000_000\nmy @parsed = pmap_chunked 50, { json_decode } @json_strings\n```",
         "pgrep" => "Parallel `grep` that evaluates the filter predicate concurrently across all CPU cores using rayon. The result preserves the original input order, so it is a drop-in replacement for `grep` on large lists. Best suited for predicates that do meaningful work per element — if the predicate is trivial (e.g. a single regex on short strings), sequential `grep` may be faster due to lower scheduling overhead.\n\nTwo equivalent surface syntaxes: `pgrep { BLOCK } LIST` or `pgrep FUNC, LIST`.\n\n```perl\n# Block form\nmy @matches = pgrep { /complex_pattern/ } @big_list\nmy @primes = pgrep { is_prime } 2..1_000_000\n@files |> pgrep { -s $_ > 1024 } |> e p\n\n# Bare-fn form\nsub even { $_0 % 2 == 0 }\nmy @e = pgrep even, 1..10        # (2,4,6,8,10)\n```",
+        "pgreps" => "Streaming parallel `grep` — returns a lazy iterator that filters items across all CPU cores. Unlike `pgrep` which eagerly collects all matching items, `pgreps` yields matches as they are found through a bounded channel. Output order is non-deterministic (completion order). Each worker thread reuses a single interpreter instance.\n\n```perl\nrange(0, 1e6) |> pgreps { is_prime($_) } |> take 100 |> ep\nt 1..1e9 pgreps { $_ % 7 == 0 } take 10 ep\n```",
         "pfor" => "Parallel `foreach` that executes a side-effecting block across all CPU cores with no return value. Use this when you need to perform work for each element (writing files, sending requests, updating shared state) but don't need to collect results. The block receives each element as `$_`. Iteration order is non-deterministic, so the block must be safe to run concurrently.\n\nTwo equivalent surface syntaxes: `pfor { BLOCK } LIST` or `pfor FUNC, LIST`.\n\n```perl\n# Block form\npfor { write_report } @records\npfor { compress_file } glob(\"*.log\")\n@urls |> pfor { fetch\n    p \"done: $_\" }\n\n# Bare-fn form\nsub work { print \"did $_0\\n\" }\npfor work, (1, 2, 3)\n```",
         "psort" => "Parallel sort that uses rayon's parallel merge-sort algorithm. Accepts an optional comparator block using `$_0`/`$_1` (or `$a`/`$b`). For large lists (10k+ elements), this significantly outperforms the sequential `sort` by splitting the array, sorting partitions in parallel, and merging. The sort is stable — equal elements retain their relative order.\n\n```perl\nmy @sorted = psort { $_0 <=> $_1 } @big_list\nmy @by_name = psort { $_0->{name} cmp $_1->{name} } @records\n@nums |> psort { $a <=> $b } |> e p\n```",
         "pcache" => "Parallel memoized map — each element is processed concurrently, but results are cached by the stringified value of `$_` so duplicate inputs are computed only once. This is ideal when your input list contains many repeated values and the computation is expensive. The cache is a concurrent hash map shared across all threads, so there is no lock contention on reads after the first computation.\n\nTwo equivalent surface syntaxes: `pcache { BLOCK } LIST` or `pcache FUNC, LIST`.\n\n```perl\n# Block form\nmy @out = pcache { expensive_lookup } @list_with_dupes\nmy @resolved = pcache { dns_resolve } @hostnames\n\n# Bare-fn form\nmy @resolved = pcache dns_resolve, @hostnames\n```",
@@ -2464,8 +2467,10 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
         "Parallel Primitives",
         &[
             "pmap",
+            "pmaps",
             "pmap_chunked",
             "pgrep",
+            "pgreps",
             "pfor",
             "psort",
             "pcache",
@@ -2476,6 +2481,7 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
             "pfirst",
             "puniq",
             "pflat_map",
+            "pflat_maps",
             "fan",
             "fan_cap",
         ],
@@ -3347,9 +3353,19 @@ fn push_snippet_completions(filter: &str, items: &mut Vec<CompletionItem>) {
             "Parallel map (snippet)",
         ),
         (
+            "pmaps",
+            "${1:source} |> pmaps { ${0} } |> ep",
+            "Streaming parallel map (snippet)",
+        ),
+        (
             "pgrep",
             "my @${1:out} = pgrep { ${0} } @${2:list};",
             "Parallel grep (snippet)",
+        ),
+        (
+            "pgreps",
+            "${1:source} |> pgreps { ${0} } |> ep",
+            "Streaming parallel grep (snippet)",
         ),
         (
             "pfor",

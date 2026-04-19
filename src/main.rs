@@ -450,7 +450,7 @@ fn print_cyberpunk_help() {
     println!(
         "  --remote-worker-v1     {G}//{N} Legacy one-shot worker (stdio); only arg after {bin}"
     );
-    if matches!(bin, "stryke" | "st") {
+    if matches!(bin, "stryke" | "st" | "s") {
         println!(
             "  (no switches, TTY stdin) {G}//{N} Interactive REPL (readline; exit with quit or EOF)"
         );
@@ -1193,7 +1193,7 @@ fn main() {
             .ok();
     }
 
-    let is_repl = matches!(env!("CARGO_BIN_NAME"), "stryke" | "st")
+    let is_repl = matches!(env!("CARGO_BIN_NAME"), "stryke" | "st" | "s")
         && cli.script.is_none()
         && cli.execute.is_empty()
         && cli.execute_features.is_empty()

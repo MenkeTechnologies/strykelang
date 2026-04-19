@@ -1,7 +1,7 @@
 #!/bin/bash
-# Benchmark stryke vs perl5 vs python3 vs ruby vs julia.
+# Benchmark stryke vs perl5 vs python3 vs ruby vs julia vs raku.
 #
-# Extends run_bench.sh with Python 3, Ruby, and Julia columns. Same methodology:
+# Extends run_bench.sh with Python 3, Ruby, Julia, and Raku columns. Same methodology:
 # hyperfine with warmup, mean of N runs, includes process startup.
 
 set -euo pipefail
@@ -12,6 +12,8 @@ PERL="${PERL:-perl}"
 PYTHON="${PYTHON:-python3}"
 RUBY="${RUBY:-ruby}"
 JULIA="${JULIA:-julia}"
+RAKU="${RAKU:-raku}"
+LUAJIT="${LUAJIT:-luajit}"
 RUNS="${RUNS:-10}"
 WARMUP="${WARMUP:-3}"
 
@@ -49,14 +51,38 @@ julia_version() {
     "$JULIA" --version 2>&1
 }
 
+raku_version() {
+    "$RAKU" --version 2>&1 | head -1
+}
+
+luajit_version() {
+    "$LUAJIT" -v 2>&1 | head -1
+}
+
+# Detect which languages are available.
+HAVE_JULIA=1
+HAVE_RAKU=1
+HAVE_LUAJIT=1
+command -v "$JULIA"  >/dev/null 2>&1 || HAVE_JULIA=0
+command -v "$RAKU"   >/dev/null 2>&1 || HAVE_RAKU=0
+command -v "$LUAJIT" >/dev/null 2>&1 || HAVE_LUAJIT=0
+
 printf '\n'
-printf ' stryke benchmark harness (5-way)\n'
+printf ' stryke benchmark harness (multi-language)\n'
 printf ' ──────────────────────────────────────────────\n'
 printf '  stryke:  %s\n'   "$(stryke_version)"
 printf '  perl5:   %s\n'   "$(perl5_version)"
 printf '  python:  %s\n'   "$(python_version)"
 printf '  ruby:    %s\n'   "$(ruby_version)"
-printf '  julia:   %s\n'   "$(julia_version)"
+if [ "$HAVE_JULIA" = 1 ]; then
+    printf '  julia:   %s\n'   "$(julia_version)"
+fi
+if [ "$HAVE_RAKU" = 1 ]; then
+    printf '  raku:    %s\n'   "$(raku_version)"
+fi
+if [ "$HAVE_LUAJIT" = 1 ]; then
+    printf '  luajit:  %s\n'   "$(luajit_version)"
+fi
 printf '  cores:   %s\n'   "$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo ?)"
 printf '  warmup:  %s runs\n' "$WARMUP"
 printf '  measure: hyperfine (min %s runs)\n\n' "$RUNS"
@@ -80,34 +106,80 @@ ratio() {
     "$PERL" -e 'printf "%.2fx", $ARGV[0]/$ARGV[1]' -- "$1" "$2"
 }
 
-printf '  %-12s %10s  %10s  %10s  %10s  %10s  %10s  %10s  %10s  %10s\n' \
-    'bench' 'stryke ms' 'perl5 ms' 'python3 ms' 'ruby ms' 'julia ms' 'vs perl5' 'vs python' 'vs ruby' 'vs julia'
-printf '  %-12s %10s  %10s  %10s  %10s  %10s  %10s  %10s  %10s  %10s\n' \
-    '---------' '---------' '--------' '----------' '-------' '--------' '--------' '---------' '-------' '--------'
+# Build header dynamically based on available languages.
+hdr_langs='stryke ms  perl5 ms  python3 ms  ruby ms'
+hdr_sep='----------  --------  ----------  -------'
+hdr_ratios='vs perl5  vs python  vs ruby'
+sep_ratios='--------  ---------  -------'
+
+if [ "$HAVE_JULIA" = 1 ]; then
+    hdr_langs="$hdr_langs  julia ms"
+    hdr_sep="$hdr_sep  --------"
+    hdr_ratios="$hdr_ratios  vs julia"
+    sep_ratios="$sep_ratios  --------"
+fi
+if [ "$HAVE_RAKU" = 1 ]; then
+    hdr_langs="$hdr_langs  raku ms"
+    hdr_sep="$hdr_sep  -------"
+    hdr_ratios="$hdr_ratios  vs raku"
+    sep_ratios="$sep_ratios  -------"
+fi
+if [ "$HAVE_LUAJIT" = 1 ]; then
+    hdr_langs="$hdr_langs  luajit ms"
+    hdr_sep="$hdr_sep  ---------"
+    hdr_ratios="$hdr_ratios  vs luajit"
+    sep_ratios="$sep_ratios  ---------"
+fi
+
+printf '  %-12s %s  %s\n' 'bench' "$hdr_langs" "$hdr_ratios"
+printf '  %-12s %s  %s\n' '---------' "$hdr_sep" "$sep_ratios"
 
 for name in startup fib loop string hash array regex map_grep; do
     pl="$HERE/bench_${name}.pl"
     py="$HERE/bench_${name}.py"
     rb="$HERE/bench_${name}.rb"
     jl="$HERE/bench_${name}.jl"
+    rk="$HERE/bench_${name}.raku"
+    lj="$HERE/bench_${name}.lua"
     [ -f "$pl" ] || continue
     [ -f "$py" ] || continue
     [ -f "$rb" ] || continue
-    [ -f "$jl" ] || continue
 
     rs_mean=$(measure "stryke_$name"  "$STRYKE $pl")
     p5_mean=$(measure "perl_$name"    "$PERL $pl")
     py_mean=$(measure "python_$name"  "$PYTHON $py")
     rb_mean=$(measure "ruby_$name"    "$RUBY $rb")
-    jl_mean=$(measure "julia_$name"   "$JULIA $jl")
 
     r_p5=$(ratio "$rs_mean" "$p5_mean")
     r_py=$(ratio "$rs_mean" "$py_mean")
     r_rb=$(ratio "$rs_mean" "$rb_mean")
-    r_jl=$(ratio "$rs_mean" "$jl_mean")
 
-    printf '  %-12s %10.1f  %10.1f  %10.1f  %10.1f  %10.1f  %10s  %10s  %10s  %10s\n' \
-        "$name" "$rs_mean" "$p5_mean" "$py_mean" "$rb_mean" "$jl_mean" "$r_p5" "$r_py" "$r_rb" "$r_jl"
+    row=$(printf '  %-12s %10.1f  %10.1f  %10.1f  %10.1f' \
+        "$name" "$rs_mean" "$p5_mean" "$py_mean" "$rb_mean")
+    ratios=$(printf '%10s  %10s  %10s' "$r_p5" "$r_py" "$r_rb")
+
+    if [ "$HAVE_JULIA" = 1 ] && [ -f "$jl" ]; then
+        jl_mean=$(measure "julia_$name" "$JULIA $jl")
+        r_jl=$(ratio "$rs_mean" "$jl_mean")
+        row=$(printf '%s  %10.1f' "$row" "$jl_mean")
+        ratios=$(printf '%s  %10s' "$ratios" "$r_jl")
+    fi
+
+    if [ "$HAVE_RAKU" = 1 ] && [ -f "$rk" ]; then
+        rk_mean=$(measure "raku_$name" "$RAKU $rk")
+        r_rk=$(ratio "$rs_mean" "$rk_mean")
+        row=$(printf '%s  %10.1f' "$row" "$rk_mean")
+        ratios=$(printf '%s  %10s' "$ratios" "$r_rk")
+    fi
+
+    if [ "$HAVE_LUAJIT" = 1 ] && [ -f "$lj" ]; then
+        lj_mean=$(measure "luajit_$name" "$LUAJIT $lj")
+        r_lj=$(ratio "$rs_mean" "$lj_mean")
+        row=$(printf '%s  %10.1f' "$row" "$lj_mean")
+        ratios=$(printf '%s  %10s' "$ratios" "$r_lj")
+    fi
+
+    printf '%s  %s\n' "$row" "$ratios"
 done
 
 printf '\n  Notes:\n'
@@ -115,5 +187,7 @@ printf '    - All timings include process startup (not steady-state).\n'
 printf '    - Mean of %s warm runs (warmup=%s), measured by hyperfine.\n' "$RUNS" "$WARMUP"
 printf '    - "vs X" = stryke_ms / X_ms — values <1.0x mean stryke is faster.\n'
 printf '    - Julia timings include JIT compilation (first-run cost).\n'
+printf '    - Raku timings include MoarVM startup overhead.\n'
+printf '    - LuaJIT uses Lua patterns (not PCRE) for regex bench.\n'
 printf '    - To override: RUNS=30 WARMUP=5 bash %s\n' "$(basename "$0")"
 printf '\n'

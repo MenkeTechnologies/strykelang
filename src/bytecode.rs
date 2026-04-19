@@ -560,6 +560,10 @@ pub enum Op {
     PMapWithBlock(u16),
     /// pflat_map { BLOCK } @list — flatten array results; output in **input order**; stack same as [`Op::PMapWithBlock`]
     PFlatMapWithBlock(u16),
+    /// pmaps { BLOCK } LIST — streaming parallel map; stack: \[list\] → \[iterator\]
+    PMapsWithBlock(u16),
+    /// pflat_maps { BLOCK } LIST — streaming parallel flat map; stack: \[list\] → \[iterator\]
+    PFlatMapsWithBlock(u16),
     /// `pmap_on` / `pflat_map_on` over SSH — stack: \[progress_flag, list, cluster\] → \[mapped\]; `flat` = 1 for flatten
     PMapRemote {
         block_idx: u16,
@@ -575,6 +579,8 @@ pub enum Op {
     PMapChunkedWithBlock(u16),
     /// pgrep { BLOCK } @list — block_idx; stack: \[progress_flag, list\] → \[filtered\]
     PGrepWithBlock(u16),
+    /// pgreps { BLOCK } LIST — streaming parallel grep; stack: \[list\] → \[iterator\]
+    PGrepsWithBlock(u16),
     /// pfor { BLOCK } @list — block_idx; stack: \[progress_flag, list\] → \[\]
     PForWithBlock(u16),
     /// psort { BLOCK } @list — block_idx; stack: \[progress_flag, list\] → \[sorted\]
