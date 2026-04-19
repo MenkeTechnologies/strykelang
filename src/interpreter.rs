@@ -5768,6 +5768,41 @@ impl Interpreter {
         arms: &[MatchArm],
         line: usize,
     ) -> ExecResult {
+        // Exhaustive enum match: check variant coverage before matching
+        if let Some(e) = val.as_enum_inst() {
+            let has_catchall = arms.iter().any(|a| matches!(a.pattern, MatchPattern::Any));
+            if !has_catchall {
+                let covered: Vec<String> = arms
+                    .iter()
+                    .filter_map(|a| {
+                        if let MatchPattern::Value(expr) = &a.pattern {
+                            if let ExprKind::FuncCall { name, .. } = &expr.kind {
+                                return name.rsplit_once("::").map(|(_, v)| v.to_string());
+                            }
+                        }
+                        None
+                    })
+                    .collect();
+                let missing: Vec<&str> = e
+                    .def
+                    .variants
+                    .iter()
+                    .filter(|v| !covered.contains(&v.name))
+                    .map(|v| v.name.as_str())
+                    .collect();
+                if !missing.is_empty() {
+                    return Err(PerlError::runtime(
+                        format!(
+                            "non-exhaustive match on enum `{}`: missing variant(s) {}",
+                            e.def.name,
+                            missing.join(", ")
+                        ),
+                        line,
+                    )
+                    .into());
+                }
+            }
+        }
         for arm in arms {
             if let MatchPattern::Regex { pattern, flags } = &arm.pattern {
                 let re = self.compile_regex(pattern, flags, line)?;
@@ -5819,49 +5854,6 @@ impl Interpreter {
                 let out = self.eval_expr(&arm.body);
                 self.scope_pop_hook();
                 return out;
-            }
-        }
-        // Exhaustive enum match: report missing variants
-        if let Some(e) = val.as_enum_inst() {
-            let has_catchall = arms.iter().any(|a| matches!(a.pattern, MatchPattern::Any));
-            if !has_catchall {
-                let covered: Vec<String> = arms
-                    .iter()
-                    .filter_map(|a| {
-                        if let MatchPattern::Value(expr) = &a.pattern {
-                            if let ExprKind::FuncCall { name, .. } = &expr.kind {
-                                return name.rsplit_once("::").map(|(_, v)| v.to_string());
-                            }
-                            // Fallback: evaluate the expression and check the enum instance
-                            if let Ok(pv) = self.eval_expr(expr) {
-                                if let Some(ei) = pv.as_enum_inst() {
-                                    if ei.def.name == e.def.name {
-                                        return Some(ei.variant_name().to_string());
-                                    }
-                                }
-                            }
-                        }
-                        None
-                    })
-                    .collect();
-                let missing: Vec<&str> = e
-                    .def
-                    .variants
-                    .iter()
-                    .filter(|v| !covered.contains(&v.name))
-                    .map(|v| v.name.as_str())
-                    .collect();
-                if !missing.is_empty() {
-                    return Err(PerlError::runtime(
-                        format!(
-                            "non-exhaustive match on enum `{}`: missing variant(s) {}",
-                            e.def.name,
-                            missing.join(", ")
-                        ),
-                        line,
-                    )
-                    .into());
-                }
             }
         }
         Err(PerlError::runtime(

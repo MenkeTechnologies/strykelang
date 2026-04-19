@@ -920,3 +920,164 @@ fn class_field_any_allows_anything() {
         "hello"
     );
 }
+
+// ── Trait default method inheritance ────────────────────────────────
+
+#[test]
+fn trait_default_method_inherited() {
+    assert_eq!(
+        eval_string(
+            r#"trait Greetable {
+                fn greeting { "Hello" }
+                fn name
+            }
+            class Person impl Greetable {
+                n: Str
+                fn name { $self->n }
+            }
+            my $p = Person(n => "Alice");
+            $p->greeting() . " " . $p->name()"#
+        ),
+        "Hello Alice"
+    );
+}
+
+#[test]
+fn trait_default_method_can_be_overridden() {
+    assert_eq!(
+        eval_string(
+            r#"trait Greetable {
+                fn greeting { "Hello" }
+                fn name
+            }
+            class Person impl Greetable {
+                n: Str
+                fn name { $self->n }
+                fn greeting { "Hi" }
+            }
+            my $p = Person(n => "Bob");
+            $p->greeting()"#
+        ),
+        "Hi"
+    );
+}
+
+#[test]
+fn trait_multiple_defaults_from_multiple_traits() {
+    assert_eq!(
+        eval_string(
+            r#"trait Describable {
+                fn describe { "an object" }
+            }
+            trait Taggable {
+                fn tag { "untagged" }
+            }
+            class Item impl Describable, Taggable {
+                name: Str
+            }
+            my $i = Item(name => "x");
+            $i->describe() . ":" . $i->tag()"#
+        ),
+        "an object:untagged"
+    );
+}
+
+// ── Abstract method declarations ────────────────────────────────────
+
+#[test]
+fn abstract_method_enforced_in_subclass() {
+    assert_eq!(
+        eval_err_kind(
+            r#"abstract class Shape {
+                fn area
+            }
+            class Circle extends Shape {
+                r: Int
+            }"#
+        ),
+        ErrorKind::Runtime,
+    );
+}
+
+#[test]
+fn abstract_method_satisfied_by_subclass() {
+    assert_eq!(
+        eval_int(
+            r#"abstract class Shape {
+                fn area
+            }
+            class Square extends Shape {
+                side: Int
+                fn area { $self->side() * $self->side() }
+            }
+            my $s = Square(side => 5);
+            $s->area()"#
+        ),
+        25
+    );
+}
+
+#[test]
+fn abstract_class_with_concrete_and_abstract_methods() {
+    assert_eq!(
+        eval_string(
+            r#"abstract class Animal {
+                fn speak
+                fn kind { "animal" }
+            }
+            class Dog extends Animal {
+                fn speak { "woof" }
+            }
+            my $d = Dog();
+            $d->kind() . ":" . $d->speak()"#
+        ),
+        "animal:woof"
+    );
+}
+
+// ── Exhaustive enum match checking ──────────────────────────────────
+
+#[test]
+fn enum_match_exhaustive_error_on_missing_variant() {
+    assert_eq!(
+        eval_err_kind(
+            r#"enum Color { Red, Green, Blue }
+            my $c = Color::Red();
+            match ($c) {
+                Color::Red() => "r",
+                Color::Green() => "g",
+            }"#
+        ),
+        ErrorKind::Runtime,
+    );
+}
+
+#[test]
+fn enum_match_exhaustive_ok_with_catchall() {
+    assert_eq!(
+        eval_string(
+            r#"enum Color { Red, Green, Blue }
+            my $c = Color::Blue();
+            match ($c) {
+                Color::Red() => "r",
+                _ => "other",
+            }"#
+        ),
+        "other"
+    );
+}
+
+#[test]
+fn enum_match_exhaustive_ok_all_covered() {
+    assert_eq!(
+        eval_string(
+            r#"enum Light { On, Off }
+            my $l = Light::Off();
+            match ($l) {
+                Light::On() => "on",
+                Light::Off() => "off",
+            }"#
+        ),
+        "off"
+    );
+}
