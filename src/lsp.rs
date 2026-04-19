@@ -2210,6 +2210,63 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "base85_encode" | "b85e" | "ascii85_encode" | "a85e" => "`base85_encode` (aliases `b85e`, `a85e`) encodes a string using Ascii85/Base85 encoding. More compact than Base64 (4:5 ratio vs 3:4).\n\n```perl\np b85e(\"Hello\")  # encoded string\n```",
         "base85_decode" | "b85d" | "ascii85_decode" | "a85d" => "`base85_decode` (aliases `b85d`, `a85d`) decodes an Ascii85/Base85 encoded string.\n\n```perl\np b85d(b85e(\"Hello\"))  # Hello\n```",
 
+        // ── R base: distribution CDFs & quantiles ────────────────────────
+        "pnorm" => "`pnorm` — normal CDF. P(X ≤ x) for N(mu, sigma). Args: x [, mu, sigma]. Default standard normal.\n\n```perl\np pnorm(0)          # 0.5\np pnorm(1.96)       # 0.975\np pnorm(100, 90, 15) # z-score for IQ 100\n```",
+        "qnorm" => "`qnorm` — normal quantile (inverse CDF). Returns x such that P(X ≤ x) = p. Args: p [, mu, sigma].\n\n```perl\np qnorm(0.975)      # 1.96\np qnorm(0.5)        # 0.0\np qnorm(0.95, 100, 15)  # 90th percentile IQ\n```",
+        "pbinom" => "`pbinom` — binomial CDF. P(X ≤ k) for Binom(n, p). Args: k, n, p.\n\n```perl\np pbinom(5, 10, 0.5)   # P(≤5 heads in 10 flips)\n```",
+        "dbinom" => "`dbinom` — binomial PMF. P(X = k) for Binom(n, p). Args: k, n, p.\n\n```perl\np dbinom(5, 10, 0.5)   # P(exactly 5 heads in 10 flips)\n```",
+        "ppois" => "`ppois` — Poisson CDF. P(X ≤ k) for Poisson(lambda). Args: k, lambda.\n\n```perl\np ppois(3, 2.5)  # P(≤3 events when avg is 2.5)\n```",
+        "punif" => "`punif` — uniform CDF. P(X ≤ x) for Uniform(a, b). Args: x, a, b.\n\n```perl\np punif(0.5, 0, 1)  # 0.5\np punif(3, 0, 10)   # 0.3\n```",
+        "pexp" => "`pexp` — exponential CDF. P(X ≤ x) for Exp(rate). Args: x, rate.\n\n```perl\np pexp(1, 1)     # 0.6321 (1 - e^-1)\np pexp(5, 0.5)   # P(wait ≤ 5 with avg wait 2)\n```",
+        "pweibull" => "`pweibull` — Weibull CDF. P(X ≤ x) for Weibull(shape, scale). Args: x, shape, scale.\n\n```perl\np pweibull(1, 1, 1)  # same as exponential\n```",
+        "plnorm" => "`plnorm` — log-normal CDF. P(X ≤ x) for LogN(mu, sigma). Args: x, mu, sigma.\n\n```perl\np plnorm(1, 0, 1)   # 0.5 (median of LogN(0,1))\n```",
+        "pcauchy" => "`pcauchy` — Cauchy CDF. P(X ≤ x). Args: x [, location, scale].\n\n```perl\np pcauchy(0, 0, 1)  # 0.5\n```",
+
+        // ── R base: matrix ops ───────────────────────────────────────────
+        "rbind" => "`rbind` — bind matrices/vectors by rows (vertical stack). Like R's rbind().\n\n```perl\nmy $m = rbind([1,2,3], [4,5,6])  # [[1,2,3],[4,5,6]]\n```",
+        "cbind" => "`cbind` — bind matrices by columns (horizontal join). Like R's cbind().\n\n```perl\nmy $m = cbind([[1],[2]], [[3],[4]])  # [[1,3],[2,4]]\n```",
+        "row_sums" | "rowSums" => "`row_sums` (alias `rowSums`) — sum of each row in a matrix. Like R's rowSums().\n\n```perl\np row_sums([[1,2,3],[4,5,6]])  # [6, 15]\n```",
+        "col_sums" | "colSums" => "`col_sums` (alias `colSums`) — sum of each column. Like R's colSums().\n\n```perl\np colSums([[1,2],[3,4]])  # [4, 6]\n```",
+        "row_means" | "rowMeans" => "`row_means` (alias `rowMeans`) — mean of each row. Like R's rowMeans().\n\n```perl\np rowMeans([[2,4],[6,8]])  # [3, 7]\n```",
+        "col_means" | "colMeans" => "`col_means` (alias `colMeans`) — mean of each column. Like R's colMeans().\n\n```perl\np colMeans([[2,4],[6,8]])  # [4, 6]\n```",
+        "outer_product" | "outer" => "`outer` — outer product of two vectors. Returns matrix where M[i][j] = v1[i] * v2[j].\n\n```perl\nmy $m = outer([1,2,3], [10,20])  # [[10,20],[20,40],[30,60]]\n```",
+        "crossprod" => "`crossprod` — cross product t(M) * M (R's crossprod). Efficiently computes M^T M without explicit transpose.\n\n```perl\nmy $ata = crossprod([[1,2],[3,4]])  # [[10,14],[14,20]]\n```",
+        "tcrossprod" => "`tcrossprod` — M * t(M) (R's tcrossprod).\n\n```perl\nmy $aat = tcrossprod([[1,2],[3,4]])  # [[5,11],[11,25]]\n```",
+        "nrow" => "`nrow` — number of rows in a matrix.\n\n```perl\np nrow([[1,2],[3,4],[5,6]])  # 3\n```",
+        "ncol" => "`ncol` — number of columns in a matrix.\n\n```perl\np ncol([[1,2,3],[4,5,6]])  # 3\n```",
+        "prop_table" | "proptable" => "`prop_table` — convert a count matrix to proportions (each cell / total). Like R's prop.table().\n\n```perl\np prop_table([[10,20],[30,40]])  # [[0.1,0.2],[0.3,0.4]]\n```",
+
+        // ── R base: vector ops ───────────────────────────────────────────
+        "cummax" => "`cummax` — cumulative maximum. Each element is the max of all elements up to that position.\n\n```perl\np cummax([3,1,4,1,5,9])  # [3,3,4,4,5,9]\n```",
+        "cummin" => "`cummin` — cumulative minimum.\n\n```perl\np cummin([9,5,1,4,3])  # [9,5,1,1,1]\n```",
+        "scale_vec" | "scale" => "`scale` — standardize a vector: (x - mean) / sd. Like R's scale().\n\n```perl\nmy @z = @{scale([10,20,30])}  # [-1, 0, 1]\n```",
+        "which_fn" => "`which_fn` — return indices where a predicate is true. Like R's which().\n\n```perl\nmy @idx = @{which_fn([1,5,3,8,2], sub { $_[0] > 3 })}  # [1, 3]\n```",
+        "tabulate" => "`tabulate` — frequency table of values. Returns hash of value => count. Like R's table().\n\n```perl\nmy %t = %{tabulate([qw(a b a c b a)])}\np $t{a}  # 3\n```",
+        "duplicated" | "duped" => "`duplicated` — boolean array: 1 if element appeared earlier in the vector, 0 otherwise. Like R's duplicated().\n\n```perl\np duplicated([1,2,3,2,1])  # [0,0,0,1,1]\n```",
+        "seq_fn" => "`seq_fn` — generate a numeric sequence from, to, by. Like R's seq().\n\n```perl\nmy @s = @{seq_fn(1, 10, 2)}  # [1,3,5,7,9]\nmy @r = @{seq_fn(5, 1, -1)}  # [5,4,3,2,1]\n```",
+        "rep_fn" => "`rep_fn` — repeat a value N times. Like R's rep().\n\n```perl\nmy @r = @{rep_fn(0, 10)}   # ten zeros\nmy @s = @{rep_fn(\"x\", 5)}  # five \"x\"s\n```",
+        "cut_bins" | "cut" => "`cut` — bin continuous values into intervals. Returns integer bin indices. Like R's cut().\n\n```perl\np cut([1.5, 3.2, 7.8], [0, 2, 5, 10])  # [1, 2, 3]\n```",
+        "find_interval" | "findInterval" => "`find_interval` — for each x, find which interval in breaks it falls into. Like R's findInterval().\n\n```perl\np findInterval([1.5, 3.5, 7.5], [0, 2, 5, 10])  # [1, 2, 3]\n```",
+        "ecdf_fn" | "ecdf" => "`ecdf` — empirical CDF: proportion of data ≤ x. Like R's ecdf().\n\n```perl\np ecdf([1,2,3,4,5], 3)  # 0.6 (3 of 5 values ≤ 3)\n```",
+        "density_est" | "density" => "`density` — kernel density estimation with Gaussian kernel and Silverman bandwidth. Returns [[x_grid], [density_values]]. Like R's density().\n\n```perl\nmy ($x, $y) = @{density([1,2,2,3,3,3,4,4,5])}\n# $x is grid of 512 points, $y is estimated density\n```",
+        "embed_ts" | "embed" => "`embed` — time-delay embedding. Converts a time series into a matrix of lagged values. Like R's embed().\n\n```perl\np embed([1,2,3,4,5], 3)  # [[3,2,1],[4,3,2],[5,4,3]]\n```",
+
+        // ── R base: stats tests ──────────────────────────────────────────
+        "shapiro_test" | "shapiro" => "`shapiro_test` (alias `shapiro`) — Shapiro-Wilk normality test. Returns W statistic (close to 1 = normal). Like R's shapiro.test().\n\n```perl\np shapiro([rnorm(100)])  # W ≈ 0.99 for normal data\np shapiro([1,1,1,2,10]) # W < 0.9 for non-normal\n```",
+        "ks_test" | "ks" => "`ks_test` (alias `ks`) — two-sample Kolmogorov-Smirnov test. Returns D statistic (max CDF difference). Like R's ks.test().\n\n```perl\nmy $D = ks([1,2,3,4,5], [2,3,4,5,6])  # small D = similar\n```",
+        "wilcox_test" | "wilcox" | "mann_whitney" => "`wilcox_test` (aliases `wilcox`, `mann_whitney`) — Wilcoxon rank-sum test (Mann-Whitney U). Returns U statistic. Like R's wilcox.test().\n\n```perl\nmy $U = wilcox([1,2,3], [4,5,6])  # 0 (no overlap)\n```",
+        "prop_test" | "proptest" => "`prop_test` — one-sample proportion z-test. Returns [z-statistic, p-value]. Like R's prop.test().\n\n```perl\nmy ($z, $pval) = @{proptest(55, 100, 0.5)}  # test if 55/100 differs from 50%%\n```",
+        "binom_test" | "binomtest" => "`binom_test` — exact binomial test. Returns two-sided p-value. Like R's binom.test().\n\n```perl\nmy $p = binomtest(7, 10, 0.5)  # p-value for 7/10 successes vs p=0.5\n```",
+
+        // ── R base: apply family ─────────────────────────────────────────
+        "sapply" => "`sapply` — apply a function to each element, return a vector. Like R's sapply().\n\n```perl\nmy @sq = @{sapply([1,2,3,4], sub { $_[0] ** 2 })}  # [1,4,9,16]\n```",
+        "tapply" => "`tapply` — apply a function by group. Takes data, group labels, and function. Returns hash. Like R's tapply().\n\n```perl\nmy %means = %{tapply([1,2,3,4], [\"a\",\"a\",\"b\",\"b\"], sub { avg(@{$_[0]}) })}\np $means{a}  # 1.5\np $means{b}  # 3.5\n```",
+        "do_call" | "docall" => "`do_call` — call a function with args from a list. Like R's do.call().\n\n```perl\nmy $result = docall(sub { $_[0] + $_[1] }, [3, 4])  # 7\n```",
+
+        // ── R base: ML / clustering ──────────────────────────────────────
+        "kmeans" => "`kmeans` — k-means clustering (Lloyd's algorithm). Takes array of points and k. Returns cluster assignments. Like R's kmeans().\n\n```perl\nmy @clusters = @{kmeans([[0,0],[1,0],[10,10],[11,10]], 2)}\n# [0,0,1,1] — two clusters\n```",
+        "prcomp" | "pca" => "`prcomp` (alias `pca`) — Principal Component Analysis via eigendecomposition of covariance matrix. Returns eigenvalues (variance explained). Like R's prcomp().\n\n```perl\nmy @var = @{pca([[1,2],[3,4],[5,6],[7,8]])}\n# variance explained by each component\n```",
+
         _ => return None,
     };
     Some(md)
