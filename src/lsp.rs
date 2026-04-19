@@ -2267,6 +2267,45 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "kmeans" => "`kmeans` — k-means clustering (Lloyd's algorithm). Takes array of points and k. Returns cluster assignments. Like R's kmeans().\n\n```perl\nmy @clusters = @{kmeans([[0,0],[1,0],[10,10],[11,10]], 2)}\n# [0,0,1,1] — two clusters\n```",
         "prcomp" | "pca" => "`prcomp` (alias `pca`) — Principal Component Analysis via eigendecomposition of covariance matrix. Returns eigenvalues (variance explained). Like R's prcomp().\n\n```perl\nmy @var = @{pca([[1,2],[3,4],[5,6],[7,8]])}\n# variance explained by each component\n```",
 
+        // ── R base: random generators ────────────────────────────────────
+        "rnorm" => "`rnorm` — generate n random normal variates. Args: n [, mu, sigma]. Like R's rnorm().\n\n```perl\nmy @x = @{rnorm(1000)}          # 1000 standard normal\nmy @y = @{rnorm(100, 50, 10)}   # mean=50, sd=10\n```",
+        "runif" => "`runif` — generate n random uniform variates. Args: n [, min, max]. Like R's runif().\n\n```perl\nmy @x = @{runif(100, 0, 1)}     # 100 uniform [0,1]\n```",
+        "rexp" => "`rexp` — generate n random exponential variates. Args: n [, rate]. Like R's rexp().\n\n```perl\nmy @x = @{rexp(100, 0.5)}       # rate=0.5 (mean=2)\n```",
+        "rbinom" => "`rbinom` — generate n random binomial variates. Args: n, size, prob. Like R's rbinom().\n\n```perl\nmy @x = @{rbinom(100, 10, 0.3)} # 100 draws from Binom(10,0.3)\n```",
+        "rpois" => "`rpois` — generate n random Poisson variates. Args: n, lambda. Like R's rpois().\n\n```perl\nmy @x = @{rpois(100, 5)}        # Poisson with mean 5\n```",
+        "rgeom" => "`rgeom` — generate n random geometric variates. Args: n, prob.\n\n```perl\nmy @x = @{rgeom(100, 0.3)}      # trials until first success\n```",
+        "rgamma" => "`rgamma` — generate n random gamma variates. Args: n, shape [, scale]. Like R's rgamma().\n\n```perl\nmy @x = @{rgamma(100, 2, 1)}    # Gamma(2,1)\n```",
+        "rbeta" => "`rbeta` — generate n random beta variates. Args: n, alpha, beta. Like R's rbeta().\n\n```perl\nmy @x = @{rbeta(100, 2, 5)}     # Beta(2,5)\n```",
+        "rchisq" => "`rchisq` — generate n random chi-squared variates. Args: n, df. Like R's rchisq().\n\n```perl\nmy @x = @{rchisq(100, 5)}       # Chi-sq with 5 df\n```",
+        "rt" => "`rt` — generate n random Student's t variates. Args: n, df. Like R's rt().\n\n```perl\nmy @x = @{rt(100, 10)}          # t with 10 df\n```",
+        "rf" => "`rf` — generate n random F variates. Args: n, d1, d2. Like R's rf().\n\n```perl\nmy @x = @{rf(100, 5, 10)}       # F(5,10)\n```",
+        "rweibull" => "`rweibull` — generate n random Weibull variates. Args: n, shape [, scale].\n\n```perl\nmy @x = @{rweibull(100, 2, 1)}  # Weibull(2,1)\n```",
+        "rlnorm" => "`rlnorm` — generate n random log-normal variates. Args: n [, mu, sigma].\n\n```perl\nmy @x = @{rlnorm(100, 0, 1)}    # LogN(0,1)\n```",
+        "rcauchy" => "`rcauchy` — generate n random Cauchy variates. Args: n [, location, scale].\n\n```perl\nmy @x = @{rcauchy(100, 0, 1)}   # standard Cauchy\n```",
+
+        // ── R base: quantile functions ───────────────────────────────────
+        "qunif" => "`qunif` — uniform quantile. Args: p [, min, max].\n\n```perl\np qunif(0.5, 0, 10)  # 5.0 (median)\n```",
+        "qexp" => "`qexp` — exponential quantile. Args: p [, rate].\n\n```perl\np qexp(0.5, 1)       # 0.693 (median of Exp(1))\n```",
+        "qweibull" => "`qweibull` — Weibull quantile. Args: p, shape [, scale].\n\n```perl\np qweibull(0.5, 1, 1)  # same as qexp\n```",
+        "qlnorm" => "`qlnorm` — log-normal quantile. Args: p [, mu, sigma].\n\n```perl\np qlnorm(0.5, 0, 1)  # 1.0 (median of LogN(0,1))\n```",
+        "qcauchy" => "`qcauchy` — Cauchy quantile. Args: p [, location, scale].\n\n```perl\np qcauchy(0.75, 0, 1)  # 1.0\n```",
+
+        // ── R base: additional CDFs & PMFs ───────────────────────────────
+        "pgamma" => "`pgamma` — gamma CDF. Args: x, shape [, scale].\n\n```perl\np pgamma(2, 2, 1)  # P(X ≤ 2) for Gamma(2,1)\n```",
+        "pbeta" => "`pbeta` — beta CDF (regularized incomplete beta). Args: x, a, b.\n\n```perl\np pbeta(0.5, 2, 5)  # P(X ≤ 0.5) for Beta(2,5)\n```",
+        "pchisq" => "`pchisq` — chi-squared CDF. Args: x, df.\n\n```perl\np pchisq(3.84, 1)  # 0.95 (critical value for p=0.05)\n```",
+        "pt_cdf" | "pt" => "`pt` — Student's t CDF. Args: x, df.\n\n```perl\np pt(1.96, 100)  # ≈ 0.975\n```",
+        "pf_cdf" | "pf" => "`pf` — F-distribution CDF. Args: x, d1, d2.\n\n```perl\np pf(4.0, 5, 10)  # P(F ≤ 4) for F(5,10)\n```",
+        "dgeom" => "`dgeom` — geometric PMF P(X=k). Args: k, prob.\n\n```perl\np dgeom(3, 0.5)  # P(first success on 4th trial)\n```",
+        "dunif" => "`dunif` — uniform PDF. Args: x, a, b.\n\n```perl\np dunif(0.5, 0, 1)  # 1.0\n```",
+        "dnbinom" => "`dnbinom` — negative binomial PMF. Args: k, size, prob.\n\n```perl\np dnbinom(3, 5, 0.5)  # P(3 failures before 5 successes)\n```",
+        "dhyper" => "`dhyper` — hypergeometric PMF. Args: k, m (white), n (black), nn (draws).\n\n```perl\np dhyper(2, 5, 5, 3)  # P(2 white balls in 3 draws from 5W+5B)\n```",
+
+        // ── R base: smoothing & linear models ───────────────────────────
+        "lowess" | "loess" => "`lowess` (alias `loess`) — locally-weighted scatterplot smoothing (LOWESS/LOESS). Returns smoothed Y values with tricube weighting.\n\n```perl\nmy @smooth = @{lowess([1,2,3,4,5], [2,1,4,3,5])}\n```",
+        "approx_fn" | "approx" => "`approx_fn` (alias `approx`) — piecewise linear interpolation at query points. Like R's approx().\n\n```perl\nmy @y = @{approx([0,1,2], [0,10,0], [0.5, 1.0, 1.5])}\n# [5, 10, 5]\n```",
+        "lm_fit" | "lm" => "`lm_fit` (alias `lm`) — simple linear regression. Returns hash with intercept, slope, r_squared, residuals, fitted. Like R's lm().\n\n```perl\nmy %m = %{lm([1,2,3,4,5], [2,4,5,4,5])}\np $m{slope}       # slope\np $m{r_squared}   # R²\n```",
+
         _ => return None,
     };
     Some(md)
