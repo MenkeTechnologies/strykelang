@@ -47,7 +47,7 @@ fn tmp_path(tag: &str) -> PathBuf {
 /// Temp directory containing an `ssh` executable that skips ssh flags, host, and `pe_path`,
 /// then `exec`s the test `fo` binary — matches what [`forge::cluster`] passes to `ssh`.
 fn make_fake_ssh_shim_dir(tag: &str) -> PathBuf {
-    let pe_exe = env!("CARGO_BIN_EXE_pe");
+    let pe_exe = env!("CARGO_BIN_EXE_fo");
     let shim_dir = tmp_path(tag);
     fs::create_dir_all(&shim_dir).unwrap();
     let shim_path = shim_dir.join("ssh");
@@ -95,7 +95,7 @@ impl Drop for PrependPathGuard {
 
 /// Spawn the local `fo --remote-worker` and return the live child.
 fn spawn_local_worker() -> Child {
-    let exe = env!("CARGO_BIN_EXE_pe");
+    let exe = env!("CARGO_BIN_EXE_fo");
     Command::new(exe)
         .arg("--remote-worker")
         .stdin(Stdio::piped())

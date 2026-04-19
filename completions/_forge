@@ -42,7 +42,7 @@ _forge_build() {
   _arguments -s -S \
     '(-o --output)'{-o+,--output=}'[output binary path]:output:_files' \
     '(-h --help)'{-h,--help}'[show fo build usage]' \
-    '1:script file:_files -g "*.pr *.pl *.pm *.t *.cgi *.psgi"'
+    '1:script file:_files -g "*.for *.pl *.pm *.t *.cgi *.psgi"'
 }
 
 # `fo docs [TOPIC]` — built-in documentation browser
@@ -57,7 +57,7 @@ _forge_serve() {
   _arguments -s -S \
     '(-h --help)'{-h,--help}'[show fo serve usage]' \
     '1:port (default 8000):' \
-    '2:script or -e:_files -g "*.pr *.pl"'
+    '2:script or -e:_files -g "*.for *.pl"'
 }
 
 _forge_deconvert() {
@@ -65,7 +65,7 @@ _forge_deconvert() {
     '(-i --in-place)'{-i,--in-place}'[write .pl files alongside originals]' \
     '(-d --output-delim)'{-d+,--output-delim=}'[delimiter for s/// tr/// m// (default: preserve original)]:delimiter:' \
     '(-h --help)'{-h,--help}'[show fo deconvert usage]' \
-    '*:forge files:_files -g "*.pr"'
+    '*:forge files:_files -g "*.for"'
 }
 # `fo convert [-i] [-d DELIM] FILE...` — convert Perl source to idiomatic forge syntax
 _forge_convert() {
@@ -98,7 +98,7 @@ _forge() {
     '--ast[dump parsed AST as JSON and exit (no execution)]' \
     '--fmt[pretty-print parsed Perl to stdout and exit]' \
     '--profile[wall-clock profile: per-line + per-sub timings to stderr]' \
-    '--flame[SVG flamegraph to stdout (fo --flame script.pr > flame.svg)]' \
+    '--flame[SVG flamegraph to stdout (fo --flame script.for > flame.svg)]' \
     '--no-jit[disable Cranelift JIT (bytecode interpreter only)]' \
     '--explain=[print expanded hint for an error code]:error code (e.g. E0001):' \
     '-d+[run program under debugger]::module:' \
@@ -144,11 +144,11 @@ _forge() {
         'convert:convert Perl source to idiomatic forge syntax with |> pipes'
         'deconvert:convert forge source to vanilla perl syntax'
         'docs:built-in documentation browser (fo docs pmap)'
-        'serve:start a built-in HTTP server (fo serve 8080 app.pr)'
+        'serve:start a built-in HTTP server (fo serve 8080 app.for)'
       )
       _alternative \
         'subcommands:forge subcommand:((${subcmds}))' \
-        'scripts:perl script:_files -g "*.pr *.pl *.pm *.t *.cgi *.psgi"'
+        'scripts:perl script:_files -g "*.for *.pl *.pm *.t *.cgi *.psgi"'
       ;;
     script_args)
       # `$line[1]` is the first positional that was already consumed. If it was `build`,

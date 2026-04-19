@@ -31,7 +31,7 @@ fn run_with_cache(exe: &str, cache_dir: &PathBuf, script: &PathBuf) -> std::proc
 
 #[test]
 fn pec_first_run_writes_cache_warm_run_reuses_it() {
-    let exe = env!("CARGO_BIN_EXE_pe");
+    let exe = env!("CARGO_BIN_EXE_fo");
     let script = tmp_path("simple.pl");
     let cache_dir = tmp_path("cache");
     fs::create_dir_all(&cache_dir).unwrap();
@@ -89,7 +89,7 @@ fn pec_first_run_writes_cache_warm_run_reuses_it() {
 
 #[test]
 fn pec_source_change_invalidates_cache() {
-    let exe = env!("CARGO_BIN_EXE_pe");
+    let exe = env!("CARGO_BIN_EXE_fo");
     let script = tmp_path("changing.pl");
     let cache_dir = tmp_path("cache_inval");
     fs::create_dir_all(&cache_dir).unwrap();
@@ -125,7 +125,7 @@ fn pec_source_change_invalidates_cache() {
 
 #[test]
 fn pec_disabled_by_default_no_cache_writes() {
-    let exe = env!("CARGO_BIN_EXE_pe");
+    let exe = env!("CARGO_BIN_EXE_fo");
     let script = tmp_path("nocache.pl");
     let cache_dir = tmp_path("cache_off");
     fs::create_dir_all(&cache_dir).unwrap();
@@ -153,7 +153,7 @@ fn pec_disabled_for_dash_e_oneliners() {
     // One-liners must NOT touch the cache: warm load is slower than parse+compile for
     // tiny scripts (measured ~2-3×), and unique `-e` invocations would pollute the cache
     // directory with no GC. The gate in main.rs is the contract this test pins.
-    let exe = env!("CARGO_BIN_EXE_pe");
+    let exe = env!("CARGO_BIN_EXE_fo");
     let cache_dir = tmp_path("cache_oneliner");
     fs::create_dir_all(&cache_dir).unwrap();
 
@@ -191,7 +191,7 @@ fn pec_disabled_for_dash_e_oneliners() {
 fn pec_warm_run_preserves_runtime_errors() {
     // Cache only stores the bytecode + program — runtime errors must still surface
     // identically on warm runs.
-    let exe = env!("CARGO_BIN_EXE_pe");
+    let exe = env!("CARGO_BIN_EXE_fo");
     let script = tmp_path("die.pl");
     let cache_dir = tmp_path("cache_die");
     fs::create_dir_all(&cache_dir).unwrap();

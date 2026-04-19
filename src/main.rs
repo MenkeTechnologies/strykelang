@@ -60,7 +60,7 @@ pub(crate) struct Cli {
     #[arg(long = "profile")]
     profile: bool,
 
-    /// Flamegraph: colored terminal bars (TTY) or SVG to stdout (piped: fo --flame x.pr > flame.svg)
+    /// Flamegraph: colored terminal bars (TTY) or SVG to stdout (piped: fo --flame x.for > flame.svg)
     #[arg(long = "flame")]
     flame: bool,
 
@@ -352,15 +352,15 @@ fn print_cyberpunk_help() {
     const G: &str = "\x1b[32m"; // green
     const N: &str = "\x1b[0m"; // reset
 
-    println!("{C} ██████╗ ███████╗██████╗ ██╗     ██████╗ ███████╗{N}");
-    println!("{C} ██╔══██╗██╔════╝██╔══██╗██║     ██╔══██╗██╔════╝{N}");
-    println!("{M} ██████╔╝█████╗  ██████╔╝██║     ██████╔╝███████╗{N}");
-    println!("{M} ██╔═══╝ ██╔══╝  ██╔══██╗██║     ██╔══██╗╚════██║{N}");
-    println!("{R} ██║     ███████╗██║  ██║███████╗██║  ██║███████║{N}");
-    println!("{R} ╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚══════╝{N}");
-    println!("{C} ┌──────────────────────────────────────────────────────┐{N}");
-    println!("{C} │ STATUS: ONLINE  // CORES: {threads:<2} // SIGNAL: ████████░░ │{N}");
-    println!("{C} └──────────────────────────────────────────────────────┘{N}");
+    println!("{C} ███████╗ ██████╗ ██████╗  ██████╗ ███████╗{N}");
+    println!("{C} ██╔════╝██╔═══██╗██╔══██╗██╔════╝ ██╔════╝{N}");
+    println!("{M} █████╗  ██║   ██║██████╔╝██║  ███╗█████╗  {N}");
+    println!("{M} ██╔══╝  ██║   ██║██╔══██╗██║   ██║██╔══╝  {N}");
+    println!("{R} ██║     ╚██████╔╝██║  ██║╚██████╔╝███████╗{N}");
+    println!("{R} ╚═╝      ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝{N}");
+    println!("{C} ┌─────────────────────────────────────────────┐{N}");
+    println!("{C} │ STATUS: ONLINE // CORES: {threads:<2} // SIGNAL: ██░ │{N}");
+    println!("{C} └─────────────────────────────────────────────┘{N}");
     println!("{M}  >> PARALLEL PERL5 INTERPRETER // RUST-POWERED v{version} <<{N}");
     println!();
     println!();
@@ -437,7 +437,7 @@ fn print_cyberpunk_help() {
         "  build SCRIPT [-o OUT]  {G}//{N} AOT: copy this binary with SCRIPT embedded (standalone exe)"
     );
     println!("  docs [TOPIC]           {G}//{N} Built-in docs (fo docs pmap, fo docs |>, fo docs)");
-    println!("  serve [PORT] [SCRIPT]  {G}//{N} HTTP server (fo serve, fo serve 8080 app.pr)");
+    println!("  serve [PORT] [SCRIPT]  {G}//{N} HTTP server (fo serve, fo serve 8080 app.for)");
     println!(
         "  --remote-worker        {G}//{N} Persistent cluster worker (stdio); only arg after {bin}"
     );
@@ -1091,7 +1091,7 @@ fn main() {
         process::exit(run_convert_subcommand(&args[2..]));
     }
 
-    // `fo deconvert FILE...` subcommand: convert forge .pr files back to standard Perl .pl syntax.
+    // `fo deconvert FILE...` subcommand: convert forge .for files back to standard Perl .pl syntax.
     if args.len() >= 2 && args[1] == "deconvert" {
         process::exit(run_deconvert_subcommand(&args[2..]));
     }
@@ -1321,7 +1321,7 @@ fn main() {
     }
 
     if cli.format_source {
-        // Use convert_program for clean forge (.pr) syntax with pipes
+        // Use convert_program for clean forge (.for) syntax with pipes
         println!("{}", forge::convert::convert_program(&program));
         return;
     }
@@ -1377,7 +1377,7 @@ fn main() {
     }
 
     // --flame: when stdout is piped to a file, save real stdout for the SVG and redirect
-    // script output to stderr so `fo --flame x.pr > flame.svg` captures a clean SVG.
+    // script output to stderr so `fo --flame x.for > flame.svg` captures a clean SVG.
     // When stdout is a TTY, skip the redirect — we'll render colored bars to stderr instead.
     let flame_is_tty = cli.flame && io::stdout().is_terminal();
     #[cfg(unix)]
@@ -1654,12 +1654,12 @@ fn run_convert_subcommand(args: &[String]) -> i32 {
                 println!("  - #!/usr/bin/env forge shebang");
                 println!();
                 println!("Options:");
-                println!("  -i, --in-place       Write .pr files alongside originals");
+                println!("  -i, --in-place       Write .for files alongside originals");
                 println!("  -d, --output-delim   Delimiter for s///, tr///, m// (default: preserve original)");
                 println!();
                 println!("Examples:");
                 println!("  fo convert app.pl              # print to stdout");
-                println!("  fo convert -i lib/*.pm         # write lib/*.pr");
+                println!("  fo convert -i lib/*.pm         # write lib/*.for");
                 println!("  fo convert -d '|' app.pl       # use | as delimiter: s|old|new|g");
                 return 0;
             }
@@ -1734,7 +1734,7 @@ fn run_serve_subcommand(args: &[String]) -> i32 {
             "  fo serve                                              # static file server on 8000"
         );
         eprintln!("  fo serve 8080                                         # static file server");
-        eprintln!("  fo serve 8080 app.pr                                  # script handler");
+        eprintln!("  fo serve 8080 app.for                                 # script handler");
         eprintln!("  fo serve 3000 -e '\"hello \" . $req->{{path}}'           # one-liner");
         eprintln!("  fo serve 8080 -e 'status => 200, body => json_encode(+{{ok => 1}})'");
         return 0;
@@ -2771,7 +2771,7 @@ fn render_inline_code(line: &str, color: &str, reset: &str) -> String {
     out
 }
 
-/// `fo deconvert FILE...` — convert forge .pr files back to standard Perl .pl syntax.
+/// `fo deconvert FILE...` — convert forge .for files back to standard Perl .pl syntax.
 fn run_deconvert_subcommand(args: &[String]) -> i32 {
     let mut files: Vec<String> = Vec::new();
     let mut in_place = false;
@@ -2799,7 +2799,7 @@ fn run_deconvert_subcommand(args: &[String]) -> i32 {
             "-h" | "--help" => {
                 println!("usage: fo deconvert [-i] [-d DELIM] FILE...");
                 println!();
-                println!("Convert forge .pr files back to standard Perl .pl syntax:");
+                println!("Convert forge .for files back to standard Perl .pl syntax:");
                 println!("  - Pipe chains and thread macros → nested function calls");
                 println!("  - fn → sub");
                 println!("  - p → say");
@@ -2811,9 +2811,9 @@ fn run_deconvert_subcommand(args: &[String]) -> i32 {
                 println!("  -d, --output-delim   Delimiter for s///, tr///, m// (default: preserve original)");
                 println!();
                 println!("Examples:");
-                println!("  fo deconvert app.pr              # print to stdout");
-                println!("  fo deconvert -i lib/*.pr         # write lib/*.pl");
-                println!("  fo deconvert -d '|' app.pr       # use | as delimiter: s|old|new|g");
+                println!("  fo deconvert app.for             # print to stdout");
+                println!("  fo deconvert -i lib/*.for        # write lib/*.pl");
+                println!("  fo deconvert -d '|' app.for      # use | as delimiter: s|old|new|g");
                 return 0;
             }
             s if s.starts_with('-') => {

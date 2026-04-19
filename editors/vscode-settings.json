@@ -1,6 +1,6 @@
 {
   "files.associations": {
-    "*.pr": "perl"
+    "*.for": "perl"
   },
   "[perl]": {
     "editor.tabSize": 4,

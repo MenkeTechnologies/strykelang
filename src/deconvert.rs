@@ -1,4 +1,4 @@
-//! Deconvert forge .pr syntax back to standard Perl .pl syntax.
+//! Deconvert forge .for syntax back to standard Perl .pl syntax.
 //!
 //! This is the inverse of [`crate::convert`]: takes a parsed forge program
 //! and emits valid Perl 5 source code that can run under stock `perl`.

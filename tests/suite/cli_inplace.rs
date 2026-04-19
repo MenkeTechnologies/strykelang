@@ -10,7 +10,7 @@ fn pe_i_p_e_inplace_edits_argv_file() {
     let f = dir.join("t.txt");
     fs::write(&f, "hello a world\n").unwrap();
 
-    let exe = env!("CARGO_BIN_EXE_pe");
+    let exe = env!("CARGO_BIN_EXE_fo");
     let out = Command::new(exe)
         .current_dir(&dir)
         .args(["-i", "-p", "-e", "s/a/b/", "t.txt"])
@@ -33,7 +33,7 @@ fn pe_i_bak_creates_backup_next_to_target() {
     let f = dir.join("t.txt");
     fs::write(&f, "x\n").unwrap();
 
-    let exe = env!("CARGO_BIN_EXE_pe");
+    let exe = env!("CARGO_BIN_EXE_fo");
     let out = Command::new(exe)
         .current_dir(&dir)
         .args(["-i.bak", "-p", "-e", "s/x/y/", "t.txt"])
@@ -61,7 +61,7 @@ fn pe_i_p_e_inplace_edits_multiple_argv_files_in_parallel() {
         fs::write(p, "hello a world\n").unwrap();
     }
 
-    let exe = env!("CARGO_BIN_EXE_pe");
+    let exe = env!("CARGO_BIN_EXE_fo");
     let out = Command::new(exe)
         .current_dir(&dir)
         .args(["-i", "-p", "-e", "s/a/b/"])

@@ -1,17 +1,17 @@
 /**
- * perlrs docs — theme / CRT / neon / color-scheme toggles.
+ * forge docs — theme / CRT / neon / color-scheme toggles.
  * Vendored and simplified from audio_haxor/docs/hud-theme.js.
- * Storage keys live under the `perlrs-hud-*` namespace so the two projects
+ * Storage keys live under the `forge-hud-*` namespace so the two projects
  * can't clobber each other if ever opened from the same origin.
  */
 (function () {
   'use strict';
 
   var STORAGE = {
-    theme: 'perlrs-hud-theme',
-    crt: 'perlrs-hud-crt',
-    neon: 'perlrs-hud-neon',
-    scheme: 'perlrs-hud-scheme',
+    theme: 'forge-hud-theme',
+    crt: 'forge-hud-crt',
+    neon: 'forge-hud-neon',
+    scheme: 'forge-hud-scheme',
   };
 
   var SCHEME_VAR_KEYS = [

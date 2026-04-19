@@ -97,7 +97,7 @@ autoload -Uz compinit && compinit
 | CSV → JSON | `fo 'csv_read("f") \|> tj \|> p'` **33c** | needs `Text::CSV` + `JSON` | needs `csv` + `json` | needs `csv` + `json` imports | — |
 | Parallel map | `fo '1..1e6 \|> pmap { $_ * 2 }'` **33c** | not built in | not built in | not built in | `xargs -P8` 50c+ |
 | Sparkline | `fo '(3,7,1,9) \|> spark \|> p'` **31c** | not built in | not built in | not built in | not built in |
-| In-place sed (parallel) | `fo -i -fo 's/foo/bar/g' *.txt` **31c** | `perl -i -fo 's/foo/bar/g' *.txt` 33c (sequential) | `ruby -i -fo '$_.gsub!(...)'` 35c+ | — | `sed -i '' 's/foo/bar/g' *.txt` 31c (sequential) |
+| In-place sed (parallel) | `fo -i -pe 's/foo/bar/g' *.txt` **31c** | `perl -i -pe 's/foo/bar/g' *.txt` 33c (sequential) | `ruby -i -pe '$_.gsub!(...)'` 35c+ | — | `sed -i '' 's/foo/bar/g' *.txt` 31c (sequential) |
 
 ### Feature matrix
 
@@ -136,15 +136,15 @@ fo --disasm script.pl                   # bytecode listing on stderr
 fo --ast script.pl                      # AST as JSON
 fo --fmt script.pl                      # pretty-print parsed source
 fo --profile script.pl                  # folded stacks + per-line/per-sub ns
-fo --flame script.pr                    # colored flamegraph bars in terminal
-fo --flame script.pr > flame.svg        # interactive SVG flamegraph when piped
+fo --flame script.for                   # colored flamegraph bars in terminal
+fo --flame script.for > flame.svg       # interactive SVG flamegraph when piped
 fo --explain E0001                      # expanded hint for an error code
 fo docs                                  # interactive reference book (vim-style: j/k/]/[/t/q)
 fo docs pmap                             # jump straight to a topic
 fo docs --toc                            # table of contents
 fo docs --search parallel                # search all pages
 fo serve                                # static file server for $PWD on port 8000
-fo serve 8080 app.pr                    # HTTP server with handler script
+fo serve 8080 app.for                   # HTTP server with handler script
 fo serve 3000 -e '"hello " . $req->{path}'  # one-liner HTTP server
 fo build script.pl -o myapp             # bake into a standalone binary ([0x0D])
 fo --lsp                                # language server over stdio ([0x11])
@@ -176,9 +176,9 @@ A line whose trimmed text is exactly `__DATA__` ends the program; the trailing b
 
 ```sh
 echo data | fo -ne 'print uc $_'        # line loop
-cat f.txt | fo -fo 's/foo/bar/g'        # auto-print like sed
-fo -i -fo 's/foo/bar/g' file1 file2     # in-place edit (parallel across files)
-fo -i.bak -fo 's/x/y/g' *.txt           # with backup suffix
+cat f.txt | fo -pe 's/foo/bar/g'        # auto-print like sed
+fo -i -pe 's/foo/bar/g' file1 file2     # in-place edit (parallel across files)
+fo -i.bak -pe 's/x/y/g' *.txt           # with backup suffix
 echo a:b:c | fo -aF: -ne 'print $F[1]'  # auto-split
 ```
 
@@ -578,7 +578,7 @@ forge-specific long flags:
 | `--ast` | Dump parsed AST as JSON and exit |
 | `--fmt` | Pretty-print parsed Perl to stdout and exit |
 | `--profile` | Wall-clock profile: per-line + per-sub timings on stderr |
-| `--flame` | Flamegraph: colored terminal bars when interactive, SVG when piped (`fo --flame x.pr > flame.svg`) |
+| `--flame` | Flamegraph: colored terminal bars when interactive, SVG when piped (`fo --flame x.for > flame.svg`) |
 | `--no-jit` | Disable Cranelift JIT (bytecode interpreter only) |
 | `--compat` | Perl 5 strict-compatibility mode: disable all forge extensions (`\|>`, `struct`, `enum`, `match`, `pmap`, `#{expr}`, etc.) |
 | `--explain CODE` | Print expanded hint for an error code (e.g. `E0001`) |
@@ -588,7 +588,7 @@ forge-specific long flags:
 | `--remote-worker-v1` | Legacy one-shot cluster worker over stdio |
 | `build SCRIPT [-o OUT]` | AOT compile script to standalone binary ([\[0x0D\]](#0x0d-standalone-binaries-fo-build)) |
 | `doc [TOPIC]` | Interactive reference book with vim-style navigation (`fo doc`, `fo doc pmap`, `fo doc --toc`) |
-| `serve [PORT] [SCRIPT]` | HTTP server (default port 8000): static files (`fo serve`), script (`fo serve 8080 app.pr`), one-liner (`fo serve 3000 -e 'EXPR'`) |
+| `serve [PORT] [SCRIPT]` | HTTP server (default port 8000): static files (`fo serve`), script (`fo serve 8080 app.for`), one-liner (`fo serve 3000 -e 'EXPR'`) |
 
 ![fo -h](img/fo-help.png)
 
@@ -1350,8 +1350,8 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 fo examples/fibonacci.pl
 fo examples/text_processing.pl
 fo examples/parallel_demo.pl
-fo convert examples/fibonacci.pl > examples/fibonacci.pr
-fo examples/fibonacci.pr
+fo convert examples/fibonacci.pl > examples/fibonacci.for
+fo examples/fibonacci.for
 ```
 
 ```sh

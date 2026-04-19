@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 fn fo() -> &'static str {
-    env!("CARGO_BIN_EXE_pe")
+    env!("CARGO_BIN_EXE_fo")
 }
 
 fn repo_root() -> PathBuf {
@@ -28,7 +28,7 @@ fn assert_success(label: &str, out: &std::process::Output) {
 }
 
 #[test]
-fn readme_pe_dash_e_print_hello() {
+fn readme_fo_dash_e_print_hello() {
     let out = Command::new(fo())
         .args(["-e", r#"print "Hello, world!\n""#])
         .output()
@@ -38,7 +38,7 @@ fn readme_pe_dash_e_print_hello() {
 }
 
 #[test]
-fn readme_pe_script_plus_argv() {
+fn readme_fo_script_plus_argv() {
     let out = Command::new(fo())
         .arg(fib())
         .args(["arg1", "arg2"])
@@ -48,7 +48,7 @@ fn readme_pe_script_plus_argv() {
 }
 
 #[test]
-fn readme_pe_lane_autosplit_field0() {
+fn readme_fo_lane_autosplit_field0() {
     let mut child = Command::new(fo())
         .args(["-lane", "print $F[0]"])
         .stdin(Stdio::piped())
@@ -63,7 +63,7 @@ fn readme_pe_lane_autosplit_field0() {
 }
 
 #[test]
-fn readme_pe_syntax_check() {
+fn readme_fo_syntax_check() {
     let out = Command::new(fo())
         .arg("-c")
         .arg(fib())
@@ -75,7 +75,7 @@ fn readme_pe_syntax_check() {
 }
 
 #[test]
-fn readme_pe_lint() {
+fn readme_fo_lint() {
     let out = Command::new(fo())
         .arg("--lint")
         .arg(fib())
@@ -90,7 +90,7 @@ fn readme_pe_lint() {
 }
 
 #[test]
-fn readme_pe_disasm() {
+fn readme_fo_disasm() {
     let out = Command::new(fo())
         .arg("--disasm")
         .arg(fib())
@@ -105,7 +105,7 @@ fn readme_pe_disasm() {
 }
 
 #[test]
-fn readme_pe_ast_json() {
+fn readme_fo_ast_json() {
     let out = Command::new(fo())
         .arg("--ast")
         .arg(fib())
@@ -120,7 +120,7 @@ fn readme_pe_ast_json() {
 }
 
 #[test]
-fn readme_pe_fmt() {
+fn readme_fo_fmt() {
     let out = Command::new(fo())
         .arg("--fmt")
         .arg(fib())
@@ -135,7 +135,7 @@ fn readme_pe_fmt() {
 }
 
 #[test]
-fn readme_pe_profile() {
+fn readme_fo_profile() {
     let out = Command::new(fo())
         .arg("--profile")
         .arg(fib())
@@ -150,7 +150,7 @@ fn readme_pe_profile() {
 }
 
 #[test]
-fn readme_pe_explain_e0001() {
+fn readme_fo_explain_e0001() {
     let out = Command::new(fo())
         .args(["--explain", "E0001"])
         .output()
@@ -164,7 +164,7 @@ fn readme_pe_explain_e0001() {
 }
 
 #[test]
-fn readme_pe_ne_uc_topic() {
+fn readme_fo_ne_uc_topic() {
     let mut child = Command::new(fo())
         .args(["-ne", "print uc $_"])
         .stdin(Stdio::piped())
@@ -179,10 +179,10 @@ fn readme_pe_ne_uc_topic() {
 }
 
 #[test]
-fn readme_pe_pe_subst_pipe() {
-    // README: `cat f.txt | fo -fo 's/foo/bar/g'` — transform lines from stdin.
+fn readme_fo_subst_pipe() {
+    // README: `cat f.txt | fo -pe 's/foo/bar/g'` — transform lines from stdin.
     let mut child = Command::new(fo())
-        .args(["-fo", "s/foo/bar/g"])
+        .args(["-pe", "s/foo/bar/g"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -195,13 +195,13 @@ fn readme_pe_pe_subst_pipe() {
         .write_all(b"foo line\n")
         .unwrap();
     let out = child.wait_with_output().expect("wait");
-    assert_success("fo -fo pipe", &out);
+    assert_success("fo -pe pipe", &out);
     assert_eq!(String::from_utf8_lossy(&out.stdout), "bar line\n");
 }
 
 #[test]
-fn readme_pe_i_pe_two_files() {
-    let dir = std::env::temp_dir().join(format!("readme_pe_i2_{}", std::process::id()));
+fn readme_fo_i_two_files() {
+    let dir = std::env::temp_dir().join(format!("readme_fo_i2_{}", std::process::id()));
     fs::create_dir_all(&dir).unwrap();
     let a = dir.join("file1");
     let b = dir.join("file2");
@@ -210,7 +210,7 @@ fn readme_pe_i_pe_two_files() {
 
     let out = Command::new(fo())
         .current_dir(&dir)
-        .args(["-i", "-fo", "s/foo/bar/g"])
+        .args(["-i", "-pe", "s/foo/bar/g"])
         .arg(&a)
         .arg(&b)
         .output()
@@ -221,15 +221,15 @@ fn readme_pe_i_pe_two_files() {
 }
 
 #[test]
-fn readme_pe_i_bak_glob_txt() {
-    let dir = std::env::temp_dir().join(format!("readme_pe_ibak_{}", std::process::id()));
+fn readme_fo_i_bak_glob_txt() {
+    let dir = std::env::temp_dir().join(format!("readme_fo_ibak_{}", std::process::id()));
     fs::create_dir_all(&dir).unwrap();
     let t = dir.join("z.txt");
     fs::write(&t, "x\n").unwrap();
 
     let out = Command::new(fo())
         .current_dir(&dir)
-        .args(["-i.bak", "-fo", "s/x/y/g"])
+        .args(["-i.bak", "-pe", "s/x/y/g"])
         .arg("z.txt")
         .output()
         .expect("spawn");
@@ -241,7 +241,7 @@ fn readme_pe_i_bak_glob_txt() {
 }
 
 #[test]
-fn readme_pe_a_f_autosplit() {
+fn readme_fo_a_f_autosplit() {
     let mut child = Command::new(fo())
         .args(["-aF:", "-ne", "print $F[1]"])
         .stdin(Stdio::piped())
@@ -256,7 +256,7 @@ fn readme_pe_a_f_autosplit() {
 }
 
 #[test]
-fn readme_pe_j_pmap() {
+fn readme_fo_j_pmap() {
     let out = Command::new(fo())
         .args([
             "-j",
@@ -271,7 +271,7 @@ fn readme_pe_j_pmap() {
 }
 
 #[test]
-fn readme_pe_examples_scripts() {
+fn readme_fo_examples_scripts() {
     for rel in [
         "examples/fibonacci.pl",
         "examples/text_processing.pl",
