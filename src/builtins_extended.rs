@@ -1033,32 +1033,6 @@ fn builtin_chi_square_stat(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(chi2))
 }
 
-/// `entropy LIST` — Shannon entropy (base 2).
-fn builtin_entropy(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    use std::collections::HashMap;
-    let vals: Vec<String> = flatten_args(args).iter().map(|v| v.to_string()).collect();
-    if vals.is_empty() {
-        return Ok(PerlValue::float(0.0));
-    }
-    let mut freq: HashMap<&str, usize> = HashMap::new();
-    for v in &vals {
-        *freq.entry(v.as_str()).or_insert(0) += 1;
-    }
-    let n = vals.len() as f64;
-    let entropy: f64 = freq
-        .values()
-        .map(|&c| {
-            let p = c as f64 / n;
-            if p > 0.0 {
-                -p * p.log2()
-            } else {
-                0.0
-            }
-        })
-        .sum();
-    Ok(PerlValue::float(entropy))
-}
-
 /// `gini_coefficient LIST` — Gini coefficient (0 = perfect equality, 1 = perfect inequality).
 fn builtin_gini(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut vals: Vec<f64> = flatten_args(args)
@@ -1151,21 +1125,22 @@ fn builtin_five_number_summary(args: &[PerlValue]) -> PerlResult<PerlValue> {
 fn builtin_describe(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut vals: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
     if vals.is_empty() {
-        return Ok(PerlValue::hash_from_pairs(vec![]));
+        let m: indexmap::IndexMap<String, PerlValue> = indexmap::IndexMap::new();
+        return Ok(PerlValue::hash(m));
     }
     vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let n = vals.len();
     let mean = stats_mean(&vals);
     let stddev = stats_stddev(&vals);
-    Ok(PerlValue::hash_from_pairs(vec![
-        ("count".to_string(), PerlValue::integer(n as i64)),
-        ("min".to_string(), PerlValue::float(vals[0])),
-        ("max".to_string(), PerlValue::float(vals[n - 1])),
-        ("mean".to_string(), PerlValue::float(mean)),
-        ("median".to_string(), PerlValue::float(vals[n / 2])),
-        ("stddev".to_string(), PerlValue::float(stddev)),
-        ("sum".to_string(), PerlValue::float(vals.iter().sum())),
-    ]))
+    let mut m = indexmap::IndexMap::new();
+    m.insert("count".to_string(), PerlValue::integer(n as i64));
+    m.insert("min".to_string(), PerlValue::float(vals[0]));
+    m.insert("max".to_string(), PerlValue::float(vals[n - 1]));
+    m.insert("mean".to_string(), PerlValue::float(mean));
+    m.insert("median".to_string(), PerlValue::float(vals[n / 2]));
+    m.insert("stddev".to_string(), PerlValue::float(stddev));
+    m.insert("sum".to_string(), PerlValue::float(vals.iter().sum()));
+    Ok(PerlValue::hash(m))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1309,27 +1284,6 @@ fn builtin_degrees_to_compass(interp: &Interpreter, args: &[PerlValue]) -> PerlR
     Ok(PerlValue::string(
         dirs[((d + 11.25) / 22.5) as usize % 16].to_string(),
     ))
-}
-
-/// `rotate_point X, Y, ANGLE_DEG [, CX, CY]` — rotate point around center (default origin).
-fn builtin_rotate_point(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
-    let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let angle = args
-        .get(2)
-        .map(|v| v.to_number())
-        .unwrap_or(0.0)
-        .to_radians();
-    let cx = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
-    let cy = args.get(4).map(|v| v.to_number()).unwrap_or(0.0);
-    let dx = x - cx;
-    let dy = y - cy;
-    let cos_a = angle.cos();
-    let sin_a = angle.sin();
-    Ok(PerlValue::array(vec![
-        PerlValue::float(cx + dx * cos_a - dy * sin_a),
-        PerlValue::float(cy + dx * sin_a + dy * cos_a),
-    ]))
 }
 
 /// `scale_point X, Y, SX, SY [, CX, CY]` — scale point around center (default origin).
@@ -1622,19 +1576,19 @@ fn builtin_sector_area(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `torus_volume MAJOR_R, MINOR_R` — volume of torus.
 fn builtin_torus_volume(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let R = args.first().map(|v| v.to_number()).unwrap_or(0.0);
-    let r = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let major_r = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let minor_r = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(
-        2.0 * std::f64::consts::PI * std::f64::consts::PI * R * r * r,
+        2.0 * std::f64::consts::PI * std::f64::consts::PI * major_r * minor_r * minor_r,
     ))
 }
 
 /// `torus_surface MAJOR_R, MINOR_R` — surface area of torus.
 fn builtin_torus_surface(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let R = args.first().map(|v| v.to_number()).unwrap_or(0.0);
-    let r = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let major_r = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let minor_r = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(
-        4.0 * std::f64::consts::PI * std::f64::consts::PI * R * r,
+        4.0 * std::f64::consts::PI * std::f64::consts::PI * major_r * minor_r,
     ))
 }
 
@@ -2020,36 +1974,6 @@ fn builtin_pmt(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(-pmt))
 }
 
-/// `fv RATE, NPER, PMT [, PV, TYPE]` — future value.
-fn builtin_fv(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let rate = args.first().map(|v| v.to_number()).unwrap_or(0.0);
-    let nper = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    let pmt = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
-    let pv = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
-    let typ = args.get(4).map(|v| v.to_int()).unwrap_or(0);
-    if rate == 0.0 {
-        return Ok(PerlValue::float(-(pv + pmt * nper)));
-    }
-    let pvif = (1.0 + rate).powf(nper);
-    let fv = -pv * pvif - pmt * (1.0 + rate * typ as f64) * (pvif - 1.0) / rate;
-    Ok(PerlValue::float(fv))
-}
-
-/// `pv RATE, NPER, PMT [, FV, TYPE]` — present value.
-fn builtin_pv(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let rate = args.first().map(|v| v.to_number()).unwrap_or(0.0);
-    let nper = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    let pmt = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
-    let fv = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
-    let typ = args.get(4).map(|v| v.to_int()).unwrap_or(0);
-    if rate == 0.0 {
-        return Ok(PerlValue::float(-(fv + pmt * nper)));
-    }
-    let pvif = (1.0 + rate).powf(nper);
-    let pv = (-fv - pmt * (1.0 + rate * typ as f64) * (pvif - 1.0) / rate) / pvif;
-    Ok(PerlValue::float(pv))
-}
-
 /// `nper RATE, PMT, PV [, FV, TYPE]` — number of periods.
 fn builtin_nper(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let rate = args.first().map(|v| v.to_number()).unwrap_or(0.0);
@@ -2251,17 +2175,6 @@ fn builtin_max_drawdown(args: &[PerlValue]) -> PerlResult<PerlValue> {
         }
     }
     Ok(PerlValue::float(max_dd))
-}
-
-/// `compound_interest PRINCIPAL, RATE, TIME [, N]` — compound interest (N compounds per period).
-fn builtin_compound_interest(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let principal = args.first().map(|v| v.to_number()).unwrap_or(0.0);
-    let rate = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let time = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
-    let n = args.get(3).map(|v| v.to_number()).unwrap_or(1.0).max(1.0);
-    Ok(PerlValue::float(
-        principal * (1.0 + rate / n).powf(n * time),
-    ))
 }
 
 /// `continuous_compound PRINCIPAL, RATE, TIME` — continuous compounding.
@@ -4646,35 +4559,6 @@ fn builtin_upsample(args: &[PerlValue]) -> PerlResult<PerlValue> {
         }
     }
     Ok(PerlValue::array(out))
-}
-
-/// `diff SIGNAL` — first-order difference (derivative approximation).
-fn builtin_diff(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let signal: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
-    if signal.len() < 2 {
-        return Ok(PerlValue::array(vec![]));
-    }
-    Ok(PerlValue::array(
-        signal
-            .windows(2)
-            .map(|w| PerlValue::float(w[1] - w[0]))
-            .collect(),
-    ))
-}
-
-/// `cumsum SIGNAL` — cumulative sum (integral approximation).
-fn builtin_cumsum(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let signal: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
-    let mut sum = 0.0;
-    Ok(PerlValue::array(
-        signal
-            .into_iter()
-            .map(|s| {
-                sum += s;
-                PerlValue::float(sum)
-            })
-            .collect(),
-    ))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
