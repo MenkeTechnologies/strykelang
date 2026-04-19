@@ -1,11 +1,11 @@
 #compdef stryke st s
 
-# Zsh completion for stryke / st — a Perl interpreter written in Rust
+# Zsh completion for stryke / s — a Perl interpreter written in Rust
 #
 # Three contexts:
-#   1. `st build SCRIPT [-o OUT]`            — AOT compile a script to a standalone binary
-#   2. `st convert [-i] [-d DELIM] FILE...`  — convert Perl to stryke syntax with |> pipes
-#   3. `st [perl-flags] [SCRIPT] [args]`     — normal interpreter mode
+#   1. `s build SCRIPT [-o OUT]`            — AOT compile a script to a standalone binary
+#   2. `s convert [-i] [-d DELIM] FILE...`  — convert Perl to stryke syntax with |> pipes
+#   3. `s [perl-flags] [SCRIPT] [args]`     — normal interpreter mode
 #
 # Note on the dispatch pattern: we use `_arguments -C` + `'1: :->cmd'` + `'*::arg:->args'`
 # so subcommand handlers run via the standard state-machine. An earlier version of this
@@ -37,25 +37,25 @@ _stryke_debug_flags() {
     'v[verbose: use abs path when printing file names]'
 }
 
-# `st build SCRIPT [-o OUT]` — bake a Perl script into a standalone executable
+# `s build SCRIPT [-o OUT]` — bake a Perl script into a standalone executable
 _stryke_build() {
   _arguments -s -S \
     '(-o --output)'{-o+,--output=}'[output binary path]:output:_files' \
-    '(-h --help)'{-h,--help}'[show st build usage]' \
+    '(-h --help)'{-h,--help}'[show s build usage]' \
     '1:script file:_files -g "*.stk *.pl *.pm *.t *.cgi *.psgi"'
 }
 
-# `st docs [TOPIC]` — built-in documentation browser
+# `s docs [TOPIC]` — built-in documentation browser
 _stryke_docs() {
   local -a _topics
-  _topics=(${(f)"$(st docs --list 2>/dev/null | sed 's/^ *[0-9]*\. //')"})
+  _topics=(${(f)"$(s docs --list 2>/dev/null | sed 's/^ *[0-9]*\. //')"})
   _describe 'docs topic' _topics
 }
 
-# `st serve [PORT] [SCRIPT]` — built-in HTTP server (default port 8000)
+# `s serve [PORT] [SCRIPT]` — built-in HTTP server (default port 8000)
 _stryke_serve() {
   _arguments -s -S \
-    '(-h --help)'{-h,--help}'[show st serve usage]' \
+    '(-h --help)'{-h,--help}'[show s serve usage]' \
     '1:port (default 8000):' \
     '2:script or -e:_files -g "*.stk *.pl"'
 }
@@ -64,15 +64,15 @@ _stryke_deconvert() {
   _arguments -s -S \
     '(-i --in-place)'{-i,--in-place}'[write .pl files alongside originals]' \
     '(-d --output-delim)'{-d+,--output-delim=}'[delimiter for s/// tr/// m// (default: preserve original)]:delimiter:' \
-    '(-h --help)'{-h,--help}'[show st deconvert usage]' \
+    '(-h --help)'{-h,--help}'[show s deconvert usage]' \
     '*:stryke files:_files -g "*.stk"'
 }
-# `st convert [-i] [-d DELIM] FILE...` — convert Perl source to idiomatic stryke syntax
+# `s convert [-i] [-d DELIM] FILE...` — convert Perl source to idiomatic stryke syntax
 _stryke_convert() {
   _arguments -s -S \
     '(-i --in-place)'{-i,--in-place}'[rewrite files in place]' \
     '(-d --output-delim)'{-d+,--output-delim=}'[delimiter for s/// tr/// m// (default: preserve original)]:delimiter:' \
-    '(-h --help)'{-h,--help}'[show st convert usage]' \
+    '(-h --help)'{-h,--help}'[show s convert usage]' \
     '*:perl files:_files -g "*.pl *.pm *.t *.cgi *.psgi"'
 }
 

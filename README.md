@@ -89,15 +89,15 @@ autoload -Uz compinit && compinit
 
 | Task | `stryke` | `perl` | `ruby` | `python` | `awk` / other |
 |---|---|---|---|---|---|
-| Print hello world | `stryke 'p "hello world"'` **21c** | `perl -e 'print "hello world\n"'` 32c | `ruby -e 'puts "hello world"'` 29c | `python3 -c 'print("hello world")'` 34c | `echo \| awk '{print "hello world"}'` 36c |
-| Sum 1..100 | `stryke 'p sum 1..100'` **19c** | `perl -MList::Util=sum -e 'print sum 1..100'` 45c | `ruby -e 'puts (1..100).sum'` 28c | `python3 -c 'print(sum(range(1,101)))'` 38c | — |
-| Word frequencies | `stryke -an 'freq(@F) \|> dd'` **25c** | `perl -ane '$h{$_}++ for @F}{print "$_ $h{$_}\n" for keys %h'` 61c | — | — | `awk '{for(i=1;i<=NF;i++) a[$i]++} END{...}'` 65c+ |
-| SHA256 of file | `stryke 'p s256"f"'` **14c** | `perl -MDigest::SHA=sha256_hex -e '...'` 70c+ | — | `python3 -c 'import hashlib;...'` 80c+ | `shasum -a 256 f` 15c |
-| Fetch JSON API | `stryke 'fetch_json(URL) \|> dd'` **~50c** | needs `LWP` + `JSON` modules | needs `net/http` + `json` | needs `urllib` + `json` | `curl -s URL \| jq .` ~40c |
-| CSV → JSON | `stryke 'csv_read("f") \|> tj \|> p'` **33c** | needs `Text::CSV` + `JSON` | needs `csv` + `json` | needs `csv` + `json` imports | — |
-| Parallel map | `stryke '1..1e6 \|> pmap { $_ * 2 }'` **33c** | not built in | not built in | not built in | `xargs -P8` 50c+ |
-| Sparkline | `stryke '(3,7,1,9) \|> spark \|> p'` **31c** | not built in | not built in | not built in | not built in |
-| In-place sed (parallel) | `stryke -i -pe 's/foo/bar/g' *.txt` **31c** | `perl -i -pe 's/foo/bar/g' *.txt` 33c (sequential) | `ruby -i -pe '$_.gsub!(...)'` 35c+ | — | `sed -i '' 's/foo/bar/g' *.txt` 31c (sequential) |
+| Print hello world | `s 'p "hello world"'` **21c** | `perl -e 'print "hello world\n"'` 32c | `ruby -e 'puts "hello world"'` 29c | `python3 -c 'print("hello world")'` 34c | `echo \| awk '{print "hello world"}'` 36c |
+| Sum 1..100 | `s 'p sum 1..100'` **19c** | `perl -MList::Util=sum -e 'print sum 1..100'` 45c | `ruby -e 'puts (1..100).sum'` 28c | `python3 -c 'print(sum(range(1,101)))'` 38c | — |
+| Word frequencies | `s -an 'freq(@F) \|> dd'` **25c** | `perl -ane '$h{$_}++ for @F}{print "$_ $h{$_}\n" for keys %h'` 61c | — | — | `awk '{for(i=1;i<=NF;i++) a[$i]++} END{...}'` 65c+ |
+| SHA256 of file | `s 'p s256"f"'` **14c** | `perl -MDigest::SHA=sha256_hex -e '...'` 70c+ | — | `python3 -c 'import hashlib;...'` 80c+ | `shasum -a 256 f` 15c |
+| Fetch JSON API | `s 'fetch_json(URL) \|> dd'` **~50c** | needs `LWP` + `JSON` modules | needs `net/http` + `json` | needs `urllib` + `json` | `curl -s URL \| jq .` ~40c |
+| CSV → JSON | `s 'csv_read("f") \|> tj \|> p'` **33c** | needs `Text::CSV` + `JSON` | needs `csv` + `json` | needs `csv` + `json` imports | — |
+| Parallel map | `s '1..1e6 \|> pmap { $_ * 2 }'` **33c** | not built in | not built in | not built in | `xargs -P8` 50c+ |
+| Sparkline | `s '(3,7,1,9) \|> spark \|> p'` **31c** | not built in | not built in | not built in | not built in |
+| In-place sed (parallel) | `s -i -pe 's/foo/bar/g' *.txt` **31c** | `perl -i -pe 's/foo/bar/g' *.txt` 33c (sequential) | `ruby -i -pe '$_.gsub!(...)'` 35c+ | — | `sed -i '' 's/foo/bar/g' *.txt` 31c (sequential) |
 
 ### Feature matrix
 
