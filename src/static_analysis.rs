@@ -207,6 +207,28 @@ impl StaticAnalyzer {
                     }
                 }
             }
+            StmtKind::ClassDecl { def } => {
+                // Register class name as a callable (constructor)
+                self.declare_sub(&def.name);
+                // Register static methods and static fields as Class::name
+                for m in &def.methods {
+                    if m.is_static {
+                        self.declare_sub(&format!("{}::{}", def.name, m.name));
+                    }
+                }
+                for sf in &def.static_fields {
+                    self.declare_sub(&format!("{}::{}", def.name, sf.name));
+                }
+            }
+            StmtKind::StructDecl { def } => {
+                self.declare_sub(&def.name);
+            }
+            StmtKind::EnumDecl { def } => {
+                self.declare_sub(&def.name);
+                for v in &def.variants {
+                    self.declare_sub(&format!("{}::{}", def.name, v.name));
+                }
+            }
             _ => {}
         }
     }

@@ -1,6 +1,7 @@
 //! Tests for the forge native `class` OOP system.
 
 use crate::common::*;
+use forge::error::ErrorKind;
 
 #[test]
 fn class_basic_instantiation() {
@@ -276,5 +277,330 @@ fn class_multiple_inheritance() {
             $obj->a . "," . $obj->b . "," . $obj->c"#
         ),
         "1,2,3"
+    );
+}
+
+// ── Abstract classes ─────────────────────────────────────────────────
+
+#[test]
+fn abstract_class_cannot_instantiate() {
+    assert_eq!(
+        eval_err_kind(r#"abstract class Shape { name: Str }; Shape(name => "x")"#),
+        ErrorKind::Runtime,
+    );
+}
+
+#[test]
+fn abstract_class_subclass_can_instantiate() {
+    assert_eq!(
+        eval_string(
+            r#"abstract class Shape { name: Str }
+            class Circle extends Shape { radius: Int }
+            my $c = Circle(name => "c", radius => 5);
+            $c->name . ":" . $c->radius"#
+        ),
+        "c:5"
+    );
+}
+
+#[test]
+fn abstract_class_with_methods() {
+    assert_eq!(
+        eval_string(
+            r#"abstract class Shape {
+                name: Str
+                fn describe { "Shape: " . $self->name }
+            }
+            class Circle extends Shape { }
+            my $c = Circle(name => "ring");
+            $c->describe()"#
+        ),
+        "Shape: ring"
+    );
+}
+
+// ── Protected visibility ─────────────────────────────────────────────
+
+#[test]
+fn protected_field_accessible_from_own_method() {
+    assert_eq!(
+        eval_int(
+            r#"class Secret {
+                prot hidden: Int = 42
+                fn reveal { $self->hidden }
+            }
+            my $s = Secret();
+            $s->reveal()"#
+        ),
+        42
+    );
+}
+
+#[test]
+fn protected_field_accessible_from_subclass_method() {
+    assert_eq!(
+        eval_int(
+            r#"class Base {
+                prot secret: Int = 99
+            }
+            class Child extends Base {
+                fn get_secret { $self->secret }
+            }
+            my $c = Child();
+            $c->get_secret()"#
+        ),
+        99
+    );
+}
+
+#[test]
+fn protected_field_blocked_from_outside() {
+    assert_eq!(
+        eval_err_kind(
+            r#"class Guarded { prot value: Int = 10 }
+            my $g = Guarded();
+            $g->value"#
+        ),
+        ErrorKind::Runtime,
+    );
+}
+
+#[test]
+fn protected_method_accessible_from_subclass() {
+    assert_eq!(
+        eval_string(
+            r#"class Base {
+                prot fn helper { "helped" }
+            }
+            class Child extends Base {
+                fn do_work { $self->helper() }
+            }
+            my $c = Child();
+            $c->do_work()"#
+        ),
+        "helped"
+    );
+}
+
+#[test]
+fn protected_method_blocked_from_outside() {
+    assert_eq!(
+        eval_err_kind(
+            r#"class Guarded {
+                prot fn internal { "secret" }
+            }
+            my $g = Guarded();
+            $g->internal()"#
+        ),
+        ErrorKind::Runtime,
+    );
+}
+
+#[test]
+fn private_field_blocked_from_outside() {
+    assert_eq!(
+        eval_err_kind(
+            r#"class Vault { priv code: Int = 1234 }
+            my $v = Vault();
+            $v->code"#
+        ),
+        ErrorKind::Runtime,
+    );
+}
+
+#[test]
+fn private_field_accessible_from_own_method() {
+    assert_eq!(
+        eval_int(
+            r#"class Vault {
+                priv code: Int = 1234
+                fn get_code { $self->code }
+            }
+            my $v = Vault();
+            $v->get_code()"#
+        ),
+        1234
+    );
+}
+
+// ── Static fields ────────────────────────────────────────────────────
+
+#[test]
+fn static_field_default_value() {
+    assert_eq!(
+        eval_int(
+            r#"class Counter {
+                static count: Int = 0
+            }
+            Counter::count()"#
+        ),
+        0
+    );
+}
+
+#[test]
+fn static_field_setter() {
+    assert_eq!(
+        eval_int(
+            r#"class Counter {
+                static count: Int = 0
+            }
+            Counter::count(5);
+            Counter::count()"#
+        ),
+        5
+    );
+}
+
+#[test]
+fn static_field_shared_across_instances() {
+    assert_eq!(
+        eval_int(
+            r#"class Tracker {
+                static total: Int = 0
+                name: Str
+                fn BUILD { Tracker::total(Tracker::total() + 1) }
+            }
+            my $a = Tracker(name => "a");
+            my $b = Tracker(name => "b");
+            Tracker::total()"#
+        ),
+        2
+    );
+}
+
+// ── BUILD constructor hook ───────────────────────────────────────────
+
+#[test]
+fn build_hook_runs_on_construction() {
+    assert_eq!(
+        eval_string(
+            r#"class Greeter {
+                name: Str
+                greeting: Str = ""
+                fn BUILD { $self->greeting("Hello, " . $self->name) }
+            }
+            my $g = Greeter(name => "World");
+            $g->greeting"#
+        ),
+        "Hello, World"
+    );
+}
+
+#[test]
+fn build_hook_parent_runs_first() {
+    assert_eq!(
+        eval_string(
+            r#"class Base {
+                log: Str = ""
+                fn BUILD { $self->log("base") }
+            }
+            class Child extends Base {
+                fn BUILD { $self->log($self->log . "+child") }
+            }
+            my $c = Child();
+            $c->log"#
+        ),
+        "base+child"
+    );
+}
+
+// ── DESTROY destructor ──────────────────────────────────────────────
+
+#[test]
+fn destroy_runs_child_first() {
+    assert_eq!(
+        eval_string(
+            r#"class Base {
+                static log: Str = ""
+                fn DESTROY { Base::log(Base::log() . "base,") }
+            }
+            class Child extends Base {
+                fn DESTROY { Base::log(Base::log() . "child,") }
+            }
+            my $c = Child();
+            $c->destroy();
+            Base::log()"#
+        ),
+        "child,base,"
+    );
+}
+
+// ── Trait contract enforcement ───────────────────────────────────────
+
+#[test]
+fn trait_missing_required_method_error() {
+    assert_eq!(
+        eval_err_kind(
+            r#"trait Drawable { fn draw }
+            class Box impl Drawable {
+                name: Str
+            }"#
+        ),
+        ErrorKind::Runtime,
+    );
+}
+
+#[test]
+fn trait_all_required_methods_satisfied() {
+    assert_eq!(
+        eval_string(
+            r#"trait Drawable { fn draw }
+            class Box impl Drawable {
+                name: Str
+                fn draw { "drawing " . $self->name }
+            }
+            my $b = Box(name => "square");
+            $b->draw()"#
+        ),
+        "drawing square"
+    );
+}
+
+#[test]
+fn trait_default_method_not_required() {
+    assert_eq!(
+        eval_string(
+            r#"trait Loggable {
+                fn log_prefix { "LOG" }
+                fn log_msg
+            }
+            class Event impl Loggable {
+                msg: Str
+                fn log_msg { $self->msg }
+            }
+            my $e = Event(msg => "hello");
+            $e->log_msg()"#
+        ),
+        "hello"
+    );
+}
+
+#[test]
+fn class_does_trait_check() {
+    assert_eq!(
+        eval_int(
+            r#"trait Printable { fn to_str }
+            class Item impl Printable {
+                name: Str
+                fn to_str { $self->name }
+            }
+            my $i = Item(name => "x");
+            $i->does("Printable")"#
+        ),
+        1
+    );
+}
+
+#[test]
+fn class_does_unrelated_trait_false() {
+    assert_eq!(
+        eval_string(
+            r#"trait Printable { fn to_str }
+            class Item { name: Str }
+            my $i = Item(name => "x");
+            $i->does("Printable")"#
+        ),
+        ""
     );
 }

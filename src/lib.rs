@@ -283,14 +283,46 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut Interpreter) -> PerlR
             .enum_defs
             .insert(def.name.clone(), std::sync::Arc::new(def.clone()));
     }
-    for def in &chunk.class_defs {
-        interp
-            .class_defs
-            .insert(def.name.clone(), std::sync::Arc::new(def.clone()));
-    }
+    // Load traits before classes so trait enforcement can reference them
     for def in &chunk.trait_defs {
         interp
             .trait_defs
+            .insert(def.name.clone(), std::sync::Arc::new(def.clone()));
+    }
+    for def in &chunk.class_defs {
+        // Trait contract enforcement
+        for trait_name in &def.implements {
+            if let Some(trait_def) = interp.trait_defs.get(trait_name) {
+                for required in trait_def.required_methods() {
+                    let has_method = def.methods.iter().any(|m| m.name == required.name);
+                    if !has_method {
+                        return Err(crate::error::PerlError::runtime(
+                            format!(
+                                "class `{}` implements trait `{}` but does not define required method `{}`",
+                                def.name, trait_name, required.name
+                            ),
+                            0,
+                        ));
+                    }
+                }
+            }
+        }
+        // Initialize static fields
+        for sf in &def.static_fields {
+            let val = if let Some(ref expr) = sf.default {
+                match interp.eval_expr(expr) {
+                    Ok(v) => v,
+                    Err(crate::interpreter::FlowOrError::Error(e)) => return Err(e),
+                    Err(_) => crate::value::PerlValue::UNDEF,
+                }
+            } else {
+                crate::value::PerlValue::UNDEF
+            };
+            let key = format!("{}::{}", def.name, sf.name);
+            interp.scope.declare_scalar(&key, val);
+        }
+        interp
+            .class_defs
             .insert(def.name.clone(), std::sync::Arc::new(def.clone()));
     }
     let vm_jit = interp.vm_jit_enabled && interp.profiler.is_none();

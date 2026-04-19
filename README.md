@@ -335,7 +335,7 @@ For `mysync` scalars holding a `Set`, `|`/`&` are union/intersection. Without `m
 | **Crypto** | `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `md5`, `hmac`, `hmac_sha256`, `crc32`, `uuid`, `base64_encode/decode`, `hex_encode/decode` |
 | **Compression** ([`flate2`](https://crates.io/crates/flate2), [`zstd`](https://crates.io/crates/zstd)) | `gzip`, `gunzip`, `zstd`, `zstd_decode` |
 | **Time** ([`chrono`](https://crates.io/crates/chrono), [`chrono-tz`](https://crates.io/crates/chrono-tz)) | `datetime_utc`, `datetime_from_epoch`, `datetime_parse_rfc3339`, `datetime_strftime`, `datetime_now_tz`, `datetime_format_tz`, `datetime_parse_local`, `datetime_add_seconds`, `elapsed` |
-| **Structs / Enums / Classes / Types** | `struct Point { x => Float }`, `enum Color { Red, Green }`, `class Dog extends Animal { breed: Str; fn bark { } }`, `trait Printable { fn to_str }`, `typed my $x : Int`, typed sub params `fn ($a: Int) { }` |
+| **Structs / Enums / Classes / Types** | `struct Point { x => Float }`, `enum Color { Red, Green }`, `class Dog extends Animal { breed: Str; fn bark { } }`, `abstract class Shape { }`, `trait Printable { fn to_str }` (enforced), `pub`/`priv`/`prot` visibility, `static count: Int`, `BUILD`/`DESTROY`, `typed my $x : Int`, typed sub params `fn ($a: Int) { }` |
 
 ```perl
 my $data = "https://api.example.com/users/1" |> fetch_json
@@ -481,12 +481,58 @@ my $d3 = $dog->clone()       # deep copy
 # Smart stringify
 p $dog  # Dog(name => Rex, age => 5, breed => Lab)
 
-# Visibility (pub/priv)
+# Visibility (pub/priv/prot)
 class Secret {
     pub visible: Int = 1
     priv hidden: Int = 42
-    pub fn get_hidden { $self->hidden }  # internal access ok
+    prot internal: Str = "base"         # subclass-only access
+    pub fn get_hidden { $self->hidden } # internal access ok
 }
+class Child extends Secret {
+    fn get_internal { $self->internal }  # prot: ok from subclass
+}
+
+# Abstract classes — cannot be instantiated directly
+abstract class Shape {
+    name: Str
+    fn area        # subclasses must implement
+}
+class Circle extends Shape {
+    radius: Float
+    fn area { 3.14159 * $self->radius * $self->radius }
+}
+# Shape() → error!  Circle(name => "c", radius => 5) → ok
+
+# Static fields (class variables) — shared across all instances
+class Counter {
+    static count: Int = 0
+    name: Str
+    fn BUILD { Counter::count(Counter::count() + 1) }
+}
+my $a = Counter(name => "a")
+my $b = Counter(name => "b")
+p Counter::count()  # 2
+
+# BUILD constructor hook — runs after field init, parent BUILD first
+class Logger {
+    log: Str = ""
+    fn BUILD { $self->log("initialized") }
+}
+
+# DESTROY destructor — explicit via $obj->destroy(), child first
+class Resource {
+    fn DESTROY { say "cleanup" }
+}
+my $r = Resource()
+$r->destroy()  # prints "cleanup"
+
+# Trait enforcement — required methods checked at class definition
+trait Drawable { fn draw }
+# class Oops impl Drawable { }  # → error: missing required method `draw`
+class Box impl Drawable {
+    fn draw { "drawn" }    # satisfies trait contract
+}
+p Box()->does("Drawable")  # 1
 # ────────────────────────────────────────────────────────────────────
 
 typed my $n : Int = 42

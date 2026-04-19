@@ -393,7 +393,8 @@ fn format_statement_indent(s: &Statement, depth: usize) -> String {
             format!("enum {} {{ {} }}", def.name, variants)
         }
         StmtKind::ClassDecl { def } => {
-            let mut header = format!("class {}", def.name);
+            let prefix = if def.is_abstract { "abstract " } else { "" };
+            let mut header = format!("{}class {}", prefix, def.name);
             if !def.extends.is_empty() {
                 header.push_str(&format!(" extends {}", def.extends.join(", ")));
             }
@@ -406,6 +407,7 @@ fn format_statement_indent(s: &Statement, depth: usize) -> String {
                 .map(|f| {
                     let vis = match f.visibility {
                         crate::ast::Visibility::Private => "priv ",
+                        crate::ast::Visibility::Protected => "prot ",
                         crate::ast::Visibility::Public => "",
                     };
                     format!("{}{}: {}", vis, f.name, f.ty.display_name())
