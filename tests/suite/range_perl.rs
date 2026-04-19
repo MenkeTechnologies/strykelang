@@ -1,7 +1,7 @@
-//! Perl 5–style range and flip-flop operators in forge (`..`, `...`).
+//! Perl 5–style range and flip-flop operators in stryke (`..`, `...`).
 //!
 //! ## List context (`..` / `...`)
-//! - **Numeric expansion** when [`forge::value::perl_list_range_pair_is_numeric`] says so: inclusive
+//! - **Numeric expansion** when [`stryke::value::perl_list_range_pair_is_numeric`] says so: inclusive
 //!   integer sequence; **descending** numeric `(5..2)` is empty.
 //! - **Magical string increment** otherwise (`perl_magic_string_increment_for_range` in `value.rs`):
 //!   ASCII letter/digit tails advance like Perl `++`; iteration stops when the current string’s width
@@ -11,7 +11,7 @@
 //!   simple numeric literals (regression guard).
 //!
 //! ## Scalar context — numeric line flip-flop
-//! - Driven by `$.` ([`forge::interpreter::Interpreter::scalar_flipflop_dot_line`]). Inactive → empty
+//! - Driven by `$.` ([`stryke::interpreter::Interpreter::scalar_flipflop_dot_line`]). Inactive → empty
 //!   string (`""`, false). Active lines emit `"1"`, `"2"`, …; the **closing** line uses a `"E0"` suffix
 //!   (Perl `pp_flop` stringification).
 //!

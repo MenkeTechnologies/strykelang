@@ -3,8 +3,8 @@
 //! `docs/index.html`. Run with `cargo run --bin gen-docs` before pushing to
 //! GitHub Pages.
 //!
-//! Source of truth: `forge::lsp::DOC_CATEGORIES` (chapter → topic names)
-//! and `forge::lsp::doc_text_for(topic)` (raw markdown). Topics not in
+//! Source of truth: `stryke::lsp::DOC_CATEGORIES` (chapter → topic names)
+//! and `stryke::lsp::doc_text_for(topic)` (raw markdown). Topics not in
 //! any `DOC_CATEGORIES` chapter land under a synthetic "Other" chapter so
 //! nothing silently vanishes.
 //!
@@ -18,7 +18,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 
-use forge::lsp::{doc_text_for, doc_topics, DOC_CATEGORIES};
+use stryke::lsp::{doc_text_for, doc_topics, DOC_CATEGORIES};
 
 fn main() {
     let out_path = PathBuf::from("docs/reference.html");
@@ -28,9 +28,9 @@ fn main() {
     stamp_index_version();
 }
 
-/// Rewrite the `forge v…` line in `docs/index.html` so the hub page stays
+/// Rewrite the `stryke v…` line in `docs/index.html` so the hub page stays
 /// in sync with `Cargo.toml` without hand-editing. Relies on a stable id
-/// selector (`id="forgeBuildLine"`) on the `<p class="docs-build-line">`
+/// selector (`id="strykeBuildLine"`) on the `<p class="docs-build-line">`
 /// so we can swap just that line without touching the rest of the markup.
 fn stamp_index_version() {
     let path = PathBuf::from("docs/index.html");
@@ -39,7 +39,7 @@ fn stamp_index_version() {
         return;
     };
     let version = env!("CARGO_PKG_VERSION");
-    let needle_start = r#"<p class="docs-build-line" id="forgeBuildLine">"#;
+    let needle_start = r#"<p class="docs-build-line" id="strykeBuildLine">"#;
     let needle_end = "</p>";
     let Some(s) = src.find(needle_start) else {
         println!("note: build-line marker not found in docs/index.html, skipping");
@@ -54,7 +54,7 @@ fn stamp_index_version() {
     // content ("Rust-powered · Rayon work-stealing …").
     let current = &src[after..e];
     let tail = current.find(" · ").map(|i| &current[i..]).unwrap_or("");
-    let replacement = format!("forge v{version}{tail}");
+    let replacement = format!("stryke v{version}{tail}");
     if current == replacement {
         return;
     }
@@ -121,22 +121,22 @@ fn build_page() -> String {
         r#"  <header class="tutorial-header">
     <div class="tutorial-header-inner">
       <div>
-        <h1 class="tutorial-brand">// FORGE — FULL REFERENCE</h1>
+        <h1 class="tutorial-brand">// STRYKE — FULL REFERENCE</h1>
         <nav class="tutorial-crumbs" aria-label="Breadcrumb">
           <a href="index.html">Docs</a>
           <span class="sep">/</span>
           <span class="current">Reference</span>
           <span class="sep">/</span>
-          <a href="https://github.com/MenkeTechnologies/forge" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">forge v{version} · {total_topics} topics · {chapter_count} chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v{version} · {total_topics} topics · {chapter_count} chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
         <button type="button" class="btn btn-secondary active" id="btnCrt" title="CRT scanline overlay">CRT</button>
         <button type="button" class="btn btn-secondary active" id="btnNeon" title="Neon border pulse">Neon</button>
         <a class="btn btn-secondary" href="index.html">Hub</a>
-        <a class="btn btn-secondary" href="https://github.com/MenkeTechnologies/forge" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a class="btn btn-secondary" href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
       </div>
     </div>
   </header>
@@ -389,8 +389,8 @@ const HEAD: &str = r##"<!DOCTYPE html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <meta name="description" content="forge full reference — every builtin, keyword, alias, and extension with its LSP hover doc rendered as a static page.">
-  <title>forge — Reference</title>
+  <meta name="description" content="stryke full reference — every builtin, keyword, alias, and extension with its LSP hover doc rendered as a static page.">
+  <title>stryke — Reference</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&amp;family=Share+Tech+Mono&amp;display=swap" rel="stylesheet">

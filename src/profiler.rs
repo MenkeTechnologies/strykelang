@@ -61,21 +61,21 @@ impl Profiler {
         // Incomplete enter/exit pairs (e.g. `die` before `return`) would confuse folded output.
         self.sub_stack.clear();
 
-        eprintln!("# forge --profile: collapsed stacks (name stack → ns); feed to flamegraph.pl");
+        eprintln!("# stryke --profile: collapsed stacks (name stack → ns); feed to flamegraph.pl");
         let mut stacks: Vec<_> = self.folded_ns.iter().collect();
         stacks.sort_by(|a, b| b.1.cmp(a.1));
         for (k, ns) in stacks.iter() {
             eprintln!("{} {}", k, ns);
         }
 
-        eprintln!("# forge --profile: lines (file:line → total ns)");
+        eprintln!("# stryke --profile: lines (file:line → total ns)");
         let mut lines: Vec<_> = self.line_ns.iter().collect();
         lines.sort_by(|a, b| b.1.cmp(a.1));
         for ((f, ln), ns) in lines.iter() {
             eprintln!("{}:{} {}", f, ln, ns);
         }
 
-        eprintln!("# forge --profile: subs (name → inclusive ns)");
+        eprintln!("# stryke --profile: subs (name → inclusive ns)");
         let mut subs: Vec<_> = self.sub_inclusive_ns.iter().collect();
         subs.sort_by(|a, b| b.1.cmp(a.1));
         for (name, ns) in subs {
@@ -96,7 +96,7 @@ impl Profiler {
         let line_refs: Vec<&str> = lines.iter().map(|s| s.as_str()).collect();
 
         let mut opts = inferno::flamegraph::Options::default();
-        opts.title = format!("forge --flame: {}", self.file);
+        opts.title = format!("stryke --flame: {}", self.file);
         opts.count_name = "ns".to_string();
         opts.colors = inferno::flamegraph::color::Palette::Basic(
             inferno::flamegraph::color::BasicPalette::Hot,
@@ -118,7 +118,7 @@ impl Profiler {
         let pct_prefix_len = 8;
 
         // ── header ──────────────────────────────────────────────────
-        eprintln!("\x1b[1;97m── forge --flame: {} ──\x1b[0m", self.file);
+        eprintln!("\x1b[1;97m── stryke --flame: {} ──\x1b[0m", self.file);
         eprintln!();
 
         // ── subroutine inclusive time (flat) ─────────────────────────

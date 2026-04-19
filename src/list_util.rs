@@ -1,4 +1,4 @@
-//! Perl 5 `List::Util` — core Perl ships an XS `List/Util.pm`; forge registers native Rust
+//! Perl 5 `List::Util` — core Perl ships an XS `List/Util.pm`; stryke registers native Rust
 //! implementations here so every `EXPORT_OK` name is callable and matches common Perl 5 semantics.
 
 use std::sync::Arc;
@@ -290,7 +290,7 @@ pub(crate) fn native_dispatch(
     }
 }
 
-/// Perl: `set_subname $name, $coderef` → returns `$coderef` (forge does not rename closures).
+/// Perl: `set_subname $name, $coderef` → returns `$coderef` (stryke does not rename closures).
 fn sub_util_set_subname(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
     Ok(args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
 }

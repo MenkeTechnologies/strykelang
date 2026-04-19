@@ -10,7 +10,7 @@
 //!   [u64 uncompressed_len]
 //!   [u32 version]
 //!   [u32 reserved (0)]
-//!   [8 bytes magic  b"FORGEAOT"]
+//!   [8 bytes magic  b"STRYKEAOT"]
 //! ```
 //!
 //! Payload (before zstd compression):
@@ -35,8 +35,8 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
-/// 8-byte trailer magic (`b"FORGEAOT"`).
-pub const AOT_MAGIC: &[u8; 8] = b"FORGEAOT";
+/// 8-byte trailer magic (`b"STRK_AOT"`).
+pub const AOT_MAGIC: &[u8; 8] = b"STRK_AOT";
 /// Trailer format version. Bump when the layout changes in a backward-incompatible way.
 pub const AOT_VERSION: u32 = 1;
 /// Fixed trailer length in bytes: `8 (cl) + 8 (ul) + 4 (ver) + 4 (rsv) + 8 (magic)`.
@@ -236,7 +236,7 @@ mod tests {
     fn tmp_path(tag: &str) -> PathBuf {
         let dir = std::env::temp_dir();
         dir.join(format!(
-            "forge-aot-test-{}-{}-{}",
+            "stryke-aot-test-{}-{}-{}",
             std::process::id(),
             tag,
             rand::random::<u32>()

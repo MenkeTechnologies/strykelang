@@ -1,5 +1,5 @@
 #!/bin/bash
-# Benchmark forge vs perl5.
+# Benchmark stryke vs perl5.
 #
 # Every serial bench is run twice: once on the canonical `bench/bench_*.pl`
 # file, and once on a functionally-equivalent "perturbed" copy written to a
@@ -16,7 +16,7 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-FORGE="$HERE/../target/release/forge"
+STRYKE="$HERE/../target/release/stryke"
 PERL="${PERL:-perl}"
 RUNS="${RUNS:-10}"
 WARMUP="${WARMUP:-3}"
@@ -27,8 +27,8 @@ if ! command -v hyperfine >/dev/null 2>&1; then
     exit 1
 fi
 
-if [ ! -x "$FORGE" ]; then
-    printf 'error: %s not found. build first: cargo build --release\n' "$FORGE" >&2
+if [ ! -x "$STRYKE" ]; then
+    printf 'error: %s not found. build first: cargo build --release\n' "$STRYKE" >&2
     exit 2
 fi
 
@@ -42,8 +42,8 @@ trap 'rm -rf "$TMPDIR_"' EXIT
 perturb() {
     local src="$1" dst="$2"
     {
-        printf 'my $__forge_bench_guard = 1;\n'
-        printf '$__forge_bench_guard++ if 0;\n'
+        printf 'my $__stryke_bench_guard = 1;\n'
+        printf '$__stryke_bench_guard++ if 0;\n'
         # Rename common loop-counter identifiers so any `i_name == "i"` check fails.
         # Sed substitutions are scoped to `$i`/`my $i` and similar; aggressive enough
         # to perturb the AST but safe for the benches in bench/*.pl, which only use
@@ -60,15 +60,15 @@ perl5_version() {
     "$PERL" -v 2>&1 | grep -m1 -i 'version' | sed 's/^This is //'
 }
 
-forge_version() {
-    "$FORGE" -v 2>&1 | head -1
+stryke_version() {
+    "$STRYKE" -v 2>&1 | head -1
 }
 
 printf '\n'
-printf ' forge benchmark harness\n'
+printf ' stryke benchmark harness\n'
 printf ' ---------------------------------------\n'
 printf '  perl5:   %s\n'   "$(perl5_version)"
-printf '  forge:  %s\n'   "$(forge_version)"
+printf '  stryke:  %s\n'   "$(stryke_version)"
 printf '  cores:   %s\n'   "$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo ?)"
 printf '  warmup:  %s runs\n' "$WARMUP"
 printf '  measure: hyperfine (min %s runs)\n\n' "$RUNS"
@@ -91,9 +91,9 @@ measure() {
     ' < "$json"
 }
 
-# Print a row: label | perl5 | forge JIT | forge noJIT | forge perturbed | rs/perl5 | jit speedup | warn
+# Print a row: label | perl5 | stryke JIT | stryke noJIT | stryke perturbed | rs/perl5 | jit speedup | warn
 #
-# `noJit` runs the same canonical file under `FORGE_NO_JIT=1` so the
+# `noJit` runs the same canonical file under `STRYKE_NO_JIT=1` so the
 # Cranelift block-JIT is disabled and only the bytecode interpreter runs.
 # `jit/noJit` is `noJit_mean / jit_mean` — values >1.0 mean JIT helped.
 #
@@ -104,9 +104,9 @@ row() {
     local label="$1" canonical="$2" perturbed="$3"
 
     read -r p5_mean p5_sd     < <(measure "perl_$label"               "$PERL $canonical")
-    read -r rs_mean rs_sd     < <(measure "forge_$label"             "$FORGE $canonical")
-    read -r rsnj_mean rsnj_sd < <(measure "forge_${label}_nojit"     "$FORGE --no-jit $canonical")
-    read -r rsp_mean rsp_sd   < <(measure "forge_${label}_perturbed" "$FORGE $perturbed")
+    read -r rs_mean rs_sd     < <(measure "stryke_$label"             "$STRYKE $canonical")
+    read -r rsnj_mean rsnj_sd < <(measure "stryke_${label}_nojit"     "$STRYKE --no-jit $canonical")
+    read -r rsp_mean rsp_sd   < <(measure "stryke_${label}_perturbed" "$STRYKE $perturbed")
 
     local ratio jit_speedup
     ratio=$("$PERL" -e 'printf "%.2fx", $ARGV[0]/$ARGV[1]' -- "$rs_mean" "$p5_mean")
@@ -128,7 +128,7 @@ row() {
 }
 
 printf '  %-12s %10s  %10s  %10s  %10s  %8s  %8s\n' \
-    'bench' 'perl5 ms' 'forge ms' 'noJit ms' 'perturb ms' 'rs/perl5' 'jit/noJit'
+    'bench' 'perl5 ms' 'stryke ms' 'noJit ms' 'perturb ms' 'rs/perl5' 'jit/noJit'
 printf '  %-12s %10s  %10s  %10s  %10s  %8s  %8s\n' \
     '---------' '--------' '---------' '--------' '---------' '--------' '---------'
 
@@ -140,18 +140,18 @@ for name in startup fib loop string hash array regex map_grep; do
     row "$name" "$file" "$perturbed"
 done
 
-printf '\n  pmap vs map (forge only, 50k items with per-item work)\n'
+printf '\n  pmap vs map (stryke only, 50k items with per-item work)\n'
 printf '  %-12s %10s  %10s  %10s\n' 'bench' 'map ms' 'pmap ms' 'speedup'
 printf '  %-12s %10s  %10s  %10s\n' '---------' '--------' '--------' '--------'
 
-read -r map_mean  _ < <(measure "forge_map"  "$FORGE $HERE/bench_pmap_perl.pl")
-read -r pmap_mean _ < <(measure "forge_pmap" "$FORGE $HERE/bench_pmap.pl")
+read -r map_mean  _ < <(measure "stryke_map"  "$STRYKE $HERE/bench_pmap_perl.pl")
+read -r pmap_mean _ < <(measure "stryke_pmap" "$STRYKE $HERE/bench_pmap.pl")
 pmap_ratio=$("$PERL" -e 'printf "%.2fx", $ARGV[0]/$ARGV[1]' -- "$map_mean" "$pmap_mean")
 printf '  %-12s %10.1f  %10.1f  %10s\n' 'pmap' "$map_mean" "$pmap_mean" "$pmap_ratio"
 
 printf '\n  Notes:\n'
 printf '    - All timings are mean of at least %s warm runs (warmup=%s).\n' "$RUNS" "$WARMUP"
-printf '    - The "forge ms" column has Cranelift block-JIT enabled (default).\n'
+printf '    - The "stryke ms" column has Cranelift block-JIT enabled (default).\n'
 printf '    - The "noJit ms" column runs the same canonical file with\n'
 printf '      "--no-jit" so only the bytecode interpreter executes — the\n'
 printf '      "jit/noJit" ratio is noJit_mean / jit_mean (>1.0 = JIT helped).\n'

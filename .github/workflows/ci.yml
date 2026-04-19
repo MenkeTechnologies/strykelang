@@ -117,7 +117,7 @@ jobs:
       - run: cargo build --release --locked --target ${{ matrix.target }}
       - uses: actions/upload-artifact@v4
         with:
-          name: forge-${{ matrix.target }}
+          name: stryke-${{ matrix.target }}
           path: |
-            target/${{ matrix.target }}/release/forge
+            target/${{ matrix.target }}/release/stryke
             target/${{ matrix.target }}/release/fo

@@ -1,15 +1,15 @@
 //! Native `csv_*`, `sqlite`, `struct`, and `typed my`.
 
 use crate::common::*;
-use forge::error::ErrorKind;
 use std::fs;
 use std::io::Write;
 use std::process::{Command, Stdio};
+use stryke::error::ErrorKind;
 
 #[test]
 fn csv_write_read_roundtrip_hash() {
     let dir = std::env::temp_dir();
-    let path = dir.join(format!("forge_tcsv_{}.csv", std::process::id()));
+    let path = dir.join(format!("stryke_tcsv_{}.csv", std::process::id()));
     let ps = path.to_string_lossy().replace('\\', "/");
     let code = format!(
         r#"csv_write("{ps}", {{ name => "a", n => "1" }}); my @r = csv_read("{ps}"); $r[0]->{{name}}"#
@@ -22,7 +22,7 @@ fn csv_write_read_roundtrip_hash() {
 #[test]
 fn dataframe_sum_and_filter() {
     let dir = std::env::temp_dir();
-    let path = dir.join(format!("forge_tdf_{}.csv", std::process::id()));
+    let path = dir.join(format!("stryke_tdf_{}.csv", std::process::id()));
     let ps = path.to_string_lossy().replace('\\', "/");
     let code = format!(
         r#"csv_write("{ps}",
@@ -41,7 +41,7 @@ fn dataframe_sum_and_filter() {
 #[test]
 fn dataframe_group_by_sum() {
     let dir = std::env::temp_dir();
-    let path = dir.join(format!("forge_tdfg_{}.csv", std::process::id()));
+    let path = dir.join(format!("stryke_tdfg_{}.csv", std::process::id()));
     let ps = path.to_string_lossy().replace('\\', "/");
     let code = format!(
         r#"csv_write("{ps}",
@@ -60,7 +60,7 @@ fn dataframe_group_by_sum() {
 #[test]
 fn sqlite_exec_query() {
     let dir = std::env::temp_dir();
-    let path = dir.join(format!("forge_tsql_{}.db", std::process::id()));
+    let path = dir.join(format!("stryke_tsql_{}.db", std::process::id()));
     let ps = path.to_string_lossy().replace('\\', "/");
     let code = format!(
         r#"
@@ -91,7 +91,7 @@ fn struct_new_and_field_access() {
 fn typed_my_rejects_wrong_type() {
     assert!(matches!(
         eval_err_kind(r#"typed my $n : Int; $n = "x""#),
-        forge::error::ErrorKind::Type
+        stryke::error::ErrorKind::Type
     ));
 }
 
@@ -210,7 +210,7 @@ fn par_pipeline_list_chain_filter_map_take() {
 /// README `par_pipeline` example: bare `{ }` blocks, `readline(STDIN)` source, bareword stage bodies.
 #[test]
 fn par_pipeline_readline_stdin_bare_blocks_bareword_stages() {
-    let exe = env!("CARGO_BIN_EXE_fo");
+    let exe = env!("CARGO_BIN_EXE_st");
     let mut child = Command::new(exe)
         .args([
             "-e",
@@ -376,7 +376,7 @@ fn crc32_binary_deterministic() {
 
 #[test]
 fn par_find_files_matches_glob_pattern() {
-    let dir = std::env::temp_dir().join(format!("forge_pff_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("stryke_pff_{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(dir.join("sub")).unwrap();
     fs::write(dir.join("a.txt"), "1").unwrap();
@@ -390,7 +390,7 @@ fn par_find_files_matches_glob_pattern() {
 
 #[test]
 fn par_find_files_empty_on_no_match() {
-    let dir = std::env::temp_dir().join(format!("forge_pff2_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("stryke_pff2_{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     fs::write(dir.join("a.txt"), "1").unwrap();
@@ -403,7 +403,7 @@ fn par_find_files_empty_on_no_match() {
 #[test]
 fn par_find_files_nonexistent_dir_returns_empty() {
     assert_eq!(
-        eval_int(r#"scalar par_find_files("/nonexistent_forge_test", "*.txt")"#),
+        eval_int(r#"scalar par_find_files("/nonexistent_stryke_test", "*.txt")"#),
         0
     );
 }
@@ -412,7 +412,7 @@ fn par_find_files_nonexistent_dir_returns_empty() {
 
 #[test]
 fn par_line_count_single_file() {
-    let dir = std::env::temp_dir().join(format!("forge_plc_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("stryke_plc_{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let f = dir.join("lines.txt");
@@ -425,7 +425,7 @@ fn par_line_count_single_file() {
 
 #[test]
 fn par_line_count_multiple_files() {
-    let dir = std::env::temp_dir().join(format!("forge_plc2_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("stryke_plc2_{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let f1 = dir.join("a.txt");
@@ -442,7 +442,7 @@ fn par_line_count_multiple_files() {
 
 #[test]
 fn par_line_count_empty_file() {
-    let dir = std::env::temp_dir().join(format!("forge_plc3_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("stryke_plc3_{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let f = dir.join("empty.txt");
@@ -457,9 +457,9 @@ fn par_line_count_empty_file() {
 #[test]
 fn par_pipeline_stream_rejects_psort() {
     let program =
-        forge::parse(r#"par_pipeline_stream((1..5))->psort(fn { $a <=> $b })->collect()"#)
+        stryke::parse(r#"par_pipeline_stream((1..5))->psort(fn { $a <=> $b })->collect()"#)
             .expect("parse");
-    let mut interp = forge::interpreter::Interpreter::new();
+    let mut interp = stryke::interpreter::Interpreter::new();
     let err = interp.execute(&program).unwrap_err();
     assert!(
         err.to_string().contains("cannot stream"),

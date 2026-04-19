@@ -1,20 +1,20 @@
-# Helix editor configuration for forge
+# Helix editor configuration for stryke
 # Add to ~/.config/helix/languages.toml
 
 [[language]]
-name = "forge"
+name = "stryke"
 scope = "source.perl"
-injection-regex = "forge"
+injection-regex = "stryke"
 file-types = ["pr"]
 comment-token = "#"
 indent = { tab-width = 4, unit = "    " }
-language-servers = ["forge"]
+language-servers = ["stryke"]
 
-[language-server.forge]
+[language-server.stryke]
 command = "fo"
 args = ["--lsp"]
 
-# Also use forge for regular .pl/.pm files
+# Also use stryke for regular .pl/.pm files
 [[language]]
 name = "perl"
-language-servers = ["forge"]
+language-servers = ["stryke"]

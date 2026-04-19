@@ -1,5 +1,5 @@
 use crate::common::*;
-use forge::interpreter::Interpreter;
+use stryke::interpreter::Interpreter;
 
 #[test]
 fn array_ref() {
@@ -145,7 +145,7 @@ fn numeric_functions() {
 #[test]
 fn die_in_eval() {
     let code = r#"eval { die "test error\n" }; $@ eq "test error\n" ? 1 : 0"#;
-    let program = forge::parse(code).expect("parse failed");
+    let program = stryke::parse(code).expect("parse failed");
     let mut interp = Interpreter::new();
     let result = interp.execute(&program);
     assert!(result.is_ok());
@@ -205,17 +205,17 @@ fn getpriority_current_process() {
 }
 
 #[test]
-fn stringify_list_to_forge_literal() {
+fn stringify_list_to_stryke_literal() {
     assert_eq!(eval_string("str (1, 2, 3)"), "(1, 2, 3)");
 }
 
 #[test]
-fn stringify_hash_ref_to_forge_literal() {
+fn stringify_hash_ref_to_stryke_literal() {
     assert_eq!(eval_string("str {a => 1}"), "+{a => 1}");
 }
 
 #[test]
-fn stringify_array_ref_to_forge_literal() {
+fn stringify_array_ref_to_stryke_literal() {
     assert_eq!(eval_string("str [1, 2]"), "[1, 2]");
 }
 

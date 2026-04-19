@@ -1,9 +1,9 @@
 {
   "languageserver": {
-    "forge": {
+    "stryke": {
       "command": "fo",
       "args": ["--lsp"],
-      "filetypes": ["forge", "perl"],
+      "filetypes": ["stryke", "perl"],
       "rootPatterns": [".git", "Makefile.PL", "cpanfile", "dist.ini"]
     }
   }

@@ -1,21 +1,21 @@
--- Neovim LSP configuration for forge
+-- Neovim LSP configuration for stryke
 -- Add to your init.lua or source this file
 --
 -- Usage:
---   require('forge') -- if in lua path
+--   require('stryke') -- if in lua path
 --   -- or --
---   dofile('/path/to/forge/editors/forge.lua')
+--   dofile('/path/to/stryke/editors/stryke.lua')
 
--- Register .for files as forge filetype
+-- Register .stk files as stryke filetype
 vim.filetype.add({
   extension = {
-    ['for'] = 'forge',
+    ['stk'] = 'stryke',
   },
 })
 
--- Use perl syntax highlighting for forge files
+-- Use perl syntax highlighting for stryke files
 vim.api.nvim_create_autocmd('FileType', {
-  pattern = 'forge',
+  pattern = 'stryke',
   callback = function()
     vim.bo.syntax = 'perl'
     vim.bo.commentstring = '# %s'
@@ -27,11 +27,11 @@ local ok, lspconfig = pcall(require, 'lspconfig')
 if ok then
   local configs = require('lspconfig.configs')
 
-  if not configs.forge then
-    configs.forge = {
+  if not configs.stryke then
+    configs.stryke = {
       default_config = {
         cmd = { 'fo', '--lsp' },
-        filetypes = { 'forge', 'perl' },
+        filetypes = { 'stryke', 'perl' },
         root_dir = function(fname)
           return lspconfig.util.root_pattern('.git', 'Makefile.PL', 'cpanfile', 'dist.ini')(fname)
             or lspconfig.util.path.dirname(fname)
@@ -42,7 +42,7 @@ if ok then
     }
   end
 
-  lspconfig.forge.setup({
+  lspconfig.stryke.setup({
     on_attach = function(client, bufnr)
       local opts = { buffer = bufnr, noremap = true, silent = true }
       vim.keymap.set('n', 'gd', vim.lsp.buf.definition, opts)
@@ -58,10 +58,10 @@ if ok then
 else
   -- Fallback: manual LSP setup without lspconfig
   vim.api.nvim_create_autocmd('FileType', {
-    pattern = { 'forge', 'perl' },
+    pattern = { 'stryke', 'perl' },
     callback = function()
       vim.lsp.start({
-        name = 'forge',
+        name = 'stryke',
         cmd = { 'fo', '--lsp' },
         root_dir = vim.fn.getcwd(),
       })

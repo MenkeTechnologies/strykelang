@@ -1,7 +1,7 @@
 //! Parser accepts parallel-extension and regex-binding forms (one test per snippet).
 
 fn p(src: &str) {
-    forge::parse(src).unwrap_or_else(|e| panic!("parse failed for {src:?}: {e}"));
+    stryke::parse(src).unwrap_or_else(|e| panic!("parse failed for {src:?}: {e}"));
 }
 
 #[test]

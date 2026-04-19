@@ -1,25 +1,25 @@
 [package]
-name = "forgelang"
-version = "0.6.4"
+name = "strykelang"
+version = "0.6.5"
 edition = "2021"
 description = "A highly parallel Perl 5 interpreter written in Rust"
 license = "MIT"
 authors = ["MenkeTechnologies"]
-repository = "https://github.com/MenkeTechnologies/forge"
-documentation = "https://docs.rs/forgelang"
+repository = "https://github.com/MenkeTechnologies/strykelang"
+documentation = "https://docs.rs/strykelang"
 # `cargo package` uses the git file list; `exclude` drops paths from the tarball.
 # `vendor/perl` stays tracked and ships (e.g. `List/Util.pm`). `parity/` is local/CI only.
 exclude = ["/parity/", "/.github/"]
 
 [lib]
-name = "forge"
+name = "stryke"
 
 [[bin]]
-name = "forge"
+name = "stryke"
 path = "src/main.rs"
 
 [[bin]]
-name = "fo"
+name = "st"
 path = "src/main.rs"
 
 # Offline tool: regenerate `docs/reference.html` from the LSP doc strings.

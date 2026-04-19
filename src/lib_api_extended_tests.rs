@@ -2,7 +2,7 @@
 
 use crate::interpreter::Interpreter;
 use crate::{
-    compat_mode, convert_to_forge, deconvert_to_perl, format_program, lint_program, parse,
+    compat_mode, convert_to_stryke, deconvert_to_perl, format_program, lint_program, parse,
     parse_and_run_string_in_file, pec, run, set_compat_mode, try_vm_execute,
 };
 use std::fs;
@@ -29,9 +29,9 @@ fn test_format_and_convert_roundtrip() {
     let formatted = format_program(&p);
     assert!(formatted.contains("sub foo"));
 
-    let forge = convert_to_forge(&p);
-    // forge conversion might be more complex, just check it's not empty
-    assert!(!forge.is_empty());
+    let stryke = convert_to_stryke(&p);
+    // stryke conversion might be more complex, just check it's not empty
+    assert!(!stryke.is_empty());
 
     let deconverted = deconvert_to_perl(&p);
     assert!(deconverted.contains("sub foo"));
@@ -69,10 +69,10 @@ fn test_pec_cache_save_load() {
     let bundle = pec::PecBundle::new(false, fp, p.clone(), chunk);
 
     // Use a temp dir for cache to avoid polluting home
-    let tmp_dir = std::env::temp_dir().join("forge_pec_test");
+    let tmp_dir = std::env::temp_dir().join("stryke_pec_test");
     fs::create_dir_all(&tmp_dir).expect("mkdir");
-    let old_dir = std::env::var("FORGE_BC_DIR").ok();
-    std::env::set_var("FORGE_BC_DIR", &tmp_dir);
+    let old_dir = std::env::var("STRYKE_BC_DIR").ok();
+    std::env::set_var("STRYKE_BC_DIR", &tmp_dir);
 
     pec::try_save(&bundle).expect("save");
 
@@ -81,9 +81,9 @@ fn test_pec_cache_save_load() {
 
     fs::remove_dir_all(&tmp_dir).expect("rmdir");
     if let Some(d) = old_dir {
-        std::env::set_var("FORGE_BC_DIR", d);
+        std::env::set_var("STRYKE_BC_DIR", d);
     } else {
-        std::env::remove_var("FORGE_BC_DIR");
+        std::env::remove_var("STRYKE_BC_DIR");
     }
 }
 

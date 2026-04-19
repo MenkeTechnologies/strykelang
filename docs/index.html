@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <meta name="description" content="forge — a highly parallel Perl 5 interpreter in Rust. Rayon-powered builtins, bytecode VM + JIT, pipe-forward syntax, and reflection hashes for every builtin / alias / extension.">
-  <title>forge — Documentation</title>
+  <meta name="description" content="stryke — a highly parallel Perl 5 interpreter in Rust. Rayon-powered builtins, bytecode VM + JIT, pipe-forward syntax, and reflection hashes for every builtin / alias / extension.">
+  <title>stryke — Documentation</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&amp;family=Share+Tech+Mono&amp;display=swap" rel="stylesheet">
@@ -137,27 +137,27 @@
     <header class="tutorial-header">
       <div class="tutorial-header-inner">
         <div>
-          <h1 class="tutorial-brand">// FORGE — PARALLEL PERL5 INTERPRETER</h1>
+          <h1 class="tutorial-brand">// STRYKE — PARALLEL PERL5 INTERPRETER</h1>
           <nav class="tutorial-crumbs" aria-label="Breadcrumb">
             <span class="current">Docs</span>
             <span class="sep">/</span>
             <a href="reference.html">Full reference</a>
             <span class="sep">/</span>
-            <a href="https://github.com/MenkeTechnologies/forge" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
             <span class="sep">/</span>
-            <a href="https://crates.io/crates/forge" target="_blank" rel="noopener noreferrer">crates.io</a>
+            <a href="https://crates.io/crates/stryke" target="_blank" rel="noopener noreferrer">crates.io</a>
             <span class="sep">/</span>
-            <a href="https://docs.rs/forge" target="_blank" rel="noopener noreferrer">docs.rs</a>
+            <a href="https://docs.rs/stryke" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line" id="forgeBuildLine">forge v0.6.3 · Rust-powered · Rayon work-stealing · Cranelift JIT · Perl 5 compat surface + pipe-forward sugar</p>
+          <p class="docs-build-line" id="strykeBuildLine">stryke v0.6.5 · Rust-powered · Rayon work-stealing · Cranelift JIT · Perl 5 compat surface + pipe-forward sugar</p>
         </div>
         <div class="tutorial-toolbar">
           <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
           <button type="button" class="btn btn-secondary active" id="btnCrt" title="CRT scanline overlay">CRT</button>
           <button type="button" class="btn btn-secondary active" id="btnNeon" title="Neon border pulse">Neon</button>
           <a class="btn btn-secondary" href="reference.html">Reference</a>
-          <a class="btn btn-secondary" href="https://github.com/MenkeTechnologies/forge" target="_blank" rel="noopener noreferrer">GitHub</a>
-          <a class="btn btn-secondary" href="https://github.com/MenkeTechnologies/forge/issues" target="_blank" rel="noopener noreferrer">Issues</a>
+          <a class="btn btn-secondary" href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a class="btn btn-secondary" href="https://github.com/MenkeTechnologies/stryke/issues" target="_blank" rel="noopener noreferrer">Issues</a>
         </div>
       </div>
     </header>
@@ -170,40 +170,40 @@
     </div>
 
     <main class="tutorial-main">
-      <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>FORGE REFERENCE</h2>
+      <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>STRYKE REFERENCE</h2>
       <p class="tutorial-subtitle">A Perl 5 interpreter written in Rust, optimized for parallelism. NaN-boxed <code>PerlValue</code>, rayon work-stealing across every CPU, bytecode VM with Cranelift JIT, and a pipe-forward (<code>|&gt;</code>) syntax that threads values through chained stages without refs or intermediate vars. This hub links to the authoritative docs in <code>README.md</code> and <code>rustdoc</code>; the sections below give a fast tour of the surface.</p>
 
       <section class="tutorial-section">
         <h2>Quickstart</h2>
-        <p>Install from crates.io or source, then run scripts or one-liners with <code>fo</code> (short for forge):</p>
+        <p>Install from crates.io or source, then run scripts or one-liners with <code>st</code> (short for stryke):</p>
 <pre># install
-cargo install forgelang
+cargo install strykelang
 
 # from source
-git clone https://github.com/MenkeTechnologies/forge
-cd forge &amp;&amp; cargo build --release
+git clone https://github.com/MenkeTechnologies/stryke
+cd stryke &amp;&amp; cargo build --release
 
 # one-liners
-fo 'p "hello, world"'
-fo '1..20 |&gt; grep { $_ % 2 == 0 } |&gt; map { $_ * $_ } |&gt; sum |&gt; p'
-fo 'qw(a b c) |&gt; map uc |&gt; join "," |&gt; p'
+st 'p "hello, world"'
+st '1..20 |&gt; grep { $_ % 2 == 0 } |&gt; map { $_ * $_ } |&gt; sum |&gt; p'
+st 'qw(a b c) |&gt; map uc |&gt; join "," |&gt; p'
 
 # parallel primitives
-fo '(1..8) |&gt; pmap { expensive($_) } |&gt; p'
+st '(1..8) |&gt; pmap { expensive($_) } |&gt; p'
 
 # read + parse JSON
-fo 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
-        <p>Full install + usage live in the <a href="https://github.com/MenkeTechnologies/forge#readme">README</a>.</p>
-        <p><strong><code>-e</code> is optional.</strong> If the first argument isn't a file and looks like code, <code>fo</code> runs it directly. <code>fo 'p 42'</code> and <code>fo -e 'p 42'</code> are equivalent.</p>
+st 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
+        <p>Full install + usage live in the <a href="https://github.com/MenkeTechnologies/stryke#readme">README</a>.</p>
+        <p><strong><code>-e</code> is optional.</strong> If the first argument isn't a file and looks like code, <code>st</code> runs it directly. <code>st 'p 42'</code> and <code>st -e 'p 42'</code> are equivalent.</p>
       </section>
 
       <section class="tutorial-section">
-        <h2>Why forge — One-Liner Comparison</h2>
+        <h2>Why stryke — One-Liner Comparison</h2>
         <table class="comparison-table" style="width:100%; border-collapse:collapse; font-size:0.85em;">
           <thead>
             <tr style="border-bottom:2px solid #0ff;">
               <th style="text-align:left; padding:4px;">Feature</th>
-              <th style="padding:4px;">fo</th>
+              <th style="padding:4px;">st</th>
               <th style="padding:4px;">perl5</th>
               <th style="padding:4px;">ruby</th>
               <th style="padding:4px;">python</th>
@@ -233,18 +233,18 @@ fo 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
           <thead>
             <tr style="border-bottom:2px solid #0ff;">
               <th style="text-align:left; padding:4px;">Task</th>
-              <th style="padding:4px;">fo</th>
+              <th style="padding:4px;">st</th>
               <th style="padding:4px;">perl5</th>
               <th style="padding:4px;">ruby</th>
               <th style="padding:4px;">python</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td>Sum 1..100</td><td style="color:#0f0;"><code>fo 'p sum 1..100'</code> <b>19c</b></td><td>45c</td><td>28c</td><td>38c</td></tr>
-            <tr><td>Word freq</td><td style="color:#0f0;"><code>fo -an 'freq(@F) |&gt; dd'</code> <b>25c</b></td><td>61c</td><td>—</td><td>—</td></tr>
-            <tr><td>SHA256 file</td><td style="color:#0f0;"><code>fo 'p s256"f"'</code> <b>14c</b></td><td>70c+</td><td>—</td><td>80c+</td></tr>
-            <tr><td>CSV → JSON</td><td style="color:#0f0;"><code>fo 'csv_read("f") |&gt; tj |&gt; p'</code> <b>33c</b></td><td>needs modules</td><td>needs modules</td><td>90c</td></tr>
-            <tr><td>Parallel map</td><td style="color:#0f0;"><code>fo '1..1e6 |&gt; pmap { $_ * 2 }'</code> <b>33c</b></td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td>Sum 1..100</td><td style="color:#0f0;"><code>st 'p sum 1..100'</code> <b>19c</b></td><td>45c</td><td>28c</td><td>38c</td></tr>
+            <tr><td>Word freq</td><td style="color:#0f0;"><code>st -an 'freq(@F) |&gt; dd'</code> <b>25c</b></td><td>61c</td><td>—</td><td>—</td></tr>
+            <tr><td>SHA256 file</td><td style="color:#0f0;"><code>st 'p s256"f"'</code> <b>14c</b></td><td>70c+</td><td>—</td><td>80c+</td></tr>
+            <tr><td>CSV → JSON</td><td style="color:#0f0;"><code>st 'csv_read("f") |&gt; tj |&gt; p'</code> <b>33c</b></td><td>needs modules</td><td>needs modules</td><td>90c</td></tr>
+            <tr><td>Parallel map</td><td style="color:#0f0;"><code>st '1..1e6 |&gt; pmap { $_ * 2 }'</code> <b>33c</b></td><td>—</td><td>—</td><td>—</td></tr>
           </tbody>
         </table>
       </section>
@@ -262,7 +262,7 @@ fo 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
 
       <section class="tutorial-section">
         <h2>Language reflection</h2>
-        <p>Everything the parser and dispatcher know about is exposed as plain Perl hashes, populated from the source of truth at compile time. <code>build.rs</code> parses category-labeled section comments in <code>is_perl5_core</code> / <code>forge_extension_name</code>, the <code>try_builtin</code> match arms, and LSP hover docs in <code>doc_for_label_text</code>. <strong>Eight hashes — every direct lookup is O(1)</strong>.</p>
+        <p>Everything the parser and dispatcher know about is exposed as plain Perl hashes, populated from the source of truth at compile time. <code>build.rs</code> parses category-labeled section comments in <code>is_perl5_core</code> / <code>stryke_extension_name</code>, the <code>try_builtin</code> match arms, and LSP hover docs in <code>doc_for_label_text</code>. <strong>Eight hashes — every direct lookup is O(1)</strong>.</p>
 
         <h3>Forward maps</h3>
         <table class="reflection-table">
@@ -270,12 +270,12 @@ fo 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
             <tr><th>Long name</th><th>Short</th><th>Key → Value</th></tr>
           </thead>
           <tbody>
-            <tr><td><code>%forge::builtins</code></td><td><code>%b</code></td><td><strong>primary</strong> callable name → category. Clean unique-op count.</td></tr>
-            <tr><td><code>%forge::all</code></td><td><code>%all</code></td><td><strong>every spelling</strong> (primary + alias) → category. Aliases inherit their primary's tag. Use for <code>scalar keys %all</code>.</td></tr>
-            <tr><td><code>%forge::perl_compats</code></td><td><code>%pc</code></td><td>subset of <code>%b</code>: Perl 5 core only, name → category</td></tr>
-            <tr><td><code>%forge::extensions</code></td><td><code>%e</code></td><td>subset of <code>%b</code>: forge-only, name → category</td></tr>
-            <tr><td><code>%forge::aliases</code></td><td><code>%a</code></td><td>alias → canonical primary</td></tr>
-            <tr><td><code>%forge::descriptions</code></td><td><code>%d</code></td><td>name → LSP one-liner (<em>sparse</em>)</td></tr>
+            <tr><td><code>%stryke::builtins</code></td><td><code>%b</code></td><td><strong>primary</strong> callable name → category. Clean unique-op count.</td></tr>
+            <tr><td><code>%stryke::all</code></td><td><code>%all</code></td><td><strong>every spelling</strong> (primary + alias) → category. Aliases inherit their primary's tag. Use for <code>scalar keys %all</code>.</td></tr>
+            <tr><td><code>%stryke::perl_compats</code></td><td><code>%pc</code></td><td>subset of <code>%b</code>: Perl 5 core only, name → category</td></tr>
+            <tr><td><code>%stryke::extensions</code></td><td><code>%e</code></td><td>subset of <code>%b</code>: stryke-only, name → category</td></tr>
+            <tr><td><code>%stryke::aliases</code></td><td><code>%a</code></td><td>alias → canonical primary</td></tr>
+            <tr><td><code>%stryke::descriptions</code></td><td><code>%d</code></td><td>name → LSP one-liner (<em>sparse</em>)</td></tr>
           </tbody>
         </table>
 
@@ -285,32 +285,32 @@ fo 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
             <tr><th>Long name</th><th>Short</th><th>Key → Value</th></tr>
           </thead>
           <tbody>
-            <tr><td><code>%forge::categories</code></td><td><code>%c</code></td><td>category → arrayref of names (<code>$c{parallel}</code> → <code>[pmap, pgrep, …]</code>)</td></tr>
-            <tr><td><code>%forge::primaries</code></td><td><code>%p</code></td><td>primary → arrayref of its aliases (<code>$p{to_json}</code> → <code>[tj]</code>)</td></tr>
+            <tr><td><code>%stryke::categories</code></td><td><code>%c</code></td><td>category → arrayref of names (<code>$c{parallel}</code> → <code>[pmap, pgrep, …]</code>)</td></tr>
+            <tr><td><code>%stryke::primaries</code></td><td><code>%p</code></td><td>primary → arrayref of its aliases (<code>$p{to_json}</code> → <code>[tj]</code>)</td></tr>
           </tbody>
         </table>
 
         <h3>Examples</h3>
-        <div class="oneliner">fo 'p $b{pmap}'                              <span class="comment"># "parallel"</span></div>
-        <div class="oneliner">fo 'p $b{to_json}'                           <span class="comment"># "serialization"</span></div>
-        <div class="oneliner">fo 'p $all{tj}'                              <span class="comment"># "serialization"  (alias resolves via %all)</span></div>
-        <div class="oneliner">fo 'p scalar keys %all'                      <span class="comment"># total callable spellings (primaries + aliases)</span></div>
-        <div class="oneliner">fo 'p $pc{map}'                              <span class="comment"># "array / list"   (Perl core only)</span></div>
-        <div class="oneliner">fo 'p $e{pmap}'                              <span class="comment"># "parallel"       (extensions only)</span></div>
-        <div class="oneliner">fo 'p $a{tj}'                                <span class="comment"># "to_json"</span></div>
-        <div class="oneliner">fo 'p $d{pmap}'                              <span class="comment"># LSP one-liner</span></div>
-        <div class="oneliner">fo '$c{parallel} |&gt; e p'                      <span class="comment"># every parallel op, O(1) reverse-lookup</span></div>
-        <div class="oneliner">fo '$p{to_json} |&gt; e p'                       <span class="comment"># every alias of to_json</span></div>
-        <div class="oneliner">fo 'keys %pc |&gt; sort |&gt; p'                    <span class="comment"># every Perl compat, sorted</span></div>
-        <div class="oneliner">fo 'keys %e  |&gt; sort |&gt; p'                    <span class="comment"># every forge extension</span></div>
-        <div class="oneliner">fo 'keys %all |&gt; less'                       <span class="comment"># browse every spelling in $PAGER</span></div>
-        <div class="oneliner">fo 'my %f; $f{$b{$_}}++ for keys %b; dd \%f'  <span class="comment"># per-category frequency</span></div>
-        <div class="oneliner">fo 'for my $h (qw(b all pc e a d c p)) { printf "%%%-4s %d\n", $h, scalar keys %$h }'  <span class="comment"># catalog</span></div>
+        <div class="oneliner">st 'p $b{pmap}'                              <span class="comment"># "parallel"</span></div>
+        <div class="oneliner">st 'p $b{to_json}'                           <span class="comment"># "serialization"</span></div>
+        <div class="oneliner">st 'p $all{tj}'                              <span class="comment"># "serialization"  (alias resolves via %all)</span></div>
+        <div class="oneliner">st 'p scalar keys %all'                      <span class="comment"># total callable spellings (primaries + aliases)</span></div>
+        <div class="oneliner">st 'p $pc{map}'                              <span class="comment"># "array / list"   (Perl core only)</span></div>
+        <div class="oneliner">st 'p $e{pmap}'                              <span class="comment"># "parallel"       (extensions only)</span></div>
+        <div class="oneliner">st 'p $a{tj}'                                <span class="comment"># "to_json"</span></div>
+        <div class="oneliner">st 'p $d{pmap}'                              <span class="comment"># LSP one-liner</span></div>
+        <div class="oneliner">st '$c{parallel} |&gt; e p'                      <span class="comment"># every parallel op, O(1) reverse-lookup</span></div>
+        <div class="oneliner">st '$p{to_json} |&gt; e p'                       <span class="comment"># every alias of to_json</span></div>
+        <div class="oneliner">st 'keys %pc |&gt; sort |&gt; p'                    <span class="comment"># every Perl compat, sorted</span></div>
+        <div class="oneliner">st 'keys %e  |&gt; sort |&gt; p'                    <span class="comment"># every stryke extension</span></div>
+        <div class="oneliner">st 'keys %all |&gt; less'                       <span class="comment"># browse every spelling in $PAGER</span></div>
+        <div class="oneliner">st 'my %f; $f{$b{$_}}++ for keys %b; dd \%f'  <span class="comment"># per-category frequency</span></div>
+        <div class="oneliner">st 'for my $h (qw(b all pc e a d c p)) { printf "%%%-4s %d\n", $h, scalar keys %$h }'  <span class="comment"># catalog</span></div>
 
         <h3>Notes</h3>
         <ul>
           <li>Every <code>$h{name}</code> lookup is O(1). Inverted indexes (<code>%c</code>, <code>%p</code>) let you do reverse-queries in O(1) too; filters like <code>grep { cond } keys %h</code> are still O(n).</li>
-          <li>Hash sigil namespace is separate from scalars/subs — the short-alias letters don't collide with <code>$a</code>/<code>$b</code> sort specials, the <code>e</code> extension sub, or any other forge name.</li>
+          <li>Hash sigil namespace is separate from scalars/subs — the short-alias letters don't collide with <code>$a</code>/<code>$b</code> sort specials, the <code>e</code> extension sub, or any other stryke name.</li>
           <li><code>%descriptions</code> is sparse: <code>exists $d{$name}</code> doubles as "is this documented in the LSP?".</li>
           <li>A value of <code>"uncategorized"</code> in <code>%builtins</code> flags a name that's dispatched at runtime but missing a <code>// ── category ──</code> section comment in <code>parser.rs</code>.</li>
         </ul>
@@ -341,7 +341,7 @@ f("*.txt") |&gt; map { [$_, slurp($_) |&gt; split(/\s+/) |&gt; scalar] }
 
       <section class="tutorial-section">
         <h2>Builtin categories</h2>
-        <p>2,001 operations across 2,093 spellings. Query them via <code>keys %forge::builtins</code> — the table below is a navigational overview, not a full index. Run <code>fo 'p scalar keys %b'</code> for the live count.</p>
+        <p>2,001 operations across 2,093 spellings. Query them via <code>keys %stryke::builtins</code> — the table below is a navigational overview, not a full index. Run <code>st 'p scalar keys %b'</code> for the live count.</p>
         <div class="cat-grid">
           <div class="cat-card"><h4>Array / List (134+)</h4><p><code>map maps flat_map grep sort reverse push pop shift unshift splice reduce fold fore e first any all none take take_while drop skip_while partition min_by max_by zip zip_with interleave frequencies count_by chunk windowed enumerate shuffle uniq dedup compact flatten concat pluck grep_v with_index sorted sorted_desc sorted_nums without take_last drop_last pairwise batch rotate swap_pairs sliding_pairs run_length_encode group_consecutive permutations combinations power_set cartesian_product</code> &hellip;</p></div>
           <div class="cat-card"><h4>String (129+)</h4><p><code>chomp chop length substr index rindex split join uc lc ucfirst lcfirst chr ord trim lines words chars snake_case camel_case kebab_case pascal_case constant_case capitalize swap_case title_case squish pad_left pad_right center truncate_at reverse_str rot13 rot47 caesar_shift count_vowels count_consonants first_word last_word left_str right_str wrap_text dedent indent strip_html levenshtein soundex extract_numbers extract_emails extract_urls</code> &hellip;</p></div>
@@ -411,13 +411,13 @@ par_pipeline_stream([\&amp;stage1, \&amp;stage2, \&amp;stage3], \@input);</pre>
       <section class="tutorial-section">
         <h2>Perl-compat highlights</h2>
         <ul>
-          <li><strong>OOP</strong> — <code>@ISA</code>, C3 MRO (live, not cached), <code>$obj-&gt;SUPER::method</code>, <code>tie</code> for scalars/arrays/hashes with <code>TIESCALAR</code>/<code>TIEARRAY</code>/<code>TIEHASH</code>, plus <code>EXISTS</code>/<code>DELETE</code>; <code>use overload</code> with full binary dispatch, <code>nomethod</code>, unary <code>neg</code>/<code>bool</code>/<code>abs</code>.</li>
+          <li><strong>OOP</strong> — <code>@ISA</code>, C3 MRO (live, not cached), <code>$obj-&gt;SUPER::method</code>, <code>tie</code> for scalars/arrays/hashes with <code>TIESCALAR</code>/<code>TIEARRAY</code>/<code>TIEHASH</code>, plus <code>EXISTS</code>/<code>DELETE</code>; <code>use overload</code> with full binary dispatch, <code>nomethod</code>, unary <code>neg</code>/<code>bool</code>/<code>abs</code>. Native <code>class</code> syntax with inheritance, traits, abstract/final, visibility, static fields, operator overloading, and reflection — see <a href="#oop">OOP section</a> below.</li>
           <li><strong>Specials</strong> — <code>$?</code> packed POSIX status, <code>$|</code> autoflush, <code>$.</code> line count (undef until first read), <code>@ARGV</code>, <code>%ENV</code>, <code>%SIG</code> (<code>SIGINT</code>/<code>SIGTERM</code>/<code>SIGALRM</code>/<code>SIGCHLD</code>), <code>format</code>/<code>write</code> (partial).</li>
           <li><strong>Phases</strong> — <code>BEGIN</code> / <code>UNITCHECK</code> / <code>CHECK</code> / <code>INIT</code> / <code>END</code> run in Perl order; <code>${^GLOBAL_PHASE}</code> matches Perl in both tree-walker and VM.</li>
           <li><strong>Interpolation</strong> — <code>$var</code>, <code>#{expr}</code>, <code>$h{k}</code>, <code>$a[i]</code>, <code>@a</code>, <code>@a[slice]</code>, <code>$#a</code>, <code>$0</code>, <code>$1</code>..<code>$n</code>; <code>\x{hex}</code> and unbraced <code>\x</code>.</li>
-          <li><strong>Strict / modules</strong> — per-mode <code>use strict 'refs'</code> etc., <code>@INC</code> built from <code>-I</code>, <code>vendor/perl</code>, system Perl's <code>@INC</code>, script dir, <code>FORGE_INC</code>. <code>List::Util</code> is native Rust.</li>
+          <li><strong>Strict / modules</strong> — per-mode <code>use strict 'refs'</code> etc., <code>@INC</code> built from <code>-I</code>, <code>vendor/perl</code>, system Perl's <code>@INC</code>, script dir, <code>STRYKE_INC</code>. <code>List::Util</code> is native Rust.</li>
         </ul>
-        <p>Full list in the <a href="https://github.com/MenkeTechnologies/forge#0x08-supported-perl-features">README §0x08</a>.</p>
+        <p>Full list in the <a href="https://github.com/MenkeTechnologies/stryke#0x08-supported-perl-features">README §0x08</a>.</p>
       </section>
 
       <section class="tutorial-section">
@@ -426,12 +426,12 @@ par_pipeline_stream([\&amp;stage1, \&amp;stage2, \&amp;stage3], \@input);</pre>
           <li><strong>Native data</strong> — CSV (<code>csv_read</code>/<code>csv_write</code>), columnar <code>dataframe</code>, embedded <code>sqlite</code>, TOML/YAML helpers.</li>
           <li><strong>HTTP</strong> — <code>fetch</code> / <code>fetch_json</code> / <code>fetch_async</code> / <code>par_fetch</code>.</li>
           <li><strong>Crypto / compression</strong> — <code>sha256</code>, <code>hmac_sha256</code>, <code>jwt_encode</code>/<code>decode</code>, <code>gzip</code> / <code>gunzip</code> / <code>zstd</code>.</li>
-          <li><strong>Standalone binaries</strong> — <code>fo build SCRIPT -o OUT</code> bakes a script into a self-contained executable.</li>
+          <li><strong>Standalone binaries</strong> — <code>st build SCRIPT -o OUT</code> bakes a script into a self-contained executable.</li>
           <li><strong>Inline Rust FFI</strong> — <code>rust { pub extern "C" fn ... }</code> blocks compile to a cdylib on first run, dlopen + register as Perl-callable subs.</li>
-          <li><strong>Bytecode cache</strong> — <code>FORGE_BC_CACHE=1</code> skips parse + compile on warm starts via on-disk <code>.pec</code> bundles.</li>
+          <li><strong>Bytecode cache</strong> — <code>STRYKE_BC_CACHE=1</code> skips parse + compile on warm starts via on-disk <code>.pec</code> bundles.</li>
           <li><strong>Distributed compute</strong> — <code>cluster([...])</code> builds an SSH worker pool; <code>pmap_on $cluster { } @list</code> fans a map across persistent remote workers with fault tolerance.</li>
           <li><strong>Shared state</strong> — <code>mysync</code> declares atomic variables safe to mutate from parallel workers.</li>
-          <li><strong>Language server</strong> — <code>fo --lsp</code> runs an LSP server over stdio with diagnostics, hover, completion. The five reflection hashes above are part of the completion surface.</li>
+          <li><strong>Language server</strong> — <code>st --lsp</code> runs an LSP server over stdio with diagnostics, hover, completion. The five reflection hashes above are part of the completion surface.</li>
         </ul>
       </section>
 
@@ -447,22 +447,22 @@ par_pipeline_stream([\&amp;stage1, \&amp;stage2, \&amp;stage3], \@input);</pre>
 --profile              // wall-clock profile stderr (flamegraph-ready)
 --flame                // flamegraph: terminal bars (TTY) or SVG
 --no-jit               // disable Cranelift JIT (bytecode interpreter only)
---compat               // Perl 5 strict-compat: disable all forge extensions
+--compat               // Perl 5 strict-compat: disable all stryke extensions
 -n / -p / -i           // stdin line-mode + in-place edit
 --lsp                  // run language server over stdio
-fo build SCRIPT -o OUT // standalone binary
-fo --remote-worker     // worker process for distributed cluster</pre>
+st build SCRIPT -o OUT // standalone binary
+st --remote-worker     // worker process for distributed cluster</pre>
       </section>
 
       <section class="tutorial-section">
         <h2>Repository &amp; links</h2>
         <ul>
-          <li><strong>Source</strong> — <a href="https://github.com/MenkeTechnologies/forge">github.com/MenkeTechnologies/forge</a></li>
-          <li><strong>Crate</strong> — <a href="https://crates.io/crates/forge">crates.io/crates/forge</a> (<code>cargo install forgelang</code>)</li>
-          <li><strong>Rust API docs</strong> — <a href="https://docs.rs/forge">docs.rs/forge</a></li>
-          <li><strong>Issues</strong> — <a href="https://github.com/MenkeTechnologies/forge/issues">github.com/MenkeTechnologies/forge/issues</a></li>
-          <li><strong>Full README</strong> — <a href="https://github.com/MenkeTechnologies/forge#readme">README on GitHub</a> (install, parallel primitives, mysync, CLI flags, architecture, benchmarks, standalone binaries, inline Rust, bytecode cache, distributed <code>pmap_on</code>, LSP).</li>
-          <li><strong>Parity</strong> — <code>parity/cases/*.pl</code> holds 20k+ Perl-vs-fo test cases run by <code>parity/run_parity.sh</code>.</li>
+          <li><strong>Source</strong> — <a href="https://github.com/MenkeTechnologies/stryke">github.com/MenkeTechnologies/stryke</a></li>
+          <li><strong>Crate</strong> — <a href="https://crates.io/crates/stryke">crates.io/crates/stryke</a> (<code>cargo install strykelang</code>)</li>
+          <li><strong>Rust API docs</strong> — <a href="https://docs.rs/stryke">docs.rs/stryke</a></li>
+          <li><strong>Issues</strong> — <a href="https://github.com/MenkeTechnologies/stryke/issues">github.com/MenkeTechnologies/stryke/issues</a></li>
+          <li><strong>Full README</strong> — <a href="https://github.com/MenkeTechnologies/stryke#readme">README on GitHub</a> (install, parallel primitives, mysync, CLI flags, architecture, benchmarks, standalone binaries, inline Rust, bytecode cache, distributed <code>pmap_on</code>, LSP).</li>
+          <li><strong>Parity</strong> — <code>parity/cases/*.pl</code> holds 20k+ Perl-vs-st test cases run by <code>parity/run_parity.sh</code>.</li>
         </ul>
       </section>
     </main>

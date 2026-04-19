@@ -3,24 +3,24 @@
 //! `reverse <>` / `reverse <STDIN>`, `my @l = <>`, **`@a = <>` (global/package, not only `my`)**,
 //! `join('', <>)`, and `join('', <F>)` VM vs tree parity, and the zpwr `zpwrVerbsFZF` `-e` one-liner.
 
-use forge::interpreter::Interpreter;
 use std::io::Write;
 use std::process::{Command, Stdio};
+use stryke::interpreter::Interpreter;
 
-fn forge_exe() -> &'static str {
-    env!("CARGO_BIN_EXE_forge")
+fn stryke_exe() -> &'static str {
+    env!("CARGO_BIN_EXE_stryke")
 }
 
 /// Package/global `@a = <>` must use list context on the RHS (same as `my @a = <>`).
 #[test]
 fn bare_package_array_diamond_list_context_slurps_piped_stdin() {
-    let exe = forge_exe();
+    let exe = stryke_exe();
     let mut child = Command::new(exe)
         .args(["-e", r#"@a = <>; print scalar(@a)"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn forge");
+        .expect("spawn stryke");
     child
         .stdin
         .as_mut()
@@ -38,13 +38,13 @@ fn bare_package_array_diamond_list_context_slurps_piped_stdin() {
 
 #[test]
 fn diamond_list_context_slurps_piped_stdin() {
-    let exe = forge_exe();
+    let exe = stryke_exe();
     let mut child = Command::new(exe)
         .args(["-e", r#"my @a = <>; print scalar(@a)"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn forge");
+        .expect("spawn stryke");
     child
         .stdin
         .as_mut()
@@ -62,13 +62,13 @@ fn diamond_list_context_slurps_piped_stdin() {
 
 #[test]
 fn stdin_angle_bracket_list_context_slurps_piped_stdin() {
-    let exe = forge_exe();
+    let exe = stryke_exe();
     let mut child = Command::new(exe)
         .args(["-e", r#"my @a = <STDIN>; print scalar(@a)"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn forge");
+        .expect("spawn stryke");
     child
         .stdin
         .as_mut()
@@ -86,13 +86,13 @@ fn stdin_angle_bracket_list_context_slurps_piped_stdin() {
 
 #[test]
 fn diamond_list_context_join_concatenates_full_input() {
-    let exe = forge_exe();
+    let exe = stryke_exe();
     let mut child = Command::new(exe)
         .args(["-e", r#"print join('', <>)"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn forge");
+        .expect("spawn stryke");
     child
         .stdin
         .as_mut()
@@ -110,13 +110,13 @@ fn diamond_list_context_join_concatenates_full_input() {
 
 #[test]
 fn reverse_diamond_list_context_slurps_then_reverses_line_order() {
-    let exe = forge_exe();
+    let exe = stryke_exe();
     let mut child = Command::new(exe)
         .args(["-e", r#"my @a = reverse <>; print $a[0]"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn forge");
+        .expect("spawn stryke");
     child
         .stdin
         .as_mut()
@@ -134,13 +134,13 @@ fn reverse_diamond_list_context_slurps_then_reverses_line_order() {
 
 #[test]
 fn empty_stdin_diamond_list_context_yields_zero_lines() {
-    let exe = forge_exe();
+    let exe = stryke_exe();
     let mut child = Command::new(exe)
         .args(["-e", r#"my @a = <>; print scalar(@a)"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn forge");
+        .expect("spawn stryke");
     drop(child.stdin.take());
     let out = child.wait_with_output().expect("wait");
     assert!(
@@ -153,13 +153,13 @@ fn empty_stdin_diamond_list_context_yields_zero_lines() {
 
 #[test]
 fn scalar_diamond_still_reads_only_first_line() {
-    let exe = forge_exe();
+    let exe = stryke_exe();
     let mut child = Command::new(exe)
         .args(["-e", r#"my $x = <>; print $x"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn forge");
+        .expect("spawn stryke");
     child
         .stdin
         .as_mut()
@@ -178,7 +178,8 @@ fn scalar_diamond_still_reads_only_first_line() {
 /// Bytecode VM and tree-walker must agree on `<FH>` list slurp from a real file (not only stdin pipe).
 #[test]
 fn open_file_readline_list_vm_matches_tree_walker() {
-    let path = std::env::temp_dir().join(format!("forge_readline_list_{}.txt", std::process::id()));
+    let path =
+        std::env::temp_dir().join(format!("stryke_readline_list_{}.txt", std::process::id()));
     std::fs::write(&path, b"one\ntwo\nthree\n").expect("write temp");
     let ps = path.to_str().expect("utf-8 path");
     let code = format!(
@@ -189,7 +190,7 @@ fn open_file_readline_list_vm_matches_tree_walker() {
         0+@a;
     "#
     );
-    let program = forge::parse(&code).expect("parse");
+    let program = stryke::parse(&code).expect("parse");
     let mut vm_interp = Interpreter::new();
     let v_vm = vm_interp.execute(&program).expect("execute vm");
     let mut tree_interp = Interpreter::new();
@@ -206,7 +207,7 @@ fn open_file_readline_list_vm_matches_tree_walker() {
 /// Global `@a = <F>`: VM vs tree-walker (must not regress to scalar readline).
 #[test]
 fn open_file_global_array_assign_readline_list_vm_matches_tree_walker() {
-    let path = std::env::temp_dir().join(format!("forge_global_slurp_{}.txt", std::process::id()));
+    let path = std::env::temp_dir().join(format!("stryke_global_slurp_{}.txt", std::process::id()));
     std::fs::write(&path, b"u\nv\nw\n").expect("write temp");
     let ps = path.to_str().expect("utf-8 path");
     let code = format!(
@@ -217,7 +218,7 @@ fn open_file_global_array_assign_readline_list_vm_matches_tree_walker() {
         0+@a;
     "#
     );
-    let program = forge::parse(&code).expect("parse");
+    let program = stryke::parse(&code).expect("parse");
     let mut vm_interp = Interpreter::new();
     let v_vm = vm_interp.execute(&program).expect("execute vm");
     let mut tree_interp = Interpreter::new();
@@ -234,7 +235,8 @@ fn open_file_global_array_assign_readline_list_vm_matches_tree_walker() {
 /// `reverse <FH>`: list context through `reverse` (same zpwr pattern as `reverse <>` on stdin).
 #[test]
 fn open_file_reverse_readline_list_vm_matches_tree_walker() {
-    let path = std::env::temp_dir().join(format!("forge_reverse_slurp_{}.txt", std::process::id()));
+    let path =
+        std::env::temp_dir().join(format!("stryke_reverse_slurp_{}.txt", std::process::id()));
     std::fs::write(&path, b"aa\nbb\ncc\n").expect("write temp");
     let ps = path.to_str().expect("utf-8 path");
     let code = format!(
@@ -245,7 +247,7 @@ fn open_file_reverse_readline_list_vm_matches_tree_walker() {
         $a[0];
     "#
     );
-    let program = forge::parse(&code).expect("parse");
+    let program = stryke::parse(&code).expect("parse");
     let mut vm_interp = Interpreter::new();
     let v_vm = vm_interp.execute(&program).expect("execute vm");
     let mut tree_interp = Interpreter::new();
@@ -258,13 +260,13 @@ fn open_file_reverse_readline_list_vm_matches_tree_walker() {
 /// `sort <>` — inner readline receives list context.
 #[test]
 fn sort_diamond_slurps_then_sorts_lines() {
-    let exe = forge_exe();
+    let exe = stryke_exe();
     let mut child = Command::new(exe)
         .args(["-e", r#"print join('', sort <>)"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn forge");
+        .expect("spawn stryke");
     child
         .stdin
         .as_mut()
@@ -283,13 +285,13 @@ fn sort_diamond_slurps_then_sorts_lines() {
 /// `for (<>)` — list context slurp then iteration (not one line per read).
 #[test]
 fn foreach_diamond_slurps_full_list_before_iterating() {
-    let exe = forge_exe();
+    let exe = stryke_exe();
     let mut child = Command::new(exe)
         .args(["-e", r#"my $n = 0; for (<>) { $n++ } print $n"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn forge");
+        .expect("spawn stryke");
     child
         .stdin
         .as_mut()
@@ -308,13 +310,13 @@ fn foreach_diamond_slurps_full_list_before_iterating() {
 /// Explicit scalar context: one line (assignment form; `scalar(EXPR)` as sole `print` arg may not parse).
 #[test]
 fn explicit_scalar_diamond_reads_one_line_from_pipe() {
-    let exe = forge_exe();
+    let exe = stryke_exe();
     let mut child = Command::new(exe)
         .args(["-e", r#"my $x = scalar(<>); print $x"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn forge");
+        .expect("spawn stryke");
     child
         .stdin
         .as_mut()
@@ -332,13 +334,13 @@ fn explicit_scalar_diamond_reads_one_line_from_pipe() {
 
 #[test]
 fn reverse_stdin_list_context_matches_diamond() {
-    let exe = forge_exe();
+    let exe = stryke_exe();
     let mut child = Command::new(exe)
         .args(["-e", r#"my @a = reverse <STDIN>; print $a[0]"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn forge");
+        .expect("spawn stryke");
     child
         .stdin
         .as_mut()
@@ -357,13 +359,13 @@ fn reverse_stdin_list_context_matches_diamond() {
 /// `my @l = <>` — zpwr naming (`@l` vs `@a`); same list-context slurp as `@a = <>`.
 #[test]
 fn my_l_array_slurp_diamond_matches_scalar_count() {
-    let exe = forge_exe();
+    let exe = stryke_exe();
     let mut child = Command::new(exe)
         .args(["-e", r#"my @l = <>; print scalar(@l)"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn forge");
+        .expect("spawn stryke");
     child
         .stdin
         .as_mut()
@@ -382,13 +384,13 @@ fn my_l_array_slurp_diamond_matches_scalar_count() {
 /// `grep { 1 } <>` — `grep` passes list context into its list operand (readline slurp).
 #[test]
 fn grep_diamond_list_operand_slurps_stdin() {
-    let exe = forge_exe();
+    let exe = stryke_exe();
     let mut child = Command::new(exe)
         .args(["-e", r#"my @a = grep { 1 } <>; print scalar(@a)"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn forge");
+        .expect("spawn stryke");
     child
         .stdin
         .as_mut()
@@ -407,7 +409,7 @@ fn grep_diamond_list_operand_slurps_stdin() {
 /// Slurped file content via `join('', <F>)`: VM vs tree-walker agree on full bytes.
 #[test]
 fn open_file_join_readline_list_vm_matches_tree_walker() {
-    let path = std::env::temp_dir().join(format!("forge_join_slurp_{}.txt", std::process::id()));
+    let path = std::env::temp_dir().join(format!("stryke_join_slurp_{}.txt", std::process::id()));
     std::fs::write(&path, b"part1\npart2\n").expect("write temp");
     let ps = path.to_str().expect("utf-8 path");
     let code = format!(
@@ -418,7 +420,7 @@ fn open_file_join_readline_list_vm_matches_tree_walker() {
         $s;
     "#
     );
-    let program = forge::parse(&code).expect("parse");
+    let program = stryke::parse(&code).expect("parse");
     let mut vm_interp = Interpreter::new();
     let v_vm = vm_interp.execute(&program).expect("execute vm");
     let mut tree_interp = Interpreter::new();
@@ -431,7 +433,7 @@ fn open_file_join_readline_list_vm_matches_tree_walker() {
 /// `zpwrVerbsFZF`: slurp fzf-selected lines and emit `zpwr <verb>; …` for `eval` (same `-e` as zpwr).
 #[test]
 fn zpwr_verbs_fzf_slurp_emits_zpwr_commands() {
-    let exe = forge_exe();
+    let exe = stryke_exe();
     let script =
         r#"@a=<>;$c=$#a;for (@a){print "zpwr $1"if m{^(\S+)\s+};print ";" if $c--;print " "}"#;
     let mut child = Command::new(exe)
@@ -439,7 +441,7 @@ fn zpwr_verbs_fzf_slurp_emits_zpwr_commands() {
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn forge");
+        .expect("spawn stryke");
     // Padded column layout: verb + spaces + description (requires \s+ after first word).
     child
         .stdin

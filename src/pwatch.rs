@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn parent_dir_for_literal_missing_path_absolute() {
         let tmp = std::env::temp_dir();
-        let child = tmp.join("forge_pwatch_literal_test_path");
+        let child = tmp.join("stryke_pwatch_literal_test_path");
         let pat = child.to_string_lossy().into_owned();
         let _ = std::fs::remove_file(&child);
         assert!(!child.exists());

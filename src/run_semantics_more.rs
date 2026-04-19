@@ -1,4 +1,4 @@
-//! Additional `forge::run()` semantics: strings, builtins, aggregates, loops.
+//! Additional `stryke::run()` semantics: strings, builtins, aggregates, loops.
 
 use crate::run;
 

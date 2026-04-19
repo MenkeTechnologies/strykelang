@@ -2,9 +2,9 @@
 
 use crate::common::eval_err_kind;
 
-use forge::error::ErrorKind;
-use forge::interpreter::{Interpreter, FEAT_SAY};
-use forge::parse;
+use stryke::error::ErrorKind;
+use stryke::interpreter::{Interpreter, FEAT_SAY};
+use stryke::parse;
 
 #[test]
 fn use_strict_refs_only() {

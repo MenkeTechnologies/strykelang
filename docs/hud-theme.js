@@ -1,17 +1,17 @@
 /**
- * forge docs — theme / CRT / neon / color-scheme toggles.
+ * stryke docs — theme / CRT / neon / color-scheme toggles.
  * Vendored and simplified from audio_haxor/docs/hud-theme.js.
- * Storage keys live under the `forge-hud-*` namespace so the two projects
+ * Storage keys live under the `stryke-hud-*` namespace so the two projects
  * can't clobber each other if ever opened from the same origin.
  */
 (function () {
   'use strict';
 
   var STORAGE = {
-    theme: 'forge-hud-theme',
-    crt: 'forge-hud-crt',
-    neon: 'forge-hud-neon',
-    scheme: 'forge-hud-scheme',
+    theme: 'stryke-hud-theme',
+    crt: 'stryke-hud-crt',
+    neon: 'stryke-hud-neon',
+    scheme: 'stryke-hud-scheme',
   };
 
   var SCHEME_VAR_KEYS = [

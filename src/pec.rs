@@ -1,5 +1,5 @@
 //! On-disk bytecode bundles (`.pec`): serialized [`crate::ast::Program`] + [`crate::bytecode::Chunk`]
-//! for warm starts without re-parsing or re-compiling when `FORGE_BC_CACHE=1`.
+//! for warm starts without re-parsing or re-compiling when `STRYKE_BC_CACHE=1`.
 
 use std::fs;
 use std::io::{self, Write};
@@ -13,23 +13,23 @@ use crate::bytecode::Chunk;
 use crate::error::{PerlError, PerlResult};
 use crate::value::PerlValue;
 
-/// `FORGE_BC_CACHE=1` enables read-through `.pec` in [`cache_dir`] / `<sha256>.pec`.
+/// `STRYKE_BC_CACHE=1` enables read-through `.pec` in [`cache_dir`] / `<sha256>.pec`.
 pub fn cache_enabled() -> bool {
     matches!(
-        std::env::var("FORGE_BC_CACHE").as_deref(),
+        std::env::var("STRYKE_BC_CACHE").as_deref(),
         Ok("1") | Ok("true") | Ok("yes")
     )
 }
 
-/// `~/.cache/forge/bc` (or `$FORGE_BC_DIR` override).
+/// `~/.cache/stryke/bc` (or `$STRYKE_BC_DIR` override).
 pub fn cache_dir() -> PathBuf {
-    if let Ok(p) = std::env::var("FORGE_BC_DIR") {
+    if let Ok(p) = std::env::var("STRYKE_BC_DIR") {
         return PathBuf::from(p);
     }
     let home = std::env::var_os("HOME")
         .or_else(|| std::env::var_os("USERPROFILE"))
         .unwrap_or_default();
-    PathBuf::from(home).join(".cache").join("forge").join("bc")
+    PathBuf::from(home).join(".cache").join("stryke").join("bc")
 }
 
 /// Fingerprint for cache key (includes crate version, strict flag, path, and source).

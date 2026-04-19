@@ -221,7 +221,7 @@ fn try_vm_execute_map_expr_comma_length_builtin() {
 #[test]
 fn try_vm_execute_tell_after_print_to_file() {
     let dir = std::env::temp_dir();
-    let path = dir.join("forge_vm_tell_api_test");
+    let path = dir.join("stryke_vm_tell_api_test");
     let _ = std::fs::remove_file(&path);
     let ps = path.to_string_lossy();
     let src = format!(r#"open F, ">", "{ps}"; print F "xyzzy"; my $p = tell F; close F; $p"#);
@@ -392,7 +392,7 @@ fn try_vm_execute_fileno_stdout() {
 #[test]
 fn try_vm_execute_getc_reads_from_open_file() {
     let dir = std::env::temp_dir();
-    let path = dir.join("forge_vm_getc_test");
+    let path = dir.join("stryke_vm_getc_test");
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, b"QZ").expect("write temp");
     let ps = path.to_string_lossy();
@@ -496,7 +496,7 @@ fn try_vm_execute_join_reverse_list() {
 #[test]
 fn try_vm_execute_sysseek_seek_set_then_tell() {
     let dir = std::env::temp_dir();
-    let path = dir.join("forge_vm_sysseek_test");
+    let path = dir.join("stryke_vm_sysseek_test");
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, b"WXYZ").expect("write temp");
     let ps = path.to_string_lossy();
@@ -518,7 +518,7 @@ fn try_vm_execute_sysseek_seek_set_then_tell() {
 #[test]
 fn try_vm_execute_eof_false_while_input_handle_open() {
     let dir = std::env::temp_dir();
-    let path = dir.join("forge_vm_eof_open_test");
+    let path = dir.join("stryke_vm_eof_open_test");
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, b"x").expect("write temp");
     let ps = path.to_string_lossy();
@@ -539,7 +539,7 @@ fn try_vm_execute_eof_false_while_input_handle_open() {
 #[test]
 fn try_vm_execute_eof_true_after_input_handle_closed() {
     let dir = std::env::temp_dir();
-    let path = dir.join("forge_vm_eof_closed_test");
+    let path = dir.join("stryke_vm_eof_closed_test");
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, b"y").expect("write temp");
     let ps = path.to_string_lossy();
@@ -559,7 +559,7 @@ fn try_vm_execute_eof_true_after_input_handle_closed() {
 #[test]
 fn try_vm_execute_truncate_path_shortens_file() {
     let dir = std::env::temp_dir();
-    let path = dir.join("forge_vm_truncate_test");
+    let path = dir.join("stryke_vm_truncate_test");
     let _ = std::fs::remove_file(&path);
     let ps = path.to_string_lossy();
     let src = format!(
@@ -631,7 +631,7 @@ fn try_vm_execute_eval_block_expression() {
 #[test]
 fn try_vm_execute_filetest_s_nonempty_file() {
     let dir = std::env::temp_dir();
-    let path = dir.join("forge_vm_filetest_s");
+    let path = dir.join("stryke_vm_filetest_s");
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, b"hi").expect("write temp");
     let ps = path.to_string_lossy();
@@ -647,7 +647,7 @@ fn try_vm_execute_filetest_s_nonempty_file() {
 #[test]
 fn try_vm_execute_filetest_z_empty_file() {
     let dir = std::env::temp_dir();
-    let path = dir.join("forge_vm_filetest_z");
+    let path = dir.join("stryke_vm_filetest_z");
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, b"").expect("write temp");
     let ps = path.to_string_lossy();
@@ -671,7 +671,7 @@ fn try_vm_execute_sleep_zero() {
 
 #[test]
 fn try_vm_execute_glob_lists_matching_files_in_dir() {
-    let base = std::env::temp_dir().join(format!("forge_vm_glob_{}", std::process::id()));
+    let base = std::env::temp_dir().join(format!("stryke_vm_glob_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     std::fs::create_dir_all(&base).expect("mkdir temp glob");
     std::fs::write(base.join("a.txt"), b"x").expect("write a.txt");
@@ -879,7 +879,7 @@ fn try_vm_execute_fc_foldcase() {
 #[test]
 fn try_vm_execute_slurp_reads_whole_file() {
     let dir = std::env::temp_dir();
-    let path = dir.join("forge_vm_slurp_test");
+    let path = dir.join("stryke_vm_slurp_test");
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, b"slurp-me").expect("write temp");
     let ps = path.to_string_lossy();
@@ -895,7 +895,7 @@ fn try_vm_execute_slurp_reads_whole_file() {
 #[test]
 fn try_vm_execute_stat_file_size_at_index_seven() {
     let dir = std::env::temp_dir();
-    let path = dir.join("forge_vm_stat_size_test");
+    let path = dir.join("stryke_vm_stat_size_test");
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, b"1234567").expect("write temp");
     let ps = path.to_string_lossy();
@@ -913,7 +913,8 @@ fn try_vm_execute_stat_file_size_at_index_seven() {
 
 #[test]
 fn try_vm_execute_stat_missing_path_empty_list() {
-    let p = parse(r#"my @st = stat("forge___stat___no_such___file"); scalar @st;"#).expect("parse");
+    let p =
+        parse(r#"my @st = stat("stryke___stat___no_such___file"); scalar @st;"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "stat missing path should compile on VM");
@@ -923,7 +924,7 @@ fn try_vm_execute_stat_missing_path_empty_list() {
 #[test]
 fn try_vm_execute_readline_scalar_first_line() {
     let dir = std::env::temp_dir();
-    let path = dir.join(format!("forge_vm_readline_scalar_{}", std::process::id()));
+    let path = dir.join(format!("stryke_vm_readline_scalar_{}", std::process::id()));
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, b"first\nsecond\n").expect("write temp");
     let ps = path.to_string_lossy();
@@ -943,7 +944,7 @@ fn try_vm_execute_readline_scalar_first_line() {
 
 #[test]
 fn try_vm_execute_mkdir_and_d_filetest() {
-    let base = std::env::temp_dir().join(format!("forge_vm_mkdir_{}", std::process::id()));
+    let base = std::env::temp_dir().join(format!("stryke_vm_mkdir_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     let pb = base.to_string_lossy();
     let src = format!(
@@ -970,7 +971,7 @@ fn try_vm_execute_capture_true_reports_zero_exit() {
 #[test]
 fn try_vm_execute_filetest_e_and_f_nonempty_file() {
     let dir = std::env::temp_dir();
-    let path = dir.join("forge_vm_ef_test");
+    let path = dir.join("stryke_vm_ef_test");
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, b"!").expect("write temp");
     let ps = path.to_string_lossy();
@@ -985,7 +986,7 @@ fn try_vm_execute_filetest_e_and_f_nonempty_file() {
 
 #[test]
 fn try_vm_execute_opendir_readdir_finds_known_file() {
-    let base = std::env::temp_dir().join(format!("forge_vm_od_{}", std::process::id()));
+    let base = std::env::temp_dir().join(format!("stryke_vm_od_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     std::fs::create_dir_all(&base).expect("mkdir");
     std::fs::write(base.join("needle.txt"), b"ok").expect("write file");
@@ -1014,7 +1015,7 @@ fn try_vm_execute_opendir_readdir_finds_known_file() {
 
 #[test]
 fn try_vm_execute_rewinddir_resets_telldir() {
-    let base = std::env::temp_dir().join(format!("forge_vm_rewind_{}", std::process::id()));
+    let base = std::env::temp_dir().join(format!("stryke_vm_rewind_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     std::fs::create_dir_all(&base).expect("mkdir");
     std::fs::write(base.join("x.txt"), b"1").expect("write");
@@ -1042,7 +1043,7 @@ fn try_vm_execute_rewinddir_resets_telldir() {
 #[test]
 fn try_vm_execute_readlink_returns_symlink_target() {
     use std::os::unix::fs::symlink;
-    let base = std::env::temp_dir().join(format!("forge_vm_rl_{}", std::process::id()));
+    let base = std::env::temp_dir().join(format!("stryke_vm_rl_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     std::fs::create_dir_all(&base).expect("mkdir");
     let link = base.join("L");
@@ -1061,8 +1062,8 @@ fn try_vm_execute_readlink_returns_symlink_target() {
 #[test]
 fn try_vm_execute_hard_link_shares_file_contents() {
     let dir = std::env::temp_dir();
-    let a = dir.join(format!("forge_vm_hl_a_{}", std::process::id()));
-    let b = dir.join(format!("forge_vm_hl_b_{}", std::process::id()));
+    let a = dir.join(format!("stryke_vm_hl_a_{}", std::process::id()));
+    let b = dir.join(format!("stryke_vm_hl_b_{}", std::process::id()));
     let _ = std::fs::remove_file(&a);
     let _ = std::fs::remove_file(&b);
     std::fs::write(&a, b"shared").expect("write");
@@ -1085,7 +1086,7 @@ fn try_vm_execute_hard_link_shares_file_contents() {
 #[test]
 fn try_vm_execute_lstat_symlink_size_differs_from_stat() {
     use std::os::unix::fs::symlink;
-    let base = std::env::temp_dir().join(format!("forge_vm_lstat_{}", std::process::id()));
+    let base = std::env::temp_dir().join(format!("stryke_vm_lstat_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     std::fs::create_dir_all(&base).expect("mkdir");
     let target = base.join("longtargetfilename");
@@ -1109,7 +1110,7 @@ fn try_vm_execute_lstat_symlink_size_differs_from_stat() {
 #[test]
 fn try_vm_execute_unlink_removes_file() {
     let dir = std::env::temp_dir();
-    let path = dir.join("forge_vm_unlink_test");
+    let path = dir.join("stryke_vm_unlink_test");
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, b"x").expect("write temp");
     let ps = path.to_string_lossy();
@@ -1140,8 +1141,8 @@ fn try_vm_execute_wantarray_scalar_vs_list_in_sub() {
 fn try_vm_execute_rename_file() {
     let dir = std::env::temp_dir();
     let pid = std::process::id();
-    let p1 = dir.join(format!("forge_vm_rename_from_{pid}"));
-    let p2 = dir.join(format!("forge_vm_rename_to_{pid}"));
+    let p1 = dir.join(format!("stryke_vm_rename_from_{pid}"));
+    let p2 = dir.join(format!("stryke_vm_rename_to_{pid}"));
     let _ = std::fs::remove_file(&p1);
     let _ = std::fs::remove_file(&p2);
     std::fs::write(&p1, b"mv").expect("write temp");

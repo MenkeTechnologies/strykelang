@@ -1,6 +1,6 @@
 //! AST-to-source deparser for serializing code refs.
 //!
-//! Converts [`Expr`], [`Statement`], and [`Block`] back to valid forge source code.
+//! Converts [`Expr`], [`Statement`], and [`Block`] back to valid stryke source code.
 
 use crate::ast::*;
 use std::cell::RefCell;

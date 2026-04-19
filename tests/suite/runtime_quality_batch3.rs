@@ -3,7 +3,7 @@
 
 use crate::common::*;
 
-use forge::error::ErrorKind;
+use stryke::error::ErrorKind;
 
 #[test]
 fn sleep_zero_returns_quickly() {
@@ -27,7 +27,10 @@ fn json_decode_integer_roundtrip() {
 
 #[test]
 fn json_encode_decode_string_roundtrip() {
-    assert_eq!(eval_string(r#"json_decode(json_encode("forge"))"#), "forge");
+    assert_eq!(
+        eval_string(r#"json_decode(json_encode("stryke"))"#),
+        "stryke"
+    );
 }
 
 #[test]

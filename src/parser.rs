@@ -107,7 +107,7 @@ pub struct Parser {
     next_desugar_tmp: u32,
     /// Source path for [`PerlError`] (matches lexer / `parse_with_file`).
     error_file: String,
-    /// User-declared sub names (for allowing UDF to shadow forge extensions in compat mode).
+    /// User-declared sub names (for allowing UDF to shadow stryke extensions in compat mode).
     declared_subs: std::collections::HashSet<String>,
     /// When > 0, `parse_named_expr` will not consume following barewords as paren-less
     /// function arguments. Used by thread macro to prevent `t Color::Red p` from
@@ -186,7 +186,7 @@ impl Parser {
 
     /// Lift a `Bareword("f")` to `FuncCall { f, [$_] }`.
     ///
-    /// forge extension contexts (map/grep/fore expression forms, pipe-forward)
+    /// stryke extension contexts (map/grep/fore expression forms, pipe-forward)
     /// call this so that `map sha512, @list` invokes `sha512($_)` for each
     /// element instead of stringifying the bareword.  Non-bareword expressions
     /// pass through unchanged.
@@ -338,9 +338,9 @@ impl Parser {
 
     /// True when the next token is a statement-starting keyword on a *different*
     /// line from `stmt_line`.  Used by `parse_use` / `parse_no` to stop parsing
-    /// import lists when semicolons are omitted (forge extension).
+    /// import lists when semicolons are omitted (stryke extension).
     fn next_is_new_stmt_keyword(&self, stmt_line: usize) -> bool {
-        // Semicolons-optional is a forge extension; in compat mode, require them.
+        // Semicolons-optional is a stryke extension; in compat mode, require them.
         if crate::compat_mode() {
             return false;
         }
@@ -473,7 +473,7 @@ impl Parser {
                 "struct" => {
                     if crate::compat_mode() {
                         return Err(self.syntax_err(
-                            "`struct` is a forge extension (disabled by --compat)",
+                            "`struct` is a stryke extension (disabled by --compat)",
                             self.peek_line(),
                         ));
                     }
@@ -482,7 +482,7 @@ impl Parser {
                 "enum" => {
                     if crate::compat_mode() {
                         return Err(self.syntax_err(
-                            "`enum` is a forge extension (disabled by --compat)",
+                            "`enum` is a stryke extension (disabled by --compat)",
                             self.peek_line(),
                         ));
                     }
@@ -519,7 +519,7 @@ impl Parser {
                 "trait" => {
                     if crate::compat_mode() {
                         return Err(self.syntax_err(
-                            "`trait` is a forge extension (disabled by --compat)",
+                            "`trait` is a stryke extension (disabled by --compat)",
                             self.peek_line(),
                         ));
                     }
@@ -530,7 +530,7 @@ impl Parser {
                 "mysync" => {
                     if crate::compat_mode() {
                         return Err(self.syntax_err(
-                            "`mysync` is a forge extension (disabled by --compat)",
+                            "`mysync` is a stryke extension (disabled by --compat)",
                             self.peek_line(),
                         ));
                     }
@@ -540,7 +540,7 @@ impl Parser {
                     let leading = kw.as_str().to_string();
                     if crate::compat_mode() {
                         return Err(self.syntax_err(
-                            format!("`{leading}` is a forge extension (disabled by --compat)"),
+                            format!("`{leading}` is a stryke extension (disabled by --compat)"),
                             self.peek_line(),
                         ));
                     }
@@ -574,7 +574,7 @@ impl Parser {
                 "typed" => {
                     if crate::compat_mode() {
                         return Err(self.syntax_err(
-                            "`typed` is a forge extension (disabled by --compat)",
+                            "`typed` is a stryke extension (disabled by --compat)",
                             self.peek_line(),
                         ));
                     }
@@ -2837,9 +2837,10 @@ impl Parser {
         self.advance(); // 'if'
         if matches!(self.peek(), Token::Ident(ref s) if s == "let") {
             if crate::compat_mode() {
-                return Err(
-                    self.syntax_err("`if let` is a forge extension (disabled by --compat)", line)
-                );
+                return Err(self.syntax_err(
+                    "`if let` is a stryke extension (disabled by --compat)",
+                    line,
+                ));
             }
             return self.parse_if_let(line);
         }
@@ -2991,7 +2992,7 @@ impl Parser {
         if matches!(self.peek(), Token::Ident(ref s) if s == "let") {
             if crate::compat_mode() {
                 return Err(self.syntax_err(
-                    "`while let` is a forge extension (disabled by --compat)",
+                    "`while let` is a stryke extension (disabled by --compat)",
                     line,
                 ));
             }
@@ -3441,7 +3442,7 @@ impl Parser {
                     if name == "$$" || name == ")" {
                         return Err(self.syntax_err(
                             format!(
-                                "`{name}` cannot start a forge sub signature (use legacy prototype `($$)` etc.)"
+                                "`{name}` cannot start a stryke sub signature (use legacy prototype `($$)` etc.)"
                             ),
                             self.peek_line(),
                         ));
@@ -3535,7 +3536,7 @@ impl Parser {
         Ok(params)
     }
 
-    /// Optional `sub` parens: either a Perl 5 prototype string or a forge **`$name` / `{ k => $v }`** signature.
+    /// Optional `sub` parens: either a Perl 5 prototype string or a stryke **`$name` / `{ k => $v }`** signature.
     fn parse_sub_sig_or_prototype_opt(&mut self) -> PerlResult<(Vec<SubSigParam>, Option<String>)> {
         if !matches!(self.peek(), Token::LParen) {
             return Ok((vec![], None));
@@ -4165,7 +4166,7 @@ impl Parser {
         elems: Vec<MatchArrayElem>,
         rhs: Expr,
     ) -> PerlResult<Statement> {
-        let tmp = format!("__forge_ds_{}", self.alloc_desugar_tmp());
+        let tmp = format!("__stryke_ds_{}", self.alloc_desugar_tmp());
         let mut stmts: Vec<Statement> = Vec::new();
         stmts.push(destructure_stmt_from_var_decls(
             keyword,
@@ -4355,7 +4356,7 @@ impl Parser {
         pairs: Vec<MatchHashPair>,
         rhs: Expr,
     ) -> PerlResult<Statement> {
-        let tmp = format!("__forge_ds_{}", self.alloc_desugar_tmp());
+        let tmp = format!("__stryke_ds_{}", self.alloc_desugar_tmp());
         let mut stmts: Vec<Statement> = Vec::new();
         stmts.push(destructure_stmt_from_var_decls(
             keyword,
@@ -5160,7 +5161,7 @@ impl Parser {
         while matches!(self.peek(), Token::PipeForward) {
             if crate::compat_mode() {
                 return Err(self.syntax_err(
-                    "pipe-forward operator `|>` is a forge extension (disabled by --compat)",
+                    "pipe-forward operator `|>` is a stryke extension (disabled by --compat)",
                     left.line,
                 ));
             }
@@ -7466,10 +7467,10 @@ impl Parser {
         }
 
         if crate::compat_mode() {
-            if let Some(ext) = Self::forge_extension_name(&name) {
+            if let Some(ext) = Self::stryke_extension_name(&name) {
                 if !self.declared_subs.contains(&name) {
                     return Err(self.syntax_err(
-                        format!("`{ext}` is a forge extension (disabled by --compat)"),
+                        format!("`{ext}` is a stryke extension (disabled by --compat)"),
                         line,
                     ));
                 }
@@ -7624,7 +7625,7 @@ impl Parser {
                     line,
                 })
             }
-            // forge unary numeric extensions — treat like `abs` so a bare
+            // stryke unary numeric extensions — treat like `abs` so a bare
             // identifier in `map { inc }` / `for (…) { p inc }` becomes a
             // call with implicit `$_` rather than falling through to the
             // generic `Bareword` arm (which stringifies to `"inc"`).
@@ -8421,7 +8422,7 @@ impl Parser {
             "match" => {
                 if crate::compat_mode() {
                     return Err(self.syntax_err(
-                        "algebraic `match` is a forge extension (disabled by --compat)",
+                        "algebraic `match` is a stryke extension (disabled by --compat)",
                         line,
                     ));
                 }
@@ -10376,7 +10377,7 @@ impl Parser {
                 } else {
                     // No parens, no visible arguments — emit a Bareword.
                     // At runtime, Bareword tries sub resolution first (zero-arg
-                    // call) and falls back to a string value.  forge extension
+                    // call) and falls back to a string value.  stryke extension
                     // contexts (pipe-forward, map/fore) lift Bareword → FuncCall
                     // with `$_` injection separately.
                     Ok(Expr {
@@ -10892,12 +10893,12 @@ impl Parser {
     /// Returns true if `name` is a Perl keyword/builtin that should NOT be
     /// treated as a bare sub name (e.g. inside `sort`).
     /// True for any bareword the parser treats as a known builtin / keyword —
-    /// Perl 5 core *or* a forge extension. Used to suppress "call as user
+    /// Perl 5 core *or* a stryke extension. Used to suppress "call as user
     /// sub" interpretations (e.g. `sort my_cmp @list` only treats `my_cmp`
     /// as a comparator name if it *isn't* a known bareword). Previously named
     /// `is_perl_keyword`, which was misleading.
     fn is_known_bareword(name: &str) -> bool {
-        Self::is_perl5_core(name) || Self::forge_extension_name(name).is_some()
+        Self::is_perl5_core(name) || Self::stryke_extension_name(name).is_some()
     }
 
     /// True iff `name` appears as any spelling (primary *or* alias) in a
@@ -10913,7 +10914,7 @@ impl Parser {
 
     /// True iff `name` is a Perl 5 core keyword/builtin (as shipped in stock
     /// `perl`). Extensions (`pmap`, `fan`, `timer`, …) are *not* included
-    /// here — those live in `forge_extension_name`. `%forge::perl_compats`
+    /// here — those live in `stryke_extension_name`. `%stryke::perl_compats`
     /// is derived from this list by `build.rs`.
     fn is_perl5_core(name: &str) -> bool {
         matches!(
@@ -10989,9 +10990,9 @@ impl Parser {
         )
     }
 
-    /// If `name` is a forge-only extension keyword/builtin, return it; else `None`.
+    /// If `name` is a stryke-only extension keyword/builtin, return it; else `None`.
     /// Used by `--compat` to reject extensions at parse time.
-    fn forge_extension_name(name: &str) -> Option<&str> {
+    fn stryke_extension_name(name: &str) -> Option<&str> {
         match name {
             // ── parallel ────────────────────────────────────────────────────
             | "pmap" | "pmap_on" | "pflat_map" | "pflat_map_on" | "pmap_chunked"
@@ -11041,7 +11042,7 @@ impl Parser {
             | "par_fetch" | "par_csv_read" | "par_pipeline"
             | "json_encode" | "json_decode" | "json_jq"
             | "http_request" | "serve" | "ssh"
-            // ── serialization (forge-only encoders) ────────────────────────
+            // ── serialization (stryke-only encoders) ────────────────────────
             | "toml_encode" | "toml_decode"
             | "yaml_encode" | "yaml_decode"
             | "xml_encode" | "xml_decode"
@@ -11133,7 +11134,7 @@ impl Parser {
             | "slurp" | "cat" | "c" | "capture" | "pager" | "pg" | "less"
             | "stdin"
             // ── internal ────────────────────────────────────────────────────
-            | "__forge_rust_compile"
+            | "__stryke_rust_compile"
             // ── short aliases ───────────────────────────────────────────────
             | "p" | "rev"
             // ── trivial numeric / predicate builtins ────────────────────────
@@ -12515,7 +12516,7 @@ impl Parser {
                     //   `${name}`              → ScalarVar(name)        (Perl standard)
                     //   `${$ref}` / `${\EXPR}` → deref the expression   (Perl standard)
                     //   `${name}[idx]` / `${name}{k}` / `${$r}[i]` …    chain after `}`
-                    // forge's prior `#{expr}` form remains supported elsewhere.
+                    // stryke's prior `#{expr}` form remains supported elsewhere.
                     i += 1;
                     let mut inner = String::new();
                     let mut depth = 1usize;
@@ -12663,7 +12664,7 @@ impl Parser {
                         name.push(chars[i]);
                         i += 1;
                     }
-                    // `$_<`, `$_<<`, … — outer topic (forge extension); only for bare `_`.
+                    // `$_<`, `$_<<`, … — outer topic (stryke extension); only for bare `_`.
                     if name == "_" {
                         while i < chars.len() && chars[i] == '<' {
                             name.push('<');
@@ -13042,7 +13043,7 @@ impl Parser {
                 && chars[i + 1] == '{'
                 && !crate::compat_mode()
             {
-                // #{expr} — Ruby-style expression interpolation (forge extension).
+                // #{expr} — Ruby-style expression interpolation (stryke extension).
                 if !literal.is_empty() {
                     parts.push(StringPart::Literal(std::mem::take(&mut literal)));
                 }

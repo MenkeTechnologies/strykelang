@@ -4,7 +4,7 @@
 //!
 //! 1. **Wire protocol vs a real `fo --remote-worker` subprocess.** Spawns the worker
 //!    directly (no ssh), drives the v3 handshake (HELLO → SESSION_INIT → JOB → JOB_RESP →
-//!    SHUTDOWN) using the public [`forge::remote_wire`] helpers, and verifies many JOBs
+//!    SHUTDOWN) using the public [`stryke::remote_wire`] helpers, and verifies many JOBs
 //!    flow over a single session. This is the closest we can get to a real cluster without
 //!    actually setting up SSH in CI.
 //!
@@ -28,16 +28,16 @@ use std::sync::{Arc, Mutex};
 /// parallel tests corrupt each other's `PATH` and the wrong `ssh` binary gets invoked.
 static SSH_SHIM_LOCK: Mutex<()> = Mutex::new(());
 
-use forge::cluster::perl_items_to_json;
-use forge::remote_wire::{
+use stryke::cluster::perl_items_to_json;
+use stryke::remote_wire::{
     frame_kind, read_typed_frame, send_msg, write_typed_frame, HelloAck, HelloMsg, JobMsg,
     JobRespMsg, SessionAck, SessionInit, PROTO_VERSION,
 };
-use forge::value::{PerlSub, PerlValue};
+use stryke::value::{PerlSub, PerlValue};
 
 fn tmp_path(tag: &str) -> PathBuf {
     std::env::temp_dir().join(format!(
-        "forge-cluster-{}-{}-{}",
+        "stryke-cluster-{}-{}-{}",
         std::process::id(),
         tag,
         rand::random::<u32>()
@@ -45,9 +45,9 @@ fn tmp_path(tag: &str) -> PathBuf {
 }
 
 /// Temp directory containing an `ssh` executable that skips ssh flags, host, and `pe_path`,
-/// then `exec`s the test `fo` binary — matches what [`forge::cluster`] passes to `ssh`.
+/// then `exec`s the test `fo` binary — matches what [`stryke::cluster`] passes to `ssh`.
 fn make_fake_ssh_shim_dir(tag: &str) -> PathBuf {
-    let pe_exe = env!("CARGO_BIN_EXE_fo");
+    let pe_exe = env!("CARGO_BIN_EXE_st");
     let shim_dir = tmp_path(tag);
     fs::create_dir_all(&shim_dir).unwrap();
     let shim_path = shim_dir.join("ssh");
@@ -95,7 +95,7 @@ impl Drop for PrependPathGuard {
 
 /// Spawn the local `fo --remote-worker` and return the live child.
 fn spawn_local_worker() -> Child {
-    let exe = env!("CARGO_BIN_EXE_fo");
+    let exe = env!("CARGO_BIN_EXE_st");
     Command::new(exe)
         .arg("--remote-worker")
         .stdin(Stdio::piped())
@@ -138,8 +138,8 @@ fn perl_items_to_json_rejects_code_reference_items() {
 
 #[test]
 fn run_cluster_empty_items_returns_ok_without_touching_slots() {
-    use forge::cluster::run_cluster;
-    use forge::value::RemoteCluster;
+    use stryke::cluster::run_cluster;
+    use stryke::value::RemoteCluster;
 
     let cluster = RemoteCluster {
         slots: vec![],
@@ -154,8 +154,8 @@ fn run_cluster_empty_items_returns_ok_without_touching_slots() {
 
 #[test]
 fn run_cluster_errors_when_no_slots_and_nonempty_items() {
-    use forge::cluster::run_cluster;
-    use forge::value::RemoteCluster;
+    use stryke::cluster::run_cluster;
+    use stryke::value::RemoteCluster;
 
     let cluster = RemoteCluster {
         slots: vec![],
@@ -695,8 +695,8 @@ fn worker_session_runs_subs_prelude_once_visible_to_jobs() {
 
 #[test]
 fn dispatcher_runs_against_fake_ssh_with_two_slots() {
-    use forge::cluster::run_cluster;
-    use forge::value::RemoteCluster;
+    use stryke::cluster::run_cluster;
+    use stryke::value::RemoteCluster;
 
     let _lock = SSH_SHIM_LOCK.lock().unwrap();
     let shim_dir = make_fake_ssh_shim_dir("ssh-shim");
@@ -706,11 +706,11 @@ fn dispatcher_runs_against_fake_ssh_with_two_slots() {
     // our shim hardcodes the test binary; we still set it for realism.
     let cluster = RemoteCluster {
         slots: vec![
-            forge::value::RemoteSlot {
+            stryke::value::RemoteSlot {
                 host: "fake1".to_string(),
                 pe_path: "fo".to_string(),
             },
-            forge::value::RemoteSlot {
+            stryke::value::RemoteSlot {
                 host: "fake2".to_string(),
                 pe_path: "fo".to_string(),
             },
@@ -743,15 +743,15 @@ fn dispatcher_runs_against_fake_ssh_with_two_slots() {
 
 #[test]
 fn dispatcher_single_slot_preserves_input_order() {
-    use forge::cluster::run_cluster;
-    use forge::value::RemoteCluster;
+    use stryke::cluster::run_cluster;
+    use stryke::value::RemoteCluster;
 
     let _lock = SSH_SHIM_LOCK.lock().unwrap();
     let shim_dir = make_fake_ssh_shim_dir("ssh-shim-one");
     let _path = PrependPathGuard::prepend(&shim_dir);
 
     let cluster = RemoteCluster {
-        slots: vec![forge::value::RemoteSlot {
+        slots: vec![stryke::value::RemoteSlot {
             host: "solo".to_string(),
             pe_path: "fo".to_string(),
         }],
@@ -776,8 +776,8 @@ fn dispatcher_single_slot_preserves_input_order() {
 
 #[test]
 fn dispatcher_applies_lexical_capture_from_run_cluster() {
-    use forge::cluster::run_cluster;
-    use forge::value::RemoteCluster;
+    use stryke::cluster::run_cluster;
+    use stryke::value::RemoteCluster;
 
     let _lock = SSH_SHIM_LOCK.lock().unwrap();
     let shim_dir = make_fake_ssh_shim_dir("ssh-shim-cap");
@@ -785,11 +785,11 @@ fn dispatcher_applies_lexical_capture_from_run_cluster() {
 
     let cluster = RemoteCluster {
         slots: vec![
-            forge::value::RemoteSlot {
+            stryke::value::RemoteSlot {
                 host: "cap1".to_string(),
                 pe_path: "fo".to_string(),
             },
-            forge::value::RemoteSlot {
+            stryke::value::RemoteSlot {
                 host: "cap2".to_string(),
                 pe_path: "fo".to_string(),
             },
@@ -822,15 +822,15 @@ fn dispatcher_applies_lexical_capture_from_run_cluster() {
 
 #[test]
 fn dispatcher_surfaces_permanent_block_failure_from_worker() {
-    use forge::cluster::run_cluster;
-    use forge::value::RemoteCluster;
+    use stryke::cluster::run_cluster;
+    use stryke::value::RemoteCluster;
 
     let _lock = SSH_SHIM_LOCK.lock().unwrap();
     let shim_dir = make_fake_ssh_shim_dir("ssh-shim-die");
     let _path = PrependPathGuard::prepend(&shim_dir);
 
     let cluster = RemoteCluster {
-        slots: vec![forge::value::RemoteSlot {
+        slots: vec![stryke::value::RemoteSlot {
             host: "diehost".to_string(),
             pe_path: "fo".to_string(),
         }],

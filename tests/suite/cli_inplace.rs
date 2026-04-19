@@ -5,12 +5,12 @@ use std::process::Command;
 
 #[test]
 fn pe_i_p_e_inplace_edits_argv_file() {
-    let dir = std::env::temp_dir().join(format!("forge_inplace_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("stryke_inplace_{}", std::process::id()));
     fs::create_dir_all(&dir).unwrap();
     let f = dir.join("t.txt");
     fs::write(&f, "hello a world\n").unwrap();
 
-    let exe = env!("CARGO_BIN_EXE_fo");
+    let exe = env!("CARGO_BIN_EXE_st");
     let out = Command::new(exe)
         .current_dir(&dir)
         .args(["-i", "-p", "-e", "s/a/b/", "t.txt"])
@@ -28,12 +28,12 @@ fn pe_i_p_e_inplace_edits_argv_file() {
 
 #[test]
 fn pe_i_bak_creates_backup_next_to_target() {
-    let dir = std::env::temp_dir().join(format!("forge_inplace_bak_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("stryke_inplace_bak_{}", std::process::id()));
     fs::create_dir_all(&dir).unwrap();
     let f = dir.join("t.txt");
     fs::write(&f, "x\n").unwrap();
 
-    let exe = env!("CARGO_BIN_EXE_fo");
+    let exe = env!("CARGO_BIN_EXE_st");
     let out = Command::new(exe)
         .current_dir(&dir)
         .args(["-i.bak", "-p", "-e", "s/x/y/", "t.txt"])
@@ -54,14 +54,14 @@ fn pe_i_bak_creates_backup_next_to_target() {
 
 #[test]
 fn pe_i_p_e_inplace_edits_multiple_argv_files_in_parallel() {
-    let dir = std::env::temp_dir().join(format!("forge_inplace_par_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("stryke_inplace_par_{}", std::process::id()));
     fs::create_dir_all(&dir).unwrap();
     let paths: Vec<_> = (0..4).map(|i| dir.join(format!("f{i}.txt"))).collect();
     for p in &paths {
         fs::write(p, "hello a world\n").unwrap();
     }
 
-    let exe = env!("CARGO_BIN_EXE_fo");
+    let exe = env!("CARGO_BIN_EXE_st");
     let out = Command::new(exe)
         .current_dir(&dir)
         .args(["-i", "-p", "-e", "s/a/b/"])
