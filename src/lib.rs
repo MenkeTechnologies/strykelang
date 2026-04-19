@@ -283,6 +283,16 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut Interpreter) -> PerlR
             .enum_defs
             .insert(def.name.clone(), std::sync::Arc::new(def.clone()));
     }
+    for def in &chunk.class_defs {
+        interp
+            .class_defs
+            .insert(def.name.clone(), std::sync::Arc::new(def.clone()));
+    }
+    for def in &chunk.trait_defs {
+        interp
+            .trait_defs
+            .insert(def.name.clone(), std::sync::Arc::new(def.clone()));
+    }
     let vm_jit = interp.vm_jit_enabled && interp.profiler.is_none();
     let mut vm = vm::VM::new(&chunk, interp);
     vm.set_jit_enabled(vm_jit);

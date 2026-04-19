@@ -361,6 +361,12 @@ impl Parser {
     // ── Top level ──
 
     pub fn parse_program(&mut self) -> PerlResult<Program> {
+        let statements = self.parse_statements()?;
+        Ok(Program { statements })
+    }
+
+    /// Parse statements until EOF. Used by parse_program and parse_block_from_str.
+    pub fn parse_statements(&mut self) -> PerlResult<Vec<Statement>> {
         let mut statements = Vec::new();
         while !self.at_eof() {
             if matches!(self.peek(), Token::Semicolon) {
@@ -375,7 +381,7 @@ impl Parser {
             }
             statements.push(self.parse_statement()?);
         }
-        Ok(Program { statements })
+        Ok(statements)
     }
 
     // ── Statements ──
@@ -481,6 +487,25 @@ impl Parser {
                         ));
                     }
                     self.parse_enum_decl()?
+                }
+                "class" => {
+                    if crate::compat_mode() {
+                        // TODO: parse Perl 5.38 class syntax with :isa()
+                        return Err(self.syntax_err(
+                            "Perl 5.38 `class` syntax not yet implemented in --compat mode",
+                            self.peek_line(),
+                        ));
+                    }
+                    self.parse_class_decl()?
+                }
+                "trait" => {
+                    if crate::compat_mode() {
+                        return Err(self.syntax_err(
+                            "`trait` is a perlrs extension (disabled by --compat)",
+                            self.peek_line(),
+                        ));
+                    }
+                    self.parse_trait_decl()?
                 }
                 "my" => self.parse_my_our_local("my", false)?,
                 "state" => self.parse_my_our_local("state", false)?,
@@ -3724,6 +3749,262 @@ impl Parser {
             label: None,
             kind: StmtKind::EnumDecl {
                 def: EnumDef { name, variants },
+            },
+            line,
+        })
+    }
+
+    /// `class Name extends Parent impl Trait { fields; methods }`
+    fn parse_class_decl(&mut self) -> PerlResult<Statement> {
+        use crate::ast::{ClassDef, ClassField, ClassMethod, Visibility};
+        let line = self.peek_line();
+        self.advance(); // class
+        let name = match self.advance() {
+            (Token::Ident(n), _) => n,
+            (tok, err_line) => {
+                return Err(self.syntax_err(format!("Expected class name, got {:?}", tok), err_line))
+            }
+        };
+
+        // Parse `extends Parent1, Parent2`
+        let mut extends = Vec::new();
+        if matches!(self.peek(), Token::Ident(ref s) if s == "extends") {
+            self.advance(); // extends
+            loop {
+                match self.advance() {
+                    (Token::Ident(parent), _) => extends.push(parent),
+                    (tok, err_line) => {
+                        return Err(self.syntax_err(
+                            format!("Expected parent class name after `extends`, got {:?}", tok),
+                            err_line,
+                        ))
+                    }
+                }
+                if !self.eat(&Token::Comma) {
+                    break;
+                }
+            }
+        }
+
+        // Parse `impl Trait1, Trait2`
+        let mut implements = Vec::new();
+        if matches!(self.peek(), Token::Ident(ref s) if s == "impl") {
+            self.advance(); // impl
+            loop {
+                match self.advance() {
+                    (Token::Ident(trait_name), _) => implements.push(trait_name),
+                    (tok, err_line) => {
+                        return Err(self.syntax_err(
+                            format!("Expected trait name after `impl`, got {:?}", tok),
+                            err_line,
+                        ))
+                    }
+                }
+                if !self.eat(&Token::Comma) {
+                    break;
+                }
+            }
+        }
+
+        self.expect(&Token::LBrace)?;
+        let mut fields = Vec::new();
+        let mut methods = Vec::new();
+
+        while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            // Check for visibility modifier
+            let visibility = match self.peek() {
+                Token::Ident(ref s) if s == "pub" => {
+                    self.advance();
+                    Visibility::Public
+                }
+                Token::Ident(ref s) if s == "priv" => {
+                    self.advance();
+                    Visibility::Private
+                }
+                _ => Visibility::Public, // default public
+            };
+
+            // Check for method: `fn name` or `fn Self.name` (static)
+            let is_method = matches!(self.peek(), Token::Ident(ref s) if s == "fn" || s == "sub");
+            if is_method {
+                self.advance(); // fn/sub
+
+                // Check for static method: `fn Self.name`
+                let is_static = matches!(self.peek(), Token::Ident(ref s) if s == "Self");
+                if is_static {
+                    self.advance(); // Self
+                    self.expect(&Token::Dot)?;
+                }
+
+                let method_name = match self.advance() {
+                    (Token::Ident(n), _) => n,
+                    (tok, err_line) => {
+                        return Err(self
+                            .syntax_err(format!("Expected method name, got {:?}", tok), err_line))
+                    }
+                };
+
+                // Parse optional signature
+                let params = if self.eat(&Token::LParen) {
+                    let p = self.parse_sub_signature_param_list()?;
+                    self.expect(&Token::RParen)?;
+                    p
+                } else {
+                    Vec::new()
+                };
+
+                // Body is optional (abstract method in trait has no body)
+                let body = if matches!(self.peek(), Token::LBrace) {
+                    Some(self.parse_block()?)
+                } else {
+                    None
+                };
+
+                methods.push(ClassMethod {
+                    name: method_name,
+                    params,
+                    body,
+                    visibility,
+                    is_static,
+                });
+                self.eat(&Token::Comma);
+                self.eat(&Token::Semicolon);
+                continue;
+            }
+
+            // Parse field: `name: Type = default`
+            let field_name = match self.advance() {
+                (Token::Ident(n), _) => n,
+                (tok, err_line) => {
+                    return Err(
+                        self.syntax_err(format!("Expected field name, got {:?}", tok), err_line)
+                    )
+                }
+            };
+
+            // Type after colon: `name: Type`
+            let ty = if self.eat(&Token::Colon) {
+                self.parse_type_name()?
+            } else {
+                crate::ast::PerlTypeName::Any
+            };
+
+            // Default value after `=`
+            let default = if self.eat(&Token::Assign) {
+                Some(self.parse_ternary()?)
+            } else {
+                None
+            };
+
+            fields.push(ClassField {
+                name: field_name,
+                ty,
+                visibility,
+                default,
+            });
+
+            if !self.eat(&Token::Comma) {
+                self.eat(&Token::Semicolon);
+            }
+        }
+
+        self.expect(&Token::RBrace)?;
+        self.eat(&Token::Semicolon);
+
+        Ok(Statement {
+            label: None,
+            kind: StmtKind::ClassDecl {
+                def: ClassDef {
+                    name,
+                    extends,
+                    implements,
+                    fields,
+                    methods,
+                },
+            },
+            line,
+        })
+    }
+
+    /// `trait Name { fn required; fn with_default { } }`
+    fn parse_trait_decl(&mut self) -> PerlResult<Statement> {
+        use crate::ast::{ClassMethod, TraitDef, Visibility};
+        let line = self.peek_line();
+        self.advance(); // trait
+        let name = match self.advance() {
+            (Token::Ident(n), _) => n,
+            (tok, err_line) => {
+                return Err(self.syntax_err(format!("Expected trait name, got {:?}", tok), err_line))
+            }
+        };
+
+        self.expect(&Token::LBrace)?;
+        let mut methods = Vec::new();
+
+        while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            // Optional visibility
+            let visibility = match self.peek() {
+                Token::Ident(ref s) if s == "pub" => {
+                    self.advance();
+                    Visibility::Public
+                }
+                Token::Ident(ref s) if s == "priv" => {
+                    self.advance();
+                    Visibility::Private
+                }
+                _ => Visibility::Public,
+            };
+
+            // Expect `fn` or `sub`
+            if !matches!(self.peek(), Token::Ident(ref s) if s == "fn" || s == "sub") {
+                return Err(self.syntax_err("Expected `fn` in trait definition", self.peek_line()));
+            }
+            self.advance(); // fn/sub
+
+            let method_name = match self.advance() {
+                (Token::Ident(n), _) => n,
+                (tok, err_line) => {
+                    return Err(
+                        self.syntax_err(format!("Expected method name, got {:?}", tok), err_line)
+                    )
+                }
+            };
+
+            // Optional signature
+            let params = if self.eat(&Token::LParen) {
+                let p = self.parse_sub_signature_param_list()?;
+                self.expect(&Token::RParen)?;
+                p
+            } else {
+                Vec::new()
+            };
+
+            // Body is optional (no body = abstract/required method)
+            let body = if matches!(self.peek(), Token::LBrace) {
+                Some(self.parse_block()?)
+            } else {
+                None
+            };
+
+            methods.push(ClassMethod {
+                name: method_name,
+                params,
+                body,
+                visibility,
+                is_static: false,
+            });
+
+            self.eat(&Token::Comma);
+            self.eat(&Token::Semicolon);
+        }
+
+        self.expect(&Token::RBrace)?;
+        self.eat(&Token::Semicolon);
+
+        Ok(Statement {
+            label: None,
+            kind: StmtKind::TraitDecl {
+                def: TraitDef { name, methods },
             },
             line,
         })
@@ -12698,7 +12979,7 @@ impl Parser {
                 if i < chars.len() {
                     i += 1; // skip closing `}`
                 }
-                let expr = parse_expression_from_str(inner.trim(), "-e")?;
+                let expr = parse_block_from_str(inner.trim(), "-e", line)?;
                 parts.push(StringPart::Expr(expr));
             } else {
                 literal.push(chars[i]);
@@ -12778,6 +13059,26 @@ pub fn parse_expression_from_str(s: &str, file: &str) -> PerlResult<Expr> {
         ));
     }
     Ok(e)
+}
+
+/// Parse a statement list from `s` and wrap as `do { ... }` (for `#{...}` interpolation).
+pub fn parse_block_from_str(s: &str, file: &str, line: usize) -> PerlResult<Expr> {
+    let mut lexer = Lexer::new_with_file(s, file);
+    let tokens = lexer.tokenize()?;
+    let mut parser = Parser::new_with_file(tokens, file);
+    let stmts = parser.parse_statements()?;
+    let inner_line = stmts.first().map(|st| st.line).unwrap_or(line);
+    let inner = Expr {
+        kind: ExprKind::CodeRef {
+            params: vec![],
+            body: stmts,
+        },
+        line: inner_line,
+    };
+    Ok(Expr {
+        kind: ExprKind::Do(Box::new(inner)),
+        line,
+    })
 }
 
 /// Comma-separated expressions on a `format` value line (below a picture line).

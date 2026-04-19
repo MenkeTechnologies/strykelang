@@ -189,6 +189,14 @@ pub enum StmtKind {
     EnumDecl {
         def: EnumDef,
     },
+    /// `class Name extends Parent impl Trait { fields; methods }` — full OOP.
+    ClassDecl {
+        def: ClassDef,
+    },
+    /// `trait Name { fn required; fn with_default { } }` — interface/mixin.
+    TraitDecl {
+        def: TraitDef,
+    },
     /// `eval_timeout SECS { ... }` — run block on a worker thread; main waits up to SECS (portable timeout).
     EvalTimeout {
         timeout: Expr,
@@ -308,6 +316,92 @@ pub struct StructDef {
     /// User-defined methods: `fn name { }` inside struct body.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub methods: Vec<StructMethod>,
+}
+
+/// Visibility modifier for class fields and methods.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum Visibility {
+    #[default]
+    Public,
+    Private,
+}
+
+/// Single field in a class definition: `name: Type = default` or `pub name: Type`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClassField {
+    pub name: String,
+    pub ty: PerlTypeName,
+    pub visibility: Visibility,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default: Option<Expr>,
+}
+
+/// Method defined inside a class: `fn name { }` or `pub fn name($self, ...) { }`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClassMethod {
+    pub name: String,
+    pub params: Vec<SubSigParam>,
+    pub body: Option<Block>,
+    pub visibility: Visibility,
+    pub is_static: bool,
+}
+
+/// Trait definition: `trait Name { fn required; fn with_default { } }`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TraitDef {
+    pub name: String,
+    pub methods: Vec<ClassMethod>,
+}
+
+impl TraitDef {
+    #[inline]
+    pub fn method(&self, name: &str) -> Option<&ClassMethod> {
+        self.methods.iter().find(|m| m.name == name)
+    }
+
+    #[inline]
+    pub fn required_methods(&self) -> impl Iterator<Item = &ClassMethod> {
+        self.methods.iter().filter(|m| m.body.is_none())
+    }
+}
+
+/// Class definition: `class Name extends Parent impl Trait { fields; methods }`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClassDef {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub extends: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub implements: Vec<String>,
+    pub fields: Vec<ClassField>,
+    pub methods: Vec<ClassMethod>,
+}
+
+impl ClassDef {
+    #[inline]
+    pub fn field_index(&self, name: &str) -> Option<usize> {
+        self.fields.iter().position(|f| f.name == name)
+    }
+
+    #[inline]
+    pub fn field(&self, name: &str) -> Option<&ClassField> {
+        self.fields.iter().find(|f| f.name == name)
+    }
+
+    #[inline]
+    pub fn method(&self, name: &str) -> Option<&ClassMethod> {
+        self.methods.iter().find(|m| m.name == name)
+    }
+
+    #[inline]
+    pub fn static_methods(&self) -> impl Iterator<Item = &ClassMethod> {
+        self.methods.iter().filter(|m| m.is_static)
+    }
+
+    #[inline]
+    pub fn instance_methods(&self) -> impl Iterator<Item = &ClassMethod> {
+        self.methods.iter().filter(|m| !m.is_static)
+    }
 }
 
 impl StructDef {

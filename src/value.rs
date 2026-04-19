@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 use std::sync::Arc;
 use std::sync::Barrier;
 
-use crate::ast::{Block, EnumDef, StructDef, SubSigParam};
+use crate::ast::{Block, ClassDef, EnumDef, StructDef, SubSigParam};
 use crate::error::PerlResult;
 use crate::nanbox;
 use crate::perl_decode::decode_utf8_or_latin1;
@@ -565,6 +565,7 @@ pub(crate) enum HeapObject {
     StructInst(Arc<StructInstance>),
     DataFrame(Arc<Mutex<PerlDataFrame>>),
     EnumInst(Arc<EnumInstance>),
+    ClassInst(Arc<ClassInstance>),
     /// Lazy pull-based iterator (`frs`, `drs`, `rev` wrapping, etc.).
     Iterator(Arc<dyn PerlIterator>),
     /// Numeric/string dualvar: **`$!`** (errno + message) and **`$@`** (numeric flag or code + message).
@@ -900,6 +901,65 @@ impl Clone for EnumInstance {
             def: Arc::clone(&self.def),
             variant_idx: self.variant_idx,
             data: self.data.clone(),
+        }
+    }
+}
+
+/// Instance of a `class Name extends ... impl ... { ... }` definition.
+#[derive(Debug)]
+pub struct ClassInstance {
+    pub def: Arc<ClassDef>,
+    pub values: RwLock<Vec<PerlValue>>,
+}
+
+impl ClassInstance {
+    pub fn new(def: Arc<ClassDef>, values: Vec<PerlValue>) -> Self {
+        Self {
+            def,
+            values: RwLock::new(values),
+        }
+    }
+
+    #[inline]
+    pub fn get_field(&self, idx: usize) -> Option<PerlValue> {
+        self.values.read().get(idx).cloned()
+    }
+
+    #[inline]
+    pub fn set_field(&self, idx: usize, val: PerlValue) {
+        if let Some(slot) = self.values.write().get_mut(idx) {
+            *slot = val;
+        }
+    }
+
+    #[inline]
+    pub fn get_values(&self) -> Vec<PerlValue> {
+        self.values.read().clone()
+    }
+
+    /// Get field value by name (searches through class and parent hierarchies).
+    pub fn get_field_by_name(&self, name: &str) -> Option<PerlValue> {
+        self.def
+            .field_index(name)
+            .and_then(|idx| self.get_field(idx))
+    }
+
+    /// Set field value by name.
+    pub fn set_field_by_name(&self, name: &str, val: PerlValue) -> bool {
+        if let Some(idx) = self.def.field_index(name) {
+            self.set_field(idx, val);
+            true
+        } else {
+            false
+        }
+    }
+}
+
+impl Clone for ClassInstance {
+    fn clone(&self) -> Self {
+        Self {
+            def: Arc::clone(&self.def),
+            values: RwLock::new(self.values.read().clone()),
         }
     }
 }
@@ -1279,6 +1339,15 @@ impl PerlValue {
     }
 
     #[inline]
+    pub fn as_class_inst(&self) -> Option<Arc<ClassInstance>> {
+        self.with_heap(|h| match h {
+            HeapObject::ClassInst(c) => Some(Arc::clone(c)),
+            _ => None,
+        })
+        .flatten()
+    }
+
+    #[inline]
     pub fn as_dataframe(&self) -> Option<Arc<Mutex<PerlDataFrame>>> {
         self.with_heap(|h| match h {
             HeapObject::DataFrame(d) => Some(Arc::clone(d)),
@@ -1537,6 +1606,11 @@ impl PerlValue {
     #[inline]
     pub fn enum_inst(e: Arc<EnumInstance>) -> Self {
         Self::from_heap(Arc::new(HeapObject::EnumInst(e)))
+    }
+
+    #[inline]
+    pub fn class_inst(c: Arc<ClassInstance>) -> Self {
+        Self::from_heap(Arc::new(HeapObject::ClassInst(c)))
     }
 
     #[inline]
@@ -1916,6 +1990,7 @@ impl PerlValue {
             HeapObject::SqliteConn(_) => "SqliteConn".to_string(),
             HeapObject::StructInst(s) => s.def.name.to_string(),
             HeapObject::EnumInst(e) => e.def.name.to_string(),
+            HeapObject::ClassInst(c) => c.def.name.to_string(),
             HeapObject::Iterator(_) => "Iterator".to_string(),
             HeapObject::ErrnoDual { .. } => "Errno".to_string(),
             HeapObject::Integer(_) => "INTEGER".to_string(),
@@ -2225,6 +2300,23 @@ impl fmt::Display for PerlValue {
                 }
                 Ok(())
             }
+            HeapObject::ClassInst(c) => {
+                // Smart stringify: Dog(name => "Rex", age => 5)
+                write!(f, "{}(", c.def.name)?;
+                let values = c.values.read();
+                for (i, field) in c.def.fields.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(
+                        f,
+                        "{} => {}",
+                        field.name,
+                        values.get(i).cloned().unwrap_or(PerlValue::UNDEF)
+                    )?;
+                }
+                f.write_str(")")
+            }
             HeapObject::DataFrame(d) => {
                 let g = d.lock();
                 write!(f, "DataFrame({} rows)", g.nrows())
@@ -2315,6 +2407,7 @@ pub fn set_member_key(v: &PerlValue) -> String {
         HeapObject::EnumInst(e) => {
             format!("en:{}::{}:{}", e.def.name, e.variant_name(), e.data)
         }
+        HeapObject::ClassInst(c) => format!("cl:{}:{:?}", c.def.name, c.values),
         HeapObject::DataFrame(d) => format!("df:{:p}", Arc::as_ptr(d)),
         HeapObject::Iterator(_) => "iter".to_string(),
         HeapObject::ErrnoDual { code, msg } => format!("e:{code}:{msg}"),

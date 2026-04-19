@@ -482,6 +482,36 @@ fn deparse_stmt_into(buf: &mut String, stmt: &Statement, indent: usize) {
             }
             buf.push_str(" }");
         }
+        StmtKind::ClassDecl { def } => {
+            let _ = write!(buf, "class {}", def.name);
+            if !def.extends.is_empty() {
+                let _ = write!(buf, " extends {}", def.extends.join(", "));
+            }
+            if !def.implements.is_empty() {
+                let _ = write!(buf, " impl {}", def.implements.join(", "));
+            }
+            buf.push_str(" { ");
+            for (i, field) in def.fields.iter().enumerate() {
+                if i > 0 {
+                    buf.push_str("; ");
+                }
+                if matches!(field.visibility, crate::ast::Visibility::Private) {
+                    buf.push_str("priv ");
+                }
+                let _ = write!(buf, "{}: {}", field.name, field.ty.display_name());
+            }
+            buf.push_str(" }");
+        }
+        StmtKind::TraitDecl { def } => {
+            let _ = write!(buf, "trait {} {{ ", def.name);
+            for (i, method) in def.methods.iter().enumerate() {
+                if i > 0 {
+                    buf.push_str("; ");
+                }
+                let _ = write!(buf, "fn {}", method.name);
+            }
+            buf.push_str(" }");
+        }
         StmtKind::Empty => {
             buf.push(';');
         }
