@@ -1773,82 +1773,94 @@ fn run_serve_subcommand(args: &[String]) -> i32 {
         eprintln!("perlrs: serving {} on http://0.0.0.0:{}", dir, port);
         format!(
             r#"
-chdir "{dir_escaped}";
-serve {port}, fn ($req) {{
-    my $url_path = $req->{{path}};
-    $url_path =~ s|\.\./||g;
-    my $fs_path = $url_path;
-    $fs_path =~ s|^/||;
-    $fs_path = "." if $fs_path eq "";
+chdir "{dir_escaped}"
 
-    # If it's a directory, try index.html, else list contents
-    if (-d $fs_path) {{
-        my $idx = $fs_path eq "." ? "index.html" : "$fs_path/index.html";
-        if (-f $idx) {{
-            +{{ status => 200, body => slurp($idx), headers => +{{ "content-type" => "text/html; charset=utf-8" }} }}
+my %mime = (
+    html => "text/html; charset=utf-8",
+    htm => "text/html; charset=utf-8",
+    css => "text/css; charset=utf-8",
+    js => "application/javascript; charset=utf-8",
+    mjs => "application/javascript; charset=utf-8",
+    json => "application/json; charset=utf-8",
+    xml => "text/xml; charset=utf-8",
+    md => "text/markdown; charset=utf-8",
+    txt => "text/plain; charset=utf-8",
+    toml => "application/toml; charset=utf-8",
+    pl => "text/x-perl; charset=utf-8",
+    pr => "text/x-perl; charset=utf-8",
+    pm => "text/x-perl; charset=utf-8",
+    png => "image/png",
+    jpg => "image/jpeg",
+    jpeg => "image/jpeg",
+    gif => "image/gif",
+    svg => "image/svg+xml",
+    webp => "image/webp",
+    avif => "image/avif",
+    ico => "image/x-icon",
+    woff2 => "font/woff2",
+    woff => "font/woff",
+    ttf => "font/ttf",
+    mp3 => "audio/mpeg",
+    ogg => "audio/ogg",
+    mp4 => "video/mp4",
+    webm => "video/webm",
+    zip => "application/zip",
+    gz => "application/gzip",
+    wasm => "application/wasm",
+    pdf => "application/pdf"
+)
+
+fn mime_for($path) {{
+    my $ext = $path =~ /\.([^.]+)$/ ? lc($1) : ""
+    $mime{{$ext}} // "text/plain"
+}}
+
+fn dir_listing($url_path, $fs_path) {{
+    $url_path .= "/" unless $url_path =~ m|/$|
+    my $prefix = $fs_path eq "." ? "" : "$fs_path/"
+    my @entries
+    push @entries, ".." unless $url_path eq "/"
+    push @entries, dirs($fs_path)
+    push @entries, filesf($fs_path)
+    my $html = ""
+    for my $e (@entries) {{
+        my $full = $e eq ".." ? ".." : "$prefix$e"
+        my $name = $e
+        my $href = $url_path . $name
+        if (-d $full) {{
+            $html .= "<li class=\"dir\"><a href=\"$href/\">$name/</a></li>"
         }} else {{
-            # Directory listing
-            $url_path .= "/" unless $url_path =~ m|/$|;
-            my @entries;
-            push @entries, ".." unless $url_path eq "/";
-            push @entries, dirs($fs_path);
-            push @entries, filesf($fs_path);
-            my $html = "<!DOCTYPE html><html><head><meta charset=\"utf-8\">";
-            $html .= "<title>Directory listing for $url_path</title>";
-            $html .= "<style>body{{font-family:monospace;margin:2em}}a{{text-decoration:none}}a:hover{{text-decoration:underline}}li{{padding:2px 0}}.dir{{font-weight:bold}}</style>";
-            $html .= "</head><body>";
-            $html .= "<h1>Directory listing for $url_path</h1><hr><ul>";
-            my $e;
-            for $e (@entries) {{
-                my $name = $e;
-                $name =~ s|.*/||;
-                my $href = $url_path . $name;
-                if (-d $e) {{
-                    $html .= "<li class=\"dir\"><a href=\"$href/\">$name/</a></li>";
-                }} else {{
-                    my @st = stat($e);
-                    my $sz = defined $st[7] ? $st[7] : 0;
-                    $html .= "<li><a href=\"$href\">$name</a> <span style=\"color:#888\">($sz bytes)</span></li>";
-                }}
-            }}
-            $html .= "</ul><hr><p style=\"color:#888\">perlrs/{port}</p></body></html>";
-            +{{ status => 200, body => $html, headers => +{{ "content-type" => "text/html; charset=utf-8" }} }}
+            my $sz = (stat($full))[7] // 0
+            $html .= "<li><a href=\"$href\">$name</a> <span style=\"color:#888\">($sz bytes)</span></li>"
+        }}
+    }}
+    "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
+    . "<title>Directory listing for $url_path</title>"
+    . "<style>body{{font-family:monospace;margin:2em}}a{{text-decoration:none}}a:hover{{text-decoration:underline}}li{{padding:2px 0}}.dir{{font-weight:bold}}</style>"
+    . "</head><body><h1>Directory listing for $url_path</h1><hr><ul>"
+    . $html
+    . "</ul><hr><p style=\"color:#888\">perlrs/{port}</p></body></html>"
+}}
+
+serve {port}, fn ($req) {{
+    my $url_path = $req->{{path}}
+    $url_path =~ s|\.\./||g
+    my $fs_path = $url_path =~ s|^/||r
+    $fs_path = "." if $fs_path eq ""
+
+    if (-d $fs_path) {{
+        my $idx = $fs_path eq "." ? "index.html" : "$fs_path/index.html"
+        if (-f $idx) {{
+            +{{ status => 200, body => cat($idx), headers => +{{ "content-type" => "text/html; charset=utf-8" }} }}
+        }} else {{
+            +{{ status => 200, body => dir_listing($url_path, $fs_path), headers => +{{ "content-type" => "text/html; charset=utf-8" }} }}
         }}
     }} elsif (-f $fs_path) {{
-        my $body = slurp($fs_path);
-        my $ct = "text/plain";
-        $ct = "text/html; charset=utf-8"  if $fs_path =~ /\.html?$/;
-        $ct = "text/css; charset=utf-8"   if $fs_path =~ /\.css$/;
-        $ct = "application/javascript; charset=utf-8" if $fs_path =~ /\.m?js$/;
-        $ct = "application/json; charset=utf-8" if $fs_path =~ /\.json$/;
-        $ct = "image/png"  if $fs_path =~ /\.png$/;
-        $ct = "image/jpeg" if $fs_path =~ /\.jpe?g$/;
-        $ct = "image/gif"  if $fs_path =~ /\.gif$/;
-        $ct = "image/svg+xml" if $fs_path =~ /\.svg$/;
-        $ct = "image/webp" if $fs_path =~ /\.webp$/;
-        $ct = "image/avif" if $fs_path =~ /\.avif$/;
-        $ct = "image/x-icon" if $fs_path =~ /\.ico$/;
-        $ct = "application/wasm" if $fs_path =~ /\.wasm$/;
-        $ct = "text/xml; charset=utf-8"   if $fs_path =~ /\.xml$/;
-        $ct = "application/pdf" if $fs_path =~ /\.pdf$/;
-        $ct = "font/woff2" if $fs_path =~ /\.woff2$/;
-        $ct = "font/woff"  if $fs_path =~ /\.woff$/;
-        $ct = "font/ttf"   if $fs_path =~ /\.ttf$/;
-        $ct = "audio/mpeg" if $fs_path =~ /\.mp3$/;
-        $ct = "audio/ogg"  if $fs_path =~ /\.ogg$/;
-        $ct = "video/mp4"  if $fs_path =~ /\.mp4$/;
-        $ct = "video/webm" if $fs_path =~ /\.webm$/;
-        $ct = "application/zip" if $fs_path =~ /\.zip$/;
-        $ct = "application/gzip" if $fs_path =~ /\.gz$/;
-        $ct = "text/markdown; charset=utf-8" if $fs_path =~ /\.md$/;
-        $ct = "text/plain; charset=utf-8" if $fs_path =~ /\.txt$/;
-        $ct = "application/toml; charset=utf-8" if $fs_path =~ /\.toml$/;
-        $ct = "text/x-perl; charset=utf-8" if $fs_path =~ /\.p[lrm]$/;
-        +{{ status => 200, body => $body, headers => +{{ "content-type" => $ct }} }}
+        +{{ status => 200, body => cat($fs_path), headers => +{{ "content-type" => mime_for($fs_path) }} }}
     }} else {{
         +{{ status => 404, body => "404 Not Found: $url_path\n" }}
     }}
-}};
+}}
 "#
         )
     } else if rest[0] == "-e" {
@@ -1864,7 +1876,7 @@ serve {port}, fn ($req) {{
         let script_path = &rest[0];
         match std::fs::read_to_string(script_path) {
             Ok(src) => {
-                format!("$ENV{{PERLRS_PORT}} = {};\n{}", port, src)
+                format!("$ENV{{PERLRS_PORT}} = {}\n{}", port, src)
             }
             Err(e) => {
                 eprintln!("pe serve: {}: {}", script_path, e);

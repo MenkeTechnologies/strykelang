@@ -52,11 +52,11 @@ _perlrs_docs() {
   _describe 'docs topic' _topics
 }
 
-# `pe serve PORT SCRIPT` — built-in HTTP server
+# `pe serve [PORT] [SCRIPT]` — built-in HTTP server (default port 8000)
 _perlrs_serve() {
   _arguments -s -S \
     '(-h --help)'{-h,--help}'[show pe serve usage]' \
-    '1:port:' \
+    '1:port (default 8000):' \
     '2:script or -e:_files -g "*.pr *.pl"'
 }
 
