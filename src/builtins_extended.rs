@@ -6325,7 +6325,7 @@ fn builtin_beta_pdf(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
-    if x < 0.0 || x > 1.0 {
+    if !(0.0..=1.0).contains(&x) {
         return Ok(PerlValue::float(0.0));
     }
     let ln_beta = lgamma_fn(a) + lgamma_fn(b) - lgamma_fn(a + b);
@@ -6435,14 +6435,14 @@ fn lgamma_fn(x: f64) -> f64 {
     // Lanczos approximation coefficients
     let g = 7.0;
     let c = [
-        0.99999999999980993,
+        0.999_999_999_999_809_9,
         676.5203681218851,
         -1259.1392167224028,
-        771.32342877765313,
-        -176.61502916214059,
+        771.323_428_777_653_1,
+        -176.615_029_162_140_6,
         12.507343278686905,
         -0.13857109526572012,
-        9.9843695780195716e-6,
+        9.984_369_578_019_572e-6,
         1.5056327351493116e-7,
     ];
     if x < 0.5 {
@@ -7254,12 +7254,12 @@ fn builtin_miller_rabin(args: &[PerlValue]) -> PerlResult<PerlValue> {
     if n < 4 {
         return Ok(PerlValue::integer(1));
     }
-    if n % 2 == 0 {
+    if n.is_multiple_of(2) {
         return Ok(PerlValue::integer(0));
     }
     let mut d = n - 1;
     let mut r = 0u32;
-    while d % 2 == 0 {
+    while d.is_multiple_of(2) {
         d /= 2;
         r += 1;
     }
@@ -7810,7 +7810,7 @@ fn builtin_cbind(args: &[PerlValue]) -> PerlResult<PerlValue> {
     if args.is_empty() {
         return Ok(PerlValue::array(vec![]));
     }
-    let mats: Vec<Vec<Vec<f64>>> = args.iter().map(|a| args_to_matrix(a)).collect();
+    let mats: Vec<Vec<Vec<f64>>> = args.iter().map(args_to_matrix).collect();
     let nrows = mats.iter().map(|m| m.len()).max().unwrap_or(0);
     let mut result = Vec::with_capacity(nrows);
     for i in 0..nrows {
@@ -9768,7 +9768,7 @@ fn builtin_cutree(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = merges_raw.len() + 1;
     // Start with each point in its own cluster
     let mut assignment: Vec<usize> = (0..n).collect();
-    let merges_to_apply = if n > k { n - k } else { 0 };
+    let merges_to_apply = n.saturating_sub(k);
     for i in 0..merges_to_apply {
         let merge = arg_to_vec(&merges_raw[i]);
         if merge.len() < 2 {
@@ -10582,7 +10582,7 @@ pub(crate) fn builtin_cyber_grid(args: &[PerlValue]) -> PerlResult<PerlValue> {
                 let on_vline = rel < spread && (rel % spacing) < 1.0;
 
                 // Horizontal grid lines
-                let on_hline = depth % (1 + depth / 4) == 0;
+                let on_hline = depth.is_multiple_of(1 + depth / 4);
 
                 // Color interpolation
                 let r = (0.0 + t * 0.0) as u8;

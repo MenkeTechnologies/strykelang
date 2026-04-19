@@ -66,7 +66,7 @@ A Perl 5 compatible interpreter in Rust with native parallel primitives, NaN-box
 ```sh
 cargo install strykelang
 # or from source
-git clone https://github.com/MenkeTechnologies/strykelang && cd stryke && cargo build --release
+git clone https://github.com/MenkeTechnologies/strykelang && cd strykelang && cargo build --release
 ```
 
 #### Zsh tab completion
