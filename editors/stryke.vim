@@ -30,8 +30,8 @@ function! s:RegisterStrykeALE() abort
   if exists('*ale#linter#Define')
     call ale#linter#Define('stryke', {
     \   'name': 'stryke',
-    \   'executable': 'fo',
-    \   'command': 'fo --lint %t 2>&1',
+    \   'executable': 'st',
+    \   'command': 'st --lint %t 2>&1',
     \   'callback': 'StrykeHandler',
     \   'project_root': function('StrykeProjectRoot'),
     \})
@@ -46,7 +46,7 @@ autocmd VimEnter * call s:RegisterStrykeALE()
 if exists('*lsp#register_server')
   call lsp#register_server({
   \   'name': 'stryke',
-  \   'cmd': ['fo', '--lsp'],
+  \   'cmd': ['st', '--lsp'],
   \   'allowlist': ['stryke', 'perl'],
   \})
 endif
@@ -55,7 +55,7 @@ endif
 " {
 "   "languageserver": {
 "     "stryke": {
-"       "command": "fo",
+"       "command": "st",
 "       "args": ["--lsp"],
 "       "filetypes": ["stryke", "perl"]
 "     }

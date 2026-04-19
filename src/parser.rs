@@ -11728,6 +11728,39 @@ impl Parser {
             | "sierpinski" | "tower_of_hanoi" | "truth_table"
             // ── misc / utility ──────────────────────────────────────────────────
             | "byte_size" | "degrees_to_compass" | "to_string_val" | "type_of"
+            // ── math formulas ───────────────────────────────────────────────────
+            | "quadratic_roots" | "quadratic_discriminant" | "arithmetic_series"
+            | "geometric_series" | "permutations" | "combinations" | "stirling_approx"
+            | "double_factorial" | "rising_factorial" | "falling_factorial"
+            | "gamma_approx" | "beta_fn" | "erf_approx" | "normal_pdf" | "normal_cdf"
+            | "poisson_pmf" | "exponential_pdf" | "lerp" | "inverse_lerp" | "smoothstep"
+            | "map_range"
+            // ── physics formulas ────────────────────────────────────────────────
+            | "momentum" | "impulse" | "work" | "power_phys" | "torque" | "angular_velocity"
+            | "centripetal_force" | "escape_velocity" | "orbital_velocity" | "orbital_period"
+            | "gravitational_force" | "coulomb_force" | "electric_field" | "capacitance"
+            | "capacitor_energy" | "inductor_energy" | "resonant_frequency"
+            | "rc_time_constant" | "rl_time_constant" | "impedance_rlc"
+            | "relativistic_mass" | "lorentz_factor" | "time_dilation" | "length_contraction"
+            | "relativistic_energy" | "rest_energy" | "de_broglie_wavelength"
+            | "photon_energy" | "photon_energy_wavelength" | "schwarzschild_radius"
+            | "stefan_boltzmann" | "wien_displacement" | "ideal_gas_pressure" | "ideal_gas_volume"
+            | "projectile_range" | "projectile_max_height" | "projectile_time"
+            | "spring_force" | "spring_energy" | "pendulum_period" | "doppler_frequency"
+            | "decibel_ratio" | "snells_law" | "brewster_angle" | "critical_angle"
+            | "lens_power" | "thin_lens" | "magnification_lens"
+            // ── math constants ──────────────────────────────────────────────────
+            | "euler_mascheroni" | "apery_constant" | "feigenbaum_delta" | "feigenbaum_alpha"
+            | "catalan_constant" | "khinchin_constant" | "glaisher_constant"
+            | "plastic_number" | "silver_ratio" | "supergolden_ratio"
+            // ── physics constants ───────────────────────────────────────────────
+            | "vacuum_permittivity" | "vacuum_permeability" | "coulomb_constant"
+            | "fine_structure_constant" | "rydberg_constant" | "bohr_radius"
+            | "bohr_magneton" | "nuclear_magneton" | "stefan_boltzmann_constant"
+            | "wien_constant" | "gas_constant" | "faraday_constant" | "neutron_mass"
+            | "atomic_mass_unit" | "earth_mass" | "earth_radius" | "sun_mass" | "sun_radius"
+            | "astronomical_unit" | "light_year" | "parsec" | "hubble_constant"
+            | "planck_length" | "planck_time" | "planck_mass" | "planck_temperature"
             => Some(name),
             _ => None,
         }

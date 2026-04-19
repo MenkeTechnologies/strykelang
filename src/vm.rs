@@ -1370,7 +1370,7 @@ impl<'a> VM<'a> {
                 for field in &def.fields {
                     if let Some(ref expr) = field.default {
                         let val = self.interp.eval_expr(expr).map_err(|e| match e {
-                            crate::interpreter::FlowOrError::Error(fo) => fo,
+                            crate::interpreter::FlowOrError::Error(stryke) => stryke,
                             _ => PerlError::runtime("default evaluation flow", line),
                         })?;
                         defaults.push(Some(val));
@@ -1448,8 +1448,8 @@ impl<'a> VM<'a> {
             match local_interp.exec_block_no_scope(&block) {
                 Ok(_) => {}
                 Err(e) => {
-                    let fo = match e {
-                        FlowOrError::Error(fo) => fo,
+                    let stryke = match e {
+                        FlowOrError::Error(stryke) => stryke,
                         FlowOrError::Flow(_) => PerlError::runtime(
                             "return/last/next/redo not supported inside fan block",
                             line,
@@ -1457,7 +1457,7 @@ impl<'a> VM<'a> {
                     };
                     let mut g = first_err.lock();
                     if g.is_none() {
-                        *g = Some(fo);
+                        *g = Some(stryke);
                     }
                 }
             }
@@ -1515,14 +1515,14 @@ impl<'a> VM<'a> {
             match r {
                 Ok(v) => out.push(v),
                 Err(e) => {
-                    let fo = match e {
-                        FlowOrError::Error(fo) => fo,
+                    let stryke = match e {
+                        FlowOrError::Error(stryke) => stryke,
                         FlowOrError::Flow(_) => PerlError::runtime(
                             "return/last/next/redo not supported inside fan_cap block",
                             line,
                         ),
                     };
-                    return Err(fo);
+                    return Err(stryke);
                 }
             }
         }
@@ -7407,8 +7407,8 @@ impl<'a> VM<'a> {
                                 match local_interp.exec_block_no_scope(&block) {
                                     Ok(_) => {}
                                     Err(e) => {
-                                        let fo = match e {
-                                        FlowOrError::Error(fo) => fo,
+                                        let stryke = match e {
+                                        FlowOrError::Error(stryke) => stryke,
                                         FlowOrError::Flow(_) => PerlError::runtime(
                                             "return/last/next/redo not supported inside pfor block",
                                             line,
@@ -7416,7 +7416,7 @@ impl<'a> VM<'a> {
                                     };
                                         let mut g = first_err.lock();
                                         if g.is_none() {
-                                            *g = Some(fo);
+                                            *g = Some(stryke);
                                         }
                                     }
                                 }

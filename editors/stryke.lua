@@ -30,7 +30,7 @@ if ok then
   if not configs.stryke then
     configs.stryke = {
       default_config = {
-        cmd = { 'fo', '--lsp' },
+        cmd = { 'st', '--lsp' },
         filetypes = { 'stryke', 'perl' },
         root_dir = function(fname)
           return lspconfig.util.root_pattern('.git', 'Makefile.PL', 'cpanfile', 'dist.ini')(fname)
@@ -62,7 +62,7 @@ else
     callback = function()
       vim.lsp.start({
         name = 'stryke',
-        cmd = { 'fo', '--lsp' },
+        cmd = { 'st', '--lsp' },
         root_dir = vim.fn.getcwd(),
       })
     end,

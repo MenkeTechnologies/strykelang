@@ -280,7 +280,7 @@ fn par_sed_rewrites_multiple_files_in_parallel() {
     std::fs::remove_dir_all(&dir).ok();
 }
 
-/// `fan { }` iterates `$_` from `0` to `rayon::current_num_threads() - 1` (same pool as `fo -j`).
+/// `fan { }` iterates `$_` from `0` to `rayon::current_num_threads() - 1` (same pool as `stryke -j`).
 #[test]
 fn fan_default_count_matches_rayon_thread_pool() {
     let n = rayon::current_num_threads();

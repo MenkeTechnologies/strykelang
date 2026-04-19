@@ -61,7 +61,7 @@ fn pe_reads_full_multiline_script_from_stdin_pipe() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn fo");
+        .expect("spawn stryke");
 
     let script = "#!/usr/bin/env perl\nsay 1;\nsay 2;\n";
     let mut stdin = child.stdin.take().expect("stdin");

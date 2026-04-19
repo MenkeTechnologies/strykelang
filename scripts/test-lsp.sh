@@ -76,7 +76,7 @@ DOC_ESCAPED=$(printf '%s' "$DOC" | jq -Rs .)
 
   # 15. Exit
   send_lsp '{"jsonrpc":"2.0","method":"exit"}'
-} | timeout 10 fo --lsp 2>&1 | sed 's/Content-Length: [0-9]*/\n/g' | grep -v '^$' | while IFS= read -r line; do
+} | timeout 10 stryke --lsp 2>&1 | sed 's/Content-Length: [0-9]*/\n/g' | grep -v '^$' | while IFS= read -r line; do
   echo "$line" | jq . 2>/dev/null || echo "$line"
 done || true
 

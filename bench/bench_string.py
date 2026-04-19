@@ -1,4 +1,6 @@
-s = ""
+import io
+buf = io.StringIO()
 for i in range(500_000):
-    s += "x"
+    buf.write("x")
+s = buf.getvalue()
 print(len(s))

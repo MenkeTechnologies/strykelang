@@ -4043,7 +4043,7 @@ fn compat_mode_udf_shadowing() {
     // NOTE: compat mode uses a global AtomicBool. Setting it to `true` here
     // would poison every other test running in parallel (Rust runs `#[test]`
     // functions concurrently within the same process).  Instead, we test the
-    // compat-mode behavior via the CLI (`fo --compat`), not through the
+    // compat-mode behavior via the CLI (`stryke --compat`), not through the
     // library API in parallel tests.
     //
     // Verify the flag API exists and round-trips without actually enabling it.

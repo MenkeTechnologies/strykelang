@@ -95,7 +95,7 @@ pub fn compat_mode() -> bool {
 use value::PerlValue;
 
 /// Parse a string of Perl code and return the AST.
-/// Pretty-print a parsed program as Perl-like source (`fo --fmt`).
+/// Pretty-print a parsed program as Perl-like source (`stryke --fmt`).
 pub fn format_program(p: &ast::Program) -> String {
     fmt::format_program(p)
 }
@@ -169,18 +169,18 @@ pub fn parse_and_run_string_in_file(
     Ok(v)
 }
 
-/// Crate-root `vendor/perl` (e.g. `List/Util.pm`). The `stryke` / `fo` driver prepends this to
+/// Crate-root `vendor/perl` (e.g. `List/Util.pm`). The `stryke` / `stryke` driver prepends this to
 /// `@INC` when the directory exists so in-tree pure-Perl modules shadow XS-only core stubs.
 pub fn vendor_perl_inc_path() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("vendor/perl")
 }
 
-/// Language server over stdio (`fo --lsp`). Returns a process exit code.
+/// Language server over stdio (`stryke --lsp`). Returns a process exit code.
 pub fn run_lsp_stdio() -> i32 {
     match lsp::run_stdio() {
         Ok(()) => 0,
         Err(e) => {
-            eprintln!("fo --lsp: {e}");
+            eprintln!("stryke --lsp: {e}");
             1
         }
     }
@@ -198,7 +198,7 @@ pub fn run(code: &str) -> PerlResult<PerlValue> {
 /// Try to compile and run via bytecode VM. Returns None if compilation fails.
 ///
 /// **`.pec` bytecode cache integration.** When `interp.pec_precompiled_chunk` is populated
-/// (set by the `fo` driver from a [`crate::pec::try_load`] hit), this function skips
+/// (set by the `stryke` driver from a [`crate::pec::try_load`] hit), this function skips
 /// `compile_program` entirely and runs the preloaded chunk. On cache miss the compiler
 /// runs normally and, if `interp.pec_cache_fingerprint` is set, the fresh chunk + program
 /// are persisted as a `.pec` bundle so the next warm start can skip both parse and compile.

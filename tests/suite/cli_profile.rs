@@ -1,4 +1,4 @@
-//! `fo --profile`: wall-clock samples on stderr (VM opcode lines + subs; flamegraph-ready).
+//! `stryke --profile`: wall-clock samples on stderr (VM opcode lines + subs; flamegraph-ready).
 
 use std::process::Command;
 
@@ -8,7 +8,7 @@ fn pe_profile_stderr_has_vm_report_sections() {
     let out = Command::new(exe)
         .args(["--profile", "-e", "sub foo { 1 } foo();"])
         .output()
-        .expect("spawn fo");
+        .expect("spawn stryke");
 
     assert!(
         out.status.success(),

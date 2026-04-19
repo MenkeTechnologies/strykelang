@@ -1,7 +1,7 @@
 //! End-to-end tests for the `.pec` bytecode cache: `STRYKE_BC_CACHE=1` should produce a
 //! cache file on first run and successfully load it on the second.
 //!
-//! These run the real `fo` binary in a child process so the test exercises the same
+//! These run the real `stryke` binary in a child process so the test exercises the same
 //! main.rs wiring users hit. Cache directory is per-test under `$TMPDIR` to keep runs
 //! isolated and avoid clobbering the developer's `~/.cache/stryke/bc`.
 
@@ -26,7 +26,7 @@ fn run_with_cache(exe: &str, cache_dir: &PathBuf, script: &PathBuf) -> std::proc
         .env("STRYKE_BC_DIR", cache_dir)
         .arg(script)
         .output()
-        .expect("spawn fo")
+        .expect("spawn stryke")
 }
 
 #[test]
@@ -136,7 +136,7 @@ fn pec_disabled_by_default_no_cache_writes() {
         .env("STRYKE_BC_DIR", &cache_dir)
         .arg(&script)
         .output()
-        .expect("spawn fo");
+        .expect("spawn stryke");
     assert!(out.status.success());
     let count = fs::read_dir(&cache_dir).unwrap().count();
     assert_eq!(
@@ -163,7 +163,7 @@ fn pec_disabled_for_dash_e_oneliners() {
         .arg("-e")
         .arg("print 7+8")
         .output()
-        .expect("spawn fo -e");
+        .expect("spawn stryke -e");
     assert!(
         out.status.success(),
         "stderr={}",

@@ -163,7 +163,7 @@
 
   <main class="tutorial-main">
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>LANGUAGE REFERENCE</h2>
-    <p class="tutorial-subtitle">Every builtin, keyword, alias, and extension with an LSP hover doc — rendered from the exact markdown that `fo docs` shows in the terminal. Jump via the chapter index, or <kbd>Ctrl+F</kbd> for a specific name.</p>
+    <p class="tutorial-subtitle">Every builtin, keyword, alias, and extension with an LSP hover doc — rendered from the exact markdown that `st docs` shows in the terminal. Jump via the chapter index, or <kbd>Ctrl+F</kbd> for a specific name.</p>
     <section class="tutorial-section">
       <h2>Chapters</h2>
       <ul class="chapter-index">
@@ -314,7 +314,7 @@ my @r = pflat_map expand, (1, 2, 3)   # (1, 10, 2, 20, 3, 30)
       </article>
       <article class="doc-entry" id="doc-fan">
         <h3><a class="doc-anchor" href="#doc-fan">#</a> <code>fan</code></h3>
-        <p>Execute BLOCK or FUNC N times in parallel (<code>$_</code>/<code>$_0</code> = index 0..N-1). With no count, defaults to the rayon pool size (<code>fo -j</code>).</p>
+        <p>Execute BLOCK or FUNC N times in parallel (<code>$_</code>/<code>$_0</code> = index 0..N-1). With no count, defaults to the rayon pool size (<code>st -j</code>).</p>
         <p>Two equivalent surface syntaxes: • Block form — <code>fan N { BLOCK }</code> or <code>fan { BLOCK }</code> • Bare-fn form — <code>fan N, FUNC</code> or <code>fan FUNC</code></p>
         <pre><code class="lang-perl"># Block form
 fan 8 { work($_) }
@@ -4653,7 +4653,7 @@ p &quot;main work&quot;
       <article class="doc-entry" id="doc-cluster">
         <h3><a class="doc-anchor" href="#doc-cluster">#</a> <code>cluster</code></h3>
         <p><code>cluster([&quot;host1:N&quot;, &quot;host2:M&quot;, ...])</code> — build an SSH-backed worker pool for distributing stryke workloads across multiple machines.</p>
-        <p>Each entry in the list is a hostname (or <code>user@host</code>) followed by a colon and the number of worker slots to allocate on that host. Under the hood, stryke opens persistent SSH multiplexed connections to each host, deploys lightweight <code>fo --remote-worker</code> processes, and manages a work-stealing scheduler across the entire cluster. The cluster object is then passed to distributed primitives like <code>pmap_on</code> and <code>pflat_map_on</code>. Workers must have <code>fo</code> installed and accessible on <code>$PATH</code>. If a host becomes unreachable mid-computation, its in-flight tasks are automatically re-queued to surviving hosts.</p>
+        <p>Each entry in the list is a hostname (or <code>user@host</code>) followed by a colon and the number of worker slots to allocate on that host. Under the hood, stryke opens persistent SSH multiplexed connections to each host, deploys lightweight <code>st --remote-worker</code> processes, and manages a work-stealing scheduler across the entire cluster. The cluster object is then passed to distributed primitives like <code>pmap_on</code> and <code>pflat_map_on</code>. Workers must have <code>fo</code> installed and accessible on <code>$PATH</code>. If a host becomes unreachable mid-computation, its in-flight tasks are automatically re-queued to surviving hosts.</p>
         <pre><code class="lang-perl">my $cl = cluster([&quot;server1:8&quot;, &quot;server2:4&quot;, &quot;gpu-box:16&quot;])
 my @results = pmap_on $cl, { heavy_compute } @jobs
 
@@ -4664,7 +4664,7 @@ my $local = cluster([&quot;localhost:4&quot;])
       <article class="doc-entry" id="doc-pmap-on">
         <h3><a class="doc-anchor" href="#doc-pmap-on">#</a> <code>pmap_on</code></h3>
         <p><code>pmap_on $cluster, { BLOCK } @list</code> — distributed parallel map that fans work across a <code>cluster</code> of remote machines.</p>
-        <p>Elements from <code>@list</code> are serialized, shipped to remote <code>fo --remote-worker</code> processes over SSH, executed in parallel across every worker slot in the cluster, and the results are gathered back in input order. This is the distributed equivalent of <code>pmap</code>: same interface, same order guarantee, but the thread pool spans multiple hosts instead of local cores. Use this when a single machine&#39;s CPU count is the bottleneck. The block must be self-contained — it cannot close over local file handles or database connections, since it executes in a separate process on a remote host. Large closures are serialized once and cached on each worker for the lifetime of the cluster.</p>
+        <p>Elements from <code>@list</code> are serialized, shipped to remote <code>st --remote-worker</code> processes over SSH, executed in parallel across every worker slot in the cluster, and the results are gathered back in input order. This is the distributed equivalent of <code>pmap</code>: same interface, same order guarantee, but the thread pool spans multiple hosts instead of local cores. Use this when a single machine&#39;s CPU count is the bottleneck. The block must be self-contained — it cannot close over local file handles or database connections, since it executes in a separate process on a remote host. Large closures are serialized once and cached on each worker for the lifetime of the cluster.</p>
         <pre><code class="lang-perl">my $cl = cluster([&quot;host1:8&quot;, &quot;host2:8&quot;])
 my @hashes = pmap_on $cl, { sha256(slurp) } @file_paths
 my @results = pmap_on $cl, { fetch(&quot;https://api.example.com/$_&quot;) } 1..10_000
@@ -4997,7 +4997,7 @@ srand()                     # re-seed from entropy
       <article class="doc-entry" id="doc-basename">
         <h3><a class="doc-anchor" href="#doc-basename">#</a> <code>basename</code></h3>
         <p>Extract the filename component from a path, stripping all leading directory segments. The short alias <code>bn</code> keeps one-liner pipelines terse. If an optional suffix argument is provided, that suffix is also stripped from the result, which is handy for removing extensions.</p>
-        <pre><code class="lang-perl">p basename(&quot;/usr/local/bin/fo&quot;)        # fo
+        <pre><code class="lang-perl">p basename(&quot;/usr/local/bin/st&quot;)        # st
 p bn(&quot;/tmp/data.csv&quot;, &quot;.csv&quot;)           # data
 &quot;/etc/nginx/nginx.conf&quot; |&gt; bn |&gt; p      # nginx.conf
 </code></pre>
@@ -5005,7 +5005,7 @@ p bn(&quot;/tmp/data.csv&quot;, &quot;.csv&quot;)           # data
       <article class="doc-entry" id="doc-dirname">
         <h3><a class="doc-anchor" href="#doc-dirname">#</a> <code>dirname</code></h3>
         <p>Return the directory portion of a path, stripping the final filename component. The short alias <code>dn</code> mirrors <code>bn</code>. This is a pure string operation — it does not touch the filesystem, so it works on paths that do not exist yet. Useful for deriving output directories from input file paths.</p>
-        <pre><code class="lang-perl">p dirname(&quot;/usr/local/bin/fo&quot;)          # /usr/local/bin
+        <pre><code class="lang-perl">p dirname(&quot;/usr/local/bin/st&quot;)          # /usr/local/bin
 p dn(&quot;/tmp/data.csv&quot;)                   # /tmp
 my $dir = dn($0)                        # directory of current script
 </code></pre>
@@ -5187,9 +5187,9 @@ p $st1[1] == $st2[1]   # 1 — same inode
       <article class="doc-entry" id="doc-symlink">
         <h3><a class="doc-anchor" href="#doc-symlink">#</a> <code>symlink</code></h3>
         <p>Create a symbolic (soft) link that points to a target path. Unlike hard links, symlinks can cross filesystems and can point to directories. The link stores the target as a string, so it can dangle if the target is later removed. Use <code>readlink</code> to inspect where a symlink points.</p>
-        <pre><code class="lang-perl">symlink(&quot;/usr/local/bin/fo&quot;, &quot;pe_link&quot;)
-p readlink(&quot;pe_link&quot;)       # /usr/local/bin/fo
-p -l &quot;pe_link&quot;              # 1 (is a symlink)
+        <pre><code class="lang-perl">symlink(&quot;/usr/local/bin/st&quot;, &quot;st_link&quot;)
+p readlink(&quot;st_link&quot;)       # /usr/local/bin/st
+p -l &quot;st_link&quot;              # 1 (is a symlink)
 symlink(&quot;../lib&quot;, &quot;lib_link&quot;)  # relative target
 </code></pre>
       </article>
@@ -14750,7 +14750,7 @@ p irr(@cf)   # ~0.166 (16.6%)
       </article>
       <article class="doc-entry" id="doc-less">
         <h3><a class="doc-anchor" href="#doc-less">#</a> <code>less</code></h3>
-        <p><code>LIST |&gt; pager</code> / <code>pager LIST</code> — pipe each element (one per line) into the user&#39;s <code>$PAGER</code> (default <code>less -R</code>; falls back to <code>more</code>, then plain stdout). Bypasses the pager when stdout isn&#39;t a TTY so pipelines like <code>fo &#39;... |&gt; pager&#39; | grep</code> still compose.</p>
+        <p><code>LIST |&gt; pager</code> / <code>pager LIST</code> — pipe each element (one per line) into the user&#39;s <code>$PAGER</code> (default <code>less -R</code>; falls back to <code>more</code>, then plain stdout). Bypasses the pager when stdout isn&#39;t a TTY so pipelines like <code>st &#39;... |&gt; pager&#39; | grep</code> still compose.</p>
         <p>Blocks until the user quits the pager; returns <code>undef</code>.</p>
         <p>Aliases: <code>pager</code>, <code>pg</code>, <code>less</code>.</p>
         <pre><code class="lang-perl"># browse every callable spelling interactively

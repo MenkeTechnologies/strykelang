@@ -604,7 +604,7 @@ pub enum Op {
     Pwatch(u16),
     /// fan N { BLOCK } — block_idx; stack: \[progress_flag, count\] (`progress_flag` is 0/1)
     FanWithBlock(u16),
-    /// fan { BLOCK } — block_idx; stack: \[progress_flag\]; COUNT = rayon pool size (`fo -j`)
+    /// fan { BLOCK } — block_idx; stack: \[progress_flag\]; COUNT = rayon pool size (`stryke -j`)
     FanWithBlockAuto(u16),
     /// fan_cap N { BLOCK } — like fan; stack: \[progress_flag, count\] → array of block return values
     FanCapWithBlock(u16),

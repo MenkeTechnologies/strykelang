@@ -11,7 +11,7 @@ indent = { tab-width = 4, unit = "    " }
 language-servers = ["stryke"]
 
 [language-server.stryke]
-command = "fo"
+command = "st"
 args = ["--lsp"]
 
 # Also use stryke for regular .pl/.pm files

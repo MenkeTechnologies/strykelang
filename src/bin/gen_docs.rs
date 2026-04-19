@@ -1,4 +1,4 @@
-//! Offline generator for `docs/reference.html` — the full `fo docs` corpus
+//! Offline generator for `docs/reference.html` — the full `stryke docs` corpus
 //! rendered as a static HTML page using the same cyberpunk styling as
 //! `docs/index.html`. Run with `cargo run --bin gen-docs` before pushing to
 //! GitHub Pages.
@@ -150,7 +150,7 @@ fn build_page() -> String {
 
   <main class="tutorial-main">
     <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>LANGUAGE REFERENCE</h2>
-    <p class="tutorial-subtitle">Every builtin, keyword, alias, and extension with an LSP hover doc — rendered from the exact markdown that `fo docs` shows in the terminal. Jump via the chapter index, or <kbd>Ctrl+F</kbd> for a specific name.</p>
+    <p class="tutorial-subtitle">Every builtin, keyword, alias, and extension with an LSP hover doc — rendered from the exact markdown that `stryke docs` shows in the terminal. Jump via the chapter index, or <kbd>Ctrl+F</kbd> for a specific name.</p>
 "#,
         version = env!("CARGO_PKG_VERSION"),
         total_topics = total_topics,

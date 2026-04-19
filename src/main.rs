@@ -60,7 +60,7 @@ pub(crate) struct Cli {
     #[arg(long = "profile")]
     profile: bool,
 
-    /// Flamegraph: colored terminal bars (TTY) or SVG to stdout (piped: fo --flame x.stk > flame.svg)
+    /// Flamegraph: colored terminal bars (TTY) or SVG to stdout (piped: stryke --flame x.stk > flame.svg)
     #[arg(long = "flame")]
     flame: bool,
 
@@ -436,15 +436,17 @@ fn print_cyberpunk_help() {
     println!(
         "  build SCRIPT [-o OUT]  {G}//{N} AOT: copy this binary with SCRIPT embedded (standalone exe)"
     );
-    println!("  docs [TOPIC]           {G}//{N} Built-in docs (fo docs pmap, fo docs |>, fo docs)");
-    println!("  serve [PORT] [SCRIPT]  {G}//{N} HTTP server (fo serve, fo serve 8080 app.stk)");
+    println!("  docs [TOPIC]           {G}//{N} Built-in docs (stryke docs pmap, stryke docs |>, stryke docs)");
+    println!(
+        "  serve [PORT] [SCRIPT]  {G}//{N} HTTP server (stryke serve, stryke serve 8080 app.stk)"
+    );
     println!(
         "  --remote-worker        {G}//{N} Persistent cluster worker (stdio); only arg after {bin}"
     );
     println!(
         "  --remote-worker-v1     {G}//{N} Legacy one-shot worker (stdio); only arg after {bin}"
     );
-    if matches!(bin, "fo" | "stryke") {
+    if matches!(bin, "stryke" | "stryke") {
         println!(
             "  (no switches, TTY stdin) {G}//{N} Interactive REPL (readline; exit with quit or EOF)"
         );
@@ -604,7 +606,7 @@ fn adjacent_temp_path(target: &Path) -> PathBuf {
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| "file".to_string());
     let rnd: u32 = rand::thread_rng().gen();
-    dir.join(format!("{name}.fo-tmp-{rnd}"))
+    dir.join(format!("{name}.stryke-tmp-{rnd}"))
 }
 
 /// Write `new_content` to `path` in place; optional backup `path` + `inplace_edit` (Perl `$^I`).
@@ -1080,28 +1082,28 @@ fn main() {
         process::exit(stryke::run_lsp_stdio());
     }
 
-    // `fo build SCRIPT -o OUT` subcommand: intercept before clap so `build` does not have
+    // `stryke build SCRIPT -o OUT` subcommand: intercept before clap so `build` does not have
     // to be added to the main `Cli` struct (keeping the perl-compatible flag surface clean).
     if args.len() >= 2 && args[1] == "build" {
         process::exit(run_build_subcommand(&args[2..]));
     }
 
-    // `fo convert FILE...` subcommand: convert Perl source to stryke syntax with |> pipes.
+    // `stryke convert FILE...` subcommand: convert Perl source to stryke syntax with |> pipes.
     if args.len() >= 2 && args[1] == "convert" {
         process::exit(run_convert_subcommand(&args[2..]));
     }
 
-    // `fo deconvert FILE...` subcommand: convert stryke .stk files back to standard Perl .pl syntax.
+    // `stryke deconvert FILE...` subcommand: convert stryke .stk files back to standard Perl .pl syntax.
     if args.len() >= 2 && args[1] == "deconvert" {
         process::exit(run_deconvert_subcommand(&args[2..]));
     }
 
-    // `fo docs [TOPIC]` subcommand: built-in documentation browser.
+    // `stryke docs [TOPIC]` subcommand: built-in documentation browser.
     if args.len() >= 2 && args[1] == "docs" {
         process::exit(run_doc_subcommand(&args[2..]));
     }
 
-    // `fo serve PORT SCRIPT` or `fo serve PORT -e CODE` subcommand.
+    // `stryke serve PORT SCRIPT` or `stryke serve PORT -e CODE` subcommand.
     if args.len() >= 2 && args[1] == "serve" {
         process::exit(run_serve_subcommand(&args[2..]));
     }
@@ -1183,7 +1185,7 @@ fn main() {
             .ok();
     }
 
-    let is_repl = matches!(env!("CARGO_BIN_NAME"), "fo" | "stryke")
+    let is_repl = matches!(env!("CARGO_BIN_NAME"), "stryke" | "stryke")
         && cli.script.is_none()
         && cli.execute.is_empty()
         && cli.execute_features.is_empty()
@@ -1233,7 +1235,7 @@ fn main() {
             match read_file_text_perl_compat(&script_path) {
                 Ok(content) => (content, script_path),
                 Err(_) if !cli.force_script && looks_like_code(&script_path) => {
-                    // One-liner-first: `fo 'p 1+2'` works without `-e`
+                    // One-liner-first: `stryke 'p 1+2'` works without `-e`
                     (script_path, "-e".to_string())
                 }
                 Err(e) => {
@@ -1379,7 +1381,7 @@ fn main() {
     }
 
     // --flame: when stdout is piped to a file, save real stdout for the SVG and redirect
-    // script output to stderr so `fo --flame x.stk > flame.svg` captures a clean SVG.
+    // script output to stderr so `stryke --flame x.stk > flame.svg` captures a clean SVG.
     // When stdout is a TTY, skip the redirect — we'll render colored bars to stderr instead.
     let flame_is_tty = cli.flame && io::stdout().is_terminal();
     #[cfg(unix)]
@@ -1551,8 +1553,8 @@ fn run_embedded_script(embedded: stryke::aot::EmbeddedScript, argv: Vec<String>)
     }
 }
 
-/// `fo build SCRIPT [-o OUT]` — compile a Perl script into a standalone binary by
-/// copying the currently-running `fo` and appending a zstd-compressed source trailer.
+/// `stryke build SCRIPT [-o OUT]` — compile a Perl script into a standalone binary by
+/// copying the currently-running `stryke` and appending a zstd-compressed source trailer.
 /// The resulting file behaves as a native program: all CLI args go to the embedded script.
 fn run_build_subcommand(args: &[String]) -> i32 {
     let mut script: Option<String> = None;
@@ -1563,19 +1565,19 @@ fn run_build_subcommand(args: &[String]) -> i32 {
             "-o" | "--output" => {
                 i += 1;
                 if i >= args.len() {
-                    eprintln!("fo build: -o requires an argument");
+                    eprintln!("stryke build: -o requires an argument");
                     return 2;
                 }
                 out = Some(args[i].clone());
             }
             "-h" | "--help" => {
-                println!("usage: fo build SCRIPT [-o OUTPUT]");
+                println!("usage: stryke build SCRIPT [-o OUTPUT]");
                 println!();
                 println!(
                     "Compile a Perl script into a standalone executable binary. The output is"
                 );
                 println!(
-                    "a copy of this fo binary with the script source embedded as a compressed"
+                    "a copy of this stryke binary with the script source embedded as a compressed"
                 );
                 println!(
                     "trailer. `scp` the result to any compatible machine and run it directly —"
@@ -1583,22 +1585,22 @@ fn run_build_subcommand(args: &[String]) -> i32 {
                 println!("no perl, no stryke, no @INC setup required.");
                 println!();
                 println!("Examples:");
-                println!("  fo build app.pl                     # → ./app");
-                println!("  fo build app.pl -o /usr/local/bin/app");
+                println!("  stryke build app.pl                     # → ./app");
+                println!("  stryke build app.pl -o /usr/local/bin/app");
                 return 0;
             }
             s if script.is_none() && !s.starts_with('-') => script = Some(s.to_string()),
             other => {
-                eprintln!("fo build: unknown argument: {}", other);
-                eprintln!("usage: fo build SCRIPT [-o OUTPUT]");
+                eprintln!("stryke build: unknown argument: {}", other);
+                eprintln!("usage: stryke build SCRIPT [-o OUTPUT]");
                 return 2;
             }
         }
         i += 1;
     }
     let Some(script) = script else {
-        eprintln!("fo build: missing SCRIPT");
-        eprintln!("usage: fo build SCRIPT [-o OUTPUT]");
+        eprintln!("stryke build: missing SCRIPT");
+        eprintln!("usage: stryke build SCRIPT [-o OUTPUT]");
         return 2;
     };
     let script_path = PathBuf::from(&script);
@@ -1610,7 +1612,7 @@ fn run_build_subcommand(args: &[String]) -> i32 {
     }));
     match stryke::aot::build(&script_path, &out_path) {
         Ok(p) => {
-            eprintln!("fo build: wrote {}", p.display());
+            eprintln!("stryke build: wrote {}", p.display());
             0
         }
         Err(e) => {
@@ -1620,7 +1622,7 @@ fn run_build_subcommand(args: &[String]) -> i32 {
     }
 }
 
-/// `fo convert FILE...` — convert Perl source to idiomatic stryke syntax.
+/// `stryke convert FILE...` — convert Perl source to idiomatic stryke syntax.
 fn run_convert_subcommand(args: &[String]) -> i32 {
     let mut files: Vec<String> = Vec::new();
     let mut in_place = false;
@@ -1632,13 +1634,13 @@ fn run_convert_subcommand(args: &[String]) -> i32 {
             "-d" | "--output-delim" => {
                 i += 1;
                 if i >= args.len() {
-                    eprintln!("fo convert: --output-delim requires an argument");
+                    eprintln!("stryke convert: --output-delim requires an argument");
                     return 2;
                 }
                 let delim_str = &args[i];
                 if delim_str.chars().count() != 1 {
                     eprintln!(
-                        "fo convert: --output-delim must be a single character, got {:?}",
+                        "stryke convert: --output-delim must be a single character, got {:?}",
                         delim_str
                     );
                     return 2;
@@ -1646,7 +1648,7 @@ fn run_convert_subcommand(args: &[String]) -> i32 {
                 output_delim = delim_str.chars().next();
             }
             "-h" | "--help" => {
-                println!("usage: fo convert [-i] [-d DELIM] FILE...");
+                println!("usage: stryke convert [-i] [-d DELIM] FILE...");
                 println!();
                 println!("Convert standard Perl source to idiomatic stryke syntax:");
                 println!("  - Nested calls → |> pipe-forward chains");
@@ -1660,14 +1662,14 @@ fn run_convert_subcommand(args: &[String]) -> i32 {
                 println!("  -d, --output-delim   Delimiter for s///, tr///, m// (default: preserve original)");
                 println!();
                 println!("Examples:");
-                println!("  fo convert app.pl              # print to stdout");
-                println!("  fo convert -i lib/*.pm         # write lib/*.stk");
-                println!("  fo convert -d '|' app.pl       # use | as delimiter: s|old|new|g");
+                println!("  stryke convert app.pl              # print to stdout");
+                println!("  stryke convert -i lib/*.pm         # write lib/*.stk");
+                println!("  stryke convert -d '|' app.pl       # use | as delimiter: s|old|new|g");
                 return 0;
             }
             s if s.starts_with('-') => {
-                eprintln!("fo convert: unknown option: {}", s);
-                eprintln!("usage: fo convert [-i] [-d DELIM] FILE...");
+                eprintln!("stryke convert: unknown option: {}", s);
+                eprintln!("usage: stryke convert [-i] [-d DELIM] FILE...");
                 return 2;
             }
             s => files.push(s.to_string()),
@@ -1675,8 +1677,8 @@ fn run_convert_subcommand(args: &[String]) -> i32 {
         i += 1;
     }
     if files.is_empty() {
-        eprintln!("fo convert: no input files");
-        eprintln!("usage: fo convert [-i] [-d DELIM] FILE...");
+        eprintln!("stryke convert: no input files");
+        eprintln!("usage: stryke convert [-i] [-d DELIM] FILE...");
         return 2;
     }
     let opts = stryke::convert::ConvertOptions { output_delim };
@@ -1685,7 +1687,7 @@ fn run_convert_subcommand(args: &[String]) -> i32 {
         let code = match std::fs::read_to_string(f) {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("fo convert: {}: {}", f, e);
+                eprintln!("stryke convert: {}: {}", f, e);
                 errors += 1;
                 continue;
             }
@@ -1693,7 +1695,7 @@ fn run_convert_subcommand(args: &[String]) -> i32 {
         let program = match stryke::parse_with_file(&code, f) {
             Ok(p) => p,
             Err(e) => {
-                eprintln!("fo convert: {}: {}", f, e);
+                eprintln!("stryke convert: {}: {}", f, e);
                 errors += 1;
                 continue;
             }
@@ -1702,7 +1704,7 @@ fn run_convert_subcommand(args: &[String]) -> i32 {
         if in_place {
             let out_path = std::path::Path::new(f).with_extension("pr");
             if let Err(e) = std::fs::write(&out_path, &converted) {
-                eprintln!("fo convert: {}: {}", out_path.display(), e);
+                eprintln!("stryke convert: {}: {}", out_path.display(), e);
                 errors += 1;
             }
         } else {
@@ -1716,29 +1718,31 @@ fn run_convert_subcommand(args: &[String]) -> i32 {
     }
 }
 
-/// `fo serve [PORT] [SCRIPT]` or `fo serve [PORT] -e CODE` — start an HTTP server (default port 8000).
+/// `stryke serve [PORT] [SCRIPT]` or `stryke serve [PORT] -e CODE` — start an HTTP server (default port 8000).
 ///
 /// Wraps the user's handler in `serve(PORT, fn ($req) { ... })`.
 fn run_serve_subcommand(args: &[String]) -> i32 {
     if !args.is_empty() && (args[0] == "-h" || args[0] == "--help") {
-        eprintln!("usage: fo serve [PORT] [SCRIPT | -e CODE]");
+        eprintln!("usage: stryke serve [PORT] [SCRIPT | -e CODE]");
         eprintln!();
-        eprintln!("  fo serve                   serve $PWD on port 8000");
-        eprintln!("  fo serve PORT              serve $PWD as static files");
-        eprintln!("  fo serve PORT SCRIPT       run script (must call serve())");
-        eprintln!("  fo serve PORT -e CODE      one-liner handler");
+        eprintln!("  stryke serve                   serve $PWD on port 8000");
+        eprintln!("  stryke serve PORT              serve $PWD as static files");
+        eprintln!("  stryke serve PORT SCRIPT       run script (must call serve())");
+        eprintln!("  stryke serve PORT -e CODE      one-liner handler");
         eprintln!();
         eprintln!("  Handler receives $req (hashref: method, path, query, headers, body, peer)");
         eprintln!("  and returns: string (200 OK), key-value pairs, hashref, or undef (404).");
         eprintln!();
         eprintln!("examples:");
         eprintln!(
-            "  fo serve                                              # static file server on 8000"
+            "  stryke serve                                              # static file server on 8000"
         );
-        eprintln!("  fo serve 8080                                         # static file server");
-        eprintln!("  fo serve 8080 app.stk                                 # script handler");
-        eprintln!("  fo serve 3000 -e '\"hello \" . $req->{{path}}'           # one-liner");
-        eprintln!("  fo serve 8080 -e 'status => 200, body => json_encode(+{{ok => 1}})'");
+        eprintln!(
+            "  stryke serve 8080                                         # static file server"
+        );
+        eprintln!("  stryke serve 8080 app.stk                                 # script handler");
+        eprintln!("  stryke serve 3000 -e '\"hello \" . $req->{{path}}'           # one-liner");
+        eprintln!("  stryke serve 8080 -e 'status => 200, body => json_encode(+{{ok => 1}})'");
         return 0;
     }
 
@@ -1865,7 +1869,7 @@ serve {port}, fn ($req) {{
         )
     } else if rest[0] == "-e" {
         if rest.len() < 2 {
-            eprintln!("fo serve: -e requires an argument");
+            eprintln!("stryke serve: -e requires an argument");
             return 1;
         }
         let handler_body = rest[1..].join(" ");
@@ -1879,7 +1883,7 @@ serve {port}, fn ($req) {{
                 format!("$ENV{{STRYKE_PORT}} = {}\n{}", port, src)
             }
             Err(e) => {
-                eprintln!("fo serve: {}: {}", script_path, e);
+                eprintln!("stryke serve: {}: {}", script_path, e);
                 return 1;
             }
         }
@@ -1899,13 +1903,13 @@ serve {port}, fn ($req) {{
 }
 
 #[allow(non_snake_case)]
-/// `fo docs [TOPIC]` — interactive built-in documentation book.
+/// `stryke docs [TOPIC]` — interactive built-in documentation book.
 ///
-/// - `fo docs`          → full-screen interactive book (vim-style navigation)
-/// - `fo docs TOPIC`    → single-topic lookup
-/// - `fo docs -t`       → table of contents
-/// - `fo docs -s PAT`   → search topics
-/// - `fo docs -h`       → help
+/// - `stryke docs`          → full-screen interactive book (vim-style navigation)
+/// - `stryke docs TOPIC`    → single-topic lookup
+/// - `stryke docs -t`       → table of contents
+/// - `stryke docs -s PAT`   → search topics
+/// - `stryke docs -h`       → help
 fn run_doc_subcommand(args: &[String]) -> i32 {
     let theme = DocTheme {
         C: "\x1b[36m",
@@ -1960,7 +1964,7 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         }
     }
     if entries.is_empty() {
-        eprintln!("fo docs: no documentation pages found");
+        eprintln!("stryke docs: no documentation pages found");
         return 1;
     }
 
@@ -2025,7 +2029,7 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         doc_print_hline('└', '┘', theme);
         println!("  {D}>> THE STRYKE ENCYCLOPEDIA // INTERACTIVE REFERENCE SYSTEM <<{N}");
         println!();
-        println!("  {B}USAGE:{N} fo docs {D}[OPTIONS] [PAGE|TOPIC]{N}");
+        println!("  {B}USAGE:{N} stryke docs {D}[OPTIONS] [PAGE|TOPIC]{N}");
         println!();
         doc_print_separator("OPTIONS", theme);
         println!("  {C}-h, --help{N}                          {D}// Show this help{N}");
@@ -2033,7 +2037,7 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         println!("  {C}-s, --search <pattern>{N}              {D}// Search pages{N}");
         println!("  {C}-l, --list{N}                          {D}// List all pages{N}");
         println!(
-            "  {C}TOPIC{N}                               {D}// Jump to topic (fo docs pmap){N}"
+            "  {C}TOPIC{N}                               {D}// Jump to topic (stryke docs pmap){N}"
         );
         println!("  {C}PAGE{N}                                {D}// Jump to page number{N}");
         println!();
@@ -2054,11 +2058,11 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         println!("  {C}q{N}                                   {D}// Quit{N}");
         println!();
         doc_print_separator("EXAMPLES", theme);
-        println!("  {C}fo docs{N}                             {D}// start from page 1{N}");
-        println!("  {C}fo docs --toc{N}                       {D}// table of contents{N}");
-        println!("  {C}fo docs 42{N}                          {D}// jump to page 42{N}");
-        println!("  {C}fo docs pmap{N}                        {D}// jump to pmap{N}");
-        println!("  {C}fo docs --search parallel{N}           {D}// find parallel pages{N}");
+        println!("  {C}stryke docs{N}                             {D}// start from page 1{N}");
+        println!("  {C}stryke docs --toc{N}                       {D}// table of contents{N}");
+        println!("  {C}stryke docs 42{N}                          {D}// jump to page 42{N}");
+        println!("  {C}stryke docs pmap{N}                        {D}// jump to pmap{N}");
+        println!("  {C}stryke docs --search parallel{N}           {D}// find parallel pages{N}");
         println!();
         return 0;
     }
@@ -2132,8 +2136,8 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
                         .unwrap_or(0);
                 }
                 None => {
-                    eprintln!("fo docs: no documentation for '{}'", arg);
-                    eprintln!("run 'fo docs -h' for help");
+                    eprintln!("stryke docs: no documentation for '{}'", arg);
+                    eprintln!("run 'stryke docs -h' for help");
                     return 1;
                 }
             }
@@ -2773,7 +2777,7 @@ fn render_inline_code(line: &str, color: &str, reset: &str) -> String {
     out
 }
 
-/// `fo deconvert FILE...` — convert stryke .stk files back to standard Perl .pl syntax.
+/// `stryke deconvert FILE...` — convert stryke .stk files back to standard Perl .pl syntax.
 fn run_deconvert_subcommand(args: &[String]) -> i32 {
     let mut files: Vec<String> = Vec::new();
     let mut in_place = false;
@@ -2785,13 +2789,13 @@ fn run_deconvert_subcommand(args: &[String]) -> i32 {
             "-d" | "--output-delim" => {
                 i += 1;
                 if i >= args.len() {
-                    eprintln!("fo deconvert: --output-delim requires an argument");
+                    eprintln!("stryke deconvert: --output-delim requires an argument");
                     return 2;
                 }
                 let delim_str = &args[i];
                 if delim_str.chars().count() != 1 {
                     eprintln!(
-                        "fo deconvert: --output-delim must be a single character, got {:?}",
+                        "stryke deconvert: --output-delim must be a single character, got {:?}",
                         delim_str
                     );
                     return 2;
@@ -2799,7 +2803,7 @@ fn run_deconvert_subcommand(args: &[String]) -> i32 {
                 output_delim = delim_str.chars().next();
             }
             "-h" | "--help" => {
-                println!("usage: fo deconvert [-i] [-d DELIM] FILE...");
+                println!("usage: stryke deconvert [-i] [-d DELIM] FILE...");
                 println!();
                 println!("Convert stryke .stk files back to standard Perl .pl syntax:");
                 println!("  - Pipe chains and thread macros → nested function calls");
@@ -2813,14 +2817,16 @@ fn run_deconvert_subcommand(args: &[String]) -> i32 {
                 println!("  -d, --output-delim   Delimiter for s///, tr///, m// (default: preserve original)");
                 println!();
                 println!("Examples:");
-                println!("  fo deconvert app.stk             # print to stdout");
-                println!("  fo deconvert -i lib/*.stk        # write lib/*.pl");
-                println!("  fo deconvert -d '|' app.stk      # use | as delimiter: s|old|new|g");
+                println!("  stryke deconvert app.stk             # print to stdout");
+                println!("  stryke deconvert -i lib/*.stk        # write lib/*.pl");
+                println!(
+                    "  stryke deconvert -d '|' app.stk      # use | as delimiter: s|old|new|g"
+                );
                 return 0;
             }
             s if s.starts_with('-') => {
-                eprintln!("fo deconvert: unknown option: {}", s);
-                eprintln!("usage: fo deconvert [-i] [-d DELIM] FILE...");
+                eprintln!("stryke deconvert: unknown option: {}", s);
+                eprintln!("usage: stryke deconvert [-i] [-d DELIM] FILE...");
                 return 2;
             }
             s => files.push(s.to_string()),
@@ -2828,8 +2834,8 @@ fn run_deconvert_subcommand(args: &[String]) -> i32 {
         i += 1;
     }
     if files.is_empty() {
-        eprintln!("fo deconvert: no input files");
-        eprintln!("usage: fo deconvert [-i] [-d DELIM] FILE...");
+        eprintln!("stryke deconvert: no input files");
+        eprintln!("usage: stryke deconvert [-i] [-d DELIM] FILE...");
         return 2;
     }
     let opts = stryke::deconvert::DeconvertOptions { output_delim };
@@ -2838,7 +2844,7 @@ fn run_deconvert_subcommand(args: &[String]) -> i32 {
         let code = match std::fs::read_to_string(f) {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("fo deconvert: {}: {}", f, e);
+                eprintln!("stryke deconvert: {}: {}", f, e);
                 errors += 1;
                 continue;
             }
@@ -2846,7 +2852,7 @@ fn run_deconvert_subcommand(args: &[String]) -> i32 {
         let program = match stryke::parse_with_file(&code, f) {
             Ok(p) => p,
             Err(e) => {
-                eprintln!("fo deconvert: {}: {}", f, e);
+                eprintln!("stryke deconvert: {}: {}", f, e);
                 errors += 1;
                 continue;
             }
@@ -2855,7 +2861,7 @@ fn run_deconvert_subcommand(args: &[String]) -> i32 {
         if in_place {
             let out_path = std::path::Path::new(f).with_extension("pl");
             if let Err(e) = std::fs::write(&out_path, &deconverted) {
-                eprintln!("fo deconvert: {}: {}", out_path.display(), e);
+                eprintln!("stryke deconvert: {}: {}", out_path.display(), e);
                 errors += 1;
             }
         } else {
@@ -2902,7 +2908,7 @@ fn strip_shebang_and_extract(content: &str, extract: bool) -> String {
 }
 
 /// Heuristic: does this string look like inline code rather than a filename?
-/// Used for `fo 'p 1+2'` (no `-e` needed).
+/// Used for `stryke 'p 1+2'` (no `-e` needed).
 fn looks_like_code(s: &str) -> bool {
     // Contains whitespace, Perl operators, or known statement starters
     s.contains(' ')

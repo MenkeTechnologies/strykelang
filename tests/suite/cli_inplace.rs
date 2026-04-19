@@ -1,4 +1,4 @@
-//! `fo -i` / `$^I`: driver wires in-place editing for `-n`/`-p` over `@ARGV` files.
+//! `stryke -i` / `$^I`: driver wires in-place editing for `-n`/`-p` over `@ARGV` files.
 
 use std::fs;
 use std::process::Command;
@@ -15,7 +15,7 @@ fn pe_i_p_e_inplace_edits_argv_file() {
         .current_dir(&dir)
         .args(["-i", "-p", "-e", "s/a/b/", "t.txt"])
         .output()
-        .expect("spawn fo");
+        .expect("spawn stryke");
 
     assert!(
         out.status.success(),
@@ -38,7 +38,7 @@ fn pe_i_bak_creates_backup_next_to_target() {
         .current_dir(&dir)
         .args(["-i.bak", "-p", "-e", "s/x/y/", "t.txt"])
         .output()
-        .expect("spawn fo");
+        .expect("spawn stryke");
 
     assert!(
         out.status.success(),
@@ -67,7 +67,7 @@ fn pe_i_p_e_inplace_edits_multiple_argv_files_in_parallel() {
         .args(["-i", "-p", "-e", "s/a/b/"])
         .args(&paths)
         .output()
-        .expect("spawn fo");
+        .expect("spawn stryke");
 
     assert!(
         out.status.success(),

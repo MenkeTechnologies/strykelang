@@ -4594,7 +4594,7 @@ fn builtin_pager(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVal
         }
     }
 
-    // Not a TTY → just print. Preserves pipelines: `fo -e '... |> pager' | grep`
+    // Not a TTY → just print. Preserves pipelines: `stryke -e '... |> pager' | grep`
     // still works because `pager` becomes an identity stage under redirection.
     if !std::io::stdout().is_terminal() {
         print!("{}", buf);

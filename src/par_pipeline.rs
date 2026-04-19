@@ -113,7 +113,7 @@ fn parse_args(args: &[PerlValue]) -> Result<ParPipelineSpec, PerlError> {
 
 fn flow_err_msg(e: FlowOrError) -> String {
     match e {
-        FlowOrError::Error(fo) => fo.to_string(),
+        FlowOrError::Error(stryke) => stryke.to_string(),
         FlowOrError::Flow(Flow::Return(_)) => "unexpected return in par_pipeline stage".into(),
         FlowOrError::Flow(f) => format!("unexpected control flow in par_pipeline: {:?}", f),
     }
