@@ -405,6 +405,10 @@ pub(crate) fn try_builtin(
         "words" | "wd" => Some(builtin_words(interp, args)),
         "chars" | "ch" => Some(builtin_chars(interp, args)),
         "digits" | "dg" => Some(builtin_digits(interp, args)),
+        "letters" | "lt" => Some(builtin_letters(interp, args)),
+        "letters_uc" => Some(builtin_letters_uc(interp, args)),
+        "letters_lc" => Some(builtin_letters_lc(interp, args)),
+        "punctuation" | "punct" => Some(builtin_punctuation(interp, args)),
         "sentences" | "sents" => Some(builtin_sentences(interp, args)),
         "paragraphs" | "paras" => Some(builtin_paragraphs(interp, args)),
         "sections" | "sects" => Some(builtin_sections(interp, args)),
@@ -4004,6 +4008,50 @@ fn builtin_digits(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVa
     let out: Vec<PerlValue> = s
         .chars()
         .filter(|c| c.is_ascii_digit())
+        .map(|c| PerlValue::string(c.to_string()))
+        .collect();
+    Ok(PerlValue::array(out))
+}
+
+/// `letters STRING` — extract all alphabetic characters from a string.
+fn builtin_letters(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let out: Vec<PerlValue> = s
+        .chars()
+        .filter(|c| c.is_alphabetic())
+        .map(|c| PerlValue::string(c.to_string()))
+        .collect();
+    Ok(PerlValue::array(out))
+}
+
+/// `letters_uc STRING` — extract only uppercase letters from a string.
+fn builtin_letters_uc(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let out: Vec<PerlValue> = s
+        .chars()
+        .filter(|c| c.is_uppercase())
+        .map(|c| PerlValue::string(c.to_string()))
+        .collect();
+    Ok(PerlValue::array(out))
+}
+
+/// `letters_lc STRING` — extract only lowercase letters from a string.
+fn builtin_letters_lc(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let out: Vec<PerlValue> = s
+        .chars()
+        .filter(|c| c.is_lowercase())
+        .map(|c| PerlValue::string(c.to_string()))
+        .collect();
+    Ok(PerlValue::array(out))
+}
+
+/// `punctuation STRING` — extract all punctuation characters from a string.
+fn builtin_punctuation(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = first_arg_or_topic(interp, args).to_string();
+    let out: Vec<PerlValue> = s
+        .chars()
+        .filter(|c| c.is_ascii_punctuation())
         .map(|c| PerlValue::string(c.to_string()))
         .collect();
     Ok(PerlValue::array(out))

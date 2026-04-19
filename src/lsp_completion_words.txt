@@ -1331,6 +1331,9 @@ length
 length_each
 lerp
 less
+letters
+letters_lc
+letters_uc
 lev
 levenshtein
 lfrm
@@ -1888,6 +1891,8 @@ pt
 pt_cdf
 ptdist
 ptri
+punct
+punctuation
 puniq
 push
 pw
