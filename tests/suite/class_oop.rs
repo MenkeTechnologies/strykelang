@@ -1,7 +1,7 @@
-//! Tests for the forge native `class` OOP system.
+//! Tests for the stryke native `class` OOP system.
 
 use crate::common::*;
-use forge::error::ErrorKind;
+use stryke::error::ErrorKind;
 
 #[test]
 fn class_basic_instantiation() {

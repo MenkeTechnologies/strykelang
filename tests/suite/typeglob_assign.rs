@@ -30,26 +30,26 @@ fn typeglob_assign_glob_copies_subroutine_slot() {
 
 #[test]
 fn typeglob_parse_simple_glob_assign_statement() {
-    let p = forge::parse("*a = *b").expect("parse");
+    let p = stryke::parse("*a = *b").expect("parse");
     assert!(!p.statements.is_empty());
 }
 
 #[test]
 fn typeglob_parse_package_qualified_name() {
-    let p = forge::parse("*Foo::x").expect("parse");
+    let p = stryke::parse("*Foo::x").expect("parse");
     assert!(!p.statements.is_empty());
 }
 
 #[test]
 fn typeglob_parse_qualified_glob_assign() {
-    let p = forge::parse("*Foo::x = *Foo::y").expect("parse");
+    let p = stryke::parse("*Foo::x = *Foo::y").expect("parse");
     assert!(!p.statements.is_empty());
 }
 
 #[test]
 fn typeglob_assign_anonymous_sub_empty_prototype_parses() {
     // Carp.pm-style: *NAME = sub () { 1 };
-    let p = forge::parse("no strict; *x = sub () { 1 }").expect("parse");
+    let p = stryke::parse("no strict; *x = sub () { 1 }").expect("parse");
     assert!(!p.statements.is_empty());
 }
 
@@ -58,10 +58,10 @@ fn vm_compiles_dynamic_typeglob_expr() {
     // Exporter.pm-style: *{"$pkg::$sym"} = ...
     let code = r#"no strict 'vars';
         *{"STDOUT"};"#;
-    let program = forge::parse(code).expect("parse");
-    let mut interp = forge::interpreter::Interpreter::new();
+    let program = stryke::parse(code).expect("parse");
+    let mut interp = stryke::interpreter::Interpreter::new();
     assert!(
-        forge::try_vm_execute(&program, &mut interp).is_some(),
+        stryke::try_vm_execute(&program, &mut interp).is_some(),
         "expected bytecode VM for dynamic typeglob (Op::LoadDynamicTypeglob)"
     );
 }

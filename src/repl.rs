@@ -1,4 +1,4 @@
-//! Interactive REPL for `fo` and `forge` (readline, history, tab-completion).
+//! Interactive REPL for `fo` and `stryke` (readline, history, tab-completion).
 
 use std::process;
 use std::sync::{Arc, Mutex};
@@ -11,17 +11,17 @@ use rustyline::validate::Validator;
 use rustyline::{Config, Context, Editor, Helper};
 
 use crate::Cli;
-use forge::error::ErrorKind;
-use forge::interpreter::{repl_arrow_method_completions, Interpreter, ReplCompletionSnapshot};
-use forge::token::KEYWORDS;
+use stryke::error::ErrorKind;
+use stryke::interpreter::{repl_arrow_method_completions, Interpreter, ReplCompletionSnapshot};
+use stryke::token::KEYWORDS;
 
-/// Extra builtin names not listed in [`forge::token::KEYWORDS`].
+/// Extra builtin names not listed in [`stryke::token::KEYWORDS`].
 const EXTRA_KEYWORDS: &[&str] = &["deque", "heap", "ppool", "barrier", "bench", "spawn"];
 
 fn history_path() -> std::path::PathBuf {
     std::env::var_os("HOME")
-        .map(|h| std::path::PathBuf::from(h).join(".forge_history"))
-        .unwrap_or_else(|| std::path::PathBuf::from(".forge_history"))
+        .map(|h| std::path::PathBuf::from(h).join(".stryke_history"))
+        .unwrap_or_else(|| std::path::PathBuf::from(".stryke_history"))
 }
 
 fn build_static_completions() -> Vec<String> {
@@ -196,7 +196,7 @@ pub fn run(cli: &Cli) {
             *s = interp.repl_completion_snapshot();
         }
 
-        let read = rl.readline("forge> ");
+        let read = rl.readline("stryke> ");
         match read {
             Ok(line) => {
                 let trimmed = line.trim();
@@ -211,7 +211,7 @@ pub fn run(cli: &Cli) {
                 let _ = rl.add_history_entry(trimmed);
 
                 let full = format!("{}{}", prelude, trimmed);
-                let program = match forge::parse(&full) {
+                let program = match stryke::parse(&full) {
                     Ok(p) => p,
                     Err(e) => {
                         eprintln!("{}", e);

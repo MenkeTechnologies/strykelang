@@ -3,7 +3,7 @@
 
 use crate::common::*;
 
-use forge::error::ErrorKind;
+use stryke::error::ErrorKind;
 
 // ── loop control: `redo` / `continue` (VM + tree paths via `eval`) ──
 

@@ -289,7 +289,8 @@ impl PerlValue {
         }
         if nanbox::is_heap(bits) {
             unsafe {
-                let arc = Arc::from_raw(nanbox::decode_heap_ptr::<HeapObject>(bits) as *mut HeapObject);
+                let arc =
+                    Arc::from_raw(nanbox::decode_heap_ptr::<HeapObject>(bits) as *mut HeapObject);
                 match Arc::try_unwrap(arc) {
                     Ok(HeapObject::String(s)) => return s,
                     Ok(o) => return PerlValue::from_heap(Arc::new(o)).to_string(),
@@ -339,7 +340,12 @@ impl PerlValue {
             HeapObject::Deque(d) => d.lock().len() as f64,
             HeapObject::Heap(h) => h.lock().items.len() as f64,
             HeapObject::Pipeline(p) => p.lock().source.len() as f64,
-            HeapObject::Capture(_) | HeapObject::Ppool(_) | HeapObject::Barrier(_) | HeapObject::SqliteConn(_) | HeapObject::StructInst(_) | HeapObject::IOHandle(_) => 1.0,
+            HeapObject::Capture(_)
+            | HeapObject::Ppool(_)
+            | HeapObject::Barrier(_)
+            | HeapObject::SqliteConn(_)
+            | HeapObject::StructInst(_)
+            | HeapObject::IOHandle(_) => 1.0,
             _ => 0.0,
         }
     }
@@ -366,7 +372,12 @@ impl PerlValue {
             HeapObject::Deque(d) => d.lock().len() as i64,
             HeapObject::Heap(h) => h.lock().items.len() as i64,
             HeapObject::Pipeline(p) => p.lock().source.len() as i64,
-            HeapObject::Capture(_) | HeapObject::Ppool(_) | HeapObject::Barrier(_) | HeapObject::SqliteConn(_) | HeapObject::StructInst(_) | HeapObject::IOHandle(_) => 1,
+            HeapObject::Capture(_)
+            | HeapObject::Ppool(_)
+            | HeapObject::Barrier(_)
+            | HeapObject::SqliteConn(_)
+            | HeapObject::StructInst(_)
+            | HeapObject::IOHandle(_) => 1,
             _ => 0,
         }
     }

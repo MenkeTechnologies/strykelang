@@ -1,7 +1,7 @@
 //! String and comparison operators — parse acceptance (explicit tests; no batching).
 
 fn p(src: &str) {
-    forge::parse(src).unwrap_or_else(|e| panic!("parse failed for {src:?}: {e}"));
+    stryke::parse(src).unwrap_or_else(|e| panic!("parse failed for {src:?}: {e}"));
 }
 
 #[test]

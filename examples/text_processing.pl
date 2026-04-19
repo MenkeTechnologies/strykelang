@@ -1,4 +1,4 @@
-#!/usr/bin/env forge
+#!/usr/bin/env stryke
 # Text processing demo — common Perl one-liner patterns
 
 use strict;

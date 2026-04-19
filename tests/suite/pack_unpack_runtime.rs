@@ -73,9 +73,9 @@ fn pack_q_preserves_negative() {
 
 #[test]
 fn pack_unpack_errors_are_runtime() {
-    use forge::error::ErrorKind;
-    let program = forge::parse(r#"unpack 'N', "12""#).expect("parse");
-    let mut interp = forge::interpreter::Interpreter::new();
+    use stryke::error::ErrorKind;
+    let program = stryke::parse(r#"unpack 'N', "12""#).expect("parse");
+    let mut interp = stryke::interpreter::Interpreter::new();
     let e = interp.execute(&program).expect_err("too short for N");
     assert_eq!(e.kind, ErrorKind::Runtime);
 }

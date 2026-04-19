@@ -57,8 +57,8 @@ fn check_init_unitcheck_run_before_main_in_perl_order() {
 #[test]
 fn end_block_runs_after_main_without_panicking() {
     let code = "my $x = 1; END { $x = 2 }; $x";
-    let program = forge::parse(code).expect("parse");
-    let mut interp = forge::interpreter::Interpreter::new();
+    let program = stryke::parse(code).expect("parse");
+    let mut interp = stryke::interpreter::Interpreter::new();
     let v = interp.execute(&program).expect("execute");
     assert_eq!(
         v.to_int(),

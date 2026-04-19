@@ -105,7 +105,7 @@ use std::path::PathBuf;
 #[test]
 fn slurp_valid_utf8_round_trips() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("forge_fix_slurp_utf8_{}", std::process::id()));
+        std::env::temp_dir().join(format!("stryke_fix_slurp_utf8_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("u.txt");
@@ -121,7 +121,7 @@ fn slurp_valid_utf8_round_trips() {
 #[test]
 fn slurp_invalid_utf8_octets_map_to_u_plus_00xx() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("forge_fix_slurp_latin1_{}", std::process::id()));
+        std::env::temp_dir().join(format!("stryke_fix_slurp_latin1_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("b.bin");
@@ -139,7 +139,7 @@ fn slurp_invalid_utf8_octets_map_to_u_plus_00xx() {
 #[test]
 fn slurp_mixed_utf8_and_latin1_lines_per_line_decode() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("forge_fix_slurp_mixed_{}", std::process::id()));
+        std::env::temp_dir().join(format!("stryke_fix_slurp_mixed_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("mix.txt");
@@ -160,7 +160,7 @@ fn slurp_mixed_utf8_and_latin1_lines_per_line_decode() {
 #[test]
 fn readline_decodes_high_octet_line_as_latin1() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("forge_fix_readline_l1_{}", std::process::id()));
+        std::env::temp_dir().join(format!("stryke_fix_readline_l1_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("rl.txt");
@@ -245,7 +245,7 @@ fn tell_read_handle_matches_bytes_after_sysread() {
     // `readline` uses a `BufReader` that may prefetch; `tell` shares the underlying `File` cursor
     // with `sysread`, so byte offsets are predictable after `sysread`.
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("forge_fix_tell_read_{}", std::process::id()));
+        std::env::temp_dir().join(format!("stryke_fix_tell_read_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("t.dat");
@@ -384,7 +384,7 @@ fn splice_aref_no_length_removes_tail_and_returns_removed_list_stringified() {
 #[test]
 fn require_scans_inc_in_array_order_first_dir_shadows_later() {
     let base: PathBuf =
-        std::env::temp_dir().join(format!("forge_fix_inc_order_{}", std::process::id()));
+        std::env::temp_dir().join(format!("stryke_fix_inc_order_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     let d1 = base.join("first");
     let d2 = base.join("second");
@@ -506,7 +506,7 @@ fn regex_match_uses_literal_dollar_inside_char_class() {
 #[test]
 fn slurp_crlf_file_contains_both_bytes_without_replacement_char() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("forge_fix_slurp_crlf_{}", std::process::id()));
+        std::env::temp_dir().join(format!("stryke_fix_slurp_crlf_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("crlf.txt");
@@ -558,7 +558,7 @@ fn chomp_removes_single_trailing_newline() {
 #[test]
 fn sysseek_seek_set_then_tell_reports_offset() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("forge_fix_sysseek_tell_{}", std::process::id()));
+        std::env::temp_dir().join(format!("stryke_fix_sysseek_tell_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("seek.dat");
@@ -1203,7 +1203,7 @@ fn split_with_no_pattern_splits_whitespace_on_topic() {
 #[test]
 fn open_append_mode_preserves_then_extends_file() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("forge_fix_append_{}", std::process::id()));
+        std::env::temp_dir().join(format!("stryke_fix_append_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("log.txt");
@@ -1407,7 +1407,7 @@ fn cos_zero_is_one() {
 
 #[test]
 fn filetest_e_true_for_existing_path() {
-    let dir: PathBuf = std::env::temp_dir().join(format!("forge_fix_fte_{}", std::process::id()));
+    let dir: PathBuf = std::env::temp_dir().join(format!("stryke_fix_fte_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("exists.dat");
@@ -1415,7 +1415,7 @@ fn filetest_e_true_for_existing_path() {
     let p = path.to_str().expect("utf-8");
     assert_eq!(eval_int(&format!(r#"(-e "{p}") ? 1 : 0"#)), 1);
     assert_eq!(
-        eval_int(r#"(-e "/nonexistent_forge_fte_987654321") ? 1 : 0"#),
+        eval_int(r#"(-e "/nonexistent_stryke_fte_987654321") ? 1 : 0"#),
         0
     );
     std::fs::remove_dir_all(&dir).ok();
@@ -1425,7 +1425,7 @@ fn filetest_e_true_for_existing_path() {
 
 #[test]
 fn filetest_f_and_s_for_regular_file() {
-    let dir: PathBuf = std::env::temp_dir().join(format!("forge_fix_fs_{}", std::process::id()));
+    let dir: PathBuf = std::env::temp_dir().join(format!("stryke_fix_fs_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("n.dat");
@@ -1445,7 +1445,7 @@ fn filetest_f_and_s_for_regular_file() {
 #[test]
 fn mkdir_creates_directory_and_negative_d_test() {
     let base: PathBuf =
-        std::env::temp_dir().join(format!("forge_fix_mkdir_d_{}", std::process::id()));
+        std::env::temp_dir().join(format!("stryke_fix_mkdir_d_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     let pb = base.to_str().expect("utf-8");
     assert_eq!(
@@ -1458,7 +1458,7 @@ fn mkdir_creates_directory_and_negative_d_test() {
 #[test]
 fn unlink_removes_file_and_negative_e_test() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("forge_fix_unlink_{}", std::process::id()));
+        std::env::temp_dir().join(format!("stryke_fix_unlink_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("gone.txt");
@@ -1693,7 +1693,7 @@ fn caret_o_osname_nonempty() {
 #[test]
 fn rename_moves_file_contents_preserved() {
     let dir: PathBuf =
-        std::env::temp_dir().join(format!("forge_fix_rename_{}", std::process::id()));
+        std::env::temp_dir().join(format!("stryke_fix_rename_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let old_p = dir.join("old.txt");
@@ -1976,7 +1976,7 @@ fn list_util_pairs_returns_one_pair_object_per_kv() {
 
 #[test]
 fn readdir_lists_created_files_in_directory() {
-    let dir: PathBuf = std::env::temp_dir().join(format!("forge_fix_rd_{}", std::process::id()));
+    let dir: PathBuf = std::env::temp_dir().join(format!("stryke_fix_rd_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("alpha.txt"), b"a").unwrap();
@@ -1996,7 +1996,7 @@ fn readdir_lists_created_files_in_directory() {
 
 #[test]
 fn readdir_list_context_second_read_on_same_handle_is_empty() {
-    let dir: PathBuf = std::env::temp_dir().join(format!("forge_fix_rd2_{}", std::process::id()));
+    let dir: PathBuf = std::env::temp_dir().join(format!("stryke_fix_rd2_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("alpha.txt"), b"a").unwrap();
@@ -2017,7 +2017,7 @@ fn readdir_list_context_second_read_on_same_handle_is_empty() {
 
 #[test]
 fn readdir_rewinddir_refills_stream_same_length_as_first_list_read() {
-    let dir: PathBuf = std::env::temp_dir().join(format!("forge_fix_rdrw_{}", std::process::id()));
+    let dir: PathBuf = std::env::temp_dir().join(format!("stryke_fix_rdrw_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("alpha.txt"), b"a").unwrap();
@@ -2044,7 +2044,8 @@ fn readdir_rewinddir_refills_stream_same_length_as_first_list_read() {
 
 #[test]
 fn telldir_after_list_readdir_matches_number_of_entries_read() {
-    let dir: PathBuf = std::env::temp_dir().join(format!("forge_fix_telld_{}", std::process::id()));
+    let dir: PathBuf =
+        std::env::temp_dir().join(format!("stryke_fix_telld_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("only.txt"), b"x").unwrap();
@@ -2064,7 +2065,7 @@ fn telldir_after_list_readdir_matches_number_of_entries_read() {
 
 #[test]
 fn glob_expands_star_pattern_in_directory() {
-    let dir: PathBuf = std::env::temp_dir().join(format!("forge_fix_glob_{}", std::process::id()));
+    let dir: PathBuf = std::env::temp_dir().join(format!("stryke_fix_glob_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("one.g"), b"1").unwrap();
@@ -2175,7 +2176,7 @@ fn string_concatenation_interpolates_number_as_string() {
 
 #[test]
 fn filetest_f_is_false_for_directory_path() {
-    let dir: PathBuf = std::env::temp_dir().join(format!("forge_fix_ftd_{}", std::process::id()));
+    let dir: PathBuf = std::env::temp_dir().join(format!("stryke_fix_ftd_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let p = dir.to_str().expect("utf-8");
@@ -2658,7 +2659,8 @@ fn push_evaluates_arithmetic_before_append() {
 
 #[test]
 fn seekdir_zero_then_scalar_readdir_matches_first_list_entry() {
-    let dir: PathBuf = std::env::temp_dir().join(format!("forge_fix_skdir_{}", std::process::id()));
+    let dir: PathBuf =
+        std::env::temp_dir().join(format!("stryke_fix_skdir_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("first.txt"), b"a").unwrap();
@@ -2680,7 +2682,7 @@ fn seekdir_zero_then_scalar_readdir_matches_first_list_entry() {
 
 #[test]
 fn filetest_z_true_for_empty_regular_file() {
-    let dir: PathBuf = std::env::temp_dir().join(format!("forge_fix_z_{}", std::process::id()));
+    let dir: PathBuf = std::env::temp_dir().join(format!("stryke_fix_z_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("empty.dat");

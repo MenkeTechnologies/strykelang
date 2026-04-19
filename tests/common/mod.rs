@@ -1,13 +1,13 @@
 //! Shared helpers for integration tests. `cargo test` runs `tests/integration.rs` as its own crate
 //! that imports this module and `tests/suite/*`.
 
-use forge::error::ErrorKind;
-use forge::interpreter::Interpreter;
-use forge::value::PerlValue;
+use stryke::error::ErrorKind;
+use stryke::interpreter::Interpreter;
+use stryke::value::PerlValue;
 
 /// Parse and execute Perl code; panics on parse or runtime error.
 pub fn eval(code: &str) -> PerlValue {
-    let program = forge::parse(code).expect("parse failed");
+    let program = stryke::parse(code).expect("parse failed");
     let mut interp = Interpreter::new();
     interp.execute(&program).expect("execution failed")
 }
@@ -21,11 +21,11 @@ pub fn eval_int(code: &str) -> i64 {
 }
 
 pub fn eval_err_kind(code: &str) -> ErrorKind {
-    let program = forge::parse(code).expect("parse failed");
+    let program = stryke::parse(code).expect("parse failed");
     let mut interp = Interpreter::new();
     interp.execute(&program).unwrap_err().kind
 }
 
 pub fn parse_err_kind(code: &str) -> ErrorKind {
-    forge::parse(code).unwrap_err().kind
+    stryke::parse(code).unwrap_err().kind
 }

@@ -3,7 +3,7 @@
 //! For each case we run the same one-liner through `perl` and `fo --compat`,
 //! capture stderr, and assert byte-equal (modulo an absolute-path
 //! normalization so tempdir / binary-path differences don't count).
-//! Extensions keep forge-native error codes — those are tested elsewhere.
+//! Extensions keep stryke-native error codes — those are tested elsewhere.
 //!
 //! If `perl` isn't on `$PATH` (CI images without it, Rust-only dev loops),
 //! every test in this suite no-ops rather than failing — the suite is a
@@ -104,7 +104,7 @@ parity_test!(die_with_newline, "die \"bang\\n\"");
 parity_test!(warn_literal, r#"warn "watch out""#);
 
 // ── I/O ──────────────────────────────────────────────────────────────────
-// SEMANTIC GAP: forge `open` dies on failure; Perl returns false + sets $!.
+// SEMANTIC GAP: stryke `open` dies on failure; Perl returns false + sets $!.
 // Fixing this is a bigger change than a message tweak — see interpreter.rs
 // `open_builtin_execute`. Promote to assertive once fixed.
 parity_test!(
@@ -114,7 +114,7 @@ parity_test!(
 );
 
 // ── strict ───────────────────────────────────────────────────────────────
-// SEMANTIC GAP: strict-vars is a runtime check in forge, a compile-time
+// SEMANTIC GAP: strict-vars is a runtime check in stryke, a compile-time
 // check in perl — the latter appends "Execution of -e aborted due to
 // compilation errors." Fix by flagging these errors distinctly so
 // main.rs can append the trailing line.
@@ -130,7 +130,7 @@ parity_test!(
 );
 
 // ── Type / argument mismatches ───────────────────────────────────────────
-// SEMANTIC GAP: perl 5.24+ rejects `push SCALAR`; forge silently accepts.
+// SEMANTIC GAP: perl 5.24+ rejects `push SCALAR`; stryke silently accepts.
 // Needs a parser rule to reject non-array first arg of push (plus matching
 // "Execution of -e aborted..." trailing line).
 parity_test!(
@@ -140,7 +140,7 @@ parity_test!(
 );
 // SEMANTIC GAP: under no-strict, perl treats `@$s` where $s is a number
 // as a symbolic ref to `@{'42'}` and silently returns an empty array;
-// forge errors. Minor but visible.
+// stryke errors. Minor but visible.
 parity_test!(
     #[ignore = "TODO: `@$s` on non-ref should symbolic-deref under no-strict"]
     deref_non_ref,

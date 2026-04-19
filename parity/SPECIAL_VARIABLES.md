@@ -1,6 +1,6 @@
-# Perl special variables vs forge
+# Perl special variables vs stryke
 
-This document audits **Perl 5’s “special” globals** against **forge** as implemented in the tree-walker / VM (`src/interpreter.rs`, `src/lexer.rs`, `src/vm.rs`, `src/scope.rs`). Full stock **perlvar** parity is not claimed; this file tracks what is wired, stubbed, or absent. **Any** scalar whose name starts with `^` (including `${^NAME}` from the lexer) is routed through [`get_special_var`](src/interpreter.rs); unknown names read from `Interpreter.special_caret_scalars` (default `undef`) and can be assigned for compatibility. Documented `${^NAME}` scalars from Perl 5 are pre-seeded (see [`special_vars::PERL5_DOCUMENTED_CARET_NAMES`](src/special_vars.rs)) so `defined ${^NAME}` works without a prior assignment; a few have dedicated semantics (e.g. `${^UNICODE}`, `${^TAINT}`). **`${^OPEN}`** is **`1`** after **`use open`** with `:utf8` / `:std` / `:encoding(UTF-8)` (forge enables UTF-8 lossy readline decoding); **`0`** otherwise — not Perl’s full I/O layer bitmask.
+This document audits **Perl 5’s “special” globals** against **stryke** as implemented in the tree-walker / VM (`src/interpreter.rs`, `src/lexer.rs`, `src/vm.rs`, `src/scope.rs`). Full stock **perlvar** parity is not claimed; this file tracks what is wired, stubbed, or absent. **Any** scalar whose name starts with `^` (including `${^NAME}` from the lexer) is routed through [`get_special_var`](src/interpreter.rs); unknown names read from `Interpreter.special_caret_scalars` (default `undef`) and can be assigned for compatibility. Documented `${^NAME}` scalars from Perl 5 are pre-seeded (see [`special_vars::PERL5_DOCUMENTED_CARET_NAMES`](src/special_vars.rs)) so `defined ${^NAME}` works without a prior assignment; a few have dedicated semantics (e.g. `${^UNICODE}`, `${^TAINT}`). **`${^OPEN}`** is **`1`** after **`use open`** with `:utf8` / `:std` / `:encoding(UTF-8)` (stryke enables UTF-8 lossy readline decoding); **`0`** otherwise — not Perl’s full I/O layer bitmask.
 
 Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists but semantics differ; **No** = not implemented or wrong tokenization.
 
@@ -10,7 +10,7 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 
 ## Implemented with dedicated handling
 
-| Perl | Role | forge |
+| Perl | Role | stryke |
 |------|------|--------|
 | `__FILE__` / `__LINE__` | Compile-time literals | `ExprKind::MagicConst` — `__FILE__` → `Interpreter::file` (driver sets `-e` or script path); `__LINE__` → lexer line (1-based). VM bytecode uses `Compiler::source_file` (wired from `Interpreter::file` in `try_vm_execute`). |
 | `$_` | Default topic | Ordinary scalar `$_` in scope; set by `map`/`grep`/many iterators, `given`, `readline`, etc. |
@@ -40,7 +40,7 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 | `%SIG` | Signal handlers | Hash in scope. On **Unix**, `SIGINT` / `SIGTERM` / `SIGALRM` / `SIGCHLD` are registered (`signal_hook`); [`perl_signal::poll`](src/perl_signal.rs) runs **before each tree-walker statement** (`exec_statement_inner`) and **before each VM opcode** (and once before the linear JIT fast path). Invokes code refs (`IGNORE` / `DEFAULT` are no-ops). Non-Unix: no OS delivery. |
 | `$]` | Numeric language version | `get_special_var("]")` → `perl_bracket_version()` (emulated Perl 5.x.y level; see `perl_bracket_version` in `src/interpreter.rs`). |
 | `$;` | Subscript separator | `subscript_sep` field; default `\x1c` (Perl `\034`). |
-| `$^I` | In-place edit extension | `inplace_edit` string; lexer reads `$^` + letter as variable name `^I`. The **`fo`/`forge` driver** sets this from **`-i`** / **`-i.ext`** (backup suffix) and applies in-place rewrites for **`-n`/`-p`** over **`@ARGV`** files. |
+| `$^I` | In-place edit extension | `inplace_edit` string; lexer reads `$^` + letter as variable name `^I`. The **`fo`/`stryke` driver** sets this from **`-i`** / **`-i.ext`** (backup suffix) and applies in-place rewrites for **`-n`/`-p`** over **`@ARGV`** files. |
 | `$^D` | Debug flags | `debug_flags` (`i64`). |
 | `$^P` | Debugger flags | `perl_debug_flags` (`i64`). |
 | `$^S` | Exception state (in eval) | `eval_nesting > 0` while `eval` runs (tree-walker and VM `eval` / `evalblock`). |
@@ -60,7 +60,7 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 | `$^C` | Pending interrupt | On Unix, `SIGINT` sets a latch before the `%SIG` handler runs; `get_special_var("^C")` returns `1` once then clears (otherwise `0`). |
 | `$^F` | Max system FD | `max_system_fd` (default `2`). |
 | `$^L` | Form feed | `formfeed_string` (default `\f`). |
-| `$^M` | Emergency memory pool | `emergency_memory` string (no native pool in forge). |
+| `$^M` | Emergency memory pool | `emergency_memory` string (no native pool in stryke). |
 | `$^N` | Last opened named capture | `last_subpattern_name` after `apply_regex_captures`. |
 | `$^X` | Executable path | `executable_path` from `std::env::current_exe()` at interpreter init. |
 | `$INC` | `@INC` hook index | `inc_hook_index` (Perl 5.37+ hook traversal; hooks not fully implemented). |
@@ -83,7 +83,7 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 | `@_` | Works as the **subroutine argument array** in user subs; not fully identical to Perl’s XS calling conventions. |
 | `pos $_` | Supported with `regex_pos` map; edge cases may differ from Perl. |
 | `%SIG` / `$^C` | Tree-walker: **between statements**. VM: **between opcodes** (not inside a single native/Rust op). `$^C` reads `1` once after `SIGINT` if the latch was set; see [`perl_signal`](src/perl_signal.rs). |
-| `$^I` | The **`fo`/`forge` driver** applies **`-i`** / **`-i.bak`** for **`-n`/`-p`** over **`@ARGV`**; value is stored for compatibility with other code paths. |
+| `$^I` | The **`fo`/`stryke` driver** applies **`-i`** / **`-i.bak`** for **`-n`/`-p`** over **`@ARGV`**; value is stored for compatibility with other code paths. |
 | `$^V` | String form only (`v…` from crate version); not a Perl `version` object. |
 | `$^E` | Uses `std::io::Error::last_os_error()`, not Perl’s per-platform extended error. |
 | `${^GLOBAL_PHASE}` | **`DESTRUCT`** is set during [`Interpreter::run_global_teardown`](src/interpreter.rs) after a top-level program (post-`END`) so `DESTROY` drains match Perl’s global-destruction phase name; ordering vs every Perl 5 edge case is not guaranteed. Otherwise **`START`** … **`END`** track the tree-walker and VM the same way. |

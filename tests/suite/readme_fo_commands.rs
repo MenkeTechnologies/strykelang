@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 fn fo() -> &'static str {
-    env!("CARGO_BIN_EXE_fo")
+    env!("CARGO_BIN_EXE_st")
 }
 
 fn repo_root() -> PathBuf {

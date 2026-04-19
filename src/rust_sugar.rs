@@ -6,7 +6,7 @@
 //! block with:
 //!
 //! ```text
-//!     BEGIN { __forge_rust_compile(q‹SOURCE›, $LINE); }
+//!     BEGIN { __stryke_rust_compile(q‹SOURCE›, $LINE); }
 //! ```
 //!
 //! so later phases (lexer / parser / interpreter) see normal Perl. The runtime builtin
@@ -293,7 +293,7 @@ fn emit_begin_call(body: &str, line: usize) -> String {
     use base64::Engine as _;
     let encoded = base64::engine::general_purpose::STANDARD.encode(body.as_bytes());
     format!(
-        "BEGIN {{ __forge_rust_compile(\"{}\", {}); }}",
+        "BEGIN {{ __stryke_rust_compile(\"{}\", {}); }}",
         encoded, line
     )
 }
@@ -326,7 +326,7 @@ mod tests {
             "rust { pub extern \"C\" fn add(a: i64, b: i64) -> i64 { a + b } }\nprint add(1, 2);\n";
         let out = desugar_rust_blocks(src);
         assert!(out.contains("BEGIN"), "no BEGIN: {out}");
-        assert!(out.contains("__forge_rust_compile"), "no builtin call");
+        assert!(out.contains("__stryke_rust_compile"), "no builtin call");
         assert!(!out.contains("pub extern"), "Rust body leaked: {out}");
         assert!(out.contains("print add(1, 2);"));
     }

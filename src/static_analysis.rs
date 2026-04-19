@@ -934,8 +934,8 @@ mod tests {
     use crate::parse_with_file;
 
     fn lint(code: &str) -> PerlResult<()> {
-        let prog = parse_with_file(code, "test.for").expect("parse");
-        analyze_program(&prog, "test.for")
+        let prog = parse_with_file(code, "test.stk").expect("parse");
+        analyze_program(&prog, "test.stk")
     }
 
     #[test]

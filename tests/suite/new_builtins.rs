@@ -265,7 +265,7 @@ fn interleave_pipe_forward() {
 #[test]
 fn read_lines_reads_file_into_array() {
     let dir = std::env::temp_dir();
-    let path = dir.join(format!("forge_test_rl_{}.txt", std::process::id()));
+    let path = dir.join(format!("stryke_test_rl_{}.txt", std::process::id()));
     let ps = path.to_string_lossy().replace('\\', "/");
     fs::write(&path, "alpha\nbeta\ngamma\n").unwrap();
     let code = format!(r#"my @l = read_lines("{ps}"); "@l""#);
@@ -277,7 +277,7 @@ fn read_lines_reads_file_into_array() {
 #[test]
 fn read_lines_scalar_context_count() {
     let dir = std::env::temp_dir();
-    let path = dir.join(format!("forge_test_rlc_{}.txt", std::process::id()));
+    let path = dir.join(format!("stryke_test_rlc_{}.txt", std::process::id()));
     let ps = path.to_string_lossy().replace('\\', "/");
     fs::write(&path, "one\ntwo\nthree\n").unwrap();
     let code = format!(r#"my @l = read_lines("{ps}"); scalar @l"#);
@@ -289,7 +289,7 @@ fn read_lines_scalar_context_count() {
 #[test]
 fn read_lines_no_trailing_newline() {
     let dir = std::env::temp_dir();
-    let path = dir.join(format!("forge_test_rlnt_{}.txt", std::process::id()));
+    let path = dir.join(format!("stryke_test_rlnt_{}.txt", std::process::id()));
     let ps = path.to_string_lossy().replace('\\', "/");
     fs::write(&path, "first\nsecond").unwrap();
     let code = format!(r#"my @l = read_lines("{ps}"); scalar @l"#);
@@ -303,7 +303,7 @@ fn read_lines_no_trailing_newline() {
 #[test]
 fn append_file_creates_and_appends() {
     let dir = std::env::temp_dir();
-    let path = dir.join(format!("forge_test_af_{}.txt", std::process::id()));
+    let path = dir.join(format!("stryke_test_af_{}.txt", std::process::id()));
     let ps = path.to_string_lossy().replace('\\', "/");
     let code = format!(
         r#"append_file("{ps}", "hello\n"); append_file("{ps}", "world\n"); my @l = read_lines("{ps}"); "@l""#
@@ -338,7 +338,7 @@ fn tempdir_returns_valid_directory() {
 #[test]
 fn write_json_read_json_roundtrip_hash() {
     let dir = std::env::temp_dir();
-    let path = dir.join(format!("forge_test_json_{}.json", std::process::id()));
+    let path = dir.join(format!("stryke_test_json_{}.json", std::process::id()));
     let ps = path.to_string_lossy().replace('\\', "/");
     let code = format!(
         r#"write_json("{ps}", {{ name => "Alice", age => 30 }}); my $d = read_json("{ps}"); $d->{{name}}"#
@@ -351,7 +351,7 @@ fn write_json_read_json_roundtrip_hash() {
 #[test]
 fn write_json_read_json_roundtrip_array() {
     let dir = std::env::temp_dir();
-    let path = dir.join(format!("forge_test_json2_{}.json", std::process::id()));
+    let path = dir.join(format!("stryke_test_json2_{}.json", std::process::id()));
     let ps = path.to_string_lossy().replace('\\', "/");
     let code = format!(r#"write_json("{ps}", [1,2,3]); my $d = read_json("{ps}"); $d->[1]"#);
     let got = eval_int(&code);
@@ -362,7 +362,7 @@ fn write_json_read_json_roundtrip_array() {
 #[test]
 fn read_json_nested_hash() {
     let dir = std::env::temp_dir();
-    let path = dir.join(format!("forge_test_json3_{}.json", std::process::id()));
+    let path = dir.join(format!("stryke_test_json3_{}.json", std::process::id()));
     let ps = path.to_string_lossy().replace('\\', "/");
     fs::write(&path, r#"{"user":{"name":"Bob","scores":[10,20]}}"#).unwrap();
     let code = format!(r#"my $d = read_json("{ps}"); $d->{{user}}->{{name}}"#);
@@ -423,7 +423,7 @@ fn which_all_returns_array() {
 #[test]
 fn which_all_nonexistent_returns_empty() {
     assert_eq!(
-        eval_int(r#"my @w = which_all("__forge_nonexistent_cmd_xyz__"); scalar @w"#),
+        eval_int(r#"my @w = which_all("__stryke_nonexistent_cmd_xyz__"); scalar @w"#),
         0,
     );
 }

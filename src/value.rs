@@ -1240,7 +1240,7 @@ impl PerlValue {
     }
 
     /// Expand a `map` / `flat_map` / `pflat_map` block result into list elements. Plain arrays
-    /// expand; when `peel_array_ref`, a single ARRAY ref is dereferenced one level (forge
+    /// expand; when `peel_array_ref`, a single ARRAY ref is dereferenced one level (stryke
     /// `flat_map` / `pflat_map`; stock `map` uses `peel_array_ref == false`).
     pub fn map_flatten_outputs(&self, peel_array_ref: bool) -> Vec<PerlValue> {
         if let Some(a) = self.as_array_vec() {

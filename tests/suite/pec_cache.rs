@@ -1,9 +1,9 @@
-//! End-to-end tests for the `.pec` bytecode cache: `FORGE_BC_CACHE=1` should produce a
+//! End-to-end tests for the `.pec` bytecode cache: `STRYKE_BC_CACHE=1` should produce a
 //! cache file on first run and successfully load it on the second.
 //!
 //! These run the real `fo` binary in a child process so the test exercises the same
 //! main.rs wiring users hit. Cache directory is per-test under `$TMPDIR` to keep runs
-//! isolated and avoid clobbering the developer's `~/.cache/forge/bc`.
+//! isolated and avoid clobbering the developer's `~/.cache/stryke/bc`.
 
 #![cfg(unix)]
 
@@ -13,7 +13,7 @@ use std::process::Command;
 
 fn tmp_path(tag: &str) -> PathBuf {
     std::env::temp_dir().join(format!(
-        "forge-pec-{}-{}-{}",
+        "stryke-pec-{}-{}-{}",
         std::process::id(),
         tag,
         rand::random::<u32>()
@@ -22,8 +22,8 @@ fn tmp_path(tag: &str) -> PathBuf {
 
 fn run_with_cache(exe: &str, cache_dir: &PathBuf, script: &PathBuf) -> std::process::Output {
     Command::new(exe)
-        .env("FORGE_BC_CACHE", "1")
-        .env("FORGE_BC_DIR", cache_dir)
+        .env("STRYKE_BC_CACHE", "1")
+        .env("STRYKE_BC_DIR", cache_dir)
         .arg(script)
         .output()
         .expect("spawn fo")
@@ -31,7 +31,7 @@ fn run_with_cache(exe: &str, cache_dir: &PathBuf, script: &PathBuf) -> std::proc
 
 #[test]
 fn pec_first_run_writes_cache_warm_run_reuses_it() {
-    let exe = env!("CARGO_BIN_EXE_fo");
+    let exe = env!("CARGO_BIN_EXE_st");
     let script = tmp_path("simple.pl");
     let cache_dir = tmp_path("cache");
     fs::create_dir_all(&cache_dir).unwrap();
@@ -89,7 +89,7 @@ fn pec_first_run_writes_cache_warm_run_reuses_it() {
 
 #[test]
 fn pec_source_change_invalidates_cache() {
-    let exe = env!("CARGO_BIN_EXE_fo");
+    let exe = env!("CARGO_BIN_EXE_st");
     let script = tmp_path("changing.pl");
     let cache_dir = tmp_path("cache_inval");
     fs::create_dir_all(&cache_dir).unwrap();
@@ -125,15 +125,15 @@ fn pec_source_change_invalidates_cache() {
 
 #[test]
 fn pec_disabled_by_default_no_cache_writes() {
-    let exe = env!("CARGO_BIN_EXE_fo");
+    let exe = env!("CARGO_BIN_EXE_st");
     let script = tmp_path("nocache.pl");
     let cache_dir = tmp_path("cache_off");
     fs::create_dir_all(&cache_dir).unwrap();
     fs::write(&script, "print \"hi\\n\";\n").unwrap();
 
-    // No `FORGE_BC_CACHE=1` → cache must be inert.
+    // No `STRYKE_BC_CACHE=1` → cache must be inert.
     let out = Command::new(exe)
-        .env("FORGE_BC_DIR", &cache_dir)
+        .env("STRYKE_BC_DIR", &cache_dir)
         .arg(&script)
         .output()
         .expect("spawn fo");
@@ -141,7 +141,7 @@ fn pec_disabled_by_default_no_cache_writes() {
     let count = fs::read_dir(&cache_dir).unwrap().count();
     assert_eq!(
         count, 0,
-        "cache directory must stay empty when FORGE_BC_CACHE is unset"
+        "cache directory must stay empty when STRYKE_BC_CACHE is unset"
     );
 
     fs::remove_file(&script).ok();
@@ -153,13 +153,13 @@ fn pec_disabled_for_dash_e_oneliners() {
     // One-liners must NOT touch the cache: warm load is slower than parse+compile for
     // tiny scripts (measured ~2-3×), and unique `-e` invocations would pollute the cache
     // directory with no GC. The gate in main.rs is the contract this test pins.
-    let exe = env!("CARGO_BIN_EXE_fo");
+    let exe = env!("CARGO_BIN_EXE_st");
     let cache_dir = tmp_path("cache_oneliner");
     fs::create_dir_all(&cache_dir).unwrap();
 
     let out = Command::new(exe)
-        .env("FORGE_BC_CACHE", "1")
-        .env("FORGE_BC_DIR", &cache_dir)
+        .env("STRYKE_BC_CACHE", "1")
+        .env("STRYKE_BC_DIR", &cache_dir)
         .arg("-e")
         .arg("print 7+8")
         .output()
@@ -191,7 +191,7 @@ fn pec_disabled_for_dash_e_oneliners() {
 fn pec_warm_run_preserves_runtime_errors() {
     // Cache only stores the bytecode + program — runtime errors must still surface
     // identically on warm runs.
-    let exe = env!("CARGO_BIN_EXE_fo");
+    let exe = env!("CARGO_BIN_EXE_st");
     let script = tmp_path("die.pl");
     let cache_dir = tmp_path("cache_die");
     fs::create_dir_all(&cache_dir).unwrap();

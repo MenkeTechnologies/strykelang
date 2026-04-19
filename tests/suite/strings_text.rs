@@ -31,7 +31,7 @@ fn double_quoted_whitespace_after_dollar_before_name() {
 
 #[test]
 fn qq_bracket_interpolates_at_plus_after_match() {
-    // `@+` last-match offsets; array interpolates with `$"` (may be empty in forge → `"11"`).
+    // `@+` last-match offsets; array interpolates with `$"` (may be empty in stryke → `"11"`).
     let s = eval_string(r#"$_ = "ab"; /(.)/; qq[@+]"#);
     assert!(
         s == "11" || s == "1 1",
@@ -56,7 +56,7 @@ fn dollar_hash_array_last_index_reads_special_var() {
 
 #[test]
 fn double_quoted_dollar_only_whitespace_before_close_quote_is_parse_error() {
-    assert!(forge::parse(r#"my $x = "a$ ""#).is_err());
+    assert!(stryke::parse(r#"my $x = "a$ ""#).is_err());
 }
 
 #[test]

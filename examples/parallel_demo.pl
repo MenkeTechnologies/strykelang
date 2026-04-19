@@ -1,4 +1,4 @@
-#!/usr/bin/env forge
+#!/usr/bin/env stryke
 # Parallel operations demo — showcasing rayon-powered parallelism
 
 use strict;

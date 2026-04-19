@@ -1,4 +1,4 @@
-//! Streaming `maps` / `flat_maps` / `filter` — lazy [`PerlIterator`] output (forge extension).
+//! Streaming `maps` / `flat_maps` / `filter` — lazy [`PerlIterator`] output (stryke extension).
 
 use std::collections::VecDeque;
 use std::sync::Arc;

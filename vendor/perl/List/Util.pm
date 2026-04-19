@@ -1,4 +1,4 @@
-# Stub only: `List::Util` is implemented natively in forge (`src/list_util.rs`) so every
+# Stub only: `List::Util` is implemented natively in stryke (`src/list_util.rs`) so every
 # EXPORT_OK name matches Perl 5 without loading XS. This file exists for `%INC` / tooling.
 
 package List::Util;

@@ -210,7 +210,7 @@ enum PatternBinding {
 }
 
 /// Perl `$]` — numeric language level (`5 + minor/1000 + patch/1_000_000`).
-/// Emulated Perl 5.x level (not the `forge` crate semver).
+/// Emulated Perl 5.x level (not the `stryke` crate semver).
 pub fn perl_bracket_version() -> f64 {
     const PERL_EMUL_MINOR: u32 = 38;
     const PERL_EMUL_PATCH: u32 = 0;
@@ -232,7 +232,7 @@ fn cached_executable_path() -> String {
         .get_or_init(|| {
             std::env::current_exe()
                 .map(|p| p.to_string_lossy().into_owned())
-                .unwrap_or_else(|_| "forge".to_string())
+                .unwrap_or_else(|_| "stryke".to_string())
         })
         .clone()
 }
@@ -630,7 +630,7 @@ pub struct Interpreter {
     pub accumulator_format: String,
     /// `$^F` — max system file descriptor (Perl default 2).
     pub max_system_fd: i64,
-    /// `$^M` — emergency memory buffer (no-op pool in forge).
+    /// `$^M` — emergency memory buffer (no-op pool in stryke).
     pub emergency_memory: String,
     /// `$^N` — last opened named regexp capture name.
     pub last_subpattern_name: String,
@@ -664,7 +664,7 @@ pub struct Interpreter {
     /// Bare names from `our $x` per frame — same length as [`Self::english_lexical_scalars`].
     our_lexical_scalars: Vec<HashSet<String>>,
     /// When false, the bytecode VM runs without Cranelift (see [`crate::try_vm_execute`]). Disabled by
-    /// `FORGE_NO_JIT=1` / `true` / `yes`, or `fo --no-jit` after [`Self::new`].
+    /// `STRYKE_NO_JIT=1` / `true` / `yes`, or `fo --no-jit` after [`Self::new`].
     pub vm_jit_enabled: bool,
     /// When true, [`crate::try_vm_execute`] prints bytecode disassembly to stderr before running the VM.
     pub disasm_bytecode: bool,
@@ -1214,14 +1214,14 @@ impl Interpreter {
         // Reflection hashes — populated from `build.rs`-generated tables so
         // they track the real parser/dispatcher/LSP without hand-maintenance.
         // Seven hashes; all lookups are O(1). Forward maps:
-        //   %b  / %forge::builtins      — name → category ("parallel", "string", …)
-        //   %pc / %forge::perl_compats  — subset: Perl 5 core only
-        //   %e  / %forge::extensions    — subset: forge-only
-        //   %a  / %forge::aliases       — alias → primary
-        //   %d  / %forge::descriptions  — name → LSP one-liner (sparse)
+        //   %b  / %stryke::builtins      — name → category ("parallel", "string", …)
+        //   %pc / %stryke::perl_compats  — subset: Perl 5 core only
+        //   %e  / %stryke::extensions    — subset: stryke-only
+        //   %a  / %stryke::aliases       — alias → primary
+        //   %d  / %stryke::descriptions  — name → LSP one-liner (sparse)
         // Inverted indexes for constant-time reverse queries:
-        //   %c  / %forge::categories    — category → arrayref of names
-        //   %p  / %forge::primaries     — primary → arrayref of aliases
+        //   %c  / %stryke::categories    — category → arrayref of names
+        //   %p  / %stryke::primaries     — primary → arrayref of aliases
         //
         // `keys %perl_compats ∩ keys %extensions == ∅` by construction;
         // together they cover `keys %builtins`. Short aliases use the
@@ -1234,16 +1234,16 @@ impl Interpreter {
         let categories_map = crate::builtins::categories_hash_map();
         let primaries_map = crate::builtins::primaries_hash_map();
         let all_map = crate::builtins::all_hash_map();
-        scope.declare_hash("forge::builtins", builtins_map.clone());
-        scope.declare_hash("forge::perl_compats", perl_compats_map.clone());
-        scope.declare_hash("forge::extensions", extensions_map.clone());
-        scope.declare_hash("forge::aliases", aliases_map.clone());
-        scope.declare_hash("forge::descriptions", descriptions_map.clone());
-        scope.declare_hash("forge::categories", categories_map.clone());
-        scope.declare_hash("forge::primaries", primaries_map.clone());
-        scope.declare_hash("forge::all", all_map.clone());
+        scope.declare_hash("stryke::builtins", builtins_map.clone());
+        scope.declare_hash("stryke::perl_compats", perl_compats_map.clone());
+        scope.declare_hash("stryke::extensions", extensions_map.clone());
+        scope.declare_hash("stryke::aliases", aliases_map.clone());
+        scope.declare_hash("stryke::descriptions", descriptions_map.clone());
+        scope.declare_hash("stryke::categories", categories_map.clone());
+        scope.declare_hash("stryke::primaries", primaries_map.clone());
+        scope.declare_hash("stryke::all", all_map.clone());
         scope.declare_scalar(
-            "forge::VERSION",
+            "stryke::VERSION",
             PerlValue::string(env!("CARGO_PKG_VERSION").to_string()),
         );
         scope.declare_hash("b", builtins_map);
@@ -1294,7 +1294,7 @@ impl Interpreter {
             argv: Vec::new(),
             env: IndexMap::new(),
             env_materialized: false,
-            program_name: "forge".to_string(),
+            program_name: "stryke".to_string(),
             line_number: 0,
             last_readline_handle: String::new(),
             last_stdin_die_bracket: "<STDIN>".to_string(),
@@ -1385,7 +1385,7 @@ impl Interpreter {
             english_lexical_scalars: vec![HashSet::new()],
             our_lexical_scalars: vec![HashSet::new()],
             vm_jit_enabled: !matches!(
-                std::env::var("FORGE_NO_JIT"),
+                std::env::var("STRYKE_NO_JIT"),
                 Ok(v)
                     if v == "1"
                         || v.eq_ignore_ascii_case("true")
@@ -2854,7 +2854,7 @@ impl Interpreter {
             "state" => FEAT_STATE,
             "switch" => FEAT_SWITCH,
             "unicode_strings" => FEAT_UNICODE_STRINGS,
-            // Features that forge accepts as known but tracks no separate bit for —
+            // Features that stryke accepts as known but tracks no separate bit for —
             // either always-on, always-off, or syntactic sugar already enabled.
             // Keeps `use feature 'X'` from erroring on common Perl 5.20+ pragmas.
             "postderef"
@@ -16532,7 +16532,7 @@ impl Interpreter {
         Ok(m)
     }
 
-    /// Bind forge `sub name ($a, { k => $v })` parameters from `@_` before the body runs.
+    /// Bind stryke `sub name ($a, { k => $v })` parameters from `@_` before the body runs.
     pub(crate) fn apply_sub_signature(
         &mut self,
         sub: &PerlSub,

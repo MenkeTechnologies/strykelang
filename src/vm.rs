@@ -243,7 +243,7 @@ struct CallFrame {
     stack_base: usize,
     scope_depth: usize,
     saved_wantarray: WantarrayCtx,
-    /// [`forge_jit_call_sub`] — no bytecode resume; result stored in [`VM::jit_trampoline_out`].
+    /// [`stryke_jit_call_sub`] — no bytecode resume; result stored in [`VM::jit_trampoline_out`].
     jit_trampoline_return: bool,
     /// Synthetic frame for [`Op::BlockReturnValue`] (`map`/`grep`/`sort` block bytecode), paired with
     /// `scope_push_hook` at [`VM::run_block_region`] entry (not a sub call; no closure capture).
@@ -317,7 +317,7 @@ pub struct VM<'a> {
     sub_entry_at_ip: Vec<bool>,
     /// Invocations per sub-entry IP (tiered JIT: interpreter until count exceeds threshold).
     sub_entry_invoke_count: Vec<u32>,
-    /// Minimum invocations before attempting subroutine JIT. Override with `FORGE_JIT_SUB_INVOKES` (default 50).
+    /// Minimum invocations before attempting subroutine JIT. Override with `STRYKE_JIT_SUB_INVOKES` (default 50).
     jit_sub_invoke_threshold: u32,
     /// Reused `i64` tables for sub-JIT / top-level JIT attempts (avoids `vec![0; n]` on every try).
     jit_buf_slot: Vec<i64>,
@@ -424,7 +424,7 @@ impl<'a> VM<'a> {
                 v
             },
             sub_entry_invoke_count: vec![0; chunk.ops.len().saturating_add(1)],
-            jit_sub_invoke_threshold: std::env::var("FORGE_JIT_SUB_INVOKES")
+            jit_sub_invoke_threshold: std::env::var("STRYKE_JIT_SUB_INVOKES")
                 .ok()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(50),
@@ -7827,7 +7827,7 @@ impl<'a> VM<'a> {
         Ok(last)
     }
 
-    /// Called from Cranelift (`forge_jit_call_sub`) to run a compiled sub by bytecode IP with `i64` args.
+    /// Called from Cranelift (`stryke_jit_call_sub`) to run a compiled sub by bytecode IP with `i64` args.
     pub(crate) fn jit_trampoline_run_sub(
         &mut self,
         entry_ip: usize,
@@ -8856,7 +8856,7 @@ fn int_cmp(
 ///
 /// `vm` must be a valid, non-null pointer to a live [`VM`] for the duration of this call.
 #[no_mangle]
-pub unsafe extern "C" fn forge_jit_concat_vm(vm: *mut std::ffi::c_void, a: i64, b: i64) -> i64 {
+pub unsafe extern "C" fn stryke_jit_concat_vm(vm: *mut std::ffi::c_void, a: i64, b: i64) -> i64 {
     let vm: &mut VM<'static> = unsafe { &mut *(vm as *mut VM<'static>) };
     let pa = PerlValue::from_raw_bits(crate::jit::perl_value_bits_from_jit_string_operand(a));
     let pb = PerlValue::from_raw_bits(crate::jit::perl_value_bits_from_jit_string_operand(b));
@@ -8874,7 +8874,7 @@ pub unsafe extern "C" fn forge_jit_concat_vm(vm: *mut std::ffi::c_void, a: i64, 
 /// `vm` must be a valid, non-null pointer to a live [`VM`] for the duration of this call (JIT only
 /// invokes this while the VM is executing).
 #[no_mangle]
-pub unsafe extern "C" fn forge_jit_call_sub(
+pub unsafe extern "C" fn stryke_jit_call_sub(
     vm: *mut std::ffi::c_void,
     sub_ip: i64,
     argc: i64,
@@ -9074,7 +9074,7 @@ mod tests {
         let idx = c.intern_name("0");
         c.emit(Op::GetScalar(idx), 1);
         c.emit(Op::Halt, 1);
-        assert_eq!(run_chunk(&c).expect("vm").to_string(), "forge");
+        assert_eq!(run_chunk(&c).expect("vm").to_string(), "stryke");
 
         let mut c = Chunk::new();
         let idx = c.intern_name("0");

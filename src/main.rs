@@ -8,21 +8,21 @@ use clap::Parser;
 use rand::Rng;
 use rayon::prelude::*;
 
-use forge::ast::Program;
-use forge::error::{ErrorKind, PerlError};
-use forge::interpreter::Interpreter;
-use forge::perl_fs::{
+use stryke::ast::Program;
+use stryke::error::{ErrorKind, PerlError};
+use stryke::interpreter::Interpreter;
+use stryke::perl_fs::{
     decode_utf8_or_latin1, read_file_text_perl_compat, read_line_perl_compat,
     read_logical_line_perl_compat,
 };
 
 mod repl;
 
-/// forge — A highly parallel Perl 5 interpreter written in Rust
+/// stryke — A highly parallel Perl 5 interpreter written in Rust
 #[derive(Parser, Debug, Default)]
-#[command(name = "forge", version, about, long_about = None)]
+#[command(name = "stryke", version, about, long_about = None)]
 #[command(disable_version_flag = true, disable_help_flag = true)]
-#[command(override_usage = "forge [switches] [--] [programfile] [arguments]")]
+#[command(override_usage = "stryke [switches] [--] [programfile] [arguments]")]
 pub(crate) struct Cli {
     /// Specify record separator (\0 if no argument); -0777 for slurp mode
     #[arg(short = '0', value_name = "OCTAL")]
@@ -60,7 +60,7 @@ pub(crate) struct Cli {
     #[arg(long = "profile")]
     profile: bool,
 
-    /// Flamegraph: colored terminal bars (TTY) or SVG to stdout (piped: fo --flame x.for > flame.svg)
+    /// Flamegraph: colored terminal bars (TTY) or SVG to stdout (piped: fo --flame x.stk > flame.svg)
     #[arg(long = "flame")]
     flame: bool,
 
@@ -180,11 +180,11 @@ pub(crate) struct Cli {
     #[arg(short = 'h', long = "help")]
     help: bool,
 
-    /// Number of threads for parallel operations (forge extension)
+    /// Number of threads for parallel operations (stryke extension)
     #[arg(short = 'j', long = "threads", value_name = "N")]
     threads: Option<usize>,
 
-    /// Perl 5 strict-compatibility mode: disable all forge extensions
+    /// Perl 5 strict-compatibility mode: disable all stryke extensions
     #[arg(long = "compat")]
     compat: bool,
 
@@ -392,7 +392,7 @@ fn print_cyberpunk_help() {
     );
     println!("  --no-jit               {G}//{N} Disable Cranelift JIT (bytecode interpreter only)");
     println!(
-        "  --compat               {G}//{N} Perl 5 strict-compat: disable all forge extensions"
+        "  --compat               {G}//{N} Perl 5 strict-compat: disable all stryke extensions"
     );
     println!("  -d[t][:MOD]            {G}//{N} Run program under debugger or module Devel::MOD");
     println!("  -D[number/letters]     {G}//{N} Set debugging flags");
@@ -437,19 +437,19 @@ fn print_cyberpunk_help() {
         "  build SCRIPT [-o OUT]  {G}//{N} AOT: copy this binary with SCRIPT embedded (standalone exe)"
     );
     println!("  docs [TOPIC]           {G}//{N} Built-in docs (fo docs pmap, fo docs |>, fo docs)");
-    println!("  serve [PORT] [SCRIPT]  {G}//{N} HTTP server (fo serve, fo serve 8080 app.for)");
+    println!("  serve [PORT] [SCRIPT]  {G}//{N} HTTP server (fo serve, fo serve 8080 app.stk)");
     println!(
         "  --remote-worker        {G}//{N} Persistent cluster worker (stdio); only arg after {bin}"
     );
     println!(
         "  --remote-worker-v1     {G}//{N} Legacy one-shot worker (stdio); only arg after {bin}"
     );
-    if matches!(bin, "fo" | "forge") {
+    if matches!(bin, "fo" | "stryke") {
         println!(
             "  (no switches, TTY stdin) {G}//{N} Interactive REPL (readline; exit with quit or EOF)"
         );
     }
-    println!("{C}  ── PARALLEL EXTENSIONS (forge) ─────────────────────{N}");
+    println!("{C}  ── PARALLEL EXTENSIONS (stryke) ─────────────────────{N}");
     println!("  -j N                   {G}//{N} Set number of parallel threads (rayon)");
     println!(
         "  pmap  {{BLOCK}} @list [, progress => EXPR] {G}//{N} Parallel map; optional stderr progress bar"
@@ -507,16 +507,16 @@ fn print_cyberpunk_help() {
     println!(
         "  fan_cap [N] {{BLOCK}} [, progress => EXPR]  {G}//{N} Like fan; returns list of block return values (index order)"
     );
-    println!("{C}  ── TYPING (forge) ───────────────────────────────────{N}");
+    println!("{C}  ── TYPING (stryke) ───────────────────────────────────{N}");
     println!(
         "  typed my \\$x : Int|Str|Float  {G}//{N} Optional scalar types; runtime checks on assign"
     );
     println!(
         "  fn (\\$a: Int, \\$b: Str) {{}}   {G}//{N} Typed sub params; runtime checks on call"
     );
-    println!("{C}  ── SERIALIZATION (forge) ───────────────────────────────{N}");
+    println!("{C}  ── SERIALIZATION (stryke) ───────────────────────────────{N}");
     println!(
-        "  str \\$val / stringify \\$val  {G}//{N} Convert any value to parseable forge literal"
+        "  str \\$val / stringify \\$val  {G}//{N} Convert any value to parseable stryke literal"
     );
     println!("  eval str \\$fn              {G}//{N} Round-trip: serialize + deserialize coderefs");
     println!("{C}  ── POSITIONAL ─────────────────────────────────────────{N}");
@@ -935,7 +935,7 @@ pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut Interpreter, filenam
     }
 
     if (cli.taint_check || cli.taint_warn) && cli.warnings {
-        eprintln!("forge: taint mode acknowledged but not enforced");
+        eprintln!("stryke: taint mode acknowledged but not enforced");
     }
 
     if let Some(ref ext_opt) = cli.inplace {
@@ -966,11 +966,11 @@ pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut Interpreter, filenam
                 if let Some((name, val)) = switch.split_once('=') {
                     let _ = interp
                         .scope
-                        .set_scalar(name, forge::value::PerlValue::string(val.to_string()));
+                        .set_scalar(name, stryke::value::PerlValue::string(val.to_string()));
                 } else {
                     let _ = interp
                         .scope
-                        .set_scalar(switch, forge::value::PerlValue::integer(1));
+                        .set_scalar(switch, stryke::value::PerlValue::integer(1));
                 }
             }
         }
@@ -981,49 +981,49 @@ pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut Interpreter, filenam
     interp.scope.declare_array(
         "ARGV",
         argv.into_iter()
-            .map(forge::value::PerlValue::string)
+            .map(stryke::value::PerlValue::string)
             .collect(),
     );
 
     // Order: `-I`, in-tree `vendor/perl` (pure-Perl List::Util, …), system `perl`’s @INC, script
-    // dir, `FORGE_INC`, then `.` (deduped).
+    // dir, `STRYKE_INC`, then `.` (deduped).
     let mut inc_paths: Vec<String> = cli.include.clone();
-    let vendor = forge::vendor_perl_inc_path();
+    let vendor = stryke::vendor_perl_inc_path();
     if vendor.is_dir() {
-        forge::perl_inc::push_unique_string_paths(
+        stryke::perl_inc::push_unique_string_paths(
             &mut inc_paths,
             vec![vendor.to_string_lossy().into_owned()],
         );
     }
-    forge::perl_inc::push_unique_string_paths(
+    stryke::perl_inc::push_unique_string_paths(
         &mut inc_paths,
-        forge::perl_inc::paths_from_system_perl(),
+        stryke::perl_inc::paths_from_system_perl(),
     );
     if filename != "-e" && filename != "-" && filename != "repl" {
         if let Some(parent) = std::path::Path::new(filename).parent() {
             if !parent.as_os_str().is_empty() {
-                forge::perl_inc::push_unique_string_paths(
+                stryke::perl_inc::push_unique_string_paths(
                     &mut inc_paths,
                     vec![parent.to_string_lossy().into_owned()],
                 );
             }
         }
     }
-    if let Ok(extra) = std::env::var("FORGE_INC") {
+    if let Ok(extra) = std::env::var("STRYKE_INC") {
         let extra: Vec<String> = std::env::split_paths(&extra)
             .map(|p| p.to_string_lossy().into_owned())
             .collect();
-        forge::perl_inc::push_unique_string_paths(&mut inc_paths, extra);
+        stryke::perl_inc::push_unique_string_paths(&mut inc_paths, extra);
     }
-    forge::perl_inc::push_unique_string_paths(&mut inc_paths, vec![".".to_string()]);
-    let inc_dirs: Vec<forge::value::PerlValue> = inc_paths
+    stryke::perl_inc::push_unique_string_paths(&mut inc_paths, vec![".".to_string()]);
+    let inc_dirs: Vec<stryke::value::PerlValue> = inc_paths
         .into_iter()
-        .map(forge::value::PerlValue::string)
+        .map(stryke::value::PerlValue::string)
         .collect();
     interp.scope.declare_array("INC", inc_dirs);
 
     if cli.debugger.is_some() {
-        eprintln!("forge: debugger not yet implemented, running normally");
+        eprintln!("stryke: debugger not yet implemented, running normally");
     }
 }
 
@@ -1033,7 +1033,7 @@ pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut Interpreter, filenam
 /// `--flame` + TTY stdout  → colored terminal bars to stderr.
 /// `--profile` (no flame)  → plain text report to stderr.
 fn emit_profiler_report(
-    p: &mut forge::profiler::Profiler,
+    p: &mut stryke::profiler::Profiler,
     flame_out: &Option<File>,
     flame_tty: bool,
 ) {
@@ -1041,7 +1041,7 @@ fn emit_profiler_report(
         // stdout was piped — write SVG to the saved fd
         let mut w = io::BufWriter::new(f);
         if let Err(e) = p.render_flame_svg(&mut w) {
-            eprintln!("forge --flame: {}", e);
+            eprintln!("stryke --flame: {}", e);
         }
     } else if flame_tty {
         // stdout is a TTY — render colored bars to stderr
@@ -1058,7 +1058,7 @@ fn main() {
     // program: all command-line args become `@ARGV` for the embedded script. The probe
     // costs one file open + one 32-byte read (~50 µs) on the no-trailer path.
     if let Ok(exe) = std::env::current_exe() {
-        if let Some(embedded) = forge::aot::try_load_embedded(&exe) {
+        if let Some(embedded) = stryke::aot::try_load_embedded(&exe) {
             let argv: Vec<String> = std::env::args().skip(1).collect();
             process::exit(run_embedded_script(embedded, argv));
         }
@@ -1070,14 +1070,14 @@ fn main() {
         // Persistent v3 session loop: HELLO → SESSION_INIT → many JOBs → SHUTDOWN.
         // The basic v1 one-shot loop is still reachable via `--remote-worker-v1` for the
         // round-trip integration test.
-        process::exit(forge::remote_wire::run_remote_worker_session());
+        process::exit(stryke::remote_wire::run_remote_worker_session());
     }
     if args.len() == 2 && args[1] == "--remote-worker-v1" {
-        process::exit(forge::remote_wire::run_remote_worker_stdio());
+        process::exit(stryke::remote_wire::run_remote_worker_stdio());
     }
 
     if args.len() == 2 && args[1] == "--lsp" {
-        process::exit(forge::run_lsp_stdio());
+        process::exit(stryke::run_lsp_stdio());
     }
 
     // `fo build SCRIPT -o OUT` subcommand: intercept before clap so `build` does not have
@@ -1086,12 +1086,12 @@ fn main() {
         process::exit(run_build_subcommand(&args[2..]));
     }
 
-    // `fo convert FILE...` subcommand: convert Perl source to forge syntax with |> pipes.
+    // `fo convert FILE...` subcommand: convert Perl source to stryke syntax with |> pipes.
     if args.len() >= 2 && args[1] == "convert" {
         process::exit(run_convert_subcommand(&args[2..]));
     }
 
-    // `fo deconvert FILE...` subcommand: convert forge .for files back to standard Perl .pl syntax.
+    // `fo deconvert FILE...` subcommand: convert stryke .stk files back to standard Perl .pl syntax.
     if args.len() >= 2 && args[1] == "deconvert" {
         process::exit(run_deconvert_subcommand(&args[2..]));
     }
@@ -1106,7 +1106,7 @@ fn main() {
         process::exit(run_serve_subcommand(&args[2..]));
     }
 
-    // Fast path: `forge SCRIPT [ARGS...]` with no dashes anywhere — the common case, and
+    // Fast path: `stryke SCRIPT [ARGS...]` with no dashes anywhere — the common case, and
     // clap parsing is the dominant term on `print "hello\n"` (it knocks ~1ms off the
     // startup bench). We can't bypass clap when any flag is present, so fall through to the
     // full parser in that case.
@@ -1131,7 +1131,7 @@ fn main() {
 
     // Set global compat-mode flag before any parsing happens.
     if cli.compat {
-        forge::set_compat_mode(true);
+        stryke::set_compat_mode(true);
     }
 
     if cli.help {
@@ -1141,7 +1141,7 @@ fn main() {
 
     if cli.show_version {
         println!(
-            "This is forge v{} — A highly parallel Perl 5 interpreter (Rust)\n",
+            "This is stryke v{} — A highly parallel Perl 5 interpreter (Rust)\n",
             env!("CARGO_PKG_VERSION")
         );
         println!("Built with rayon for parallel map/grep/for/sort");
@@ -1165,10 +1165,10 @@ fn main() {
     }
 
     if let Some(code) = &cli.explain {
-        match forge::error::explain_error(code) {
+        match stryke::error::explain_error(code) {
             Some(text) => println!("{}", text),
             None => {
-                eprintln!("forge: unknown explain code {:?}", code);
+                eprintln!("stryke: unknown explain code {:?}", code);
                 process::exit(1);
             }
         }
@@ -1183,7 +1183,7 @@ fn main() {
             .ok();
     }
 
-    let is_repl = matches!(env!("CARGO_BIN_NAME"), "fo" | "forge")
+    let is_repl = matches!(env!("CARGO_BIN_NAME"), "fo" | "stryke")
         && cli.script.is_none()
         && cli.execute.is_empty()
         && cli.execute_features.is_empty()
@@ -1252,7 +1252,7 @@ fn main() {
         (code, "-".to_string())
     };
 
-    let (program_text, data_opt) = forge::data_section::split_data_section(&raw_script);
+    let (program_text, data_opt) = stryke::data_section::split_data_section(&raw_script);
     let code = strip_shebang_and_extract(&program_text, cli.extract.is_some());
 
     let mut full_code = module_prelude(&cli);
@@ -1261,10 +1261,10 @@ fn main() {
     // `.pec` bytecode cache fast path — skip parse AND compile on warm starts.
     //
     // Keyed on (crate version, filename, full source including `-M` prelude). Enabled by
-    // `FORGE_BC_CACHE=1` (opt-in for v1 — see [`forge::pec::cache_enabled`]). On a hit,
-    // the [`forge::pec::PecBundle`] carries both the AST `Program` and the compiled
+    // `STRYKE_BC_CACHE=1` (opt-in for v1 — see [`stryke::pec::cache_enabled`]). On a hit,
+    // the [`stryke::pec::PecBundle`] carries both the AST `Program` and the compiled
     // `Chunk`; we hand the chunk to the interpreter via a sideband field that
-    // [`forge::try_vm_execute`] consumes. On a miss, we parse normally and stash the
+    // [`stryke::try_vm_execute`] consumes. On a miss, we parse normally and stash the
     // fingerprint so the try-VM path persists the freshly-compiled chunk after run.
     //
     // **Disabled for `-e` / `-E` one-liners.** Measured: warm `.pec` is ~2-3× *slower* than
@@ -1273,7 +1273,7 @@ fn main() {
     // also pollute the cache directory with one entry per unique `-e` invocation, with no
     // GC in v1. The break-even is around 1000+ lines, so file-based scripts only.
     let is_one_liner = !cli.execute.is_empty() || !cli.execute_features.is_empty();
-    let pec_on = forge::pec::cache_enabled()
+    let pec_on = stryke::pec::cache_enabled()
         && !cli.line_mode
         && !cli.print_mode
         && !cli.lint
@@ -1286,20 +1286,22 @@ fn main() {
         && !filename.is_empty();
     let pec_fp_opt: Option<[u8; 32]> = if pec_on {
         // `strict_vars` enters the fingerprint as `false` here; an eventual [`PecBundle::strict_vars`]
-        // mismatch at load time is treated as a miss (see [`forge::pec::try_load`]), so two strict
+        // mismatch at load time is treated as a miss (see [`stryke::pec::try_load`]), so two strict
         // modes may collide in one slot without producing wrong answers.
-        Some(forge::pec::source_fingerprint(false, &filename, &full_code))
+        Some(stryke::pec::source_fingerprint(
+            false, &filename, &full_code,
+        ))
     } else {
         None
     };
     let cached_bundle = pec_fp_opt
         .as_ref()
-        .and_then(|fp| forge::pec::try_load(fp, false).ok().flatten());
+        .and_then(|fp| stryke::pec::try_load(fp, false).ok().flatten());
 
     let (program, pec_precompiled) = if let Some(bundle) = cached_bundle {
         (bundle.program, Some(bundle.chunk))
     } else {
-        let parsed = match forge::parse_with_file(&full_code, &filename) {
+        let parsed = match stryke::parse_with_file(&full_code, &filename) {
             Ok(p) => p,
             Err(e) => {
                 eprintln!("{}", e);
@@ -1313,7 +1315,7 @@ fn main() {
         match serde_json::to_string_pretty(&program) {
             Ok(json) => println!("{}", json),
             Err(e) => {
-                eprintln!("forge: failed to serialize AST to JSON: {}", e);
+                eprintln!("stryke: failed to serialize AST to JSON: {}", e);
                 process::exit(1);
             }
         }
@@ -1321,8 +1323,8 @@ fn main() {
     }
 
     if cli.format_source {
-        // Use convert_program for clean forge (.for) syntax with pipes
-        println!("{}", forge::convert::convert_program(&program));
+        // Use convert_program for clean stryke (.stk) syntax with pipes
+        println!("{}", stryke::convert::convert_program(&program));
         return;
     }
 
@@ -1335,7 +1337,7 @@ fn main() {
         if let Some(data) = data_opt {
             interp.install_data_handle(data);
         }
-        match forge::lint_program(&program, &mut interp) {
+        match stryke::lint_program(&program, &mut interp) {
             Ok(()) => {
                 eprintln!("{} compile OK", filename);
                 return;
@@ -1365,7 +1367,7 @@ fn main() {
         interp.disasm_bytecode = true;
     }
     if cli.profile || cli.flame {
-        interp.profiler = Some(forge::profiler::Profiler::new(filename.clone()));
+        interp.profiler = Some(stryke::profiler::Profiler::new(filename.clone()));
     }
     // Hand the `.pec` sideband to the interpreter so `try_vm_execute` either runs the
     // pre-compiled chunk (cache hit) or saves the freshly-compiled one (cache miss).
@@ -1377,7 +1379,7 @@ fn main() {
     }
 
     // --flame: when stdout is piped to a file, save real stdout for the SVG and redirect
-    // script output to stderr so `fo --flame x.for > flame.svg` captures a clean SVG.
+    // script output to stderr so `fo --flame x.stk > flame.svg` captures a clean SVG.
     // When stdout is a TTY, skip the redirect — we'll render colored bars to stderr instead.
     let flame_is_tty = cli.flame && io::stdout().is_terminal();
     #[cfg(unix)]
@@ -1478,19 +1480,19 @@ fn main() {
     }
 }
 
-/// Run an [`forge::aot::EmbeddedScript`] as if it were the primary program. Minimal
+/// Run an [`stryke::aot::EmbeddedScript`] as if it were the primary program. Minimal
 /// `@INC` setup: current directory only — the AOT binary is meant to be self-contained, so
 /// the target machine's `perl` (which may not exist) is not consulted. `-I` at build time
 /// is not yet supported (v1); drop everything into the `rust { ... }` block instead.
-fn run_embedded_script(embedded: forge::aot::EmbeddedScript, argv: Vec<String>) -> i32 {
-    // AOT binaries pick up the `.pec` bytecode cache for free when `FORGE_BC_CACHE=1` —
+fn run_embedded_script(embedded: stryke::aot::EmbeddedScript, argv: Vec<String>) -> i32 {
+    // AOT binaries pick up the `.pec` bytecode cache for free when `STRYKE_BC_CACHE=1` —
     // the first run of a shipped binary parses and compiles the embedded source, then
     // every subsequent run reuses the cached chunk. Cache key includes the script name
     // embedded in the trailer, so two binaries with different embedded scripts will not
     // collide.
-    let pec_on = forge::pec::cache_enabled();
+    let pec_on = stryke::pec::cache_enabled();
     let pec_fp = if pec_on {
-        Some(forge::pec::source_fingerprint(
+        Some(stryke::pec::source_fingerprint(
             false,
             &embedded.name,
             &embedded.source,
@@ -1500,11 +1502,11 @@ fn run_embedded_script(embedded: forge::aot::EmbeddedScript, argv: Vec<String>) 
     };
     let cached = pec_fp
         .as_ref()
-        .and_then(|fp| forge::pec::try_load(fp, false).ok().flatten());
+        .and_then(|fp| stryke::pec::try_load(fp, false).ok().flatten());
     let (program, pec_precompiled) = if let Some(bundle) = cached {
         (bundle.program, Some(bundle.chunk))
     } else {
-        let parsed = match forge::parse_with_file(&embedded.source, &embedded.name) {
+        let parsed = match stryke::parse_with_file(&embedded.source, &embedded.name) {
             Ok(p) => p,
             Err(e) => {
                 eprintln!("{}", e);
@@ -1520,12 +1522,12 @@ fn run_embedded_script(embedded: forge::aot::EmbeddedScript, argv: Vec<String>) 
     interp.scope.declare_array(
         "ARGV",
         argv.into_iter()
-            .map(forge::value::PerlValue::string)
+            .map(stryke::value::PerlValue::string)
             .collect(),
     );
     interp.scope.declare_array(
         "INC",
-        vec![forge::value::PerlValue::string(".".to_string())],
+        vec![stryke::value::PerlValue::string(".".to_string())],
     );
     interp.pec_precompiled_chunk = pec_precompiled;
     interp.pec_cache_fingerprint = pec_fp;
@@ -1578,7 +1580,7 @@ fn run_build_subcommand(args: &[String]) -> i32 {
                 println!(
                     "trailer. `scp` the result to any compatible machine and run it directly —"
                 );
-                println!("no perl, no forge, no @INC setup required.");
+                println!("no perl, no stryke, no @INC setup required.");
                 println!();
                 println!("Examples:");
                 println!("  fo build app.pl                     # → ./app");
@@ -1606,7 +1608,7 @@ fn run_build_subcommand(args: &[String]) -> i32 {
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_else(|| "a.out".to_string())
     }));
-    match forge::aot::build(&script_path, &out_path) {
+    match stryke::aot::build(&script_path, &out_path) {
         Ok(p) => {
             eprintln!("fo build: wrote {}", p.display());
             0
@@ -1618,7 +1620,7 @@ fn run_build_subcommand(args: &[String]) -> i32 {
     }
 }
 
-/// `fo convert FILE...` — convert Perl source to idiomatic forge syntax.
+/// `fo convert FILE...` — convert Perl source to idiomatic stryke syntax.
 fn run_convert_subcommand(args: &[String]) -> i32 {
     let mut files: Vec<String> = Vec::new();
     let mut in_place = false;
@@ -1646,20 +1648,20 @@ fn run_convert_subcommand(args: &[String]) -> i32 {
             "-h" | "--help" => {
                 println!("usage: fo convert [-i] [-d DELIM] FILE...");
                 println!();
-                println!("Convert standard Perl source to idiomatic forge syntax:");
+                println!("Convert standard Perl source to idiomatic stryke syntax:");
                 println!("  - Nested calls → |> pipe-forward chains");
                 println!("  - map/grep/sort/join LIST → LIST |> map/grep/sort/join");
                 println!("  - No trailing semicolons");
                 println!("  - 4-space indentation");
-                println!("  - #!/usr/bin/env forge shebang");
+                println!("  - #!/usr/bin/env stryke shebang");
                 println!();
                 println!("Options:");
-                println!("  -i, --in-place       Write .for files alongside originals");
+                println!("  -i, --in-place       Write .stk files alongside originals");
                 println!("  -d, --output-delim   Delimiter for s///, tr///, m// (default: preserve original)");
                 println!();
                 println!("Examples:");
                 println!("  fo convert app.pl              # print to stdout");
-                println!("  fo convert -i lib/*.pm         # write lib/*.for");
+                println!("  fo convert -i lib/*.pm         # write lib/*.stk");
                 println!("  fo convert -d '|' app.pl       # use | as delimiter: s|old|new|g");
                 return 0;
             }
@@ -1677,7 +1679,7 @@ fn run_convert_subcommand(args: &[String]) -> i32 {
         eprintln!("usage: fo convert [-i] [-d DELIM] FILE...");
         return 2;
     }
-    let opts = forge::convert::ConvertOptions { output_delim };
+    let opts = stryke::convert::ConvertOptions { output_delim };
     let mut errors = 0;
     for f in &files {
         let code = match std::fs::read_to_string(f) {
@@ -1688,7 +1690,7 @@ fn run_convert_subcommand(args: &[String]) -> i32 {
                 continue;
             }
         };
-        let program = match forge::parse_with_file(&code, f) {
+        let program = match stryke::parse_with_file(&code, f) {
             Ok(p) => p,
             Err(e) => {
                 eprintln!("fo convert: {}: {}", f, e);
@@ -1696,7 +1698,7 @@ fn run_convert_subcommand(args: &[String]) -> i32 {
                 continue;
             }
         };
-        let converted = forge::convert_to_forge_with_options(&program, &opts);
+        let converted = stryke::convert_to_stryke_with_options(&program, &opts);
         if in_place {
             let out_path = std::path::Path::new(f).with_extension("pr");
             if let Err(e) = std::fs::write(&out_path, &converted) {
@@ -1734,7 +1736,7 @@ fn run_serve_subcommand(args: &[String]) -> i32 {
             "  fo serve                                              # static file server on 8000"
         );
         eprintln!("  fo serve 8080                                         # static file server");
-        eprintln!("  fo serve 8080 app.for                                 # script handler");
+        eprintln!("  fo serve 8080 app.stk                                 # script handler");
         eprintln!("  fo serve 3000 -e '\"hello \" . $req->{{path}}'           # one-liner");
         eprintln!("  fo serve 8080 -e 'status => 200, body => json_encode(+{{ok => 1}})'");
         return 0;
@@ -1768,7 +1770,7 @@ fn run_serve_subcommand(args: &[String]) -> i32 {
 
     let code = if let Some(dir) = static_dir {
         let dir_escaped = dir.replace('\\', "\\\\").replace('"', "\\\"");
-        eprintln!("forge: serving {} on http://0.0.0.0:{}", dir, port);
+        eprintln!("stryke: serving {} on http://0.0.0.0:{}", dir, port);
         format!(
             r#"
 chdir "{dir_escaped}"
@@ -1837,7 +1839,7 @@ fn dir_listing($url_path, $fs_path) {{
     . "<style>body{{font-family:monospace;margin:2em}}a{{text-decoration:none}}a:hover{{text-decoration:underline}}li{{padding:2px 0}}.dir{{font-weight:bold}}</style>"
     . "</head><body><h1>Directory listing for $url_path</h1><hr><ul>"
     . $html
-    . "</ul><hr><p style=\"color:#888\">forge/{port}</p></body></html>"
+    . "</ul><hr><p style=\"color:#888\">stryke/{port}</p></body></html>"
 }}
 
 serve {port}, fn ($req) {{
@@ -1870,11 +1872,11 @@ serve {port}, fn ($req) {{
         format!("serve {}, fn ($req) {{ {} }}", port, handler_body)
     } else {
         // Script file — the script must call serve() itself.
-        // PORT is injected as $ENV{FORGE_PORT} for convenience.
+        // PORT is injected as $ENV{STRYKE_PORT} for convenience.
         let script_path = &rest[0];
         match std::fs::read_to_string(script_path) {
             Ok(src) => {
-                format!("$ENV{{FORGE_PORT}} = {}\n{}", port, src)
+                format!("$ENV{{STRYKE_PORT}} = {}\n{}", port, src)
             }
             Err(e) => {
                 eprintln!("fo serve: {}: {}", script_path, e);
@@ -1883,11 +1885,11 @@ serve {port}, fn ($req) {{
         }
     };
 
-    let mut interp = forge::interpreter::Interpreter::new();
-    match forge::parse_and_run_string(&code, &mut interp) {
+    let mut interp = stryke::interpreter::Interpreter::new();
+    match stryke::parse_and_run_string(&code, &mut interp) {
         Ok(_) => 0,
         Err(e) => {
-            if let forge::error::ErrorKind::Exit(code) = e.kind {
+            if let stryke::error::ErrorKind::Exit(code) = e.kind {
                 return code;
             }
             eprintln!("{}", e);
@@ -1929,9 +1931,9 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
     let mut entries: Vec<(&str, &str, String)> = Vec::new();
     let mut seen = std::collections::HashSet::new();
     let mut seen_text_ptrs = std::collections::HashSet::new();
-    for &(category, topics) in forge::lsp::DOC_CATEGORIES {
+    for &(category, topics) in stryke::lsp::DOC_CATEGORIES {
         for &topic in topics {
-            if let Some(text) = forge::lsp::doc_text_for(topic) {
+            if let Some(text) = stryke::lsp::doc_text_for(topic) {
                 let ptr = text.as_ptr() as usize;
                 if !seen_text_ptrs.insert(ptr) {
                     seen.insert(topic);
@@ -1944,11 +1946,11 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         }
     }
     // Pick up every documented topic not yet in a category
-    for topic in forge::lsp::doc_topics() {
+    for topic in stryke::lsp::doc_topics() {
         if seen.contains(topic) {
             continue;
         }
-        if let Some(text) = forge::lsp::doc_text_for(topic) {
+        if let Some(text) = stryke::lsp::doc_text_for(topic) {
             let ptr = text.as_ptr() as usize;
             if !seen_text_ptrs.insert(ptr) {
                 continue; // alias already rendered
@@ -1969,12 +1971,12 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
 
     // Insert intro page at position 0
     let entry_count = entries.len();
-    let chapter_count = forge::lsp::DOC_CATEGORIES.len();
+    let chapter_count = stryke::lsp::DOC_CATEGORIES.len();
     let mut intro = format!(
         "\
-  {D}>> THE FORGE ENCYCLOPEDIA // INTERACTIVE REFERENCE SYSTEM <<{N}\n\
+  {D}>> THE STRYKE ENCYCLOPEDIA // INTERACTIVE REFERENCE SYSTEM <<{N}\n\
 \n\
-  {B}A comprehensive reference for every forge builtin, keyword,{N}\n\
+  {B}A comprehensive reference for every stryke builtin, keyword,{N}\n\
   {B}and extension. {G}{entry_count}{N} {B}topics across {G}{chapter_count}{N} {B}chapters.{N}\n\
 \n\
   {D}── GETTING STARTED ─────────────────────────────────────────────{N}\n\
@@ -1994,7 +1996,7 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
   {D}── CHAPTERS ───────────────────────────────────────────────────{N}\n\
 "
     );
-    for (i, &(cat, topics)) in forge::lsp::DOC_CATEGORIES.iter().enumerate() {
+    for (i, &(cat, topics)) in stryke::lsp::DOC_CATEGORIES.iter().enumerate() {
         intro.push_str(&format!(
             "  {C}{:>2}.{N} {B}{:<32}{N} {D}{} topics{N}\n",
             i + 1,
@@ -2017,11 +2019,11 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         doc_print_banner(theme);
         doc_print_hline('┌', '┐', theme);
         doc_print_boxline(
-            &format!(" {G}STATUS: ONLINE{N}  {D}//{N} {C}SIGNAL: {G}████████{D}░░{N}  {D}//{N} {M}FORGE DOCS{N}"),
+            &format!(" {G}STATUS: ONLINE{N}  {D}//{N} {C}SIGNAL: {G}████████{D}░░{N}  {D}//{N} {M}STRYKE DOCS{N}"),
             theme,
         );
         doc_print_hline('└', '┘', theme);
-        println!("  {D}>> THE FORGE ENCYCLOPEDIA // INTERACTIVE REFERENCE SYSTEM <<{N}");
+        println!("  {D}>> THE STRYKE ENCYCLOPEDIA // INTERACTIVE REFERENCE SYSTEM <<{N}");
         println!();
         println!("  {B}USAGE:{N} fo docs {D}[OPTIONS] [PAGE|TOPIC]{N}");
         println!();
@@ -2658,7 +2660,7 @@ fn doc_print_toc_entries(
     doc_print_hline('┌', '┐', theme);
     doc_print_boxline(
         &format!(
-            " {G}TABLE OF CONTENTS{N}  {D}//{N} {C}{topic_count} topics, {page_count} pages{N}  {D}//{N} {M}The forge Encyclopedia{N}"
+            " {G}TABLE OF CONTENTS{N}  {D}//{N} {C}{topic_count} topics, {page_count} pages{N}  {D}//{N} {M}The stryke Encyclopedia{N}"
         ),
         theme,
     );
@@ -2771,7 +2773,7 @@ fn render_inline_code(line: &str, color: &str, reset: &str) -> String {
     out
 }
 
-/// `fo deconvert FILE...` — convert forge .for files back to standard Perl .pl syntax.
+/// `fo deconvert FILE...` — convert stryke .stk files back to standard Perl .pl syntax.
 fn run_deconvert_subcommand(args: &[String]) -> i32 {
     let mut files: Vec<String> = Vec::new();
     let mut in_place = false;
@@ -2799,7 +2801,7 @@ fn run_deconvert_subcommand(args: &[String]) -> i32 {
             "-h" | "--help" => {
                 println!("usage: fo deconvert [-i] [-d DELIM] FILE...");
                 println!();
-                println!("Convert forge .for files back to standard Perl .pl syntax:");
+                println!("Convert stryke .stk files back to standard Perl .pl syntax:");
                 println!("  - Pipe chains and thread macros → nested function calls");
                 println!("  - fn → sub");
                 println!("  - p → say");
@@ -2811,9 +2813,9 @@ fn run_deconvert_subcommand(args: &[String]) -> i32 {
                 println!("  -d, --output-delim   Delimiter for s///, tr///, m// (default: preserve original)");
                 println!();
                 println!("Examples:");
-                println!("  fo deconvert app.for             # print to stdout");
-                println!("  fo deconvert -i lib/*.for        # write lib/*.pl");
-                println!("  fo deconvert -d '|' app.for      # use | as delimiter: s|old|new|g");
+                println!("  fo deconvert app.stk             # print to stdout");
+                println!("  fo deconvert -i lib/*.stk        # write lib/*.pl");
+                println!("  fo deconvert -d '|' app.stk      # use | as delimiter: s|old|new|g");
                 return 0;
             }
             s if s.starts_with('-') => {
@@ -2830,7 +2832,7 @@ fn run_deconvert_subcommand(args: &[String]) -> i32 {
         eprintln!("usage: fo deconvert [-i] [-d DELIM] FILE...");
         return 2;
     }
-    let opts = forge::deconvert::DeconvertOptions { output_delim };
+    let opts = stryke::deconvert::DeconvertOptions { output_delim };
     let mut errors = 0;
     for f in &files {
         let code = match std::fs::read_to_string(f) {
@@ -2841,7 +2843,7 @@ fn run_deconvert_subcommand(args: &[String]) -> i32 {
                 continue;
             }
         };
-        let program = match forge::parse_with_file(&code, f) {
+        let program = match stryke::parse_with_file(&code, f) {
             Ok(p) => p,
             Err(e) => {
                 eprintln!("fo deconvert: {}: {}", f, e);
@@ -2849,7 +2851,7 @@ fn run_deconvert_subcommand(args: &[String]) -> i32 {
                 continue;
             }
         };
-        let deconverted = forge::deconvert_to_perl_with_options(&program, &opts);
+        let deconverted = stryke::deconvert_to_perl_with_options(&program, &opts);
         if in_place {
             let out_path = std::path::Path::new(f).with_extension("pl");
             if let Err(e) = std::fs::write(&out_path, &deconverted) {
@@ -2950,7 +2952,7 @@ fn print_config(configvar: Option<&str>) {
             "cc" => "rustc".to_string(),
             "optimize" => "-O3 -lto".to_string(),
             "prefix" | "installprefix" => "/usr/local".to_string(),
-            "perlpath" => "forge".to_string(),
+            "perlpath" => "stryke".to_string(),
             _ => {
                 eprintln!("Unknown config variable: {}", var);
                 return;
@@ -2958,7 +2960,7 @@ fn print_config(configvar: Option<&str>) {
         };
         println!("{}='{}'", var, val);
     } else {
-        println!("Summary of forge v{} configuration:\n", version);
+        println!("Summary of stryke v{} configuration:\n", version);
         println!("  Platform:");
         println!("    osname={}, archname={}-{}", os, arch, os);
         println!("  Compiler:");
@@ -2970,7 +2972,7 @@ fn print_config(configvar: Option<&str>) {
         println!("  Parallel extensions:");
         println!("    rayon=define, pmap=define, pmap_chunked=define, pipeline=define, par_pipeline=define, async=define, await=define, pgrep=define, pfor=define, psort=define, reduce=define, preduce=define, preduce_init=define, jit=define");
         println!("  Install:");
-        println!("    perlpath=forge");
+        println!("    perlpath=stryke");
     }
 }
 
@@ -2985,7 +2987,7 @@ mod cli_argv_tests {
 
     #[test]
     fn prelude_inserts_double_dash_before_script_argv_long_flags() {
-        let a = args(&["forge", "s.pl", "--regex", "--foo"]);
+        let a = args(&["stryke", "s.pl", "--regex", "--foo"]);
         let cli = parse_cli_prelude(&a).expect("expected prelude parse");
         assert_eq!(cli.script.as_deref(), Some("s.pl"));
         assert_eq!(cli.args, vec!["--regex".to_string(), "--foo".to_string()]);
@@ -2993,7 +2995,7 @@ mod cli_argv_tests {
 
     #[test]
     fn prelude_with_dash_w_before_script() {
-        let a = args(&["forge", "-w", "s.pl", "--regex"]);
+        let a = args(&["stryke", "-w", "s.pl", "--regex"]);
         let cli = parse_cli_prelude(&a).expect("expected prelude parse");
         assert!(cli.warnings);
         assert_eq!(cli.script.as_deref(), Some("s.pl"));
@@ -3002,7 +3004,7 @@ mod cli_argv_tests {
 
     #[test]
     fn prelude_dash_e_then_argv_with_long_flag() {
-        let a = args(&["forge", "-e", "1", "foo", "--regex"]);
+        let a = args(&["stryke", "-e", "1", "foo", "--regex"]);
         let mut cli = parse_cli_prelude(&a).expect("expected prelude parse");
         normalize_argv_after_dash_e(&mut cli);
         assert_eq!(cli.execute, vec!["1"]);
@@ -3012,7 +3014,7 @@ mod cli_argv_tests {
 
     #[test]
     fn explicit_user_double_dash_skips_prelude() {
-        let a = args(&["forge", "--", "s.pl", "x"]);
+        let a = args(&["stryke", "--", "s.pl", "x"]);
         assert!(parse_cli_prelude(&a).is_none());
     }
 
@@ -3024,7 +3026,7 @@ mod cli_argv_tests {
             ("-lne", "print 3", false, true),
             ("-lnE", "say 4", false, true),
         ] {
-            let a = expand_perl_bundled_argv(args(&["forge", flag, code]));
+            let a = expand_perl_bundled_argv(args(&["stryke", flag, code]));
             let cli = Cli::try_parse_from(&a).expect("parse bundled flags");
             assert!(
                 cli.line_ending.is_some(),
@@ -3044,7 +3046,7 @@ mod cli_argv_tests {
 
     #[test]
     fn bundled_lpe_preserves_print_mode() {
-        let a = expand_perl_bundled_argv(args(&["forge", "-lpe", "print 1"]));
+        let a = expand_perl_bundled_argv(args(&["stryke", "-lpe", "print 1"]));
         let cli = Cli::try_parse_from(&a).expect("parse");
         assert!(cli.print_mode);
         assert_eq!(cli.execute, vec!["print 1"]);
@@ -3052,7 +3054,7 @@ mod cli_argv_tests {
 
     #[test]
     fn bundled_0777_not_split() {
-        let a = expand_perl_bundled_argv(args(&["forge", "-0777", "-e", "1"]));
+        let a = expand_perl_bundled_argv(args(&["stryke", "-0777", "-e", "1"]));
         assert!(
             a.contains(&"-0777".to_string()),
             "expected -0777 kept intact: {a:?}"
@@ -3061,7 +3063,7 @@ mod cli_argv_tests {
 
     #[test]
     fn bundled_0ne_splits_like_perl() {
-        let a = expand_perl_bundled_argv(args(&["forge", "-0ne", "print 1"]));
+        let a = expand_perl_bundled_argv(args(&["stryke", "-0ne", "print 1"]));
         let cli = Cli::try_parse_from(&a).expect("parse");
         assert_eq!(cli.execute, vec!["print 1"]);
         assert!(cli.line_mode);
@@ -3069,7 +3071,7 @@ mod cli_argv_tests {
 
     #[test]
     fn bundled_f_colon_takes_rest_of_token() {
-        let a = expand_perl_bundled_argv(args(&["forge", "-F:", "-anE", "say $F[0]"]));
+        let a = expand_perl_bundled_argv(args(&["stryke", "-F:", "-anE", "say $F[0]"]));
         let cli = Cli::try_parse_from(&a).expect("parse");
         assert_eq!(cli.field_separator.as_deref(), Some(":"));
         assert!(cli.auto_split);
@@ -3079,14 +3081,14 @@ mod cli_argv_tests {
 
     #[test]
     fn bundled_f_comma_takes_rest_of_token() {
-        let a = expand_perl_bundled_argv(args(&["forge", "-F,", "-anE", "print 1"]));
+        let a = expand_perl_bundled_argv(args(&["stryke", "-F,", "-anE", "print 1"]));
         let cli = Cli::try_parse_from(&a).expect("parse");
         assert_eq!(cli.field_separator.as_deref(), Some(","));
     }
 
     #[test]
     fn help_alias_not_bundled_as_h_e_l_p() {
-        let a = expand_perl_bundled_argv(args(&["forge", "-help"]));
+        let a = expand_perl_bundled_argv(args(&["stryke", "-help"]));
         let cli = Cli::try_parse_from(&a).expect("parse");
         assert!(cli.help);
     }

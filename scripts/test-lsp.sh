@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test forge LSP server manually via stdio.
+# Test stryke LSP server manually via stdio.
 # Usage: ./scripts/test-lsp.sh
 
 set -euo pipefail

@@ -1,4 +1,4 @@
-# Fifty core modules for the forge `core_modules_smoke` harness (one package per line).
+# Fifty core modules for the stryke `core_modules_smoke` harness (one package per line).
 # The test skips entries whose `Foo/Bar.pm` is not found on disk under `@INC`.
 Carp
 Exporter

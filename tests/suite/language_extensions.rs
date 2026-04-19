@@ -429,11 +429,11 @@ fn fold_reduce_undef_on_empty_list_and_fold_max() {
 fn chunked_windowed_reject_legacy_multi_arg_at_parse() {
     assert!(matches!(
         parse_err_kind("chunked(1, 2, 3, 4, 2)"),
-        forge::error::ErrorKind::Syntax
+        stryke::error::ErrorKind::Syntax
     ));
     assert!(matches!(
         parse_err_kind("windowed(1, 2, 3, 2)"),
-        forge::error::ErrorKind::Syntax
+        stryke::error::ErrorKind::Syntax
     ));
 }
 
@@ -729,7 +729,7 @@ fn thread_udf_with_explicit_paren_args() {
 #[test]
 fn thread_udf_paren_args_without_topic_errors() {
     // Args without `$_` would silently drop the threaded value — refuse it.
-    let err = forge::parse(r#"sub add2 { $_0 + $_1 } thread 10 add2(3)"#)
+    let err = stryke::parse(r#"sub add2 { $_0 + $_1 } thread 10 add2(3)"#)
         .expect_err("should reject call-stage args missing `$_`");
     let msg = format!("{}", err);
     assert!(
@@ -1074,7 +1074,7 @@ fn dunder_sub_in_named_sub() {
 }
 
 // ── defer ──
-// Note: forge closures capture by value, not reference. Tests verify
+// Note: stryke closures capture by value, not reference. Tests verify
 // defer execution through computation rather than mutation.
 
 #[test]

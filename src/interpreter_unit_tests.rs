@@ -94,7 +94,7 @@ fn new_default_file_is_dash_e() {
 
 #[test]
 fn new_default_program_name() {
-    assert_eq!(Interpreter::new().program_name, "forge");
+    assert_eq!(Interpreter::new().program_name, "stryke");
 }
 
 #[test]

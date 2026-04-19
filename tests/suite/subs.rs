@@ -51,7 +51,7 @@ fn sub_with_prototype_two_scalars_uses_at_underscore() {
 }
 
 #[test]
-fn sub_forge_signature_scalar_and_hash_destruct() {
+fn sub_stryke_signature_scalar_and_hash_destruct() {
     assert_eq!(
         eval_int(
             r#"sub move_to ($self, { x => $x, y => $y }) { $x + $y }
@@ -69,7 +69,7 @@ fn sub_forge_signature_scalar_and_hash_destruct() {
 }
 
 #[test]
-fn sub_forge_signature_array_destruct() {
+fn sub_stryke_signature_array_destruct() {
     assert_eq!(
         eval_int(
             r#"sub pair_sum ([ $x, $y ]) { $x + $y }
@@ -112,7 +112,7 @@ fn my_destructure_hashref() {
 
 #[test]
 fn my_destructure_arrayref_length_mismatch_dies() {
-    use forge::error::ErrorKind;
+    use stryke::error::ErrorKind;
     let k = eval_err_kind(
         r#"my $r = [1];
            my [$a, $b] = $r;
@@ -126,12 +126,12 @@ fn my_destructure_arrayref_length_mismatch_dies() {
 }
 
 #[test]
-fn sub_forge_signature_only_scalars() {
+fn sub_stryke_signature_only_scalars() {
     assert_eq!(eval_int(r#"sub add ($a, $b) { $a + $b } add(8, 34)"#), 42);
 }
 
 #[test]
-fn sub_forge_signature_prototype_builtin_undef() {
+fn sub_stryke_signature_prototype_builtin_undef() {
     assert_eq!(
         eval_int(
             r#"sub sig ($a) { $a }
@@ -142,7 +142,7 @@ fn sub_forge_signature_prototype_builtin_undef() {
 }
 
 #[test]
-fn anon_sub_forge_signature() {
+fn anon_sub_stryke_signature() {
     assert_eq!(eval_int(r#"my $f = sub ($n) { $n * 7 }; $f->(6)"#), 42);
 }
 

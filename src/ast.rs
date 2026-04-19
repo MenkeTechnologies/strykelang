@@ -59,7 +59,7 @@ impl GrepBuiltinKeyword {
     }
 }
 
-/// Named parameter in `sub name (SIG ...) { }` — forge extension (not Perl 5 prototype syntax).
+/// Named parameter in `sub name (SIG ...) { }` — stryke extension (not Perl 5 prototype syntax).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SubSigParam {
     /// `$name` or `$name: Type` — one positional scalar from `@_`, optionally typed.
@@ -131,7 +131,7 @@ pub enum StmtKind {
         module: String,
         imports: Vec<Expr>,
     },
-    /// `use 5.008;` / `use 5;` — Perl version requirement (no-op at runtime in forge).
+    /// `use 5.008;` / `use 5;` — Perl version requirement (no-op at runtime in stryke).
     UsePerlVersion {
         version: f64,
     },
@@ -613,7 +613,7 @@ pub enum SortComparator {
     Code(Box<Expr>),
 }
 
-// ── Algebraic `match` expression (forge extension) ──
+// ── Algebraic `match` expression (stryke extension) ──
 
 /// One arm of [`ExprKind::AlgebraicMatch`]: `PATTERN [if EXPR] => EXPR`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -651,7 +651,7 @@ pub enum MatchPattern {
     /// `{ name => $n, ... }` — required keys; `$n` binds the value for the arm body.
     Hash(Vec<MatchHashPair>),
     /// `Some($x)` — matches array-like values with **at least two** elements where index `1` is
-    /// Perl-truthy (forge: `$gen->next` yields `[value, more]` with `more` truthy while iterating).
+    /// Perl-truthy (stryke: `$gen->next` yields `[value, more]` with `more` truthy while iterating).
     OptionSome(String),
 }
 
@@ -895,9 +895,9 @@ pub enum ExprKind {
     MapExpr {
         block: Block,
         list: Box<Expr>,
-        /// `flat_map { }` — peel one ARRAY ref from each iteration (forge extension).
+        /// `flat_map { }` — peel one ARRAY ref from each iteration (stryke extension).
         flatten_array_refs: bool,
-        /// `maps` / `flat_maps` — lazy iterator output (forge); `map` / `flat_map` use `false`.
+        /// `maps` / `flat_maps` — lazy iterator output (stryke); `map` / `flat_map` use `false`.
         #[serde(default)]
         stream: bool,
     },
@@ -928,7 +928,7 @@ pub enum ExprKind {
         list: Box<Expr>,
     },
     ReverseExpr(Box<Expr>),
-    /// `rev EXPR` — always string-reverse (scalar reverse), forge extension.
+    /// `rev EXPR` — always string-reverse (scalar reverse), stryke extension.
     ScalarReverse(Box<Expr>),
     JoinExpr {
         separator: Box<Expr>,

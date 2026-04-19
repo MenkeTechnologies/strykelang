@@ -1,4 +1,4 @@
-//! Crate root — see [`README.md`](https://github.com/MenkeTechnologies/forge) for overview.
+//! Crate root — see [`README.md`](https://github.com/MenkeTechnologies/stryke) for overview.
 // `cargo doc` with `RUSTDOCFLAGS=-D warnings` (CI) flags intra-doc links to private items and
 // a few shorthand links (`MethodCall`, `Op::…`) that do not resolve as paths. Suppress until
 // docs are normalized to `crate::…` paths and public-only links.
@@ -76,12 +76,12 @@ use interpreter::Interpreter;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-/// When `true`, all forge extensions are disabled and only stock Perl 5
+/// When `true`, all stryke extensions are disabled and only stock Perl 5
 /// syntax / builtins are accepted.  Set once from the CLI driver and read by
 /// the parser, compiler, and interpreter.
 static COMPAT_MODE: AtomicBool = AtomicBool::new(false);
 
-/// Enable Perl 5 strict-compatibility mode (disables all forge extensions).
+/// Enable Perl 5 strict-compatibility mode (disables all stryke extensions).
 pub fn set_compat_mode(on: bool) {
     COMPAT_MODE.store(on, Ordering::Relaxed);
 }
@@ -99,22 +99,22 @@ pub fn format_program(p: &ast::Program) -> String {
     fmt::format_program(p)
 }
 
-/// Convert a parsed program to forge syntax with `|>` pipes and no semicolons.
-pub fn convert_to_forge(p: &ast::Program) -> String {
+/// Convert a parsed program to stryke syntax with `|>` pipes and no semicolons.
+pub fn convert_to_stryke(p: &ast::Program) -> String {
     convert::convert_program(p)
 }
 
-/// Convert a parsed program to forge syntax with custom options.
-pub fn convert_to_forge_with_options(p: &ast::Program, opts: &convert::ConvertOptions) -> String {
+/// Convert a parsed program to stryke syntax with custom options.
+pub fn convert_to_stryke_with_options(p: &ast::Program, opts: &convert::ConvertOptions) -> String {
     convert::convert_program_with_options(p, opts)
 }
 
-/// Deconvert a parsed forge program back to standard Perl .pl syntax.
+/// Deconvert a parsed stryke program back to standard Perl .pl syntax.
 pub fn deconvert_to_perl(p: &ast::Program) -> String {
     deconvert::deconvert_program(p)
 }
 
-/// Deconvert a parsed forge program back to standard Perl .pl syntax with options.
+/// Deconvert a parsed stryke program back to standard Perl .pl syntax with options.
 pub fn deconvert_to_perl_with_options(
     p: &ast::Program,
     opts: &deconvert::DeconvertOptions,
@@ -168,7 +168,7 @@ pub fn parse_and_run_string_in_file(
     Ok(v)
 }
 
-/// Crate-root `vendor/perl` (e.g. `List/Util.pm`). The `forge` / `fo` driver prepends this to
+/// Crate-root `vendor/perl` (e.g. `List/Util.pm`). The `stryke` / `fo` driver prepends this to
 /// `@INC` when the directory exists so in-tree pure-Perl modules shadow XS-only core stubs.
 pub fn vendor_perl_inc_path() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("vendor/perl")

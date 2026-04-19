@@ -7,10 +7,10 @@
  ╚═╝      ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝
 ```
 
-[![CI](https://github.com/MenkeTechnologies/forge/actions/workflows/ci.yml/badge.svg)](https://github.com/MenkeTechnologies/forge/actions/workflows/ci.yml)
-[![Crates.io](https://img.shields.io/crates/v/forgelang.svg)](https://crates.io/crates/forgelang)
-[![Downloads](https://img.shields.io/crates/d/forgelang.svg)](https://crates.io/crates/forgelang)
-[![Docs.rs](https://docs.rs/forgelang/badge.svg)](https://docs.rs/forgelang)
+[![CI](https://github.com/MenkeTechnologies/strykelang/actions/workflows/ci.yml/badge.svg)](https://github.com/MenkeTechnologies/strykelang/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/strykelang.svg)](https://crates.io/crates/strykelang)
+[![Downloads](https://img.shields.io/crates/d/strykelang.svg)](https://crates.io/crates/strykelang)
+[![Docs.rs](https://docs.rs/strykelang/badge.svg)](https://docs.rs/strykelang)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ### `[PARALLEL PERL5 INTERPRETER // RUST-POWERED EXECUTION ENGINE]`
@@ -19,7 +19,7 @@
 
 A Perl 5 compatible interpreter in Rust with native parallel primitives, NaN-boxed values, three-tier regex, bytecode VM + Cranelift JIT, and rayon work-stealing across all cores.
 
-### [`Read the Docs`](https://menketechnologies.github.io/forge/)
+### [`Read the Docs`](https://menketechnologies.github.io/strykelang/)
 ---
 
 ## Table of Contents
@@ -49,7 +49,7 @@ A Perl 5 compatible interpreter in Rust with native parallel primitives, NaN-box
 
 ## [0x00] OVERVIEW
 
-`forge` parses and executes Perl 5 scripts with rayon-powered work-stealing primitives across every CPU core. Highlights:
+`stryke` parses and executes Perl 5 scripts with rayon-powered work-stealing primitives across every CPU core. Highlights:
 
 - **New Parallel Subroutines and |> Pipeline Syntactic Sugar**
 - **Runtime values** — `PerlValue` is a NaN-boxed `u64`: immediates (`undef`, `i32`, raw `f64` bits) and tagged `Arc<HeapObject>` pointers for big ints, strings, arrays, hashes, refs, regexes, atomics, channels.
@@ -64,16 +64,16 @@ A Perl 5 compatible interpreter in Rust with native parallel primitives, NaN-box
 ## [0x01] INSTALL
 
 ```sh
-cargo install forgelang
+cargo install strykelang
 # or from source
-git clone https://github.com/MenkeTechnologies/forge && cd forge && cargo build --release
+git clone https://github.com/MenkeTechnologies/stryke && cd stryke && cargo build --release
 ```
 
 #### Zsh tab completion
 
 ```sh
-cp completions/_forge /usr/local/share/zsh/site-functions/_forge
-# or: fpath=(/path/to/forge/completions $fpath) in .zshrc
+cp completions/_stryke /usr/local/share/zsh/site-functions/_stryke
+# or: fpath=(/path/to/stryke/completions $fpath) in .zshrc
 autoload -Uz compinit && compinit
 ```
 
@@ -81,7 +81,7 @@ autoload -Uz compinit && compinit
 
 ---
 
-## [0x01b] WHY FORGE — ONE-LINER COMPARISON
+## [0x01b] WHY STRYKE — ONE-LINER COMPARISON
 
 `fo` is a **one-liner-first** language. No `-e` flag needed, everything built in, shortest syntax wins.
 
@@ -136,19 +136,19 @@ fo --disasm script.pl                   # bytecode listing on stderr
 fo --ast script.pl                      # AST as JSON
 fo --fmt script.pl                      # pretty-print parsed source
 fo --profile script.pl                  # folded stacks + per-line/per-sub ns
-fo --flame script.for                   # colored flamegraph bars in terminal
-fo --flame script.for > flame.svg       # interactive SVG flamegraph when piped
+fo --flame script.stk                   # colored flamegraph bars in terminal
+fo --flame script.stk > flame.svg       # interactive SVG flamegraph when piped
 fo --explain E0001                      # expanded hint for an error code
 fo docs                                  # interactive reference book (vim-style: j/k/]/[/t/q)
 fo docs pmap                             # jump straight to a topic
 fo docs --toc                            # table of contents
 fo docs --search parallel                # search all pages
 fo serve                                # static file server for $PWD on port 8000
-fo serve 8080 app.for                   # HTTP server with handler script
+fo serve 8080 app.stk                   # HTTP server with handler script
 fo serve 3000 -e '"hello " . $req->{path}'  # one-liner HTTP server
 fo build script.pl -o myapp             # bake into a standalone binary ([0x0D])
 fo --lsp                                # language server over stdio ([0x11])
-FORGE_BC_CACHE=1 fo app.pl             # warm starts skip parse + compile ([0x0F])
+STRYKE_BC_CACHE=1 fo app.pl             # warm starts skip parse + compile ([0x0F])
 ```
 
 > **`-e` is optional.** If the first argument isn't a file on disk and looks like code, `fo` runs it directly. `fo 'p 42'` and `fo -e 'p 42'` are equivalent. Use `-e` when combining with `-n`/`-p`/`-l`/`-a` (e.g. `fo -lane 'p $F[0]'`).
@@ -166,7 +166,7 @@ my $x = 1; my $y = 2; p $x + $y # 3 — same line needs `;` between statements
 
 #### Interactive REPL
 
-Run `fo` with no arguments to enter a readline session: line editing, history (`~/.forge_history`), tab completion for keywords, lexicals in scope, sub names, methods after `->` on blessed objects, and file paths. `exit`/`quit`/Ctrl-D leaves. Non-TTY stdin is read as a complete program.
+Run `fo` with no arguments to enter a readline session: line editing, history (`~/.stryke_history`), tab completion for keywords, lexicals in scope, sub names, methods after `->` on blessed objects, and file paths. `exit`/`quit`/Ctrl-D leaves. Non-TTY stdin is read as a complete program.
 
 #### `__DATA__`
 
@@ -275,7 +275,7 @@ my @r = @huge |> pmap_on $cluster heavy
 
 **Parallel capture safety** — workers set `Scope::parallel_guard` after restoring captured lexicals. Assignments to captured non-`mysync` aggregates are rejected at runtime; `mysync`, package-qualified names, and topics (`$_`/`$a`/`$b`) are allowed. `pmap`/`pgrep` treat block failures as `undef`/false; use `pfor` when failures must abort.
 
-**Outer topic `$_<`** — inside nested blocks (`fan`, `fan_cap`, `map`, `grep`, `>{}`), `$_` is rebound per iteration. Use `$_<` to access the **previous** topic, `$_<<` for two levels up, up to `$_<<<<` (4 levels). This is a forge extension — stock Perl 5 has no equivalent.
+**Outer topic `$_<`** — inside nested blocks (`fan`, `fan_cap`, `map`, `grep`, `>{}`), `$_` is rebound per iteration. Use `$_<` to access the **previous** topic, `$_<<` for two levels up, up to `$_<<<<` (4 levels). This is a stryke extension — stock Perl 5 has no equivalent.
 
 ```perl
 ~> 10 >{fan `say "outer topic is $_< and inner topic is $_"`}
@@ -584,7 +584,7 @@ p $add->(3, 4)  # 7
 fn greet ($name: Str) { "Hello, $name!" }
 p greet("world")  # Hello, world!
 
-# stringify/str — convert any value to a parseable forge literal
+# stringify/str — convert any value to a parseable stryke literal
 my $data = {a => [1, 2], b => "hello"}
 my $s = str $data  # +{a => [1, 2], b => "hello"}
 my $copy = eval $s  # round-trip via eval
@@ -654,7 +654,7 @@ my $next = $g->next  # [value, more]
 
 All stock `perl` flags are supported: `-0`, `-a`, `-c`, `-C`, `-d`, `-D`, `-e`, `-E`, `-f`, `-F`, `-g`, `-h`, `-i`, `-I`, `-l`, `-m`, `-M`, `-n`, `-p`, `-s`, `-S`, `-t`, `-T`, `-u`, `-U`, `-v`, `-V`, `-w`, `-W`, `-x`, `-X`. Perl-style single-dash (`-version`, `-help`) and GNU-style double-dash (`--version`, `--help`) long forms work. Bundled switches are expanded: `-Mstrict` → `-M strict`, `-I/tmp` → `-I /tmp`, `-V:version` → `-V version`, `-lane` → `-l -a -n -e`.
 
-forge-specific long flags:
+stryke-specific long flags:
 
 | Flag | Description |
 | --- | --- |
@@ -663,9 +663,9 @@ forge-specific long flags:
 | `--ast` | Dump parsed AST as JSON and exit |
 | `--fmt` | Pretty-print parsed Perl to stdout and exit |
 | `--profile` | Wall-clock profile: per-line + per-sub timings on stderr |
-| `--flame` | Flamegraph: colored terminal bars when interactive, SVG when piped (`fo --flame x.for > flame.svg`) |
+| `--flame` | Flamegraph: colored terminal bars when interactive, SVG when piped (`fo --flame x.stk > flame.svg`) |
 | `--no-jit` | Disable Cranelift JIT (bytecode interpreter only) |
-| `--compat` | Perl 5 strict-compatibility mode: disable all forge extensions (`\|>`, `struct`, `enum`, `match`, `pmap`, `#{expr}`, etc.) |
+| `--compat` | Perl 5 strict-compatibility mode: disable all stryke extensions (`\|>`, `struct`, `enum`, `match`, `pmap`, `#{expr}`, etc.) |
 | `--explain CODE` | Print expanded hint for an error code (e.g. `E0001`) |
 | `--lsp` | Language server over stdio ([\[0x11\]](#0x11-language-server---lsp)) |
 | `-j N` / `--threads N` | Set number of parallel threads (rayon) |
@@ -673,7 +673,7 @@ forge-specific long flags:
 | `--remote-worker-v1` | Legacy one-shot cluster worker over stdio |
 | `build SCRIPT [-o OUT]` | AOT compile script to standalone binary ([\[0x0D\]](#0x0d-standalone-binaries-fo-build)) |
 | `doc [TOPIC]` | Interactive reference book with vim-style navigation (`fo doc`, `fo doc pmap`, `fo doc --toc`) |
-| `serve [PORT] [SCRIPT]` | HTTP server (default port 8000): static files (`fo serve`), script (`fo serve 8080 app.for`), one-liner (`fo serve 3000 -e 'EXPR'`) |
+| `serve [PORT] [SCRIPT]` | HTTP server (default port 8000): static files (`fo serve`), script (`fo serve 8080 app.stk`), one-liner (`fo serve 3000 -e 'EXPR'`) |
 
 ![fo -h](img/fo-help.png)
 
@@ -688,7 +688,7 @@ Scalars `$x`, arrays `@a`, hashes `%h`, refs `\$x`/`\@a`/`\%h`/`\&sub`, anon `[.
 `if`/`elsif`/`else`/`unless`, `while`/`until`, `do { } while/until`, C-style `for`, `foreach`, `last`/`next`/`redo` with labels, postfix `if`/`unless`/`while`/`until`/`for`, ternary, `try { } catch ($err) { } finally { }`, `given`/`when`/`default`, algebraic `match (EXPR) { PATTERN [if EXPR] => EXPR, ... }` (regex, array, hash, wildcard, literal patterns; bindings scoped per arm), `eval_timeout SECS { ... }`.
 
 #### Operators
-Arithmetic, string `.`/`x`, comparison, `eq`/`ne`/`lt`/`gt`/`cmp`, logical `&&`/`||`/`//`/`!`/`and`/`or`/`not`, bitwise (`|`/`&` are set ops on native `Set`), assignment + compound (`+=`, `.=`, `//=`, …), regex `=~`/`!~`, range `..` / `...` (incl. flip-flop with `eof`), arrow `->`, **pipe-forward `|>`** (forge extension — threads the LHS as the **first** argument of the RHS call; see [Extensions beyond stock Perl 5](#extensions-beyond-stock-perl-5)).
+Arithmetic, string `.`/`x`, comparison, `eq`/`ne`/`lt`/`gt`/`cmp`, logical `&&`/`||`/`//`/`!`/`and`/`or`/`not`, bitwise (`|`/`&` are set ops on native `Set`), assignment + compound (`+=`, `.=`, `//=`, …), regex `=~`/`!~`, range `..` / `...` (incl. flip-flop with `eof`), arrow `->`, **pipe-forward `|>`** (stryke extension — threads the LHS as the **first** argument of the RHS call; see [Extensions beyond stock Perl 5](#extensions-beyond-stock-perl-5)).
 
 #### Regex engine
 Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anchor (no `/m`) is rewritten to `(?:\n?\z)`. Match `=~`, dynamic `$str =~ $pat`, substitution `s///`, transliteration `tr///`, flags `g`/`i`/`m`/`s`/`x`/`e`/`r`, captures `$1`…`$n`, named groups → `%+`/`$+{name}`, `\Q...\E`, `quotemeta`, `m//`/`qr//`. The `/r` flag (non-destructive) returns the modified string instead of the match count — auto-injected when `s///` or `tr///` appear as pipe-forward RHS. Bare `/pat/` in statement/boolean context is `$_ =~ /pat/`.
@@ -743,7 +743,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **Typeglobs** — `*foo = \&bar`, `*lhs = *rhs` copies sub/scalar/array/hash/IO slots; package-qualified `*Pkg::name` supported.
 - **`%SIG` (Unix)** — `SIGINT`/`SIGTERM`/`SIGALRM`/`SIGCHLD` as code refs; handlers run between statements/opcodes via `perl_signal::poll`. `IGNORE` and `DEFAULT` honored.
 - **`format` / `write`** — partial: `format NAME = ... .` registers a template; pictures `@<<<<`, `@>>>>`, `@||||`, `@####`, `@****`, literal `@@`. `formline` populates `$^A`. `write` (no args) uses `$~` to stdout. Not yet: `write FILEHANDLE`, `$^`.
-- **`@INC` / `%INC` / `require` / `use`** — `@INC` is built from `-I`, `vendor/perl`, system `perl`'s `@INC` (set `FORGE_NO_PERL_INC` to skip), the script dir, `FORGE_INC`, then `.`. `List::Util` is implemented natively in Rust (`src/list_util.rs`). `use Module qw(a b);` honors `@EXPORT_OK`/`@EXPORT`. Built-in pragmas (`strict`, `warnings`, `utf8`, `feature`, `open`, `Env`) do not load files.
+- **`@INC` / `%INC` / `require` / `use`** — `@INC` is built from `-I`, `vendor/perl`, system `perl`'s `@INC` (set `STRYKE_NO_PERL_INC` to skip), the script dir, `STRYKE_INC`, then `.`. `List::Util` is implemented natively in Rust (`src/list_util.rs`). `use Module qw(a b);` honors `@EXPORT_OK`/`@EXPORT`. Built-in pragmas (`strict`, `warnings`, `utf8`, `feature`, `open`, `Env`) do not load files.
 - **`chunked` / `windowed` / `fold`** — Use **pipe-forward**: **`LIST |> chunked(N)`**, **`LIST |> windowed(N)`**, **`LIST |> fold { BLOCK }`** (same for **`reduce`**). `List::Util::fold` / **`qw(...) |> List::Util::fold { }`** alias **`List::Util::reduce`**. List context → arrayrefs per chunk/window or the folded value; scalar context → chunk/window count where applicable.
 
   ```perl
@@ -769,7 +769,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **Distributed compute** ([\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster)): `cluster([...])` builds an SSH worker pool; `pmap_on $cluster { } @list` and `pflat_map_on $cluster { } @list` fan a map across persistent remote workers with fault tolerance and per-job retries.
 - **Standalone binaries** ([\[0x0D\]](#0x0d-standalone-binaries-fo-build)): `fo build SCRIPT -o OUT` bakes a script into a self-contained executable.
 - **Inline Rust FFI** ([\[0x0E\]](#0x0e-inline-rust-ffi-rust-----)): `rust { pub extern "C" fn ... }` blocks compile to a cdylib on first run, dlopen + register as Perl-callable subs.
-- **Bytecode cache** ([\[0x0F\]](#0x0f-bytecode-cache-pec)): `FORGE_BC_CACHE=1` skips parse + compile on warm starts via on-disk `.pec` bundles.
+- **Bytecode cache** ([\[0x0F\]](#0x0f-bytecode-cache-pec)): `STRYKE_BC_CACHE=1` skips parse + compile on warm starts via on-disk `.pec` bundles.
 - **Language server** ([\[0x11\]](#0x11-language-server---lsp)): `fo --lsp` runs an LSP server over stdio with diagnostics, hover, completion.
 - `mysync` shared state ([\[0x04\]](#0x04-shared-state-mysync)).
 - `frozen my` (or `const my` — same thing, more familiar spelling), `typed my`, `struct`, `enum`, `class` (full OOP with `extends`/`impl`), `trait`, algebraic `match`, `try/catch/finally`, `eval_timeout`, `retry`, `rate_limit`, `every`, `gen { ... yield }`.
@@ -967,7 +967,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   p "#{rgb(255,100,0)}ORANGE#{off}"  # true color (24-bit)
   p "#{color256(196)}RED#{off}"  # 256-color palette
 
-  # ── stringify / str — parseable forge literals ──────────────────────
+  # ── stringify / str — parseable stryke literals ──────────────────────
   $data |> str |> p  # +{a => 1, b => [2, 3]}
   my $fn = fn { $_ * 2 }
   $fn |> str |> p  # fn { $_ * 2; }
@@ -1146,7 +1146,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   **Language comparison — the same 10-stage pipeline:**
 
   ```perl
-  # forge: 1 line, reads left-to-right, no noise
+  # stryke: 1 line, reads left-to-right, no noise
   ~> " hello world " trim uc rev lc ucfirst snake_case camel_case kebab_case to_json p
   ```
 
@@ -1207,12 +1207,12 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   print(json.dumps(s))
   ```
 
-  **forge: 1 line. Perl 5: 10+ lines + CPAN. JavaScript: 15+ lines. Python: 15+ lines.**
+  **stryke: 1 line. Perl 5: 10+ lines + CPAN. JavaScript: 15+ lines. Python: 15+ lines.**
 
   **Lisp hell** — without `|>`, the same pipeline becomes unreadable:
 
   ```perl
-  # forge with |> : reads left-to-right
+  # stryke with |> : reads left-to-right
   " hello world " |> trim |> uc |> rev |> lc |> ucfirst |> rev |> snake_case |> camel_case |> kebab_case |> rev |> uc |> lc |> trim |> to_json |> p
   # "d-lrow-olleh"
 
@@ -1393,7 +1393,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   reduce { |$acc, $val| $acc + $val }, 1..10         # 55
   ```
 
-`forge` is **not** a full `perl` replacement: many real `.pm` files (especially XS modules) will not run. See [`PARITY_ROADMAP.md`](parity/PARITY_ROADMAP.md).
+`stryke` is **not** a full `perl` replacement: many real `.pm` files (especially XS modules) will not run. See [`PARITY_ROADMAP.md`](parity/PARITY_ROADMAP.md).
 
 ---
 
@@ -1422,7 +1422,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **Lexer** ([`src/lexer.rs`](src/lexer.rs)) — context-sensitive tokenizer for Perl's ambiguous syntax (regex vs division, hash vs modulo, heredocs, interpolation).
 - **Parser** ([`src/parser.rs`](src/parser.rs)) — recursive descent + Pratt precedence climbing.
 - **Compiler / VM** ([`src/compiler.rs`](src/compiler.rs), [`src/vm.rs`](src/vm.rs)) — match-dispatch interpreter; `try_vm_execute` runs bytecode first then falls back to tree-walker on `CompileError::Unsupported` or unsupported ops. Compiled subs use slot ops for frame-local `my` scalars (O(1)). Lowering covers `BEGIN`/`UNITCHECK`/`CHECK`/`INIT`/`END` with `Op::SetGlobalPhase`, `mysync`, `tie`, scalar compound assigns via `Scope::atomic_mutate`, regex values, named-sub coderefs, folds, `pcache`, `pselect`, `par_lines`, `par_walk`, `par_sed`, `pwatch`, `each`, four-arg `substr`, dynamic `keys`/`values`/`delete`/`exists`, etc.
-- **JIT** ([`src/jit.rs`](src/jit.rs)) — Cranelift two-tier JIT (linear-sub + block) with cached `OwnedTargetIsa`, tiered after `FORGE_JIT_SUB_INVOKES` (default 50) interpreter invocations. Block JIT validates a CFG, joins typed `i64`/`f64` slots at merges, and compiles straight-line numeric hot loops. Disable with `--no-jit` / `FORGE_NO_JIT=1`.
+- **JIT** ([`src/jit.rs`](src/jit.rs)) — Cranelift two-tier JIT (linear-sub + block) with cached `OwnedTargetIsa`, tiered after `STRYKE_JIT_SUB_INVOKES` (default 50) interpreter invocations. Block JIT validates a CFG, joins typed `i64`/`f64` slots at merges, and compiles straight-line numeric hot loops. Disable with `--no-jit` / `STRYKE_NO_JIT=1`.
 - **Feature work policy** — prefer **new VM opcodes** in [`bytecode.rs`](src/bytecode.rs), lowering in [`compiler.rs`](src/compiler.rs), implementation in [`vm.rs`](src/vm.rs). Do **not** add new `ExprKind`/`StmtKind` variants for new behavior.
 - **Tree-walker** ([`src/interpreter.rs`](src/interpreter.rs)) — fallback execution with `Arc<RwLock>` for thread-safe ref types; `fib_like_tail.rs` specializes simple integer-base-case recursive `f(n-1)+f(n-2)` patterns to avoid nested scope frames.
 - **Parallelism** — each parallel block spawns an isolated interpreter with captured scope; rayon does work-stealing.
@@ -1435,8 +1435,8 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 fo examples/fibonacci.pl
 fo examples/text_processing.pl
 fo examples/parallel_demo.pl
-fo convert examples/fibonacci.pl > examples/fibonacci.for
-fo examples/fibonacci.for
+fo convert examples/fibonacci.pl > examples/fibonacci.stk
+fo examples/fibonacci.stk
 ```
 
 ```sh
@@ -1448,18 +1448,18 @@ fo 'my $a = set(1,2,2,3); my $b = set(2,3,4); p scalar($a | $b), " ", scalar($a 
 
 ## [0x0B] BENCHMARKS
 
-`bash bench/run_bench.sh` — forge vs perl 5.42.2 on Apple M5 18-core. Mean of 10 hyperfine runs with 3 warmups; **includes process startup** (not steady-state).
+`bash bench/run_bench.sh` — stryke vs perl 5.42.2 on Apple M5 18-core. Mean of 10 hyperfine runs with 3 warmups; **includes process startup** (not steady-state).
 
 ```
- forge benchmark harness (honest mode)
+ stryke benchmark harness (honest mode)
  ---------------------------------------
   perl5:   perl 5, version 42, subversion 2 (v5.42.2) built for darwin-thread-multi-2level
-  forge:  This is forge v0.1.41 — A highly parallel Perl 5 interpreter (Rust)
+  stryke:  This is stryke v0.1.41 — A highly parallel Perl 5 interpreter (Rust)
   cores:   18
   warmup:  3 runs
   measure: hyperfine (min 10 runs)
 
-  bench          perl5 ms   forge ms    noJit ms  perturb ms  rs/perl5  jit/noJit
+  bench          perl5 ms   stryke ms    noJit ms  perturb ms  rs/perl5  jit/noJit
   ---------      --------   ---------    --------   ---------  --------  ---------
   startup             2.7         3.7         4.0         3.5     1.37x     1.08x
   fib               192.0         8.3         8.5         8.3     0.04x     1.02x
@@ -1470,18 +1470,18 @@ fo 'my $a = set(1,2,2,3); my $b = set(2,3,4); p scalar($a | $b), " ", scalar($a 
   regex              91.8        13.3        13.0        13.1     0.14x     0.98x
   map_grep           51.9        15.3        15.3        15.8     0.29x     1.00x
 
-  pmap vs map (forge only, 50k items with per-item work)
+  pmap vs map (stryke only, 50k items with per-item work)
   bench            map ms     pmap ms     speedup
   ---------      --------    --------    --------
   pmap              272.7       684.8       0.40x
 
 ```
 
-**forge beats perl5 on 7 of 8 benches** — `fib` and `loop` ~26x, `string` 2.6x, `array` 2.4x, `map_grep` 3.5x. Losses: `hash` 1.46x (Perl 5 hash access is heavily tuned), `regex` 1.08x (effectively a tie), `startup` 1.36x (~900 µs Rust binary load).
+**stryke beats perl5 on 7 of 8 benches** — `fib` and `loop` ~26x, `string` 2.6x, `array` 2.4x, `map_grep` 3.5x. Losses: `hash` 1.46x (Perl 5 hash access is heavily tuned), `regex` 1.08x (effectively a tie), `startup` 1.36x (~900 µs Rust binary load).
 
 **JIT impact is essentially zero on this suite** (`jit/noJit` within ±6%). The wins over Perl 5 come from the **bytecode interpreter**, not the JIT — the current Cranelift block JIT only covers a narrow band of frame-slot numeric hot loops.
 
-The `noJit` column is `forge --no-jit`. The `perturb` column re-runs each bench through a renamed but functionally-equivalent file so any future shape-matcher that short-circuits the canonical bench files would show a divergence.
+The `noJit` column is `stryke --no-jit`. The `perturb` column re-runs each bench through a renamed but functionally-equivalent file so any future shape-matcher that short-circuits the canonical bench files would show a divergence.
 
 #### Parallel speedup
 
@@ -1502,19 +1502,19 @@ Pull requests and pushes to `main` run [`.github/workflows/ci.yml`](.github/work
 cargo test --lib                # parser smoke, lexer/value/error/scope, interpreter, vm, jit
 cargo test --test integration   # tests/suite/* (runtime, readline list context, line-mode stdin, …)
 cargo bench --bench jit_compare # JIT vs interpreter on the same bytecode
-bash bench/run_bench.sh         # full perl5 vs forge suite (needs hyperfine)
+bash bench/run_bench.sh         # full perl5 vs stryke suite (needs hyperfine)
 bash parity/run_parity.sh       # exact stdout/stderr parity vs system perl (20 000+ cases)
 ```
 
 - `Cargo.lock` is committed (CI uses `--locked`). If your global gitignore strips it, force-add updates: `git add -f Cargo.lock`.
-- Disable JIT: `FORGE_NO_JIT=1` or `fo --no-jit`.
+- Disable JIT: `STRYKE_NO_JIT=1` or `fo --no-jit`.
 - Parity work is tracked in [`PARITY_ROADMAP.md`](parity/PARITY_ROADMAP.md).
 
 ---
 
 ## [0x0D] STANDALONE BINARIES (`fo build`)
 
-Compile any Perl script to a single self-contained native executable. The output is a copy of the `fo` binary with the script source embedded as a zstd-compressed trailer. `scp` it to any compatible machine and run it — **no `perl`, no `forge`, no `@INC`, no CPAN**.
+Compile any Perl script to a single self-contained native executable. The output is a copy of the `fo` binary with the script source embedded as a zstd-compressed trailer. `scp` it to any compatible machine and run it — **no `perl`, no `stryke`, no `@INC`, no CPAN**.
 
 ```sh
 fo build app.pl                         # → ./app
@@ -1530,7 +1530,7 @@ fo build app.pl -o /usr/local/bin/app   # explicit output path
 - Unix: the output is marked `+x` automatically. macOS: unsigned — `codesign` before distribution if your environment requires it.
 - Current AOT runtime sets `@INC = (".")`; modules outside the embedded script have to be inlined. (`require` of a local `.pm` next to the running binary still works.)
 
-**Under the hood** ([`src/aot.rs`](src/aot.rs)): trailer layout is `[zstd payload][u64 compressed_len][u64 uncompressed_len][u32 version][u32 reserved][8B magic b"FORGEAOT"]`. ELF / Mach-O loaders ignore bytes past the mapped segments so the embedded payload is invisible to the OS loader. The `b"FORGEAOT"` magic plus version byte lets a future pre-compiled-bytecode payload ship alongside v1 without breaking already-shipped binaries.
+**Under the hood** ([`src/aot.rs`](src/aot.rs)): trailer layout is `[zstd payload][u64 compressed_len][u64 uncompressed_len][u32 version][u32 reserved][8B magic b"STRYKEAOT"]`. ELF / Mach-O loaders ignore bytes past the mapped segments so the embedded payload is invisible to the OS loader. The `b"STRYKEAOT"` magic plus version byte lets a future pre-compiled-bytecode payload ship alongside v1 without breaking already-shipped binaries.
 
 ```sh
 # 13 MB binary, no external runtime required:
@@ -1546,7 +1546,7 @@ hi alice
 
 ## [0x0E] INLINE RUST FFI (`rust { ... }`)
 
-Drop a block of Rust directly into a Perl script. On first run, forge compiles it to a cdylib (cached at `~/.cache/forge/ffi/<hash>.{dylib,so}`), `dlopen`s it, and registers every exported function as a regular Perl-callable sub.
+Drop a block of Rust directly into a Perl script. On first run, stryke compiles it to a cdylib (cached at `~/.cache/stryke/ffi/<hash>.{dylib,so}`), `dlopen`s it, and registers every exported function as a regular Perl-callable sub.
 
 ```perl
 rust {
@@ -1575,9 +1575,9 @@ p fib 50             # 12586269025
 
 **Requirements**: `rustc` must be on `PATH`. First-run compile costs ~1 second; subsequent runs hit the cache and pay only `dlopen` (~10 ms). `#[no_mangle]` is auto-inserted by the wrapper — you don't need to write it. The body is `#![crate_type = "cdylib"]` with `use std::os::raw::c_char; use std::ffi::{CStr, CString};` already in scope.
 
-**How it works** ([`src/rust_sugar.rs`](src/rust_sugar.rs), [`src/rust_ffi.rs`](src/rust_ffi.rs)): the source-level pre-pass desugars every top-level `rust { ... }` into a `BEGIN { __forge_rust_compile("<base64 body>", $line); }` call. The `__forge_rust_compile` builtin hashes the body, compiles via `rustc --edition=2021 -O` if the cache is cold, `libc::dlopen`s the result, `dlsym`s each detected signature, and stores the raw symbol + arity/type tag in a process-global registry. Calls from Perl flow through a fallback arm in [`crate::builtins::try_builtin`] that dispatches on the signature tag via direct function-pointer transmute — no libffi dep, no per-call alloc, no marshalling overhead beyond the `PerlValue::to_int` / `to_number` / `to_string` calls you'd do for any builtin.
+**How it works** ([`src/rust_sugar.rs`](src/rust_sugar.rs), [`src/rust_ffi.rs`](src/rust_ffi.rs)): the source-level pre-pass desugars every top-level `rust { ... }` into a `BEGIN { __stryke_rust_compile("<base64 body>", $line); }` call. The `__stryke_rust_compile` builtin hashes the body, compiles via `rustc --edition=2021 -O` if the cache is cold, `libc::dlopen`s the result, `dlsym`s each detected signature, and stores the raw symbol + arity/type tag in a process-global registry. Calls from Perl flow through a fallback arm in [`crate::builtins::try_builtin`] that dispatches on the signature tag via direct function-pointer transmute — no libffi dep, no per-call alloc, no marshalling overhead beyond the `PerlValue::to_int` / `to_number` / `to_string` calls you'd do for any builtin.
 
-**Combine with AOT for zero-friction deployment:** `fo build script.pl -o prog` bakes the Perl source — which includes the `rust { ... }` block — into a standalone binary. The FFI compile still happens on first run of `./prog`, but the user only needs `rustc` once, then the `~/.cache/forge/ffi/` entry is permanent.
+**Combine with AOT for zero-friction deployment:** `fo build script.pl -o prog` bakes the Perl source — which includes the `rust { ... }` block — into a standalone binary. The FFI compile still happens on first run of `./prog`, but the user only needs `rustc` once, then the `~/.cache/stryke/ffi/` entry is permanent.
 
 **Limitations (v1):**
 
@@ -1590,11 +1590,11 @@ p fib 50             # 12586269025
 
 ## [0x0F] BYTECODE CACHE (`.pec`)
 
-`FORGE_BC_CACHE=1` enables the on-disk bytecode cache. The first run of a script parses + compiles + persists a `.pec` bundle to `~/.cache/forge/bc/<sha256>.pec`. Every subsequent run skips **both parse and compile** and feeds the cached chunk straight into the VM.
+`STRYKE_BC_CACHE=1` enables the on-disk bytecode cache. The first run of a script parses + compiles + persists a `.pec` bundle to `~/.cache/stryke/bc/<sha256>.pec`. Every subsequent run skips **both parse and compile** and feeds the cached chunk straight into the VM.
 
 ```sh
-FORGE_BC_CACHE=1 fo my_app.pl              # cold: parse + compile + save
-FORGE_BC_CACHE=1 fo my_app.pl              # warm: load + dispatch
+STRYKE_BC_CACHE=1 fo my_app.pl              # cold: parse + compile + save
+STRYKE_BC_CACHE=1 fo my_app.pl              # warm: load + dispatch
 ```
 
 **Measured impact** (Apple M5, 13 MB release `fo`, hyperfine `--warmup 5 -N`, mean ± σ):
@@ -1609,12 +1609,12 @@ The toy-script result is the honest one to call out: for tiny scripts the cache 
 
 **Tuning knobs:**
 
-- `FORGE_BC_CACHE=1` — opt-in. (V1 is opt-in to avoid surprising users with stray cache files; flip to opt-out once we have a `fo cache prune` subcommand and confidence in invalidation.)
-- `FORGE_BC_DIR=/path/to/dir` — override the cache location. Useful for test isolation and CI.
+- `STRYKE_BC_CACHE=1` — opt-in. (V1 is opt-in to avoid surprising users with stray cache files; flip to opt-out once we have a `fo cache prune` subcommand and confidence in invalidation.)
+- `STRYKE_BC_DIR=/path/to/dir` — override the cache location. Useful for test isolation and CI.
 
 **Format** ([`src/pec.rs`](src/pec.rs)): `[4B magic b"PEC2"][zstd-compressed bincode of PecBundle]`. The `PecBundle` carries `format_version`, `pointer_width` (so a cache built on a 64-bit host is rejected on 32-bit), `strict_vars` (a mismatch is treated as a clean miss → re-compile), `source_fingerprint`, the parsed `Program`, and the compiled `Chunk`. Format version 2 introduced zstd compression — files dropped ~10× in size and warm-load latency dropped with them.
 
-**Cache key** ([`pec::source_fingerprint`](src/pec.rs)): SHA-256 of `(crate version, source filename, full source including -M prelude)`. Editing the script, upgrading forge, or changing the `-M` flags all force a recompile. The crate version is mixed in so a `cargo install forgelang` upgrade silently invalidates everyone's cache rather than risking a stale-bytecode mismatch.
+**Cache key** ([`pec::source_fingerprint`](src/pec.rs)): SHA-256 of `(crate version, source filename, full source including -M prelude)`. Editing the script, upgrading stryke, or changing the `-M` flags all force a recompile. The crate version is mixed in so a `cargo install strykelang` upgrade silently invalidates everyone's cache rather than risking a stale-bytecode mismatch.
 
 **Pairs with [`fo build`](#0x0d-standalone-binaries-fo-build):** AOT binaries pick up the cache for free. The first run of a shipped binary parses and compiles the embedded source; every subsequent run on the same machine reuses the cached chunk. The cache key includes the script name baked into the trailer, so two binaries with different embedded scripts never collide.
 
@@ -1622,7 +1622,7 @@ The toy-script result is the honest one to call out: for tiny scripts the cache 
 
 - **Bypassed for `-e` / `-E` one-liners.** Measured: warm `.pec` is ~2-3× *slower* than cold for tiny scripts because the deserialize cost (~1-2 ms for fs read + zstd decode + bincode) dominates the parse+compile work it replaces (~500 µs). Each unique `-e` invocation would also pollute the cache directory with no GC. The break-even is around 1000 lines, so file-based scripts only.
 - Bypassed for `-n` / `-p` / `--lint` / `--check` / `--ast` / `--fmt` / `--profile` modes (those paths run a different driver loop).
-- No automatic eviction yet — old `.pec` files for edited scripts accumulate. `rm ~/.cache/forge/bc/*.pec` is a fine workaround until `fo cache prune` lands.
+- No automatic eviction yet — old `.pec` files for edited scripts accumulate. `rm ~/.cache/stryke/bc/*.pec` is a fine workaround until `fo cache prune` lands.
 - Cache hit path cannot fall back to the tree walker mid-run — but this is unreachable in practice because `compile_program` only emits ops the VM implements before persisting.
 
 ---
@@ -1744,13 +1744,13 @@ fo --remote-worker-v1                # legacy one-shot session for compat tests
 - **Symbol lookup** for subs and packages within the open file
 - **Completion** for built-in function names and the keywords listed in [\[0x08\]](#0x08-supported-perl-features)
 
-Wire it into VS Code, JetBrains, or any LSP-aware editor by pointing the client at `fo --lsp` as the language-server command. There is no `Cargo.toml`-style separate `forge-lsp` binary in v1 — the same `fo` you run scripts with also acts as its own language server when invoked with `--lsp`.
+Wire it into VS Code, JetBrains, or any LSP-aware editor by pointing the client at `fo --lsp` as the language-server command. There is no `Cargo.toml`-style separate `stryke-lsp` binary in v1 — the same `fo` you run scripts with also acts as its own language server when invoked with `--lsp`.
 
 ```jsonc
 // .vscode/settings.json
 {
-  "forge.serverPath": "/usr/local/bin/fo",
-  "forge.serverArgs": ["--lsp"]
+  "stryke.serverPath": "/usr/local/bin/fo",
+  "stryke.serverArgs": ["--lsp"]
 }
 ```
 
@@ -1758,12 +1758,12 @@ Wire it into VS Code, JetBrains, or any LSP-aware editor by pointing the client 
 
 ## [0x12] LANGUAGE REFLECTION
 
-forge exposes its own parser and dispatcher state as plain Perl hashes, so
+stryke exposes its own parser and dispatcher state as plain Perl hashes, so
 you can enumerate, look up, filter, and pipe over everything the interpreter
 knows about — no separate API surface to learn, just standard hash ops.
 
 The data is derived at compile time by `build.rs` from the source of truth:
-section-commented groups in `is_perl5_core` / `forge_extension_name` (for
+section-commented groups in `is_perl5_core` / `stryke_extension_name` (for
 categories), `try_builtin` arm names (for aliases), and `doc_for_label_text`
 in `src/lsp.rs` (for descriptions). No hand-maintained list, no stale counts.
 
@@ -1773,19 +1773,19 @@ Eight hashes; every direct lookup (`$h{name}`) is **O(1)**. Forward maps:
 
 | Long name | Short | Key → Value |
 | --- | --- | --- |
-| `%forge::builtins` | `%b` | **primary** callable name → category (`"parallel"`, `"string"`, …). Primaries-only — clean unique-op count. |
-| `%forge::all` | `%all` | **every spelling** (primary + alias) → category. Aliases inherit their primary's tag. Use this for `scalar keys %all`. |
-| `%forge::perl_compats` | `%pc` | subset of `%b`: Perl 5 core only, name → category |
-| `%forge::extensions` | `%e` | subset of `%b`: forge-only, name → category |
-| `%forge::aliases` | `%a` | alias → canonical primary (`$a{tj}` → `"to_json"`) |
-| `%forge::descriptions` | `%d` | name → one-line LSP summary (**sparse**) |
+| `%stryke::builtins` | `%b` | **primary** callable name → category (`"parallel"`, `"string"`, …). Primaries-only — clean unique-op count. |
+| `%stryke::all` | `%all` | **every spelling** (primary + alias) → category. Aliases inherit their primary's tag. Use this for `scalar keys %all`. |
+| `%stryke::perl_compats` | `%pc` | subset of `%b`: Perl 5 core only, name → category |
+| `%stryke::extensions` | `%e` | subset of `%b`: stryke-only, name → category |
+| `%stryke::aliases` | `%a` | alias → canonical primary (`$a{tj}` → `"to_json"`) |
+| `%stryke::descriptions` | `%d` | name → one-line LSP summary (**sparse**) |
 
 Inverted indexes for constant-time reverse queries:
 
 | Long name | Short | Key → Value |
 | --- | --- | --- |
-| `%forge::categories` | `%c` | category → arrayref of names (`$c{parallel}` → `[pmap, pgrep, …]`) |
-| `%forge::primaries` | `%p` | primary → arrayref of its aliases (`$p{to_json}` → `[tj]`) |
+| `%stryke::categories` | `%c` | category → arrayref of names (`$c{parallel}` → `[pmap, pgrep, …]`) |
+| `%stryke::primaries` | `%p` | primary → arrayref of its aliases (`$p{to_json}` → `[tj]`) |
 
 #### Examples
 
@@ -1807,7 +1807,7 @@ fo 'p scalar keys %all'
 # see just Perl compats
 fo 'keys %pc |> sort |> p'
 
-# see just forge extensions
+# see just stryke extensions
 fo 'keys %e |> sort |> p'
 
 # enumerate a whole category in O(1)
@@ -1837,7 +1837,7 @@ fo 'for my $h (qw(b all pc e a d c p)) {
   queries.
 - Hash sigil namespace is separate from scalars and subs, so `%a`/`%b`/`%c`/`%d`/`%e`/`%p`/`%pc`
   don't collide with `$a`/`$b` sort specials or the `e` extension sub.
-- Short aliases are value copies of the long `%forge::*` names — currently
+- Short aliases are value copies of the long `%stryke::*` names — currently
   read-only in practice, so the copy never diverges.
 - `%descriptions` is sparse: `exists $d{$name}` doubles as "is this
   documented in the LSP?". Undocumented ops still appear in `%builtins`

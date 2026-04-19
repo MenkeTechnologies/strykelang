@@ -52,18 +52,18 @@ mod tests {
     #[test]
     fn run_readpipe_echo_stdout_string() {
         let mut interp = Interpreter::new();
-        let v = run_readpipe(&mut interp, "echo forge_readpipe_ok", 1).expect("readpipe");
-        assert_eq!(v.to_string(), "forge_readpipe_ok\n");
+        let v = run_readpipe(&mut interp, "echo stryke_readpipe_ok", 1).expect("readpipe");
+        assert_eq!(v.to_string(), "stryke_readpipe_ok\n");
     }
 
     #[test]
     fn run_capture_echo_stdout_exit_zero() {
         let mut interp = Interpreter::new();
-        let v = run_capture(&mut interp, "echo forge_capture_ok", 1).expect("capture");
+        let v = run_capture(&mut interp, "echo stryke_capture_ok", 1).expect("capture");
         let c = v.as_capture().expect("capture PerlValue");
         assert_eq!(c.exitcode, 0, "stderr={:?}", c.stderr);
         assert!(
-            c.stdout.contains("forge_capture_ok"),
+            c.stdout.contains("stryke_capture_ok"),
             "stdout={:?}",
             c.stdout
         );

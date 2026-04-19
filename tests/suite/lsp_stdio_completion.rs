@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 
-const FO: &str = env!("CARGO_BIN_EXE_fo");
+const FO: &str = env!("CARGO_BIN_EXE_st");
 const URI: &str = "file:///lsp_completion_fixture.pl";
 const READ_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_DRAIN: usize = 64;

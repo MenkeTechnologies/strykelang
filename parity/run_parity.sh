@@ -118,7 +118,7 @@ version="${version:-unknown}"
 generated=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # Emit totals line on stdout — always, regardless of `--summary`.
-printf 'parity: %d/%d passed (%s%%) · failed %d · forge v%s\n' \
+printf 'parity: %d/%d passed (%s%%) · failed %d · stryke v%s\n' \
   "$passed" "$total" "$pct" "$failed" "$version"
 
 # Point the user at the failure log when there were any and it's not stderr.
@@ -131,7 +131,7 @@ fi
 # signal, the log file has the triage detail, so a third artifact is noise.
 if [[ -n "$JSON_OUT" ]]; then
   tmp_json=$(mktemp "${TMPDIR:-/tmp}/parity.summary.$$.XXXXXX")
-  printf '{\n  "total": %d,\n  "passed": %d,\n  "failed": %d,\n  "percent": %s,\n  "forge_version": "%s",\n  "generated_at": "%s"\n}\n' \
+  printf '{\n  "total": %d,\n  "passed": %d,\n  "failed": %d,\n  "percent": %s,\n  "stryke_version": "%s",\n  "generated_at": "%s"\n}\n' \
     "$total" "$passed" "$failed" "$pct" "$version" "$generated" >"$tmp_json"
   command mv "$tmp_json" "$JSON_OUT"
 fi

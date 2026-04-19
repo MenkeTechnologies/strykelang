@@ -9,7 +9,7 @@ the case id and slot so lines are textually unique within a file.
 
 Only core Perl 5 is used (no CPAN). Exotic or privileged ops are either omitted or
 written as no-ops with `if 0` where including the syntax still helps parsers; the
-predicate is constant-false so stock perl and forge do not execute them.
+predicate is constant-false so stock perl and stryke do not execute them.
 
 Payload lines come from FMT after str.format; chained statements are split one per line.
 """
@@ -235,7 +235,7 @@ def _species_table() -> tuple:
         "my $v%(n)d_L%(s)d = %(u)d & %(v)d;",
         "my $v%(n)d_L%(s)d = %(u)d | %(v)d;",
         "my $v%(n)d_L%(s)d = %(u)d ^ %(v)d;",
-        # Avoid << / >>: some runtimes lex << as here-doc start (forge).
+        # Avoid << / >>: some runtimes lex << as here-doc start (stryke).
         "my $v%(n)d_L%(s)d = int(%(u)d * (2 ** (%(v)d %% 3)));",
         "my $v%(n)d_L%(s)d = int(%(u)d / (2 ** ((%(v)d %% 3) + 1)));",
         "my $v%(n)d_L%(s)d = ~%(u)d & 255;",
@@ -252,7 +252,7 @@ def _species_table() -> tuple:
         "my $v%(n)d_L%(s)d = defined(undef);",
         "my $v%(n)d_L%(s)d = eval \"%(u)d + %(v)d\";",
         "my $v%(n)d_L%(s)d = 0+(@{[ %(u)d, %(v)d, %(w)d ]});",
-        # () = (1..N) breaks forge sort later in the file; use scalar @rng for the count.
+        # () = (1..N) breaks stryke sort later in the file; use scalar @rng for the count.
         "my @rng%(n)d_L%(s)d = (1..(3 + (%(u)d %% 8))); my $v%(n)d_L%(s)d = scalar @rng%(n)d_L%(s)d;",
         # strings
         "my $v%(n)d_L%(s)d = length(\"%(u)d\");",
@@ -272,10 +272,10 @@ def _species_table() -> tuple:
         "my $v%(n)d_L%(s)d = hex sprintf \"%%x\", %(u)d %% 255;",
         "my $v%(n)d_L%(s)d = oct sprintf \"0o%%o\", 1 + %(u)d %% 6;",
         "my $v%(n)d_L%(s)d = length sprintf \"%%x\", %(u)d %% 4095;",
-        # Nested my inside length/chop/chomp breaks forge scoping; use two lexicals on one line.
+        # Nested my inside length/chop/chomp breaks stryke scoping; use two lexicals on one line.
         "my $st%(n)d_L%(s)d = \"x%(n)dy%(s)d\"; my $v%(n)d_L%(s)d = length($st%(n)d_L%(s)d);",
         "my $v%(n)d_L%(s)d = do { local $_ = \"foo\"; pos $_; };",
-        # vec() not in forge yet; ord(substr) matches8-bit vec read for ASCII.
+        # vec() not in stryke yet; ord(substr) matches8-bit vec read for ASCII.
         "my $v%(n)d_L%(s)d = ord substr(\"abc\", %(w)d %% 3, 1);",
         "my $t%(n)d_L%(s)d = \"ab\"; my $v%(n)d_L%(s)d = chop($t%(n)d_L%(s)d);",
         "my $m%(n)d_L%(s)d = \"ab\\n\"; my $v%(n)d_L%(s)d = chomp($m%(n)d_L%(s)d);",
@@ -290,14 +290,14 @@ def _species_table() -> tuple:
         "my @v%(n)d_L%(s)d = grep { /./ } split //, \"%(u)d\";",
         "my @v%(n)d_L%(s)d = sort { $a <=> $b } (%(u)d %% 20, %(v)d %% 20, %(w)d %% 20);",
         "my @v%(n)d_L%(s)d = sort { $b cmp $a } qw/zz yy xx/;",
-        # forge splice/unshift/push/pop/shift require a real @array, not @{[...]}.
+        # stryke splice/unshift/push/pop/shift require a real @array, not @{[...]}.
         "my @sp%(n)d_L%(s)d = (9, 8, 7); my $v%(n)d_L%(s)d = scalar splice @sp%(n)d_L%(s)d, 1, 1;",
         "my @uh%(n)d_L%(s)d = (1); my $v%(n)d_L%(s)d = unshift @uh%(n)d_L%(s)d, %(u)d %% 9;",
         "my @ps%(n)d_L%(s)d = (2, 3); my $v%(n)d_L%(s)d = push @ps%(n)d_L%(s)d, %(v)d %% 9;",
         "my @pp%(n)d_L%(s)d = (10, 20, 30); my $v%(n)d_L%(s)d = pop @pp%(n)d_L%(s)d;",
         "my @sh%(n)d_L%(s)d = (7, 8, 9); my $v%(n)d_L%(s)d = shift @sh%(n)d_L%(s)d;",
         "my @v%(n)d_L%(s)d = @{[qw(a b c)]}[0, 2];",
-        # forge: hash refs must use literal pairs (not map inside { }); keys need %{$href}.
+        # stryke: hash refs must use literal pairs (not map inside { }); keys need %{$href}.
         "my $hk%(n)d_L%(s)d = { %(u)d => 1, %(v)d => 1, %(w)d => 1 }; my $v%(n)d_L%(s)d = scalar keys %%{$hk%(n)d_L%(s)d};",
         "my $hv%(n)d_L%(s)d = { a => %(u)d, b => %(v)d }; my $v%(n)d_L%(s)d = scalar values %%{$hv%(n)d_L%(s)d};",
         "my $he%(n)d_L%(s)d = { z => %(u)d }; my $v%(n)d_L%(s)d = exists $he%(n)d_L%(s)d->{z};",
@@ -309,7 +309,7 @@ def _species_table() -> tuple:
         "my $v%(n)d_L%(s)d = ref bless { n => %(u)d }, \"O%(n)d_L%(s)d\";",
         # regex
         "my $v%(n)d_L%(s)d = (\"hello%(u)d\" =~ /l/) ? 1 : 0;",
-        # /r modifier not parsed by forge; use do-block copy mutate.
+        # /r modifier not parsed by stryke; use do-block copy mutate.
         "my $v%(n)d_L%(s)d = do { my $t = \"abc%(v)d\"; $t =~ s/b/B/g; $t };",
         "my $v%(n)d_L%(s)d = do { my $t = \"aba\"; $t =~ tr/a/b/; $t };",
         # pack
@@ -317,7 +317,7 @@ def _species_table() -> tuple:
         "my $v%(n)d_L%(s)d = unpack(\"H*\", pack(\"n\", %(u)d %% 65535));",
         # time
         "my $v%(n)d_L%(s)d = $^T ^ %(u)d;",
-        # localtime/gmtime not in forge yet; deterministic stand-ins (same on perl and fo).
+        # localtime/gmtime not in stryke yet; deterministic stand-ins (same on perl and fo).
         "my $v%(n)d_L%(s)d = (%(n)d + %(s)d) %% 7;",
         "my $v%(n)d_L%(s)d = (%(hh)d %% 100000) %% 28 + 1;",
         # introspection

@@ -1,8 +1,8 @@
-//! Algebraic `match (EXPR) { PATTERN => EXPR, ... }` (forge extension; tree interpreter).
+//! Algebraic `match (EXPR) { PATTERN => EXPR, ... }` (stryke extension; tree interpreter).
 
-use forge::ast::{ExprKind, MatchPattern, StmtKind};
-use forge::parse;
-use forge::run;
+use stryke::ast::{ExprKind, MatchPattern, StmtKind};
+use stryke::parse;
+use stryke::run;
 
 #[test]
 fn parse_algebraic_match_shape() {

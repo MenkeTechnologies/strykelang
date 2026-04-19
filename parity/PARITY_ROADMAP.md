@@ -1,4 +1,4 @@
-# Perl 5 parity roadmap (forge)
+# Perl 5 parity roadmap (stryke)
 
 This is an **ordered engineering program**, not a promise of bit-identical `perl` for every program. Each phase has a **definition of done** so work can land in sequence without scope creep.
 
@@ -115,7 +115,7 @@ This is an **ordered engineering program**, not a promise of bit-identical `perl
   ┌──────┬────────────────────────────────────────────────────────────────────────────────┐
   │ Case │                                      Gap                                       │
   ├──────┼────────────────────────────────────────────────────────────────────────────────┤
-  │ 302  │ <<'EOF' single-quoted — forge interpolates inside                             │ - done
+  │ 302  │ <<'EOF' single-quoted — stryke interpolates inside                             │ - done
   ├──────┼────────────────────────────────────────────────────────────────────────────────┤
   │ 303  │ ${\ EXPR} inline expression interpolation produces empty                       │
   ├──────┼────────────────────────────────────────────────────────────────────────────────┤

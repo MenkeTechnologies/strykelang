@@ -46,12 +46,12 @@
 //! Linear tier: [`validate_linear_seq`] / [`linear_result_cell_seq`]. Block tier: [`validate_block_cfg`]
 //! (stack merge at joins, merged [`Cell`] for the `Halt` result); [`block_jit_validate`] is the
 //! `pub(crate)` entry used by [`crate::vm::VM::execute`]. Both use [`simulate_one_op`] so
-//! division/modulus/`Pow` safety matches the VM; integer `Pow` calls [`forge_jit_pow_i64`], and the
-//! float path uses [`forge_jit_pow_f64`] / [`forge_jit_fmod_f64`] when the abstract stack is float.
+//! division/modulus/`Pow` safety matches the VM; integer `Pow` calls [`stryke_jit_pow_i64`], and the
+//! float path uses [`stryke_jit_pow_f64`] / [`stryke_jit_fmod_f64`] when the abstract stack is float.
 //!
 //! ## Subroutine linear JIT call-out (`Op::Call`)
 //! A compiled sub that calls another compiled sub with **stack-args** (`GetArg`) and **scalar** context
-//! can emit a Cranelift call to [`crate::vm::forge_jit_call_sub`] (VM pointer as the first parameter,
+//! can emit a Cranelift call to [`crate::vm::stryke_jit_call_sub`] (VM pointer as the first parameter,
 //! then callee bytecode IP and up to eight `i64` args). The trampoline runs [`crate::vm::VM::jit_trampoline_run_sub`]
 //! so the callee may be interpreted or JIT’d again.
 //!
@@ -60,14 +60,14 @@
 //! on set values, non-integer slot/plain/arg materialization where the VM would not be `i64`,
 //! calls that are not a compiled stack-args scalar `Op::Call` (see above), array/hash ops.
 //! String `.` and string compares are **not** JIT’d: [`simulate_one_op`] returns [`None`] for those
-//! opcodes so validation bails to the interpreter. [`forge_jit_concat_bits`] /
-//! [`forge_jit_string_cmp_bits`] remain for a future lowering.
+//! opcodes so validation bails to the interpreter. [`stryke_jit_concat_bits`] /
+//! [`stryke_jit_string_cmp_bits`] remain for a future lowering.
 //! `LoadUndef` is JIT’d as full nanbox bits; the return
 //! path uses `PerlValue::from_raw_bits` when the abstract result is [`Cell::Undef`].
 //!
 //! ## Subroutine block JIT call-out (`Op::Call`)
 //! Same ABI as linear: jitable [`Op::Call`] to a compiled stack-args scalar sub emits a call to
-//! [`crate::vm::forge_jit_call_sub`] with the VM pointer (first block parameter when needed).
+//! [`crate::vm::stryke_jit_call_sub`] with the VM pointer (first block parameter when needed).
 //!
 //! ## Not JIT’d (block CFG)
 //! Unsupported opcodes, inconsistent stack height at a merge, or merge where [`join_cell`] fails.
@@ -75,13 +75,13 @@
 //! unconditional jump (fall-through is dead). When the abstract top is [`Cell::Dyn`] immediately after
 //! [`Op::GetScalarSlot`] / [`Op::GetScalarPlain`] / [`Op::GetArg`], the block JIT uses **raw-buffer
 //! mode**: slot/plain/arg `i64` tables carry [`PerlValue::raw_bits`] (sign reinterpretation), loads
-//! preserve `undef`, and the terminator calls [`forge_jit_is_defined_raw_bits`]. That mode rejects
+//! preserve `undef`, and the terminator calls [`stryke_jit_is_defined_raw_bits`]. That mode rejects
 //! arithmetic and most other data ops so stack values stay valid NaN-box encodings. Other [`Cell::Dyn`]
 //! / [`Cell::DynF`] shapes still fall back to the interpreter.
 //!
 //! ## VM integration
 //! **Tiered subroutine JIT**: [`crate::vm::VM`] counts invocations per sub-entry IP; only after
-//! **`FORGE_JIT_SUB_INVOKES`** (default **50**) does it attempt [`try_run_linear_sub`] / block sub-JIT,
+//! **`STRYKE_JIT_SUB_INVOKES`** (default **50**) does it attempt [`try_run_linear_sub`] / block sub-JIT,
 //! so cold code avoids Cranelift compile cost.
 //!
 //! [`crate::vm::VM::execute`] tries [`try_run_linear_ops`] on the full opcode buffer, then
@@ -222,7 +222,7 @@ fn isa_flags() -> settings::Flags {
 
 /// Integer `**` matching `vm.rs` when both operands are `i64` and `0 ≤ exp ≤ 63`.
 #[no_mangle]
-pub extern "C" fn forge_jit_pow_i64(base: i64, exp: i64) -> i64 {
+pub extern "C" fn stryke_jit_pow_i64(base: i64, exp: i64) -> i64 {
     if (0..=63).contains(&exp) {
         base.wrapping_pow(exp as u32)
     } else {
@@ -232,13 +232,13 @@ pub extern "C" fn forge_jit_pow_i64(base: i64, exp: i64) -> i64 {
 
 /// Float `**` — delegates to `f64::powf`.
 #[no_mangle]
-pub extern "C" fn forge_jit_pow_f64(base: f64, exp: f64) -> f64 {
+pub extern "C" fn stryke_jit_pow_f64(base: f64, exp: f64) -> f64 {
     base.powf(exp)
 }
 
 /// Float `%` — delegates to Rust `f64 % f64` (IEEE 754 remainder / `fmod`).
 #[no_mangle]
-pub extern "C" fn forge_jit_fmod_f64(a: f64, b: f64) -> f64 {
+pub extern "C" fn stryke_jit_fmod_f64(a: f64, b: f64) -> f64 {
     a % b
 }
 
@@ -256,7 +256,7 @@ pub(crate) fn perl_value_bits_from_jit_string_operand(n: i64) -> u64 {
 
 /// `!` on a value that is interpreted as integer (`PerlValue::integer(n)`), matching `Op::LogNot` + stack.
 #[no_mangle]
-pub extern "C" fn forge_jit_lognot_i64(n: i64) -> i64 {
+pub extern "C" fn stryke_jit_lognot_i64(n: i64) -> i64 {
     if PerlValue::integer(n).is_true() {
         0
     } else {
@@ -266,7 +266,7 @@ pub extern "C" fn forge_jit_lognot_i64(n: i64) -> i64 {
 
 /// String concatenation (`.`) — operands are Perl nanbox bits or linear-JIT plain integers (`a` then `b`).
 #[no_mangle]
-pub extern "C" fn forge_jit_concat_bits(a: i64, b: i64) -> i64 {
+pub extern "C" fn stryke_jit_concat_bits(a: i64, b: i64) -> i64 {
     let pa = PerlValue::from_raw_bits(perl_value_bits_from_jit_string_operand(a));
     let pb = PerlValue::from_raw_bits(perl_value_bits_from_jit_string_operand(b));
     let mut s = pa.into_string();
@@ -276,7 +276,7 @@ pub extern "C" fn forge_jit_concat_bits(a: i64, b: i64) -> i64 {
 
 /// String compares — `kind` 1=`StrEq`, 2=`StrNe`, 3=`StrCmp`, 4–7=`StrLt`/`StrGt`/`StrLe`/`StrGe`.
 #[no_mangle]
-pub extern "C" fn forge_jit_string_cmp_bits(a: i64, b: i64, kind: i32) -> i64 {
+pub extern "C" fn stryke_jit_string_cmp_bits(a: i64, b: i64, kind: i32) -> i64 {
     use std::cmp::Ordering;
     let pa = PerlValue::from_raw_bits(perl_value_bits_from_jit_string_operand(a));
     let pb = PerlValue::from_raw_bits(perl_value_bits_from_jit_string_operand(b));
@@ -310,7 +310,7 @@ pub extern "C" fn forge_jit_string_cmp_bits(a: i64, b: i64, kind: i32) -> i64 {
 
 /// `defined` for a value transported as [`PerlValue::raw_bits`] in an `i64` stack slot (block JIT raw-buffer mode).
 #[no_mangle]
-pub extern "C" fn forge_jit_is_defined_raw_bits(bits: i64) -> i64 {
+pub extern "C" fn stryke_jit_is_defined_raw_bits(bits: i64) -> i64 {
     if PerlValue::from_raw_bits(bits as u64).is_undef() {
         0
     } else {
@@ -334,26 +334,29 @@ fn cached_owned_isa() -> Option<&'static OwnedTargetIsa> {
 fn new_jit_module() -> Option<JITModule> {
     let isa = cached_owned_isa()?.clone();
     let mut builder = JITBuilder::with_isa(isa, default_libcall_names());
-    builder.symbol("forge_jit_pow_i64", forge_jit_pow_i64 as *const u8);
-    builder.symbol("forge_jit_lognot_i64", forge_jit_lognot_i64 as *const u8);
-    builder.symbol("forge_jit_pow_f64", forge_jit_pow_f64 as *const u8);
-    builder.symbol("forge_jit_fmod_f64", forge_jit_fmod_f64 as *const u8);
+    builder.symbol("stryke_jit_pow_i64", stryke_jit_pow_i64 as *const u8);
+    builder.symbol("stryke_jit_lognot_i64", stryke_jit_lognot_i64 as *const u8);
+    builder.symbol("stryke_jit_pow_f64", stryke_jit_pow_f64 as *const u8);
+    builder.symbol("stryke_jit_fmod_f64", stryke_jit_fmod_f64 as *const u8);
     builder.symbol(
-        "forge_jit_is_defined_raw_bits",
-        forge_jit_is_defined_raw_bits as *const u8,
+        "stryke_jit_is_defined_raw_bits",
+        stryke_jit_is_defined_raw_bits as *const u8,
     );
     builder.symbol(
-        "forge_jit_call_sub",
-        crate::vm::forge_jit_call_sub as *const u8,
-    );
-    builder.symbol("forge_jit_concat_bits", forge_jit_concat_bits as *const u8);
-    builder.symbol(
-        "forge_jit_concat_vm",
-        crate::vm::forge_jit_concat_vm as *const u8,
+        "stryke_jit_call_sub",
+        crate::vm::stryke_jit_call_sub as *const u8,
     );
     builder.symbol(
-        "forge_jit_string_cmp_bits",
-        forge_jit_string_cmp_bits as *const u8,
+        "stryke_jit_concat_bits",
+        stryke_jit_concat_bits as *const u8,
+    );
+    builder.symbol(
+        "stryke_jit_concat_vm",
+        crate::vm::stryke_jit_concat_vm as *const u8,
+    );
+    builder.symbol(
+        "stryke_jit_string_cmp_bits",
+        stryke_jit_string_cmp_bits as *const u8,
     );
     Some(JITModule::new(builder))
 }
@@ -370,7 +373,7 @@ fn find_sub_entry_slice(
     None
 }
 
-/// `Op::Call` / [`Op::CallStaticSubId`] that can be lowered to [`crate::vm::forge_jit_call_sub`].
+/// `Op::Call` / [`Op::CallStaticSubId`] that can be lowered to [`crate::vm::stryke_jit_call_sub`].
 fn call_is_jitable(op: &Op, sub_entries: &[(u16, usize, bool)]) -> bool {
     let (name_idx, argc, wa) = match op {
         Op::Call(ni, a, w) => (*ni, *a, *w),
@@ -1279,7 +1282,7 @@ fn compile_linear_ops(
         ps.returns.push(AbiParam::new(types::I64));
         Some(
             module
-                .declare_function("forge_jit_pow_i64", Linkage::Import, &ps)
+                .declare_function("stryke_jit_pow_i64", Linkage::Import, &ps)
                 .ok()?,
         )
     } else {
@@ -1292,7 +1295,7 @@ fn compile_linear_ops(
         ps.returns.push(AbiParam::new(types::F64));
         Some(
             module
-                .declare_function("forge_jit_pow_f64", Linkage::Import, &ps)
+                .declare_function("stryke_jit_pow_f64", Linkage::Import, &ps)
                 .ok()?,
         )
     } else {
@@ -1307,7 +1310,7 @@ fn compile_linear_ops(
         ps.returns.push(AbiParam::new(types::F64));
         Some(
             module
-                .declare_function("forge_jit_fmod_f64", Linkage::Import, &ps)
+                .declare_function("stryke_jit_fmod_f64", Linkage::Import, &ps)
                 .ok()?,
         )
     } else {
@@ -1321,7 +1324,7 @@ fn compile_linear_ops(
         ps.returns.push(AbiParam::new(types::I64));
         Some(
             module
-                .declare_function("forge_jit_lognot_i64", Linkage::Import, &ps)
+                .declare_function("stryke_jit_lognot_i64", Linkage::Import, &ps)
                 .ok()?,
         )
     } else {
@@ -1336,7 +1339,7 @@ fn compile_linear_ops(
         ps.returns.push(AbiParam::new(types::I64));
         Some(
             module
-                .declare_function("forge_jit_concat_bits", Linkage::Import, &ps)
+                .declare_function("stryke_jit_concat_bits", Linkage::Import, &ps)
                 .ok()?,
         )
     } else {
@@ -1356,7 +1359,7 @@ fn compile_linear_ops(
         ps.returns.push(AbiParam::new(types::I64));
         Some(
             module
-                .declare_function("forge_jit_string_cmp_bits", Linkage::Import, &ps)
+                .declare_function("stryke_jit_string_cmp_bits", Linkage::Import, &ps)
                 .ok()?,
         )
     } else {
@@ -1376,7 +1379,7 @@ fn compile_linear_ops(
         ps.returns.push(AbiParam::new(types::I64));
         Some(
             module
-                .declare_function("forge_jit_call_sub", Linkage::Import, &ps)
+                .declare_function("stryke_jit_call_sub", Linkage::Import, &ps)
                 .ok()?,
         )
     } else {
@@ -1541,7 +1544,7 @@ fn compile_linear_void_ops(seq: &[Op], constants: &[PerlValue]) -> Option<Linear
         ps.returns.push(AbiParam::new(types::I64));
         Some(
             module
-                .declare_function("forge_jit_pow_i64", Linkage::Import, &ps)
+                .declare_function("stryke_jit_pow_i64", Linkage::Import, &ps)
                 .ok()?,
         )
     } else {
@@ -1554,7 +1557,7 @@ fn compile_linear_void_ops(seq: &[Op], constants: &[PerlValue]) -> Option<Linear
         ps.returns.push(AbiParam::new(types::F64));
         Some(
             module
-                .declare_function("forge_jit_pow_f64", Linkage::Import, &ps)
+                .declare_function("stryke_jit_pow_f64", Linkage::Import, &ps)
                 .ok()?,
         )
     } else {
@@ -1569,7 +1572,7 @@ fn compile_linear_void_ops(seq: &[Op], constants: &[PerlValue]) -> Option<Linear
         ps.returns.push(AbiParam::new(types::F64));
         Some(
             module
-                .declare_function("forge_jit_fmod_f64", Linkage::Import, &ps)
+                .declare_function("stryke_jit_fmod_f64", Linkage::Import, &ps)
                 .ok()?,
         )
     } else {
@@ -1583,7 +1586,7 @@ fn compile_linear_void_ops(seq: &[Op], constants: &[PerlValue]) -> Option<Linear
         ps.returns.push(AbiParam::new(types::I64));
         Some(
             module
-                .declare_function("forge_jit_lognot_i64", Linkage::Import, &ps)
+                .declare_function("stryke_jit_lognot_i64", Linkage::Import, &ps)
                 .ok()?,
         )
     } else {
@@ -3261,7 +3264,7 @@ fn compile_blocks_validated(
         ps.returns.push(AbiParam::new(types::I64));
         Some(
             module
-                .declare_function("forge_jit_pow_i64", Linkage::Import, &ps)
+                .declare_function("stryke_jit_pow_i64", Linkage::Import, &ps)
                 .ok()?,
         )
     } else {
@@ -3274,7 +3277,7 @@ fn compile_blocks_validated(
         ps.returns.push(AbiParam::new(types::F64));
         Some(
             module
-                .declare_function("forge_jit_pow_f64", Linkage::Import, &ps)
+                .declare_function("stryke_jit_pow_f64", Linkage::Import, &ps)
                 .ok()?,
         )
     } else {
@@ -3289,7 +3292,7 @@ fn compile_blocks_validated(
         ps.returns.push(AbiParam::new(types::F64));
         Some(
             module
-                .declare_function("forge_jit_fmod_f64", Linkage::Import, &ps)
+                .declare_function("stryke_jit_fmod_f64", Linkage::Import, &ps)
                 .ok()?,
         )
     } else {
@@ -3303,7 +3306,7 @@ fn compile_blocks_validated(
         ps.returns.push(AbiParam::new(types::I64));
         Some(
             module
-                .declare_function("forge_jit_lognot_i64", Linkage::Import, &ps)
+                .declare_function("stryke_jit_lognot_i64", Linkage::Import, &ps)
                 .ok()?,
         )
     } else {
@@ -3318,7 +3321,7 @@ fn compile_blocks_validated(
         ps.returns.push(AbiParam::new(types::I64));
         Some(
             module
-                .declare_function("forge_jit_concat_vm", Linkage::Import, &ps)
+                .declare_function("stryke_jit_concat_vm", Linkage::Import, &ps)
                 .ok()?,
         )
     } else {
@@ -3338,7 +3341,7 @@ fn compile_blocks_validated(
         ps.returns.push(AbiParam::new(types::I64));
         Some(
             module
-                .declare_function("forge_jit_string_cmp_bits", Linkage::Import, &ps)
+                .declare_function("stryke_jit_string_cmp_bits", Linkage::Import, &ps)
                 .ok()?,
         )
     } else {
@@ -3352,7 +3355,7 @@ fn compile_blocks_validated(
         ps.returns.push(AbiParam::new(types::I64));
         Some(
             module
-                .declare_function("forge_jit_is_defined_raw_bits", Linkage::Import, &ps)
+                .declare_function("stryke_jit_is_defined_raw_bits", Linkage::Import, &ps)
                 .ok()?,
         )
     } else {
@@ -3371,7 +3374,7 @@ fn compile_blocks_validated(
         ps.returns.push(AbiParam::new(types::I64));
         Some(
             module
-                .declare_function("forge_jit_call_sub", Linkage::Import, &ps)
+                .declare_function("stryke_jit_call_sub", Linkage::Import, &ps)
                 .ok()?,
         )
     } else {

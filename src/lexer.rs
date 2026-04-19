@@ -910,7 +910,7 @@ impl Lexer {
             }
             Some(c) if c.is_alphabetic() || c == '_' => {
                 let ident = self.read_package_qualified_identifier();
-                // `$_<`, `$_<<`, … — outer topic (forge extension); only for bare `_`.
+                // `$_<`, `$_<<`, … — outer topic (stryke extension); only for bare `_`.
                 if ident == "_" {
                     let mut lts = String::new();
                     while self.peek() == Some('<') {

@@ -2,7 +2,7 @@ use std::process::Command;
 
 #[test]
 fn pe_compat_mode_extensions_are_errors() {
-    let exe = env!("CARGO_BIN_EXE_fo");
+    let exe = env!("CARGO_BIN_EXE_st");
     let out = Command::new(exe)
         .args(["--compat", "-e", "collect(1, 2, 3);"])
         .output()
@@ -10,12 +10,12 @@ fn pe_compat_mode_extensions_are_errors() {
 
     assert!(!out.status.success());
     let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(stderr.contains("forge extension"));
+    assert!(stderr.contains("stryke extension"));
 }
 
 #[test]
 fn pe_compat_mode_udf_shadowing_works() {
-    let exe = env!("CARGO_BIN_EXE_fo");
+    let exe = env!("CARGO_BIN_EXE_st");
     let out = Command::new(exe)
         .args(["--compat", "-e", "sub collect { 42 } print collect();"])
         .output()
@@ -28,7 +28,7 @@ fn pe_compat_mode_udf_shadowing_works() {
 
 #[test]
 fn pe_no_compat_mode_extensions_work() {
-    let exe = env!("CARGO_BIN_EXE_fo");
+    let exe = env!("CARGO_BIN_EXE_st");
     let out = Command::new(exe)
         .args(["-e", "print scalar collect(1, 2, 3);"])
         .output()
