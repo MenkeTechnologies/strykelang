@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/perlrs" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">perlrs v0.6.1 · 2582 topics · 24 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">perlrs v0.6.3 · 2711 topics · 25 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -175,7 +175,8 @@
         <li><a href="#ch-perlrs-extensions">perlrs Extensions</a> <span class="chapter-count">19</span></li>
         <li><a href="#ch-data-serialization">Data &amp; Serialization</a> <span class="chapter-count">39</span></li>
         <li><a href="#ch-http-networking">HTTP &amp; Networking</a> <span class="chapter-count">23</span></li>
-        <li><a href="#ch-crypto-encoding">Crypto &amp; Encoding</a> <span class="chapter-count">21</span></li>
+        <li><a href="#ch-crypto-encoding">Crypto &amp; Encoding</a> <span class="chapter-count">133</span></li>
+        <li><a href="#ch-special-math-functions">Special Math Functions</a> <span class="chapter-count">12</span></li>
         <li><a href="#ch-parallel-i-o">Parallel I/O</a> <span class="chapter-count">8</span></li>
         <li><a href="#ch-file-i-o">File I/O</a> <span class="chapter-count">35</span></li>
         <li><a href="#ch-strings">Strings</a> <span class="chapter-count">26</span></li>
@@ -190,7 +191,7 @@
         <li><a href="#ch-process">Process</a> <span class="chapter-count">20</span></li>
         <li><a href="#ch-pack-binary">Pack / Binary</a> <span class="chapter-count">3</span></li>
         <li><a href="#ch-logging">Logging</a> <span class="chapter-count">7</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">2144</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">2149</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -2132,7 +2133,7 @@ p $ssh_port                     # 22
     </section>
     <section class="tutorial-section" id="ch-crypto-encoding">
       <h2>Crypto &amp; Encoding</h2>
-      <p class="chapter-meta">21 topics</p>
+      <p class="chapter-meta">133 topics</p>
       <article class="doc-entry" id="doc-sha256">
         <h3><a class="doc-anchor" href="#doc-sha256">#</a> <code>sha256</code></h3>
         <p><code>sha256</code> (alias <code>s256</code>) computes the SHA-256 cryptographic hash of the input data and returns it as a 64-character lowercase hexadecimal string. SHA-256 is the most widely used hash function for data integrity verification, content addressing, and digital signatures. The Rust implementation is significantly faster than pure-Perl alternatives. Accepts strings or byte buffers.</p>
@@ -2195,6 +2196,184 @@ my $webhook_sig = hmac(&quot;POST /hook\n$body&quot;, $secret)
 p $webhook_sig eq $expected ? &quot;valid&quot; : &quot;tampered&quot;
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-blake2b">
+        <h3><a class="doc-anchor" href="#doc-blake2b">#</a> <code>blake2b</code></h3>
+        <p><code>blake2b</code> (alias <code>b2b</code>) computes the BLAKE2b-512 cryptographic hash and returns a 128-character hex string. BLAKE2b is faster than SHA-256 while being at least as secure. It is used in Argon2 password hashing, libsodium, WireGuard, and many modern cryptographic protocols. Prefer BLAKE2b or BLAKE3 for new projects over SHA-256.</p>
+        <pre><code class="lang-perl">p blake2b &quot;hello world&quot;   # 021ced8799...
+my $hash = b2b(slurp &quot;large-file.bin&quot;)
+my @hashes = map blake2b @messages
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-blake2s">
+        <h3><a class="doc-anchor" href="#doc-blake2s">#</a> <code>blake2s</code></h3>
+        <p><code>blake2s</code> (alias <code>b2s</code>) computes the BLAKE2s-256 cryptographic hash and returns a 64-character hex string. BLAKE2s is optimized for 8-32 bit platforms while BLAKE2b targets 64-bit. Use BLAKE2s when targeting embedded systems, WebAssembly, or when a 256-bit digest suffices.</p>
+        <pre><code class="lang-perl">p blake2s &quot;hello world&quot;   # 9aec6806...
+my $checksum = b2s($firmware_blob)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-blake3">
+        <h3><a class="doc-anchor" href="#doc-blake3">#</a> <code>blake3</code></h3>
+        <p><code>blake3</code> (alias <code>b3</code>) computes the BLAKE3 cryptographic hash and returns a 64-character hex string (256-bit). BLAKE3 is the latest evolution — it is parallelizable, even faster than BLAKE2, and suitable for hashing large files at maximum speed. It is the recommended hash function for new projects where legacy compatibility is not required.</p>
+        <pre><code class="lang-perl">p blake3 &quot;hello world&quot;   # d74981efa...
+my $hash = b3(slurp &quot;gigabyte-file.bin&quot;)  # fast!
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-argon2-hash">
+        <h3><a class="doc-anchor" href="#doc-argon2-hash">#</a> <code>argon2_hash</code></h3>
+        <p><code>argon2_hash</code> (alias <code>argon2</code>) hashes a password using Argon2id, the winner of the Password Hashing Competition. Returns a PHC-format string containing algorithm parameters, salt, and hash. Argon2 is memory-hard and resistant to GPU/ASIC attacks. Use this for user password storage — never use MD5/SHA for passwords.</p>
+        <pre><code class="lang-perl">my $hash = argon2_hash(&quot;user-password&quot;)
+to_file(&quot;user.hash&quot;, $hash)
+# later...
+if (argon2_verify(&quot;user-password&quot;, $hash)) {
+    p &quot;login successful&quot;
+}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-argon2-verify">
+        <h3><a class="doc-anchor" href="#doc-argon2-verify">#</a> <code>argon2_verify</code></h3>
+        <p><code>argon2_verify</code> verifies a password against an Argon2 PHC hash string. Returns 1 if the password matches, 0 otherwise. The verification automatically extracts parameters from the stored hash, so changing Argon2 settings for new hashes does not break existing ones.</p>
+        <pre><code class="lang-perl">my $stored = rl(&quot;user.hash&quot;)
+if (argon2_verify($user_input, $stored)) {
+    p &quot;access granted&quot;
+} else {
+    p &quot;invalid password&quot;
+}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-bcrypt-hash">
+        <h3><a class="doc-anchor" href="#doc-bcrypt-hash">#</a> <code>bcrypt_hash</code></h3>
+        <p><code>bcrypt_hash</code> (alias <code>bcrypt</code>) hashes a password using the bcrypt algorithm, returning a standard <code>$2b$...</code> format string. Bcrypt has been the industry standard for password hashing for over 20 years. While Argon2 is now preferred for new systems, bcrypt remains secure and widely deployed.</p>
+        <pre><code class="lang-perl">my $hash = bcrypt_hash(&quot;my-password&quot;)
+p $hash  # $2b$12$...
+if (bcrypt_verify(&quot;my-password&quot;, $hash)) {
+    p &quot;correct&quot;
+}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-bcrypt-verify">
+        <h3><a class="doc-anchor" href="#doc-bcrypt-verify">#</a> <code>bcrypt_verify</code></h3>
+        <p><code>bcrypt_verify</code> verifies a password against a bcrypt hash string. Returns 1 if correct, 0 otherwise. The cost factor and salt are extracted from the stored hash automatically.</p>
+        <pre><code class="lang-perl">if (bcrypt_verify($password, $stored_hash)) {
+    grant_access()
+}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-scrypt-hash">
+        <h3><a class="doc-anchor" href="#doc-scrypt-hash">#</a> <code>scrypt_hash</code></h3>
+        <p><code>scrypt_hash</code> (alias <code>scrypt</code>) hashes a password using the scrypt algorithm, returning a PHC-format string. Scrypt is memory-hard like Argon2 and is used in cryptocurrency (Litecoin) and some enterprise systems. It predates Argon2 but remains secure.</p>
+        <pre><code class="lang-perl">my $hash = scrypt_hash(&quot;password123&quot;)
+if (scrypt_verify(&quot;password123&quot;, $hash)) {
+    p &quot;verified&quot;
+}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-scrypt-verify">
+        <h3><a class="doc-anchor" href="#doc-scrypt-verify">#</a> <code>scrypt_verify</code></h3>
+        <p><code>scrypt_verify</code> verifies a password against a scrypt PHC hash. Returns 1 on match, 0 otherwise.</p>
+        <pre><code class="lang-perl">if (scrypt_verify($input, $stored)) {
+    p &quot;valid&quot;
+}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pbkdf2">
+        <h3><a class="doc-anchor" href="#doc-pbkdf2">#</a> <code>pbkdf2</code></h3>
+        <p><code>pbkdf2</code> (alias <code>pbkdf2_derive</code>) derives a cryptographic key from a password using PBKDF2-HMAC-SHA256. Returns a 64-character hex string (32 bytes). Takes password, salt, and optional iteration count (default 100,000). Use this when you need a fixed-length key from a password — for encryption keys, not password storage (use Argon2/bcrypt for that).</p>
+        <pre><code class="lang-perl">my $key = pbkdf2(&quot;password&quot;, &quot;random-salt&quot;)
+p $key  # 64 hex chars = 32 bytes
+my $strong = pbkdf2(&quot;pass&quot;, $salt, 200_000)  # more iterations
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-random-bytes">
+        <h3><a class="doc-anchor" href="#doc-random-bytes">#</a> <code>random_bytes</code></h3>
+        <p><code>random_bytes</code> (alias <code>randbytes</code>) generates cryptographically secure random bytes using the OS CSPRNG. Returns a byte buffer of the specified length. Use for encryption keys, nonces, salts, and any security-sensitive randomness. Never use <code>rand()</code> for cryptographic purposes.</p>
+        <pre><code class="lang-perl">my $key = random_bytes(32)   # 256-bit key
+my $nonce = random_bytes(12) # 96-bit nonce for AES-GCM
+p hex_encode($key)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-random-bytes-hex">
+        <h3><a class="doc-anchor" href="#doc-random-bytes-hex">#</a> <code>random_bytes_hex</code></h3>
+        <p><code>random_bytes_hex</code> (alias <code>randhex</code>) generates cryptographically secure random bytes and returns them as a hex string. Convenient when you need a random hex token or key without a separate hex_encode call.</p>
+        <pre><code class="lang-perl">my $token = random_bytes_hex(16)  # 32 hex chars
+p $token   # 7a3f9b2c1d...
+my $api_key = &quot;sk_&quot; . randhex(24)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-aes-encrypt">
+        <h3><a class="doc-anchor" href="#doc-aes-encrypt">#</a> <code>aes_encrypt</code></h3>
+        <p><code>aes_encrypt</code> (alias <code>aes_enc</code>) encrypts plaintext using AES-256-GCM authenticated encryption. Takes a 32-byte key (use <code>random_bytes(32)</code> or <code>pbkdf2</code>). Returns a base64 string containing the nonce and ciphertext. AES-GCM provides both confidentiality and integrity — tampering is detected on decryption.</p>
+        <pre><code class="lang-perl">my $key = random_bytes(32)
+my $cipher = aes_encrypt($key, &quot;secret message&quot;)
+p $cipher  # base64 encoded
+my $plain = aes_decrypt($key, $cipher)
+p $plain   # secret message
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-aes-decrypt">
+        <h3><a class="doc-anchor" href="#doc-aes-decrypt">#</a> <code>aes_decrypt</code></h3>
+        <p><code>aes_decrypt</code> (alias <code>aes_dec</code>) decrypts AES-256-GCM ciphertext produced by <code>aes_encrypt</code>. Takes the same 32-byte key and the base64 ciphertext. Dies if the key is wrong or the ciphertext was tampered with (authentication failure).</p>
+        <pre><code class="lang-perl">my $plain = aes_decrypt($key, $ciphertext)
+p $plain
+# wrong key or tampered data raises exception
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-chacha-encrypt">
+        <h3><a class="doc-anchor" href="#doc-chacha-encrypt">#</a> <code>chacha_encrypt</code></h3>
+        <p><code>chacha_encrypt</code> (alias <code>chacha_enc</code>) encrypts plaintext using ChaCha20-Poly1305 authenticated encryption. Takes a 32-byte key. Returns base64(nonce || ciphertext || tag). ChaCha20-Poly1305 is the modern alternative to AES-GCM — faster in software, constant-time, and used in TLS 1.3, WireGuard, and SSH.</p>
+        <pre><code class="lang-perl">my $key = random_bytes(32)
+my $cipher = chacha_encrypt($key, &quot;secret data&quot;)
+my $plain = chacha_decrypt($key, $cipher)
+p $plain
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-chacha-decrypt">
+        <h3><a class="doc-anchor" href="#doc-chacha-decrypt">#</a> <code>chacha_decrypt</code></h3>
+        <p><code>chacha_decrypt</code> (alias <code>chacha_dec</code>) decrypts ChaCha20-Poly1305 ciphertext. Takes the same 32-byte key and base64 ciphertext. Dies on wrong key or tampering.</p>
+        <pre><code class="lang-perl">my $plain = chacha_decrypt($key, $cipher)
+p $plain
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ed25519-keygen">
+        <h3><a class="doc-anchor" href="#doc-ed25519-keygen">#</a> <code>ed25519_keygen</code></h3>
+        <p><code>ed25519_keygen</code> (alias <code>ed_keygen</code>) generates an Ed25519 signing keypair. Returns [private_key_hex, public_key_hex]. Ed25519 is the modern standard for digital signatures — fast, secure, and used in SSH, GPG, and cryptocurrency. The private key is 32 bytes (64 hex), the public key is also 32 bytes.</p>
+        <pre><code class="lang-perl">my ($priv, $pub) = @{ ed25519_keygen() }
+p &quot;Private: $priv&quot;
+p &quot;Public:  $pub&quot;
+my $sig = ed25519_sign($priv, &quot;message&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ed25519-sign">
+        <h3><a class="doc-anchor" href="#doc-ed25519-sign">#</a> <code>ed25519_sign</code></h3>
+        <p><code>ed25519_sign</code> (alias <code>ed_sign</code>) signs a message with an Ed25519 private key. Takes the private key (hex) and message. Returns a 128-character hex signature (64 bytes). Signatures are deterministic — the same key+message always produces the same signature.</p>
+        <pre><code class="lang-perl">my $sig = ed25519_sign($private_key, &quot;hello world&quot;)
+p $sig   # 128 hex chars
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ed25519-verify">
+        <h3><a class="doc-anchor" href="#doc-ed25519-verify">#</a> <code>ed25519_verify</code></h3>
+        <p><code>ed25519_verify</code> (alias <code>ed_verify</code>) verifies an Ed25519 signature. Takes public_key_hex, message, signature_hex. Returns 1 if valid, 0 if invalid. Never trust unsigned data in security contexts.</p>
+        <pre><code class="lang-perl">if (ed25519_verify($pub, &quot;hello world&quot;, $sig)) {
+    p &quot;signature valid&quot;
+} else {
+    p &quot;FORGED!&quot;
+}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-x25519-keygen">
+        <h3><a class="doc-anchor" href="#doc-x25519-keygen">#</a> <code>x25519_keygen</code></h3>
+        <p><code>x25519_keygen</code> (alias <code>x_keygen</code>) generates an X25519 key-exchange keypair. Returns [private_key_hex, public_key_hex]. X25519 is the modern Diffie-Hellman — used in TLS 1.3, Signal, WireGuard. Both parties generate keypairs and exchange public keys to derive a shared secret.</p>
+        <pre><code class="lang-perl">my ($my_priv, $my_pub) = @{ x25519_keygen() }
+# send $my_pub to peer, receive $their_pub
+my $shared = x25519_dh($my_priv, $their_pub)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-x25519-dh">
+        <h3><a class="doc-anchor" href="#doc-x25519-dh">#</a> <code>x25519_dh</code></h3>
+        <p><code>x25519_dh</code> (alias <code>x_dh</code>) performs X25519 Diffie-Hellman key exchange. Takes your private key and their public key. Returns a 64-character hex shared secret. Both parties derive the same secret, which can be used as an encryption key.</p>
+        <pre><code class="lang-perl">my $shared = x25519_dh($my_private, $their_public)
+my $key = hex_decode(substr($shared, 0, 64))  # use as AES key
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-base64-encode">
         <h3><a class="doc-anchor" href="#doc-base64-encode">#</a> <code>base64_encode</code></h3>
         <p><code>base64_encode</code> (alias <code>b64e</code>) encodes a string or byte buffer as a Base64 string using the standard alphabet (A-Z, a-z, 0-9, +, /). Base64 is the standard way to embed binary data in text-based formats like JSON, XML, email (MIME), and data URIs. The output length is always a multiple of 4, padded with <code>=</code> as needed. Use <code>base64_decode</code> to reverse the encoding.</p>
@@ -2238,7 +2417,7 @@ p hex_decode(hex_encode(&quot;round trip&quot;))  # round trip
       </article>
       <article class="doc-entry" id="doc-uuid">
         <h3><a class="doc-anchor" href="#doc-uuid">#</a> <code>uuid</code></h3>
-        <p><code>uuid</code> (alias <code>uid</code>) generates a cryptographically random UUID version 4 string in the standard 8-4-4-4-12 hyphenated format. Each call produces a unique identifier suitable for database primary keys, correlation IDs, session tokens, temporary file names, or any situation requiring a globally unique identifier without coordination. The randomness comes from the OS CSPRNG.</p>
+        <p><code>uuid</code> generates a cryptographically random UUID version 4 string in the standard 8-4-4-4-12 hyphenated format. Each call produces a unique identifier suitable for database primary keys, correlation IDs, session tokens, temporary file names, or any situation requiring a globally unique identifier without coordination. The randomness comes from the OS CSPRNG.</p>
         <pre><code class="lang-perl">my $id = uuid()
 p $id   # e.g., 550e8400-e29b-41d4-a716-446655440000
 my %record = (id =&gt; uuid(), name =&gt; &quot;Alice&quot;, created =&gt; time)
@@ -2342,6 +2521,696 @@ p $original
 # file round-trip
 to_file(&quot;cache.zst&quot;, zstd($payload))
 p zstd_decode(rl(&quot;cache.zst&quot;))
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sha3-256">
+        <h3><a class="doc-anchor" href="#doc-sha3-256">#</a> <code>sha3_256</code></h3>
+        <p><code>sha3_256</code> (alias <code>s3_256</code>) computes the SHA3-256 hash (NIST FIPS 202) and returns a 64-character hex string. SHA-3 is the newest NIST-approved hash family, designed as a backup if SHA-2 is ever compromised. It uses the Keccak sponge construction which is fundamentally different from SHA-2.</p>
+        <pre><code class="lang-perl">p sha3_256 &quot;hello world&quot;   # 644bcc7e...
+my $h = s3_256(slurp &quot;file.bin&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sha3-512">
+        <h3><a class="doc-anchor" href="#doc-sha3-512">#</a> <code>sha3_512</code></h3>
+        <p><code>sha3_512</code> (alias <code>s3_512</code>) computes the SHA3-512 hash and returns a 128-character hex string. Provides a 512-bit digest with the SHA-3 sponge construction.</p>
+        <pre><code class="lang-perl">p sha3_512 &quot;hello world&quot;   # 840006...
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-shake128">
+        <h3><a class="doc-anchor" href="#doc-shake128">#</a> <code>shake128</code></h3>
+        <p><code>shake128</code> is a SHA-3 extendable-output function (XOF). Unlike fixed-length hashes, SHAKE can produce arbitrary-length output. Takes data and output length in bytes, returns hex. Useful for key derivation or when you need a variable-length digest.</p>
+        <pre><code class="lang-perl">p shake128(&quot;seed&quot;, 32)   # 64 hex chars (32 bytes)
+p shake128(&quot;seed&quot;, 64)   # 128 hex chars
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-shake256">
+        <h3><a class="doc-anchor" href="#doc-shake256">#</a> <code>shake256</code></h3>
+        <p><code>shake256</code> is a SHA-3 XOF with higher security margin than SHAKE128. Takes data and output length in bytes, returns hex.</p>
+        <pre><code class="lang-perl">p shake256(&quot;seed&quot;, 32)
+p shake256(&quot;key material&quot;, 64)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ripemd160">
+        <h3><a class="doc-anchor" href="#doc-ripemd160">#</a> <code>ripemd160</code></h3>
+        <p><code>ripemd160</code> (alias <code>rmd160</code>) computes the RIPEMD-160 hash and returns a 40-character hex string. RIPEMD-160 is used in Bitcoin addresses (Hash160 = RIPEMD160(SHA256(pubkey))) and some legacy systems. Not recommended for new designs but essential for Bitcoin/crypto compatibility.</p>
+        <pre><code class="lang-perl">p ripemd160 &quot;hello world&quot;   # 98c615784c...
+my $hash160 = ripemd160(hex_decode(sha256($pubkey)))
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-siphash">
+        <h3><a class="doc-anchor" href="#doc-siphash">#</a> <code>siphash</code></h3>
+        <p><code>siphash</code> computes SipHash-2-4 with default keys (0,0) and returns a 16-character hex string (64-bit). SipHash is designed for hash table DoS resistance — it&#39;s fast and keyed, preventing attackers from crafting collisions. Used in Rust&#39;s HashMap, Python dict, and many other hash tables.</p>
+        <pre><code class="lang-perl">p siphash &quot;key&quot;   # 16 hex chars
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hmac-sha1">
+        <h3><a class="doc-anchor" href="#doc-hmac-sha1">#</a> <code>hmac_sha1</code></h3>
+        <p><code>hmac_sha1</code> computes HMAC-SHA1 and returns a 40-character hex string. Used in OAuth 1.0, TOTP (Google Authenticator), and legacy APIs. Prefer HMAC-SHA256 for new designs.</p>
+        <pre><code class="lang-perl">p hmac_sha1(&quot;secret&quot;, &quot;message&quot;)   # 40 hex chars
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hmac-sha384">
+        <h3><a class="doc-anchor" href="#doc-hmac-sha384">#</a> <code>hmac_sha384</code></h3>
+        <p><code>hmac_sha384</code> computes HMAC-SHA384 and returns a 96-character hex string. Middle ground between SHA-256 and SHA-512.</p>
+        <pre><code class="lang-perl">p hmac_sha384(&quot;key&quot;, &quot;data&quot;)   # 96 hex chars
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hmac-sha512">
+        <h3><a class="doc-anchor" href="#doc-hmac-sha512">#</a> <code>hmac_sha512</code></h3>
+        <p><code>hmac_sha512</code> computes HMAC-SHA512 and returns a 128-character hex string. Maximum security margin in the SHA-2 family.</p>
+        <pre><code class="lang-perl">p hmac_sha512(&quot;key&quot;, &quot;data&quot;)   # 128 hex chars
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hmac-md5">
+        <h3><a class="doc-anchor" href="#doc-hmac-md5">#</a> <code>hmac_md5</code></h3>
+        <p><code>hmac_md5</code> computes HMAC-MD5 and returns a 32-character hex string. Legacy only — MD5 is broken for collision resistance but HMAC-MD5 is still considered safe for authentication. Only use for compatibility with old systems.</p>
+        <pre><code class="lang-perl">p hmac_md5(&quot;key&quot;, &quot;data&quot;)   # 32 hex chars
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hkdf-sha256">
+        <h3><a class="doc-anchor" href="#doc-hkdf-sha256">#</a> <code>hkdf_sha256</code></h3>
+        <p><code>hkdf_sha256</code> (alias <code>hkdf</code>) is HKDF key derivation (RFC 5869) using HMAC-SHA256. Extracts entropy from input key material and expands it to the desired length. Used to derive encryption keys from shared secrets (after ECDH/X25519). Args: ikm, salt, info, output_length.</p>
+        <pre><code class="lang-perl">my $key = hkdf(&quot;shared_secret&quot;, &quot;salt&quot;, &quot;context&quot;, 32)  # 64 hex
+my $enc_key = hex_decode($key)  # 32 bytes for AES-256
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hkdf-sha512">
+        <h3><a class="doc-anchor" href="#doc-hkdf-sha512">#</a> <code>hkdf_sha512</code></h3>
+        <p><code>hkdf_sha512</code> is HKDF using HMAC-SHA512. Higher security margin than SHA256 variant.</p>
+        <pre><code class="lang-perl">my $key = hkdf_sha512(&quot;ikm&quot;, &quot;salt&quot;, &quot;info&quot;, 64)  # 128 hex chars
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-poly1305">
+        <h3><a class="doc-anchor" href="#doc-poly1305">#</a> <code>poly1305</code></h3>
+        <p><code>poly1305</code> computes a Poly1305 one-time MAC. Takes a 32-byte key and message, returns a 32-character hex tag (128-bit). Poly1305 is used with ChaCha20 in TLS 1.3. CRITICAL: each key must only be used once — reusing a key completely breaks security.</p>
+        <pre><code class="lang-perl">my $key = random_bytes(32)
+p poly1305($key, &quot;message&quot;)   # 32 hex chars
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rsa-keygen">
+        <h3><a class="doc-anchor" href="#doc-rsa-keygen">#</a> <code>rsa_keygen</code></h3>
+        <p><code>rsa_keygen</code> generates an RSA keypair. Takes key size in bits (2048, 3072, or 4096). Returns [private_key_pem, public_key_pem]. RSA is the most widely used asymmetric algorithm — essential for TLS, SSH, and JWT RS256 signing.</p>
+        <pre><code class="lang-perl">my @kp = rsa_keygen(2048)
+my ($priv, $pub) = @kp
+spurt(&quot;private.pem&quot;, $priv)
+spurt(&quot;public.pem&quot;, $pub)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rsa-encrypt">
+        <h3><a class="doc-anchor" href="#doc-rsa-encrypt">#</a> <code>rsa_encrypt</code></h3>
+        <p><code>rsa_encrypt</code> (alias <code>rsa_enc</code>) encrypts data with RSA-OAEP-SHA256. Takes public_key_pem and plaintext. Returns base64 ciphertext. Message size is limited to key_size/8 - 66 bytes (e.g. 190 bytes for 2048-bit key).</p>
+        <pre><code class="lang-perl">my $cipher = rsa_encrypt($pub_pem, &quot;secret&quot;)
+my $plain = rsa_decrypt($priv_pem, $cipher)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rsa-decrypt">
+        <h3><a class="doc-anchor" href="#doc-rsa-decrypt">#</a> <code>rsa_decrypt</code></h3>
+        <p><code>rsa_decrypt</code> (alias <code>rsa_dec</code>) decrypts RSA-OAEP ciphertext. Takes private_key_pem and base64 ciphertext.</p>
+        <pre><code class="lang-perl">my $plain = rsa_decrypt($priv, $ciphertext)
+p $plain
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rsa-sign">
+        <h3><a class="doc-anchor" href="#doc-rsa-sign">#</a> <code>rsa_sign</code></h3>
+        <p><code>rsa_sign</code> signs a message with RSA-PKCS1v15-SHA256. Takes private_key_pem and message. Returns base64 signature. This is the RS256 algorithm used in JWT.</p>
+        <pre><code class="lang-perl">my $sig = rsa_sign($priv, &quot;message&quot;)
+if (rsa_verify($pub, &quot;message&quot;, $sig)) {
+    p &quot;valid&quot;
+}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rsa-verify">
+        <h3><a class="doc-anchor" href="#doc-rsa-verify">#</a> <code>rsa_verify</code></h3>
+        <p><code>rsa_verify</code> verifies an RSA-PKCS1v15-SHA256 signature. Takes public_key_pem, message, and base64 signature. Returns 1 if valid, 0 if not.</p>
+        <pre><code class="lang-perl">if (rsa_verify($pub_pem, $msg, $sig)) {
+    p &quot;signature valid&quot;
+}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ecdsa-p256-keygen">
+        <h3><a class="doc-anchor" href="#doc-ecdsa-p256-keygen">#</a> <code>ecdsa_p256_keygen</code></h3>
+        <p><code>ecdsa_p256_keygen</code> (alias <code>p256_keygen</code>) generates an ECDSA P-256 (secp256r1/prime256v1) keypair. Returns [private_hex, public_hex_compressed]. P-256 is the NIST curve used in TLS, ES256 JWT, and WebAuthn.</p>
+        <pre><code class="lang-perl">my @kp = ecdsa_p256_keygen()
+my ($priv, $pub) = @kp
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ecdsa-p256-sign">
+        <h3><a class="doc-anchor" href="#doc-ecdsa-p256-sign">#</a> <code>ecdsa_p256_sign</code></h3>
+        <p><code>ecdsa_p256_sign</code> (alias <code>p256_sign</code>) signs a message with ECDSA P-256. Takes private_key_hex and message. Returns DER-encoded signature as hex.</p>
+        <pre><code class="lang-perl">my $sig = ecdsa_p256_sign($priv, &quot;hello&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ecdsa-p256-verify">
+        <h3><a class="doc-anchor" href="#doc-ecdsa-p256-verify">#</a> <code>ecdsa_p256_verify</code></h3>
+        <p><code>ecdsa_p256_verify</code> (alias <code>p256_verify</code>) verifies an ECDSA P-256 signature. Returns 1 if valid.</p>
+        <pre><code class="lang-perl">if (ecdsa_p256_verify($pub, &quot;hello&quot;, $sig)) {
+    p &quot;valid&quot;
+}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ecdsa-p384-keygen">
+        <h3><a class="doc-anchor" href="#doc-ecdsa-p384-keygen">#</a> <code>ecdsa_p384_keygen</code></h3>
+        <p><code>ecdsa_p384_keygen</code> generates an ECDSA P-384 keypair. P-384 offers more security margin than P-256.</p>
+        <pre><code class="lang-perl">my @kp = ecdsa_p384_keygen()
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ecdsa-p384-sign">
+        <h3><a class="doc-anchor" href="#doc-ecdsa-p384-sign">#</a> <code>ecdsa_p384_sign</code></h3>
+        <p><code>ecdsa_p384_sign</code> signs with ECDSA P-384.</p>
+        <pre><code class="lang-perl">my $sig = ecdsa_p384_sign($priv, $msg)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ecdsa-p384-verify">
+        <h3><a class="doc-anchor" href="#doc-ecdsa-p384-verify">#</a> <code>ecdsa_p384_verify</code></h3>
+        <p><code>ecdsa_p384_verify</code> verifies an ECDSA P-384 signature.</p>
+        <pre><code class="lang-perl">p ecdsa_p384_verify($pub, $msg, $sig)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ecdsa-secp256k1-keygen">
+        <h3><a class="doc-anchor" href="#doc-ecdsa-secp256k1-keygen">#</a> <code>ecdsa_secp256k1_keygen</code></h3>
+        <p><code>ecdsa_secp256k1_keygen</code> generates an ECDSA secp256k1 keypair. This is the Bitcoin/Ethereum curve — different from P-256.</p>
+        <pre><code class="lang-perl">my @kp = ecdsa_secp256k1_keygen()
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ecdsa-secp256k1-sign">
+        <h3><a class="doc-anchor" href="#doc-ecdsa-secp256k1-sign">#</a> <code>ecdsa_secp256k1_sign</code></h3>
+        <p><code>ecdsa_secp256k1_sign</code> signs with ECDSA secp256k1.</p>
+        <pre><code class="lang-perl">my $sig = ecdsa_secp256k1_sign($priv, $msg)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ecdsa-secp256k1-verify">
+        <h3><a class="doc-anchor" href="#doc-ecdsa-secp256k1-verify">#</a> <code>ecdsa_secp256k1_verify</code></h3>
+        <p><code>ecdsa_secp256k1_verify</code> verifies an ECDSA secp256k1 signature.</p>
+        <pre><code class="lang-perl">p ecdsa_secp256k1_verify($pub, $msg, $sig)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ecdh-p256">
+        <h3><a class="doc-anchor" href="#doc-ecdh-p256">#</a> <code>ecdh_p256</code></h3>
+        <p><code>ecdh_p256</code> (alias <code>p256_dh</code>) performs ECDH key exchange on P-256. Takes my_private_hex and their_public_hex, returns shared_secret_hex. Use HKDF to derive encryption keys from the shared secret.</p>
+        <pre><code class="lang-perl">my @alice = ecdsa_p256_keygen()
+my @bob = ecdsa_p256_keygen()
+my $shared_a = ecdh_p256($alice[0], $bob[1])
+my $shared_b = ecdh_p256($bob[0], $alice[1])
+p $shared_a eq $shared_b  # 1 — same secret
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ecdh-p384">
+        <h3><a class="doc-anchor" href="#doc-ecdh-p384">#</a> <code>ecdh_p384</code></h3>
+        <p><code>ecdh_p384</code> performs ECDH key exchange on P-384.</p>
+        <pre><code class="lang-perl">my $shared = ecdh_p384($my_priv, $their_pub)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-base32-encode">
+        <h3><a class="doc-anchor" href="#doc-base32-encode">#</a> <code>base32_encode</code></h3>
+        <p><code>base32_encode</code> (alias <code>b32e</code>) encodes data as RFC 4648 Base32. Used in TOTP secrets, onion addresses, and Bech32. Returns uppercase with padding.</p>
+        <pre><code class="lang-perl">p base32_encode(&quot;hello&quot;)   # NBSWY3DP
+my $secret = base32_encode(random_bytes(20))
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-base32-decode">
+        <h3><a class="doc-anchor" href="#doc-base32-decode">#</a> <code>base32_decode</code></h3>
+        <p><code>base32_decode</code> (alias <code>b32d</code>) decodes RFC 4648 Base32 back to bytes. Accepts with or without padding.</p>
+        <pre><code class="lang-perl">p base32_decode(&quot;NBSWY3DP&quot;)   # hello
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-base58-encode">
+        <h3><a class="doc-anchor" href="#doc-base58-encode">#</a> <code>base58_encode</code></h3>
+        <p><code>base58_encode</code> (alias <code>b58e</code>) encodes data using Bitcoin&#39;s Base58 alphabet (no 0, O, I, l to avoid confusion). Used in Bitcoin addresses, IPFS CIDs.</p>
+        <pre><code class="lang-perl">p base58_encode(&quot;hello&quot;)   # Cn8eVZg
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-base58-decode">
+        <h3><a class="doc-anchor" href="#doc-base58-decode">#</a> <code>base58_decode</code></h3>
+        <p><code>base58_decode</code> (alias <code>b58d</code>) decodes Base58 back to bytes.</p>
+        <pre><code class="lang-perl">p base58_decode(&quot;Cn8eVZg&quot;)   # hello
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-totp">
+        <h3><a class="doc-anchor" href="#doc-totp">#</a> <code>totp</code></h3>
+        <p><code>totp</code> (alias <code>totp_generate</code>) generates a TOTP code (RFC 6238) for 2FA. Takes base32-encoded secret, optional digits (default 6), optional period (default 30s). Compatible with Google Authenticator, Authy, etc.</p>
+        <pre><code class="lang-perl">my $secret = base32_encode(random_bytes(20))
+my $code = totp($secret)
+p $code   # 6-digit code
+# Custom: 8 digits, 60s period
+my $code8 = totp($secret, 8, 60)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-totp-verify">
+        <h3><a class="doc-anchor" href="#doc-totp-verify">#</a> <code>totp_verify</code></h3>
+        <p><code>totp_verify</code> verifies a TOTP code with optional time window (default ±1 period). Returns 1 if valid.</p>
+        <pre><code class="lang-perl">if (totp_verify($secret, $user_code)) {
+    p &quot;2FA valid&quot;
+}
+# Wider window: ±2 periods
+totp_verify($secret, $code, 2)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hotp">
+        <h3><a class="doc-anchor" href="#doc-hotp">#</a> <code>hotp</code></h3>
+        <p><code>hotp</code> (alias <code>hotp_generate</code>) generates an HOTP code (RFC 4226) using a counter. Takes base32 secret, counter value, optional digits.</p>
+        <pre><code class="lang-perl">my $code = hotp($secret, 42)  # counter=42
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-aes-cbc-encrypt">
+        <h3><a class="doc-anchor" href="#doc-aes-cbc-encrypt">#</a> <code>aes_cbc_encrypt</code></h3>
+        <p><code>aes_cbc_encrypt</code> (alias <code>aes_cbc_enc</code>) encrypts with AES-256-CBC and PKCS7 padding. Takes 32-byte key, plaintext, optional 16-byte IV (auto-generated if omitted). Returns base64(iv || ciphertext). Legacy mode — prefer <code>aes_encrypt</code> (GCM) for new code.</p>
+        <pre><code class="lang-perl">my $key = random_bytes(32)
+my $ct = aes_cbc_encrypt($key, &quot;secret&quot;)
+my $pt = aes_cbc_decrypt($key, $ct)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-aes-cbc-decrypt">
+        <h3><a class="doc-anchor" href="#doc-aes-cbc-decrypt">#</a> <code>aes_cbc_decrypt</code></h3>
+        <p><code>aes_cbc_decrypt</code> (alias <code>aes_cbc_dec</code>) decrypts AES-256-CBC. Takes 32-byte key and base64(iv || ciphertext).</p>
+        <pre><code class="lang-perl">my $pt = aes_cbc_decrypt($key, $ciphertext)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-qr-ascii">
+        <h3><a class="doc-anchor" href="#doc-qr-ascii">#</a> <code>qr_ascii</code></h3>
+        <p><code>qr_ascii</code> (alias <code>qr</code>) generates a QR code as ASCII art. Perfect for terminal output.</p>
+        <pre><code class="lang-perl">p qr(&quot;https://example.com&quot;)
+p qr(&quot;otpauth://totp/App:user?secret=$secret&amp;issuer=App&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-qr-png">
+        <h3><a class="doc-anchor" href="#doc-qr-png">#</a> <code>qr_png</code></h3>
+        <p><code>qr_png</code> generates a QR code as PNG image data (base64 encoded). Optional size parameter. Save to file or embed in HTML.</p>
+        <pre><code class="lang-perl">my $png = qr_png(&quot;https://example.com&quot;)
+spurt(&quot;qr.png&quot;, base64_decode($png))
+# Larger QR
+my $big = qr_png($url, 16)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-qr-svg">
+        <h3><a class="doc-anchor" href="#doc-qr-svg">#</a> <code>qr_svg</code></h3>
+        <p><code>qr_svg</code> generates a QR code as SVG string. Scalable vector graphics, ideal for web.</p>
+        <pre><code class="lang-perl">my $svg = qr_svg(&quot;https://example.com&quot;)
+spurt(&quot;qr.svg&quot;, $svg)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-barcode-code128">
+        <h3><a class="doc-anchor" href="#doc-barcode-code128">#</a> <code>barcode_code128</code></h3>
+        <p><code>barcode_code128</code> (alias <code>code128</code>) generates a Code 128 barcode as ASCII. Code 128 supports alphanumeric data and is widely used in shipping labels.</p>
+        <pre><code class="lang-perl">p code128(&quot;ABC-123&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-barcode-code39">
+        <h3><a class="doc-anchor" href="#doc-barcode-code39">#</a> <code>barcode_code39</code></h3>
+        <p><code>barcode_code39</code> (alias <code>code39</code>) generates a Code 39 barcode. Supports uppercase, digits, and some symbols. Used in automotive and defense.</p>
+        <pre><code class="lang-perl">p code39(&quot;HELLO123&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-barcode-ean13">
+        <h3><a class="doc-anchor" href="#doc-barcode-ean13">#</a> <code>barcode_ean13</code></h3>
+        <p><code>barcode_ean13</code> (alias <code>ean13</code>) generates an EAN-13 barcode (European Article Number). Standard retail barcode — requires exactly 12-13 digits.</p>
+        <pre><code class="lang-perl">p ean13(&quot;5901234123457&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-barcode-svg">
+        <h3><a class="doc-anchor" href="#doc-barcode-svg">#</a> <code>barcode_svg</code></h3>
+        <p><code>barcode_svg</code> generates a barcode as SVG. Second argument specifies type: code128, code39, ean13, upca.</p>
+        <pre><code class="lang-perl">my $svg = barcode_svg(&quot;ABC-123&quot;, &quot;code128&quot;)
+spurt(&quot;barcode.svg&quot;, $svg)
+my $retail = barcode_svg(&quot;012345678905&quot;, &quot;upca&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-brotli">
+        <h3><a class="doc-anchor" href="#doc-brotli">#</a> <code>brotli</code></h3>
+        <p><code>brotli</code> (alias <code>br</code>) compresses data using the Brotli algorithm (RFC 7932). Excellent compression ratio, used in HTTP compression. Returns compressed bytes.</p>
+        <pre><code class="lang-perl">my $compressed = brotli($data)
+p length($data) . &quot; -&gt; &quot; . length($compressed)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-brotli-decode">
+        <h3><a class="doc-anchor" href="#doc-brotli-decode">#</a> <code>brotli_decode</code></h3>
+        <p><code>brotli_decode</code> (alias <code>ubr</code>) decompresses Brotli data.</p>
+        <pre><code class="lang-perl">my $original = brotli_decode($compressed)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-xz">
+        <h3><a class="doc-anchor" href="#doc-xz">#</a> <code>xz</code></h3>
+        <p><code>xz</code> (alias <code>lzma</code>) compresses data using XZ/LZMA2. Best compression ratio, slower. Returns compressed bytes.</p>
+        <pre><code class="lang-perl">my $compressed = xz($data)
+spurt(&quot;file.xz&quot;, $compressed)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-xz-decode">
+        <h3><a class="doc-anchor" href="#doc-xz-decode">#</a> <code>xz_decode</code></h3>
+        <p><code>xz_decode</code> (aliases <code>unxz</code>, <code>unlzma</code>) decompresses XZ/LZMA data.</p>
+        <pre><code class="lang-perl">my $original = xz_decode(slurp(&quot;file.xz&quot;))
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-bzip2">
+        <h3><a class="doc-anchor" href="#doc-bzip2">#</a> <code>bzip2</code></h3>
+        <p><code>bzip2</code> (alias <code>bz2</code>) compresses data using bzip2. Good compression, moderate speed. Returns compressed bytes.</p>
+        <pre><code class="lang-perl">my $compressed = bzip2($data)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-bzip2-decode">
+        <h3><a class="doc-anchor" href="#doc-bzip2-decode">#</a> <code>bzip2_decode</code></h3>
+        <p><code>bzip2_decode</code> (aliases <code>bunzip2</code>, <code>ubz2</code>) decompresses bzip2 data.</p>
+        <pre><code class="lang-perl">my $original = bunzip2($compressed)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-lz4">
+        <h3><a class="doc-anchor" href="#doc-lz4">#</a> <code>lz4</code></h3>
+        <p><code>lz4</code> compresses data using LZ4. Very fast compression/decompression, moderate ratio. Ideal for real-time compression.</p>
+        <pre><code class="lang-perl">my $compressed = lz4($data)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-lz4-decode">
+        <h3><a class="doc-anchor" href="#doc-lz4-decode">#</a> <code>lz4_decode</code></h3>
+        <p><code>lz4_decode</code> (alias <code>unlz4</code>) decompresses LZ4 data.</p>
+        <pre><code class="lang-perl">my $original = lz4_decode($compressed)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-snappy">
+        <h3><a class="doc-anchor" href="#doc-snappy">#</a> <code>snappy</code></h3>
+        <p><code>snappy</code> (alias <code>snp</code>) compresses data using Snappy. Fastest compression, used in databases and RPC. Returns compressed bytes.</p>
+        <pre><code class="lang-perl">my $compressed = snappy($data)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-snappy-decode">
+        <h3><a class="doc-anchor" href="#doc-snappy-decode">#</a> <code>snappy_decode</code></h3>
+        <p><code>snappy_decode</code> (alias <code>unsnappy</code>) decompresses Snappy data.</p>
+        <pre><code class="lang-perl">my $original = snappy_decode($compressed)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-lzw">
+        <h3><a class="doc-anchor" href="#doc-lzw">#</a> <code>lzw</code></h3>
+        <p><code>lzw</code> compresses data using LZW (GIF/TIFF style). Classic algorithm.</p>
+        <pre><code class="lang-perl">my $compressed = lzw($data)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-lzw-decode">
+        <h3><a class="doc-anchor" href="#doc-lzw-decode">#</a> <code>lzw_decode</code></h3>
+        <p><code>lzw_decode</code> (alias <code>unlzw</code>) decompresses LZW data.</p>
+        <pre><code class="lang-perl">my $original = lzw_decode($compressed)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-tar-create">
+        <h3><a class="doc-anchor" href="#doc-tar-create">#</a> <code>tar_create</code></h3>
+        <p><code>tar_create</code> (alias <code>tar</code>) creates a tar archive from a directory. Returns tar bytes.</p>
+        <pre><code class="lang-perl">my $archive = tar_create(&quot;./src&quot;)
+spurt(&quot;backup.tar&quot;, $archive)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-tar-extract">
+        <h3><a class="doc-anchor" href="#doc-tar-extract">#</a> <code>tar_extract</code></h3>
+        <p><code>tar_extract</code> (alias <code>untar</code>) extracts a tar archive to a directory.</p>
+        <pre><code class="lang-perl">tar_extract(slurp(&quot;backup.tar&quot;), &quot;./restored&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-tar-list">
+        <h3><a class="doc-anchor" href="#doc-tar-list">#</a> <code>tar_list</code></h3>
+        <p><code>tar_list</code> lists files in a tar archive. Returns array of paths.</p>
+        <pre><code class="lang-perl">my @files = @{tar_list(slurp(&quot;backup.tar&quot;))}
+@files |&gt; e p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-tar-gz-create">
+        <h3><a class="doc-anchor" href="#doc-tar-gz-create">#</a> <code>tar_gz_create</code></h3>
+        <p><code>tar_gz_create</code> (alias <code>tgz</code>) creates a gzipped tar archive. Convenience for tar + gzip.</p>
+        <pre><code class="lang-perl">my $tgz = tgz(&quot;./project&quot;)
+spurt(&quot;project.tar.gz&quot;, $tgz)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-tar-gz-extract">
+        <h3><a class="doc-anchor" href="#doc-tar-gz-extract">#</a> <code>tar_gz_extract</code></h3>
+        <p><code>tar_gz_extract</code> (alias <code>untgz</code>) extracts a .tar.gz archive.</p>
+        <pre><code class="lang-perl">untgz(slurp(&quot;project.tar.gz&quot;), &quot;./extracted&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-zip-create">
+        <h3><a class="doc-anchor" href="#doc-zip-create">#</a> <code>zip_create</code></h3>
+        <p><code>zip_create</code> creates a ZIP archive from a directory. Returns zip bytes.</p>
+        <pre><code class="lang-perl">my $archive = zip_create(&quot;./docs&quot;)
+spurt(&quot;docs.zip&quot;, $archive)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-zip-extract">
+        <h3><a class="doc-anchor" href="#doc-zip-extract">#</a> <code>zip_extract</code></h3>
+        <p><code>zip_extract</code> extracts a ZIP archive to a directory.</p>
+        <pre><code class="lang-perl">zip_extract(slurp(&quot;docs.zip&quot;), &quot;./extracted&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-zip-list">
+        <h3><a class="doc-anchor" href="#doc-zip-list">#</a> <code>zip_list</code></h3>
+        <p><code>zip_list</code> lists files in a ZIP archive. Returns array of paths.</p>
+        <pre><code class="lang-perl">my @files = @{zip_list(slurp(&quot;archive.zip&quot;))}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-md4">
+        <h3><a class="doc-anchor" href="#doc-md4">#</a> <code>md4</code></h3>
+        <p><code>md4</code> computes the MD4 hash and returns a 32-character hex string. MD4 is completely broken — only use for legacy NTLM compatibility or historical systems.</p>
+        <pre><code class="lang-perl">p md4(&quot;hello&quot;)   # 32 hex chars
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-xxh32">
+        <h3><a class="doc-anchor" href="#doc-xxh32">#</a> <code>xxh32</code></h3>
+        <p><code>xxh32</code> (alias <code>xxhash32</code>) computes xxHash32 — extremely fast non-cryptographic hash. Optional seed parameter. Returns 8 hex chars.</p>
+        <pre><code class="lang-perl">p xxh32(&quot;hello&quot;)        # default seed 0
+p xxh32(&quot;hello&quot;, 42)    # with seed
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-xxh64">
+        <h3><a class="doc-anchor" href="#doc-xxh64">#</a> <code>xxh64</code></h3>
+        <p><code>xxh64</code> (alias <code>xxhash64</code>) computes xxHash64 — fast 64-bit hash. Returns 16 hex chars.</p>
+        <pre><code class="lang-perl">p xxh64(&quot;hello&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-xxh3">
+        <h3><a class="doc-anchor" href="#doc-xxh3">#</a> <code>xxh3</code></h3>
+        <p><code>xxh3</code> (alias <code>xxhash3</code>) computes xxHash3-64 — newest xxHash variant, fastest on modern CPUs. Returns 16 hex chars.</p>
+        <pre><code class="lang-perl">p xxh3(&quot;hello&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-xxh3-128">
+        <h3><a class="doc-anchor" href="#doc-xxh3-128">#</a> <code>xxh3_128</code></h3>
+        <p><code>xxh3_128</code> computes xxHash3-128. Returns 32 hex chars.</p>
+        <pre><code class="lang-perl">p xxh3_128(&quot;hello&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-murmur3">
+        <h3><a class="doc-anchor" href="#doc-murmur3">#</a> <code>murmur3</code></h3>
+        <p><code>murmur3</code> (alias <code>murmur3_32</code>) computes MurmurHash3 32-bit. Fast non-cryptographic hash, widely used in hash tables and bloom filters. Optional seed. Returns 8 hex chars.</p>
+        <pre><code class="lang-perl">p murmur3(&quot;hello&quot;)       # default seed 0
+p murmur3(&quot;hello&quot;, 42)   # with seed
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-murmur3-128">
+        <h3><a class="doc-anchor" href="#doc-murmur3-128">#</a> <code>murmur3_128</code></h3>
+        <p><code>murmur3_128</code> computes MurmurHash3 128-bit (x64 variant). Returns 32 hex chars.</p>
+        <pre><code class="lang-perl">p murmur3_128(&quot;hello&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-blowfish-encrypt">
+        <h3><a class="doc-anchor" href="#doc-blowfish-encrypt">#</a> <code>blowfish_encrypt</code></h3>
+        <p><code>blowfish_encrypt</code> (alias <code>bf_enc</code>) encrypts with Blowfish-CBC. Key=4-56 bytes, optional 8-byte IV. Legacy cipher — use AES for new code.</p>
+        <pre><code class="lang-perl">my $ct = blowfish_encrypt($key, &quot;secret&quot;)
+my $pt = blowfish_decrypt($key, $ct)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-blowfish-decrypt">
+        <h3><a class="doc-anchor" href="#doc-blowfish-decrypt">#</a> <code>blowfish_decrypt</code></h3>
+        <p><code>blowfish_decrypt</code> (alias <code>bf_dec</code>) decrypts Blowfish-CBC.</p>
+        <pre><code class="lang-perl">my $pt = blowfish_decrypt($key, $ciphertext)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-des3-encrypt">
+        <h3><a class="doc-anchor" href="#doc-des3-encrypt">#</a> <code>des3_encrypt</code></h3>
+        <p><code>des3_encrypt</code> (aliases <code>3des_enc</code>, <code>tdes_enc</code>) encrypts with Triple DES (3DES) CBC. Key=24 bytes (three 8-byte DES keys). Legacy cipher for PCI-DSS compliance.</p>
+        <pre><code class="lang-perl">my $key = random_bytes(24)
+my $ct = des3_encrypt($key, &quot;secret&quot;)
+my $pt = des3_decrypt($key, $ct)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-des3-decrypt">
+        <h3><a class="doc-anchor" href="#doc-des3-decrypt">#</a> <code>des3_decrypt</code></h3>
+        <p><code>des3_decrypt</code> (aliases <code>3des_dec</code>, <code>tdes_dec</code>) decrypts Triple DES (3DES) CBC.</p>
+        <pre><code class="lang-perl">my $pt = des3_decrypt($key, $ciphertext)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-twofish-encrypt">
+        <h3><a class="doc-anchor" href="#doc-twofish-encrypt">#</a> <code>twofish_encrypt</code></h3>
+        <p><code>twofish_encrypt</code> (alias <code>tf_enc</code>) encrypts with Twofish-CBC. Key=16/24/32 bytes. AES finalist, still secure.</p>
+        <pre><code class="lang-perl">my $key = random_bytes(32)
+my $ct = twofish_encrypt($key, &quot;secret&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-twofish-decrypt">
+        <h3><a class="doc-anchor" href="#doc-twofish-decrypt">#</a> <code>twofish_decrypt</code></h3>
+        <p><code>twofish_decrypt</code> (alias <code>tf_dec</code>) decrypts Twofish-CBC.</p>
+        <pre><code class="lang-perl">my $pt = twofish_decrypt($key, $ct)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-camellia-encrypt">
+        <h3><a class="doc-anchor" href="#doc-camellia-encrypt">#</a> <code>camellia_encrypt</code></h3>
+        <p><code>camellia_encrypt</code> (alias <code>cam_enc</code>) encrypts with Camellia-CBC. Key=16/24/32 bytes. Japanese/EU standard, equivalent security to AES.</p>
+        <pre><code class="lang-perl">my $ct = camellia_encrypt($key, &quot;secret&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-camellia-decrypt">
+        <h3><a class="doc-anchor" href="#doc-camellia-decrypt">#</a> <code>camellia_decrypt</code></h3>
+        <p><code>camellia_decrypt</code> (alias <code>cam_dec</code>) decrypts Camellia-CBC.</p>
+        <pre><code class="lang-perl">my $pt = camellia_decrypt($key, $ct)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cast5-encrypt">
+        <h3><a class="doc-anchor" href="#doc-cast5-encrypt">#</a> <code>cast5_encrypt</code></h3>
+        <p><code>cast5_encrypt</code> encrypts with CAST5-CBC. Key=5-16 bytes. Used in PGP.</p>
+        <pre><code class="lang-perl">my $ct = cast5_encrypt($key, &quot;secret&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cast5-decrypt">
+        <h3><a class="doc-anchor" href="#doc-cast5-decrypt">#</a> <code>cast5_decrypt</code></h3>
+        <p><code>cast5_decrypt</code> decrypts CAST5-CBC.</p>
+        <pre><code class="lang-perl">my $pt = cast5_decrypt($key, $ct)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-salsa20">
+        <h3><a class="doc-anchor" href="#doc-salsa20">#</a> <code>salsa20</code></h3>
+        <p><code>salsa20</code> encrypts with Salsa20 stream cipher. Key=32 bytes, nonce auto-generated. Fast, secure stream cipher.</p>
+        <pre><code class="lang-perl">my $ct = salsa20($key, &quot;data&quot;)
+my $pt = salsa20_decrypt($key, $ct)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-salsa20-decrypt">
+        <h3><a class="doc-anchor" href="#doc-salsa20-decrypt">#</a> <code>salsa20_decrypt</code></h3>
+        <p><code>salsa20_decrypt</code> decrypts Salsa20.</p>
+        <pre><code class="lang-perl">my $pt = salsa20_decrypt($key, $ct)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-xsalsa20">
+        <h3><a class="doc-anchor" href="#doc-xsalsa20">#</a> <code>xsalsa20</code></h3>
+        <p><code>xsalsa20</code> encrypts with XSalsa20 (extended 24-byte nonce). Safer for random nonces.</p>
+        <pre><code class="lang-perl">my $ct = xsalsa20($key, &quot;data&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-xsalsa20-decrypt">
+        <h3><a class="doc-anchor" href="#doc-xsalsa20-decrypt">#</a> <code>xsalsa20_decrypt</code></h3>
+        <p><code>xsalsa20_decrypt</code> decrypts XSalsa20.</p>
+        <pre><code class="lang-perl">my $pt = xsalsa20_decrypt($key, $ct)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-secretbox">
+        <h3><a class="doc-anchor" href="#doc-secretbox">#</a> <code>secretbox</code></h3>
+        <p><code>secretbox</code> (alias <code>secretbox_seal</code>) is NaCl&#39;s symmetric authenticated encryption (XSalsa20-Poly1305). Key=32 bytes. Simple, secure, fast.</p>
+        <pre><code class="lang-perl">my $key = random_bytes(32)
+my $ct = secretbox($key, &quot;message&quot;)
+my $pt = secretbox_open($key, $ct)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-secretbox-open">
+        <h3><a class="doc-anchor" href="#doc-secretbox-open">#</a> <code>secretbox_open</code></h3>
+        <p><code>secretbox_open</code> decrypts and authenticates NaCl secretbox.</p>
+        <pre><code class="lang-perl">my $pt = secretbox_open($key, $ct)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-nacl-box-keygen">
+        <h3><a class="doc-anchor" href="#doc-nacl-box-keygen">#</a> <code>nacl_box_keygen</code></h3>
+        <p><code>nacl_box_keygen</code> generates a NaCl box keypair (X25519). Returns [secret_key_hex, public_key_hex].</p>
+        <pre><code class="lang-perl">my @kp = nacl_box_keygen()
+my ($sk, $pk) = @kp
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-nacl-box">
+        <h3><a class="doc-anchor" href="#doc-nacl-box">#</a> <code>nacl_box</code></h3>
+        <p><code>nacl_box</code> is NaCl&#39;s asymmetric authenticated encryption. Takes recipient&#39;s public key, sender&#39;s secret key, plaintext.</p>
+        <pre><code class="lang-perl">my @alice = nacl_box_keygen()
+my @bob = nacl_box_keygen()
+my $ct = nacl_box($bob[1], $alice[0], &quot;hello&quot;)  # to Bob from Alice
+my $pt = nacl_box_open($alice[1], $bob[0], $ct)  # Bob decrypts
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-nacl-box-open">
+        <h3><a class="doc-anchor" href="#doc-nacl-box-open">#</a> <code>nacl_box_open</code></h3>
+        <p><code>nacl_box_open</code> decrypts NaCl box. Takes sender&#39;s public key, recipient&#39;s secret key, ciphertext.</p>
+        <pre><code class="lang-perl">my $pt = nacl_box_open($sender_pk, $my_sk, $ct)
+</code></pre>
+      </article>
+    </section>
+    <section class="tutorial-section" id="ch-special-math-functions">
+      <h2>Special Math Functions</h2>
+      <p class="chapter-meta">12 topics</p>
+      <article class="doc-entry" id="doc-erf">
+        <h3><a class="doc-anchor" href="#doc-erf">#</a> <code>erf</code></h3>
+        <p><code>erf</code> computes the error function, which arises in probability, statistics, and solutions to the heat equation. erf(x) is the probability that a standard normal random variable falls in [-x√2, x√2]. Returns a value in (-1, 1).</p>
+        <pre><code class="lang-perl">p erf(0)      # 0
+p erf(1)      # 0.8427...
+p erf(10)     # ~1
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-erfc">
+        <h3><a class="doc-anchor" href="#doc-erfc">#</a> <code>erfc</code></h3>
+        <p><code>erfc</code> computes the complementary error function erfc(x) = 1 - erf(x). Numerically stable for large x where erf(x) ≈ 1. Used in computing tail probabilities of normal distributions.</p>
+        <pre><code class="lang-perl">p erfc(0)     # 1
+p erfc(3)     # 0.0000220...
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gamma">
+        <h3><a class="doc-anchor" href="#doc-gamma">#</a> <code>gamma</code></h3>
+        <p><code>gamma</code> (alias <code>tgamma</code>) computes the gamma function Γ(x), the extension of factorial to real numbers. Γ(n) = (n-1)! for positive integers. Used throughout statistics, physics, and combinatorics.</p>
+        <pre><code class="lang-perl">p gamma(5)    # 24 (= 4!)
+p gamma(0.5)  # √π ≈ 1.7724...
+p gamma(1)    # 1
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-lgamma">
+        <h3><a class="doc-anchor" href="#doc-lgamma">#</a> <code>lgamma</code></h3>
+        <p><code>lgamma</code> (alias <code>ln_gamma</code>) computes the natural logarithm of the gamma function: ln(Γ(x)). Avoids overflow for large arguments where Γ(x) would be astronomical. Essential for computing log-probabilities in statistics.</p>
+        <pre><code class="lang-perl">p lgamma(100)  # 359.13...
+p lgamma(1000) # 5905.22...
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-digamma">
+        <h3><a class="doc-anchor" href="#doc-digamma">#</a> <code>digamma</code></h3>
+        <p><code>digamma</code> (alias <code>psi</code>) computes the digamma function ψ(x) = d/dx ln(Γ(x)), the logarithmic derivative of gamma. Appears in Bayesian statistics (expected log of Dirichlet variables), optimization, and special function theory.</p>
+        <pre><code class="lang-perl">p digamma(1)   # -γ ≈ -0.5772 (Euler-Mascheroni)
+p digamma(2)   # 1 - γ ≈ 0.4228
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-beta-fn">
+        <h3><a class="doc-anchor" href="#doc-beta-fn">#</a> <code>beta_fn</code></h3>
+        <p><code>beta_fn</code> computes the beta function B(a,b) = Γ(a)Γ(b)/Γ(a+b). The beta function is the normalizing constant of the Beta distribution and appears throughout Bayesian statistics and combinatorics.</p>
+        <pre><code class="lang-perl">p beta_fn(2, 3)   # 0.0833...
+p beta_fn(0.5, 0.5)  # π
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-lbeta">
+        <h3><a class="doc-anchor" href="#doc-lbeta">#</a> <code>lbeta</code></h3>
+        <p><code>lbeta</code> (alias <code>ln_beta</code>) computes ln(B(a,b)), the log of the beta function. Avoids overflow for small a or b where B(a,b) is very large.</p>
+        <pre><code class="lang-perl">p lbeta(0.01, 0.01)  # large positive
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-betainc">
+        <h3><a class="doc-anchor" href="#doc-betainc">#</a> <code>betainc</code></h3>
+        <p><code>betainc</code> (alias <code>beta_reg</code>) computes the regularized incomplete beta function I_x(a,b), the CDF of the Beta distribution. Takes (x, a, b). Essential for computing p-values of F-tests, t-tests, and binomial probabilities.</p>
+        <pre><code class="lang-perl">p betainc(0.5, 2, 3)  # P(Beta(2,3) &lt; 0.5)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gammainc">
+        <h3><a class="doc-anchor" href="#doc-gammainc">#</a> <code>gammainc</code></h3>
+        <p><code>gammainc</code> (alias <code>gamma_li</code>) computes the lower incomplete gamma function γ(a,x) = ∫₀ˣ t^(a-1) e^(-t) dt. Used in computing CDFs of gamma and chi-squared distributions.</p>
+        <pre><code class="lang-perl">p gammainc(2, 1)  # γ(2, 1)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gammaincc">
+        <h3><a class="doc-anchor" href="#doc-gammaincc">#</a> <code>gammaincc</code></h3>
+        <p><code>gammaincc</code> (alias <code>gamma_ui</code>) computes the upper incomplete gamma function Γ(a,x) = ∫ₓ^∞ t^(a-1) e^(-t) dt = Γ(a) - γ(a,x). Useful for tail probabilities.</p>
+        <pre><code class="lang-perl">p gammaincc(2, 1)  # Γ(2, 1)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gammainc-reg">
+        <h3><a class="doc-anchor" href="#doc-gammainc-reg">#</a> <code>gammainc_reg</code></h3>
+        <p><code>gammainc_reg</code> (alias <code>gamma_lr</code>) computes the regularized lower incomplete gamma P(a,x) = γ(a,x)/Γ(a), the CDF of the gamma distribution Gamma(a, 1).</p>
+        <pre><code class="lang-perl">p gammainc_reg(2, 1)  # P(Gamma(2,1) &lt; 1)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gammaincc-reg">
+        <h3><a class="doc-anchor" href="#doc-gammaincc-reg">#</a> <code>gammaincc_reg</code></h3>
+        <p><code>gammaincc_reg</code> (alias <code>gamma_ur</code>) computes the regularized upper incomplete gamma Q(a,x) = 1 - P(a,x), the survival function of the gamma distribution.</p>
+        <pre><code class="lang-perl">p gammaincc_reg(2, 1)  # P(Gamma(2,1) &gt; 1)
 </code></pre>
       </article>
     </section>
@@ -4755,7 +5624,7 @@ log_info(&quot;hidden&quot;)    # not printed
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">2144 topics</p>
+      <p class="chapter-meta">2149 topics</p>
       <article class="doc-entry" id="doc-perlrs-rust-compile">
         <h3><a class="doc-anchor" href="#doc-perlrs-rust-compile">#</a> <code>__perlrs_rust_compile</code></h3>
         <p><code>__perlrs_rust_compile</code> — internal builtin.</p>
@@ -18219,6 +19088,18 @@ p format_bytes(rss - $before) . &quot; allocated&quot;
 @list |&gt; map rptd |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-rsa-decrypt-pkcs1">
+        <h3><a class="doc-anchor" href="#doc-rsa-decrypt-pkcs1">#</a> <code>rsa_decrypt_pkcs1</code></h3>
+        <p><code>rsa_decrypt_pkcs1</code> decrypts RSA-PKCS1v15 ciphertext.</p>
+        <pre><code class="lang-perl">my $plain = rsa_decrypt_pkcs1($priv, $cipher)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rsa-encrypt-pkcs1">
+        <h3><a class="doc-anchor" href="#doc-rsa-encrypt-pkcs1">#</a> <code>rsa_encrypt_pkcs1</code></h3>
+        <p><code>rsa_encrypt_pkcs1</code> encrypts with legacy RSA-PKCS1v15 padding. Only for compatibility with old systems — prefer OAEP.</p>
+        <pre><code class="lang-perl">my $cipher = rsa_encrypt_pkcs1($pub, &quot;data&quot;)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-rsamp">
         <h3><a class="doc-anchor" href="#doc-rsamp">#</a> <code>rsamp</code></h3>
         <p><code>rsamp</code> — matrix operations (uncategorized batch) builtin. Alias for <code>reservoir_sample</code>.</p>
@@ -18863,6 +19744,12 @@ p format_bytes(rss - $before) . &quot; allocated&quot;
         <pre><code class="lang-perl">my $result = sinh $x 
 # or in a pipeline:
 @list |&gt; map sinh |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-siphash-keyed">
+        <h3><a class="doc-anchor" href="#doc-siphash-keyed">#</a> <code>siphash_keyed</code></h3>
+        <p><code>siphash_keyed</code> computes SipHash-2-4 with a custom 128-bit key (two 64-bit integers). The key should be random per application to prevent collision attacks.</p>
+        <pre><code class="lang-perl">p siphash_keyed(&quot;data&quot;, 0x123456789, 0xabcdef012)  # keyed hash
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-size">
@@ -20894,6 +21781,14 @@ p $allowed-&gt;contains(&quot;foo&quot;)
 @list |&gt; map unzip |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-unzip-archive">
+        <h3><a class="doc-anchor" href="#doc-unzip-archive">#</a> <code>unzip_archive</code></h3>
+        <p><code>unzip_archive</code> — crypto / encoding builtin. Alias for <code>zip_extract</code>.</p>
+        <pre><code class="lang-perl">my $result = unzip_archive $x 
+# or in a pipeline:
+@list |&gt; map unzip_archive |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-unzip-pairs">
         <h3><a class="doc-anchor" href="#doc-unzip-pairs">#</a> <code>unzip_pairs</code></h3>
         <p><code>unzip_pairs</code> — go/general functional utilities builtin.</p>
@@ -21663,6 +22558,14 @@ p scalar wha(&quot;perl&quot;)        # number of perls on PATH
         <pre><code class="lang-perl">my $result = zip_apply $x 
 # or in a pipeline:
 @list |&gt; map zip_apply |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-zip-archive">
+        <h3><a class="doc-anchor" href="#doc-zip-archive">#</a> <code>zip_archive</code></h3>
+        <p><code>zip_archive</code> — crypto / encoding builtin. Alias for <code>zip_create</code>.</p>
+        <pre><code class="lang-perl">my $result = zip_archive $x 
+# or in a pipeline:
+@list |&gt; map zip_archive |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-zip-with">

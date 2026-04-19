@@ -1,6 +1,6 @@
 [package]
 name = "perlrs"
-version = "0.6.2"
+version = "0.6.3"
 edition = "2021"
 description = "A highly parallel Perl 5 interpreter written in Rust"
 license = "MIT"
@@ -58,6 +58,54 @@ hex = "0.4"
 uuid = { version = "1", features = ["v4"] }
 base64 = "0.22"
 crc32fast = "1"
+blake2 = "0.10"
+blake3 = "1"
+argon2 = "0.5"
+bcrypt = "0.16"
+scrypt = "0.11"
+pbkdf2 = { version = "0.12", features = ["simple"] }
+aes-gcm = "0.10"
+chacha20poly1305 = "0.10"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+statrs = "0.18"
+sha3 = "0.10"
+ripemd = "0.1"
+siphasher = "1"
+rsa = "0.9"
+p256 = { version = "0.13", features = ["ecdsa", "ecdh"] }
+p384 = { version = "0.13", features = ["ecdsa", "ecdh"] }
+k256 = { version = "0.13", features = ["ecdsa"] }
+hkdf = "0.12"
+elliptic-curve = { version = "0.13", features = ["sec1"] }
+ecdsa = { version = "0.16", features = ["signing", "verifying"] }
+poly1305 = "0.8"
+cbc = "0.1"
+aes = "0.8"
+base32 = "0.5"
+totp-lite = "2"
+qrcode = "0.14"
+barcoders = "2"
+image = { version = "0.25", default-features = false, features = ["png"] }
+brotli = "7"
+xz2 = "0.1"
+bzip2 = "0.5"
+lz4_flex = "0.11"
+tar = "0.4"
+snap = "1"
+weezl = "0.1"
+zip = "2"
+xxhash-rust = { version = "0.8", features = ["xxh32", "xxh64", "xxh3"] }
+murmur3 = "0.5"
+md4 = "0.10"
+blowfish = "0.9"
+des = "0.8"
+twofish = "0.7"
+camellia = "0.1"
+cast5 = "0.11"
+salsa20 = "0.10"
+crypto_secretbox = "0.1"
+crypto_box = "0.9"
 flate2 = "1"
 zstd = "0.13"
 chrono = "0.4"

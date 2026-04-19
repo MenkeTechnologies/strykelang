@@ -32,7 +32,7 @@ fn main() {
     // uses `match name { … }` (braces). Different block markers per fn.
     let core_cats = extract_categorized_names(&parser_src, "fn is_perl5_core", "matches!");
     let ext_cats = extract_categorized_names(&parser_src, "fn perlrs_extension_name", "match name");
-    // Descriptions: /// doc comments from builtins.rs (primary source for ~990 fns)
+    // Descriptions: /// doc comments from builtins.rs (primary source for ~1100 fns)
     // merged with hand-written lsp.rs entries (keywords, operators, reflection hashes).
     let mut descriptions = extract_builtin_doc_comments(&builtins_src, &arms);
     let lsp_descs = extract_lsp_descriptions(&lsp_src);
