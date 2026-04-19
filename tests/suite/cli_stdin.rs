@@ -55,7 +55,7 @@ fn forge_dash_reads_program_from_stdin() {
 
 #[test]
 fn pe_reads_full_multiline_script_from_stdin_pipe() {
-    let exe = env!("CARGO_BIN_EXE_pe");
+    let exe = env!("CARGO_BIN_EXE_fo");
     let mut child = Command::new(exe)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

@@ -6,10 +6,10 @@
 --   -- or --
 --   dofile('/path/to/forge/editors/forge.lua')
 
--- Register .pr files as forge filetype
+-- Register .for files as forge filetype
 vim.filetype.add({
   extension = {
-    pr = 'forge',
+    ['for'] = 'forge',
   },
 })
 

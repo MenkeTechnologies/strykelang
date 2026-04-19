@@ -255,7 +255,7 @@ mod cluster_parsing_tests {
     }
 
     #[test]
-    fn parses_host_slots_pe_path_triple() {
+    fn parses_host_slots_fo_path_triple() {
         let c = RemoteCluster::from_list_args(&[s("build1:3:/usr/local/bin/fo")]).expect("parse");
         assert_eq!(c.slots.len(), 3);
         assert!(c.slots.iter().all(|sl| sl.host == "build1"));

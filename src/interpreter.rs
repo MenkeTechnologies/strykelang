@@ -6818,6 +6818,34 @@ impl Interpreter {
                     )
                     .into());
                 }
+                // Trait contract enforcement: verify all required trait methods are implemented
+                for trait_name in &def.implements {
+                    if let Some(trait_def) = self.trait_defs.get(trait_name).cloned() {
+                        for required in trait_def.required_methods() {
+                            let has_method = def.methods.iter().any(|m| m.name == required.name);
+                            if !has_method {
+                                return Err(PerlError::runtime(
+                                    format!(
+                                        "class `{}` implements trait `{}` but does not define required method `{}`",
+                                        def.name, trait_name, required.name
+                                    ),
+                                    stmt.line,
+                                )
+                                .into());
+                            }
+                        }
+                    }
+                }
+                // Initialize static fields
+                for sf in &def.static_fields {
+                    let val = if let Some(ref expr) = sf.default {
+                        self.eval_expr(expr)?
+                    } else {
+                        PerlValue::UNDEF
+                    };
+                    let key = format!("{}::{}", def.name, sf.name);
+                    self.scope.declare_scalar(&key, val);
+                }
                 self.class_defs
                     .insert(def.name.clone(), Arc::new(def.clone()));
                 Ok(PerlValue::UNDEF)
@@ -13585,10 +13613,11 @@ impl Interpreter {
                         return self.enum_construct(&def, variant_name, args, line);
                     }
                 }
-                // Check for static class method: Math::add(...)
-                if let Some((class_name, method_name)) = name.rsplit_once("::") {
+                // Check for static class method or static field: Math::add(...) / Counter::count()
+                if let Some((class_name, member_name)) = name.rsplit_once("::") {
                     if let Some(def) = self.class_defs.get(class_name).cloned() {
-                        if let Some(m) = def.method(method_name) {
+                        // Static method
+                        if let Some(m) = def.method(member_name) {
                             if m.is_static {
                                 if let Some(ref body) = m.body {
                                     let params = m.params.clone();
@@ -13603,6 +13632,30 @@ impl Interpreter {
                                         Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
                                         Err(e) => Err(e),
                                     };
+                                }
+                            }
+                        }
+                        // Static field access: getter (0 args) or setter (1 arg)
+                        if def.static_fields.iter().any(|sf| sf.name == member_name) {
+                            let key = format!("{}::{}", class_name, member_name);
+                            match args.len() {
+                                0 => {
+                                    let val = self.scope.get_scalar(&key);
+                                    return Ok(val);
+                                }
+                                1 => {
+                                    self.scope.set_scalar(&key, args[0].clone());
+                                    return Ok(args[0].clone());
+                                }
+                                _ => {
+                                    return Err(PerlError::runtime(
+                                        format!(
+                                            "static field `{}::{}` takes 0 or 1 arguments",
+                                            class_name, member_name
+                                        ),
+                                        line,
+                                    )
+                                    .into());
                                 }
                             }
                         }
@@ -13678,6 +13731,15 @@ impl Interpreter {
     ) -> ExecResult {
         use crate::value::ClassInstance;
 
+        // Prevent instantiation of abstract classes
+        if def.is_abstract {
+            return Err(PerlError::runtime(
+                format!("cannot instantiate abstract class `{}`", def.name),
+                _line,
+            )
+            .into());
+        }
+
         // Collect all fields from inheritance chain (parent fields first)
         let all_fields = self.collect_class_fields(def);
 
@@ -13720,33 +13782,115 @@ impl Interpreter {
             }
         }
 
-        Ok(PerlValue::class_inst(Arc::new(ClassInstance::new(
-            Arc::clone(def),
-            values,
-        ))))
+        let instance = PerlValue::class_inst(Arc::new(ClassInstance::new(Arc::clone(def), values)));
+
+        // Call BUILD hooks: parent BUILD first, then child BUILD
+        let build_chain = self.collect_build_chain(def);
+        if !build_chain.is_empty() {
+            for (body, params) in &build_chain {
+                let call_args = vec![instance.clone()];
+                match self.call_class_method(body, params, call_args, _line) {
+                    Ok(_) => {}
+                    Err(FlowOrError::Flow(Flow::Return(_))) => {}
+                    Err(e) => return Err(e),
+                }
+            }
+        }
+
+        Ok(instance)
+    }
+
+    /// Collect BUILD methods from parent to child order.
+    fn collect_build_chain(&self, def: &ClassDef) -> Vec<(Block, Vec<SubSigParam>)> {
+        let mut chain = Vec::new();
+        // Parent BUILD first
+        for parent_name in &def.extends {
+            if let Some(parent_def) = self.class_defs.get(parent_name) {
+                chain.extend(self.collect_build_chain(parent_def));
+            }
+        }
+        // Own BUILD
+        if let Some(m) = def.method("BUILD") {
+            if let Some(ref body) = m.body {
+                chain.push((body.clone(), m.params.clone()));
+            }
+        }
+        chain
     }
 
     /// Collect all fields from a class and its parent hierarchy (parent fields first).
+    /// Returns (name, default, type, visibility, owning_class_name).
     fn collect_class_fields(
         &self,
         def: &ClassDef,
     ) -> Vec<(String, Option<Expr>, crate::ast::PerlTypeName)> {
+        self.collect_class_fields_full(def)
+            .into_iter()
+            .map(|(name, default, ty, _, _)| (name, default, ty))
+            .collect()
+    }
+
+    /// Like collect_class_fields but includes visibility and owning class name.
+    fn collect_class_fields_full(
+        &self,
+        def: &ClassDef,
+    ) -> Vec<(
+        String,
+        Option<Expr>,
+        crate::ast::PerlTypeName,
+        crate::ast::Visibility,
+        String,
+    )> {
         let mut all_fields = Vec::new();
 
-        // First, collect parent fields
         for parent_name in &def.extends {
             if let Some(parent_def) = self.class_defs.get(parent_name) {
-                let parent_fields = self.collect_class_fields(parent_def);
+                let parent_fields = self.collect_class_fields_full(parent_def);
                 all_fields.extend(parent_fields);
             }
         }
 
-        // Then add own fields
         for field in &def.fields {
-            all_fields.push((field.name.clone(), field.default.clone(), field.ty.clone()));
+            all_fields.push((
+                field.name.clone(),
+                field.default.clone(),
+                field.ty.clone(),
+                field.visibility,
+                def.name.clone(),
+            ));
         }
 
         all_fields
+    }
+
+    /// Collect DESTROY methods from child to parent order (reverse of BUILD).
+    fn collect_destroy_chain(&self, def: &ClassDef) -> Vec<(Block, Vec<SubSigParam>)> {
+        let mut chain = Vec::new();
+        // Own DESTROY first
+        if let Some(m) = def.method("DESTROY") {
+            if let Some(ref body) = m.body {
+                chain.push((body.clone(), m.params.clone()));
+            }
+        }
+        // Then parent DESTROY
+        for parent_name in &def.extends {
+            if let Some(parent_def) = self.class_defs.get(parent_name) {
+                chain.extend(self.collect_destroy_chain(parent_def));
+            }
+        }
+        chain
+    }
+
+    /// Check if `child` class inherits (directly or transitively) from `ancestor`.
+    fn class_inherits_from(&self, child: &str, ancestor: &str) -> bool {
+        if let Some(def) = self.class_defs.get(child) {
+            for parent in &def.extends {
+                if parent == ancestor || self.class_inherits_from(parent, ancestor) {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     /// Find a method in a class or its parent hierarchy (child methods override parent).
@@ -14209,17 +14353,61 @@ impl Interpreter {
         }
         // Class instance method dispatch
         if let Some(c) = receiver.as_class_inst() {
-            // Collect all fields from inheritance chain
-            let all_fields = self.collect_class_fields(&c.def);
+            // Collect all fields from inheritance chain (with visibility)
+            let all_fields_full = self.collect_class_fields_full(&c.def);
+            let all_fields: Vec<(String, Option<Expr>, crate::ast::PerlTypeName)> = all_fields_full
+                .iter()
+                .map(|(n, d, t, _, _)| (n.clone(), d.clone(), t.clone()))
+                .collect();
 
             // Field access: $obj->name or $obj->name(value)
-            if let Some(idx) = all_fields.iter().position(|(name, _, _)| name == method) {
+            if let Some(idx) = all_fields_full
+                .iter()
+                .position(|(name, _, _, _, _)| name == method)
+            {
+                let (_, _, ref ty, vis, ref owner_class) = all_fields_full[idx];
+
+                // Enforce field visibility
+                match vis {
+                    crate::ast::Visibility::Private => {
+                        // Only accessible from within the owning class's methods
+                        let caller_class = self
+                            .scope
+                            .get_scalar("self")
+                            .as_class_inst()
+                            .map(|ci| ci.def.name.clone());
+                        if caller_class.as_deref() != Some(owner_class.as_str()) {
+                            return Some(Err(PerlError::runtime(
+                                format!("field `{}` of class {} is private", method, owner_class),
+                                line,
+                            )));
+                        }
+                    }
+                    crate::ast::Visibility::Protected => {
+                        // Accessible from owning class or subclasses
+                        let caller_class = self
+                            .scope
+                            .get_scalar("self")
+                            .as_class_inst()
+                            .map(|ci| ci.def.name.clone());
+                        let allowed = caller_class.as_deref().is_some_and(|caller| {
+                            caller == owner_class || self.class_inherits_from(caller, owner_class)
+                        });
+                        if !allowed {
+                            return Some(Err(PerlError::runtime(
+                                format!("field `{}` of class {} is protected", method, owner_class),
+                                line,
+                            )));
+                        }
+                    }
+                    crate::ast::Visibility::Public => {}
+                }
+
                 match args.len() {
                     0 => {
                         return Some(Ok(c.get_field(idx).unwrap_or(PerlValue::UNDEF)));
                     }
                     1 => {
-                        let (_, _, ty) = &all_fields[idx];
                         let new_val = args[0].clone();
                         if let Err(msg) = ty.check_value(&new_val) {
                             return Some(Err(PerlError::type_error(
@@ -14324,16 +14512,72 @@ impl Interpreter {
                         PerlValue::string(String::new())
                     }));
                 }
+                "does" => {
+                    if args.len() != 1 {
+                        return Some(Err(PerlError::runtime("does requires one argument", line)));
+                    }
+                    let trait_name = args[0].to_string();
+                    let implements = c.def.implements.contains(&trait_name);
+                    return Some(Ok(if implements {
+                        PerlValue::integer(1)
+                    } else {
+                        PerlValue::string(String::new())
+                    }));
+                }
+                "destroy" => {
+                    // Explicit destructor call — runs DESTROY chain child-first
+                    let destroy_chain = self.collect_destroy_chain(&c.def);
+                    for (body, params) in &destroy_chain {
+                        let call_args = vec![receiver.clone()];
+                        match self.call_class_method(body, params, call_args, line) {
+                            Ok(_) => {}
+                            Err(FlowOrError::Flow(Flow::Return(_))) => {}
+                            Err(FlowOrError::Error(e)) => return Some(Err(e)),
+                            Err(_) => {}
+                        }
+                    }
+                    return Some(Ok(PerlValue::UNDEF));
+                }
                 _ => {}
             }
             // User-defined class method (search inheritance chain)
-            if let Some((m, _class_name)) = self.find_class_method(&c.def, method) {
-                // Check visibility for private methods
-                if matches!(m.visibility, crate::ast::Visibility::Private) {
-                    return Some(Err(PerlError::runtime(
-                        format!("method `{}` of class {} is private", method, c.def.name),
-                        line,
-                    )));
+            if let Some((m, ref owner_class)) = self.find_class_method(&c.def, method) {
+                // Check visibility
+                match m.visibility {
+                    crate::ast::Visibility::Private => {
+                        let caller_class = self
+                            .scope
+                            .get_scalar("self")
+                            .as_class_inst()
+                            .map(|ci| ci.def.name.clone());
+                        if caller_class.as_deref() != Some(owner_class.as_str()) {
+                            return Some(Err(PerlError::runtime(
+                                format!("method `{}` of class {} is private", method, owner_class),
+                                line,
+                            )));
+                        }
+                    }
+                    crate::ast::Visibility::Protected => {
+                        let caller_class = self
+                            .scope
+                            .get_scalar("self")
+                            .as_class_inst()
+                            .map(|ci| ci.def.name.clone());
+                        let allowed = caller_class.as_deref().is_some_and(|caller| {
+                            caller == owner_class.as_str()
+                                || self.class_inherits_from(caller, owner_class)
+                        });
+                        if !allowed {
+                            return Some(Err(PerlError::runtime(
+                                format!(
+                                    "method `{}` of class {} is protected",
+                                    method, owner_class
+                                ),
+                                line,
+                            )));
+                        }
+                    }
+                    crate::ast::Visibility::Public => {}
                 }
                 if let Some(ref body) = m.body {
                     let params = m.params.clone();

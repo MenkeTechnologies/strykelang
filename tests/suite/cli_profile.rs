@@ -4,7 +4,7 @@ use std::process::Command;
 
 #[test]
 fn pe_profile_stderr_has_vm_report_sections() {
-    let exe = env!("CARGO_BIN_EXE_pe");
+    let exe = env!("CARGO_BIN_EXE_fo");
     let out = Command::new(exe)
         .args(["--profile", "-e", "sub foo { 1 } foo();"])
         .output()

@@ -21,7 +21,7 @@ fn tmp_path(tag: &str) -> PathBuf {
 
 #[test]
 fn aot_build_and_run_hello_script() {
-    let exe = env!("CARGO_BIN_EXE_pe");
+    let exe = env!("CARGO_BIN_EXE_fo");
     let script = tmp_path("hello.pl");
     let bin = tmp_path("hello_bin");
 
@@ -68,7 +68,7 @@ fn aot_build_and_run_hello_script() {
 
 #[test]
 fn aot_build_preserves_exit_code_from_die() {
-    let exe = env!("CARGO_BIN_EXE_pe");
+    let exe = env!("CARGO_BIN_EXE_fo");
     let script = tmp_path("fail.pl");
     let bin = tmp_path("fail_bin");
     fs::write(&script, "die \"oops\\n\";\n").unwrap();
@@ -103,7 +103,7 @@ fn aot_build_preserves_exit_code_from_die() {
 
 #[test]
 fn aot_build_rejects_syntax_error_at_build_time() {
-    let exe = env!("CARGO_BIN_EXE_pe");
+    let exe = env!("CARGO_BIN_EXE_fo");
     let script = tmp_path("bad.pl");
     let bin = tmp_path("bad_bin");
     fs::write(&script, "sub oops {\n").unwrap();
@@ -130,7 +130,7 @@ fn aot_build_rejects_syntax_error_at_build_time() {
 
 #[test]
 fn aot_build_help_subcommand_prints_usage() {
-    let exe = env!("CARGO_BIN_EXE_pe");
+    let exe = env!("CARGO_BIN_EXE_fo");
     let out = Command::new(exe)
         .arg("build")
         .arg("--help")

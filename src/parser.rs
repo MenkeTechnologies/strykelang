@@ -496,7 +496,17 @@ impl Parser {
                             self.peek_line(),
                         ));
                     }
-                    self.parse_class_decl()?
+                    self.parse_class_decl(false)?
+                }
+                "abstract" => {
+                    self.advance(); // abstract
+                    if !matches!(self.peek(), Token::Ident(ref s) if s == "class") {
+                        return Err(self.syntax_err(
+                            "`abstract` must be followed by `class`",
+                            self.peek_line(),
+                        ));
+                    }
+                    self.parse_class_decl(true)?
                 }
                 "trait" => {
                     if crate::compat_mode() {
@@ -3753,9 +3763,9 @@ impl Parser {
         })
     }
 
-    /// `class Name extends Parent impl Trait { fields; methods }`
-    fn parse_class_decl(&mut self) -> PerlResult<Statement> {
-        use crate::ast::{ClassDef, ClassField, ClassMethod, Visibility};
+    /// `[abstract] class Name extends Parent impl Trait { fields; methods }`
+    fn parse_class_decl(&mut self, is_abstract: bool) -> PerlResult<Statement> {
+        use crate::ast::{ClassDef, ClassField, ClassMethod, ClassStaticField, Visibility};
         let line = self.peek_line();
         self.advance(); // class
         let name = match self.advance() {
@@ -3808,6 +3818,7 @@ impl Parser {
         self.expect(&Token::LBrace)?;
         let mut fields = Vec::new();
         let mut methods = Vec::new();
+        let mut static_fields = Vec::new();
 
         while !matches!(self.peek(), Token::RBrace | Token::Eof) {
             // Check for visibility modifier
@@ -3820,8 +3831,60 @@ impl Parser {
                     self.advance();
                     Visibility::Private
                 }
+                Token::Ident(ref s) if s == "prot" => {
+                    self.advance();
+                    Visibility::Protected
+                }
                 _ => Visibility::Public, // default public
             };
+
+            // Check for static field: `static name: Type = default`
+            if matches!(self.peek(), Token::Ident(ref s) if s == "static") {
+                self.advance(); // static
+
+                // Could be a static method (`static fn`) or static field
+                if matches!(self.peek(), Token::Ident(ref s) if s == "fn" || s == "sub") {
+                    // static fn is same as fn Self.name — handled below but not here
+                    return Err(self.syntax_err(
+                        "use `fn Self.name` for static methods, not `static fn`",
+                        self.peek_line(),
+                    ));
+                }
+
+                let field_name = match self.advance() {
+                    (Token::Ident(n), _) => n,
+                    (tok, err_line) => {
+                        return Err(self.syntax_err(
+                            format!("Expected static field name, got {:?}", tok),
+                            err_line,
+                        ))
+                    }
+                };
+
+                let ty = if self.eat(&Token::Colon) {
+                    self.parse_type_name()?
+                } else {
+                    crate::ast::PerlTypeName::Any
+                };
+
+                let default = if self.eat(&Token::Assign) {
+                    Some(self.parse_ternary()?)
+                } else {
+                    None
+                };
+
+                static_fields.push(ClassStaticField {
+                    name: field_name,
+                    ty,
+                    visibility,
+                    default,
+                });
+
+                if !self.eat(&Token::Comma) {
+                    self.eat(&Token::Semicolon);
+                }
+                continue;
+            }
 
             // Check for method: `fn name` or `fn Self.name` (static)
             let is_method = matches!(self.peek(), Token::Ident(ref s) if s == "fn" || s == "sub");
@@ -3915,10 +3978,12 @@ impl Parser {
             kind: StmtKind::ClassDecl {
                 def: ClassDef {
                     name,
+                    is_abstract,
                     extends,
                     implements,
                     fields,
                     methods,
+                    static_fields,
                 },
             },
             line,
@@ -3950,6 +4015,10 @@ impl Parser {
                 Token::Ident(ref s) if s == "priv" => {
                     self.advance();
                     Visibility::Private
+                }
+                Token::Ident(ref s) if s == "prot" => {
+                    self.advance();
+                    Visibility::Protected
                 }
                 _ => Visibility::Public,
             };

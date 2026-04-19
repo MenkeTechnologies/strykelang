@@ -324,6 +324,7 @@ pub enum Visibility {
     #[default]
     Public,
     Private,
+    Protected,
 }
 
 /// Single field in a class definition: `name: Type = default` or `pub name: Type`.
@@ -365,16 +366,34 @@ impl TraitDef {
     }
 }
 
+/// A static (class-level) variable: `static count: Int = 0`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClassStaticField {
+    pub name: String,
+    pub ty: PerlTypeName,
+    pub visibility: Visibility,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default: Option<Expr>,
+}
+
 /// Class definition: `class Name extends Parent impl Trait { fields; methods }`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClassDef {
     pub name: String,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub is_abstract: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub extends: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub implements: Vec<String>,
     pub fields: Vec<ClassField>,
     pub methods: Vec<ClassMethod>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub static_fields: Vec<ClassStaticField>,
+}
+
+fn is_false(v: &bool) -> bool {
+    !*v
 }
 
 impl ClassDef {

@@ -53,7 +53,7 @@ mod phases;
 mod pragmas;
 mod range_perl;
 mod readline_list_context;
-mod readme_pe_commands;
+mod readme_fo_commands;
 mod reflection;
 mod regex;
 mod regex_extended;

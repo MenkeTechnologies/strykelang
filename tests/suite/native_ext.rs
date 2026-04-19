@@ -210,7 +210,7 @@ fn par_pipeline_list_chain_filter_map_take() {
 /// README `par_pipeline` example: bare `{ }` blocks, `readline(STDIN)` source, bareword stage bodies.
 #[test]
 fn par_pipeline_readline_stdin_bare_blocks_bareword_stages() {
-    let exe = env!("CARGO_BIN_EXE_pe");
+    let exe = env!("CARGO_BIN_EXE_fo");
     let mut child = Command::new(exe)
         .args([
             "-e",
