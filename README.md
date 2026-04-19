@@ -117,7 +117,7 @@ autoload -Uz compinit && compinit
 | Data viz (spark/bars/flame) | **yes** | no | no | no | no | no | no |
 | Clipboard (clip/paste) | **yes** | no | no | no | no | no | `clip` |
 | `$NR`/`$NF` AWK compat | **yes** | `-MEnglish` | no | no | native | no | no |
-| Typed structs/enums | **yes** | no | native | native | no | no | native |
+| Typed structs/enums/classes | **yes** | no | native | native | no | no | native |
 | JIT compiler | **Cranelift** | no | YJIT | no | no | no | no |
 | Single binary | **18MB** | system pkg | system pkg | system pkg | system pkg | 3MB | 50MB+ |
 
@@ -335,7 +335,7 @@ For `mysync` scalars holding a `Set`, `|`/`&` are union/intersection. Without `m
 | **Crypto** | `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `md5`, `hmac`, `hmac_sha256`, `crc32`, `uuid`, `base64_encode/decode`, `hex_encode/decode` |
 | **Compression** ([`flate2`](https://crates.io/crates/flate2), [`zstd`](https://crates.io/crates/zstd)) | `gzip`, `gunzip`, `zstd`, `zstd_decode` |
 | **Time** ([`chrono`](https://crates.io/crates/chrono), [`chrono-tz`](https://crates.io/crates/chrono-tz)) | `datetime_utc`, `datetime_from_epoch`, `datetime_parse_rfc3339`, `datetime_strftime`, `datetime_now_tz`, `datetime_format_tz`, `datetime_parse_local`, `datetime_add_seconds`, `elapsed` |
-| **Structs / Enums / Types** | `struct Name { x => Float, y => Int }; Name(x => 1, y => 2)`; `enum Color { Red, Green, Blue }; Color::Red()`; `typed my $x : Int\|Str\|Float`; typed sub params `fn ($a: Int, $b: Str) { }` |
+| **Structs / Enums / Classes / Types** | `struct Point { x => Float }`, `enum Color { Red, Green }`, `class Dog extends Animal { breed: Str; fn bark { } }`, `trait Printable { fn to_str }`, `typed my $x : Int`, typed sub params `fn ($a: Int) { }` |
 
 ```perl
 my $data = "https://api.example.com/users/1" |> fetch_json
@@ -419,6 +419,74 @@ p $r  # Result::Err(not found)
 # Result::Ok("bad")  # ERROR: expected Int
 # Maybe::Some()  # ERROR: requires data
 # Color::Red(42)  # ERROR: does not take data
+# ────────────────────────────────────────────────────────────────────
+
+# ─── Classes (full OOP) ────────────────────────────────────────────
+# Declaration: class Name extends Parent impl Trait { fields; methods }
+class Animal {
+    name: Str
+    age: Int = 0
+    fn speak { say "Animal: " . $self->name }
+}
+
+# Inheritance with extends
+class Dog extends Animal {
+    breed: Str = "Mixed"
+    fn bark { say "Woof! I am " . $self->name }
+    fn speak { say $self->name . " barks!" }  # override
+}
+
+# Construction: named or positional
+my $dog = Dog(name => "Rex", age => 5, breed => "Lab")
+my $dog = Dog("Rex", 5, "Lab")  # positional
+
+# Field access: getter (0 args) or setter (1 arg)
+p $dog->name        # Rex
+$dog->age(6)        # setter
+p $dog->age         # 6
+
+# Instance methods
+$dog->bark()        # Woof! I am Rex
+$dog->speak()       # Rex barks!
+
+# Static methods: fn Self.name
+class Math {
+    fn Self.add($a, $b) { $a + $b }
+    fn Self.pi { 3.14159 }
+}
+p Math::add(3, 4)   # 7
+p Math::pi()        # 3.14159
+
+# Traits (interfaces)
+trait Printable { fn to_str }
+class Item impl Printable {
+    name: Str
+    fn to_str { $self->name }
+}
+
+# Multiple inheritance
+class C extends A, B { }
+
+# isa checks inheritance chain
+p $dog->isa("Dog")     # 1
+p $dog->isa("Animal")  # 1
+p $dog->isa("Cat")     # "" (false)
+
+# Built-in methods (same as struct)
+my @f = $dog->fields()       # (name, age, breed)
+my $h = $dog->to_hash()      # { name => "Rex", ... }
+my $d2 = $dog->with(age => 1) # functional update
+my $d3 = $dog->clone()       # deep copy
+
+# Smart stringify
+p $dog  # Dog(name => Rex, age => 5, breed => Lab)
+
+# Visibility (pub/priv)
+class Secret {
+    pub visible: Int = 1
+    priv hidden: Int = 42
+    pub fn get_hidden { $self->hidden }  # internal access ok
+}
 # ────────────────────────────────────────────────────────────────────
 
 typed my $n : Int = 42
@@ -619,7 +687,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **Bytecode cache** ([\[0x0F\]](#0x0f-bytecode-cache-pec)): `PERLRS_BC_CACHE=1` skips parse + compile on warm starts via on-disk `.pec` bundles.
 - **Language server** ([\[0x11\]](#0x11-language-server---lsp)): `pe --lsp` runs an LSP server over stdio with diagnostics, hover, completion.
 - `mysync` shared state ([\[0x04\]](#0x04-shared-state-mysync)).
-- `frozen my` (or `const my` — same thing, more familiar spelling), `typed my`, `struct`, `enum`, algebraic `match`, `try/catch/finally`, `eval_timeout`, `retry`, `rate_limit`, `every`, `gen { ... yield }`.
+- `frozen my` (or `const my` — same thing, more familiar spelling), `typed my`, `struct`, `enum`, `class` (full OOP with `extends`/`impl`), `trait`, algebraic `match`, `try/catch/finally`, `eval_timeout`, `retry`, `rate_limit`, `every`, `gen { ... yield }`.
 - **Functional composition** — `compose`, `partial`, `curry`, `memoize`, `once`, `constantly`, `complement`, `juxt`, `fnil`:
 
   ```perl

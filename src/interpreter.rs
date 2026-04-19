@@ -16486,7 +16486,7 @@ impl Interpreter {
     }
 
     /// Call a user-defined class method: `$dog->bark()` where `fn bark { }` is in class.
-    pub fn call_class_method(
+    pub(crate) fn call_class_method(
         &mut self,
         body: &Block,
         params: &[SubSigParam],
@@ -16497,7 +16497,7 @@ impl Interpreter {
     }
 
     /// Call a static class method: `Math::add(...)`.
-    pub fn call_static_class_method(
+    pub(crate) fn call_static_class_method(
         &mut self,
         body: &Block,
         params: &[SubSigParam],
