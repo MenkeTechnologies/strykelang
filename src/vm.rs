@@ -2414,7 +2414,12 @@ impl<'a> VM<'a> {
 
                     // ── Stack ──
                     Op::Pop => {
-                        self.pop();
+                        let v = self.pop();
+                        // Drain iterators used as void statements so side effects fire.
+                        if v.is_iterator() {
+                            let iter = v.into_iterator();
+                            while iter.next_item().is_some() {}
+                        }
                         Ok(())
                     }
                     Op::Dup => {
@@ -7877,6 +7882,13 @@ impl<'a> VM<'a> {
 
         if !self.stack.is_empty() {
             last = self.stack.last().cloned().unwrap_or(PerlValue::UNDEF);
+            // Drain iterators left on the stack so side effects fire
+            // (e.g. `pmaps { system(...) } @list` with no consumer).
+            if last.is_iterator() {
+                let iter = last.clone().into_iterator();
+                while iter.next_item().is_some() {}
+                last = PerlValue::UNDEF;
+            }
         }
 
         Ok(last)

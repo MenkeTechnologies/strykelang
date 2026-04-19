@@ -405,7 +405,7 @@ pub(crate) fn try_builtin(
         "words" | "wd" => Some(builtin_words(interp, args)),
         "chars" | "ch" => Some(builtin_chars(interp, args)),
         "digits" | "dg" => Some(builtin_digits(interp, args)),
-        "letters" | "lt" => Some(builtin_letters(interp, args)),
+        "letters" | "lts" => Some(builtin_letters(interp, args)),
         "letters_uc" => Some(builtin_letters_uc(interp, args)),
         "letters_lc" => Some(builtin_letters_lc(interp, args)),
         "punctuation" | "punct" => Some(builtin_punctuation(interp, args)),

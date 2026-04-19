@@ -1879,14 +1879,16 @@ impl Parser {
                             }
                         }
                         self.expect(&Token::RParen)?;
+                        // If no `$_` placeholder, auto-inject threaded value as first arg.
+                        // `t data to_file("/tmp/o.html")` → `to_file($_, "/tmp/o.html")`
                         if !call_args.iter().any(Self::expr_contains_topic_var) {
-                            return Err(self.syntax_err(
-                                format!(
-                                    "thread: `{}(...)` call-stage requires `$_` placeholder somewhere in args (e.g. `{}($_, ...)`); use bare `{}` for sole-arg threading or `>{{ ... }}` for arbitrary expressions",
-                                    func_name, func_name, func_name
-                                ),
-                                stage_line,
-                            ));
+                            call_args.insert(
+                                0,
+                                Expr {
+                                    kind: ExprKind::ScalarVar("_".to_string()),
+                                    line: stage_line,
+                                },
+                            );
                         }
                         let call_expr = Expr {
                             kind: ExprKind::FuncCall {
@@ -2259,7 +2261,7 @@ impl Parser {
                 name: "digits".to_string(),
                 args: vec![arg],
             },
-            "letters" | "lt" => ExprKind::FuncCall {
+            "letters" | "lts" => ExprKind::FuncCall {
                 name: "letters".to_string(),
                 args: vec![arg],
             },
