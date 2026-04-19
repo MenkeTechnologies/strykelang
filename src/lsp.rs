@@ -2097,6 +2097,119 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "earth_mass" | "mearth" => "`earth_mass` (alias `mearth`) — M⊕ ≈ 5.972×10²⁴ kg. Mass of Earth.\n\n```perl\np mearth   # 5.972167867e24 kg\n```",
         "sun_mass" | "msun" => "`sun_mass` (alias `msun`) — M☉ ≈ 1.989×10³⁰ kg. Mass of Sun (solar mass).\n\n```perl\np msun   # 1.98892e30 kg\n```",
 
+        // ── Linear Algebra ────────────────────────────────────────────────
+        "matrix_solve" | "msolve" | "solve" => "`matrix_solve` (aliases `msolve`, `solve`) solves the linear system Ax=b via Gaussian elimination with partial pivoting. Returns the solution vector x.\n\n```perl\nmy $A = [[2,1],[-1,1]]\nmy $b = [5,2]\nmy $x = solve($A, $b)   # [1, 3]\n```",
+        "matrix_lu" | "mlu" => "`matrix_lu` (alias `mlu`) computes the LU decomposition with partial pivoting. Returns [L, U, P] where PA = LU.\n\n```perl\nmy ($L, $U, $P) = @{mlu([[4,3],[6,3]])}\n```",
+        "matrix_qr" | "mqr" => "`matrix_qr` (alias `mqr`) computes the QR decomposition via Gram-Schmidt orthogonalization. Returns [Q, R] where A = QR.\n\n```perl\nmy ($Q, $R) = @{mqr([[1,1],[1,-1]])}\n```",
+        "matrix_eigenvalues" | "meig" | "eigenvalues" | "eig" => "`matrix_eigenvalues` (aliases `meig`, `eig`) computes eigenvalues of a square matrix via QR iteration. Returns an array of eigenvalues.\n\n```perl\nmy @eigs = @{eig([[2,1],[1,2]])}   # [3, 1]\n```",
+        "matrix_norm" | "mnorm" => "`matrix_norm` (alias `mnorm`) computes a matrix norm. Default is Frobenius; pass 1 for max-column-sum, Inf for max-row-sum.\n\n```perl\np mnorm([[3,4]])           # 5 (Frobenius)\np mnorm([[1,2],[3,4]], 1)  # 6 (1-norm)\n```",
+        "matrix_cond" | "mcond" | "cond" => "`matrix_cond` (aliases `mcond`, `cond`) estimates the condition number of a matrix (ratio of largest to smallest singular value). Large values indicate ill-conditioning.\n\n```perl\np cond([[1,0],[0,1]])    # 1 (perfect)\np cond([[1,2],[2,4]])    # Inf (singular)\n```",
+        "matrix_pinv" | "mpinv" | "pinv" => "`matrix_pinv` (aliases `mpinv`, `pinv`) computes the Moore-Penrose pseudo-inverse via (A^T A)^{-1} A^T.\n\n```perl\nmy $A_plus = pinv([[1,2],[3,4],[5,6]])\n```",
+        "matrix_cholesky" | "mchol" | "cholesky" => "`matrix_cholesky` (aliases `mchol`, `cholesky`) computes the Cholesky decomposition of a symmetric positive-definite matrix. Returns lower-triangular L where M = L·L^T.\n\n```perl\nmy $L = cholesky([[4,2],[2,3]])\n```",
+        "matrix_det_general" | "mdetg" | "det" => "`matrix_det_general` (aliases `mdetg`, `det`) computes the determinant of any NxN matrix via LU decomposition.\n\n```perl\np det([[1,2,3],[4,5,6],[7,8,0]])  # 27\n```",
+
+        // ── Statistics Tests ─────────────────────────────────────────────
+        "welch_ttest" | "welcht" => "`welch_ttest` (alias `welcht`) performs Welch's t-test for two independent samples with unequal variances. Returns [t-statistic, degrees of freedom].\n\n```perl\nmy ($t, $df) = @{welcht([1,2,3,4,5], [3,4,5,6,7])}\np \"t=$t df=$df\"\n```",
+        "paired_ttest" | "pairedt" => "`paired_ttest` (alias `pairedt`) performs a paired t-test on two matched samples. Returns [t-statistic, degrees of freedom].\n\n```perl\nmy ($t, $df) = @{pairedt([85,90,78], [88,92,80])}\n```",
+        "cohen_d" | "cohend" => "`cohen_d` (alias `cohend`) computes Cohen's d effect size between two samples. Small=0.2, medium=0.5, large=0.8.\n\n```perl\np cohend([1,2,3], [4,5,6])  # large effect\n```",
+        "anova_oneway" | "anova" | "anova1" => "`anova_oneway` (aliases `anova`, `anova1`) performs one-way ANOVA. Returns [F-statistic, df_between, df_within].\n\n```perl\nmy ($F, $dfb, $dfw) = @{anova([1,2,3], [4,5,6], [7,8,9])}\n```",
+        "spearman_corr" | "rho" => "`spearman` (aliases `spearman_corr`, `rho`) computes Spearman's rank correlation coefficient between two samples.\n\n```perl\np rho([1,2,3,4,5], [5,6,7,8,7])  # ~0.82\n```",
+        "kendall_tau" | "kendall" | "ktau" => "`kendall_tau` (aliases `kendall`, `ktau`) computes Kendall's rank correlation coefficient (tau-b).\n\n```perl\np ktau([1,2,3,4], [1,2,4,3])  # 0.67\n```",
+        "confidence_interval" | "ci" => "`confidence_interval` (alias `ci`) computes a confidence interval for the mean. Default 95%. Returns [lower, upper].\n\n```perl\nmy ($lo, $hi) = @{ci([10,12,14,11,13])}\np \"95%% CI: $lo to $hi\"\nmy ($lo99, $hi99) = @{ci([10,12,14,11,13], 0.99)}\n```",
+
+        // ── Distributions ────────────────────────────────────────────────
+        "beta_pdf" | "betapdf" => "`beta_pdf` (alias `betapdf`) evaluates the Beta distribution PDF at x with shape parameters alpha and beta.\n\n```perl\np betapdf(0.5, 2, 5)  # Beta(2,5) at x=0.5\n```",
+        "gamma_pdf" | "gammapdf" => "`gamma_pdf` (alias `gammapdf`) evaluates the Gamma distribution PDF at x with shape k and scale theta.\n\n```perl\np gammapdf(2.0, 2, 1)  # Gamma(2,1) at x=2\n```",
+        "chi2_pdf" | "chi2pdf" | "chi_squared_pdf" => "`chi2_pdf` (alias `chi2pdf`) evaluates the chi-squared distribution PDF at x with k degrees of freedom.\n\n```perl\np chi2pdf(3.84, 1)  # p-value boundary for df=1\n```",
+        "t_pdf" | "tpdf" | "student_pdf" => "`t_pdf` (alias `tpdf`) evaluates Student's t-distribution PDF at x with nu degrees of freedom.\n\n```perl\np tpdf(0, 10)    # peak of t(10)\np tpdf(2.228, 10)\n```",
+        "f_pdf" | "fpdf" | "fisher_pdf" => "`f_pdf` (alias `fpdf`) evaluates the F-distribution PDF at x with d1 and d2 degrees of freedom.\n\n```perl\np fpdf(1.0, 5, 10)\n```",
+        "lognormal_pdf" | "lnormpdf" => "`lognormal_pdf` (alias `lnormpdf`) evaluates the log-normal distribution PDF at x with parameters mu and sigma.\n\n```perl\np lnormpdf(1.0, 0, 1)  # LogN(0,1) at x=1\n```",
+        "weibull_pdf" | "weibpdf" => "`weibull_pdf` (alias `weibpdf`) evaluates the Weibull distribution PDF at x with shape k and scale lambda.\n\n```perl\np weibpdf(1.0, 1.5, 1.0)\n```",
+        "cauchy_pdf" | "cauchypdf" => "`cauchy_pdf` (alias `cauchypdf`) evaluates the Cauchy distribution PDF at x with location x0 and scale gamma.\n\n```perl\np cauchypdf(0, 0, 1)  # peak of standard Cauchy\n```",
+        "laplace_pdf" | "laplacepdf" => "`laplace_pdf` (alias `laplacepdf`) evaluates the Laplace distribution PDF at x with location mu and scale b.\n\n```perl\np laplacepdf(0, 0, 1)  # 0.5 (peak)\n```",
+        "pareto_pdf" | "paretopdf" => "`pareto_pdf` (alias `paretopdf`) evaluates the Pareto distribution PDF at x with minimum xm and shape alpha.\n\n```perl\np paretopdf(2, 1, 3)  # Pareto(1,3) at x=2\n```",
+
+        // ── Interpolation ────────────────────────────────────────────────
+        "lagrange_interp" | "lagrange" | "linterp" => "`lagrange_interp` (aliases `lagrange`, `linterp`) performs Lagrange polynomial interpolation. Takes xs, ys, and a query point x.\n\n```perl\np lagrange([0,1,2], [0,1,4], 1.5)  # 2.25\n```",
+        "cubic_spline" | "cspline" | "spline" => "`cubic_spline` (aliases `cspline`, `spline`) performs natural cubic spline interpolation. Takes xs, ys, and a query point x.\n\n```perl\np spline([0,1,2,3], [0,1,0,1], 1.5)  # smooth interpolation\n```",
+        "poly_eval" | "polyval" => "`poly_eval` (alias `polyval`) evaluates a polynomial c0 + c1·x + c2·x² + ... using Horner's method.\n\n```perl\np polyval([1, 0, 1], 3)  # 1 + 0*3 + 1*9 = 10\n```",
+        "polynomial_fit" | "polyfit" => "`polynomial_fit` (alias `polyfit`) performs least-squares polynomial fitting. Returns coefficients [c0, c1, ..., cn].\n\n```perl\nmy $c = polyfit([0,1,2,3], [1,3,5,7], 1)  # linear fit\n```",
+
+        // ── Numerical Methods ────────────────────────────────────────────
+        "trapz" | "trapezoid" => "`trapz` (alias `trapezoid`) integrates evenly-spaced samples using the trapezoidal rule. Optional dx (default 1).\n\n```perl\nmy @y = map { $_ ** 2 } 0..100\np trapz(\\@y, 0.01)  # ≈ 0.3333\n```",
+        "simpson" | "simps" => "`simpson` (alias `simps`) integrates evenly-spaced samples using Simpson's rule. More accurate than trapz for smooth functions.\n\n```perl\nmy @y = map { sin($_ * 0.01) } 0..314\np simps(\\@y, 0.01)  # ≈ 2.0\n```",
+        "numerical_diff" | "numdiff" | "diff_array" => "`numerical_diff` (aliases `numdiff`, `diff_array`) computes the numerical first derivative via central differences. Returns an array.\n\n```perl\nmy @y = map { $_ ** 2 } 0..10\nmy @dy = @{numdiff(\\@y)}  # ≈ [0, 2, 4, 6, ...]\n```",
+        "cumtrapz" | "cumulative_trapz" => "`cumtrapz` cumulative trapezoidal integration. Returns running integral array.\n\n```perl\nmy @y = (1, 2, 3, 4)\nmy @F = @{cumtrapz(\\@y)}  # [0, 1.5, 4.0, 7.5]\n```",
+
+        // ── Optimization ─────────────────────────────────────────────────
+        "bisection" | "bisect" => "`bisection` (alias `bisect`) finds a root of f(x)=0 in [a,b] via the bisection method. Takes a code ref, a, b, and optional tolerance.\n\n```perl\nmy $root = bisect(sub { $_[0]**2 - 2 }, 1, 2)  # √2 ≈ 1.4142\n```",
+        "newton_method" | "newton" | "newton_raphson" => "`newton_method` (aliases `newton`, `newton_raphson`) finds a root via Newton-Raphson. Takes f, f', x0, and optional tolerance.\n\n```perl\nmy $root = newton(sub { $_[0]**2 - 2 }, sub { 2*$_[0] }, 1.5)  # √2\n```",
+        "golden_section" | "golden" | "gss" => "`golden_section` (aliases `golden`, `gss`) finds the minimum of f on [a,b] via golden-section search.\n\n```perl\nmy $xmin = golden(sub { ($_[0]-3)**2 }, 0, 10)  # 3.0\n```",
+
+        // ── ODE Solvers ──────────────────────────────────────────────────
+        "rk4" | "runge_kutta" | "rk4_ode" => "`rk4` (aliases `runge_kutta`, `rk4_ode`) solves an ODE dy/dt = f(t,y) using 4th-order Runge-Kutta. Returns [[t,y], ...].\n\n```perl\n# dy/dt = -y, y(0) = 1 → y = e^(-t)\nmy $sol = rk4(sub { -$_[1] }, 0, 1, 0.1, 100)\n```",
+        "euler_ode" | "euler_method" => "`euler_ode` (alias `euler_method`) solves an ODE dy/dt = f(t,y) using the Euler method. Returns [[t,y], ...].\n\n```perl\nmy $sol = euler_ode(sub { $_[1] }, 0, 1, 0.01, 100)  # exponential growth\n```",
+
+        // ── Graph Algorithms ─────────────────────────────────────────────
+        "dijkstra" | "shortest_path" => "`dijkstra` (alias `shortest_path`) computes shortest paths from a source node. Graph is a hash of {node => [[neighbor, weight], ...]}. Returns {node => distance}.\n\n```perl\nmy $g = {A => [[\"B\",1],[\"C\",4]], B => [[\"C\",2]], C => []}\nmy $d = dijkstra($g, \"A\")  # {A=>0, B=>1, C=>3}\n```",
+        "bellman_ford" | "bellmanford" => "`bellman_ford` (alias `bellmanford`) computes shortest paths from a source in a graph with negative weights. Takes edges [[u,v,w],...], node count, source index.\n\n```perl\nmy $d = bellmanford([[0,1,4],[0,2,5],[1,2,-3]], 3, 0)\n```",
+        "floyd_warshall" | "floydwarshall" | "apsp" => "`floyd_warshall` (aliases `floydwarshall`, `apsp`) computes all-pairs shortest paths. Takes a distance matrix (use Inf for no edge).\n\n```perl\nmy $d = apsp([[0,3,1e18],[1e18,0,1],[1e18,1e18,0]])\n```",
+        "prim_mst" | "mst" | "prim" => "`prim_mst` (aliases `mst`, `prim`) computes the minimum spanning tree weight via Prim's algorithm. Takes an adjacency matrix.\n\n```perl\np mst([[0,2,0],[2,0,3],[0,3,0]])  # 5\n```",
+
+        // ── Trig Extensions ──────────────────────────────────────────────
+        "cot" => "`cot` returns the cotangent (1/tan) of an angle in radians.\n\n```perl\np cot(0.7854)  # ≈ 1.0 (cot 45°)\n```",
+        "sec" => "`sec` returns the secant (1/cos) of an angle in radians.\n\n```perl\np sec(0)  # 1.0\n```",
+        "csc" => "`csc` returns the cosecant (1/sin) of an angle in radians.\n\n```perl\np csc(1.5708)  # ≈ 1.0 (csc 90°)\n```",
+        "sinc" => "`sinc` returns the unnormalized sinc function: sin(x)/x, with sinc(0)=1.\n\n```perl\np sinc(0)       # 1.0\np sinc(3.14159) # ≈ 0\n```",
+
+        // ── ML Activation Functions ──────────────────────────────────────
+        "leaky_relu" | "lrelu" => "`leaky_relu` (alias `lrelu`) applies Leaky ReLU: x if x≥0, alpha*x otherwise (default alpha=0.01).\n\n```perl\np lrelu(5)     # 5\np lrelu(-5)    # -0.05\np lrelu(-5, 0.1)  # -0.5\n```",
+        "elu" => "`elu` applies the Exponential Linear Unit: x if x≥0, alpha*(e^x - 1) otherwise.\n\n```perl\np elu(1)     # 1\np elu(-1)    # -0.632\n```",
+        "selu" => "`selu` applies the Scaled ELU with fixed lambda=1.0507, alpha=1.6733 for self-normalizing networks.\n\n```perl\np selu(1)    # 1.0507\np selu(-1)   # -1.1113\n```",
+        "gelu" => "`gelu` applies the Gaussian Error Linear Unit, used in BERT/GPT transformers.\n\n```perl\np gelu(1)    # 0.8412\np gelu(-1)   # -0.1588\n```",
+        "silu" | "swish" => "`silu` (alias `swish`) applies SiLU/Swish: x·sigmoid(x). Smooth approximation to ReLU.\n\n```perl\np silu(1)    # 0.7311\np swish(-2)  # -0.2384\n```",
+        "mish" => "`mish` applies the Mish activation: x·tanh(softplus(x)). Often outperforms ReLU/Swish.\n\n```perl\np mish(1)    # 0.8651\np mish(-1)   # -0.3034\n```",
+        "softplus" => "`softplus` applies the Softplus activation: ln(1 + e^x). Smooth approximation to ReLU.\n\n```perl\np softplus(0)   # 0.6931 (ln 2)\np softplus(10)  # ≈ 10\n```",
+
+        // ── Special Functions ────────────────────────────────────────────
+        "bessel_j0" | "j0" => "`bessel_j0` (alias `j0`) computes the Bessel function of the first kind, order 0.\n\n```perl\np j0(0)    # 1.0\np j0(2.4)  # ≈ 0 (first zero)\n```",
+        "bessel_j1" | "j1" => "`bessel_j1` (alias `j1`) computes the Bessel function of the first kind, order 1.\n\n```perl\np j1(0)    # 0.0\np j1(1.84) # ≈ 0.582 (first max)\n```",
+        "lambert_w" | "lambertw" | "productlog" => "`lambert_w` (aliases `lambertw`, `productlog`) computes the Lambert W function (principal branch): the inverse of f(w) = w·e^w.\n\n```perl\np lambertw(1)   # 0.5671 (Omega constant)\np lambertw(exp(1))  # 1.0\n```",
+
+        // ── Number Theory ────────────────────────────────────────────────
+        "mod_exp" | "modexp" | "powmod" => "`mod_exp` (aliases `modexp`, `powmod`) computes modular exponentiation: base^exp mod m, using fast binary exponentiation.\n\n```perl\np powmod(2, 10, 1000)  # 24 (2^10 mod 1000)\np powmod(3, 13, 50)    # 7\n```",
+        "mod_inv" | "modinv" => "`mod_inv` (alias `modinv`) computes the modular multiplicative inverse via extended Euclidean algorithm. Errors if no inverse exists.\n\n```perl\np modinv(3, 7)   # 5 (3*5 ≡ 1 mod 7)\n```",
+        "chinese_remainder" | "crt" => "`chinese_remainder` (alias `crt`) solves a system of simultaneous congruences via the Chinese Remainder Theorem.\n\n```perl\np crt([2,3,2], [3,5,7])  # 23 (x≡2 mod 3, x≡3 mod 5, x≡2 mod 7)\n```",
+        "miller_rabin" | "millerrabin" | "is_probable_prime" => "`miller_rabin` (aliases `millerrabin`, `is_probable_prime`) performs a probabilistic primality test with k rounds (default 20).\n\n```perl\np millerrabin(104729)     # 1 (prime)\np millerrabin(104730)     # 0 (composite)\n```",
+
+        // ── Combinatorics ────────────────────────────────────────────────
+        "derangements" => "`derangements` counts the number of derangements (subfactorial !n) — permutations with no fixed points.\n\n```perl\np derangements(4)   # 9\np derangements(5)   # 44\n```",
+        "stirling2" | "stirling_second" => "`stirling2` (alias `stirling_second`) computes the Stirling number of the second kind S(n,k) — the number of ways to partition n elements into k non-empty subsets.\n\n```perl\np stirling2(4, 2)   # 7\np stirling2(5, 3)   # 25\n```",
+        "bernoulli_number" | "bernoulli" => "`bernoulli_number` (alias `bernoulli`) computes the nth Bernoulli number. B(0)=1, B(1)=-0.5, odd B(n>1)=0.\n\n```perl\np bernoulli(0)   # 1\np bernoulli(2)   # 0.1667\np bernoulli(4)   # -0.0333\n```",
+        "harmonic_number" | "harmonic" => "`harmonic_number` (alias `harmonic`) computes the nth harmonic number H_n = 1 + 1/2 + 1/3 + ... + 1/n.\n\n```perl\np harmonic(1)    # 1.0\np harmonic(10)   # 2.9290\np harmonic(100)  # 5.1874\n```",
+
+        // ── Physics ──────────────────────────────────────────────────────
+        "drag_force" | "fdrag" => "`drag_force` (alias `fdrag`) computes aerodynamic drag: F = 0.5·Cd·ρ·A·v². Args: drag_coeff, air_density, area, velocity.\n\n```perl\np fdrag(0.47, 1.225, 0.01, 30)  # drag on a ball at 30 m/s\n```",
+        "ideal_gas" | "pv_nrt" => "`ideal_gas` (alias `pv_nrt`) solves PV=nRT for the unknown (pass 0 for the value to solve). Args: P, V, n, T.\n\n```perl\np pv_nrt(0, 0.0224, 1, 273.15)  # pressure at STP\np pv_nrt(101325, 0, 1, 273.15)   # volume at STP\n```",
+
+        // ── Financial Greeks ─────────────────────────────────────────────
+        "bs_delta" | "bsdelta" | "option_delta" => "`bs_delta` (aliases `bsdelta`, `option_delta`) computes the Black-Scholes delta (∂C/∂S). Args: S, K, T, r, sigma.\n\n```perl\np bsdelta(100, 100, 1, 0.05, 0.2)  # ≈ 0.64\n```",
+        "bs_gamma" | "bsgamma" | "option_gamma" => "`bs_gamma` computes the Black-Scholes gamma (∂²C/∂S²). Measures convexity of option value.\n\n```perl\np bsgamma(100, 100, 1, 0.05, 0.2)  # ≈ 0.019\n```",
+        "bs_vega" | "bsvega" | "option_vega" => "`bs_vega` computes the Black-Scholes vega (∂C/∂σ). Sensitivity to volatility.\n\n```perl\np bsvega(100, 100, 1, 0.05, 0.2)  # ≈ 37.5\n```",
+        "bs_theta" | "bstheta" | "option_theta" => "`bs_theta` computes the Black-Scholes theta (∂C/∂t). Time decay per unit time.\n\n```perl\np bstheta(100, 100, 1, 0.05, 0.2)  # negative (time decay)\n```",
+        "bs_rho" | "bsrho" | "option_rho" => "`bs_rho` computes the Black-Scholes rho (∂C/∂r). Sensitivity to interest rate.\n\n```perl\np bsrho(100, 100, 1, 0.05, 0.2)  # ≈ 46\n```",
+        "mac_duration" => "`bond_duration` (alias `mac_duration`) computes Macaulay duration — the weighted-average time to receive cash flows.\n\n```perl\nmy $dur = bond_duration([5,5,5,105], 0.05)  # ≈ 3.72 years\n```",
+
+        // ── DSP ──────────────────────────────────────────────────────────
+        "dct" => "`dct` computes the Type-II Discrete Cosine Transform of a signal. Used in JPEG, MP3, and speech processing.\n\n```perl\nmy @coeffs = @{dct([1,2,3,4])}\n```",
+        "idct" => "`idct` computes the inverse DCT (Type-III). Reconstructs a signal from DCT coefficients.\n\n```perl\nmy @signal = @{idct(dct([1,2,3,4]))}\n```",
+        "goertzel" => "`goertzel` computes the magnitude of a single DFT frequency bin using the Goertzel algorithm. Much faster than full FFT when you need one frequency.\n\n```perl\nmy $mag = goertzel(\\@signal, 440, 44100)  # 440 Hz component\n```",
+        "chirp" | "chirp_signal" => "`chirp` generates a linear chirp signal sweeping from f0 to f1 Hz. Args: n_samples, f0, f1, sample_rate.\n\n```perl\nmy @sig = @{chirp(1000, 100, 1000, 8000)}\n```",
+
+        // ── Encoding ─────────────────────────────────────────────────────
+        "base85_encode" | "b85e" | "ascii85_encode" | "a85e" => "`base85_encode` (aliases `b85e`, `a85e`) encodes a string using Ascii85/Base85 encoding. More compact than Base64 (4:5 ratio vs 3:4).\n\n```perl\np b85e(\"Hello\")  # encoded string\n```",
+        "base85_decode" | "b85d" | "ascii85_decode" | "a85d" => "`base85_decode` (aliases `b85d`, `a85d`) decodes an Ascii85/Base85 encoded string.\n\n```perl\np b85d(b85e(\"Hello\"))  # Hello\n```",
+
         _ => return None,
     };
     Some(md)
