@@ -2049,8 +2049,8 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "normal_pdf" | "normpdf" => "`normal_pdf($x, $mu, $sigma)` (alias `normpdf`) — normal/Gaussian distribution probability density function. Default: μ=0, σ=1 (standard normal).\n\n```perl\np normpdf(0)              # ~0.399 (peak of standard normal)\np normpdf(0, 100, 15)     # PDF at IQ=100, mean=100, stddev=15\n```",
         "normal_cdf" | "normcdf" => "`normal_cdf($x, $mu, $sigma)` (alias `normcdf`) — cumulative distribution function. Returns probability that a value is ≤ x.\n\n```perl\np normcdf(0)              # 0.5 (half below mean)\np normcdf(1.96)           # ~0.975 (95% confidence bound)\n```",
         "poisson_pmf" | "poisson" => "`poisson_pmf($k, $lambda)` (alias `poisson`) — Poisson probability mass function. P(X=k) for events with rate λ.\n\n```perl\np poisson(3, 5)   # P(X=3) when avg rate is 5\n```",
-        "gamma_approx" | "gamma" => "`gamma_approx($z)` (alias `gamma`) — Gamma function Γ(z) using Lanczos approximation. Extends factorial: Γ(n) = (n-1)!\n\n```perl\np gamma(5)    # 24 (same as 4!)\np gamma(0.5)  # ~1.772 (√π)\n```",
-        "erf_approx" | "erf" => "`erf_approx($x)` (alias `erf`) — error function. Used in probability, statistics, and partial differential equations.\n\n```perl\np erf(1)    # ~0.843\np erf(2)    # ~0.995\n```",
+        "gamma_approx" => "`gamma_approx($z)` — Gamma function Γ(z) using Lanczos approximation. Extends factorial: Γ(n) = (n-1)!\n\n```perl\np gamma(5)    # 24 (same as 4!)\np gamma(0.5)  # ~1.772 (√π)\n```",
+        "erf_approx" => "`erf_approx($x)` — error function. Used in probability, statistics, and partial differential equations.\n\n```perl\np erf(1)    # ~0.843\np erf(2)    # ~0.995\n```",
 
         // ── Physics Formulas ────────────────────────────────────────────────────
         "momentum" => "`momentum($mass, $velocity)` — compute momentum p = mv (kg⋅m/s).\n\n```perl\np momentum(10, 5)   # 50 kg⋅m/s\n```",

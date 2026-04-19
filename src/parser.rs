@@ -11730,10 +11730,10 @@ impl Parser {
             | "byte_size" | "degrees_to_compass" | "to_string_val" | "type_of"
             // ── math formulas ───────────────────────────────────────────────────
             | "quadratic_roots" | "quadratic_discriminant" | "arithmetic_series"
-            | "geometric_series" | "permutations" | "combinations" | "stirling_approx"
+            | "geometric_series" | "stirling_approx"
             | "double_factorial" | "rising_factorial" | "falling_factorial"
-            | "gamma_approx" | "beta_fn" | "erf_approx" | "normal_pdf" | "normal_cdf"
-            | "poisson_pmf" | "exponential_pdf" | "lerp" | "inverse_lerp" | "smoothstep"
+            | "gamma_approx" | "erf_approx" | "normal_pdf" | "normal_cdf"
+            | "poisson_pmf" | "exponential_pdf" | "inverse_lerp"
             | "map_range"
             // ── physics formulas ────────────────────────────────────────────────
             | "momentum" | "impulse" | "work" | "power_phys" | "torque" | "angular_velocity"
