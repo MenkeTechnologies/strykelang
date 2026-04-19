@@ -357,10 +357,7 @@ impl Debugger {
             let val = scope.get_array(name);
             eprintln!(
                 "({})",
-                val.iter()
-                    .map(|v| format_value(v))
-                    .collect::<Vec<_>>()
-                    .join(", ")
+                val.iter().map(format_value).collect::<Vec<_>>().join(", ")
             );
         } else if let Some(name) = var.strip_prefix('%') {
             let val = scope.get_hash(name);

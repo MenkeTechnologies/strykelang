@@ -1356,7 +1356,7 @@ fn builtin_line_intersection(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
     let t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
     let u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
-    if t >= 0.0 && t <= 1.0 && u >= 0.0 && u <= 1.0 {
+    if (0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&u) {
         Ok(PerlValue::array(vec![
             PerlValue::float(x1 + t * (x2 - x1)),
             PerlValue::float(y1 + t * (y2 - y1)),
@@ -4834,4 +4834,827 @@ fn builtin_bac_estimate(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(
         ((drinks * 14.0) / (weight_kg * 1000.0 * r) * 100.0 - 0.015 * hours).max(0.0),
     ))
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Math Formulas
+// ════════════════════════════════════════════════════════════════════════════
+
+fn builtin_quadratic_roots(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let c = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    if a == 0.0 {
+        return Ok(if b == 0.0 {
+            PerlValue::UNDEF
+        } else {
+            PerlValue::array(vec![PerlValue::float(-c / b)])
+        });
+    }
+    let disc = b * b - 4.0 * a * c;
+    if disc < 0.0 {
+        return Ok(PerlValue::UNDEF);
+    }
+    let sqrt_disc = disc.sqrt();
+    Ok(PerlValue::array(vec![
+        PerlValue::float((-b + sqrt_disc) / (2.0 * a)),
+        PerlValue::float((-b - sqrt_disc) / (2.0 * a)),
+    ]))
+}
+
+fn builtin_quadratic_discriminant(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let c = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float(b * b - 4.0 * a * c))
+}
+
+fn builtin_arithmetic_series(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a1 = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let d = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let n = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(n / 2.0 * (2.0 * a1 + (n - 1.0) * d)))
+}
+
+fn builtin_geometric_series(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a1 = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let n = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(if (r - 1.0).abs() < f64::EPSILON {
+        a1 * n
+    } else {
+        a1 * (1.0 - r.powf(n)) / (1.0 - r)
+    }))
+}
+
+fn builtin_stirling_approx(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = first_arg_or_topic(interp, args).to_number().max(0.0);
+    if n < 1.0 {
+        return Ok(PerlValue::float(1.0));
+    }
+    let e = std::f64::consts::E;
+    let pi = std::f64::consts::PI;
+    Ok(PerlValue::float((2.0 * pi * n).sqrt() * (n / e).powf(n)))
+}
+
+fn builtin_double_factorial(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = first_arg_or_topic(interp, args).to_int().max(0);
+    let mut result: i64 = 1;
+    let mut i = n;
+    while i > 1 {
+        result = result.saturating_mul(i);
+        i -= 2;
+    }
+    Ok(PerlValue::integer(result))
+}
+
+fn builtin_rising_factorial(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let n = args.get(1).map(|v| v.to_int()).unwrap_or(1).max(0);
+    let mut result = 1.0;
+    for i in 0..n {
+        result *= x + i as f64;
+    }
+    Ok(PerlValue::float(result))
+}
+
+fn builtin_falling_factorial(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let n = args.get(1).map(|v| v.to_int()).unwrap_or(1).max(0);
+    let mut result = 1.0;
+    for i in 0..n {
+        result *= x - i as f64;
+    }
+    Ok(PerlValue::float(result))
+}
+
+fn builtin_gamma_approx(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let z = first_arg_or_topic(interp, args).to_number();
+    fn gamma_internal(z: f64) -> f64 {
+        let g = 7;
+        let c = [
+            0.999_999_999_999_809_9,
+            676.5203681218851,
+            -1259.1392167224028,
+            771.323_428_777_653_1,
+            -176.615_029_162_140_6,
+            12.507343278686905,
+            -0.13857109526572012,
+            9.984_369_578_019_572e-6,
+            1.5056327351493116e-7,
+        ];
+        if z < 0.5 {
+            let pi = std::f64::consts::PI;
+            return pi / ((pi * z).sin() * gamma_internal(1.0 - z));
+        }
+        let z = z - 1.0;
+        let mut x = c[0];
+        for i in 1..(g + 2) {
+            x += c[i] / (z + i as f64);
+        }
+        let t = z + g as f64 + 0.5;
+        (2.0 * std::f64::consts::PI).sqrt() * t.powf(z + 0.5) * (-t).exp() * x
+    }
+    Ok(PerlValue::float(gamma_internal(z)))
+}
+
+fn builtin_erf_approx(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = first_arg_or_topic(interp, args).to_number();
+    let a1 = 0.254829592;
+    let a2 = -0.284496736;
+    let a3 = 1.421413741;
+    let a4 = -1.453152027;
+    let a5 = 1.061405429;
+    let p = 0.3275911;
+    let sign = if x < 0.0 { -1.0 } else { 1.0 };
+    let x = x.abs();
+    let t = 1.0 / (1.0 + p * x);
+    let y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * (-x * x).exp();
+    Ok(PerlValue::float(sign * y))
+}
+
+fn builtin_normal_pdf(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let sigma = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let pi = std::f64::consts::PI;
+    let z = (x - mu) / sigma;
+    Ok(PerlValue::float(
+        (1.0 / (sigma * (2.0 * pi).sqrt())) * (-0.5 * z * z).exp(),
+    ))
+}
+
+fn builtin_normal_cdf(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let sigma = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let z = (x - mu) / (sigma * std::f64::consts::SQRT_2);
+    let a1 = 0.254829592;
+    let a2 = -0.284496736;
+    let a3 = 1.421413741;
+    let a4 = -1.453152027;
+    let a5 = 1.061405429;
+    let p = 0.3275911;
+    let sign = if z < 0.0 { -1.0 } else { 1.0 };
+    let z_abs = z.abs();
+    let t = 1.0 / (1.0 + p * z_abs);
+    let erf = sign
+        * (1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * (-z_abs * z_abs).exp());
+    Ok(PerlValue::float(0.5 * (1.0 + erf)))
+}
+
+fn builtin_poisson_pmf(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let k = args.first().map(|v| v.to_int()).unwrap_or(0).max(0);
+    let lambda = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let mut result = (-lambda).exp();
+    for i in 1..=k {
+        result *= lambda / i as f64;
+    }
+    Ok(PerlValue::float(result))
+}
+
+fn builtin_exponential_pdf(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let lambda = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(if x < 0.0 {
+        0.0
+    } else {
+        lambda * (-lambda * x).exp()
+    }))
+}
+
+fn builtin_inverse_lerp(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let b = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let v = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
+    let denom = b - a;
+    Ok(PerlValue::float(if denom.abs() < f64::EPSILON {
+        0.0
+    } else {
+        (v - a) / denom
+    }))
+}
+
+fn builtin_map_range(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let value = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let in_min = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let in_max = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let out_min = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
+    let out_max = args.get(4).map(|v| v.to_number()).unwrap_or(1.0);
+    let t = (value - in_min) / (in_max - in_min);
+    Ok(PerlValue::float(out_min + t * (out_max - out_min)))
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Physics Formulas
+// ════════════════════════════════════════════════════════════════════════════
+
+fn builtin_momentum(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let v = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float(m * v))
+}
+
+fn builtin_impulse(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let f = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let t = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(f * t))
+}
+
+fn builtin_work(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let f = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let d = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let angle = args
+        .get(2)
+        .map(|v| v.to_number())
+        .unwrap_or(0.0)
+        .to_radians();
+    Ok(PerlValue::float(f * d * angle.cos()))
+}
+
+fn builtin_power_phys(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let w = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let t = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(if t == 0.0 {
+        f64::INFINITY
+    } else {
+        w / t
+    }))
+}
+
+fn builtin_torque(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let f = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let r = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let angle = args
+        .get(2)
+        .map(|v| v.to_number())
+        .unwrap_or(90.0)
+        .to_radians();
+    Ok(PerlValue::float(r * f * angle.sin()))
+}
+
+fn builtin_angular_velocity(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let theta = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let t = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(if t == 0.0 { 0.0 } else { theta / t }))
+}
+
+fn builtin_centripetal_force(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let v = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let r = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(if r == 0.0 {
+        f64::INFINITY
+    } else {
+        m * v * v / r
+    }))
+}
+
+fn builtin_escape_velocity(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = args.first().map(|v| v.to_number()).unwrap_or(5.972e24);
+    let r = args.get(1).map(|v| v.to_number()).unwrap_or(6.371e6);
+    const G: f64 = 6.67430e-11;
+    Ok(PerlValue::float((2.0 * G * m / r).sqrt()))
+}
+
+fn builtin_orbital_velocity(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = args.first().map(|v| v.to_number()).unwrap_or(5.972e24);
+    let r = args
+        .get(1)
+        .map(|v| v.to_number())
+        .unwrap_or(6.371e6 + 400000.0);
+    const G: f64 = 6.67430e-11;
+    Ok(PerlValue::float((G * m / r).sqrt()))
+}
+
+fn builtin_orbital_period(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = args.first().map(|v| v.to_number()).unwrap_or(5.972e24);
+    let r = args
+        .get(1)
+        .map(|v| v.to_number())
+        .unwrap_or(6.371e6 + 400000.0);
+    const G: f64 = 6.67430e-11;
+    let pi = std::f64::consts::PI;
+    Ok(PerlValue::float(2.0 * pi * (r.powi(3) / (G * m)).sqrt()))
+}
+
+fn builtin_gravitational_force(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m1 = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let m2 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let r = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    const G: f64 = 6.67430e-11;
+    Ok(PerlValue::float(if r == 0.0 {
+        f64::INFINITY
+    } else {
+        G * m1 * m2 / (r * r)
+    }))
+}
+
+fn builtin_coulomb_force(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let q1 = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let q2 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let r = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    const K: f64 = 8.9875517923e9;
+    Ok(PerlValue::float(if r == 0.0 {
+        f64::INFINITY
+    } else {
+        K * q1 * q2 / (r * r)
+    }))
+}
+
+fn builtin_electric_field(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let q = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    const K: f64 = 8.9875517923e9;
+    Ok(PerlValue::float(if r == 0.0 {
+        f64::INFINITY
+    } else {
+        K * q / (r * r)
+    }))
+}
+
+fn builtin_capacitance(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let q = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let v = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(if v == 0.0 { 0.0 } else { q / v }))
+}
+
+fn builtin_capacitor_energy(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let c = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let v = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float(0.5 * c * v * v))
+}
+
+fn builtin_inductor_energy(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let l = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let i = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float(0.5 * l * i * i))
+}
+
+fn builtin_resonant_frequency(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let l = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let c = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let pi = std::f64::consts::PI;
+    Ok(PerlValue::float(1.0 / (2.0 * pi * (l * c).sqrt())))
+}
+
+fn builtin_rc_time_constant(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let r = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let c = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(r * c))
+}
+
+fn builtin_rl_time_constant(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let l = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(if r == 0.0 {
+        f64::INFINITY
+    } else {
+        l / r
+    }))
+}
+
+fn builtin_impedance_rlc(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let r = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let l = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let c = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let f = args.get(3).map(|v| v.to_number()).unwrap_or(1.0);
+    let omega = 2.0 * std::f64::consts::PI * f;
+    let xl = omega * l;
+    let xc = if c == 0.0 || omega == 0.0 {
+        0.0
+    } else {
+        1.0 / (omega * c)
+    };
+    Ok(PerlValue::float((r * r + (xl - xc).powi(2)).sqrt()))
+}
+
+fn builtin_relativistic_mass(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m0 = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let v = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    const C: f64 = 299792458.0;
+    let v2_c2 = (v / C).powi(2);
+    Ok(PerlValue::float(if v2_c2 >= 1.0 {
+        f64::INFINITY
+    } else {
+        m0 / (1.0 - v2_c2).sqrt()
+    }))
+}
+
+fn builtin_lorentz_factor(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v = first_arg_or_topic(interp, args).to_number();
+    const C: f64 = 299792458.0;
+    let v2_c2 = (v / C).powi(2);
+    Ok(PerlValue::float(if v2_c2 >= 1.0 {
+        f64::INFINITY
+    } else {
+        1.0 / (1.0 - v2_c2).sqrt()
+    }))
+}
+
+fn builtin_time_dilation(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let dt0 = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let v = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    const C: f64 = 299792458.0;
+    let v2_c2 = (v / C).powi(2);
+    Ok(PerlValue::float(if v2_c2 >= 1.0 {
+        f64::INFINITY
+    } else {
+        dt0 / (1.0 - v2_c2).sqrt()
+    }))
+}
+
+fn builtin_length_contraction(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let l0 = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let v = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    const C: f64 = 299792458.0;
+    let v2_c2 = (v / C).powi(2);
+    Ok(PerlValue::float(if v2_c2 >= 1.0 {
+        0.0
+    } else {
+        l0 * (1.0 - v2_c2).sqrt()
+    }))
+}
+
+fn builtin_relativistic_energy(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m0 = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let v = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    const C: f64 = 299792458.0;
+    let v2_c2 = (v / C).powi(2);
+    let gamma = if v2_c2 >= 1.0 {
+        f64::INFINITY
+    } else {
+        1.0 / (1.0 - v2_c2).sqrt()
+    };
+    Ok(PerlValue::float(gamma * m0 * C * C))
+}
+
+fn builtin_rest_energy(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = first_arg_or_topic(interp, args).to_number();
+    const C: f64 = 299792458.0;
+    Ok(PerlValue::float(m * C * C))
+}
+
+fn builtin_de_broglie_wavelength(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = args.first().map(|v| v.to_number()).unwrap_or(9.109e-31);
+    let v = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    const H: f64 = 6.62607015e-34;
+    let p = m * v;
+    Ok(PerlValue::float(if p == 0.0 {
+        f64::INFINITY
+    } else {
+        H / p
+    }))
+}
+
+fn builtin_photon_energy(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let f = first_arg_or_topic(interp, args).to_number();
+    const H: f64 = 6.62607015e-34;
+    Ok(PerlValue::float(H * f))
+}
+
+fn builtin_photon_energy_wavelength(
+    interp: &Interpreter,
+    args: &[PerlValue],
+) -> PerlResult<PerlValue> {
+    let lambda = first_arg_or_topic(interp, args).to_number();
+    const H: f64 = 6.62607015e-34;
+    const C: f64 = 299792458.0;
+    Ok(PerlValue::float(if lambda == 0.0 {
+        f64::INFINITY
+    } else {
+        H * C / lambda
+    }))
+}
+
+fn builtin_schwarzschild_radius(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = first_arg_or_topic(interp, args).to_number();
+    const G: f64 = 6.67430e-11;
+    const C: f64 = 299792458.0;
+    Ok(PerlValue::float(2.0 * G * m / (C * C)))
+}
+
+fn builtin_stefan_boltzmann(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let area = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let temp = args.get(1).map(|v| v.to_number()).unwrap_or(300.0);
+    const SIGMA: f64 = 5.670374419e-8;
+    Ok(PerlValue::float(SIGMA * area * temp.powi(4)))
+}
+
+fn builtin_wien_displacement(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let temp = first_arg_or_topic(interp, args).to_number();
+    const B: f64 = 2.897771955e-3;
+    Ok(PerlValue::float(if temp == 0.0 {
+        f64::INFINITY
+    } else {
+        B / temp
+    }))
+}
+
+fn builtin_ideal_gas_pressure(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let v = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let t = args.get(2).map(|v| v.to_number()).unwrap_or(273.15);
+    const R: f64 = 8.314462618;
+    Ok(PerlValue::float(if v == 0.0 {
+        f64::INFINITY
+    } else {
+        n * R * t / v
+    }))
+}
+
+fn builtin_ideal_gas_volume(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let p = args.get(1).map(|v| v.to_number()).unwrap_or(101325.0);
+    let t = args.get(2).map(|v| v.to_number()).unwrap_or(273.15);
+    const R: f64 = 8.314462618;
+    Ok(PerlValue::float(if p == 0.0 {
+        f64::INFINITY
+    } else {
+        n * R * t / p
+    }))
+}
+
+fn builtin_projectile_range(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let theta = args
+        .get(1)
+        .map(|v| v.to_number())
+        .unwrap_or(45.0)
+        .to_radians();
+    const G: f64 = 9.80665;
+    Ok(PerlValue::float(v * v * (2.0 * theta).sin() / G))
+}
+
+fn builtin_projectile_max_height(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let theta = args
+        .get(1)
+        .map(|v| v.to_number())
+        .unwrap_or(45.0)
+        .to_radians();
+    const G: f64 = 9.80665;
+    Ok(PerlValue::float(v * v * theta.sin().powi(2) / (2.0 * G)))
+}
+
+fn builtin_projectile_time(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let theta = args
+        .get(1)
+        .map(|v| v.to_number())
+        .unwrap_or(45.0)
+        .to_radians();
+    const G: f64 = 9.80665;
+    Ok(PerlValue::float(2.0 * v * theta.sin() / G))
+}
+
+fn builtin_spring_force(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let k = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let x = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float(-k * x))
+}
+
+fn builtin_spring_energy(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let k = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let x = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float(0.5 * k * x * x))
+}
+
+fn builtin_pendulum_period(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let l = first_arg_or_topic(interp, args).to_number();
+    const G: f64 = 9.80665;
+    let pi = std::f64::consts::PI;
+    Ok(PerlValue::float(2.0 * pi * (l / G).sqrt()))
+}
+
+fn builtin_doppler_frequency(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let f = args.first().map(|v| v.to_number()).unwrap_or(440.0);
+    let vs = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let vo = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    const V_SOUND: f64 = 343.0;
+    let denom = V_SOUND + vs;
+    Ok(PerlValue::float(if denom == 0.0 {
+        f64::INFINITY
+    } else {
+        f * (V_SOUND + vo) / denom
+    }))
+}
+
+fn builtin_decibel_ratio(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let p1 = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let p2 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(if p2 == 0.0 {
+        f64::INFINITY
+    } else {
+        10.0 * (p1 / p2).log10()
+    }))
+}
+
+fn builtin_snells_law(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n1 = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let n2 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let theta1 = args
+        .get(2)
+        .map(|v| v.to_number())
+        .unwrap_or(0.0)
+        .to_radians();
+    let sin_theta2 = n1 * theta1.sin() / n2;
+    if sin_theta2.abs() > 1.0 {
+        return Ok(PerlValue::UNDEF);
+    }
+    Ok(PerlValue::float(sin_theta2.asin().to_degrees()))
+}
+
+fn builtin_brewster_angle(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n1 = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let n2 = args.get(1).map(|v| v.to_number()).unwrap_or(1.5);
+    Ok(PerlValue::float((n2 / n1).atan().to_degrees()))
+}
+
+fn builtin_critical_angle(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n1 = args.first().map(|v| v.to_number()).unwrap_or(1.5);
+    let n2 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let ratio = n2 / n1;
+    if ratio > 1.0 {
+        return Ok(PerlValue::UNDEF);
+    }
+    Ok(PerlValue::float(ratio.asin().to_degrees()))
+}
+
+fn builtin_lens_power(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let f = first_arg_or_topic(interp, args).to_number();
+    Ok(PerlValue::float(if f == 0.0 {
+        f64::INFINITY
+    } else {
+        1.0 / f
+    }))
+}
+
+fn builtin_thin_lens(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let d_o = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let f = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
+    let inv_di = 1.0 / f - 1.0 / d_o;
+    Ok(PerlValue::float(if inv_di == 0.0 {
+        f64::INFINITY
+    } else {
+        1.0 / inv_di
+    }))
+}
+
+fn builtin_magnification_lens(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let di = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let d_o = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(if d_o == 0.0 { 0.0 } else { -di / d_o }))
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Math Constants
+// ════════════════════════════════════════════════════════════════════════════
+
+fn builtin_euler_mascheroni(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(0.5772156649015329))
+}
+
+fn builtin_apery_constant(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(1.2020569031595943))
+}
+
+fn builtin_feigenbaum_delta(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(4.669_201_609_102_99))
+}
+
+fn builtin_feigenbaum_alpha(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(2.502907875095893))
+}
+
+fn builtin_catalan_constant(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(0.915_965_594_177_219))
+}
+
+fn builtin_khinchin_constant(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(2.6854520010653065))
+}
+
+fn builtin_glaisher_constant(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(1.2824271291006226))
+}
+
+fn builtin_plastic_number(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(1.3247179572447458))
+}
+
+fn builtin_silver_ratio(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(1.0 + std::f64::consts::SQRT_2))
+}
+
+fn builtin_supergolden_ratio(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(1.465_571_231_876_768))
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Physics Constants
+// ════════════════════════════════════════════════════════════════════════════
+
+fn builtin_vacuum_permittivity(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(8.8541878128e-12))
+}
+
+fn builtin_vacuum_permeability(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(1.25663706212e-6))
+}
+
+fn builtin_coulomb_constant(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(8.9875517923e9))
+}
+
+fn builtin_fine_structure_constant(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(0.0072973525693))
+}
+
+fn builtin_rydberg_constant(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(10973731.568160))
+}
+
+fn builtin_bohr_radius(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(5.29177210903e-11))
+}
+
+fn builtin_bohr_magneton(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(9.2740100783e-24))
+}
+
+fn builtin_nuclear_magneton(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(5.0507837461e-27))
+}
+
+fn builtin_stefan_boltzmann_constant(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(5.670374419e-8))
+}
+
+fn builtin_wien_constant(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(2.897771955e-3))
+}
+
+fn builtin_gas_constant(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(8.314462618))
+}
+
+fn builtin_faraday_constant(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(96485.33212))
+}
+
+fn builtin_neutron_mass(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(1.67492749804e-27))
+}
+
+fn builtin_atomic_mass_unit(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(1.66053906660e-27))
+}
+
+fn builtin_earth_mass(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(5.972167867e24))
+}
+
+fn builtin_earth_radius(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(6.3710088e6))
+}
+
+fn builtin_sun_mass(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(1.98892e30))
+}
+
+fn builtin_sun_radius(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(6.9634e8))
+}
+
+fn builtin_astronomical_unit(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(1.495978707e11))
+}
+
+fn builtin_light_year(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(9.4607304725808e15))
+}
+
+fn builtin_parsec(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(3.085_677_581_491_367e16))
+}
+
+fn builtin_hubble_constant(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(70.0))
+}
+
+fn builtin_planck_length(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(1.616255e-35))
+}
+
+fn builtin_planck_time(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(5.391247e-44))
+}
+
+fn builtin_planck_mass(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(2.176434e-8))
+}
+
+fn builtin_planck_temperature(_args: &[PerlValue]) -> PerlResult<PerlValue> {
+    Ok(PerlValue::float(1.416784e32))
 }
