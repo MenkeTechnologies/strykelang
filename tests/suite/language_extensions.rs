@@ -1580,3 +1580,45 @@ fn thread_match_in_chain() {
 fn thread_match_no_match_in_chain() {
     assert_eq!(eval_int(r#"t "abc" m/z/ inc"#), 1);
 }
+
+// ── Block params `{ |$var| body }` ──
+
+#[test]
+fn block_params_map_single() {
+    assert_eq!(
+        eval_string(r#"join ",", map { |$n| $n * $n }, 1..5"#),
+        "1,4,9,16,25"
+    );
+}
+
+#[test]
+fn block_params_grep_single() {
+    assert_eq!(
+        eval_string(r#"join ",", grep { |$x| $x > 3 }, 1..6"#),
+        "4,5,6"
+    );
+}
+
+#[test]
+fn block_params_sort_two() {
+    assert_eq!(
+        eval_string(r#"join ",", sort { |$x, $y| $y <=> $x }, 3, 1, 4, 1, 5"#),
+        "5,4,3,1,1"
+    );
+}
+
+#[test]
+fn block_params_reduce_two() {
+    assert_eq!(
+        eval_int(r#"reduce { |$acc, $val| $acc + $val }, 1..10"#),
+        55
+    );
+}
+
+#[test]
+fn block_params_map_pipe() {
+    assert_eq!(
+        eval_string(r#"(1, 2, 3) |> map { |$n| $n + 10 } |> join ",""#),
+        "11,12,13"
+    );
+}

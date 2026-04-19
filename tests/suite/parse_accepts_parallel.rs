@@ -67,8 +67,8 @@ fn accepts_pfor_psort_pcache_par_lines_progress() {
     p("my @s = psort { $a <=> $b } (3, 1, 2), progress => 1");
     p("my @t = psort (3, 1, 2), progress => 1");
     p("my @u = pcache { $_ } (1, 2), progress => 1");
-    p(r#"par_lines "x.txt", sub { 1 }, progress => 1"#);
-    p(r#"par_walk "/tmp", sub { 1 }, progress => 1"#);
+    p(r#"par_lines "x.txt", fn { 1 }, progress => 1"#);
+    p(r#"par_walk "/tmp", fn { 1 }, progress => 1"#);
     p(r#"par_sed "a", "b", "f1.txt", "f2.txt", progress => 0"#);
 }
 
@@ -139,7 +139,7 @@ fn accepts_pfor_bareword_stmt_in_block() {
 
 #[test]
 fn accepts_pwatch_glob_and_sub() {
-    p(r#"pwatch "/var/log/*.log", sub { say $_ }"#);
+    p(r#"pwatch "/var/log/*.log", fn { say $_ }"#);
 }
 
 #[test]
@@ -159,7 +159,7 @@ fn accepts_timer_block() {
 
 #[test]
 fn accepts_pipeline_chain() {
-    p("my @r = pipeline(1, 2)->map(sub { $_ * 2 })->collect()");
+    p("my @r = pipeline(1, 2)->map(fn { $_ * 2 })->collect()");
 }
 
 #[test]

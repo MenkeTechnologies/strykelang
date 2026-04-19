@@ -113,10 +113,7 @@ fn run_conditional_expression() {
 
 #[test]
 fn run_simple_subroutine() {
-    assert_eq!(
-        run_int("sub add2 { return $_[0] + $_[1]; } add2(30, 12);"),
-        42
-    );
+    assert_eq!(run_int("sub add2 { return $_0 + $_1; } add2(30, 12);"), 42);
 }
 
 #[test]
@@ -707,7 +704,7 @@ fn try_vm_execute_qx_scalar_reads_stdout() {
 #[test]
 fn try_vm_execute_prototype_coderef() {
     let p = parse(
-        r#"sub demo ($) { $_[0] * 2 }
+        r#"sub demo ($) { $_0 * 2 }
         prototype \&demo;"#,
     )
     .expect("parse");
@@ -1225,7 +1222,7 @@ fn try_vm_execute_use_overload_add_and_qq_stringify() {
         package O;
         use overload '+' => 'add', '""' => 'str';
         sub add { my ($a, $b) = @_; $a->{n} + $b }
-        sub str { "" . $_[0]->{n} }
+        sub str { "" . $_0->{n} }
         package main;
         my $x = O->new(n => 3);
         "$x" . ":" . ($x + 1);
@@ -1314,7 +1311,7 @@ fn try_vm_execute_join_overload_stringify() {
         r#"
         package O;
         use overload '""' => 'as_str';
-        sub as_str { "[" . $_[0]->{k} . "]" }
+        sub as_str { "[" . $_0->{k} . "]" }
         package main;
         my $o = bless { k => 9 }, "O";
         join "-", $o, "z";
@@ -1334,7 +1331,7 @@ fn try_vm_execute_use_overload_bool_unary_not() {
         r#"
         package O;
         use overload 'bool' => 'as_bool';
-        sub as_bool { $_[0]->{f} }
+        sub as_bool { $_0->{f} }
         package main;
         my $o = bless { f => 0 }, "O";
         !$o;
@@ -1353,7 +1350,7 @@ fn try_vm_execute_use_overload_not_keyword_with_bool() {
         r#"
         package O;
         use overload 'bool' => 'as_bool';
-        sub as_bool { $_[0]->{f} }
+        sub as_bool { $_0->{f} }
         package main;
         my $o = bless { f => 1 }, "O";
         not $o;
@@ -1799,7 +1796,7 @@ fn try_vm_execute_arrow_hash_log_and_assign() {
 
 #[test]
 fn try_vm_execute_indirect_coderef_call() {
-    let p = parse("my $inc = sub { $_[0] + 1 }; $inc(41);").expect("parse");
+    let p = parse("my $inc = fn { $_[0] + 1 }; $inc(41);").expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
@@ -1813,7 +1810,7 @@ fn try_vm_execute_indirect_coderef_call() {
 fn try_vm_execute_sort_with_coderef_comparator() {
     let p = parse(
         r#"no strict 'vars';
-        my $cmp = sub { $a <=> $b };
+        my $cmp = fn { $a <=> $b };
         join(",", sort $cmp (3, 1, 2));"#,
     )
     .expect("parse");

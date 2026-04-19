@@ -7,7 +7,7 @@ fn anon_sub_captures_outer_lexical() {
     assert_eq!(
         eval_int(
             "my $x = 10; \
-             my $c = sub { $x + 5 }; \
+             my $c = fn { $x + 5 }; \
              $c->()",
         ),
         15
@@ -19,7 +19,7 @@ fn anon_sub_captures_lexical_array_and_hash() {
     assert_eq!(
         eval_int(
             "my @a = (10, 20, 30); \
-             my $c = sub { $a[1] }; \
+             my $c = fn { $a[1] }; \
              $c->()",
         ),
         20
@@ -27,7 +27,7 @@ fn anon_sub_captures_lexical_array_and_hash() {
     assert_eq!(
         eval_int(
             "my %h = (k => 42); \
-             my $c = sub { $h{k} }; \
+             my $c = fn { $h{k} }; \
              $c->()",
         ),
         42

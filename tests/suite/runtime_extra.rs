@@ -334,7 +334,7 @@ fn concat_preserves_order() {
 
 #[test]
 fn anon_sub_returns_from_block() {
-    assert_eq!(eval_int("my $f = sub { return 8; 9 }; $f->()"), 8);
+    assert_eq!(eval_int("my $f = fn { return 8; 9 }; $f->()"), 8);
 }
 
 #[test]

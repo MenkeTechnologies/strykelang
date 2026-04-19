@@ -101,8 +101,8 @@ fn par_pipeline_counts_last_stage() {
         eval_string(
             r#"my $n = 0;
             par_pipeline(
-                source => sub { $n++; $n <= 3 ? $n : undef },
-                stages => [ sub { $_ * 2 } ],
+                source => fn { $n++; $n <= 3 ? $n : undef },
+                stages => [ fn { $_ * 2 } ],
                 workers => [2],
                 buffer => 8
             );"#,
@@ -249,8 +249,8 @@ say $n;"#,
 fn par_pipeline_stream_filter_map_collect() {
     let result = eval_string(
         r#"my @r = par_pipeline_stream((1..20))
-            ->filter(sub { $_ > 15 })
-            ->map(sub { $_ * 10 })
+            ->filter(fn { $_ > 15 })
+            ->map(fn { $_ * 10 })
             ->collect();
         my @s = sort { $a <=> $b } @r;
         join ",", @s"#,
@@ -263,7 +263,7 @@ fn par_pipeline_stream_filter_map_collect() {
 fn par_pipeline_stream_take() {
     let result = eval_string(
         r#"my @r = par_pipeline_stream((1..1000))
-            ->map(sub { $_ * 2 })
+            ->map(fn { $_ * 2 })
             ->take(5)
             ->collect();
         scalar @r"#,
@@ -276,7 +276,7 @@ fn par_pipeline_stream_take() {
 fn par_pipeline_stream_workers_buffer() {
     let result = eval_string(
         r#"my @r = par_pipeline_stream((1..10), workers => 2, buffer => 4)
-            ->map(sub { $_ + 100 })
+            ->map(fn { $_ + 100 })
             ->collect();
         my @s = sort { $a <=> $b } @r;
         join ",", @s"#,
@@ -305,8 +305,8 @@ fn par_pipeline_stream_named_form() {
         eval_string(
             r#"my $n = 0;
             par_pipeline_stream(
-                source => sub { $n++; $n <= 5 ? $n : undef },
-                stages => [ sub { $_ * 10 } ],
+                source => fn { $n++; $n <= 5 ? $n : undef },
+                stages => [ fn { $_ * 10 } ],
                 workers => [2],
                 buffer => 8
             );"#,
@@ -457,7 +457,7 @@ fn par_line_count_empty_file() {
 #[test]
 fn par_pipeline_stream_rejects_psort() {
     let program =
-        perlrs::parse(r#"par_pipeline_stream((1..5))->psort(sub { $a <=> $b })->collect()"#)
+        perlrs::parse(r#"par_pipeline_stream((1..5))->psort(fn { $a <=> $b })->collect()"#)
             .expect("parse");
     let mut interp = perlrs::interpreter::Interpreter::new();
     let err = interp.execute(&program).unwrap_err();

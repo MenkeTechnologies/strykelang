@@ -412,7 +412,7 @@ fn accepts_do_string() {
 #[test]
 fn accepts_sub_decl() {
     p("sub f { }");
-    p("sub g ($$) { return $_[0] + $_[1]; }");
+    p("sub g ($$) { return $_0 + $_1; }");
 }
 
 #[test]

@@ -60,7 +60,7 @@ fn list_util_reduce_block_form() {
 #[test]
 fn list_util_any_coderef() {
     let mut interp = Interpreter::new();
-    let p = parse("List::Util::any(sub { $_ > 2 }, 1, 2, 3)").expect("parse");
+    let p = parse("List::Util::any(fn { $_ > 2 }, 1, 2, 3)").expect("parse");
     let v = interp.execute(&p).expect("run");
     assert_eq!(v.to_int(), 1);
 }
@@ -68,7 +68,7 @@ fn list_util_any_coderef() {
 #[test]
 fn list_util_all_coderef() {
     let mut interp = Interpreter::new();
-    let p = parse("List::Util::all(sub { $_ > 0 }, 1, 2, 3)").expect("parse");
+    let p = parse("List::Util::all(fn { $_ > 0 }, 1, 2, 3)").expect("parse");
     let v = interp.execute(&p).expect("run");
     assert_eq!(v.to_int(), 1);
 }
@@ -76,7 +76,7 @@ fn list_util_all_coderef() {
 #[test]
 fn list_util_none_coderef() {
     let mut interp = Interpreter::new();
-    let p = parse("List::Util::none(sub { $_ < 0 }, 1, 2, 3)").expect("parse");
+    let p = parse("List::Util::none(fn { $_ < 0 }, 1, 2, 3)").expect("parse");
     let v = interp.execute(&p).expect("run");
     assert_eq!(v.to_int(), 1);
 }
@@ -84,7 +84,7 @@ fn list_util_none_coderef() {
 #[test]
 fn list_util_notall_coderef() {
     let mut interp = Interpreter::new();
-    let p = parse("List::Util::notall(sub { $_ > 0 }, 1, -1, 2)").expect("parse");
+    let p = parse("List::Util::notall(fn { $_ > 0 }, 1, -1, 2)").expect("parse");
     let v = interp.execute(&p).expect("run");
     assert_eq!(v.to_int(), 1);
 }

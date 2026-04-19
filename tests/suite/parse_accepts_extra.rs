@@ -46,7 +46,7 @@ fn accepts_sub_named_with_block() {
 
 #[test]
 fn accepts_coderef_scalar_assignment() {
-    p("my $c = sub { 1 }");
+    p("my $c = fn { 1 }");
 }
 
 #[test]
@@ -91,7 +91,7 @@ fn accepts_array_slice_syntax() {
 
 #[test]
 fn accepts_prototype_parens_on_sub() {
-    p("sub sum ($$) { $_[0] + $_[1]; }");
+    p("sub sum ($$) { $_0 + $_1; }");
 }
 
 #[test]

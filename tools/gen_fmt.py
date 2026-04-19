@@ -224,7 +224,7 @@ def main() -> None:
                 prototype,
             } => {
                 let proto = prototype.as_ref().map(|p| format!(" ({})", p)).unwrap_or_default();
-                format!("sub {}{} {{\\n{}\\n}}", name, proto, format_block(body))
+                format!("fn {}{} {{\\n{}\\n}}", name, proto, format_block(body))
             },"""
             if name == "Package":
                 return '        StmtKind::Package { name } => format!("package {};", name),'
