@@ -143,21 +143,21 @@
             <span class="sep">/</span>
             <a href="reference.html">Full reference</a>
             <span class="sep">/</span>
-            <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
             <span class="sep">/</span>
-            <a href="https://crates.io/crates/stryke" target="_blank" rel="noopener noreferrer">crates.io</a>
+            <a href="https://crates.io/crates/strykelang" target="_blank" rel="noopener noreferrer">crates.io</a>
             <span class="sep">/</span>
-            <a href="https://docs.rs/stryke" target="_blank" rel="noopener noreferrer">docs.rs</a>
+            <a href="https://docs.rs/strykelang" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line" id="strykeBuildLine">stryke v0.6.5 · Rust-powered · Rayon work-stealing · Cranelift JIT · Perl 5 compat surface + pipe-forward sugar</p>
+          <p class="docs-build-line" id="strykeBuildLine">stryke v0.6.7 · Rust-powered · Rayon work-stealing · Cranelift JIT · Perl 5 compat surface + pipe-forward sugar</p>
         </div>
         <div class="tutorial-toolbar">
           <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
           <button type="button" class="btn btn-secondary active" id="btnCrt" title="CRT scanline overlay">CRT</button>
           <button type="button" class="btn btn-secondary active" id="btnNeon" title="Neon border pulse">Neon</button>
           <a class="btn btn-secondary" href="reference.html">Reference</a>
-          <a class="btn btn-secondary" href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
-          <a class="btn btn-secondary" href="https://github.com/MenkeTechnologies/stryke/issues" target="_blank" rel="noopener noreferrer">Issues</a>
+          <a class="btn btn-secondary" href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a class="btn btn-secondary" href="https://github.com/MenkeTechnologies/strykelang/issues" target="_blank" rel="noopener noreferrer">Issues</a>
         </div>
       </div>
     </header>
@@ -180,7 +180,7 @@
 cargo install strykelang
 
 # from source
-git clone https://github.com/MenkeTechnologies/stryke
+git clone https://github.com/MenkeTechnologies/strykelang
 cd stryke &amp;&amp; cargo build --release
 
 # one-liners
@@ -193,7 +193,7 @@ st '(1..8) |&gt; pmap { expensive($_) } |&gt; p'
 
 # read + parse JSON
 st 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
-        <p>Full install + usage live in the <a href="https://github.com/MenkeTechnologies/stryke#readme">README</a>.</p>
+        <p>Full install + usage live in the <a href="https://github.com/MenkeTechnologies/strykelang#readme">README</a>.</p>
         <p><strong><code>-e</code> is optional.</strong> If the first argument isn't a file and looks like code, <code>st</code> runs it directly. <code>st 'p 42'</code> and <code>st -e 'p 42'</code> are equivalent.</p>
       </section>
 
@@ -203,7 +203,7 @@ st 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
           <thead>
             <tr style="border-bottom:2px solid #0ff;">
               <th style="text-align:left; padding:4px;">Feature</th>
-              <th style="padding:4px;">st</th>
+              <th style="padding:4px;">stryke</th>
               <th style="padding:4px;">perl5</th>
               <th style="padding:4px;">ruby</th>
               <th style="padding:4px;">python</th>
@@ -225,7 +225,7 @@ st 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
             <tr><td>Data viz (spark/bars/flame)</td><td style="color:#0f0;">&#10003;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td></tr>
             <tr><td>Clipboard</td><td style="color:#0f0;">&#10003;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td></tr>
             <tr><td>JIT compiler</td><td style="color:#0f0;">Cranelift</td><td>&#10007;</td><td>YJIT</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td></tr>
-            <tr><td>Single binary</td><td style="color:#0f0;">18MB</td><td>pkg</td><td>pkg</td><td>pkg</td><td>pkg</td><td>3MB</td></tr>
+            <tr><td>Single binary</td><td style="color:#0f0;">20MB</td><td>pkg</td><td>pkg</td><td>pkg</td><td>pkg</td><td>3MB</td></tr>
           </tbody>
         </table>
         <h3 style="margin-top:1em;">Character count — real tasks</h3>
@@ -417,7 +417,7 @@ par_pipeline_stream([\&amp;stage1, \&amp;stage2, \&amp;stage3], \@input);</pre>
           <li><strong>Interpolation</strong> — <code>$var</code>, <code>#{expr}</code>, <code>$h{k}</code>, <code>$a[i]</code>, <code>@a</code>, <code>@a[slice]</code>, <code>$#a</code>, <code>$0</code>, <code>$1</code>..<code>$n</code>; <code>\x{hex}</code> and unbraced <code>\x</code>.</li>
           <li><strong>Strict / modules</strong> — per-mode <code>use strict 'refs'</code> etc., <code>@INC</code> built from <code>-I</code>, <code>vendor/perl</code>, system Perl's <code>@INC</code>, script dir, <code>STRYKE_INC</code>. <code>List::Util</code> is native Rust.</li>
         </ul>
-        <p>Full list in the <a href="https://github.com/MenkeTechnologies/stryke#0x08-supported-perl-features">README §0x08</a>.</p>
+        <p>Full list in the <a href="https://github.com/MenkeTechnologies/strykelang#0x08-supported-perl-features">README §0x08</a>.</p>
       </section>
 
       <section class="tutorial-section" id="oop">
@@ -681,11 +681,11 @@ st --remote-worker     // worker process for distributed cluster</pre>
       <section class="tutorial-section">
         <h2>Repository &amp; links</h2>
         <ul>
-          <li><strong>Source</strong> — <a href="https://github.com/MenkeTechnologies/stryke">github.com/MenkeTechnologies/stryke</a></li>
-          <li><strong>Crate</strong> — <a href="https://crates.io/crates/stryke">crates.io/crates/stryke</a> (<code>cargo install strykelang</code>)</li>
-          <li><strong>Rust API docs</strong> — <a href="https://docs.rs/stryke">docs.rs/stryke</a></li>
-          <li><strong>Issues</strong> — <a href="https://github.com/MenkeTechnologies/stryke/issues">github.com/MenkeTechnologies/stryke/issues</a></li>
-          <li><strong>Full README</strong> — <a href="https://github.com/MenkeTechnologies/stryke#readme">README on GitHub</a> (install, parallel primitives, mysync, CLI flags, architecture, benchmarks, standalone binaries, inline Rust, bytecode cache, distributed <code>pmap_on</code>, LSP).</li>
+          <li><strong>Source</strong> — <a href="https://github.com/MenkeTechnologies/strykelang">github.com/MenkeTechnologies/stryke</a></li>
+          <li><strong>Crate</strong> — <a href="https://crates.io/crates/strykelang">crates.io/crates/stryke</a> (<code>cargo install strykelang</code>)</li>
+          <li><strong>Rust API docs</strong> — <a href="https://docs.rs/strykelang">docs.rs/stryke</a></li>
+          <li><strong>Issues</strong> — <a href="https://github.com/MenkeTechnologies/strykelang/issues">github.com/MenkeTechnologies/stryke/issues</a></li>
+          <li><strong>Full README</strong> — <a href="https://github.com/MenkeTechnologies/strykelang#readme">README on GitHub</a> (install, parallel primitives, mysync, CLI flags, architecture, benchmarks, standalone binaries, inline Rust, bytecode cache, distributed <code>pmap_on</code>, LSP).</li>
           <li><strong>Parity</strong> — <code>parity/cases/*.pl</code> holds 20k+ Perl-vs-st test cases run by <code>parity/run_parity.sh</code>.</li>
         </ul>
       </section>

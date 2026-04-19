@@ -46,8 +46,11 @@ always_false
 always_true
 amax
 amin
+amort
+amortization_schedule
 and_list
 andl
+angle_between
 angle_between_deg
 angle_bracket
 ansi_256
@@ -71,8 +74,10 @@ append_file
 appl
 apply
 apply_list
+apply_window
 approx_eq
 arange
+arc_length
 area_circle
 area_ellipse
 area_rectangle
@@ -122,6 +127,7 @@ b64d
 b64e
 bac
 bac_estimate
+bandpass_filter
 bar_to_pascals
 barrier
 base_convert
@@ -130,6 +136,7 @@ base64_encode
 basename
 batch
 batched
+bbox
 bconv
 bcount
 bearing
@@ -169,6 +176,9 @@ bitset_set
 bitset_test
 bkt
 bl
+black_scholes_call
+black_scholes_put
+blackman
 bless
 bmi
 bmi_calc
@@ -176,9 +186,14 @@ bn
 boltz
 boltzmann
 boltzmann_constant
+bond_duration
+bond_price
+bond_yield
 bool_each
 bool_to_int
 both
+bounding_box
+bpf
 bracket
 braille
 braille_encode
@@ -186,8 +201,10 @@ break_even
 break_fn
 breakeven
 brkf
+bscall
 bsearch
 bsize
+bsput
 btch
 bucket
 butlast
@@ -212,6 +229,7 @@ canonpath
 cap
 capg
 capitalize
+capm
 capture_groups
 cartesian_power
 cartesian_product
@@ -225,6 +243,7 @@ cblend
 cbrt
 cc
 ccgraph
+ccomp
 ccompl
 ccount
 cdarken
@@ -235,6 +254,7 @@ ceil_each
 ceiling
 center
 center_text
+centroid
 cgray
 ch
 chain
@@ -250,6 +270,8 @@ chat
 chdir
 chebyshev_distance
 chfr
+chi_square_stat
+chi2
 chk
 chkstr
 chkw
@@ -261,6 +283,7 @@ chop_str
 chown
 chr
 chroot
+chull
 chunk
 chunk_n
 chunk_string
@@ -268,6 +291,8 @@ chunk_while
 chunked
 cinv
 cinvert
+circ3
+circle_from_three_points
 circum
 circumference
 clamp
@@ -342,8 +367,10 @@ contains_all
 contains_any
 contains_elem
 continue
+continuous_compound
 conv
 converge
+convex_hull
 convolution
 copy
 copy_sign
@@ -391,6 +418,7 @@ cpyw
 cr
 crc32
 croak
+cross_correlation
 cross_entropy
 cross_product
 crossp
@@ -443,6 +471,7 @@ ddump
 debug_val
 dec
 dec_each
+decimate
 dedent
 dedent_text
 dedup
@@ -475,10 +504,12 @@ depreciation_linear
 deq
 deque
 deroman
+describe
 dew_point
 df
 dfs
 dfs_traverse
+dft
 diag
 diagonal
 dice_coefficient
@@ -499,6 +530,7 @@ digroot
 dirname
 discount
 discount_amount
+discounted_payback
 dissoc
 dist
 distance
@@ -522,6 +554,7 @@ double
 double_each
 double_metaphone
 downcase_each
+downsample
 downto
 doy
 drnk
@@ -536,6 +569,7 @@ dtf
 dump
 dup
 duplicate_count
+duration
 each
 each_cons
 each_slice
@@ -553,7 +587,9 @@ elem_of
 elementary_charge
 elidx
 elidxs
+ellipse_perimeter
 ellipsis
+ellper
 elof
 else
 elsif
@@ -576,6 +612,7 @@ endpwent
 ends_with
 ends_with_any
 endservent
+energy
 ensure_prefix
 ensure_suffix
 entropy
@@ -586,6 +623,7 @@ env_keys
 env_pairs
 env_remove
 env_set
+envelope
 eod
 eof
 epoch
@@ -675,6 +713,8 @@ first_elem
 first_eq
 first_or
 first_word
+five_number_summary
+fivenum
 fizzbuzz
 fl
 flat_depth
@@ -734,6 +774,7 @@ from_hex
 from_oct
 from_pairs
 frq
+frustum_volume
 fsize
 fst
 ft
@@ -780,6 +821,8 @@ getsockname
 getsockopt
 gid
 gin
+gini
+gini_coefficient
 given
 glob
 glob_match
@@ -812,7 +855,9 @@ gzip
 half
 half_each
 hamdist
+hamming
 hamming_distance
+hann
 hanoi
 harmonic_mean
 has_all_keys
@@ -837,6 +882,7 @@ hash_to_list
 hash_update
 hash_zip
 haversine
+haversine_distance
 hd
 head
 head_lines
@@ -854,6 +900,8 @@ hex_of
 hex_to_bytes
 hex_to_rgb
 hex_upper
+highpass_filter
+hilbert_env
 hist
 histogram
 histogram_bins
@@ -867,6 +915,7 @@ hours_to_days
 hours_to_minutes
 hours_to_seconds
 hp_to_watts
+hpf
 hr
 hsl_to_rgb
 hsl2rgb
@@ -889,6 +938,7 @@ ical
 id
 identity
 identity_matrix
+idft
 idt
 idxb
 if
@@ -928,6 +978,7 @@ int_to_roman
 intercalate
 interleave
 interleave_lists
+interpolate
 interpose
 intersect_list
 intersperse
@@ -942,6 +993,7 @@ invert
 ipos
 ipv4_to_int
 iqr
+irr
 is_abundant
 is_alnum
 is_alpha
@@ -1188,6 +1240,7 @@ jwt_decode_unsafe
 jwt_encode
 k_to_c
 k_to_f
+kaiser
 kb_to_b
 kb_to_bytes
 kb_to_mb
@@ -1244,6 +1297,7 @@ levenshtein
 lfrm
 linc
 line_count
+line_intersection
 linear_regression
 linear_search
 lines
@@ -1295,9 +1349,13 @@ longest_increasing
 longest_run
 look_and_say
 lookup_assoc
+lorenz
+lorenz_curve
 lower_bound
 lowercase
+lowpass_filter
 lpad
+lpf
 lru_new
 lrun
 lsearch
@@ -1367,6 +1425,7 @@ matrix_transpose
 matrix_zeros
 max
 max_abs
+max_drawdown
 max_float
 max_list
 max_of
@@ -1380,6 +1439,7 @@ mb_to_gb
 mcat
 mcol
 md5
+mdd
 mdet
 mdiag
 mdist
@@ -1388,8 +1448,10 @@ mean_absolute_error
 mean_list
 mean_squared_error
 measure
+medfilt
 median
 median_absolute_deviation
+median_filter
 memo
 memoize
 merge_hash
@@ -1438,11 +1500,13 @@ mmx
 mmxb
 mob
 mobius
+mod_dur
 mod_op
 mode
 mode_list
 mode_stat
 mode_val
+modified_duration
 mones
 month_name
 month_short
@@ -1510,10 +1574,12 @@ normalize
 normalize_array
 normalize_list
 normalize_range
+normalize_signal
 normalize_spaces
 normalize_vec
 normalize_whitespace
 normarr
+normsig
 not
 not_any
 not_each
@@ -1523,6 +1589,7 @@ now
 now_ms
 now_ns
 now_us
+nper
 npv
 nrm
 nrmrng
@@ -1543,6 +1610,7 @@ nub_by
 nubb
 num_cpus
 num_divisors
+num_periods
 numeric_count
 nxtp
 nxtperm
@@ -1584,6 +1652,7 @@ orl
 os_arch
 os_name
 our
+outliers_iqr
 ovals
 overlap_coefficient
 overlapcoef
@@ -1645,6 +1714,8 @@ path_join
 path_parent
 path_split
 path_stem
+payback
+payback_period
 pbool
 pby
 pc_case
@@ -1661,18 +1732,11 @@ pentagonal_number
 pentnum
 percent
 percentile
+percentile_rank
 perfect_numbers
 perfnums
 perimeter_rectangle
 perimeter_triangle
-stryke::aliases
-stryke::all
-stryke::builtins
-stryke::categories
-stryke::descriptions
-stryke::extensions
-stryke::perl_compats
-stryke::primaries
 perm
 permutations
 pfact
@@ -1684,6 +1748,7 @@ pfor
 pft
 pg
 pgrep
+phase_spectrum
 phi
 phonedigit
 phonetic_digit
@@ -1694,6 +1759,7 @@ pid
 pig_latin
 piglat
 pint
+pip
 pipe
 pipeline
 pkc
@@ -1707,9 +1773,13 @@ pmap_chunked
 pmap_on
 pmap_reduce
 pmass
+pmt
 point_distance
+point_in_polygon
 polyarea
 polygon_area
+polygon_perimeter
+polyper
 pop
 pop_clj
 popc
@@ -1722,6 +1792,7 @@ potential_energy
 pow
 pow2
 power_set
+power_spectrum
 powers_of_seq
 powerset
 ppi
@@ -1748,6 +1819,7 @@ product_of
 proton_mass
 prototype
 prvp
+psd
 pselect
 psi_to_pascals
 psort
@@ -1760,15 +1832,18 @@ pwatch
 pwd
 pwd_str
 pwi
+pyramid_volume
 qm
 qntl
 quantile
 quarter_of
+quartiles
 queue_new
 quote
 quotemeta
 r_squared
 r2d
+r72
 rad_to_deg
 radd
 radians
@@ -1820,6 +1895,7 @@ reduce_indexed
 reduce_right
 reductions
 ref
+reflect_point
 regex_extract
 regex_replace_str
 regex_split_str
@@ -1855,6 +1931,7 @@ repln
 replre
 repv
 require
+resample
 reservoir_sample
 reset
 rest
@@ -1917,6 +1994,7 @@ rpn
 rptd
 rsamp
 rst
+rule_of_72
 run_length_decode
 run_length_decode_str
 run_length_encode
@@ -1947,10 +2025,12 @@ say
 sc
 scalar
 scale_each
+scale_point
 scan
 scan_left
 scanl
 scanr
+scentroid
 script_name
 sdivs
 sdx
@@ -1960,6 +2040,7 @@ second_elem
 seconds_to_days
 seconds_to_hours
 seconds_to_minutes
+sector_area
 seek
 seekdir
 select
@@ -1987,6 +2068,8 @@ sha224
 sha256
 sha384
 sha512
+sharpe
+sharpe_ratio
 shift
 shift_left
 shift_right
@@ -2059,6 +2142,8 @@ sorted
 sorted_by_length
 sorted_desc
 sorted_nums
+sortino
+sortino_ratio
 sortw
 soundex
 spaceship
@@ -2068,6 +2153,10 @@ spanf
 spat
 spawn
 spbfs
+spearman
+spearman_correlation
+spectral_centroid
+spectrogram
 speed_distance_time
 speed_of_light
 sphere_surface
@@ -2116,6 +2205,7 @@ stddev
 stderr_stat
 stdin
 step
+stft
 stone_to_kg
 str
 strdist
@@ -2132,6 +2222,14 @@ strip_prefix
 strip_suffix
 strmul
 struct
+stryke::aliases
+stryke::all
+stryke::builtins
+stryke::categories
+stryke::descriptions
+stryke::extensions
+stryke::perl_compats
+stryke::primaries
 study
 sub
 sub_script
@@ -2167,6 +2265,8 @@ sysseek
 system
 syswrite
 t
+t_test_one_sample
+t_test_two_sample
 tail
 tail_lines
 tail_n
@@ -2260,6 +2360,8 @@ tomorrow
 top
 topological_sort
 toposort
+torus_surface
+torus_volume
 totient_sum
 totsum
 touch
@@ -2267,6 +2369,7 @@ tower_of_hanoi
 trailing_zeros
 transform_keys
 transform_values
+translate_point
 transpose
 trev
 triangle_hypotenuse
@@ -2297,6 +2400,8 @@ tsrt
 tstr
 tt
 ttable
+ttest1
+ttest2
 tvals
 twin_primes
 twinp
@@ -2361,6 +2466,7 @@ update_in
 upper_bound
 upper_snake
 uppercase
+upsample
 uptime_secs
 upto
 uqb
@@ -2386,8 +2492,11 @@ uzst
 values
 values_at
 values_sorted
+vangle
 variance
 vat
+vcross
+vdot
 vec
 vec_add
 vec_clj
@@ -2395,8 +2504,16 @@ vec_normalize
 vec_scale
 vec_sub
 vecc
+vector_angle
+vector_cross
+vector_dot
+vector_magnitude
+vector_normalize
 version_cmp
+vmag
+vnorm
 void
+wacc
 wait
 waitpid
 warn
@@ -2423,6 +2540,10 @@ while
 wi
 wincirc
 wind_chill
+window_blackman
+window_hamming
+window_hann
+window_kaiser
 window_n
 windowed
 windowed_circular
@@ -2452,9 +2573,11 @@ wrprng
 wrpt
 wsamp
 wwrap
+xcorr
 xd
 xe
 xentropy
+xirr
 xml_decode
 xml_encode
 xor_bool
@@ -2466,6 +2589,8 @@ yd
 ye
 yes
 yesterday
+z_score
+z_scores
 zalgo
 zall
 zcross
