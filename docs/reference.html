@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.6.9 · 3022 topics · 25 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.7.0 · 3053 topics · 25 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -191,7 +191,7 @@
         <li><a href="#ch-process">Process</a> <span class="chapter-count">20</span></li>
         <li><a href="#ch-pack-binary">Pack / Binary</a> <span class="chapter-count">3</span></li>
         <li><a href="#ch-logging">Logging</a> <span class="chapter-count">7</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">2460</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">2491</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -5624,7 +5624,7 @@ log_info(&quot;hidden&quot;)    # not printed
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">2460 topics</p>
+      <p class="chapter-meta">2491 topics</p>
       <article class="doc-entry" id="doc-stryke-rust-compile">
         <h3><a class="doc-anchor" href="#doc-stryke-rust-compile">#</a> <code>__stryke_rust_compile</code></h3>
         <p><code>__stryke_rust_compile</code> — internal builtin.</p>
@@ -6241,6 +6241,13 @@ p $angle   # ~1.5708 (π/2 radians = 90°)
         <pre><code class="lang-perl">my $w = hann(scalar @signal)
 my $windowed = apply_window(\@signal, $w)
 my $spectrum = dft($windowed)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-approx">
+        <h3><a class="doc-anchor" href="#doc-approx">#</a> <code>approx</code></h3>
+        <p><code>approx_fn</code> (alias <code>approx</code>) — piecewise linear interpolation at query points. Like R&#39;s approx().</p>
+        <pre><code class="lang-perl">my @y = @{approx([0,1,2], [0,10,0], [0.5, 1.0, 1.5])}
+# [5, 10, 5]
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-approx-eq">
@@ -9690,6 +9697,18 @@ p $stats-&gt;{&quot;50%&quot;}   # median
 my $spectrum = dft(\@signal)
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-dgeom">
+        <h3><a class="doc-anchor" href="#doc-dgeom">#</a> <code>dgeom</code></h3>
+        <p><code>dgeom</code> — geometric PMF P(X=k). Args: k, prob.</p>
+        <pre><code class="lang-perl">p dgeom(3, 0.5)  # P(first success on 4th trial)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-dhyper">
+        <h3><a class="doc-anchor" href="#doc-dhyper">#</a> <code>dhyper</code></h3>
+        <p><code>dhyper</code> — hypergeometric PMF. Args: k, m (white), n (black), nn (draws).</p>
+        <pre><code class="lang-perl">p dhyper(2, 5, 5, 3)  # P(2 white balls in 3 draws from 5W+5B)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-diag">
         <h3><a class="doc-anchor" href="#doc-diag">#</a> <code>diag</code></h3>
         <p><code>diag</code> — extended stdlib builtin. Alias for <code>diagonal</code>.</p>
@@ -9995,6 +10014,12 @@ p &quot;$pct% disk used&quot;
 @list |&gt; map dmetph |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-dnbinom">
+        <h3><a class="doc-anchor" href="#doc-dnbinom">#</a> <code>dnbinom</code></h3>
+        <p><code>dnbinom</code> — negative binomial PMF. Args: k, size, prob.</p>
+        <pre><code class="lang-perl">p dnbinom(3, 5, 0.5)  # P(3 failures before 5 successes)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-do-call">
         <h3><a class="doc-anchor" href="#doc-do-call">#</a> <code>do_call</code></h3>
         <p><code>do_call</code> — call a function with args from a list. Like R&#39;s do.call().</p>
@@ -10156,6 +10181,12 @@ p doppler(440, 30, 0)    # ~405 Hz (ambulance receding)
         <pre><code class="lang-perl">my $result = dump $x 
 # or in a pipeline:
 @list |&gt; map dump |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-dunif">
+        <h3><a class="doc-anchor" href="#doc-dunif">#</a> <code>dunif</code></h3>
+        <p><code>dunif</code> — uniform PDF. Args: x, a, b.</p>
+        <pre><code class="lang-perl">p dunif(0.5, 0, 1)  # 1.0
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-duped">
@@ -15762,6 +15793,14 @@ p list_count 1, 2, 3   # 3  (flat list works too)
 @list |&gt; map lkpa |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-lm">
+        <h3><a class="doc-anchor" href="#doc-lm">#</a> <code>lm</code></h3>
+        <p><code>lm_fit</code> (alias <code>lm</code>) — simple linear regression. Returns hash with intercept, slope, r_squared, residuals, fitted. Like R&#39;s lm().</p>
+        <pre><code class="lang-perl">my %m = %{lm([1,2,3,4,5], [2,4,5,4,5])}
+p $m{slope}       # slope
+p $m{r_squared}   # R²
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-ln10">
         <h3><a class="doc-anchor" href="#doc-ln10">#</a> <code>ln10</code></h3>
         <p><code>ln10</code> — math / physics constants builtin.</p>
@@ -15798,6 +15837,12 @@ p list_count 1, 2, 3   # 3  (flat list works too)
         <pre><code class="lang-perl">my $la = load_avg
 p &quot;1m=$la-&gt;[0] 5m=$la-&gt;[1] 15m=$la-&gt;[2]&quot;
 load_avg |&gt; spark |&gt; p                   # sparkline of load
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-loess">
+        <h3><a class="doc-anchor" href="#doc-loess">#</a> <code>loess</code></h3>
+        <p><code>lowess</code> (alias <code>loess</code>) — locally-weighted scatterplot smoothing (LOWESS/LOESS). Returns smoothed Y values with tricube weighting.</p>
+        <pre><code class="lang-perl">my @smooth = @{lowess([1,2,3,4,5], [2,1,4,3,5])}
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-log10">
@@ -18619,6 +18664,12 @@ p pc / ly   # ~3.26 light years
         <pre><code class="lang-perl">p payback(1000, 300, 400, 500)   # 2.6 periods
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-pbeta">
+        <h3><a class="doc-anchor" href="#doc-pbeta">#</a> <code>pbeta</code></h3>
+        <p><code>pbeta</code> — beta CDF (regularized incomplete beta). Args: x, a, b.</p>
+        <pre><code class="lang-perl">p pbeta(0.5, 2, 5)  # P(X ≤ 0.5) for Beta(2,5)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-pbinom">
         <h3><a class="doc-anchor" href="#doc-pbinom">#</a> <code>pbinom</code></h3>
         <p><code>pbinom</code> — binomial CDF. P(X ≤ k) for Binom(n, p). Args: k, n, p.</p>
@@ -18660,6 +18711,12 @@ p pc / ly   # ~3.26 light years
         <h3><a class="doc-anchor" href="#doc-pcauchy">#</a> <code>pcauchy</code></h3>
         <p><code>pcauchy</code> — Cauchy CDF. P(X ≤ x). Args: x [, location, scale].</p>
         <pre><code class="lang-perl">p pcauchy(0, 0, 1)  # 0.5
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pchisq">
+        <h3><a class="doc-anchor" href="#doc-pchisq">#</a> <code>pchisq</code></h3>
+        <p><code>pchisq</code> — chi-squared CDF. Args: x, df.</p>
+        <pre><code class="lang-perl">p pchisq(3.84, 1)  # 0.95 (critical value for p=0.05)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pcr">
@@ -18803,6 +18860,12 @@ p perm(10, 2)   # 90
 p pexp(5, 0.5)   # P(wait ≤ 5 with avg wait 2)
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-pf">
+        <h3><a class="doc-anchor" href="#doc-pf">#</a> <code>pf</code></h3>
+        <p><code>pf</code> — F-distribution CDF. Args: x, d1, d2.</p>
+        <pre><code class="lang-perl">p pf(4.0, 5, 10)  # P(F ≤ 4) for F(5,10)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-pfact">
         <h3><a class="doc-anchor" href="#doc-pfact">#</a> <code>pfact</code></h3>
         <p><code>pfact</code> — number theory / primes builtin. Alias for <code>prime_factors</code>.</p>
@@ -18825,6 +18888,12 @@ p pexp(5, 0.5)   # P(wait ≤ 5 with avg wait 2)
         <pre><code class="lang-perl">my $result = pft $x 
 # or in a pipeline:
 @list |&gt; map pft |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pgamma">
+        <h3><a class="doc-anchor" href="#doc-pgamma">#</a> <code>pgamma</code></h3>
+        <p><code>pgamma</code> — gamma CDF. Args: x, shape [, scale].</p>
+        <pre><code class="lang-perl">p pgamma(2, 2, 1)  # P(X ≤ 2) for Gamma(2,1)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-phase-spectrum">
@@ -19405,6 +19474,12 @@ p projrange(100, 30)   # ~884 m
         <pre><code class="lang-perl">my $result = psi_to_pascals $input 
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-pt">
+        <h3><a class="doc-anchor" href="#doc-pt">#</a> <code>pt</code></h3>
+        <p><code>pt</code> — Student&#39;s t CDF. Args: x, df.</p>
+        <pre><code class="lang-perl">p pt(1.96, 100)  # ≈ 0.975
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-ptdist">
         <h3><a class="doc-anchor" href="#doc-ptdist">#</a> <code>ptdist</code></h3>
         <p><code>ptdist</code> — geometry / physics builtin. Alias for <code>point_distance</code>.</p>
@@ -19478,6 +19553,24 @@ p punif(3, 0, 10)   # 0.3
         <pre><code class="lang-perl">my $result = q $x 
 # or in a pipeline:
 @list |&gt; map q |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-qcauchy">
+        <h3><a class="doc-anchor" href="#doc-qcauchy">#</a> <code>qcauchy</code></h3>
+        <p><code>qcauchy</code> — Cauchy quantile. Args: p [, location, scale].</p>
+        <pre><code class="lang-perl">p qcauchy(0.75, 0, 1)  # 1.0
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-qexp">
+        <h3><a class="doc-anchor" href="#doc-qexp">#</a> <code>qexp</code></h3>
+        <p><code>qexp</code> — exponential quantile. Args: p [, rate].</p>
+        <pre><code class="lang-perl">p qexp(0.5, 1)       # 0.693 (median of Exp(1))
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-qlnorm">
+        <h3><a class="doc-anchor" href="#doc-qlnorm">#</a> <code>qlnorm</code></h3>
+        <p><code>qlnorm</code> — log-normal quantile. Args: p [, mu, sigma].</p>
+        <pre><code class="lang-perl">p qlnorm(0.5, 0, 1)  # 1.0 (median of LogN(0,1))
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-qm">
@@ -19560,6 +19653,12 @@ p &quot;Q1=$q-&gt;[0] Q2=$q-&gt;[1] Q3=$q-&gt;[2]&quot;
 @list |&gt; map queue_new |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-qunif">
+        <h3><a class="doc-anchor" href="#doc-qunif">#</a> <code>qunif</code></h3>
+        <p><code>qunif</code> — uniform quantile. Args: p [, min, max].</p>
+        <pre><code class="lang-perl">p qunif(0.5, 0, 10)  # 5.0 (median)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-quote">
         <h3><a class="doc-anchor" href="#doc-quote">#</a> <code>quote</code></h3>
         <p><code>quote</code> — string quote / escape builtin.</p>
@@ -19574,6 +19673,12 @@ p &quot;Q1=$q-&gt;[0] Q2=$q-&gt;[1] Q3=$q-&gt;[2]&quot;
         <pre><code class="lang-perl">my $result = qw $x 
 # or in a pipeline:
 @list |&gt; map qw |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-qweibull">
+        <h3><a class="doc-anchor" href="#doc-qweibull">#</a> <code>qweibull</code></h3>
+        <p><code>qweibull</code> — Weibull quantile. Args: p, shape [, scale].</p>
+        <pre><code class="lang-perl">p qweibull(0.5, 1, 1)  # same as qexp
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-r2d">
@@ -19773,10 +19878,22 @@ p r72(0.10)   # 7.2 years at 10%
 @list |&gt; map rb |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-rbeta">
+        <h3><a class="doc-anchor" href="#doc-rbeta">#</a> <code>rbeta</code></h3>
+        <p><code>rbeta</code> — generate n random beta variates. Args: n, alpha, beta. Like R&#39;s rbeta().</p>
+        <pre><code class="lang-perl">my @x = @{rbeta(100, 2, 5)}     # Beta(2,5)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-rbind">
         <h3><a class="doc-anchor" href="#doc-rbind">#</a> <code>rbind</code></h3>
         <p><code>rbind</code> — bind matrices/vectors by rows (vertical stack). Like R&#39;s rbind().</p>
         <pre><code class="lang-perl">my $m = rbind([1,2,3], [4,5,6])  # [[1,2,3],[4,5,6]]
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rbinom">
+        <h3><a class="doc-anchor" href="#doc-rbinom">#</a> <code>rbinom</code></h3>
+        <p><code>rbinom</code> — generate n random binomial variates. Args: n, size, prob. Like R&#39;s rbinom().</p>
+        <pre><code class="lang-perl">my @x = @{rbinom(100, 10, 0.3)} # 100 draws from Binom(10,0.3)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-rc-time-constant">
@@ -19785,6 +19902,18 @@ p r72(0.10)   # 7.2 years at 10%
         <pre><code class="lang-perl">my $result = rc_time_constant $x 
 # or in a pipeline:
 @list |&gt; map rc_time_constant |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rcauchy">
+        <h3><a class="doc-anchor" href="#doc-rcauchy">#</a> <code>rcauchy</code></h3>
+        <p><code>rcauchy</code> — generate n random Cauchy variates. Args: n [, location, scale].</p>
+        <pre><code class="lang-perl">my @x = @{rcauchy(100, 0, 1)}   # standard Cauchy
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rchisq">
+        <h3><a class="doc-anchor" href="#doc-rchisq">#</a> <code>rchisq</code></h3>
+        <p><code>rchisq</code> — generate n random chi-squared variates. Args: n, df. Like R&#39;s rchisq().</p>
+        <pre><code class="lang-perl">my @x = @{rchisq(100, 5)}       # Chi-sq with 5 df
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-rcolor">
@@ -20329,6 +20458,24 @@ my $down = resample(\@signal, 0.5) # halve sample rate
 @list |&gt; map revwords |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-rexp">
+        <h3><a class="doc-anchor" href="#doc-rexp">#</a> <code>rexp</code></h3>
+        <p><code>rexp</code> — generate n random exponential variates. Args: n [, rate]. Like R&#39;s rexp().</p>
+        <pre><code class="lang-perl">my @x = @{rexp(100, 0.5)}       # rate=0.5 (mean=2)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rf">
+        <h3><a class="doc-anchor" href="#doc-rf">#</a> <code>rf</code></h3>
+        <p><code>rf</code> — generate n random F variates. Args: n, d1, d2. Like R&#39;s rf().</p>
+        <pre><code class="lang-perl">my @x = @{rf(100, 5, 10)}       # F(5,10)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rgamma">
+        <h3><a class="doc-anchor" href="#doc-rgamma">#</a> <code>rgamma</code></h3>
+        <p><code>rgamma</code> — generate n random gamma variates. Args: n, shape [, scale]. Like R&#39;s rgamma().</p>
+        <pre><code class="lang-perl">my @x = @{rgamma(100, 2, 1)}    # Gamma(2,1)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-rgb">
         <h3><a class="doc-anchor" href="#doc-rgb">#</a> <code>rgb</code></h3>
         <p><code>rgb</code> — color / ansi builtin. Alias for <code>red</code>.</p>
@@ -20369,6 +20516,12 @@ my $down = resample(\@signal, 0.5) # halve sample rate
         <h3><a class="doc-anchor" href="#doc-rgb-to-hsv">#</a> <code>rgb_to_hsv</code></h3>
         <p><code>rgb_to_hsv</code> — color operations builtin.</p>
         <pre><code class="lang-perl">my $result = rgb_to_hsv $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rgeom">
+        <h3><a class="doc-anchor" href="#doc-rgeom">#</a> <code>rgeom</code></h3>
+        <p><code>rgeom</code> — generate n random geometric variates. Args: n, prob.</p>
+        <pre><code class="lang-perl">my @x = @{rgeom(100, 0.3)}      # trials until first success
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-rho">
@@ -20488,6 +20641,12 @@ my $sol = rk4(sub { -$_[1] }, 0, 1, 0.1, 100)
 @list |&gt; map rle_str |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-rlnorm">
+        <h3><a class="doc-anchor" href="#doc-rlnorm">#</a> <code>rlnorm</code></h3>
+        <p><code>rlnorm</code> — generate n random log-normal variates. Args: n [, mu, sigma].</p>
+        <pre><code class="lang-perl">my @x = @{rlnorm(100, 0, 1)}    # LogN(0,1)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-rmall">
         <h3><a class="doc-anchor" href="#doc-rmall">#</a> <code>rmall</code></h3>
         <p><code>rmall</code> — extended stdlib builtin. Alias for <code>remove_all_str</code>.</p>
@@ -20558,6 +20717,13 @@ my $sol = rk4(sub { -$_[1] }, 0, 1, 0.1, 100)
         <pre><code class="lang-perl">my $result = rnk $x 
 # or in a pipeline:
 @list |&gt; map rnk |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rnorm">
+        <h3><a class="doc-anchor" href="#doc-rnorm">#</a> <code>rnorm</code></h3>
+        <p><code>rnorm</code> — generate n random normal variates. Args: n [, mu, sigma]. Like R&#39;s rnorm().</p>
+        <pre><code class="lang-perl">my @x = @{rnorm(1000)}          # 1000 standard normal
+my @y = @{rnorm(100, 50, 10)}   # mean=50, sd=10
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-roi">
@@ -20690,6 +20856,12 @@ my $sol = rk4(sub { -$_[1] }, 0, 1, 0.1, 100)
 @list |&gt; map rpn |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-rpois">
+        <h3><a class="doc-anchor" href="#doc-rpois">#</a> <code>rpois</code></h3>
+        <p><code>rpois</code> — generate n random Poisson variates. Args: n, lambda. Like R&#39;s rpois().</p>
+        <pre><code class="lang-perl">my @x = @{rpois(100, 5)}        # Poisson with mean 5
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-rptd">
         <h3><a class="doc-anchor" href="#doc-rptd">#</a> <code>rptd</code></h3>
         <p><code>rptd</code> — algebraic match builtin. Alias for <code>repeatedly</code>.</p>
@@ -20726,6 +20898,12 @@ my $sol = rk4(sub { -$_[1] }, 0, 1, 0.1, 100)
 @list |&gt; map rst |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-rt">
+        <h3><a class="doc-anchor" href="#doc-rt">#</a> <code>rt</code></h3>
+        <p><code>rt</code> — generate n random Student&#39;s t variates. Args: n, df. Like R&#39;s rt().</p>
+        <pre><code class="lang-perl">my @x = @{rt(100, 10)}          # t with 10 df
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-run-length-decode">
         <h3><a class="doc-anchor" href="#doc-run-length-decode">#</a> <code>run_length_decode</code></h3>
         <p><code>run_length_decode</code> — collection more builtin.</p>
@@ -20758,6 +20936,12 @@ my $sol = rk4(sub { -$_[1] }, 0, 1, 0.1, 100)
 @list |&gt; map run_length_encode_str |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-runif">
+        <h3><a class="doc-anchor" href="#doc-runif">#</a> <code>runif</code></h3>
+        <p><code>runif</code> — generate n random uniform variates. Args: n [, min, max]. Like R&#39;s runif().</p>
+        <pre><code class="lang-perl">my @x = @{runif(100, 0, 1)}     # 100 uniform [0,1]
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-running-max">
         <h3><a class="doc-anchor" href="#doc-running-max">#</a> <code>running_max</code></h3>
         <p><code>running_max</code> — list helpers (batch 4) builtin.</p>
@@ -20788,6 +20972,12 @@ my $sol = rk4(sub { -$_[1] }, 0, 1, 0.1, 100)
         <pre><code class="lang-perl">my $result = runred $x 
 # or in a pipeline:
 @list |&gt; map runred |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rweibull">
+        <h3><a class="doc-anchor" href="#doc-rweibull">#</a> <code>rweibull</code></h3>
+        <p><code>rweibull</code> — generate n random Weibull variates. Args: n, shape [, scale].</p>
+        <pre><code class="lang-perl">my @x = @{rweibull(100, 2, 1)}  # Weibull(2,1)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-rydberg-constant">
