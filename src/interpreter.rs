@@ -1035,7 +1035,7 @@ fn rewrite_perl_regex_dollar_end_anchor(pat: &str, multiline_flag: bool) -> Stri
                     continue;
                 }
             }
-            out.push_str("(?:\\n?\\z)");
+            out.push_str("(?=\\n?\\z)");
             i += 1;
             continue;
         }
