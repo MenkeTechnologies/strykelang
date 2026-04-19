@@ -11829,6 +11829,31 @@ impl Parser {
             // ── encoding extensions ───────────────────────────────────────
             | "base85_encode" | "b85e" | "ascii85_encode" | "a85e"
             | "base85_decode" | "b85d" | "ascii85_decode" | "a85d"
+            // ── R base: distributions ─────────────────────────────────────
+            | "pnorm" | "qnorm" | "pbinom" | "dbinom" | "ppois"
+            | "punif" | "pexp" | "pweibull" | "plnorm" | "pcauchy"
+            // ── R base: matrix ops ────────────────────────────────────────
+            | "rbind" | "cbind"
+            | "row_sums" | "rowSums" | "col_sums" | "colSums"
+            | "row_means" | "rowMeans" | "col_means" | "colMeans"
+            | "outer_product" | "outer" | "crossprod" | "tcrossprod"
+            | "nrow" | "ncol" | "prop_table" | "proptable"
+            // ── R base: vector ops ────────────────────────────────────────
+            | "cummax" | "cummin" | "scale_vec" | "scale"
+            | "which_fn" | "tabulate"
+            | "duplicated" | "duped" | "rev_vec"
+            | "seq_fn" | "rep_fn" | "rep"
+            | "cut_bins" | "cut" | "find_interval" | "findInterval"
+            | "ecdf_fn" | "ecdf" | "density_est" | "density"
+            | "embed_ts" | "embed"
+            // ── R base: stats tests ───────────────────────────────────────
+            | "shapiro_test" | "shapiro" | "ks_test" | "ks"
+            | "wilcox_test" | "wilcox" | "mann_whitney"
+            | "prop_test" | "proptest" | "binom_test" | "binomtest"
+            // ── R base: apply / functional ────────────────────────────────
+            | "sapply" | "tapply" | "do_call" | "docall"
+            // ── R base: ML / clustering ───────────────────────────────────
+            | "kmeans" | "prcomp" | "pca"
             => Some(name),
             _ => None,
         }
