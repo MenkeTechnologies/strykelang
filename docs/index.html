@@ -175,7 +175,7 @@
 
       <section class="tutorial-section">
         <h2>Quickstart</h2>
-        <p>Install from crates.io or source, then run scripts or one-liners with <code>st</code> (short for stryke):</p>
+        <p>Install from crates.io or source, then run scripts or one-liners with <code>s</code> (short for stryke):</p>
 <pre># install
 cargo install strykelang
 
@@ -184,17 +184,17 @@ git clone https://github.com/MenkeTechnologies/strykelang
 cd strykelang &amp;&amp; cargo build --release
 
 # one-liners
-st 'p "hello, world"'
-st '1..20 |&gt; grep { $_ % 2 == 0 } |&gt; map { $_ * $_ } |&gt; sum |&gt; p'
-st 'qw(a b c) |&gt; map uc |&gt; join "," |&gt; p'
+s 'p "hello, world"'
+s '1..20 |&gt; grep { $_ % 2 == 0 } |&gt; map { $_ * $_ } |&gt; sum |&gt; p'
+s 'qw(a b c) |&gt; map uc |&gt; join "," |&gt; p'
 
 # parallel primitives
-st '(1..8) |&gt; pmap { expensive($_) } |&gt; p'
+s '(1..8) |&gt; pmap { expensive($_) } |&gt; p'
 
 # read + parse JSON
-st 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
+s 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
         <p>Full install + usage live in the <a href="https://github.com/MenkeTechnologies/strykelang#readme">README</a>.</p>
-        <p><strong><code>-e</code> is optional.</strong> If the first argument isn't a file and looks like code, <code>st</code> runs it directly. <code>st 'p 42'</code> and <code>st -e 'p 42'</code> are equivalent.</p>
+        <p><strong><code>-e</code> is optional.</strong> If the first argument isn't a file and looks like code, <code>s</code> runs it directly. <code>s 'p 42'</code> and <code>s -e 'p 42'</code> are equivalent.</p>
       </section>
 
       <section class="tutorial-section">
@@ -233,18 +233,18 @@ st 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
           <thead>
             <tr style="border-bottom:2px solid #0ff;">
               <th style="text-align:left; padding:4px;">Task</th>
-              <th style="padding:4px;">st</th>
+              <th style="padding:4px;">s</th>
               <th style="padding:4px;">perl5</th>
               <th style="padding:4px;">ruby</th>
               <th style="padding:4px;">python</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td>Sum 1..100</td><td style="color:#0f0;"><code>st 'p sum 1..100'</code> <b>19c</b></td><td>45c</td><td>28c</td><td>38c</td></tr>
-            <tr><td>Word freq</td><td style="color:#0f0;"><code>st -an 'freq(@F) |&gt; dd'</code> <b>25c</b></td><td>61c</td><td>—</td><td>—</td></tr>
-            <tr><td>SHA256 file</td><td style="color:#0f0;"><code>st 'p s256"f"'</code> <b>14c</b></td><td>70c+</td><td>—</td><td>80c+</td></tr>
-            <tr><td>CSV → JSON</td><td style="color:#0f0;"><code>st 'csv_read("f") |&gt; tj |&gt; p'</code> <b>33c</b></td><td>needs modules</td><td>needs modules</td><td>90c</td></tr>
-            <tr><td>Parallel map</td><td style="color:#0f0;"><code>st '1..1e6 |&gt; pmap { $_ * 2 }'</code> <b>33c</b></td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td>Sum 1..100</td><td style="color:#0f0;"><code>s 'p sum 1..100'</code> <b>19c</b></td><td>45c</td><td>28c</td><td>38c</td></tr>
+            <tr><td>Word freq</td><td style="color:#0f0;"><code>s -an 'freq(@F) |&gt; dd'</code> <b>25c</b></td><td>61c</td><td>—</td><td>—</td></tr>
+            <tr><td>SHA256 file</td><td style="color:#0f0;"><code>s 'p s256"f"'</code> <b>14c</b></td><td>70c+</td><td>—</td><td>80c+</td></tr>
+            <tr><td>CSV → JSON</td><td style="color:#0f0;"><code>s 'csv_read("f") |&gt; tj |&gt; p'</code> <b>33c</b></td><td>needs modules</td><td>needs modules</td><td>90c</td></tr>
+            <tr><td>Parallel map</td><td style="color:#0f0;"><code>s '1..1e6 |&gt; pmap { $_ * 2 }'</code> <b>33c</b></td><td>—</td><td>—</td><td>—</td></tr>
           </tbody>
         </table>
       </section>
@@ -291,21 +291,21 @@ st 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
         </table>
 
         <h3>Examples</h3>
-        <div class="oneliner">st 'p $b{pmap}'                              <span class="comment"># "parallel"</span></div>
-        <div class="oneliner">st 'p $b{to_json}'                           <span class="comment"># "serialization"</span></div>
-        <div class="oneliner">st 'p $all{tj}'                              <span class="comment"># "serialization"  (alias resolves via %all)</span></div>
-        <div class="oneliner">st 'p scalar keys %all'                      <span class="comment"># total callable spellings (primaries + aliases)</span></div>
-        <div class="oneliner">st 'p $pc{map}'                              <span class="comment"># "array / list"   (Perl core only)</span></div>
-        <div class="oneliner">st 'p $e{pmap}'                              <span class="comment"># "parallel"       (extensions only)</span></div>
-        <div class="oneliner">st 'p $a{tj}'                                <span class="comment"># "to_json"</span></div>
-        <div class="oneliner">st 'p $d{pmap}'                              <span class="comment"># LSP one-liner</span></div>
-        <div class="oneliner">st '$c{parallel} |&gt; e p'                      <span class="comment"># every parallel op, O(1) reverse-lookup</span></div>
-        <div class="oneliner">st '$p{to_json} |&gt; e p'                       <span class="comment"># every alias of to_json</span></div>
-        <div class="oneliner">st 'keys %pc |&gt; sort |&gt; p'                    <span class="comment"># every Perl compat, sorted</span></div>
-        <div class="oneliner">st 'keys %e  |&gt; sort |&gt; p'                    <span class="comment"># every stryke extension</span></div>
-        <div class="oneliner">st 'keys %all |&gt; less'                       <span class="comment"># browse every spelling in $PAGER</span></div>
-        <div class="oneliner">st 'my %f; $f{$b{$_}}++ for keys %b; dd \%f'  <span class="comment"># per-category frequency</span></div>
-        <div class="oneliner">st 'for my $h (qw(b all pc e a d c p)) { printf "%%%-4s %d\n", $h, scalar keys %$h }'  <span class="comment"># catalog</span></div>
+        <div class="oneliner">s 'p $b{pmap}'                              <span class="comment"># "parallel"</span></div>
+        <div class="oneliner">s 'p $b{to_json}'                           <span class="comment"># "serialization"</span></div>
+        <div class="oneliner">s 'p $all{tj}'                              <span class="comment"># "serialization"  (alias resolves via %all)</span></div>
+        <div class="oneliner">s 'p scalar keys %all'                      <span class="comment"># total callable spellings (primaries + aliases)</span></div>
+        <div class="oneliner">s 'p $pc{map}'                              <span class="comment"># "array / list"   (Perl core only)</span></div>
+        <div class="oneliner">s 'p $e{pmap}'                              <span class="comment"># "parallel"       (extensions only)</span></div>
+        <div class="oneliner">s 'p $a{tj}'                                <span class="comment"># "to_json"</span></div>
+        <div class="oneliner">s 'p $d{pmap}'                              <span class="comment"># LSP one-liner</span></div>
+        <div class="oneliner">s '$c{parallel} |&gt; e p'                      <span class="comment"># every parallel op, O(1) reverse-lookup</span></div>
+        <div class="oneliner">s '$p{to_json} |&gt; e p'                       <span class="comment"># every alias of to_json</span></div>
+        <div class="oneliner">s 'keys %pc |&gt; sort |&gt; p'                    <span class="comment"># every Perl compat, sorted</span></div>
+        <div class="oneliner">s 'keys %e  |&gt; sort |&gt; p'                    <span class="comment"># every stryke extension</span></div>
+        <div class="oneliner">s 'keys %all |&gt; less'                       <span class="comment"># browse every spelling in $PAGER</span></div>
+        <div class="oneliner">s 'my %f; $f{$b{$_}}++ for keys %b; dd \%f'  <span class="comment"># per-category frequency</span></div>
+        <div class="oneliner">s 'for my $h (qw(b all pc e a d c p)) { printf "%%%-4s %d\n", $h, scalar keys %$h }'  <span class="comment"># catalog</span></div>
 
         <h3>Notes</h3>
         <ul>
@@ -341,7 +341,7 @@ f("*.txt") |&gt; map { [$_, slurp($_) |&gt; split(/\s+/) |&gt; scalar] }
 
       <section class="tutorial-section">
         <h2>Builtin categories</h2>
-        <p>3100+ operations across 3500+ spellings. Query them via <code>keys %stryke::builtins</code> — the table below is a navigational overview, not a full index. Run <code>st 'p scalar keys %b'</code> for the live count.</p>
+        <p>3100+ operations across 3500+ spellings. Query them via <code>keys %stryke::builtins</code> — the table below is a navigational overview, not a full index. Run <code>s 'p scalar keys %b'</code> for the live count.</p>
         <div class="cat-grid">
           <div class="cat-card"><h4>Array / List (134+)</h4><p><code>map maps flat_map grep sort reverse push pop shift unshift splice reduce fold fore e first any all none take take_while drop skip_while partition min_by max_by zip zip_with interleave frequencies count_by chunk windowed enumerate shuffle uniq dedup compact flatten concat pluck grep_v with_index sorted sorted_desc sorted_nums without take_last drop_last pairwise batch rotate swap_pairs sliding_pairs run_length_encode group_consecutive permutations combinations power_set cartesian_product</code> &hellip;</p></div>
           <div class="cat-card"><h4>String (129+)</h4><p><code>chomp chop length substr index rindex split join uc lc ucfirst lcfirst chr ord trim lines words chars snake_case camel_case kebab_case pascal_case constant_case capitalize swap_case title_case squish pad_left pad_right center truncate_at reverse_str rot13 rot47 caesar_shift count_vowels count_consonants first_word last_word left_str right_str wrap_text dedent indent strip_html levenshtein soundex extract_numbers extract_emails extract_urls</code> &hellip;</p></div>
@@ -651,12 +651,12 @@ p $d-&gt;isa("Cat")                      <span class="comment"># ""  (false)</sp
           <li><strong>Native data</strong> — CSV (<code>csv_read</code>/<code>csv_write</code>), columnar <code>dataframe</code>, embedded <code>sqlite</code>, TOML/YAML helpers.</li>
           <li><strong>HTTP</strong> — <code>fetch</code> / <code>fetch_json</code> / <code>fetch_async</code> / <code>par_fetch</code>.</li>
           <li><strong>Crypto / compression</strong> — <code>sha256</code>, <code>hmac_sha256</code>, <code>jwt_encode</code>/<code>decode</code>, <code>gzip</code> / <code>gunzip</code> / <code>zstd</code>.</li>
-          <li><strong>Standalone binaries</strong> — <code>st build SCRIPT -o OUT</code> bakes a script into a self-contained executable.</li>
+          <li><strong>Standalone binaries</strong> — <code>s build SCRIPT -o OUT</code> bakes a script into a self-contained executable.</li>
           <li><strong>Inline Rust FFI</strong> — <code>rust { pub extern "C" fn ... }</code> blocks compile to a cdylib on first run, dlopen + register as Perl-callable subs.</li>
           <li><strong>Bytecode cache</strong> — <code>STRYKE_BC_CACHE=1</code> skips parse + compile on warm starts via on-disk <code>.pec</code> bundles.</li>
           <li><strong>Distributed compute</strong> — <code>cluster([...])</code> builds an SSH worker pool; <code>pmap_on $cluster { } @list</code> fans a map across persistent remote workers with fault tolerance.</li>
           <li><strong>Shared state</strong> — <code>mysync</code> declares atomic variables safe to mutate from parallel workers.</li>
-          <li><strong>Language server</strong> — <code>st --lsp</code> runs an LSP server over stdio with diagnostics, hover, completion. The five reflection hashes above are part of the completion surface.</li>
+          <li><strong>Language server</strong> — <code>s --lsp</code> runs an LSP server over stdio with diagnostics, hover, completion. The five reflection hashes above are part of the completion surface.</li>
         </ul>
       </section>
 
@@ -675,8 +675,8 @@ p $d-&gt;isa("Cat")                      <span class="comment"># ""  (false)</sp
 --compat               // Perl 5 strict-compat: disable all stryke extensions
 -n / -p / -i           // stdin line-mode + in-place edit
 --lsp                  // run language server over stdio
-st build SCRIPT -o OUT // standalone binary
-st --remote-worker     // worker process for distributed cluster</pre>
+s build SCRIPT -o OUT // standalone binary
+s --remote-worker     // worker process for distributed cluster</pre>
       </section>
 
       <section class="tutorial-section">
@@ -687,7 +687,7 @@ st --remote-worker     // worker process for distributed cluster</pre>
           <li><strong>Rust API docs</strong> — <a href="https://docs.rs/strykelang">docs.rs/stryke</a></li>
           <li><strong>Issues</strong> — <a href="https://github.com/MenkeTechnologies/strykelang/issues">github.com/MenkeTechnologies/stryke/issues</a></li>
           <li><strong>Full README</strong> — <a href="https://github.com/MenkeTechnologies/strykelang#readme">README on GitHub</a> (install, parallel primitives, mysync, CLI flags, architecture, benchmarks, standalone binaries, inline Rust, bytecode cache, distributed <code>pmap_on</code>, LSP).</li>
-          <li><strong>Parity</strong> — <code>parity/cases/*.pl</code> holds 20k+ Perl-vs-st test cases run by <code>parity/run_parity.sh</code>.</li>
+          <li><strong>Parity</strong> — <code>parity/cases/*.pl</code> holds 20k+ Perl-vs-s test cases run by <code>parity/run_parity.sh</code>.</li>
         </ul>
       </section>
     </main>
