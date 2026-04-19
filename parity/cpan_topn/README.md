@@ -1,6 +1,6 @@
 # Top-N CPAN harness (Phase 4)
 
-Runs **`pe`** against a curated set of **pure-Perl** modules installed under `local/lib/perl5`
+Runs **`fo`** against a curated set of **pure-Perl** modules installed under `local/lib/perl5`
 (via `cpanm`), plus stubs under `vendor/perl/`. This is **not** full upstream test suites; it is a
 **smoke** that `require` works and a few API calls match expectations.
 
@@ -23,7 +23,7 @@ cargo build --release --locked
 bash parity/cpan_topn/run_cpan_topn.sh
 ```
 
-Env: **`PE`** (default `target/release/pe`). **`pe` does not read `PERL5LIB`**; the harness passes **`-I parity/cpan_topn/local/lib/perl5`** so real CPAN trees win over `vendor/perl` stubs.
+Env: **`FO`** (default `target/release/fo`). **`fo` does not read `PERL5LIB`**; the harness passes **`-I parity/cpan_topn/local/lib/perl5`** so real CPAN trees win over `vendor/perl` stubs.
 
 ## CI
 

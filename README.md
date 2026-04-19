@@ -8,9 +8,9 @@
 ```
 
 [![CI](https://github.com/MenkeTechnologies/forge/actions/workflows/ci.yml/badge.svg)](https://github.com/MenkeTechnologies/forge/actions/workflows/ci.yml)
-[![Crates.io](https://img.shields.io/crates/v/forge.svg)](https://crates.io/crates/forge)
-[![Downloads](https://img.shields.io/crates/d/forge.svg)](https://crates.io/crates/forge)
-[![Docs.rs](https://docs.rs/forge/badge.svg)](https://docs.rs/forge)
+[![Crates.io](https://img.shields.io/crates/v/forgelang.svg)](https://crates.io/crates/forgelang)
+[![Downloads](https://img.shields.io/crates/d/forgelang.svg)](https://crates.io/crates/forgelang)
+[![Docs.rs](https://docs.rs/forgelang/badge.svg)](https://docs.rs/forgelang)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ### `[PARALLEL PERL5 INTERPRETER // RUST-POWERED EXECUTION ENGINE]`
@@ -64,7 +64,7 @@ A Perl 5 compatible interpreter in Rust with native parallel primitives, NaN-box
 ## [0x01] INSTALL
 
 ```sh
-cargo install forge
+cargo install forgelang
 # or from source
 git clone https://github.com/MenkeTechnologies/forge && cd forge && cargo build --release
 ```
@@ -97,7 +97,7 @@ autoload -Uz compinit && compinit
 | CSV → JSON | `fo 'csv_read("f") \|> tj \|> p'` **33c** | needs `Text::CSV` + `JSON` | needs `csv` + `json` | needs `csv` + `json` imports | — |
 | Parallel map | `fo '1..1e6 \|> pmap { $_ * 2 }'` **33c** | not built in | not built in | not built in | `xargs -P8` 50c+ |
 | Sparkline | `fo '(3,7,1,9) \|> spark \|> p'` **31c** | not built in | not built in | not built in | not built in |
-| In-place sed (parallel) | `fo -i -pe 's/foo/bar/g' *.txt` **31c** | `perl -i -pe 's/foo/bar/g' *.txt` 33c (sequential) | `ruby -i -pe '$_.gsub!(...)'` 35c+ | — | `sed -i '' 's/foo/bar/g' *.txt` 31c (sequential) |
+| In-place sed (parallel) | `fo -i -fo 's/foo/bar/g' *.txt` **31c** | `perl -i -fo 's/foo/bar/g' *.txt` 33c (sequential) | `ruby -i -fo '$_.gsub!(...)'` 35c+ | — | `sed -i '' 's/foo/bar/g' *.txt` 31c (sequential) |
 
 ### Feature matrix
 
@@ -176,9 +176,9 @@ A line whose trimmed text is exactly `__DATA__` ends the program; the trailing b
 
 ```sh
 echo data | fo -ne 'print uc $_'        # line loop
-cat f.txt | fo -pe 's/foo/bar/g'        # auto-print like sed
-fo -i -pe 's/foo/bar/g' file1 file2     # in-place edit (parallel across files)
-fo -i.bak -pe 's/x/y/g' *.txt           # with backup suffix
+cat f.txt | fo -fo 's/foo/bar/g'        # auto-print like sed
+fo -i -fo 's/foo/bar/g' file1 file2     # in-place edit (parallel across files)
+fo -i.bak -fo 's/x/y/g' *.txt           # with backup suffix
 echo a:b:c | fo -aF: -ne 'print $F[1]'  # auto-split
 ```
 
@@ -1529,7 +1529,7 @@ The toy-script result is the honest one to call out: for tiny scripts the cache 
 
 **Format** ([`src/pec.rs`](src/pec.rs)): `[4B magic b"PEC2"][zstd-compressed bincode of PecBundle]`. The `PecBundle` carries `format_version`, `pointer_width` (so a cache built on a 64-bit host is rejected on 32-bit), `strict_vars` (a mismatch is treated as a clean miss → re-compile), `source_fingerprint`, the parsed `Program`, and the compiled `Chunk`. Format version 2 introduced zstd compression — files dropped ~10× in size and warm-load latency dropped with them.
 
-**Cache key** ([`pec::source_fingerprint`](src/pec.rs)): SHA-256 of `(crate version, source filename, full source including -M prelude)`. Editing the script, upgrading forge, or changing the `-M` flags all force a recompile. The crate version is mixed in so a `cargo install forge` upgrade silently invalidates everyone's cache rather than risking a stale-bytecode mismatch.
+**Cache key** ([`pec::source_fingerprint`](src/pec.rs)): SHA-256 of `(crate version, source filename, full source including -M prelude)`. Editing the script, upgrading forge, or changing the `-M` flags all force a recompile. The crate version is mixed in so a `cargo install forgelang` upgrade silently invalidates everyone's cache rather than risking a stale-bytecode mismatch.
 
 **Pairs with [`fo build`](#0x0d-standalone-binaries-fo-build):** AOT binaries pick up the cache for free. The first run of a shipped binary parses and compiles the embedded source; every subsequent run on the same machine reuses the cached chunk. The cache key includes the script name baked into the trailer, so two binaries with different embedded scripts never collide.
 
@@ -1547,7 +1547,7 @@ The toy-script result is the honest one to call out: for tiny scripts the cache 
 Distribute a `pmap`-style fan-out across many machines via SSH. The dispatcher spawns one persistent `fo --remote-worker` process per slot, performs a HELLO + SESSION_INIT handshake **once** per slot, then streams JOB frames over the same stdin/stdout. Pairs perfectly with `fo build`: ship one binary to N hosts, fan the workload across them.
 
 ```perl
-# Build the worker pool. Each spec maps to one or more `ssh HOST PE --remote-worker` lanes.
+# Build the worker pool. Each spec maps to one or more `ssh HOST FO --remote-worker` lanes.
 my $cluster = cluster([
     "build1:8",                          # 8 slots on build1, default `fo` from PATH
     "alice@build2:16",                   # 16 slots, ssh as alice

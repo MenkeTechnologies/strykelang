@@ -40,7 +40,7 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 | `%SIG` | Signal handlers | Hash in scope. On **Unix**, `SIGINT` / `SIGTERM` / `SIGALRM` / `SIGCHLD` are registered (`signal_hook`); [`perl_signal::poll`](src/perl_signal.rs) runs **before each tree-walker statement** (`exec_statement_inner`) and **before each VM opcode** (and once before the linear JIT fast path). Invokes code refs (`IGNORE` / `DEFAULT` are no-ops). Non-Unix: no OS delivery. |
 | `$]` | Numeric language version | `get_special_var("]")` → `perl_bracket_version()` (emulated Perl 5.x.y level; see `perl_bracket_version` in `src/interpreter.rs`). |
 | `$;` | Subscript separator | `subscript_sep` field; default `\x1c` (Perl `\034`). |
-| `$^I` | In-place edit extension | `inplace_edit` string; lexer reads `$^` + letter as variable name `^I`. The **`pe`/`forge` driver** sets this from **`-i`** / **`-i.ext`** (backup suffix) and applies in-place rewrites for **`-n`/`-p`** over **`@ARGV`** files. |
+| `$^I` | In-place edit extension | `inplace_edit` string; lexer reads `$^` + letter as variable name `^I`. The **`fo`/`forge` driver** sets this from **`-i`** / **`-i.ext`** (backup suffix) and applies in-place rewrites for **`-n`/`-p`** over **`@ARGV`** files. |
 | `$^D` | Debug flags | `debug_flags` (`i64`). |
 | `$^P` | Debugger flags | `perl_debug_flags` (`i64`). |
 | `$^S` | Exception state (in eval) | `eval_nesting > 0` while `eval` runs (tree-walker and VM `eval` / `evalblock`). |
@@ -83,7 +83,7 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 | `@_` | Works as the **subroutine argument array** in user subs; not fully identical to Perl’s XS calling conventions. |
 | `pos $_` | Supported with `regex_pos` map; edge cases may differ from Perl. |
 | `%SIG` / `$^C` | Tree-walker: **between statements**. VM: **between opcodes** (not inside a single native/Rust op). `$^C` reads `1` once after `SIGINT` if the latch was set; see [`perl_signal`](src/perl_signal.rs). |
-| `$^I` | The **`pe`/`forge` driver** applies **`-i`** / **`-i.bak`** for **`-n`/`-p`** over **`@ARGV`**; value is stored for compatibility with other code paths. |
+| `$^I` | The **`fo`/`forge` driver** applies **`-i`** / **`-i.bak`** for **`-n`/`-p`** over **`@ARGV`**; value is stored for compatibility with other code paths. |
 | `$^V` | String form only (`v…` from crate version); not a Perl `version` object. |
 | `$^E` | Uses `std::io::Error::last_os_error()`, not Perl’s per-platform extended error. |
 | `${^GLOBAL_PHASE}` | **`DESTRUCT`** is set during [`Interpreter::run_global_teardown`](src/interpreter.rs) after a top-level program (post-`END`) so `DESTROY` drains match Perl’s global-destruction phase name; ordering vs every Perl 5 edge case is not guaranteed. Otherwise **`START`** … **`END`** track the tree-walker and VM the same way. |
