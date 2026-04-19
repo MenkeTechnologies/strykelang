@@ -11761,6 +11761,74 @@ impl Parser {
             | "atomic_mass_unit" | "earth_mass" | "earth_radius" | "sun_mass" | "sun_radius"
             | "astronomical_unit" | "light_year" | "parsec" | "hubble_constant"
             | "planck_length" | "planck_time" | "planck_mass" | "planck_temperature"
+            // ── linear algebra (extended) ──────────────────────────────────
+            | "matrix_solve" | "msolve" | "solve"
+            | "matrix_lu" | "mlu" | "matrix_qr" | "mqr"
+            | "matrix_eigenvalues" | "meig" | "eigenvalues" | "eig"
+            | "matrix_norm" | "mnorm" | "matrix_cond" | "mcond" | "cond"
+            | "matrix_pinv" | "mpinv" | "pinv"
+            | "matrix_cholesky" | "mchol" | "cholesky"
+            | "matrix_det_general" | "mdetg" | "det"
+            // ── statistics tests (extended) ────────────────────────────────
+            | "welch_ttest" | "welcht" | "paired_ttest" | "pairedt"
+            | "cohen_d" | "cohend" | "anova_oneway" | "anova" | "anova1"
+            | "spearman_corr" | "rho" | "kendall_tau" | "kendall" | "ktau"
+            | "confidence_interval" | "ci"
+            // ── distributions (extended) ──────────────────────────────────
+            | "beta_pdf" | "betapdf" | "gamma_pdf" | "gammapdf"
+            | "chi2_pdf" | "chi2pdf" | "chi_squared_pdf"
+            | "t_pdf" | "tpdf" | "student_pdf"
+            | "f_pdf" | "fpdf" | "fisher_pdf"
+            | "lognormal_pdf" | "lnormpdf" | "weibull_pdf" | "weibpdf"
+            | "cauchy_pdf" | "cauchypdf" | "laplace_pdf" | "laplacepdf"
+            | "pareto_pdf" | "paretopdf"
+            // ── interpolation & curve fitting ─────────────────────────────
+            | "lagrange_interp" | "lagrange" | "linterp"
+            | "cubic_spline" | "cspline" | "spline"
+            | "poly_eval" | "polyval" | "polynomial_fit" | "polyfit"
+            // ── numerical integration & differentiation ───────────────────
+            | "trapz" | "trapezoid" | "simpson" | "simps"
+            | "numerical_diff" | "numdiff" | "diff_array"
+            | "cumtrapz" | "cumulative_trapz"
+            // ── optimization / root finding ────────────────────────────────
+            | "bisection" | "bisect" | "newton_method" | "newton" | "newton_raphson"
+            | "golden_section" | "golden" | "gss"
+            // ── ODE solvers ───────────────────────────────────────────────
+            | "rk4" | "runge_kutta" | "rk4_ode" | "euler_ode" | "euler_method"
+            // ── graph algorithms (extended) ────────────────────────────────
+            | "dijkstra" | "shortest_path" | "bellman_ford" | "bellmanford"
+            | "floyd_warshall" | "floydwarshall" | "apsp"
+            | "prim_mst" | "mst" | "prim"
+            // ── trig extensions ───────────────────────────────────────────
+            | "cot" | "sec" | "csc" | "acot" | "asec" | "acsc" | "sinc" | "versin" | "versine"
+            // ── ML activation functions ───────────────────────────────────
+            | "leaky_relu" | "lrelu" | "elu" | "selu" | "gelu"
+            | "silu" | "swish" | "mish" | "softplus"
+            | "hard_sigmoid" | "hardsigmoid" | "hard_swish" | "hardswish"
+            // ── special functions ─────────────────────────────────────────
+            | "bessel_j0" | "j0" | "bessel_j1" | "j1"
+            | "lambert_w" | "lambertw" | "productlog"
+            // ── number theory (extended) ──────────────────────────────────
+            | "mod_exp" | "modexp" | "powmod"
+            | "mod_inv" | "modinv" | "chinese_remainder" | "crt"
+            | "miller_rabin" | "millerrabin" | "is_probable_prime"
+            // ── combinatorics (extended) ──────────────────────────────────
+            | "derangements" | "stirling2" | "stirling_second"
+            | "bernoulli_number" | "bernoulli" | "harmonic_number" | "harmonic"
+            // ── physics (new) ─────────────────────────────────────────────
+            | "drag_force" | "fdrag" | "ideal_gas" | "pv_nrt"
+            // ── financial greeks & risk ───────────────────────────────────
+            | "bs_delta" | "bsdelta" | "option_delta"
+            | "bs_gamma" | "bsgamma" | "option_gamma"
+            | "bs_vega" | "bsvega" | "option_vega"
+            | "bs_theta" | "bstheta" | "option_theta"
+            | "bs_rho" | "bsrho" | "option_rho"
+            | "bond_duration" | "mac_duration"
+            // ── DSP extensions ────────────────────────────────────────────
+            | "dct" | "idct" | "goertzel" | "chirp" | "chirp_signal"
+            // ── encoding extensions ───────────────────────────────────────
+            | "base85_encode" | "b85e" | "ascii85_encode" | "a85e"
+            | "base85_decode" | "b85d" | "ascii85_decode" | "a85d"
             => Some(name),
             _ => None,
         }
