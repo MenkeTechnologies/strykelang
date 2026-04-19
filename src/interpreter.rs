@@ -5821,6 +5821,49 @@ impl Interpreter {
                 return out;
             }
         }
+        // Exhaustive enum match: report missing variants
+        if let Some(e) = val.as_enum_inst() {
+            let has_catchall = arms.iter().any(|a| matches!(a.pattern, MatchPattern::Any));
+            if !has_catchall {
+                let covered: Vec<String> = arms
+                    .iter()
+                    .filter_map(|a| {
+                        if let MatchPattern::Value(expr) = &a.pattern {
+                            if let ExprKind::FuncCall { name, .. } = &expr.kind {
+                                return name.rsplit_once("::").map(|(_, v)| v.to_string());
+                            }
+                            // Fallback: evaluate the expression and check the enum instance
+                            if let Ok(pv) = self.eval_expr(expr) {
+                                if let Some(ei) = pv.as_enum_inst() {
+                                    if ei.def.name == e.def.name {
+                                        return Some(ei.variant_name().to_string());
+                                    }
+                                }
+                            }
+                        }
+                        None
+                    })
+                    .collect();
+                let missing: Vec<&str> = e
+                    .def
+                    .variants
+                    .iter()
+                    .filter(|v| !covered.contains(&v.name))
+                    .map(|v| v.name.as_str())
+                    .collect();
+                if !missing.is_empty() {
+                    return Err(PerlError::runtime(
+                        format!(
+                            "non-exhaustive match on enum `{}`: missing variant(s) {}",
+                            e.def.name,
+                            missing.join(", ")
+                        ),
+                        line,
+                    )
+                    .into());
+                }
+            }
+        }
         Err(PerlError::runtime(
             "match: no arm matched the value (add a `_` catch-all)",
             line,
@@ -6853,8 +6896,9 @@ impl Interpreter {
                         }
                     }
                 }
-                // Trait contract enforcement: verify all required trait methods are implemented
-                for trait_name in &def.implements {
+                // Trait contract enforcement + default method inheritance
+                let mut def = def.clone();
+                for trait_name in &def.implements.clone() {
                     if let Some(trait_def) = self.trait_defs.get(trait_name).cloned() {
                         for required in trait_def.required_methods() {
                             let has_method = def.methods.iter().any(|m| m.name == required.name);
@@ -6869,6 +6913,36 @@ impl Interpreter {
                                 .into());
                             }
                         }
+                        // Inherit default methods from trait (methods with bodies)
+                        for tm in &trait_def.methods {
+                            if tm.body.is_some() && !def.methods.iter().any(|m| m.name == tm.name) {
+                                def.methods.push(tm.clone());
+                            }
+                        }
+                    }
+                }
+                // Abstract method enforcement: concrete subclasses must implement
+                // all abstract methods (body-less methods) from abstract parents
+                if !def.is_abstract {
+                    for parent_name in &def.extends.clone() {
+                        if let Some(parent_def) = self.class_defs.get(parent_name) {
+                            if parent_def.is_abstract {
+                                for m in &parent_def.methods {
+                                    if m.body.is_none()
+                                        && !def.methods.iter().any(|dm| dm.name == m.name)
+                                    {
+                                        return Err(PerlError::runtime(
+                                            format!(
+                                                "class `{}` must implement abstract method `{}` from `{}`",
+                                                def.name, m.name, parent_name
+                                            ),
+                                            stmt.line,
+                                        )
+                                        .into());
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 // Initialize static fields
@@ -6881,8 +6955,7 @@ impl Interpreter {
                     let key = format!("{}::{}", def.name, sf.name);
                     self.scope.declare_scalar(&key, val);
                 }
-                self.class_defs
-                    .insert(def.name.clone(), Arc::new(def.clone()));
+                self.class_defs.insert(def.name.clone(), Arc::new(def));
                 Ok(PerlValue::UNDEF)
             }
             StmtKind::TraitDecl { def } => {
