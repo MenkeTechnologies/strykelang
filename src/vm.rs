@@ -6558,6 +6558,17 @@ impl<'a> VM<'a> {
                         let (scope_capture, atomic_arrays, atomic_hashes) =
                             self.interp.scope.capture_with_atomics();
                         let pmap_progress = PmapProgress::new(progress_flag, list.len());
+                        let n_workers = rayon::current_num_threads();
+                        let pool: Vec<Mutex<Interpreter>> = (0..n_workers)
+                            .map(|_| {
+                                let mut interp = Interpreter::new();
+                                interp.subs = subs.clone();
+                                interp.scope.restore_capture(&scope_capture);
+                                interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
+                                interp.enable_parallel_guard();
+                                Mutex::new(interp)
+                            })
+                            .collect();
                         if let Some(&(start, end)) =
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
                         {
@@ -6565,31 +6576,18 @@ impl<'a> VM<'a> {
                             let results: Vec<PerlValue> = list
                                 .into_par_iter()
                                 .map(|item| {
-                                    thread_local! {
-                                        static TL_INTERP_BC: std::cell::RefCell<Option<Interpreter>> =
-                                            const { std::cell::RefCell::new(None) };
-                                    }
-                                    TL_INTERP_BC.with(|cell| {
-                                        let mut borrow = cell.borrow_mut();
-                                        let local_interp =
-                                            borrow.get_or_insert_with(Interpreter::new);
-                                        local_interp.subs = subs.clone();
-                                        local_interp.scope.restore_capture(&scope_capture);
-                                        local_interp
-                                            .scope
-                                            .restore_atomics(&atomic_arrays, &atomic_hashes);
-                                        local_interp.enable_parallel_guard();
-                                        local_interp.scope.set_topic(item);
-                                        let mut vm = shared.worker_vm(local_interp);
-                                        let mut op_count = 0u64;
-                                        let val =
-                                            match vm.run_block_region(start, end, &mut op_count) {
-                                                Ok(v) => v,
-                                                Err(_) => PerlValue::UNDEF,
-                                            };
-                                        pmap_progress.tick();
-                                        val
-                                    })
+                                    let tid =
+                                        rayon::current_thread_index().unwrap_or(0) % pool.len();
+                                    let mut local_interp = pool[tid].lock();
+                                    local_interp.scope.set_topic(item);
+                                    let mut vm = shared.worker_vm(&mut local_interp);
+                                    let mut op_count = 0u64;
+                                    let val = match vm.run_block_region(start, end, &mut op_count) {
+                                        Ok(v) => v,
+                                        Err(_) => PerlValue::UNDEF,
+                                    };
+                                    pmap_progress.tick();
+                                    val
                                 })
                                 .collect();
                             pmap_progress.finish();
@@ -6600,30 +6598,18 @@ impl<'a> VM<'a> {
                             let results: Vec<PerlValue> = list
                                 .into_par_iter()
                                 .map(|item| {
-                                    thread_local! {
-                                        static TL_INTERP: std::cell::RefCell<Option<Interpreter>> =
-                                            const { std::cell::RefCell::new(None) };
-                                    }
-                                    TL_INTERP.with(|cell| {
-                                        let mut borrow = cell.borrow_mut();
-                                        let local_interp =
-                                            borrow.get_or_insert_with(Interpreter::new);
-                                        local_interp.subs = subs.clone();
-                                        local_interp.scope.restore_capture(&scope_capture);
-                                        local_interp
-                                            .scope
-                                            .restore_atomics(&atomic_arrays, &atomic_hashes);
-                                        local_interp.enable_parallel_guard();
-                                        local_interp.scope.set_topic(item);
-                                        local_interp.scope_push_hook();
-                                        let val = match local_interp.exec_block_no_scope(&block) {
-                                            Ok(val) => val,
-                                            Err(_) => PerlValue::UNDEF,
-                                        };
-                                        local_interp.scope_pop_hook();
-                                        pmap_progress.tick();
-                                        val
-                                    })
+                                    let tid =
+                                        rayon::current_thread_index().unwrap_or(0) % pool.len();
+                                    let mut local_interp = pool[tid].lock();
+                                    local_interp.scope.set_topic(item);
+                                    local_interp.scope_push_hook();
+                                    let val = match local_interp.exec_block_no_scope(&block) {
+                                        Ok(val) => val,
+                                        Err(_) => PerlValue::UNDEF,
+                                    };
+                                    local_interp.scope_pop_hook();
+                                    pmap_progress.tick();
+                                    val
                                 })
                                 .collect();
                             pmap_progress.finish();
@@ -6639,6 +6625,17 @@ impl<'a> VM<'a> {
                         let (scope_capture, atomic_arrays, atomic_hashes) =
                             self.interp.scope.capture_with_atomics();
                         let pmap_progress = PmapProgress::new(progress_flag, list.len());
+                        let n_workers = rayon::current_num_threads();
+                        let pool: Vec<Mutex<Interpreter>> = (0..n_workers)
+                            .map(|_| {
+                                let mut interp = Interpreter::new();
+                                interp.subs = subs.clone();
+                                interp.scope.restore_capture(&scope_capture);
+                                interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
+                                interp.enable_parallel_guard();
+                                Mutex::new(interp)
+                            })
+                            .collect();
                         if let Some(&(start, end)) =
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
                         {
@@ -6647,31 +6644,19 @@ impl<'a> VM<'a> {
                                 .into_par_iter()
                                 .enumerate()
                                 .map(|(i, item)| {
-                                    thread_local! {
-                                        static TL_PFLAT_INTERP_BC: std::cell::RefCell<Option<Interpreter>> =
-                                            const { std::cell::RefCell::new(None) };
-                                    }
-                                    TL_PFLAT_INTERP_BC.with(|cell| {
-                                        let mut borrow = cell.borrow_mut();
-                                        let local_interp =
-                                            borrow.get_or_insert_with(Interpreter::new);
-                                        local_interp.subs = subs.clone();
-                                        local_interp.scope.restore_capture(&scope_capture);
-                                        local_interp
-                                            .scope
-                                            .restore_atomics(&atomic_arrays, &atomic_hashes);
-                                        local_interp.enable_parallel_guard();
-                                        local_interp.scope.set_topic(item);
-                                        let mut vm = shared.worker_vm(local_interp);
-                                        let mut op_count = 0u64;
-                                        let val = match vm.run_block_region(start, end, &mut op_count) {
-                                            Ok(v) => v,
-                                            Err(_) => PerlValue::UNDEF,
-                                        };
-                                        let out = val.map_flatten_outputs(true);
-                                        pmap_progress.tick();
-                                        (i, out)
-                                    })
+                                    let tid =
+                                        rayon::current_thread_index().unwrap_or(0) % pool.len();
+                                    let mut local_interp = pool[tid].lock();
+                                    local_interp.scope.set_topic(item);
+                                    let mut vm = shared.worker_vm(&mut local_interp);
+                                    let mut op_count = 0u64;
+                                    let val = match vm.run_block_region(start, end, &mut op_count) {
+                                        Ok(v) => v,
+                                        Err(_) => PerlValue::UNDEF,
+                                    };
+                                    let out = val.map_flatten_outputs(true);
+                                    pmap_progress.tick();
+                                    (i, out)
                                 })
                                 .collect();
                             pmap_progress.finish();
@@ -6686,31 +6671,19 @@ impl<'a> VM<'a> {
                                 .into_par_iter()
                                 .enumerate()
                                 .map(|(i, item)| {
-                                    thread_local! {
-                                        static TL_PFLAT_INTERP: std::cell::RefCell<Option<Interpreter>> =
-                                            const { std::cell::RefCell::new(None) };
-                                    }
-                                    TL_PFLAT_INTERP.with(|cell| {
-                                        let mut borrow = cell.borrow_mut();
-                                        let local_interp =
-                                            borrow.get_or_insert_with(Interpreter::new);
-                                        local_interp.subs = subs.clone();
-                                        local_interp.scope.restore_capture(&scope_capture);
-                                        local_interp
-                                            .scope
-                                            .restore_atomics(&atomic_arrays, &atomic_hashes);
-                                        local_interp.enable_parallel_guard();
-                                        local_interp.scope.set_topic(item);
-                                        local_interp.scope_push_hook();
-                                        let val = match local_interp.exec_block_no_scope(&block) {
-                                            Ok(val) => val,
-                                            Err(_) => PerlValue::UNDEF,
-                                        };
-                                        local_interp.scope_pop_hook();
-                                        let out = val.map_flatten_outputs(true);
-                                        pmap_progress.tick();
-                                        (i, out)
-                                    })
+                                    let tid =
+                                        rayon::current_thread_index().unwrap_or(0) % pool.len();
+                                    let mut local_interp = pool[tid].lock();
+                                    local_interp.scope.set_topic(item);
+                                    local_interp.scope_push_hook();
+                                    let val = match local_interp.exec_block_no_scope(&block) {
+                                        Ok(val) => val,
+                                        Err(_) => PerlValue::UNDEF,
+                                    };
+                                    local_interp.scope_pop_hook();
+                                    let out = val.map_flatten_outputs(true);
+                                    pmap_progress.tick();
+                                    (i, out)
                                 })
                                 .collect();
                             pmap_progress.finish();
@@ -7318,6 +7291,17 @@ impl<'a> VM<'a> {
                         let (scope_capture, atomic_arrays, atomic_hashes) =
                             self.interp.scope.capture_with_atomics();
                         let pmap_progress = PmapProgress::new(progress_flag, list.len());
+                        let n_workers = rayon::current_num_threads();
+                        let pool: Vec<Mutex<Interpreter>> = (0..n_workers)
+                            .map(|_| {
+                                let mut interp = Interpreter::new();
+                                interp.subs = subs.clone();
+                                interp.scope.restore_capture(&scope_capture);
+                                interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
+                                interp.enable_parallel_guard();
+                                Mutex::new(interp)
+                            })
+                            .collect();
                         if let Some(&(start, end)) =
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
                         {
@@ -7325,35 +7309,23 @@ impl<'a> VM<'a> {
                             let results: Vec<PerlValue> = list
                                 .into_par_iter()
                                 .filter_map(|item| {
-                                    thread_local! {
-                                        static TL_PGREP_INTERP_BC: std::cell::RefCell<Option<Interpreter>> =
-                                            const { std::cell::RefCell::new(None) };
+                                    let tid =
+                                        rayon::current_thread_index().unwrap_or(0) % pool.len();
+                                    let mut local_interp = pool[tid].lock();
+                                    local_interp.scope.set_topic(item.clone());
+                                    let mut vm = shared.worker_vm(&mut local_interp);
+                                    let mut op_count = 0u64;
+                                    let keep = match vm.run_block_region(start, end, &mut op_count)
+                                    {
+                                        Ok(val) => val.is_true(),
+                                        Err(_) => false,
+                                    };
+                                    pmap_progress.tick();
+                                    if keep {
+                                        Some(item)
+                                    } else {
+                                        None
                                     }
-                                    TL_PGREP_INTERP_BC.with(|cell| {
-                                        let mut borrow = cell.borrow_mut();
-                                        let local_interp =
-                                            borrow.get_or_insert_with(Interpreter::new);
-                                        local_interp.subs = subs.clone();
-                                        local_interp.scope.restore_capture(&scope_capture);
-                                        local_interp
-                                            .scope
-                                            .restore_atomics(&atomic_arrays, &atomic_hashes);
-                                        local_interp.enable_parallel_guard();
-                                        local_interp.scope.set_topic(item.clone());
-                                        let mut vm = shared.worker_vm(local_interp);
-                                        let mut op_count = 0u64;
-                                        let keep = match vm.run_block_region(start, end, &mut op_count)
-                                        {
-                                            Ok(val) => val.is_true(),
-                                            Err(_) => false,
-                                        };
-                                        pmap_progress.tick();
-                                        if keep {
-                                            Some(item)
-                                        } else {
-                                            None
-                                        }
-                                    })
                                 })
                                 .collect();
                             pmap_progress.finish();
@@ -7364,34 +7336,22 @@ impl<'a> VM<'a> {
                             let results: Vec<PerlValue> = list
                                 .into_par_iter()
                                 .filter_map(|item| {
-                                    thread_local! {
-                                        static TL_PGREP_INTERP: std::cell::RefCell<Option<Interpreter>> =
-                                            const { std::cell::RefCell::new(None) };
+                                    let tid =
+                                        rayon::current_thread_index().unwrap_or(0) % pool.len();
+                                    let mut local_interp = pool[tid].lock();
+                                    local_interp.scope.set_topic(item.clone());
+                                    local_interp.scope_push_hook();
+                                    let keep = match local_interp.exec_block_no_scope(&block) {
+                                        Ok(val) => val.is_true(),
+                                        Err(_) => false,
+                                    };
+                                    local_interp.scope_pop_hook();
+                                    pmap_progress.tick();
+                                    if keep {
+                                        Some(item)
+                                    } else {
+                                        None
                                     }
-                                    TL_PGREP_INTERP.with(|cell| {
-                                        let mut borrow = cell.borrow_mut();
-                                        let local_interp =
-                                            borrow.get_or_insert_with(Interpreter::new);
-                                        local_interp.subs = subs.clone();
-                                        local_interp.scope.restore_capture(&scope_capture);
-                                        local_interp
-                                            .scope
-                                            .restore_atomics(&atomic_arrays, &atomic_hashes);
-                                        local_interp.enable_parallel_guard();
-                                        local_interp.scope.set_topic(item.clone());
-                                        local_interp.scope_push_hook();
-                                        let keep = match local_interp.exec_block_no_scope(&block) {
-                                            Ok(val) => val.is_true(),
-                                            Err(_) => false,
-                                        };
-                                        local_interp.scope_pop_hook();
-                                        pmap_progress.tick();
-                                        if keep {
-                                            Some(item)
-                                        } else {
-                                            None
-                                        }
-                                    })
                                 })
                                 .collect();
                             pmap_progress.finish();
@@ -7471,6 +7431,17 @@ impl<'a> VM<'a> {
                         let (scope_capture, atomic_arrays, atomic_hashes) =
                             self.interp.scope.capture_with_atomics();
                         let first_err: Arc<Mutex<Option<PerlError>>> = Arc::new(Mutex::new(None));
+                        let n_workers = rayon::current_num_threads();
+                        let pool: Vec<Mutex<Interpreter>> = (0..n_workers)
+                            .map(|_| {
+                                let mut interp = Interpreter::new();
+                                interp.subs = subs.clone();
+                                interp.scope.restore_capture(&scope_capture);
+                                interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
+                                interp.enable_parallel_guard();
+                                Mutex::new(interp)
+                            })
+                            .collect();
                         if let Some(&(start, end)) =
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
                         {
@@ -7479,34 +7450,21 @@ impl<'a> VM<'a> {
                                 if first_err.lock().is_some() {
                                     return;
                                 }
-                                thread_local! {
-                                    static TL_PFOR_INTERP_BC: std::cell::RefCell<Option<Interpreter>> =
-                                        const { std::cell::RefCell::new(None) };
-                                }
-                                TL_PFOR_INTERP_BC.with(|cell| {
-                                    let mut borrow = cell.borrow_mut();
-                                    let local_interp =
-                                        borrow.get_or_insert_with(Interpreter::new);
-                                    local_interp.subs = subs.clone();
-                                    local_interp.scope.restore_capture(&scope_capture);
-                                    local_interp
-                                        .scope
-                                        .restore_atomics(&atomic_arrays, &atomic_hashes);
-                                    local_interp.enable_parallel_guard();
-                                    local_interp.scope.set_topic(item);
-                                    let mut vm = shared.worker_vm(local_interp);
-                                    let mut op_count = 0u64;
-                                    match vm.run_block_region(start, end, &mut op_count) {
-                                        Ok(_) => {}
-                                        Err(e) => {
-                                            let mut g = first_err.lock();
-                                            if g.is_none() {
-                                                *g = Some(e);
-                                            }
+                                let tid = rayon::current_thread_index().unwrap_or(0) % pool.len();
+                                let mut local_interp = pool[tid].lock();
+                                local_interp.scope.set_topic(item);
+                                let mut vm = shared.worker_vm(&mut local_interp);
+                                let mut op_count = 0u64;
+                                match vm.run_block_region(start, end, &mut op_count) {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        let mut g = first_err.lock();
+                                        if g.is_none() {
+                                            *g = Some(e);
                                         }
                                     }
-                                    pmap_progress.tick();
-                                });
+                                }
+                                pmap_progress.tick();
                             });
                         } else {
                             let block = self.blocks[idx].clone();
@@ -7514,41 +7472,28 @@ impl<'a> VM<'a> {
                                 if first_err.lock().is_some() {
                                     return;
                                 }
-                                thread_local! {
-                                    static TL_PFOR_INTERP: std::cell::RefCell<Option<Interpreter>> =
-                                        const { std::cell::RefCell::new(None) };
-                                }
-                                TL_PFOR_INTERP.with(|cell| {
-                                    let mut borrow = cell.borrow_mut();
-                                    let local_interp =
-                                        borrow.get_or_insert_with(Interpreter::new);
-                                    local_interp.subs = subs.clone();
-                                    local_interp.scope.restore_capture(&scope_capture);
-                                    local_interp
-                                        .scope
-                                        .restore_atomics(&atomic_arrays, &atomic_hashes);
-                                    local_interp.enable_parallel_guard();
-                                    local_interp.scope.set_topic(item);
-                                    local_interp.scope_push_hook();
-                                    match local_interp.exec_block_no_scope(&block) {
-                                        Ok(_) => {}
-                                        Err(e) => {
-                                            let stryke = match e {
+                                let tid = rayon::current_thread_index().unwrap_or(0) % pool.len();
+                                let mut local_interp = pool[tid].lock();
+                                local_interp.scope.set_topic(item);
+                                local_interp.scope_push_hook();
+                                match local_interp.exec_block_no_scope(&block) {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        let stryke = match e {
                                             FlowOrError::Error(stryke) => stryke,
                                             FlowOrError::Flow(_) => PerlError::runtime(
                                                 "return/last/next/redo not supported inside pfor block",
                                                 line,
                                             ),
                                         };
-                                            let mut g = first_err.lock();
-                                            if g.is_none() {
-                                                *g = Some(stryke);
-                                            }
+                                        let mut g = first_err.lock();
+                                        if g.is_none() {
+                                            *g = Some(stryke);
                                         }
                                     }
-                                    local_interp.scope_pop_hook();
-                                    pmap_progress.tick();
-                                });
+                                }
+                                local_interp.scope_pop_hook();
+                                pmap_progress.tick();
                             });
                         }
                         pmap_progress.finish();
