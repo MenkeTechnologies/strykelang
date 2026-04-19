@@ -9839,3 +9839,539 @@ fn builtin_cov2cor(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
     Ok(matrix_to_perl(&cor))
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SVG Plotting — terminal-friendly, pipe-friendly, zero dependencies
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SVG_W: f64 = 600.0;
+const SVG_H: f64 = 400.0;
+const SVG_PAD: f64 = 60.0;
+
+fn svg_header(w: f64, h: f64, title: &str) -> String {
+    format!(
+        r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" font-family="monospace" font-size="11">
+<rect width="{w}" height="{h}" fill="#1a1a2e"/>
+<text x="{tx}" y="20" fill="#0ff" font-size="14" text-anchor="middle">{title}</text>
+"##,
+        tx = w / 2.0
+    )
+}
+
+fn svg_footer() -> &'static str {
+    "</svg>"
+}
+
+fn svg_axis_lines(x0: f64, _y0: f64, x1: f64, y1: f64) -> String {
+    format!(
+        r##"<line x1="{x0}" y1="{y1}" x2="{x1}" y2="{y1}" stroke="#555" stroke-width="1"/>
+<line x1="{x0}" y1="30" x2="{x0}" y2="{y1}" stroke="#555" stroke-width="1"/>
+"##
+    )
+}
+
+fn svg_tick_labels(
+    x_min: f64,
+    x_max: f64,
+    y_min: f64,
+    y_max: f64,
+    px0: f64,
+    _py0: f64,
+    px1: f64,
+    py1: f64,
+    n_ticks: usize,
+) -> String {
+    let ph = py1 - 30.0;
+    let mut s = String::new();
+    for i in 0..=n_ticks {
+        let frac = i as f64 / n_ticks as f64;
+        let xv = x_min + frac * (x_max - x_min);
+        let px = px0 + frac * (px1 - px0);
+        s += &format!(
+            r##"<text x="{px:.1}" y="{ly}" fill="#888" font-size="9" text-anchor="middle">{xv:.4}</text>
+"##,
+            ly = py1 + 14.0,
+        );
+        let yv = y_min + frac * (y_max - y_min);
+        let py = py1 - frac * ph;
+        s += &format!(
+            r##"<text x="{lx}" y="{py:.1}" fill="#888" font-size="9" text-anchor="end" dominant-baseline="middle">{yv:.4}</text>
+<line x1="{px0}" y1="{py:.1}" x2="{px1}" y2="{py:.1}" stroke="#333" stroke-width="0.5" stroke-dasharray="3,3"/>
+"##,
+            lx = px0 - 5.0,
+        );
+    }
+    s
+}
+
+/// `scatter_svg XS, YS [, title]` — SVG scatter plot.
+fn builtin_scatter_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let ys: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let title = args
+        .get(2)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "Scatter Plot".to_string());
+    let n = xs.len().min(ys.len());
+    if n == 0 {
+        return Ok(PerlValue::string(String::new()));
+    }
+    let x_min = xs.iter().cloned().fold(f64::INFINITY, f64::min);
+    let x_max = xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let y_min = ys.iter().cloned().fold(f64::INFINITY, f64::min);
+    let y_max = ys.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let x_range = (x_max - x_min).max(1e-10);
+    let y_range = (y_max - y_min).max(1e-10);
+    let (px0, py0, px1, py1) = (SVG_PAD, 30.0, SVG_W - 20.0, SVG_H - SVG_PAD);
+    let pw = px1 - px0;
+    let ph = py1 - py0;
+
+    let mut svg = svg_header(SVG_W, SVG_H, &title);
+    svg += &svg_axis_lines(px0, py0, px1, py1);
+    svg += &svg_tick_labels(x_min, x_max, y_min, y_max, px0, py0, px1, py1, 5);
+    for i in 0..n {
+        let px = px0 + (xs[i] - x_min) / x_range * pw;
+        let py = py1 - (ys[i] - y_min) / y_range * ph;
+        svg += &format!(r##"<circle cx="{px:.1}" cy="{py:.1}" r="3" fill="#0ff" opacity="0.7"/>"##);
+        svg.push('\n');
+    }
+    svg += svg_footer();
+    Ok(PerlValue::string(svg))
+}
+
+/// `line_svg XS, YS [, title]` — SVG line plot.
+fn builtin_line_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let ys: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let title = args
+        .get(2)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "Line Plot".to_string());
+    let n = xs.len().min(ys.len());
+    if n < 2 {
+        return Ok(PerlValue::string(String::new()));
+    }
+    let x_min = xs.iter().cloned().fold(f64::INFINITY, f64::min);
+    let x_max = xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let y_min = ys.iter().cloned().fold(f64::INFINITY, f64::min);
+    let y_max = ys.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let x_range = (x_max - x_min).max(1e-10);
+    let y_range = (y_max - y_min).max(1e-10);
+    let (px0, _py0, px1, py1) = (SVG_PAD, 30.0, SVG_W - 20.0, SVG_H - SVG_PAD);
+    let pw = px1 - px0;
+    let ph = py1 - 30.0;
+
+    let mut svg = svg_header(SVG_W, SVG_H, &title);
+    svg += &svg_axis_lines(px0, 30.0, px1, py1);
+    svg += &svg_tick_labels(x_min, x_max, y_min, y_max, px0, 30.0, px1, py1, 5);
+    let mut points = String::new();
+    for i in 0..n {
+        let px = px0 + (xs[i] - x_min) / x_range * pw;
+        let py = py1 - (ys[i] - y_min) / y_range * ph;
+        if i > 0 {
+            points.push(' ');
+        }
+        points += &format!("{px:.1},{py:.1}");
+    }
+    svg +=
+        &format!(r##"<polyline points="{points}" fill="none" stroke="#0ff" stroke-width="1.5"/>"##);
+    svg.push('\n');
+    svg += svg_footer();
+    Ok(PerlValue::string(svg))
+}
+
+/// `plot_svg YS [, title]` — SVG line plot with auto x-axis (0..n-1).
+fn builtin_plot_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let ys: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let title = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "Plot".to_string());
+    let xs: Vec<PerlValue> = (0..ys.len()).map(|i| PerlValue::float(i as f64)).collect();
+    let ys_pv: Vec<PerlValue> = ys.iter().map(|&y| PerlValue::float(y)).collect();
+    builtin_line_svg(&[
+        PerlValue::array(xs),
+        PerlValue::array(ys_pv),
+        PerlValue::string(title),
+    ])
+}
+
+/// `hist_svg VEC [, bins [, title]]` — SVG histogram.
+fn builtin_hist_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let data: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let n_bins = args
+        .get(1)
+        .map(|v| v.to_number() as usize)
+        .unwrap_or_else(|| (data.len() as f64).sqrt().ceil().max(5.0).min(50.0) as usize);
+    let title = args
+        .get(2)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "Histogram".to_string());
+    if data.is_empty() {
+        return Ok(PerlValue::string(String::new()));
+    }
+    let d_min = data.iter().cloned().fold(f64::INFINITY, f64::min);
+    let d_max = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let range = (d_max - d_min).max(1e-10);
+    let bin_width = range / n_bins as f64;
+    let mut counts = vec![0usize; n_bins];
+    for &v in &data {
+        let idx = ((v - d_min) / bin_width).floor() as usize;
+        counts[idx.min(n_bins - 1)] += 1;
+    }
+    let max_count = *counts.iter().max().unwrap_or(&1) as f64;
+    let (px0, _py0, px1, py1) = (SVG_PAD, 30.0, SVG_W - 20.0, SVG_H - SVG_PAD);
+    let pw = px1 - px0;
+    let ph = py1 - 30.0;
+    let bar_w = pw / n_bins as f64;
+
+    let mut svg = svg_header(SVG_W, SVG_H, &title);
+    svg += &svg_axis_lines(px0, 30.0, px1, py1);
+    svg += &svg_tick_labels(d_min, d_max, 0.0, max_count, px0, 30.0, px1, py1, 5);
+    for (i, &c) in counts.iter().enumerate() {
+        let bh = (c as f64 / max_count) * ph;
+        let bx = px0 + i as f64 * bar_w;
+        let by = py1 - bh;
+        svg += &format!(
+            r##"<rect x="{bx:.1}" y="{by:.1}" width="{bw:.1}" height="{bh:.1}" fill="#0ff" opacity="0.7" stroke="#1a1a2e" stroke-width="1"/>"##,
+            bw = bar_w * 0.9,
+        );
+        svg.push('\n');
+    }
+    svg += svg_footer();
+    Ok(PerlValue::string(svg))
+}
+
+/// `boxplot_svg GROUPS [, title]` — SVG box-and-whisker plot. GROUPS is array of arrays.
+fn builtin_boxplot_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let groups_raw = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let title = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "Box Plot".to_string());
+    let groups: Vec<Vec<f64>> = groups_raw
+        .iter()
+        .map(|g| {
+            let mut v: Vec<f64> = arg_to_vec(g).iter().map(|x| x.to_number()).collect();
+            v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            v
+        })
+        .collect();
+    if groups.is_empty() {
+        return Ok(PerlValue::string(String::new()));
+    }
+    let g_min = groups
+        .iter()
+        .flat_map(|g| g.iter())
+        .cloned()
+        .fold(f64::INFINITY, f64::min);
+    let g_max = groups
+        .iter()
+        .flat_map(|g| g.iter())
+        .cloned()
+        .fold(f64::NEG_INFINITY, f64::max);
+    let y_range = (g_max - g_min).max(1e-10);
+    let ng = groups.len();
+    let (px0, _py0, px1, py1) = (SVG_PAD, 30.0, SVG_W - 20.0, SVG_H - SVG_PAD);
+    let pw = px1 - px0;
+    let ph = py1 - 30.0;
+    let box_w = (pw / ng as f64) * 0.6;
+    let gap = pw / ng as f64;
+
+    let mut svg = svg_header(SVG_W, SVG_H, &title);
+    svg += &svg_axis_lines(px0, 30.0, px1, py1);
+    for i in 0..=5 {
+        let frac = i as f64 / 5.0;
+        let yv = g_min + frac * y_range;
+        let py = py1 - frac * ph;
+        svg += &format!(
+            r##"<text x="{lx}" y="{py:.1}" fill="#888" font-size="9" text-anchor="end" dominant-baseline="middle">{yv:.2}</text>"##,
+            lx = px0 - 5.0
+        );
+        svg.push('\n');
+    }
+    let percentile_at = |v: &[f64], p: f64| -> f64 {
+        if v.is_empty() {
+            return 0.0;
+        }
+        let idx = p * (v.len() - 1) as f64;
+        let lo = idx.floor() as usize;
+        let hi = idx.ceil() as usize;
+        if lo == hi {
+            v[lo]
+        } else {
+            v[lo] + (idx - lo as f64) * (v[hi] - v[lo])
+        }
+    };
+    for (i, g) in groups.iter().enumerate() {
+        if g.is_empty() {
+            continue;
+        }
+        let q1 = percentile_at(g, 0.25);
+        let median = percentile_at(g, 0.5);
+        let q3 = percentile_at(g, 0.75);
+        let iqr = q3 - q1;
+        let wlo = g
+            .iter()
+            .cloned()
+            .find(|&v| v >= q1 - 1.5 * iqr)
+            .unwrap_or(g[0]);
+        let whi = g
+            .iter()
+            .rev()
+            .cloned()
+            .find(|&v| v <= q3 + 1.5 * iqr)
+            .unwrap_or(*g.last().unwrap());
+        let cx = px0 + (i as f64 + 0.5) * gap;
+        let to_py = |v: f64| py1 - (v - g_min) / y_range * ph;
+        let bx = cx - box_w / 2.0;
+        let by = to_py(q3);
+        let bh = to_py(q1) - by;
+        svg += &format!(
+            r##"<rect x="{bx:.1}" y="{by:.1}" width="{box_w:.1}" height="{bh:.1}" fill="none" stroke="#0ff" stroke-width="1.5"/>"##
+        );
+        svg.push('\n');
+        svg += &format!(
+            r##"<line x1="{bx:.1}" y1="{my:.1}" x2="{bx2:.1}" y2="{my:.1}" stroke="#ff0" stroke-width="2"/>"##,
+            my = to_py(median),
+            bx2 = bx + box_w
+        );
+        svg.push('\n');
+        let (wlo_py, whi_py) = (to_py(wlo), to_py(whi));
+        svg += &format!(
+            r##"<line x1="{cx:.1}" y1="{by:.1}" x2="{cx:.1}" y2="{whi_py:.1}" stroke="#0ff" stroke-width="1"/>"##
+        );
+        svg.push('\n');
+        svg += &format!(
+            r##"<line x1="{cx:.1}" y1="{q1y:.1}" x2="{cx:.1}" y2="{wlo_py:.1}" stroke="#0ff" stroke-width="1"/>"##,
+            q1y = to_py(q1)
+        );
+        svg.push('\n');
+        let cap = box_w * 0.3;
+        svg += &format!(
+            r##"<line x1="{x1:.1}" y1="{whi_py:.1}" x2="{x2:.1}" y2="{whi_py:.1}" stroke="#0ff" stroke-width="1"/>"##,
+            x1 = cx - cap,
+            x2 = cx + cap
+        );
+        svg.push('\n');
+        svg += &format!(
+            r##"<line x1="{x1:.1}" y1="{wlo_py:.1}" x2="{x2:.1}" y2="{wlo_py:.1}" stroke="#0ff" stroke-width="1"/>"##,
+            x1 = cx - cap,
+            x2 = cx + cap
+        );
+        svg.push('\n');
+        for &v in g.iter() {
+            if v < wlo || v > whi {
+                svg += &format!(
+                    r##"<circle cx="{cx:.1}" cy="{oy:.1}" r="2.5" fill="none" stroke="#f55" stroke-width="1"/>"##,
+                    oy = to_py(v)
+                );
+                svg.push('\n');
+            }
+        }
+        svg += &format!(
+            r##"<text x="{cx:.1}" y="{ly}" fill="#888" font-size="10" text-anchor="middle">{label}</text>"##,
+            ly = py1 + 14.0,
+            label = i + 1
+        );
+        svg.push('\n');
+    }
+    svg += svg_footer();
+    Ok(PerlValue::string(svg))
+}
+
+/// `bar_svg LABELS, VALUES [, title]` — SVG bar chart.
+fn builtin_bar_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let labels: Vec<String> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_string())
+        .collect();
+    let values: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let title = args
+        .get(2)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "Bar Chart".to_string());
+    let n = labels.len().min(values.len());
+    if n == 0 {
+        return Ok(PerlValue::string(String::new()));
+    }
+    let v_max = values.iter().cloned().fold(0.0f64, f64::max).max(1e-10);
+    let (px0, _py0, px1, py1) = (SVG_PAD, 30.0, SVG_W - 20.0, SVG_H - SVG_PAD);
+    let pw = px1 - px0;
+    let ph = py1 - 30.0;
+    let bar_w = (pw / n as f64) * 0.7;
+    let gap = pw / n as f64;
+    let colors = [
+        "#0ff", "#f0f", "#0f0", "#ff0", "#f55", "#55f", "#fa0", "#5ff",
+    ];
+
+    let mut svg = svg_header(SVG_W, SVG_H, &title);
+    svg += &svg_axis_lines(px0, 30.0, px1, py1);
+    for i in 0..n {
+        let bh = (values[i] / v_max) * ph;
+        let bx = px0 + (i as f64 + 0.5) * gap - bar_w / 2.0;
+        let by = py1 - bh;
+        svg += &format!(
+            r##"<rect x="{bx:.1}" y="{by:.1}" width="{bar_w:.1}" height="{bh:.1}" fill="{color}" opacity="0.8"/>"##,
+            color = colors[i % colors.len()]
+        );
+        svg.push('\n');
+        svg += &format!(
+            r##"<text x="{cx:.1}" y="{vy:.1}" fill="#fff" font-size="9" text-anchor="middle">{v:.1}</text>"##,
+            cx = bx + bar_w / 2.0,
+            vy = by - 4.0,
+            v = values[i]
+        );
+        svg.push('\n');
+        let label = if labels[i].len() > 8 {
+            &labels[i][..8]
+        } else {
+            &labels[i]
+        };
+        svg += &format!(
+            r##"<text x="{cx:.1}" y="{ly}" fill="#888" font-size="9" text-anchor="middle">{label}</text>"##,
+            cx = px0 + (i as f64 + 0.5) * gap,
+            ly = py1 + 14.0
+        );
+        svg.push('\n');
+    }
+    svg += svg_footer();
+    Ok(PerlValue::string(svg))
+}
+
+/// `pie_svg LABELS, VALUES [, title]` — SVG pie chart.
+fn builtin_pie_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let labels: Vec<String> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_string())
+        .collect();
+    let values: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let title = args
+        .get(2)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "Pie Chart".to_string());
+    let n = labels.len().min(values.len());
+    if n == 0 {
+        return Ok(PerlValue::string(String::new()));
+    }
+    let total: f64 = values.iter().sum();
+    if total <= 0.0 {
+        return Ok(PerlValue::string(String::new()));
+    }
+    let cx = SVG_W / 2.0;
+    let cy = SVG_H / 2.0 + 10.0;
+    let r = 140.0;
+    let colors = [
+        "#0ff", "#f0f", "#0f0", "#ff0", "#f55", "#55f", "#fa0", "#5ff", "#f80", "#8f0",
+    ];
+
+    let mut svg = svg_header(SVG_W, SVG_H, &title);
+    let mut angle = -std::f64::consts::FRAC_PI_2;
+    for i in 0..n {
+        let sweep = 2.0 * std::f64::consts::PI * values[i] / total;
+        let x1 = cx + r * angle.cos();
+        let y1 = cy + r * angle.sin();
+        let x2 = cx + r * (angle + sweep).cos();
+        let y2 = cy + r * (angle + sweep).sin();
+        let large = if sweep > std::f64::consts::PI { 1 } else { 0 };
+        svg += &format!(
+            r##"<path d="M{cx},{cy} L{x1:.1},{y1:.1} A{r},{r} 0 {large},1 {x2:.1},{y2:.1} Z" fill="{color}" opacity="0.8" stroke="#1a1a2e" stroke-width="1.5"/>"##,
+            color = colors[i % colors.len()]
+        );
+        svg.push('\n');
+        let mid = angle + sweep / 2.0;
+        let lx = cx + r * 0.65 * mid.cos();
+        let ly = cy + r * 0.65 * mid.sin();
+        let pct = values[i] / total * 100.0;
+        let label = if labels[i].len() > 6 {
+            &labels[i][..6]
+        } else {
+            &labels[i]
+        };
+        svg += &format!(
+            r##"<text x="{lx:.1}" y="{ly:.1}" fill="#fff" font-size="9" text-anchor="middle" dominant-baseline="middle">{label} {pct:.0}%</text>"##
+        );
+        svg.push('\n');
+        angle += sweep;
+    }
+    svg += svg_footer();
+    Ok(PerlValue::string(svg))
+}
+
+/// `heatmap_svg MATRIX [, title]` — SVG heatmap.
+fn builtin_heatmap_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let m = args_to_matrix(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let title = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "Heatmap".to_string());
+    let nr = m.len();
+    if nr == 0 {
+        return Ok(PerlValue::string(String::new()));
+    }
+    let nc = m[0].len();
+    let v_min = m
+        .iter()
+        .flat_map(|r| r.iter())
+        .cloned()
+        .fold(f64::INFINITY, f64::min);
+    let v_max = m
+        .iter()
+        .flat_map(|r| r.iter())
+        .cloned()
+        .fold(f64::NEG_INFINITY, f64::max);
+    let v_range = (v_max - v_min).max(1e-10);
+    let (px0, py0, px1, py1) = (SVG_PAD, 30.0, SVG_W - 20.0, SVG_H - 30.0);
+    let cell_w = (px1 - px0) / nc as f64;
+    let cell_h = (py1 - py0) / nr as f64;
+
+    let mut svg = svg_header(SVG_W, SVG_H, &title);
+    for i in 0..nr {
+        for j in 0..nc {
+            let t = (m[i][j] - v_min) / v_range;
+            let (cr, cg, cb) = if t < 0.5 {
+                let s = t * 2.0;
+                (
+                    (0.0 * 255.0) as u8,
+                    (s * 255.0) as u8,
+                    ((1.0 - s * 0.5) * 255.0) as u8,
+                )
+            } else {
+                let s = (t - 0.5) * 2.0;
+                ((s * 255.0) as u8, ((1.0 - s * 0.5) * 255.0) as u8, 0u8)
+            };
+            let cx = px0 + j as f64 * cell_w;
+            let cy = py0 + i as f64 * cell_h;
+            svg += &format!(
+                r##"<rect x="{cx:.1}" y="{cy:.1}" width="{cell_w:.1}" height="{cell_h:.1}" fill="rgb({cr},{cg},{cb})" stroke="#1a1a2e" stroke-width="0.5"/>"##
+            );
+            svg.push('\n');
+        }
+    }
+    svg += svg_footer();
+    Ok(PerlValue::string(svg))
+}

@@ -11880,6 +11880,11 @@ impl Parser {
             | "cor_matrix" | "cor_mat" | "cov_matrix" | "cov_mat"
             | "mahalanobis" | "mahal" | "dist_matrix" | "dist_mat"
             | "hclust" | "cutree" | "weighted_var" | "wvar" | "cov2cor"
+            // ── SVG plotting ──────────────────────────────────────────────
+            | "scatter_svg" | "scatter_plot" | "line_svg" | "line_plot"
+            | "plot_svg" | "hist_svg" | "histogram_svg"
+            | "boxplot_svg" | "box_plot" | "bar_svg" | "barchart_svg"
+            | "pie_svg" | "pie_chart" | "heatmap_svg" | "heatmap"
             => Some(name),
             _ => None,
         }
