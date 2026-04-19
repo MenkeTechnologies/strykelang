@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.6.5 · 2711 topics · 25 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.6.7 · 2792 topics · 25 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -191,7 +191,7 @@
         <li><a href="#ch-process">Process</a> <span class="chapter-count">20</span></li>
         <li><a href="#ch-pack-binary">Pack / Binary</a> <span class="chapter-count">3</span></li>
         <li><a href="#ch-logging">Logging</a> <span class="chapter-count">7</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">2149</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">2230</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -5624,7 +5624,7 @@ log_info(&quot;hidden&quot;)    # not printed
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">2149 topics</p>
+      <p class="chapter-meta">2230 topics</p>
       <article class="doc-entry" id="doc-stryke-rust-compile">
         <h3><a class="doc-anchor" href="#doc-stryke-rust-compile">#</a> <code>__stryke_rust_compile</code></h3>
         <p><code>__stryke_rust_compile</code> — internal builtin.</p>
@@ -5969,6 +5969,15 @@ log_info(&quot;hidden&quot;)    # not printed
 @list |&gt; map amin |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-amort">
+        <h3><a class="doc-anchor" href="#doc-amort">#</a> <code>amort</code></h3>
+        <p><code>amortization_schedule($principal, $rate, $periods)</code> (alias <code>amort</code>) — generates a full amortization schedule. Returns arrayref of hashrefs with period, payment, principal, interest, balance.</p>
+        <pre><code class="lang-perl">my $sched = amort(10000, 0.05, 12)
+for my $row (@$sched) {
+    p &quot;Period $row-&gt;{period}: bal=$row-&gt;{balance}&quot;
+}
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-and">
         <h3><a class="doc-anchor" href="#doc-and">#</a> <code>and</code></h3>
         <p><code>and</code> — control flow builtin.</p>
@@ -5991,6 +6000,13 @@ log_info(&quot;hidden&quot;)    # not printed
         <pre><code class="lang-perl">my $result = andl $x 
 # or in a pipeline:
 @list |&gt; map andl |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-angle-between">
+        <h3><a class="doc-anchor" href="#doc-angle-between">#</a> <code>angle_between</code></h3>
+        <p><code>angle_between($x1, $y1, $x2, $y2)</code> — computes the angle in radians between two 2D vectors from origin. Returns the angle using atan2.</p>
+        <pre><code class="lang-perl">my $angle = angle_between(1, 0, 0, 1)
+p $angle   # ~1.5708 (π/2 radians = 90°)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-angle-between-deg">
@@ -6169,6 +6185,14 @@ log_info(&quot;hidden&quot;)    # not printed
 @list |&gt; map apply_list |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-apply-window">
+        <h3><a class="doc-anchor" href="#doc-apply-window">#</a> <code>apply_window</code></h3>
+        <p><code>apply_window(\@signal, \@window)</code> — element-wise multiplies signal by window function. Use before FFT to reduce spectral leakage.</p>
+        <pre><code class="lang-perl">my $w = hann(scalar @signal)
+my $windowed = apply_window(\@signal, $w)
+my $spectrum = dft($windowed)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-approx-eq">
         <h3><a class="doc-anchor" href="#doc-approx-eq">#</a> <code>approx_eq</code></h3>
         <p><code>approx_eq</code> — math functions builtin.</p>
@@ -6183,6 +6207,13 @@ log_info(&quot;hidden&quot;)    # not printed
         <pre><code class="lang-perl">my $result = arange $x 
 # or in a pipeline:
 @list |&gt; map arange |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-arc-length">
+        <h3><a class="doc-anchor" href="#doc-arc-length">#</a> <code>arc_length</code></h3>
+        <p><code>arc_length($radius, $theta)</code> — computes the arc length of a circular arc. Theta is the central angle in radians. Returns <code>radius * theta</code>.</p>
+        <pre><code class="lang-perl">p arc_length(10, 3.14159)   # ~31.4 (half circle)
+p arc_length(5, 1.57)       # ~7.85 (quarter circle)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-area-circle">
@@ -6551,6 +6582,12 @@ log_info(&quot;hidden&quot;)    # not printed
 @list |&gt; map bac_estimate |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-bandpass-filter">
+        <h3><a class="doc-anchor" href="#doc-bandpass-filter">#</a> <code>bandpass_filter</code></h3>
+        <p><code>bandpass_filter(\@signal, $low, $high)</code> (alias <code>bpf</code>) — applies a band-pass filter passing frequencies between low and high cutoffs. Combines low-pass and high-pass.</p>
+        <pre><code class="lang-perl">my $filtered = bpf(\@signal, 0.1, 0.3)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-bar-to-pascals">
         <h3><a class="doc-anchor" href="#doc-bar-to-pascals">#</a> <code>bar_to_pascals</code></h3>
         <p><code>bar_to_pascals</code> — file stat / path builtin.</p>
@@ -6579,6 +6616,14 @@ log_info(&quot;hidden&quot;)    # not printed
         <pre><code class="lang-perl">my $result = batched $x 
 # or in a pipeline:
 @list |&gt; map batched |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-bbox">
+        <h3><a class="doc-anchor" href="#doc-bbox">#</a> <code>bbox</code></h3>
+        <p><code>bounding_box(@points)</code> (alias <code>bbox</code>) — computes the axis-aligned bounding box of 2D points. Returns [min_x, min_y, max_x, max_y].</p>
+        <pre><code class="lang-perl">my @pts = (1,2, 3,4, 0,1, 5,3)
+my $bb = bbox(@pts)
+p @$bb   # (0, 1, 5, 4)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-bconv">
@@ -7017,6 +7062,24 @@ log_info(&quot;hidden&quot;)    # not printed
 @list |&gt; map black |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-black-scholes-call">
+        <h3><a class="doc-anchor" href="#doc-black-scholes-call">#</a> <code>black_scholes_call</code></h3>
+        <p><code>black_scholes_call($S, $K, $r, $T, $sigma)</code> (alias <code>bscall</code>) — computes Black-Scholes price for a European call option. S=spot, K=strike, r=rate, T=time to expiry, sigma=volatility.</p>
+        <pre><code class="lang-perl">p bscall(100, 100, 0.05, 1, 0.2)   # ~10.45
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-black-scholes-put">
+        <h3><a class="doc-anchor" href="#doc-black-scholes-put">#</a> <code>black_scholes_put</code></h3>
+        <p><code>black_scholes_put($S, $K, $r, $T, $sigma)</code> (alias <code>bsput</code>) — computes Black-Scholes price for a European put option.</p>
+        <pre><code class="lang-perl">p bsput(100, 100, 0.05, 1, 0.2)   # ~5.57
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-blackman">
+        <h3><a class="doc-anchor" href="#doc-blackman">#</a> <code>blackman</code></h3>
+        <p><code>window_blackman($n)</code> (alias <code>blackman</code>) — generates a Blackman window of length n. Provides excellent sidelobe suppression at the cost of main lobe width.</p>
+        <pre><code class="lang-perl">my $w = blackman(1024)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-blink">
         <h3><a class="doc-anchor" href="#doc-blink">#</a> <code>blink</code></h3>
         <p><code>blink</code> — color / ansi builtin. Alias for <code>red</code>.</p>
@@ -7151,6 +7214,25 @@ log_info(&quot;hidden&quot;)    # not printed
         <pre><code class="lang-perl">my $result = boltzmann_constant $x 
 # or in a pipeline:
 @list |&gt; map boltzmann_constant |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-bond-duration">
+        <h3><a class="doc-anchor" href="#doc-bond-duration">#</a> <code>bond_duration</code></h3>
+        <p><code>duration($face, $coupon_rate, $ytm, $periods)</code> (alias <code>bond_duration</code>) — computes the Macaulay duration of a bond, measuring interest rate sensitivity as weighted average time to receive cash flows.</p>
+        <pre><code class="lang-perl">p duration(1000, 0.05, 0.05, 10)   # ~7.7 years
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-bond-price">
+        <h3><a class="doc-anchor" href="#doc-bond-price">#</a> <code>bond_price</code></h3>
+        <p><code>bond_price($face, $coupon_rate, $ytm, $periods)</code> — computes the present value (price) of a bond given face value, coupon rate, yield to maturity, and number of periods.</p>
+        <pre><code class="lang-perl">p bond_price(1000, 0.05, 0.04, 10)   # ~1081 (premium)
+p bond_price(1000, 0.05, 0.06, 10)   # ~926 (discount)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-bond-yield">
+        <h3><a class="doc-anchor" href="#doc-bond-yield">#</a> <code>bond_yield</code></h3>
+        <p><code>bond_yield($price, $face, $coupon_rate, $periods)</code> — computes the yield to maturity of a bond given its current price. Uses Newton-Raphson iteration.</p>
+        <pre><code class="lang-perl">p bond_yield(950, 1000, 0.05, 10)   # ~5.7%
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-bool-each">
@@ -7469,6 +7551,12 @@ log_info(&quot;hidden&quot;)    # not printed
 @list |&gt; map capitalize |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-capm">
+        <h3><a class="doc-anchor" href="#doc-capm">#</a> <code>capm</code></h3>
+        <p><code>capm($risk_free, $beta, $market_return)</code> — computes expected return using the Capital Asset Pricing Model: rf + β(rm - rf).</p>
+        <pre><code class="lang-perl">p capm(0.02, 1.2, 0.08)   # 9.2% expected return
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-capture-groups">
         <h3><a class="doc-anchor" href="#doc-capture-groups">#</a> <code>capture_groups</code></h3>
         <p><code>capture_groups</code> — extended stdlib builtin.</p>
@@ -7549,6 +7637,12 @@ log_info(&quot;hidden&quot;)    # not printed
 @list |&gt; map ccgraph |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-ccomp">
+        <h3><a class="doc-anchor" href="#doc-ccomp">#</a> <code>ccomp</code></h3>
+        <p><code>continuous_compound($principal, $rate, $time)</code> (alias <code>ccomp</code>) — computes future value with continuous compounding: P × e^(rt).</p>
+        <pre><code class="lang-perl">p ccomp(1000, 0.05, 10)   # ~1648.72
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-ccompl">
         <h3><a class="doc-anchor" href="#doc-ccompl">#</a> <code>ccompl</code></h3>
         <p><code>ccompl</code> — color operations builtin. Alias for <code>color_complement</code>.</p>
@@ -7627,6 +7721,14 @@ log_info(&quot;hidden&quot;)    # not printed
         <pre><code class="lang-perl">my $result = center_text $x 
 # or in a pipeline:
 @list |&gt; map center_text |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-centroid">
+        <h3><a class="doc-anchor" href="#doc-centroid">#</a> <code>centroid</code></h3>
+        <p><code>centroid(@points)</code> — computes the centroid (geometric center) of 2D points. Points as flat list [x1,y1,x2,y2,...]. Returns [$cx, $cy].</p>
+        <pre><code class="lang-perl">my @triangle = (0,0, 3,0, 0,3)
+my $c = centroid(@triangle)
+p @$c   # (1, 1)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-cgray">
@@ -7723,6 +7825,14 @@ log_info(&quot;hidden&quot;)    # not printed
 @list |&gt; map chfr |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-chi2">
+        <h3><a class="doc-anchor" href="#doc-chi2">#</a> <code>chi2</code></h3>
+        <p><code>chi_square_stat(\@observed, \@expected)</code> (alias <code>chi2</code>) — computes the chi-squared test statistic comparing observed vs expected frequencies. Useful for goodness-of-fit tests. Returns the chi-squared value.</p>
+        <pre><code class="lang-perl">my @obs = (10, 20, 30)
+my @exp = (15, 20, 25)
+p chi2(\@obs, \@exp)   # chi-squared statistic
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-chkstr">
         <h3><a class="doc-anchor" href="#doc-chkstr">#</a> <code>chkstr</code></h3>
         <p><code>chkstr</code> — string processing (uncategorized batch) builtin. Alias for <code>chunk_string</code>.</p>
@@ -7761,6 +7871,14 @@ log_info(&quot;hidden&quot;)    # not printed
         <pre><code class="lang-perl">my $result = chroot $x 
 # or in a pipeline:
 @list |&gt; map chroot |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-chull">
+        <h3><a class="doc-anchor" href="#doc-chull">#</a> <code>chull</code></h3>
+        <p><code>convex_hull(@points)</code> (alias <code>chull</code>) — computes the convex hull of a set of 2D points. Points given as flat list [x1,y1,x2,y2,...]. Returns the hull vertices in counterclockwise order. Uses Graham scan algorithm.</p>
+        <pre><code class="lang-perl">my @pts = (0,0, 1,1, 2,0, 1,0.5)
+my $hull = chull(@pts)
+p @$hull
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-chunk-by">
@@ -7809,6 +7927,13 @@ log_info(&quot;hidden&quot;)    # not printed
         <pre><code class="lang-perl">my $result = cinvert $x 
 # or in a pipeline:
 @list |&gt; map cinvert |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-circ3">
+        <h3><a class="doc-anchor" href="#doc-circ3">#</a> <code>circ3</code></h3>
+        <p><code>circle_from_three_points($x1, $y1, $x2, $y2, $x3, $y3)</code> (alias <code>circ3</code>) — finds the unique circle passing through three non-collinear points. Returns [$cx, $cy, $radius] or undef if collinear.</p>
+        <pre><code class="lang-perl">my $c = circ3(0, 0, 1, 0, 0.5, 0.866)
+p &quot;center=($c-&gt;[0], $c-&gt;[1]) r=$c-&gt;[2]&quot;
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-circum">
@@ -8637,6 +8762,13 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p  # line count
 @list |&gt; map cr |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-cross-correlation">
+        <h3><a class="doc-anchor" href="#doc-cross-correlation">#</a> <code>cross_correlation</code></h3>
+        <p><code>cross_correlation(\@a, \@b)</code> (alias <code>xcorr</code>) — computes the cross-correlation of two signals. Measures similarity as a function of time-lag. Peak location indicates time delay between signals.</p>
+        <pre><code class="lang-perl">my $xcor = xcorr(\@signal1, \@signal2)
+my $lag = max_index(@$xcor)   # find peak lag
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-cross-entropy">
         <h3><a class="doc-anchor" href="#doc-cross-entropy">#</a> <code>cross_entropy</code></h3>
         <p><code>cross_entropy</code> — math / numeric (uncategorized batch) builtin.</p>
@@ -8935,6 +9067,12 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p  # line count
 @list |&gt; map dec_each |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-decimate">
+        <h3><a class="doc-anchor" href="#doc-decimate">#</a> <code>decimate</code></h3>
+        <p><code>downsample(\@signal, $factor)</code> (alias <code>decimate</code>) — reduces sample rate by keeping every nth sample. Apply anti-aliasing filter first to avoid aliasing.</p>
+        <pre><code class="lang-perl">my $decimated = decimate(\@signal, 4)  # keep every 4th sample
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-dedent">
         <h3><a class="doc-anchor" href="#doc-dedent">#</a> <code>dedent</code></h3>
         <p><code>dedent</code> — extended stdlib builtin.</p>
@@ -9115,6 +9253,15 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p  # line count
 @list |&gt; map deroman |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-describe">
+        <h3><a class="doc-anchor" href="#doc-describe">#</a> <code>describe</code></h3>
+        <p><code>describe(@data)</code> — returns a hashref with comprehensive descriptive statistics: count, mean, std, min, 25%, 50%, 75%, max. Similar to pandas DataFrame.describe().</p>
+        <pre><code class="lang-perl">my $stats = describe(1..100)
+p $stats-&gt;{mean}    # 50.5
+p $stats-&gt;{std}     # ~29.0
+p $stats-&gt;{&quot;50%&quot;}   # median
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-detect">
         <h3><a class="doc-anchor" href="#doc-detect">#</a> <code>detect</code></h3>
         <p><code>detect</code> — functional / iterator builtin.</p>
@@ -9153,6 +9300,13 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p  # line count
         <pre><code class="lang-perl">my $result = dfs_traverse $x 
 # or in a pipeline:
 @list |&gt; map dfs_traverse |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-dft">
+        <h3><a class="doc-anchor" href="#doc-dft">#</a> <code>dft</code></h3>
+        <p><code>dft(\@signal)</code> — computes the Discrete Fourier Transform. Returns arrayref of complex numbers as [re, im] pairs. O(n²) reference implementation; for large n, use FFT libraries.</p>
+        <pre><code class="lang-perl">my @signal = map { sin(2 * 3.14159 * $_ / 64) } 0..63
+my $spectrum = dft(\@signal)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-diag">
@@ -9313,6 +9467,12 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p  # line count
         <pre><code class="lang-perl">my $result = discount_amount $x 
 # or in a pipeline:
 @list |&gt; map discount_amount |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-discounted-payback">
+        <h3><a class="doc-anchor" href="#doc-discounted-payback">#</a> <code>discounted_payback</code></h3>
+        <p><code>discounted_payback($initial, $rate, @cashflows)</code> — computes payback period using discounted cash flows. Accounts for time value of money.</p>
+        <pre><code class="lang-perl">p discounted_payback(1000, 0.1, 400, 400, 400, 400)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-disk-avail">
@@ -9704,6 +9864,13 @@ p &quot;$pct% disk used&quot;
 @list |&gt; map elidxs |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-ellipse-perimeter">
+        <h3><a class="doc-anchor" href="#doc-ellipse-perimeter">#</a> <code>ellipse_perimeter</code></h3>
+        <p><code>ellipse_perimeter($a, $b)</code> (alias <code>ellper</code>) — approximates the perimeter of an ellipse with semi-axes a and b. Uses Ramanujan&#39;s approximation.</p>
+        <pre><code class="lang-perl">p ellper(5, 3)   # ~25.5
+p ellper(10, 10)   # ~62.8 (circle)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-ellipsis">
         <h3><a class="doc-anchor" href="#doc-ellipsis">#</a> <code>ellipsis</code></h3>
         <p><code>ellipsis</code> — string quote / escape builtin.</p>
@@ -9862,6 +10029,12 @@ p &quot;$pct% disk used&quot;
 @list |&gt; map endservent |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-energy">
+        <h3><a class="doc-anchor" href="#doc-energy">#</a> <code>energy</code></h3>
+        <p><code>energy(\@signal)</code> — computes the total energy of a signal as the sum of squared samples. Useful for audio analysis and feature extraction.</p>
+        <pre><code class="lang-perl">p energy(\@signal)   # total signal energy
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-ensure-prefix">
         <h3><a class="doc-anchor" href="#doc-ensure-prefix">#</a> <code>ensure_prefix</code></h3>
         <p><code>ensure_prefix</code> — path helpers builtin.</p>
@@ -9932,6 +10105,13 @@ p &quot;$pct% disk used&quot;
         <pre><code class="lang-perl">my $result = env_set $x 
 # or in a pipeline:
 @list |&gt; map env_set |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-envelope">
+        <h3><a class="doc-anchor" href="#doc-envelope">#</a> <code>envelope</code></h3>
+        <p><code>envelope(\@signal)</code> (alias <code>hilbert_env</code>) — computes the amplitude envelope using Hilbert transform magnitude. Useful for amplitude modulation analysis.</p>
+        <pre><code class="lang-perl">my $env = envelope(\@signal)
+# $env traces the amplitude of oscillations
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-eod">
@@ -10536,6 +10716,14 @@ p &quot;$pct% disk used&quot;
 @list |&gt; map first_word |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-five-number-summary">
+        <h3><a class="doc-anchor" href="#doc-five-number-summary">#</a> <code>five_number_summary</code></h3>
+        <p><code>five_number_summary(@data)</code> (alias <code>fivenum</code>) — returns [min, Q1, median, Q3, max], the classic five-number summary used for box plots. Provides a quick view of data distribution.</p>
+        <pre><code class="lang-perl">my @data = 1..100
+my $f = fivenum(@data)
+p &quot;min=$f-&gt;[0] Q1=$f-&gt;[1] med=$f-&gt;[2] Q3=$f-&gt;[3] max=$f-&gt;[4]&quot;
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-fizzbuzz">
         <h3><a class="doc-anchor" href="#doc-fizzbuzz">#</a> <code>fizzbuzz</code></h3>
         <p><code>fizzbuzz</code> — algorithms / puzzles builtin.</p>
@@ -10928,6 +11116,12 @@ p &quot;$pct% disk used&quot;
 @list |&gt; map from_pairs |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-frustum-volume">
+        <h3><a class="doc-anchor" href="#doc-frustum-volume">#</a> <code>frustum_volume</code></h3>
+        <p><code>frustum_volume($r1, $r2, $h)</code> — computes the volume of a conical frustum (truncated cone) with base radii r1 and r2 and height h.</p>
+        <pre><code class="lang-perl">p frustum_volume(5, 3, 10)   # ~513
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-fsize">
         <h3><a class="doc-anchor" href="#doc-fsize">#</a> <code>fsize</code></h3>
         <p><code>fsize</code> — file stat / path builtin. Alias for <code>file_size</code>.</p>
@@ -11136,6 +11330,13 @@ p &quot;$pct% disk used&quot;
         <pre><code class="lang-perl">my $result = gin $x 
 # or in a pipeline:
 @list |&gt; map gin |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-gini">
+        <h3><a class="doc-anchor" href="#doc-gini">#</a> <code>gini</code></h3>
+        <p><code>gini(@data)</code> (alias <code>gini_coefficient</code>) — computes the Gini coefficient measuring inequality in a distribution. Returns a value from 0 (perfect equality) to 1 (perfect inequality). Commonly used for income distribution analysis.</p>
+        <pre><code class="lang-perl">p gini(1, 1, 1, 1)     # 0 (perfect equality)
+p gini(0, 0, 0, 100)   # ~0.75 (high inequality)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-glob-to-regex">
@@ -11374,12 +11575,24 @@ p &quot;$pct% disk used&quot;
 @list |&gt; map hamdist |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-hamming">
+        <h3><a class="doc-anchor" href="#doc-hamming">#</a> <code>hamming</code></h3>
+        <p><code>window_hamming($n)</code> (alias <code>hamming</code>) — generates a Hamming window of length n. Similar to Hann but with slightly different coefficients, optimized for speech processing.</p>
+        <pre><code class="lang-perl">my $w = hamming(1024)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-hamming-distance">
         <h3><a class="doc-anchor" href="#doc-hamming-distance">#</a> <code>hamming_distance</code></h3>
         <p><code>hamming_distance</code> — string (batch 2) builtin.</p>
         <pre><code class="lang-perl">my $result = hamming_distance $x 
 # or in a pipeline:
 @list |&gt; map hamming_distance |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hann">
+        <h3><a class="doc-anchor" href="#doc-hann">#</a> <code>hann</code></h3>
+        <p><code>window_hann($n)</code> (alias <code>hann</code>) — generates a Hann (raised cosine) window of length n. Common window function for spectral analysis that reduces spectral leakage.</p>
+        <pre><code class="lang-perl">my $w = hann(1024)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-hanoi">
@@ -11566,10 +11779,10 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-haversine">
         <h3><a class="doc-anchor" href="#doc-haversine">#</a> <code>haversine</code></h3>
-        <p><code>haversine</code> — physics formulas builtin.</p>
-        <pre><code class="lang-perl">my $result = haversine $x 
-# or in a pipeline:
-@list |&gt; map haversine |&gt; p
+        <p><code>haversine_distance($lat1, $lon1, $lat2, $lon2)</code> (alias <code>haversine</code>) — computes the great-circle distance between two points on Earth given latitude/longitude in degrees. Returns distance in kilometers.</p>
+        <pre><code class="lang-perl"># NYC to LA
+p haversine(40.7128, -74.0060, 34.0522, -118.2437)
+# ~3940 km
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-head-lines">
@@ -11662,6 +11875,13 @@ p &quot;$pct% disk used&quot;
         <pre><code class="lang-perl">my $result = hidden $x 
 # or in a pipeline:
 @list |&gt; map hidden |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-highpass-filter">
+        <h3><a class="doc-anchor" href="#doc-highpass-filter">#</a> <code>highpass_filter</code></h3>
+        <p><code>highpass_filter(\@signal, $cutoff)</code> (alias <code>hpf</code>) — applies a simple high-pass filter to remove low-frequency components (DC offset, drift). Signal = original - lowpass.</p>
+        <pre><code class="lang-perl">my @with_dc = map { 5 + sin($_/10) } 1..100
+my $ac_only = hpf(\@with_dc, 0.1)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-hist">
@@ -11898,6 +12118,13 @@ p &quot;$pct% disk used&quot;
         <pre><code class="lang-perl">my $result = identity_matrix $x 
 # or in a pipeline:
 @list |&gt; map identity_matrix |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-idft">
+        <h3><a class="doc-anchor" href="#doc-idft">#</a> <code>idft</code></h3>
+        <p><code>idft(\@spectrum)</code> — computes the Inverse Discrete Fourier Transform. Takes arrayref of [re, im] pairs and returns the time-domain signal.</p>
+        <pre><code class="lang-perl">my $spectrum = dft(\@signal)
+my $reconstructed = idft($spectrum)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-idt">
@@ -12166,6 +12393,12 @@ p &quot;$pct% disk used&quot;
 @list |&gt; map interleave_lists |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-interpolate">
+        <h3><a class="doc-anchor" href="#doc-interpolate">#</a> <code>interpolate</code></h3>
+        <p><code>upsample(\@signal, $factor)</code> (alias <code>interpolate</code>) — increases sample rate by inserting zeros and filtering. Factor must be positive integer.</p>
+        <pre><code class="lang-perl">my $upsampled = interpolate(\@signal, 4)  # 4x sample rate
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-interpose">
         <h3><a class="doc-anchor" href="#doc-interpose">#</a> <code>interpose</code></h3>
         <p><code>interpose</code> — go/general functional utilities builtin.</p>
@@ -12284,6 +12517,13 @@ p &quot;$pct% disk used&quot;
 @list |&gt; map iqr |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-irr">
+        <h3><a class="doc-anchor" href="#doc-irr">#</a> <code>irr</code></h3>
+        <p><code>irr(@cashflows)</code> — computes the Internal Rate of Return for a series of cash flows. First value is typically negative (initial investment). Uses Newton-Raphson iteration.</p>
+        <pre><code class="lang-perl">my @cf = (-1000, 300, 420, 680)
+p irr(@cf)   # ~0.166 (16.6%)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-is-abundant">
         <h3><a class="doc-anchor" href="#doc-is-abundant">#</a> <code>is_abundant</code></h3>
         <p><code>is_abundant</code> — number theory / primes builtin.</p>
@@ -12310,7 +12550,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-is-anagram">
         <h3><a class="doc-anchor" href="#doc-is-anagram">#</a> <code>is_anagram</code></h3>
-        <p><code>is_anagram</code> — matrix operations (uncategorized batch) builtin.</p>
+        <p><code>is_anagram</code> — dsp / signal (extended) builtin.</p>
         <pre><code class="lang-perl">my $result = is_anagram $x 
 # or in a pipeline:
 @list |&gt; map is_anagram |&gt; p
@@ -12350,7 +12590,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-is-balanced-parens">
         <h3><a class="doc-anchor" href="#doc-is-balanced-parens">#</a> <code>is_balanced_parens</code></h3>
-        <p><code>is_balanced_parens</code> — matrix operations (uncategorized batch) builtin.</p>
+        <p><code>is_balanced_parens</code> — dsp / signal (extended) builtin.</p>
         <pre><code class="lang-perl">my $result = is_balanced_parens $x 
 # or in a pipeline:
 @list |&gt; map is_balanced_parens |&gt; p
@@ -12438,7 +12678,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-is-control">
         <h3><a class="doc-anchor" href="#doc-is-control">#</a> <code>is_control</code></h3>
-        <p><code>is_control</code> — matrix operations (uncategorized batch) builtin.</p>
+        <p><code>is_control</code> — dsp / signal (extended) builtin.</p>
         <pre><code class="lang-perl">my $result = is_control $x 
 # or in a pipeline:
 @list |&gt; map is_control |&gt; p
@@ -12902,7 +13142,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-is-numeric-string">
         <h3><a class="doc-anchor" href="#doc-is-numeric-string">#</a> <code>is_numeric_string</code></h3>
-        <p><code>is_numeric_string</code> — matrix operations (uncategorized batch) builtin.</p>
+        <p><code>is_numeric_string</code> — dsp / signal (extended) builtin.</p>
         <pre><code class="lang-perl">my $result = is_numeric_string $x 
 # or in a pipeline:
 @list |&gt; map is_numeric_string |&gt; p
@@ -12950,7 +13190,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-is-pangram">
         <h3><a class="doc-anchor" href="#doc-is-pangram">#</a> <code>is_pangram</code></h3>
-        <p><code>is_pangram</code> — matrix operations (uncategorized batch) builtin.</p>
+        <p><code>is_pangram</code> — dsp / signal (extended) builtin.</p>
         <pre><code class="lang-perl">my $result = is_pangram $x 
 # or in a pipeline:
 @list |&gt; map is_pangram |&gt; p
@@ -13070,7 +13310,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-is-printable">
         <h3><a class="doc-anchor" href="#doc-is-printable">#</a> <code>is_printable</code></h3>
-        <p><code>is_printable</code> — matrix operations (uncategorized batch) builtin.</p>
+        <p><code>is_printable</code> — dsp / signal (extended) builtin.</p>
         <pre><code class="lang-perl">my $result = is_printable $x 
 # or in a pipeline:
 @list |&gt; map is_printable |&gt; p
@@ -13318,7 +13558,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-is-valid-cidr">
         <h3><a class="doc-anchor" href="#doc-is-valid-cidr">#</a> <code>is_valid_cidr</code></h3>
-        <p><code>is_valid_cidr</code> — matrix operations (uncategorized batch) builtin.</p>
+        <p><code>is_valid_cidr</code> — dsp / signal (extended) builtin.</p>
         <pre><code class="lang-perl">my $result = is_valid_cidr $x 
 # or in a pipeline:
 @list |&gt; map is_valid_cidr |&gt; p
@@ -13326,7 +13566,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-is-valid-cron">
         <h3><a class="doc-anchor" href="#doc-is-valid-cron">#</a> <code>is_valid_cron</code></h3>
-        <p><code>is_valid_cron</code> — matrix operations (uncategorized batch) builtin.</p>
+        <p><code>is_valid_cron</code> — dsp / signal (extended) builtin.</p>
         <pre><code class="lang-perl">my $result = is_valid_cron $x 
 # or in a pipeline:
 @list |&gt; map is_valid_cron |&gt; p
@@ -13358,7 +13598,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-is-valid-hex-color">
         <h3><a class="doc-anchor" href="#doc-is-valid-hex-color">#</a> <code>is_valid_hex_color</code></h3>
-        <p><code>is_valid_hex_color</code> — matrix operations (uncategorized batch) builtin.</p>
+        <p><code>is_valid_hex_color</code> — dsp / signal (extended) builtin.</p>
         <pre><code class="lang-perl">my $result = is_valid_hex_color $x 
 # or in a pipeline:
 @list |&gt; map is_valid_hex_color |&gt; p
@@ -13382,7 +13622,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-is-valid-latitude">
         <h3><a class="doc-anchor" href="#doc-is-valid-latitude">#</a> <code>is_valid_latitude</code></h3>
-        <p><code>is_valid_latitude</code> — matrix operations (uncategorized batch) builtin.</p>
+        <p><code>is_valid_latitude</code> — dsp / signal (extended) builtin.</p>
         <pre><code class="lang-perl">my $result = is_valid_latitude $x 
 # or in a pipeline:
 @list |&gt; map is_valid_latitude |&gt; p
@@ -13390,7 +13630,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-is-valid-longitude">
         <h3><a class="doc-anchor" href="#doc-is-valid-longitude">#</a> <code>is_valid_longitude</code></h3>
-        <p><code>is_valid_longitude</code> — matrix operations (uncategorized batch) builtin.</p>
+        <p><code>is_valid_longitude</code> — dsp / signal (extended) builtin.</p>
         <pre><code class="lang-perl">my $result = is_valid_longitude $x 
 # or in a pipeline:
 @list |&gt; map is_valid_longitude |&gt; p
@@ -13398,7 +13638,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-is-valid-mime">
         <h3><a class="doc-anchor" href="#doc-is-valid-mime">#</a> <code>is_valid_mime</code></h3>
-        <p><code>is_valid_mime</code> — matrix operations (uncategorized batch) builtin.</p>
+        <p><code>is_valid_mime</code> — dsp / signal (extended) builtin.</p>
         <pre><code class="lang-perl">my $result = is_valid_mime $x 
 # or in a pipeline:
 @list |&gt; map is_valid_mime |&gt; p
@@ -13494,7 +13734,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-isanag">
         <h3><a class="doc-anchor" href="#doc-isanag">#</a> <code>isanag</code></h3>
-        <p><code>isanag</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_anagram</code>.</p>
+        <p><code>isanag</code> — dsp / signal (extended) builtin. Alias for <code>is_anagram</code>.</p>
         <pre><code class="lang-perl">my $result = isanag $x 
 # or in a pipeline:
 @list |&gt; map isanag |&gt; p
@@ -13518,7 +13758,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-isbalp">
         <h3><a class="doc-anchor" href="#doc-isbalp">#</a> <code>isbalp</code></h3>
-        <p><code>isbalp</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_balanced_parens</code>.</p>
+        <p><code>isbalp</code> — dsp / signal (extended) builtin. Alias for <code>is_balanced_parens</code>.</p>
         <pre><code class="lang-perl">my $result = isbalp $x 
 # or in a pipeline:
 @list |&gt; map isbalp |&gt; p
@@ -13566,7 +13806,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-iscidr">
         <h3><a class="doc-anchor" href="#doc-iscidr">#</a> <code>iscidr</code></h3>
-        <p><code>iscidr</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_valid_cidr</code>.</p>
+        <p><code>iscidr</code> — dsp / signal (extended) builtin. Alias for <code>is_valid_cidr</code>.</p>
         <pre><code class="lang-perl">my $result = iscidr $x 
 # or in a pipeline:
 @list |&gt; map iscidr |&gt; p
@@ -13582,7 +13822,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-iscron">
         <h3><a class="doc-anchor" href="#doc-iscron">#</a> <code>iscron</code></h3>
-        <p><code>iscron</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_valid_cron</code>.</p>
+        <p><code>iscron</code> — dsp / signal (extended) builtin. Alias for <code>is_valid_cron</code>.</p>
         <pre><code class="lang-perl">my $result = iscron $x 
 # or in a pipeline:
 @list |&gt; map iscron |&gt; p
@@ -13590,7 +13830,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-isctrl">
         <h3><a class="doc-anchor" href="#doc-isctrl">#</a> <code>isctrl</code></h3>
-        <p><code>isctrl</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_control</code>.</p>
+        <p><code>isctrl</code> — dsp / signal (extended) builtin. Alias for <code>is_control</code>.</p>
         <pre><code class="lang-perl">my $result = isctrl $x 
 # or in a pipeline:
 @list |&gt; map isctrl |&gt; p
@@ -13638,7 +13878,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-ishexc">
         <h3><a class="doc-anchor" href="#doc-ishexc">#</a> <code>ishexc</code></h3>
-        <p><code>ishexc</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_valid_hex_color</code>.</p>
+        <p><code>ishexc</code> — dsp / signal (extended) builtin. Alias for <code>is_valid_hex_color</code>.</p>
         <pre><code class="lang-perl">my $result = ishexc $x 
 # or in a pipeline:
 @list |&gt; map ishexc |&gt; p
@@ -13734,7 +13974,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-islat">
         <h3><a class="doc-anchor" href="#doc-islat">#</a> <code>islat</code></h3>
-        <p><code>islat</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_valid_latitude</code>.</p>
+        <p><code>islat</code> — dsp / signal (extended) builtin. Alias for <code>is_valid_latitude</code>.</p>
         <pre><code class="lang-perl">my $result = islat $x 
 # or in a pipeline:
 @list |&gt; map islat |&gt; p
@@ -13750,7 +13990,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-islon">
         <h3><a class="doc-anchor" href="#doc-islon">#</a> <code>islon</code></h3>
-        <p><code>islon</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_valid_longitude</code>.</p>
+        <p><code>islon</code> — dsp / signal (extended) builtin. Alias for <code>is_valid_longitude</code>.</p>
         <pre><code class="lang-perl">my $result = islon $x 
 # or in a pipeline:
 @list |&gt; map islon |&gt; p
@@ -13774,7 +14014,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-ismime">
         <h3><a class="doc-anchor" href="#doc-ismime">#</a> <code>ismime</code></h3>
-        <p><code>ismime</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_valid_mime</code>.</p>
+        <p><code>ismime</code> — dsp / signal (extended) builtin. Alias for <code>is_valid_mime</code>.</p>
         <pre><code class="lang-perl">my $result = ismime $x 
 # or in a pipeline:
 @list |&gt; map ismime |&gt; p
@@ -13806,7 +14046,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-isnumstr">
         <h3><a class="doc-anchor" href="#doc-isnumstr">#</a> <code>isnumstr</code></h3>
-        <p><code>isnumstr</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_numeric_string</code>.</p>
+        <p><code>isnumstr</code> — dsp / signal (extended) builtin. Alias for <code>is_numeric_string</code>.</p>
         <pre><code class="lang-perl">my $result = isnumstr $x 
 # or in a pipeline:
 @list |&gt; map isnumstr |&gt; p
@@ -13838,7 +14078,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-ispang">
         <h3><a class="doc-anchor" href="#doc-ispang">#</a> <code>ispang</code></h3>
-        <p><code>ispang</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_pangram</code>.</p>
+        <p><code>ispang</code> — dsp / signal (extended) builtin. Alias for <code>is_pangram</code>.</p>
         <pre><code class="lang-perl">my $result = ispang $x 
 # or in a pipeline:
 @list |&gt; map ispang |&gt; p
@@ -13886,7 +14126,7 @@ p &quot;$pct% disk used&quot;
       </article>
       <article class="doc-entry" id="doc-isprint">
         <h3><a class="doc-anchor" href="#doc-isprint">#</a> <code>isprint</code></h3>
-        <p><code>isprint</code> — matrix operations (uncategorized batch) builtin. Alias for <code>is_printable</code>.</p>
+        <p><code>isprint</code> — dsp / signal (extended) builtin. Alias for <code>is_printable</code>.</p>
         <pre><code class="lang-perl">my $result = isprint $x 
 # or in a pipeline:
 @list |&gt; map isprint |&gt; p
@@ -14188,6 +14428,12 @@ p &quot;$pct% disk used&quot;
         <h3><a class="doc-anchor" href="#doc-k-to-f">#</a> <code>k_to_f</code></h3>
         <p><code>k_to_f</code> — unit conversions builtin.</p>
         <pre><code class="lang-perl">my $result = k_to_f $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-kaiser">
+        <h3><a class="doc-anchor" href="#doc-kaiser">#</a> <code>kaiser</code></h3>
+        <p><code>window_kaiser($n, $beta)</code> (alias <code>kaiser</code>) — generates a Kaiser window with parameter beta controlling the tradeoff between main lobe width and sidelobe level. Beta=0 is rectangular, beta~5 is similar to Hamming.</p>
+        <pre><code class="lang-perl">my $w = kaiser(1024, 5.0)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-kb-to-b">
@@ -14557,6 +14803,13 @@ slurp(&quot;README.md&quot;) |&gt; pager
 @list |&gt; map line_count |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-line-intersection">
+        <h3><a class="doc-anchor" href="#doc-line-intersection">#</a> <code>line_intersection</code></h3>
+        <p><code>line_intersection($x1, $y1, $x2, $y2, $x3, $y3, $x4, $y4)</code> — finds the intersection point of two lines defined by points (x1,y1)-(x2,y2) and (x3,y3)-(x4,y4). Returns [$x, $y] or undef if parallel.</p>
+        <pre><code class="lang-perl">my $pt = line_intersection(0, 0, 1, 1, 0, 1, 1, 0)
+p @$pt   # (0.5, 0.5)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-linear-regression">
         <h3><a class="doc-anchor" href="#doc-linear-regression">#</a> <code>linear_regression</code></h3>
         <p><code>linear_regression</code> — math / numeric (uncategorized batch) builtin.</p>
@@ -14851,6 +15104,15 @@ load_avg |&gt; spark |&gt; p                   # sparkline of load
 @list |&gt; map lookup_assoc |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-lorenz">
+        <h3><a class="doc-anchor" href="#doc-lorenz">#</a> <code>lorenz</code></h3>
+        <p><code>lorenz_curve(@data)</code> (alias <code>lorenz</code>) — computes the Lorenz curve as an arrayref of [cumulative_share_of_population, cumulative_share_of_wealth] pairs. Used to visualize inequality. The diagonal represents perfect equality.</p>
+        <pre><code class="lang-perl">my $curve = lorenz(10, 20, 30, 40)
+for my $pt (@$curve) {
+    p &quot;$pt-&gt;[0], $pt-&gt;[1]&quot;
+}
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-lower-bound">
         <h3><a class="doc-anchor" href="#doc-lower-bound">#</a> <code>lower_bound</code></h3>
         <p><code>lower_bound</code> — extended stdlib builtin.</p>
@@ -14865,6 +15127,13 @@ load_avg |&gt; spark |&gt; p                   # sparkline of load
         <pre><code class="lang-perl">my $result = lowercase $x 
 # or in a pipeline:
 @list |&gt; map lowercase |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-lowpass-filter">
+        <h3><a class="doc-anchor" href="#doc-lowpass-filter">#</a> <code>lowpass_filter</code></h3>
+        <p><code>lowpass_filter(\@signal, $cutoff)</code> (alias <code>lpf</code>) — applies a simple low-pass filter to remove high-frequency components. Cutoff is normalized (0-1). Uses exponential moving average.</p>
+        <pre><code class="lang-perl">my @noisy = map { sin($_/10) + rand(0.2) } 1..100
+my $smooth = lpf(\@noisy, 0.1)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-lpad">
@@ -15443,6 +15712,13 @@ load_avg |&gt; spark |&gt; p                   # sparkline of load
 @list |&gt; map max_by |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-max-drawdown">
+        <h3><a class="doc-anchor" href="#doc-max-drawdown">#</a> <code>max_drawdown</code></h3>
+        <p><code>max_drawdown(@equity_curve)</code> (alias <code>mdd</code>) — computes the maximum peak-to-trough decline in a series of values. Returns as a decimal (0.2 = 20% drawdown). Key risk metric.</p>
+        <pre><code class="lang-perl">my @equity = (100, 120, 90, 110, 85, 130)
+p mdd(@equity)   # ~0.29 (29% max drawdown)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-max-float">
         <h3><a class="doc-anchor" href="#doc-max-float">#</a> <code>max_float</code></h3>
         <p><code>max_float</code> — conversion / utility (batch 4) builtin.</p>
@@ -15589,6 +15865,14 @@ load_avg |&gt; spark |&gt; p                   # sparkline of load
         <pre><code class="lang-perl">my $result = measure $x 
 # or in a pipeline:
 @list |&gt; map measure |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-medfilt">
+        <h3><a class="doc-anchor" href="#doc-medfilt">#</a> <code>medfilt</code></h3>
+        <p><code>median_filter(\@signal, $window_size)</code> (alias <code>medfilt</code>) — applies a median filter for noise removal. Each output is the median of the surrounding window. Excellent for removing impulse noise while preserving edges.</p>
+        <pre><code class="lang-perl">my @spiky = (1, 2, 100, 3, 4)   # 100 is spike
+my $clean = medfilt(\@spiky, 3)
+p @$clean   # spike removed
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-median-absolute-deviation">
@@ -15944,6 +16228,12 @@ gauge(mem_used / mem_total) |&gt; p         # memory usage gauge
         <pre><code class="lang-perl">my $result = mobius $x 
 # or in a pipeline:
 @list |&gt; map mobius |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mod-dur">
+        <h3><a class="doc-anchor" href="#doc-mod-dur">#</a> <code>mod_dur</code></h3>
+        <p><code>modified_duration($face, $coupon_rate, $ytm, $periods)</code> (alias <code>mod_dur</code>) — computes modified duration, which directly measures price sensitivity to yield changes. Equal to Macaulay duration / (1 + ytm).</p>
+        <pre><code class="lang-perl">p mod_dur(1000, 0.05, 0.05, 10)   # ~7.3
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-mod-op">
@@ -16450,6 +16740,13 @@ gauge(mem_used / mem_total) |&gt; p         # memory usage gauge
 @list |&gt; map normalize_range |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-normalize-signal">
+        <h3><a class="doc-anchor" href="#doc-normalize-signal">#</a> <code>normalize_signal</code></h3>
+        <p><code>normalize_signal(\@signal)</code> (alias <code>normsig</code>) — scales signal to range [-1, 1] based on its peak absolute value. Useful for audio processing.</p>
+        <pre><code class="lang-perl">my $norm = normsig(\@audio)
+p max(map { abs } @$norm)   # 1
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-normalize-spaces">
         <h3><a class="doc-anchor" href="#doc-normalize-spaces">#</a> <code>normalize_spaces</code></h3>
         <p><code>normalize_spaces</code> — extended stdlib builtin.</p>
@@ -16544,6 +16841,12 @@ gauge(mem_used / mem_total) |&gt; p         # memory usage gauge
         <pre><code class="lang-perl">my $result = now_us $x 
 # or in a pipeline:
 @list |&gt; map now_us |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-nper">
+        <h3><a class="doc-anchor" href="#doc-nper">#</a> <code>nper</code></h3>
+        <p><code>nper($rate, $pmt, $pv)</code> (alias <code>num_periods</code>) — computes the number of periods needed to pay off a loan given rate, payment, and principal.</p>
+        <pre><code class="lang-perl">p nper(0.05/12, 500, 50000)   # ~127 months
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-npv">
@@ -16980,6 +17283,14 @@ die &quot;unix only&quot; unless os_family eq &quot;unix&quot;
 p &quot;kernel: &quot; . os_version
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-outliers-iqr">
+        <h3><a class="doc-anchor" href="#doc-outliers-iqr">#</a> <code>outliers_iqr</code></h3>
+        <p><code>outliers_iqr(@data)</code> — identifies outliers using the IQR method (1.5 × IQR beyond Q1/Q3). Returns an arrayref of outlier values. Standard approach for detecting unusual data points.</p>
+        <pre><code class="lang-perl">my @data = (1, 2, 3, 4, 5, 100)
+my $out = outliers_iqr(@data)
+p @$out   # (100)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-ovals">
         <h3><a class="doc-anchor" href="#doc-ovals">#</a> <code>ovals</code></h3>
         <p><code>ovals</code> — javascript array/object methods builtin. Alias for <code>object_values</code>.</p>
@@ -17309,6 +17620,12 @@ p page_size                              # 4096 (x86_64)
 @list |&gt; map path_stem |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-payback">
+        <h3><a class="doc-anchor" href="#doc-payback">#</a> <code>payback</code></h3>
+        <p><code>payback_period($initial, @cashflows)</code> (alias <code>payback</code>) — computes the number of periods to recover initial investment. Returns fractional periods.</p>
+        <pre><code class="lang-perl">p payback(1000, 300, 400, 500)   # 2.6 periods
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-pbool">
         <h3><a class="doc-anchor" href="#doc-pbool">#</a> <code>pbool</code></h3>
         <p><code>pbool</code> — extended stdlib builtin. Alias for <code>parse_bool</code>.</p>
@@ -17413,6 +17730,14 @@ p page_size                              # 4096 (x86_64)
 @list |&gt; map percentile |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-percentile-rank">
+        <h3><a class="doc-anchor" href="#doc-percentile-rank">#</a> <code>percentile_rank</code></h3>
+        <p><code>percentile_rank($value, @data)</code> — returns the percentile rank (0-100) of a value within a dataset. Indicates what percentage of the data falls below the given value. Useful for ranking and normalization.</p>
+        <pre><code class="lang-perl">my @scores = 1..100
+p percentile_rank(50, @scores)   # ~50
+p percentile_rank(90, @scores)   # ~90
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-perfect-numbers">
         <h3><a class="doc-anchor" href="#doc-perfect-numbers">#</a> <code>perfect_numbers</code></h3>
         <p><code>perfect_numbers</code> — number theory / primes builtin.</p>
@@ -17483,6 +17808,12 @@ p page_size                              # 4096 (x86_64)
         <pre><code class="lang-perl">my $result = pft $x 
 # or in a pipeline:
 @list |&gt; map pft |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-phase-spectrum">
+        <h3><a class="doc-anchor" href="#doc-phase-spectrum">#</a> <code>phase_spectrum</code></h3>
+        <p><code>phase_spectrum(\@signal)</code> — computes the phase angle (in radians) at each frequency bin from the DFT.</p>
+        <pre><code class="lang-perl">my $phases = phase_spectrum(\@signal)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-phi">
@@ -17565,6 +17896,14 @@ p page_size                              # 4096 (x86_64)
 @list |&gt; map pint |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-pip">
+        <h3><a class="doc-anchor" href="#doc-pip">#</a> <code>pip</code></h3>
+        <p><code>point_in_polygon($x, $y, @polygon)</code> (alias <code>pip</code>) — tests if a point lies inside a polygon. Polygon is given as flat list [x1,y1,x2,y2,...]. Returns 1 if inside, 0 if outside. Uses ray-casting algorithm.</p>
+        <pre><code class="lang-perl">my @square = (0,0, 4,0, 4,4, 0,4)
+p pip(2, 2, @square)   # 1 (inside)
+p pip(5, 5, @square)   # 0 (outside)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-pipe">
         <h3><a class="doc-anchor" href="#doc-pipe">#</a> <code>pipe</code></h3>
         <p>Create a unidirectional pipe, returning a pair of connected filehandles: one for reading and one for writing. Data written to the write end can be read from the read end, making pipes the fundamental building block for inter-process communication. Commonly used with <code>fork</code> so the parent and child can exchange data.</p>
@@ -17635,6 +17974,13 @@ p $msg   # hello from child
 @list |&gt; map pmass |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-pmt">
+        <h3><a class="doc-anchor" href="#doc-pmt">#</a> <code>pmt</code></h3>
+        <p><code>pmt($rate, $nper, $pv)</code> — computes the periodic payment for a loan given interest rate, number of periods, and present value. Standard amortization formula.</p>
+        <pre><code class="lang-perl"># $100k loan, 5% annual rate, 30 years
+p pmt(0.05/12, 360, 100000)   # ~$537/month
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-point-distance">
         <h3><a class="doc-anchor" href="#doc-point-distance">#</a> <code>point_distance</code></h3>
         <p><code>point_distance</code> — geometry / physics builtin.</p>
@@ -17663,6 +18009,13 @@ p $msg   # hello from child
         <pre><code class="lang-perl">my $result = polygon_area $x 
 # or in a pipeline:
 @list |&gt; map polygon_area |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-polygon-perimeter">
+        <h3><a class="doc-anchor" href="#doc-polygon-perimeter">#</a> <code>polygon_perimeter</code></h3>
+        <p><code>polygon_perimeter(@points)</code> (alias <code>polyper</code>) — computes the perimeter of a polygon. Points as flat list [x1,y1,x2,y2,...]. Assumes closed polygon.</p>
+        <pre><code class="lang-perl">my @square = (0,0, 1,0, 1,1, 0,1)
+p polyper(@square)   # 4
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pop-clj">
@@ -17735,6 +18088,13 @@ p $msg   # hello from child
         <pre><code class="lang-perl">my $result = power_set $x 
 # or in a pipeline:
 @list |&gt; map power_set |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-power-spectrum">
+        <h3><a class="doc-anchor" href="#doc-power-spectrum">#</a> <code>power_spectrum</code></h3>
+        <p><code>power_spectrum(\@signal)</code> (alias <code>psd</code>) — computes the power spectral density (magnitude squared of DFT). Returns real values representing power at each frequency bin.</p>
+        <pre><code class="lang-perl">my $psd = psd(\@signal)
+@$psd |&gt; e p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-powers-of-seq">
@@ -17928,6 +18288,14 @@ p format_bytes(rss - $before) . &quot; allocated&quot;
 @list |&gt; map purple |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-pv">
+        <h3><a class="doc-anchor" href="#doc-pv">#</a> <code>pv</code></h3>
+        <p><code>pv</code> — finance (extended) builtin.</p>
+        <pre><code class="lang-perl">my $result = pv $x 
+# or in a pipeline:
+@list |&gt; map pv |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-pwd-str">
         <h3><a class="doc-anchor" href="#doc-pwd-str">#</a> <code>pwd_str</code></h3>
         <p><code>pwd_str</code> — more process / system builtin. Alias for <code>cwd</code>.</p>
@@ -17942,6 +18310,12 @@ p format_bytes(rss - $before) . &quot; allocated&quot;
         <pre><code class="lang-perl">my $result = pwi $x 
 # or in a pipeline:
 @list |&gt; map pwi |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pyramid-volume">
+        <h3><a class="doc-anchor" href="#doc-pyramid-volume">#</a> <code>pyramid_volume</code></h3>
+        <p><code>pyramid_volume($base_area, $height)</code> — computes the volume of a pyramid. Returns <code>(1/3) * base_area * height</code>.</p>
+        <pre><code class="lang-perl">p pyramid_volume(100, 15)   # 500
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-q">
@@ -17992,6 +18366,14 @@ p format_bytes(rss - $before) . &quot; allocated&quot;
 @list |&gt; map quarter_of |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-quartiles">
+        <h3><a class="doc-anchor" href="#doc-quartiles">#</a> <code>quartiles</code></h3>
+        <p><code>quartiles(@data)</code> — returns the three quartile values [Q1, Q2, Q3] of a dataset. Q1 is the 25th percentile, Q2 is the median (50th), Q3 is the 75th percentile. Useful for understanding data distribution and computing IQR.</p>
+        <pre><code class="lang-perl">my @data = 1..100
+my $q = quartiles(@data)
+p &quot;Q1=$q-&gt;[0] Q2=$q-&gt;[1] Q3=$q-&gt;[2]&quot;
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-queue-new">
         <h3><a class="doc-anchor" href="#doc-queue-new">#</a> <code>queue_new</code></h3>
         <p><code>queue_new</code> — data structure helpers builtin.</p>
@@ -18022,6 +18404,13 @@ p format_bytes(rss - $before) . &quot; allocated&quot;
         <pre><code class="lang-perl">my $result = r2d $x 
 # or in a pipeline:
 @list |&gt; map r2d |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-r72">
+        <h3><a class="doc-anchor" href="#doc-r72">#</a> <code>r72</code></h3>
+        <p><code>rule_of_72($rate)</code> (alias <code>r72</code>) — estimates years to double investment using the Rule of 72: 72 / (rate × 100). Quick mental math approximation.</p>
+        <pre><code class="lang-perl">p r72(0.06)   # 12 years to double at 6%
+p r72(0.10)   # 7.2 years at 10%
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-r-squared">
@@ -18342,6 +18731,14 @@ p format_bytes(rss - $before) . &quot; allocated&quot;
 @list |&gt; map reduce_right |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-reflect-point">
+        <h3><a class="doc-anchor" href="#doc-reflect-point">#</a> <code>reflect_point</code></h3>
+        <p><code>reflect_point($x, $y, $axis)</code> — reflects a point across an axis. Axis can be &#39;x&#39;, &#39;y&#39;, or &#39;origin&#39;. Returns the reflected coordinates.</p>
+        <pre><code class="lang-perl">p reflect_point(3, 4, &#39;x&#39;)       # [3, -4]
+p reflect_point(3, 4, &#39;y&#39;)       # [-3, 4]
+p reflect_point(3, 4, &#39;origin&#39;)  # [-3, -4]
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-regex-extract">
         <h3><a class="doc-anchor" href="#doc-regex-extract">#</a> <code>regex_extract</code></h3>
         <p><code>regex_extract</code> — file stat / path builtin.</p>
@@ -18596,6 +18993,13 @@ p format_bytes(rss - $before) . &quot; allocated&quot;
         <pre><code class="lang-perl">my $result = repv $x 
 # or in a pipeline:
 @list |&gt; map repv |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-resample">
+        <h3><a class="doc-anchor" href="#doc-resample">#</a> <code>resample</code></h3>
+        <p><code>resample(\@signal, $factor)</code> — resamples signal by a rational factor. Factor &gt; 1 upsamples, factor &lt; 1 downsamples. Uses linear interpolation.</p>
+        <pre><code class="lang-perl">my $up = resample(\@signal, 2)     # double sample rate
+my $down = resample(\@signal, 0.5) # halve sample rate
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-reservoir-sample">
@@ -19214,6 +19618,22 @@ p format_bytes(rss - $before) . &quot; allocated&quot;
 @list |&gt; map sample_one |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-sample-stddev">
+        <h3><a class="doc-anchor" href="#doc-sample-stddev">#</a> <code>sample_stddev</code></h3>
+        <p><code>sample_stddev</code> — statistics (extended) builtin.</p>
+        <pre><code class="lang-perl">my $result = sample_stddev $x 
+# or in a pipeline:
+@list |&gt; map sample_stddev |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sample-variance">
+        <h3><a class="doc-anchor" href="#doc-sample-variance">#</a> <code>sample_variance</code></h3>
+        <p><code>sample_variance</code> — statistics (extended) builtin.</p>
+        <pre><code class="lang-perl">my $result = sample_variance $x 
+# or in a pipeline:
+@list |&gt; map sample_variance |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-sampn">
         <h3><a class="doc-anchor" href="#doc-sampn">#</a> <code>sampn</code></h3>
         <p><code>sampn</code> — extended stdlib builtin.</p>
@@ -19246,6 +19666,13 @@ p format_bytes(rss - $before) . &quot; allocated&quot;
 @list |&gt; map scale_each |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-scale-point">
+        <h3><a class="doc-anchor" href="#doc-scale-point">#</a> <code>scale_point</code></h3>
+        <p><code>scale_point($x, $y, $sx, $sy)</code> — scales a 2D point by factors sx and sy from the origin. Returns [$x*$sx, $y*$sy]. Use for geometric transformations.</p>
+        <pre><code class="lang-perl">my $p = scale_point(2, 3, 2, 2)
+p @$p   # (4, 6)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-scan">
         <h3><a class="doc-anchor" href="#doc-scan">#</a> <code>scan</code></h3>
         <p><code>scan</code> — functional combinators builtin.</p>
@@ -19276,6 +19703,13 @@ p format_bytes(rss - $before) . &quot; allocated&quot;
         <pre><code class="lang-perl">my $result = scanr $x 
 # or in a pipeline:
 @list |&gt; map scanr |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-scentroid">
+        <h3><a class="doc-anchor" href="#doc-scentroid">#</a> <code>scentroid</code></h3>
+        <p><code>spectral_centroid(\@spectrum)</code> (alias <code>scentroid</code>) — computes the spectral centroid (center of mass) of a spectrum. Indicates the &#39;brightness&#39; of a sound. Returns frequency bin index.</p>
+        <pre><code class="lang-perl">my $psd = psd(\@signal)
+p scentroid($psd)   # brightness measure
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-script-name">
@@ -19342,6 +19776,13 @@ p format_bytes(rss - $before) . &quot; allocated&quot;
         <h3><a class="doc-anchor" href="#doc-seconds-to-minutes">#</a> <code>seconds_to_minutes</code></h3>
         <p><code>seconds_to_minutes</code> — unit conversions builtin.</p>
         <pre><code class="lang-perl">my $result = seconds_to_minutes $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sector-area">
+        <h3><a class="doc-anchor" href="#doc-sector-area">#</a> <code>sector_area</code></h3>
+        <p><code>sector_area($radius, $theta)</code> — computes the area of a circular sector. Theta is the central angle in radians. Returns <code>0.5 * r² * theta</code>.</p>
+        <pre><code class="lang-perl">p sector_area(10, 3.14159)   # ~157 (half circle)
+p sector_area(5, 1.57)       # ~19.6
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-semctl">
@@ -19438,6 +19879,13 @@ p format_bytes(rss - $before) . &quot; allocated&quot;
         <pre><code class="lang-perl">my $result = sgnum $x 
 # or in a pipeline:
 @list |&gt; map sgnum |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sharpe">
+        <h3><a class="doc-anchor" href="#doc-sharpe">#</a> <code>sharpe</code></h3>
+        <p><code>sharpe_ratio(\@returns, $risk_free_rate)</code> (alias <code>sharpe</code>) — computes the Sharpe ratio measuring risk-adjusted returns. Higher is better. Returns (mean_return - rf) / stddev.</p>
+        <pre><code class="lang-perl">my @returns = (0.05, -0.02, 0.08, 0.03)
+p sharpe(\@returns, 0.02)   # risk-adjusted performance
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-shift-left">
@@ -19980,6 +20428,13 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p    # files larger than 1 KiB
 @list |&gt; map sorted_nums |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-sortino">
+        <h3><a class="doc-anchor" href="#doc-sortino">#</a> <code>sortino</code></h3>
+        <p><code>sortino_ratio(\@returns, $target)</code> (alias <code>sortino</code>) — computes the Sortino ratio, similar to Sharpe but only penalizes downside volatility. Better for asymmetric return distributions.</p>
+        <pre><code class="lang-perl">my @returns = (0.05, -0.02, 0.08, -0.01)
+p sortino(\@returns, 0.0)   # penalizes only negative returns
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-sortw">
         <h3><a class="doc-anchor" href="#doc-sortw">#</a> <code>sortw</code></h3>
         <p><code>sortw</code> — string processing (uncategorized batch) builtin. Alias for <code>sort_words</code>.</p>
@@ -20042,6 +20497,21 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p    # files larger than 1 KiB
         <pre><code class="lang-perl">my $result = spbfs $x 
 # or in a pipeline:
 @list |&gt; map spbfs |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-spearman">
+        <h3><a class="doc-anchor" href="#doc-spearman">#</a> <code>spearman</code></h3>
+        <p><code>spearman_correlation(\@x, \@y)</code> (alias <code>spearman</code>) — computes Spearman&#39;s rank correlation coefficient between two datasets. Measures monotonic relationships, robust to outliers. Returns a value from -1 to 1.</p>
+        <pre><code class="lang-perl">my @x = (1, 2, 3, 4, 5)
+my @y = (5, 6, 7, 8, 7)
+p spearman(\@x, \@y)   # high positive correlation
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-spectrogram">
+        <h3><a class="doc-anchor" href="#doc-spectrogram">#</a> <code>spectrogram</code></h3>
+        <p><code>spectrogram(\@signal, $window_size, $hop_size)</code> (alias <code>stft</code>) — computes Short-Time Fourier Transform. Returns a 2D arrayref where each row is the spectrum of a windowed segment. Useful for time-frequency analysis.</p>
+        <pre><code class="lang-perl">my $spec = stft(\@audio, 1024, 512)
+# $spec-&gt;[t][f] is magnitude at time t, frequency f
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-speed-distance-time">
@@ -20712,6 +21182,23 @@ my $days = int(sys_uptime / 86400)
 p &quot;up $days days&quot;
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-t-test-one-sample">
+        <h3><a class="doc-anchor" href="#doc-t-test-one-sample">#</a> <code>t_test_one_sample</code></h3>
+        <p><code>t_test_one_sample($mu, @sample)</code> (alias <code>ttest1</code>) — performs a one-sample t-test comparing a sample mean against a hypothesized population mean mu. Returns [t_statistic, degrees_of_freedom]. Use t-distribution tables for p-value lookup.</p>
+        <pre><code class="lang-perl">my @sample = (5.1, 4.9, 5.2, 5.0, 4.8)
+my $result = ttest1(5.0, @sample)
+p &quot;t=$result-&gt;[0] df=$result-&gt;[1]&quot;
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-t-test-two-sample">
+        <h3><a class="doc-anchor" href="#doc-t-test-two-sample">#</a> <code>t_test_two_sample</code></h3>
+        <p><code>t_test_two_sample(\@a, \@b)</code> (alias <code>ttest2</code>) — performs an independent two-sample t-test comparing means of two samples. Assumes equal variances. Returns [t_statistic, degrees_of_freedom].</p>
+        <pre><code class="lang-perl">my @a = (5.1, 5.3, 4.9)
+my @b = (4.2, 4.5, 4.1)
+my $r = ttest2(\@a, \@b)
+p &quot;t=$r-&gt;[0] df=$r-&gt;[1]&quot;
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-tail-lines">
         <h3><a class="doc-anchor" href="#doc-tail-lines">#</a> <code>tail_lines</code></h3>
         <p><code>tail_lines</code> — file stat / path builtin.</p>
@@ -21205,6 +21692,18 @@ p $allowed-&gt;contains(&quot;foo&quot;)
 @list |&gt; map toposort |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-torus-surface">
+        <h3><a class="doc-anchor" href="#doc-torus-surface">#</a> <code>torus_surface</code></h3>
+        <p><code>torus_surface($major_r, $minor_r)</code> — computes the surface area of a torus. Returns <code>4π²Rr</code>.</p>
+        <pre><code class="lang-perl">p torus_surface(10, 2)   # ~789.6
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-torus-volume">
+        <h3><a class="doc-anchor" href="#doc-torus-volume">#</a> <code>torus_volume</code></h3>
+        <p><code>torus_volume($major_r, $minor_r)</code> — computes the volume of a torus with major radius R (center to tube center) and minor radius r (tube radius). Returns <code>2π²Rr²</code>.</p>
+        <pre><code class="lang-perl">p torus_volume(10, 2)   # ~789.6
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-totient-sum">
         <h3><a class="doc-anchor" href="#doc-totient-sum">#</a> <code>totient_sum</code></h3>
         <p><code>totient_sum</code> — math / numeric (uncategorized batch) builtin.</p>
@@ -21259,6 +21758,13 @@ p $allowed-&gt;contains(&quot;foo&quot;)
         <pre><code class="lang-perl">my $result = transform_values $x 
 # or in a pipeline:
 @list |&gt; map transform_values |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-translate-point">
+        <h3><a class="doc-anchor" href="#doc-translate-point">#</a> <code>translate_point</code></h3>
+        <p><code>translate_point($x, $y, $dx, $dy)</code> — translates a 2D point by offset (dx, dy). Returns [$x+$dx, $y+$dy]. Basic vector addition.</p>
+        <pre><code class="lang-perl">my $p = translate_point(1, 2, 3, 4)
+p @$p   # (4, 6)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-transpose">
@@ -21987,12 +22493,32 @@ p $allowed-&gt;contains(&quot;foo&quot;)
 @list |&gt; map values_sorted |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-vangle">
+        <h3><a class="doc-anchor" href="#doc-vangle">#</a> <code>vangle</code></h3>
+        <p><code>vector_angle(\@a, \@b)</code> (alias <code>vangle</code>) — computes the angle in radians between two vectors using the dot product formula.</p>
+        <pre><code class="lang-perl">p vangle([1,0], [0,1])   # ~1.5708 (π/2)
+p vangle([1,0], [1,0])   # 0
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-vat">
         <h3><a class="doc-anchor" href="#doc-vat">#</a> <code>vat</code></h3>
         <p><code>vat</code> — python/ruby stdlib builtin. Alias for <code>values_at</code>.</p>
         <pre><code class="lang-perl">my $result = vat $x 
 # or in a pipeline:
 @list |&gt; map vat |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-vcross">
+        <h3><a class="doc-anchor" href="#doc-vcross">#</a> <code>vcross</code></h3>
+        <p><code>vector_cross(\@a, \@b)</code> (alias <code>vcross</code>) — computes the cross product of two 3D vectors. Returns a 3-element arrayref perpendicular to both inputs.</p>
+        <pre><code class="lang-perl">my $c = vcross([1,0,0], [0,1,0])
+p @$c   # (0, 0, 1)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-vdot">
+        <h3><a class="doc-anchor" href="#doc-vdot">#</a> <code>vdot</code></h3>
+        <p><code>vector_dot(\@a, \@b)</code> (alias <code>vdot</code>) — computes the dot product of two vectors. Returns the scalar sum of element-wise products.</p>
+        <pre><code class="lang-perl">p vdot([1,2,3], [4,5,6])   # 32
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-vec-add">
@@ -22043,6 +22569,20 @@ p $allowed-&gt;contains(&quot;foo&quot;)
 @list |&gt; map vecc |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-vector-magnitude">
+        <h3><a class="doc-anchor" href="#doc-vector-magnitude">#</a> <code>vector_magnitude</code></h3>
+        <p><code>vector_magnitude(\@v)</code> (alias <code>vmag</code>) — computes the Euclidean length (L2 norm) of a vector.</p>
+        <pre><code class="lang-perl">p vmag([3, 4])   # 5
+p vmag([1, 2, 2])   # 3
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-vector-normalize">
+        <h3><a class="doc-anchor" href="#doc-vector-normalize">#</a> <code>vector_normalize</code></h3>
+        <p><code>vector_normalize(\@v)</code> (alias <code>vnorm</code>) — returns a unit vector in the same direction. Divides by magnitude.</p>
+        <pre><code class="lang-perl">my $u = vnorm([3, 4])
+p @$u   # (0.6, 0.8)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-version-cmp">
         <h3><a class="doc-anchor" href="#doc-version-cmp">#</a> <code>version_cmp</code></h3>
         <p><code>version_cmp</code> — file stat / path builtin. Alias for <code>compare_versions</code>.</p>
@@ -22057,6 +22597,12 @@ p $allowed-&gt;contains(&quot;foo&quot;)
         <pre><code class="lang-perl">my $result = void $x 
 # or in a pipeline:
 @list |&gt; map void |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-wacc">
+        <h3><a class="doc-anchor" href="#doc-wacc">#</a> <code>wacc</code></h3>
+        <p><code>wacc($equity, $debt, $cost_equity, $cost_debt, $tax_rate)</code> — computes Weighted Average Cost of Capital. Returns the blended cost of capital accounting for the tax shield on debt.</p>
+        <pre><code class="lang-perl">p wacc(60, 40, 0.10, 0.05, 0.25)   # ~7.5%
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-watts-to-hp">
@@ -22402,6 +22948,14 @@ p scalar wha(&quot;perl&quot;)        # number of perls on PATH
 @list |&gt; map xentropy |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-xirr">
+        <h3><a class="doc-anchor" href="#doc-xirr">#</a> <code>xirr</code></h3>
+        <p><code>xirr(\@cashflows, \@dates)</code> — computes IRR for irregularly-spaced cash flows. Dates can be epoch timestamps or date strings. More accurate than <code>irr</code> for real-world investments.</p>
+        <pre><code class="lang-perl">my @cf = (-1000, 500, 600)
+my @dates = (&#39;2020-01-01&#39;, &#39;2020-07-01&#39;, &#39;2021-01-01&#39;)
+p xirr(\@cf, \@dates)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-xor-bool">
         <h3><a class="doc-anchor" href="#doc-xor-bool">#</a> <code>xor_bool</code></h3>
         <p><code>xor_bool</code> — boolean combinators builtin.</p>
@@ -22462,6 +23016,23 @@ p scalar wha(&quot;perl&quot;)        # number of perls on PATH
         <pre><code class="lang-perl">my $result = yesterday $x 
 # or in a pipeline:
 @list |&gt; map yesterday |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-z-score">
+        <h3><a class="doc-anchor" href="#doc-z-score">#</a> <code>z_score</code></h3>
+        <p><code>z_score($value, $mean, $stddev)</code> — computes the z-score (standard score) of a value given the population mean and standard deviation. Returns how many standard deviations the value is from the mean. Useful for standardizing data and detecting outliers.</p>
+        <pre><code class="lang-perl">my $z = z_score(85, 75, 10)
+p $z   # 1 (one stddev above mean)
+p z_score(50, 60, 5)   # -2
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-z-scores">
+        <h3><a class="doc-anchor" href="#doc-z-scores">#</a> <code>z_scores</code></h3>
+        <p><code>z_scores(@data)</code> — computes z-scores for all values in a list, returning an arrayref of standardized values. Each z-score indicates how many standard deviations that value is from the mean of the dataset. Useful for comparing values across different scales.</p>
+        <pre><code class="lang-perl">my @grades = (70, 80, 90)
+my $zs = z_scores(@grades)
+p @$zs   # (-1, 0, 1)
+@data |&gt; z_scores |&gt; e p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-zalgo">
