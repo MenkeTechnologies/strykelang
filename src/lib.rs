@@ -15,6 +15,7 @@ pub mod compiler;
 pub mod convert;
 mod crypt_util;
 pub mod data_section;
+pub mod debugger;
 pub mod deconvert;
 pub mod deparse;
 pub mod english;

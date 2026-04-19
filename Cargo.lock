@@ -3293,7 +3293,7 @@ checksum = "9091b6114800a5f2141aee1d1b9d6ca3592ac062dc5decb3764ec5895a47b4eb"
 
 [[package]]
 name = "strykelang"
-version = "0.6.5"
+version = "0.6.6"
 dependencies = [
  "aes",
  "aes-gcm",

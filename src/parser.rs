@@ -11646,6 +11646,14 @@ impl Parser {
             | "num_divisors" | "partition_number" | "pascals_triangle" | "skewness"
             | "standard_error" | "subfactorial" | "sum_divisors" | "totient_sum"
             | "tribonacci" | "weighted_mean" | "winsorize"
+            // ── statistics (extended) ─────────────────────────────────────────
+            | "chi_square_stat" | "correlation" | "covariance" | "describe" | "entropy"
+            | "five_number_summary" | "geometric_mean" | "gini" | "gini_coefficient"
+            | "harmonic_mean" | "iqr" | "lorenz_curve" | "mode" | "outliers_iqr"
+            | "percentile_rank" | "quartiles" | "rms" | "root_mean_square"
+            | "sample_stddev" | "sample_variance" | "spearman_correlation"
+            | "t_test_one_sample" | "t_test_two_sample" | "trimmed_mean"
+            | "z_score" | "z_scores"
             // ── number theory / primes ──────────────────────────────────────────
             | "abundant_numbers" | "deficient_numbers" | "is_abundant" | "is_deficient"
             | "is_pentagonal" | "is_perfect" | "is_smith" | "next_prime" | "nth_prime"
@@ -11656,12 +11664,27 @@ impl Parser {
             | "bearing" | "circumference" | "cone_volume" | "cylinder_volume" | "heron_area"
             | "midpoint" | "perimeter_rectangle" | "perimeter_triangle" | "point_distance"
             | "polygon_area" | "slope" | "sphere_surface" | "sphere_volume" | "triangle_hypotenuse"
+            // ── geometry (extended) ───────────────────────────────────────────
+            | "angle_between" | "arc_length" | "bounding_box" | "centroid"
+            | "circle_from_three_points" | "convex_hull" | "ellipse_perimeter"
+            | "frustum_volume" | "haversine_distance" | "line_intersection"
+            | "point_in_polygon" | "polygon_perimeter" | "pyramid_volume"
+            | "reflect_point" | "rotate_point" | "scale_point" | "sector_area"
+            | "torus_surface" | "torus_volume" | "translate_point"
+            | "vector_angle" | "vector_cross" | "vector_dot" | "vector_magnitude" | "vector_normalize"
             // ── constants ───────────────────────────────────────────────────────
             | "avogadro_number" | "boltzmann_constant" | "electron_mass" | "elementary_charge"
             | "gravitational_constant" | "phi" | "pi" | "planck_constant" | "proton_mass"
             | "sol" | "tau"
             // ── finance ─────────────────────────────────────────────────────────
             | "bac_estimate" | "bmi" | "break_even" | "margin" | "markup" | "roi" | "tax" | "tip"
+            // ── finance (extended) ────────────────────────────────────────────
+            | "amortization_schedule" | "black_scholes_call" | "black_scholes_put"
+            | "bond_price" | "bond_yield" | "capm" | "compound_interest" | "continuous_compound"
+            | "discounted_payback" | "duration" | "fv" | "future_value" | "irr"
+            | "max_drawdown" | "modified_duration" | "nper" | "num_periods" | "payback_period"
+            | "pmt" | "present_value" | "pv" | "rule_of_72" | "sharpe_ratio" | "sortino_ratio"
+            | "wacc" | "xirr"
             // ── string processing (uncategorized batch) ─────────────────────────
             | "acronym" | "atbash" | "bigrams" | "camel_to_snake" | "char_frequencies"
             | "chunk_string" | "collapse_whitespace" | "dedent_text" | "indent_text"
@@ -11692,6 +11715,12 @@ impl Parser {
             | "normalize_range" | "peak_detect" | "range_compress" | "range_expand"
             | "reservoir_sample" | "run_length_decode_str" | "run_length_encode_str"
             | "zero_crossings"
+            // ── DSP / signal (extended) ───────────────────────────────────────
+            | "apply_window" | "bandpass_filter" | "cross_correlation" | "cumsum" | "dft"
+            | "diff" | "downsample" | "energy" | "envelope" | "highpass_filter" | "idft"
+            | "lowpass_filter" | "median_filter" | "normalize_signal" | "phase_spectrum"
+            | "power_spectrum" | "resample" | "spectral_centroid" | "spectrogram" | "upsample"
+            | "window_blackman" | "window_hamming" | "window_hann" | "window_kaiser"
             // ── validation predicates (uncategorized batch) ─────────────────────
             | "is_anagram" | "is_balanced_parens" | "is_control" | "is_numeric_string"
             | "is_pangram" | "is_printable" | "is_valid_cidr" | "is_valid_cron"

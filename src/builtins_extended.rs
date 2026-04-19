@@ -862,6 +862,312 @@ fn builtin_weighted_mean(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }))
 }
 
+/// `z_score VALUE, MEAN, STDDEV` — standard score.
+fn builtin_z_score(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let mean = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let sd = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(if sd == 0.0 {
+        0.0
+    } else {
+        (x - mean) / sd
+    }))
+}
+
+/// `z_scores LIST` — compute z-scores for all values in the list.
+fn builtin_z_scores(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let vals: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
+    if vals.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let mean = stats_mean(&vals);
+    let sd = stats_stddev(&vals);
+    Ok(PerlValue::array(
+        vals.iter()
+            .map(|&v| PerlValue::float(if sd == 0.0 { 0.0 } else { (v - mean) / sd }))
+            .collect(),
+    ))
+}
+
+/// `percentile_rank VALUE, SORTED_LIST` — percentile rank of value in list.
+fn builtin_percentile_rank(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let vals: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    if vals.is_empty() {
+        return Ok(PerlValue::float(0.0));
+    }
+    let count_below = vals.iter().filter(|&&v| v < x).count() as f64;
+    let count_equal = vals
+        .iter()
+        .filter(|&&v| (v - x).abs() < f64::EPSILON)
+        .count() as f64;
+    Ok(PerlValue::float(
+        100.0 * (count_below + 0.5 * count_equal) / vals.len() as f64,
+    ))
+}
+
+/// `quartiles LIST` — returns [Q1, Q2 (median), Q3].
+fn builtin_quartiles(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let mut vals: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
+    if vals.is_empty() {
+        return Ok(PerlValue::array(vec![
+            PerlValue::float(0.0),
+            PerlValue::float(0.0),
+            PerlValue::float(0.0),
+        ]));
+    }
+    vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let n = vals.len();
+    let q1 = vals[n / 4];
+    let q2 = vals[n / 2];
+    let q3 = vals[3 * n / 4];
+    Ok(PerlValue::array(vec![
+        PerlValue::float(q1),
+        PerlValue::float(q2),
+        PerlValue::float(q3),
+    ]))
+}
+
+/// `spearman_correlation XS, YS` — Spearman rank correlation coefficient.
+fn builtin_spearman_correlation(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let ys: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let n = xs.len().min(ys.len());
+    if n < 2 {
+        return Ok(PerlValue::float(0.0));
+    }
+    fn ranks(vals: &[f64]) -> Vec<f64> {
+        let mut indexed: Vec<(usize, f64)> = vals.iter().copied().enumerate().collect();
+        indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        let mut r = vec![0.0; vals.len()];
+        for (rank, (orig_idx, _)) in indexed.into_iter().enumerate() {
+            r[orig_idx] = (rank + 1) as f64;
+        }
+        r
+    }
+    let rx = ranks(&xs[..n]);
+    let ry = ranks(&ys[..n]);
+    let d2: f64 = rx.iter().zip(ry.iter()).map(|(x, y)| (x - y).powi(2)).sum();
+    let nf = n as f64;
+    Ok(PerlValue::float(1.0 - (6.0 * d2) / (nf * (nf * nf - 1.0))))
+}
+
+/// `t_test_one_sample SAMPLE, POPULATION_MEAN` — one-sample t-test, returns t-statistic.
+fn builtin_t_test_one_sample(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let sample: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let pop_mean = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let n = sample.len();
+    if n < 2 {
+        return Ok(PerlValue::float(0.0));
+    }
+    let sample_mean = stats_mean(&sample);
+    let sample_sd = stats_stddev(&sample);
+    let se = sample_sd / (n as f64).sqrt();
+    Ok(PerlValue::float(if se == 0.0 {
+        0.0
+    } else {
+        (sample_mean - pop_mean) / se
+    }))
+}
+
+/// `t_test_two_sample SAMPLE1, SAMPLE2` — two-sample t-test (equal variance), returns t-statistic.
+fn builtin_t_test_two_sample(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s1: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let s2: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let n1 = s1.len();
+    let n2 = s2.len();
+    if n1 < 2 || n2 < 2 {
+        return Ok(PerlValue::float(0.0));
+    }
+    let m1 = stats_mean(&s1);
+    let m2 = stats_mean(&s2);
+    let v1 = stats_variance(&s1);
+    let v2 = stats_variance(&s2);
+    let pooled_var = ((n1 as f64 - 1.0) * v1 + (n2 as f64 - 1.0) * v2) / (n1 + n2 - 2) as f64;
+    let se = (pooled_var * (1.0 / n1 as f64 + 1.0 / n2 as f64)).sqrt();
+    Ok(PerlValue::float(if se == 0.0 {
+        0.0
+    } else {
+        (m1 - m2) / se
+    }))
+}
+
+/// `chi_square_stat OBSERVED, EXPECTED` — chi-square statistic.
+fn builtin_chi_square_stat(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let obs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let exp: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let n = obs.len().min(exp.len());
+    if n == 0 {
+        return Ok(PerlValue::float(0.0));
+    }
+    let chi2: f64 = obs[..n]
+        .iter()
+        .zip(exp[..n].iter())
+        .filter(|(_, e)| **e != 0.0)
+        .map(|(o, e)| (o - e).powi(2) / e)
+        .sum();
+    Ok(PerlValue::float(chi2))
+}
+
+/// `entropy LIST` — Shannon entropy (base 2).
+fn builtin_entropy(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    use std::collections::HashMap;
+    let vals: Vec<String> = flatten_args(args).iter().map(|v| v.to_string()).collect();
+    if vals.is_empty() {
+        return Ok(PerlValue::float(0.0));
+    }
+    let mut freq: HashMap<&str, usize> = HashMap::new();
+    for v in &vals {
+        *freq.entry(v.as_str()).or_insert(0) += 1;
+    }
+    let n = vals.len() as f64;
+    let entropy: f64 = freq
+        .values()
+        .map(|&c| {
+            let p = c as f64 / n;
+            if p > 0.0 {
+                -p * p.log2()
+            } else {
+                0.0
+            }
+        })
+        .sum();
+    Ok(PerlValue::float(entropy))
+}
+
+/// `gini_coefficient LIST` — Gini coefficient (0 = perfect equality, 1 = perfect inequality).
+fn builtin_gini(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let mut vals: Vec<f64> = flatten_args(args)
+        .iter()
+        .map(|v| v.to_number())
+        .filter(|&v| v >= 0.0)
+        .collect();
+    if vals.is_empty() {
+        return Ok(PerlValue::float(0.0));
+    }
+    vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let n = vals.len() as f64;
+    let sum: f64 = vals.iter().sum();
+    if sum == 0.0 {
+        return Ok(PerlValue::float(0.0));
+    }
+    let weighted_sum: f64 = vals
+        .iter()
+        .enumerate()
+        .map(|(i, &v)| (2.0 * (i as f64 + 1.0) - n - 1.0) * v)
+        .sum();
+    Ok(PerlValue::float(weighted_sum / (n * sum)))
+}
+
+/// `lorenz_curve LIST` — returns array of cumulative proportions for Lorenz curve.
+fn builtin_lorenz_curve(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let mut vals: Vec<f64> = flatten_args(args)
+        .iter()
+        .map(|v| v.to_number())
+        .filter(|&v| v >= 0.0)
+        .collect();
+    if vals.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let total: f64 = vals.iter().sum();
+    if total == 0.0 {
+        return Ok(PerlValue::array(vec![PerlValue::float(0.0); vals.len()]));
+    }
+    let mut cumsum = 0.0;
+    let curve: Vec<PerlValue> = vals
+        .iter()
+        .map(|&v| {
+            cumsum += v;
+            PerlValue::float(cumsum / total)
+        })
+        .collect();
+    Ok(PerlValue::array(curve))
+}
+
+/// `outliers_iqr LIST` — returns values outside 1.5*IQR from Q1/Q3.
+fn builtin_outliers_iqr(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let mut vals: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
+    if vals.len() < 4 {
+        return Ok(PerlValue::array(vec![]));
+    }
+    vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let n = vals.len();
+    let q1 = vals[n / 4];
+    let q3 = vals[3 * n / 4];
+    let iqr = q3 - q1;
+    let lower = q1 - 1.5 * iqr;
+    let upper = q3 + 1.5 * iqr;
+    let outliers: Vec<PerlValue> = vals
+        .iter()
+        .filter(|&&v| v < lower || v > upper)
+        .map(|&v| PerlValue::float(v))
+        .collect();
+    Ok(PerlValue::array(outliers))
+}
+
+/// `five_number_summary LIST` — [min, Q1, median, Q3, max].
+fn builtin_five_number_summary(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let mut vals: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
+    if vals.is_empty() {
+        return Ok(PerlValue::array(vec![PerlValue::float(0.0); 5]));
+    }
+    vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let n = vals.len();
+    Ok(PerlValue::array(vec![
+        PerlValue::float(vals[0]),
+        PerlValue::float(vals[n / 4]),
+        PerlValue::float(vals[n / 2]),
+        PerlValue::float(vals[3 * n / 4]),
+        PerlValue::float(vals[n - 1]),
+    ]))
+}
+
+/// `describe LIST` — returns hash with min, max, mean, median, stddev, count.
+fn builtin_describe(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let mut vals: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
+    if vals.is_empty() {
+        return Ok(PerlValue::hash_from_pairs(vec![]));
+    }
+    vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let n = vals.len();
+    let mean = stats_mean(&vals);
+    let stddev = stats_stddev(&vals);
+    Ok(PerlValue::hash_from_pairs(vec![
+        ("count".to_string(), PerlValue::integer(n as i64)),
+        ("min".to_string(), PerlValue::float(vals[0])),
+        ("max".to_string(), PerlValue::float(vals[n - 1])),
+        ("mean".to_string(), PerlValue::float(mean)),
+        ("median".to_string(), PerlValue::float(vals[n / 2])),
+        ("stddev".to_string(), PerlValue::float(stddev)),
+        ("sum".to_string(), PerlValue::float(vals.iter().sum())),
+    ]))
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Geometry
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1005,6 +1311,482 @@ fn builtin_degrees_to_compass(interp: &Interpreter, args: &[PerlValue]) -> PerlR
     ))
 }
 
+/// `rotate_point X, Y, ANGLE_DEG [, CX, CY]` — rotate point around center (default origin).
+fn builtin_rotate_point(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let angle = args
+        .get(2)
+        .map(|v| v.to_number())
+        .unwrap_or(0.0)
+        .to_radians();
+    let cx = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
+    let cy = args.get(4).map(|v| v.to_number()).unwrap_or(0.0);
+    let dx = x - cx;
+    let dy = y - cy;
+    let cos_a = angle.cos();
+    let sin_a = angle.sin();
+    Ok(PerlValue::array(vec![
+        PerlValue::float(cx + dx * cos_a - dy * sin_a),
+        PerlValue::float(cy + dx * sin_a + dy * cos_a),
+    ]))
+}
+
+/// `scale_point X, Y, SX, SY [, CX, CY]` — scale point around center (default origin).
+fn builtin_scale_point(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let sx = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let sy = args.get(3).map(|v| v.to_number()).unwrap_or(1.0);
+    let cx = args.get(4).map(|v| v.to_number()).unwrap_or(0.0);
+    let cy = args.get(5).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::array(vec![
+        PerlValue::float(cx + (x - cx) * sx),
+        PerlValue::float(cy + (y - cy) * sy),
+    ]))
+}
+
+/// `translate_point X, Y, DX, DY` — translate point by delta.
+fn builtin_translate_point(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let dx = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    let dy = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::array(vec![
+        PerlValue::float(x + dx),
+        PerlValue::float(y + dy),
+    ]))
+}
+
+/// `reflect_point X, Y, AXIS` — reflect point over 'x', 'y', or 'origin'.
+fn builtin_reflect_point(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let axis = args
+        .get(2)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "origin".to_string());
+    let (nx, ny) = match axis.to_lowercase().as_str() {
+        "x" => (x, -y),
+        "y" => (-x, y),
+        _ => (-x, -y),
+    };
+    Ok(PerlValue::array(vec![
+        PerlValue::float(nx),
+        PerlValue::float(ny),
+    ]))
+}
+
+/// `angle_between X1, Y1, X2, Y2` — angle in degrees from point 1 to point 2.
+fn builtin_angle_between(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x1 = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let y1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let x2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    let y2 = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float((y2 - y1).atan2(x2 - x1).to_degrees()))
+}
+
+/// `line_intersection X1, Y1, X2, Y2, X3, Y3, X4, Y4` — intersection of two line segments.
+fn builtin_line_intersection(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x1 = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let y1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let x2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    let y2 = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
+    let x3 = args.get(4).map(|v| v.to_number()).unwrap_or(0.0);
+    let y3 = args.get(5).map(|v| v.to_number()).unwrap_or(0.0);
+    let x4 = args.get(6).map(|v| v.to_number()).unwrap_or(0.0);
+    let y4 = args.get(7).map(|v| v.to_number()).unwrap_or(0.0);
+    let denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+    if denom.abs() < f64::EPSILON {
+        return Ok(PerlValue::UNDEF);
+    }
+    let t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+    let u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+    if t >= 0.0 && t <= 1.0 && u >= 0.0 && u <= 1.0 {
+        Ok(PerlValue::array(vec![
+            PerlValue::float(x1 + t * (x2 - x1)),
+            PerlValue::float(y1 + t * (y2 - y1)),
+        ]))
+    } else {
+        Ok(PerlValue::UNDEF)
+    }
+}
+
+/// `point_in_polygon X, Y, POLYGON` — test if point is inside polygon (array of [x,y] pairs).
+fn builtin_point_in_polygon(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let px = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let py = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let pts = arg_to_vec(&args.get(2).cloned().unwrap_or(PerlValue::UNDEF));
+    let n = pts.len();
+    if n < 3 {
+        return Ok(PerlValue::integer(0));
+    }
+    let mut inside = false;
+    let mut j = n - 1;
+    for i in 0..n {
+        let pi = arg_to_vec(&pts[i]);
+        let pj = arg_to_vec(&pts[j]);
+        let (xi, yi) = (
+            pi.first().map(|v| v.to_number()).unwrap_or(0.0),
+            pi.get(1).map(|v| v.to_number()).unwrap_or(0.0),
+        );
+        let (xj, yj) = (
+            pj.first().map(|v| v.to_number()).unwrap_or(0.0),
+            pj.get(1).map(|v| v.to_number()).unwrap_or(0.0),
+        );
+        if ((yi > py) != (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi) {
+            inside = !inside;
+        }
+        j = i;
+    }
+    Ok(PerlValue::integer(if inside { 1 } else { 0 }))
+}
+
+/// `convex_hull POINTS` — compute convex hull of 2D points using Graham scan.
+fn builtin_convex_hull(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let pts = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    if pts.len() < 3 {
+        return Ok(args.first().cloned().unwrap_or(PerlValue::array(vec![])));
+    }
+    let mut points: Vec<(f64, f64)> = pts
+        .iter()
+        .map(|p| {
+            let arr = arg_to_vec(p);
+            (
+                arr.first().map(|v| v.to_number()).unwrap_or(0.0),
+                arr.get(1).map(|v| v.to_number()).unwrap_or(0.0),
+            )
+        })
+        .collect();
+    points.sort_by(|a, b| {
+        a.0.partial_cmp(&b.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+    });
+    fn cross(o: (f64, f64), a: (f64, f64), b: (f64, f64)) -> f64 {
+        (a.0 - o.0) * (b.1 - o.1) - (a.1 - o.1) * (b.0 - o.0)
+    }
+    let mut lower: Vec<(f64, f64)> = Vec::new();
+    for &p in &points {
+        while lower.len() >= 2 && cross(lower[lower.len() - 2], lower[lower.len() - 1], p) <= 0.0 {
+            lower.pop();
+        }
+        lower.push(p);
+    }
+    let mut upper: Vec<(f64, f64)> = Vec::new();
+    for &p in points.iter().rev() {
+        while upper.len() >= 2 && cross(upper[upper.len() - 2], upper[upper.len() - 1], p) <= 0.0 {
+            upper.pop();
+        }
+        upper.push(p);
+    }
+    lower.pop();
+    upper.pop();
+    lower.append(&mut upper);
+    Ok(PerlValue::array(
+        lower
+            .into_iter()
+            .map(|(x, y)| PerlValue::array(vec![PerlValue::float(x), PerlValue::float(y)]))
+            .collect(),
+    ))
+}
+
+/// `bounding_box POINTS` — returns [min_x, min_y, max_x, max_y].
+fn builtin_bounding_box(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let pts = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    if pts.is_empty() {
+        return Ok(PerlValue::array(vec![
+            PerlValue::float(0.0),
+            PerlValue::float(0.0),
+            PerlValue::float(0.0),
+            PerlValue::float(0.0),
+        ]));
+    }
+    let mut min_x = f64::INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    for p in &pts {
+        let arr = arg_to_vec(p);
+        let x = arr.first().map(|v| v.to_number()).unwrap_or(0.0);
+        let y = arr.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+        min_x = min_x.min(x);
+        min_y = min_y.min(y);
+        max_x = max_x.max(x);
+        max_y = max_y.max(y);
+    }
+    Ok(PerlValue::array(vec![
+        PerlValue::float(min_x),
+        PerlValue::float(min_y),
+        PerlValue::float(max_x),
+        PerlValue::float(max_y),
+    ]))
+}
+
+/// `centroid POINTS` — geometric center of points.
+fn builtin_centroid(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let pts = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    if pts.is_empty() {
+        return Ok(PerlValue::array(vec![
+            PerlValue::float(0.0),
+            PerlValue::float(0.0),
+        ]));
+    }
+    let mut sum_x = 0.0;
+    let mut sum_y = 0.0;
+    for p in &pts {
+        let arr = arg_to_vec(p);
+        sum_x += arr.first().map(|v| v.to_number()).unwrap_or(0.0);
+        sum_y += arr.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    }
+    let n = pts.len() as f64;
+    Ok(PerlValue::array(vec![
+        PerlValue::float(sum_x / n),
+        PerlValue::float(sum_y / n),
+    ]))
+}
+
+/// `polygon_perimeter POINTS` — perimeter of polygon.
+fn builtin_polygon_perimeter(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let pts = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let n = pts.len();
+    if n < 2 {
+        return Ok(PerlValue::float(0.0));
+    }
+    let mut perimeter = 0.0;
+    for i in 0..n {
+        let p1 = arg_to_vec(&pts[i]);
+        let p2 = arg_to_vec(&pts[(i + 1) % n]);
+        let (x1, y1) = (
+            p1.first().map(|v| v.to_number()).unwrap_or(0.0),
+            p1.get(1).map(|v| v.to_number()).unwrap_or(0.0),
+        );
+        let (x2, y2) = (
+            p2.first().map(|v| v.to_number()).unwrap_or(0.0),
+            p2.get(1).map(|v| v.to_number()).unwrap_or(0.0),
+        );
+        perimeter += ((x2 - x1).powi(2) + (y2 - y1).powi(2)).sqrt();
+    }
+    Ok(PerlValue::float(perimeter))
+}
+
+/// `circle_from_three_points X1, Y1, X2, Y2, X3, Y3` — returns [center_x, center_y, radius].
+fn builtin_circle_from_three_points(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x1 = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let y1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let x2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    let y2 = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
+    let x3 = args.get(4).map(|v| v.to_number()).unwrap_or(0.0);
+    let y3 = args.get(5).map(|v| v.to_number()).unwrap_or(0.0);
+    let ax = x2 - x1;
+    let ay = y2 - y1;
+    let bx = x3 - x1;
+    let by = y3 - y1;
+    let d = 2.0 * (ax * by - ay * bx);
+    if d.abs() < f64::EPSILON {
+        return Ok(PerlValue::UNDEF);
+    }
+    let a2 = ax * ax + ay * ay;
+    let b2 = bx * bx + by * by;
+    let cx = x1 + (by * a2 - ay * b2) / d;
+    let cy = y1 + (ax * b2 - bx * a2) / d;
+    let r = ((x1 - cx).powi(2) + (y1 - cy).powi(2)).sqrt();
+    Ok(PerlValue::array(vec![
+        PerlValue::float(cx),
+        PerlValue::float(cy),
+        PerlValue::float(r),
+    ]))
+}
+
+/// `arc_length RADIUS, ANGLE_DEG` — length of circular arc.
+fn builtin_arc_length(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let r = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let angle = args
+        .get(1)
+        .map(|v| v.to_number())
+        .unwrap_or(0.0)
+        .to_radians();
+    Ok(PerlValue::float(r * angle.abs()))
+}
+
+/// `sector_area RADIUS, ANGLE_DEG` — area of circular sector.
+fn builtin_sector_area(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let r = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let angle = args
+        .get(1)
+        .map(|v| v.to_number())
+        .unwrap_or(0.0)
+        .to_radians();
+    Ok(PerlValue::float(0.5 * r * r * angle.abs()))
+}
+
+/// `torus_volume MAJOR_R, MINOR_R` — volume of torus.
+fn builtin_torus_volume(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let R = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let r = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float(
+        2.0 * std::f64::consts::PI * std::f64::consts::PI * R * r * r,
+    ))
+}
+
+/// `torus_surface MAJOR_R, MINOR_R` — surface area of torus.
+fn builtin_torus_surface(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let R = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let r = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float(
+        4.0 * std::f64::consts::PI * std::f64::consts::PI * R * r,
+    ))
+}
+
+/// `pyramid_volume BASE_AREA, HEIGHT` — volume of pyramid.
+fn builtin_pyramid_volume(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let base = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let h = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float(base * h / 3.0))
+}
+
+/// `frustum_volume R1, R2, HEIGHT` — volume of conical frustum.
+fn builtin_frustum_volume(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let r1 = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let r2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let h = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float(
+        std::f64::consts::PI * h / 3.0 * (r1 * r1 + r1 * r2 + r2 * r2),
+    ))
+}
+
+/// `ellipse_perimeter A, B` — approximate perimeter of ellipse (Ramanujan).
+fn builtin_ellipse_perimeter(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let h = ((a - b) / (a + b)).powi(2);
+    Ok(PerlValue::float(
+        std::f64::consts::PI * (a + b) * (1.0 + 3.0 * h / (10.0 + (4.0 - 3.0 * h).sqrt())),
+    ))
+}
+
+/// `haversine_distance LAT1, LON1, LAT2, LON2` — great circle distance in km.
+fn builtin_haversine_distance(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let lat1 = args
+        .first()
+        .map(|v| v.to_number())
+        .unwrap_or(0.0)
+        .to_radians();
+    let lon1 = args
+        .get(1)
+        .map(|v| v.to_number())
+        .unwrap_or(0.0)
+        .to_radians();
+    let lat2 = args
+        .get(2)
+        .map(|v| v.to_number())
+        .unwrap_or(0.0)
+        .to_radians();
+    let lon2 = args
+        .get(3)
+        .map(|v| v.to_number())
+        .unwrap_or(0.0)
+        .to_radians();
+    let dlat = lat2 - lat1;
+    let dlon = lon2 - lon1;
+    let a = (dlat / 2.0).sin().powi(2) + lat1.cos() * lat2.cos() * (dlon / 2.0).sin().powi(2);
+    let c = 2.0 * a.sqrt().asin();
+    Ok(PerlValue::float(6371.0 * c))
+}
+
+/// `vector_dot A, B` — dot product of two vectors.
+fn builtin_vector_dot(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let b: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let n = a.len().min(b.len());
+    Ok(PerlValue::float(
+        a[..n].iter().zip(b[..n].iter()).map(|(x, y)| x * y).sum(),
+    ))
+}
+
+/// `vector_cross A, B` — cross product of two 3D vectors.
+fn builtin_vector_cross(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let b: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let (a0, a1, a2) = (
+        *a.first().unwrap_or(&0.0),
+        *a.get(1).unwrap_or(&0.0),
+        *a.get(2).unwrap_or(&0.0),
+    );
+    let (b0, b1, b2) = (
+        *b.first().unwrap_or(&0.0),
+        *b.get(1).unwrap_or(&0.0),
+        *b.get(2).unwrap_or(&0.0),
+    );
+    Ok(PerlValue::array(vec![
+        PerlValue::float(a1 * b2 - a2 * b1),
+        PerlValue::float(a2 * b0 - a0 * b2),
+        PerlValue::float(a0 * b1 - a1 * b0),
+    ]))
+}
+
+/// `vector_magnitude V` — length of vector.
+fn builtin_vector_magnitude(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    Ok(PerlValue::float(
+        v.iter().map(|x| x * x).sum::<f64>().sqrt(),
+    ))
+}
+
+/// `vector_normalize V` — unit vector.
+fn builtin_vector_normalize(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let v: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let mag: f64 = v.iter().map(|x| x * x).sum::<f64>().sqrt();
+    if mag == 0.0 {
+        return Ok(PerlValue::array(
+            v.into_iter().map(PerlValue::float).collect(),
+        ));
+    }
+    Ok(PerlValue::array(
+        v.into_iter().map(|x| PerlValue::float(x / mag)).collect(),
+    ))
+}
+
+/// `vector_angle A, B` — angle between vectors in degrees.
+fn builtin_vector_angle(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let b: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let n = a.len().min(b.len());
+    let dot: f64 = a[..n].iter().zip(b[..n].iter()).map(|(x, y)| x * y).sum();
+    let mag_a: f64 = a[..n].iter().map(|x| x * x).sum::<f64>().sqrt();
+    let mag_b: f64 = b[..n].iter().map(|x| x * x).sum::<f64>().sqrt();
+    let denom = mag_a * mag_b;
+    Ok(PerlValue::float(if denom == 0.0 {
+        0.0
+    } else {
+        (dot / denom).clamp(-1.0, 1.0).acos().to_degrees()
+    }))
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Financial
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1102,6 +1884,463 @@ fn builtin_tip(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let amount = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let pct = args.get(1).map(|v| v.to_number()).unwrap_or(15.0);
     Ok(PerlValue::float(amount * pct / 100.0))
+}
+
+/// `irr CASH_FLOWS [, GUESS]` — internal rate of return using Newton-Raphson.
+fn builtin_irr(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let cfs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    if cfs.is_empty() {
+        return Ok(PerlValue::UNDEF);
+    }
+    let mut rate = args.get(1).map(|v| v.to_number()).unwrap_or(0.1);
+    for _ in 0..100 {
+        let mut npv = 0.0;
+        let mut dnpv = 0.0;
+        for (i, &cf) in cfs.iter().enumerate() {
+            let disc = (1.0 + rate).powi(i as i32);
+            npv += cf / disc;
+            if i > 0 {
+                dnpv -= i as f64 * cf / ((1.0 + rate).powi(i as i32 + 1));
+            }
+        }
+        if dnpv.abs() < f64::EPSILON {
+            break;
+        }
+        let new_rate = rate - npv / dnpv;
+        if (new_rate - rate).abs() < 1e-10 {
+            return Ok(PerlValue::float(new_rate));
+        }
+        rate = new_rate;
+    }
+    Ok(PerlValue::float(rate))
+}
+
+/// `xirr CASH_FLOWS, DATES [, GUESS]` — IRR for irregular intervals (dates as days from epoch).
+fn builtin_xirr(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let cfs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let dates: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let n = cfs.len().min(dates.len());
+    if n == 0 {
+        return Ok(PerlValue::UNDEF);
+    }
+    let d0 = dates[0];
+    let mut rate = args.get(2).map(|v| v.to_number()).unwrap_or(0.1);
+    for _ in 0..100 {
+        let mut npv = 0.0;
+        let mut dnpv = 0.0;
+        for i in 0..n {
+            let t = (dates[i] - d0) / 365.0;
+            let disc = (1.0 + rate).powf(t);
+            npv += cfs[i] / disc;
+            if t != 0.0 {
+                dnpv -= t * cfs[i] / ((1.0 + rate).powf(t + 1.0));
+            }
+        }
+        if dnpv.abs() < f64::EPSILON {
+            break;
+        }
+        let new_rate = rate - npv / dnpv;
+        if (new_rate - rate).abs() < 1e-10 {
+            return Ok(PerlValue::float(new_rate));
+        }
+        rate = new_rate;
+    }
+    Ok(PerlValue::float(rate))
+}
+
+/// `payback_period INITIAL, CASH_FLOWS` — years to recover initial investment.
+fn builtin_payback_period(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let initial = args.first().map(|v| v.to_number()).unwrap_or(0.0).abs();
+    let cfs: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let mut cumulative = 0.0;
+    for (i, &cf) in cfs.iter().enumerate() {
+        let prev = cumulative;
+        cumulative += cf;
+        if cumulative >= initial {
+            let frac = if cf == 0.0 {
+                0.0
+            } else {
+                (initial - prev) / cf
+            };
+            return Ok(PerlValue::float(i as f64 + frac));
+        }
+    }
+    Ok(PerlValue::UNDEF)
+}
+
+/// `discounted_payback INITIAL, CASH_FLOWS, RATE` — discounted payback period.
+fn builtin_discounted_payback(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let initial = args.first().map(|v| v.to_number()).unwrap_or(0.0).abs();
+    let cfs: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let rate = args.get(2).map(|v| v.to_number()).unwrap_or(0.1);
+    let mut cumulative = 0.0;
+    for (i, &cf) in cfs.iter().enumerate() {
+        let prev = cumulative;
+        let discounted = cf / (1.0 + rate).powi(i as i32 + 1);
+        cumulative += discounted;
+        if cumulative >= initial {
+            let frac = if discounted == 0.0 {
+                0.0
+            } else {
+                (initial - prev) / discounted
+            };
+            return Ok(PerlValue::float(i as f64 + frac));
+        }
+    }
+    Ok(PerlValue::UNDEF)
+}
+
+/// `pmt RATE, NPER, PV [, FV, TYPE]` — periodic payment for a loan.
+fn builtin_pmt(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let rate = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let nper = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let pv = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    let fv = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
+    let typ = args.get(4).map(|v| v.to_int()).unwrap_or(0);
+    if rate == 0.0 {
+        return Ok(PerlValue::float(-(pv + fv) / nper));
+    }
+    let pvif = (1.0 + rate).powf(nper);
+    let pmt = (rate * (pv * pvif + fv)) / ((pvif - 1.0) * (1.0 + rate * typ as f64));
+    Ok(PerlValue::float(-pmt))
+}
+
+/// `fv RATE, NPER, PMT [, PV, TYPE]` — future value.
+fn builtin_fv(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let rate = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let nper = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let pmt = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    let pv = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
+    let typ = args.get(4).map(|v| v.to_int()).unwrap_or(0);
+    if rate == 0.0 {
+        return Ok(PerlValue::float(-(pv + pmt * nper)));
+    }
+    let pvif = (1.0 + rate).powf(nper);
+    let fv = -pv * pvif - pmt * (1.0 + rate * typ as f64) * (pvif - 1.0) / rate;
+    Ok(PerlValue::float(fv))
+}
+
+/// `pv RATE, NPER, PMT [, FV, TYPE]` — present value.
+fn builtin_pv(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let rate = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let nper = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let pmt = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    let fv = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
+    let typ = args.get(4).map(|v| v.to_int()).unwrap_or(0);
+    if rate == 0.0 {
+        return Ok(PerlValue::float(-(fv + pmt * nper)));
+    }
+    let pvif = (1.0 + rate).powf(nper);
+    let pv = (-fv - pmt * (1.0 + rate * typ as f64) * (pvif - 1.0) / rate) / pvif;
+    Ok(PerlValue::float(pv))
+}
+
+/// `nper RATE, PMT, PV [, FV, TYPE]` — number of periods.
+fn builtin_nper(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let rate = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let pmt = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let pv = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    let fv = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
+    let typ = args.get(4).map(|v| v.to_int()).unwrap_or(0);
+    if rate == 0.0 {
+        return Ok(PerlValue::float(if pmt == 0.0 {
+            0.0
+        } else {
+            -(pv + fv) / pmt
+        }));
+    }
+    let z = pmt * (1.0 + rate * typ as f64) / rate;
+    let nper = (-fv + z).ln() / (pv + z).ln() / (1.0 + rate).ln();
+    Ok(PerlValue::float(nper.abs()))
+}
+
+/// `amortization_schedule PRINCIPAL, RATE, NPER` — returns array of [period, payment, principal, interest, balance].
+fn builtin_amortization_schedule(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let principal = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let rate = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let nper = args.get(2).map(|v| v.to_int()).unwrap_or(1).max(1) as usize;
+    let pmt = if rate == 0.0 {
+        principal / nper as f64
+    } else {
+        principal * rate * (1.0 + rate).powi(nper as i32) / ((1.0 + rate).powi(nper as i32) - 1.0)
+    };
+    let mut balance = principal;
+    let mut schedule = Vec::with_capacity(nper);
+    for i in 1..=nper {
+        let interest = balance * rate;
+        let prin_part = pmt - interest;
+        balance -= prin_part;
+        schedule.push(PerlValue::array(vec![
+            PerlValue::integer(i as i64),
+            PerlValue::float(pmt),
+            PerlValue::float(prin_part),
+            PerlValue::float(interest),
+            PerlValue::float(balance.max(0.0)),
+        ]));
+    }
+    Ok(PerlValue::array(schedule))
+}
+
+/// `bond_price FACE, COUPON_RATE, YIELD, PERIODS` — present value of bond.
+fn builtin_bond_price(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let face = args.first().map(|v| v.to_number()).unwrap_or(1000.0);
+    let coupon_rate = args.get(1).map(|v| v.to_number()).unwrap_or(0.05);
+    let yld = args.get(2).map(|v| v.to_number()).unwrap_or(0.05);
+    let periods = args.get(3).map(|v| v.to_int()).unwrap_or(10).max(1);
+    let coupon = face * coupon_rate;
+    let mut pv = 0.0;
+    for i in 1..=periods {
+        pv += coupon / (1.0 + yld).powi(i as i32);
+    }
+    pv += face / (1.0 + yld).powi(periods as i32);
+    Ok(PerlValue::float(pv))
+}
+
+/// `bond_yield PRICE, FACE, COUPON_RATE, PERIODS [, GUESS]` — yield to maturity.
+fn builtin_bond_yield(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let price = args.first().map(|v| v.to_number()).unwrap_or(1000.0);
+    let face = args.get(1).map(|v| v.to_number()).unwrap_or(1000.0);
+    let coupon_rate = args.get(2).map(|v| v.to_number()).unwrap_or(0.05);
+    let periods = args.get(3).map(|v| v.to_int()).unwrap_or(10).max(1);
+    let mut yld = args.get(4).map(|v| v.to_number()).unwrap_or(0.05);
+    let coupon = face * coupon_rate;
+    for _ in 0..100 {
+        let mut pv = 0.0;
+        let mut dpv = 0.0;
+        for i in 1..=periods {
+            let disc = (1.0 + yld).powi(i as i32);
+            pv += coupon / disc;
+            dpv -= i as f64 * coupon / ((1.0 + yld).powi(i as i32 + 1));
+        }
+        pv += face / (1.0 + yld).powi(periods as i32);
+        dpv -= periods as f64 * face / ((1.0 + yld).powi(periods as i32 + 1));
+        let diff = pv - price;
+        if diff.abs() < 1e-10 {
+            return Ok(PerlValue::float(yld));
+        }
+        if dpv.abs() < f64::EPSILON {
+            break;
+        }
+        yld -= diff / dpv;
+    }
+    Ok(PerlValue::float(yld))
+}
+
+/// `duration CASH_FLOWS, YIELD` — Macaulay duration.
+fn builtin_duration(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let cfs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let yld = args.get(1).map(|v| v.to_number()).unwrap_or(0.05);
+    let mut pv_sum = 0.0;
+    let mut weighted_sum = 0.0;
+    for (i, &cf) in cfs.iter().enumerate() {
+        let t = (i + 1) as f64;
+        let pv = cf / (1.0 + yld).powf(t);
+        pv_sum += pv;
+        weighted_sum += t * pv;
+    }
+    Ok(PerlValue::float(if pv_sum == 0.0 {
+        0.0
+    } else {
+        weighted_sum / pv_sum
+    }))
+}
+
+/// `modified_duration CASH_FLOWS, YIELD` — modified duration.
+fn builtin_modified_duration(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let cfs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let yld = args.get(1).map(|v| v.to_number()).unwrap_or(0.05);
+    let mut pv_sum = 0.0;
+    let mut weighted_sum = 0.0;
+    for (i, &cf) in cfs.iter().enumerate() {
+        let t = (i + 1) as f64;
+        let pv = cf / (1.0 + yld).powf(t);
+        pv_sum += pv;
+        weighted_sum += t * pv;
+    }
+    let mac_dur = if pv_sum == 0.0 {
+        0.0
+    } else {
+        weighted_sum / pv_sum
+    };
+    Ok(PerlValue::float(mac_dur / (1.0 + yld)))
+}
+
+/// `sharpe_ratio RETURNS, RISK_FREE_RATE` — Sharpe ratio.
+fn builtin_sharpe_ratio(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let returns: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let rf = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    if returns.len() < 2 {
+        return Ok(PerlValue::float(0.0));
+    }
+    let mean = stats_mean(&returns);
+    let sd = stats_stddev(&returns);
+    Ok(PerlValue::float(if sd == 0.0 {
+        0.0
+    } else {
+        (mean - rf) / sd
+    }))
+}
+
+/// `sortino_ratio RETURNS, RISK_FREE_RATE` — Sortino ratio (downside deviation).
+fn builtin_sortino_ratio(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let returns: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let rf = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    if returns.len() < 2 {
+        return Ok(PerlValue::float(0.0));
+    }
+    let mean = stats_mean(&returns);
+    let downside: Vec<f64> = returns
+        .iter()
+        .filter(|&&r| r < rf)
+        .map(|&r| (r - rf).powi(2))
+        .collect();
+    let downside_dev = if downside.is_empty() {
+        0.0
+    } else {
+        (downside.iter().sum::<f64>() / downside.len() as f64).sqrt()
+    };
+    Ok(PerlValue::float(if downside_dev == 0.0 {
+        0.0
+    } else {
+        (mean - rf) / downside_dev
+    }))
+}
+
+/// `max_drawdown PRICES` — maximum drawdown as a decimal.
+fn builtin_max_drawdown(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let prices: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
+    if prices.is_empty() {
+        return Ok(PerlValue::float(0.0));
+    }
+    let mut max_dd = 0.0;
+    let mut peak = prices[0];
+    for &price in &prices {
+        if price > peak {
+            peak = price;
+        }
+        let dd = (peak - price) / peak;
+        if dd > max_dd {
+            max_dd = dd;
+        }
+    }
+    Ok(PerlValue::float(max_dd))
+}
+
+/// `compound_interest PRINCIPAL, RATE, TIME [, N]` — compound interest (N compounds per period).
+fn builtin_compound_interest(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let principal = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let rate = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let time = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let n = args.get(3).map(|v| v.to_number()).unwrap_or(1.0).max(1.0);
+    Ok(PerlValue::float(
+        principal * (1.0 + rate / n).powf(n * time),
+    ))
+}
+
+/// `continuous_compound PRINCIPAL, RATE, TIME` — continuous compounding.
+fn builtin_continuous_compound(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let principal = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let rate = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let time = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(principal * (rate * time).exp()))
+}
+
+/// `rule_of_72 RATE` — years to double at given rate.
+fn builtin_rule_of_72(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let rate = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float(if rate == 0.0 {
+        f64::INFINITY
+    } else {
+        72.0 / (rate * 100.0)
+    }))
+}
+
+/// `wacc EQUITY, DEBT, COST_EQUITY, COST_DEBT, TAX_RATE` — weighted average cost of capital.
+fn builtin_wacc(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let equity = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let debt = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let cost_e = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    let cost_d = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
+    let tax = args.get(4).map(|v| v.to_number()).unwrap_or(0.0);
+    let total = equity + debt;
+    if total == 0.0 {
+        return Ok(PerlValue::float(0.0));
+    }
+    let wacc = (equity / total) * cost_e + (debt / total) * cost_d * (1.0 - tax);
+    Ok(PerlValue::float(wacc))
+}
+
+/// `capm RISK_FREE, BETA, MARKET_RETURN` — expected return using CAPM.
+fn builtin_capm(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let rf = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let beta = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let rm = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float(rf + beta * (rm - rf)))
+}
+
+/// `black_scholes_call SPOT, STRIKE, TIME, RATE, VOLATILITY` — Black-Scholes call option price.
+fn builtin_black_scholes_call(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let k = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let t = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let r = args.get(3).map(|v| v.to_number()).unwrap_or(0.05);
+    let sigma = args.get(4).map(|v| v.to_number()).unwrap_or(0.2);
+    if t <= 0.0 || sigma <= 0.0 || s <= 0.0 || k <= 0.0 {
+        return Ok(PerlValue::float(0.0));
+    }
+    let d1 = ((s / k).ln() + (r + sigma * sigma / 2.0) * t) / (sigma * t.sqrt());
+    let d2 = d1 - sigma * t.sqrt();
+    fn norm_cdf(x: f64) -> f64 {
+        0.5 * (1.0 + statrs::function::erf::erf(x / std::f64::consts::SQRT_2))
+    }
+    let call = s * norm_cdf(d1) - k * (-r * t).exp() * norm_cdf(d2);
+    Ok(PerlValue::float(call))
+}
+
+/// `black_scholes_put SPOT, STRIKE, TIME, RATE, VOLATILITY` — Black-Scholes put option price.
+fn builtin_black_scholes_put(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let k = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let t = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let r = args.get(3).map(|v| v.to_number()).unwrap_or(0.05);
+    let sigma = args.get(4).map(|v| v.to_number()).unwrap_or(0.2);
+    if t <= 0.0 || sigma <= 0.0 || s <= 0.0 || k <= 0.0 {
+        return Ok(PerlValue::float(0.0));
+    }
+    let d1 = ((s / k).ln() + (r + sigma * sigma / 2.0) * t) / (sigma * t.sqrt());
+    let d2 = d1 - sigma * t.sqrt();
+    fn norm_cdf(x: f64) -> f64 {
+        0.5 * (1.0 + statrs::function::erf::erf(x / std::f64::consts::SQRT_2))
+    }
+    let put = k * (-r * t).exp() * norm_cdf(-d2) - s * norm_cdf(-d1);
+    Ok(PerlValue::float(put))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2910,6 +4149,532 @@ fn builtin_peak_detect(args: &[PerlValue]) -> PerlResult<PerlValue> {
         }
     }
     Ok(PerlValue::array(peaks))
+}
+
+/// `lowpass_filter SIGNAL, ALPHA` — simple exponential low-pass filter.
+fn builtin_lowpass_filter(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let signal: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let alpha = args
+        .get(1)
+        .map(|v| v.to_number())
+        .unwrap_or(0.5)
+        .clamp(0.0, 1.0);
+    if signal.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let mut out = Vec::with_capacity(signal.len());
+    let mut prev = signal[0];
+    for &s in &signal {
+        prev = alpha * s + (1.0 - alpha) * prev;
+        out.push(PerlValue::float(prev));
+    }
+    Ok(PerlValue::array(out))
+}
+
+/// `highpass_filter SIGNAL, ALPHA` — simple high-pass filter (signal - lowpass).
+fn builtin_highpass_filter(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let signal: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let alpha = args
+        .get(1)
+        .map(|v| v.to_number())
+        .unwrap_or(0.5)
+        .clamp(0.0, 1.0);
+    if signal.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let mut out = Vec::with_capacity(signal.len());
+    let mut lp = signal[0];
+    for &s in &signal {
+        lp = alpha * s + (1.0 - alpha) * lp;
+        out.push(PerlValue::float(s - lp));
+    }
+    Ok(PerlValue::array(out))
+}
+
+/// `bandpass_filter SIGNAL, LOW_ALPHA, HIGH_ALPHA` — bandpass via lowpass then highpass.
+fn builtin_bandpass_filter(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let signal: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let low_alpha = args
+        .get(1)
+        .map(|v| v.to_number())
+        .unwrap_or(0.3)
+        .clamp(0.0, 1.0);
+    let high_alpha = args
+        .get(2)
+        .map(|v| v.to_number())
+        .unwrap_or(0.7)
+        .clamp(0.0, 1.0);
+    if signal.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let mut lp1 = Vec::with_capacity(signal.len());
+    let mut prev = signal[0];
+    for &s in &signal {
+        prev = low_alpha * s + (1.0 - low_alpha) * prev;
+        lp1.push(prev);
+    }
+    let mut out = Vec::with_capacity(signal.len());
+    let mut lp2 = lp1[0];
+    for &s in &lp1 {
+        lp2 = high_alpha * s + (1.0 - high_alpha) * lp2;
+        out.push(PerlValue::float(s - lp2));
+    }
+    Ok(PerlValue::array(out))
+}
+
+/// `median_filter SIGNAL, WINDOW_SIZE` — median filter for noise reduction.
+fn builtin_median_filter(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let signal: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let window = args.get(1).map(|v| v.to_int()).unwrap_or(3).max(1) as usize;
+    let half = window / 2;
+    let mut out = Vec::with_capacity(signal.len());
+    for i in 0..signal.len() {
+        let start = i.saturating_sub(half);
+        let end = (i + half + 1).min(signal.len());
+        let mut window_vals: Vec<f64> = signal[start..end].to_vec();
+        window_vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let mid = window_vals.len() / 2;
+        out.push(PerlValue::float(window_vals[mid]));
+    }
+    Ok(PerlValue::array(out))
+}
+
+/// `window_hann SIZE` — Hann window coefficients.
+fn builtin_window_hann(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_int()).unwrap_or(64).max(1) as usize;
+    Ok(PerlValue::array(
+        (0..n)
+            .map(|i| {
+                let w =
+                    0.5 * (1.0 - (2.0 * std::f64::consts::PI * i as f64 / (n - 1) as f64).cos());
+                PerlValue::float(w)
+            })
+            .collect(),
+    ))
+}
+
+/// `window_hamming SIZE` — Hamming window coefficients.
+fn builtin_window_hamming(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_int()).unwrap_or(64).max(1) as usize;
+    Ok(PerlValue::array(
+        (0..n)
+            .map(|i| {
+                let w =
+                    0.54 - 0.46 * (2.0 * std::f64::consts::PI * i as f64 / (n - 1) as f64).cos();
+                PerlValue::float(w)
+            })
+            .collect(),
+    ))
+}
+
+/// `window_blackman SIZE` — Blackman window coefficients.
+fn builtin_window_blackman(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_int()).unwrap_or(64).max(1) as usize;
+    let a0 = 0.42;
+    let a1 = 0.5;
+    let a2 = 0.08;
+    Ok(PerlValue::array(
+        (0..n)
+            .map(|i| {
+                let x = 2.0 * std::f64::consts::PI * i as f64 / (n - 1) as f64;
+                let w = a0 - a1 * x.cos() + a2 * (2.0 * x).cos();
+                PerlValue::float(w)
+            })
+            .collect(),
+    ))
+}
+
+/// `window_kaiser SIZE, BETA` — Kaiser window coefficients.
+fn builtin_window_kaiser(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_int()).unwrap_or(64).max(1) as usize;
+    let beta = args.get(1).map(|v| v.to_number()).unwrap_or(5.0);
+    fn bessel_i0(x: f64) -> f64 {
+        let mut sum = 1.0;
+        let mut term = 1.0;
+        for k in 1..50 {
+            term *= (x / (2.0 * k as f64)).powi(2);
+            sum += term;
+            if term < 1e-15 {
+                break;
+            }
+        }
+        sum
+    }
+    let denom = bessel_i0(beta);
+    Ok(PerlValue::array(
+        (0..n)
+            .map(|i| {
+                let x = 2.0 * i as f64 / (n - 1) as f64 - 1.0;
+                let w = bessel_i0(beta * (1.0 - x * x).sqrt()) / denom;
+                PerlValue::float(w)
+            })
+            .collect(),
+    ))
+}
+
+/// `apply_window SIGNAL, WINDOW` — element-wise multiply signal by window.
+fn builtin_apply_window(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let signal: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let window: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let n = signal.len().min(window.len());
+    Ok(PerlValue::array(
+        signal[..n]
+            .iter()
+            .zip(window[..n].iter())
+            .map(|(&s, &w)| PerlValue::float(s * w))
+            .collect(),
+    ))
+}
+
+/// `dft SIGNAL` — discrete Fourier transform, returns array of [re, im] pairs.
+fn builtin_dft(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let signal: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
+    let n = signal.len();
+    if n == 0 {
+        return Ok(PerlValue::array(vec![]));
+    }
+    Ok(PerlValue::array(
+        (0..n)
+            .map(|k| {
+                let (mut re, mut im) = (0.0, 0.0);
+                for (i, &s) in signal.iter().enumerate() {
+                    let angle = -2.0 * std::f64::consts::PI * k as f64 * i as f64 / n as f64;
+                    re += s * angle.cos();
+                    im += s * angle.sin();
+                }
+                PerlValue::array(vec![PerlValue::float(re), PerlValue::float(im)])
+            })
+            .collect(),
+    ))
+}
+
+/// `idft SPECTRUM` — inverse DFT from array of [re, im] pairs.
+fn builtin_idft(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let spectrum = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let n = spectrum.len();
+    if n == 0 {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let coeffs: Vec<(f64, f64)> = spectrum
+        .iter()
+        .map(|c| {
+            let arr = arg_to_vec(c);
+            (
+                arr.first().map(|v| v.to_number()).unwrap_or(0.0),
+                arr.get(1).map(|v| v.to_number()).unwrap_or(0.0),
+            )
+        })
+        .collect();
+    Ok(PerlValue::array(
+        (0..n)
+            .map(|i| {
+                let mut sum = 0.0;
+                for (k, &(re, im)) in coeffs.iter().enumerate() {
+                    let angle = 2.0 * std::f64::consts::PI * k as f64 * i as f64 / n as f64;
+                    sum += re * angle.cos() - im * angle.sin();
+                }
+                PerlValue::float(sum / n as f64)
+            })
+            .collect(),
+    ))
+}
+
+/// `power_spectrum SIGNAL` — power spectral density (magnitude squared).
+fn builtin_power_spectrum(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let signal: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
+    let n = signal.len();
+    if n == 0 {
+        return Ok(PerlValue::array(vec![]));
+    }
+    Ok(PerlValue::array(
+        (0..=n / 2)
+            .map(|k| {
+                let (mut re, mut im) = (0.0, 0.0);
+                for (i, &s) in signal.iter().enumerate() {
+                    let angle = -2.0 * std::f64::consts::PI * k as f64 * i as f64 / n as f64;
+                    re += s * angle.cos();
+                    im += s * angle.sin();
+                }
+                PerlValue::float(re * re + im * im)
+            })
+            .collect(),
+    ))
+}
+
+/// `phase_spectrum SIGNAL` — phase angles in radians.
+fn builtin_phase_spectrum(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let signal: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
+    let n = signal.len();
+    if n == 0 {
+        return Ok(PerlValue::array(vec![]));
+    }
+    Ok(PerlValue::array(
+        (0..=n / 2)
+            .map(|k| {
+                let (mut re, mut im) = (0.0, 0.0);
+                for (i, &s) in signal.iter().enumerate() {
+                    let angle = -2.0 * std::f64::consts::PI * k as f64 * i as f64 / n as f64;
+                    re += s * angle.cos();
+                    im += s * angle.sin();
+                }
+                PerlValue::float(im.atan2(re))
+            })
+            .collect(),
+    ))
+}
+
+/// `spectrogram SIGNAL, FRAME_SIZE, HOP_SIZE` — returns 2D array of magnitude frames.
+fn builtin_spectrogram(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let signal: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let frame_size = args.get(1).map(|v| v.to_int()).unwrap_or(256).max(1) as usize;
+    let hop_size = args.get(2).map(|v| v.to_int()).unwrap_or(128).max(1) as usize;
+    let mut frames = Vec::new();
+    let mut i = 0;
+    while i + frame_size <= signal.len() {
+        let frame = &signal[i..i + frame_size];
+        let mags: Vec<PerlValue> = (0..=frame_size / 2)
+            .map(|k| {
+                let (mut re, mut im) = (0.0, 0.0);
+                for (j, &s) in frame.iter().enumerate() {
+                    let angle =
+                        -2.0 * std::f64::consts::PI * k as f64 * j as f64 / frame_size as f64;
+                    re += s * angle.cos();
+                    im += s * angle.sin();
+                }
+                PerlValue::float((re * re + im * im).sqrt())
+            })
+            .collect();
+        frames.push(PerlValue::array(mags));
+        i += hop_size;
+    }
+    Ok(PerlValue::array(frames))
+}
+
+/// `resample SIGNAL, FACTOR` — simple linear interpolation resampling.
+fn builtin_resample(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let signal: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let factor = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(0.01);
+    if signal.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let new_len = ((signal.len() as f64) * factor).round() as usize;
+    let mut out = Vec::with_capacity(new_len);
+    for i in 0..new_len {
+        let pos = i as f64 / factor;
+        let idx = pos.floor() as usize;
+        let frac = pos - idx as f64;
+        let v = if idx + 1 < signal.len() {
+            signal[idx] * (1.0 - frac) + signal[idx + 1] * frac
+        } else {
+            signal[signal.len() - 1]
+        };
+        out.push(PerlValue::float(v));
+    }
+    Ok(PerlValue::array(out))
+}
+
+/// `normalize_signal SIGNAL` — normalize to [-1, 1] range.
+fn builtin_normalize_signal(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let signal: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
+    if signal.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let max_abs = signal.iter().map(|&v| v.abs()).fold(0.0, f64::max);
+    if max_abs == 0.0 {
+        return Ok(PerlValue::array(
+            signal.into_iter().map(PerlValue::float).collect(),
+        ));
+    }
+    Ok(PerlValue::array(
+        signal
+            .into_iter()
+            .map(|v| PerlValue::float(v / max_abs))
+            .collect(),
+    ))
+}
+
+/// `energy SIGNAL` — sum of squares.
+fn builtin_energy(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let signal: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
+    Ok(PerlValue::float(signal.iter().map(|v| v * v).sum()))
+}
+
+/// `spectral_centroid SIGNAL, SAMPLE_RATE` — center of mass of spectrum.
+fn builtin_spectral_centroid(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let signal: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let sr = args.get(1).map(|v| v.to_number()).unwrap_or(44100.0);
+    let n = signal.len();
+    if n == 0 {
+        return Ok(PerlValue::float(0.0));
+    }
+    let mut weighted_sum = 0.0;
+    let mut mag_sum = 0.0;
+    for k in 0..=n / 2 {
+        let (mut re, mut im) = (0.0, 0.0);
+        for (i, &s) in signal.iter().enumerate() {
+            let angle = -2.0 * std::f64::consts::PI * k as f64 * i as f64 / n as f64;
+            re += s * angle.cos();
+            im += s * angle.sin();
+        }
+        let mag = (re * re + im * im).sqrt();
+        let freq = k as f64 * sr / n as f64;
+        weighted_sum += freq * mag;
+        mag_sum += mag;
+    }
+    Ok(PerlValue::float(if mag_sum == 0.0 {
+        0.0
+    } else {
+        weighted_sum / mag_sum
+    }))
+}
+
+/// `envelope SIGNAL, ATTACK, RELEASE` — amplitude envelope follower.
+fn builtin_envelope(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let signal: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let attack = args
+        .get(1)
+        .map(|v| v.to_number())
+        .unwrap_or(0.01)
+        .clamp(0.0, 1.0);
+    let release = args
+        .get(2)
+        .map(|v| v.to_number())
+        .unwrap_or(0.1)
+        .clamp(0.0, 1.0);
+    if signal.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let mut env = 0.0;
+    let out: Vec<PerlValue> = signal
+        .iter()
+        .map(|&s| {
+            let abs_s = s.abs();
+            if abs_s > env {
+                env = attack * abs_s + (1.0 - attack) * env;
+            } else {
+                env = release * abs_s + (1.0 - release) * env;
+            }
+            PerlValue::float(env)
+        })
+        .collect();
+    Ok(PerlValue::array(out))
+}
+
+/// `cross_correlation A, B` — cross-correlation of two signals.
+fn builtin_cross_correlation(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let b: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    if a.is_empty() || b.is_empty() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let n = a.len() + b.len() - 1;
+    let mut result = vec![0.0; n];
+    for (i, &ai) in a.iter().enumerate() {
+        for (j, &bj) in b.iter().enumerate() {
+            result[i + j] += ai * bj;
+        }
+    }
+    Ok(PerlValue::array(
+        result.into_iter().map(PerlValue::float).collect(),
+    ))
+}
+
+/// `downsample SIGNAL, FACTOR` — reduce sample rate by integer factor.
+fn builtin_downsample(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let signal: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let factor = args.get(1).map(|v| v.to_int()).unwrap_or(2).max(1) as usize;
+    Ok(PerlValue::array(
+        signal
+            .into_iter()
+            .step_by(factor)
+            .map(PerlValue::float)
+            .collect(),
+    ))
+}
+
+/// `upsample SIGNAL, FACTOR` — increase sample rate by inserting zeros.
+fn builtin_upsample(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let signal: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let factor = args.get(1).map(|v| v.to_int()).unwrap_or(2).max(1) as usize;
+    let mut out = Vec::with_capacity(signal.len() * factor);
+    for &s in &signal {
+        out.push(PerlValue::float(s));
+        for _ in 1..factor {
+            out.push(PerlValue::float(0.0));
+        }
+    }
+    Ok(PerlValue::array(out))
+}
+
+/// `diff SIGNAL` — first-order difference (derivative approximation).
+fn builtin_diff(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let signal: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
+    if signal.len() < 2 {
+        return Ok(PerlValue::array(vec![]));
+    }
+    Ok(PerlValue::array(
+        signal
+            .windows(2)
+            .map(|w| PerlValue::float(w[1] - w[0]))
+            .collect(),
+    ))
+}
+
+/// `cumsum SIGNAL` — cumulative sum (integral approximation).
+fn builtin_cumsum(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let signal: Vec<f64> = flatten_args(args).iter().map(|v| v.to_number()).collect();
+    let mut sum = 0.0;
+    Ok(PerlValue::array(
+        signal
+            .into_iter()
+            .map(|s| {
+                sum += s;
+                PerlValue::float(sum)
+            })
+            .collect(),
+    ))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

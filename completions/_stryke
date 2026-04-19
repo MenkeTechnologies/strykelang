@@ -1,11 +1,11 @@
-#compdef stryke fo
+#compdef stryke st
 
-# Zsh completion for stryke / fo — a Perl interpreter written in Rust
+# Zsh completion for stryke / st — a Perl interpreter written in Rust
 #
 # Three contexts:
-#   1. `fo build SCRIPT [-o OUT]`            — AOT compile a script to a standalone binary
-#   2. `fo convert [-i] [-d DELIM] FILE...`  — convert Perl to stryke syntax with |> pipes
-#   3. `fo [perl-flags] [SCRIPT] [args]`     — normal interpreter mode
+#   1. `st build SCRIPT [-o OUT]`            — AOT compile a script to a standalone binary
+#   2. `st convert [-i] [-d DELIM] FILE...`  — convert Perl to stryke syntax with |> pipes
+#   3. `st [perl-flags] [SCRIPT] [args]`     — normal interpreter mode
 #
 # Note on the dispatch pattern: we use `_arguments -C` + `'1: :->cmd'` + `'*::arg:->args'`
 # so subcommand handlers run via the standard state-machine. An earlier version of this
@@ -37,25 +37,25 @@ _stryke_debug_flags() {
     'v[verbose: use abs path when printing file names]'
 }
 
-# `fo build SCRIPT [-o OUT]` — bake a Perl script into a standalone executable
+# `st build SCRIPT [-o OUT]` — bake a Perl script into a standalone executable
 _stryke_build() {
   _arguments -s -S \
     '(-o --output)'{-o+,--output=}'[output binary path]:output:_files' \
-    '(-h --help)'{-h,--help}'[show fo build usage]' \
+    '(-h --help)'{-h,--help}'[show st build usage]' \
     '1:script file:_files -g "*.stk *.pl *.pm *.t *.cgi *.psgi"'
 }
 
-# `fo docs [TOPIC]` — built-in documentation browser
+# `st docs [TOPIC]` — built-in documentation browser
 _stryke_docs() {
   local -a _topics
-  _topics=(${(f)"$(fo docs --list 2>/dev/null | sed 's/^ *[0-9]*\. //')"})
+  _topics=(${(f)"$(st docs --list 2>/dev/null | sed 's/^ *[0-9]*\. //')"})
   _describe 'docs topic' _topics
 }
 
-# `fo serve [PORT] [SCRIPT]` — built-in HTTP server (default port 8000)
+# `st serve [PORT] [SCRIPT]` — built-in HTTP server (default port 8000)
 _stryke_serve() {
   _arguments -s -S \
-    '(-h --help)'{-h,--help}'[show fo serve usage]' \
+    '(-h --help)'{-h,--help}'[show st serve usage]' \
     '1:port (default 8000):' \
     '2:script or -e:_files -g "*.stk *.pl"'
 }
@@ -64,15 +64,15 @@ _stryke_deconvert() {
   _arguments -s -S \
     '(-i --in-place)'{-i,--in-place}'[write .pl files alongside originals]' \
     '(-d --output-delim)'{-d+,--output-delim=}'[delimiter for s/// tr/// m// (default: preserve original)]:delimiter:' \
-    '(-h --help)'{-h,--help}'[show fo deconvert usage]' \
+    '(-h --help)'{-h,--help}'[show st deconvert usage]' \
     '*:stryke files:_files -g "*.stk"'
 }
-# `fo convert [-i] [-d DELIM] FILE...` — convert Perl source to idiomatic stryke syntax
+# `st convert [-i] [-d DELIM] FILE...` — convert Perl source to idiomatic stryke syntax
 _stryke_convert() {
   _arguments -s -S \
     '(-i --in-place)'{-i,--in-place}'[rewrite files in place]' \
     '(-d --output-delim)'{-d+,--output-delim=}'[delimiter for s/// tr/// m// (default: preserve original)]:delimiter:' \
-    '(-h --help)'{-h,--help}'[show fo convert usage]' \
+    '(-h --help)'{-h,--help}'[show st convert usage]' \
     '*:perl files:_files -g "*.pl *.pm *.t *.cgi *.psgi"'
 }
 
@@ -98,7 +98,7 @@ _stryke() {
     '--ast[dump parsed AST as JSON and exit (no execution)]' \
     '--fmt[pretty-print parsed Perl to stdout and exit]' \
     '--profile[wall-clock profile: per-line + per-sub timings to stderr]' \
-    '--flame[SVG flamegraph to stdout (fo --flame script.stk > flame.svg)]' \
+    '--flame[SVG flamegraph to stdout (st --flame script.stk > flame.svg)]' \
     '--no-jit[disable Cranelift JIT (bytecode interpreter only)]' \
     '--explain=[print expanded hint for an error code]:error code (e.g. E0001):' \
     '-d+[run program under debugger]::module:' \
@@ -143,8 +143,8 @@ _stryke() {
         'build:compile a Perl script into a standalone executable binary'
         'convert:convert Perl source to idiomatic stryke syntax with |> pipes'
         'deconvert:convert stryke source to vanilla perl syntax'
-        'docs:built-in documentation browser (fo docs pmap)'
-        'serve:start a built-in HTTP server (fo serve 8080 app.stk)'
+        'docs:built-in documentation browser (st docs pmap)'
+        'serve:start a built-in HTTP server (st serve 8080 app.stk)'
       )
       _alternative \
         'subcommands:stryke subcommand:((${subcmds}))' \
