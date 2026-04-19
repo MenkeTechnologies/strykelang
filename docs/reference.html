@@ -1228,7 +1228,7 @@ p $pipeline-&gt;([3,1,4,1,5])  # 3,4,5
 my $add5 = partial($add, 5)
 p $add5-&gt;(3)   # 8
 
-my $log = fn { say &quot;[$_[0]] $_[1]&quot; }
+my $log = fn { p &quot;[$_[0]] $_[1]&quot; }
 my $warn_log = partial($log, &quot;WARN&quot;)
 $warn_log-&gt;(&quot;disk full&quot;)   # [WARN] disk full
 </code></pre>
@@ -1259,7 +1259,7 @@ $fetch_user-&gt;(42)   # returns cached
       <article class="doc-entry" id="doc-once">
         <h3><a class="doc-anchor" href="#doc-once">#</a> <code>once</code></h3>
         <p><code>once</code> wraps a function so it is called at most once. The first invocation executes the function and caches the result; all subsequent calls return the cached value without re-executing. This is ideal for lazy initialization, one-time setup, or singleton patterns.</p>
-        <pre><code class="lang-perl">my $init = once(fn { say &quot;initializing...&quot;
+        <pre><code class="lang-perl">my $init = once(fn { p &quot;initializing...&quot;
     42 })
 p $init-&gt;()   # prints &quot;initializing...&quot; → 42
 p $init-&gt;()   # 42 (no print — cached)
@@ -1355,8 +1355,8 @@ my $p = Point-&gt;new(x =&gt; 1.5, y =&gt; 2.0) # traditional OO style
 my $p = Point()                    # uses defaults if defined
 </code></pre>
         <p>**Field access (getter/setter):**</p>
-        <pre><code class="lang-perl">say $p-&gt;x       # getter (0 args)
-$p-&gt;x(3.0)      # setter (1 arg)
+        <pre><code class="lang-perl">p $p-&gt;x       # getter (0 args)
+$p-&gt;x(3.0)    # setter (1 arg)
 </code></pre>
         <p>**User-defined methods:**</p>
         <pre><code class="lang-perl">struct Circle {
@@ -1367,8 +1367,8 @@ $p-&gt;x(3.0)      # setter (1 arg)
     }
 }
 my $c = Circle(radius =&gt; 5)
-say $c-&gt;area        # 78.53975
-say $c-&gt;scale(2)    # Circle(radius =&gt; 10)
+p $c-&gt;area        # 78.53975
+p $c-&gt;scale(2)    # Circle(radius =&gt; 10)
 </code></pre>
         <p>**Built-in methods:**</p>
         <pre><code class="lang-perl">my $q = $p-&gt;with(x =&gt; 5)  # functional update — new instance
@@ -1377,12 +1377,12 @@ my @f = $p-&gt;fields        # (x, y)
 my $c = $p-&gt;clone         # deep copy
 </code></pre>
         <p>**Smart stringify:**</p>
-        <pre><code class="lang-perl">say $p  # Point(x =&gt; 1.5, y =&gt; 2)
+        <pre><code class="lang-perl">p $p  # Point(x =&gt; 1.5, y =&gt; 2)
 </code></pre>
         <p>**Structural equality:**</p>
         <pre><code class="lang-perl">my $a = Point(1, 2)
 my $b = Point(1, 2)
-say $a == $b  # 1 (compares all fields)
+p $a == $b  # 1 (compares all fields)
 </code></pre>
         <p>Note: field type is checked at construction and mutation; unknown field names are fatal errors.</p>
       </article>
@@ -3238,7 +3238,7 @@ async { par_lines &quot;huge.csv&quot;, fn { $tx-&gt;send($_) }
         <h3><a class="doc-anchor" href="#doc-par-walk">#</a> <code>par_walk</code></h3>
         <p><code>par_walk PATH, { code }</code> — recursively walk a directory tree in parallel, invoking the callback for every file path found.</p>
         <p>Directory traversal is parallelized using a work-stealing thread pool: multiple directories are read concurrently, and the callback fires as each file is discovered. The path is passed as <code>$_</code> (absolute). This is significantly faster than a sequential <code>find</code>-style walk on SSDs and networked filesystems where directory <code>readdir</code> latency dominates. Symlinks are not followed by default to avoid cycles. The walk visits files only — directories themselves are not passed to the callback unless you pass <code>dirs =&gt; 1</code>. Combine with <code>pmap</code> for a two-phase pattern: first collect paths with <code>par_walk</code>, then process file contents in parallel.</p>
-        <pre><code class="lang-perl">par_walk &quot;./src&quot;, fn { say $_ if /\.rs$/ }
+        <pre><code class="lang-perl">par_walk &quot;./src&quot;, fn { p $_ if /\.rs$/ }
 
 # Collect all JSON files under a directory:
 my @json_files
@@ -9307,57 +9307,57 @@ my @F = @{cumtrapz(\@y)}  # [0, 1.5, 4.0, 7.5]
       <article class="doc-entry" id="doc-cyber-banner">
         <h3><a class="doc-anchor" href="#doc-cyber-banner">#</a> <code>cyber_banner</code></h3>
         <p><code>cyber_banner</code> (alias <code>neon_banner</code>) — large neon block-letter banner with gradient coloring and border. Args: text.</p>
-        <pre><code class="lang-perl">say cyber_banner(&quot;STRYKE&quot;)
-say cyber_banner(&quot;HACK THE PLANET&quot;)
+        <pre><code class="lang-perl">p cyber_banner(&quot;STRYKE&quot;)
+p cyber_banner(&quot;HACK THE PLANET&quot;)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-cyber-circuit">
         <h3><a class="doc-anchor" href="#doc-cyber-circuit">#</a> <code>cyber_circuit</code></h3>
         <p><code>cyber_circuit</code> — circuit board pattern with traces, intersections, and glowing nodes. Args: [width, height, seed].</p>
-        <pre><code class="lang-perl">say cyber_circuit()             # 60x20 default
-say cyber_circuit(80, 30, 42)   # custom
+        <pre><code class="lang-perl">p cyber_circuit()             # 60x20 default
+p cyber_circuit(80, 30, 42)   # custom
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-cyber-city">
         <h3><a class="doc-anchor" href="#doc-cyber-city">#</a> <code>cyber_city</code></h3>
         <p><code>cyber_city</code> — procedural neon cityscape with buildings, windows, stars, and antennas. Args: [width, height, seed]. Output: ANSI-colored string for terminal.</p>
-        <pre><code class="lang-perl">say cyber_city()              # 80x24 default
-say cyber_city(120, 40, 99)   # custom size and seed
+        <pre><code class="lang-perl">p cyber_city()              # 80x24 default
+p cyber_city(120, 40, 99)   # custom size and seed
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-cyber-eye">
         <h3><a class="doc-anchor" href="#doc-cyber-eye">#</a> <code>cyber_eye</code></h3>
         <p><code>cyber_eye</code> — cyberpunk all-seeing eye motif with layered glow. Args: [size]. Size: &quot;small&quot; (default) or &quot;large&quot;.</p>
-        <pre><code class="lang-perl">say cyber_eye()          # small eye
-say cyber_eye(&quot;large&quot;)   # large eye
+        <pre><code class="lang-perl">p cyber_eye()          # small eye
+p cyber_eye(&quot;large&quot;)   # large eye
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-cyber-glitch">
         <h3><a class="doc-anchor" href="#doc-cyber-glitch">#</a> <code>cyber_glitch</code></h3>
         <p><code>cyber_glitch</code> (alias <code>glitch_text</code>) — glitch-distort text with ANSI corruption, screen tears, and neon color bleeding. Args: text [, intensity 1-10].</p>
-        <pre><code class="lang-perl">say cyber_glitch(&quot;SYSTEM BREACH&quot;, 7)
-say cyber_glitch(&quot;hello world&quot;)
+        <pre><code class="lang-perl">p cyber_glitch(&quot;SYSTEM BREACH&quot;, 7)
+p cyber_glitch(&quot;hello world&quot;)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-cyber-grid">
         <h3><a class="doc-anchor" href="#doc-cyber-grid">#</a> <code>cyber_grid</code></h3>
         <p><code>cyber_grid</code> — retro perspective grid with vanishing point and neon glow (Tron/synthwave style). Args: [width, height].</p>
-        <pre><code class="lang-perl">say cyber_grid()           # 80x24 default
-say cyber_grid(120, 30)    # wider grid
+        <pre><code class="lang-perl">p cyber_grid()           # 80x24 default
+p cyber_grid(120, 30)    # wider grid
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-cyber-rain">
         <h3><a class="doc-anchor" href="#doc-cyber-rain">#</a> <code>cyber_rain</code></h3>
         <p><code>cyber_rain</code> (alias <code>matrix_rain</code>) — matrix-style digital rain with Japanese katakana and green phosphor glow. Args: [width, height, seed].</p>
-        <pre><code class="lang-perl">say cyber_rain()              # 80x24 default
-say cyber_rain(120, 40, 42)   # custom
+        <pre><code class="lang-perl">p cyber_rain()              # 80x24 default
+p cyber_rain(120, 40, 42)   # custom
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-cyber-skull">
         <h3><a class="doc-anchor" href="#doc-cyber-skull">#</a> <code>cyber_skull</code></h3>
         <p><code>cyber_skull</code> — neon skull ASCII art with glitch effects. Args: [size]. Size: &quot;small&quot; (default) or &quot;large&quot;.</p>
-        <pre><code class="lang-perl">say cyber_skull()          # small skull
-say cyber_skull(&quot;large&quot;)   # large skull
+        <pre><code class="lang-perl">p cyber_skull()          # small skull
+p cyber_skull(&quot;large&quot;)   # large skull
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-cyc">

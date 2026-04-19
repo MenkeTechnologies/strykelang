@@ -241,6 +241,10 @@ fn expand_perl_bundled_token(arg: &str) -> Option<Vec<String>> {
     if s.is_empty() || s.len() == 1 {
         return None;
     }
+    // Operators like `->>`, `->`, `-~>` start with non-letter after `-`; not bundled flags.
+    if s.starts_with('>') || s.starts_with('~') {
+        return None;
+    }
     // `-0` / `-0777` — record separator; do not split into `-0` `-7` …
     if let Some(rest) = s.strip_prefix('0') {
         let rest_ok = rest.chars().all(|c| matches!(c, '0'..='7'));
@@ -1112,8 +1116,12 @@ fn main() {
     // clap parsing is the dominant term on `print "hello\n"` (it knocks ~1ms off the
     // startup bench). We can't bypass clap when any flag is present, so fall through to the
     // full parser in that case.
+    // Exception: `->>`, `->`, `~>` look like flags but are actually threading operators for
+    // inline code — detect via `looks_like_code` and treat as script.
+    let arg1_is_code_not_flag =
+        args.len() >= 2 && args[1].starts_with('-') && looks_like_code(&args[1]);
     let mut cli = if args.len() >= 2
-        && !args[1].starts_with('-')
+        && (!args[1].starts_with('-') || arg1_is_code_not_flag)
         && !args[1].is_empty()
         && args[2..].iter().all(|a| !a.starts_with('-'))
     {
@@ -3097,5 +3105,15 @@ mod cli_argv_tests {
         let a = expand_perl_bundled_argv(args(&["stryke", "-help"]));
         let cli = Cli::try_parse_from(&a).expect("parse");
         assert!(cli.help);
+    }
+
+    #[test]
+    fn thread_operator_not_bundled() {
+        // `->>` and `~>` are threading operators, not bundled flags
+        let a = expand_perl_bundled_argv(args(&["stryke", "->> 1 p"]));
+        assert_eq!(a, args(&["stryke", "->> 1 p"]));
+
+        let b = expand_perl_bundled_argv(args(&["stryke", "~> 1 p"]));
+        assert_eq!(b, args(&["stryke", "~> 1 p"]));
     }
 }
