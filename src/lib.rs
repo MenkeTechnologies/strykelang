@@ -291,8 +291,9 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut Interpreter) -> PerlR
             .insert(def.name.clone(), std::sync::Arc::new(def.clone()));
     }
     for def in &chunk.class_defs {
+        let mut def = def.clone();
         // Final class/method enforcement
-        for parent_name in &def.extends {
+        for parent_name in &def.extends.clone() {
             if let Some(parent_def) = interp.class_defs.get(parent_name) {
                 if parent_def.is_final {
                     return Err(crate::error::PerlError::runtime(
@@ -315,8 +316,8 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut Interpreter) -> PerlR
                 }
             }
         }
-        // Trait contract enforcement
-        for trait_name in &def.implements {
+        // Trait contract enforcement + default method inheritance
+        for trait_name in &def.implements.clone() {
             if let Some(trait_def) = interp.trait_defs.get(trait_name) {
                 for required in trait_def.required_methods() {
                     let has_method = def.methods.iter().any(|m| m.name == required.name);
@@ -328,6 +329,33 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut Interpreter) -> PerlR
                             ),
                             0,
                         ));
+                    }
+                }
+                // Inherit default methods from trait (methods with bodies)
+                for tm in &trait_def.methods {
+                    if tm.body.is_some() && !def.methods.iter().any(|m| m.name == tm.name) {
+                        def.methods.push(tm.clone());
+                    }
+                }
+            }
+        }
+        // Abstract method enforcement: concrete subclasses must implement
+        // all abstract methods (body-less methods) from abstract parents
+        if !def.is_abstract {
+            for parent_name in &def.extends.clone() {
+                if let Some(parent_def) = interp.class_defs.get(parent_name) {
+                    if parent_def.is_abstract {
+                        for m in &parent_def.methods {
+                            if m.body.is_none() && !def.methods.iter().any(|dm| dm.name == m.name) {
+                                return Err(crate::error::PerlError::runtime(
+                                    format!(
+                                        "class `{}` must implement abstract method `{}` from `{}`",
+                                        def.name, m.name, parent_name
+                                    ),
+                                    0,
+                                ));
+                            }
+                        }
                     }
                 }
             }
@@ -348,7 +376,7 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut Interpreter) -> PerlR
         }
         interp
             .class_defs
-            .insert(def.name.clone(), std::sync::Arc::new(def.clone()));
+            .insert(def.name.clone(), std::sync::Arc::new(def));
     }
     let vm_jit = interp.vm_jit_enabled && interp.profiler.is_none();
     let mut vm = vm::VM::new(&chunk, interp);

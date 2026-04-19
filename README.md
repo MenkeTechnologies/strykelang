@@ -57,7 +57,7 @@ A Perl 5 compatible interpreter in Rust with native parallel primitives, NaN-box
 - **Bytecode VM + JIT** — match-dispatch interpreter with Cranelift block + linear-sub JIT (`src/vm.rs`, `src/jit.rs`).
 - **Rayon parallelism** — every parallel builtin uses work-stealing across all cores.
 - **Binary size** ~20 MB stripped (LTO + O3).
-- **Over 2300 standard library functions**
+- **Over 3100 standard library functions**
 
 ---
 
@@ -119,7 +119,7 @@ autoload -Uz compinit && compinit
 | `$NR`/`$NF` AWK compat | **yes** | `-MEnglish` | no | no | native | no | no |
 | Typed structs/enums/classes | **yes** | no | native | native | no | no | native |
 | JIT compiler | **Cranelift** | no | YJIT | no | no | no | no |
-| Single binary | **18MB** | system pkg | system pkg | system pkg | system pkg | 3MB | 50MB+ |
+| Single binary | **21MB** | system pkg | system pkg | system pkg | system pkg | 3MB | 50MB+ |
 
 ---
 
@@ -1448,38 +1448,41 @@ stryke 'my $a = set(1,2,2,3); my $b = set(2,3,4); p scalar($a | $b), " ", scalar
 
 ## [0x0B] BENCHMARKS
 
-### stryke vs perl5 vs python3 vs ruby
+### stryke vs perl5 vs python3 vs ruby vs julia
 
-`bash bench/run_bench_all.sh` — stryke vs perl 5.42.2 vs Python 3.14.4 vs Ruby 4.0.2 on Apple M5 18-core. Mean of 10 hyperfine runs with 3 warmups; **includes process startup** (not steady-state). Values <1.0x mean stryke is faster.
+`bash bench/run_bench_all.sh` — stryke vs perl 5.42.2 vs Python 3.14.4 vs Ruby 4.0.2 vs Julia 1.12.6 on Apple M5 18-core. Mean of 10 hyperfine runs with 3 warmups; **includes process startup** (not steady-state). Values <1.0x mean stryke is faster.
 
 ```
- stryke benchmark harness (4-way)
+ stryke benchmark harness (5-way)
  ──────────────────────────────────────────────
-  stryke:  stryke v0.6.7
+  stryke:  stryke v0.7.0
   perl5:   perl 5.42.2 (darwin-thread-multi-2level)
   python:  Python 3.14.4
   ruby:    ruby 4.0.2 +PRISM [arm64-darwin25]
+  julia:   julia 1.12.6
   cores:   18
   warmup:  3 runs
   measure: hyperfine (min 10 runs)
 
-  bench         stryke ms    perl5 ms  python3 ms     ruby ms    vs perl5   vs python     vs ruby
-  ---------     ---------    --------  ----------     -------    --------   ---------     -------
-  startup             6.3         2.7        15.6        25.8       2.33x       0.40x       0.24x
-  fib                10.3       188.9        62.5        62.7       0.05x       0.16x       0.16x
-  loop                7.4        96.9       258.5        87.2       0.08x       0.03x       0.08x
-  string             13.3        18.3        33.3        51.0       0.73x       0.40x       0.26x
-  hash               11.0        29.3        29.4        37.9       0.38x       0.37x       0.29x
-  array              13.9        26.8        37.0        43.0       0.52x       0.38x       0.32x
-  regex              16.4        94.0       280.4       248.4       0.17x       0.06x       0.07x
-  map_grep           18.3        52.6        42.2        53.6       0.35x       0.43x       0.34x
+  bench         stryke ms    perl5 ms  python3 ms     ruby ms    julia ms    vs perl5   vs python     vs ruby    vs julia
+  ---------     ---------    --------  ----------     -------    --------    --------   ---------     -------    --------
+  startup             7.8         2.9        22.7        38.0        85.8       2.69x       0.34x       0.21x       0.09x
+  fib                12.0       208.1        70.9        64.6        90.6       0.06x       0.17x       0.19x       0.13x
+  loop                8.1        98.0       209.7        81.5        91.0       0.08x       0.04x       0.10x       0.09x
+  string              8.5        11.3        34.2        51.3        94.6       0.75x       0.25x       0.17x       0.09x
+  hash               11.4        40.1        28.2        37.9       123.1       0.28x       0.40x       0.30x       0.09x
+  array              14.3        26.3        37.8        45.4       103.9       0.54x       0.38x       0.31x       0.14x
+  regex              17.6        98.0       332.7       283.0       123.5       0.18x       0.05x       0.06x       0.14x
+  map_grep           19.9        53.9        41.1        54.1       106.9       0.37x       0.48x       0.37x       0.19x
 ```
 
-**stryke vs perl5** — faster on 7 of 8 benches: `fib` 18x, `loop` 13x, `regex` 5.7x, `hash` 2.7x, `map_grep` 2.9x, `array` 1.9x, `string` 1.4x. Only `startup` is slower (2.3x — Rust binary load overhead).
+**stryke vs perl5** — faster on 7 of 8 benches: `fib` 17x, `loop` 12x, `regex` 5.6x, `hash` 3.5x, `map_grep` 2.7x, `array` 1.8x, `string` 1.3x. Only `startup` is slower (2.7x — Rust binary load overhead).
 
-**stryke vs python3** — faster on all 8 benches: `loop` 35x, `regex` 17x, `fib` 6.1x, `array` 2.7x, `startup` 2.5x, `string` 2.5x, `hash` 2.7x, `map_grep` 2.3x. Python uses `io.StringIO` for string bench (not `+=` which is O(n²) and unfair).
+**stryke vs python3** — faster on all 8 benches: `loop` 26x, `regex` 19x, `fib` 5.9x, `startup` 2.9x, `string` 4.0x, `hash` 2.5x, `array` 2.6x, `map_grep` 2.1x. Python uses `io.StringIO` for string bench (not `+=` which is O(n²) and unfair).
 
-**stryke vs ruby** — faster on all 8 benches: `regex` 15x, `loop` 12x, `fib` 6.1x, `string` 3.8x, `startup` 4.1x, `hash` 3.4x, `map_grep` 2.9x, `array` 3.1x.
+**stryke vs ruby** — faster on all 8 benches: `regex` 16x, `loop` 10x, `fib` 5.4x, `startup` 4.9x, `string` 6.0x, `hash` 3.3x, `map_grep` 2.7x, `array` 3.2x.
+
+**stryke vs julia** — faster on all 8 benches: `startup` 11x, `loop` 11x, `string` 11x, `hash` 11x, `fib` 7.6x, `array` 7.3x, `regex` 7.0x, `map_grep` 5.4x. Julia timings include LLVM JIT compilation cost — in long-running sessions Julia compiles to native code and would match C on numeric work. These benchmarks measure **scripting use cases** where startup + single-shot execution matters.
 
 ### stryke vs perl5 (detailed)
 
@@ -1522,7 +1525,7 @@ cargo test --lib                # parser smoke, lexer/value/error/scope, interpr
 cargo test --test integration   # tests/suite/* (runtime, readline list context, line-mode stdin, …)
 cargo bench --bench jit_compare # JIT vs interpreter on the same bytecode
 bash bench/run_bench.sh         # perl5 vs stryke suite (needs hyperfine)
-bash bench/run_bench_all.sh     # stryke vs perl5 vs python3 vs ruby (needs hyperfine)
+bash bench/run_bench_all.sh     # stryke vs perl5 vs python3 vs ruby vs julia (needs hyperfine)
 bash parity/run_parity.sh       # exact stdout/stderr parity vs system perl (20 000+ cases)
 ```
 
