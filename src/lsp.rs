@@ -3375,7 +3375,7 @@ mod completion_tests {
         assert!(matches!(m, LineCompletionMode::Bare(_)));
         assert_eq!(s, "ba");
         let (_, s) = raw_at("foo", 2);
-        assert_eq!(s, "stryke");
+        assert_eq!(s, "fo");
     }
 
     #[test]
