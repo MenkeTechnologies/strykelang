@@ -142,7 +142,7 @@ fn execute_tree_my_scalar_sequence() {
 
 #[test]
 fn execute_tree_registers_sub_for_later_call() {
-    let p = parse("sub times6 { return $_[0] * 6; } times6(7);").expect("parse");
+    let p = parse("sub times6 { return $_0 * 6; } times6(7);").expect("parse");
     let mut i = Interpreter::new();
     let v = i.execute_tree(&p).expect("execute_tree");
     assert_eq!(v.to_int(), 42);

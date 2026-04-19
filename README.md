@@ -110,7 +110,7 @@ autoload -Uz compinit && compinit
 | Built-in SQLite | **yes** | no | no | yes | no | no | yes |
 | Parallel map/grep | **yes** | no | no | no | no | no | `par-each` |
 | Pipe-forward `\|>` | **yes** | no | no | no | no | `\|` | `\|` |
-| Thread macro `t`/`~>` | **yes** | no | no | no | no | no | no |
+| Thread macro `~>` | **yes** | no | no | no | no | no | no |
 | In-place edit `-i` | **parallel** | sequential | sequential | no | no | no | no |
 | Regex engine | **3-tier** | PCRE | Onigmo | `re` | ERE | PCRE | — |
 | Data viz (spark/bars/flame) | **yes** | no | no | no | no | no | no |
@@ -277,7 +277,7 @@ my @r = @huge |> pmap_on $cluster heavy
 **Outer topic `$_<`** — inside nested blocks (`fan`, `fan_cap`, `map`, `grep`, `>{}`), `$_` is rebound per iteration. Use `$_<` to access the **previous** topic, `$_<<` for two levels up, up to `$_<<<<` (4 levels). This is a perlrs extension — stock Perl 5 has no equivalent.
 
 ```perl
-t 10 >{fan `say "outer topic is $_< and inner topic is $_"`}
+~> 10 >{fan `say "outer topic is $_< and inner topic is $_"`}
 
 $_ = 100
 my @r = fan_cap 3 { $_< }  # each worker sees outer topic → (100, 100, 100)
@@ -289,7 +289,7 @@ my @r = fan_cap 2 {
     $cr->($_)  # fan sets $_ = 0, 1
 }  # @r = (100, 101)
 
-$_ = 50; t 10 >{ $_ + $_< }  # 60 — thread sub stage accesses outer topic
+$_ = 50; ~> 10 >{ $_ + $_< }  # 60 — thread sub stage accesses outer topic
 
 $_ = "outer"
 fan_cap 1 { $_ = "inner"; "$_< $_" }  # "outer inner" — interpolation works
@@ -748,9 +748,9 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   $data |> to_xml  |> p  # XML with <root> wrapper
   fr |> map +{name => $_, size => format_bytes(size)} |> th |> to_file("report.html") |> xopen  # cyberpunk HTML table → browser
   fr |> map +{name => $_, size => format_bytes(size)} |> tmd |> to_file("report.md") |> xopen  # GFM Markdown table → viewer
-  # same pipelines in thread syntax:
-  t fr map +{name => $_, size => format_bytes(size)} th to_file($_, "report.html") xopen
-  t fr map +{name => $_, size => format_bytes(size)} tmd to_file($_, "report.md") xopen
+  # same pipelines in ~> syntax:
+  ~> fr map +{name => $_, size => format_bytes(size)} th to_file($_, "report.html") xopen
+  ~> fr map +{name => $_, size => format_bytes(size)} tmd to_file($_, "report.md") xopen
   fr |> map +{name => $_, size => format_bytes(size)} |> tbl |> p                      # plain-text aligned table
   fr |> map +{name => $_, size => format_bytes(size)} |> tmd |> clip                   # markdown table → clipboard
 
@@ -802,11 +802,11 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   %f |> flame |> p  # flamechart
   values %f |> spark |> p  # inline sparkline
 
-  # thread syntax equivalents — no |> needed
-  t qw(a b a c a b) freq bars p
-  t qw(a b a c a b) freq histo p
-  t qw(a b a c a b) freq tbl p
-  t (3,7,1,9,4) spark p
+  # ~> syntax equivalents — no |> needed
+  ~> qw(a b a c a b) freq bars p
+  ~> qw(a b a c a b) freq histo p
+  ~> qw(a b a c a b) freq tbl p
+  ~> (3,7,1,9,4) spark p
 
   # ── inline ANSI colors ─────────────────────────────────────────────
   p "#{red}ERROR#{off} #{green_bold}OK#{off}"  # color names as #{} builtins
@@ -859,12 +859,12 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   Precedence: `|>` binds **looser** than `||` but **tighter** than `?:` / `and`/`or`/`not` — the slot sits between `parse_ternary` and `parse_or_word` in the parser stack. So `$x + 1 |> f` parses as `f($x + 1)`, and `0 || 1 |> yes` parses as `yes(0 || 1)`. The RHS must be a call, builtin, method invocation, bareword, or coderef expression; bare binary expressions / literals on the right are a parse error (`42 |> 1 + 2` is rejected).
 
-- **`thread` macro** (`t`, `~>`, `->>`) — Clojure-inspired threading macro for clean multi-stage pipelines without repeating `|>`. Stages are bare function names, functions with blocks, parenthesized calls `name(args)` where `$_` is the threaded-value placeholder (must appear at least once in args, can sit in any position — first, last, middle, nested), or anonymous blocks (`>{}` / `fn {}` / `sub {}`). Use `|>` after `thread` to continue piping.
+- **`~>` macro** (`thread`, `t`, `->>`) — Clojure-inspired threading macro for clean multi-stage pipelines without repeating `|>`. Stages are bare function names, functions with blocks, parenthesized calls `name(args)` where `$_` is the threaded-value placeholder (must appear at least once in args, can sit in any position — first, last, middle, nested), or anonymous blocks (`>{}` / `fn {}` / `sub {}`). Use `|>` after `~>` to continue piping.
 
   ```perl
-  # thread shines with multiple block-taking functions — no |> repetition
+  # ~> shines with multiple block-taking functions — no |> repetition
   @data = 1..20
-  thread @data grep { $_ % 2 == 0 } map { $_ * $_ } sort { $_1 <=> $_0 } |> join "," |> p
+  ~> @data grep { $_ % 2 == 0 } map { $_ * $_ } sort { $_1 <=> $_0 } |> join "," |> p
   # 400,324,256,196,144,100,64,36,16,4
 
   # Compare: same pipeline with |> requires more syntax
@@ -872,41 +872,41 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   # Long data processing pipeline
   @nums = 1..100
-  thread @nums grep { $_ % 3 == 0 } map { $_ * 2 } grep { $_ > 50 } sort { $_1 <=> $_0 } |> head 5 |> join "," |> p
+  ~> @nums grep { $_ % 3 == 0 } map { $_ * 2 } grep { $_ > 50 } sort { $_1 <=> $_0 } |> head 5 |> join "," |> p
   # 198,192,186,180,174
 
   # Anonymous blocks for custom transforms
-  thread 100 >{ $_ / 2 } >{ $_ + 10 } >{ $_ * 3 } p  # 180
+  ~> 100 >{ $_ / 2 } >{ $_ + 10 } >{ $_ * 3 } p  # 180
 
   # Process list of hashes
   @users = ({name=>"alice",age=>30}, {name=>"bob",age=>25}, {name=>"carol",age=>35})
-  thread @users sort { $_0->{age} <=> $_1->{age} } map { $_->{name} } |> join "," |> p
+  ~> @users sort { $_0->{age} <=> $_1->{age} } map { $_->{name} } |> join "," |> p
   # bob,alice,carol
 
   # String processing with unary builtins
-  thread "  hello world  " trim uc p                 # HELLO WORLD
+  ~> "  hello world  " trim uc p                 # HELLO WORLD
 
   # Parenthesized call stages — `$_` is the threaded-value placeholder
   fn add2 { $_0 + $_1 }
-  thread 10 add2($_, 5) p                            # add2(10, 5)        => 15
-  thread 10 add2(5, $_) p                            # add2(5, 10)        => 15  (any position)
-  thread 10 add2($_, 5) add2($_, 100) p              # chains: 15 then 115
+  ~> 10 add2($_, 5) p                            # add2(10, 5)        => 15
+  ~> 10 add2(5, $_) p                            # add2(5, 10)        => 15  (any position)
+  ~> 10 add2($_, 5) add2($_, 100) p              # chains: 15 then 115
   fn add3 { $_0 + $_1 + $_2 }
-  thread 10 add3(5, $_, 10) p                        # add3(5, 10, 10)    => 25
+  ~> 10 add3(5, $_, 10) p                        # add3(5, 10, 10)    => 25
   # `$_` works inside nested expressions too:
   fn mul { $_0 * $_1 }
-  thread 10 mul($_ + 1, 2) p                         # mul(11, 2)         => 22
+  ~> 10 mul($_ + 1, 2) p                         # mul(11, 2)         => 22
 
   # Reduce with $_0/$_1
-  thread (1..10) reduce { $_0 + $_1 } p              # 55
+  ~> (1..10) reduce { $_0 + $_1 } p              # 55
 
   # Sort and unique
   @data = (3,1,4,1,5,9,2,6,5,3)
-  thread @data sort { $_0 <=> $_1 } uniq |> join "," |> p   # 1,2,3,4,5,6,9
+  ~> @data sort { $_0 <=> $_1 } uniq |> join "," |> p   # 1,2,3,4,5,6,9
   ```
 
-  **When to use `thread` vs `|>`:**
-  - **`thread`**: Best for chains of block-taking functions (`map { }`, `grep { }`, `sort { }`, `reduce { }`)
+  **When to use `~>` vs `|>`:**
+  - **`~>`**: Best for chains of block-taking functions (`map { }`, `grep { }`, `sort { }`, `reduce { }`)
   - **`|>`**: Best for blockless expressions (`map $_ * 2`, `grep $_ > 5`) and unary functions
 
   ```perl
@@ -914,76 +914,76 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   1..20 |> grep $_ % 2 == 0 |> map $_ * $_ |> grep $_ > 50 |> join "," |> p
   # 64,100,144,196,256,324,400
 
-  # thread with blocks — cleanest when every stage needs a block
-  thread @data map { complex($_) } grep { validate($_) } sort { $_0 cmp $_1 } |> p
+  # ~> with blocks — cleanest when every stage needs a block
+  ~> @data map { complex($_) } grep { validate($_) } sort { $_0 cmp $_1 } |> p
   ```
 
   **Stage types:**
-  - **Bare function**: `thread "hello" uc trim` — applies unary builtins in sequence
-  - **Function with block**: `thread @data map { $_ * 2 } grep { $_ > 5 }` — block-taking functions
-  - **Anonymous block**: `thread 5 >{ $_ * 2 }` or `fn { }` or `sub { }` — custom transforms
+  - **Bare function**: `~> "hello" uc trim` — applies unary builtins in sequence
+  - **Function with block**: `~> @data map { $_ * 2 } grep { $_ > 5 }` — block-taking functions
+  - **Anonymous block**: `~> 5 >{ $_ * 2 }` or `fn { }` or `sub { }` — custom transforms
 
-  **Termination:** `|>` ends the `thread` macro: `thread @l f1 f2 f3 |> f4` parses as `(thread @l f1 f2 f3) |> f4`.
+  **Termination:** `|>` ends the `~>` macro: `~> @l f1 f2 f3 |> f4` parses as `(~> @l f1 f2 f3) |> f4`.
 
   **Numeric/statistical pipelines:**
 
   ```perl
   # Sum of squares of even numbers 1-10
-  thread (1..10) grep { $_ % 2 == 0 } map { $_ * $_ } sum p       # 220
+  ~> (1..10) grep { $_ % 2 == 0 } map { $_ * $_ } sum p       # 220
 
   # Mean of squares
-  thread (1..10) map { $_ * $_ } mean p                           # 38.5
+  ~> (1..10) map { $_ * $_ } mean p                           # 38.5
 
   # Multiples of 7 up to 100, doubled, summed
-  thread (1..100) grep { $_ % 7 == 0 } map { $_ * 2 } sum p       # 1470
+  ~> (1..100) grep { $_ % 7 == 0 } map { $_ * 2 } sum p       # 1470
 
   # Sum of odd squares, sqrt, truncate
-  thread (1..50) grep { $_ % 2 == 1 } map { $_ ** 2 } sum sqrt int p  # 144
+  ~> (1..50) grep { $_ % 2 == 1 } map { $_ ** 2 } sum sqrt int p  # 144
 
   # Factorial via product
-  thread (1..10) product p                                        # 3628800
+  ~> (1..10) product p                                        # 3628800
 
   # Remove duplicates, then sum
-  thread (1,1,2,2,3,3,4,5,5) uniq sum p                           # 15
+  ~> (1,1,2,2,3,3,4,5,5) uniq sum p                           # 15
 
   # Shuffle, dedupe, sum (same result, random order internally)
-  thread (1..20) shuffle uniq sum p                               # 210
+  ~> (1..20) shuffle uniq sum p                               # 210
 
   # Statistical measures
-  thread (1..10) mean p                                           # 5.5
-  thread (1..10) median p                                         # 5.5
-  thread (1..10) stddev p                                         # 2.87228...
+  ~> (1..10) mean p                                           # 5.5
+  ~> (1..10) median p                                         # 5.5
+  ~> (1..10) stddev p                                         # 2.87228...
   ```
 
   **String pipelines:**
 
   ```perl
   # Full transformation
-  thread " hello world " trim uc rev lc ucfirst snake_case camel_case kebab_case to_json p
+  ~> " hello world " trim uc rev lc ucfirst snake_case camel_case kebab_case to_json p
   # "d-lrow-olleh"
 
   # String list operations
-  thread ("apple","banana","cherry","date") shuffle reverse minstr p  # apple
-  thread ("apple","banana","cherry","date") shuffle reverse maxstr p  # date
+  ~> ("apple","banana","cherry","date") shuffle reverse minstr p  # apple
+  ~> ("apple","banana","cherry","date") shuffle reverse maxstr p  # date
   ```
 
   **Sorting and aggregation:**
 
   ```perl
   # Sort then get min/max
-  thread (5,2,8,1,9,3) sort { $_0 <=> $_1 } min p                 # 1
-  thread (5,2,8,1,9,3) sort { $_0 <=> $_1 } max p                 # 9
+  ~> (5,2,8,1,9,3) sort { $_0 <=> $_1 } min p                 # 1
+  ~> (5,2,8,1,9,3) sort { $_0 <=> $_1 } max p                 # 9
 
   # Pairs: extract keys and values
-  thread (1,2,3,4,5,6) pairkeys |> join "," |> p                  # 1,3,5
-  thread (1,2,3,4,5,6) pairvalues |> join "," |> p                # 2,4,6
+  ~> (1,2,3,4,5,6) pairkeys |> join "," |> p                  # 1,3,5
+  ~> (1,2,3,4,5,6) pairvalues |> join "," |> p                # 2,4,6
   ```
 
   **Compare with `|>` syntax (same result, more typing):**
 
   ```perl
-  # thread version
-  thread (1..10) grep { $_ % 2 == 0 } map { $_ * $_ } sum p
+  # ~> version
+  ~> (1..10) grep { $_ % 2 == 0 } map { $_ * $_ } sum p
 
   # |> version
   (1..10) |> grep { $_ % 2 == 0 } |> map { $_ * $_ } |> sum |> p
@@ -993,7 +993,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   ```perl
   # perlrs: 1 line, reads left-to-right, no noise
-  thread " hello world " trim uc rev lc ucfirst snake_case camel_case kebab_case to_json p
+  ~> " hello world " trim uc rev lc ucfirst snake_case camel_case kebab_case to_json p
   ```
 
   ```perl
@@ -1068,20 +1068,20 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   The pipe-forward operator eliminates the cognitive overhead of matching parentheses and reading inside-out.
 
-- **Short aliases** — 1-3 character aliases for common functions, designed for `thread`/`|>` pipelines:
+- **Short aliases** — 1-3 character aliases for common functions, designed for `~>`/`|>` pipelines:
 
   ```perl
   # Long form
-  thread " hello world " trim uc rev lc ucfirst snake_case camel_case kebab_case to_json p
+  ~> " hello world " trim uc rev lc ucfirst snake_case camel_case kebab_case to_json p
 
   # Short form (same result)
-  t " hello world " tm uc rv lc ufc sc cc kc tj p
+  ~> " hello world " tm uc rv lc ufc sc cc kc tj p
   ```
 
   | Alias | Function | Alias | Function | Alias | Function |
   |-------|----------|-------|----------|-------|----------|
   | **Thread/Pipe** | | **String** | | **Case** | |
-  | `t` | `thread` | `tm` | `trim` | `sc` | `snake_case` |
+  | `~>` | `thread` | `tm` | `trim` | `sc` | `snake_case` |
   | `p` | `say` | `len` | `length` | `cc` | `camel_case` |
   | `pr` | `print` | `ufc` | `ucfirst` | `kc` | `kebab_case` |
   | | | `lfc` | `lcfirst` | `qm` | `quotemeta` |
@@ -1149,12 +1149,12 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   (1..5) |> reduce { $_0 * $_1 } |> p                  # 120 (factorial)
   ("banana","apple","cherry") |> sort { length($_0) <=> length($_1) } |> join "," |> p  # apple,banana,cherry
 
-  # $_0/$_1 in thread macro
-  thread (1..5) map { $_0 * 2 } sum p                  # 30
-  thread (1..5) reduce { $_0 + $_1 } p                 # 15
-  thread (1..5) reduce { $_0 * $_1 } p                 # 120
-  thread (5,2,8,1) sort { $_0 <=> $_1 } |> join "," |> p  # 1,2,5,8
-  thread (1..10) grep { $_0 % 2 == 0 } map { $_0 * $_0 } sum p  # 220
+  # $_0/$_1 in ~> macro
+  ~> (1..5) map { $_0 * 2 } sum p                  # 30
+  ~> (1..5) reduce { $_0 + $_1 } p                 # 15
+  ~> (1..5) reduce { $_0 * $_1 } p                 # 120
+  ~> (5,2,8,1) sort { $_0 <=> $_1 } |> join "," |> p  # 1,2,5,8
+  ~> (1..10) grep { $_0 % 2 == 0 } map { $_0 * $_0 } sum p  # 220
 
   # Multi-arg anonymous subs: $_0, $_1, ... $_N
   my $add3 = fn { $_0 + $_1 + $_2 }
@@ -1187,33 +1187,33 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   my $cmp = fn { $_0 <=> $_1 }
   (5,2,8,1) |> sort { $cmp->($_0, $_1) } |> join "," |> p  # 1,2,5,8
 
-  # User-defined functions in thread (bare stage, no block needed)
+  # User-defined functions in ~> (bare stage, no block needed)
   fn double { $_0 * 2 }
   fn triple { $_0 * 3 }
   fn add5   { $_0 + 5 }
   fn square { $_0 ** 2 }
   fn half   { $_0 / 2 }
-  thread 2 double triple add5 square half p  # 144.5
+  ~> 2 double triple add5 square half p  # 144.5
 
   fn inc  { $_0 + 1 }
   fn dec  { $_0 - 1 }
   fn dbl  { $_0 * 2 }
   fn neg  { -$_0 }
   fn abs_ { abs($_0) }
-  thread 5 inc dbl dec neg abs_ dbl inc p    # 23
+  ~> 5 inc dbl dec neg abs_ dbl inc p    # 23
 
   fn wrap  { "[$_0]" }
   fn upper { uc($_0) }
   fn trim_ { trim($_0) }
   fn rev_  { rev($_0) }
   fn bang  { "$_0!" }
-  thread "  hello  " trim_ upper rev_ wrap bang p  # [OLLEH]!
+  ~> "  hello  " trim_ upper rev_ wrap bang p  # [OLLEH]!
 
   # User-defined functions inside blocks
   fn is_even { $_0 % 2 == 0 }
-  thread (1..10) grep { is_even($_) } sum p  # 30
+  ~> (1..10) grep { is_even($_) } sum p  # 30
 
-  thread (1..5) map { square($_) } sum p     # 55
+  ~> (1..5) map { square($_) } sum p     # 55
 
   # Multi-arg user-defined functions
   fn add  { $_0 + $_1 }
@@ -1222,8 +1222,21 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   p mul3(2, 3, 4)                            # 24
 
   # Inline transforms with >{ } (arrow block)
-  thread 5 >{ $_ * 2 } >{ $_ + 10 } p        # 20
-  thread 100 >{ $_0 / 2 } >{ $_0 + 10 } >{ $_0 * 3 } p  # 180
+  ~> 5 >{ $_ * 2 } >{ $_ + 10 } p        # 20
+  ~> 100 >{ $_0 / 2 } >{ $_0 + 10 } >{ $_0 * 3 } p  # 180
+  ```
+
+- **Block params `{ |$var| body }`** — name the block's implicit arguments with Ruby-style `|$params|` at the start of a block. For single-param blocks (`map`, `grep`, `each`), the param aliases `$_`. For two-param blocks (`sort`, `reduce`), they alias `$a`/`$b`. For N≥3 params, they alias `$_`, `$_1`, `$_2`, etc.
+
+  ```perl
+  # Single param — aliases $_
+  map { |$n| $n * $n }, 1..5                         # 1 4 9 16 25
+  grep { |$x| $x > 3 }, 1..6                         # 4 5 6
+  (1..3) |> map { |$n| $n + 10 } |> join ","         # 11,12,13
+
+  # Two params — aliases $a/$b
+  sort { |$x, $y| $y <=> $x }, 3, 1, 4, 1, 5        # 5 4 3 1 1
+  reduce { |$acc, $val| $acc + $val }, 1..10         # 55
   ```
 
 `perlrs` is **not** a full `perl` replacement: many real `.pm` files (especially XS modules) will not run. See [`PARITY_ROADMAP.md`](parity/PARITY_ROADMAP.md).

@@ -45,7 +45,7 @@ fn return_with_postfix_if() {
 #[test]
 fn sub_with_prototype_two_scalars_uses_at_underscore() {
     assert_eq!(
-        eval_int("sub add2 ($$) { return $_[0] + $_[1]; } add2(40, 2)"),
+        eval_int("sub add2 ($$) { return $_0 + $_1; } add2(40, 2)"),
         42
     );
 }
@@ -149,7 +149,7 @@ fn anon_sub_perlrs_signature() {
 #[test]
 fn coderef_invocation_with_arrow() {
     assert_eq!(
-        eval_int(r#"sub dbl { $_[0] * 2 } my $r = \&dbl; $r->(21)"#),
+        eval_int(r#"sub dbl { $_0 * 2 } my $r = \&dbl; $r->(21)"#),
         42,
     );
 }

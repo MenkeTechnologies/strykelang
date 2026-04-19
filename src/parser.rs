@@ -1366,6 +1366,12 @@ impl Parser {
     fn parse_block(&mut self) -> PerlResult<Block> {
         self.expect(&Token::LBrace)?;
         let mut stmts = Vec::new();
+        // `{ |$a, $b| body }` — Ruby-style block params.
+        // Desugars to `my $a = $_` (1 param), `my $a = $a; my $b = $b` (2 — sort/reduce),
+        // or `my $p = $_N` for positional N≥3.
+        if let Some(param_stmts) = self.try_parse_block_params()? {
+            stmts.extend(param_stmts);
+        }
         while !matches!(self.peek(), Token::RBrace | Token::Eof) {
             if self.eat(&Token::Semicolon) {
                 continue;
@@ -1375,6 +1381,99 @@ impl Parser {
         self.expect(&Token::RBrace)?;
         Self::default_topic_for_sole_bareword(&mut stmts);
         Ok(stmts)
+    }
+
+    /// Try to parse `|$var1, $var2, ...|` at the start of a block.
+    /// Returns `None` if the leading `|` is not block-param syntax.
+    /// When successful, returns `my $var = <implicit>` assignment statements
+    /// that alias the block's positional arguments.
+    fn try_parse_block_params(&mut self) -> PerlResult<Option<Vec<Statement>>> {
+        if !matches!(self.peek(), Token::BitOr) {
+            return Ok(None);
+        }
+        // Lookahead: `| $scalar [, $scalar]* |` — verify before consuming.
+        let mut i = 1; // skip the opening `|`
+        loop {
+            match self.peek_at(i) {
+                Token::ScalarVar(_) => i += 1,
+                _ => return Ok(None), // not `|$var...|`
+            }
+            match self.peek_at(i) {
+                Token::BitOr => break,  // closing `|`
+                Token::Comma => i += 1, // more params
+                _ => return Ok(None),   // not block params
+            }
+        }
+        // Confirmed — consume and build assignments.
+        let line = self.peek_line();
+        self.advance(); // eat opening `|`
+        let mut names = Vec::new();
+        loop {
+            if let Token::ScalarVar(ref name) = self.peek().clone() {
+                names.push(name.clone());
+                self.advance();
+            }
+            if self.eat(&Token::BitOr) {
+                break;
+            }
+            self.expect(&Token::Comma)?;
+        }
+        // Generate `my $name = <source>` for each param.
+        // 1 param  → source is `$_` (map/grep/each/for topic)
+        // 2 params → sources are `$a`, `$b` (sort/reduce)
+        // N params → sources are `$_`, `$_1`, `$_2`, … (positional)
+        let sources: Vec<&str> = match names.len() {
+            1 => vec!["_"],
+            2 => vec!["a", "b"],
+            n => {
+                // Can't return borrowed from a generated vec, handle below.
+                let _ = n;
+                vec![] // sentinel — handled in the else branch
+            }
+        };
+        let mut stmts = Vec::with_capacity(names.len());
+        if !sources.is_empty() {
+            for (name, src) in names.iter().zip(sources.iter()) {
+                stmts.push(Statement {
+                    label: None,
+                    kind: StmtKind::My(vec![VarDecl {
+                        sigil: Sigil::Scalar,
+                        name: name.clone(),
+                        initializer: Some(Expr {
+                            kind: ExprKind::ScalarVar(src.to_string()),
+                            line,
+                        }),
+                        frozen: false,
+                        type_annotation: None,
+                    }]),
+                    line,
+                });
+            }
+        } else {
+            // N≥3: positional `$_`, `$_1`, `$_2`, …
+            for (idx, name) in names.iter().enumerate() {
+                let src = if idx == 0 {
+                    "_".to_string()
+                } else {
+                    format!("_{idx}")
+                };
+                stmts.push(Statement {
+                    label: None,
+                    kind: StmtKind::My(vec![VarDecl {
+                        sigil: Sigil::Scalar,
+                        name: name.clone(),
+                        initializer: Some(Expr {
+                            kind: ExprKind::ScalarVar(src),
+                            line,
+                        }),
+                        frozen: false,
+                        type_annotation: None,
+                    }]),
+                    line,
+                });
+            }
+        }
+        Ok(Some(stmts))
     }
 
     /// Block shorthand: when the body is literally one bare builtin call

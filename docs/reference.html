@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/perlrs" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">perlrs v0.6.0 · 2582 topics · 24 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">perlrs v0.6.1 · 2582 topics · 24 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -487,16 +487,14 @@ $url |&gt; fetch_json |&gt; json_jq &#39;.name&#39; |&gt; p
       <article class="doc-entry" id="doc-thread">
         <h3><a class="doc-anchor" href="#doc-thread">#</a> <code>thread</code></h3>
         <p>Clojure-inspired threading macro — chain stages without repeating <code>|&gt;</code>.</p>
-        <pre><code class="lang-perl">thread @data grep { $_ &gt; 5 } map { $_ * 2 } sort { $_0 &lt;=&gt; $_1 } |&gt; join &quot;,&quot; |&gt; p
-t &quot; hello &quot; tm uc rv lc ufc sc cc kc tj p  # short aliases
-~&gt; &quot; hello &quot; tm uc rv lc ufc sc cc kc tj p  # operator alias for t
--&gt;&gt; &quot; hello &quot; tm uc p                       # Clojure-style alias
+        <pre><code class="lang-perl">~&gt; @data grep { $_ &gt; 5 } map { $_ * 2 } sort { $_0 &lt;=&gt; $_1 } |&gt; join &quot;,&quot; |&gt; p
+~&gt; &quot; hello &quot; tm uc rv lc ufc sc cc kc tj p  # short aliases
 sub add2 { $_0 + $_1 }
-t 10 add2($_, 5) p                          # add2(10, 5) = 15
-t 10 add2(5, $_) p                          # add2(5, 10) = 15  (any position)
-t 10 add2($_, 5) add2($_, 100) p            # 115 (chained)
+~&gt; 10 add2($_, 5) p                          # add2(10, 5) = 15
+~&gt; 10 add2(5, $_) p                          # add2(5, 10) = 15  (any position)
+~&gt; 10 add2($_, 5) add2($_, 100) p            # 115 (chained)
 </code></pre>
-        <p>Four equivalent spellings: <code>thread</code>, <code>t</code>, <code>~&gt;</code>, <code>-&gt;&gt;</code>. Stages: bare function (<code>uc</code>, <code>tm</code>, …), function with block (<code>map { … }</code>, <code>grep { … }</code>), <code>name(args)</code> call where <code>$_</code> is the threaded-value placeholder (must appear at least once in args), or <code>&gt;{}</code> anonymous block. <code>|&gt;</code> terminates the thread macro.</p>
+        <p>Four equivalent spellings: <code>~&gt;</code>, <code>thread</code>, <code>t</code>, <code>-&gt;&gt;</code>. Stages: bare function (<code>uc</code>, <code>tm</code>, …), function with block (<code>map { … }</code>, <code>grep { … }</code>), <code>name(args)</code> call where <code>$_</code> is the threaded-value placeholder (must appear at least once in args), or <code>&gt;{}</code> anonymous block. <code>|&gt;</code> terminates the <code>~&gt;</code> macro.</p>
       </article>
       <article class="doc-entry" id="doc-pipeline">
         <h3><a class="doc-anchor" href="#doc-pipeline">#</a> <code>pipeline</code></h3>
@@ -777,27 +775,30 @@ stdin |&gt; nth 0 |&gt; p                   # first line
       <p class="chapter-meta">62 topics</p>
       <article class="doc-entry" id="doc-map">
         <h3><a class="doc-anchor" href="#doc-map">#</a> <code>map</code></h3>
-        <p><code>map BLOCK LIST</code> — evaluates the block for each element of the list, setting <code>$_</code> to the current element, and returns a new list of all the block&#39;s return values. This is the eager version: it consumes the entire input list and produces the entire output list before returning. Use <code>map</code> when you need the full result array or when the input is small. For large or infinite sequences, prefer <code>maps</code> (the streaming variant). The block can return zero, one, or multiple values per element, making <code>map</code> useful for both transformation and flattening.</p>
+        <p><code>map BLOCK LIST</code> — evaluates the block for each element of the list, setting <code>$_</code> to the current element, and returns a new list of all the block&#39;s return values. This is the eager version: it consumes the entire input list and produces the entire output list before returning. Use <code>map</code> when you need the full result array or when the input is small. For large or infinite sequences, prefer <code>maps</code> (the streaming variant). The block can return zero, one, or multiple values per element, making <code>map</code> useful for both transformation and flattening. Use <code>{ |$var| body }</code> to name the block parameter instead of <code>$_</code>.</p>
         <pre><code class="lang-perl">my @sq = map { $_ ** 2 } 1..5
 @sq |&gt; e p   # 1 4 9 16 25
+map { |$n| $n * $n }, 1..5   # named param
 my @pairs = map { ($_, $_ * 10) } 1..3
 @pairs |&gt; e p   # 1 10 2 20 3 30
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-grep">
         <h3><a class="doc-anchor" href="#doc-grep">#</a> <code>grep</code></h3>
-        <p><code>grep { BLOCK } LIST</code> — filters the list, returning only elements for which the block evaluates to true. The current element is available as <code>$_</code>. This is the eager version: it processes the entire list and returns a new list. It is Perl-compatible and works exactly like Perl&#39;s builtin <code>grep</code>. For streaming/lazy filtering in <code>|&gt;</code> pipelines, use <code>greps</code> or <code>filter</code> instead. Remember that <code>grep</code> in Perl is a list filter, not a text-search tool; for regex matching on files, use the <code>grep</code> command-line utility or perlrs&#39;s file I/O.</p>
+        <p><code>grep { BLOCK } LIST</code> — filters the list, returning only elements for which the block evaluates to true. The current element is available as <code>$_</code>. This is the eager version: it processes the entire list and returns a new list. It is Perl-compatible and works exactly like Perl&#39;s builtin <code>grep</code>. For streaming/lazy filtering in <code>|&gt;</code> pipelines, use <code>greps</code> or <code>filter</code> instead. Use <code>{ |$var| body }</code> to name the block parameter instead of <code>$_</code>.</p>
         <pre><code class="lang-perl">my @evens = grep { $_ % 2 == 0 } 1..10
 @evens |&gt; e p   # 2 4 6 8 10
+grep { |$x| $x &gt; 3 }, 1..6   # named param
 my @long = grep { length($_) &gt; 3 } @words
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-sort">
         <h3><a class="doc-anchor" href="#doc-sort">#</a> <code>sort</code></h3>
-        <p><code>sort [BLOCK] LIST</code> — returns a new list sorted in ascending order. Without a block, <code>sort</code> compares elements as strings (lexicographic). Pass a comparator block using <code>$_0</code> and <code>$_1</code> (perlrs style) or <code>$a</code> and <code>$b</code> (classic Perl) to control ordering: use <code>&lt;=&gt;</code> for numeric and <code>cmp</code> for string comparison. The sort is stable in perlrs, meaning equal elements preserve their original relative order. For descending order, reverse the operands in the comparator. Works naturally in <code>|&gt;</code> pipelines.</p>
+        <p><code>sort [BLOCK] LIST</code> — returns a new list sorted in ascending order. Without a block, <code>sort</code> compares elements as strings (lexicographic). Pass a comparator block using <code>$_0</code> and <code>$_1</code> (perlrs style) or <code>$a</code> and <code>$b</code> (classic Perl) to control ordering: use <code>&lt;=&gt;</code> for numeric and <code>cmp</code> for string comparison. The sort is stable in perlrs, meaning equal elements preserve their original relative order. For descending order, reverse the operands in the comparator. Use <code>{ |$x, $y| body }</code> to name the two comparator params. Works naturally in <code>|&gt;</code> pipelines.</p>
         <pre><code class="lang-perl">my @nums = (3, 1, 4, 1, 5)
 my @asc = sort { $_0 &lt;=&gt; $_1 } @nums
 @asc |&gt; e p   # 1 1 3 4 5
+sort { |$x, $y| $y &lt;=&gt; $x }, @nums   # named params
 my @desc = sort { $_1 &lt;=&gt; $_0 } @nums
 @desc |&gt; e p  # 5 4 3 1 1
 @nums |&gt; sort |&gt; e p   # string sort in pipeline
@@ -815,9 +816,10 @@ my @r = reverse 1..5   # (5,4,3,2,1)
       </article>
       <article class="doc-entry" id="doc-reduce">
         <h3><a class="doc-anchor" href="#doc-reduce">#</a> <code>reduce</code></h3>
-        <p><code>reduce { $_0 OP $_1 } @list</code> — performs a sequential left fold over the list. The first two elements are passed as <code>$_0</code> and <code>$_1</code> to the block; the result becomes <code>$_0</code> for the next iteration. The traditional <code>$a</code>/<code>$b</code> names are also supported for Perl compatibility. Returns <code>undef</code> for an empty list and the single element for a one-element list. For a fold with an explicit initial value, see <code>fold</code>.</p>
+        <p><code>reduce { $_0 OP $_1 } @list</code> — performs a sequential left fold over the list. The first two elements are passed as <code>$_0</code> and <code>$_1</code> to the block; the result becomes <code>$_0</code> for the next iteration. The traditional <code>$a</code>/<code>$b</code> names are also supported for Perl compatibility. Use <code>{ |$acc, $val| body }</code> to name the two params. Returns <code>undef</code> for an empty list and the single element for a one-element list. For a fold with an explicit initial value, see <code>fold</code>.</p>
         <pre><code class="lang-perl">my $fac = reduce { $_0 * $_1 } 1..6
 p $fac   # 720
+reduce { |$acc, $val| $acc + $val }, 1..10   # 55 (named params)
 my $longest = reduce { length($_0) &gt; length($_1) ? $_0 : $_1 } @words
 </code></pre>
       </article>
@@ -3701,7 +3703,7 @@ close $fh
       </article>
       <article class="doc-entry" id="doc-state">
         <h3><a class="doc-anchor" href="#doc-state">#</a> <code>state</code></h3>
-        <p>Declare a persistent lexical variable that retains its value across calls to the enclosing subroutine. Unlike <code>my</code>, which reinitializes on each call, <code>state</code> initializes only once — the first time execution reaches the declaration — and preserves the value for all subsequent calls. This is perfect for counters, caches, and memoization without resorting to globals or closures over external variables. In perlrs, <code>state</code> variables are per-thread when used inside <code>t { }</code> or <code>fan</code> blocks; they are not shared across workers.</p>
+        <p>Declare a persistent lexical variable that retains its value across calls to the enclosing subroutine. Unlike <code>my</code>, which reinitializes on each call, <code>state</code> initializes only once — the first time execution reaches the declaration — and preserves the value for all subsequent calls. This is perfect for counters, caches, and memoization without resorting to globals or closures over external variables. In perlrs, <code>state</code> variables are per-thread when used inside <code>~&gt; { }</code> or <code>fan</code> blocks; they are not shared across workers.</p>
         <pre><code class="lang-perl">fn counter {
     state $n = 0
     ++$n

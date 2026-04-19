@@ -53,7 +53,7 @@ fn range_hash_slice_deref_string_keys_read() {
 #[test]
 fn range_return_list_context() {
     assert_eq!(
-        rs(r#"sub foo { return 1..$_[0]; }
+        rs(r#"sub foo { return 1..$_0; }
                join ",", foo(4);"#),
         "1,2,3,4"
     );
@@ -701,8 +701,8 @@ fn glob_par_tree_walker_matches_count() {
 fn ppool_collect_order_and_results() {
     let n = ri(r#"
         my $p = ppool(2);
-        $p->submit(sub { $_ * 3 }, 2);
-        $p->submit(sub { $_ * 3 }, 4);
+        $p->submit(fn { $_ * 3 }, 2);
+        $p->submit(fn { $_ * 3 }, 4);
         my @r = $p->collect();
         $r[0] + $r[1];
     "#);
@@ -1516,7 +1516,7 @@ fn deque_push_front_back_pop_order() {
 #[test]
 fn heap_numeric_comparator_pops_sorted() {
     let s = r#"
-        my $pq = heap(sub { $a <=> $b });
+        my $pq = heap(fn { $a <=> $b });
         $pq->push(3);
         $pq->push(1);
         $pq->push(2);
@@ -1540,7 +1540,7 @@ fn heap_block_comparator_readme_form() {
 fn heap_sub_comparator_sees_outer_lexical() {
     let s = r#"
         my $bias = 0;
-        my $pq = heap(sub { $a <=> ($b + $bias) });
+        my $pq = heap(fn { $a <=> ($b + $bias) });
         $pq->push(1);
         $pq->push(100);
         $pq->pop() + 0;
@@ -1571,7 +1571,7 @@ fn outer_topic_in_fan_closure() {
 #[test]
 fn outer_topic_in_nested_closure() {
     let s = r#"
-        my $cr = sub { $_< };
+        my $cr = fn { $_< };
         $_ = 42;
         fan 1 { $cr->(999) } == 0 && $_< == 42;
     "#;
@@ -1584,7 +1584,7 @@ fn outer_topic_double_level() {
         $_ = 100;
         my @r = fan_cap 2 {
             my $outer = $_<;
-            my $cr = sub { $outer + $_< };
+            my $cr = fn { $outer + $_< };
             $cr->($_);
         };
         $r[0] + $r[1];
@@ -1672,8 +1672,8 @@ fn collect_without_arguments_is_runtime_error() {
 fn pipeline_filter_map_take_collect() {
     let s = r#"
         my @a = pipeline(1, 9, 10, 15)
-            ->filter(sub { $_ > 5 })
-            ->map(sub { $_ * 2 })
+            ->filter(fn { $_ > 5 })
+            ->map(fn { $_ * 2 })
             ->take(2)
             ->collect();
         $a[0] + $a[1];
@@ -1700,7 +1700,7 @@ fn pipeline_chain_bare_blocks_and_array_source() {
 fn pipeline_parallel_pgrep_pmap_psort() {
     let s = r#"
         my @r = pipeline(3, 1, 4)
-            ->pgrep(sub { $_ > 1 })
+            ->pgrep(fn { $_ > 1 })
             ->pmap(sub { $_ + 10 })
             ->psort(sub { $a <=> $b })
             ->collect();
@@ -2051,7 +2051,7 @@ fn perl_compat_use_overload_combined_coderef() {
         package O;
         use overload '+' => \&add, '""' => \&stringify;
         sub add { my ($a, $b) = @_; $a->{n} + $b->{n} }
-        sub stringify { "v" . $_[0]->{n} }
+        sub stringify { "v" . $_0->{n} }
         package main;
         my $a = O->new(n => 2);
         my $b = O->new(n => 3);
@@ -2064,7 +2064,7 @@ fn perl_compat_use_overload_combined_coderef() {
         package O;
         use overload '+' => \&add, '""' => \&stringify;
         sub add { my ($a, $b) = @_; $a->{n} + $b->{n} }
-        sub stringify { "v" . $_[0]->{n} }
+        sub stringify { "v" . $_0->{n} }
         package main;
         my $o = bless { n => 7 }, "O";
         "$o"
@@ -2105,8 +2105,8 @@ fn perl_compat_tie_hash_exists_delete() {
         ri(r#"
         package T;
         sub TIEHASH { bless { h => {} }, shift }
-        sub FETCH { $_[0]->{h}->{$_[1]} }
-        sub STORE { $_[0]->{h}->{$_[1]} = $_[2] }
+        sub FETCH { $_0->{h}->{$_1} }
+        sub STORE { $_0->{h}->{$_1} = $_2 }
         sub EXISTS { 7 }
         sub DELETE { 8 }
         package main;
@@ -2121,8 +2121,8 @@ fn perl_compat_tie_hash_exists_delete() {
         ri(r#"
         package T;
         sub TIEHASH { bless { h => {} }, shift }
-        sub FETCH { $_[0]->{h}->{$_[1]} }
-        sub STORE { $_[0]->{h}->{$_[1]} = $_[2] }
+        sub FETCH { $_0->{h}->{$_1} }
+        sub STORE { $_0->{h}->{$_1} = $_2 }
         sub EXISTS { 1 }
         sub DELETE { 8 }
         package main;
@@ -2173,7 +2173,7 @@ fn perl_compat_use_overload_bool_for_logical_not() {
         ri(r#"
         package O;
         use overload 'bool' => 'as_bool';
-        sub as_bool { $_[0]->{t} }
+        sub as_bool { $_0->{t} }
         package main;
         my $f = bless { t => 0 }, "O";
         my $t = bless { t => 1 }, "O";
@@ -2190,7 +2190,7 @@ fn perl_compat_use_overload_bool_for_not_keyword() {
         ri(r#"
         package O;
         use overload 'bool' => 'as_bool';
-        sub as_bool { $_[0]->{t} }
+        sub as_bool { $_0->{t} }
         package main;
         my $f = bless { t => 0 }, "O";
         my $t = bless { t => 1 }, "O";
@@ -2207,7 +2207,7 @@ fn perl_compat_join_stringifies_overloaded_objects() {
         rs(r#"
         package O;
         use overload '""' => 'as_str';
-        sub as_str { "@" . $_[0]->{n} }
+        sub as_str { "@" . $_0->{n} }
         package main;
         my $a = bless { n => 1 }, "O";
         my $b = bless { n => 2 }, "O";
@@ -2639,7 +2639,7 @@ fn perl_compat_tie_scalar_fetch_store() {
         package T;
         sub TIESCALAR { bless { v => 0 }, shift }
         sub FETCH { $_[0]->{v} }
-        sub STORE { $_[0]->{v} = $_[1] }
+        sub STORE { $_[0]->{v} = $_1 }
         package main;
         my $x;
         tie $x, "T";
@@ -3498,7 +3498,7 @@ fn compose_single_fn() {
 #[test]
 fn partial_prepends_args() {
     let s = r#"
-        my $add = sub { $_[0] + $_[1] };
+        my $add = sub { $_[0] + $_1 };
         my $add5 = partial($add, 5);
         $add5->(3);
     "#;
@@ -3548,7 +3548,7 @@ fn memoize_caches() {
 #[test]
 fn curry_accumulates_args() {
     let s = r#"
-        my $add = curry(sub { $_[0] + $_[1] }, 2);
+        my $add = curry(sub { $_[0] + $_1 }, 2);
         my $add5 = $add->(5);
         $add5->(3);
     "#;
@@ -3558,7 +3558,7 @@ fn curry_accumulates_args() {
 #[test]
 fn curry_immediate_when_enough_args() {
     let s = r#"
-        my $add = curry(sub { $_[0] + $_[1] }, 2);
+        my $add = curry(sub { $_[0] + $_1 }, 2);
         $add->(5, 3);
     "#;
     assert_eq!(ri(s), 8);
@@ -3567,7 +3567,7 @@ fn curry_immediate_when_enough_args() {
 #[test]
 fn curry_multiple_stages() {
     let s = r#"
-        my $add3 = curry(sub { $_[0] + $_[1] + $_[2] }, 3);
+        my $add3 = curry(sub { $_[0] + $_1 + $_2 }, 3);
         my $f1 = $add3->(1);
         my $f2 = $f1->(10);
         $f2->(100);
@@ -3578,7 +3578,7 @@ fn curry_multiple_stages() {
 #[test]
 fn fnil_replaces_undef() {
     let s = r#"
-        my $f = fnil(sub { $_[0] + $_[1] }, 10, 20);
+        my $f = fnil(sub { $_[0] + $_1 }, 10, 20);
         join ",", $f->(undef, undef), $f->(5, undef), $f->(undef, 5), $f->(5, 5);
     "#;
     assert_eq!(rs(s), "30,25,15,10");
@@ -3757,7 +3757,7 @@ fn functional_constantly_variadic() {
 #[test]
 fn functional_juxt_multi_args() {
     let s = r#"
-        my $stats = juxt(sub { $_[0] + $_[1] }, sub { $_[0] * $_[1] });
+        my $stats = juxt(sub { $_[0] + $_1 }, sub { $_[0] * $_1 });
         my @res = $stats->(10, 5);
         join ",", @res;
     "#;
@@ -4338,4 +4338,219 @@ fn core_builtins_pack_unpack_extended() {
     assert_eq!(rs("unpack('Z*', pack('Z*', 'hello'))"), "hello");
     // Repeating C
     assert_eq!(rs("join(',', unpack('C3', pack('C3', 1, 2, 3)))"), "1,2,3");
+}
+
+#[test]
+fn core_builtins_string_distance() {
+    assert_eq!(ri("levenshtein('kitten', 'sitting')"), 3);
+    assert_eq!(ri("hamming_distance('abc', 'abd')"), 1);
+    assert_eq!(rs("soundex('Robert')"), "R163");
+    assert_eq!(rs("soundex('Rupert')"), "R163");
+}
+
+#[test]
+fn core_builtins_math_more_trig() {
+    assert_eq!(ri("abs_diff(10, 7)"), 3);
+    assert_eq!(ri("abs_diff(7, 10)"), 3);
+    // asin(sin(0.5)) should be 0.5
+    assert!((run("asin(sin(0.5))").expect("run").to_number() - 0.5).abs() < 1e-9);
+    assert!((run("acos(cos(0.5))").expect("run").to_number() - 0.5).abs() < 1e-9);
+    assert!((run("atan(tan(0.5))").expect("run").to_number() - 0.5).abs() < 1e-9);
+}
+
+#[test]
+fn core_builtins_functional_accumulate() {
+    // accumulate (1, 2, 3, 4) -> (1, 3, 6, 10)
+    assert_eq!(rs("join(',', accumulate(1, 2, 3, 4))"), "1,3,6,10");
+    // accumulate sub { $_[0] * $_[1] }, 1..4 -> (1, 2, 6, 24)
+    assert_eq!(
+        rs("join(',', accumulate(sub { $_[0] * $_1 }, 1, 2, 3, 4))"),
+        "1,2,6,24"
+    );
+}
+
+#[test]
+fn core_builtins_text_analysis() {
+    assert_eq!(rs("join('', digits('a1b2c3'))"), "123");
+    assert_eq!(
+        rs("join('|', numbers('temp 98.6F, -20C, ver 3'))"),
+        "98.6|-20|3"
+    );
+    assert_eq!(rs("join(',', graphemes('café'))"), "c,a,f,é");
+    assert_eq!(
+        rs("join('|', sentences('Hello world. This is a test! Is it working?'))"),
+        "Hello world.|This is a test!|Is it working?"
+    );
+    assert_eq!(
+        rs("join('|', paragraphs(\"para 1\\n\\npara 2\\n\\npara 3\"))"),
+        "para 1|para 2|para 3"
+    );
+}
+
+#[test]
+fn core_builtins_sparkline() {
+    assert_eq!(rs("sparkline(1, 2, 3, 4, 5, 6, 7, 8)"), "▁▂▃▄▅▆▇█");
+}
+
+#[test]
+fn core_builtins_digits_of() {
+    assert_eq!(rs("join(',', digits_of(12345))"), "1,2,3,4,5");
+}
+#[test]
+fn core_builtins_dataframe_basic() {
+    let s = r#"
+            my $df = dataframe([{a => 1, b => 2}, {a => 3, b => 4}])
+            $df->nrow() . ',' . $df->ncol()
+        "#;
+    assert_eq!(rs(s), "2,2");
+}
+
+#[test]
+fn core_builtins_which() {
+    // Check if 'sh' exists on PATH
+    assert!(run("defined(which('sh'))").expect("run").is_true());
+}
+
+#[test]
+fn core_builtins_datetime() {
+    // 86400 seconds in a day
+    assert_eq!(ri("add_days(0, 1)"), 86400);
+    assert_eq!(ri("add_days(86400, -1)"), 0);
+    // 3600 seconds in an hour
+    assert_eq!(ri("add_hours(0, 1)"), 3600);
+    assert_eq!(ri("diff_days(0, 86400)"), 1);
+    assert_eq!(ri("diff_hours(0, 3600)"), 1);
+    assert_eq!(ri("start_of_day(90000)"), 86400);
+}
+
+#[test]
+fn core_builtins_list_functional_more() {
+    assert_eq!(rs("join(',', flatten([1, 2], [3, 4]))"), "1,2,3,4");
+    assert_eq!(rs("join(',', flatten_deep([1, [2, [3, 4]]]))"), "1,2,3,4");
+    assert_eq!(
+        rs("join(',', collect(grep_v('a', 'apple', 'banana', 'cherry')))"),
+        "cherry"
+    );
+
+    assert_eq!(rs("first_or('default', 1, 2, 3)"), "1");
+    assert_eq!(rs("first_or('default')"), "default");
+    let s = r#"
+        my $h = {a => 1, b => 2, c => 3}
+        my $s = select_keys($h, 'a', 'c')
+        join(',', sort keys %$s)
+    "#;
+    assert_eq!(rs(s), "a,c");
+}
+
+#[test]
+fn core_builtins_list_functional_batch3() {
+    assert_eq!(
+        rs("join(',', collect(compact(1, undef, '', 2, 0, 3)))"),
+        "1,2,0,3"
+    );
+    // concat returns a single iterator that yields all elements
+    assert_eq!(rs("join(',', collect(concat((1, 2), (3, 4))))"), "1,2,3,4");
+    assert_eq!(rs("join(',', collect(dedup(1, 1, 2, 2, 3, 1)))"), "1,2,3,1");
+    // chunk_while returns a list of arrayrefs
+    let s = r#"
+        my @r = chunk_while(fn { $_0 <= $_1 }, 1, 2, 4, 9, 5, 6, 8)
+        join('|', map { join(',', @$_) } @r)
+    "#;
+    assert_eq!(rs(s), "1,2,4,9|5,6,8");
+}
+
+#[test]
+fn core_builtins_collection_frequencies() {
+    let s = r#"
+        my $f = frequencies('a', 'b', 'a', 'c', 'b', 'a')
+        join(',', map { "$_:" . $f->{$_} } sort keys %$f)
+    "#;
+    assert_eq!(rs(s), "a:3,b:2,c:1");
+}
+
+#[test]
+fn core_builtins_path_manipulation() {
+    assert_eq!(rs("basename('/usr/local/bin/perl')"), "perl");
+    assert_eq!(rs("dirname('/usr/local/bin/perl')"), "/usr/local/bin");
+    let s = r#"
+        my ($base, $dir, $sfx) = fileparse('/usr/local/bin/perl.pl', '.pl');
+        "$base|$dir|$sfx"
+    "#;
+    assert_eq!(rs(s), "perl|/usr/local/bin|.pl");
+}
+
+#[test]
+fn core_builtins_list_interleave() {
+    assert_eq!(
+        rs("join(',', interleave([1, 2, 3], ['a', 'b']))"),
+        "1,a,2,b,3"
+    );
+}
+
+#[test]
+fn core_builtins_data_avg_columns() {
+    assert_eq!(run("avg(10, 20, 30)").expect("run").to_number(), 20.0);
+    assert_eq!(
+        rs("join('|', columns('  val1   val2  val3  '))"),
+        "val1|val2|val3"
+    );
+}
+
+#[test]
+fn core_builtins_palindrome() {
+    assert_eq!(ri("is_palindrome('racecar')"), 1);
+    assert_eq!(ri("is_palindrome('hello')"), 0);
+    assert_eq!(ri("is_palindrome('A man a plan a canal Panama')"), 1);
+}
+
+#[test]
+fn core_builtins_random_uuid() {
+    // Just check they run and return something
+    assert!(run("defined(coin_flip())").expect("run").is_true());
+    assert!(run("dice_roll(6)").expect("run").to_int() >= 1);
+    assert!(run("dice_roll(6)").expect("run").to_int() <= 6);
+    assert_eq!(run("length(uuid_v4())").expect("run").to_int(), 36);
+}
+
+#[test]
+fn core_builtins_distance_similarity() {
+    assert_eq!(
+        run("euclidean_distance([0, 0], [3, 4])")
+            .expect("run")
+            .to_number(),
+        5.0
+    );
+    assert_eq!(
+        run("manhattan_distance([0, 0], [3, 4])")
+            .expect("run")
+            .to_number(),
+        7.0
+    );
+    assert_eq!(
+        run("jaccard_index([1, 2, 3], [2, 3, 4])")
+            .expect("run")
+            .to_number(),
+        2.0 / 4.0
+    );
+    assert_eq!(
+        run("cosine_similarity([1, 0], [1, 0])")
+            .expect("run")
+            .to_number(),
+        1.0
+    );
+    assert_eq!(
+        run("cosine_similarity([1, 0], [0, 1])")
+            .expect("run")
+            .to_number(),
+        0.0
+    );
+}
+
+#[test]
+fn core_builtins_stats_entropy_zscore() {
+    // entropy of [1, 1] -> p=[0.5, 0.5] -> -(0.5*ln(0.5) + 0.5*ln(0.5)) = ln(2) = 0.693147...
+    assert!((run("entropy(1, 1)").expect("run").to_number() - 2.0f64.ln()).abs() < 1e-9);
+    // zscore(10, 5, 10, 15) -> mean=10, sd=sqrt((25+0+25)/3) = sqrt(50/3) = 4.082...
+    // zscore of 10 should be 0
+    assert_eq!(run("zscore(10, 5, 10, 15)").expect("run").to_number(), 0.0);
 }

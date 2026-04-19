@@ -321,7 +321,7 @@ fn lexical_closure_captures_outer_scalar() {
     assert_eq!(
         eval_int(
             "my $b = 2; \
-             my $outer = sub { my $c = 3; return sub { return $b + $c; }; }; \
+             my $outer = fn { my $c = 3; return fn { return $b + $c; }; }; \
              my $inner = $outer->(); \
              $inner->()",
         ),

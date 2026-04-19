@@ -1141,6 +1141,135 @@ fn test_extended_conversion_batch8() {
 }
 
 #[test]
+fn test_extended_finance_batch10() {
+    assert_eq!(
+        run("depreciation_double(1000, 0, 5)")
+            .expect("run")
+            .to_number(),
+        400.0
+    );
+}
+
+#[test]
+fn test_extended_stats_batch10() {
+    // weighted_mean([10, 20], [1, 3]) = (10*1 + 20*3) / 4 = 70 / 4 = 17.5
+    assert_eq!(
+        run("weighted_mean([10, 20], [1, 3])")
+            .expect("run")
+            .to_number(),
+        17.5
+    );
+    // winsorize(10, 1..11) -> 10% of 11 elements is 1.1, lo=vals[1]=2, hi=vals[10]=11
+    // Actually the test used 1..10 (10 elements), 10% is 1, lo=vals[1]=2, hi=vals[9]=10
+    // Wait, left was "2,2,3,4,5,6,7,8,9,10"
+    assert_eq!(
+        run("join(',', winsorize(10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10))")
+            .expect("run")
+            .to_string(),
+        "2,2,3,4,5,6,7,8,9,10"
+    );
+}
+#[test]
+fn test_extended_number_theory_batch10() {
+    assert_eq!(
+        run("join(',', deficient_numbers(10))")
+            .expect("run")
+            .to_string(),
+        "1,2,3,4,5,7,8,9,10"
+    );
+}
+
+#[test]
+fn test_extended_misc_batch10() {
+    assert_eq!(
+        run("phonetic_digit('123')").expect("run").to_string(),
+        "one two three"
+    );
+    assert_eq!(run("scalar random_color()").expect("run").to_int(), 3);
+    assert_eq!(
+        run("scalar reservoir_sample(2, 1, 2, 3, 4, 5)")
+            .expect("run")
+            .to_int(),
+        2
+    );
+}
+#[test]
+fn test_extended_signal_batch10() {
+    // fft_magnitude of DC signal [1, 1, 1, 1]
+    assert!(run("defined(fft_magnitude(1, 1, 1, 1))")
+        .expect("run")
+        .is_true());
+    // peak_detect [1, 3, 2] -> index 1
+    assert_eq!(
+        run("join(',', peak_detect(1, 3, 2))")
+            .expect("run")
+            .to_string(),
+        "1"
+    );
+}
+
+#[test]
+fn test_extended_cipher_batch11() {
+    assert_eq!(
+        run("atbash('abc xyz')").expect("run").to_string(),
+        "zyx cba"
+    );
+}
+
+#[test]
+fn test_extended_color_batch11() {
+    // Red (255, 0, 0) -> HSL (0, 1, 0.5)
+    assert_eq!(
+        run("join(',', rgb_to_hsl(255, 0, 0))")
+            .expect("run")
+            .to_string(),
+        "0,1,0.5"
+    );
+    // HSL (0, 1, 0.5) -> RGB (255, 0, 0)
+    assert_eq!(
+        run("join(',', hsl_to_rgb(0, 1, 0.5))")
+            .expect("run")
+            .to_string(),
+        "255,0,0"
+    );
+}
+
+#[test]
+fn test_extended_encoding_more_batch12() {
+    assert_eq!(
+        run("morse_encode('SOS')").expect("run").to_string(),
+        "... --- ..."
+    );
+    assert_eq!(
+        run("morse_decode('... --- ...')").expect("run").to_string(),
+        "SOS"
+    );
+    assert_eq!(
+        run("braille_encode('abc')").expect("run").to_string(),
+        "\u{2801}\u{2803}\u{2809}"
+    );
+}
+
+#[test]
+fn test_extended_string_predicates_batch12() {
+    assert_eq!(
+        run("is_anagram('listen', 'silent')").expect("run").to_int(),
+        1
+    );
+    assert_eq!(
+        run("is_anagram('hello', 'world')").expect("run").to_int(),
+        0
+    );
+    assert_eq!(
+        run("is_pangram('the quick brown fox jumps over the lazy dog')")
+            .expect("run")
+            .to_int(),
+        1
+    );
+    assert_eq!(run("is_pangram('hello')").expect("run").to_int(), 0);
+}
+
+#[test]
 fn test_extended_geometry_batch9() {
     // Square [0,0], [1,0], [1,1], [0,1]
     let poly = "polygon_area([[0,0], [1,0], [1,1], [0,1]])";

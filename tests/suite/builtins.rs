@@ -153,7 +153,7 @@ fn die_in_eval() {
 
 #[test]
 fn ref_anon_sub_is_code() {
-    assert_eq!(eval_string(r#"ref(sub { 1 })"#), "CODE");
+    assert_eq!(eval_string(r#"ref(fn { 1 })"#), "CODE");
 }
 
 #[test]
