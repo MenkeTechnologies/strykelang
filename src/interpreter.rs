@@ -13644,7 +13644,7 @@ impl Interpreter {
                                     return Ok(val);
                                 }
                                 1 => {
-                                    self.scope.set_scalar(&key, args[0].clone());
+                                    let _ = self.scope.set_scalar(&key, args[0].clone());
                                     return Ok(args[0].clone());
                                 }
                                 _ => {

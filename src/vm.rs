@@ -2178,6 +2178,28 @@ impl<'a> VM<'a> {
                                     self.line(),
                                 ));
                             }
+                        } else if def.static_fields.iter().any(|sf| sf.name == suffix) {
+                            // Static field access: getter (0 args) or setter (1 arg)
+                            let key = format!("{}::{}", prefix, suffix);
+                            match args.len() {
+                                0 => {
+                                    let val = self.interp.scope.get_scalar(&key);
+                                    self.push(val);
+                                }
+                                1 => {
+                                    let _ = self.interp.scope.set_scalar(&key, args[0].clone());
+                                    self.push(args[0].clone());
+                                }
+                                _ => {
+                                    return Err(PerlError::runtime(
+                                        format!(
+                                            "static field `{}::{}` takes 0 or 1 arguments",
+                                            prefix, suffix
+                                        ),
+                                        self.line(),
+                                    ));
+                                }
+                            }
                         } else {
                             return Err(PerlError::runtime(
                                 self.interp.undefined_subroutine_call_message(name),
