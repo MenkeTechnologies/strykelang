@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 
-const FO: &str = env!("CARGO_BIN_EXE_st");
+const ST: &str = env!("CARGO_BIN_EXE_st");
 const URI: &str = "file:///lsp_completion_fixture.pl";
 const READ_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_DRAIN: usize = 64;
@@ -86,7 +86,7 @@ struct LspHarness {
 
 impl LspHarness {
     fn new(document: &str) -> Self {
-        let mut child = Command::new(FO)
+        let mut child = Command::new(ST)
             .arg("--lsp")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
