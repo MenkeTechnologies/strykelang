@@ -2799,9 +2799,7 @@ impl<'a> VM<'a> {
                     // ── Hashes ──
                     Op::GetHash(idx) => {
                         let n = names[*idx as usize].as_str();
-                        if n == "ENV" {
-                            self.interp.materialize_env_if_needed();
-                        }
+                        self.interp.touch_env_hash(n);
                         let h = self.interp.scope.get_hash(n);
                         self.push(PerlValue::hash(h));
                         Ok(())
@@ -2893,9 +2891,7 @@ impl<'a> VM<'a> {
                             i += 2;
                         }
                         let n = names[*idx as usize].as_str();
-                        if n == "ENV" {
-                            self.interp.materialize_env_if_needed();
-                        }
+                        self.interp.touch_env_hash(n);
                         self.interp
                             .scope
                             .local_set_hash(n, map)
@@ -2907,9 +2903,7 @@ impl<'a> VM<'a> {
                         let key = self.pop().to_string();
                         let val = self.pop();
                         let n = names[*idx as usize].as_str();
-                        if n == "ENV" {
-                            self.interp.materialize_env_if_needed();
-                        }
+                        self.interp.touch_env_hash(n);
                         self.interp
                             .scope
                             .local_set_hash_element(n, key.as_str(), val.clone())
@@ -2950,9 +2944,7 @@ impl<'a> VM<'a> {
                     Op::GetHashElem(idx) => {
                         let key = self.pop().to_string();
                         let n = names[*idx as usize].as_str();
-                        if n == "ENV" {
-                            self.interp.materialize_env_if_needed();
-                        }
+                        self.interp.touch_env_hash(n);
                         let val = self.interp.scope.get_hash_element(n, &key);
                         self.push(val);
                         Ok(())
@@ -2962,9 +2954,7 @@ impl<'a> VM<'a> {
                         let val = self.pop();
                         let n = names[*idx as usize].as_str();
                         self.require_hash_mutable(n)?;
-                        if n == "ENV" {
-                            self.interp.materialize_env_if_needed();
-                        }
+                        self.interp.touch_env_hash(n);
                         self.interp
                             .scope
                             .set_hash_element(n, &key, val)
@@ -2977,9 +2967,7 @@ impl<'a> VM<'a> {
                         let val_keep = val.clone();
                         let n = names[*idx as usize].as_str();
                         self.require_hash_mutable(n)?;
-                        if n == "ENV" {
-                            self.interp.materialize_env_if_needed();
-                        }
+                        self.interp.touch_env_hash(n);
                         let line = self.line();
                         self.interp
                             .scope
@@ -2992,9 +2980,7 @@ impl<'a> VM<'a> {
                         let key = self.pop().to_string();
                         let n = names[*idx as usize].as_str();
                         self.require_hash_mutable(n)?;
-                        if n == "ENV" {
-                            self.interp.materialize_env_if_needed();
-                        }
+                        self.interp.touch_env_hash(n);
                         if let Some(obj) = self.interp.tied_hashes.get(n).cloned() {
                             let class = obj
                                 .as_blessed_ref()
@@ -3027,9 +3013,7 @@ impl<'a> VM<'a> {
                     Op::ExistsHashElem(idx) => {
                         let key = self.pop().to_string();
                         let n = names[*idx as usize].as_str();
-                        if n == "ENV" {
-                            self.interp.materialize_env_if_needed();
-                        }
+                        self.interp.touch_env_hash(n);
                         if let Some(obj) = self.interp.tied_hashes.get(n).cloned() {
                             let class = obj
                                 .as_blessed_ref()
@@ -3111,9 +3095,7 @@ impl<'a> VM<'a> {
                     }
                     Op::HashKeys(idx) => {
                         let n = names[*idx as usize].as_str();
-                        if n == "ENV" {
-                            self.interp.materialize_env_if_needed();
-                        }
+                        self.interp.touch_env_hash(n);
                         let h = self.interp.scope.get_hash(n);
                         let keys: Vec<PerlValue> =
                             h.keys().map(|k| PerlValue::string(k.clone())).collect();
@@ -3122,18 +3104,14 @@ impl<'a> VM<'a> {
                     }
                     Op::HashKeysScalar(idx) => {
                         let n = names[*idx as usize].as_str();
-                        if n == "ENV" {
-                            self.interp.materialize_env_if_needed();
-                        }
+                        self.interp.touch_env_hash(n);
                         let h = self.interp.scope.get_hash(n);
                         self.push(PerlValue::integer(h.len() as i64));
                         Ok(())
                     }
                     Op::HashValues(idx) => {
                         let n = names[*idx as usize].as_str();
-                        if n == "ENV" {
-                            self.interp.materialize_env_if_needed();
-                        }
+                        self.interp.touch_env_hash(n);
                         let h = self.interp.scope.get_hash(n);
                         let vals: Vec<PerlValue> = h.values().cloned().collect();
                         self.push(PerlValue::array(vals));
@@ -3141,9 +3119,7 @@ impl<'a> VM<'a> {
                     }
                     Op::HashValuesScalar(idx) => {
                         let n = names[*idx as usize].as_str();
-                        if n == "ENV" {
-                            self.interp.materialize_env_if_needed();
-                        }
+                        self.interp.touch_env_hash(n);
                         let h = self.interp.scope.get_hash(n);
                         self.push(PerlValue::integer(h.len() as i64));
                         Ok(())
@@ -4988,9 +4964,7 @@ impl<'a> VM<'a> {
                         // `$k` with a frame scalar, not a slot.
                         let k_name = names[*k_name_idx as usize].as_str();
                         let h_name = names[*h_name_idx as usize].as_str();
-                        if h_name == "ENV" {
-                            self.interp.materialize_env_if_needed();
-                        }
+                        self.interp.touch_env_hash(h_name);
                         let key = self.interp.scope.get_scalar(k_name).to_string();
                         let elem = self.interp.scope.get_hash_element(h_name, &key);
                         let cur = self.interp.scope.get_scalar_slot(*sum_slot);
@@ -5007,9 +4981,7 @@ impl<'a> VM<'a> {
                         // `$sum += $h{$k}` — slot counter, slot key, slot sum. Zero name lookups
                         // for `$sum` and `$k`; one frame-walk for `%h` (same as the non-slot form).
                         let h_name = names[*h_name_idx as usize].as_str();
-                        if h_name == "ENV" {
-                            self.interp.materialize_env_if_needed();
-                        }
+                        self.interp.touch_env_hash(h_name);
                         let key_val = self.interp.scope.get_scalar_slot(*k_slot);
                         let key = key_val.to_string();
                         let elem = self.interp.scope.get_hash_element(h_name, &key);
@@ -5030,9 +5002,7 @@ impl<'a> VM<'a> {
                         // `AddHashElemSlotKeyToSlot`, so this fusion is correct regardless of `$k`
                         // slot assignment — we never read `$k`.
                         let h_name = names[*h_name_idx as usize].as_str();
-                        if h_name == "ENV" {
-                            self.interp.materialize_env_if_needed();
-                        }
+                        self.interp.touch_env_hash(h_name);
                         let cur = self.interp.scope.get_scalar_slot(*sum_slot);
                         let mut int_acc: i64 = cur.as_integer().unwrap_or(0);
                         let mut float_acc: f64 = 0.0;
@@ -5072,9 +5042,7 @@ impl<'a> VM<'a> {
                         if i_cur < lim {
                             let n = names[*h_name_idx as usize].as_str();
                             self.require_hash_mutable(n)?;
-                            if n == "ENV" {
-                                self.interp.materialize_env_if_needed();
-                            }
+                            self.interp.touch_env_hash(n);
                             let line = self.line();
                             self.interp
                                 .scope
