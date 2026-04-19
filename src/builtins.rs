@@ -2906,6 +2906,130 @@ pub(crate) fn try_builtin(
         "planck_mass" | "mplanck" => Some(builtin_planck_mass(args)),
         "planck_temperature" | "tempplanck" => Some(builtin_planck_temperature(args)),
 
+        // ── Linear Algebra (extended) ────────────────────────────────────
+        "matrix_solve" | "msolve" | "solve" => Some(builtin_matrix_solve(args)),
+        "matrix_lu" | "mlu" => Some(builtin_matrix_lu(args)),
+        "matrix_qr" | "mqr" => Some(builtin_matrix_qr(args)),
+        "matrix_eigenvalues" | "meig" | "eigenvalues" | "eig" => {
+            Some(builtin_matrix_eigenvalues(args))
+        }
+        "matrix_norm" | "mnorm" => Some(builtin_matrix_norm(args)),
+        "matrix_cond" | "mcond" | "cond" => Some(builtin_matrix_cond(args)),
+        "matrix_pinv" | "mpinv" | "pinv" => Some(builtin_matrix_pinv(args)),
+        "matrix_cholesky" | "mchol" | "cholesky" => Some(builtin_matrix_cholesky(args)),
+        "matrix_det_general" | "mdetg" | "det" => Some(builtin_matrix_det_general(args)),
+
+        // ── Statistics Tests (extended) ──────────────────────────────────
+        "welch_ttest" | "welcht" => Some(builtin_welch_ttest(args)),
+        "paired_ttest" | "pairedt" => Some(builtin_paired_ttest(args)),
+        "cohen_d" | "cohend" => Some(builtin_cohen_d(args)),
+        "anova_oneway" | "anova" | "anova1" => Some(builtin_anova_oneway(args)),
+        "spearman_corr" | "rho" => Some(builtin_spearman(args)),
+        "kendall_tau" | "kendall" | "ktau" => Some(builtin_kendall_tau(args)),
+        "confidence_interval" | "ci" => Some(builtin_confidence_interval(args)),
+
+        // ── Distributions (extended) ─────────────────────────────────────
+        "beta_pdf" | "betapdf" => Some(builtin_beta_pdf(args)),
+        "gamma_pdf" | "gammapdf" => Some(builtin_gamma_pdf(args)),
+        "chi2_pdf" | "chi2pdf" | "chi_squared_pdf" => Some(builtin_chi2_pdf(args)),
+        "t_pdf" | "tpdf" | "student_pdf" => Some(builtin_t_pdf(args)),
+        "f_pdf" | "fpdf" | "fisher_pdf" => Some(builtin_f_pdf(args)),
+        "lognormal_pdf" | "lnormpdf" => Some(builtin_lognormal_pdf(args)),
+        "weibull_pdf" | "weibpdf" => Some(builtin_weibull_pdf(args)),
+        "cauchy_pdf" | "cauchypdf" => Some(builtin_cauchy_pdf(args)),
+        "laplace_pdf" | "laplacepdf" => Some(builtin_laplace_pdf(args)),
+        "pareto_pdf" | "paretopdf" => Some(builtin_pareto_pdf(args)),
+
+        // ── Interpolation & Curve Fitting ────────────────────────────────
+        "lagrange_interp" | "lagrange" | "linterp" => Some(builtin_lagrange_interp(args)),
+        "cubic_spline" | "cspline" | "spline" => Some(builtin_cubic_spline(args)),
+        "poly_eval" | "polyval" => Some(builtin_poly_eval(args)),
+        "polynomial_fit" | "polyfit" => Some(builtin_polynomial_fit(args)),
+
+        // ── Numerical Integration & Differentiation ─────────────────────
+        "trapz" | "trapezoid" => Some(builtin_trapz(args)),
+        "simpson" | "simps" => Some(builtin_simpson(args)),
+        "numerical_diff" | "numdiff" | "diff_array" => Some(builtin_numerical_diff(args)),
+        "cumtrapz" | "cumulative_trapz" => Some(builtin_cumtrapz(args)),
+
+        // ── Optimization / Root Finding ──────────────────────────────────
+        "bisection" | "bisect" => Some(builtin_bisection(interp, args, line)),
+        "newton_method" | "newton" | "newton_raphson" => {
+            Some(builtin_newton_method(interp, args, line))
+        }
+        "golden_section" | "golden" | "gss" => Some(builtin_golden_section(interp, args, line)),
+
+        // ── ODE Solvers ──────────────────────────────────────────────────
+        "rk4" | "runge_kutta" | "rk4_ode" => Some(builtin_rk4(interp, args, line)),
+        "euler_ode" | "euler_method" => Some(builtin_euler_ode(interp, args, line)),
+
+        // ── Graph Algorithms ─────────────────────────────────────────────
+        "dijkstra" | "shortest_path" => Some(builtin_dijkstra(args)),
+        "bellman_ford" | "bellmanford" => Some(builtin_bellman_ford(args)),
+        "floyd_warshall" | "floydwarshall" | "apsp" => Some(builtin_floyd_warshall(args)),
+        "prim_mst" | "mst" | "prim" => Some(builtin_prim_mst(args)),
+
+        // ── Trig Extensions ─────────────────────────────────────────────
+        "cot" => Some(builtin_cot(args)),
+        "sec" => Some(builtin_sec(args)),
+        "csc" => Some(builtin_csc(args)),
+        "acot" => Some(builtin_acot(args)),
+        "asec" => Some(builtin_asec(args)),
+        "acsc" => Some(builtin_acsc(args)),
+        "sinc" => Some(builtin_sinc(args)),
+        "versin" | "versine" => Some(builtin_versin(args)),
+
+        // ── ML Activation Functions ──────────────────────────────────────
+        "leaky_relu" | "lrelu" => Some(builtin_leaky_relu(args)),
+        "elu" => Some(builtin_elu(args)),
+        "selu" => Some(builtin_selu(args)),
+        "gelu" => Some(builtin_gelu(args)),
+        "silu" | "swish" => Some(builtin_silu(args)),
+        "mish" => Some(builtin_mish(args)),
+        "softplus" => Some(builtin_softplus(args)),
+        "hard_sigmoid" | "hardsigmoid" => Some(builtin_hard_sigmoid(args)),
+        "hard_swish" | "hardswish" => Some(builtin_hard_swish(args)),
+
+        // ── Special Functions ────────────────────────────────────────────
+        "bessel_j0" | "j0" => Some(builtin_bessel_j0(args)),
+        "bessel_j1" | "j1" => Some(builtin_bessel_j1(args)),
+        "lambert_w" | "lambertw" | "productlog" => Some(builtin_lambert_w(args)),
+
+        // ── Number Theory (extended) ─────────────────────────────────────
+        "mod_exp" | "modexp" | "powmod" => Some(builtin_mod_exp(args)),
+        "mod_inv" | "modinv" => Some(builtin_mod_inv(args)),
+        "chinese_remainder" | "crt" => Some(builtin_chinese_remainder(args)),
+        "miller_rabin" | "millerrabin" | "is_probable_prime" => Some(builtin_miller_rabin(args)),
+        // is_perfect and is_abundant already dispatched above
+
+        // ── Combinatorics (extended) ─────────────────────────────────────
+        "derangements" => Some(builtin_derangements(args)),
+        "stirling2" | "stirling_second" => Some(builtin_stirling2(args)),
+        "bernoulli_number" | "bernoulli" => Some(builtin_bernoulli_number(args)),
+        "harmonic_number" | "harmonic" => Some(builtin_harmonic_number(args)),
+
+        // ── Physics (extended — new dispatch only) ─────────────────────
+        "drag_force" | "fdrag" => Some(builtin_drag_force(args)),
+        "ideal_gas" | "pv_nrt" => Some(builtin_ideal_gas(args)),
+
+        // ── Financial Greeks & Risk ──────────────────────────────────────
+        "bs_delta" | "bsdelta" | "option_delta" => Some(builtin_bs_delta(args)),
+        "bs_gamma" | "bsgamma" | "option_gamma" => Some(builtin_bs_gamma(args)),
+        "bs_vega" | "bsvega" | "option_vega" => Some(builtin_bs_vega(args)),
+        "bs_theta" | "bstheta" | "option_theta" => Some(builtin_bs_theta(args)),
+        "bs_rho" | "bsrho" | "option_rho" => Some(builtin_bs_rho(args)),
+        "bond_duration" | "mac_duration" => Some(builtin_bond_duration(args)),
+
+        // ── DSP Extensions ───────────────────────────────────────────────
+        "dct" => Some(builtin_dct(args)),
+        "idct" => Some(builtin_idct(args)),
+        "goertzel" => Some(builtin_goertzel(args)),
+        "chirp" | "chirp_signal" => Some(builtin_chirp(args)),
+
+        // ── Encoding Extensions ──────────────────────────────────────────
+        "base85_encode" | "b85e" | "ascii85_encode" | "a85e" => Some(builtin_base85_encode(args)),
+        "base85_decode" | "b85d" | "ascii85_decode" | "a85d" => Some(builtin_base85_decode(args)),
+
         _ => crate::rust_ffi::try_call(name, args, line),
     }
 }
