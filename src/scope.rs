@@ -871,11 +871,9 @@ impl Scope {
                     names.push(name.clone());
                 }
             }
-            for opt_name in &frame.scalar_slot_names {
-                if let Some(name) = opt_name {
-                    if !names.contains(name) {
-                        names.push(name.clone());
-                    }
+            for name in frame.scalar_slot_names.iter().flatten() {
+                if !names.contains(name) {
+                    names.push(name.clone());
                 }
             }
         }
