@@ -3088,6 +3088,49 @@ pub(crate) fn try_builtin(
         "kmeans" => Some(builtin_kmeans(args)),
         "prcomp" | "pca" => Some(builtin_prcomp(args)),
 
+        // ── R base: random generators ────────────────────────────────────
+        "rnorm" => Some(builtin_rnorm(args)),
+        "runif" => Some(builtin_runif(args)),
+        "rexp" => Some(builtin_rexp(args)),
+        "rbinom" => Some(builtin_rbinom(args)),
+        "rpois" => Some(builtin_rpois(args)),
+        "rgeom" => Some(builtin_rgeom(args)),
+        "rgamma" => Some(builtin_rgamma(args)),
+        "rbeta" => Some(builtin_rbeta(args)),
+        "rchisq" => Some(builtin_rchisq(args)),
+        "rt" => Some(builtin_rt(args)),
+        "rf" => Some(builtin_rf(args)),
+        "rweibull" => Some(builtin_rweibull(args)),
+        "rlnorm" => Some(builtin_rlnorm(args)),
+        "rcauchy" => Some(builtin_rcauchy(args)),
+
+        // ── R base: quantile functions ───────────────────────────────────
+        "qunif" => Some(builtin_qunif(args)),
+        "qexp" => Some(builtin_qexp(args)),
+        "qweibull" => Some(builtin_qweibull(args)),
+        "qlnorm" => Some(builtin_qlnorm(args)),
+        "qcauchy" => Some(builtin_qcauchy(args)),
+
+        // ── R base: additional CDFs ──────────────────────────────────────
+        "pgamma" => Some(builtin_pgamma(args)),
+        "pbeta" => Some(builtin_pbeta(args)),
+        "pchisq" => Some(builtin_pchisq(args)),
+        "pt_cdf" | "pt" => Some(builtin_pt(args)),
+        "pf_cdf" | "pf" => Some(builtin_pf(args)),
+
+        // ── R base: additional PMFs ──────────────────────────────────────
+        "dgeom" => Some(builtin_dgeom(args)),
+        "dunif" => Some(builtin_dunif(args)),
+        "dnbinom" => Some(builtin_dnbinom(args)),
+        "dhyper" => Some(builtin_dhyper(args)),
+
+        // ── R base: smoothing / interpolation ────────────────────────────
+        "lowess" | "loess" => Some(builtin_lowess(args)),
+        "approx_fn" | "approx" => Some(builtin_approx_fn(args)),
+
+        // ── R base: linear models ────────────────────────────────────────
+        "lm_fit" | "lm" => Some(builtin_lm_fit(args)),
+
         _ => crate::rust_ffi::try_call(name, args, line),
     }
 }

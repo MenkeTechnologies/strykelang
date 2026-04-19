@@ -8299,8 +8299,6 @@ fn builtin_wilcox_test(args: &[PerlValue]) -> PerlResult<PerlValue> {
         .iter()
         .map(|v| v.to_number())
         .collect();
-    let n1 = s1.len();
-    let n2 = s2.len();
     let mut u = 0i64;
     for &x in &s1 {
         for &y in &s2 {
@@ -8567,4 +8565,636 @@ fn builtin_prcomp(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let eigs = builtin_matrix_eigenvalues(&eig_args)?;
     let var_explained = eigs;
     Ok(PerlValue::array(vec![var_explained]))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// R base: distribution random generators (r-functions)
+// ─────────────────────────────────────────────────────────────────────────────
+
+fn builtin_rnorm(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
+    let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let sigma = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let mut rng = rand::thread_rng();
+    use rand::Rng;
+    let result: Vec<PerlValue> = (0..n)
+        .map(|_| {
+            // Box-Muller transform
+            let u1: f64 = rng.gen::<f64>().max(1e-15);
+            let u2: f64 = rng.gen::<f64>();
+            let z = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos();
+            PerlValue::float(mu + sigma * z)
+        })
+        .collect();
+    if n == 1 {
+        Ok(result.into_iter().next().unwrap())
+    } else {
+        Ok(PerlValue::array(result))
+    }
+}
+
+fn builtin_runif(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
+    let a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let mut rng = rand::thread_rng();
+    use rand::Rng;
+    let result: Vec<PerlValue> = (0..n)
+        .map(|_| PerlValue::float(a + (b - a) * rng.gen::<f64>()))
+        .collect();
+    if n == 1 {
+        Ok(result.into_iter().next().unwrap())
+    } else {
+        Ok(PerlValue::array(result))
+    }
+}
+
+fn builtin_rexp(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
+    let rate = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let mut rng = rand::thread_rng();
+    use rand::Rng;
+    let result: Vec<PerlValue> = (0..n)
+        .map(|_| {
+            let u: f64 = rng.gen::<f64>().max(1e-15);
+            PerlValue::float(-u.ln() / rate)
+        })
+        .collect();
+    if n == 1 {
+        Ok(result.into_iter().next().unwrap())
+    } else {
+        Ok(PerlValue::array(result))
+    }
+}
+
+fn builtin_rbinom(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
+    let size = args.get(1).map(|v| v.to_number() as usize).unwrap_or(1);
+    let prob = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
+    let mut rng = rand::thread_rng();
+    use rand::Rng;
+    let result: Vec<PerlValue> = (0..n)
+        .map(|_| {
+            let k: i64 = (0..size).filter(|_| rng.gen::<f64>() < prob).count() as i64;
+            PerlValue::integer(k)
+        })
+        .collect();
+    if n == 1 {
+        Ok(result.into_iter().next().unwrap())
+    } else {
+        Ok(PerlValue::array(result))
+    }
+}
+
+fn builtin_rpois(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
+    let lambda = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let mut rng = rand::thread_rng();
+    use rand::Rng;
+    let result: Vec<PerlValue> = (0..n)
+        .map(|_| {
+            // Knuth's algorithm
+            let l = (-lambda).exp();
+            let mut k = 0i64;
+            let mut p = 1.0;
+            loop {
+                k += 1;
+                p *= rng.gen::<f64>();
+                if p < l {
+                    break;
+                }
+            }
+            PerlValue::integer(k - 1)
+        })
+        .collect();
+    if n == 1 {
+        Ok(result.into_iter().next().unwrap())
+    } else {
+        Ok(PerlValue::array(result))
+    }
+}
+
+fn builtin_rgeom(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
+    let prob = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
+    let mut rng = rand::thread_rng();
+    use rand::Rng;
+    let result: Vec<PerlValue> = (0..n)
+        .map(|_| {
+            let u: f64 = rng.gen::<f64>().max(1e-15);
+            PerlValue::integer((u.ln() / (1.0 - prob).ln()).floor() as i64)
+        })
+        .collect();
+    if n == 1 {
+        Ok(result.into_iter().next().unwrap())
+    } else {
+        Ok(PerlValue::array(result))
+    }
+}
+
+fn builtin_rgamma(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
+    let shape = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let scale = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let mut rng = rand::thread_rng();
+    use rand::Rng;
+    let result: Vec<PerlValue> = (0..n)
+        .map(|_| {
+            // Marsaglia and Tsang's method for shape >= 1
+            let a = if shape < 1.0 { shape + 1.0 } else { shape };
+            let d = a - 1.0 / 3.0;
+            let c = 1.0 / (9.0 * d).sqrt();
+            let mut x;
+            loop {
+                let u1: f64 = rng.gen::<f64>().max(1e-15);
+                let u2: f64 = rng.gen::<f64>();
+                let z = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos();
+                let v = (1.0 + c * z).powi(3);
+                if v > 0.0 {
+                    let u: f64 = rng.gen::<f64>().max(1e-15);
+                    if u.ln() < 0.5 * z * z + d * (1.0 - v + v.ln()) {
+                        x = d * v * scale;
+                        if shape < 1.0 {
+                            x *= rng.gen::<f64>().max(1e-15).powf(1.0 / shape);
+                        }
+                        break;
+                    }
+                }
+            }
+            PerlValue::float(x)
+        })
+        .collect();
+    if n == 1 {
+        Ok(result.into_iter().next().unwrap())
+    } else {
+        Ok(PerlValue::array(result))
+    }
+}
+
+fn builtin_rbeta(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
+    let a = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    // Beta(a,b) = Gamma(a,1) / (Gamma(a,1) + Gamma(b,1))
+    let ga_args = [
+        PerlValue::integer(1),
+        PerlValue::float(a),
+        PerlValue::float(1.0),
+    ];
+    let gb_args = [
+        PerlValue::integer(1),
+        PerlValue::float(b),
+        PerlValue::float(1.0),
+    ];
+    let result: Vec<PerlValue> = (0..n)
+        .map(|_| {
+            let xa = builtin_rgamma(&ga_args).unwrap().to_number();
+            let xb = builtin_rgamma(&gb_args).unwrap().to_number();
+            PerlValue::float(xa / (xa + xb))
+        })
+        .collect();
+    if n == 1 {
+        Ok(result.into_iter().next().unwrap())
+    } else {
+        Ok(PerlValue::array(result))
+    }
+}
+
+fn builtin_rchisq(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
+    let df = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    // Chi-sq(df) = Gamma(df/2, 2)
+    let g_args = [
+        PerlValue::integer(n as i64),
+        PerlValue::float(df / 2.0),
+        PerlValue::float(2.0),
+    ];
+    builtin_rgamma(&g_args)
+}
+
+fn builtin_rt(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
+    let df = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    // t(df) = Z / sqrt(Chi2(df)/df)
+    let result: Vec<PerlValue> = (0..n)
+        .map(|_| {
+            let z = builtin_rnorm(&[PerlValue::integer(1)]).unwrap().to_number();
+            let chi2 = builtin_rchisq(&[PerlValue::integer(1), PerlValue::float(df)])
+                .unwrap()
+                .to_number();
+            PerlValue::float(z / (chi2 / df).sqrt())
+        })
+        .collect();
+    if n == 1 {
+        Ok(result.into_iter().next().unwrap())
+    } else {
+        Ok(PerlValue::array(result))
+    }
+}
+
+fn builtin_rf(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
+    let d1 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let d2 = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let result: Vec<PerlValue> = (0..n)
+        .map(|_| {
+            let c1 = builtin_rchisq(&[PerlValue::integer(1), PerlValue::float(d1)])
+                .unwrap()
+                .to_number();
+            let c2 = builtin_rchisq(&[PerlValue::integer(1), PerlValue::float(d2)])
+                .unwrap()
+                .to_number();
+            PerlValue::float((c1 / d1) / (c2 / d2))
+        })
+        .collect();
+    if n == 1 {
+        Ok(result.into_iter().next().unwrap())
+    } else {
+        Ok(PerlValue::array(result))
+    }
+}
+
+fn builtin_rweibull(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
+    let shape = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let scale = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let mut rng = rand::thread_rng();
+    use rand::Rng;
+    let result: Vec<PerlValue> = (0..n)
+        .map(|_| {
+            let u: f64 = rng.gen::<f64>().max(1e-15);
+            PerlValue::float(scale * (-u.ln()).powf(1.0 / shape))
+        })
+        .collect();
+    if n == 1 {
+        Ok(result.into_iter().next().unwrap())
+    } else {
+        Ok(PerlValue::array(result))
+    }
+}
+
+fn builtin_rlnorm(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
+    let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let sigma = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let norms = builtin_rnorm(&[
+        PerlValue::integer(n as i64),
+        PerlValue::float(mu),
+        PerlValue::float(sigma),
+    ])?;
+    if n == 1 {
+        return Ok(PerlValue::float(norms.to_number().exp()));
+    }
+    let v = arg_to_vec(&norms);
+    Ok(PerlValue::array(
+        v.iter()
+            .map(|x| PerlValue::float(x.to_number().exp()))
+            .collect(),
+    ))
+}
+
+fn builtin_rcauchy(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
+    let x0 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let gamma = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let mut rng = rand::thread_rng();
+    use rand::Rng;
+    let result: Vec<PerlValue> = (0..n)
+        .map(|_| {
+            let u: f64 = rng.gen::<f64>();
+            PerlValue::float(x0 + gamma * (std::f64::consts::PI * (u - 0.5)).tan())
+        })
+        .collect();
+    if n == 1 {
+        Ok(result.into_iter().next().unwrap())
+    } else {
+        Ok(PerlValue::array(result))
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// R base: quantile functions (q-functions) — inverse CDFs
+// ─────────────────────────────────────────────────────────────────────────────
+
+fn builtin_qunif(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
+    let a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(a + p * (b - a)))
+}
+
+fn builtin_qexp(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
+    let rate = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(-(1.0 - p).ln() / rate))
+}
+
+fn builtin_qweibull(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
+    let k = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let lambda = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(lambda * (-(1.0 - p).ln()).powf(1.0 / k)))
+}
+
+fn builtin_qlnorm(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
+    let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let sigma = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let z = qnorm_approx(p);
+    Ok(PerlValue::float((mu + sigma * z).exp()))
+}
+
+fn builtin_qcauchy(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
+    let x0 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let gamma = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(
+        x0 + gamma * (std::f64::consts::PI * (p - 0.5)).tan(),
+    ))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// R base: additional CDFs
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// `pgamma x, shape [, scale]` — gamma CDF via numerical integration.
+fn builtin_pgamma(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let shape = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let scale = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    if x <= 0.0 {
+        return Ok(PerlValue::float(0.0));
+    }
+    // Use regularized lower incomplete gamma
+    let z = x / scale;
+    // Series expansion for small z
+    let mut sum = 0.0;
+    let mut term = 1.0 / shape;
+    sum += term;
+    for n in 1..200 {
+        term *= z / (shape + n as f64);
+        sum += term;
+        if term.abs() < 1e-12 {
+            break;
+        }
+    }
+    let result = z.powf(shape) * (-z).exp() * sum / lgamma_fn(shape).exp();
+    Ok(PerlValue::float(result.min(1.0).max(0.0)))
+}
+
+/// `pbeta x, a, b` — beta CDF (regularized incomplete beta).
+fn builtin_pbeta(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let a = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    if x <= 0.0 {
+        return Ok(PerlValue::float(0.0));
+    }
+    if x >= 1.0 {
+        return Ok(PerlValue::float(1.0));
+    }
+    // Numerical integration via trapezoidal rule
+    let steps = 1000;
+    let dx = x / steps as f64;
+    let mut sum = 0.0;
+    let ln_beta = lgamma_fn(a) + lgamma_fn(b) - lgamma_fn(a + b);
+    for i in 0..steps {
+        let t = (i as f64 + 0.5) * dx;
+        sum += t.powf(a - 1.0) * (1.0 - t).powf(b - 1.0);
+    }
+    let result = sum * dx / ln_beta.exp();
+    Ok(PerlValue::float(result.min(1.0).max(0.0)))
+}
+
+fn builtin_pchisq(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let df = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    builtin_pgamma(&[
+        PerlValue::float(x),
+        PerlValue::float(df / 2.0),
+        PerlValue::float(2.0),
+    ])
+}
+
+fn builtin_pt(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let df = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    // Approximate via normal for large df, otherwise numerical
+    if df > 100.0 {
+        return Ok(PerlValue::float(norm_cdf(x)));
+    }
+    let steps = 2000;
+    let lo = -20.0f64;
+    let hi = x;
+    if hi <= lo {
+        return Ok(PerlValue::float(0.0));
+    }
+    let dx = (hi - lo) / steps as f64;
+    let coeff = (lgamma_fn((df + 1.0) / 2.0) - lgamma_fn(df / 2.0)).exp()
+        / (df * std::f64::consts::PI).sqrt();
+    let mut sum = 0.0;
+    for i in 0..steps {
+        let t = lo + (i as f64 + 0.5) * dx;
+        sum += coeff * (1.0 + t * t / df).powf(-(df + 1.0) / 2.0);
+    }
+    Ok(PerlValue::float((sum * dx).min(1.0).max(0.0)))
+}
+
+fn builtin_pf(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let d1 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let d2 = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    if x <= 0.0 {
+        return Ok(PerlValue::float(0.0));
+    }
+    // Use beta CDF: F(x) = I(d1*x/(d1*x+d2); d1/2, d2/2)
+    let z = d1 * x / (d1 * x + d2);
+    builtin_pbeta(&[
+        PerlValue::float(z),
+        PerlValue::float(d1 / 2.0),
+        PerlValue::float(d2 / 2.0),
+    ])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// R base: additional PMFs
+// ─────────────────────────────────────────────────────────────────────────────
+
+fn builtin_dgeom(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let k = args.first().map(|v| v.to_number() as i64).unwrap_or(0);
+    let p = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
+    Ok(PerlValue::float(p * (1.0 - p).powi(k as i32)))
+}
+
+fn builtin_dunif(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float(if x >= a && x <= b {
+        1.0 / (b - a)
+    } else {
+        0.0
+    }))
+}
+
+fn builtin_dnbinom(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let k = args.first().map(|v| v.to_number() as i64).unwrap_or(0);
+    let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let p = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
+    // NB(k; r, p) = C(k+r-1, k) * p^r * (1-p)^k
+    let mut binom = 1.0;
+    for j in 0..k {
+        binom *= (k + r as i64 - 1 - j) as f64 / (j + 1) as f64;
+    }
+    Ok(PerlValue::float(
+        binom * p.powf(r) * (1.0 - p).powi(k as i32),
+    ))
+}
+
+fn builtin_dhyper(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let k = args.first().map(|v| v.to_number() as i64).unwrap_or(0);
+    let m = args.get(1).map(|v| v.to_number() as i64).unwrap_or(10); // successes in population
+    let n = args.get(2).map(|v| v.to_number() as i64).unwrap_or(10); // failures in population
+    let nn = args.get(3).map(|v| v.to_number() as i64).unwrap_or(5); // draws
+                                                                     // C(m,k) * C(n, nn-k) / C(m+n, nn)
+    let lnchoose = |a: i64, b: i64| -> f64 {
+        if b < 0 || b > a {
+            return f64::NEG_INFINITY;
+        }
+        lgamma_fn((a + 1) as f64) - lgamma_fn((b + 1) as f64) - lgamma_fn((a - b + 1) as f64)
+    };
+    let log_pmf = lnchoose(m, k) + lnchoose(n, nn - k) - lnchoose(m + n, nn);
+    Ok(PerlValue::float(log_pmf.exp()))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// R base: smoothing
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// `lowess XS, YS [, f]` — locally-weighted scatterplot smoothing. Returns smoothed Y values.
+fn builtin_lowess(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let ys: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let f = args.get(2).map(|v| v.to_number()).unwrap_or(0.6667);
+    let n = xs.len();
+    if n < 3 || ys.len() != n {
+        return Err(PerlError::runtime("lowess: need >= 3 matched points", 0));
+    }
+    let span = (f * n as f64).ceil() as usize;
+    let span = span.max(2).min(n);
+    let mut smoothed = Vec::with_capacity(n);
+    for i in 0..n {
+        // Find span nearest neighbors
+        let mut dists: Vec<(usize, f64)> = (0..n).map(|j| (j, (xs[j] - xs[i]).abs())).collect();
+        dists.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        let max_dist = dists[span - 1].1.max(1e-10);
+        // Weighted least squares (degree 1)
+        let mut sw = 0.0;
+        let mut swx = 0.0;
+        let mut swy = 0.0;
+        let mut swxx = 0.0;
+        let mut swxy = 0.0;
+        for &(j, d) in dists.iter().take(span) {
+            let u = d / max_dist;
+            let w = (1.0 - u * u * u).max(0.0).powi(3); // tricube
+            sw += w;
+            swx += w * xs[j];
+            swy += w * ys[j];
+            swxx += w * xs[j] * xs[j];
+            swxy += w * xs[j] * ys[j];
+        }
+        let det = sw * swxx - swx * swx;
+        let y_hat = if det.abs() > 1e-12 {
+            let b0 = (swxx * swy - swx * swxy) / det;
+            let b1 = (sw * swxy - swx * swy) / det;
+            b0 + b1 * xs[i]
+        } else {
+            swy / sw
+        };
+        smoothed.push(PerlValue::float(y_hat));
+    }
+    Ok(PerlValue::array(smoothed))
+}
+
+/// `approx_fn XS, YS, XOUT` — linear interpolation at points xout (R's approx).
+fn builtin_approx_fn(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let ys: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let xout: Vec<f64> = arg_to_vec(&args.get(2).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let n = xs.len();
+    let result: Vec<PerlValue> = xout
+        .iter()
+        .map(|&x| {
+            if n < 2 {
+                return PerlValue::float(f64::NAN);
+            }
+            if x <= xs[0] {
+                return PerlValue::float(ys[0]);
+            }
+            if x >= xs[n - 1] {
+                return PerlValue::float(ys[n - 1]);
+            }
+            let mut i = 0;
+            while i < n - 1 && xs[i + 1] < x {
+                i += 1;
+            }
+            let t = (x - xs[i]) / (xs[i + 1] - xs[i]);
+            PerlValue::float(ys[i] + t * (ys[i + 1] - ys[i]))
+        })
+        .collect();
+    Ok(PerlValue::array(result))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// R base: linear models
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// `lm_fit XS, YS` — simple linear regression. Returns {intercept, slope, r_squared, residuals, fitted}.
+fn builtin_lm_fit(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let ys: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let n = xs.len() as f64;
+    let mx: f64 = xs.iter().sum::<f64>() / n;
+    let my_val: f64 = ys.iter().sum::<f64>() / n;
+    let ss_xy: f64 = xs
+        .iter()
+        .zip(ys.iter())
+        .map(|(x, y)| (x - mx) * (y - my_val))
+        .sum();
+    let ss_xx: f64 = xs.iter().map(|x| (x - mx).powi(2)).sum();
+    let slope = ss_xy / ss_xx;
+    let intercept = my_val - slope * mx;
+    let fitted: Vec<f64> = xs.iter().map(|&x| intercept + slope * x).collect();
+    let residuals: Vec<f64> = ys.iter().zip(fitted.iter()).map(|(y, f)| y - f).collect();
+    let ss_res: f64 = residuals.iter().map(|r| r * r).sum();
+    let ss_tot: f64 = ys.iter().map(|y| (y - my_val).powi(2)).sum();
+    let r2 = 1.0 - ss_res / ss_tot;
+    let mut result = indexmap::IndexMap::new();
+    result.insert("intercept".to_string(), PerlValue::float(intercept));
+    result.insert("slope".to_string(), PerlValue::float(slope));
+    result.insert("r_squared".to_string(), PerlValue::float(r2));
+    result.insert("residuals".to_string(), vec_to_perl(&residuals));
+    result.insert("fitted".to_string(), vec_to_perl(&fitted));
+    Ok(PerlValue::hash(result))
 }

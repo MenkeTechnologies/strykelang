@@ -11854,6 +11854,20 @@ impl Parser {
             | "sapply" | "tapply" | "do_call" | "docall"
             // ── R base: ML / clustering ───────────────────────────────────
             | "kmeans" | "prcomp" | "pca"
+            // ── R base: random generators ─────────────────────────────────
+            | "rnorm" | "runif" | "rexp" | "rbinom" | "rpois" | "rgeom"
+            | "rgamma" | "rbeta" | "rchisq" | "rt" | "rf"
+            | "rweibull" | "rlnorm" | "rcauchy"
+            // ── R base: quantile functions ────────────────────────────────
+            | "qunif" | "qexp" | "qweibull" | "qlnorm" | "qcauchy"
+            // ── R base: additional CDFs ───────────────────────────────────
+            | "pgamma" | "pbeta" | "pchisq" | "pt_cdf" | "pt" | "pf_cdf" | "pf"
+            // ── R base: additional PMFs ───────────────────────────────────
+            | "dgeom" | "dunif" | "dnbinom" | "dhyper"
+            // ── R base: smoothing / interpolation ─────────────────────────
+            | "lowess" | "loess" | "approx_fn" | "approx"
+            // ── R base: linear models ─────────────────────────────────────
+            | "lm_fit" | "lm"
             => Some(name),
             _ => None,
         }
