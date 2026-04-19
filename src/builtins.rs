@@ -3131,6 +3131,35 @@ pub(crate) fn try_builtin(
         // ── R base: linear models ────────────────────────────────────────
         "lm_fit" | "lm" => Some(builtin_lm_fit(args)),
 
+        // ── R base: remaining quantile functions ─────────────────────────
+        "qgamma" => Some(builtin_qgamma(args)),
+        "qbeta" => Some(builtin_qbeta(args)),
+        "qchisq" => Some(builtin_qchisq(args)),
+        "qt_fn" | "qt" => Some(builtin_qt(args)),
+        "qf_fn" | "qf" => Some(builtin_qf(args)),
+        "qbinom" => Some(builtin_qbinom(args)),
+        "qpois" => Some(builtin_qpois(args)),
+
+        // ── R base: time series ──────────────────────────────────────────
+        "acf_fn" | "acf" => Some(builtin_acf_fn(args)),
+        "pacf_fn" | "pacf" => Some(builtin_pacf_fn(args)),
+        "diff_lag" | "diff_ts" => Some(builtin_diff_lag(args)),
+        "ts_filter" | "filter_ts" => Some(builtin_ts_filter(args)),
+
+        // ── R base: regression diagnostics ───────────────────────────────
+        "predict_lm" | "predict" => Some(builtin_predict_lm(args)),
+        "confint_lm" | "confint" => Some(builtin_confint_lm(args)),
+
+        // ── R base: multivariate stats ───────────────────────────────────
+        "cor_matrix" | "cor_mat" => Some(builtin_cor_matrix(args)),
+        "cov_matrix" | "cov_mat" => Some(builtin_cov_matrix(args)),
+        "mahalanobis" | "mahal" => Some(builtin_mahalanobis(args)),
+        "dist_matrix" | "dist_mat" => Some(builtin_dist_matrix(args)),
+        "hclust" => Some(builtin_hclust(args)),
+        "cutree" => Some(builtin_cutree(args)),
+        "weighted_var" | "wvar" => Some(builtin_weighted_var(args)),
+        "cov2cor" => Some(builtin_cov2cor(args)),
+
         _ => crate::rust_ffi::try_call(name, args, line),
     }
 }

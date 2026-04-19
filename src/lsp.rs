@@ -2306,6 +2306,35 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "approx_fn" | "approx" => "`approx_fn` (alias `approx`) — piecewise linear interpolation at query points. Like R's approx().\n\n```perl\nmy @y = @{approx([0,1,2], [0,10,0], [0.5, 1.0, 1.5])}\n# [5, 10, 5]\n```",
         "lm_fit" | "lm" => "`lm_fit` (alias `lm`) — simple linear regression. Returns hash with intercept, slope, r_squared, residuals, fitted. Like R's lm().\n\n```perl\nmy %m = %{lm([1,2,3,4,5], [2,4,5,4,5])}\np $m{slope}       # slope\np $m{r_squared}   # R²\n```",
 
+        // ── R base: remaining quantiles ──────────────────────────────────
+        "qgamma" => "`qgamma` — gamma quantile (inverse CDF). Args: p, shape [, scale].\n\n```perl\np qgamma(0.95, 2, 1)  # 95th percentile of Gamma(2,1)\n```",
+        "qbeta" => "`qbeta` — beta quantile. Args: p, alpha, beta.\n\n```perl\np qbeta(0.5, 2, 5)  # median of Beta(2,5)\n```",
+        "qchisq" => "`qchisq` — chi-squared quantile. Args: p, df.\n\n```perl\np qchisq(0.95, 1)  # 3.84 (critical value)\np qchisq(0.95, 5)  # 11.07\n```",
+        "qt_fn" | "qt" => "`qt` — Student's t quantile. Args: p, df.\n\n```perl\np qt(0.975, 10)   # ≈ 2.228 (two-tailed 5%)\n```",
+        "qf_fn" | "qf" => "`qf` — F-distribution quantile. Args: p, d1, d2.\n\n```perl\np qf(0.95, 5, 10)  # critical F value\n```",
+        "qbinom" => "`qbinom` — binomial quantile (smallest k where P(X≤k) ≥ p). Args: p, n, prob.\n\n```perl\np qbinom(0.5, 10, 0.5)  # median of Binom(10, 0.5) = 5\n```",
+        "qpois" => "`qpois` — Poisson quantile (smallest k where P(X≤k) ≥ p). Args: p, lambda.\n\n```perl\np qpois(0.5, 5)  # median of Poisson(5)\n```",
+
+        // ── R base: time series ──────────────────────────────────────────
+        "acf_fn" | "acf" => "`acf_fn` (alias `acf`) — autocorrelation function. Returns ACF values for lags 0..max_lag. Like R's acf().\n\n```perl\nmy @a = @{acf([1,3,2,4,3,5,4,6], 5)}\np $a[0]  # 1.0 (lag 0 is always 1)\np $a[1]  # lag-1 autocorrelation\n```",
+        "pacf_fn" | "pacf" => "`pacf_fn` (alias `pacf`) — partial autocorrelation function via Durbin-Levinson. Like R's pacf().\n\n```perl\nmy @pa = @{pacf([1,3,2,4,3,5], 3)}\n```",
+        "diff_lag" | "diff_ts" => "`diff_lag` (alias `diff_ts`) — lagged differences. Args: vec [, lag, differences]. Like R's diff().\n\n```perl\np diff_lag([1,3,6,10])       # [2,3,4] (lag=1)\np diff_lag([1,3,6,10], 2)    # [5,7] (lag=2)\np diff_lag([1,3,6,10], 1, 2) # [1,1] (second differences)\n```",
+        "ts_filter" | "filter_ts" => "`ts_filter` — linear convolution filter. Like R's filter(method='convolution').\n\n```perl\nmy @smooth = @{ts_filter([1,5,2,8,3], [0.25,0.5,0.25])}\n```",
+
+        // ── R base: regression diagnostics ───────────────────────────────
+        "predict_lm" | "predict" => "`predict_lm` (alias `predict`) — predict from a linear model at new x values.\n\n```perl\nmy $model = lm([1,2,3], [2,4,6])\nmy @pred = @{predict($model, [4,5,6])}  # [8,10,12]\n```",
+        "confint_lm" | "confint" => "`confint_lm` (alias `confint`) — confidence intervals for model coefficients. Returns hash with intercept_lower/upper, slope_lower/upper.\n\n```perl\nmy $ci = confint(lm([1,2,3,4,5], [2,4,5,4,5]))\np $ci->{slope_lower}\n```",
+
+        // ── R base: multivariate stats ───────────────────────────────────
+        "cor_matrix" | "cor_mat" => "`cor_matrix` (alias `cor_mat`) — correlation matrix from observations. Each row is an observation vector.\n\n```perl\nmy $R = cor_mat([[1,2],[3,4],[5,6]])  # 2x2 correlation matrix\n```",
+        "cov_matrix" | "cov_mat" => "`cov_matrix` (alias `cov_mat`) — covariance matrix from observations.\n\n```perl\nmy $S = cov_mat([[1,2],[3,4],[5,6]])\n```",
+        "mahalanobis" | "mahal" => "`mahalanobis` — Mahalanobis distance. Args: data, center, inverse_covariance. Like R's mahalanobis().\n\n```perl\nmy @d = @{mahal([[1,2],[3,4]], [2,3], [[1,0],[0,1]])}\n```",
+        "dist_matrix" | "dist_mat" => "`dist_matrix` (alias `dist_mat`) — pairwise distance matrix. Supports 'euclidean' (default), 'manhattan', 'maximum'. Like R's dist().\n\n```perl\nmy $D = dist_mat([[0,0],[1,0],[0,1]])  # 3x3 distance matrix\nmy $D2 = dist_mat([[0,0],[1,1]], \"manhattan\")  # Manhattan\n```",
+        "hclust" => "`hclust` — hierarchical clustering (average linkage). Takes a distance matrix. Returns merge list [[i,j,height],...]. Like R's hclust().\n\n```perl\nmy $merges = hclust(dist_mat([[0,0],[1,0],[10,10]]))\n```",
+        "cutree" => "`cutree` — cut a dendrogram into k clusters. Takes merge list from hclust and k. Returns cluster assignments. Like R's cutree().\n\n```perl\nmy @clusters = @{cutree(hclust(dist_mat($data)), 3)}\n```",
+        "weighted_var" | "wvar" => "`weighted_var` — weighted variance. Args: values, weights.\n\n```perl\np wvar([1,2,3,4], [1,1,1,1])  # same as var\n```",
+        "cov2cor" => "`cov2cor` — convert covariance matrix to correlation matrix. Like R's cov2cor().\n\n```perl\nmy $cor = cov2cor(cov_mat($data))\n```",
+
         _ => return None,
     };
     Some(md)
