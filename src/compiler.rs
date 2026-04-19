@@ -6814,30 +6814,42 @@ impl Compiler {
                 progress,
                 flat_outputs,
                 on_cluster,
+                stream,
             } => {
-                if let Some(p) = progress {
-                    self.compile_expr(p)?;
-                } else {
-                    self.emit_op(Op::LoadInt(0), line, Some(root));
-                }
-                self.compile_expr_ctx(list, WantarrayCtx::List)?;
-                if let Some(cluster_e) = on_cluster {
-                    self.compile_expr(cluster_e)?;
-                    let block_idx = self.chunk.add_block(block.clone());
-                    self.emit_op(
-                        Op::PMapRemote {
-                            block_idx,
-                            flat: u8::from(*flat_outputs),
-                        },
-                        line,
-                        Some(root),
-                    );
-                } else {
+                if *stream {
+                    // Streaming: no progress flag needed, just list + block.
+                    self.compile_expr_ctx(list, WantarrayCtx::List)?;
                     let block_idx = self.chunk.add_block(block.clone());
                     if *flat_outputs {
-                        self.emit_op(Op::PFlatMapWithBlock(block_idx), line, Some(root));
+                        self.emit_op(Op::PFlatMapsWithBlock(block_idx), line, Some(root));
                     } else {
-                        self.emit_op(Op::PMapWithBlock(block_idx), line, Some(root));
+                        self.emit_op(Op::PMapsWithBlock(block_idx), line, Some(root));
+                    }
+                } else {
+                    if let Some(p) = progress {
+                        self.compile_expr(p)?;
+                    } else {
+                        self.emit_op(Op::LoadInt(0), line, Some(root));
+                    }
+                    self.compile_expr_ctx(list, WantarrayCtx::List)?;
+                    if let Some(cluster_e) = on_cluster {
+                        self.compile_expr(cluster_e)?;
+                        let block_idx = self.chunk.add_block(block.clone());
+                        self.emit_op(
+                            Op::PMapRemote {
+                                block_idx,
+                                flat: u8::from(*flat_outputs),
+                            },
+                            line,
+                            Some(root),
+                        );
+                    } else {
+                        let block_idx = self.chunk.add_block(block.clone());
+                        if *flat_outputs {
+                            self.emit_op(Op::PFlatMapWithBlock(block_idx), line, Some(root));
+                        } else {
+                            self.emit_op(Op::PMapWithBlock(block_idx), line, Some(root));
+                        }
                     }
                 }
             }
@@ -6861,15 +6873,22 @@ impl Compiler {
                 block,
                 list,
                 progress,
+                stream,
             } => {
-                if let Some(p) = progress {
-                    self.compile_expr(p)?;
+                if *stream {
+                    self.compile_expr_ctx(list, WantarrayCtx::List)?;
+                    let block_idx = self.chunk.add_block(block.clone());
+                    self.emit_op(Op::PGrepsWithBlock(block_idx), line, Some(root));
                 } else {
-                    self.emit_op(Op::LoadInt(0), line, Some(root));
+                    if let Some(p) = progress {
+                        self.compile_expr(p)?;
+                    } else {
+                        self.emit_op(Op::LoadInt(0), line, Some(root));
+                    }
+                    self.compile_expr_ctx(list, WantarrayCtx::List)?;
+                    let block_idx = self.chunk.add_block(block.clone());
+                    self.emit_op(Op::PGrepWithBlock(block_idx), line, Some(root));
                 }
-                self.compile_expr_ctx(list, WantarrayCtx::List)?;
-                let block_idx = self.chunk.add_block(block.clone());
-                self.emit_op(Op::PGrepWithBlock(block_idx), line, Some(root));
             }
             ExprKind::PForExpr {
                 block,

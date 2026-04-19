@@ -901,6 +901,7 @@ impl Parser {
                             progress,
                             flat_outputs: false,
                             on_cluster: None,
+                            stream: false,
                         },
                         "pflat_map" => ExprKind::PMapExpr {
                             block,
@@ -908,11 +909,13 @@ impl Parser {
                             progress,
                             flat_outputs: true,
                             on_cluster: None,
+                            stream: false,
                         },
                         "pgrep" => ExprKind::PGrepExpr {
                             block,
                             list,
                             progress,
+                            stream: false,
                         },
                         "pfor" => ExprKind::PForExpr {
                             block,
@@ -1333,13 +1336,16 @@ impl Parser {
                 | "pchannel"
                 | "pfor"
                 | "pgrep"
+                | "pgreps"
                 | "pipeline"
                 | "pmap_chunked"
                 | "pmap_reduce"
                 | "pmap_on"
                 | "pflat_map_on"
                 | "pmap"
+                | "pmaps"
                 | "pflat_map"
+                | "pflat_maps"
                 | "pop"
                 | "pos"
                 | "ppool"
@@ -2586,21 +2592,23 @@ impl Parser {
                 },
                 line,
             }),
-            "pmap" | "pflat_map" => Ok(Expr {
+            "pmap" | "pflat_map" | "pmaps" | "pflat_maps" => Ok(Expr {
                 kind: ExprKind::PMapExpr {
                     block,
                     list: Box::new(placeholder),
                     progress: None,
-                    flat_outputs: name == "pflat_map",
+                    flat_outputs: name == "pflat_map" || name == "pflat_maps",
                     on_cluster: None,
+                    stream: name == "pmaps" || name == "pflat_maps",
                 },
                 line,
             }),
-            "pgrep" => Ok(Expr {
+            "pgrep" | "pgreps" => Ok(Expr {
                 kind: ExprKind::PGrepExpr {
                     block,
                     list: Box::new(placeholder),
                     progress: None,
+                    stream: name == "pgreps",
                 },
                 line,
             }),
@@ -5652,12 +5660,14 @@ impl Parser {
                 progress,
                 flat_outputs,
                 on_cluster,
+                stream,
             } => ExprKind::PMapExpr {
                 block,
                 list: Box::new(lhs),
                 progress,
                 flat_outputs,
                 on_cluster,
+                stream,
             },
             ExprKind::PMapChunkedExpr {
                 chunk_size,
@@ -5674,10 +5684,12 @@ impl Parser {
                 block,
                 list: _,
                 progress,
+                stream,
             } => ExprKind::PGrepExpr {
                 block,
                 list: Box::new(lhs),
                 progress,
+                stream,
             },
             ExprKind::PForExpr {
                 block,
@@ -8795,6 +8807,7 @@ impl Parser {
                         progress: progress.map(Box::new),
                         flat_outputs: false,
                         on_cluster: None,
+                        stream: false,
                     },
                     line,
                 })
@@ -8809,6 +8822,7 @@ impl Parser {
                         progress: progress.map(Box::new),
                         flat_outputs: false,
                         on_cluster: Some(Box::new(cluster)),
+                        stream: false,
                     },
                     line,
                 })
@@ -8822,6 +8836,7 @@ impl Parser {
                         progress: progress.map(Box::new),
                         flat_outputs: true,
                         on_cluster: None,
+                        stream: false,
                     },
                     line,
                 })
@@ -8836,6 +8851,47 @@ impl Parser {
                         progress: progress.map(Box::new),
                         flat_outputs: true,
                         on_cluster: Some(Box::new(cluster)),
+                        stream: false,
+                    },
+                    line,
+                })
+            }
+            "pmaps" => {
+                let (block, list, progress) = self.parse_block_then_list_optional_progress()?;
+                Ok(Expr {
+                    kind: ExprKind::PMapExpr {
+                        block,
+                        list: Box::new(list),
+                        progress: progress.map(Box::new),
+                        flat_outputs: false,
+                        on_cluster: None,
+                        stream: true,
+                    },
+                    line,
+                })
+            }
+            "pflat_maps" => {
+                let (block, list, progress) = self.parse_block_then_list_optional_progress()?;
+                Ok(Expr {
+                    kind: ExprKind::PMapExpr {
+                        block,
+                        list: Box::new(list),
+                        progress: progress.map(Box::new),
+                        flat_outputs: true,
+                        on_cluster: None,
+                        stream: true,
+                    },
+                    line,
+                })
+            }
+            "pgreps" => {
+                let (block, list, progress) = self.parse_block_then_list_optional_progress()?;
+                Ok(Expr {
+                    kind: ExprKind::PGrepExpr {
+                        block,
+                        list: Box::new(list),
+                        progress: progress.map(Box::new),
+                        stream: true,
                     },
                     line,
                 })
@@ -8862,6 +8918,7 @@ impl Parser {
                         block,
                         list: Box::new(list),
                         progress: progress.map(Box::new),
+                        stream: false,
                     },
                     line,
                 })

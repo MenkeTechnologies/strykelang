@@ -9841,6 +9841,7 @@ impl Interpreter {
                 progress,
                 flat_outputs,
                 on_cluster,
+                stream,
             } => {
                 let show_progress = progress
                     .as_ref()
@@ -9859,6 +9860,22 @@ impl Interpreter {
                         *flat_outputs,
                         line,
                     );
+                }
+                if *stream {
+                    let source = crate::map_stream::into_pull_iter(list_val);
+                    let sub = self.anon_coderef_from_block(block);
+                    let (capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
+                    return Ok(PerlValue::iterator(Arc::new(
+                        crate::map_stream::PMapStreamIterator::new(
+                            source,
+                            sub,
+                            self.subs.clone(),
+                            capture,
+                            atomic_arrays,
+                            atomic_hashes,
+                            *flat_outputs,
+                        ),
+                    )));
                 }
                 let items = list_val.to_list();
                 let block = block.clone();
@@ -9980,6 +9997,7 @@ impl Interpreter {
                 block,
                 list,
                 progress,
+                stream,
             } => {
                 let show_progress = progress
                     .as_ref()
@@ -9988,6 +10006,21 @@ impl Interpreter {
                     .map(|v| v.is_true())
                     .unwrap_or(false);
                 let list_val = self.eval_expr(list)?;
+                if *stream {
+                    let source = crate::map_stream::into_pull_iter(list_val);
+                    let sub = self.anon_coderef_from_block(block);
+                    let (capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
+                    return Ok(PerlValue::iterator(Arc::new(
+                        crate::map_stream::PGrepStreamIterator::new(
+                            source,
+                            sub,
+                            self.subs.clone(),
+                            capture,
+                            atomic_arrays,
+                            atomic_hashes,
+                        ),
+                    )));
+                }
                 let items = list_val.to_list();
                 let block = block.clone();
                 let subs = self.subs.clone();

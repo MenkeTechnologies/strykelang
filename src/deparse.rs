@@ -1184,6 +1184,7 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
             progress,
             flat_outputs,
             on_cluster,
+            stream: _,
         } => {
             if *flat_outputs {
                 buf.push_str("pflat_map");
@@ -1207,6 +1208,7 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
             block,
             list,
             progress,
+            stream: _,
         } => {
             buf.push_str("pgrep { ");
             deparse_block_into(buf, block, 0);

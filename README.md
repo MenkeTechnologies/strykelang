@@ -128,14 +128,14 @@ autoload -Uz compinit && compinit
 ```sh
 stryke 'p "Hello, world!"'                 # inline code — no -e needed
 stryke 'p 1 + 2'                           # just quote and go
-stryke script.pl arg1 arg2                  # script + args
+stryke script.stk arg1 arg2                  # script + args
 stryke -lane 'p $F[0]'                     # bundled short switches
-stryke -c script.pl                         # syntax check
-stryke --lint script.pl                     # parse + compile (no run)
-stryke --disasm script.pl                   # bytecode listing on stderr
-stryke --ast script.pl                      # AST as JSON
-stryke --fmt script.pl                      # pretty-print parsed source
-stryke --profile script.pl                  # folded stacks + per-line/per-sub ns
+stryke -c script.stk                          # syntax check
+stryke --lint script.stk                     # parse + compile (no run)
+stryke --disasm script.stk                   # bytecode listing on stderr
+stryke --ast script.stk                      # AST as JSON
+stryke --fmt script.stk                      # pretty-print parsed source
+stryke --profile script.stk                  # folded stacks + per-line/per-sub ns
 stryke --flame script.stk                   # colored flamegraph bars in terminal
 stryke --flame script.stk > flame.svg       # interactive SVG flamegraph when piped
 stryke --explain E0001                      # expanded hint for an error code
@@ -146,9 +146,9 @@ stryke docs --search parallel                # search all pages
 stryke serve                                # static file server for $PWD on port 8000
 stryke serve 8080 app.stk                   # HTTP server with handler script
 stryke serve 3000 -e '"hello " . $req->{path}'  # one-liner HTTP server
-stryke build script.pl -o myapp             # bake into a standalone binary ([0x0D])
+stryke build script.stk -o myapp             # bake into a standalone binary ([0x0D])
 stryke --lsp                                # language server over stdio ([0x11])
-STRYKE_BC_CACHE=1 stryke app.pl             # warm starts skip parse + compile ([0x0F])
+STRYKE_BC_CACHE=1 stryke app.stk             # warm starts skip parse + compile ([0x0F])
 ```
 
 > **`-e` is optional.** If the first argument isn't a file on disk and looks like code, `stryke` runs it directly. `stryke 'p 42'` and `stryke -e 'p 42'` are equivalent. Use `-e` when combining with `-n`/`-p`/`-l`/`-a` (e.g. `stryke -lane 'p $F[0]'`).
@@ -1473,9 +1473,9 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 ## [0x0A] EXAMPLES
 
 ```sh
-stryke examples/fibonacci.pl
-stryke examples/text_processing.pl
-stryke examples/parallel_demo.pl
+stryke examples/fibonacci.stk
+stryke examples/text_processing.stk
+stryke examples/parallel_demo.stk
 stryke convert examples/fibonacci.pl > examples/fibonacci.stk
 stryke examples/fibonacci.stk
 ```
@@ -1489,9 +1489,9 @@ stryke 'my $a = set(1,2,2,3); my $b = set(2,3,4); p scalar($a | $b), " ", scalar
 
 ## [0x0B] BENCHMARKS
 
-### stryke vs perl5 vs python3 vs ruby vs julia
+### stryke vs perl5 vs python3 vs ruby vs julia vs raku vs luajit
 
-`bash bench/run_bench_all.sh` — stryke vs perl 5.42.2 vs Python 3.14.4 vs Ruby 4.0.2 vs Julia 1.12.6 on Apple M5 18-core. Mean of 10 hyperfine runs with 3 warmups; **includes process startup** (not steady-state). Values <1.0x mean stryke is faster.
+`bash bench/run_bench_all.sh` — stryke vs perl 5.42.2 vs Python 3.14.4 vs Ruby 4.0.2 vs Julia 1.12.6 vs Raku vs LuaJIT on Apple M5 18-core. Mean of 10 hyperfine runs with 3 warmups; **includes process startup** (not steady-state). Values <1.0x mean stryke is faster.
 
 ```
  stryke benchmark harness (5-way)
@@ -1524,6 +1524,10 @@ stryke 'my $a = set(1,2,2,3); my $b = set(2,3,4); p scalar($a | $b), " ", scalar
 **stryke vs ruby** — faster on all 8 benches: `regex` 16x, `loop` 10x, `fib` 5.4x, `startup` 4.9x, `string` 6.0x, `hash` 3.3x, `map_grep` 2.7x, `array` 3.2x.
 
 **stryke vs julia** — faster on all 8 benches: `startup` 11x, `loop` 11x, `string` 11x, `hash` 11x, `fib` 7.6x, `array` 7.3x, `regex` 7.0x, `map_grep` 5.4x. Julia timings include LLVM JIT compilation cost — in long-running sessions Julia compiles to native code and would match C on numeric work. These benchmarks measure **scripting use cases** where startup + single-shot execution matters.
+
+**stryke vs raku** — Raku (Perl 6) runs on MoarVM with notoriously slow startup (~200ms+). Re-run `bash bench/run_bench_all.sh` to see current numbers. Raku's strengths (grammars, gradual typing, junctions) are language features, not runtime speed — expect stryke to be significantly faster on all benchmarks.
+
+**stryke vs luajit** — LuaJIT is the fastest scripting runtime on earth (tracing JIT that rivals C on numeric code). Expect LuaJIT to win on pure compute (`fib`, `loop`) but lack one-liner ergonomics — no `$_`, no `-ne`, no regex literals, no parallelism. LuaJIT uses Lua patterns (not PCRE) for regex bench.
 
 ### stryke vs perl5 (detailed)
 
@@ -1566,7 +1570,7 @@ cargo test --lib                # parser smoke, lexer/value/error/scope, interpr
 cargo test --test integration   # tests/suite/* (runtime, readline list context, line-mode stdin, …)
 cargo bench --bench jit_compare # JIT vs interpreter on the same bytecode
 bash bench/run_bench.sh         # perl5 vs stryke suite (needs hyperfine)
-bash bench/run_bench_all.sh     # stryke vs perl5 vs python3 vs ruby vs julia (needs hyperfine)
+bash bench/run_bench_all.sh     # stryke vs perl5 vs python3 vs ruby vs julia vs raku vs luajit (needs hyperfine)
 bash parity/run_parity.sh       # exact stdout/stderr parity vs system perl (20 000+ cases)
 ```
 
@@ -1581,8 +1585,8 @@ bash parity/run_parity.sh       # exact stdout/stderr parity vs system perl (20 
 Compile any Perl script to a single self-contained native executable. The output is a copy of the `stryke` binary with the script source embedded as a zstd-compressed trailer. `scp` it to any compatible machine and run it — **no `perl`, no `stryke`, no `@INC`, no CPAN**.
 
 ```sh
-stryke build app.pl                         # → ./app
-stryke build app.pl -o /usr/local/bin/app   # explicit output path
+stryke build app.stk                         # → ./app
+stryke build app.stk -o /usr/local/bin/app   # explicit output path
 ./app --any --script --args             # all argv reach the embedded script's @ARGV
 ```
 
@@ -1590,7 +1594,7 @@ stryke build app.pl -o /usr/local/bin/app   # explicit output path
 
 - Parse / compile errors are surfaced **at build time**, not when users run the binary.
 - The embedded script is detected at startup by a 32-byte trailer sniff (~50 µs), then decompressed and executed by the embedded VM. A script with no trailer runs normally as `stryke`.
-- Builds are idempotent: `stryke build app.pl -o app` followed by `stryke --exe app build other.pl -o other` strips the previous trailer first, so binaries never stack.
+- Builds are idempotent: `stryke build app.stk -o app` followed by `stryke --exe app build other.stk -o other` strips the previous trailer first, so binaries never stack.
 - Unix: the output is marked `+x` automatically. macOS: unsigned — `codesign` before distribution if your environment requires it.
 - Current AOT runtime sets `@INC = (".")`; modules outside the embedded script have to be inlined. (`require` of a local `.pm` next to the running binary still works.)
 
@@ -1598,7 +1602,7 @@ stryke build app.pl -o /usr/local/bin/app   # explicit output path
 
 ```sh
 # 13 MB binary, no external runtime required:
-$ stryke build hello.pl -o hello
+$ stryke build hello.stk -o hello
 stryke build: wrote hello
 $ file hello
 hello: Mach-O 64-bit executable arm64
@@ -1641,7 +1645,7 @@ p fib 50             # 12586269025
 
 **How it works** ([`src/rust_sugar.rs`](src/rust_sugar.rs), [`src/rust_ffi.rs`](src/rust_ffi.rs)): the source-level pre-pass desugars every top-level `rust { ... }` into a `BEGIN { __stryke_rust_compile("<base64 body>", $line); }` call. The `__stryke_rust_compile` builtin hashes the body, compiles via `rustc --edition=2021 -O` if the cache is cold, `libc::dlopen`s the result, `dlsym`s each detected signature, and stores the raw symbol + arity/type tag in a process-global registry. Calls from Perl flow through a fallback arm in [`crate::builtins::try_builtin`] that dispatches on the signature tag via direct function-pointer transmute — no libffi dep, no per-call alloc, no marshalling overhead beyond the `PerlValue::to_int` / `to_number` / `to_string` calls you'd do for any builtin.
 
-**Combine with AOT for zero-friction deployment:** `stryke build script.pl -o prog` bakes the Perl source — which includes the `rust { ... }` block — into a standalone binary. The FFI compile still happens on first run of `./prog`, but the user only needs `rustc` once, then the `~/.cache/stryke/ffi/` entry is permanent.
+**Combine with AOT for zero-friction deployment:** `stryke build script.stk -o prog` bakes the Perl source — which includes the `rust { ... }` block — into a standalone binary. The FFI compile still happens on first run of `./prog`, but the user only needs `rustc` once, then the `~/.cache/stryke/ffi/` entry is permanent.
 
 **Limitations (v1):**
 
@@ -1657,8 +1661,8 @@ p fib 50             # 12586269025
 `STRYKE_BC_CACHE=1` enables the on-disk bytecode cache. The first run of a script parses + compiles + persists a `.pec` bundle to `~/.cache/stryke/bc/<sha256>.pec`. Every subsequent run skips **both parse and compile** and feeds the cached chunk straight into the VM.
 
 ```sh
-STRYKE_BC_CACHE=1 stryke my_app.pl              # cold: parse + compile + save
-STRYKE_BC_CACHE=1 stryke my_app.pl              # warm: load + dispatch
+STRYKE_BC_CACHE=1 stryke my_app.stk              # cold: parse + compile + save
+STRYKE_BC_CACHE=1 stryke my_app.stk              # warm: load + dispatch
 ```
 
 **Measured impact** (Apple M5, 13 MB release `stryke`, hyperfine `--warmup 5 -N`, mean ± σ):

@@ -932,6 +932,7 @@ fn extract_pipe_source(e: &Expr, segments: &mut Vec<String>) -> String {
             progress,
             flat_outputs,
             on_cluster,
+            stream: _,
         } if progress.is_none() && on_cluster.is_none() => {
             let kw = if *flat_outputs { "pflat_map" } else { "pmap" };
             segments.push(format!("{} {{\n{}\n}}", kw, convert_block(block, 0)));
@@ -941,6 +942,7 @@ fn extract_pipe_source(e: &Expr, segments: &mut Vec<String>) -> String {
             block,
             list,
             progress,
+            stream: _,
         } if progress.is_none() => {
             segments.push(format!("pgrep {{\n{}\n}}", convert_block(block, 0)));
             extract_pipe_source(list, segments)
