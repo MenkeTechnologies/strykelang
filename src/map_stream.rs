@@ -55,7 +55,7 @@ pub(crate) struct MapStreamIterator {
     source: Arc<dyn PerlIterator>,
     pending: Mutex<VecDeque<PerlValue>>,
     mode: MapStreamMode,
-    subs: std::collections::HashMap<String, Arc<PerlSub>>,
+    interp: Mutex<Interpreter>,
     capture: Vec<(String, PerlValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
@@ -72,11 +72,15 @@ impl MapStreamIterator {
         atomic_hashes: Vec<(String, AtomicHash)>,
         peel: bool,
     ) -> Self {
+        let mut interp = Interpreter::new();
+        interp.subs = subs;
+        interp.scope.restore_capture(&capture);
+        interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
         Self {
             source,
             pending: Mutex::new(VecDeque::new()),
             mode: MapStreamMode::Block(sub),
-            subs,
+            interp: Mutex::new(interp),
             capture,
             atomic_arrays,
             atomic_hashes,
@@ -93,11 +97,15 @@ impl MapStreamIterator {
         atomic_hashes: Vec<(String, AtomicHash)>,
         peel: bool,
     ) -> Self {
+        let mut interp = Interpreter::new();
+        interp.subs = subs;
+        interp.scope.restore_capture(&capture);
+        interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
         Self {
             source,
             pending: Mutex::new(VecDeque::new()),
             mode: MapStreamMode::Expr(expr),
-            subs,
+            interp: Mutex::new(interp),
             capture,
             atomic_arrays,
             atomic_hashes,
@@ -113,12 +121,7 @@ impl MapStreamIterator {
             }
         }
         while let Some(item) = self.source.next_item() {
-            let mut interp = Interpreter::new();
-            interp.subs = self.subs.clone();
-            interp.scope.restore_capture(&self.capture);
-            interp
-                .scope
-                .restore_atomics(&self.atomic_arrays, &self.atomic_hashes);
+            let mut interp = self.interp.lock();
             interp.scope.set_topic(item);
             match &self.mode {
                 MapStreamMode::Block(sub) => {
@@ -187,7 +190,7 @@ enum FilterStreamMode {
 pub(crate) struct FilterStreamIterator {
     source: Arc<dyn PerlIterator>,
     mode: FilterStreamMode,
-    subs: std::collections::HashMap<String, Arc<PerlSub>>,
+    interp: Mutex<Interpreter>,
     capture: Vec<(String, PerlValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
@@ -202,10 +205,14 @@ impl FilterStreamIterator {
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
     ) -> Self {
+        let mut interp = Interpreter::new();
+        interp.subs = subs;
+        interp.scope.restore_capture(&capture);
+        interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
         Self {
             source,
             mode: FilterStreamMode::Block(sub),
-            subs,
+            interp: Mutex::new(interp),
             capture,
             atomic_arrays,
             atomic_hashes,
@@ -220,10 +227,14 @@ impl FilterStreamIterator {
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
     ) -> Self {
+        let mut interp = Interpreter::new();
+        interp.subs = subs;
+        interp.scope.restore_capture(&capture);
+        interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
         Self {
             source,
             mode: FilterStreamMode::Expr(expr),
-            subs,
+            interp: Mutex::new(interp),
             capture,
             atomic_arrays,
             atomic_hashes,
@@ -234,12 +245,7 @@ impl FilterStreamIterator {
 impl PerlIterator for FilterStreamIterator {
     fn next_item(&self) -> Option<PerlValue> {
         while let Some(item) = self.source.next_item() {
-            let mut interp = Interpreter::new();
-            interp.subs = self.subs.clone();
-            interp.scope.restore_capture(&self.capture);
-            interp
-                .scope
-                .restore_atomics(&self.atomic_arrays, &self.atomic_hashes);
+            let mut interp = self.interp.lock();
             interp.scope.set_topic(item.clone());
             match &self.mode {
                 FilterStreamMode::Block(sub) => match interp.exec_block(&sub.body) {
@@ -607,7 +613,7 @@ impl PerlIterator for RangeIterator {
 pub(crate) struct TakeWhileIterator {
     source: Arc<dyn PerlIterator>,
     sub: Arc<PerlSub>,
-    subs: std::collections::HashMap<String, Arc<PerlSub>>,
+    interp: Mutex<Interpreter>,
     capture: Vec<(String, PerlValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
@@ -624,10 +630,14 @@ impl TakeWhileIterator {
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
     ) -> Self {
+        let mut interp = Interpreter::new();
+        interp.subs = subs;
+        interp.scope.restore_capture(&capture);
+        interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
         Self {
             source,
             sub,
-            subs,
+            interp: Mutex::new(interp),
             capture,
             atomic_arrays,
             atomic_hashes,
@@ -642,12 +652,7 @@ impl PerlIterator for TakeWhileIterator {
             return None;
         }
         if let Some(item) = self.source.next_item() {
-            let mut interp = Interpreter::new();
-            interp.subs = self.subs.clone();
-            interp.scope.restore_capture(&self.capture);
-            interp
-                .scope
-                .restore_atomics(&self.atomic_arrays, &self.atomic_hashes);
+            let mut interp = self.interp.lock();
             interp.scope.set_topic(item.clone());
             match interp.exec_block(&self.sub.body) {
                 Ok(v) if v.is_true() => Some(item),
@@ -667,7 +672,7 @@ impl PerlIterator for TakeWhileIterator {
 pub(crate) struct SkipWhileIterator {
     source: Arc<dyn PerlIterator>,
     sub: Arc<PerlSub>,
-    subs: std::collections::HashMap<String, Arc<PerlSub>>,
+    interp: Mutex<Interpreter>,
     capture: Vec<(String, PerlValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
@@ -684,10 +689,14 @@ impl SkipWhileIterator {
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
     ) -> Self {
+        let mut interp = Interpreter::new();
+        interp.subs = subs;
+        interp.scope.restore_capture(&capture);
+        interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
         Self {
             source,
             sub,
-            subs,
+            interp: Mutex::new(interp),
             capture,
             atomic_arrays,
             atomic_hashes,
@@ -704,12 +713,7 @@ impl PerlIterator for SkipWhileIterator {
             if !still_skipping {
                 return Some(item);
             }
-            let mut interp = Interpreter::new();
-            interp.subs = self.subs.clone();
-            interp.scope.restore_capture(&self.capture);
-            interp
-                .scope
-                .restore_atomics(&self.atomic_arrays, &self.atomic_hashes);
+            let mut interp = self.interp.lock();
             interp.scope.set_topic(item.clone());
             match interp.exec_block(&self.sub.body) {
                 Ok(v) if v.is_true() => continue,
@@ -726,7 +730,7 @@ impl PerlIterator for SkipWhileIterator {
 pub(crate) struct TapIterator {
     source: Arc<dyn PerlIterator>,
     sub: Arc<PerlSub>,
-    subs: std::collections::HashMap<String, Arc<PerlSub>>,
+    interp: Mutex<Interpreter>,
     capture: Vec<(String, PerlValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
@@ -741,10 +745,14 @@ impl TapIterator {
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
     ) -> Self {
+        let mut interp = Interpreter::new();
+        interp.subs = subs;
+        interp.scope.restore_capture(&capture);
+        interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
         Self {
             source,
             sub,
-            subs,
+            interp: Mutex::new(interp),
             capture,
             atomic_arrays,
             atomic_hashes,
@@ -755,12 +763,7 @@ impl TapIterator {
 impl PerlIterator for TapIterator {
     fn next_item(&self) -> Option<PerlValue> {
         let item = self.source.next_item()?;
-        let mut interp = Interpreter::new();
-        interp.subs = self.subs.clone();
-        interp.scope.restore_capture(&self.capture);
-        interp
-            .scope
-            .restore_atomics(&self.atomic_arrays, &self.atomic_hashes);
+        let mut interp = self.interp.lock();
         interp.scope.set_topic(item.clone());
         let _ = interp.exec_block(&self.sub.body);
         Some(item)
@@ -987,7 +990,7 @@ impl PerlIterator for CompactIterator {
 pub(crate) struct RejectIterator {
     source: Arc<dyn PerlIterator>,
     sub: Arc<PerlSub>,
-    subs: std::collections::HashMap<String, Arc<PerlSub>>,
+    interp: Mutex<Interpreter>,
     capture: Vec<(String, PerlValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
@@ -1003,10 +1006,14 @@ impl RejectIterator {
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
     ) -> Self {
+        let mut interp = Interpreter::new();
+        interp.subs = subs;
+        interp.scope.restore_capture(&capture);
+        interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
         Self {
             source,
             sub,
-            subs,
+            interp: Mutex::new(interp),
             capture,
             atomic_arrays,
             atomic_hashes,
@@ -1017,12 +1024,7 @@ impl RejectIterator {
 impl PerlIterator for RejectIterator {
     fn next_item(&self) -> Option<PerlValue> {
         while let Some(item) = self.source.next_item() {
-            let mut interp = Interpreter::new();
-            interp.subs = self.subs.clone();
-            interp.scope.restore_capture(&self.capture);
-            interp
-                .scope
-                .restore_atomics(&self.atomic_arrays, &self.atomic_hashes);
+            let mut interp = self.interp.lock();
             interp.scope.set_topic(item.clone());
             match interp.exec_block(&self.sub.body) {
                 Ok(v) if !v.is_true() => return Some(item),
@@ -1499,11 +1501,11 @@ impl PMapStreamIterator {
                 let sub = Arc::clone(&sub);
                 workers.push(std::thread::spawn(move || {
                     let mut interp = Interpreter::new();
+                    interp.subs = subs.clone();
+                    interp.scope.restore_capture(&capture);
+                    interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
+                    interp.enable_parallel_guard();
                     while let Ok(item) = work_rx.recv() {
-                        interp.subs = subs.clone();
-                        interp.scope.restore_capture(&capture);
-                        interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
-                        interp.enable_parallel_guard();
                         interp.scope.set_topic(item);
                         match interp.exec_block_with_tail(&sub.body, WantarrayCtx::List) {
                             Ok(val) => {
@@ -1577,17 +1579,15 @@ impl PGrepStreamIterator {
                 let sub = Arc::clone(&sub);
                 workers.push(std::thread::spawn(move || {
                     let mut interp = Interpreter::new();
+                    interp.subs = subs.clone();
+                    interp.scope.restore_capture(&capture);
+                    interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
+                    interp.enable_parallel_guard();
                     while let Ok(item) = work_rx.recv() {
-                        interp.subs = subs.clone();
-                        interp.scope.restore_capture(&capture);
-                        interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
-                        interp.enable_parallel_guard();
                         interp.scope.set_topic(item.clone());
                         match interp.exec_block(&sub.body) {
-                            Ok(v) if v.is_true() => {
-                                if tx.send(item).is_err() {
-                                    return;
-                                }
+                            Ok(v) if v.is_true() && tx.send(item).is_err() => {
+                                return;
                             }
                             _ => {}
                         }
