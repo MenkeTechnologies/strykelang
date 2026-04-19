@@ -335,7 +335,7 @@ For `mysync` scalars holding a `Set`, `|`/`&` are union/intersection. Without `m
 | **Crypto** | `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `md5`, `hmac`, `hmac_sha256`, `crc32`, `uuid`, `base64_encode/decode`, `hex_encode/decode` |
 | **Compression** ([`flate2`](https://crates.io/crates/flate2), [`zstd`](https://crates.io/crates/zstd)) | `gzip`, `gunzip`, `zstd`, `zstd_decode` |
 | **Time** ([`chrono`](https://crates.io/crates/chrono), [`chrono-tz`](https://crates.io/crates/chrono-tz)) | `datetime_utc`, `datetime_from_epoch`, `datetime_parse_rfc3339`, `datetime_strftime`, `datetime_now_tz`, `datetime_format_tz`, `datetime_parse_local`, `datetime_add_seconds`, `elapsed` |
-| **Structs / Enums / Classes / Types** | `struct Point { x => Float }`, `enum Color { Red, Green }`, `class Dog extends Animal { breed: Str; fn bark { } }`, `abstract class Shape { }`, `trait Printable { fn to_str }` (enforced), `pub`/`priv`/`prot` visibility, `static count: Int`, `BUILD`/`DESTROY`, `typed my $x : Int`, typed sub params `fn ($a: Int) { }` |
+| **Structs / Enums / Classes / Types** | `struct Point { x => Float }`, `enum Color { Red, Green }`, `class Dog extends Animal { breed: Str; fn bark { } }`, `abstract class`/`final class`, `trait Printable { fn to_str }` (enforced), `pub`/`priv`/`prot` visibility, `static count: Int`, `BUILD`/`DESTROY`, `final fn`, `methods()`/`superclass()`/`does()`, `static::method()`, `typed my $x : Int` |
 
 ```perl
 my $data = "https://api.example.com/users/1" |> fetch_json
@@ -533,6 +533,45 @@ class Box impl Drawable {
     fn draw { "drawn" }    # satisfies trait contract
 }
 p Box()->does("Drawable")  # 1
+
+# Final classes — cannot be extended
+final class Singleton { value: Int = 1 }
+# class Bad extends Singleton { }  # → error
+
+# Final methods — cannot be overridden
+class Secure {
+    final fn id { 42 }
+    fn label { "secure" }  # can be overridden
+}
+
+# Reflection: methods(), superclass()
+my @m = $dog->methods()     # ("speak", "bark", ...)
+my @p = $dog->superclass()  # ("Animal")
+
+# Late static binding: static::method() resolves to runtime class
+class Base {
+    fn class_name { static::identify() }
+    fn identify { "Base" }
+}
+class Child extends Base {
+    fn identify { "Child" }
+}
+Child()->class_name()  # "Child" (not "Base")
+
+# Operator overloading for native classes
+class Vec2 {
+    x: Int; y: Int
+    fn op_add($other) {
+        Vec2(x => $self->x + $other->x, y => $self->y + $other->y)
+    }
+    fn op_eq($other) { $self->x == $other->x && $self->y == $other->y }
+    fn stringify { "(" . $self->x . "," . $self->y . ")" }
+}
+my $v = Vec2(x => 1, y => 2) + Vec2(x => 3, y => 4)
+p $v  # (4,6)
+# Supported: op_add op_sub op_mul op_div op_mod op_pow op_concat
+#            op_eq op_ne op_lt op_gt op_le op_ge op_spaceship op_cmp
+#            op_neg op_bool op_abs op_numify stringify
 # ────────────────────────────────────────────────────────────────────
 
 typed my $n : Int = 42

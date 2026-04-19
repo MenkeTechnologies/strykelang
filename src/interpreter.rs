@@ -6818,6 +6818,33 @@ impl Interpreter {
                     )
                     .into());
                 }
+                // Final class enforcement: prevent subclassing
+                for parent_name in &def.extends {
+                    if let Some(parent_def) = self.class_defs.get(parent_name) {
+                        if parent_def.is_final {
+                            return Err(PerlError::runtime(
+                                format!("cannot extend final class `{}`", parent_name),
+                                stmt.line,
+                            )
+                            .into());
+                        }
+                        // Final method enforcement: prevent overriding
+                        for m in &def.methods {
+                            if let Some(parent_method) = parent_def.method(&m.name) {
+                                if parent_method.is_final {
+                                    return Err(PerlError::runtime(
+                                        format!(
+                                            "cannot override final method `{}` from class `{}`",
+                                            m.name, parent_name
+                                        ),
+                                        stmt.line,
+                                    )
+                                    .into());
+                                }
+                            }
+                        }
+                    }
+                }
                 // Trait contract enforcement: verify all required trait methods are implemented
                 for trait_name in &def.implements {
                     if let Some(trait_def) = self.trait_defs.get(trait_name).cloned() {
@@ -11672,6 +11699,17 @@ impl Interpreter {
         v: &PerlValue,
         line: usize,
     ) -> Option<ExecResult> {
+        // Native class instance: look for method named '""' or 'stringify'
+        if let Some(c) = v.as_class_inst() {
+            let method_name = c
+                .def
+                .method("stringify")
+                .or_else(|| c.def.method("\"\""))
+                .filter(|m| m.body.is_some())?;
+            let body = method_name.body.clone().unwrap();
+            let params = method_name.params.clone();
+            return Some(self.call_class_method(&body, &params, vec![v.clone()], line));
+        }
         let br = v.as_blessed_ref()?;
         let class = br.class.clone();
         let map = self.overload_table.get(&class)?;
@@ -11679,6 +11717,34 @@ impl Interpreter {
         let fq = format!("{}::{}", class, sub_short);
         let sub = self.subs.get(&fq)?.clone();
         Some(self.call_sub(&sub, vec![v.clone()], WantarrayCtx::Scalar, line))
+    }
+
+    /// Map overload operator key to native class method name.
+    fn overload_method_name_for_key(key: &str) -> Option<&'static str> {
+        match key {
+            "+" => Some("op_add"),
+            "-" => Some("op_sub"),
+            "*" => Some("op_mul"),
+            "/" => Some("op_div"),
+            "%" => Some("op_mod"),
+            "**" => Some("op_pow"),
+            "." => Some("op_concat"),
+            "==" => Some("op_eq"),
+            "!=" => Some("op_ne"),
+            "<" => Some("op_lt"),
+            ">" => Some("op_gt"),
+            "<=" => Some("op_le"),
+            ">=" => Some("op_ge"),
+            "<=>" => Some("op_spaceship"),
+            "eq" => Some("op_str_eq"),
+            "ne" => Some("op_str_ne"),
+            "lt" => Some("op_str_lt"),
+            "gt" => Some("op_str_gt"),
+            "le" => Some("op_str_le"),
+            "ge" => Some("op_str_ge"),
+            "cmp" => Some("op_cmp"),
+            _ => None,
+        }
     }
 
     pub(crate) fn try_overload_binop(
@@ -11689,6 +11755,30 @@ impl Interpreter {
         line: usize,
     ) -> Option<ExecResult> {
         let key = Self::overload_key_for_binop(op)?;
+        // Native class instance overloading
+        let (ci_def, invocant, other) = if let Some(c) = lv.as_class_inst() {
+            (Some(c.def.clone()), lv.clone(), rv.clone())
+        } else if let Some(c) = rv.as_class_inst() {
+            (Some(c.def.clone()), rv.clone(), lv.clone())
+        } else {
+            (None, lv.clone(), rv.clone())
+        };
+        if let Some(ref def) = ci_def {
+            if let Some(method_name) = Self::overload_method_name_for_key(key) {
+                if let Some((m, _)) = self.find_class_method(def, method_name) {
+                    if let Some(ref body) = m.body {
+                        let params = m.params.clone();
+                        return Some(self.call_class_method(
+                            body,
+                            &params,
+                            vec![invocant, other],
+                            line,
+                        ));
+                    }
+                }
+            }
+        }
+        // Blessed ref overloading (existing path)
         let (class, invocant, other) = if let Some(br) = lv.as_blessed_ref() {
             (br.class.clone(), lv.clone(), rv.clone())
         } else if let Some(br) = rv.as_blessed_ref() {
@@ -11723,6 +11813,24 @@ impl Interpreter {
         val: &PerlValue,
         line: usize,
     ) -> Option<ExecResult> {
+        // Native class instance: look for op_neg, op_bool, op_abs, op_numify
+        if let Some(c) = val.as_class_inst() {
+            let method_name = match op_key {
+                "neg" => "op_neg",
+                "bool" => "op_bool",
+                "abs" => "op_abs",
+                "0+" => "op_numify",
+                _ => return None,
+            };
+            if let Some((m, _)) = self.find_class_method(&c.def, method_name) {
+                if let Some(ref body) = m.body {
+                    let params = m.params.clone();
+                    return Some(self.call_class_method(body, &params, vec![val.clone()], line));
+                }
+            }
+            return None;
+        }
+        // Blessed ref path
         let br = val.as_blessed_ref()?;
         let class = br.class.clone();
         let map = self.overload_table.get(&class)?;
@@ -13599,6 +13707,39 @@ impl Interpreter {
                 Ok(PerlValue::remote_cluster(Arc::new(c)))
             }
             _ => {
+                // Late static binding: static::method() resolves to runtime class of $self
+                if let Some(method_name) = name.strip_prefix("static::") {
+                    let self_val = self.scope.get_scalar("self");
+                    if let Some(c) = self_val.as_class_inst() {
+                        if let Some((m, _)) = self.find_class_method(&c.def, method_name) {
+                            if let Some(ref body) = m.body {
+                                let params = m.params.clone();
+                                let mut call_args = vec![self_val.clone()];
+                                call_args.extend(args);
+                                return match self.call_class_method(body, &params, call_args, line)
+                                {
+                                    Ok(v) => Ok(v),
+                                    Err(FlowOrError::Error(e)) => Err(e.into()),
+                                    Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
+                                    Err(e) => Err(e),
+                                };
+                            }
+                        }
+                        return Err(PerlError::runtime(
+                            format!(
+                                "static::{} — method not found on class {}",
+                                method_name, c.def.name
+                            ),
+                            line,
+                        )
+                        .into());
+                    }
+                    return Err(PerlError::runtime(
+                        "static:: can only be used inside a class method",
+                        line,
+                    )
+                    .into());
+                }
                 // Check for struct constructor: Point(x => 1, y => 2) or Point(1, 2)
                 if let Some(def) = self.struct_defs.get(name).cloned() {
                     return self.struct_construct(&def, args, line);
@@ -13861,6 +14002,22 @@ impl Interpreter {
         }
 
         all_fields
+    }
+
+    /// Collect all method names from class and parents (deduplicates, child overrides parent).
+    fn collect_class_method_names(&self, def: &ClassDef, names: &mut Vec<String>) {
+        // Parent methods first
+        for parent_name in &def.extends {
+            if let Some(parent_def) = self.class_defs.get(parent_name) {
+                self.collect_class_method_names(parent_def, names);
+            }
+        }
+        // Own methods (add if not already present — child overrides parent name)
+        for m in &def.methods {
+            if !m.is_static && !names.contains(&m.name) {
+                names.push(m.name.clone());
+            }
+        }
     }
 
     /// Collect DESTROY methods from child to parent order (reverse of BUILD).
@@ -14523,6 +14680,30 @@ impl Interpreter {
                     } else {
                         PerlValue::string(String::new())
                     }));
+                }
+                "methods" => {
+                    if !args.is_empty() {
+                        return Some(Err(PerlError::runtime("methods takes no arguments", line)));
+                    }
+                    let mut names = Vec::new();
+                    self.collect_class_method_names(&c.def, &mut names);
+                    let values: Vec<PerlValue> = names.into_iter().map(PerlValue::string).collect();
+                    return Some(Ok(PerlValue::array(values)));
+                }
+                "superclass" => {
+                    if !args.is_empty() {
+                        return Some(Err(PerlError::runtime(
+                            "superclass takes no arguments",
+                            line,
+                        )));
+                    }
+                    let parents: Vec<PerlValue> = c
+                        .def
+                        .extends
+                        .iter()
+                        .map(|s| PerlValue::string(s.clone()))
+                        .collect();
+                    return Some(Ok(PerlValue::array(parents)));
                 }
                 "destroy" => {
                     // Explicit destructor call — runs DESTROY chain child-first
