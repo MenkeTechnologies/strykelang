@@ -1432,28 +1432,37 @@ impl Interpreter {
         let primaries_map = crate::builtins::primaries_hash_map();
         let all_map = crate::builtins::all_hash_map();
         self.scope
-            .declare_hash("stryke::builtins", builtins_map.clone());
+            .declare_hash_global("stryke::builtins", builtins_map.clone());
         self.scope
-            .declare_hash("stryke::perl_compats", perl_compats_map.clone());
+            .declare_hash_global("stryke::perl_compats", perl_compats_map.clone());
         self.scope
-            .declare_hash("stryke::extensions", extensions_map.clone());
+            .declare_hash_global("stryke::extensions", extensions_map.clone());
         self.scope
-            .declare_hash("stryke::aliases", aliases_map.clone());
+            .declare_hash_global("stryke::aliases", aliases_map.clone());
         self.scope
-            .declare_hash("stryke::descriptions", descriptions_map.clone());
+            .declare_hash_global("stryke::descriptions", descriptions_map.clone());
         self.scope
-            .declare_hash("stryke::categories", categories_map.clone());
+            .declare_hash_global("stryke::categories", categories_map.clone());
         self.scope
-            .declare_hash("stryke::primaries", primaries_map.clone());
-        self.scope.declare_hash("stryke::all", all_map.clone());
-        self.scope.declare_hash("b", builtins_map);
-        self.scope.declare_hash("pc", perl_compats_map);
-        self.scope.declare_hash("e", extensions_map);
-        self.scope.declare_hash("a", aliases_map);
-        self.scope.declare_hash("d", descriptions_map);
-        self.scope.declare_hash("c", categories_map);
-        self.scope.declare_hash("p", primaries_map);
-        self.scope.declare_hash("all", all_map);
+            .declare_hash_global("stryke::primaries", primaries_map.clone());
+        self.scope
+            .declare_hash_global("stryke::all", all_map.clone());
+        // Short aliases: only declare if no user-declared hash with that name
+        // exists, to avoid overwriting `my %e` etc.
+        for (name, val) in [
+            ("b", builtins_map),
+            ("pc", perl_compats_map),
+            ("e", extensions_map),
+            ("a", aliases_map),
+            ("d", descriptions_map),
+            ("c", categories_map),
+            ("p", primaries_map),
+            ("all", all_map),
+        ] {
+            if !self.scope.any_frame_has_hash(name) {
+                self.scope.declare_hash_global(name, val);
+            }
+        }
     }
 
     /// `overload::import` / `overload::unimport` — core stubs used by CPAN modules (e.g.
@@ -2273,7 +2282,7 @@ impl Interpreter {
     pub(crate) fn touch_env_hash(&mut self, hash_name: &str) {
         if hash_name == "ENV" {
             self.materialize_env_if_needed();
-        } else if !self.reflection_hashes_ready {
+        } else if !self.reflection_hashes_ready && !self.scope.has_lexical_hash(hash_name) {
             match hash_name {
                 "b"
                 | "pc"

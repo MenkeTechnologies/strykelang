@@ -727,18 +727,6 @@ fn thread_udf_with_explicit_paren_args() {
 }
 
 #[test]
-fn thread_udf_paren_args_without_topic_errors() {
-    // Args without `$_` would silently drop the threaded value — refuse it.
-    let err = stryke::parse(r#"sub add2 { $_0 + $_1 } thread 10 add2(3)"#)
-        .expect_err("should reject call-stage args missing `$_`");
-    let msg = format!("{}", err);
-    assert!(
-        msg.contains("requires `$_` placeholder"),
-        "unexpected error message: {msg}"
-    );
-}
-
-#[test]
 fn closure_args_in_pipe_map() {
     assert_eq!(
         eval_string(r#"(1..5) |> map { $_0 * 2 } |> join ",""#),

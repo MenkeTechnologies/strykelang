@@ -1513,6 +1513,23 @@ impl Scope {
         }
     }
 
+    /// Declare a hash in the bottom (global) frame, not the current lexical frame.
+    pub fn declare_hash_global(&mut self, name: &str, val: IndexMap<String, PerlValue>) {
+        if let Some(frame) = self.frames.first_mut() {
+            frame.set_hash(name, val);
+        }
+    }
+
+    /// Returns `true` if a lexical (non-bottom) frame declares `%name`.
+    pub fn has_lexical_hash(&self, name: &str) -> bool {
+        self.frames.iter().skip(1).any(|f| f.has_hash(name))
+    }
+
+    /// Returns `true` if ANY frame (including global) declares `%name`.
+    pub fn any_frame_has_hash(&self, name: &str) -> bool {
+        self.frames.iter().any(|f| f.has_hash(name))
+    }
+
     pub fn get_hash(&self, name: &str) -> IndexMap<String, PerlValue> {
         if let Some(ah) = self.find_atomic_hash(name) {
             return ah.0.lock().clone();
