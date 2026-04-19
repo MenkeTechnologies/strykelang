@@ -9198,3 +9198,644 @@ fn builtin_lm_fit(args: &[PerlValue]) -> PerlResult<PerlValue> {
     result.insert("fitted".to_string(), vec_to_perl(&fitted));
     Ok(PerlValue::hash(result))
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// R base: remaining distribution quantiles (q-functions)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// `qgamma p, shape [, scale]` — gamma quantile via Newton iteration on pgamma.
+fn builtin_qgamma(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
+    let shape = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let scale = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    // Initial guess via Wilson-Hilferty
+    let mut x = shape * scale;
+    for _ in 0..100 {
+        let cdf = builtin_pgamma(&[
+            PerlValue::float(x),
+            PerlValue::float(shape),
+            PerlValue::float(scale),
+        ])?
+        .to_number();
+        let pdf_args = [
+            PerlValue::float(x),
+            PerlValue::float(shape),
+            PerlValue::float(scale),
+        ];
+        let pdf = builtin_gamma_pdf(&pdf_args)?.to_number();
+        if pdf.abs() < 1e-15 {
+            break;
+        }
+        let dx = (cdf - p) / pdf;
+        x -= dx;
+        x = x.max(1e-15);
+        if dx.abs() < 1e-10 {
+            break;
+        }
+    }
+    Ok(PerlValue::float(x))
+}
+
+/// `qbeta p, a, b` — beta quantile via Newton iteration on pbeta.
+fn builtin_qbeta(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
+    let a = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let mut x = p; // initial guess
+    for _ in 0..100 {
+        let cdf = builtin_pbeta(&[
+            PerlValue::float(x),
+            PerlValue::float(a),
+            PerlValue::float(b),
+        ])?
+        .to_number();
+        let pdf = builtin_beta_pdf(&[
+            PerlValue::float(x),
+            PerlValue::float(a),
+            PerlValue::float(b),
+        ])?
+        .to_number();
+        if pdf.abs() < 1e-15 {
+            break;
+        }
+        let dx = (cdf - p) / pdf;
+        x -= dx;
+        x = x.max(1e-12).min(1.0 - 1e-12);
+        if dx.abs() < 1e-10 {
+            break;
+        }
+    }
+    Ok(PerlValue::float(x))
+}
+
+/// `qchisq p, df` — chi-squared quantile.
+fn builtin_qchisq(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
+    let df = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    builtin_qgamma(&[
+        PerlValue::float(p),
+        PerlValue::float(df / 2.0),
+        PerlValue::float(2.0),
+    ])
+}
+
+/// `qt p, df` — Student's t quantile via Newton iteration on pt.
+fn builtin_qt(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
+    let df = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let mut x = qnorm_approx(p); // initial guess from normal
+    for _ in 0..100 {
+        let cdf = builtin_pt(&[PerlValue::float(x), PerlValue::float(df)])?.to_number();
+        let pdf = builtin_t_pdf(&[PerlValue::float(x), PerlValue::float(df)])?.to_number();
+        if pdf.abs() < 1e-15 {
+            break;
+        }
+        let dx = (cdf - p) / pdf;
+        x -= dx;
+        if dx.abs() < 1e-10 {
+            break;
+        }
+    }
+    Ok(PerlValue::float(x))
+}
+
+/// `qf p, d1, d2` — F-distribution quantile via Newton iteration.
+fn builtin_qf(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
+    let d1 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let d2 = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let mut x = 1.0; // initial guess
+    for _ in 0..100 {
+        let cdf = builtin_pf(&[
+            PerlValue::float(x),
+            PerlValue::float(d1),
+            PerlValue::float(d2),
+        ])?
+        .to_number();
+        let pdf = builtin_f_pdf(&[
+            PerlValue::float(x),
+            PerlValue::float(d1),
+            PerlValue::float(d2),
+        ])?
+        .to_number();
+        if pdf.abs() < 1e-15 {
+            break;
+        }
+        let dx = (cdf - p) / pdf;
+        x -= dx;
+        x = x.max(1e-15);
+        if dx.abs() < 1e-10 {
+            break;
+        }
+    }
+    Ok(PerlValue::float(x))
+}
+
+/// `qbinom p, n, prob` — binomial quantile (smallest k where P(X<=k) >= p).
+fn builtin_qbinom(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
+    let n = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
+    let prob = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
+    let mut cdf = 0.0;
+    for k in 0..=n {
+        let pmf = builtin_dbinom(&[
+            PerlValue::integer(k),
+            PerlValue::integer(n),
+            PerlValue::float(prob),
+        ])?
+        .to_number();
+        cdf += pmf;
+        if cdf >= p {
+            return Ok(PerlValue::integer(k));
+        }
+    }
+    Ok(PerlValue::integer(n))
+}
+
+/// `qpois p, lambda` — Poisson quantile (smallest k where P(X<=k) >= p).
+fn builtin_qpois(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let p = args.first().map(|v| v.to_number()).unwrap_or(0.5);
+    let lambda = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let mut cdf = 0.0;
+    let mut term = (-lambda).exp();
+    cdf += term;
+    if cdf >= p {
+        return Ok(PerlValue::integer(0));
+    }
+    for k in 1..10000 {
+        term *= lambda / k as f64;
+        cdf += term;
+        if cdf >= p {
+            return Ok(PerlValue::integer(k));
+        }
+    }
+    Ok(PerlValue::integer(0))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// R base: time series
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// `acf_fn VEC [, max_lag]` — autocorrelation function. Returns array of ACF values for lags 0..max_lag.
+fn builtin_acf_fn(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let n = x.len();
+    let max_lag = args
+        .get(1)
+        .map(|v| v.to_number() as usize)
+        .unwrap_or(n.min(40));
+    let mean: f64 = x.iter().sum::<f64>() / n as f64;
+    let var: f64 = x.iter().map(|v| (v - mean).powi(2)).sum::<f64>();
+    let mut acf_vals = Vec::with_capacity(max_lag + 1);
+    for lag in 0..=max_lag.min(n - 1) {
+        let mut s = 0.0;
+        for i in 0..n - lag {
+            s += (x[i] - mean) * (x[i + lag] - mean);
+        }
+        acf_vals.push(PerlValue::float(s / var));
+    }
+    Ok(PerlValue::array(acf_vals))
+}
+
+/// `pacf_fn VEC [, max_lag]` — partial autocorrelation function via Durbin-Levinson.
+fn builtin_pacf_fn(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let acf_result = builtin_acf_fn(args)?;
+    let acf: Vec<f64> = arg_to_vec(&acf_result)
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let max_lag = acf.len() - 1;
+    let mut pacf_vals = vec![PerlValue::float(1.0)]; // lag 0
+    if max_lag == 0 {
+        return Ok(PerlValue::array(pacf_vals));
+    }
+    let mut phi = vec![vec![0.0; max_lag + 1]; max_lag + 1];
+    phi[1][1] = acf[1];
+    pacf_vals.push(PerlValue::float(acf[1]));
+    for k in 2..=max_lag {
+        let mut num = acf[k];
+        for j in 1..k {
+            num -= phi[k - 1][j] * acf[k - j];
+        }
+        let mut den = 1.0;
+        for j in 1..k {
+            den -= phi[k - 1][j] * acf[j];
+        }
+        phi[k][k] = if den.abs() > 1e-15 { num / den } else { 0.0 };
+        for j in 1..k {
+            phi[k][j] = phi[k - 1][j] - phi[k][k] * phi[k - 1][k - j];
+        }
+        pacf_vals.push(PerlValue::float(phi[k][k]));
+    }
+    Ok(PerlValue::array(pacf_vals))
+}
+
+/// `diff_lag VEC [, lag [, differences]]` — lagged differences (R's diff).
+fn builtin_diff_lag(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let mut v: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let lag = args.get(1).map(|v| v.to_number() as usize).unwrap_or(1);
+    let differences = args.get(2).map(|v| v.to_number() as usize).unwrap_or(1);
+    for _ in 0..differences {
+        if v.len() <= lag {
+            return Ok(PerlValue::array(vec![]));
+        }
+        let new: Vec<f64> = (lag..v.len()).map(|i| v[i] - v[i - lag]).collect();
+        v = new;
+    }
+    Ok(vec_to_perl(&v))
+}
+
+/// `ts_filter VEC, COEFFS` — linear filtering (convolution with coefficients). R's filter() with method="convolution".
+fn builtin_ts_filter(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let filt: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let n = x.len();
+    let m = filt.len();
+    if n < m {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let half = m / 2;
+    let mut result = Vec::with_capacity(n);
+    for i in 0..n {
+        if i < half || i + m - half > n {
+            result.push(PerlValue::float(f64::NAN));
+        } else {
+            let mut s = 0.0;
+            for j in 0..m {
+                let idx = i + j - half;
+                if idx < n {
+                    s += x[idx] * filt[j];
+                }
+            }
+            result.push(PerlValue::float(s));
+        }
+    }
+    Ok(PerlValue::array(result))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// R base: regression diagnostics
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// `predict_lm MODEL, X_NEW` — predict from a linear model. MODEL is hash from lm_fit.
+fn builtin_predict_lm(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let model = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let x_new: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let map = model
+        .as_hash_map()
+        .ok_or_else(|| PerlError::runtime("predict_lm: expected model hash from lm_fit", 0))?;
+    let intercept = map.get("intercept").map(|v| v.to_number()).unwrap_or(0.0);
+    let slope = map.get("slope").map(|v| v.to_number()).unwrap_or(0.0);
+    let result: Vec<PerlValue> = x_new
+        .iter()
+        .map(|&x| PerlValue::float(intercept + slope * x))
+        .collect();
+    Ok(PerlValue::array(result))
+}
+
+/// `confint_lm MODEL [, level]` — confidence intervals for linear model coefficients.
+fn builtin_confint_lm(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let model = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let level = args.get(1).map(|v| v.to_number()).unwrap_or(0.95);
+    let map = model
+        .as_hash_map()
+        .ok_or_else(|| PerlError::runtime("confint_lm: expected model hash", 0))?;
+    let intercept = map.get("intercept").map(|v| v.to_number()).unwrap_or(0.0);
+    let slope = map.get("slope").map(|v| v.to_number()).unwrap_or(0.0);
+    let residuals = map
+        .get("residuals")
+        .map(|v| {
+            arg_to_vec(v)
+                .iter()
+                .map(|x| x.to_number())
+                .collect::<Vec<f64>>()
+        })
+        .unwrap_or_default();
+    let fitted = map
+        .get("fitted")
+        .map(|v| {
+            arg_to_vec(v)
+                .iter()
+                .map(|x| x.to_number())
+                .collect::<Vec<f64>>()
+        })
+        .unwrap_or_default();
+    let n = residuals.len() as f64;
+    if n < 3.0 {
+        return Err(PerlError::runtime("confint_lm: need >= 3 observations", 0));
+    }
+    let se_resid = (residuals.iter().map(|r| r * r).sum::<f64>() / (n - 2.0)).sqrt();
+    // Reconstruct xs from fitted and model
+    let xs: Vec<f64> = fitted
+        .iter()
+        .map(|&f| (f - intercept) / slope.max(1e-15))
+        .collect();
+    let mx: f64 = xs.iter().sum::<f64>() / n;
+    let ss_xx: f64 = xs.iter().map(|x| (x - mx).powi(2)).sum();
+    let se_intercept = se_resid * (1.0 / n + mx * mx / ss_xx).sqrt();
+    let se_slope = se_resid / ss_xx.sqrt();
+    let alpha = 1.0 - level;
+    let t_crit = builtin_qt(&[
+        PerlValue::float(1.0 - alpha / 2.0),
+        PerlValue::float(n - 2.0),
+    ])?
+    .to_number();
+    let mut result = indexmap::IndexMap::new();
+    result.insert(
+        "intercept_lower".to_string(),
+        PerlValue::float(intercept - t_crit * se_intercept),
+    );
+    result.insert(
+        "intercept_upper".to_string(),
+        PerlValue::float(intercept + t_crit * se_intercept),
+    );
+    result.insert(
+        "slope_lower".to_string(),
+        PerlValue::float(slope - t_crit * se_slope),
+    );
+    result.insert(
+        "slope_upper".to_string(),
+        PerlValue::float(slope + t_crit * se_slope),
+    );
+    Ok(PerlValue::hash(result))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// R base: multivariate statistics
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// `cor_matrix DATA` — correlation matrix. DATA is array of observations (each is a vector).
+fn builtin_cor_matrix(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let data: Vec<Vec<f64>> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| arg_to_vec(v).iter().map(|x| x.to_number()).collect())
+        .collect();
+    let n = data.len();
+    if n < 2 {
+        return Err(PerlError::runtime("cor_matrix: need >= 2 observations", 0));
+    }
+    let p = data[0].len();
+    let nf = n as f64;
+    let means: Vec<f64> = (0..p)
+        .map(|j| data.iter().map(|r| r[j]).sum::<f64>() / nf)
+        .collect();
+    let sds: Vec<f64> = (0..p)
+        .map(|j| (data.iter().map(|r| (r[j] - means[j]).powi(2)).sum::<f64>() / (nf - 1.0)).sqrt())
+        .collect();
+    let mut cor = vec![vec![0.0; p]; p];
+    for i in 0..p {
+        cor[i][i] = 1.0;
+        for j in (i + 1)..p {
+            let r: f64 = data
+                .iter()
+                .map(|row| (row[i] - means[i]) * (row[j] - means[j]))
+                .sum::<f64>()
+                / ((nf - 1.0) * sds[i] * sds[j]);
+            cor[i][j] = r;
+            cor[j][i] = r;
+        }
+    }
+    Ok(matrix_to_perl(&cor))
+}
+
+/// `cov_matrix DATA` — covariance matrix.
+fn builtin_cov_matrix(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let data: Vec<Vec<f64>> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| arg_to_vec(v).iter().map(|x| x.to_number()).collect())
+        .collect();
+    let n = data.len();
+    if n < 2 {
+        return Err(PerlError::runtime("cov_matrix: need >= 2 observations", 0));
+    }
+    let p = data[0].len();
+    let nf = n as f64;
+    let means: Vec<f64> = (0..p)
+        .map(|j| data.iter().map(|r| r[j]).sum::<f64>() / nf)
+        .collect();
+    let mut cov = vec![vec![0.0; p]; p];
+    for i in 0..p {
+        for j in i..p {
+            let s: f64 = data
+                .iter()
+                .map(|r| (r[i] - means[i]) * (r[j] - means[j]))
+                .sum();
+            cov[i][j] = s / (nf - 1.0);
+            cov[j][i] = cov[i][j];
+        }
+    }
+    Ok(matrix_to_perl(&cov))
+}
+
+/// `mahalanobis X, CENTER, COV_INV` — Mahalanobis distance for each observation.
+fn builtin_mahalanobis(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let data: Vec<Vec<f64>> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| arg_to_vec(v).iter().map(|x| x.to_number()).collect())
+        .collect();
+    let center: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let cov_inv = args_to_matrix(&args.get(2).cloned().unwrap_or(PerlValue::UNDEF));
+    let p = center.len();
+    let result: Vec<PerlValue> = data
+        .iter()
+        .map(|x| {
+            let diff: Vec<f64> = (0..p).map(|j| x[j] - center[j]).collect();
+            let mut d = 0.0;
+            for i in 0..p {
+                for j in 0..p {
+                    d += diff[i] * cov_inv[i][j] * diff[j];
+                }
+            }
+            PerlValue::float(d.sqrt())
+        })
+        .collect();
+    Ok(PerlValue::array(result))
+}
+
+/// `dist_matrix DATA [, method]` — distance matrix between observations. Default "euclidean".
+fn builtin_dist_matrix(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let data: Vec<Vec<f64>> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| arg_to_vec(v).iter().map(|x| x.to_number()).collect())
+        .collect();
+    let method = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "euclidean".to_string());
+    let n = data.len();
+    let mut d = vec![vec![0.0; n]; n];
+    for i in 0..n {
+        for j in (i + 1)..n {
+            let dist = match method.as_str() {
+                "manhattan" => data[i]
+                    .iter()
+                    .zip(data[j].iter())
+                    .map(|(a, b)| (a - b).abs())
+                    .sum(),
+                "maximum" | "chebyshev" => data[i]
+                    .iter()
+                    .zip(data[j].iter())
+                    .map(|(a, b)| (a - b).abs())
+                    .fold(0.0f64, f64::max),
+                _ => data[i]
+                    .iter()
+                    .zip(data[j].iter())
+                    .map(|(a, b)| (a - b).powi(2))
+                    .sum::<f64>()
+                    .sqrt(),
+            };
+            d[i][j] = dist;
+            d[j][i] = dist;
+        }
+    }
+    Ok(matrix_to_perl(&d))
+}
+
+/// `hclust DIST_MATRIX [, method]` — hierarchical clustering. Returns merge order as array of [i, j, height].
+fn builtin_hclust(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let d = args_to_matrix(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let n = d.len();
+    if n < 2 {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let mut active: Vec<bool> = vec![true; n];
+    let mut cluster_size = vec![1usize; n];
+    let mut dist = d.clone();
+    let mut merges = Vec::new();
+    for _ in 0..n - 1 {
+        // Find minimum distance
+        let mut min_d = f64::INFINITY;
+        let mut mi = 0;
+        let mut mj = 0;
+        for i in 0..n {
+            if !active[i] {
+                continue;
+            }
+            for j in (i + 1)..n {
+                if !active[j] {
+                    continue;
+                }
+                if dist[i][j] < min_d {
+                    min_d = dist[i][j];
+                    mi = i;
+                    mj = j;
+                }
+            }
+        }
+        merges.push(PerlValue::array(vec![
+            PerlValue::integer(mi as i64),
+            PerlValue::integer(mj as i64),
+            PerlValue::float(min_d),
+        ]));
+        // Merge mj into mi (average linkage)
+        active[mj] = false;
+        let si = cluster_size[mi] as f64;
+        let sj = cluster_size[mj] as f64;
+        for k in 0..n {
+            if !active[k] || k == mi {
+                continue;
+            }
+            dist[mi][k] = (dist[mi][k] * si + dist[mj][k] * sj) / (si + sj);
+            dist[k][mi] = dist[mi][k];
+        }
+        cluster_size[mi] += cluster_size[mj];
+    }
+    Ok(PerlValue::array(merges))
+}
+
+/// `cutree MERGES, k` — cut dendrogram to k clusters. Returns cluster assignments.
+fn builtin_cutree(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let merges_raw = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let k = args.get(1).map(|v| v.to_number() as usize).unwrap_or(2);
+    let n = merges_raw.len() + 1;
+    // Start with each point in its own cluster
+    let mut assignment: Vec<usize> = (0..n).collect();
+    let merges_to_apply = if n > k { n - k } else { 0 };
+    for i in 0..merges_to_apply {
+        let merge = arg_to_vec(&merges_raw[i]);
+        if merge.len() < 2 {
+            continue;
+        }
+        let mi = merge[0].to_number() as usize;
+        let mj = merge[1].to_number() as usize;
+        let target = assignment[mi];
+        let source = assignment[mj];
+        for a in assignment.iter_mut() {
+            if *a == source {
+                *a = target;
+            }
+        }
+    }
+    // Renumber clusters 0..k-1
+    let mut label_map = std::collections::HashMap::new();
+    let mut next_label = 0usize;
+    let result: Vec<PerlValue> = assignment
+        .iter()
+        .map(|&a| {
+            let label = *label_map.entry(a).or_insert_with(|| {
+                let l = next_label;
+                next_label += 1;
+                l
+            });
+            PerlValue::integer(label as i64)
+        })
+        .collect();
+    Ok(PerlValue::array(result))
+}
+
+/// `weighted_var VEC, WEIGHTS` — weighted variance.
+fn builtin_weighted_var(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let w: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let sw: f64 = w.iter().sum();
+    let wm: f64 = x.iter().zip(w.iter()).map(|(xi, wi)| xi * wi).sum::<f64>() / sw;
+    let wv: f64 = x
+        .iter()
+        .zip(w.iter())
+        .map(|(xi, wi)| wi * (xi - wm).powi(2))
+        .sum::<f64>()
+        / sw;
+    Ok(PerlValue::float(wv))
+}
+
+/// `cov2cor COV_MATRIX` — convert covariance matrix to correlation matrix.
+fn builtin_cov2cor(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let cov = args_to_matrix(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let p = cov.len();
+    let sds: Vec<f64> = (0..p).map(|i| cov[i][i].sqrt()).collect();
+    let mut cor = vec![vec![0.0; p]; p];
+    for i in 0..p {
+        for j in 0..p {
+            cor[i][j] = if sds[i] > 0.0 && sds[j] > 0.0 {
+                cov[i][j] / (sds[i] * sds[j])
+            } else {
+                0.0
+            };
+        }
+    }
+    Ok(matrix_to_perl(&cor))
+}

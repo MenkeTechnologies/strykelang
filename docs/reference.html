@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.7.0 · 3053 topics · 25 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.7.0 · 3074 topics · 25 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -191,7 +191,7 @@
         <li><a href="#ch-process">Process</a> <span class="chapter-count">20</span></li>
         <li><a href="#ch-pack-binary">Pack / Binary</a> <span class="chapter-count">3</span></li>
         <li><a href="#ch-logging">Logging</a> <span class="chapter-count">7</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">2491</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">2512</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -5624,7 +5624,7 @@ log_info(&quot;hidden&quot;)    # not printed
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">2491 topics</p>
+      <p class="chapter-meta">2512 topics</p>
       <article class="doc-entry" id="doc-stryke-rust-compile">
         <h3><a class="doc-anchor" href="#doc-stryke-rust-compile">#</a> <code>__stryke_rust_compile</code></h3>
         <p><code>__stryke_rust_compile</code> — internal builtin.</p>
@@ -5715,6 +5715,14 @@ log_info(&quot;hidden&quot;)    # not printed
         <pre><code class="lang-perl">my $result = accumulate $x 
 # or in a pipeline:
 @list |&gt; map accumulate |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-acf">
+        <h3><a class="doc-anchor" href="#doc-acf">#</a> <code>acf</code></h3>
+        <p><code>acf_fn</code> (alias <code>acf</code>) — autocorrelation function. Returns ACF values for lags 0..max_lag. Like R&#39;s acf().</p>
+        <pre><code class="lang-perl">my @a = @{acf([1,3,2,4,3,5,4,6], 5)}
+p $a[0]  # 1.0 (lag 0 is always 1)
+p $a[1]  # lag-1 autocorrelation
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-acirc">
@@ -8593,6 +8601,13 @@ p cond([[1,2],[2,4]])    # Inf (singular)
 @list |&gt; map conevol |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-confint">
+        <h3><a class="doc-anchor" href="#doc-confint">#</a> <code>confint</code></h3>
+        <p><code>confint_lm</code> (alias <code>confint</code>) — confidence intervals for model coefficients. Returns hash with intercept_lower/upper, slope_lower/upper.</p>
+        <pre><code class="lang-perl">my $ci = confint(lm([1,2,3,4,5], [2,4,5,4,5]))
+p $ci-&gt;{slope_lower}
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-conj">
         <h3><a class="doc-anchor" href="#doc-conj">#</a> <code>conj</code></h3>
         <p><code>conj</code> — algebraic match builtin.</p>
@@ -8727,6 +8742,12 @@ p cond([[1,2],[2,4]])    # Inf (singular)
         <pre><code class="lang-perl">my $result = copysign $x 
 # or in a pipeline:
 @list |&gt; map copysign |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cor-mat">
+        <h3><a class="doc-anchor" href="#doc-cor-mat">#</a> <code>cor_mat</code></h3>
+        <p><code>cor_matrix</code> (alias <code>cor_mat</code>) — correlation matrix from observations. Each row is an observation vector.</p>
+        <pre><code class="lang-perl">my $R = cor_mat([[1,2],[3,4],[5,6]])  # 2x2 correlation matrix
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-corr">
@@ -8981,6 +9002,18 @@ p cond([[1,2],[2,4]])    # Inf (singular)
 @list |&gt; map cov |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-cov2cor">
+        <h3><a class="doc-anchor" href="#doc-cov2cor">#</a> <code>cov2cor</code></h3>
+        <p><code>cov2cor</code> — convert covariance matrix to correlation matrix. Like R&#39;s cov2cor().</p>
+        <pre><code class="lang-perl">my $cor = cov2cor(cov_mat($data))
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cov-mat">
+        <h3><a class="doc-anchor" href="#doc-cov-mat">#</a> <code>cov_mat</code></h3>
+        <p><code>cov_matrix</code> (alias <code>cov_mat</code>) — covariance matrix from observations.</p>
+        <pre><code class="lang-perl">my $S = cov_mat([[1,2],[3,4],[5,6]])
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-covariance">
         <h3><a class="doc-anchor" href="#doc-covariance">#</a> <code>covariance</code></h3>
         <p><code>covariance</code> — extended stdlib builtin.</p>
@@ -9211,6 +9244,12 @@ my @F = @{cumtrapz(\@y)}  # [0, 1.5, 4.0, 7.5]
         <h3><a class="doc-anchor" href="#doc-cut">#</a> <code>cut</code></h3>
         <p><code>cut</code> — bin continuous values into intervals. Returns integer bin indices. Like R&#39;s cut().</p>
         <pre><code class="lang-perl">p cut([1.5, 3.2, 7.8], [0, 2, 5, 10])  # [1, 2, 3]
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cutree">
+        <h3><a class="doc-anchor" href="#doc-cutree">#</a> <code>cutree</code></h3>
+        <p><code>cutree</code> — cut a dendrogram into k clusters. Takes merge list from hclust and k. Returns cluster assignments. Like R&#39;s cutree().</p>
+        <pre><code class="lang-perl">my @clusters = @{cutree(hclust(dist_mat($data)), 3)}
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-cv">
@@ -9796,6 +9835,14 @@ my @dy = @{numdiff(\@y)}  # ≈ [0, 2, 4, 6, ...]
 @list |&gt; map diff_hours |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-diff-lag">
+        <h3><a class="doc-anchor" href="#doc-diff-lag">#</a> <code>diff_lag</code></h3>
+        <p><code>diff_lag</code> (alias <code>diff_ts</code>) — lagged differences. Args: vec [, lag, differences]. Like R&#39;s diff().</p>
+        <pre><code class="lang-perl">p diff_lag([1,3,6,10])       # [2,3,4] (lag=1)
+p diff_lag([1,3,6,10], 2)    # [5,7] (lag=2)
+p diff_lag([1,3,6,10], 1, 2) # [1,1] (second differences)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-diffd">
         <h3><a class="doc-anchor" href="#doc-diffd">#</a> <code>diffd</code></h3>
         <p><code>diffd</code> — extended stdlib builtin. Alias for <code>diff_days</code>.</p>
@@ -9932,6 +9979,13 @@ p &quot;$pct% disk used&quot;
         <pre><code class="lang-perl">my $result = dist $x 
 # or in a pipeline:
 @list |&gt; map dist |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-dist-mat">
+        <h3><a class="doc-anchor" href="#doc-dist-mat">#</a> <code>dist_mat</code></h3>
+        <p><code>dist_matrix</code> (alias <code>dist_mat</code>) — pairwise distance matrix. Supports &#39;euclidean&#39; (default), &#39;manhattan&#39;, &#39;maximum&#39;. Like R&#39;s dist().</p>
+        <pre><code class="lang-perl">my $D = dist_mat([[0,0],[1,0],[0,1]])  # 3x3 distance matrix
+my $D2 = dist_mat([[0,0],[1,1]], &quot;manhattan&quot;)  # Manhattan
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-distance">
@@ -11168,6 +11222,12 @@ p escvel(1.989e30, 6.96e8)      # ~617 km/s (Sun)
         <pre><code class="lang-perl">my $result = filter_map $x 
 # or in a pipeline:
 @list |&gt; map filter_map |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-filter-ts">
+        <h3><a class="doc-anchor" href="#doc-filter-ts">#</a> <code>filter_ts</code></h3>
+        <p><code>ts_filter</code> — linear convolution filter. Like R&#39;s filter(method=&#39;convolution&#39;).</p>
+        <pre><code class="lang-perl">my @smooth = @{ts_filter([1,5,2,8,3], [0.25,0.5,0.25])}
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-filterfalse">
@@ -12468,6 +12528,12 @@ p harmonic(100)  # 5.1874
         <pre><code class="lang-perl"># NYC to LA
 p haversine(40.7128, -74.0060, 34.0522, -118.2437)
 # ~3940 km
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hclust">
+        <h3><a class="doc-anchor" href="#doc-hclust">#</a> <code>hclust</code></h3>
+        <p><code>hclust</code> — hierarchical clustering (average linkage). Takes a distance matrix. Returns merge list [[i,j,height],...]. Like R&#39;s hclust().</p>
+        <pre><code class="lang-perl">my $merges = hclust(dist_mat([[0,0],[1,0],[10,10]]))
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-head-lines">
@@ -16170,6 +16236,12 @@ my $smooth = lpf(\@noisy, 0.1)
 @list |&gt; map magnitude |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-mahal">
+        <h3><a class="doc-anchor" href="#doc-mahal">#</a> <code>mahal</code></h3>
+        <p><code>mahalanobis</code> — Mahalanobis distance. Args: data, center, inverse_covariance. Like R&#39;s mahalanobis().</p>
+        <pre><code class="lang-perl">my @d = @{mahal([[1,2],[3,4]], [2,3], [[1,0],[0,1]])}
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-majority">
         <h3><a class="doc-anchor" href="#doc-majority">#</a> <code>majority</code></h3>
         <p><code>majority</code> — extended stdlib batch 3 builtin. Alias for <code>majority_element</code>.</p>
@@ -18348,6 +18420,12 @@ p @$out   # (100)
         <pre><code class="lang-perl">my $result = oz_to_g $input 
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-pacf">
+        <h3><a class="doc-anchor" href="#doc-pacf">#</a> <code>pacf</code></h3>
+        <p><code>pacf_fn</code> (alias <code>pacf</code>) — partial autocorrelation function via Durbin-Levinson. Like R&#39;s pacf().</p>
+        <pre><code class="lang-perl">my @pa = @{pacf([1,3,2,4,3,5], 3)}
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-pad-left">
         <h3><a class="doc-anchor" href="#doc-pad-left">#</a> <code>pad_left</code></h3>
         <p><code>pad_left</code> — trivial string ops builtin.</p>
@@ -19329,6 +19407,13 @@ p polyper(@square)   # 4
 @list |&gt; map pred |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-predict">
+        <h3><a class="doc-anchor" href="#doc-predict">#</a> <code>predict</code></h3>
+        <p><code>predict_lm</code> (alias <code>predict</code>) — predict from a linear model at new x values.</p>
+        <pre><code class="lang-perl">my $model = lm([1,2,3], [2,4,6])
+my @pred = @{predict($model, [4,5,6])}  # [8,10,12]
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-prefix-sums">
         <h3><a class="doc-anchor" href="#doc-prefix-sums">#</a> <code>prefix_sums</code></h3>
         <p><code>prefix_sums</code> — list helpers (batch 4) builtin.</p>
@@ -19555,16 +19640,47 @@ p punif(3, 0, 10)   # 0.3
 @list |&gt; map q |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-qbeta">
+        <h3><a class="doc-anchor" href="#doc-qbeta">#</a> <code>qbeta</code></h3>
+        <p><code>qbeta</code> — beta quantile. Args: p, alpha, beta.</p>
+        <pre><code class="lang-perl">p qbeta(0.5, 2, 5)  # median of Beta(2,5)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-qbinom">
+        <h3><a class="doc-anchor" href="#doc-qbinom">#</a> <code>qbinom</code></h3>
+        <p><code>qbinom</code> — binomial quantile (smallest k where P(X≤k) ≥ p). Args: p, n, prob.</p>
+        <pre><code class="lang-perl">p qbinom(0.5, 10, 0.5)  # median of Binom(10, 0.5) = 5
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-qcauchy">
         <h3><a class="doc-anchor" href="#doc-qcauchy">#</a> <code>qcauchy</code></h3>
         <p><code>qcauchy</code> — Cauchy quantile. Args: p [, location, scale].</p>
         <pre><code class="lang-perl">p qcauchy(0.75, 0, 1)  # 1.0
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-qchisq">
+        <h3><a class="doc-anchor" href="#doc-qchisq">#</a> <code>qchisq</code></h3>
+        <p><code>qchisq</code> — chi-squared quantile. Args: p, df.</p>
+        <pre><code class="lang-perl">p qchisq(0.95, 1)  # 3.84 (critical value)
+p qchisq(0.95, 5)  # 11.07
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-qexp">
         <h3><a class="doc-anchor" href="#doc-qexp">#</a> <code>qexp</code></h3>
         <p><code>qexp</code> — exponential quantile. Args: p [, rate].</p>
         <pre><code class="lang-perl">p qexp(0.5, 1)       # 0.693 (median of Exp(1))
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-qf">
+        <h3><a class="doc-anchor" href="#doc-qf">#</a> <code>qf</code></h3>
+        <p><code>qf</code> — F-distribution quantile. Args: p, d1, d2.</p>
+        <pre><code class="lang-perl">p qf(0.95, 5, 10)  # critical F value
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-qgamma">
+        <h3><a class="doc-anchor" href="#doc-qgamma">#</a> <code>qgamma</code></h3>
+        <p><code>qgamma</code> — gamma quantile (inverse CDF). Args: p, shape [, scale].</p>
+        <pre><code class="lang-perl">p qgamma(0.95, 2, 1)  # 95th percentile of Gamma(2,1)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-qlnorm">
@@ -19597,12 +19713,24 @@ p qnorm(0.95, 100, 15)  # 90th percentile IQ
 @list |&gt; map qntl |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-qpois">
+        <h3><a class="doc-anchor" href="#doc-qpois">#</a> <code>qpois</code></h3>
+        <p><code>qpois</code> — Poisson quantile (smallest k where P(X≤k) ≥ p). Args: p, lambda.</p>
+        <pre><code class="lang-perl">p qpois(0.5, 5)  # median of Poisson(5)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-qq">
         <h3><a class="doc-anchor" href="#doc-qq">#</a> <code>qq</code></h3>
         <p><code>qq</code> — quoting builtin.</p>
         <pre><code class="lang-perl">my $result = qq $x 
 # or in a pipeline:
 @list |&gt; map qq |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-qt">
+        <h3><a class="doc-anchor" href="#doc-qt">#</a> <code>qt</code></h3>
+        <p><code>qt</code> — Student&#39;s t quantile. Args: p, df.</p>
+        <pre><code class="lang-perl">p qt(0.975, 10)   # ≈ 2.228 (two-tailed 5%)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-quadratic-discriminant">
@@ -24397,6 +24525,12 @@ p @$u   # (0.6, 0.8)
         <pre><code class="lang-perl">my $result = weighted_sample $x 
 # or in a pipeline:
 @list |&gt; map weighted_sample |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-weighted-var">
+        <h3><a class="doc-anchor" href="#doc-weighted-var">#</a> <code>weighted_var</code></h3>
+        <p><code>weighted_var</code> — weighted variance. Args: values, weights.</p>
+        <pre><code class="lang-perl">p wvar([1,2,3,4], [1,1,1,1])  # same as var
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-welch-ttest">

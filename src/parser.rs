@@ -11868,6 +11868,18 @@ impl Parser {
             | "lowess" | "loess" | "approx_fn" | "approx"
             // ── R base: linear models ─────────────────────────────────────
             | "lm_fit" | "lm"
+            // ── R base: remaining quantiles ───────────────────────────────
+            | "qgamma" | "qbeta" | "qchisq" | "qt_fn" | "qt" | "qf_fn" | "qf"
+            | "qbinom" | "qpois"
+            // ── R base: time series ───────────────────────────────────────
+            | "acf_fn" | "acf" | "pacf_fn" | "pacf"
+            | "diff_lag" | "diff_ts" | "ts_filter" | "filter_ts"
+            // ── R base: regression diagnostics ────────────────────────────
+            | "predict_lm" | "predict" | "confint_lm" | "confint"
+            // ── R base: multivariate stats ────────────────────────────────
+            | "cor_matrix" | "cor_mat" | "cov_matrix" | "cov_mat"
+            | "mahalanobis" | "mahal" | "dist_matrix" | "dist_mat"
+            | "hclust" | "cutree" | "weighted_var" | "wvar" | "cov2cor"
             => Some(name),
             _ => None,
         }
