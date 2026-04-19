@@ -604,3 +604,255 @@ fn class_does_unrelated_trait_false() {
         ""
     );
 }
+
+// ── Final classes/methods ────────────────────────────────────────────
+
+#[test]
+fn final_class_cannot_be_extended() {
+    assert_eq!(
+        eval_err_kind(
+            r#"final class Singleton { value: Int = 1 }
+            class Bad extends Singleton { }"#
+        ),
+        ErrorKind::Runtime,
+    );
+}
+
+#[test]
+fn final_class_can_be_instantiated() {
+    assert_eq!(
+        eval_int(
+            r#"final class Config { value: Int = 42 }
+            my $c = Config();
+            $c->value"#
+        ),
+        42
+    );
+}
+
+#[test]
+fn final_method_cannot_be_overridden() {
+    assert_eq!(
+        eval_err_kind(
+            r#"class Base {
+                final fn id { 1 }
+            }
+            class Child extends Base {
+                fn id { 2 }
+            }"#
+        ),
+        ErrorKind::Runtime,
+    );
+}
+
+#[test]
+fn final_method_can_be_called() {
+    assert_eq!(
+        eval_int(
+            r#"class Base {
+                final fn id { 42 }
+            }
+            class Child extends Base { }
+            my $c = Child();
+            $c->id()"#
+        ),
+        42
+    );
+}
+
+// ── Reflection: methods(), superclass() ──────────────────────────────
+
+#[test]
+fn reflection_methods() {
+    assert_eq!(
+        eval_string(
+            r#"class Animal {
+                name: Str
+                fn speak { "..." }
+                fn eat { "nom" }
+            }
+            my $a = Animal(name => "x");
+            join(",", $a->methods())"#
+        ),
+        "speak,eat"
+    );
+}
+
+#[test]
+fn reflection_methods_inherited() {
+    assert_eq!(
+        eval_string(
+            r#"class Base {
+                fn base_method { 1 }
+            }
+            class Child extends Base {
+                fn child_method { 2 }
+            }
+            my $c = Child();
+            join(",", $c->methods())"#
+        ),
+        "base_method,child_method"
+    );
+}
+
+#[test]
+fn reflection_superclass() {
+    assert_eq!(
+        eval_string(
+            r#"class Animal { }
+            class Dog extends Animal { }
+            my $d = Dog();
+            join(",", $d->superclass())"#
+        ),
+        "Animal"
+    );
+}
+
+#[test]
+fn reflection_superclass_multiple() {
+    assert_eq!(
+        eval_string(
+            r#"class A { }
+            class B { }
+            class C extends A, B { }
+            my $c = C();
+            join(",", $c->superclass())"#
+        ),
+        "A,B"
+    );
+}
+
+#[test]
+fn reflection_superclass_none() {
+    assert_eq!(
+        eval_string(
+            r#"class Root { }
+            my $r = Root();
+            join(",", $r->superclass())"#
+        ),
+        ""
+    );
+}
+
+// ── Late static binding (static::) ──────────────────────────────────
+
+#[test]
+fn late_static_binding_resolves_runtime_class() {
+    assert_eq!(
+        eval_string(
+            r#"class Base {
+                fn class_name { static::identify() }
+                fn identify { "Base" }
+            }
+            class Child extends Base {
+                fn identify { "Child" }
+            }
+            my $c = Child();
+            $c->class_name()"#
+        ),
+        "Child"
+    );
+}
+
+// ── Operator overloading for native classes ──────────────────────────
+
+#[test]
+fn class_overload_op_add() {
+    assert_eq!(
+        eval_string(
+            r#"class Vec2 {
+                x: Int; y: Int
+                fn op_add($other) {
+                    Vec2(x => $self->x + $other->x, y => $self->y + $other->y)
+                }
+            }
+            my $a = Vec2(x => 1, y => 2);
+            my $b = Vec2(x => 3, y => 4);
+            my $c = $a + $b;
+            $c->x . "," . $c->y"#
+        ),
+        "4,6"
+    );
+}
+
+#[test]
+fn class_overload_op_eq() {
+    assert_eq!(
+        eval_int(
+            r#"class Id {
+                val: Int
+                fn op_eq($other) { $self->val == $other->val }
+            }
+            my $a = Id(val => 5);
+            my $b = Id(val => 5);
+            $a == $b"#
+        ),
+        1
+    );
+}
+
+#[test]
+fn class_overload_stringify() {
+    assert_eq!(
+        eval_string(
+            r#"class Point {
+                x: Int; y: Int
+                fn stringify { "(" . $self->x . "," . $self->y . ")" }
+            }
+            my $p = Point(x => 3, y => 7);
+            "$p""#
+        ),
+        "(3,7)"
+    );
+}
+
+#[test]
+fn class_overload_op_neg() {
+    assert_eq!(
+        eval_string(
+            r#"class Num {
+                val: Int
+                fn op_neg { Num(val => -$self->val) }
+                fn stringify { "" . $self->val }
+            }
+            my $n = Num(val => 5);
+            my $m = -$n;
+            "$m""#
+        ),
+        "-5"
+    );
+}
+
+#[test]
+fn class_overload_op_sub() {
+    assert_eq!(
+        eval_int(
+            r#"class Counter {
+                n: Int
+                fn op_sub($other) { Counter(n => $self->n - $other->n) }
+            }
+            my $a = Counter(n => 10);
+            my $b = Counter(n => 3);
+            my $c = $a - $b;
+            $c->n"#
+        ),
+        7
+    );
+}
+
+// ── Generics (parameterized types) ──────────────────────────────────
+
+#[test]
+fn class_generic_basic() {
+    assert_eq!(
+        eval_string(
+            r#"class Box {
+                value
+                fn unwrap { $self->value }
+            }
+            my $b = Box(value => "hello");
+            $b->unwrap()"#
+        ),
+        "hello"
+    );
+}

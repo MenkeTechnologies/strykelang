@@ -436,7 +436,13 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
             format!("enum {} {{ {} }}", def.name, variants)
         }
         StmtKind::ClassDecl { def } => {
-            let prefix = if def.is_abstract { "abstract " } else { "" };
+            let prefix = if def.is_abstract {
+                "abstract "
+            } else if def.is_final {
+                "final "
+            } else {
+                ""
+            };
             let mut parts = vec![format!("{}class {}", prefix, def.name)];
             if !def.extends.is_empty() {
                 parts.push(format!("extends {}", def.extends.join(", ")));

@@ -130,6 +130,10 @@ impl StaticAnalyzer {
     }
 
     fn is_sub_defined(&self, name: &str) -> bool {
+        // Late static binding: static::method() is always valid (runtime-resolved)
+        if name.starts_with("static::") {
+            return true;
+        }
         let base = name.rsplit("::").next().unwrap_or(name);
         if builtins().contains(base) {
             return true;

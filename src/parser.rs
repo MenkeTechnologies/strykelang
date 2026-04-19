@@ -496,7 +496,7 @@ impl Parser {
                             self.peek_line(),
                         ));
                     }
-                    self.parse_class_decl(false)?
+                    self.parse_class_decl(false, false)?
                 }
                 "abstract" => {
                     self.advance(); // abstract
@@ -506,7 +506,15 @@ impl Parser {
                             self.peek_line(),
                         ));
                     }
-                    self.parse_class_decl(true)?
+                    self.parse_class_decl(true, false)?
+                }
+                "final" => {
+                    self.advance(); // final
+                    if !matches!(self.peek(), Token::Ident(ref s) if s == "class") {
+                        return Err(self
+                            .syntax_err("`final` must be followed by `class`", self.peek_line()));
+                    }
+                    self.parse_class_decl(false, true)?
                 }
                 "trait" => {
                     if crate::compat_mode() {
@@ -3763,8 +3771,8 @@ impl Parser {
         })
     }
 
-    /// `[abstract] class Name extends Parent impl Trait { fields; methods }`
-    fn parse_class_decl(&mut self, is_abstract: bool) -> PerlResult<Statement> {
+    /// `[abstract|final] class Name extends Parent impl Trait { fields; methods }`
+    fn parse_class_decl(&mut self, is_abstract: bool, is_final: bool) -> PerlResult<Statement> {
         use crate::ast::{ClassDef, ClassField, ClassMethod, ClassStaticField, Visibility};
         let line = self.peek_line();
         self.advance(); // class
@@ -3886,6 +3894,12 @@ impl Parser {
                 continue;
             }
 
+            // Check for `final` modifier before fn
+            let method_is_final = matches!(self.peek(), Token::Ident(ref s) if s == "final");
+            if method_is_final {
+                self.advance(); // final
+            }
+
             // Check for method: `fn name` or `fn Self.name` (static)
             let is_method = matches!(self.peek(), Token::Ident(ref s) if s == "fn" || s == "sub");
             if is_method {
@@ -3928,10 +3942,13 @@ impl Parser {
                     body,
                     visibility,
                     is_static,
+                    is_final: method_is_final,
                 });
                 self.eat(&Token::Comma);
                 self.eat(&Token::Semicolon);
                 continue;
+            } else if method_is_final {
+                return Err(self.syntax_err("`final` must be followed by `fn`", self.peek_line()));
             }
 
             // Parse field: `name: Type = default`
@@ -3979,6 +3996,7 @@ impl Parser {
                 def: ClassDef {
                     name,
                     is_abstract,
+                    is_final,
                     extends,
                     implements,
                     fields,
@@ -4060,6 +4078,7 @@ impl Parser {
                 body,
                 visibility,
                 is_static: false,
+                is_final: false,
             });
 
             self.eat(&Token::Comma);

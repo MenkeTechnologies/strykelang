@@ -345,6 +345,8 @@ pub struct ClassMethod {
     pub body: Option<Block>,
     pub visibility: Visibility,
     pub is_static: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub is_final: bool,
 }
 
 /// Trait definition: `trait Name { fn required; fn with_default { } }`.
@@ -382,6 +384,8 @@ pub struct ClassDef {
     pub name: String,
     #[serde(default, skip_serializing_if = "is_false")]
     pub is_abstract: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub is_final: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub extends: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

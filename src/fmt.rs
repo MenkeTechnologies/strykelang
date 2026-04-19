@@ -393,7 +393,13 @@ fn format_statement_indent(s: &Statement, depth: usize) -> String {
             format!("enum {} {{ {} }}", def.name, variants)
         }
         StmtKind::ClassDecl { def } => {
-            let prefix = if def.is_abstract { "abstract " } else { "" };
+            let prefix = if def.is_abstract {
+                "abstract "
+            } else if def.is_final {
+                "final "
+            } else {
+                ""
+            };
             let mut header = format!("{}class {}", prefix, def.name);
             if !def.extends.is_empty() {
                 header.push_str(&format!(" extends {}", def.extends.join(", ")));

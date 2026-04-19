@@ -290,6 +290,30 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut Interpreter) -> PerlR
             .insert(def.name.clone(), std::sync::Arc::new(def.clone()));
     }
     for def in &chunk.class_defs {
+        // Final class/method enforcement
+        for parent_name in &def.extends {
+            if let Some(parent_def) = interp.class_defs.get(parent_name) {
+                if parent_def.is_final {
+                    return Err(crate::error::PerlError::runtime(
+                        format!("cannot extend final class `{}`", parent_name),
+                        0,
+                    ));
+                }
+                for m in &def.methods {
+                    if let Some(parent_method) = parent_def.method(&m.name) {
+                        if parent_method.is_final {
+                            return Err(crate::error::PerlError::runtime(
+                                format!(
+                                    "cannot override final method `{}` from class `{}`",
+                                    m.name, parent_name
+                                ),
+                                0,
+                            ));
+                        }
+                    }
+                }
+            }
+        }
         // Trait contract enforcement
         for trait_name in &def.implements {
             if let Some(trait_def) = interp.trait_defs.get(trait_name) {
