@@ -431,6 +431,19 @@ my $s = match ($light) {
 # match ($c) { Color::Red() => "r" }  # ERROR: missing variant(s) Green, Blue
 # ────────────────────────────────────────────────────────────────────
 
+# ─── Cyberpunk Terminal Art ────────────────────────────────────────
+p cyber_banner("STRYKE")          # large neon block-letter banner
+p cyber_city()                    # procedural neon cityscape (80x24)
+p cyber_city(120, 40, 99)         # custom width, height, seed
+p cyber_grid(80, 20)              # synthwave perspective grid
+p cyber_rain(80, 24)              # matrix-style digital rain
+p cyber_glitch("BREACH", 7)       # glitch-distort text (intensity 1-10)
+p cyber_circuit(60, 20)           # circuit board with traces and nodes
+p cyber_skull()                   # neon skull (or "large" for big version)
+p cyber_eye("large")              # all-seeing eye motif
+# All output ANSI-colored Unicode — pipe to `less -R` or print directly.
+# ────────────────────────────────────────────────────────────────────
+
 # ─── Classes (full OOP) ────────────────────────────────────────────
 # Declaration: class Name extends Parent impl Trait { fields; methods }
 class Animal {
