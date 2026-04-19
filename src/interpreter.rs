@@ -529,7 +529,7 @@ pub struct Interpreter {
     /// `$;` — hash subscript separator (multi-key join); Perl default `\034`.
     pub subscript_sep: String,
     /// `$^I` — in-place edit backup suffix (empty when no backup; also unset when `-i` was not passed).
-    /// The `fo` driver sets this from `-i` / `-i.ext`.
+    /// The `stryke` driver sets this from `-i` / `-i.ext`.
     pub inplace_edit: String,
     /// `$^D` — debugging flags (integer; mostly ignored).
     pub debug_flags: i64,
@@ -599,7 +599,7 @@ pub struct Interpreter {
     pub class_defs: HashMap<String, Arc<ClassDef>>,
     /// `trait Name { ... }` definitions.
     pub trait_defs: HashMap<String, Arc<TraitDef>>,
-    /// When set, `fo --profile` records timings: VM path uses per-opcode line samples and sub
+    /// When set, `stryke --profile` records timings: VM path uses per-opcode line samples and sub
     /// call/return (JIT disabled); tree-walker fallback uses per-statement lines and subs.
     pub profiler: Option<Profiler>,
     /// Per-module `our @EXPORT` / `our @EXPORT_OK` (Exporter-style). Absent key → legacy import-all.
@@ -664,7 +664,7 @@ pub struct Interpreter {
     /// Bare names from `our $x` per frame — same length as [`Self::english_lexical_scalars`].
     our_lexical_scalars: Vec<HashSet<String>>,
     /// When false, the bytecode VM runs without Cranelift (see [`crate::try_vm_execute`]). Disabled by
-    /// `STRYKE_NO_JIT=1` / `true` / `yes`, or `fo --no-jit` after [`Self::new`].
+    /// `STRYKE_NO_JIT=1` / `true` / `yes`, or `stryke --no-jit` after [`Self::new`].
     pub vm_jit_enabled: bool,
     /// When true, [`crate::try_vm_execute`] prints bytecode disassembly to stderr before running the VM.
     pub disasm_bytecode: bool,
@@ -1156,7 +1156,7 @@ fn pw_home_dir_for_current_uid() -> Option<std::ffi::OsString> {
     Some(std::ffi::OsString::from_vec(bytes.to_vec()))
 }
 
-/// Passwd home for a login name (e.g. **`SUDO_USER`** when `fo` runs under `sudo`).
+/// Passwd home for a login name (e.g. **`SUDO_USER`** when `stryke` runs under `sudo`).
 #[cfg(unix)]
 fn pw_home_dir_for_login_name(login: &std::ffi::OsStr) -> Option<std::ffi::OsString> {
     use libc::getpwnam_r;
@@ -1583,7 +1583,7 @@ impl Interpreter {
         }
     }
 
-    /// Rayon pool size (`fo -j`); lazily initialized from `rayon::current_num_threads()`.
+    /// Rayon pool size (`stryke -j`); lazily initialized from `rayon::current_num_threads()`.
     pub(crate) fn parallel_thread_count(&mut self) -> usize {
         if self.num_threads == 0 {
             self.num_threads = rayon::current_num_threads();
@@ -9991,8 +9991,8 @@ impl Interpreter {
                     match local_interp.exec_block(&block) {
                         Ok(_) => {}
                         Err(e) => {
-                            let fo = match e {
-                                FlowOrError::Error(fo) => fo,
+                            let stryke = match e {
+                                FlowOrError::Error(stryke) => stryke,
                                 FlowOrError::Flow(_) => PerlError::runtime(
                                     "return/last/next/redo not supported inside pfor block",
                                     line,
@@ -10000,7 +10000,7 @@ impl Interpreter {
                             };
                             let mut g = first_err.lock();
                             if g.is_none() {
-                                *g = Some(fo);
+                                *g = Some(stryke);
                             }
                         }
                     }
@@ -10089,8 +10089,8 @@ impl Interpreter {
                     match local_interp.exec_block(&block) {
                         Ok(_) => {}
                         Err(e) => {
-                            let fo = match e {
-                                FlowOrError::Error(fo) => fo,
+                            let stryke = match e {
+                                FlowOrError::Error(stryke) => stryke,
                                 FlowOrError::Flow(_) => PerlError::runtime(
                                     "return/last/next/redo not supported inside fan block",
                                     line,
@@ -10098,7 +10098,7 @@ impl Interpreter {
                             };
                             let mut g = first_err.lock();
                             if g.is_none() {
-                                *g = Some(fo);
+                                *g = Some(stryke);
                             }
                         }
                     }
@@ -15875,8 +15875,8 @@ impl Interpreter {
                         match local_interp.exec_block_no_scope(&sub.body) {
                             Ok(_) => {}
                             Err(e) => {
-                                let fo = match e {
-                                    FlowOrError::Error(fo) => fo,
+                                let stryke = match e {
+                                    FlowOrError::Error(stryke) => stryke,
                                     FlowOrError::Flow(_) => PerlError::runtime(
                                         "return/last/next/redo not supported inside pipeline pfor block",
                                         line,
@@ -15884,7 +15884,7 @@ impl Interpreter {
                                 };
                                 let mut g = first_err.lock();
                                 if g.is_none() {
-                                    *g = Some(fo);
+                                    *g = Some(stryke);
                                 }
                             }
                         }
@@ -16352,7 +16352,7 @@ impl Interpreter {
                                         Ok(_) => {}
                                         Err(e) => {
                                             let msg = match e {
-                                                FlowOrError::Error(fo) => fo.to_string(),
+                                                FlowOrError::Error(stryke) => stryke.to_string(),
                                                 FlowOrError::Flow(_) => {
                                                     "unexpected control flow in par_pipeline_stream pfor".into()
                                                 }
@@ -16396,7 +16396,7 @@ impl Interpreter {
                                         Ok(_) => {}
                                         Err(e) => {
                                             let msg = match e {
-                                                FlowOrError::Error(fo) => fo.to_string(),
+                                                FlowOrError::Error(stryke) => stryke.to_string(),
                                                 FlowOrError::Flow(_) => {
                                                     "unexpected control flow in par_pipeline_stream tap"
                                                         .into()
@@ -16588,7 +16588,7 @@ impl Interpreter {
                     let binds = self
                         .match_array_pattern_elems(&arr, elems, line)
                         .map_err(|e| match e {
-                            FlowOrError::Error(fo) => fo,
+                            FlowOrError::Error(stryke) => stryke,
                             FlowOrError::Flow(_) => PerlError::runtime(
                                 "unexpected flow in sub signature array destruct",
                                 line,
@@ -17016,7 +17016,7 @@ impl Interpreter {
                     let binds = self
                         .match_array_pattern_elems(&arr, elems, line)
                         .map_err(|e| match e {
-                            FlowOrError::Error(fo) => fo,
+                            FlowOrError::Error(stryke) => stryke,
                             FlowOrError::Flow(_) => {
                                 PerlError::runtime("unexpected flow in method array destruct", line)
                             }

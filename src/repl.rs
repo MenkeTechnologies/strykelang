@@ -1,4 +1,4 @@
-//! Interactive REPL for `fo` and `stryke` (readline, history, tab-completion).
+//! Interactive REPL for `stryke` and `stryke` (readline, history, tab-completion).
 
 use std::process;
 use std::sync::{Arc, Mutex};

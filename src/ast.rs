@@ -955,7 +955,7 @@ pub enum ExprKind {
         /// `pflat_map { }` — flatten each block result like [`ExprKind::MapExpr`] (arrays expand);
         /// parallel output is stitched in **input order** (unlike plain `pmap`, which is unordered).
         flat_outputs: bool,
-        /// `pmap_on $cluster { } @list` — fan out over SSH (`fo --remote-worker`); `None` = local rayon.
+        /// `pmap_on $cluster { } @list` — fan out over SSH (`stryke --remote-worker`); `None` = local rayon.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         on_cluster: Option<Box<Expr>>,
     },

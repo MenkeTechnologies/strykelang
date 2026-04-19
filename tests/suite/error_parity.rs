@@ -1,6 +1,6 @@
 //! Error-message parity with stock `perl(1)` for Perl 5 core constructs.
 //!
-//! For each case we run the same one-liner through `perl` and `fo --compat`,
+//! For each case we run the same one-liner through `perl` and `stryke --compat`,
 //! capture stderr, and assert byte-equal (modulo an absolute-path
 //! normalization so tempdir / binary-path differences don't count).
 //! Extensions keep stryke-native error codes — those are tested elsewhere.
@@ -18,7 +18,7 @@ fn run_both(code: &str) -> Option<(String, String)> {
     if Command::new("perl").arg("-e").arg("1").output().is_err() {
         return None;
     }
-    let fo = pe_binary()?;
+    let stryke = pe_binary()?;
 
     let perl_err = Command::new("perl")
         .arg("-e")
@@ -26,7 +26,7 @@ fn run_both(code: &str) -> Option<(String, String)> {
         .output()
         .ok()?
         .stderr;
-    let pe_err = Command::new(&fo)
+    let pe_err = Command::new(&stryke)
         .arg("--compat")
         .arg("-e")
         .arg(code)
@@ -38,7 +38,7 @@ fn run_both(code: &str) -> Option<(String, String)> {
 
 fn pe_binary() -> Option<PathBuf> {
     // Prefer release (what the user actually ships), fall back to debug.
-    for candidate in ["target/release/fo", "target/debug/fo"] {
+    for candidate in ["target/release/stryke", "target/debug/stryke"] {
         let p = PathBuf::from(candidate);
         if p.exists() {
             return Some(p);
@@ -65,14 +65,14 @@ macro_rules! parity_test {
     ($name:ident, $code:expr) => {
         #[test]
         fn $name() {
-            let Some((perl, fo)) = run_both($code) else {
-                eprintln!("skip: perl(1) or target/*/fo not available");
+            let Some((perl, stryke)) = run_both($code) else {
+                eprintln!("skip: perl(1) or target/*/stryke not available");
                 return;
             };
             assert_eq!(
-                perl, fo,
+                perl, stryke,
                 "error-message parity regressed for:\n    {}\n\nperl:\n{}\n\npe:\n{}\n",
-                $code, perl, fo,
+                $code, perl, stryke,
             );
         }
     };
@@ -80,14 +80,14 @@ macro_rules! parity_test {
         #[test]
         #[ignore = $reason]
         fn $name() {
-            let Some((perl, fo)) = run_both($code) else {
-                eprintln!("skip: perl(1) or target/*/fo not available");
+            let Some((perl, stryke)) = run_both($code) else {
+                eprintln!("skip: perl(1) or target/*/stryke not available");
                 return;
             };
             assert_eq!(
-                perl, fo,
+                perl, stryke,
                 "error-message parity regressed for:\n    {}\n\nperl:\n{}\n\npe:\n{}\n",
-                $code, perl, fo,
+                $code, perl, stryke,
             );
         }
     };

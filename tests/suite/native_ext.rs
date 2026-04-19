@@ -227,7 +227,7 @@ say $n;"#,
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn fo");
+        .expect("spawn stryke");
 
     let mut stdin = child.stdin.take().expect("stdin");
     stdin.write_all(b"a\nb\n").unwrap();

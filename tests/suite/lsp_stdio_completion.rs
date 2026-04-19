@@ -1,4 +1,4 @@
-//! Drive `fo --lsp` over JSON-RPC stdio: completion, hover, and go-to-definition.
+//! Drive `stryke --lsp` over JSON-RPC stdio: completion, hover, and go-to-definition.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
@@ -92,7 +92,7 @@ impl LspHarness {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .expect("spawn fo --lsp");
+            .expect("spawn stryke --lsp");
 
         let stdin = child.stdin.take().expect("stdin");
         let reader = BufReader::new(child.stdout.take().expect("stdout"));
@@ -363,7 +363,7 @@ impl LspHarness {
         let _ = self.child.wait();
         let err = self.stderr_rx.recv().unwrap_or_default();
         if err.contains("panic") {
-            panic!("fo --lsp stderr:\n{err}");
+            panic!("stryke --lsp stderr:\n{err}");
         }
     }
 }

@@ -2,14 +2,14 @@
 //!
 //! Two layers exercised here:
 //!
-//! 1. **Wire protocol vs a real `fo --remote-worker` subprocess.** Spawns the worker
+//! 1. **Wire protocol vs a real `stryke --remote-worker` subprocess.** Spawns the worker
 //!    directly (no ssh), drives the v3 handshake (HELLO → SESSION_INIT → JOB → JOB_RESP →
 //!    SHUTDOWN) using the public [`stryke::remote_wire`] helpers, and verifies many JOBs
 //!    flow over a single session. This is the closest we can get to a real cluster without
 //!    actually setting up SSH in CI.
 //!
 //! 2. **Full dispatcher with a fake `ssh` shim.** Drops a tiny shell script into a temp
-//!    `PATH` directory that just `exec`s `fo --remote-worker` (ignoring its host argument),
+//!    `PATH` directory that just `exec`s `stryke --remote-worker` (ignoring its host argument),
 //!    points the dispatcher's `PATH` at it, and runs `cluster::run_cluster` end-to-end.
 //!    This validates the per-slot worker thread, work-stealing queue, and result ordering
 //!    without needing a real remote host.
@@ -45,7 +45,7 @@ fn tmp_path(tag: &str) -> PathBuf {
 }
 
 /// Temp directory containing an `ssh` executable that skips ssh flags, host, and `pe_path`,
-/// then `exec`s the test `fo` binary — matches what [`stryke::cluster`] passes to `ssh`.
+/// then `exec`s the test `stryke` binary — matches what [`stryke::cluster`] passes to `ssh`.
 fn make_fake_ssh_shim_dir(tag: &str) -> PathBuf {
     let pe_exe = env!("CARGO_BIN_EXE_st");
     let shim_dir = tmp_path(tag);
@@ -93,7 +93,7 @@ impl Drop for PrependPathGuard {
     }
 }
 
-/// Spawn the local `fo --remote-worker` and return the live child.
+/// Spawn the local `stryke --remote-worker` and return the live child.
 fn spawn_local_worker() -> Child {
     let exe = env!("CARGO_BIN_EXE_st");
     Command::new(exe)
@@ -102,7 +102,7 @@ fn spawn_local_worker() -> Child {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn fo --remote-worker")
+        .expect("spawn stryke --remote-worker")
 }
 
 #[test]
@@ -708,11 +708,11 @@ fn dispatcher_runs_against_fake_ssh_with_two_slots() {
         slots: vec![
             stryke::value::RemoteSlot {
                 host: "fake1".to_string(),
-                pe_path: "fo".to_string(),
+                pe_path: "stryke".to_string(),
             },
             stryke::value::RemoteSlot {
                 host: "fake2".to_string(),
-                pe_path: "fo".to_string(),
+                pe_path: "stryke".to_string(),
             },
         ],
         job_timeout_ms: 30_000,
@@ -753,7 +753,7 @@ fn dispatcher_single_slot_preserves_input_order() {
     let cluster = RemoteCluster {
         slots: vec![stryke::value::RemoteSlot {
             host: "solo".to_string(),
-            pe_path: "fo".to_string(),
+            pe_path: "stryke".to_string(),
         }],
         job_timeout_ms: 30_000,
         max_attempts: RemoteCluster::DEFAULT_MAX_ATTEMPTS,
@@ -787,11 +787,11 @@ fn dispatcher_applies_lexical_capture_from_run_cluster() {
         slots: vec![
             stryke::value::RemoteSlot {
                 host: "cap1".to_string(),
-                pe_path: "fo".to_string(),
+                pe_path: "stryke".to_string(),
             },
             stryke::value::RemoteSlot {
                 host: "cap2".to_string(),
-                pe_path: "fo".to_string(),
+                pe_path: "stryke".to_string(),
             },
         ],
         job_timeout_ms: 30_000,
@@ -832,7 +832,7 @@ fn dispatcher_surfaces_permanent_block_failure_from_worker() {
     let cluster = RemoteCluster {
         slots: vec![stryke::value::RemoteSlot {
             host: "diehost".to_string(),
-            pe_path: "fo".to_string(),
+            pe_path: "stryke".to_string(),
         }],
         job_timeout_ms: 30_000,
         max_attempts: RemoteCluster::DEFAULT_MAX_ATTEMPTS,

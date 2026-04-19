@@ -37,7 +37,7 @@ A Perl 5 compatible interpreter in Rust with native parallel primitives, NaN-box
 - [\[0x0A\] Examples](#0x0a-examples)
 - [\[0x0B\] Benchmarks](#0x0b-benchmarks)
 - [\[0x0C\] Development & CI](#0x0c-development--ci)
-- [\[0x0D\] Standalone Binaries (`fo build`)](#0x0d-standalone-binaries-fo-build)
+- [\[0x0D\] Standalone Binaries (`stryke build`)](#0x0d-standalone-binaries-stryke-build)
 - [\[0x0E\] Inline Rust FFI (`rust { ... }`)](#0x0e-inline-rust-ffi-rust-----)
 - [\[0x0F\] Bytecode Cache (`.pec`)](#0x0f-bytecode-cache-pec)
 - [\[0x10\] Distributed `pmap_on` over SSH (`cluster`)](#0x10-distributed-pmap_on-over-ssh-cluster)
@@ -77,31 +77,31 @@ cp completions/_stryke /usr/local/share/zsh/site-functions/_stryke
 autoload -Uz compinit && compinit
 ```
 
-`fo <TAB>` then completes flags, options, and script files.
+`stryke <TAB>` then completes flags, options, and script files.
 
 ---
 
 ## [0x01b] WHY STRYKE — ONE-LINER COMPARISON
 
-`fo` is a **one-liner-first** language. No `-e` flag needed, everything built in, shortest syntax wins.
+`stryke` is a **one-liner-first** language. No `-e` flag needed, everything built in, shortest syntax wins.
 
 ### Character count — real tasks
 
-| Task | `fo` | `perl` | `ruby` | `python` | `awk` / other |
+| Task | `stryke` | `perl` | `ruby` | `python` | `awk` / other |
 |---|---|---|---|---|---|
-| Print hello world | `fo 'p "hello world"'` **21c** | `perl -e 'print "hello world\n"'` 32c | `ruby -e 'puts "hello world"'` 29c | `python3 -c 'print("hello world")'` 34c | `echo \| awk '{print "hello world"}'` 36c |
-| Sum 1..100 | `fo 'p sum 1..100'` **19c** | `perl -MList::Util=sum -e 'print sum 1..100'` 45c | `ruby -e 'puts (1..100).sum'` 28c | `python3 -c 'print(sum(range(1,101)))'` 38c | — |
-| Word frequencies | `fo -an 'freq(@F) \|> dd'` **25c** | `perl -ane '$h{$_}++ for @F}{print "$_ $h{$_}\n" for keys %h'` 61c | — | — | `awk '{for(i=1;i<=NF;i++) a[$i]++} END{...}'` 65c+ |
-| SHA256 of file | `fo 'p s256"f"'` **14c** | `perl -MDigest::SHA=sha256_hex -e '...'` 70c+ | — | `python3 -c 'import hashlib;...'` 80c+ | `shasum -a 256 f` 15c |
-| Fetch JSON API | `fo 'fetch_json(URL) \|> dd'` **~50c** | needs `LWP` + `JSON` modules | needs `net/http` + `json` | needs `urllib` + `json` | `curl -s URL \| jq .` ~40c |
-| CSV → JSON | `fo 'csv_read("f") \|> tj \|> p'` **33c** | needs `Text::CSV` + `JSON` | needs `csv` + `json` | needs `csv` + `json` imports | — |
-| Parallel map | `fo '1..1e6 \|> pmap { $_ * 2 }'` **33c** | not built in | not built in | not built in | `xargs -P8` 50c+ |
-| Sparkline | `fo '(3,7,1,9) \|> spark \|> p'` **31c** | not built in | not built in | not built in | not built in |
-| In-place sed (parallel) | `fo -i -pe 's/foo/bar/g' *.txt` **31c** | `perl -i -pe 's/foo/bar/g' *.txt` 33c (sequential) | `ruby -i -pe '$_.gsub!(...)'` 35c+ | — | `sed -i '' 's/foo/bar/g' *.txt` 31c (sequential) |
+| Print hello world | `stryke 'p "hello world"'` **21c** | `perl -e 'print "hello world\n"'` 32c | `ruby -e 'puts "hello world"'` 29c | `python3 -c 'print("hello world")'` 34c | `echo \| awk '{print "hello world"}'` 36c |
+| Sum 1..100 | `stryke 'p sum 1..100'` **19c** | `perl -MList::Util=sum -e 'print sum 1..100'` 45c | `ruby -e 'puts (1..100).sum'` 28c | `python3 -c 'print(sum(range(1,101)))'` 38c | — |
+| Word frequencies | `stryke -an 'freq(@F) \|> dd'` **25c** | `perl -ane '$h{$_}++ for @F}{print "$_ $h{$_}\n" for keys %h'` 61c | — | — | `awk '{for(i=1;i<=NF;i++) a[$i]++} END{...}'` 65c+ |
+| SHA256 of file | `stryke 'p s256"f"'` **14c** | `perl -MDigest::SHA=sha256_hex -e '...'` 70c+ | — | `python3 -c 'import hashlib;...'` 80c+ | `shasum -a 256 f` 15c |
+| Fetch JSON API | `stryke 'fetch_json(URL) \|> dd'` **~50c** | needs `LWP` + `JSON` modules | needs `net/http` + `json` | needs `urllib` + `json` | `curl -s URL \| jq .` ~40c |
+| CSV → JSON | `stryke 'csv_read("f") \|> tj \|> p'` **33c** | needs `Text::CSV` + `JSON` | needs `csv` + `json` | needs `csv` + `json` imports | — |
+| Parallel map | `stryke '1..1e6 \|> pmap { $_ * 2 }'` **33c** | not built in | not built in | not built in | `xargs -P8` 50c+ |
+| Sparkline | `stryke '(3,7,1,9) \|> spark \|> p'` **31c** | not built in | not built in | not built in | not built in |
+| In-place sed (parallel) | `stryke -i -pe 's/foo/bar/g' *.txt` **31c** | `perl -i -pe 's/foo/bar/g' *.txt` 33c (sequential) | `ruby -i -pe '$_.gsub!(...)'` 35c+ | — | `sed -i '' 's/foo/bar/g' *.txt` 31c (sequential) |
 
 ### Feature matrix
 
-| Feature | fo | perl5 | ruby | python | awk | jq | nushell |
+| Feature | stryke | perl5 | ruby | python | awk | jq | nushell |
 |---|---|---|---|---|---|---|---|
 | No `-e` flag needed | **yes** | no | no | no (`-c`) | — | — | — |
 | No semicolons | **yes** | no | yes | yes | yes | yes | yes |
@@ -126,32 +126,32 @@ autoload -Uz compinit && compinit
 ## [0x02] USAGE
 
 ```sh
-fo 'p "Hello, world!"'                 # inline code — no -e needed
-fo 'p 1 + 2'                           # just quote and go
-fo script.pl arg1 arg2                  # script + args
-fo -lane 'p $F[0]'                     # bundled short switches
-fo -c script.pl                         # syntax check
-fo --lint script.pl                     # parse + compile (no run)
-fo --disasm script.pl                   # bytecode listing on stderr
-fo --ast script.pl                      # AST as JSON
-fo --fmt script.pl                      # pretty-print parsed source
-fo --profile script.pl                  # folded stacks + per-line/per-sub ns
-fo --flame script.stk                   # colored flamegraph bars in terminal
-fo --flame script.stk > flame.svg       # interactive SVG flamegraph when piped
-fo --explain E0001                      # expanded hint for an error code
-fo docs                                  # interactive reference book (vim-style: j/k/]/[/t/q)
-fo docs pmap                             # jump straight to a topic
-fo docs --toc                            # table of contents
-fo docs --search parallel                # search all pages
-fo serve                                # static file server for $PWD on port 8000
-fo serve 8080 app.stk                   # HTTP server with handler script
-fo serve 3000 -e '"hello " . $req->{path}'  # one-liner HTTP server
-fo build script.pl -o myapp             # bake into a standalone binary ([0x0D])
-fo --lsp                                # language server over stdio ([0x11])
-STRYKE_BC_CACHE=1 fo app.pl             # warm starts skip parse + compile ([0x0F])
+stryke 'p "Hello, world!"'                 # inline code — no -e needed
+stryke 'p 1 + 2'                           # just quote and go
+stryke script.pl arg1 arg2                  # script + args
+stryke -lane 'p $F[0]'                     # bundled short switches
+stryke -c script.pl                         # syntax check
+stryke --lint script.pl                     # parse + compile (no run)
+stryke --disasm script.pl                   # bytecode listing on stderr
+stryke --ast script.pl                      # AST as JSON
+stryke --fmt script.pl                      # pretty-print parsed source
+stryke --profile script.pl                  # folded stacks + per-line/per-sub ns
+stryke --flame script.stk                   # colored flamegraph bars in terminal
+stryke --flame script.stk > flame.svg       # interactive SVG flamegraph when piped
+stryke --explain E0001                      # expanded hint for an error code
+stryke docs                                  # interactive reference book (vim-style: j/k/]/[/t/q)
+stryke docs pmap                             # jump straight to a topic
+stryke docs --toc                            # table of contents
+stryke docs --search parallel                # search all pages
+stryke serve                                # static file server for $PWD on port 8000
+stryke serve 8080 app.stk                   # HTTP server with handler script
+stryke serve 3000 -e '"hello " . $req->{path}'  # one-liner HTTP server
+stryke build script.pl -o myapp             # bake into a standalone binary ([0x0D])
+stryke --lsp                                # language server over stdio ([0x11])
+STRYKE_BC_CACHE=1 stryke app.pl             # warm starts skip parse + compile ([0x0F])
 ```
 
-> **`-e` is optional.** If the first argument isn't a file on disk and looks like code, `fo` runs it directly. `fo 'p 42'` and `fo -e 'p 42'` are equivalent. Use `-e` when combining with `-n`/`-p`/`-l`/`-a` (e.g. `fo -lane 'p $F[0]'`).
+> **`-e` is optional.** If the first argument isn't a file on disk and looks like code, `stryke` runs it directly. `stryke 'p 42'` and `stryke -e 'p 42'` are equivalent. Use `-e` when combining with `-n`/`-p`/`-l`/`-a` (e.g. `stryke -lane 'p $F[0]'`).
 
 #### Semicolons
 
@@ -166,7 +166,7 @@ my $x = 1; my $y = 2; p $x + $y # 3 — same line needs `;` between statements
 
 #### Interactive REPL
 
-Run `fo` with no arguments to enter a readline session: line editing, history (`~/.stryke_history`), tab completion for keywords, lexicals in scope, sub names, methods after `->` on blessed objects, and file paths. `exit`/`quit`/Ctrl-D leaves. Non-TTY stdin is read as a complete program.
+Run `stryke` with no arguments to enter a readline session: line editing, history (`~/.stryke_history`), tab completion for keywords, lexicals in scope, sub names, methods after `->` on blessed objects, and file paths. `exit`/`quit`/Ctrl-D leaves. Non-TTY stdin is read as a complete program.
 
 #### `__DATA__`
 
@@ -175,11 +175,11 @@ A line whose trimmed text is exactly `__DATA__` ends the program; the trailing b
 #### Stdin / `-n` / `-p` / `-i`
 
 ```sh
-echo data | fo -ne 'print uc $_'        # line loop
-cat f.txt | fo -pe 's/foo/bar/g'        # auto-print like sed
-fo -i -pe 's/foo/bar/g' file1 file2     # in-place edit (parallel across files)
-fo -i.bak -pe 's/x/y/g' *.txt           # with backup suffix
-echo a:b:c | fo -aF: -ne 'print $F[1]'  # auto-split
+echo data | stryke -ne 'print uc $_'        # line loop
+cat f.txt | stryke -pe 's/foo/bar/g'        # auto-print like sed
+stryke -i -pe 's/foo/bar/g' file1 file2     # in-place edit (parallel across files)
+stryke -i.bak -pe 's/x/y/g' *.txt           # with backup suffix
+echo a:b:c | stryke -aF: -ne 'print $F[1]'  # auto-split
 ```
 
 `-l` chomps each record and sets `$\`. `eof` with no args is true on the last line of stdin or each `@ARGV` file (Perl-compat).
@@ -213,7 +213,7 @@ my $hist     = @words |> preduce_init {}, { my ($acc, $x) = @_; $acc->{$x}++; $a
 
 # fan — run a block or fn N times in parallel ($_/$_0 = index 0..N-1)
 fan 8, work  # bare-fn form: fan N, FUNC
-fan work, progress => 1  # uses rayon pool size (`fo -j`)
+fan work, progress => 1  # uses rayon pool size (`stryke -j`)
 fan 8 { work($_) }  # block form
 fan { work($_) }  # block form, pool-sized
 my @r = fan_cap 8, compute  # capture results in index order
@@ -266,7 +266,7 @@ watch  "/tmp/x", p
 pwatch "logs/*", heavy
 
 # control thread count
-fo -j 8 -e '@data |> pmap heavy'
+stryke -j 8 -e '@data |> pmap heavy'
 
 # distributed pmap over an SSH worker pool — see [0x10] for details
 my $cluster = cluster(["build1:8", "build2:16"])
@@ -663,7 +663,7 @@ stryke-specific long flags:
 | `--ast` | Dump parsed AST as JSON and exit |
 | `--fmt` | Pretty-print parsed Perl to stdout and exit |
 | `--profile` | Wall-clock profile: per-line + per-sub timings on stderr |
-| `--flame` | Flamegraph: colored terminal bars when interactive, SVG when piped (`fo --flame x.stk > flame.svg`) |
+| `--flame` | Flamegraph: colored terminal bars when interactive, SVG when piped (`stryke --flame x.stk > flame.svg`) |
 | `--no-jit` | Disable Cranelift JIT (bytecode interpreter only) |
 | `--compat` | Perl 5 strict-compatibility mode: disable all stryke extensions (`\|>`, `struct`, `enum`, `match`, `pmap`, `#{expr}`, etc.) |
 | `--explain CODE` | Print expanded hint for an error code (e.g. `E0001`) |
@@ -671,11 +671,11 @@ stryke-specific long flags:
 | `-j N` / `--threads N` | Set number of parallel threads (rayon) |
 | `--remote-worker` | Persistent cluster worker over stdio ([\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster)) |
 | `--remote-worker-v1` | Legacy one-shot cluster worker over stdio |
-| `build SCRIPT [-o OUT]` | AOT compile script to standalone binary ([\[0x0D\]](#0x0d-standalone-binaries-fo-build)) |
-| `doc [TOPIC]` | Interactive reference book with vim-style navigation (`fo doc`, `fo doc pmap`, `fo doc --toc`) |
-| `serve [PORT] [SCRIPT]` | HTTP server (default port 8000): static files (`fo serve`), script (`fo serve 8080 app.stk`), one-liner (`fo serve 3000 -e 'EXPR'`) |
+| `build SCRIPT [-o OUT]` | AOT compile script to standalone binary ([\[0x0D\]](#0x0d-standalone-binaries-stryke-build)) |
+| `doc [TOPIC]` | Interactive reference book with vim-style navigation (`stryke doc`, `stryke doc pmap`, `stryke doc --toc`) |
+| `serve [PORT] [SCRIPT]` | HTTP server (default port 8000): static files (`stryke serve`), script (`stryke serve 8080 app.stk`), one-liner (`stryke serve 3000 -e 'EXPR'`) |
 
-![fo -h](img/fo-help.png)
+![stryke -h](img/stryke-help.png)
 
 ---
 
@@ -767,10 +767,10 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - Crypto, compression, time, TOML, YAML helpers (see [\[0x05\]](#0x05-native-data-scripting)).
 - All parallel primitives in [\[0x03\]](#0x03-parallel-primitives) (`pmap`, `fan`, `pipeline`, `par_pipeline_stream`, `pchannel`, `pselect`, `barrier`, `ppool`, `glob_par`, `par_walk`, `par_lines`, `par_sed`, `par_find_files`, `par_line_count`, `pwatch`, `watch`).
 - **Distributed compute** ([\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster)): `cluster([...])` builds an SSH worker pool; `pmap_on $cluster { } @list` and `pflat_map_on $cluster { } @list` fan a map across persistent remote workers with fault tolerance and per-job retries.
-- **Standalone binaries** ([\[0x0D\]](#0x0d-standalone-binaries-fo-build)): `fo build SCRIPT -o OUT` bakes a script into a self-contained executable.
+- **Standalone binaries** ([\[0x0D\]](#0x0d-standalone-binaries-stryke-build)): `stryke build SCRIPT -o OUT` bakes a script into a self-contained executable.
 - **Inline Rust FFI** ([\[0x0E\]](#0x0e-inline-rust-ffi-rust-----)): `rust { pub extern "C" fn ... }` blocks compile to a cdylib on first run, dlopen + register as Perl-callable subs.
 - **Bytecode cache** ([\[0x0F\]](#0x0f-bytecode-cache-pec)): `STRYKE_BC_CACHE=1` skips parse + compile on warm starts via on-disk `.pec` bundles.
-- **Language server** ([\[0x11\]](#0x11-language-server---lsp)): `fo --lsp` runs an LSP server over stdio with diagnostics, hover, completion.
+- **Language server** ([\[0x11\]](#0x11-language-server---lsp)): `stryke --lsp` runs an LSP server over stdio with diagnostics, hover, completion.
 - `mysync` shared state ([\[0x04\]](#0x04-shared-state-mysync)).
 - `frozen my` (or `const my` — same thing, more familiar spelling), `typed my`, `struct`, `enum`, `class` (full OOP with `extends`/`impl`), `trait`, algebraic `match`, `try/catch/finally`, `eval_timeout`, `retry`, `rate_limit`, `every`, `gen { ... yield }`.
 - **Functional composition** — `compose`, `partial`, `curry`, `memoize`, `once`, `constantly`, `complement`, `juxt`, `fnil`:
@@ -835,10 +835,10 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   "foo123bar456" |> /\d+/g |> p  # 123 456
 
   # full pipeline: read input, strip newlines, split, count word frequencies
-  # man ls | fo 'input |> s@\n@@g |> split |> frequencies |> ddump |> p'
+  # man ls | stryke 'input |> s@\n@@g |> split |> frequencies |> ddump |> p'
 
   # extract all emails from text, deduplicate
-  # cat log.txt | fo 'input |> /[\w.]+@[\w.]+/g |> distinct |> e p'
+  # cat log.txt | stryke 'input |> /[\w.]+@[\w.]+/g |> distinct |> e p'
 
   # capture groups with /g:
   "a=1 b=2" |> /(\w+)=(\w+)/g |> ddump |> p
@@ -850,7 +850,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   # ── input / output ─────────────────────────────────────────────────
   input                                # slurp all of stdin as one string
   input($fh)                           # slurp a filehandle
-  # cat data.txt | fo 'input |> lines |> e p'
+  # cat data.txt | stryke 'input |> lines |> e p'
 
   # ── string → list ──────────────────────────────────────────────────
   "hello\nworld" |> lines |> ddump |> p  # ("hello", "world")
@@ -1432,16 +1432,16 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 ## [0x0A] EXAMPLES
 
 ```sh
-fo examples/fibonacci.pl
-fo examples/text_processing.pl
-fo examples/parallel_demo.pl
-fo convert examples/fibonacci.pl > examples/fibonacci.stk
-fo examples/fibonacci.stk
+stryke examples/fibonacci.pl
+stryke examples/text_processing.pl
+stryke examples/parallel_demo.pl
+stryke convert examples/fibonacci.pl > examples/fibonacci.stk
+stryke examples/fibonacci.stk
 ```
 
 ```sh
 # sets: dedupe + union / intersection (`scalar` gives member count, like `scalar @array`)
-fo 'my $a = set(1,2,2,3); my $b = set(2,3,4); p scalar($a | $b), " ", scalar($a & $b)'
+stryke 'my $a = set(1,2,2,3); my $b = set(2,3,4); p scalar($a | $b), " ", scalar($a & $b)'
 ```
 
 ---
@@ -1465,21 +1465,21 @@ fo 'my $a = set(1,2,2,3); my $b = set(2,3,4); p scalar($a | $b), " ", scalar($a 
 
   bench         stryke ms    perl5 ms  python3 ms     ruby ms    vs perl5   vs python     vs ruby
   ---------     ---------    --------  ----------     -------    --------   ---------     -------
-  startup             6.6         2.7        15.4        25.3       2.44x       0.43x       0.26x
-  fib                 9.9       187.7        61.3        58.5       0.05x       0.16x       0.17x
-  loop                6.3        90.8       205.9        76.8       0.07x       0.03x       0.08x
-  string              6.9        10.4      1808.0        47.6       0.66x       0.00x       0.14x
-  hash               10.2        27.6        27.4        35.2       0.37x       0.37x       0.29x
-  array              13.4        25.7        24.5        33.1       0.52x       0.55x       0.40x
-  regex              15.9        91.9       268.1       240.3       0.17x       0.06x       0.07x
-  map_grep           18.0        50.5        39.0        52.8       0.36x       0.46x       0.34x
+  startup             6.3         2.7        15.6        25.8       2.33x       0.40x       0.24x
+  fib                10.3       188.9        62.5        62.7       0.05x       0.16x       0.16x
+  loop                7.4        96.9       258.5        87.2       0.08x       0.03x       0.08x
+  string             13.3        18.3        33.3        51.0       0.73x       0.40x       0.26x
+  hash               11.0        29.3        29.4        37.9       0.38x       0.37x       0.29x
+  array              13.9        26.8        37.0        43.0       0.52x       0.38x       0.32x
+  regex              16.4        94.0       280.4       248.4       0.17x       0.06x       0.07x
+  map_grep           18.3        52.6        42.2        53.6       0.35x       0.43x       0.34x
 ```
 
-**stryke vs perl5** — faster on 7 of 8 benches: `fib` 19x, `loop` 14x, `regex` 5.8x, `string` 1.5x, `hash` 2.7x, `array` 1.9x, `map_grep` 2.8x. Only `startup` is slower (2.4x — Rust binary load overhead).
+**stryke vs perl5** — faster on 7 of 8 benches: `fib` 18x, `loop` 13x, `regex` 5.7x, `hash` 2.7x, `map_grep` 2.9x, `array` 1.9x, `string` 1.4x. Only `startup` is slower (2.3x — Rust binary load overhead).
 
-**stryke vs python3** — faster on all 8 benches: `string` 262x (Python's `+=` on strings is O(n²)), `loop` 33x, `regex` 17x, `fib` 6.2x, `startup` 2.3x, `hash` 2.7x, `map_grep` 2.2x, `array` 1.8x.
+**stryke vs python3** — faster on all 8 benches: `loop` 35x, `regex` 17x, `fib` 6.1x, `array` 2.7x, `startup` 2.5x, `string` 2.5x, `hash` 2.7x, `map_grep` 2.3x. Python uses `io.StringIO` for string bench (not `+=` which is O(n²) and unfair).
 
-**stryke vs ruby** — faster on all 8 benches: `startup` 3.8x, `loop` 12x, `fib` 5.9x, `string` 6.9x, `hash` 3.5x, `regex` 15x, `array` 2.5x, `map_grep` 2.9x.
+**stryke vs ruby** — faster on all 8 benches: `regex` 15x, `loop` 12x, `fib` 6.1x, `string` 3.8x, `startup` 4.1x, `hash` 3.4x, `map_grep` 2.9x, `array` 3.1x.
 
 ### stryke vs perl5 (detailed)
 
@@ -1527,26 +1527,26 @@ bash parity/run_parity.sh       # exact stdout/stderr parity vs system perl (20 
 ```
 
 - `Cargo.lock` is committed (CI uses `--locked`). If your global gitignore strips it, force-add updates: `git add -f Cargo.lock`.
-- Disable JIT: `STRYKE_NO_JIT=1` or `fo --no-jit`.
+- Disable JIT: `STRYKE_NO_JIT=1` or `stryke --no-jit`.
 - Parity work is tracked in [`PARITY_ROADMAP.md`](parity/PARITY_ROADMAP.md).
 
 ---
 
-## [0x0D] STANDALONE BINARIES (`fo build`)
+## [0x0D] STANDALONE BINARIES (`stryke build`)
 
-Compile any Perl script to a single self-contained native executable. The output is a copy of the `fo` binary with the script source embedded as a zstd-compressed trailer. `scp` it to any compatible machine and run it — **no `perl`, no `stryke`, no `@INC`, no CPAN**.
+Compile any Perl script to a single self-contained native executable. The output is a copy of the `stryke` binary with the script source embedded as a zstd-compressed trailer. `scp` it to any compatible machine and run it — **no `perl`, no `stryke`, no `@INC`, no CPAN**.
 
 ```sh
-fo build app.pl                         # → ./app
-fo build app.pl -o /usr/local/bin/app   # explicit output path
+stryke build app.pl                         # → ./app
+stryke build app.pl -o /usr/local/bin/app   # explicit output path
 ./app --any --script --args             # all argv reach the embedded script's @ARGV
 ```
 
 **What's in the box:**
 
 - Parse / compile errors are surfaced **at build time**, not when users run the binary.
-- The embedded script is detected at startup by a 32-byte trailer sniff (~50 µs), then decompressed and executed by the embedded VM. A script with no trailer runs normally as `fo`.
-- Builds are idempotent: `fo build app.pl -o app` followed by `fo --exe app build other.pl -o other` strips the previous trailer first, so binaries never stack.
+- The embedded script is detected at startup by a 32-byte trailer sniff (~50 µs), then decompressed and executed by the embedded VM. A script with no trailer runs normally as `stryke`.
+- Builds are idempotent: `stryke build app.pl -o app` followed by `stryke --exe app build other.pl -o other` strips the previous trailer first, so binaries never stack.
 - Unix: the output is marked `+x` automatically. macOS: unsigned — `codesign` before distribution if your environment requires it.
 - Current AOT runtime sets `@INC = (".")`; modules outside the embedded script have to be inlined. (`require` of a local `.pm` next to the running binary still works.)
 
@@ -1554,8 +1554,8 @@ fo build app.pl -o /usr/local/bin/app   # explicit output path
 
 ```sh
 # 13 MB binary, no external runtime required:
-$ fo build hello.pl -o hello
-fo build: wrote hello
+$ stryke build hello.pl -o hello
+stryke build: wrote hello
 $ file hello
 hello: Mach-O 64-bit executable arm64
 $ ./hello alice
@@ -1597,7 +1597,7 @@ p fib 50             # 12586269025
 
 **How it works** ([`src/rust_sugar.rs`](src/rust_sugar.rs), [`src/rust_ffi.rs`](src/rust_ffi.rs)): the source-level pre-pass desugars every top-level `rust { ... }` into a `BEGIN { __stryke_rust_compile("<base64 body>", $line); }` call. The `__stryke_rust_compile` builtin hashes the body, compiles via `rustc --edition=2021 -O` if the cache is cold, `libc::dlopen`s the result, `dlsym`s each detected signature, and stores the raw symbol + arity/type tag in a process-global registry. Calls from Perl flow through a fallback arm in [`crate::builtins::try_builtin`] that dispatches on the signature tag via direct function-pointer transmute — no libffi dep, no per-call alloc, no marshalling overhead beyond the `PerlValue::to_int` / `to_number` / `to_string` calls you'd do for any builtin.
 
-**Combine with AOT for zero-friction deployment:** `fo build script.pl -o prog` bakes the Perl source — which includes the `rust { ... }` block — into a standalone binary. The FFI compile still happens on first run of `./prog`, but the user only needs `rustc` once, then the `~/.cache/stryke/ffi/` entry is permanent.
+**Combine with AOT for zero-friction deployment:** `stryke build script.pl -o prog` bakes the Perl source — which includes the `rust { ... }` block — into a standalone binary. The FFI compile still happens on first run of `./prog`, but the user only needs `rustc` once, then the `~/.cache/stryke/ffi/` entry is permanent.
 
 **Limitations (v1):**
 
@@ -1613,11 +1613,11 @@ p fib 50             # 12586269025
 `STRYKE_BC_CACHE=1` enables the on-disk bytecode cache. The first run of a script parses + compiles + persists a `.pec` bundle to `~/.cache/stryke/bc/<sha256>.pec`. Every subsequent run skips **both parse and compile** and feeds the cached chunk straight into the VM.
 
 ```sh
-STRYKE_BC_CACHE=1 fo my_app.pl              # cold: parse + compile + save
-STRYKE_BC_CACHE=1 fo my_app.pl              # warm: load + dispatch
+STRYKE_BC_CACHE=1 stryke my_app.pl              # cold: parse + compile + save
+STRYKE_BC_CACHE=1 stryke my_app.pl              # warm: load + dispatch
 ```
 
-**Measured impact** (Apple M5, 13 MB release `fo`, hyperfine `--warmup 5 -N`, mean ± σ):
+**Measured impact** (Apple M5, 13 MB release `stryke`, hyperfine `--warmup 5 -N`, mean ± σ):
 
 | script              | cold (no cache) | warm (.pec)    | speedup       | `.pec` size |
 |---------------------|-----------------|----------------|---------------|-------------|
@@ -1629,35 +1629,35 @@ The toy-script result is the honest one to call out: for tiny scripts the cache 
 
 **Tuning knobs:**
 
-- `STRYKE_BC_CACHE=1` — opt-in. (V1 is opt-in to avoid surprising users with stray cache files; flip to opt-out once we have a `fo cache prune` subcommand and confidence in invalidation.)
+- `STRYKE_BC_CACHE=1` — opt-in. (V1 is opt-in to avoid surprising users with stray cache files; flip to opt-out once we have a `stryke cache prune` subcommand and confidence in invalidation.)
 - `STRYKE_BC_DIR=/path/to/dir` — override the cache location. Useful for test isolation and CI.
 
 **Format** ([`src/pec.rs`](src/pec.rs)): `[4B magic b"PEC2"][zstd-compressed bincode of PecBundle]`. The `PecBundle` carries `format_version`, `pointer_width` (so a cache built on a 64-bit host is rejected on 32-bit), `strict_vars` (a mismatch is treated as a clean miss → re-compile), `source_fingerprint`, the parsed `Program`, and the compiled `Chunk`. Format version 2 introduced zstd compression — files dropped ~10× in size and warm-load latency dropped with them.
 
 **Cache key** ([`pec::source_fingerprint`](src/pec.rs)): SHA-256 of `(crate version, source filename, full source including -M prelude)`. Editing the script, upgrading stryke, or changing the `-M` flags all force a recompile. The crate version is mixed in so a `cargo install strykelang` upgrade silently invalidates everyone's cache rather than risking a stale-bytecode mismatch.
 
-**Pairs with [`fo build`](#0x0d-standalone-binaries-fo-build):** AOT binaries pick up the cache for free. The first run of a shipped binary parses and compiles the embedded source; every subsequent run on the same machine reuses the cached chunk. The cache key includes the script name baked into the trailer, so two binaries with different embedded scripts never collide.
+**Pairs with [`stryke build`](#0x0d-standalone-binaries-stryke-build):** AOT binaries pick up the cache for free. The first run of a shipped binary parses and compiles the embedded source; every subsequent run on the same machine reuses the cached chunk. The cache key includes the script name baked into the trailer, so two binaries with different embedded scripts never collide.
 
 **Limitations (v1):**
 
 - **Bypassed for `-e` / `-E` one-liners.** Measured: warm `.pec` is ~2-3× *slower* than cold for tiny scripts because the deserialize cost (~1-2 ms for fs read + zstd decode + bincode) dominates the parse+compile work it replaces (~500 µs). Each unique `-e` invocation would also pollute the cache directory with no GC. The break-even is around 1000 lines, so file-based scripts only.
 - Bypassed for `-n` / `-p` / `--lint` / `--check` / `--ast` / `--fmt` / `--profile` modes (those paths run a different driver loop).
-- No automatic eviction yet — old `.pec` files for edited scripts accumulate. `rm ~/.cache/stryke/bc/*.pec` is a fine workaround until `fo cache prune` lands.
+- No automatic eviction yet — old `.pec` files for edited scripts accumulate. `rm ~/.cache/stryke/bc/*.pec` is a fine workaround until `stryke cache prune` lands.
 - Cache hit path cannot fall back to the tree walker mid-run — but this is unreachable in practice because `compile_program` only emits ops the VM implements before persisting.
 
 ---
 
 ## [0x10] DISTRIBUTED `pmap_on` OVER SSH (`cluster`)
 
-Distribute a `pmap`-style fan-out across many machines via SSH. The dispatcher spawns one persistent `fo --remote-worker` process per slot, performs a HELLO + SESSION_INIT handshake **once** per slot, then streams JOB frames over the same stdin/stdout. Pairs perfectly with `fo build`: ship one binary to N hosts, fan the workload across them.
+Distribute a `pmap`-style fan-out across many machines via SSH. The dispatcher spawns one persistent `stryke --remote-worker` process per slot, performs a HELLO + SESSION_INIT handshake **once** per slot, then streams JOB frames over the same stdin/stdout. Pairs perfectly with `stryke build`: ship one binary to N hosts, fan the workload across them.
 
 ```perl
-# Build the worker pool. Each spec maps to one or more `ssh HOST FO --remote-worker` lanes.
+# Build the worker pool. Each spec maps to one or more `ssh HOST STRYKE --remote-worker` lanes.
 my $cluster = cluster([
-    "build1:8",                          # 8 slots on build1, default `fo` from PATH
+    "build1:8",                          # 8 slots on build1, default `stryke` from PATH
     "alice@build2:16",                   # 16 slots, ssh as alice
-    "build3:4:/usr/local/bin/fo",        # 4 slots, custom remote fo path
-    { host => "data1", slots => 12, fo => "/opt/fo" },  # hashref form
+    "build3:4:/usr/local/bin/stryke",        # 4 slots, custom remote stryke path
+    { host => "data1", slots => 12, stryke => "/opt/stryke" },  # hashref form
     { timeout => 30, retries => 2, connect_timeout => 5 },  # trailing tunables
 ])
 
@@ -1673,11 +1673,11 @@ Each list element to `cluster([...])` is one of:
 
 | Form | Meaning |
 |------|---------|
-| `"host"` | One slot on `host`, remote `fo` from `$PATH` |
+| `"host"` | One slot on `host`, remote `stryke` from `$PATH` |
 | `"host:N"` | `N` slots on `host` |
-| `"host:N:/path/to/fo"` | `N` slots, custom remote `fo` binary |
+| `"host:N:/path/to/stryke"` | `N` slots, custom remote `stryke` binary |
 | `"user@host:N"` | `ssh` user override (kept verbatim, passed through to ssh) |
-| `{ host => "...", slots => N, fo => "..." }` | Hashref form with explicit fields |
+| `{ host => "...", slots => N, stryke => "..." }` | Hashref form with explicit fields |
 | trailing `{ timeout => SECS, retries => N, connect_timeout => SECS }` | Cluster-wide tunables (must be the last argument; consumed only when **all** keys are tunable names) |
 
 **Tunables** (defaults shown):
@@ -1718,7 +1718,7 @@ Every message is `[u64 LE length][u8 kind][bincode payload]`. The single-byte `k
 dispatcher                    worker
     │                            │
     │── HELLO ─────────────────►│   (proto version, build id)
-    │◄───────────── HELLO_ACK ──│   (worker fo version, hostname)
+    │◄───────────── HELLO_ACK ──│   (worker stryke version, hostname)
     │── SESSION_INIT ──────────►│   (subs prelude, block source, captured lexicals)
     │◄────────── SESSION_ACK ───│   (or ERROR)
     │── JOB(seq=0) ────────────►│   (item)
@@ -1736,13 +1736,13 @@ The basic v1 protocol shipped the entire subs prelude on **every** job and spawn
 
 When a slot's read or write fails (ssh died, network blip, remote crash, per-job timeout), the worker thread re-enqueues the in-flight job to the shared queue with `attempts++` and exits. Other living slots pick the job up. A job is permanently failed when its attempt count reaches `cluster.max_attempts`. The whole map fails only when **every** slot is dead or every queued job has exhausted its retry budget.
 
-#### `fo --remote-worker`
+#### `stryke --remote-worker`
 
 The worker subprocess. Reads a HELLO frame from stdin, parses subs prelude + block source from SESSION_INIT exactly once, then handles JOB frames in a loop until SHUTDOWN or stdin EOF. Started by the dispatcher via `ssh HOST FO_PATH --remote-worker`. Also reachable directly for local testing:
 
 ```sh
-echo "..." | fo --remote-worker      # reads framed wire protocol from stdin
-fo --remote-worker-v1                # legacy one-shot session for compat tests
+echo "..." | stryke --remote-worker      # reads framed wire protocol from stdin
+stryke --remote-worker-v1                # legacy one-shot session for compat tests
 ```
 
 #### Limitations (v1)
@@ -1757,19 +1757,19 @@ fo --remote-worker-v1                # legacy one-shot session for compat tests
 
 ## [0x11] LANGUAGE SERVER (`--lsp`)
 
-`fo --lsp` runs an LSP server over stdio. Hooks into the existing parser, lexer, and symbol table — no separate analyzer to maintain. Surfaces:
+`stryke --lsp` runs an LSP server over stdio. Hooks into the existing parser, lexer, and symbol table — no separate analyzer to maintain. Surfaces:
 
 - **Diagnostics** on save (parse + compile errors with line / column / message)
 - **Hover docs** for builtins (`pmap`, `cluster`, `fetch_json`, `dataframe`, …) — including the parallel and cluster primitives from sections [\[0x03\]](#0x03-parallel-primitives) and [\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster)
 - **Symbol lookup** for subs and packages within the open file
 - **Completion** for built-in function names and the keywords listed in [\[0x08\]](#0x08-supported-perl-features)
 
-Wire it into VS Code, JetBrains, or any LSP-aware editor by pointing the client at `fo --lsp` as the language-server command. There is no `Cargo.toml`-style separate `stryke-lsp` binary in v1 — the same `fo` you run scripts with also acts as its own language server when invoked with `--lsp`.
+Wire it into VS Code, JetBrains, or any LSP-aware editor by pointing the client at `stryke --lsp` as the language-server command. There is no `Cargo.toml`-style separate `stryke-lsp` binary in v1 — the same `stryke` you run scripts with also acts as its own language server when invoked with `--lsp`.
 
 ```jsonc
 // .vscode/settings.json
 {
-  "stryke.serverPath": "/usr/local/bin/fo",
+  "stryke.serverPath": "/usr/local/bin/stryke",
   "stryke.serverArgs": ["--lsp"]
 }
 ```
@@ -1811,40 +1811,40 @@ Inverted indexes for constant-time reverse queries:
 
 ```sh
 # O(1) direct lookups
-fo 'p $b{pmap}'              # "parallel"
-fo 'p $b{to_json}'           # "serialization"
-fo 'p $pc{map}'              # "array / list"
-fo 'p $e{pmap}'              # "parallel"
-fo 'p $a{tj}'                # "to_json"
-fo 'p $d{pmap}'              # LSP one-liner
-fo 'p $all{tj}'              # "serialization"  (alias resolved via %all)
-fo 'p scalar @{$c{parallel}}'  # number of parallel ops
-fo '$p{to_json} |> e p'        # every alias of to_json
+stryke 'p $b{pmap}'              # "parallel"
+stryke 'p $b{to_json}'           # "serialization"
+stryke 'p $pc{map}'              # "array / list"
+stryke 'p $e{pmap}'              # "parallel"
+stryke 'p $a{tj}'                # "to_json"
+stryke 'p $d{pmap}'              # LSP one-liner
+stryke 'p $all{tj}'              # "serialization"  (alias resolved via %all)
+stryke 'p scalar @{$c{parallel}}'  # number of parallel ops
+stryke '$p{to_json} |> e p'        # every alias of to_json
 
 # total callable spellings (primaries + aliases), one direct count
-fo 'p scalar keys %all'
+stryke 'p scalar keys %all'
 
 # see just Perl compats
-fo 'keys %pc |> sort |> p'
+stryke 'keys %pc |> sort |> p'
 
 # see just stryke extensions
-fo 'keys %e |> sort |> p'
+stryke 'keys %e |> sort |> p'
 
 # enumerate a whole category in O(1)
-fo '$c{parallel} |> e p'
-fo '$c{"array / list"} |> e p'
+stryke '$c{parallel} |> e p'
+stryke '$c{"array / list"} |> e p'
 
 # browse any of them interactively via the pager
-fo 'keys %all |> less'
+stryke 'keys %all |> less'
 
 # frequency table: how many ops per category?
-fo 'my %f; $f{$b{$_}}++ for keys %b; dd \%f'
+stryke 'my %f; $f{$b{$_}}++ for keys %b; dd \%f'
 
 # find every documented op mentioning "parallel"
-fo 'keys %d |> grep { $d{$_} =~ /parallel/i } |> sort |> p'
+stryke 'keys %d |> grep { $d{$_} =~ /parallel/i } |> sort |> p'
 
 # catalog the full reflection surface
-fo 'for my $h (qw(b all pc e a d c p)) {
+stryke 'for my $h (qw(b all pc e a d c p)) {
          printf "%%%-4s %d\n", $h, scalar keys %$h
        }'
 ```

@@ -1,4 +1,4 @@
-//! Wall-clock profiler for `fo --profile`.
+//! Wall-clock profiler for `stryke --profile`.
 //!
 //! **Tree-walker**: per-statement line times and [`Profiler::enter_sub`] / [`Profiler::exit_sub`]
 //! around subroutine bodies.

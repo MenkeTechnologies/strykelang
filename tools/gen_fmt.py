@@ -317,7 +317,7 @@ def main() -> None:
             return f'        StmtKind::{name} {{ .. }} => format!("/* StmtKind::{name} */"),'
 
     out: list[str] = []
-    out.append("//! Pretty-print parsed Perl back to source (`fo --fmt`).")
+    out.append("//! Pretty-print parsed Perl back to source (`st --fmt`).")
     out.append("//! Regenerate with `python3 tools/gen_fmt.py` after `ast.rs` changes.")
     out.append("")
     out.append("#![allow(unused_variables)] // generated `match` arms name fields not always used")

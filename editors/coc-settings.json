@@ -1,7 +1,7 @@
 {
   "languageserver": {
     "stryke": {
-      "command": "fo",
+      "command": "st",
       "args": ["--lsp"],
       "filetypes": ["stryke", "perl"],
       "rootPatterns": [".git", "Makefile.PL", "cpanfile", "dist.ini"]
