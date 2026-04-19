@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.6.9 · 2975 topics · 25 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.6.9 · 3022 topics · 25 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -191,7 +191,7 @@
         <li><a href="#ch-process">Process</a> <span class="chapter-count">20</span></li>
         <li><a href="#ch-pack-binary">Pack / Binary</a> <span class="chapter-count">3</span></li>
         <li><a href="#ch-logging">Logging</a> <span class="chapter-count">7</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">2413</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">2460</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -5624,7 +5624,7 @@ log_info(&quot;hidden&quot;)    # not printed
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">2413 topics</p>
+      <p class="chapter-meta">2460 topics</p>
       <article class="doc-entry" id="doc-stryke-rust-compile">
         <h3><a class="doc-anchor" href="#doc-stryke-rust-compile">#</a> <code>__stryke_rust_compile</code></h3>
         <p><code>__stryke_rust_compile</code> — internal builtin.</p>
@@ -7016,6 +7016,12 @@ p j1(1.84) # ≈ 0.582 (first max)
 @list |&gt; map binom |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-binom-test">
+        <h3><a class="doc-anchor" href="#doc-binom-test">#</a> <code>binom_test</code></h3>
+        <p><code>binom_test</code> — exact binomial test. Returns two-sided p-value. Like R&#39;s binom.test().</p>
+        <pre><code class="lang-perl">my $p = binomtest(7, 10, 0.5)  # p-value for 7/10 successes vs p=0.5
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-binomial">
         <h3><a class="doc-anchor" href="#doc-binomial">#</a> <code>binomial</code></h3>
         <p><code>binomial</code> — extended stdlib batch 3 builtin.</p>
@@ -7811,6 +7817,12 @@ p bond_price(1000, 0.05, 0.06, 10)   # ~926 (discount)
         <pre><code class="lang-perl">p cauchypdf(0, 0, 1)  # peak of standard Cauchy
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-cbind">
+        <h3><a class="doc-anchor" href="#doc-cbind">#</a> <code>cbind</code></h3>
+        <p><code>cbind</code> — bind matrices by columns (horizontal join). Like R&#39;s cbind().</p>
+        <pre><code class="lang-perl">my $m = cbind([[1],[2]], [[3],[4]])  # [[1,3],[2,4]]
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-cblend">
         <h3><a class="doc-anchor" href="#doc-cblend">#</a> <code>cblend</code></h3>
         <p><code>cblend</code> — color operations builtin. Alias for <code>color_blend</code>.</p>
@@ -8354,6 +8366,18 @@ rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p  # line count
         <pre><code class="lang-perl">my $result = coin_flip $x 
 # or in a pipeline:
 @list |&gt; map coin_flip |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-colmeans">
+        <h3><a class="doc-anchor" href="#doc-colmeans">#</a> <code>colMeans</code></h3>
+        <p><code>col_means</code> (alias <code>colMeans</code>) — mean of each column. Like R&#39;s colMeans().</p>
+        <pre><code class="lang-perl">p colMeans([[2,4],[6,8]])  # [4, 6]
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-colsums">
+        <h3><a class="doc-anchor" href="#doc-colsums">#</a> <code>colSums</code></h3>
+        <p><code>col_sums</code> (alias <code>colSums</code>) — sum of each column. Like R&#39;s colSums().</p>
+        <pre><code class="lang-perl">p colSums([[1,2],[3,4]])  # [4, 6]
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-collapse-whitespace">
@@ -9061,6 +9085,12 @@ my $lag = max_index(@$xcor)   # find peak lag
 @list |&gt; map crossp |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-crossprod">
+        <h3><a class="doc-anchor" href="#doc-crossprod">#</a> <code>crossprod</code></h3>
+        <p><code>crossprod</code> — cross product t(M) * M (R&#39;s crossprod). Efficiently computes M^T M without explicit transpose.</p>
+        <pre><code class="lang-perl">my $ata = crossprod([[1,2],[3,4]])  # [[10,14],[14,20]]
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-csc">
         <h3><a class="doc-anchor" href="#doc-csc">#</a> <code>csc</code></h3>
         <p><code>csc</code> returns the cosecant (1/sin) of an angle in radians.</p>
@@ -9129,6 +9159,18 @@ my $lag = max_index(@$xcor)   # find peak lag
 @list |&gt; map cubes_seq |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-cummax">
+        <h3><a class="doc-anchor" href="#doc-cummax">#</a> <code>cummax</code></h3>
+        <p><code>cummax</code> — cumulative maximum. Each element is the max of all elements up to that position.</p>
+        <pre><code class="lang-perl">p cummax([3,1,4,1,5,9])  # [3,3,4,4,5,9]
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cummin">
+        <h3><a class="doc-anchor" href="#doc-cummin">#</a> <code>cummin</code></h3>
+        <p><code>cummin</code> — cumulative minimum.</p>
+        <pre><code class="lang-perl">p cummin([9,5,1,4,3])  # [9,5,1,1,1]
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-cumprod">
         <h3><a class="doc-anchor" href="#doc-cumprod">#</a> <code>cumprod</code></h3>
         <p><code>cumprod</code> — extended stdlib builtin.</p>
@@ -9156,6 +9198,12 @@ my @F = @{cumtrapz(\@y)}  # [0, 1.5, 4.0, 7.5]
         <h3><a class="doc-anchor" href="#doc-cups-to-ml">#</a> <code>cups_to_ml</code></h3>
         <p><code>cups_to_ml</code> — file stat / path builtin.</p>
         <pre><code class="lang-perl">my $result = cups_to_ml $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cut">
+        <h3><a class="doc-anchor" href="#doc-cut">#</a> <code>cut</code></h3>
+        <p><code>cut</code> — bin continuous values into intervals. Returns integer bin indices. Like R&#39;s cut().</p>
+        <pre><code class="lang-perl">p cut([1.5, 3.2, 7.8], [0, 2, 5, 10])  # [1, 2, 3]
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-cv">
@@ -9304,6 +9352,12 @@ my @F = @{cumtrapz(\@y)}  # [0, 1.5, 4.0, 7.5]
         <pre><code class="lang-perl">my $result = daysinmo $x 
 # or in a pipeline:
 @list |&gt; map daysinmo |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-dbinom">
+        <h3><a class="doc-anchor" href="#doc-dbinom">#</a> <code>dbinom</code></h3>
+        <p><code>dbinom</code> — binomial PMF. P(X = k) for Binom(n, p). Args: k, n, p.</p>
+        <pre><code class="lang-perl">p dbinom(5, 10, 0.5)   # P(exactly 5 heads in 10 flips)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-dbmclose">
@@ -9518,6 +9572,13 @@ my @F = @{cumtrapz(\@y)}  # [0, 1.5, 4.0, 7.5]
         <pre><code class="lang-perl">my $result = dense_rank $x 
 # or in a pipeline:
 @list |&gt; map dense_rank |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-density">
+        <h3><a class="doc-anchor" href="#doc-density">#</a> <code>density</code></h3>
+        <p><code>density</code> — kernel density estimation with Gaussian kernel and Silverman bandwidth. Returns [[x_grid], [density_values]]. Like R&#39;s density().</p>
+        <pre><code class="lang-perl">my ($x, $y) = @{density([1,2,2,3,3,3,4,4,5])}
+# $x is grid of 512 points, $y is estimated density
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-depdbl">
@@ -9934,6 +9995,12 @@ p &quot;$pct% disk used&quot;
 @list |&gt; map dmetph |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-do-call">
+        <h3><a class="doc-anchor" href="#doc-do-call">#</a> <code>do_call</code></h3>
+        <p><code>do_call</code> — call a function with args from a list. Like R&#39;s do.call().</p>
+        <pre><code class="lang-perl">my $result = docall(sub { $_[0] + $_[1] }, [3, 4])  # 7
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-doppler-frequency">
         <h3><a class="doc-anchor" href="#doc-doppler-frequency">#</a> <code>doppler_frequency</code></h3>
         <p><code>doppler_frequency($source_freq, $source_vel, $observer_vel)</code> (alias <code>doppler</code>) — observed frequency with Doppler effect. Uses speed of sound (343 m/s).</p>
@@ -10091,6 +10158,12 @@ p doppler(440, 30, 0)    # ~405 Hz (ambulance receding)
 @list |&gt; map dump |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-duped">
+        <h3><a class="doc-anchor" href="#doc-duped">#</a> <code>duped</code></h3>
+        <p><code>duplicated</code> — boolean array: 1 if element appeared earlier in the vector, 0 otherwise. Like R&#39;s duplicated().</p>
+        <pre><code class="lang-perl">p duplicated([1,2,3,2,1])  # [0,0,0,1,1]
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-duplicate-count">
         <h3><a class="doc-anchor" href="#doc-duplicate-count">#</a> <code>duplicate_count</code></h3>
         <p><code>duplicate_count</code> — list helpers (batch 4) builtin.</p>
@@ -10143,6 +10216,12 @@ p doppler(440, 30, 0)    # ~405 Hz (ambulance receding)
         <pre><code class="lang-perl">my $result = earth_radius $x 
 # or in a pipeline:
 @list |&gt; map earth_radius |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ecdf">
+        <h3><a class="doc-anchor" href="#doc-ecdf">#</a> <code>ecdf</code></h3>
+        <p><code>ecdf</code> — empirical CDF: proportion of data ≤ x. Like R&#39;s ecdf().</p>
+        <pre><code class="lang-perl">p ecdf([1,2,3,4,5], 3)  # 0.6 (3 of 5 values ≤ 3)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-echarge">
@@ -10307,6 +10386,12 @@ p elu(-1)    # -0.632
         <pre><code class="lang-perl">my $result = emavg $x 
 # or in a pipeline:
 @list |&gt; map emavg |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-embed">
+        <h3><a class="doc-anchor" href="#doc-embed">#</a> <code>embed</code></h3>
+        <p><code>embed</code> — time-delay embedding. Converts a time series into a matrix of lagged values. Like R&#39;s embed().</p>
+        <pre><code class="lang-perl">p embed([1,2,3,4,5], 3)  # [[3,2,1],[4,3,2],[5,4,3]]
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-emojinum">
@@ -11068,6 +11153,12 @@ p escvel(1.989e30, 6.96e8)      # ~617 km/s (Sun)
         <pre><code class="lang-perl">my $result = find $x 
 # or in a pipeline:
 @list |&gt; map find |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-findinterval">
+        <h3><a class="doc-anchor" href="#doc-findinterval">#</a> <code>findInterval</code></h3>
+        <p><code>find_interval</code> — for each x, find which interval in breaks it falls into. Like R&#39;s findInterval().</p>
+        <pre><code class="lang-perl">p findInterval([1.5, 3.5, 7.5], [0, 2, 5, 10])  # [1, 2, 3]
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-find-all">
@@ -15153,12 +15244,25 @@ p millerrabin(104730)     # 0 (composite)
         <pre><code class="lang-perl">my $result = km_to_miles $input 
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-kmeans">
+        <h3><a class="doc-anchor" href="#doc-kmeans">#</a> <code>kmeans</code></h3>
+        <p><code>kmeans</code> — k-means clustering (Lloyd&#39;s algorithm). Takes array of points and k. Returns cluster assignments. Like R&#39;s kmeans().</p>
+        <pre><code class="lang-perl">my @clusters = @{kmeans([[0,0],[1,0],[10,10],[11,10]], 2)}
+# [0,0,1,1] — two clusters
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-kp">
         <h3><a class="doc-anchor" href="#doc-kp">#</a> <code>kp</code></h3>
         <p><code>kp</code> — algebraic match builtin. Alias for <code>keep</code>.</p>
         <pre><code class="lang-perl">my $result = kp $x 
 # or in a pipeline:
 @list |&gt; map kp |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ks">
+        <h3><a class="doc-anchor" href="#doc-ks">#</a> <code>ks</code></h3>
+        <p><code>ks_test</code> (alias <code>ks</code>) — two-sample Kolmogorov-Smirnov test. Returns D statistic (max CDF difference). Like R&#39;s ks.test().</p>
+        <pre><code class="lang-perl">my $D = ks([1,2,3,4,5], [2,3,4,5,6])  # small D = similar
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-kth-largest">
@@ -16067,6 +16171,12 @@ my $smooth = lpf(\@noisy, 0.1)
         <pre><code class="lang-perl">my $result = manhattan_distance $x 
 # or in a pipeline:
 @list |&gt; map manhattan_distance |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mann-whitney">
+        <h3><a class="doc-anchor" href="#doc-mann-whitney">#</a> <code>mann_whitney</code></h3>
+        <p><code>wilcox_test</code> (aliases <code>wilcox</code>, <code>mann_whitney</code>) — Wilcoxon rank-sum test (Mann-Whitney U). Returns U statistic. Like R&#39;s wilcox.test().</p>
+        <pre><code class="lang-perl">my $U = wilcox([1,2,3], [4,5,6])  # 0 (no overlap)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-map-chars">
@@ -17331,6 +17441,12 @@ p powmod(3, 13, 50)    # 7
         <pre><code class="lang-perl">my $result = nato_phonetic $input 
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-ncol">
+        <h3><a class="doc-anchor" href="#doc-ncol">#</a> <code>ncol</code></h3>
+        <p><code>ncol</code> — number of columns in a matrix.</p>
+        <pre><code class="lang-perl">p ncol([[1,2,3],[4,5,6]])  # 3
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-ndivs">
         <h3><a class="doc-anchor" href="#doc-ndivs">#</a> <code>ndivs</code></h3>
         <p><code>ndivs</code> — math / numeric (uncategorized batch) builtin. Alias for <code>num_divisors</code>.</p>
@@ -17712,6 +17828,12 @@ p max(map { abs } @$norm)   # 1
         <pre><code class="lang-perl">my $result = nroot $x 
 # or in a pipeline:
 @list |&gt; map nroot |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-nrow">
+        <h3><a class="doc-anchor" href="#doc-nrow">#</a> <code>nrow</code></h3>
+        <p><code>nrow</code> — number of rows in a matrix.</p>
+        <pre><code class="lang-perl">p nrow([[1,2],[3,4],[5,6]])  # 3
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-ns-to-ms">
@@ -18129,6 +18251,12 @@ die &quot;unix only&quot; unless os_family eq &quot;unix&quot;
 p &quot;kernel: &quot; . os_version
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-outer">
+        <h3><a class="doc-anchor" href="#doc-outer">#</a> <code>outer</code></h3>
+        <p><code>outer</code> — outer product of two vectors. Returns matrix where M[i][j] = v1[i] * v2[j].</p>
+        <pre><code class="lang-perl">my $m = outer([1,2,3], [10,20])  # [[10,20],[20,40],[30,60]]
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-outliers-iqr">
         <h3><a class="doc-anchor" href="#doc-outliers-iqr">#</a> <code>outliers_iqr</code></h3>
         <p><code>outliers_iqr(@data)</code> — identifies outliers using the IQR method (1.5 × IQR beyond Q1/Q3). Returns an arrayref of outlier values. Standard approach for detecting unusual data points.</p>
@@ -18491,6 +18619,12 @@ p pc / ly   # ~3.26 light years
         <pre><code class="lang-perl">p payback(1000, 300, 400, 500)   # 2.6 periods
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-pbinom">
+        <h3><a class="doc-anchor" href="#doc-pbinom">#</a> <code>pbinom</code></h3>
+        <p><code>pbinom</code> — binomial CDF. P(X ≤ k) for Binom(n, p). Args: k, n, p.</p>
+        <pre><code class="lang-perl">p pbinom(5, 10, 0.5)   # P(≤5 heads in 10 flips)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-pbool">
         <h3><a class="doc-anchor" href="#doc-pbool">#</a> <code>pbool</code></h3>
         <p><code>pbool</code> — extended stdlib builtin. Alias for <code>parse_bool</code>.</p>
@@ -18513,6 +18647,19 @@ p pc / ly   # ~3.26 light years
         <pre><code class="lang-perl">my $result = pc_case $x 
 # or in a pipeline:
 @list |&gt; map pc_case |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pca">
+        <h3><a class="doc-anchor" href="#doc-pca">#</a> <code>pca</code></h3>
+        <p><code>prcomp</code> (alias <code>pca</code>) — Principal Component Analysis via eigendecomposition of covariance matrix. Returns eigenvalues (variance explained). Like R&#39;s prcomp().</p>
+        <pre><code class="lang-perl">my @var = @{pca([[1,2],[3,4],[5,6],[7,8]])}
+# variance explained by each component
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pcauchy">
+        <h3><a class="doc-anchor" href="#doc-pcauchy">#</a> <code>pcauchy</code></h3>
+        <p><code>pcauchy</code> — Cauchy CDF. P(X ≤ x). Args: x [, location, scale].</p>
+        <pre><code class="lang-perl">p pcauchy(0, 0, 1)  # 0.5
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pcr">
@@ -18647,6 +18794,13 @@ p percentile_rank(90, @scores)   # ~90
         <p><code>permutations($n, $r)</code> (alias <code>perm</code>) — number of ways to arrange r items from n. Formula: n!/(n-r)!. Order matters.</p>
         <pre><code class="lang-perl">p perm(5, 3)    # 60 (ways to arrange 3 items from 5)
 p perm(10, 2)   # 90
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pexp">
+        <h3><a class="doc-anchor" href="#doc-pexp">#</a> <code>pexp</code></h3>
+        <p><code>pexp</code> — exponential CDF. P(X ≤ x) for Exp(rate). Args: x, rate.</p>
+        <pre><code class="lang-perl">p pexp(1, 1)     # 0.6321 (1 - e^-1)
+p pexp(5, 0.5)   # P(wait ≤ 5 with avg wait 2)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pfact">
@@ -18857,6 +19011,12 @@ p $msg   # hello from child
 @list |&gt; map plastic_number |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-plnorm">
+        <h3><a class="doc-anchor" href="#doc-plnorm">#</a> <code>plnorm</code></h3>
+        <p><code>plnorm</code> — log-normal CDF. P(X ≤ x) for LogN(mu, sigma). Args: x, mu, sigma.</p>
+        <pre><code class="lang-perl">p plnorm(1, 0, 1)   # 0.5 (median of LogN(0,1))
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-plur">
         <h3><a class="doc-anchor" href="#doc-plur">#</a> <code>plur</code></h3>
         <p><code>plur</code> — extended stdlib builtin. Alias for <code>pluralize</code>.</p>
@@ -18886,6 +19046,14 @@ p $msg   # hello from child
         <p><code>pmt($rate, $nper, $pv)</code> — computes the periodic payment for a loan given interest rate, number of periods, and present value. Standard amortization formula.</p>
         <pre><code class="lang-perl"># $100k loan, 5% annual rate, 30 years
 p pmt(0.05/12, 360, 100000)   # ~$537/month
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pnorm">
+        <h3><a class="doc-anchor" href="#doc-pnorm">#</a> <code>pnorm</code></h3>
+        <p><code>pnorm</code> — normal CDF. P(X ≤ x) for N(mu, sigma). Args: x [, mu, sigma]. Default standard normal.</p>
+        <pre><code class="lang-perl">p pnorm(0)          # 0.5
+p pnorm(1.96)       # 0.975
+p pnorm(100, 90, 15) # z-score for IQ 100
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-point-distance">
@@ -19062,6 +19230,12 @@ p polyper(@square)   # 4
 @list |&gt; map ppid |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-ppois">
+        <h3><a class="doc-anchor" href="#doc-ppois">#</a> <code>ppois</code></h3>
+        <p><code>ppois</code> — Poisson CDF. P(X ≤ k) for Poisson(lambda). Args: k, lambda.</p>
+        <pre><code class="lang-perl">p ppois(3, 2.5)  # P(≤3 events when avg is 2.5)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-ppt">
         <h3><a class="doc-anchor" href="#doc-ppt">#</a> <code>ppt</code></h3>
         <p><code>ppt</code> — extended stdlib builtin. Alias for <code>partition_point</code>.</p>
@@ -19197,6 +19371,18 @@ p projrange(100, 30)   # ~884 m
 @list |&gt; map projectile_time |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-prop-table">
+        <h3><a class="doc-anchor" href="#doc-prop-table">#</a> <code>prop_table</code></h3>
+        <p><code>prop_table</code> — convert a count matrix to proportions (each cell / total). Like R&#39;s prop.table().</p>
+        <pre><code class="lang-perl">p prop_table([[10,20],[30,40]])  # [[0.1,0.2],[0.3,0.4]]
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-prop-test">
+        <h3><a class="doc-anchor" href="#doc-prop-test">#</a> <code>prop_test</code></h3>
+        <p><code>prop_test</code> — one-sample proportion z-test. Returns [z-statistic, p-value]. Like R&#39;s prop.test().</p>
+        <pre><code class="lang-perl">my ($z, $pval) = @{proptest(55, 100, 0.5)}  # test if 55/100 differs from 50%%
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-proton-mass">
         <h3><a class="doc-anchor" href="#doc-proton-mass">#</a> <code>proton_mass</code></h3>
         <p><code>proton_mass</code> — constants builtin.</p>
@@ -19235,6 +19421,13 @@ p projrange(100, 30)   # ~884 m
 @list |&gt; map ptri |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-punif">
+        <h3><a class="doc-anchor" href="#doc-punif">#</a> <code>punif</code></h3>
+        <p><code>punif</code> — uniform CDF. P(X ≤ x) for Uniform(a, b). Args: x, a, b.</p>
+        <pre><code class="lang-perl">p punif(0.5, 0, 1)  # 0.5
+p punif(3, 0, 10)   # 0.3
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-purple">
         <h3><a class="doc-anchor" href="#doc-purple">#</a> <code>purple</code></h3>
         <p><code>purple</code> — color / ansi builtin. Alias for <code>red</code>.</p>
@@ -19257,6 +19450,12 @@ p projrange(100, 30)   # ~884 m
         <pre><code class="lang-perl">my $result = pwd_str $x 
 # or in a pipeline:
 @list |&gt; map pwd_str |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pweibull">
+        <h3><a class="doc-anchor" href="#doc-pweibull">#</a> <code>pweibull</code></h3>
+        <p><code>pweibull</code> — Weibull CDF. P(X ≤ x) for Weibull(shape, scale). Args: x, shape, scale.</p>
+        <pre><code class="lang-perl">p pweibull(1, 1, 1)  # same as exponential
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pwi">
@@ -19287,6 +19486,14 @@ p projrange(100, 30)   # ~884 m
         <pre><code class="lang-perl">my $result = qm $x 
 # or in a pipeline:
 @list |&gt; map qm |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-qnorm">
+        <h3><a class="doc-anchor" href="#doc-qnorm">#</a> <code>qnorm</code></h3>
+        <p><code>qnorm</code> — normal quantile (inverse CDF). Returns x such that P(X ≤ x) = p. Args: p [, mu, sigma].</p>
+        <pre><code class="lang-perl">p qnorm(0.975)      # 1.96
+p qnorm(0.5)        # 0.0
+p qnorm(0.95, 100, 15)  # 90th percentile IQ
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-qntl">
@@ -19564,6 +19771,12 @@ p r72(0.10)   # 7.2 years at 10%
         <pre><code class="lang-perl">my $result = rb $x 
 # or in a pipeline:
 @list |&gt; map rb |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rbind">
+        <h3><a class="doc-anchor" href="#doc-rbind">#</a> <code>rbind</code></h3>
+        <p><code>rbind</code> — bind matrices/vectors by rows (vertical stack). Like R&#39;s rbind().</p>
+        <pre><code class="lang-perl">my $m = rbind([1,2,3], [4,5,6])  # [[1,2,3],[4,5,6]]
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-rc-time-constant">
@@ -19862,6 +20075,21 @@ p reflect_point(3, 4, &#39;origin&#39;)  # [-3, -4]
 @list |&gt; map remove_whitespace |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-rep">
+        <h3><a class="doc-anchor" href="#doc-rep">#</a> <code>rep</code></h3>
+        <p><code>rep</code> — r base builtin. Alias for <code>rep_fn</code>.</p>
+        <pre><code class="lang-perl">my $result = rep $x 
+# or in a pipeline:
+@list |&gt; map rep |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rep-fn">
+        <h3><a class="doc-anchor" href="#doc-rep-fn">#</a> <code>rep_fn</code></h3>
+        <p><code>rep_fn</code> — repeat a value N times. Like R&#39;s rep().</p>
+        <pre><code class="lang-perl">my @r = @{rep_fn(0, 10)}   # ten zeros
+my @s = @{rep_fn(&quot;x&quot;, 5)}  # five &quot;x&quot;s
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-repa">
         <h3><a class="doc-anchor" href="#doc-repa">#</a> <code>repa</code></h3>
         <p><code>repa</code> — javascript array/object methods builtin. Alias for <code>replace_at</code>.</p>
@@ -20043,6 +20271,14 @@ my $down = resample(\@signal, 0.5) # halve sample rate
         <pre><code class="lang-perl">my $result = rev_str $x 
 # or in a pipeline:
 @list |&gt; map rev_str |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rev-vec">
+        <h3><a class="doc-anchor" href="#doc-rev-vec">#</a> <code>rev_vec</code></h3>
+        <p><code>rev_vec</code> — r base builtin.</p>
+        <pre><code class="lang-perl">my $result = rev_vec $x 
+# or in a pipeline:
+@list |&gt; map rev_vec |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-reverse-each">
@@ -20426,6 +20662,18 @@ my $sol = rk4(sub { -$_[1] }, 0, 1, 0.1, 100)
 @list |&gt; map round_to |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-rowmeans">
+        <h3><a class="doc-anchor" href="#doc-rowmeans">#</a> <code>rowMeans</code></h3>
+        <p><code>row_means</code> (alias <code>rowMeans</code>) — mean of each row. Like R&#39;s rowMeans().</p>
+        <pre><code class="lang-perl">p rowMeans([[2,4],[6,8]])  # [3, 7]
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-rowsums">
+        <h3><a class="doc-anchor" href="#doc-rowsums">#</a> <code>rowSums</code></h3>
+        <p><code>row_sums</code> (alias <code>rowSums</code>) — sum of each row in a matrix. Like R&#39;s rowSums().</p>
+        <pre><code class="lang-perl">p row_sums([[1,2,3],[4,5,6]])  # [6, 15]
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-rpad">
         <h3><a class="doc-anchor" href="#doc-rpad">#</a> <code>rpad</code></h3>
         <p><code>rpad</code> — trivial string ops builtin. Alias for <code>pad_right</code>.</p>
@@ -20682,6 +20930,12 @@ my $sol = rk4(sub { -$_[1] }, 0, 1, 0.1, 100)
 @list |&gt; map sampn |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-sapply">
+        <h3><a class="doc-anchor" href="#doc-sapply">#</a> <code>sapply</code></h3>
+        <p><code>sapply</code> — apply a function to each element, return a vector. Like R&#39;s sapply().</p>
+        <pre><code class="lang-perl">my @sq = @{sapply([1,2,3,4], sub { $_[0] ** 2 })}  # [1,4,9,16]
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-sat01">
         <h3><a class="doc-anchor" href="#doc-sat01">#</a> <code>sat01</code></h3>
         <p><code>sat01</code> — trig / math (batch 2) builtin. Alias for <code>saturate</code>.</p>
@@ -20696,6 +20950,12 @@ my $sol = rk4(sub { -$_[1] }, 0, 1, 0.1, 100)
         <pre><code class="lang-perl">my $result = saturate $x 
 # or in a pipeline:
 @list |&gt; map saturate |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-scale">
+        <h3><a class="doc-anchor" href="#doc-scale">#</a> <code>scale</code></h3>
+        <p><code>scale</code> — standardize a vector: (x - mean) / sd. Like R&#39;s scale().</p>
+        <pre><code class="lang-perl">my @z = @{scale([10,20,30])}  # [-1, 0, 1]
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-scale-each">
@@ -20885,6 +21145,13 @@ p selu(-1)   # -1.1113
 @list |&gt; map seq |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-seq-fn">
+        <h3><a class="doc-anchor" href="#doc-seq-fn">#</a> <code>seq_fn</code></h3>
+        <p><code>seq_fn</code> — generate a numeric sequence from, to, by. Like R&#39;s seq().</p>
+        <pre><code class="lang-perl">my @s = @{seq_fn(1, 10, 2)}  # [1,3,5,7,9]
+my @r = @{seq_fn(5, 1, -1)}  # [5,4,3,2,1]
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-setgrent">
         <h3><a class="doc-anchor" href="#doc-setgrent">#</a> <code>setgrent</code></h3>
         <p><code>setgrent</code> — posix metadata builtin.</p>
@@ -20939,6 +21206,13 @@ p selu(-1)   # -1.1113
         <pre><code class="lang-perl">my $result = sgnum $x 
 # or in a pipeline:
 @list |&gt; map sgnum |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-shapiro">
+        <h3><a class="doc-anchor" href="#doc-shapiro">#</a> <code>shapiro</code></h3>
+        <p><code>shapiro_test</code> (alias <code>shapiro</code>) — Shapiro-Wilk normality test. Returns W statistic (close to 1 = normal). Like R&#39;s shapiro.test().</p>
+        <pre><code class="lang-perl">p shapiro([rnorm(100)])  # W ≈ 0.99 for normal data
+p shapiro([1,1,1,2,10]) # W &lt; 0.9 for non-normal
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-sharpe">
@@ -22375,6 +22649,13 @@ my $r = ttest2(\@a, \@b)
 p &quot;t=$r-&gt;[0] df=$r-&gt;[1]&quot;
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-tabulate">
+        <h3><a class="doc-anchor" href="#doc-tabulate">#</a> <code>tabulate</code></h3>
+        <p><code>tabulate</code> — frequency table of values. Returns hash of value =&gt; count. Like R&#39;s table().</p>
+        <pre><code class="lang-perl">my %t = %{tabulate([qw(a b a c b a)])}
+p $t{a}  # 3
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-tail-lines">
         <h3><a class="doc-anchor" href="#doc-tail-lines">#</a> <code>tail_lines</code></h3>
         <p><code>tail_lines</code> — file stat / path builtin.</p>
@@ -22479,6 +22760,14 @@ p &quot;t=$r-&gt;[0] df=$r-&gt;[1]&quot;
 @list |&gt; map tap_val |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-tapply">
+        <h3><a class="doc-anchor" href="#doc-tapply">#</a> <code>tapply</code></h3>
+        <p><code>tapply</code> — apply a function by group. Takes data, group labels, and function. Returns hash. Like R&#39;s tapply().</p>
+        <pre><code class="lang-perl">my %means = %{tapply([1,2,3,4], [&quot;a&quot;,&quot;a&quot;,&quot;b&quot;,&quot;b&quot;], sub { avg(@{$_[0]}) })}
+p $means{a}  # 1.5
+p $means{b}  # 3.5
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-tau">
         <h3><a class="doc-anchor" href="#doc-tau">#</a> <code>tau</code></h3>
         <p><code>tau</code> — constants builtin.</p>
@@ -22501,6 +22790,12 @@ p &quot;t=$r-&gt;[0] df=$r-&gt;[1]&quot;
         <pre><code class="lang-perl">my $result = tax_amount $x 
 # or in a pipeline:
 @list |&gt; map tax_amount |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-tcrossprod">
+        <h3><a class="doc-anchor" href="#doc-tcrossprod">#</a> <code>tcrossprod</code></h3>
+        <p><code>tcrossprod</code> — M * t(M) (R&#39;s tcrossprod).</p>
+        <pre><code class="lang-perl">my $aat = tcrossprod([[1,2],[3,4]])  # [[5,11],[11,25]]
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-td">
@@ -23960,6 +24255,12 @@ p scalar wha(&quot;perl&quot;)        # number of perls on PATH
         <pre><code class="lang-perl">my $result = when_true $x 
 # or in a pipeline:
 @list |&gt; map when_true |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-which-fn">
+        <h3><a class="doc-anchor" href="#doc-which-fn">#</a> <code>which_fn</code></h3>
+        <p><code>which_fn</code> — return indices where a predicate is true. Like R&#39;s which().</p>
+        <pre><code class="lang-perl">my @idx = @{which_fn([1,5,3,8,2], sub { $_[0] &gt; 3 })}  # [1, 3]
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-white">
