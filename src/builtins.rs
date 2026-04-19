@@ -3160,6 +3160,16 @@ pub(crate) fn try_builtin(
         "weighted_var" | "wvar" => Some(builtin_weighted_var(args)),
         "cov2cor" => Some(builtin_cov2cor(args)),
 
+        // ── SVG Plotting ─────────────────────────────────────────────────
+        "scatter_svg" | "scatter_plot" => Some(builtin_scatter_svg(args)),
+        "line_svg" | "line_plot" => Some(builtin_line_svg(args)),
+        "plot_svg" => Some(builtin_plot_svg(args)),
+        "hist_svg" | "histogram_svg" => Some(builtin_hist_svg(args)),
+        "boxplot_svg" | "box_plot" => Some(builtin_boxplot_svg(args)),
+        "bar_svg" | "barchart_svg" => Some(builtin_bar_svg(args)),
+        "pie_svg" | "pie_chart" => Some(builtin_pie_svg(args)),
+        "heatmap_svg" | "heatmap" => Some(builtin_heatmap_svg(args)),
+
         _ => crate::rust_ffi::try_call(name, args, line),
     }
 }
