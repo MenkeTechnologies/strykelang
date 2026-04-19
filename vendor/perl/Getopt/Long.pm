@@ -18,7 +18,7 @@ sub GetOptions {
                 my $namespec = $1;
                 my @names = split /\|/, $namespec;
                 for my $n (@names) {
-                    # String prefix (perlrs regex does not implement \Q...\E like Perl 5).
+                    # String prefix (forge regex does not implement \Q...\E like Perl 5).
                     my $prefix = "--$n=";
                     if ( length($arg) >= length($prefix)
                         && substr( $arg, 0, length($prefix) ) eq $prefix )

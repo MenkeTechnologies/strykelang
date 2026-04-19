@@ -1,11 +1,11 @@
-//! `pe -i` / `$^I`: driver wires in-place editing for `-n`/`-p` over `@ARGV` files.
+//! `fo -i` / `$^I`: driver wires in-place editing for `-n`/`-p` over `@ARGV` files.
 
 use std::fs;
 use std::process::Command;
 
 #[test]
 fn pe_i_p_e_inplace_edits_argv_file() {
-    let dir = std::env::temp_dir().join(format!("perlrs_inplace_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("forge_inplace_{}", std::process::id()));
     fs::create_dir_all(&dir).unwrap();
     let f = dir.join("t.txt");
     fs::write(&f, "hello a world\n").unwrap();
@@ -15,7 +15,7 @@ fn pe_i_p_e_inplace_edits_argv_file() {
         .current_dir(&dir)
         .args(["-i", "-p", "-e", "s/a/b/", "t.txt"])
         .output()
-        .expect("spawn pe");
+        .expect("spawn fo");
 
     assert!(
         out.status.success(),
@@ -28,7 +28,7 @@ fn pe_i_p_e_inplace_edits_argv_file() {
 
 #[test]
 fn pe_i_bak_creates_backup_next_to_target() {
-    let dir = std::env::temp_dir().join(format!("perlrs_inplace_bak_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("forge_inplace_bak_{}", std::process::id()));
     fs::create_dir_all(&dir).unwrap();
     let f = dir.join("t.txt");
     fs::write(&f, "x\n").unwrap();
@@ -38,7 +38,7 @@ fn pe_i_bak_creates_backup_next_to_target() {
         .current_dir(&dir)
         .args(["-i.bak", "-p", "-e", "s/x/y/", "t.txt"])
         .output()
-        .expect("spawn pe");
+        .expect("spawn fo");
 
     assert!(
         out.status.success(),
@@ -54,7 +54,7 @@ fn pe_i_bak_creates_backup_next_to_target() {
 
 #[test]
 fn pe_i_p_e_inplace_edits_multiple_argv_files_in_parallel() {
-    let dir = std::env::temp_dir().join(format!("perlrs_inplace_par_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("forge_inplace_par_{}", std::process::id()));
     fs::create_dir_all(&dir).unwrap();
     let paths: Vec<_> = (0..4).map(|i| dir.join(format!("f{i}.txt"))).collect();
     for p in &paths {
@@ -67,7 +67,7 @@ fn pe_i_p_e_inplace_edits_multiple_argv_files_in_parallel() {
         .args(["-i", "-p", "-e", "s/a/b/"])
         .args(&paths)
         .output()
-        .expect("spawn pe");
+        .expect("spawn fo");
 
     assert!(
         out.status.success(),

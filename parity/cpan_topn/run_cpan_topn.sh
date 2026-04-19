@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Run parity/cpan_topn/smoke_all.pl under pe(1) with -I local/lib/perl5 (pe ignores PERL5LIB).
+# Run parity/cpan_topn/smoke_all.pl under fo(1) with -I local/lib/perl5 (fo ignores PERL5LIB).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LOCAL_LIB="$ROOT/parity/cpan_topn/local/lib/perl5"
 VENDOR_PERL="$ROOT/vendor/perl"
-PE="${PE:-$ROOT/target/release/pe}"
+PE="${PE:-$ROOT/target/release/fo}"
 SMOKE="$ROOT/parity/cpan_topn/smoke_all.pl"
 
 export LC_ALL=C
@@ -17,7 +17,7 @@ if [[ ! -d "$LOCAL_LIB" ]]; then
 fi
 
 if [[ ! -x "$PE" ]]; then
-  echo "cpan_topn: building release pe …" >&2
+  echo "cpan_topn: building release fo …" >&2
   (builtin cd "$ROOT" && cargo build --release --locked -q)
 fi
 
@@ -26,7 +26,7 @@ if [[ ! -x "$PE" ]]; then
   exit 2
 fi
 
-# pe(1) does not read PERL5LIB. Put in-tree vendor/perl *before* local: CPAN may ship an XS
+# fo(1) does not read PERL5LIB. Put in-tree vendor/perl *before* local: CPAN may ship an XS
 # `Sub/Util.pm` that breaks Try::Tiny; vendor stubs + native `Sub::Util::set_subname` must win.
 echo "cpan_topn: PE=$PE -I $VENDOR_PERL -I $LOCAL_LIB …" >&2
 

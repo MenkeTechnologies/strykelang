@@ -1,7 +1,7 @@
 //! Extra `ErrorKind` coverage via `parse_err_kind` / `eval_err_kind` (explicit tests; no batching).
 
 use crate::common::{eval_err_kind, parse_err_kind};
-use perlrs::error::ErrorKind;
+use forge::error::ErrorKind;
 
 #[test]
 fn parse_eof_after_open_paren_is_syntax() {

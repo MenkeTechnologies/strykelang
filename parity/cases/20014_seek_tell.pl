@@ -3,7 +3,7 @@ use strict;
 use warnings;
 
 # seek, tell, read on a temp file
-my $f = "/tmp/perlrs_test_seek_$$.tmp";
+my $f = "/tmp/forge_test_seek_$$.tmp";
 open(WFH, '>', $f) or die "open write: $!";
 print WFH "ABCDEFGHIJ";
 close(WFH);

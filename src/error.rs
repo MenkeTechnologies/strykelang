@@ -80,7 +80,7 @@ impl fmt::Display for PerlError {
             ErrorKind::Exit(_) => write!(f, ""),
             // Perl 5 ends runtime errors with `.` after the line number
             // (`Illegal division by zero at -e line 1.`). Matches stock
-            // perl for `pe --compat` parity — see `tests/suite/error_parity.rs`.
+            // perl for `fo --compat` parity — see `tests/suite/error_parity.rs`.
             _ => write!(f, "{} at {} line {}.", self.message, self.file, self.line),
         }
     }
@@ -90,7 +90,7 @@ impl std::error::Error for PerlError {}
 
 pub type PerlResult<T> = Result<T, PerlError>;
 
-/// Long-form hints for `pe --explain CODE` (rustc-style).
+/// Long-form hints for `fo --explain CODE` (rustc-style).
 pub fn explain_error(code: &str) -> Option<&'static str> {
     match code {
         "E0001" => Some(

@@ -1,7 +1,7 @@
 //! Additional parse-accept cases (one `#[test]` per snippet; no macro batching).
 
 fn p(src: &str) {
-    perlrs::parse(src).unwrap_or_else(|e| panic!("parse failed for {src:?}: {e}"));
+    forge::parse(src).unwrap_or_else(|e| panic!("parse failed for {src:?}: {e}"));
 }
 
 #[test]

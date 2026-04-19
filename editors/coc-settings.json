@@ -1,9 +1,9 @@
 {
   "languageserver": {
-    "perlrs": {
-      "command": "pe",
+    "forge": {
+      "command": "fo",
       "args": ["--lsp"],
-      "filetypes": ["perlrs", "perl"],
+      "filetypes": ["forge", "perl"],
       "rootPatterns": [".git", "Makefile.PL", "cpanfile", "dist.ini"]
     }
   }

@@ -1,21 +1,21 @@
--- Neovim LSP configuration for perlrs
+-- Neovim LSP configuration for forge
 -- Add to your init.lua or source this file
 --
 -- Usage:
---   require('perlrs') -- if in lua path
+--   require('forge') -- if in lua path
 --   -- or --
---   dofile('/path/to/perlrs/editors/perlrs.lua')
+--   dofile('/path/to/forge/editors/forge.lua')
 
--- Register .pr files as perlrs filetype
+-- Register .pr files as forge filetype
 vim.filetype.add({
   extension = {
-    pr = 'perlrs',
+    pr = 'forge',
   },
 })
 
--- Use perl syntax highlighting for perlrs files
+-- Use perl syntax highlighting for forge files
 vim.api.nvim_create_autocmd('FileType', {
-  pattern = 'perlrs',
+  pattern = 'forge',
   callback = function()
     vim.bo.syntax = 'perl'
     vim.bo.commentstring = '# %s'
@@ -27,11 +27,11 @@ local ok, lspconfig = pcall(require, 'lspconfig')
 if ok then
   local configs = require('lspconfig.configs')
 
-  if not configs.perlrs then
-    configs.perlrs = {
+  if not configs.forge then
+    configs.forge = {
       default_config = {
-        cmd = { 'pe', '--lsp' },
-        filetypes = { 'perlrs', 'perl' },
+        cmd = { 'fo', '--lsp' },
+        filetypes = { 'forge', 'perl' },
         root_dir = function(fname)
           return lspconfig.util.root_pattern('.git', 'Makefile.PL', 'cpanfile', 'dist.ini')(fname)
             or lspconfig.util.path.dirname(fname)
@@ -42,7 +42,7 @@ if ok then
     }
   end
 
-  lspconfig.perlrs.setup({
+  lspconfig.forge.setup({
     on_attach = function(client, bufnr)
       local opts = { buffer = bufnr, noremap = true, silent = true }
       vim.keymap.set('n', 'gd', vim.lsp.buf.definition, opts)
@@ -58,11 +58,11 @@ if ok then
 else
   -- Fallback: manual LSP setup without lspconfig
   vim.api.nvim_create_autocmd('FileType', {
-    pattern = { 'perlrs', 'perl' },
+    pattern = { 'forge', 'perl' },
     callback = function()
       vim.lsp.start({
-        name = 'perlrs',
-        cmd = { 'pe', '--lsp' },
+        name = 'forge',
+        cmd = { 'fo', '--lsp' },
         root_dir = vim.fn.getcwd(),
       })
     end,

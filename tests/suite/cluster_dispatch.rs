@@ -2,14 +2,14 @@
 //!
 //! Two layers exercised here:
 //!
-//! 1. **Wire protocol vs a real `pe --remote-worker` subprocess.** Spawns the worker
+//! 1. **Wire protocol vs a real `fo --remote-worker` subprocess.** Spawns the worker
 //!    directly (no ssh), drives the v3 handshake (HELLO → SESSION_INIT → JOB → JOB_RESP →
-//!    SHUTDOWN) using the public [`perlrs::remote_wire`] helpers, and verifies many JOBs
+//!    SHUTDOWN) using the public [`forge::remote_wire`] helpers, and verifies many JOBs
 //!    flow over a single session. This is the closest we can get to a real cluster without
 //!    actually setting up SSH in CI.
 //!
 //! 2. **Full dispatcher with a fake `ssh` shim.** Drops a tiny shell script into a temp
-//!    `PATH` directory that just `exec`s `pe --remote-worker` (ignoring its host argument),
+//!    `PATH` directory that just `exec`s `fo --remote-worker` (ignoring its host argument),
 //!    points the dispatcher's `PATH` at it, and runs `cluster::run_cluster` end-to-end.
 //!    This validates the per-slot worker thread, work-stealing queue, and result ordering
 //!    without needing a real remote host.
@@ -28,16 +28,16 @@ use std::sync::{Arc, Mutex};
 /// parallel tests corrupt each other's `PATH` and the wrong `ssh` binary gets invoked.
 static SSH_SHIM_LOCK: Mutex<()> = Mutex::new(());
 
-use perlrs::cluster::perl_items_to_json;
-use perlrs::remote_wire::{
+use forge::cluster::perl_items_to_json;
+use forge::remote_wire::{
     frame_kind, read_typed_frame, send_msg, write_typed_frame, HelloAck, HelloMsg, JobMsg,
     JobRespMsg, SessionAck, SessionInit, PROTO_VERSION,
 };
-use perlrs::value::{PerlSub, PerlValue};
+use forge::value::{PerlSub, PerlValue};
 
 fn tmp_path(tag: &str) -> PathBuf {
     std::env::temp_dir().join(format!(
-        "perlrs-cluster-{}-{}-{}",
+        "forge-cluster-{}-{}-{}",
         std::process::id(),
         tag,
         rand::random::<u32>()
@@ -45,7 +45,7 @@ fn tmp_path(tag: &str) -> PathBuf {
 }
 
 /// Temp directory containing an `ssh` executable that skips ssh flags, host, and `pe_path`,
-/// then `exec`s the test `pe` binary — matches what [`perlrs::cluster`] passes to `ssh`.
+/// then `exec`s the test `fo` binary — matches what [`forge::cluster`] passes to `ssh`.
 fn make_fake_ssh_shim_dir(tag: &str) -> PathBuf {
     let pe_exe = env!("CARGO_BIN_EXE_pe");
     let shim_dir = tmp_path(tag);
@@ -93,7 +93,7 @@ impl Drop for PrependPathGuard {
     }
 }
 
-/// Spawn the local `pe --remote-worker` and return the live child.
+/// Spawn the local `fo --remote-worker` and return the live child.
 fn spawn_local_worker() -> Child {
     let exe = env!("CARGO_BIN_EXE_pe");
     Command::new(exe)
@@ -102,7 +102,7 @@ fn spawn_local_worker() -> Child {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn pe --remote-worker")
+        .expect("spawn fo --remote-worker")
 }
 
 #[test]
@@ -138,8 +138,8 @@ fn perl_items_to_json_rejects_code_reference_items() {
 
 #[test]
 fn run_cluster_empty_items_returns_ok_without_touching_slots() {
-    use perlrs::cluster::run_cluster;
-    use perlrs::value::RemoteCluster;
+    use forge::cluster::run_cluster;
+    use forge::value::RemoteCluster;
 
     let cluster = RemoteCluster {
         slots: vec![],
@@ -154,8 +154,8 @@ fn run_cluster_empty_items_returns_ok_without_touching_slots() {
 
 #[test]
 fn run_cluster_errors_when_no_slots_and_nonempty_items() {
-    use perlrs::cluster::run_cluster;
-    use perlrs::value::RemoteCluster;
+    use forge::cluster::run_cluster;
+    use forge::value::RemoteCluster;
 
     let cluster = RemoteCluster {
         slots: vec![],
@@ -695,8 +695,8 @@ fn worker_session_runs_subs_prelude_once_visible_to_jobs() {
 
 #[test]
 fn dispatcher_runs_against_fake_ssh_with_two_slots() {
-    use perlrs::cluster::run_cluster;
-    use perlrs::value::RemoteCluster;
+    use forge::cluster::run_cluster;
+    use forge::value::RemoteCluster;
 
     let _lock = SSH_SHIM_LOCK.lock().unwrap();
     let shim_dir = make_fake_ssh_shim_dir("ssh-shim");
@@ -706,13 +706,13 @@ fn dispatcher_runs_against_fake_ssh_with_two_slots() {
     // our shim hardcodes the test binary; we still set it for realism.
     let cluster = RemoteCluster {
         slots: vec![
-            perlrs::value::RemoteSlot {
+            forge::value::RemoteSlot {
                 host: "fake1".to_string(),
-                pe_path: "pe".to_string(),
+                pe_path: "fo".to_string(),
             },
-            perlrs::value::RemoteSlot {
+            forge::value::RemoteSlot {
                 host: "fake2".to_string(),
-                pe_path: "pe".to_string(),
+                pe_path: "fo".to_string(),
             },
         ],
         job_timeout_ms: 30_000,
@@ -743,17 +743,17 @@ fn dispatcher_runs_against_fake_ssh_with_two_slots() {
 
 #[test]
 fn dispatcher_single_slot_preserves_input_order() {
-    use perlrs::cluster::run_cluster;
-    use perlrs::value::RemoteCluster;
+    use forge::cluster::run_cluster;
+    use forge::value::RemoteCluster;
 
     let _lock = SSH_SHIM_LOCK.lock().unwrap();
     let shim_dir = make_fake_ssh_shim_dir("ssh-shim-one");
     let _path = PrependPathGuard::prepend(&shim_dir);
 
     let cluster = RemoteCluster {
-        slots: vec![perlrs::value::RemoteSlot {
+        slots: vec![forge::value::RemoteSlot {
             host: "solo".to_string(),
-            pe_path: "pe".to_string(),
+            pe_path: "fo".to_string(),
         }],
         job_timeout_ms: 30_000,
         max_attempts: RemoteCluster::DEFAULT_MAX_ATTEMPTS,
@@ -776,8 +776,8 @@ fn dispatcher_single_slot_preserves_input_order() {
 
 #[test]
 fn dispatcher_applies_lexical_capture_from_run_cluster() {
-    use perlrs::cluster::run_cluster;
-    use perlrs::value::RemoteCluster;
+    use forge::cluster::run_cluster;
+    use forge::value::RemoteCluster;
 
     let _lock = SSH_SHIM_LOCK.lock().unwrap();
     let shim_dir = make_fake_ssh_shim_dir("ssh-shim-cap");
@@ -785,13 +785,13 @@ fn dispatcher_applies_lexical_capture_from_run_cluster() {
 
     let cluster = RemoteCluster {
         slots: vec![
-            perlrs::value::RemoteSlot {
+            forge::value::RemoteSlot {
                 host: "cap1".to_string(),
-                pe_path: "pe".to_string(),
+                pe_path: "fo".to_string(),
             },
-            perlrs::value::RemoteSlot {
+            forge::value::RemoteSlot {
                 host: "cap2".to_string(),
-                pe_path: "pe".to_string(),
+                pe_path: "fo".to_string(),
             },
         ],
         job_timeout_ms: 30_000,
@@ -822,17 +822,17 @@ fn dispatcher_applies_lexical_capture_from_run_cluster() {
 
 #[test]
 fn dispatcher_surfaces_permanent_block_failure_from_worker() {
-    use perlrs::cluster::run_cluster;
-    use perlrs::value::RemoteCluster;
+    use forge::cluster::run_cluster;
+    use forge::value::RemoteCluster;
 
     let _lock = SSH_SHIM_LOCK.lock().unwrap();
     let shim_dir = make_fake_ssh_shim_dir("ssh-shim-die");
     let _path = PrependPathGuard::prepend(&shim_dir);
 
     let cluster = RemoteCluster {
-        slots: vec![perlrs::value::RemoteSlot {
+        slots: vec![forge::value::RemoteSlot {
             host: "diehost".to_string(),
-            pe_path: "pe".to_string(),
+            pe_path: "fo".to_string(),
         }],
         job_timeout_ms: 30_000,
         max_attempts: RemoteCluster::DEFAULT_MAX_ATTEMPTS,

@@ -53,8 +53,7 @@ mod tests {
 
     #[test]
     fn collect_paths_includes_file_and_directory() {
-        let base =
-            std::env::temp_dir().join(format!("perlrs_par_walk_test_{}", std::process::id()));
+        let base = std::env::temp_dir().join(format!("forge_par_walk_test_{}", std::process::id()));
         let _ = fs::remove_dir_all(&base);
         fs::create_dir_all(&base).expect("mkdir");
         let file = base.join("one.txt");

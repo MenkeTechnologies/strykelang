@@ -8,8 +8,8 @@ print "-d_tmp: ", (-d $d ? 1 : 0), "\n";
 print "-f_tmp: ", (-f $d ? 1 : 0), "\n";
 
 # Symlink test
-my $link = "/tmp/perlrs_test_link_$$.tmp";
-my $target = "/tmp/perlrs_test_target_$$.tmp";
+my $link = "/tmp/forge_test_link_$$.tmp";
+my $target = "/tmp/forge_test_target_$$.tmp";
 open(TGTFH, '>', $target) or die;
 print TGTFH "test\n";
 close(TGTFH);

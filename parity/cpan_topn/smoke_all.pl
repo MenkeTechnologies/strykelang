@@ -9,7 +9,7 @@ sub fail {
     die "cpan_topn FAIL [$name] ${err}\n";
 }
 
-# --- Try::Tiny (before JSON::PP: loading JSON::PP first currently breaks a follow-on require Try::Tiny in perlrs) ---
+# --- Try::Tiny (before JSON::PP: loading JSON::PP first currently breaks a follow-on require Try::Tiny in forge) ---
 eval {
     require Try::Tiny;
     Try::Tiny->VERSION >= 0.20 or die "version";
@@ -155,7 +155,7 @@ eval {
 };
 fail( 'constant', $@ ) if $@;
 
-# --- overload (perlrs requires \&name, not anon coderef) ---
+# --- overload (forge requires \&name, not anon coderef) ---
 eval {
     require overload;
     {

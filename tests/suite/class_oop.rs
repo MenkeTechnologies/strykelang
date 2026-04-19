@@ -1,4 +1,4 @@
-//! Tests for the perlrs native `class` OOP system.
+//! Tests for the forge native `class` OOP system.
 
 use crate::common::*;
 

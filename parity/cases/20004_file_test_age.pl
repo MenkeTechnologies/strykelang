@@ -3,7 +3,7 @@ use strict;
 use warnings;
 
 # File test: -M -A -C return fractional days
-my $f = "/tmp/perlrs_test_age_$$.tmp";
+my $f = "/tmp/forge_test_age_$$.tmp";
 open(AGEFH, '>', $f) or die;
 print AGEFH "test\n";
 close(AGEFH);

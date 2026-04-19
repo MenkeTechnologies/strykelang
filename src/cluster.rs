@@ -326,7 +326,7 @@ fn requeue_or_fail(
 }
 
 /// One persistent ssh child + the framed I/O handles to talk to it. Holds a stderr
-/// drainer thread so a verbose remote `pe` doesn't fill its pipe and deadlock.
+/// drainer thread so a verbose remote `fo` doesn't fill its pipe and deadlock.
 struct SlotSession {
     child: Child,
     stdin: std::process::ChildStdin,

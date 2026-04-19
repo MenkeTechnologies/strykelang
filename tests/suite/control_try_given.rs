@@ -1,8 +1,8 @@
 //! `try`/`catch`, `given`/`when`/`default`, and `eval_timeout` (tree interpreter).
 
-use perlrs::ast::StmtKind;
-use perlrs::parse;
-use perlrs::run;
+use forge::ast::StmtKind;
+use forge::parse;
+use forge::run;
 #[test]
 fn parse_try_catch_shape() {
     let p = parse("try { 1; } catch ($err) { 2; }").expect("parse");

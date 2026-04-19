@@ -6,11 +6,11 @@ fn pe_compat_mode_extensions_are_errors() {
     let out = Command::new(exe)
         .args(["--compat", "-e", "collect(1, 2, 3);"])
         .output()
-        .expect("spawn pe");
+        .expect("spawn fo");
 
     assert!(!out.status.success());
     let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(stderr.contains("perlrs extension"));
+    assert!(stderr.contains("forge extension"));
 }
 
 #[test]
@@ -19,7 +19,7 @@ fn pe_compat_mode_udf_shadowing_works() {
     let out = Command::new(exe)
         .args(["--compat", "-e", "sub collect { 42 } print collect();"])
         .output()
-        .expect("spawn pe");
+        .expect("spawn fo");
 
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
@@ -32,7 +32,7 @@ fn pe_no_compat_mode_extensions_work() {
     let out = Command::new(exe)
         .args(["-e", "print scalar collect(1, 2, 3);"])
         .output()
-        .expect("spawn pe");
+        .expect("spawn fo");
 
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);

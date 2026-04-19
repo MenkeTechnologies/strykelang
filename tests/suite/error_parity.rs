@@ -1,9 +1,9 @@
 //! Error-message parity with stock `perl(1)` for Perl 5 core constructs.
 //!
-//! For each case we run the same one-liner through `perl` and `pe --compat`,
+//! For each case we run the same one-liner through `perl` and `fo --compat`,
 //! capture stderr, and assert byte-equal (modulo an absolute-path
 //! normalization so tempdir / binary-path differences don't count).
-//! Extensions keep perlrs-native error codes — those are tested elsewhere.
+//! Extensions keep forge-native error codes — those are tested elsewhere.
 //!
 //! If `perl` isn't on `$PATH` (CI images without it, Rust-only dev loops),
 //! every test in this suite no-ops rather than failing — the suite is a
@@ -18,7 +18,7 @@ fn run_both(code: &str) -> Option<(String, String)> {
     if Command::new("perl").arg("-e").arg("1").output().is_err() {
         return None;
     }
-    let pe = pe_binary()?;
+    let fo = pe_binary()?;
 
     let perl_err = Command::new("perl")
         .arg("-e")
@@ -26,7 +26,7 @@ fn run_both(code: &str) -> Option<(String, String)> {
         .output()
         .ok()?
         .stderr;
-    let pe_err = Command::new(&pe)
+    let pe_err = Command::new(&fo)
         .arg("--compat")
         .arg("-e")
         .arg(code)
@@ -38,7 +38,7 @@ fn run_both(code: &str) -> Option<(String, String)> {
 
 fn pe_binary() -> Option<PathBuf> {
     // Prefer release (what the user actually ships), fall back to debug.
-    for candidate in ["target/release/pe", "target/debug/pe"] {
+    for candidate in ["target/release/fo", "target/debug/fo"] {
         let p = PathBuf::from(candidate);
         if p.exists() {
             return Some(p);
@@ -65,14 +65,14 @@ macro_rules! parity_test {
     ($name:ident, $code:expr) => {
         #[test]
         fn $name() {
-            let Some((perl, pe)) = run_both($code) else {
-                eprintln!("skip: perl(1) or target/*/pe not available");
+            let Some((perl, fo)) = run_both($code) else {
+                eprintln!("skip: perl(1) or target/*/fo not available");
                 return;
             };
             assert_eq!(
-                perl, pe,
+                perl, fo,
                 "error-message parity regressed for:\n    {}\n\nperl:\n{}\n\npe:\n{}\n",
-                $code, perl, pe,
+                $code, perl, fo,
             );
         }
     };
@@ -80,14 +80,14 @@ macro_rules! parity_test {
         #[test]
         #[ignore = $reason]
         fn $name() {
-            let Some((perl, pe)) = run_both($code) else {
-                eprintln!("skip: perl(1) or target/*/pe not available");
+            let Some((perl, fo)) = run_both($code) else {
+                eprintln!("skip: perl(1) or target/*/fo not available");
                 return;
             };
             assert_eq!(
-                perl, pe,
+                perl, fo,
                 "error-message parity regressed for:\n    {}\n\nperl:\n{}\n\npe:\n{}\n",
-                $code, perl, pe,
+                $code, perl, fo,
             );
         }
     };
@@ -104,7 +104,7 @@ parity_test!(die_with_newline, "die \"bang\\n\"");
 parity_test!(warn_literal, r#"warn "watch out""#);
 
 // ── I/O ──────────────────────────────────────────────────────────────────
-// SEMANTIC GAP: perlrs `open` dies on failure; Perl returns false + sets $!.
+// SEMANTIC GAP: forge `open` dies on failure; Perl returns false + sets $!.
 // Fixing this is a bigger change than a message tweak — see interpreter.rs
 // `open_builtin_execute`. Promote to assertive once fixed.
 parity_test!(
@@ -114,7 +114,7 @@ parity_test!(
 );
 
 // ── strict ───────────────────────────────────────────────────────────────
-// SEMANTIC GAP: strict-vars is a runtime check in perlrs, a compile-time
+// SEMANTIC GAP: strict-vars is a runtime check in forge, a compile-time
 // check in perl — the latter appends "Execution of -e aborted due to
 // compilation errors." Fix by flagging these errors distinctly so
 // main.rs can append the trailing line.
@@ -130,7 +130,7 @@ parity_test!(
 );
 
 // ── Type / argument mismatches ───────────────────────────────────────────
-// SEMANTIC GAP: perl 5.24+ rejects `push SCALAR`; perlrs silently accepts.
+// SEMANTIC GAP: perl 5.24+ rejects `push SCALAR`; forge silently accepts.
 // Needs a parser rule to reject non-array first arg of push (plus matching
 // "Execution of -e aborted..." trailing line).
 parity_test!(
@@ -140,7 +140,7 @@ parity_test!(
 );
 // SEMANTIC GAP: under no-strict, perl treats `@$s` where $s is a number
 // as a symbolic ref to `@{'42'}` and silently returns an empty array;
-// perlrs errors. Minor but visible.
+// forge errors. Minor but visible.
 parity_test!(
     #[ignore = "TODO: `@$s` on non-ref should symbolic-deref under no-strict"]
     deref_non_ref,

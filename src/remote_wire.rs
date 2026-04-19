@@ -1,4 +1,4 @@
-//! Framed bincode over stdin/stdout for `pe --remote-worker` (distributed `pmap_on`).
+//! Framed bincode over stdin/stdout for `fo --remote-worker` (distributed `pmap_on`).
 //!
 //! ## Wire protocol
 //!
@@ -12,7 +12,7 @@
 //! dispatcher                    worker
 //!     │                            │
 //!     │── HELLO ─────────────────►│   (proto version, build id)
-//!     │◄───────────── HELLO_ACK ──│   (worker pe version, hostname)
+//!     │◄───────────── HELLO_ACK ──│   (worker fo version, hostname)
 //!     │── SESSION_INIT ──────────►│   (subs prelude, block source, captured lexicals)
 //!     │◄────────── SESSION_ACK ───│   (or ERROR)
 //!     │── JOB(seq=0) ────────────►│   (item)
@@ -204,7 +204,7 @@ pub fn recv_msg<R: Read, T: for<'de> Deserialize<'de>>(
     bincode::deserialize(&body).map_err(|e| format!("bincode decode: {e}"))
 }
 
-/// One unit of work executed on a remote `pe --remote-worker`.
+/// One unit of work executed on a remote `fo --remote-worker`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemoteJobV1 {
     pub seq: u64,
@@ -421,7 +421,7 @@ pub fn run_job_local(job: &RemoteJobV1) -> RemoteRespV1 {
         Err(e) => {
             interp.scope_pop_hook();
             let msg = match e {
-                FlowOrError::Error(pe) => pe.to_string(),
+                FlowOrError::Error(fo) => fo.to_string(),
                 FlowOrError::Flow(f) => format!("unexpected control flow: {:?}", f),
             };
             return RemoteRespV1 {
@@ -632,12 +632,12 @@ fn run_one_session_job(interp: &mut Interpreter, block: &Block, job: &JobMsg) ->
     interp.scope.set_topic(item_pv);
     let r = match interp.exec_block_smart(block) {
         Ok(v) => v,
-        Err(FlowOrError::Error(pe)) => {
+        Err(FlowOrError::Error(fo)) => {
             return JobRespMsg {
                 seq: job.seq,
                 ok: false,
                 result: serde_json::Value::Null,
-                err_msg: pe.to_string(),
+                err_msg: fo.to_string(),
             };
         }
         Err(FlowOrError::Flow(f)) => {
@@ -751,7 +751,7 @@ pub fn ssh_invoke_remote_worker(
     let stderr_text = stderr_task.join().unwrap_or_default();
     if !status.success() {
         return Err(format!(
-            "ssh remote pe exited {:?}: {}",
+            "ssh remote fo exited {:?}: {}",
             status.code(),
             stderr_text.trim()
         ));

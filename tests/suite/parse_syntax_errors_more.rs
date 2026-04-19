@@ -1,7 +1,7 @@
 //! Additional syntax-error cases (explicit `#[test]`; no macro batching).
 
 use crate::common::parse_err_kind;
-use perlrs::error::ErrorKind;
+use forge::error::ErrorKind;
 
 #[test]
 fn eof_after_minus() {
@@ -20,23 +20,23 @@ fn eof_after_comma() {
 
 #[test]
 fn unclosed_interpolation_brace_in_string() {
-    assert!(perlrs::parse(r#"my $x = "@{"#).is_err());
+    assert!(forge::parse(r#"my $x = "@{"#).is_err());
 }
 
 #[test]
 fn rejects_invalid_numeric_double_quote_interpolation() {
     // Perl: Numeric variables with more than one digit may not start with '0'
-    assert!(perlrs::parse(r##"my $x = "$01""##).is_err());
+    assert!(forge::parse(r##"my $x = "$01""##).is_err());
 }
 
 #[test]
 fn missing_comma_in_list() {
-    assert!(perlrs::parse("(1 2)").is_err());
+    assert!(forge::parse("(1 2)").is_err());
 }
 
 #[test]
 fn statement_anonymous_sub_empty_prototype_parses() {
-    assert!(perlrs::parse("sub () { }").is_ok());
+    assert!(forge::parse("sub () { }").is_ok());
 }
 
 #[test]
@@ -46,40 +46,40 @@ fn double_operator_eof() {
 
 #[test]
 fn slash_only() {
-    assert!(perlrs::parse("/").is_err());
+    assert!(forge::parse("/").is_err());
 }
 
 #[test]
 fn m_regex_missing_closing_delimiter() {
-    assert!(perlrs::parse("m/a").is_err());
+    assert!(forge::parse("m/a").is_err());
 }
 
 #[test]
 fn package_eof_after_keyword() {
-    assert!(perlrs::parse("package").is_err());
+    assert!(forge::parse("package").is_err());
 }
 
 #[test]
 fn use_eof_after_keyword() {
-    assert!(perlrs::parse("use").is_err());
+    assert!(forge::parse("use").is_err());
 }
 
 #[test]
 fn my_eof_after_paren_open() {
-    assert!(perlrs::parse("my $x = (").is_err());
+    assert!(forge::parse("my $x = (").is_err());
 }
 
 #[test]
 fn hash_key_incomplete() {
-    assert!(perlrs::parse("$h{").is_err());
+    assert!(forge::parse("$h{").is_err());
 }
 
 #[test]
 fn array_index_incomplete() {
-    assert!(perlrs::parse("$a[").is_err());
+    assert!(forge::parse("$a[").is_err());
 }
 
 #[test]
 fn quotelike_unclosed_paren() {
-    assert!(perlrs::parse("qq(").is_err());
+    assert!(forge::parse("qq(").is_err());
 }

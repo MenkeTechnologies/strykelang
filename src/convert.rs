@@ -1,4 +1,4 @@
-//! Convert standard Perl source to idiomatic perlrs syntax.
+//! Convert standard Perl source to idiomatic forge syntax.
 //!
 //! Transformations applied:
 //! - Nested function/builtin calls → `|>` pipe-forward chains
@@ -8,7 +8,7 @@
 //! - `join(SEP, LIST)` → `LIST |> join SEP`
 //! - No trailing semicolons (newline terminates statements)
 //! - 4-space indentation for block bodies
-//! - `#!/usr/bin/env perlrs` shebang prepended
+//! - `#!/usr/bin/env forge` shebang prepended
 //! - Pipe RHS uses bare args: `|> binmode ":utf8"` not `|> binmode(":utf8")`
 
 #![allow(unused_variables)]
@@ -45,17 +45,17 @@ fn choose_delim(original: char) -> char {
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
-/// Convert a parsed Perl program to perlrs syntax.
+/// Convert a parsed Perl program to forge syntax.
 pub fn convert_program(p: &Program) -> String {
     convert_program_with_options(p, &ConvertOptions::default())
 }
 
-/// Convert a parsed Perl program to perlrs syntax with custom options.
+/// Convert a parsed Perl program to forge syntax with custom options.
 pub fn convert_program_with_options(p: &Program, opts: &ConvertOptions) -> String {
     set_output_delim(opts.output_delim);
     let body = convert_statements(&p.statements, 0);
     set_output_delim(None);
-    format!("#!/usr/bin/env perlrs\n{}", body)
+    format!("#!/usr/bin/env forge\n{}", body)
 }
 
 // ── Block / Statement ───────────────────────────────────────────────────────
@@ -1451,7 +1451,7 @@ mod tests {
         let p = parse(code).expect("parse failed");
         let out = convert_program(&p);
         // Strip shebang line for test comparisons
-        out.strip_prefix("#!/usr/bin/env perlrs\n")
+        out.strip_prefix("#!/usr/bin/env forge\n")
             .unwrap_or(&out)
             .to_string()
     }
@@ -1585,7 +1585,7 @@ mod tests {
     fn shebang_prepended() {
         let p = parse("print 1;").expect("parse failed");
         let out = convert_program(&p);
-        assert!(out.starts_with("#!/usr/bin/env perlrs\n"));
+        assert!(out.starts_with("#!/usr/bin/env forge\n"));
     }
 
     #[test]
@@ -1609,7 +1609,7 @@ mod tests {
             output_delim: Some(delim),
         };
         let out = convert_program_with_options(&p, &opts);
-        out.strip_prefix("#!/usr/bin/env perlrs\n")
+        out.strip_prefix("#!/usr/bin/env forge\n")
             .unwrap_or(&out)
             .to_string()
     }

@@ -1,4 +1,4 @@
-//! Pretty-print parsed Perl back to source (`pe --fmt`).
+//! Pretty-print parsed Perl back to source (`fo --fmt`).
 //! Regenerate with `python3 tools/gen_fmt.py` after `ast.rs` changes.
 
 #![allow(unused_variables)] // generated `match` arms name fields not always used

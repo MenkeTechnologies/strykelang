@@ -3,7 +3,7 @@ use strict;
 use warnings;
 
 # File test: ownership -o -O
-my $f = "/tmp/perlrs_test_own_$$.tmp";
+my $f = "/tmp/forge_test_own_$$.tmp";
 open(OWNFH, '>', $f) or die;
 print OWNFH "mine\n";
 close(OWNFH);

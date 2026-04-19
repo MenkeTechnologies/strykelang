@@ -2,9 +2,9 @@
 
 use crate::common::eval_err_kind;
 
-use perlrs::error::ErrorKind;
-use perlrs::interpreter::{Interpreter, FEAT_SAY};
-use perlrs::parse;
+use forge::error::ErrorKind;
+use forge::interpreter::{Interpreter, FEAT_SAY};
+use forge::parse;
 
 #[test]
 fn use_strict_refs_only() {

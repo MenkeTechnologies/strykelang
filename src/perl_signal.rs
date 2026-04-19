@@ -1,6 +1,6 @@
 //! Minimal `%SIG` delivery for common signals (Unix). Handlers run between statements.
 //!
-//! Signal hooks install lazily the first time Perl code assigns `$SIG{NAME}` (or the perlrs
+//! Signal hooks install lazily the first time Perl code assigns `$SIG{NAME}` (or the forge
 //! runtime asks for a specific signal). Until then we leave the POSIX default in place so that
 //! **Ctrl-C terminates immediately** on scripts that do not trap `SIGINT` — otherwise `signal_hook`
 //! would hijack the default action the moment the first statement polled. A second `SIGINT` that

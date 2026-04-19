@@ -3,7 +3,7 @@
 
 use crate::common::*;
 
-use perlrs::error::ErrorKind;
+use forge::error::ErrorKind;
 
 // ── loop control: `redo` / `continue` (VM + tree paths via `eval`) ──
 

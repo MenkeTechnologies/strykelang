@@ -243,7 +243,7 @@ struct CallFrame {
     stack_base: usize,
     scope_depth: usize,
     saved_wantarray: WantarrayCtx,
-    /// [`perlrs_jit_call_sub`] — no bytecode resume; result stored in [`VM::jit_trampoline_out`].
+    /// [`forge_jit_call_sub`] — no bytecode resume; result stored in [`VM::jit_trampoline_out`].
     jit_trampoline_return: bool,
     /// Synthetic frame for [`Op::BlockReturnValue`] (`map`/`grep`/`sort` block bytecode), paired with
     /// `scope_push_hook` at [`VM::run_block_region`] entry (not a sub call; no closure capture).
@@ -317,7 +317,7 @@ pub struct VM<'a> {
     sub_entry_at_ip: Vec<bool>,
     /// Invocations per sub-entry IP (tiered JIT: interpreter until count exceeds threshold).
     sub_entry_invoke_count: Vec<u32>,
-    /// Minimum invocations before attempting subroutine JIT. Override with `PERLRS_JIT_SUB_INVOKES` (default 50).
+    /// Minimum invocations before attempting subroutine JIT. Override with `FORGE_JIT_SUB_INVOKES` (default 50).
     jit_sub_invoke_threshold: u32,
     /// Reused `i64` tables for sub-JIT / top-level JIT attempts (avoids `vec![0; n]` on every try).
     jit_buf_slot: Vec<i64>,
@@ -424,7 +424,7 @@ impl<'a> VM<'a> {
                 v
             },
             sub_entry_invoke_count: vec![0; chunk.ops.len().saturating_add(1)],
-            jit_sub_invoke_threshold: std::env::var("PERLRS_JIT_SUB_INVOKES")
+            jit_sub_invoke_threshold: std::env::var("FORGE_JIT_SUB_INVOKES")
                 .ok()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(50),
@@ -1370,7 +1370,7 @@ impl<'a> VM<'a> {
                 for field in &def.fields {
                     if let Some(ref expr) = field.default {
                         let val = self.interp.eval_expr(expr).map_err(|e| match e {
-                            crate::interpreter::FlowOrError::Error(pe) => pe,
+                            crate::interpreter::FlowOrError::Error(fo) => fo,
                             _ => PerlError::runtime("default evaluation flow", line),
                         })?;
                         defaults.push(Some(val));
@@ -1448,8 +1448,8 @@ impl<'a> VM<'a> {
             match local_interp.exec_block_no_scope(&block) {
                 Ok(_) => {}
                 Err(e) => {
-                    let pe = match e {
-                        FlowOrError::Error(pe) => pe,
+                    let fo = match e {
+                        FlowOrError::Error(fo) => fo,
                         FlowOrError::Flow(_) => PerlError::runtime(
                             "return/last/next/redo not supported inside fan block",
                             line,
@@ -1457,7 +1457,7 @@ impl<'a> VM<'a> {
                     };
                     let mut g = first_err.lock();
                     if g.is_none() {
-                        *g = Some(pe);
+                        *g = Some(fo);
                     }
                 }
             }
@@ -1515,14 +1515,14 @@ impl<'a> VM<'a> {
             match r {
                 Ok(v) => out.push(v),
                 Err(e) => {
-                    let pe = match e {
-                        FlowOrError::Error(pe) => pe,
+                    let fo = match e {
+                        FlowOrError::Error(fo) => fo,
                         FlowOrError::Flow(_) => PerlError::runtime(
                             "return/last/next/redo not supported inside fan_cap block",
                             line,
                         ),
                     };
-                    return Err(pe);
+                    return Err(fo);
                 }
             }
         }
@@ -7370,8 +7370,8 @@ impl<'a> VM<'a> {
                                 match local_interp.exec_block_no_scope(&block) {
                                     Ok(_) => {}
                                     Err(e) => {
-                                        let pe = match e {
-                                        FlowOrError::Error(pe) => pe,
+                                        let fo = match e {
+                                        FlowOrError::Error(fo) => fo,
                                         FlowOrError::Flow(_) => PerlError::runtime(
                                             "return/last/next/redo not supported inside pfor block",
                                             line,
@@ -7379,7 +7379,7 @@ impl<'a> VM<'a> {
                                     };
                                         let mut g = first_err.lock();
                                         if g.is_none() {
-                                            *g = Some(pe);
+                                            *g = Some(fo);
                                         }
                                     }
                                 }
@@ -7805,7 +7805,7 @@ impl<'a> VM<'a> {
         Ok(last)
     }
 
-    /// Called from Cranelift (`perlrs_jit_call_sub`) to run a compiled sub by bytecode IP with `i64` args.
+    /// Called from Cranelift (`forge_jit_call_sub`) to run a compiled sub by bytecode IP with `i64` args.
     pub(crate) fn jit_trampoline_run_sub(
         &mut self,
         entry_ip: usize,
@@ -8834,7 +8834,7 @@ fn int_cmp(
 ///
 /// `vm` must be a valid, non-null pointer to a live [`VM`] for the duration of this call.
 #[no_mangle]
-pub unsafe extern "C" fn perlrs_jit_concat_vm(vm: *mut std::ffi::c_void, a: i64, b: i64) -> i64 {
+pub unsafe extern "C" fn forge_jit_concat_vm(vm: *mut std::ffi::c_void, a: i64, b: i64) -> i64 {
     let vm: &mut VM<'static> = unsafe { &mut *(vm as *mut VM<'static>) };
     let pa = PerlValue::from_raw_bits(crate::jit::perl_value_bits_from_jit_string_operand(a));
     let pb = PerlValue::from_raw_bits(crate::jit::perl_value_bits_from_jit_string_operand(b));
@@ -8852,7 +8852,7 @@ pub unsafe extern "C" fn perlrs_jit_concat_vm(vm: *mut std::ffi::c_void, a: i64,
 /// `vm` must be a valid, non-null pointer to a live [`VM`] for the duration of this call (JIT only
 /// invokes this while the VM is executing).
 #[no_mangle]
-pub unsafe extern "C" fn perlrs_jit_call_sub(
+pub unsafe extern "C" fn forge_jit_call_sub(
     vm: *mut std::ffi::c_void,
     sub_ip: i64,
     argc: i64,
@@ -9052,7 +9052,7 @@ mod tests {
         let idx = c.intern_name("0");
         c.emit(Op::GetScalar(idx), 1);
         c.emit(Op::Halt, 1);
-        assert_eq!(run_chunk(&c).expect("vm").to_string(), "perlrs");
+        assert_eq!(run_chunk(&c).expect("vm").to_string(), "forge");
 
         let mut c = Chunk::new();
         let idx = c.intern_name("0");

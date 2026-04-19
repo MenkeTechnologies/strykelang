@@ -212,15 +212,15 @@ pub struct PerlHeap {
 /// One SSH worker lane: a single `ssh HOST PE_PATH --remote-worker` process. The persistent
 /// dispatcher in [`crate::cluster`] holds one of these per concurrent worker thread.
 ///
-/// `pe_path` is the path to the `pe` binary on the **remote** host — the basic implementation
+/// `pe_path` is the path to the `fo` binary on the **remote** host — the basic implementation
 /// used `std::env::current_exe()` which is wrong by definition (a local `/Users/...` path
-/// rarely exists on a remote machine). Default is the bare string `"pe"` so the remote
+/// rarely exists on a remote machine). Default is the bare string `"fo"` so the remote
 /// host's `$PATH` resolves it like any other ssh command.
 #[derive(Debug, Clone)]
 pub struct RemoteSlot {
     /// Argument passed to `ssh` (e.g. `host`, `user@host`, `host` with `~/.ssh/config` host alias).
     pub host: String,
-    /// Path to `pe` on the remote host. `"pe"` resolves via remote `$PATH`.
+    /// Path to `fo` on the remote host. `"fo"` resolves via remote `$PATH`.
     pub pe_path: String,
 }
 
@@ -237,7 +237,7 @@ mod cluster_parsing_tests {
         let c = RemoteCluster::from_list_args(&[s("host1")]).expect("parse");
         assert_eq!(c.slots.len(), 1);
         assert_eq!(c.slots[0].host, "host1");
-        assert_eq!(c.slots[0].pe_path, "pe");
+        assert_eq!(c.slots[0].pe_path, "fo");
     }
 
     #[test]
@@ -256,10 +256,10 @@ mod cluster_parsing_tests {
 
     #[test]
     fn parses_host_slots_pe_path_triple() {
-        let c = RemoteCluster::from_list_args(&[s("build1:3:/usr/local/bin/pe")]).expect("parse");
+        let c = RemoteCluster::from_list_args(&[s("build1:3:/usr/local/bin/fo")]).expect("parse");
         assert_eq!(c.slots.len(), 3);
         assert!(c.slots.iter().all(|sl| sl.host == "build1"));
-        assert!(c.slots.iter().all(|sl| sl.pe_path == "/usr/local/bin/pe"));
+        assert!(c.slots.iter().all(|sl| sl.pe_path == "/usr/local/bin/fo"));
     }
 
     #[test]
@@ -276,11 +276,11 @@ mod cluster_parsing_tests {
         let mut h = indexmap::IndexMap::new();
         h.insert("host".to_string(), s("data1"));
         h.insert("slots".to_string(), PerlValue::integer(2));
-        h.insert("pe".to_string(), s("/opt/pe"));
+        h.insert("fo".to_string(), s("/opt/fo"));
         let c = RemoteCluster::from_list_args(&[PerlValue::hash(h)]).expect("parse");
         assert_eq!(c.slots.len(), 2);
         assert_eq!(c.slots[0].host, "data1");
-        assert_eq!(c.slots[0].pe_path, "/opt/pe");
+        assert_eq!(c.slots[0].pe_path, "/opt/fo");
     }
 
     #[test]
@@ -346,11 +346,11 @@ impl RemoteCluster {
     /// Parse a list of cluster spec values into a [`RemoteCluster`]. Accepted forms (any may
     /// appear in the same call):
     ///
-    /// - `"host"`                       — 1 slot, default `pe` path
+    /// - `"host"`                       — 1 slot, default `fo` path
     /// - `"host:N"`                     — N slots
-    /// - `"host:N:/path/to/pe"`         — N slots, custom remote `pe`
+    /// - `"host:N:/path/to/fo"`         — N slots, custom remote `fo`
     /// - `"user@host:N"`                — ssh user override (kept verbatim in `host`)
-    /// - hashref `{ host => "h", slots => N, pe => "/usr/local/bin/pe" }`
+    /// - hashref `{ host => "h", slots => N, fo => "/usr/local/bin/fo" }`
     /// - trailing hashref `{ timeout => 30, retries => 2, connect_timeout => 5 }` — global
     ///   tunables that apply to the whole cluster (must be the **last** argument; consumed
     ///   only when its keys are all known tunable names so it cannot be confused with a slot)
@@ -397,7 +397,7 @@ impl RemoteCluster {
         }
 
         for it in slot_items {
-            // Hashref form: { host => "h", slots => N, pe => "/path" }
+            // Hashref form: { host => "h", slots => N, fo => "/path" }
             if let Some(map) = it
                 .as_hash_map()
                 .or_else(|| it.as_hash_ref().map(|r| r.read().clone()))
@@ -407,15 +407,15 @@ impl RemoteCluster {
                     .map(|v| v.to_string())
                     .ok_or_else(|| "cluster: hashref slot needs `host`".to_string())?;
                 let n = map.get("slots").map(|v| v.to_int().max(1)).unwrap_or(1) as usize;
-                let pe = map
-                    .get("pe")
+                let fo = map
+                    .get("fo")
                     .or_else(|| map.get("pe_path"))
                     .map(|v| v.to_string())
-                    .unwrap_or_else(|| "pe".to_string());
+                    .unwrap_or_else(|| "fo".to_string());
                 for _ in 0..n {
                     slots.push(RemoteSlot {
                         host: host.clone(),
-                        pe_path: pe.clone(),
+                        pe_path: fo.clone(),
                     });
                 }
                 continue;
@@ -423,9 +423,9 @@ impl RemoteCluster {
 
             // String form. Split into up to 3 colon-separated fields, but be careful: a
             // pe_path may itself contain a colon (rare but possible). We use rsplitn(2) to
-            // peel off the optional pe path only when the segment after the second colon
+            // peel off the optional fo path only when the segment after the second colon
             // looks like a path (starts with `/` or `.`) — otherwise treat the trailing
-            // segment as part of the pe path candidate.
+            // segment as part of the fo path candidate.
             let s = it.to_string();
             // Heuristic: split into (left = host[:N], pe_path) if the third field is present.
             let (left, pe_path) = if let Some(idx) = s.find(':') {
@@ -448,7 +448,7 @@ impl RemoteCluster {
             } else {
                 (s.clone(), None)
             };
-            let pe_path = pe_path.unwrap_or_else(|| "pe".to_string());
+            let pe_path = pe_path.unwrap_or_else(|| "fo".to_string());
 
             // Now `left` is either `host` or `host:N`. The N suffix is digits only, so
             // `user@host` (which contains `@` but no trailing `:digits`) is preserved.
@@ -1240,7 +1240,7 @@ impl PerlValue {
     }
 
     /// Expand a `map` / `flat_map` / `pflat_map` block result into list elements. Plain arrays
-    /// expand; when `peel_array_ref`, a single ARRAY ref is dereferenced one level (perlrs
+    /// expand; when `peel_array_ref`, a single ARRAY ref is dereferenced one level (forge
     /// `flat_map` / `pflat_map`; stock `map` uses `peel_array_ref == false`).
     pub fn map_flatten_outputs(&self, peel_array_ref: bool) -> Vec<PerlValue> {
         if let Some(a) = self.as_array_vec() {

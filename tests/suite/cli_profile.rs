@@ -1,4 +1,4 @@
-//! `pe --profile`: wall-clock samples on stderr (VM opcode lines + subs; flamegraph-ready).
+//! `fo --profile`: wall-clock samples on stderr (VM opcode lines + subs; flamegraph-ready).
 
 use std::process::Command;
 
@@ -8,7 +8,7 @@ fn pe_profile_stderr_has_vm_report_sections() {
     let out = Command::new(exe)
         .args(["--profile", "-e", "sub foo { 1 } foo();"])
         .output()
-        .expect("spawn pe");
+        .expect("spawn fo");
 
     assert!(
         out.status.success(),
@@ -17,15 +17,15 @@ fn pe_profile_stderr_has_vm_report_sections() {
     );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        stderr.contains("perlrs --profile: collapsed stacks"),
+        stderr.contains("forge --profile: collapsed stacks"),
         "expected flamegraph folded header, got: {stderr:?}"
     );
     assert!(
-        stderr.contains("perlrs --profile: lines"),
+        stderr.contains("forge --profile: lines"),
         "expected line totals header, got: {stderr:?}"
     );
     assert!(
-        stderr.contains("perlrs --profile: subs"),
+        stderr.contains("forge --profile: subs"),
         "expected subs header, got: {stderr:?}"
     );
 }

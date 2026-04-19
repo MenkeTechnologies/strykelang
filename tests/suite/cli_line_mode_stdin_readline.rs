@@ -4,20 +4,20 @@
 use std::io::Write;
 use std::process::{Command, Stdio};
 
-fn perlrs_exe() -> &'static str {
-    env!("CARGO_BIN_EXE_perlrs")
+fn forge_exe() -> &'static str {
+    env!("CARGO_BIN_EXE_forge")
 }
 
 /// Body `<>` reads the next line after `$_` (Perl); must not deadlock with the outer line loop.
 #[test]
 fn line_mode_n_stdin_body_readline_prints_next_line() {
-    let exe = perlrs_exe();
+    let exe = forge_exe();
     let mut child = Command::new(exe)
         .args(["-ne", r#"print <>"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn perlrs");
+        .expect("spawn forge");
     let mut stdin = child.stdin.take().expect("stdin");
     stdin.write_all(b"a\nb\n").expect("write stdin");
     drop(stdin);
@@ -33,13 +33,13 @@ fn line_mode_n_stdin_body_readline_prints_next_line() {
 /// After the last line, `<>` in the body sees EOF (undef) and must not block.
 #[test]
 fn line_mode_n_stdin_body_readline_after_eof_returns_undef_without_hang() {
-    let exe = perlrs_exe();
+    let exe = forge_exe();
     let mut child = Command::new(exe)
         .args(["-ne", r#"print <>"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn perlrs");
+        .expect("spawn forge");
     let mut stdin = child.stdin.take().expect("stdin");
     stdin.write_all(b"a\n").expect("write stdin");
     drop(stdin);
@@ -55,13 +55,13 @@ fn line_mode_n_stdin_body_readline_after_eof_returns_undef_without_hang() {
 /// `-l` + `-p`: chomped `$_` is printed with `$\` (default newline) after each line — multi-line must not concatenate.
 #[test]
 fn line_mode_lpe_implicit_print_appends_ors_each_line() {
-    let exe = perlrs_exe();
+    let exe = forge_exe();
     let mut child = Command::new(exe)
         .args(["-lpe", r#"$_=uc"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn perlrs");
+        .expect("spawn forge");
     let mut stdin = child.stdin.take().expect("stdin");
     stdin.write_all(b"a\nb\nc\n").expect("write stdin");
     drop(stdin);
@@ -77,13 +77,13 @@ fn line_mode_lpe_implicit_print_appends_ors_each_line() {
 /// `-l` sets output record separator; implicit print after `-p` must still run for empty `$_`.
 #[test]
 fn line_mode_lpe_empty_lines_preserve_blank_records() {
-    let exe = perlrs_exe();
+    let exe = forge_exe();
     let mut child = Command::new(exe)
         .args(["-lpe", r#""#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn perlrs");
+        .expect("spawn forge");
     let mut stdin = child.stdin.take().expect("stdin");
     stdin.write_all(b"a\n\nb\n").expect("write stdin");
     drop(stdin);
@@ -99,13 +99,13 @@ fn line_mode_lpe_empty_lines_preserve_blank_records() {
 /// Regression: chomped line must not be rejoined; each record gets its own trailing `$\`.
 #[test]
 fn line_mode_lpe_multibyte_utf8_line_round_trips() {
-    let exe = perlrs_exe();
+    let exe = forge_exe();
     let mut child = Command::new(exe)
         .args(["-lpe", r#"$_ = "«$_»""#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn perlrs");
+        .expect("spawn forge");
     let mut stdin = child.stdin.take().expect("stdin");
     stdin
         .write_all("café\nrésumé\n".as_bytes())
@@ -123,13 +123,13 @@ fn line_mode_lpe_multibyte_utf8_line_round_trips() {
 /// `die` / `warn` append `, <> line N.` after an implicit `-n` read (matches Perl 5).
 #[test]
 fn line_mode_die_includes_diamond_input_line_in_message() {
-    let exe = perlrs_exe();
+    let exe = forge_exe();
     let mut child = Command::new(exe)
         .args(["-lane", r#"die if /pro/"#])
         .stdin(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn perlrs");
+        .expect("spawn forge");
     let mut stdin = child.stdin.take().expect("stdin");
     stdin
         .write_all(b"a\nb\nc\nd\ne\nprofile\n")
@@ -147,12 +147,12 @@ fn line_mode_die_includes_diamond_input_line_in_message() {
 /// `die` before any input read omits the `, <> line N.` clause (matches Perl 5).
 #[test]
 fn die_without_read_has_no_input_line_clause() {
-    let exe = perlrs_exe();
+    let exe = forge_exe();
     let out = Command::new(exe)
         .args(["-e", "die"])
         .stderr(Stdio::piped())
         .output()
-        .expect("run perlrs");
+        .expect("run forge");
     assert_eq!(out.status.code(), Some(255));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
@@ -168,13 +168,13 @@ fn die_without_read_has_no_input_line_clause() {
 /// Diamond `while (<>)` on stdin uses `<>`, not `<STDIN>`, in the die suffix (matches Perl 5).
 #[test]
 fn die_while_diamond_stdin_uses_angle_brackets_not_stdin() {
-    let exe = perlrs_exe();
+    let exe = forge_exe();
     let mut child = Command::new(exe)
         .args(["-e", r#"while (<>) { die }"#])
         .stdin(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn perlrs");
+        .expect("spawn forge");
     let mut stdin = child.stdin.take().expect("stdin");
     stdin.write_all(b"hi\n").expect("write stdin");
     drop(stdin);
@@ -194,13 +194,13 @@ fn die_while_diamond_stdin_uses_angle_brackets_not_stdin() {
 /// Explicit read from `STDIN` is reflected as `<STDIN>` in the die suffix (matches Perl 5).
 #[test]
 fn die_explicit_stdin_read_shows_stdin_in_message() {
-    let exe = perlrs_exe();
+    let exe = forge_exe();
     let mut child = Command::new(exe)
         .args(["-e", r#"$_ = <STDIN>; die"#])
         .stdin(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn perlrs");
+        .expect("spawn forge");
     let mut stdin = child.stdin.take().expect("stdin");
     stdin.write_all(b"hi\n").expect("write stdin");
     drop(stdin);
@@ -213,14 +213,14 @@ fn die_explicit_stdin_read_shows_stdin_in_message() {
 /// `warn` uses the same input-line suffix as `die` under `-n` (matches Perl 5).
 #[test]
 fn warn_line_mode_includes_diamond_input_line_in_message() {
-    let exe = perlrs_exe();
+    let exe = forge_exe();
     let mut child = Command::new(exe)
         .args(["-ne", r#"warn if /hi/"#])
         .stdin(Stdio::piped())
         .stderr(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn perlrs");
+        .expect("spawn forge");
     let mut stdin = child.stdin.take().expect("stdin");
     stdin.write_all(b"hi\n").expect("write stdin");
     drop(stdin);

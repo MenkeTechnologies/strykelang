@@ -14,8 +14,8 @@
 //! ## Stream selection
 //!
 //! If **stderr** is a TTY, progress goes to stderr; else if **stdout** is a TTY, progress goes to
-//! stdout.  `PERLRS_PROGRESS_PLAIN=1` forces one line per tick (CI/logs).
-//! `PERLRS_PROGRESS_FULLSCREEN=1` opts in to the alternate-screen mode (PmapProgress only).
+//! stdout.  `FORGE_PROGRESS_PLAIN=1` forces one line per tick (CI/logs).
+//! `FORGE_PROGRESS_FULLSCREEN=1` opts in to the alternate-screen mode (PmapProgress only).
 
 use std::io::{self, IsTerminal, Write};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, AtomicUsize, Ordering};
@@ -59,7 +59,7 @@ fn flush_other(stream: ProgressStream) {
 }
 
 fn env_force_plain_lines() -> bool {
-    match std::env::var("PERLRS_PROGRESS_PLAIN") {
+    match std::env::var("FORGE_PROGRESS_PLAIN") {
         Ok(s) if s == "0" || s.eq_ignore_ascii_case("false") => false,
         Ok(s) if s.is_empty() => false,
         Ok(_) => true,
@@ -72,7 +72,7 @@ fn parse_fullscreen_var(v: &str) -> bool {
 }
 
 fn env_fullscreen_mode() -> bool {
-    std::env::var("PERLRS_PROGRESS_FULLSCREEN")
+    std::env::var("FORGE_PROGRESS_FULLSCREEN")
         .map(|v| parse_fullscreen_var(&v))
         .unwrap_or(false)
 }

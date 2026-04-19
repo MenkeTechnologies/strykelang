@@ -1,4 +1,4 @@
-//! Crate root — see [`README.md`](https://github.com/MenkeTechnologies/perlrs) for overview.
+//! Crate root — see [`README.md`](https://github.com/MenkeTechnologies/forge) for overview.
 // `cargo doc` with `RUSTDOCFLAGS=-D warnings` (CI) flags intra-doc links to private items and
 // a few shorthand links (`MethodCall`, `Op::…`) that do not resolve as paths. Suppress until
 // docs are normalized to `crate::…` paths and public-only links.
@@ -76,12 +76,12 @@ use interpreter::Interpreter;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-/// When `true`, all perlrs extensions are disabled and only stock Perl 5
+/// When `true`, all forge extensions are disabled and only stock Perl 5
 /// syntax / builtins are accepted.  Set once from the CLI driver and read by
 /// the parser, compiler, and interpreter.
 static COMPAT_MODE: AtomicBool = AtomicBool::new(false);
 
-/// Enable Perl 5 strict-compatibility mode (disables all perlrs extensions).
+/// Enable Perl 5 strict-compatibility mode (disables all forge extensions).
 pub fn set_compat_mode(on: bool) {
     COMPAT_MODE.store(on, Ordering::Relaxed);
 }
@@ -94,27 +94,27 @@ pub fn compat_mode() -> bool {
 use value::PerlValue;
 
 /// Parse a string of Perl code and return the AST.
-/// Pretty-print a parsed program as Perl-like source (`pe --fmt`).
+/// Pretty-print a parsed program as Perl-like source (`fo --fmt`).
 pub fn format_program(p: &ast::Program) -> String {
     fmt::format_program(p)
 }
 
-/// Convert a parsed program to perlrs syntax with `|>` pipes and no semicolons.
-pub fn convert_to_perlrs(p: &ast::Program) -> String {
+/// Convert a parsed program to forge syntax with `|>` pipes and no semicolons.
+pub fn convert_to_forge(p: &ast::Program) -> String {
     convert::convert_program(p)
 }
 
-/// Convert a parsed program to perlrs syntax with custom options.
-pub fn convert_to_perlrs_with_options(p: &ast::Program, opts: &convert::ConvertOptions) -> String {
+/// Convert a parsed program to forge syntax with custom options.
+pub fn convert_to_forge_with_options(p: &ast::Program, opts: &convert::ConvertOptions) -> String {
     convert::convert_program_with_options(p, opts)
 }
 
-/// Deconvert a parsed perlrs program back to standard Perl .pl syntax.
+/// Deconvert a parsed forge program back to standard Perl .pl syntax.
 pub fn deconvert_to_perl(p: &ast::Program) -> String {
     deconvert::deconvert_program(p)
 }
 
-/// Deconvert a parsed perlrs program back to standard Perl .pl syntax with options.
+/// Deconvert a parsed forge program back to standard Perl .pl syntax with options.
 pub fn deconvert_to_perl_with_options(
     p: &ast::Program,
     opts: &deconvert::DeconvertOptions,
@@ -168,18 +168,18 @@ pub fn parse_and_run_string_in_file(
     Ok(v)
 }
 
-/// Crate-root `vendor/perl` (e.g. `List/Util.pm`). The `perlrs` / `pe` driver prepends this to
+/// Crate-root `vendor/perl` (e.g. `List/Util.pm`). The `forge` / `fo` driver prepends this to
 /// `@INC` when the directory exists so in-tree pure-Perl modules shadow XS-only core stubs.
 pub fn vendor_perl_inc_path() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("vendor/perl")
 }
 
-/// Language server over stdio (`pe --lsp`). Returns a process exit code.
+/// Language server over stdio (`fo --lsp`). Returns a process exit code.
 pub fn run_lsp_stdio() -> i32 {
     match lsp::run_stdio() {
         Ok(()) => 0,
         Err(e) => {
-            eprintln!("pe --lsp: {e}");
+            eprintln!("fo --lsp: {e}");
             1
         }
     }
@@ -197,7 +197,7 @@ pub fn run(code: &str) -> PerlResult<PerlValue> {
 /// Try to compile and run via bytecode VM. Returns None if compilation fails.
 ///
 /// **`.pec` bytecode cache integration.** When `interp.pec_precompiled_chunk` is populated
-/// (set by the `pe` driver from a [`crate::pec::try_load`] hit), this function skips
+/// (set by the `fo` driver from a [`crate::pec::try_load`] hit), this function skips
 /// `compile_program` entirely and runs the preloaded chunk. On cache miss the compiler
 /// runs normally and, if `interp.pec_cache_fingerprint` is set, the fresh chunk + program
 /// are persisted as a `.pec` bundle so the next warm start can skip both parse and compile.

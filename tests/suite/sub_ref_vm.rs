@@ -1,7 +1,7 @@
 //! `&sub` / `\&sub` / `\&{ EXPR }` lowered to VM (`Op::Call` / `Op::LoadNamedSubRef` / `Op::LoadDynamicSubRef`).
 
 use crate::common::*;
-use perlrs::interpreter::Interpreter;
+use forge::interpreter::Interpreter;
 
 #[test]
 fn ampersand_sub_invokes_named_sub() {
@@ -33,10 +33,10 @@ fn vm_program_compiles_subroutine_code_ref() {
     let code = r#"no strict 'vars';
         sub f { 1 }
         \&f"#;
-    let program = perlrs::parse(code).expect("parse");
+    let program = forge::parse(code).expect("parse");
     let mut interp = Interpreter::new();
     assert!(
-        perlrs::try_vm_execute(&program, &mut interp).is_some(),
+        forge::try_vm_execute(&program, &mut interp).is_some(),
         "expected bytecode VM for \\\\&f expression"
     );
 }
@@ -46,10 +46,10 @@ fn vm_program_compiles_dynamic_subroutine_coderef() {
     let code = r#"no strict 'vars';
         sub g { 7 }
         \&{"g"}"#;
-    let program = perlrs::parse(code).expect("parse");
+    let program = forge::parse(code).expect("parse");
     let mut interp = Interpreter::new();
     assert!(
-        perlrs::try_vm_execute(&program, &mut interp).is_some(),
+        forge::try_vm_execute(&program, &mut interp).is_some(),
         "expected bytecode VM for Op::LoadDynamicSubRef (dynamic coderef)"
     );
 }

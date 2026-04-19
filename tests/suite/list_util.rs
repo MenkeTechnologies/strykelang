@@ -1,9 +1,9 @@
 //! `List::Util` — implemented natively in `src/list_util.rs`; `vendor/perl/List/Util.pm` is a stub
 //! for `%INC` / `require`. Use `Interpreter::new()` so subs are registered (tests may add `vendor/perl` to `@INC`).
 
-use perlrs::interpreter::Interpreter;
-use perlrs::value::PerlValue;
-use perlrs::{parse, vendor_perl_inc_path};
+use forge::interpreter::Interpreter;
+use forge::value::PerlValue;
+use forge::{parse, vendor_perl_inc_path};
 
 fn with_vendor_inc() -> Interpreter {
     let mut interp = Interpreter::new();

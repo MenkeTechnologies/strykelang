@@ -7,7 +7,7 @@
 //!     (used for the `%aliases` alias → primary map).
 //!   - `CATEGORY_MAP: &[(&str, &str)]` — name → category string, parsed
 //!     from the `// ── category ──` section comments in `is_perl5_core`
-//!     and `perlrs_extension_name`. Category strings are lowercase,
+//!     and `forge_extension_name`. Category strings are lowercase,
 //!     human-readable ("parallel", "string", "filesystem", ...).
 //!   - `DESCRIPTIONS: &[(&str, &str)]` — name → first-line hover doc,
 //!     harvested from the `doc_for_label_text` match in `src/lsp.rs`.
@@ -28,10 +28,10 @@ fn main() {
     let lsp_src = fs::read_to_string("src/lsp.rs").expect("read src/lsp.rs");
 
     let arms = extract_try_builtin_arms(&builtins_src);
-    // `is_perl5_core` uses `matches!(name, …)` (parens), `perlrs_extension_name`
+    // `is_perl5_core` uses `matches!(name, …)` (parens), `forge_extension_name`
     // uses `match name { … }` (braces). Different block markers per fn.
     let core_cats = extract_categorized_names(&parser_src, "fn is_perl5_core", "matches!");
-    let ext_cats = extract_categorized_names(&parser_src, "fn perlrs_extension_name", "match name");
+    let ext_cats = extract_categorized_names(&parser_src, "fn forge_extension_name", "match name");
     // Descriptions: /// doc comments from builtins.rs (primary source for ~1100 fns)
     // merged with hand-written lsp.rs entries (keywords, operators, reflection hashes).
     let mut descriptions = extract_builtin_doc_comments(&builtins_src, &arms);
@@ -231,7 +231,7 @@ fn extract_try_builtin_arms(src: &str) -> Vec<Vec<String>> {
 
 /// Parse a function with `// ── category ──` section comments above groups
 /// of quoted names, returning one (name, category) pair per listed name.
-/// Works for both `is_perl5_core` (matches!) and `perlrs_extension_name`
+/// Works for both `is_perl5_core` (matches!) and `forge_extension_name`
 /// (match name { … }).
 fn extract_categorized_names(
     src: &str,
@@ -319,8 +319,8 @@ fn parse_section_header(comment_body: &str) -> Option<String> {
     if label.is_empty() {
         return None;
     }
-    // Reject noisy ones: the perlrs_extension_name list has a stray
-    // "perlrs extensions that produce lists or have special syntax"
+    // Reject noisy ones: the forge_extension_name list has a stray
+    // "forge extensions that produce lists or have special syntax"
     // header from the pre-split era — if we ever see it again, tag it so.
     if label.len() > 40 {
         return None;
@@ -524,7 +524,7 @@ fn extract_quoted(slice: &str, out: &mut Vec<String>) {
 
 /// Extract `///` doc comments from `fn builtin_*` in `src/builtins.rs` and
 /// map each to its dispatch names. Makes `///` comments the single source of
-/// truth for `%perlrs::descriptions` and LSP hover.
+/// truth for `%forge::descriptions` and LSP hover.
 fn extract_builtin_doc_comments(src: &str, _arms: &[Vec<String>]) -> Vec<(String, String)> {
     // Scan dispatch: "name" => Some(builtin_xyz( to build name->fn map
     let mut name_to_fn: std::collections::HashMap<String, String> =

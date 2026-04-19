@@ -71,14 +71,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release --locked
-      - name: Compare pe output to perl on parity/cases
+      - name: Compare fo output to perl on parity/cases
         # Exit code is the signal: any mismatch fails the step, fails the
         # job, and blocks the release-build chain via `needs: [parity]`.
         # `--summary` keeps the CI log small (totals + short FAIL lines);
         # the full per-case diff lives in parity_failures.log uploaded below.
         run: bash parity/run_parity.sh --summary
         env:
-          PE: ${{ github.workspace }}/target/release/pe
+          FO: ${{ github.workspace }}/target/release/fo
       - name: Upload parity failure log
         # `if: always()` so we capture the log even when the step fails —
         # that's exactly when the diffs are useful for triage.
@@ -117,7 +117,7 @@ jobs:
       - run: cargo build --release --locked --target ${{ matrix.target }}
       - uses: actions/upload-artifact@v4
         with:
-          name: perlrs-${{ matrix.target }}
+          name: forge-${{ matrix.target }}
           path: |
-            target/${{ matrix.target }}/release/perlrs
-            target/${{ matrix.target }}/release/pe
+            target/${{ matrix.target }}/release/forge
+            target/${{ matrix.target }}/release/fo

@@ -16,7 +16,7 @@ pub struct RuntimeSubDecl {
     pub prototype: Option<String>,
 }
 
-/// Stack-based bytecode instruction set for the perlrs VM.
+/// Stack-based bytecode instruction set for the forge VM.
 /// Operands use u16 for pool indices (64k names/constants) and i32 for jumps.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Op {
@@ -604,7 +604,7 @@ pub enum Op {
     Pwatch(u16),
     /// fan N { BLOCK } — block_idx; stack: \[progress_flag, count\] (`progress_flag` is 0/1)
     FanWithBlock(u16),
-    /// fan { BLOCK } — block_idx; stack: \[progress_flag\]; COUNT = rayon pool size (`pe -j`)
+    /// fan { BLOCK } — block_idx; stack: \[progress_flag\]; COUNT = rayon pool size (`fo -j`)
     FanWithBlockAuto(u16),
     /// fan_cap N { BLOCK } — like fan; stack: \[progress_flag, count\] → array of block return values
     FanCapWithBlock(u16),
@@ -767,7 +767,7 @@ pub enum Op {
     Halt,
 
     // ── Streaming map (appended — do not reorder earlier op tags) ─────────────
-    /// `maps { BLOCK } LIST` — stack: \[list\] → lazy iterator (pull-based; perlrs extension).
+    /// `maps { BLOCK } LIST` — stack: \[list\] → lazy iterator (pull-based; forge extension).
     MapsWithBlock(u16),
     /// `flat_maps { BLOCK } LIST` — like [`Op::MapsWithBlock`] with `flat_map`-style flattening.
     MapsFlatMapWithBlock(u16),
@@ -775,7 +775,7 @@ pub enum Op {
     MapsWithExpr(u16),
     /// `flat_maps EXPR, LIST` — same pools as [`Op::MapsWithExpr`].
     MapsFlatMapWithExpr(u16),
-    /// `filter { BLOCK } LIST` — stack: \[list\] → lazy iterator (perlrs; `grep` remains eager).
+    /// `filter { BLOCK } LIST` — stack: \[list\] → lazy iterator (forge; `grep` remains eager).
     FilterWithBlock(u16),
     /// `filter EXPR, LIST` — index into [`Chunk::grep_expr_entries`]; stack: \[list\] → iterator.
     FilterWithExpr(u16),
@@ -1045,7 +1045,7 @@ pub struct Chunk {
     pub algebraic_match_subject_bytecode_ranges: Vec<Option<(usize, usize)>>,
     /// Nested / runtime `sub` declarations (see [`Op::RuntimeSubDecl`]).
     pub runtime_sub_decls: Vec<RuntimeSubDecl>,
-    /// Perlrs `sub ($a, …)` / hash-destruct params for [`Op::MakeCodeRef`] (second operand is pool index).
+    /// Forge `sub ($a, …)` / hash-destruct params for [`Op::MakeCodeRef`] (second operand is pool index).
     pub code_ref_sigs: Vec<Vec<SubSigParam>>,
     /// `par_lines PATH, sub { } [, progress => EXPR]` — evaluated by interpreter inside VM.
     pub par_lines_entries: Vec<(Expr, Expr, Option<Expr>)>,
@@ -1338,7 +1338,7 @@ impl Chunk {
         idx
     }
 
-    /// Pool index for [`Op::MakeCodeRef`] signature (`perlrs` extension); use empty vec for legacy `sub { }`.
+    /// Pool index for [`Op::MakeCodeRef`] signature (`forge` extension); use empty vec for legacy `sub { }`.
     pub fn add_code_ref_sig(&mut self, params: Vec<SubSigParam>) -> u16 {
         let idx = self.code_ref_sigs.len();
         if idx > u16::MAX as usize {
