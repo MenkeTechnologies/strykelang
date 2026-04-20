@@ -4424,8 +4424,8 @@ fn map_squares_each_integer_in_range() {
 }
 
 #[test]
-fn chained_less_than_coerces_prior_boolean_to_operand() {
-    // Parses as `(1 < 2) < 3` → `1 < 3`.
+fn chained_less_than_raku_style() {
+    // Raku-style chained comparison: `1 < 2 < 3` → `(1 < 2) && (2 < 3)` → true
     assert_eq!(eval_int(r#"(1 < 2 < 3) ? 1 : 0"#), 1);
 }
 
@@ -7374,6 +7374,212 @@ fn double_bang_eval_block_constant_is_truthy() {
 #[test]
 fn sprintf_round_half_to_even_two_point_five() {
     assert_eq!(eval_string(r#"sprintf "%.0f", 2.5"#), "2");
+}
+
+// ── Chained comparisons (Raku-style) ──
+
+#[test]
+fn chained_comparison_less_than_true() {
+    // `1 < 2 < 3` → `(1 < 2) && (2 < 3)` → true
+    assert_eq!(eval_int(r#"(1 < 2 < 3) ? 1 : 0"#), 1);
+}
+
+#[test]
+fn chained_comparison_less_than_false_right() {
+    // `1 < 2 < 1` → `(1 < 2) && (2 < 1)` → false
+    assert_eq!(eval_int(r#"(1 < 2 < 1) ? 1 : 0"#), 0);
+}
+
+#[test]
+fn chained_comparison_less_than_false_left() {
+    // `3 < 2 < 5` → `(3 < 2) && (2 < 5)` → false (short-circuits)
+    assert_eq!(eval_int(r#"(3 < 2 < 5) ? 1 : 0"#), 0);
+}
+
+#[test]
+fn chained_comparison_three_way() {
+    // `1 < 2 < 3 < 4` → `(1<2) && (2<3) && (3<4)` → true
+    assert_eq!(eval_int(r#"(1 < 2 < 3 < 4) ? 1 : 0"#), 1);
+}
+
+#[test]
+fn chained_comparison_mixed_lt_le() {
+    // `1 < 2 <= 2` → `(1 < 2) && (2 <= 2)` → true
+    assert_eq!(eval_int(r#"(1 < 2 <= 2) ? 1 : 0"#), 1);
+}
+
+#[test]
+fn chained_comparison_greater_than() {
+    // `5 > 3 > 1` → `(5 > 3) && (3 > 1)` → true
+    assert_eq!(eval_int(r#"(5 > 3 > 1) ? 1 : 0"#), 1);
+}
+
+#[test]
+fn chained_comparison_greater_than_false() {
+    // `5 > 3 > 4` → `(5 > 3) && (3 > 4)` → false
+    assert_eq!(eval_int(r#"(5 > 3 > 4) ? 1 : 0"#), 0);
+}
+
+#[test]
+fn chained_comparison_with_variable() {
+    assert_eq!(eval_int(r#"my $x = 5; (1 < $x < 10) ? 1 : 0"#), 1);
+}
+
+#[test]
+fn chained_comparison_variable_out_of_range() {
+    assert_eq!(eval_int(r#"my $x = 15; (1 < $x < 10) ? 1 : 0"#), 0);
+}
+
+#[test]
+fn chained_comparison_string_lt() {
+    // `"a" lt "b" lt "c"` → true
+    assert_eq!(eval_int(r#"("a" lt "b" lt "c") ? 1 : 0"#), 1);
+}
+
+#[test]
+fn chained_comparison_string_gt() {
+    // `"c" gt "b" gt "a"` → true
+    assert_eq!(eval_int(r#"("c" gt "b" gt "a") ? 1 : 0"#), 1);
+}
+
+// ── Default parameter values ──
+// Note: In stryke, calling foo() with zero args implicitly passes $_ as the first arg.
+// This is a stryke extension for lambda-style programming. Default parameters kick in
+// only when argc < param count (after the implicit $_ is added).
+
+#[test]
+fn fn_scalar_param_default_used() {
+    // With 2 params, foo() passes $_ to first, default used for second
+    assert_eq!(eval_int(r#"fn foo($a, $x = 42) { $x } foo(1)"#), 42);
+}
+
+#[test]
+fn fn_scalar_param_default_overridden() {
+    assert_eq!(eval_int(r#"fn foo($a, $x = 42) { $x } foo(1, 99)"#), 99);
+}
+
+#[test]
+fn fn_scalar_param_default_expression() {
+    assert_eq!(eval_int(r#"fn foo($a, $x = 2 + 3) { $x } foo(1)"#), 5);
+}
+
+#[test]
+fn fn_scalar_param_default_with_type() {
+    assert_eq!(eval_int(r#"fn foo($a, $x: Int = 42) { $x } foo(1)"#), 42);
+}
+
+#[test]
+fn fn_multiple_params_with_defaults() {
+    // First param gets the one explicit arg, rest get defaults
+    assert_eq!(
+        eval_int(r#"fn foo($a, $b = 2, $c = 3) { $a + $b + $c } foo(1)"#),
+        6
+    );
+}
+
+#[test]
+fn fn_mixed_params_some_defaults() {
+    assert_eq!(eval_int(r#"fn foo($a, $b = 10) { $a + $b } foo(5)"#), 15);
+}
+
+#[test]
+fn fn_array_param_default() {
+    // Scalar first, then array default
+    assert_eq!(
+        eval_string(r#"fn foo($x, @a = (1, 2, 3)) { join "-", @a } foo(0)"#),
+        "1-2-3"
+    );
+}
+
+#[test]
+fn fn_array_param_default_overridden() {
+    assert_eq!(
+        eval_string(r#"fn foo($x, @a = (1, 2, 3)) { join "-", @a } foo(0, 7, 8, 9)"#),
+        "7-8-9"
+    );
+}
+
+#[test]
+fn fn_hash_param_default() {
+    assert_eq!(
+        eval_int(r#"fn foo($x, %h = (a => 1, b => 2)) { $h{a} + $h{b} } foo(0)"#),
+        3
+    );
+}
+
+#[test]
+fn fn_hash_param_default_overridden() {
+    assert_eq!(
+        eval_int(r#"fn foo($x, %h = (a => 1, b => 2)) { $h{a} + $h{b} } foo(0, a => 10, b => 20)"#),
+        30
+    );
+}
+
+#[test]
+fn fn_default_uses_outer_scope_variable() {
+    assert_eq!(
+        eval_int(r#"my $base = 100; fn foo($a, $x = $base) { $x } foo(1)"#),
+        100
+    );
+}
+
+#[test]
+fn fn_default_calls_function() {
+    assert_eq!(
+        eval_int(r#"fn get_default { 99 } fn foo($a, $x = get_default()) { $x } foo(1)"#),
+        99
+    );
+}
+
+#[test]
+fn fn_default_second_uses_first() {
+    // Later param can reference earlier param
+    assert_eq!(eval_int(r#"fn foo($a, $b = $a * 2) { $b } foo(10)"#), 20);
+}
+
+#[test]
+fn fn_default_explicit_undef_not_use_default() {
+    // Passing explicit undef should NOT use default (matches Perl behavior)
+    assert_eq!(
+        eval_string(r#"fn foo($a, $x = "default") { defined($x) ? $x : "undef" } foo(1, undef)"#),
+        "undef"
+    );
+}
+
+#[test]
+fn fn_default_zero_does_not_trigger_default() {
+    assert_eq!(eval_int(r#"fn foo($a, $x = 42) { $x } foo(1, 0)"#), 0);
+}
+
+#[test]
+fn fn_default_empty_string_does_not_trigger_default() {
+    assert_eq!(
+        eval_string(r#"fn foo($a, $x = "default") { $x eq "" ? "empty" : $x } foo(1, "")"#),
+        "empty"
+    );
+}
+
+#[test]
+fn fn_array_default_expression() {
+    assert_eq!(
+        eval_string(r#"fn foo($x, @a = (1..5)) { join "-", @a } foo(0)"#),
+        "1-2-3-4-5"
+    );
+}
+
+#[test]
+fn fn_default_with_ternary() {
+    assert_eq!(
+        eval_int(r#"my $flag = 1; fn foo($a, $x = $flag ? 100 : 0) { $x } foo(1)"#),
+        100
+    );
+}
+
+#[test]
+fn fn_single_param_default_topic_passes_through() {
+    // When calling foo() with 0 explicit args, $_ becomes the implicit first arg
+    // So for a single-param function, the default is NOT used
+    assert_eq!(eval_int(r#"$_ = 999; fn foo($x = 42) { $x } foo()"#), 999);
 }
 
 // ── Autovivify: assign past end of array ──

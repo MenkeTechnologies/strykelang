@@ -640,18 +640,30 @@ fn deparse_params(buf: &mut String, params: &[SubSigParam]) {
             buf.push_str(", ");
         }
         match p {
-            SubSigParam::Scalar(name, ty) => {
+            SubSigParam::Scalar(name, ty, default) => {
                 let _ = write!(buf, "${}", name);
                 if let Some(t) = ty {
                     buf.push_str(": ");
                     buf.push_str(&t.display_name());
                 }
+                if let Some(d) = default {
+                    buf.push_str(" = ");
+                    deparse_expr_into(buf, d);
+                }
             }
-            SubSigParam::Array(name) => {
+            SubSigParam::Array(name, default) => {
                 let _ = write!(buf, "@{}", name);
+                if let Some(d) = default {
+                    buf.push_str(" = ");
+                    deparse_expr_into(buf, d);
+                }
             }
-            SubSigParam::Hash(name) => {
+            SubSigParam::Hash(name, default) => {
                 let _ = write!(buf, "%{}", name);
+                if let Some(d) = default {
+                    buf.push_str(" = ");
+                    deparse_expr_into(buf, d);
+                }
             }
             SubSigParam::ArrayDestruct(elems) => {
                 buf.push('[');

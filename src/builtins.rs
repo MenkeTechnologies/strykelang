@@ -349,7 +349,7 @@ pub(crate) fn try_builtin(
         "dirname" | "dn" => Some(builtin_dirname(args)),
         "fileparse" => Some(builtin_fileparse(interp, args, line)),
         "gethostname" | "hn" => Some(builtin_gethostname()),
-        "spurt" | "write_file" | "wf" => Some(builtin_spurt(args, line)),
+        "spurt" | "spew" | "write_file" | "wf" => Some(builtin_spurt(args, line)),
         "collect" => Some(interp.builtin_collect_execute(args, line)),
         "take" | "head" | "hd" => {
             if name == "take"
@@ -1389,6 +1389,11 @@ pub(crate) fn try_builtin(
         "to_toml" | "tt" => Some(builtin_to_toml(args)),
         "to_yaml" | "ty" => Some(builtin_to_yaml(args)),
         "to_xml" | "tx" => Some(builtin_to_xml(args)),
+        "from_json" | "fj" => Some(builtin_from_json(args)),
+        "from_yaml" | "fy" => Some(builtin_from_yaml(args)),
+        "from_toml" | "ftoml" => Some(builtin_from_toml(args)),
+        "from_xml" | "fx" => Some(builtin_from_xml(args)),
+        "from_csv" | "fcsv" => Some(builtin_from_csv(args)),
         "set" => Some(Ok(crate::value::set_from_elements(args.iter().cloned()))),
         "tee" => Some(builtin_tee(args, line)),
         "nth" => Some(builtin_nth(args)),
@@ -3948,18 +3953,27 @@ fn stringify_value(buf: &mut String, val: &PerlValue) {
                     buf.push_str(", ");
                 }
                 match p {
-                    crate::ast::SubSigParam::Scalar(name, ty) => {
+                    crate::ast::SubSigParam::Scalar(name, ty, default) => {
                         let _ = write!(buf, "${}", name);
                         if let Some(t) = ty {
                             buf.push_str(": ");
                             buf.push_str(&t.display_name());
                         }
+                        if default.is_some() {
+                            buf.push_str(" = ...");
+                        }
                     }
-                    crate::ast::SubSigParam::Array(name) => {
+                    crate::ast::SubSigParam::Array(name, default) => {
                         let _ = write!(buf, "@{}", name);
+                        if default.is_some() {
+                            buf.push_str(" = ...");
+                        }
                     }
-                    crate::ast::SubSigParam::Hash(name) => {
+                    crate::ast::SubSigParam::Hash(name, default) => {
                         let _ = write!(buf, "%{}", name);
+                        if default.is_some() {
+                            buf.push_str(" = ...");
+                        }
                     }
                     crate::ast::SubSigParam::ArrayDestruct(_) => buf.push_str("[...]"),
                     crate::ast::SubSigParam::HashDestruct(_) => buf.push_str("{...}"),
@@ -22910,6 +22924,521 @@ fn xml_escape(s: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&apos;")
+}
+
+// ── from_json ───────────────────────────────────────────────────────────
+
+/// `from_json STRING` — parse a JSON string into a PerlValue.
+fn builtin_from_json(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    parse_json_value(&s)
+}
+
+fn parse_json_value(s: &str) -> PerlResult<PerlValue> {
+    let s = s.trim();
+    if s.is_empty() || s == "null" {
+        return Ok(PerlValue::UNDEF);
+    }
+    if s == "true" {
+        return Ok(PerlValue::integer(1));
+    }
+    if s == "false" {
+        return Ok(PerlValue::integer(0));
+    }
+    if s.starts_with('"') && s.ends_with('"') {
+        let inner = &s[1..s.len() - 1];
+        return Ok(PerlValue::string(
+            inner
+                .replace("\\n", "\n")
+                .replace("\\t", "\t")
+                .replace("\\r", "\r")
+                .replace("\\\"", "\"")
+                .replace("\\\\", "\\")
+                .into(),
+        ));
+    }
+    if let Ok(n) = s.parse::<i64>() {
+        return Ok(PerlValue::integer(n));
+    }
+    if let Ok(f) = s.parse::<f64>() {
+        return Ok(PerlValue::float(f));
+    }
+    if s.starts_with('[') && s.ends_with(']') {
+        return parse_json_array(s);
+    }
+    if s.starts_with('{') && s.ends_with('}') {
+        return parse_json_object(s);
+    }
+    Ok(PerlValue::string(s.into()))
+}
+
+fn parse_json_array(s: &str) -> PerlResult<PerlValue> {
+    let inner = &s[1..s.len() - 1];
+    if inner.trim().is_empty() {
+        return Ok(PerlValue::array_ref(Arc::new(RwLock::new(Vec::new()))));
+    }
+    let mut items = Vec::new();
+    let mut depth = 0;
+    let mut in_string = false;
+    let mut escape = false;
+    let mut start = 0;
+    for (i, c) in inner.char_indices() {
+        if escape {
+            escape = false;
+            continue;
+        }
+        match c {
+            '\\' if in_string => escape = true,
+            '"' => in_string = !in_string,
+            '[' | '{' if !in_string => depth += 1,
+            ']' | '}' if !in_string => depth -= 1,
+            ',' if !in_string && depth == 0 => {
+                items.push(parse_json_value(inner[start..i].trim())?);
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    if start < inner.len() {
+        let remaining = inner[start..].trim();
+        if !remaining.is_empty() {
+            items.push(parse_json_value(remaining)?);
+        }
+    }
+    Ok(PerlValue::array_ref(Arc::new(RwLock::new(items))))
+}
+
+fn parse_json_object(s: &str) -> PerlResult<PerlValue> {
+    let inner = &s[1..s.len() - 1];
+    if inner.trim().is_empty() {
+        return Ok(PerlValue::hash_ref(Arc::new(RwLock::new(
+            indexmap::IndexMap::new(),
+        ))));
+    }
+    let hash: indexmap::IndexMap<String, PerlValue> = indexmap::IndexMap::new();
+    let hash = Arc::new(RwLock::new(hash));
+    let mut depth = 0;
+    let mut in_string = false;
+    let mut escape = false;
+    let mut start = 0;
+    for (i, c) in inner.char_indices() {
+        if escape {
+            escape = false;
+            continue;
+        }
+        match c {
+            '\\' if in_string => escape = true,
+            '"' => in_string = !in_string,
+            '[' | '{' if !in_string => depth += 1,
+            ']' | '}' if !in_string => depth -= 1,
+            ',' if !in_string && depth == 0 => {
+                parse_json_kv(&inner[start..i], &hash)?;
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    if start < inner.len() {
+        let remaining = inner[start..].trim();
+        if !remaining.is_empty() {
+            parse_json_kv(remaining, &hash)?;
+        }
+    }
+    Ok(PerlValue::hash_ref(hash))
+}
+
+fn parse_json_kv(
+    kv: &str,
+    hash: &Arc<RwLock<indexmap::IndexMap<String, PerlValue>>>,
+) -> PerlResult<()> {
+    let kv = kv.trim();
+    let colon = kv
+        .find(':')
+        .ok_or_else(|| PerlError::runtime("Invalid JSON: missing colon", 0))?;
+    let key = kv[..colon].trim();
+    let key = if key.starts_with('"') && key.ends_with('"') {
+        &key[1..key.len() - 1]
+    } else {
+        key
+    };
+    let val_str = kv[colon + 1..].trim();
+    let val = parse_json_value(val_str)?;
+    hash.write().insert(key.to_string(), val);
+    Ok(())
+}
+
+// ── from_yaml ───────────────────────────────────────────────────────────
+
+/// `from_yaml STRING` — parse a YAML string into a PerlValue.
+fn builtin_from_yaml(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    parse_yaml(&s)
+}
+
+fn parse_yaml(s: &str) -> PerlResult<PerlValue> {
+    let s = s.trim();
+    if s.is_empty() || s == "~" || s == "null" {
+        return Ok(PerlValue::UNDEF);
+    }
+    let s = s
+        .strip_prefix("---")
+        .map(|rest| rest.trim_start())
+        .unwrap_or(s);
+    if s.is_empty() || s == "~" || s == "null" {
+        return Ok(PerlValue::UNDEF);
+    }
+    if s == "true" {
+        return Ok(PerlValue::integer(1));
+    }
+    if s == "false" {
+        return Ok(PerlValue::integer(0));
+    }
+    if s == "{}" {
+        return Ok(PerlValue::hash_ref(Arc::new(RwLock::new(
+            indexmap::IndexMap::new(),
+        ))));
+    }
+    if s == "[]" {
+        return Ok(PerlValue::array_ref(Arc::new(RwLock::new(Vec::new()))));
+    }
+    if let Ok(n) = s.parse::<i64>() {
+        return Ok(PerlValue::integer(n));
+    }
+    if let Ok(f) = s.parse::<f64>() {
+        return Ok(PerlValue::float(f));
+    }
+    if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
+        let inner = &s[1..s.len() - 1];
+        return Ok(PerlValue::string(
+            inner.replace("\\n", "\n").replace("\\\"", "\"").into(),
+        ));
+    }
+    if s.starts_with("- ") || s.starts_with("-\n") {
+        return parse_yaml_array(s);
+    }
+    if s.contains(':') && !s.starts_with('"') {
+        return parse_yaml_hash(s);
+    }
+    Ok(PerlValue::string(s.into()))
+}
+
+fn parse_yaml_array(s: &str) -> PerlResult<PerlValue> {
+    let mut items = Vec::new();
+    let mut current = String::new();
+    let mut in_item = false;
+    for line in s.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("- ") {
+            if in_item && !current.is_empty() {
+                items.push(parse_yaml(&current)?);
+            }
+            current = trimmed[2..].to_string();
+            in_item = true;
+        } else if in_item {
+            current.push('\n');
+            current.push_str(line);
+        }
+    }
+    if in_item && !current.is_empty() {
+        items.push(parse_yaml(&current)?);
+    }
+    Ok(PerlValue::array_ref(Arc::new(RwLock::new(items))))
+}
+
+fn parse_yaml_hash(s: &str) -> PerlResult<PerlValue> {
+    let hash: indexmap::IndexMap<String, PerlValue> = indexmap::IndexMap::new();
+    let hash = Arc::new(RwLock::new(hash));
+    let mut current_key: Option<String> = None;
+    let mut current_value = String::new();
+    let mut base_indent: Option<usize> = None;
+    for line in s.lines() {
+        let indent = line.len() - line.trim_start().len();
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if base_indent.is_none() {
+            base_indent = Some(indent);
+        }
+        if indent == base_indent.unwrap_or(0) {
+            if let Some(key) = current_key.take() {
+                let val = parse_yaml(&current_value)?;
+                hash.write().insert(key, val);
+                current_value.clear();
+            }
+            if let Some(colon_pos) = trimmed.find(':') {
+                let key = trimmed[..colon_pos].trim();
+                let rest = trimmed[colon_pos + 1..].trim();
+                current_key = Some(key.to_string());
+                if !rest.is_empty() {
+                    current_value = rest.to_string();
+                }
+            }
+        } else if current_key.is_some() {
+            if !current_value.is_empty() {
+                current_value.push('\n');
+            }
+            current_value.push_str(trimmed);
+        }
+    }
+    if let Some(key) = current_key {
+        let val = parse_yaml(&current_value)?;
+        hash.write().insert(key, val);
+    }
+    Ok(PerlValue::hash_ref(hash))
+}
+
+// ── from_toml ───────────────────────────────────────────────────────────
+
+/// `from_toml STRING` — parse a TOML string into a PerlValue.
+fn builtin_from_toml(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    parse_toml(&s)
+}
+
+fn parse_toml(s: &str) -> PerlResult<PerlValue> {
+    let hash: indexmap::IndexMap<String, PerlValue> = indexmap::IndexMap::new();
+    let hash = Arc::new(RwLock::new(hash));
+    let mut current_section: Option<String> = None;
+    for line in s.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            current_section = Some(trimmed[1..trimmed.len() - 1].to_string());
+            continue;
+        }
+        if let Some(eq_pos) = trimmed.find('=') {
+            let key = trimmed[..eq_pos].trim();
+            let val_str = trimmed[eq_pos + 1..].trim();
+            let val = parse_toml_value(val_str);
+            if let Some(ref section) = current_section {
+                let section_hash = {
+                    let guard = hash.read();
+                    guard.get(section).and_then(|v| v.as_hash_ref())
+                };
+                let section_hash = section_hash.unwrap_or_else(|| {
+                    let new_hash: indexmap::IndexMap<String, PerlValue> = indexmap::IndexMap::new();
+                    let new_hash = Arc::new(RwLock::new(new_hash));
+                    hash.write()
+                        .insert(section.clone(), PerlValue::hash_ref(new_hash.clone()));
+                    new_hash
+                });
+                section_hash.write().insert(key.to_string(), val);
+            } else {
+                hash.write().insert(key.to_string(), val);
+            }
+        }
+    }
+    Ok(PerlValue::hash_ref(hash))
+}
+
+fn parse_toml_value(s: &str) -> PerlValue {
+    let s = s.trim();
+    if s == "true" {
+        return PerlValue::integer(1);
+    }
+    if s == "false" {
+        return PerlValue::integer(0);
+    }
+    if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
+        let inner = &s[1..s.len() - 1];
+        return PerlValue::string(inner.replace("\\n", "\n").replace("\\\"", "\"").into());
+    }
+    if s.starts_with('[') && s.ends_with(']') {
+        let inner = &s[1..s.len() - 1];
+        let items: Vec<PerlValue> = inner
+            .split(',')
+            .map(|item| parse_toml_value(item.trim()))
+            .collect();
+        return PerlValue::array_ref(Arc::new(RwLock::new(items)));
+    }
+    if let Ok(n) = s.parse::<i64>() {
+        return PerlValue::integer(n);
+    }
+    if let Ok(f) = s.parse::<f64>() {
+        return PerlValue::float(f);
+    }
+    PerlValue::string(s.into())
+}
+
+// ── from_xml ────────────────────────────────────────────────────────────
+
+/// `from_xml STRING` — parse an XML string into a PerlValue.
+fn builtin_from_xml(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    parse_xml(&s)
+}
+
+fn parse_xml(s: &str) -> PerlResult<PerlValue> {
+    let s = s.trim();
+    let s = if s.starts_with("<?xml") {
+        s.find("?>").map(|i| &s[i + 2..]).unwrap_or(s).trim()
+    } else {
+        s
+    };
+    if s.is_empty() {
+        return Ok(PerlValue::UNDEF);
+    }
+    parse_xml_element(s).map(|(val, _)| val)
+}
+
+fn find_matching_close_tag(s: &str, open_tag: &str, close_tag: &str) -> Option<usize> {
+    let mut depth = 1;
+    let mut pos = 0;
+    while pos < s.len() {
+        if let Some(close_offset) = s[pos..].find(close_tag) {
+            let close_abs = pos + close_offset;
+            let mut open_search_end = close_abs;
+            while let Some(open_offset) = s[pos..open_search_end].find(open_tag) {
+                let open_abs = pos + open_offset;
+                let after_open = &s[open_abs + open_tag.len()..];
+                let next_char = after_open.chars().next();
+                if next_char == Some('>') || next_char == Some(' ') || next_char == Some('/') {
+                    depth += 1;
+                }
+                pos = open_abs + 1;
+                open_search_end = close_abs;
+            }
+            depth -= 1;
+            if depth == 0 {
+                return Some(close_abs);
+            }
+            pos = close_abs + close_tag.len();
+        } else {
+            return None;
+        }
+    }
+    None
+}
+
+fn parse_xml_element(s: &str) -> PerlResult<(PerlValue, &str)> {
+    let s = s.trim_start();
+    if !s.starts_with('<') {
+        let end = s.find('<').unwrap_or(s.len());
+        let text = xml_unescape(s[..end].trim());
+        return Ok((PerlValue::string(text.into()), &s[end..]));
+    }
+    let tag_end = s
+        .find('>')
+        .ok_or_else(|| PerlError::runtime("Invalid XML: unclosed tag", 0))?;
+    let tag_content = &s[1..tag_end];
+    if tag_content.ends_with('/') {
+        let tag_name = tag_content[..tag_content.len() - 1]
+            .split_whitespace()
+            .next()
+            .unwrap_or("");
+        let hash: indexmap::IndexMap<String, PerlValue> = indexmap::IndexMap::new();
+        let hash = Arc::new(RwLock::new(hash));
+        hash.write().insert(tag_name.to_string(), PerlValue::UNDEF);
+        return Ok((PerlValue::hash_ref(hash), &s[tag_end + 1..]));
+    }
+    let tag_name = tag_content.split_whitespace().next().unwrap_or("");
+    let open_tag = format!("<{}", tag_name);
+    let close_tag = format!("</{}>", tag_name);
+    let content_start = tag_end + 1;
+    let close_pos = find_matching_close_tag(&s[content_start..], &open_tag, &close_tag)
+        .ok_or_else(|| PerlError::runtime(format!("Invalid XML: unclosed tag {}", tag_name), 0))?;
+    let content = &s[content_start..content_start + close_pos];
+    let rest = &s[content_start + close_pos + close_tag.len()..];
+    let content = content.trim();
+    if content.is_empty() {
+        let hash: indexmap::IndexMap<String, PerlValue> = indexmap::IndexMap::new();
+        let hash = Arc::new(RwLock::new(hash));
+        hash.write()
+            .insert(tag_name.to_string(), PerlValue::string("".into()));
+        return Ok((PerlValue::hash_ref(hash), rest));
+    }
+    if !content.contains('<') {
+        let hash: indexmap::IndexMap<String, PerlValue> = indexmap::IndexMap::new();
+        let hash = Arc::new(RwLock::new(hash));
+        hash.write().insert(
+            tag_name.to_string(),
+            PerlValue::string(xml_unescape(content).into()),
+        );
+        return Ok((PerlValue::hash_ref(hash), rest));
+    }
+    let inner_hash: indexmap::IndexMap<String, PerlValue> = indexmap::IndexMap::new();
+    let inner_hash = Arc::new(RwLock::new(inner_hash));
+    let mut remaining = content;
+    while !remaining.trim().is_empty() {
+        let (child, new_remaining) = parse_xml_element(remaining)?;
+        if let Some(hr) = child.as_hash_ref() {
+            for (k, v) in hr.read().iter() {
+                inner_hash.write().insert(k.clone(), v.clone());
+            }
+        }
+        remaining = new_remaining;
+    }
+    let hash: indexmap::IndexMap<String, PerlValue> = indexmap::IndexMap::new();
+    let hash = Arc::new(RwLock::new(hash));
+    hash.write()
+        .insert(tag_name.to_string(), PerlValue::hash_ref(inner_hash));
+    Ok((PerlValue::hash_ref(hash), rest))
+}
+
+fn xml_unescape(s: &str) -> String {
+    s.replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+}
+
+// ── from_csv ────────────────────────────────────────────────────────────
+
+/// `from_csv STRING` — parse a CSV string into an array of hashes.
+/// First line is treated as headers.
+fn builtin_from_csv(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    parse_csv(&s)
+}
+
+fn parse_csv(s: &str) -> PerlResult<PerlValue> {
+    let mut lines = s.lines();
+    let header_line = match lines.next() {
+        Some(h) => h,
+        None => return Ok(PerlValue::array_ref(Arc::new(RwLock::new(Vec::new())))),
+    };
+    let headers: Vec<&str> = parse_csv_line(header_line);
+    let mut rows = Vec::new();
+    for line in lines {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let values = parse_csv_line(line);
+        let row: indexmap::IndexMap<String, PerlValue> = indexmap::IndexMap::new();
+        let row = Arc::new(RwLock::new(row));
+        for (i, header) in headers.iter().enumerate() {
+            let val = values
+                .get(i)
+                .map(|s| PerlValue::string((*s).into()))
+                .unwrap_or(PerlValue::UNDEF);
+            row.write().insert(header.to_string(), val);
+        }
+        rows.push(PerlValue::hash_ref(row));
+    }
+    Ok(PerlValue::array_ref(Arc::new(RwLock::new(rows))))
+}
+
+fn parse_csv_line(line: &str) -> Vec<&str> {
+    let mut fields = Vec::new();
+    let mut start = 0;
+    let mut in_quotes = false;
+    let bytes = line.as_bytes();
+    for (i, &b) in bytes.iter().enumerate() {
+        if b == b'"' {
+            in_quotes = !in_quotes;
+        } else if b == b',' && !in_quotes {
+            let field = &line[start..i];
+            fields.push(field.trim().trim_matches('"'));
+            start = i + 1;
+        }
+    }
+    let field = &line[start..];
+    fields.push(field.trim().trim_matches('"'));
+    fields
 }
 
 // ── to_html ─────────────────────────────────────────────────────────────

@@ -1700,7 +1700,11 @@ impl Parser {
 
         // Parse stages until we hit a statement terminator
         loop {
-            // Check for terminators - |> ends thread and allows piping the result
+            // Check for terminators - |> ends thread and allows piping the result.
+            // Variables ($x, @x, %x) and declaration keywords (my, our, local, state)
+            // cannot be stages, so they implicitly terminate the thread macro.
+            // This allows `my $a = ~> LIST sum` followed by `my $b = ...` on the next
+            // line without requiring a semicolon after the thread expression.
             match self.peek() {
                 Token::Semicolon
                 | Token::Newline
@@ -1708,7 +1712,36 @@ impl Parser {
                 | Token::RParen
                 | Token::RBracket
                 | Token::PipeForward
-                | Token::Eof => break,
+                | Token::Eof
+                | Token::ScalarVar(_)
+                | Token::ArrayVar(_)
+                | Token::HashVar(_)
+                | Token::Comma => break,
+                Token::Ident(ref kw)
+                    if matches!(
+                        kw.as_str(),
+                        "my" | "our"
+                            | "local"
+                            | "state"
+                            | "if"
+                            | "unless"
+                            | "while"
+                            | "until"
+                            | "for"
+                            | "foreach"
+                            | "return"
+                            | "last"
+                            | "next"
+                            | "redo"
+                            | "die"
+                            | "warn"
+                            | "print"
+                            | "say"
+                            | "p"
+                    ) =>
+                {
+                    break
+                }
                 _ => {}
             }
 
@@ -1881,54 +1914,93 @@ impl Parser {
                         self.pipe_rhs_depth = self.pipe_rhs_depth.saturating_sub(1);
                         result = self.pipe_forward_apply(result, stage, stage_line)?;
                     } else if matches!(self.peek(), Token::LParen) {
-                        // `name($_-bearing-args)` — parse explicit args, require at
-                        // least one `$_` placeholder, then wrap as a `>{...}` block
-                        // so the threaded value binds to `$_` at any position.
-                        // Examples:
-                        //   t 10 add2($_, 5) p      → add2(10, 5)
-                        //   t 10 sub2(20, $_) p     → sub2(20, 10)
-                        //   t 10 add3($_, 5, 10) p  → add3(10, 5, 10)
-                        // To pass the threaded value as a sole arg, use bare form:
-                        //   t 10 add2 p   (not `add2()`)
-                        self.advance(); // consume `(`
-                        let mut call_args = Vec::new();
-                        while !matches!(self.peek(), Token::RParen | Token::Eof) {
-                            call_args.push(self.parse_assign_expr()?);
-                            if !self.eat(&Token::Comma) {
-                                break;
-                            }
-                        }
-                        self.expect(&Token::RParen)?;
-                        // If no `$_` placeholder, auto-inject threaded value as first arg.
-                        // `t data to_file("/tmp/o.html")` → `to_file($_, "/tmp/o.html")`
-                        if !call_args.iter().any(Self::expr_contains_topic_var) {
-                            call_args.insert(
-                                0,
-                                Expr {
-                                    kind: ExprKind::ScalarVar("_".to_string()),
-                                    line: stage_line,
+                        // Special handling for join(sep) and split(pattern) in thread context.
+                        // These take the threaded list/string as their data argument, not as $_.
+                        if func_name == "join" {
+                            self.advance(); // consume `(`
+                            let separator = self.parse_assign_expr()?;
+                            self.expect(&Token::RParen)?;
+                            let placeholder = self.pipe_placeholder_list(stage_line);
+                            let stage = Expr {
+                                kind: ExprKind::JoinExpr {
+                                    separator: Box::new(separator),
+                                    list: Box::new(placeholder),
                                 },
-                            );
+                                line: stage_line,
+                            };
+                            result = self.pipe_forward_apply(result, stage, stage_line)?;
+                        } else if func_name == "split" {
+                            self.advance(); // consume `(`
+                            let pattern = self.parse_assign_expr()?;
+                            let limit = if self.eat(&Token::Comma) {
+                                Some(Box::new(self.parse_assign_expr()?))
+                            } else {
+                                None
+                            };
+                            self.expect(&Token::RParen)?;
+                            let placeholder = Expr {
+                                kind: ExprKind::ScalarVar("_".to_string()),
+                                line: stage_line,
+                            };
+                            let stage = Expr {
+                                kind: ExprKind::SplitExpr {
+                                    pattern: Box::new(pattern),
+                                    string: Box::new(placeholder),
+                                    limit,
+                                },
+                                line: stage_line,
+                            };
+                            result = self.pipe_forward_apply(result, stage, stage_line)?;
+                        } else {
+                            // `name($_-bearing-args)` — parse explicit args, require at
+                            // least one `$_` placeholder, then wrap as a `>{...}` block
+                            // so the threaded value binds to `$_` at any position.
+                            // Examples:
+                            //   t 10 add2($_, 5) p      → add2(10, 5)
+                            //   t 10 sub2(20, $_) p     → sub2(20, 10)
+                            //   t 10 add3($_, 5, 10) p  → add3(10, 5, 10)
+                            // To pass the threaded value as a sole arg, use bare form:
+                            //   t 10 add2 p   (not `add2()`)
+                            self.advance(); // consume `(`
+                            let mut call_args = Vec::new();
+                            while !matches!(self.peek(), Token::RParen | Token::Eof) {
+                                call_args.push(self.parse_assign_expr()?);
+                                if !self.eat(&Token::Comma) {
+                                    break;
+                                }
+                            }
+                            self.expect(&Token::RParen)?;
+                            // If no `$_` placeholder, auto-inject threaded value as first arg.
+                            // `t data to_file("/tmp/o.html")` → `to_file($_, "/tmp/o.html")`
+                            if !call_args.iter().any(Self::expr_contains_topic_var) {
+                                call_args.insert(
+                                    0,
+                                    Expr {
+                                        kind: ExprKind::ScalarVar("_".to_string()),
+                                        line: stage_line,
+                                    },
+                                );
+                            }
+                            let call_expr = Expr {
+                                kind: ExprKind::FuncCall {
+                                    name: func_name.clone(),
+                                    args: call_args,
+                                },
+                                line: stage_line,
+                            };
+                            let code_ref = Expr {
+                                kind: ExprKind::CodeRef {
+                                    params: vec![],
+                                    body: vec![Statement {
+                                        label: None,
+                                        kind: StmtKind::Expression(call_expr),
+                                        line: stage_line,
+                                    }],
+                                },
+                                line: stage_line,
+                            };
+                            result = self.pipe_forward_apply(result, code_ref, stage_line)?;
                         }
-                        let call_expr = Expr {
-                            kind: ExprKind::FuncCall {
-                                name: func_name.clone(),
-                                args: call_args,
-                            },
-                            line: stage_line,
-                        };
-                        let code_ref = Expr {
-                            kind: ExprKind::CodeRef {
-                                params: vec![],
-                                body: vec![Statement {
-                                    label: None,
-                                    kind: StmtKind::Expression(call_expr),
-                                    line: stage_line,
-                                }],
-                            },
-                            line: stage_line,
-                        };
-                        result = self.pipe_forward_apply(result, code_ref, stage_line)?;
                     } else {
                         // Bare function name — handle unary builtins specially
                         result = self.thread_apply_bare_func(&func_name, result, stage_line)?;
@@ -3626,15 +3698,31 @@ impl Parser {
                     } else {
                         None
                     };
-                    params.push(SubSigParam::Scalar(name, ty));
+                    // Check for default value: `$x = expr`
+                    let default = if self.eat(&Token::Assign) {
+                        Some(Box::new(self.parse_ternary()?))
+                    } else {
+                        None
+                    };
+                    params.push(SubSigParam::Scalar(name, ty, default));
                 }
                 Token::ArrayVar(name) => {
                     self.advance();
-                    params.push(SubSigParam::Array(name));
+                    let default = if self.eat(&Token::Assign) {
+                        Some(Box::new(self.parse_ternary()?))
+                    } else {
+                        None
+                    };
+                    params.push(SubSigParam::Array(name, default));
                 }
                 Token::HashVar(name) => {
                     self.advance();
-                    params.push(SubSigParam::Hash(name));
+                    let default = if self.eat(&Token::Assign) {
+                        Some(Box::new(self.parse_ternary()?))
+                    } else {
+                        None
+                    };
+                    params.push(SubSigParam::Hash(name, default));
                 }
                 Token::LBracket => {
                     self.advance();
@@ -5371,6 +5459,7 @@ impl Parser {
                     | "letters_uc" | "letters_lc" | "punctuation" | "numbers" | "graphemes"
                     | "columns" | "sentences" | "paragraphs" | "sections" | "trim" | "avg"
                     | "to_json" | "to_csv" | "to_toml" | "to_yaml" | "to_xml" | "to_html"
+                    | "from_json" | "from_csv" | "from_toml" | "from_yaml" | "from_xml"
                     | "to_markdown" | "to_table" | "xopen" | "clip" | "sparkline" | "bar_chart"
                     | "flame" | "stddev" | "squared" | "sq" | "square" | "cubed" | "cb"
                     | "cube" | "normalize" | "snake_case" | "camel_case" | "kebab_case" => {
@@ -6120,7 +6209,50 @@ impl Parser {
     }
 
     fn parse_comparison(&mut self) -> PerlResult<Expr> {
-        let mut left = self.parse_shift()?;
+        let left = self.parse_shift()?;
+        let first_op = match self.peek() {
+            Token::NumLt => BinOp::NumLt,
+            Token::NumGt => BinOp::NumGt,
+            Token::NumLe => BinOp::NumLe,
+            Token::NumGe => BinOp::NumGe,
+            Token::StrLt => BinOp::StrLt,
+            Token::StrGt => BinOp::StrGt,
+            Token::StrLe => BinOp::StrLe,
+            Token::StrGe => BinOp::StrGe,
+            _ => return Ok(left),
+        };
+        let line = left.line;
+        self.advance();
+        let middle = self.parse_shift()?;
+
+        let second_op = match self.peek() {
+            Token::NumLt => Some(BinOp::NumLt),
+            Token::NumGt => Some(BinOp::NumGt),
+            Token::NumLe => Some(BinOp::NumLe),
+            Token::NumGe => Some(BinOp::NumGe),
+            Token::StrLt => Some(BinOp::StrLt),
+            Token::StrGt => Some(BinOp::StrGt),
+            Token::StrLe => Some(BinOp::StrLe),
+            Token::StrGe => Some(BinOp::StrGe),
+            _ => None,
+        };
+
+        if second_op.is_none() {
+            return Ok(Expr {
+                kind: ExprKind::BinOp {
+                    left: Box::new(left),
+                    op: first_op,
+                    right: Box::new(middle),
+                },
+                line,
+            });
+        }
+
+        // Chained comparison: `a < b < c` → `(a < b) && (b < c)`
+        // Collect all operands and operators for chains like `1 < x < 10 < y`
+        let mut operands = vec![left, middle];
+        let mut ops = vec![first_op];
+
         loop {
             let op = match self.peek() {
                 Token::NumLt => BinOp::NumLt,
@@ -6133,19 +6265,41 @@ impl Parser {
                 Token::StrGe => BinOp::StrGe,
                 _ => break,
             };
-            let line = left.line;
             self.advance();
-            let right = self.parse_shift()?;
-            left = Expr {
+            ops.push(op);
+            operands.push(self.parse_shift()?);
+        }
+
+        // Build `(a op0 b) && (b op1 c) && (c op2 d) && ...`
+        let mut result = Expr {
+            kind: ExprKind::BinOp {
+                left: Box::new(operands[0].clone()),
+                op: ops[0],
+                right: Box::new(operands[1].clone()),
+            },
+            line,
+        };
+
+        for i in 1..ops.len() {
+            let cmp = Expr {
                 kind: ExprKind::BinOp {
-                    left: Box::new(left),
-                    op,
-                    right: Box::new(right),
+                    left: Box::new(operands[i].clone()),
+                    op: ops[i],
+                    right: Box::new(operands[i + 1].clone()),
+                },
+                line,
+            };
+            result = Expr {
+                kind: ExprKind::BinOp {
+                    left: Box::new(result),
+                    op: BinOp::LogAnd,
+                    right: Box::new(cmp),
                 },
                 line,
             };
         }
-        Ok(left)
+
+        Ok(result)
     }
 
     fn parse_shift(&mut self) -> PerlResult<Expr> {
@@ -11267,6 +11421,7 @@ impl Parser {
             | "frequencies" | "freq" | "interleave" | "ddump" | "stringify" | "str" | "top"
             | "to_json" | "to_csv" | "to_toml" | "to_yaml" | "to_xml"
             | "to_html" | "to_markdown" | "to_table" | "xopen"
+            | "from_json" | "from_csv" | "from_toml" | "from_yaml" | "from_xml"
             | "clip" | "clipboard" | "paste" | "pbcopy" | "pbpaste" | "preview"
             | "sparkline" | "spark" | "bar_chart" | "bars" | "flame" | "flamechart"
             | "histo" | "gauge" | "spinner" | "spinner_start" | "spinner_stop"

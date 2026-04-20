@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.7.11 · 3251 topics · 33 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.8.0 · 3256 topics · 33 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -173,7 +173,7 @@
         <li><a href="#ch-streaming-iterators">Streaming Iterators</a> <span class="chapter-count">24</span></li>
         <li><a href="#ch-list-operations">List Operations</a> <span class="chapter-count">62</span></li>
         <li><a href="#ch-stryke-extensions">stryke Extensions</a> <span class="chapter-count">19</span></li>
-        <li><a href="#ch-data-serialization">Data &amp; Serialization</a> <span class="chapter-count">40</span></li>
+        <li><a href="#ch-data-serialization">Data &amp; Serialization</a> <span class="chapter-count">45</span></li>
         <li><a href="#ch-http-networking">HTTP &amp; Networking</a> <span class="chapter-count">23</span></li>
         <li><a href="#ch-crypto-encoding">Crypto &amp; Encoding</a> <span class="chapter-count">133</span></li>
         <li><a href="#ch-special-math-functions">Special Math Functions</a> <span class="chapter-count">12</span></li>
@@ -1364,11 +1364,21 @@ p deq({x =&gt; [1,2]}, {x =&gt; [1,2]})            # 1
       <p class="chapter-meta">19 topics</p>
       <article class="doc-entry" id="doc-fn">
         <h3><a class="doc-anchor" href="#doc-fn">#</a> <code>fn</code></h3>
-        <p>Alias for <code>sub</code> — define a function.</p>
+        <p>Alias for <code>sub</code> — define a function with optional typed parameters and default values.</p>
         <pre><code class="lang-perl">fn double($x) { $x * 2 }
 my $f = fn { $_ * 2 }
 my $add = fn ($a: Int, $b: Int) { $a + $b }
+
+# Default parameter values (stryke extension):
+fn greet($name = &quot;world&quot;) { p &quot;hello $name&quot; }
+greet()           # hello world
+greet(&quot;Alice&quot;)    # hello Alice
+
+fn range_check($x, $min = 0, $max = 100) { $min &lt;= $x &lt;= $max }
+fn with_list(@items = (1, 2, 3)) { join &quot;-&quot;, @items }
+fn with_hash(%opts = (debug =&gt; 0)) { $opts{debug} }
 </code></pre>
+        <p>Default values are evaluated at call time if the argument is not provided.</p>
       </article>
       <article class="doc-entry" id="doc-struct">
         <h3><a class="doc-anchor" href="#doc-struct">#</a> <code>struct</code></h3>
@@ -1557,7 +1567,7 @@ capture(&quot;ps aux&quot;) |&gt; lines |&gt; map { columns } |&gt; tbl |&gt; p
     </section>
     <section class="tutorial-section" id="ch-data-serialization">
       <h2>Data &amp; Serialization</h2>
-      <p class="chapter-meta">40 topics</p>
+      <p class="chapter-meta">45 topics</p>
       <article class="doc-entry" id="doc-json-encode">
         <h3><a class="doc-anchor" href="#doc-json-encode">#</a> <code>json_encode</code></h3>
         <p><code>json_encode</code> serializes any Perl data structure — hashrefs, arrayrefs, nested combinations, numbers, strings, booleans, and undef — into a compact JSON string. It uses a fast Rust-backed serializer so it is significantly faster than <code>JSON::XS</code> for large payloads. The output is always valid UTF-8 JSON suitable for writing to files, sending over HTTP, or piping to other tools. Use <code>json_decode</code> to round-trip back.</p>
@@ -1662,6 +1672,54 @@ my @rows = ({name =&gt; &quot;Alice&quot;, age =&gt; 30}, {name =&gt; &quot;Bob&
 # | --- | --- |
 # | Alice | 30 |
 # | Bob | 25 |
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-from-json">
+        <h3><a class="doc-anchor" href="#doc-from-json">#</a> <code>from_json</code></h3>
+        <p><code>from_json</code> (alias <code>fj</code>) parses a JSON string into a stryke data structure (hashref, arrayref, scalar). This is the inverse of <code>to_json</code> and the idiomatic way to decode JSON responses from APIs, config files, or inter-process communication. The Rust-backed parser handles large documents efficiently.</p>
+        <pre><code class="lang-perl">my $json = &#39;{&quot;name&quot;:&quot;Alice&quot;,&quot;age&quot;:30}&#39;
+my $data = from_json($json)
+p $data-&gt;{name}   # Alice
+my $arr = fj &#39;[1, 2, {&quot;x&quot;: 3}]&#39;
+p $arr-&gt;[2]{x}    # 3
+slurp(&quot;config.json&quot;) |&gt; fj
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-from-yaml">
+        <h3><a class="doc-anchor" href="#doc-from-yaml">#</a> <code>from_yaml</code></h3>
+        <p><code>from_yaml</code> (alias <code>fy</code>) parses a YAML string into a stryke data structure. YAML is commonly used for configuration files due to its human-readable syntax. Handles scalars, arrays, hashes, and nested combinations. The parser supports common YAML features like multi-line strings and bare unquoted keys.</p>
+        <pre><code class="lang-perl">my $yaml = &quot;name: Alice\nage: 30&quot;
+my $data = from_yaml($yaml)
+p $data-&gt;{name}   # Alice
+slurp(&quot;config.yaml&quot;) |&gt; fy |&gt; say $_-&gt;{database}{host}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-from-toml">
+        <h3><a class="doc-anchor" href="#doc-from-toml">#</a> <code>from_toml</code></h3>
+        <p><code>from_toml</code> (alias <code>ftoml</code>) parses a TOML string into a stryke hashref. TOML is popular for Rust, Python, and other config files due to its explicit syntax. Sections become nested hashes, arrays stay arrays, and typed values (integers, floats, strings, booleans) are preserved.</p>
+        <pre><code class="lang-perl">my $toml = &quot;[package]\nname = \&quot;myapp\&quot;\nversion = \&quot;1.0\&quot;&quot;
+my $data = from_toml($toml)
+p $data-&gt;{package}{name}   # myapp
+slurp(&quot;Cargo.toml&quot;) |&gt; ftoml |&gt; say $_-&gt;{package}{version}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-from-xml">
+        <h3><a class="doc-anchor" href="#doc-from-xml">#</a> <code>from_xml</code></h3>
+        <p><code>from_xml</code> (alias <code>fx</code>) parses an XML string into a stryke hashref. Element names become hash keys, text content becomes string values, nested elements become nested hashes. The parser handles the XML declaration and basic structures.</p>
+        <pre><code class="lang-perl">my $xml = &#39;&lt;root&gt;&lt;name&gt;Alice&lt;/name&gt;&lt;age&gt;30&lt;/age&gt;&lt;/root&gt;&#39;
+my $data = from_xml($xml)
+p $data-&gt;{root}{name}   # Alice
+slurp(&quot;config.xml&quot;) |&gt; fx |&gt; say $_-&gt;{config}{database}{host}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-from-csv">
+        <h3><a class="doc-anchor" href="#doc-from-csv">#</a> <code>from_csv</code></h3>
+        <p><code>from_csv</code> (alias <code>fcsv</code>) parses a CSV string into an arrayref of hashrefs, treating the first line as headers. This is the inverse of <code>to_csv</code> and handles quoted fields containing commas according to RFC 4180.</p>
+        <pre><code class="lang-perl">my $csv = &quot;name,age\nAlice,30\nBob,25&quot;
+my $rows = from_csv($csv)
+p $rows-&gt;[0]{name}   # Alice
+p $rows-&gt;[1]{age}    # 25
+slurp(&quot;data.csv&quot;) |&gt; fcsv |&gt; grep { $_-&gt;{age} &gt; 25 }
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-xopen">

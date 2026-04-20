@@ -1,11 +1,11 @@
 //! Extra tests for AOT (Ahead-of-Time) building and trailer handling.
 
-use crate::aot::{AOT_MAGIC, AOT_VERSION, TRAILER_LEN};
+use crate::aot::{AOT_MAGIC, AOT_VERSION_V1, TRAILER_LEN};
 
 #[test]
 fn test_aot_constants() {
     assert_eq!(AOT_MAGIC, b"STRK_AOT");
-    assert_eq!(AOT_VERSION, 1);
+    assert_eq!(AOT_VERSION_V1, 1);
     assert_eq!(TRAILER_LEN, 32);
 }
 
@@ -45,7 +45,7 @@ fn test_aot_invalid_trailers() {
 
 #[test]
 fn test_aot_payload_corrupted_zstd() {
-    use crate::aot::{try_load_embedded, AOT_MAGIC, AOT_VERSION};
+    use crate::aot::{try_load_embedded, AOT_MAGIC, AOT_VERSION_V1};
     use std::fs;
     use std::io::Write;
 
@@ -64,7 +64,7 @@ fn test_aot_payload_corrupted_zstd() {
     let mut trailer = [0u8; 32];
     trailer[0..8].copy_from_slice(&(corrupt_zstd.len() as u64).to_le_bytes());
     trailer[8..16].copy_from_slice(&100u64.to_le_bytes()); // uncompressed_len
-    trailer[16..20].copy_from_slice(&AOT_VERSION.to_le_bytes());
+    trailer[16..20].copy_from_slice(&AOT_VERSION_V1.to_le_bytes());
     trailer[24..32].copy_from_slice(AOT_MAGIC);
     f.write_all(&trailer).unwrap();
     drop(f);

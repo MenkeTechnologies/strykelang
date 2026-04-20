@@ -1,4 +1,60 @@
-# lib/closures.stk — closures, lexical scope, and variable capture
+# lib/closures.stk — closures, lexical scope, state variables, and variable capture
+
+# ── State variables (persistent lexicals) ──────────────────────────
+
+fn counter_with_state {
+    state $count = 0
+    ++$count
+}
+
+fn accumulator_state($n) {
+    state $total = 0
+    $total += $n
+    $total
+}
+
+fn fibonacci_state {
+    state $a = 0
+    state $b = 1
+    my $result = $a
+    ($a, $b) = ($b, $a + $b)
+    $result
+}
+
+fn unique_id {
+    state $id = 0
+    "id_" . (++$id)
+}
+
+fn memoized_factorial($n) {
+    state $cache = {}
+    return $cache->{$n} if exists $cache->{$n}
+    my $result = $n <= 1 ? 1 : $n * memoized_factorial($n - 1)
+    $cache->{$n} = $result
+    $result
+}
+
+fn running_average($val) {
+    state $sum = 0
+    state $count = 0
+    $sum += $val
+    $count++
+    $sum / $count
+}
+
+fn toggle_state {
+    state $on = 0
+    $on = !$on
+    $on ? "ON" : "OFF"
+}
+
+fn ring_buffer_state($val) {
+    state $buffer = []
+    state $size = 5
+    push @$buffer, $val
+    shift @$buffer if @$buffer > $size
+    @$buffer
+}
 
 # ── Basic closure capture ──────────────────────────────────────────
 
