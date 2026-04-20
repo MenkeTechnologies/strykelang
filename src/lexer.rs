@@ -1720,9 +1720,11 @@ impl Lexer {
                     "tr" | "y" => {
                         // `y` is both transliteration (y///) and a valid package/typeglob name (`Foo::y`).
                         // If the next byte cannot start a tr/y body, treat as a plain identifier.
+                        // Includes newline for semicolon-less code like `$obj->y\n`.
                         if ident == "y" {
                             if let Some(d) = self.peek() {
-                                if matches!(d, ';' | '=' | ',' | ')' | ']' | '}' | '>' | ':') {
+                                if matches!(d, ';' | '=' | ',' | ')' | ']' | '}' | '>' | ':' | '\n')
+                                {
                                     self.last_was_term = true;
                                     return Ok(Token::Ident(ident));
                                 }

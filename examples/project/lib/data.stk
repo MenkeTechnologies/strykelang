@@ -19,7 +19,7 @@ fn group_records ($key, @records) {
 fn summarize_list (@data) {
     my $n = scalar @data
     return {} unless $n
-    my $total = sum(@data);
+    my $total = sum(@data)
     +{
         count  => $n,
         sum    => $total,

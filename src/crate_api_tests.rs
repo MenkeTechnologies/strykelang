@@ -9,111 +9,111 @@ fn run_int(code: &str) -> i64 {
 
 #[test]
 fn run_arithmetic_add_sub_mul_div_mod() {
-    assert_eq!(run_int("11 + 4;"), 15);
-    assert_eq!(run_int("20 - 7;"), 13);
-    assert_eq!(run_int("6 * 9;"), 54);
-    assert_eq!(run_int("22 / 4;"), 5);
-    assert_eq!(run_int("17 % 5;"), 2);
+    assert_eq!(run_int("11 + 4"), 15);
+    assert_eq!(run_int("20 - 7"), 13);
+    assert_eq!(run_int("6 * 9"), 54);
+    assert_eq!(run_int("22 / 4"), 5);
+    assert_eq!(run_int("17 % 5"), 2);
 }
 
 #[test]
 fn run_power_and_precedence() {
-    assert_eq!(run_int("2 ** 8;"), 256);
-    assert_eq!(run_int("2 + 3 * 4;"), 14);
-    assert_eq!(run_int("(2 + 3) * 4;"), 20);
+    assert_eq!(run_int("2 ** 8"), 256);
+    assert_eq!(run_int("2 + 3 * 4"), 14);
+    assert_eq!(run_int("(2 + 3) * 4"), 20);
 }
 
 #[test]
 fn run_compound_assign_xor_shift() {
-    assert_eq!(run_int(r#"my $x = 4; $x <<= 2; $x;"#), 16);
-    assert_eq!(run_int(r#"my $x = 16; $x >>= 2; $x;"#), 4);
-    assert_eq!(run_int(r#"my $x = 5; $x ^= 3; $x;"#), 6);
+    assert_eq!(run_int(r#"my $x = 4; $x <<= 2; $x"#), 16);
+    assert_eq!(run_int(r#"my $x = 16; $x >>= 2; $x"#), 4);
+    assert_eq!(run_int(r#"my $x = 5; $x ^= 3; $x"#), 6);
 }
 
 #[test]
 fn run_numeric_comparisons_yield_perl_truth() {
-    assert_eq!(run_int("5 == 5;"), 1);
-    assert_eq!(run_int("5 != 3;"), 1);
-    assert_eq!(run_int("3 < 5;"), 1);
-    assert_eq!(run_int("5 > 3;"), 1);
-    assert_eq!(run_int("5 <= 5;"), 1);
-    assert_eq!(run_int("5 >= 4;"), 1);
+    assert_eq!(run_int("5 == 5"), 1);
+    assert_eq!(run_int("5 != 3"), 1);
+    assert_eq!(run_int("3 < 5"), 1);
+    assert_eq!(run_int("5 > 3"), 1);
+    assert_eq!(run_int("5 <= 5"), 1);
+    assert_eq!(run_int("5 >= 4"), 1);
 }
 
 #[test]
 fn run_spaceship_operator() {
-    assert_eq!(run_int("5 <=> 3;"), 1);
-    assert_eq!(run_int("3 <=> 5;"), -1);
-    assert_eq!(run_int("4 <=> 4;"), 0);
+    assert_eq!(run_int("5 <=> 3"), 1);
+    assert_eq!(run_int("3 <=> 5"), -1);
+    assert_eq!(run_int("4 <=> 4"), 0);
 }
 
 #[test]
 fn run_string_cmp_and_eq() {
-    assert_eq!(run_int(r#""a" cmp "b";"#), -1);
-    assert_eq!(run_int(r#""b" cmp "a";"#), 1);
-    assert_eq!(run_int(r#""a" eq "a";"#), 1);
-    assert_eq!(run_int(r#""a" ne "b";"#), 1);
+    assert_eq!(run_int(r#""a" cmp "b""#), -1);
+    assert_eq!(run_int(r#""b" cmp "a""#), 1);
+    assert_eq!(run_int(r#""a" eq "a""#), 1);
+    assert_eq!(run_int(r#""a" ne "b""#), 1);
 }
 
 #[test]
 fn run_logical_short_circuit() {
-    assert_eq!(run_int("1 && 7;"), 7);
-    assert_eq!(run_int("0 && 7;"), 0);
-    assert_eq!(run_int("0 || 8;"), 8);
-    assert_eq!(run_int("3 || 8;"), 3);
+    assert_eq!(run_int("1 && 7"), 7);
+    assert_eq!(run_int("0 && 7"), 0);
+    assert_eq!(run_int("0 || 8"), 8);
+    assert_eq!(run_int("3 || 8"), 3);
 }
 
 #[test]
 fn run_log_and_compound_assign() {
-    assert_eq!(run_int("my $x = 0; $x &&= 5; $x;"), 0);
-    assert_eq!(run_int("my $y = 2; $y &&= 7; $y;"), 7);
+    assert_eq!(run_int("my $x = 0; $x &&= 5; $x"), 0);
+    assert_eq!(run_int("my $y = 2; $y &&= 7; $y"), 7);
 }
 
 #[test]
 fn run_defined_or_operator() {
-    assert_eq!(run_int("undef // 99;"), 99);
-    assert_eq!(run_int("0 // 5;"), 0);
+    assert_eq!(run_int("undef // 99"), 99);
+    assert_eq!(run_int("0 // 5"), 0);
 }
 
 #[test]
 fn run_bitwise_ops() {
-    assert_eq!(run_int("0x0F & 0x33;"), 0x03);
-    assert_eq!(run_int("0x01 | 0x02;"), 0x03);
-    assert_eq!(run_int("0x0F ^ 0x33;"), 0x3C);
+    assert_eq!(run_int("0x0F & 0x33"), 0x03);
+    assert_eq!(run_int("0x01 | 0x02"), 0x03);
+    assert_eq!(run_int("0x0F ^ 0x33"), 0x3C);
 }
 
 #[test]
 fn run_unary_minus_and_not() {
-    assert_eq!(run_int("- 42;"), -42);
-    assert_eq!(run_int("!0;"), 1);
-    assert_eq!(run_int("!1;"), 0);
+    assert_eq!(run_int("- 42"), -42);
+    assert_eq!(run_int("!0"), 1);
+    assert_eq!(run_int("!1"), 0);
 }
 
 #[test]
 fn run_concat_and_repeat() {
-    assert_eq!(run(r#""a" . "b" . "c";"#).expect("run").to_string(), "abc");
-    assert_eq!(run(r#""x" x 4;"#).expect("run").to_string(), "xxxx");
+    assert_eq!(run(r#""a" . "b" . "c""#).expect("run").to_string(), "abc");
+    assert_eq!(run(r#""x" x 4"#).expect("run").to_string(), "xxxx");
 }
 
 #[test]
 fn run_list_and_scalar_context_array() {
-    assert_eq!(run_int("scalar (1, 2, 3);"), 3);
+    assert_eq!(run_int("scalar (1, 2, 3)"), 3);
 }
 
 #[test]
 fn run_my_variable_and_assignment() {
-    assert_eq!(run_int("my $x = 41; $x + 1;"), 42);
+    assert_eq!(run_int("my $x = 41; $x + 1"), 42);
 }
 
 #[test]
 fn run_conditional_expression() {
-    assert_eq!(run_int("1 ? 10 : 20;"), 10);
-    assert_eq!(run_int("0 ? 10 : 20;"), 20);
+    assert_eq!(run_int("1 ? 10 : 20"), 10);
+    assert_eq!(run_int("0 ? 10 : 20"), 20);
 }
 
 #[test]
 fn run_simple_subroutine() {
-    assert_eq!(run_int("sub add2 { return $_0 + $_1; } add2(30, 12);"), 42);
+    assert_eq!(run_int("sub add2 { return $_0 + $_1; } add2(30, 12)"), 42);
 }
 
 #[test]
@@ -136,7 +136,7 @@ fn parse_and_run_string_shares_interpreter_state() {
 
 #[test]
 fn try_vm_execute_runs_simple_literal_program() {
-    let p = parse("42;").expect("parse");
+    let p = parse("42").expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some());
@@ -146,17 +146,17 @@ fn try_vm_execute_runs_simple_literal_program() {
 /// `pos = EXPR` updates `regex_pos` for `$_` (Text::Balanced / `m//gc` preamble).
 #[test]
 fn run_pos_assign_implicit_underbar_reads_back() {
-    assert_eq!(run_int(r#"$_ = "zz"; pos = 2; pos;"#), 2);
+    assert_eq!(run_int(r#"$_ = "zz"; pos = 2; pos"#), 2);
 }
 
 #[test]
 fn run_pos_assign_named_scalar_reads_back() {
-    assert_eq!(run_int(r#"my $s = "ab"; pos $s = 1; pos $s;"#), 1);
+    assert_eq!(run_int(r#"my $s = "ab"; pos $s = 1; pos $s"#), 1);
 }
 
 #[test]
 fn try_vm_execute_pos_assign_sets_regex_pos() {
-    let p = parse(r#"$_ = ""; pos = 3; pos;"#).expect("parse");
+    let p = parse(r#"$_ = ""; pos = 3; pos"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
@@ -171,11 +171,11 @@ fn try_vm_execute_pos_assign_sets_regex_pos() {
 fn run_pos_deref_scalar_assign_reads_back() {
     assert_eq!(
         run_int(
-            r#"no strict 'vars';
-            my $s = "ab";
-            my $r = \$s;
-            pos $$r = 1;
-            pos $$r;"#
+            r#"no strict 'vars'
+            my $s = "ab"
+            my $r = \$s
+            pos $$r = 1
+            pos $$r"#
         ),
         1
     );
@@ -184,11 +184,11 @@ fn run_pos_deref_scalar_assign_reads_back() {
 #[test]
 fn try_vm_execute_pos_deref_scalar_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $s = "";
-        my $t = \$s;
-        pos $$t = 2;
-        pos $$t;"#,
+        r#"no strict 'vars'
+        my $s = ""
+        my $t = \$s
+        pos $$t = 2
+        pos $$t"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -204,8 +204,8 @@ fn try_vm_execute_pos_deref_scalar_assign() {
 #[test]
 fn try_vm_execute_map_expr_comma_length_builtin() {
     let p = parse(
-        r#"no strict 'vars';
-        join(",", map length, qw(a bb));"#,
+        r#"no strict 'vars'
+        join(",", map length, qw(a bb))"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -235,7 +235,7 @@ fn try_vm_execute_tell_after_print_to_file() {
 
 #[test]
 fn try_vm_execute_quotemeta_builtin() {
-    let p = parse(r#"quotemeta("a.c");"#).expect("parse");
+    let p = parse(r#"quotemeta("a.c")"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "quotemeta should compile on VM");
@@ -246,9 +246,9 @@ fn try_vm_execute_quotemeta_builtin() {
 #[test]
 fn try_vm_execute_do_block_propagates_list_context_to_grep() {
     let p = parse(
-        r#"my @l = (1, 2, 3, 2, 1);
-        my @u = do { my %seen; grep { !$seen{$_}++ } @l };
-        scalar @u;"#,
+        r#"my @l = (1, 2, 3, 2, 1)
+        my @u = do { my %seen; grep { !$seen{$_}++ } @l }
+        scalar @u"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -264,9 +264,9 @@ fn try_vm_execute_do_block_propagates_list_context_to_grep() {
 #[test]
 fn try_vm_execute_chomp_scalar_returns_removed_count() {
     let p = parse(
-        r#"my $s = "xy\n";
-        my $n = chomp $s;
-        $n * 100 + length($s);"#,
+        r#"my $s = "xy\n"
+        my $n = chomp $s
+        $n * 100 + length($s)"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -295,9 +295,9 @@ fn try_vm_execute_subst_pattern_expands_env_brace() {
 fn try_vm_execute_subst_replacement_expands_env_brace() {
     let home = std::env::var("HOME").expect("HOME");
     let p = parse(
-        r#"$_ = "~/baz";
-        s@^([~])([^~]*)$@$ENV{HOME}$2@;
-        $_;"#,
+        r#"$_ = "~/baz"
+        s@^([~])([^~]*)$@$ENV{HOME}$2@
+        $_"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -313,8 +313,8 @@ fn try_vm_execute_subst_replacement_expands_env_brace() {
 #[test]
 fn try_vm_execute_my_array_assign_do_block_list_rhs() {
     let p = parse(
-        r#"my @a = do { (7, 8, 9) };
-        $a[0] * 100 + $a[1] * 10 + $a[2];"#,
+        r#"my @a = do { (7, 8, 9) }
+        $a[0] * 100 + $a[1] * 10 + $a[2]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -330,8 +330,8 @@ fn try_vm_execute_my_array_assign_do_block_list_rhs() {
 #[test]
 fn try_vm_execute_my_hash_assign_do_block_list_rhs() {
     let p = parse(
-        r#"my %h = do { ("a", 2, "b", 5) };
-        $h{"a"} * 10 + $h{"b"};"#,
+        r#"my %h = do { ("a", 2, "b", 5) }
+        $h{"a"} * 10 + $h{"b"}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -345,7 +345,7 @@ fn try_vm_execute_my_hash_assign_do_block_list_rhs() {
 
 #[test]
 fn try_vm_execute_tell_stdout_returns_negative_one() {
-    let p = parse("tell STDOUT;").expect("parse");
+    let p = parse("tell STDOUT").expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "tell STDOUT should compile on VM");
@@ -354,7 +354,7 @@ fn try_vm_execute_tell_stdout_returns_negative_one() {
 
 #[test]
 fn try_vm_execute_core_tell_stdout() {
-    let p = parse("CORE::tell STDOUT;").expect("parse");
+    let p = parse("CORE::tell STDOUT").expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "CORE::tell should compile on VM");
@@ -365,9 +365,9 @@ fn try_vm_execute_core_tell_stdout() {
 #[test]
 fn try_vm_execute_array_assign_flattens_hash() {
     let p = parse(
-        r#"my %h = ("u", 1, "v", 2);
-        my @a = %h;
-        scalar @a;"#,
+        r#"my %h = ("u", 1, "v", 2)
+        my @a = %h
+        scalar @a"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -382,7 +382,7 @@ fn try_vm_execute_array_assign_flattens_hash() {
 #[cfg(unix)]
 #[test]
 fn try_vm_execute_fileno_stdout() {
-    let p = parse("fileno STDOUT;").expect("parse");
+    let p = parse("fileno STDOUT").expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "fileno should compile on VM");
@@ -412,7 +412,7 @@ fn try_vm_execute_getc_reads_from_open_file() {
 
 #[test]
 fn try_vm_execute_binmode_stdout() {
-    let p = parse("binmode STDOUT;").expect("parse");
+    let p = parse("binmode STDOUT").expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "binmode should compile on VM");
@@ -423,9 +423,9 @@ fn try_vm_execute_binmode_stdout() {
 #[test]
 fn try_vm_execute_join_uses_list_separator_glue() {
     let p = parse(
-        r#"no strict 'vars';
-        $" = "-";
-        join $", ("aa", "bb", "cc");"#,
+        r#"no strict 'vars'
+        $" = "-"
+        join $", ("aa", "bb", "cc")"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -440,10 +440,10 @@ fn try_vm_execute_join_uses_list_separator_glue() {
 #[test]
 fn try_vm_execute_qq_array_respects_custom_list_separator() {
     let p = parse(
-        r#"no strict 'vars';
-        my @a = (1, 2, 3);
-        $" = "|";
-        "@a";"#,
+        r#"no strict 'vars'
+        my @a = (1, 2, 3)
+        $" = "|"
+        "@a""#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -458,8 +458,8 @@ fn try_vm_execute_qq_array_respects_custom_list_separator() {
 #[test]
 fn try_vm_execute_scalar_keys_hash_count() {
     let p = parse(
-        r#"my %h = ("a", 1, "b", 2, "c", 3);
-        scalar keys %h;"#,
+        r#"my %h = ("a", 1, "b", 2, "c", 3)
+        scalar keys %h"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -474,8 +474,8 @@ fn try_vm_execute_scalar_keys_hash_count() {
 #[test]
 fn try_vm_execute_scalar_values_hash_count() {
     let p = parse(
-        r#"my %h = ("a", 1, "b", 2);
-        scalar values %h;"#,
+        r#"my %h = ("a", 1, "b", 2)
+        scalar values %h"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -486,7 +486,7 @@ fn try_vm_execute_scalar_values_hash_count() {
 
 #[test]
 fn try_vm_execute_join_reverse_list() {
-    let p = parse(r#"join(",", reverse (30, 20, 10));"#).expect("parse");
+    let p = parse(r#"join(",", reverse (30, 20, 10))"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "reverse list then join should compile on VM");
@@ -582,7 +582,7 @@ fn try_vm_execute_truncate_path_shortens_file() {
 
 #[test]
 fn try_vm_execute_split_with_limit() {
-    let p = parse(r#"scalar split(",", "aa,bb,cc,dd", 2);"#).expect("parse");
+    let p = parse(r#"scalar split(",", "aa,bb,cc,dd", 2)"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "split with LIMIT should compile on VM");
@@ -591,7 +591,7 @@ fn try_vm_execute_split_with_limit() {
 
 #[test]
 fn try_vm_execute_pack_unsigned_char() {
-    let p = parse(r#"ord substr(pack("C", 77), 0, 1);"#).expect("parse");
+    let p = parse(r#"ord substr(pack("C", 77), 0, 1)"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "pack C should compile on VM");
@@ -600,7 +600,7 @@ fn try_vm_execute_pack_unsigned_char() {
 
 #[test]
 fn try_vm_execute_unpack_after_pack_unsigned_char() {
-    let p = parse(r#"scalar unpack("C", pack("C", 91));"#).expect("parse");
+    let p = parse(r#"scalar unpack("C", pack("C", 91))"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "unpack after pack should compile on VM");
@@ -609,7 +609,7 @@ fn try_vm_execute_unpack_after_pack_unsigned_char() {
 
 #[test]
 fn try_vm_execute_eval_string_expression() {
-    let p = parse(r#"eval '31 + 11';"#).expect("parse");
+    let p = parse(r#"eval '31 + 11'"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
@@ -621,7 +621,7 @@ fn try_vm_execute_eval_string_expression() {
 
 #[test]
 fn try_vm_execute_eval_block_expression() {
-    let p = parse(r#"eval { 50 - 8 };"#).expect("parse");
+    let p = parse(r#"eval { 50 - 8 }"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "eval block should compile on VM (EvalBlock)");
@@ -662,7 +662,7 @@ fn try_vm_execute_filetest_z_empty_file() {
 
 #[test]
 fn try_vm_execute_sleep_zero() {
-    let p = parse("sleep 0;").expect("parse");
+    let p = parse("sleep 0").expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "sleep should compile on VM");
@@ -694,7 +694,7 @@ fn try_vm_execute_glob_lists_matching_files_in_dir() {
 #[cfg(unix)]
 #[test]
 fn try_vm_execute_qx_scalar_reads_stdout() {
-    let p = parse(r#"scalar `printf '%s' vm_qx_ok`;"#).expect("parse");
+    let p = parse(r#"scalar `printf '%s' vm_qx_ok`"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "qx / readpipe should compile on VM");
@@ -705,7 +705,7 @@ fn try_vm_execute_qx_scalar_reads_stdout() {
 fn try_vm_execute_prototype_coderef() {
     let p = parse(
         r#"sub demo ($) { $_0 * 2 }
-        prototype \&demo;"#,
+        prototype \&demo"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -716,7 +716,7 @@ fn try_vm_execute_prototype_coderef() {
 
 #[test]
 fn try_vm_execute_study_non_empty_string() {
-    let p = parse(r#"study "pq";"#).expect("parse");
+    let p = parse(r#"study "pq""#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "study should compile on VM");
@@ -725,7 +725,7 @@ fn try_vm_execute_study_non_empty_string() {
 
 #[test]
 fn try_vm_execute_hex_and_oct_literals() {
-    let p = parse(r#"hex("2a") + oct("10");"#).expect("parse");
+    let p = parse(r#"hex("2a") + oct("10")"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "hex and oct should compile on VM");
@@ -735,9 +735,9 @@ fn try_vm_execute_hex_and_oct_literals() {
 #[test]
 fn try_vm_execute_select_default_output_handle_roundtrip() {
     let p = parse(
-        r#"my $was = select(STDERR);
-        my $prev = select($was);
-        $was . ":" . $prev;"#,
+        r#"my $was = select(STDERR)
+        my $prev = select($was)
+        $was . ":" . $prev"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -751,7 +751,7 @@ fn try_vm_execute_select_default_output_handle_roundtrip() {
 
 #[test]
 fn try_vm_execute_abs_int_sqrt_builtins() {
-    let p = parse(r#"abs(-11) + int(3.9) + sqrt(36);"#).expect("parse");
+    let p = parse(r#"abs(-11) + int(3.9) + sqrt(36)"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
@@ -763,7 +763,7 @@ fn try_vm_execute_abs_int_sqrt_builtins() {
 
 #[test]
 fn try_vm_execute_defined_builtin() {
-    let p = parse(r#"defined("ok") * 100 + defined(undef);"#).expect("parse");
+    let p = parse(r#"defined("ok") * 100 + defined(undef)"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "defined should compile on VM");
@@ -773,9 +773,9 @@ fn try_vm_execute_defined_builtin() {
 #[test]
 fn try_vm_execute_ref_scalar_reference() {
     let p = parse(
-        r#"no strict 'vars';
-        my $q = 0;
-        ref \$q;"#,
+        r#"no strict 'vars'
+        my $q = 0
+        ref \$q"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -787,9 +787,9 @@ fn try_vm_execute_ref_scalar_reference() {
 #[test]
 fn try_vm_execute_bless_sets_ref_package() {
     let p = parse(
-        r#"no strict 'vars';
-        my $o = bless {}, "Zoo";
-        ref $o;"#,
+        r#"no strict 'vars'
+        my $o = bless {}, "Zoo"
+        ref $o"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -801,10 +801,10 @@ fn try_vm_execute_bless_sets_ref_package() {
 #[test]
 fn try_vm_execute_delete_hash_key_and_exists() {
     let p = parse(
-        r#"my %h = ("k", 33);
-        my $d = delete $h{"k"};
-        my $still = exists $h{"k"};
-        $d * 10 + $still;"#,
+        r#"my %h = ("k", 33)
+        my $d = delete $h{"k"}
+        my $still = exists $h{"k"}
+        $d * 10 + $still"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -818,7 +818,7 @@ fn try_vm_execute_delete_hash_key_and_exists() {
 
 #[test]
 fn try_vm_execute_sin_cos_atan2_log_exp() {
-    let p = parse(r#"int(100 * atan2(1, 1)) + int(sin(0) + cos(0)) + int(log(exp(4)));"#)
+    let p = parse(r#"int(100 * atan2(1, 1)) + int(sin(0) + cos(0)) + int(log(exp(4)))"#)
         .expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
@@ -832,7 +832,7 @@ fn try_vm_execute_sin_cos_atan2_log_exp() {
 #[test]
 fn try_vm_execute_index_rindex_substr() {
     let p =
-        parse(r#"index("abca", "a") + 10 * rindex("abca", "a") + length substr("abcdef", 1, 3);"#)
+        parse(r#"index("abca", "a") + 10 * rindex("abca", "a") + length substr("abcdef", 1, 3)"#)
             .expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
@@ -843,8 +843,8 @@ fn try_vm_execute_index_rindex_substr() {
 #[test]
 fn try_vm_execute_splice_returns_removed_slice() {
     let p = parse(
-        r#"my @v = (10, 20, 30, 40);
-        join("-", splice @v, 1, 2);"#,
+        r#"my @v = (10, 20, 30, 40)
+        join("-", splice @v, 1, 2)"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -856,9 +856,9 @@ fn try_vm_execute_splice_returns_removed_slice() {
 #[test]
 fn try_vm_execute_unshift_prepends() {
     let p = parse(
-        r#"my @w = (9);
-        unshift @w, 8;
-        $w[0] * 10 + $w[1];"#,
+        r#"my @w = (9)
+        unshift @w, 8
+        $w[0] * 10 + $w[1]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -869,7 +869,7 @@ fn try_vm_execute_unshift_prepends() {
 
 #[test]
 fn try_vm_execute_fc_foldcase() {
-    let p = parse(r#"fc("AbC");"#).expect("parse");
+    let p = parse(r#"fc("AbC")"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "fc should compile on VM");
@@ -913,8 +913,7 @@ fn try_vm_execute_stat_file_size_at_index_seven() {
 
 #[test]
 fn try_vm_execute_stat_missing_path_empty_list() {
-    let p =
-        parse(r#"my @st = stat("stryke___stat___no_such___file"); scalar @st;"#).expect("parse");
+    let p = parse(r#"my @st = stat("stryke___stat___no_such___file"); scalar @st"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "stat missing path should compile on VM");
@@ -961,7 +960,7 @@ fn try_vm_execute_mkdir_and_d_filetest() {
 
 #[test]
 fn try_vm_execute_capture_true_reports_zero_exit() {
-    let p = parse(r#"my $r = capture("true"); $r->exitcode;"#).expect("parse");
+    let p = parse(r#"my $r = capture("true"); $r->exitcode"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "capture should compile on VM");
@@ -1126,9 +1125,9 @@ fn try_vm_execute_unlink_removes_file() {
 fn try_vm_execute_wantarray_scalar_vs_list_in_sub() {
     let p = parse(
         r#"sub wa { wantarray ? 5 : 9 }
-        my $s = wa();
-        my @L = wa();
-        $s * 100 + $L[0];"#,
+        my $s = wa()
+        my @L = wa()
+        $s * 100 + $L[0]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1163,11 +1162,11 @@ fn try_vm_execute_rename_file() {
 #[test]
 fn try_vm_execute_srand_makes_rand_repeatable() {
     let p = parse(
-        r#"srand(4242);
-        my $a = int(rand(100_000));
-        srand(4242);
-        my $b = int(rand(100_000));
-        ($a == $b) ? 1 : 0;"#,
+        r#"srand(4242)
+        my $a = int(rand(100_000))
+        srand(4242)
+        my $b = int(rand(100_000))
+        ($a == $b) ? 1 : 0"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1181,7 +1180,7 @@ fn try_vm_execute_srand_makes_rand_repeatable() {
 
 #[test]
 fn try_vm_execute_lc_uc_concat() {
-    let p = parse(r#"lc("Ab") . uc("cD");"#).expect("parse");
+    let p = parse(r#"lc("Ab") . uc("cD")"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "lc and uc should compile on VM");
@@ -1190,7 +1189,7 @@ fn try_vm_execute_lc_uc_concat() {
 
 #[test]
 fn try_vm_execute_scalar_reverse_string() {
-    let p = parse(r#"scalar reverse "Perl";"#).expect("parse");
+    let p = parse(r#"scalar reverse "Perl""#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
@@ -1203,9 +1202,9 @@ fn try_vm_execute_scalar_reverse_string() {
 #[test]
 fn try_vm_execute_chop_shortens_string() {
     let p = parse(
-        r#"my $g = "xy";
-        chop $g;
-        $g;"#,
+        r#"my $g = "xy"
+        chop $g
+        $g"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1219,13 +1218,13 @@ fn try_vm_execute_chop_shortens_string() {
 fn try_vm_execute_use_overload_add_and_qq_stringify() {
     let p = parse(
         r#"
-        package O;
-        use overload '+' => 'add', '""' => 'str';
+        package O
+        use overload '+' => 'add', '""' => 'str'
         sub add { my ($a, $b) = @_; $a->{n} + $b }
         sub str { "" . $_0->{n} }
-        package main;
-        my $x = O->new(n => 3);
-        "$x" . ":" . ($x + 1);
+        package main
+        my $x = O->new(n => 3)
+        "$x" . ":" . ($x + 1)
     "#,
     )
     .expect("parse");
@@ -1243,12 +1242,12 @@ fn try_vm_execute_use_overload_add_and_qq_stringify() {
 fn try_vm_execute_use_overload_unary_neg() {
     let p = parse(
         r#"
-        package O;
-        use overload 'neg' => 'negate';
+        package O
+        use overload 'neg' => 'negate'
         sub negate { 77 }
-        package main;
-        my $o = bless {}, "O";
-        -$o;
+        package main
+        my $o = bless {}, "O"
+        -$o
     "#,
     )
     .expect("parse");
@@ -1263,12 +1262,12 @@ fn try_vm_execute_use_overload_unary_neg() {
 fn try_vm_execute_use_overload_concat_string_on_lhs() {
     let p = parse(
         r#"
-        package O;
-        use overload '.' => 'odot';
+        package O
+        use overload '.' => 'odot'
         sub odot { my ($a, $b) = @_; "[" . $a->{n} . "+" . $b . "]" }
-        package main;
-        my $a = O->new(n => "x");
-        "z" . $a;
+        package main
+        my $a = O->new(n => "x")
+        "z" . $a
     "#,
     )
     .expect("parse");
@@ -1286,12 +1285,12 @@ fn try_vm_execute_use_overload_concat_string_on_lhs() {
 fn try_vm_execute_sprintf_percent_s_overload_stringify() {
     let p = parse(
         r#"
-        package O;
-        use overload '""' => 'as_string';
+        package O
+        use overload '""' => 'as_string'
         sub as_string { "QQ" }
-        package main;
-        my $o = bless {}, "O";
-        sprintf "%s:%s", $o, "ok";
+        package main
+        my $o = bless {}, "O"
+        sprintf "%s:%s", $o, "ok"
     "#,
     )
     .expect("parse");
@@ -1309,12 +1308,12 @@ fn try_vm_execute_sprintf_percent_s_overload_stringify() {
 fn try_vm_execute_join_overload_stringify() {
     let p = parse(
         r#"
-        package O;
-        use overload '""' => 'as_str';
+        package O
+        use overload '""' => 'as_str'
         sub as_str { "[" . $_0->{k} . "]" }
-        package main;
-        my $o = bless { k => 9 }, "O";
-        join "-", $o, "z";
+        package main
+        my $o = bless { k => 9 }, "O"
+        join "-", $o, "z"
     "#,
     )
     .expect("parse");
@@ -1329,12 +1328,12 @@ fn try_vm_execute_join_overload_stringify() {
 fn try_vm_execute_use_overload_bool_unary_not() {
     let p = parse(
         r#"
-        package O;
-        use overload 'bool' => 'as_bool';
+        package O
+        use overload 'bool' => 'as_bool'
         sub as_bool { $_0->{f} }
-        package main;
-        my $o = bless { f => 0 }, "O";
-        !$o;
+        package main
+        my $o = bless { f => 0 }, "O"
+        !$o
     "#,
     )
     .expect("parse");
@@ -1348,12 +1347,12 @@ fn try_vm_execute_use_overload_bool_unary_not() {
 fn try_vm_execute_use_overload_not_keyword_with_bool() {
     let p = parse(
         r#"
-        package O;
-        use overload 'bool' => 'as_bool';
+        package O
+        use overload 'bool' => 'as_bool'
         sub as_bool { $_0->{f} }
-        package main;
-        my $o = bless { f => 1 }, "O";
-        not $o;
+        package main
+        my $o = bless { f => 1 }, "O"
+        not $o
     "#,
     )
     .expect("parse");
@@ -1371,13 +1370,13 @@ fn try_vm_execute_use_overload_not_keyword_with_bool() {
 fn try_vm_execute_use_overload_nomethod_binop() {
     let p = parse(
         r#"
-        package O;
-        use overload nomethod => 'catch_all', fallback => 1;
+        package O
+        use overload nomethod => 'catch_all', fallback => 1
         sub catch_all { my ($a, $b, $op) = @_; $op eq "+" ? 88 : 0 }
-        package main;
-        my $x = bless { n => 1 }, "O";
-        my $y = bless { n => 2 }, "O";
-        $x + $y;
+        package main
+        my $x = bless { n => 1 }, "O"
+        my $y = bless { n => 2 }, "O"
+        $x + $y
     "#,
     )
     .expect("parse");
@@ -1391,9 +1390,9 @@ fn try_vm_execute_use_overload_nomethod_binop() {
 #[test]
 fn try_vm_execute_qq_named_array_element() {
     let p = parse(
-        r#"no strict 'vars';
-        my @a = (33, 44);
-        "n$a[0]";"#,
+        r#"no strict 'vars'
+        my @a = (33, 44)
+        "n$a[0]""#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1406,9 +1405,9 @@ fn try_vm_execute_qq_named_array_element() {
 #[test]
 fn try_vm_execute_qq_braced_scalar_trailing_literal() {
     let p = parse(
-        r#"no strict 'vars';
-        my $u = 8;
-        "k${u}zz";"#,
+        r#"no strict 'vars'
+        my $u = 8
+        "k${u}zz""#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1424,10 +1423,10 @@ fn try_vm_execute_qq_braced_scalar_trailing_literal() {
 #[test]
 fn try_vm_execute_named_array_slice_list_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my @a = (1, 2);
-        @a[0, 1] = (30, 40);
-        $a[0] + $a[1];"#,
+        r#"no strict 'vars'
+        my @a = (1, 2)
+        @a[0, 1] = (30, 40)
+        $a[0] + $a[1]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1442,9 +1441,9 @@ fn try_vm_execute_named_array_slice_list_assign() {
 #[test]
 fn try_vm_execute_qq_braced_scalar_leading_and_trailing_literals() {
     let p = parse(
-        r#"no strict 'vars';
-        my $u = 4;
-        "M${u}N";"#,
+        r#"no strict 'vars'
+        my $u = 4
+        "M${u}N""#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1459,10 +1458,10 @@ fn try_vm_execute_qq_braced_scalar_leading_and_trailing_literals() {
 #[test]
 fn try_vm_execute_qq_mixed_braced_and_plain_scalar() {
     let p = parse(
-        r#"no strict 'vars';
-        my $x = 3;
-        my $y = 4;
-        "p${x}q$y";"#,
+        r#"no strict 'vars'
+        my $x = 3
+        my $y = 4
+        "p${x}q$y""#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1478,10 +1477,10 @@ fn try_vm_execute_qq_mixed_braced_and_plain_scalar() {
 #[test]
 fn try_vm_execute_named_array_slice_single_index_list_rhs() {
     let p = parse(
-        r#"no strict 'vars';
-        my @a = (1, 2);
-        @a[1] = (99);
-        $a[0] + $a[1];"#,
+        r#"no strict 'vars'
+        my @a = (1, 2)
+        @a[1] = (99)
+        $a[0] + $a[1]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1496,10 +1495,10 @@ fn try_vm_execute_named_array_slice_single_index_list_rhs() {
 #[test]
 fn try_vm_execute_named_array_slice_three_indices_list_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my @a = (1, 1, 1);
-        @a[0, 1, 2] = (2, 3, 4);
-        $a[0] * 100 + $a[1] * 10 + $a[2];"#,
+        r#"no strict 'vars'
+        my @a = (1, 1, 1)
+        @a[0, 1, 2] = (2, 3, 4)
+        $a[0] * 100 + $a[1] * 10 + $a[2]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1515,10 +1514,10 @@ fn try_vm_execute_named_array_slice_three_indices_list_assign() {
 #[test]
 fn try_vm_execute_qq_literal_then_two_scalars() {
     let p = parse(
-        r#"no strict 'vars';
-        my $x = 2;
-        my $y = 3;
-        "p$x$y";"#,
+        r#"no strict 'vars'
+        my $x = 2
+        my $y = 3
+        "p$x$y""#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1533,9 +1532,9 @@ fn try_vm_execute_qq_literal_then_two_scalars() {
 #[test]
 fn try_vm_execute_scalar_defined_or_assign() {
     let p = parse(
-        r#"my $x;
-        $x //= 99;
-        $x;"#,
+        r#"my $x
+        $x //= 99
+        $x"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1550,10 +1549,10 @@ fn try_vm_execute_scalar_defined_or_assign() {
 #[test]
 fn try_vm_execute_scalar_defined_or_assign_short_circuit() {
     let p = parse(
-        r#"my $x = 0;
-        my $runs = 0;
-        $x //= ($runs = 1);
-        $runs;"#,
+        r#"my $x = 0
+        my $runs = 0
+        $x //= ($runs = 1)
+        $runs"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1565,9 +1564,9 @@ fn try_vm_execute_scalar_defined_or_assign_short_circuit() {
 #[test]
 fn try_vm_execute_scalar_log_or_assign() {
     let p = parse(
-        r#"my $x = 0;
-        $x ||= 8;
-        $x;"#,
+        r#"my $x = 0
+        $x ||= 8
+        $x"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1582,10 +1581,10 @@ fn try_vm_execute_scalar_log_or_assign() {
 #[test]
 fn try_vm_execute_scalar_log_or_assign_short_circuit() {
     let p = parse(
-        r#"my $x = 5;
-        my $runs = 0;
-        $x ||= ($runs = 1);
-        $runs;"#,
+        r#"my $x = 5
+        my $runs = 0
+        $x ||= ($runs = 1)
+        $runs"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1597,9 +1596,9 @@ fn try_vm_execute_scalar_log_or_assign_short_circuit() {
 #[test]
 fn try_vm_execute_scalar_log_and_assign() {
     let p = parse(
-        r#"my $x = 2;
-        $x &&= 7;
-        $x;"#,
+        r#"my $x = 2
+        $x &&= 7
+        $x"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1614,10 +1613,10 @@ fn try_vm_execute_scalar_log_and_assign() {
 #[test]
 fn try_vm_execute_scalar_log_and_assign_short_circuit() {
     let p = parse(
-        r#"my $x = 0;
-        my $runs = 0;
-        $x &&= ($runs = 1);
-        $runs;"#,
+        r#"my $x = 0
+        my $runs = 0
+        $x &&= ($runs = 1)
+        $runs"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1632,10 +1631,10 @@ fn try_vm_execute_scalar_log_and_assign_short_circuit() {
 #[test]
 fn try_vm_execute_array_elem_defined_or_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my @a;
-        $a[0] //= 11;
-        $a[0];"#,
+        r#"no strict 'vars'
+        my @a
+        $a[0] //= 11
+        $a[0]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1650,11 +1649,11 @@ fn try_vm_execute_array_elem_defined_or_assign() {
 #[test]
 fn try_vm_execute_array_elem_defined_or_assign_short_circuit() {
     let p = parse(
-        r#"no strict 'vars';
-        my @a = (9);
-        my $runs = 0;
-        $a[0] //= ($runs = 1);
-        $runs;"#,
+        r#"no strict 'vars'
+        my @a = (9)
+        my $runs = 0
+        $a[0] //= ($runs = 1)
+        $runs"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1669,10 +1668,10 @@ fn try_vm_execute_array_elem_defined_or_assign_short_circuit() {
 #[test]
 fn try_vm_execute_array_elem_log_or_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my @a = (0);
-        $a[0] ||= 6;
-        $a[0];"#,
+        r#"no strict 'vars'
+        my @a = (0)
+        $a[0] ||= 6
+        $a[0]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1687,10 +1686,10 @@ fn try_vm_execute_array_elem_log_or_assign() {
 #[test]
 fn try_vm_execute_hash_elem_defined_or_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my %h;
-        $h{"x"} //= 33;
-        $h{"x"};"#,
+        r#"no strict 'vars'
+        my %h
+        $h{"x"} //= 33
+        $h{"x"}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1705,11 +1704,11 @@ fn try_vm_execute_hash_elem_defined_or_assign() {
 #[test]
 fn try_vm_execute_hash_elem_defined_or_assign_short_circuit() {
     let p = parse(
-        r#"no strict 'vars';
-        my %h = ("x" => 1);
-        my $runs = 0;
-        $h{"x"} //= ($runs = 1);
-        $runs;"#,
+        r#"no strict 'vars'
+        my %h = ("x" => 1)
+        my $runs = 0
+        $h{"x"} //= ($runs = 1)
+        $runs"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1724,10 +1723,10 @@ fn try_vm_execute_hash_elem_defined_or_assign_short_circuit() {
 #[test]
 fn try_vm_execute_hash_elem_log_or_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my %h = ("x" => 0);
-        $h{"x"} ||= 4;
-        $h{"x"};"#,
+        r#"no strict 'vars'
+        my %h = ("x" => 0)
+        $h{"x"} ||= 4
+        $h{"x"}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1742,10 +1741,10 @@ fn try_vm_execute_hash_elem_log_or_assign() {
 #[test]
 fn try_vm_execute_array_elem_log_and_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my @a = (1);
-        $a[0] &&= 8;
-        $a[0];"#,
+        r#"no strict 'vars'
+        my @a = (1)
+        $a[0] &&= 8
+        $a[0]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1760,11 +1759,11 @@ fn try_vm_execute_array_elem_log_and_assign() {
 #[test]
 fn try_vm_execute_hash_elem_log_and_assign_short_circuit() {
     let p = parse(
-        r#"no strict 'vars';
-        my %h = ("x" => 0);
-        my $runs = 0;
-        $h{"x"} &&= ($runs = 1);
-        $runs;"#,
+        r#"no strict 'vars'
+        my %h = ("x" => 0)
+        my $runs = 0
+        $h{"x"} &&= ($runs = 1)
+        $runs"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1779,10 +1778,10 @@ fn try_vm_execute_hash_elem_log_and_assign_short_circuit() {
 #[test]
 fn try_vm_execute_arrow_hash_log_and_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { "a" => 1 };
-        $h->{"a"} &&= 9;
-        $h->{"a"};"#,
+        r#"no strict 'vars'
+        my $h = { "a" => 1 }
+        $h->{"a"} &&= 9
+        $h->{"a"}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1796,7 +1795,7 @@ fn try_vm_execute_arrow_hash_log_and_assign() {
 
 #[test]
 fn try_vm_execute_indirect_coderef_call() {
-    let p = parse("my $inc = fn { $_[0] + 1 }; $inc(41);").expect("parse");
+    let p = parse("my $inc = fn { $_[0] + 1 }; $inc(41)").expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
@@ -1809,9 +1808,9 @@ fn try_vm_execute_indirect_coderef_call() {
 #[test]
 fn try_vm_execute_sort_with_coderef_comparator() {
     let p = parse(
-        r#"no strict 'vars';
-        my $cmp = fn { $a <=> $b };
-        join(",", sort $cmp (3, 1, 2));"#,
+        r#"no strict 'vars'
+        my $cmp = fn { $a <=> $b }
+        join(",", sort $cmp (3, 1, 2))"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1826,10 +1825,10 @@ fn try_vm_execute_sort_with_coderef_comparator() {
 #[test]
 fn try_vm_execute_symbolic_scalar_deref() {
     let p = parse(
-        r#"no strict 'vars';
-        my $x = 42;
-        my $r = \$x;
-        $$r;"#,
+        r#"no strict 'vars'
+        my $x = 42
+        my $r = \$x
+        $$r"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1844,11 +1843,11 @@ fn try_vm_execute_symbolic_scalar_deref() {
 #[test]
 fn try_vm_execute_symbolic_scalar_ref_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $x = 0;
-        my $r = \$x;
-        $$r = 7;
-        $x;"#,
+        r#"no strict 'vars'
+        my $x = 0
+        my $r = \$x
+        $$r = 7
+        $x"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1863,11 +1862,11 @@ fn try_vm_execute_symbolic_scalar_ref_assign() {
 #[test]
 fn try_vm_execute_symbolic_scalar_ref_compound_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $x = 10;
-        my $r = \$x;
-        $$r += 2;
-        $x;"#,
+        r#"no strict 'vars'
+        my $x = 10
+        my $r = \$x
+        $$r += 2
+        $x"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1882,11 +1881,11 @@ fn try_vm_execute_symbolic_scalar_ref_compound_assign() {
 #[test]
 fn try_vm_execute_symbolic_scalar_ref_defined_or_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $x;
-        my $r = \$x;
-        $$r //= 99;
-        $x;"#,
+        r#"no strict 'vars'
+        my $x
+        my $r = \$x
+        $$r //= 99
+        $x"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1901,12 +1900,12 @@ fn try_vm_execute_symbolic_scalar_ref_defined_or_assign() {
 #[test]
 fn try_vm_execute_symbolic_scalar_ref_defined_or_assign_short_circuit() {
     let p = parse(
-        r#"no strict 'vars';
-        my $x = 0;
-        my $r = \$x;
-        my $runs = 0;
-        $$r //= ($runs = 1);
-        $runs;"#,
+        r#"no strict 'vars'
+        my $x = 0
+        my $r = \$x
+        my $runs = 0
+        $$r //= ($runs = 1)
+        $runs"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1918,11 +1917,11 @@ fn try_vm_execute_symbolic_scalar_ref_defined_or_assign_short_circuit() {
 #[test]
 fn try_vm_execute_symbolic_scalar_ref_log_or_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $x = 0;
-        my $r = \$x;
-        $$r ||= 8;
-        $x;"#,
+        r#"no strict 'vars'
+        my $x = 0
+        my $r = \$x
+        $$r ||= 8
+        $x"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1937,12 +1936,12 @@ fn try_vm_execute_symbolic_scalar_ref_log_or_assign() {
 #[test]
 fn try_vm_execute_symbolic_scalar_ref_log_or_assign_short_circuit() {
     let p = parse(
-        r#"no strict 'vars';
-        my $x = 5;
-        my $r = \$x;
-        my $runs = 0;
-        $$r ||= ($runs = 1);
-        $runs;"#,
+        r#"no strict 'vars'
+        my $x = 5
+        my $r = \$x
+        my $runs = 0
+        $$r ||= ($runs = 1)
+        $runs"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1954,10 +1953,10 @@ fn try_vm_execute_symbolic_scalar_ref_log_or_assign_short_circuit() {
 #[test]
 fn try_vm_execute_arrow_hash_compound_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { "a" => 10 };
-        $h->{"a"} += 2;
-        $h->{"a"};"#,
+        r#"no strict 'vars'
+        my $h = { "a" => 10 }
+        $h->{"a"} += 2
+        $h->{"a"}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1972,10 +1971,10 @@ fn try_vm_execute_arrow_hash_compound_assign() {
 #[test]
 fn try_vm_execute_arrow_hash_defined_or_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { "a" => undef };
-        $h->{"a"} //= 42;
-        $h->{"a"};"#,
+        r#"no strict 'vars'
+        my $h = { "a" => undef }
+        $h->{"a"} //= 42
+        $h->{"a"}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -1990,11 +1989,11 @@ fn try_vm_execute_arrow_hash_defined_or_assign() {
 #[test]
 fn try_vm_execute_arrow_hash_defined_or_assign_short_circuit() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { "a" => 1 };
-        my $runs = 0;
-        $h->{"a"} //= ($runs = 1);
-        $runs;"#,
+        r#"no strict 'vars'
+        my $h = { "a" => 1 }
+        my $runs = 0
+        $h->{"a"} //= ($runs = 1)
+        $runs"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2009,10 +2008,10 @@ fn try_vm_execute_arrow_hash_defined_or_assign_short_circuit() {
 #[test]
 fn try_vm_execute_scalar_deref_hash_defined_or_assign() {
     let p = parse(
-        r#"my %h = ();
-        my $r = \%h;
-        $$r{x} //= 42;
-        $h{x};"#,
+        r#"my %h = ()
+        my $r = \%h
+        $$r{x} //= 42
+        $h{x}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2027,11 +2026,11 @@ fn try_vm_execute_scalar_deref_hash_defined_or_assign() {
 #[test]
 fn try_vm_execute_scalar_deref_hash_defined_or_assign_short_circuit() {
     let p = parse(
-        r#"my %h = (a => 1);
-        my $r = \%h;
-        my $runs = 0;
-        $$r{a} //= ($runs = 1);
-        $runs;"#,
+        r#"my %h = (a => 1)
+        my $r = \%h
+        my $runs = 0
+        $$r{a} //= ($runs = 1)
+        $runs"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2046,10 +2045,10 @@ fn try_vm_execute_scalar_deref_hash_defined_or_assign_short_circuit() {
 #[test]
 fn try_vm_execute_arrow_hash_log_or_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { "a" => 0 };
-        $h->{"a"} ||= 9;
-        $h->{"a"};"#,
+        r#"no strict 'vars'
+        my $h = { "a" => 0 }
+        $h->{"a"} ||= 9
+        $h->{"a"}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2064,11 +2063,11 @@ fn try_vm_execute_arrow_hash_log_or_assign() {
 #[test]
 fn try_vm_execute_arrow_hash_log_or_assign_short_circuit() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { "a" => 2 };
-        my $runs = 0;
-        $h->{"a"} ||= ($runs = 1);
-        $runs;"#,
+        r#"no strict 'vars'
+        my $h = { "a" => 2 }
+        my $runs = 0
+        $h->{"a"} ||= ($runs = 1)
+        $runs"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2083,10 +2082,10 @@ fn try_vm_execute_arrow_hash_log_or_assign_short_circuit() {
 #[test]
 fn try_vm_execute_arrow_hash_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { "a" => 1 };
-        $h->{"b"} = 2;
-        $h->{"a"} + $h->{"b"};"#,
+        r#"no strict 'vars'
+        my $h = { "a" => 1 }
+        $h->{"b"} = 2
+        $h->{"a"} + $h->{"b"}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2101,10 +2100,10 @@ fn try_vm_execute_arrow_hash_assign() {
 #[test]
 fn try_vm_execute_arrow_hash_assign_returns_rhs() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = {};
-        my $x = ($h->{"k"} = 11);
-        $x + $h->{"k"};"#,
+        r#"no strict 'vars'
+        my $h = {}
+        my $x = ($h->{"k"} = 11)
+        $x + $h->{"k"}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2119,10 +2118,10 @@ fn try_vm_execute_arrow_hash_assign_returns_rhs() {
 #[test]
 fn try_vm_execute_arrow_array_assign_returns_rhs() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [];
-        my $x = ($a->[0] = 4);
-        $x + $a->[0];"#,
+        r#"no strict 'vars'
+        my $a = []
+        my $x = ($a->[0] = 4)
+        $x + $a->[0]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2137,10 +2136,10 @@ fn try_vm_execute_arrow_array_assign_returns_rhs() {
 #[test]
 fn try_vm_execute_arrow_array_compound_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [10, 20];
-        $a->[0] += 2;
-        $a->[0];"#,
+        r#"no strict 'vars'
+        my $a = [10, 20]
+        $a->[0] += 2
+        $a->[0]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2155,10 +2154,10 @@ fn try_vm_execute_arrow_array_compound_assign() {
 #[test]
 fn try_vm_execute_arrow_array_defined_or_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [undef];
-        $a->[0] //= 7;
-        $a->[0];"#,
+        r#"no strict 'vars'
+        my $a = [undef]
+        $a->[0] //= 7
+        $a->[0]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2173,11 +2172,11 @@ fn try_vm_execute_arrow_array_defined_or_assign() {
 #[test]
 fn try_vm_execute_arrow_array_defined_or_assign_short_circuit() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [99];
-        my $runs = 0;
-        $a->[0] //= ($runs = 1);
-        $runs;"#,
+        r#"no strict 'vars'
+        my $a = [99]
+        my $runs = 0
+        $a->[0] //= ($runs = 1)
+        $runs"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2192,10 +2191,10 @@ fn try_vm_execute_arrow_array_defined_or_assign_short_circuit() {
 #[test]
 fn try_vm_execute_arrow_array_log_or_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [0];
-        $a->[0] ||= 5;
-        $a->[0];"#,
+        r#"no strict 'vars'
+        my $a = [0]
+        $a->[0] ||= 5
+        $a->[0]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2210,11 +2209,11 @@ fn try_vm_execute_arrow_array_log_or_assign() {
 #[test]
 fn try_vm_execute_arrow_array_log_or_assign_short_circuit() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [3];
-        my $runs = 0;
-        $a->[0] ||= ($runs = 1);
-        $runs;"#,
+        r#"no strict 'vars'
+        my $a = [3]
+        my $runs = 0
+        $a->[0] ||= ($runs = 1)
+        $runs"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2230,9 +2229,9 @@ fn try_vm_execute_arrow_array_log_or_assign_short_circuit() {
 #[test]
 fn try_vm_execute_empty_named_array_slice_assign_vm_runtime_error() {
     let p = parse(
-        r#"no strict 'vars';
-        my @a = (1, 2);
-        @a[] = (3, 4);
+        r#"no strict 'vars'
+        my @a = (1, 2)
+        @a[] = (3, 4)
         0"#,
     )
     .expect("parse");
@@ -2251,9 +2250,9 @@ fn try_vm_execute_empty_named_array_slice_assign_vm_runtime_error() {
 #[test]
 fn try_vm_execute_empty_named_hash_slice_assign_vm_runtime_error() {
     let p = parse(
-        r#"no strict 'vars';
-        my %h = ("a", 1);
-        @h{} = (2);
+        r#"no strict 'vars'
+        my %h = ("a", 1)
+        @h{} = (2)
         0"#,
     )
     .expect("parse");
@@ -2273,9 +2272,9 @@ fn try_vm_execute_empty_named_hash_slice_assign_vm_runtime_error() {
 fn try_vm_execute_empty_arrow_array_slice_assign_vm_runtime_error() {
     // `1..0` yields no indices (same as an empty slice through the ref).
     let p = parse(
-        r#"no strict 'vars';
-        my $r = [1, 2];
-        @$r[1..0] = (3, 4);
+        r#"no strict 'vars'
+        my $r = [1, 2]
+        @$r[1..0] = (3, 4)
         0"#,
     )
     .expect("parse");
@@ -2295,10 +2294,10 @@ fn try_vm_execute_empty_arrow_array_slice_assign_vm_runtime_error() {
 fn try_vm_execute_empty_hash_slice_deref_assign_vm_runtime_error() {
     // Empty braces: zero keys in the slice (not `@$r{()}` — `()` is one scalar key, `undef`).
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { "a" => 1 };
-        my $r = $h;
-        @$r{} = (2);
+        r#"no strict 'vars'
+        my $h = { "a" => 1 }
+        my $r = $h
+        @$r{} = (2)
         0"#,
     )
     .expect("parse");
@@ -2317,10 +2316,10 @@ fn try_vm_execute_empty_hash_slice_deref_assign_vm_runtime_error() {
 #[test]
 fn try_vm_execute_empty_hash_slice_deref_plus_eq_vm_runtime_error() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = {};
-        my $r = $h;
-        @$r{} += 1;
+        r#"no strict 'vars'
+        my $h = {}
+        my $r = $h
+        @$r{} += 1
         0"#,
     )
     .expect("parse");
@@ -2343,11 +2342,11 @@ fn try_vm_compile_exists_delete_href_emits_arrow_hash_ops() {
     let chunk = Compiler::new()
         .compile_program(
             &parse(
-                r#"no strict 'vars';
-                my $h = {};
-                my $r = $h;
-                exists $r->{k};
-                delete $r->{k};"#,
+                r#"no strict 'vars'
+                my $h = {}
+                my $r = $h
+                exists $r->{k}
+                delete $r->{k}"#,
             )
             .expect("parse"),
         )
@@ -2373,13 +2372,13 @@ fn try_vm_compile_exists_delete_href_emits_arrow_hash_ops() {
 #[test]
 fn try_vm_execute_exists_delete_href() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { u => 1 };
-        my $r = $h;
-        my $e = exists $r->{u};
-        my $d = delete $r->{u};
-        my $e2 = exists $r->{u};
-        $e . "," . $d . "," . $e2;"#,
+        r#"no strict 'vars'
+        my $h = { u => 1 }
+        my $r = $h
+        my $e = exists $r->{u}
+        my $d = delete $r->{u}
+        my $e2 = exists $r->{u}
+        $e . "," . $d . "," . $e2"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2398,9 +2397,9 @@ fn try_vm_compile_exists_delete_named_array_emits_array_elem_ops() {
     let chunk = Compiler::new()
         .compile_program(
             &parse(
-                r#"my @a = (1, 2, 3);
-                exists $a[1];
-                delete $a[1];"#,
+                r#"my @a = (1, 2, 3)
+                exists $a[1]
+                delete $a[1]"#,
             )
             .expect("parse"),
         )
@@ -2430,12 +2429,12 @@ fn try_vm_compile_exists_delete_named_array_emits_array_elem_ops() {
 #[test]
 fn try_vm_execute_exists_delete_named_array() {
     let p = parse(
-        r#"my @a = (10, 20, 30);
-        my $e0 = exists $a[99];
-        my $e1 = exists $a[1];
-        my $d = delete $a[1];
-        my $e2 = exists $a[1];
-        $e0 . "," . $e1 . "," . $d . "," . $e2;"#,
+        r#"my @a = (10, 20, 30)
+        my $e0 = exists $a[99]
+        my $e1 = exists $a[1]
+        my $d = delete $a[1]
+        my $e2 = exists $a[1]
+        $e0 . "," . $e1 . "," . $d . "," . $e2"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2454,10 +2453,10 @@ fn try_vm_compile_exists_delete_aref_emits_arrow_array_ops() {
     let chunk = Compiler::new()
         .compile_program(
             &parse(
-                r#"no strict 'vars';
-                my $a = [1, 2, 3];
-                exists $a->[1];
-                delete $a->[1];"#,
+                r#"no strict 'vars'
+                my $a = [1, 2, 3]
+                exists $a->[1]
+                delete $a->[1]"#,
             )
             .expect("parse"),
         )
@@ -2487,13 +2486,13 @@ fn try_vm_compile_exists_delete_aref_emits_arrow_array_ops() {
 #[test]
 fn try_vm_execute_exists_delete_aref() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [10, 20, 30];
-        my $e0 = exists $a->[99];
-        my $e1 = exists $a->[1];
-        my $d = delete $a->[1];
-        my $e2 = exists $a->[1];
-        $e0 . "," . $e1 . "," . $d . "," . $e2;"#,
+        r#"no strict 'vars'
+        my $a = [10, 20, 30]
+        my $e0 = exists $a->[99]
+        my $e1 = exists $a->[1]
+        my $d = delete $a->[1]
+        my $e2 = exists $a->[1]
+        $e0 . "," . $e1 . "," . $d . "," . $e2"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2512,11 +2511,11 @@ fn try_vm_compile_keys_values_href_use_from_value_ops() {
     let chunk = Compiler::new()
         .compile_program(
             &parse(
-                r#"no strict 'vars';
-                my $h = { a => 1, b => 2 };
-                my $r = $h;
-                scalar keys $r;
-                scalar values $r;"#,
+                r#"no strict 'vars'
+                my $h = { a => 1, b => 2 }
+                my $r = $h
+                scalar keys $r
+                scalar values $r"#,
             )
             .expect("parse"),
         )
@@ -2547,10 +2546,10 @@ fn try_vm_compile_keys_values_href_use_from_value_ops() {
 #[test]
 fn try_vm_execute_keys_values_hashref_scalar_context() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { x => 1, y => 2, z => 3 };
-        my $r = $h;
-        (scalar keys $r) + (scalar values $r);"#,
+        r#"no strict 'vars'
+        my $h = { x => 1, y => 2, z => 3 }
+        my $r = $h
+        (scalar keys $r) + (scalar values $r)"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2569,9 +2568,9 @@ fn try_vm_compile_push_aref_uses_push_array_deref() {
     let chunk = Compiler::new()
         .compile_program(
             &parse(
-                r#"no strict 'vars';
-                my $a = [1];
-                push @$a, 2, 3;"#,
+                r#"no strict 'vars'
+                my $a = [1]
+                push @$a, 2, 3"#,
             )
             .expect("parse"),
         )
@@ -2594,9 +2593,9 @@ fn try_vm_compile_scalar_at_aref_uses_array_deref_len() {
     let chunk = Compiler::new()
         .compile_program(
             &parse(
-                r#"no strict 'vars';
-                my $a = [1, 2, 3];
-                scalar @$a;"#,
+                r#"no strict 'vars'
+                my $a = [1, 2, 3]
+                scalar @$a"#,
             )
             .expect("parse"),
         )
@@ -2619,9 +2618,9 @@ fn try_vm_compile_scalar_at_aref_uses_array_deref_len() {
 #[test]
 fn try_vm_execute_scalar_at_aref_is_length() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [10, 20, 30];
-        scalar @$a;"#,
+        r#"no strict 'vars'
+        my $a = [10, 20, 30]
+        scalar @$a"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2633,9 +2632,9 @@ fn try_vm_execute_scalar_at_aref_is_length() {
 #[test]
 fn try_vm_execute_scalar_at_aref_empty_is_zero() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [];
-        scalar @$a;"#,
+        r#"no strict 'vars'
+        my $a = []
+        scalar @$a"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2654,9 +2653,9 @@ fn try_vm_compile_scalar_braced_aref_uses_array_deref_len() {
     let chunk = Compiler::new()
         .compile_program(
             &parse(
-                r#"no strict 'vars';
-                my $a = [9, 8];
-                scalar @{$a};"#,
+                r#"no strict 'vars'
+                my $a = [9, 8]
+                scalar @{$a}"#,
             )
             .expect("parse"),
         )
@@ -2671,9 +2670,9 @@ fn try_vm_compile_scalar_braced_aref_uses_array_deref_len() {
 #[test]
 fn try_vm_execute_scalar_braced_aref_is_length() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [1, 2, 3, 4, 5];
-        scalar @{$a};"#,
+        r#"no strict 'vars'
+        my $a = [1, 2, 3, 4, 5]
+        scalar @{$a}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2685,9 +2684,9 @@ fn try_vm_execute_scalar_braced_aref_is_length() {
 #[test]
 fn try_vm_execute_scalar_braced_sub_returning_aref_is_length() {
     let p = parse(
-        r#"no strict 'vars';
+        r#"no strict 'vars'
         sub mk { [1, 2, 3, 4] }
-        scalar @{mk()};"#,
+        scalar @{mk()}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2702,10 +2701,10 @@ fn try_vm_execute_scalar_braced_sub_returning_aref_is_length() {
 #[test]
 fn try_vm_execute_assignment_rhs_at_aref_yields_length() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [9, 8, 7];
-        my $n = @$a;
-        $n;"#,
+        r#"no strict 'vars'
+        my $a = [9, 8, 7]
+        my $n = @$a
+        $n"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2717,9 +2716,9 @@ fn try_vm_execute_assignment_rhs_at_aref_yields_length() {
 #[test]
 fn try_vm_execute_assign_named_array_to_scalar_is_length() {
     let p = parse(
-        r#"my @y = (10, 20, 30);
-        my $x = @y;
-        $x;"#,
+        r#"my @y = (10, 20, 30)
+        my $x = @y
+        $x"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2735,8 +2734,8 @@ fn try_vm_compile_scalar_percent_hash_uses_value_scalar_context() {
     let chunk = Compiler::new()
         .compile_program(
             &parse(
-                r#"my %h = (a => 1, b => 2);
-                scalar %h;"#,
+                r#"my %h = (a => 1, b => 2)
+                scalar %h"#,
             )
             .expect("parse"),
         )
@@ -2754,8 +2753,8 @@ fn try_vm_compile_scalar_percent_hash_uses_value_scalar_context() {
 #[test]
 fn try_vm_execute_scalar_percent_empty_hash_is_zero() {
     let p = parse(
-        r#"my %h = ();
-        scalar %h;"#,
+        r#"my %h = ()
+        scalar %h"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2771,9 +2770,9 @@ fn try_vm_compile_scalar_percent_href_emits_hash_deref_and_value_scalar_context(
     let chunk = Compiler::new()
         .compile_program(
             &parse(
-                r#"no strict 'vars';
-                my $r = { a => 1, b => 2 };
-                scalar %$r;"#,
+                r#"no strict 'vars'
+                my $r = { a => 1, b => 2 }
+                scalar %$r"#,
             )
             .expect("parse"),
         )
@@ -2796,9 +2795,9 @@ fn try_vm_compile_scalar_percent_href_emits_hash_deref_and_value_scalar_context(
 #[test]
 fn try_vm_execute_scalar_percent_href_nonempty_fill_string() {
     let p = parse(
-        r#"no strict 'vars';
-        my $r = { a => 1, b => 2 };
-        scalar %$r;"#,
+        r#"no strict 'vars'
+        my $r = { a => 1, b => 2 }
+        scalar %$r"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2810,9 +2809,9 @@ fn try_vm_execute_scalar_percent_href_nonempty_fill_string() {
 #[test]
 fn try_vm_execute_scalar_percent_href_empty_is_zero() {
     let p = parse(
-        r#"no strict 'vars';
-        my $r = {};
-        scalar %$r;"#,
+        r#"no strict 'vars'
+        my $r = {}
+        scalar %$r"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2828,8 +2827,8 @@ fn try_vm_compile_scalar_named_array_emits_array_len_not_get_array() {
     let chunk = Compiler::new()
         .compile_program(
             &parse(
-                r#"my @t = (9, 8);
-                scalar @t;"#,
+                r#"my @t = (9, 8)
+                scalar @t"#,
             )
             .expect("parse"),
         )
@@ -2849,8 +2848,8 @@ fn try_vm_compile_scalar_named_array_emits_array_len_not_get_array() {
 #[test]
 fn try_vm_execute_scalar_named_array_length() {
     let p = parse(
-        r#"my @u = (1, 2, 3, 4);
-        scalar @u;"#,
+        r#"my @u = (1, 2, 3, 4)
+        scalar @u"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2862,9 +2861,9 @@ fn try_vm_execute_scalar_named_array_length() {
 #[test]
 fn try_vm_execute_join_scalar_at_aref_single_argument() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [10, 20, 30, 40, 50];
-        join "-", scalar @$a;"#,
+        r#"no strict 'vars'
+        my $a = [10, 20, 30, 40, 50]
+        join "-", scalar @$a"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2883,9 +2882,9 @@ fn try_vm_compile_splice_aref_uses_splice_array_deref() {
     let chunk = Compiler::new()
         .compile_program(
             &parse(
-                r#"no strict 'vars';
-                my $a = [10, 20, 30, 40];
-                join("-", splice @$a, 1, 2);"#,
+                r#"no strict 'vars'
+                my $a = [10, 20, 30, 40]
+                join("-", splice @$a, 1, 2)"#,
             )
             .expect("parse"),
         )
@@ -2911,9 +2910,9 @@ fn try_vm_compile_splice_aref_with_replacements_emits_splice_array_deref_count()
     let chunk = Compiler::new()
         .compile_program(
             &parse(
-                r#"no strict 'vars';
-                my $a = [1, 2, 3, 4];
-                join("-", splice @$a, 1, 2, 9, 8);"#,
+                r#"no strict 'vars'
+                my $a = [1, 2, 3, 4]
+                join("-", splice @$a, 1, 2, 9, 8)"#,
             )
             .expect("parse"),
         )
@@ -2935,9 +2934,9 @@ fn try_vm_compile_splice_aref_negative_offset_emits_splice_array_deref() {
     let chunk = Compiler::new()
         .compile_program(
             &parse(
-                r#"no strict 'vars';
-                my $a = [1, 2, 3, 4, 5];
-                join("-", splice @$a, -2);"#,
+                r#"no strict 'vars'
+                my $a = [1, 2, 3, 4, 5]
+                join("-", splice @$a, -2)"#,
             )
             .expect("parse"),
         )
@@ -2964,9 +2963,9 @@ fn try_vm_compile_splice_aref_negative_length_emits_splice_array_deref() {
     let chunk = Compiler::new()
         .compile_program(
             &parse(
-                r#"no strict 'vars';
-                my $a = [1, 2, 3, 4, 5];
-                join("-", splice @$a, 0, -2);"#,
+                r#"no strict 'vars'
+                my $a = [1, 2, 3, 4, 5]
+                join("-", splice @$a, 0, -2)"#,
             )
             .expect("parse"),
         )
@@ -2993,9 +2992,9 @@ fn try_vm_compile_splice_aref_negative_offset_with_replacement_emits_splice_arra
     let chunk = Compiler::new()
         .compile_program(
             &parse(
-                r#"no strict 'vars';
-                my $a = [1, 2, 3, 4, 5];
-                join("-", splice @$a, -2, 1, 99);"#,
+                r#"no strict 'vars'
+                my $a = [1, 2, 3, 4, 5]
+                join("-", splice @$a, -2, 1, 99)"#,
             )
             .expect("parse"),
         )
@@ -3022,9 +3021,9 @@ fn try_vm_compile_splice_aref_three_replacements_emits_splice_array_deref_count(
     let chunk = Compiler::new()
         .compile_program(
             &parse(
-                r#"no strict 'vars';
-                my $a = [10, 20, 30, 40];
-                join("-", splice @$a, 1, 2, 1, 2, 3);"#,
+                r#"no strict 'vars'
+                my $a = [10, 20, 30, 40]
+                join("-", splice @$a, 1, 2, 1, 2, 3)"#,
             )
             .expect("parse"),
         )
@@ -3047,9 +3046,9 @@ fn try_vm_compile_splice_aref_three_replacements_emits_splice_array_deref_count(
 #[test]
 fn try_vm_execute_splice_aref_returns_removed_slice() {
     let p = parse(
-        r#"no strict 'vars';
-        my $v = [10, 20, 30, 40];
-        join("-", splice @$v, 1, 2);"#,
+        r#"no strict 'vars'
+        my $v = [10, 20, 30, 40]
+        join("-", splice @$v, 1, 2)"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3061,10 +3060,10 @@ fn try_vm_execute_splice_aref_returns_removed_slice() {
 #[test]
 fn try_vm_execute_splice_aref_negative_offset_removed_tail() {
     let p = parse(
-        r#"no strict 'vars';
-        my $v = [1, 2, 3, 4, 5];
-        my $r = join "-", splice @$v, -2;
-        $r . "|" . join "-", @$v;"#,
+        r#"no strict 'vars'
+        my $v = [1, 2, 3, 4, 5]
+        my $r = join "-", splice @$v, -2
+        $r . "|" . join "-", @$v"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3079,10 +3078,10 @@ fn try_vm_execute_splice_aref_negative_offset_removed_tail() {
 #[test]
 fn try_vm_execute_splice_aref_negative_length_preserves_tail() {
     let p = parse(
-        r#"no strict 'vars';
-        my $v = [1, 2, 3, 4, 5];
-        my $r = join "-", splice @$v, 0, -2;
-        $r . "|" . join "-", @$v;"#,
+        r#"no strict 'vars'
+        my $v = [1, 2, 3, 4, 5]
+        my $r = join "-", splice @$v, 0, -2
+        $r . "|" . join "-", @$v"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3097,10 +3096,10 @@ fn try_vm_execute_splice_aref_negative_length_preserves_tail() {
 #[test]
 fn try_vm_execute_splice_aref_negative_offset_with_replacement() {
     let p = parse(
-        r#"no strict 'vars';
-        my $v = [1, 2, 3, 4, 5];
-        splice @$v, -2, 1, 99;
-        join "-", @$v;"#,
+        r#"no strict 'vars'
+        my $v = [1, 2, 3, 4, 5]
+        splice @$v, -2, 1, 99
+        join "-", @$v"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3115,10 +3114,10 @@ fn try_vm_execute_splice_aref_negative_offset_with_replacement() {
 #[test]
 fn try_vm_execute_splice_aref_three_replacements_mutates_target() {
     let p = parse(
-        r#"no strict 'vars';
-        my $v = [10, 20, 30, 40];
-        splice @$v, 1, 2, 1, 2, 3;
-        join "-", @$v;"#,
+        r#"no strict 'vars'
+        my $v = [10, 20, 30, 40]
+        splice @$v, 1, 2, 1, 2, 3
+        join "-", @$v"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3133,10 +3132,10 @@ fn try_vm_execute_splice_aref_three_replacements_mutates_target() {
 #[test]
 fn try_vm_execute_splice_aref_zero_length_insert() {
     let p = parse(
-        r#"no strict 'vars';
-        my $v = [1, 2, 3];
-        splice @$v, 1, 0, 9;
-        join "-", @$v;"#,
+        r#"no strict 'vars'
+        my $v = [1, 2, 3]
+        splice @$v, 1, 0, 9
+        join "-", @$v"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3148,10 +3147,10 @@ fn try_vm_execute_splice_aref_zero_length_insert() {
 #[test]
 fn try_vm_execute_push_aref_splice_list_chain() {
     let p = parse(
-        r#"no strict 'vars';
-        my $v = [1, 2, 3];
-        push @$v, splice @$v, 0, 1;
-        join "-", @$v;"#,
+        r#"no strict 'vars'
+        my $v = [1, 2, 3]
+        push @$v, splice @$v, 0, 1
+        join "-", @$v"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3166,10 +3165,10 @@ fn try_vm_execute_push_aref_splice_list_chain() {
 #[test]
 fn try_vm_execute_splice_aref_with_replacements_mutates_target() {
     let p = parse(
-        r#"no strict 'vars';
-        my $v = [1, 2, 3, 4];
-        my $removed = join "-", splice @$v, 1, 2, 9, 8;
-        ($removed eq "2-3" && $v->[1] == 9 && $v->[2] == 8 && $v->[3] == 4) ? 1 : 0;"#,
+        r#"no strict 'vars'
+        my $v = [1, 2, 3, 4]
+        my $removed = join "-", splice @$v, 1, 2, 9, 8
+        ($removed eq "2-3" && $v->[1] == 9 && $v->[2] == 8 && $v->[3] == 4) ? 1 : 0"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3184,9 +3183,9 @@ fn try_vm_execute_splice_aref_with_replacements_mutates_target() {
 #[test]
 fn try_vm_execute_scalar_splice_aref_returns_last_removed() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [5, 6, 7];
-        scalar splice @$a, 0, 2;"#,
+        r#"no strict 'vars'
+        my $a = [5, 6, 7]
+        scalar splice @$a, 0, 2"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3201,13 +3200,13 @@ fn try_vm_execute_scalar_splice_aref_returns_last_removed() {
 #[test]
 fn try_vm_execute_push_pop_shift_unshift_aref() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [10, 20];
-        my $n = push @$a, 30;
-        my $p = pop @$a;
-        my $s = shift @$a;
-        my $u = unshift @$a, 5;
-        $n + $p + $s + $u + $a->[0] + $a->[1];"#,
+        r#"no strict 'vars'
+        my $a = [10, 20]
+        my $n = push @$a, 30
+        my $p = pop @$a
+        my $s = shift @$a
+        my $u = unshift @$a, 5
+        $n + $p + $s + $u + $a->[0] + $a->[1]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3223,9 +3222,9 @@ fn try_vm_execute_push_pop_shift_unshift_aref() {
 #[test]
 fn try_vm_execute_named_array_splice_negative_offset_replacement() {
     let p = parse(
-        r#"my @a = (1, 2, 3, 4, 5);
-        splice @a, -2, 1, 88;
-        join "-", @a;"#,
+        r#"my @a = (1, 2, 3, 4, 5)
+        splice @a, -2, 1, 88
+        join "-", @a"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3237,10 +3236,10 @@ fn try_vm_execute_named_array_splice_negative_offset_replacement() {
 #[test]
 fn try_vm_execute_unshift_splice_aref_chain() {
     let p = parse(
-        r#"no strict 'vars';
-        my $v = [1, 2, 3];
-        unshift @$v, splice(@$v, 0, 1);
-        join "-", @$v;"#,
+        r#"no strict 'vars'
+        my $v = [1, 2, 3]
+        unshift @$v, splice(@$v, 0, 1)
+        join "-", @$v"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3252,9 +3251,9 @@ fn try_vm_execute_unshift_splice_aref_chain() {
 #[test]
 fn try_vm_execute_grep_block_aref() {
     let p = parse(
-        r#"no strict 'vars';
-        my $v = [1, 2, 3, 4];
-        scalar grep { $_ > 1 } @$v;"#,
+        r#"no strict 'vars'
+        my $v = [1, 2, 3, 4]
+        scalar grep { $_ > 1 } @$v"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3266,10 +3265,10 @@ fn try_vm_execute_grep_block_aref() {
 #[test]
 fn try_vm_execute_map_block_aref() {
     let p = parse(
-        r#"no strict 'vars';
-        my $v = [1, 2, 3];
-        my @m = map { $_ * 2 } @$v;
-        $m[2];"#,
+        r#"no strict 'vars'
+        my $v = [1, 2, 3]
+        my @m = map { $_ * 2 } @$v
+        $m[2]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3281,9 +3280,9 @@ fn try_vm_execute_map_block_aref() {
 #[test]
 fn try_vm_execute_scalar_keys_hashref() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { u => 1, v => 2, w => 3 };
-        scalar keys %$h;"#,
+        r#"no strict 'vars'
+        my $h = { u => 1, v => 2, w => 3 }
+        scalar keys %$h"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3295,11 +3294,11 @@ fn try_vm_execute_scalar_keys_hashref() {
 #[test]
 fn try_vm_execute_for_loop_over_aref() {
     let p = parse(
-        r#"no strict 'vars';
-        my $v = [1, 2, 3];
-        my $s = 0;
+        r#"no strict 'vars'
+        my $v = [1, 2, 3]
+        my $s = 0
         for my $x (@$v) { $s = $s + $x; }
-        $s;"#,
+        $s"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3311,11 +3310,11 @@ fn try_vm_execute_for_loop_over_aref() {
 #[test]
 fn try_vm_execute_splice_aref_variable_offset() {
     let p = parse(
-        r#"no strict 'vars';
-        my $v = [1, 2, 3, 4];
-        my $o = 1;
-        splice @$v, $o, 2, 9;
-        join "-", @$v;"#,
+        r#"no strict 'vars'
+        my $v = [1, 2, 3, 4]
+        my $o = 1
+        splice @$v, $o, 2, 9
+        join "-", @$v"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3327,11 +3326,11 @@ fn try_vm_execute_splice_aref_variable_offset() {
 #[test]
 fn try_vm_execute_concat_two_arefs() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [1, 2];
-        my $b = [3, 4];
-        my @x = (@$a, @$b);
-        join "-", @x;"#,
+        r#"no strict 'vars'
+        my $a = [1, 2]
+        my $b = [3, 4]
+        my @x = (@$a, @$b)
+        join "-", @x"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3343,9 +3342,9 @@ fn try_vm_execute_concat_two_arefs() {
 #[test]
 fn try_vm_execute_scalar_splice_named_negative_offset() {
     let p = parse(
-        r#"my @a = (1, 2, 3, 4, 5);
-        my $n = scalar splice @a, -3, 2;
-        $n . "|" . join("-", @a);"#,
+        r#"my @a = (1, 2, 3, 4, 5)
+        my $n = scalar splice @a, -3, 2
+        $n . "|" . join("-", @a)"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3357,9 +3356,9 @@ fn try_vm_execute_scalar_splice_named_negative_offset() {
 #[test]
 fn try_vm_execute_splice_named_three_replacements_return_removed() {
     let p = parse(
-        r#"my @a = (1, 2, 3, 4);
-        my @b = splice @a, 1, 2, 9, 8, 7;
-        join("-", @a) . "|" . join("-", @b);"#,
+        r#"my @a = (1, 2, 3, 4)
+        my @b = splice @a, 1, 2, 9, 8, 7
+        join("-", @a) . "|" . join("-", @b)"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3374,10 +3373,10 @@ fn try_vm_execute_splice_named_three_replacements_return_removed() {
 #[test]
 fn try_vm_execute_splice_aref_three_replacements_return_removed() {
     let p = parse(
-        r#"no strict 'vars';
-        my $v = [1, 2, 3, 4];
-        my @b = splice @$v, 1, 2, 9, 8, 7;
-        join("-", @$v) . "|" . join("-", @b);"#,
+        r#"no strict 'vars'
+        my $v = [1, 2, 3, 4]
+        my @b = splice @$v, 1, 2, 9, 8, 7
+        join("-", @$v) . "|" . join("-", @b)"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3389,11 +3388,11 @@ fn try_vm_execute_splice_aref_three_replacements_return_removed() {
 #[test]
 fn try_vm_execute_shift_then_pop_aref() {
     let p = parse(
-        r#"no strict 'vars';
-        my $v = [1, 2, 3];
-        shift @$v;
-        my $x = pop @$v;
-        $x . "|" . join("-", @$v);"#,
+        r#"no strict 'vars'
+        my $v = [1, 2, 3]
+        shift @$v
+        my $x = pop @$v
+        $x . "|" . join("-", @$v)"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3405,9 +3404,9 @@ fn try_vm_execute_shift_then_pop_aref() {
 #[test]
 fn try_vm_execute_empty_arrow_array_slice_preinc_vm_runtime_error() {
     let p = parse(
-        r#"no strict 'vars';
-        my $r = [1];
-        ++@$r[1..0];
+        r#"no strict 'vars'
+        my $r = [1]
+        ++@$r[1..0]
         0"#,
     )
     .expect("parse");
@@ -3427,9 +3426,9 @@ fn try_vm_execute_empty_arrow_array_slice_preinc_vm_runtime_error() {
 #[test]
 fn try_vm_execute_empty_array_slice_preinc_vm_runtime_error() {
     let p = parse(
-        r#"no strict 'vars';
-        my @a = (1);
-        ++@a[];
+        r#"no strict 'vars'
+        my @a = (1)
+        ++@a[]
         0"#,
     )
     .expect("parse");
@@ -3451,7 +3450,7 @@ fn try_vm_compile_empty_array_slice_plus_eq_no_tree_fallback() {
     use crate::bytecode::Op;
     use crate::compiler::Compiler;
     let chunk = Compiler::new()
-        .compile_program(&parse("no strict 'vars'; my @a; @a[] += 1;").expect("parse"))
+        .compile_program(&parse("no strict 'vars'; my @a; @a[] += 1").expect("parse"))
         .expect("compile");
     assert!(
         chunk
@@ -3466,10 +3465,10 @@ fn try_vm_compile_empty_array_slice_plus_eq_no_tree_fallback() {
 #[test]
 fn try_vm_execute_arrow_array_defined_or_range_subscript() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [1, undef];
-        $a->[0..1] //= (10, 20);
-        $a->[0] . "," . $a->[1];"#,
+        r#"no strict 'vars'
+        my $a = [1, undef]
+        $a->[0..1] //= (10, 20)
+        $a->[0] . "," . $a->[1]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3484,10 +3483,10 @@ fn try_vm_execute_arrow_array_defined_or_range_subscript() {
 #[test]
 fn try_vm_execute_arrow_array_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [1, 2];
-        $a->[2] = 3;
-        $a->[0] + $a->[1] + $a->[2];"#,
+        r#"no strict 'vars'
+        my $a = [1, 2]
+        $a->[2] = 3
+        $a->[0] + $a->[1] + $a->[2]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3502,10 +3501,10 @@ fn try_vm_execute_arrow_array_assign() {
 #[test]
 fn try_vm_execute_arrow_array_slice_through_atref_read() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [10, 20, 30];
-        my $r = $a;
-        join(",", @$r[1,2]);"#,
+        r#"no strict 'vars'
+        my $a = [10, 20, 30]
+        my $r = $a
+        join(",", @$r[1,2])"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3520,10 +3519,10 @@ fn try_vm_execute_arrow_array_slice_through_atref_read() {
 #[test]
 fn try_vm_execute_arrow_array_slice_through_atref_read_single() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [10, 20];
-        my $r = $a;
-        @$r[1];"#,
+        r#"no strict 'vars'
+        my $a = [10, 20]
+        my $r = $a
+        @$r[1]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3538,11 +3537,11 @@ fn try_vm_execute_arrow_array_slice_through_atref_read_single() {
 #[test]
 fn try_vm_execute_arrow_array_slice_through_atref_assign_list() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [0, 0, 0, 0];
-        my $r = $a;
-        @$r[1,2] = (7, 8);
-        $r->[1] . "," . $r->[2];"#,
+        r#"no strict 'vars'
+        my $a = [0, 0, 0, 0]
+        my $r = $a
+        @$r[1,2] = (7, 8)
+        $r->[1] . "," . $r->[2]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3557,10 +3556,10 @@ fn try_vm_execute_arrow_array_slice_through_atref_assign_list() {
 #[test]
 fn try_vm_execute_arrow_array_pre_inc_only() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [9];
-        ++$a->[0];
-        $a->[0];"#,
+        r#"no strict 'vars'
+        my $a = [9]
+        ++$a->[0]
+        $a->[0]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3571,10 +3570,10 @@ fn try_vm_execute_arrow_array_pre_inc_only() {
 #[test]
 fn try_vm_execute_arrow_hash_pre_inc_only() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { "x" => 9 };
-        ++$h->{"x"};
-        $h->{"x"};"#,
+        r#"no strict 'vars'
+        my $h = { "x" => 9 }
+        ++$h->{"x"}
+        $h->{"x"}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3585,14 +3584,14 @@ fn try_vm_execute_arrow_hash_pre_inc_only() {
 #[test]
 fn try_vm_execute_arrow_array_hash_pre_post_inc() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [9];
-        my $h = { "x" => 9 };
-        my $pre_a = ++$a->[0];
-        my $post_a = $a->[0]++;
-        my $pre_h = ++$h->{"x"};
-        my $post_h = $h->{"x"}++;
-        $pre_a + $post_a + $a->[0] + $pre_h + $post_h + $h->{"x"};"#,
+        r#"no strict 'vars'
+        my $a = [9]
+        my $h = { "x" => 9 }
+        my $pre_a = ++$a->[0]
+        my $post_a = $a->[0]++
+        my $pre_h = ++$h->{"x"}
+        my $post_h = $h->{"x"}++
+        $pre_a + $post_a + $a->[0] + $pre_h + $post_h + $h->{"x"}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3607,12 +3606,12 @@ fn try_vm_execute_arrow_array_hash_pre_post_inc() {
 #[test]
 fn try_vm_execute_symbolic_scalar_ref_pre_post_inc() {
     let p = parse(
-        r#"no strict 'vars';
-        my $x = 9;
-        my $r = \$x;
-        my $pre = ++$$r;
-        my $post = $$r++;
-        $pre + $post + $x;"#,
+        r#"no strict 'vars'
+        my $x = 9
+        my $r = \$x
+        my $pre = ++$$r
+        my $post = $$r++
+        $pre + $post + $x"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3627,14 +3626,14 @@ fn try_vm_execute_symbolic_scalar_ref_pre_post_inc() {
 #[test]
 fn try_vm_execute_symbolic_array_hash_ref_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $a = [1, 2];
-        my $r = $a;
-        @{ $r } = (3, 4, 5);
-        my $h = { "a" => 1 };
-        my $hr = $h;
-        %{ $hr } = ("b", 2, "c", 3);
-        join(",", @$r) . ";" . join(",", sort keys %$hr);"#,
+        r#"no strict 'vars'
+        my $a = [1, 2]
+        my $r = $a
+        @{ $r } = (3, 4, 5)
+        my $h = { "a" => 1 }
+        my $hr = $h
+        %{ $hr } = ("b", 2, "c", 3)
+        join(",", @$r) . ";" . join(",", sort keys %$hr)"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3649,10 +3648,10 @@ fn try_vm_execute_symbolic_array_hash_ref_assign() {
 #[test]
 fn try_vm_execute_hash_slice_deref() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { a => 10, b => 20 };
-        my $r = $h;
-        join(",", @$r{"a", "b"});"#,
+        r#"no strict 'vars'
+        my $h = { a => 10, b => 20 }
+        my $r = $h
+        join(",", @$r{"a", "b"})"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3667,11 +3666,11 @@ fn try_vm_execute_hash_slice_deref() {
 #[test]
 fn try_vm_execute_hash_slice_deref_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { "a" => 1, "b" => 2 };
-        my $r = $h;
-        @$r{"a", "b"} = (10, 20);
-        $r->{"a"} . "," . $r->{"b"};"#,
+        r#"no strict 'vars'
+        my $h = { "a" => 1, "b" => 2 }
+        my $r = $h
+        @$r{"a", "b"} = (10, 20)
+        $r->{"a"} . "," . $r->{"b"}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3687,10 +3686,10 @@ fn try_vm_execute_hash_slice_deref_assign() {
 #[test]
 fn try_vm_execute_named_hash_slice_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my %h = ("a", 1, "b", 2, "c", 3);
-        @h{qw(a c)} = (100, 300);
-        $h{"a"} . "," . $h{"b"} . "," . $h{"c"};"#,
+        r#"no strict 'vars'
+        my %h = ("a", 1, "b", 2, "c", 3)
+        @h{qw(a c)} = (100, 300)
+        $h{"a"} . "," . $h{"b"} . "," . $h{"c"}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3703,12 +3702,12 @@ fn try_vm_execute_named_hash_slice_assign() {
 #[test]
 fn try_vm_execute_named_hash_slice_compound_assign_multi_key() {
     let p = parse(
-        r#"no strict 'vars';
-        my %h = ("a", 10, "b", 20);
-        @h{"a","b"} += 5;
-        my $first = $h{"a"};
-        my $second = defined($h{"b"}) ? 1 : 0;
-        $first * 10 + $second;"#,
+        r#"no strict 'vars'
+        my %h = ("a", 10, "b", 20)
+        @h{"a","b"} += 5
+        my $first = $h{"a"}
+        my $second = defined($h{"b"}) ? 1 : 0
+        $first * 10 + $second"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3725,7 +3724,7 @@ fn compile_named_hash_slice_multi_key_compound_emits_dedicated_op() {
     use crate::bytecode::Op;
     use crate::compiler::Compiler;
     let chunk = Compiler::new()
-        .compile_program(&parse("my %h = (); @h{\"a\",\"b\"} += 1;").expect("parse"))
+        .compile_program(&parse("my %h = (); @h{\"a\",\"b\"} += 1").expect("parse"))
         .expect("compile");
     assert!(
         chunk
@@ -3741,10 +3740,10 @@ fn compile_named_hash_slice_multi_key_compound_emits_dedicated_op() {
 #[test]
 fn try_vm_execute_named_hash_slice_multi_key_defined_or() {
     let p = parse(
-        r#"no strict 'vars';
-        my %h = ("a", 1, "b", undef);
-        @h{qw(a b)} //= (10, 20);
-        $h{"a"} . "," . $h{"b"};"#,
+        r#"no strict 'vars'
+        my %h = ("a", 1, "b", undef)
+        @h{qw(a b)} //= (10, 20)
+        $h{"a"} . "," . $h{"b"}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3761,7 +3760,7 @@ fn compile_named_hash_slice_multi_key_logical_compound_emits_peek_and_set_last()
     use crate::bytecode::Op;
     use crate::compiler::Compiler;
     let chunk = Compiler::new()
-        .compile_program(&parse("my %h = (); @h{\"a\",\"b\"} //= 1;").expect("parse"))
+        .compile_program(&parse("my %h = (); @h{\"a\",\"b\"} //= 1").expect("parse"))
         .expect("compile");
     assert!(
         chunk
@@ -3785,11 +3784,11 @@ fn compile_named_hash_slice_multi_key_logical_compound_emits_peek_and_set_last()
 #[test]
 fn try_vm_execute_hash_slice_deref_multi_key_defined_or() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { "a" => 1, "b" => undef };
-        my $r = $h;
-        @$r{qw(a b)} //= (10, 20);
-        $r->{"a"} . "," . $r->{"b"};"#,
+        r#"no strict 'vars'
+        my $h = { "a" => 1, "b" => undef }
+        my $r = $h
+        @$r{qw(a b)} //= (10, 20)
+        $r->{"a"} . "," . $r->{"b"}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3806,9 +3805,7 @@ fn compile_hash_slice_deref_multi_key_logical_compound_emits_peek_and_set_last()
     use crate::bytecode::Op;
     use crate::compiler::Compiler;
     let chunk = Compiler::new()
-        .compile_program(
-            &parse("my %h = (); my $r = \\%h; @$r{\"a\",\"b\"} //= 1;").expect("parse"),
-        )
+        .compile_program(&parse("my %h = (); my $r = \\%h; @$r{\"a\",\"b\"} //= 1").expect("parse"))
         .expect("compile");
     assert!(
         chunk
@@ -3832,12 +3829,12 @@ fn compile_hash_slice_deref_multi_key_logical_compound_emits_peek_and_set_last()
 #[test]
 fn try_vm_execute_named_hash_slice_multi_key_pre_inc() {
     let p = parse(
-        r#"no strict 'vars';
-        my %h = ("a", 10, "b", 20, "c", 30);
-        my $pre = ++@h{"a","b","c"};
-        my $first = $h{"a"};
-        my $second_def = defined($h{"b"}) ? 1 : 0;
-        $pre * 100 + $first * 10 + $second_def;"#,
+        r#"no strict 'vars'
+        my %h = ("a", 10, "b", 20, "c", 30)
+        my $pre = ++@h{"a","b","c"}
+        my $first = $h{"a"}
+        my $second_def = defined($h{"b"}) ? 1 : 0
+        $pre * 100 + $first * 10 + $second_def"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3879,11 +3876,11 @@ fn compile_named_hash_slice_multi_key_inc_dec_emits_dedicated_op() {
 #[test]
 fn try_vm_execute_hash_slice_deref_compound_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { "a" => 10 };
-        my $r = $h;
-        @$r{"a"} += 2;
-        $r->{"a"};"#,
+        r#"no strict 'vars'
+        my $h = { "a" => 10 }
+        my $r = $h
+        @$r{"a"} += 2
+        $r->{"a"}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3900,13 +3897,13 @@ fn try_vm_execute_hash_slice_deref_compound_assign() {
 #[test]
 fn try_vm_execute_hash_slice_deref_compound_assign_multi_key() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { "a" => 10, "b" => 20 };
-        my $r = $h;
-        @$r{"a","b"} += 5;
-        my $first = $r->{"a"};
-        my $second = defined($r->{"b"}) ? 1 : 0;
-        $first * 10 + $second;"#,
+        r#"no strict 'vars'
+        my $h = { "a" => 10, "b" => 20 }
+        my $r = $h
+        @$r{"a","b"} += 5
+        my $first = $r->{"a"}
+        my $second = defined($r->{"b"}) ? 1 : 0
+        $first * 10 + $second"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3924,7 +3921,7 @@ fn compile_hash_slice_deref_multi_key_compound_emits_dedicated_op() {
     use crate::bytecode::Op;
     use crate::compiler::Compiler;
     let chunk = Compiler::new()
-        .compile_program(&parse("my %h = (); my $r = \\%h; @$r{\"a\",\"b\"} += 1;").expect("parse"))
+        .compile_program(&parse("my %h = (); my $r = \\%h; @$r{\"a\",\"b\"} += 1").expect("parse"))
         .expect("compile");
     assert!(
         chunk
@@ -3941,13 +3938,13 @@ fn compile_hash_slice_deref_multi_key_compound_emits_dedicated_op() {
 #[test]
 fn try_vm_execute_hash_slice_deref_multi_key_pre_inc() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { "a" => 10, "b" => 20, "c" => 30 };
-        my $r = $h;
-        my $pre = ++@$r{"a","b","c"};
-        my $first = $r->{"a"};
-        my $second_def = defined($r->{"b"}) ? 1 : 0;
-        $pre * 100 + $first * 10 + $second_def;"#,
+        r#"no strict 'vars'
+        my $h = { "a" => 10, "b" => 20, "c" => 30 }
+        my $r = $h
+        my $pre = ++@$r{"a","b","c"}
+        my $first = $r->{"a"}
+        my $second_def = defined($r->{"b"}) ? 1 : 0
+        $pre * 100 + $first * 10 + $second_def"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3963,13 +3960,13 @@ fn try_vm_execute_hash_slice_deref_multi_key_pre_inc() {
 #[test]
 fn try_vm_execute_hash_slice_deref_multi_key_post_inc() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { "a" => 10, "b" => 20, "c" => 30 };
-        my $r = $h;
-        my $post = @$r{"a","b","c"}++;
-        my $first = $r->{"a"};
-        my $second_def = defined($r->{"b"}) ? 1 : 0;
-        $post . ":" . $first . ":" . $second_def;"#,
+        r#"no strict 'vars'
+        my $h = { "a" => 10, "b" => 20, "c" => 30 }
+        my $r = $h
+        my $post = @$r{"a","b","c"}++
+        my $first = $r->{"a"}
+        my $second_def = defined($r->{"b"}) ? 1 : 0
+        $post . ":" . $first . ":" . $second_def"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -3985,11 +3982,11 @@ fn try_vm_execute_hash_slice_deref_multi_key_post_inc() {
 #[test]
 fn try_vm_execute_hash_slice_deref_multi_key_post_dec() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { "a" => 100, "b" => 200 };
-        my $r = $h;
-        @$r{"a","b"}--;
-        $r->{"a"};"#,
+        r#"no strict 'vars'
+        my $h = { "a" => 100, "b" => 200 }
+        my $r = $h
+        @$r{"a","b"}--
+        $r->{"a"}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4032,11 +4029,11 @@ fn compile_hash_slice_deref_multi_key_inc_dec_emits_dedicated_op() {
 #[test]
 fn try_vm_execute_hash_slice_deref_defined_or_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { "a" => undef };
-        my $r = $h;
-        @$r{"a"} //= 42;
-        $r->{"a"};"#,
+        r#"no strict 'vars'
+        my $h = { "a" => undef }
+        my $r = $h
+        @$r{"a"} //= 42
+        $r->{"a"}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4051,12 +4048,12 @@ fn try_vm_execute_hash_slice_deref_defined_or_assign() {
 #[test]
 fn try_vm_execute_hash_slice_deref_defined_or_assign_short_circuit() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { "a" => 1 };
-        my $r = $h;
-        my $runs = 0;
-        @$r{"a"} //= ($runs = 1);
-        $runs;"#,
+        r#"no strict 'vars'
+        my $h = { "a" => 1 }
+        my $r = $h
+        my $runs = 0
+        @$r{"a"} //= ($runs = 1)
+        $runs"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4071,11 +4068,11 @@ fn try_vm_execute_hash_slice_deref_defined_or_assign_short_circuit() {
 #[test]
 fn try_vm_execute_hash_slice_deref_pre_inc_only() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { "x" => 9 };
-        my $r = $h;
-        ++@$r{"x"};
-        $r->{"x"};"#,
+        r#"no strict 'vars'
+        my $h = { "x" => 9 }
+        my $r = $h
+        ++@$r{"x"}
+        $r->{"x"}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4086,12 +4083,12 @@ fn try_vm_execute_hash_slice_deref_pre_inc_only() {
 #[test]
 fn try_vm_execute_hash_slice_deref_pre_post_inc() {
     let p = parse(
-        r#"no strict 'vars';
-        my $h = { "x" => 9 };
-        my $r = $h;
-        my $pre = ++@$r{"x"};
-        my $post = @$r{"x"}++;
-        $pre + $post + $r->{"x"};"#,
+        r#"no strict 'vars'
+        my $h = { "x" => 9 }
+        my $r = $h
+        my $pre = ++@$r{"x"}
+        my $post = @$r{"x"}++
+        $pre + $post + $r->{"x"}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4108,10 +4105,10 @@ fn try_vm_execute_hash_slice_deref_pre_post_inc() {
 #[test]
 fn try_vm_execute_multi_index_array_slice_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $r = [10, 20, 30, 40, 50];
-        @$r[1, 3] = (200, 400);
-        join(",", @$r);"#,
+        r#"no strict 'vars'
+        my $r = [10, 20, 30, 40, 50]
+        @$r[1, 3] = (200, 400)
+        join(",", @$r)"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4127,10 +4124,10 @@ fn try_vm_execute_multi_index_array_slice_assign() {
 #[test]
 fn try_vm_execute_named_array_slice_assign_list() {
     let p = parse(
-        r#"no strict 'vars';
-        my @a = (10, 20, 30, 40, 50);
-        @a[1, 3] = (200, 400);
-        join(",", @a);"#,
+        r#"no strict 'vars'
+        my @a = (10, 20, 30, 40, 50)
+        @a[1, 3] = (200, 400)
+        join(",", @a)"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4145,10 +4142,10 @@ fn try_vm_execute_named_array_slice_assign_list() {
 #[test]
 fn try_vm_execute_named_array_slice_assign_range_subscript() {
     let p = parse(
-        r#"no strict 'vars';
-        my @a = (0, 0, 0);
-        @a[0..1] = (7, 8);
-        $a[0] . "," . $a[1] . "," . $a[2];"#,
+        r#"no strict 'vars'
+        my @a = (0, 0, 0)
+        @a[0..1] = (7, 8)
+        $a[0] . "," . $a[1] . "," . $a[2]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4161,12 +4158,12 @@ fn try_vm_execute_named_array_slice_assign_range_subscript() {
 #[test]
 fn try_vm_execute_multi_index_array_slice_compound_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $r = [10, 20, 30];
-        @$r[0, 2] += 5;
-        my $a = $r->[0];
-        my $b_def = defined($r->[2]) ? 1 : 0;
-        $a * 10 + $b_def;"#,
+        r#"no strict 'vars'
+        my $r = [10, 20, 30]
+        @$r[0, 2] += 5
+        my $a = $r->[0]
+        my $b_def = defined($r->[2]) ? 1 : 0
+        $a * 10 + $b_def"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4179,11 +4176,11 @@ fn try_vm_execute_multi_index_array_slice_compound_assign() {
 #[test]
 fn try_vm_execute_multi_index_array_slice_pre_inc() {
     let p = parse(
-        r#"no strict 'vars';
-        my $r = [100, 200, 300];
-        my $pre = ++@$r[0, 1, 2];
-        my $first = $r->[0];
-        $pre * 10 + $first;"#,
+        r#"no strict 'vars'
+        my $r = [100, 200, 300]
+        my $pre = ++@$r[0, 1, 2]
+        my $first = $r->[0]
+        $pre * 10 + $first"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4196,10 +4193,10 @@ fn try_vm_execute_multi_index_array_slice_pre_inc() {
 #[test]
 fn try_vm_execute_multi_index_array_slice_post_dec() {
     let p = parse(
-        r#"no strict 'vars';
-        my $r = [100, 200];
-        my $post = @$r[0, 1]--;
-        $post . ":" . $r->[0];"#,
+        r#"no strict 'vars'
+        my $r = [100, 200]
+        my $post = @$r[0, 1]--
+        $post . ":" . $r->[0]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4212,10 +4209,10 @@ fn try_vm_execute_multi_index_array_slice_post_dec() {
 #[test]
 fn try_vm_execute_multi_index_arrow_slice_defined_or_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $r = [1, 0];
-        @$r[0,1] //= (5, 6);
-        $r->[0] . "," . $r->[1];"#,
+        r#"no strict 'vars'
+        my $r = [1, 0]
+        @$r[0,1] //= (5, 6)
+        $r->[0] . "," . $r->[1]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4230,10 +4227,10 @@ fn try_vm_execute_multi_index_arrow_slice_defined_or_assign() {
 #[test]
 fn try_vm_execute_multi_index_arrow_slice_defined_or_assign_fills_undef_last() {
     let p = parse(
-        r#"no strict 'vars';
-        my $r = [1, undef];
-        @$r[0, 1] //= (5, 6);
-        $r->[0] . "," . $r->[1];"#,
+        r#"no strict 'vars'
+        my $r = [1, undef]
+        @$r[0, 1] //= (5, 6)
+        $r->[0] . "," . $r->[1]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4246,10 +4243,10 @@ fn try_vm_execute_multi_index_arrow_slice_defined_or_assign_fills_undef_last() {
 #[test]
 fn try_vm_execute_multi_index_arrow_slice_log_or_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $r = [0, 0];
-        @$r[0, 1] ||= (3, 4);
-        $r->[0] . "," . $r->[1];"#,
+        r#"no strict 'vars'
+        my $r = [0, 0]
+        @$r[0, 1] ||= (3, 4)
+        $r->[0] . "," . $r->[1]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4262,10 +4259,10 @@ fn try_vm_execute_multi_index_arrow_slice_log_or_assign() {
 #[test]
 fn try_vm_execute_multi_index_arrow_slice_log_and_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my $r = [1, 2];
-        @$r[0, 1] &&= (0, 0);
-        $r->[0] . "," . $r->[1];"#,
+        r#"no strict 'vars'
+        my $r = [1, 2]
+        @$r[0, 1] &&= (0, 0)
+        $r->[0] . "," . $r->[1]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4278,11 +4275,11 @@ fn try_vm_execute_multi_index_arrow_slice_log_and_assign() {
 #[test]
 fn try_vm_execute_named_array_multi_slice_pre_inc() {
     let p = parse(
-        r#"no strict 'vars';
-        my @a = (100, 200, 300);
-        my $pre = ++@a[0, 1, 2];
-        my $first = $a[0];
-        $pre * 10 + $first;"#,
+        r#"no strict 'vars'
+        my @a = (100, 200, 300)
+        my $pre = ++@a[0, 1, 2]
+        my $first = $a[0]
+        $pre * 10 + $first"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4298,12 +4295,12 @@ fn try_vm_execute_named_array_multi_slice_pre_inc() {
 #[test]
 fn try_vm_execute_named_array_slice_pre_inc_range_and_list_subscript() {
     let p = parse(
-        r#"no strict 'vars';
-        my @a = (100, 200, 300);
-        my $x = ++@a[0..1];
-        my @b = (10, 20, 30);
-        my $y = ++@b[(0, 1)];
-        $x * 1000 + $y * 10 + $a[0] + $b[1];"#,
+        r#"no strict 'vars'
+        my @a = (100, 200, 300)
+        my $x = ++@a[0..1]
+        my @b = (10, 20, 30)
+        my $y = ++@b[(0, 1)]
+        $x * 1000 + $y * 10 + $a[0] + $b[1]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4319,10 +4316,10 @@ fn try_vm_execute_named_array_slice_pre_inc_range_and_list_subscript() {
 #[test]
 fn try_vm_execute_named_array_multi_slice_defined_or_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my @a = (1, 0);
-        @a[0, 1] //= (5, 6);
-        $a[0] . "," . $a[1];"#,
+        r#"no strict 'vars'
+        my @a = (1, 0)
+        @a[0, 1] //= (5, 6)
+        $a[0] . "," . $a[1]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4334,10 +4331,10 @@ fn try_vm_execute_named_array_multi_slice_defined_or_assign() {
 #[test]
 fn try_vm_execute_named_array_multi_slice_log_or_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my @a = (0, 0);
-        @a[0, 1] ||= (3, 4);
-        $a[0] . "," . $a[1];"#,
+        r#"no strict 'vars'
+        my @a = (0, 0)
+        @a[0, 1] ||= (3, 4)
+        $a[0] . "," . $a[1]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4352,10 +4349,10 @@ fn try_vm_execute_named_array_multi_slice_log_or_assign() {
 #[test]
 fn try_vm_execute_named_array_multi_slice_log_and_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my @a = (1, 2);
-        @a[0, 1] &&= (0, 0);
-        $a[0] . "," . $a[1];"#,
+        r#"no strict 'vars'
+        my @a = (1, 2)
+        @a[0, 1] &&= (0, 0)
+        $a[0] . "," . $a[1]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4367,10 +4364,10 @@ fn try_vm_execute_named_array_multi_slice_log_and_assign() {
 #[test]
 fn try_vm_execute_named_array_multi_slice_plus_assign() {
     let p = parse(
-        r#"no strict 'vars';
-        my @a = (10, 20, 30);
-        @a[0, 1, 2] += 7;
-        $a[0] + $a[1] + $a[2];"#,
+        r#"no strict 'vars'
+        my @a = (10, 20, 30)
+        @a[0, 1, 2] += 7
+        $a[0] + $a[1] + $a[2]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4383,9 +4380,9 @@ fn try_vm_execute_named_array_multi_slice_plus_assign() {
 #[test]
 fn try_vm_execute_arrow_array_slice_read_range_subscript() {
     let p = parse(
-        r#"no strict 'vars';
-        my $r = [10, 20, 30];
-        join(",", @$r[0..1]);"#,
+        r#"no strict 'vars'
+        my $r = [10, 20, 30]
+        join(",", @$r[0..1])"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4401,10 +4398,10 @@ fn try_vm_execute_arrow_array_slice_read_range_subscript() {
 #[test]
 fn try_vm_execute_arrow_array_slice_pre_inc_range() {
     let p = parse(
-        r#"no strict 'vars';
-        my $r = [100, 200, 300];
-        my $pre = ++@$r[0..1];
-        $pre . ":" . $r->[0] . ":" . $r->[1];"#,
+        r#"no strict 'vars'
+        my $r = [100, 200, 300]
+        my $pre = ++@$r[0..1]
+        $pre . ":" . $r->[0] . ":" . $r->[1]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4417,10 +4414,10 @@ fn try_vm_execute_arrow_array_slice_pre_inc_range() {
 #[test]
 fn try_vm_execute_arrow_array_slice_assign_range_subscript() {
     let p = parse(
-        r#"no strict 'vars';
-        my $r = [0, 0, 0];
-        @$r[0..1] = (7, 8);
-        $r->[0] . "," . $r->[1] . "," . $r->[2];"#,
+        r#"no strict 'vars'
+        my $r = [0, 0, 0]
+        @$r[0..1] = (7, 8)
+        $r->[0] . "," . $r->[1] . "," . $r->[2]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4434,17 +4431,17 @@ fn try_vm_execute_arrow_array_slice_assign_range_subscript() {
 #[test]
 fn try_vm_execute_next_nested_in_if() {
     let p = parse(
-        r#"no strict 'vars';
-        my $i = 0;
-        my $sum = 0;
+        r#"no strict 'vars'
+        my $i = 0
+        my $sum = 0
         while ($i < 5) {
-            $i++;
+            $i++
             if ($i == 3) {
-                next;
+                next
             }
-            $sum += $i;
+            $sum += $i
         }
-        $sum;"#,
+        $sum"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4459,17 +4456,17 @@ fn try_vm_execute_next_nested_in_if() {
 #[test]
 fn try_vm_execute_last_nested_in_if() {
     let p = parse(
-        r#"no strict 'vars';
-        my $i = 0;
-        my $sum = 0;
+        r#"no strict 'vars'
+        my $i = 0
+        my $sum = 0
         while ($i < 10) {
-            $i++;
+            $i++
             if ($i == 4) {
-                last;
+                last
             }
-            $sum += $i;
+            $sum += $i
         }
-        $sum * 10 + $i;"#,
+        $sum * 10 + $i"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4484,19 +4481,19 @@ fn try_vm_execute_last_nested_in_if() {
 #[test]
 fn try_vm_execute_last_label_from_nested() {
     let p = parse(
-        r#"no strict 'vars';
-        my $hit = 0;
+        r#"no strict 'vars'
+        my $hit = 0
         OUTER: while (1) {
-            my $j = 0;
+            my $j = 0
             while ($j < 3) {
-                $j++;
+                $j++
                 if ($j == 2) {
-                    last OUTER;
+                    last OUTER
                 }
-                $hit++;
+                $hit++
             }
         }
-        $hit;"#,
+        $hit"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4513,13 +4510,13 @@ fn try_vm_execute_last_label_from_nested() {
 fn try_vm_execute_redo_while_restarts_body() {
     let p = parse(
         r#"
-        my $x = 0;
+        my $x = 0
         while ($x < 10) {
-            $x++;
+            $x++
             if ($x == 1) { redo; }
-            last;
+            last
         }
-        $x;
+        $x
         "#,
     )
     .expect("parse");
@@ -4533,11 +4530,11 @@ fn try_vm_execute_redo_while_restarts_body() {
 #[test]
 fn try_vm_execute_strict_vars_happy_path() {
     let p = parse(
-        r#"use strict;
-        use warnings;
-        my $x = 5;
-        my $y = 10;
-        $x + $y;"#,
+        r#"use strict
+        use warnings
+        my $x = 5
+        my $y = 10
+        $x + $y"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4555,9 +4552,9 @@ fn try_vm_execute_strict_vars_happy_path() {
 #[test]
 fn try_vm_execute_strict_vars_rejects_undeclared_scalar() {
     let p = parse(
-        r#"use strict;
-        $undeclared = 5;
-        $undeclared;"#,
+        r#"use strict
+        $undeclared = 5
+        $undeclared"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4579,15 +4576,15 @@ fn try_vm_execute_strict_vars_rejects_undeclared_scalar() {
 #[test]
 fn try_vm_execute_strict_vars_allows_underscore_and_foreach_var() {
     let p = parse(
-        r#"use strict;
+        r#"use strict
         sub sum {
-            my $s = 0;
+            my $s = 0
             for my $x (@_) {
-                $s += $x;
+                $s += $x
             }
-            return $s;
+            return $s
         }
-        sum(1, 2, 3, 4, 5);"#,
+        sum(1, 2, 3, 4, 5)"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4605,10 +4602,10 @@ fn try_vm_execute_strict_vars_allows_underscore_and_foreach_var() {
 #[test]
 fn try_vm_execute_strict_refs_via_transitive_helper() {
     let p = parse(
-        r#"use strict 'refs';
-        my $name = "foo";
-        my @a = @$name;
-        $a[0];"#,
+        r#"use strict 'refs'
+        my $name = "foo"
+        my @a = @$name
+        $a[0]"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4634,14 +4631,14 @@ fn try_vm_execute_strict_refs_via_transitive_helper() {
 #[test]
 fn try_vm_execute_compound_assign_on_slot_lexical_in_sub() {
     let p = parse(
-        r#"no strict 'vars';
+        r#"no strict 'vars'
         sub foo {
-            my $s = 0;
-            $s += 5;
-            $s *= 2;
-            return $s;
+            my $s = 0
+            $s += 5
+            $s *= 2
+            return $s
         }
-        foo();"#,
+        foo()"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4658,14 +4655,14 @@ fn try_vm_execute_compound_assign_on_slot_lexical_in_sub() {
 #[test]
 fn try_vm_execute_concat_compound_assign_on_slot_lexical_in_sub() {
     let p = parse(
-        r#"no strict 'vars';
+        r#"no strict 'vars'
         sub foo {
-            my $s = "";
-            $s .= "ab";
-            $s .= "cd";
-            return $s;
+            my $s = ""
+            $s .= "ab"
+            $s .= "cd"
+            return $s
         }
-        foo();"#,
+        foo()"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4686,11 +4683,11 @@ fn try_vm_execute_concat_compound_assign_on_slot_lexical_in_sub() {
 #[test]
 fn try_vm_execute_top_level_goto_forward() {
     let p = parse(
-        r#"no strict 'vars';
-        my $x = 0;
-        goto END;
-        $x = 99;
-        END: $x;"#,
+        r#"no strict 'vars'
+        my $x = 0
+        goto END
+        $x = 99
+        END: $x"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4708,14 +4705,14 @@ fn try_vm_execute_top_level_goto_forward() {
 #[test]
 fn try_vm_execute_sub_body_goto_forward() {
     let p = parse(
-        r#"no strict 'vars';
+        r#"no strict 'vars'
         sub foo {
-            my $r = 10;
-            goto SKIP;
-            $r = 20;
-            SKIP: return $r;
+            my $r = 10
+            goto SKIP
+            $r = 20
+            SKIP: return $r
         }
-        foo();"#,
+        foo()"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4734,13 +4731,13 @@ fn try_vm_execute_goto_backward_unconditional_after_return() {
     // Simplest backward-goto shape: jump back to a label that has already been emitted.
     // To avoid an infinite loop we only execute the goto once, guarded by a counter.
     let p = parse(
-        r#"no strict 'vars';
-        my $sum = 0;
-        my $i = 0;
-        LOOP: $sum = $sum + $i;
-        $i = $i + 1;
+        r#"no strict 'vars'
+        my $sum = 0
+        my $i = 0
+        LOOP: $sum = $sum + $i
+        $i = $i + 1
         if ($i < 4) { goto LOOP; }
-        $sum;"#,
+        $sum"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4770,12 +4767,12 @@ fn try_vm_execute_goto_backward_same_frame() {
     // backward jump. We only execute the backward jump zero times because the flag short-circuits
     // the path to it via a forward goto to DONE.
     let p = parse(
-        r#"no strict 'vars';
-        my $x = 0;
-        LOOP: $x = $x + 1;
-        goto DONE;
-        goto LOOP;
-        DONE: $x;"#,
+        r#"no strict 'vars'
+        my $x = 0
+        LOOP: $x = $x + 1
+        goto DONE
+        goto LOOP
+        DONE: $x"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4793,8 +4790,8 @@ fn try_vm_execute_goto_backward_same_frame() {
 #[test]
 fn try_vm_execute_goto_unknown_label_errors() {
     let p = parse(
-        r#"no strict 'vars';
-        goto NO_SUCH;"#,
+        r#"no strict 'vars'
+        goto NO_SUCH"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4813,16 +4810,16 @@ fn try_vm_execute_goto_unknown_label_errors() {
 #[test]
 fn try_vm_execute_while_with_continue_block() {
     let p = parse(
-        r#"no strict 'vars';
-        my $sum = 0;
-        my $i = 0;
+        r#"no strict 'vars'
+        my $sum = 0
+        my $i = 0
         while ($i < 5) {
-            $sum += $i;
+            $sum += $i
         } continue {
-            $i++;
+            $i++
         }
         # sum = 0+1+2+3+4 = 10; i = 5
-        $sum * 10 + $i;"#,
+        $sum * 10 + $i"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4837,16 +4834,16 @@ fn try_vm_execute_while_with_continue_block() {
 #[test]
 fn try_vm_execute_foreach_with_continue_block() {
     let p = parse(
-        r#"no strict 'vars';
-        my $body = 0;
-        my $cont = 0;
+        r#"no strict 'vars'
+        my $body = 0
+        my $cont = 0
         foreach my $x (1..4) {
-            $body += $x;
+            $body += $x
         } continue {
-            $cont += $x;
+            $cont += $x
         }
         # body = 1+2+3+4 = 10; cont = 10
-        $body * 100 + $cont;"#,
+        $body * 100 + $cont"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4859,17 +4856,17 @@ fn try_vm_execute_foreach_with_continue_block() {
 #[test]
 fn try_vm_execute_while_continue_with_top_level_next() {
     let p = parse(
-        r#"no strict 'vars';
-        my $cont_runs = 0;
-        my $i = 0;
+        r#"no strict 'vars'
+        my $cont_runs = 0
+        my $i = 0
         while ($i < 3) {
-            $i++;
-            next;
+            $i++
+            next
         } continue {
-            $cont_runs++;
+            $cont_runs++
         }
         # cont_runs should be 3 (continue runs per iteration even when next fires)
-        $cont_runs;"#,
+        $cont_runs"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4885,16 +4882,16 @@ fn try_vm_execute_while_continue_with_top_level_next() {
 #[test]
 fn try_vm_execute_until_with_continue_block() {
     let p = parse(
-        r#"no strict 'vars';
-        my $i = 0;
-        my $cont_runs = 0;
+        r#"no strict 'vars'
+        my $i = 0
+        my $cont_runs = 0
         until ($i >= 3) {
             # body does nothing except guard
         } continue {
-            $i++;
-            $cont_runs++;
+            $i++
+            $cont_runs++
         }
-        $i * 10 + $cont_runs;"#,
+        $i * 10 + $cont_runs"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4972,9 +4969,9 @@ fn try_vm_execute_rejects_aggregate_symbolic_inc_dec_directly() {
 fn symbolic_array_hash_deref_inc_dec_errors_like_perl() {
     let mut i = Interpreter::new();
     let p = parse(
-        r#"no strict 'vars';
-        my $r = [1, 2, 3];
-        ++@{ $r };"#,
+        r#"no strict 'vars'
+        my $r = [1, 2, 3]
+        ++@{ $r }"#,
     )
     .expect("parse");
     let e = i.execute(&p).expect_err("++@{...} is invalid in Perl 5");
@@ -4985,10 +4982,10 @@ fn symbolic_array_hash_deref_inc_dec_errors_like_perl() {
     );
 
     let p2 = parse(
-        r#"no strict 'vars';
-        my $h = { a => 1 };
-        my $hr = $h;
-        %{ $hr }++;"#,
+        r#"no strict 'vars'
+        my $h = { a => 1 }
+        my $hr = $h
+        %{ $hr }++"#,
     )
     .expect("parse");
     let e2 = i.execute(&p2).expect_err("%{...}++ is invalid in Perl 5");
@@ -4999,9 +4996,9 @@ fn symbolic_array_hash_deref_inc_dec_errors_like_perl() {
     );
 
     let p3 = parse(
-        r#"no strict 'vars';
-        my $r = [1];
-        --@$r;"#,
+        r#"no strict 'vars'
+        my $r = [1]
+        --@$r"#,
     )
     .expect("parse");
     let e3 = i.execute(&p3).expect_err("--@$r is invalid in Perl 5");
@@ -5015,8 +5012,8 @@ fn symbolic_array_hash_deref_inc_dec_errors_like_perl() {
 #[test]
 fn try_vm_execute_grep_expr_comma() {
     let p = parse(
-        r#"no strict 'vars';
-        join(",", grep $_ > 1, (1, 2, 3));"#,
+        r#"no strict 'vars'
+        join(",", grep $_ > 1, (1, 2, 3))"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -5031,8 +5028,8 @@ fn try_vm_execute_grep_expr_comma() {
 #[test]
 fn try_vm_execute_map_expr_comma() {
     let p = parse(
-        r#"no strict 'vars';
-        join(",", map $_ * 2, (1, 2, 3));"#,
+        r#"no strict 'vars'
+        join(",", map $_ * 2, (1, 2, 3))"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -5046,7 +5043,7 @@ fn try_vm_execute_map_expr_comma() {
 
 #[test]
 fn try_vm_execute_runs_begin_block_before_main() {
-    let p = parse("BEGIN { 1; } 2;").expect("parse");
+    let p = parse("BEGIN { 1; } 2").expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i).expect("vm path");
     assert_eq!(out.expect("vm").to_int(), 2);
@@ -5054,14 +5051,14 @@ fn try_vm_execute_runs_begin_block_before_main() {
 
 #[test]
 fn lint_program_accepts_vm_compilable_program() {
-    let p = parse("42;").expect("parse");
+    let p = parse("42").expect("parse");
     let mut i = Interpreter::new();
     assert!(lint_program(&p, &mut i).is_ok());
 }
 
 #[test]
 fn bench_builtin_reports_stats() {
-    let v = run("bench { 1 + 1 } 5;").expect("run");
+    let v = run("bench { 1 + 1 } 5").expect("run");
     let s = v.to_string();
     assert!(s.contains("bench:"));
     assert!(s.contains("min="));
@@ -5083,7 +5080,7 @@ fn try_vm_execute_runs_given_when_and_algebraic_match() {
 
 #[test]
 fn run_empty_statement_list_undef_or_zero() {
-    let v = run(";;;").expect("run");
+    let v = run(";;").expect("run");
     assert!(v.is_undef() || v.to_int() == 0);
 }
 
@@ -5095,78 +5092,76 @@ fn parse_returns_empty_program_for_whitespace() {
 
 #[test]
 fn run_builtin_abs_int_sqrt() {
-    assert_eq!(run_int("abs(-9);"), 9);
-    assert_eq!(run_int("int(9.9);"), 9);
-    assert_eq!(run_int("sqrt(49);"), 7);
+    assert_eq!(run_int("abs(-9)"), 9);
+    assert_eq!(run_int("int(9.9)"), 9);
+    assert_eq!(run_int("sqrt(49)"), 7);
 }
 
 #[test]
 fn run_length_uc_lc() {
-    assert_eq!(run_int(r#"length("abc");"#), 3);
-    assert_eq!(run(r#"uc("ab");"#).expect("run").to_string(), "AB");
-    assert_eq!(run(r#"lc("CD");"#).expect("run").to_string(), "cd");
+    assert_eq!(run_int(r#"length("abc")"#), 3);
+    assert_eq!(run(r#"uc("ab")"#).expect("run").to_string(), "AB");
+    assert_eq!(run(r#"lc("CD")"#).expect("run").to_string(), "cd");
 }
 
 #[test]
 fn run_array_push_pop_shift() {
-    assert_eq!(run_int("my @a = (1, 2); push @a, 3; scalar @a;"), 3);
-    assert_eq!(run_int("my @b = (7, 8, 9); pop @b;"), 9);
-    assert_eq!(run_int("my @c = (7, 8, 9); shift @c;"), 7);
+    assert_eq!(run_int("my @a = (1, 2); push @a, 3; scalar @a"), 3);
+    assert_eq!(run_int("my @b = (7, 8, 9); pop @b"), 9);
+    assert_eq!(run_int("my @c = (7, 8, 9); shift @c"), 7);
 }
 
 #[test]
 fn run_join_reverse_sort_numbers() {
     assert_eq!(
-        run(r#"join("-", 1, 2, 3);"#).expect("run").to_string(),
+        run(r#"join("-", 1, 2, 3)"#).expect("run").to_string(),
         "1-2-3"
     );
     assert_eq!(
-        run(r#"scalar reverse (1, 2, 3);"#)
-            .expect("run")
-            .to_string(),
+        run(r#"scalar reverse (1, 2, 3)"#).expect("run").to_string(),
         "321"
     );
 }
 
 #[test]
 fn run_hash_keys_values() {
-    assert_eq!(run_int(r#"my %h = (a => 1, b => 2); scalar keys %h;"#), 2);
+    assert_eq!(run_int(r#"my %h = (a => 1, b => 2); scalar keys %h"#), 2);
 }
 
 #[test]
 fn run_ord_chr_roundtrip() {
-    assert_eq!(run_int(r#"ord("A");"#), 65);
-    assert_eq!(run(r#"chr(65);"#).expect("run").to_string(), "A");
+    assert_eq!(run_int(r#"ord("A")"#), 65);
+    assert_eq!(run(r#"chr(65)"#).expect("run").to_string(), "A");
 }
 
 #[test]
 fn run_defined_and_undef_scalar() {
-    assert_eq!(run_int(r#"defined("x");"#), 1);
-    assert_eq!(run_int(r#"defined(undef);"#), 0);
+    assert_eq!(run_int(r#"defined("x")"#), 1);
+    assert_eq!(run_int(r#"defined(undef)"#), 0);
 }
 
 #[test]
 fn run_string_compare_str_ops() {
-    assert_eq!(run_int(r#""a" lt "b";"#), 1);
-    assert_eq!(run_int(r#""b" gt "a";"#), 1);
-    assert_eq!(run_int(r#""a" le "a";"#), 1);
-    assert_eq!(run_int(r#""b" ge "b";"#), 1);
+    assert_eq!(run_int(r#""a" lt "b""#), 1);
+    assert_eq!(run_int(r#""b" gt "a""#), 1);
+    assert_eq!(run_int(r#""a" le "a""#), 1);
+    assert_eq!(run_int(r#""b" ge "b""#), 1);
 }
 
 #[test]
 fn run_do_block_value() {
-    assert_eq!(run_int("do { 6 * 7 };"), 42);
+    assert_eq!(run_int("do { 6 * 7 }"), 42);
 }
 
 #[test]
 fn run_foreach_accumulator() {
     assert_eq!(
-        run_int("my $s = 0; foreach my $n (1, 2, 3, 4) { $s = $s + $n; } $s;"),
+        run_int("my $s = 0; foreach my $n (1, 2, 3, 4) { $s = $s + $n; } $s"),
         10
     );
 }
 
 #[test]
 fn run_while_counter() {
-    assert_eq!(run_int("my $i = 0; while ($i < 5) { $i = $i + 1; } $i;"), 5);
+    assert_eq!(run_int("my $i = 0; while ($i < 5) { $i = $i + 1; } $i"), 5);
 }

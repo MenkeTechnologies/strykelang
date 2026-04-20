@@ -12,7 +12,7 @@ fn test_lint_program() {
     let mut interp = Interpreter::new();
 
     // Correct program
-    let p1 = parse("my $x = 1; $x + 2;").expect("parse");
+    let p1 = parse("my $x = 1; $x + 2").expect("parse");
     assert!(lint_program(&p1, &mut interp).is_ok());
 
     // The current lint_program implementation might not catch all strict violations
@@ -23,7 +23,7 @@ fn test_lint_program() {
 
 #[test]
 fn test_format_and_convert_roundtrip() {
-    let code = "sub foo { my $x = shift; return $x * 2; } foo(21);";
+    let code = "sub foo { my $x = shift; return $x * 2; } foo(21)";
     let p = parse(code).expect("parse");
 
     let formatted = format_program(&p);
@@ -130,10 +130,10 @@ fn test_codecs() {
 #[test]
 fn test_compression() {
     let code = r#"
-        my $orig = "compressed text";
-        my $gz = gzip($orig);
-        my $back = gunzip($gz);
-        $back eq $orig;
+        my $orig = "compressed text"
+        my $gz = gzip($orig)
+        my $back = gunzip($gz)
+        $back eq $orig
     "#;
     assert_eq!(run(code).expect("run").to_int(), 1);
 }
@@ -141,8 +141,8 @@ fn test_compression() {
 #[test]
 fn test_json_jq() {
     let code = r#"
-        my $data = { a => 1, b => [2, 3] };
-        json_jq($data, ".b[1]");
+        my $data = { a => 1, b => [2, 3] }
+        json_jq($data, ".b[1]")
     "#;
     assert_eq!(run(code).expect("run").to_int(), 3);
 }

@@ -1653,7 +1653,7 @@ mod tests {
 
     #[test]
     fn format_program_expression_statement_includes_binop() {
-        let p = parse("2 + 3;").expect("parse");
+        let p = parse("2 + 3").expect("parse");
         let out = format_program(&p);
         assert!(
             out.contains("2") && out.contains("3") && out.contains("+"),
@@ -1670,14 +1670,14 @@ mod tests {
 
     #[test]
     fn format_program_package_line() {
-        let p = parse("package Foo::Bar;").expect("parse");
+        let p = parse("package Foo::Bar").expect("parse");
         let out = format_program(&p);
         assert!(out.contains("package Foo::Bar"));
     }
 
     #[test]
     fn format_program_string_literal_escapes_quote() {
-        let p = parse(r#"my $s = "a\"b";"#).expect("parse");
+        let p = parse(r#"my $s = "a\"b""#).expect("parse");
         let out = format_program(&p);
         assert!(out.contains("\\\""), "expected escaped quote in: {out}");
     }

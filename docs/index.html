@@ -225,7 +225,7 @@ s 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
             <tr><td>Data viz (spark/bars/flame)</td><td style="color:#0f0;">&#10003;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td></tr>
             <tr><td>Clipboard</td><td style="color:#0f0;">&#10003;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td></tr>
             <tr><td>JIT compiler</td><td style="color:#0f0;">Cranelift</td><td>&#10007;</td><td>YJIT</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td></tr>
-            <tr><td>Single binary</td><td style="color:#0f0;">20MB</td><td>pkg</td><td>pkg</td><td>pkg</td><td>pkg</td><td>3MB</td></tr>
+            <tr><td>Single binary</td><td style="color:#0f0;">26MB</td><td>pkg</td><td>pkg</td><td>pkg</td><td>pkg</td><td>3MB</td></tr>
           </tbody>
         </table>
         <h3 style="margin-top:1em;">Character count — real tasks</h3>
@@ -341,7 +341,7 @@ f("*.txt") |&gt; map { [$_, slurp($_) |&gt; split(/\s+/) |&gt; scalar] }
 
       <section class="tutorial-section">
         <h2>Builtin categories</h2>
-        <p>3100+ operations across 3500+ spellings. Query them via <code>keys %stryke::builtins</code> — the table below is a navigational overview, not a full index. Run <code>s 'p scalar keys %b'</code> for the live count.</p>
+        <p>3200+ operations across 3700+ spellings. Query them via <code>keys %stryke::builtins</code> — the table below is a navigational overview, not a full index. Run <code>s 'p scalar keys %b'</code> for the live count.</p>
         <div class="cat-grid">
           <div class="cat-card"><h4>Array / List (134+)</h4><p><code>map maps flat_map grep sort reverse push pop shift unshift splice reduce fold fore e first any all none take take_while drop skip_while partition min_by max_by zip zip_with interleave frequencies count_by chunk windowed enumerate shuffle uniq dedup compact flatten concat pluck grep_v with_index sorted sorted_desc sorted_nums without take_last drop_last pairwise batch rotate swap_pairs sliding_pairs run_length_encode group_consecutive permutations combinations power_set cartesian_product</code> &hellip;</p></div>
           <div class="cat-card"><h4>String (129+)</h4><p><code>chomp chop length substr index rindex split join uc lc ucfirst lcfirst chr ord trim lines words chars snake_case camel_case kebab_case pascal_case constant_case capitalize swap_case title_case squish pad_left pad_right center truncate_at reverse_str rot13 rot47 caesar_shift count_vowels count_consonants first_word last_word left_str right_str wrap_text dedent indent strip_html levenshtein soundex extract_numbers extract_emails extract_urls</code> &hellip;</p></div>

@@ -456,9 +456,9 @@ mod tests {
     #[test]
     fn run_executes_last_expression_value() {
         // Statement-only programs may yield 0 via the VM path; assert parse + run succeed.
-        let p = parse("2 + 2;").expect("parse");
+        let p = parse("2 + 2").expect("parse");
         assert!(!p.statements.is_empty());
-        let _ = run("2 + 2;").expect("run");
+        let _ = run("2 + 2").expect("run");
     }
 
     #[test]
@@ -469,7 +469,7 @@ mod tests {
     #[test]
     fn interpreter_scope_persists_global_scalar_across_execute_tree_calls() {
         let mut interp = Interpreter::new();
-        let assign = parse("$persist_test = 100;").expect("parse assign");
+        let assign = parse("$persist_test = 100").expect("parse assign");
         interp.execute_tree(&assign).expect("assign");
         let read = parse("$persist_test").expect("parse read");
         let v = interp.execute_tree(&read).expect("read");
@@ -484,13 +484,13 @@ mod tests {
 
     #[test]
     fn parse_expression_statement() {
-        let p = parse("2 + 2;").expect("parse");
+        let p = parse("2 + 2").expect("parse");
         assert!(!p.statements.is_empty());
     }
 
     #[test]
     fn parse_semicolon_only_statements() {
-        parse(";;;").expect("semicolons only");
+        parse(";;").expect("semicolons only");
     }
 
     #[test]
@@ -510,7 +510,7 @@ mod tests {
 
     #[test]
     fn parse_qw_word_list() {
-        parse("my @a = qw(x y z);").expect("qw list");
+        parse("my @a = qw(x y z)").expect("qw list");
     }
 
     #[test]
@@ -520,7 +520,7 @@ mod tests {
 
     #[test]
     fn parse_package_statement() {
-        parse("package Foo::Bar; 1;").expect("package");
+        parse("package Foo::Bar; 1").expect("package");
     }
 
     #[test]
@@ -535,14 +535,14 @@ mod tests {
 
     #[test]
     fn parse_q_constructor() {
-        parse(r#"my $s = q{braces};"#).expect("q{}");
-        parse(r#"my $t = qq(double);"#).expect("qq()");
+        parse(r#"my $s = q{braces}"#).expect("q{}");
+        parse(r#"my $t = qq(double)"#).expect("qq()");
     }
 
     #[test]
     fn parse_regex_literals() {
-        parse("m/foo/;").expect("m//");
-        parse("s/foo/bar/g;").expect("s///");
+        parse("m/foo/").expect("m//");
+        parse("s/foo/bar/g").expect("s///");
     }
 
     #[test]
@@ -553,7 +553,7 @@ mod tests {
 
     #[test]
     fn parse_transliterate_y() {
-        parse("$_ = 'a'; y/a/A/;").expect("y//");
+        parse("$_ = 'a'; y/a/A/").expect("y//");
     }
 
     #[test]
@@ -563,18 +563,18 @@ mod tests {
 
     #[test]
     fn parse_our_declaration() {
-        parse("our $g = 1;").expect("our");
+        parse("our $g = 1").expect("our");
     }
 
     #[test]
     fn parse_local_declaration() {
-        parse("local $x = 1;").expect("local");
+        parse("local $x = 1").expect("local");
     }
 
     #[test]
     fn parse_use_no_statements() {
-        parse("use strict;").expect("use");
-        parse("no warnings;").expect("no");
+        parse("use strict").expect("use");
+        parse("no warnings").expect("no");
     }
 
     #[test]
@@ -585,42 +585,42 @@ mod tests {
 
     #[test]
     fn parse_list_expression_in_parentheses() {
-        parse("my @a = (1, 2, 3);").expect("list");
+        parse("my @a = (1, 2, 3)").expect("list");
     }
 
     #[test]
     fn parse_require_expression() {
-        parse("require strict;").expect("require");
+        parse("require strict").expect("require");
     }
 
     #[test]
     fn parse_do_string_eval_form() {
-        parse(r#"do "foo.pl";"#).expect("do string");
+        parse(r#"do "foo.pl""#).expect("do string");
     }
 
     #[test]
     fn parse_package_qualified_name() {
-        parse("package Foo::Bar::Baz;").expect("package ::");
+        parse("package Foo::Bar::Baz").expect("package ::");
     }
 
     #[test]
     fn parse_my_multiple_declarations() {
-        parse("my ($a, $b, $c);").expect("my list");
+        parse("my ($a, $b, $c)").expect("my list");
     }
 
     #[test]
     fn parse_eval_block_statement() {
-        parse("eval { 1; };").expect("eval block");
+        parse("eval { 1; }").expect("eval block");
     }
 
     #[test]
     fn parse_say_statement() {
-        parse("say 42;").expect("say");
+        parse("say 42").expect("say");
     }
 
     #[test]
     fn parse_chop_scalar() {
-        parse("chop $s;").expect("chop");
+        parse("chop $s").expect("chop");
     }
 
     #[test]
@@ -635,7 +635,7 @@ mod tests {
 
     #[test]
     fn format_program_roundtrips_simple_expression() {
-        let p = parse("$x + 1;").expect("parse");
+        let p = parse("$x + 1").expect("parse");
         let out = format_program(&p);
         assert!(!out.trim().is_empty());
     }
@@ -679,3 +679,27 @@ mod run_semantics_more;
 
 #[cfg(test)]
 mod value_extra_tests;
+
+#[cfg(test)]
+mod lexer_extra_tests;
+
+#[cfg(test)]
+mod parser_extra_tests;
+
+#[cfg(test)]
+mod builtins_extra_tests;
+
+#[cfg(test)]
+mod thread_extra_tests;
+
+#[cfg(test)]
+mod error_extra_tests;
+
+#[cfg(test)]
+mod oo_extra_tests;
+
+#[cfg(test)]
+mod regex_extra_tests;
+
+#[cfg(test)]
+mod aot_extra_tests;
