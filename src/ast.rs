@@ -64,6 +64,10 @@ impl GrepBuiltinKeyword {
 pub enum SubSigParam {
     /// `$name` or `$name: Type` — one positional scalar from `@_`, optionally typed.
     Scalar(String, Option<PerlTypeName>),
+    /// `@name` — slurps remaining positional args into an array.
+    Array(String),
+    /// `%name` — slurps remaining positional args into a hash (key-value pairs).
+    Hash(String),
     /// `[ $a, @tail, ... ]` — next argument must be array-like; same element rules as algebraic `match`.
     ArrayDestruct(Vec<MatchArrayElem>),
     /// `{ k => $v, ... }` — next argument must be a hash or hashref; keys bind to listed scalars.

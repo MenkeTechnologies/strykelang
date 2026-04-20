@@ -27,6 +27,8 @@ pub(crate) fn format_sub_sig_param(p: &SubSigParam) -> String {
             }
             s
         }
+        SubSigParam::Array(name) => format!("@{}", name),
+        SubSigParam::Hash(name) => format!("%{}", name),
         SubSigParam::ArrayDestruct(elems) => {
             let inner = elems
                 .iter()

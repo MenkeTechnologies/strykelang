@@ -34,7 +34,7 @@ fn lcm_of ($a, $b) {
 
 # Returns a closure that adds $n to its argument
 fn make_adder ($n) {
-    sub { $_[0] + $n }
+    fn { $_0 + $n }
 }
 
 # Higher-order: apply a function N times to a value
@@ -47,6 +47,6 @@ fn apply_n ($f, $n, $val) {
 fn sqrt_newton ($x) {
     return 0 if $x == 0
     my $guess = $x / 2.0
-    my $refine = sub { ($guess + $x / $guess) / 2.0 }
+    my $refine = fn { ($guess + $x / $guess) / 2.0 }
     apply_n($refine, 20, $guess)
 }

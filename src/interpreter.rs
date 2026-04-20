@@ -16800,6 +16800,23 @@ impl Interpreter {
                     let n = self.english_scalar_name(name);
                     self.scope.declare_scalar(n, val);
                 }
+                SubSigParam::Array(name) => {
+                    let rest: Vec<PerlValue> = argv[i..].to_vec();
+                    i = argv.len();
+                    let aname = self.stash_array_name_for_package(name);
+                    self.scope.declare_array(&aname, rest);
+                }
+                SubSigParam::Hash(name) => {
+                    let rest: Vec<PerlValue> = argv[i..].to_vec();
+                    i = argv.len();
+                    let mut map = IndexMap::new();
+                    let mut j = 0;
+                    while j + 1 < rest.len() {
+                        map.insert(rest[j].to_string(), rest[j + 1].clone());
+                        j += 2;
+                    }
+                    self.scope.declare_hash(name, map);
+                }
                 SubSigParam::ArrayDestruct(elems) => {
                     let arg = argv.get(i).cloned().unwrap_or(PerlValue::UNDEF);
                     i += 1;
@@ -17232,6 +17249,23 @@ impl Interpreter {
                     }
                     let n = self.english_scalar_name(name);
                     self.scope.declare_scalar(n, v);
+                }
+                SubSigParam::Array(name) => {
+                    let rest: Vec<PerlValue> = argv[i..].to_vec();
+                    i = argv.len();
+                    let aname = self.stash_array_name_for_package(name);
+                    self.scope.declare_array(&aname, rest);
+                }
+                SubSigParam::Hash(name) => {
+                    let rest: Vec<PerlValue> = argv[i..].to_vec();
+                    i = argv.len();
+                    let mut map = IndexMap::new();
+                    let mut j = 0;
+                    while j + 1 < rest.len() {
+                        map.insert(rest[j].to_string(), rest[j + 1].clone());
+                        j += 2;
+                    }
+                    self.scope.declare_hash(name, map);
                 }
                 SubSigParam::ArrayDestruct(elems) => {
                     let arg = argv.get(i).cloned().unwrap_or(PerlValue::UNDEF);

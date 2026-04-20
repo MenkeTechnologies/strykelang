@@ -33,8 +33,7 @@ fn diff_sets ($a, $b) {
 # ── Hash pipeline utilities ─────────────────────────────────────────
 
 # Invert a hash (swap keys and values), returns hashref
-fn flip_hash {
-    my %h = @_
+fn flip_hash (%h) {
     my $inv = {}
     for my $k (keys %h) {
         $inv->{$h{$k}} = $k
@@ -43,8 +42,7 @@ fn flip_hash {
 }
 
 # Select only certain keys from a hash
-fn extract_keys {
-    my $href = $_[0]
+fn extract_keys ($href) {
     my @keys
     for my $i (1..scalar(@_) - 1) {
         push @keys, $_[$i]
@@ -67,15 +65,13 @@ fn apply_to_values ($href, $fn) {
 
 # ── Higher-order collection functions ────────────────────────────────
 
-# Compose two functions: compose_fns(f, g) returns sub { f(g(x)) }
+# Compose two functions: compose_fns(f, g) returns fn { f(g(x)) }
 fn compose_fns ($f, $g) {
-    fn { $f->($g->($_[0])) }
+    fn { $f->($g->($_0)) }
 }
 
 # Apply a list of transforms to a value (left fold of functions)
-fn apply_pipeline {
-    my $val = shift
-    my @fns = @_
+fn apply_pipeline ($val, @fns) {
     for my $fn (@fns) {
         $val = $fn->($val)
     }
@@ -83,8 +79,7 @@ fn apply_pipeline {
 }
 
 # Count occurrences — returns arrayref of [value, count] pairs
-fn count_occurrences {
-    my @items = @_
+fn count_occurrences (@items) {
     my $freq = {}
     for my $item (@items) {
         $freq->{$item} = ($freq->{$item} // 0) + 1
@@ -98,9 +93,7 @@ fn count_occurrences {
 }
 
 # Split an array into groups of N
-fn split_chunks {
-    my $n = shift
-    my @items = @_
+fn split_chunks ($n, @items) {
     my @chunks
     while (scalar @items) {
         my @group

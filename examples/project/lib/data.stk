@@ -6,8 +6,7 @@ fn word_freq_map {
     $freq
 }
 
-fn group_records {
-    my ($key, @records) = @_
+fn group_records ($key, @records) {
     my $groups = {}
     for my $r (@records) {
         my $k = $r->{$key} // "unknown"
@@ -17,8 +16,7 @@ fn group_records {
     $groups
 }
 
-fn summarize_list {
-    my @data = @_
+fn summarize_list (@data) {
     my $n = scalar @data
     return {} unless $n
     my $total = sum(@data);
@@ -42,8 +40,7 @@ fn zip_to_hash ($keys, $vals) {
 }
 
 # Partition an array into two: [matching, non-matching]
-fn split_by_pred {
-    my ($pred, @items) = @_
+fn split_by_pred ($pred, @items) {
     my $yes = []
     my $no = []
     for my $item (@items) {
@@ -58,8 +55,7 @@ fn split_by_pred {
 }
 
 # Running total of a numeric array
-fn running_total {
-    my @data = @_
+fn running_total (@data) {
     my @result
     my $acc = 0
     for my $v (@data) {

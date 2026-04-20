@@ -676,3 +676,6 @@ mod run_semantics_tests;
 
 #[cfg(test)]
 mod run_semantics_more;
+
+#[cfg(test)]
+mod value_extra_tests;
