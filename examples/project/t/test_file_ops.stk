@@ -1,0 +1,133 @@
+# t/test_file_ops.stk — file operation tests
+
+require "./lib/file_ops.stk"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SLURP
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq slurp_self(), 1, "slurp self"
+assert_eq slurp_has_content(), 1, "slurp has content"
+assert_eq slurp_missing(), 1, "slurp missing"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPEW
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq spew_and_read(), "hello world", "spew and read"
+assert_eq spew_overwrite(), "second", "spew overwrite"
+# split includes trailing empty, so 4 not 3
+assert_eq spew_multiline(), 4, "spew multiline"
+assert_eq spew_empty(), 0, "spew empty"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FILE TEST OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq file_exists_true(), 1, "file exists true"
+assert_eq file_exists_false(), 0, "file exists false"
+assert_eq file_is_file(), 1, "file is file"
+assert_eq file_is_dir(), 1, "file is dir"
+assert_eq file_is_readable(), 1, "file is readable"
+assert_eq file_is_writable(), 1, "file is writable"
+assert_eq test_file_has_size(), 1, "file size"
+assert_eq dir_not_file(), 1, "dir not file"
+assert_eq file_not_dir(), 1, "file not dir"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GLOB
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq glob_lib_files(), 1, "glob lib files"
+assert_eq glob_test_files(), 1, "glob test files"
+assert_eq glob_no_match(), 0, "glob no match"
+assert_eq glob_single(), 1, "glob single"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STAT
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq stat_file(), 1, "stat file"
+assert_eq stat_size(), 1, "stat size"
+assert_eq stat_missing(), 0, "stat missing"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# UNLINK
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq unlink_created(), 1, "unlink created"
+assert_eq unlink_missing(), 1, "unlink missing"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MKDIR / RMDIR
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq mkdir_and_rmdir(), 1, "mkdir and rmdir"
+assert_eq mkdir_exists(), 1, "mkdir exists"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CWD
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq cwd_defined(), 1, "cwd defined"
+assert_eq cwd_not_empty(), 1, "cwd not empty"
+assert_eq cwd_contains_project(), 1, "cwd contains project"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BASENAME / DIRNAME
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq basename_simple(), "baz.txt", "basename simple"
+assert_eq basename_no_path(), "file.txt", "basename no path"
+assert_eq basename_trailing_slash(), "bar", "basename trailing slash"
+
+assert_eq dirname_simple(), "/foo/bar", "dirname simple"
+assert_eq dirname_no_path(), ".", "dirname no path"
+assert_eq dirname_root(), "/", "dirname root"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# OPEN / CLOSE / READ / WRITE
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq open_read_close(), 1, "open read close"
+assert_eq open_write_close(), 1, "open write close"
+assert_eq open_append(), 1, "open append"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LINES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq lines_count(), 3, "lines count"
+assert_eq lines_content(), 1, "lines content"
+assert_eq lines_empty_file(), 0, "lines empty file"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TEMP FILE OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq temp_write_read(), 1, "temp write read"
+assert_eq temp_binary_like(), 1, "temp binary like"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PATH OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq path_join_manual(), 1, "path join manual"
+assert_eq path_cwd_is_absolute(), 1, "path cwd is absolute"
+assert_eq path_basename_ext(), 1, "path basename ext"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# RENAME / COPY
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq rename_file(), 1, "rename file"
+assert_eq copy_file(), 1, "copy file"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FIND FILES
+# ══════════════════════════════════════════════════════════════════
+
+assert_eq find_lib_via_glob(), 1, "find lib via glob"
+assert_eq find_test_via_glob(), 1, "find test via glob"
+
+test_run

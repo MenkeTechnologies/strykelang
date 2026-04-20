@@ -11114,7 +11114,7 @@ fn builtin_wordcloud_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
         let angle = t * 2.4;
         let x = cx + r * angle.cos();
         let y = cy + r * angle.sin();
-        if x < 10.0 || x > SVG_W - 10.0 || y < 30.0 || y > SVG_H - 10.0 {
+        if !(10.0..=SVG_W - 10.0).contains(&x) || !(30.0..=SVG_H - 10.0).contains(&y) {
             continue;
         }
         let size = 10.0 + (freqs[i] / f_max) * 30.0;
@@ -11162,7 +11162,7 @@ fn builtin_treemap_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
         w: f64,
         h: f64,
     }
-    let _rects = vec![Rect {
+    let _rects = [Rect {
         x: px0,
         y: py0,
         w: px1 - px0,

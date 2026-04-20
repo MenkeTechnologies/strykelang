@@ -1,0 +1,121 @@
+# t/test_error_handling.stk — error handling tests
+
+require "./lib/error_handling.stk"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EVAL BLOCK
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq eval_success(), 42, "eval success"
+assert_eq eval_with_die(), "undef", "eval with die"
+assert_eq eval_captures_error(), 1, "eval captures error"
+assert_eq eval_clears_error(), 1, "eval clears error"
+assert_eq eval_nested(), "outer ok", "eval nested"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DIE AND WARN
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq die_in_eval(), 1, "die in eval"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ERROR HANDLING PATTERNS
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $tc = try_catch_pattern()
+assert_eq $tc =~ /caught/ ? 1 : 0, 1, "try catch pattern"
+
+assert_eq safe_division(10, 2), 5, "safe division ok"
+assert_eq defined(safe_division(10, 0)) ? 1 : 0, 0, "safe division zero"
+
+assert_eq with_cleanup(), 1, "with cleanup"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ERROR PROPAGATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq outer_catches(), 1, "outer catches"
+assert_eq rethrow(), 1, "rethrow"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CONDITIONAL ERRORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq validate_positive(5), 5, "validate positive ok"
+
+my $neg_result = eval { validate_positive(-5) }
+assert_eq defined($neg_result) ? 1 : 0, 0, "validate positive fail"
+
+assert_eq validate_in_range(5, 1, 10), 5, "validate range ok"
+
+my $range_fail = eval { validate_in_range(15, 1, 10) }
+assert_eq $@ =~ /out of range/ ? 1 : 0, 1, "validate range fail"
+
+assert_eq validate_non_empty("hello"), "hello", "validate non-empty ok"
+
+my $empty_fail = eval { validate_non_empty("") }
+assert_eq $@ =~ /must not be empty/ ? 1 : 0, 1, "validate non-empty fail"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# RETURN VS DIE
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq return_or_die(0), "returning", "return or die - return"
+
+my $die_result = eval { return_or_die(1) }
+assert_eq $@ =~ /dying/ ? 1 : 0, 1, "return or die - die"
+
+assert_eq early_die(0), "reached end", "early die - no die"
+
+my $early_result = eval { early_die(1) }
+assert_eq $@ =~ /early/ ? 1 : 0, 1, "early die - die"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ADDITIONAL INLINE TESTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Eval string (simplified)
+my $eval_val = eval { 2 + 2 }
+assert_eq $eval_val, 4, "eval simple expr"
+
+# Multiple sequential errors
+for my $i (1..3) {
+    eval { die "error $i" }
+    assert_eq $@ =~ /error $i/ ? 1 : 0, 1, "sequential error $i"
+}
+
+# Error in loop
+my @errors
+for my $n (1, 0, 2) {
+    my $r = eval { 10 / $n }
+    push @errors, defined($r) ? "ok" : "err"
+}
+assert_eq join(",", @errors), "ok,err,ok", "errors in loop"
+
+# Nested eval
+my $nested = eval {
+    my $inner = eval { 5 + 5 }
+    $inner * 2
+}
+assert_eq $nested, 20, "nested eval success"
+
+# Die with newline
+eval { die "message\n" }
+assert_eq $@ eq "message\n", 1, "die with newline"
+
+# Die without newline (adds location)
+eval { die "message" }
+assert_eq $@ =~ /message at/ ? 1 : 0, 1, "die without newline"
+
+# $@ preservation
+$@ = ""
+my $prev_err = eval { die "test"; 1 }
+my $captured = $@
+assert_eq $captured =~ /test/ ? 1 : 0, 1, "error preserved"
+
+# Successful eval clears $@
+$@ = "previous error"
+eval { 1 }
+assert_eq $@ eq "", 1, "success clears error"
+
+test_run

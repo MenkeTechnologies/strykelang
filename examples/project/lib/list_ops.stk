@@ -1,0 +1,648 @@
+# lib/list_ops.stk — list operation tests
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MAP
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn map_double {
+    my @a = (1, 2, 3, 4, 5)
+    my @r = map { $_ * 2 } @a
+    join(",", @r)
+}
+
+fn map_square {
+    my @a = (1, 2, 3, 4)
+    my @r = map { $_ * $_ } @a
+    join(",", @r)
+}
+
+fn map_string {
+    my @a = qw(a b c)
+    my @r = map { uc($_) } @a
+    join(",", @r)
+}
+
+fn map_length {
+    my @a = qw(one two three)
+    my @r = map { length($_) } @a
+    join(",", @r)
+}
+
+fn map_empty {
+    my @a = ()
+    my @r = map { $_ * 2 } @a
+    scalar(@r)
+}
+
+fn map_to_hash_key {
+    my @a = qw(a b c)
+    my @r = map { $_ => 1 } @a
+    scalar(@r)
+}
+
+fn map_conditional {
+    my @a = (1, 2, 3, 4, 5)
+    my @r = map { $_ > 2 ? $_ : 0 } @a
+    join(",", @r)
+}
+
+fn map_chained {
+    my @a = (1, 2, 3)
+    my @r = map { $_ + 1 } map { $_ * 2 } @a
+    join(",", @r)
+}
+
+fn map_with_index {
+    my @a = qw(a b c)
+    my $i = 0
+    my @r = map { my $x = "$_$i"; $i++; $x } @a
+    join(",", @r)
+}
+
+fn map_flatten {
+    my @a = (1, 2, 3)
+    my @r = map { ($_, $_ * 10) } @a
+    join(",", @r)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GREP
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn grep_positive {
+    my @a = (-2, -1, 0, 1, 2)
+    my @r = grep { $_ > 0 } @a
+    join(",", @r)
+}
+
+fn grep_even {
+    my @a = (1, 2, 3, 4, 5, 6)
+    my @r = grep { $_ % 2 == 0 } @a
+    join(",", @r)
+}
+
+fn grep_string_match {
+    my @a = qw(apple banana cherry date)
+    my @r = grep { /a/ } @a
+    join(",", @r)
+}
+
+fn grep_defined {
+    my @a = (1, undef, 2, undef, 3)
+    my @r = grep { defined($_) } @a
+    join(",", @r)
+}
+
+fn grep_true {
+    my @a = (0, 1, "", "hello", undef)
+    my @r = grep { $_ } @a
+    scalar(@r)
+}
+
+fn grep_empty {
+    my @a = ()
+    my @r = grep { $_ > 0 } @a
+    scalar(@r)
+}
+
+fn grep_none_match {
+    my @a = (1, 2, 3)
+    my @r = grep { $_ > 10 } @a
+    scalar(@r)
+}
+
+fn grep_all_match {
+    my @a = (10, 20, 30)
+    my @r = grep { $_ > 5 } @a
+    scalar(@r)
+}
+
+fn grep_count {
+    my @a = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+    scalar(grep { $_ % 2 == 0 } @a)
+}
+
+fn grep_chained {
+    my @a = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+    my @r = grep { $_ > 3 } grep { $_ % 2 == 0 } @a
+    join(",", @r)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SORT
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn sort_numeric {
+    my @a = (3, 1, 4, 1, 5, 9, 2, 6)
+    my @r = sort { $a <=> $b } @a
+    join(",", @r)
+}
+
+fn sort_numeric_desc {
+    my @a = (3, 1, 4, 1, 5)
+    my @r = sort { $b <=> $a } @a
+    join(",", @r)
+}
+
+fn sort_string {
+    my @a = qw(banana apple cherry)
+    my @r = sort @a
+    join(",", @r)
+}
+
+fn sort_string_cmp {
+    my @a = qw(banana Apple cherry)
+    my @r = sort { $a cmp $b } @a
+    join(",", @r)
+}
+
+fn sort_string_desc {
+    my @a = qw(apple banana cherry)
+    my @r = sort { $b cmp $a } @a
+    join(",", @r)
+}
+
+fn sort_case_insensitive {
+    my @a = qw(Banana apple Cherry)
+    my @r = sort { lc($a) cmp lc($b) } @a
+    join(",", @r)
+}
+
+fn sort_by_length {
+    my @a = qw(a bb ccc dd e)
+    my @r = sort { length($a) <=> length($b) } @a
+    join(",", @r)
+}
+
+fn sort_empty {
+    my @a = ()
+    my @r = sort @a
+    scalar(@r)
+}
+
+fn sort_single {
+    my @a = (42)
+    my @r = sort @a
+    $r[0]
+}
+
+fn sort_stable_check {
+    my @a = (3, 1, 4, 1, 5)
+    my @r = sort { $a <=> $b } @a
+    $r[0] == 1 && $r[1] == 1 ? 1 : 0
+}
+
+fn sort_preserves_original {
+    my @a = (3, 1, 2)
+    my @r = sort { $a <=> $b } @a
+    $a[0]
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# REVERSE
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn reverse_array {
+    my @a = (1, 2, 3, 4, 5)
+    my @r = reverse(@a)
+    join(",", @r)
+}
+
+fn reverse_array_empty {
+    my @a = ()
+    my @r = reverse(@a)
+    scalar(@r)
+}
+
+fn reverse_array_single {
+    my @a = (42)
+    my @r = reverse(@a)
+    $r[0]
+}
+
+fn reverse_string_scalar {
+    scalar(reverse("hello"))
+}
+
+fn reverse_preserves {
+    my @a = (1, 2, 3)
+    my @r = reverse(@a)
+    $a[0]
+}
+
+fn reverse_twice {
+    my @a = (1, 2, 3)
+    my @r = reverse(reverse(@a))
+    join(",", @r)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# JOIN
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn join_comma {
+    my @a = (1, 2, 3)
+    join(",", @a)
+}
+
+fn join_space {
+    my @a = qw(hello world)
+    join(" ", @a)
+}
+
+fn join_empty_sep {
+    my @a = qw(a b c)
+    join("", @a)
+}
+
+fn join_empty_array {
+    my @a = ()
+    join(",", @a)
+}
+
+fn join_single {
+    my @a = (42)
+    join(",", @a)
+}
+
+fn join_multi_char {
+    my @a = (1, 2, 3)
+    join(" - ", @a)
+}
+
+fn join_with_undef {
+    my @a = (1, undef, 3)
+    join(",", @a)
+}
+
+fn join_mixed_types {
+    my @a = (1, "hello", 3.14)
+    join("|", @a)
+}
+
+fn join_newline {
+    my @a = qw(line1 line2 line3)
+    my $s = join("\n", @a)
+    length($s)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPLIT
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn split_comma {
+    my @r = split(/,/, "a,b,c")
+    join("|", @r)
+}
+
+fn split_space {
+    my @r = split(/ /, "hello world")
+    scalar(@r)
+}
+
+fn split_regex {
+    my @r = split(/\s+/, "a  b   c")
+    join(",", @r)
+}
+
+fn split_limit {
+    my @r = split(/,/, "a,b,c,d", 2)
+    scalar(@r)
+}
+
+fn split_limit_rest {
+    my @r = split(/,/, "a,b,c,d", 2)
+    $r[1]
+}
+
+fn split_no_match {
+    my @r = split(/x/, "hello")
+    scalar(@r)
+}
+
+fn split_empty_string {
+    my @r = split(/,/, "")
+    scalar(@r)
+}
+
+fn split_trailing_empty {
+    my @r = split(/,/, "a,b,")
+    scalar(@r)
+}
+
+fn split_multiple_delim {
+    my @r = split(/[,;]/, "a,b;c")
+    join("|", @r)
+}
+
+fn split_at_start {
+    my @r = split(/,/, ",a,b")
+    scalar(@r)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PUSH
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn push_single {
+    my @a = (1, 2)
+    push @a, 3
+    join(",", @a)
+}
+
+fn push_multiple {
+    my @a = (1)
+    push @a, 2, 3, 4
+    join(",", @a)
+}
+
+fn push_returns {
+    my @a = (1, 2)
+    push @a, 3
+}
+
+fn push_empty {
+    my @a = ()
+    push @a, 1
+    scalar(@a)
+}
+
+fn push_array {
+    my @a = (1, 2)
+    my @b = (3, 4)
+    push @a, @b
+    join(",", @a)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# POP
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn pop_returns {
+    my @a = (1, 2, 3)
+    pop @a
+}
+
+fn pop_modifies {
+    my @a = (1, 2, 3)
+    pop @a
+    join(",", @a)
+}
+
+fn pop_empty {
+    my @a = ()
+    my $r = pop @a
+    defined($r) ? 1 : 0
+}
+
+fn pop_single {
+    my @a = (42)
+    my $r = pop @a
+    $r == 42 && scalar(@a) == 0 ? 1 : 0
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SHIFT
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn shift_returns {
+    my @a = (1, 2, 3)
+    shift @a
+}
+
+fn shift_modifies {
+    my @a = (1, 2, 3)
+    shift @a
+    join(",", @a)
+}
+
+fn shift_empty {
+    my @a = ()
+    my $r = shift @a
+    defined($r) ? 1 : 0
+}
+
+fn shift_single {
+    my @a = (42)
+    my $r = shift @a
+    $r == 42 && scalar(@a) == 0 ? 1 : 0
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# UNSHIFT
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn unshift_single {
+    my @a = (2, 3)
+    unshift @a, 1
+    join(",", @a)
+}
+
+fn unshift_multiple {
+    my @a = (4)
+    unshift @a, 1, 2, 3
+    join(",", @a)
+}
+
+fn unshift_returns {
+    my @a = (2, 3)
+    unshift @a, 1
+}
+
+fn unshift_empty {
+    my @a = ()
+    unshift @a, 1
+    scalar(@a)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPLICE
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn splice_remove {
+    my @a = (1, 2, 3, 4, 5)
+    my @r = splice(@a, 1, 2)
+    join(",", @r)
+}
+
+fn splice_remove_result {
+    my @a = (1, 2, 3, 4, 5)
+    splice(@a, 1, 2)
+    join(",", @a)
+}
+
+fn splice_insert {
+    my @a = (1, 4, 5)
+    splice(@a, 1, 0, 2, 3)
+    join(",", @a)
+}
+
+fn splice_replace {
+    my @a = (1, 2, 3, 4, 5)
+    splice(@a, 1, 2, "a", "b", "c")
+    join(",", @a)
+}
+
+fn splice_to_end {
+    my @a = (1, 2, 3, 4, 5)
+    my @r = splice(@a, 2)
+    join(",", @r)
+}
+
+fn splice_negative {
+    my @a = (1, 2, 3, 4, 5)
+    my @r = splice(@a, -2)
+    join(",", @r)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# WANTARRAY IN LIST OPS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn list_in_scalar {
+    my @a = (1, 2, 3)
+    my $count = @a
+    $count
+}
+
+fn list_in_scalar_grep {
+    my @a = (1, 2, 3, 4, 5)
+    my $count = grep { $_ > 2 } @a
+    $count
+}
+
+fn list_in_scalar_map {
+    my @a = (1, 2, 3)
+    my $count = map { $_ * 2 } @a
+    $count
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COMBINED OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn map_grep_combo {
+    my @a = (1, 2, 3, 4, 5, 6)
+    my @r = map { $_ * 2 } grep { $_ % 2 == 0 } @a
+    join(",", @r)
+}
+
+fn sort_grep_combo {
+    my @a = (5, 2, 8, 1, 9, 3)
+    my @r = sort { $a <=> $b } grep { $_ > 2 } @a
+    join(",", @r)
+}
+
+fn map_sort_combo {
+    my @a = (3, 1, 2)
+    my @r = sort { $a <=> $b } map { $_ * 10 } @a
+    join(",", @r)
+}
+
+fn reverse_sort_combo {
+    my @a = (3, 1, 4, 1, 5)
+    my @r = reverse(sort { $a <=> $b } @a)
+    join(",", @r)
+}
+
+fn join_map_combo {
+    my @a = (1, 2, 3)
+    join("-", map { $_ * 2 } @a)
+}
+
+fn split_join_round {
+    my $s = "a,b,c"
+    my @a = split(/,/, $s)
+    join(",", @a)
+}
+
+fn transform_pipeline {
+    my @a = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+    my @r = sort { $b <=> $a }
+            map { $_ * $_ }
+            grep { $_ % 2 == 0 } @a
+    join(",", @r)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# REDUCE / FOLD PATTERNS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn reduce_sum {
+    my @a = (1, 2, 3, 4, 5)
+    my $sum = 0
+    $sum += $_ for @a
+    $sum
+}
+
+fn reduce_product {
+    my @a = (1, 2, 3, 4, 5)
+    my $prod = 1
+    $prod *= $_ for @a
+    $prod
+}
+
+fn reduce_max {
+    my @a = (3, 1, 4, 1, 5, 9, 2, 6)
+    my $max = $a[0]
+    for my $x (@a) {
+        $max = $x if $x > $max
+    }
+    $max
+}
+
+fn reduce_min {
+    my @a = (3, 1, 4, 1, 5, 9, 2, 6)
+    my $min = $a[0]
+    for my $x (@a) {
+        $min = $x if $x < $min
+    }
+    $min
+}
+
+fn reduce_concat {
+    my @a = qw(a b c)
+    my $s = ""
+    $s .= $_ for @a
+    $s
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EDGE CASES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn map_returns_empty {
+    my @a = (1, 2, 3)
+    my @r = map { () } @a
+    scalar(@r)
+}
+
+fn grep_regex_match {
+    my @a = qw(foo bar baz qux)
+    my @r = grep { /^b/ } @a
+    join(",", @r)
+}
+
+fn sort_with_undef {
+    my @a = (3, 1, 2)
+    my @r = sort { ($a // 0) <=> ($b // 0) } @a
+    join(",", @r)
+}
+
+fn nested_map {
+    my @a = (1, 2)
+    my @r = map { my $x = $_; map { $x * $_ } (1, 2, 3) } @a
+    join(",", @r)
+}
+
+fn first_match {
+    my @a = (1, 2, 3, 4, 5)
+    my @r = grep { $_ > 2 } @a
+    $r[0]
+}
+
+fn last_match {
+    my @a = (1, 2, 3, 4, 5)
+    my @r = grep { $_ > 2 } @a
+    $r[-1]
+}

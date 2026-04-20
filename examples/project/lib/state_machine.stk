@@ -1,0 +1,252 @@
+# lib/state_machine.stk — state machine patterns and FSM implementations
+
+fn make_traffic_light {
+    my $state = "red"
+    my $transitions = +{
+        red    => "green",
+        green  => "yellow",
+        yellow => "red",
+    }
+
+    my $next = fn {
+        $state = $transitions->{$state}
+        $state
+    }
+    my $current = fn { $state }
+    my $is_stop = fn { $state eq "red" || $state eq "yellow" }
+
+    +{ next => $next, current => $current, is_stop => $is_stop }
+}
+
+fn make_door_fsm {
+    my $state = "closed"
+    my $locked = 0
+
+    my $open = fn {
+        return "already open" if $state eq "open"
+        return "locked" if $locked
+        $state = "open"
+        "opened"
+    }
+
+    my $close = fn {
+        return "already closed" if $state eq "closed"
+        $state = "closed"
+        "closed"
+    }
+
+    my $lock = fn {
+        return "must be closed" if $state eq "open"
+        return "already locked" if $locked
+        $locked = 1
+        "locked"
+    }
+
+    my $unlock = fn {
+        return "not locked" unless $locked
+        $locked = 0
+        "unlocked"
+    }
+
+    my $status = fn { $locked ? "locked" : $state }
+
+    +{ open => $open, close => $close, lock => $lock, unlock => $unlock, status => $status }
+}
+
+fn make_counter_fsm($min, $max) {
+    my $value = $min
+
+    my $increment = fn {
+        return 0 if $value >= $max
+        $value++
+        1
+    }
+
+    my $decrement = fn {
+        return 0 if $value <= $min
+        $value--
+        1
+    }
+
+    my $reset = fn {
+        $value = $min
+    }
+
+    my $get = fn { $value }
+    my $at_min = fn { $value == $min }
+    my $at_max = fn { $value == $max }
+
+    +{ inc => $increment, dec => $decrement, reset => $reset, get => $get, at_min => $at_min, at_max => $at_max }
+}
+
+fn make_toggle_fsm {
+    my $on = 0
+
+    my $toggle = fn {
+        $on = !$on
+        $on ? "on" : "off"
+    }
+
+    my $is_on = fn { $on ? 1 : 0 }
+    my $turn_on = fn { $on = 1 }
+    my $turn_off = fn { $on = 0 }
+
+    +{ toggle => $toggle, is_on => $is_on, on => $turn_on, off => $turn_off }
+}
+
+fn make_parser_fsm {
+    my $state = "start"
+    my $tokens = []
+
+    my $feed = fn($char) {
+        if ($state eq "start") {
+            if ($char =~ /\d/) {
+                $state = "number"
+                push @$tokens, $char
+            } elsif ($char =~ /[a-zA-Z]/) {
+                $state = "word"
+                push @$tokens, $char
+            }
+        } elsif ($state eq "number") {
+            if ($char =~ /\d/) {
+                my $last_idx = scalar(@$tokens) - 1
+                $tokens->[$last_idx] .= $char
+            } else {
+                $state = "start"
+                $feed->($char) if $char =~ /\S/
+            }
+        } elsif ($state eq "word") {
+            if ($char =~ /[a-zA-Z0-9]/) {
+                my $last_idx = scalar(@$tokens) - 1
+                $tokens->[$last_idx] .= $char
+            } else {
+                $state = "start"
+                $feed->($char) if $char =~ /\S/
+            }
+        }
+    }
+
+    my $get_tokens = fn { $tokens }
+    my $reset = fn { $state = "start"; $tokens = [] }
+
+    +{ feed => $feed, tokens => $get_tokens, reset => $reset }
+}
+
+fn make_vending_machine($price) {
+    my $balance = 0
+    my $item_dispensed = 0
+
+    my $insert = fn($amount) {
+        return "already paid" if $balance >= $price
+        $balance += $amount
+        $balance
+    }
+
+    my $dispense = fn {
+        return "already dispensed" if $item_dispensed
+        return "need " . ($price - $balance) . " more" if $balance < $price
+        $item_dispensed = 1
+        my $change = $balance - $price
+        $balance = 0
+        $change
+    }
+
+    my $refund = fn {
+        my $amount = $balance
+        $balance = 0
+        $item_dispensed = 0
+        $amount
+    }
+
+    my $status = fn {
+        +{ balance => $balance, dispensed => $item_dispensed }
+    }
+
+    +{ insert => $insert, dispense => $dispense, refund => $refund, status => $status }
+}
+
+fn make_game_state {
+    my $state = "menu"
+    my $score = 0
+    my $lives = 3
+
+    my $start = fn {
+        return "already playing" if $state eq "playing"
+        $state = "playing"
+        $score = 0
+        $lives = 3
+        "game started"
+    }
+
+    my $add_score = fn($points) {
+        return 0 unless $state eq "playing"
+        $score += $points
+        $score
+    }
+
+    my $lose_life = fn {
+        return "not playing" unless $state eq "playing"
+        $lives--
+        if ($lives <= 0) {
+            $state = "game_over"
+            return "game over"
+        }
+        $lives
+    }
+
+    my $pause = fn {
+        return "not playing" unless $state eq "playing"
+        $state = "paused"
+        "paused"
+    }
+
+    my $resume = fn {
+        return "not paused" unless $state eq "paused"
+        $state = "playing"
+        "resumed"
+    }
+
+    my $get_state = fn { $state }
+    my $get_score = fn { $score }
+    my $get_lives = fn { $lives }
+
+    +{
+        start => $start, add_score => $add_score, lose_life => $lose_life,
+        pause => $pause, resume => $resume,
+        state => $get_state, score => $get_score, lives => $get_lives
+    }
+}
+
+fn make_connection_fsm {
+    my $state = "disconnected"
+    my $retries = 0
+
+    my $connect = fn {
+        return "already connected" if $state eq "connected"
+        $state = "connecting"
+        $retries++
+        "connecting"
+    }
+
+    my $connected = fn {
+        return "not connecting" unless $state eq "connecting"
+        $state = "connected"
+        $retries = 0
+        "connected"
+    }
+
+    my $disconnect = fn {
+        $state = "disconnected"
+        "disconnected"
+    }
+
+    my $fail = fn {
+        return "not connecting" unless $state eq "connecting"
+        $state = "disconnected"
+        "failed (retry $retries)"
+    }
+
+    my $status = fn { +{ state => $state, retries => $retries } }
+
+    +{ connect => $connect, connected => $connected, disconnect => $disconnect, fail => $fail, status => $status }
+}

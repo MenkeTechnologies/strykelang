@@ -1,0 +1,210 @@
+#!/usr/bin/env stryke
+# t/test_state_machines.stk — state machine patterns and FSM tests
+
+require "./lib/state_machine.stk"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TRAFFIC LIGHT FSM
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $light = make_traffic_light()
+assert_eq $light->{current}->(), "red", "traffic initial"
+assert_ok $light->{is_stop}->(), "red is stop"
+
+assert_eq $light->{next}->(), "green", "traffic red->green"
+assert_false $light->{is_stop}->(), "green not stop"
+
+assert_eq $light->{next}->(), "yellow", "traffic green->yellow"
+assert_ok $light->{is_stop}->(), "yellow is stop"
+
+assert_eq $light->{next}->(), "red", "traffic yellow->red"
+assert_eq $light->{current}->(), "red", "traffic cycled back"
+
+# Full cycle test
+my $light2 = make_traffic_light()
+for (1..6) { $light2->{next}->() }
+assert_eq $light2->{current}->(), "red", "traffic after 6 transitions"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DOOR FSM
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $door = make_door_fsm()
+assert_eq $door->{status}->(), "closed", "door initial"
+
+assert_eq $door->{open}->(), "opened", "door open"
+assert_eq $door->{status}->(), "open", "door now open"
+assert_eq $door->{open}->(), "already open", "door already open"
+
+assert_eq $door->{lock}->(), "must be closed", "cant lock open door"
+
+assert_eq $door->{close}->(), "closed", "door close"
+assert_eq $door->{close}->(), "already closed", "door already closed"
+
+assert_eq $door->{lock}->(), "locked", "door lock"
+assert_eq $door->{status}->(), "locked", "door is locked"
+assert_eq $door->{lock}->(), "already locked", "door already locked"
+
+assert_eq $door->{open}->(), "locked", "cant open locked door"
+
+assert_eq $door->{unlock}->(), "unlocked", "door unlock"
+assert_eq $door->{unlock}->(), "not locked", "door not locked"
+
+assert_eq $door->{open}->(), "opened", "door open after unlock"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COUNTER FSM
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $counter = make_counter_fsm(0, 5)
+assert_eq $counter->{get}->(), 0, "counter initial"
+assert_ok $counter->{at_min}->(), "counter at min"
+assert_false $counter->{at_max}->(), "counter not at max"
+
+assert_eq $counter->{dec}->(), 0, "counter cant dec below min"
+
+assert_eq $counter->{inc}->(), 1, "counter inc 1"
+assert_eq $counter->{get}->(), 1, "counter value 1"
+assert_false $counter->{at_min}->(), "counter not at min"
+
+for (1..4) { $counter->{inc}->() }
+assert_eq $counter->{get}->(), 5, "counter at max"
+assert_ok $counter->{at_max}->(), "counter at max flag"
+assert_eq $counter->{inc}->(), 0, "counter cant inc above max"
+
+$counter->{reset}->()
+assert_eq $counter->{get}->(), 0, "counter reset"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TOGGLE FSM
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $toggle = make_toggle_fsm()
+assert_eq $toggle->{is_on}->(), 0, "toggle initial off"
+
+assert_eq $toggle->{toggle}->(), "on", "toggle to on"
+assert_eq $toggle->{is_on}->(), 1, "toggle is on"
+
+assert_eq $toggle->{toggle}->(), "off", "toggle to off"
+assert_eq $toggle->{is_on}->(), 0, "toggle is off"
+
+$toggle->{on}->()
+assert_eq $toggle->{is_on}->(), 1, "force on"
+
+$toggle->{off}->()
+assert_eq $toggle->{is_on}->(), 0, "force off"
+
+# Multiple toggles
+for (1..10) { $toggle->{toggle}->() }
+assert_eq $toggle->{is_on}->(), 0, "toggle even times"
+
+for (1..11) { $toggle->{toggle}->() }
+assert_eq $toggle->{is_on}->(), 1, "toggle odd times"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PARSER FSM
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $parser = make_parser_fsm()
+my $input = "foo 123 bar456"
+my @chars = split("", $input)
+for my $i (1..scalar(@chars)-1) {
+    $parser->{feed}->($chars[$i])
+}
+my $tokens = $parser->{tokens}->()
+assert_eq scalar(@$tokens), 3, "parser token count"
+assert_eq $tokens->[0], "foo", "parser token 0"
+assert_eq $tokens->[1], "123", "parser token 1"
+assert_eq $tokens->[2], "bar456", "parser token 2"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VENDING MACHINE FSM
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $vend = make_vending_machine(100)
+my $status = $vend->{status}->()
+assert_eq $status->{balance}, 0, "vend initial balance"
+assert_eq $status->{dispensed}, 0, "vend not dispensed"
+
+assert_eq $vend->{insert}->(25), 25, "vend insert 25"
+assert_eq $vend->{insert}->(25), 50, "vend insert 50"
+assert_match "need 50 more", $vend->{dispense}->(), "vend not enough"
+
+assert_eq $vend->{insert}->(75), 125, "vend insert 125"
+assert_eq $vend->{dispense}->(), 25, "vend dispense change"
+assert_eq $vend->{dispense}->(), "already dispensed", "vend already dispensed"
+
+my $status2 = $vend->{status}->()
+assert_eq $status2->{dispensed}, 1, "vend dispensed flag"
+
+# Refund test
+my $vend2 = make_vending_machine(100)
+$vend2->{insert}->(50)
+assert_eq $vend2->{refund}->(), 50, "vend refund"
+my $status3 = $vend2->{status}->()
+assert_eq $status3->{balance}, 0, "vend refund clears balance"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GAME STATE FSM
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $game = make_game_state()
+assert_eq $game->{state}->(), "menu", "game initial menu"
+
+assert_eq $game->{start}->(), "game started", "game start"
+assert_eq $game->{state}->(), "playing", "game now playing"
+assert_eq $game->{start}->(), "already playing", "game already playing"
+assert_eq $game->{lives}->(), 3, "game initial lives"
+assert_eq $game->{score}->(), 0, "game initial score"
+
+assert_eq $game->{add_score}->(100), 100, "game add score"
+assert_eq $game->{add_score}->(50), 150, "game add more score"
+assert_eq $game->{score}->(), 150, "game score total"
+
+assert_eq $game->{lose_life}->(), 2, "game lose life"
+assert_eq $game->{lives}->(), 2, "game 2 lives"
+
+assert_eq $game->{pause}->(), "paused", "game pause"
+assert_eq $game->{state}->(), "paused", "game is paused"
+assert_eq $game->{pause}->(), "not playing", "game already paused"
+
+assert_eq $game->{resume}->(), "resumed", "game resume"
+assert_eq $game->{state}->(), "playing", "game resumed playing"
+
+$game->{lose_life}->()
+assert_eq $game->{lose_life}->(), "game over", "game over"
+assert_eq $game->{state}->(), "game_over", "game state over"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CONNECTION FSM
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $conn = make_connection_fsm()
+my $cstatus = $conn->{status}->()
+assert_eq $cstatus->{state}, "disconnected", "conn initial disconnected"
+
+assert_eq $conn->{connect}->(), "connecting", "conn connecting"
+$cstatus = $conn->{status}->()
+assert_eq $cstatus->{state}, "connecting", "conn is connecting"
+assert_eq $cstatus->{retries}, 1, "conn retry 1"
+
+assert_eq $conn->{fail}->(), "failed (retry 1)", "conn fail"
+$cstatus = $conn->{status}->()
+assert_eq $cstatus->{state}, "disconnected", "conn failed disconnected"
+
+assert_eq $conn->{connect}->(), "connecting", "conn retry connect"
+$cstatus = $conn->{status}->()
+assert_eq $cstatus->{retries}, 2, "conn retry 2"
+
+assert_eq $conn->{connected}->(), "connected", "conn connected"
+$cstatus = $conn->{status}->()
+assert_eq $cstatus->{state}, "connected", "conn is connected"
+assert_eq $cstatus->{retries}, 0, "conn retries reset"
+
+assert_eq $conn->{connect}->(), "already connected", "conn already connected"
+
+assert_eq $conn->{disconnect}->(), "disconnected", "conn disconnect"
+$cstatus = $conn->{status}->()
+assert_eq $cstatus->{state}, "disconnected", "conn now disconnected"
+
+test_run

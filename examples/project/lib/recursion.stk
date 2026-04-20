@@ -1,0 +1,184 @@
+# lib/recursion.stk — recursive patterns and mutual recursion
+
+fn factorial_rec($n) {
+    return 1 if $n <= 1
+    $n * factorial_rec($n - 1)
+}
+
+fn sum_rec($n) {
+    return 0 if $n <= 0
+    $n + sum_rec($n - 1)
+}
+
+fn power_rec($base, $exp) {
+    return 1 if $exp == 0
+    $base * power_rec($base, $exp - 1)
+}
+
+fn count_digits($n) {
+    $n = abs($n)
+    return 1 if $n < 10
+    1 + count_digits(int($n / 10))
+}
+
+fn sum_digits($n) {
+    $n = abs($n)
+    return $n if $n < 10
+    ($n % 10) + sum_digits(int($n / 10))
+}
+
+fn reverse_num($n) {
+    my $rev = 0
+    while ($n > 0) {
+        $rev = $rev * 10 + ($n % 10)
+        $n = int($n / 10)
+    }
+    $rev
+}
+
+fn is_palindrome_num($n) {
+    $n == reverse_num($n)
+}
+
+fn binary_search_arr(@args) {
+    my $arr = $args[0]
+    my $target = $args[1]
+    my $lo = $args[2]
+    my $hi = $args[3]
+    return -1 if $lo > $hi
+    my $mid = int(($lo + $hi) / 2)
+    my $elem = $arr->[$mid]
+    return $mid if $elem == $target
+    if ($target < $elem) {
+        return binary_search_arr($arr, $target, $lo, $mid - 1)
+    } else {
+        return binary_search_arr($arr, $target, $mid + 1, $hi)
+    }
+}
+
+fn merge_sort_arr($arr) {
+    my $len = scalar(@$arr)
+    return [@$arr] if $len <= 1
+
+    my $mid = int($len / 2)
+    my @left
+    for my $i (0..$mid-1) { push @left, $arr->[$i] }
+    my @right
+    for my $i ($mid..$len-1) { push @right, $arr->[$i] }
+
+    my $sorted_left = merge_sort_arr(\@left)
+    my $sorted_right = merge_sort_arr(\@right)
+    merge_arrs($sorted_left, $sorted_right)
+}
+
+fn merge_arrs($left, $right) {
+    my @result
+    my $i = 0
+    my $j = 0
+    my $llen = scalar(@$left)
+    my $rlen = scalar(@$right)
+
+    while ($i < $llen && $j < $rlen) {
+        my $lv = $left->[$i]
+        my $rv = $right->[$j]
+        if ($lv <= $rv) {
+            push @result, $lv
+            $i++
+        } else {
+            push @result, $rv
+            $j++
+        }
+    }
+    while ($i < $llen) { push @result, $left->[$i]; $i++ }
+    while ($j < $rlen) { push @result, $right->[$j]; $j++ }
+    [@result]
+}
+
+fn tree_depth($node) {
+    return 0 unless $node
+    my $left = tree_depth($node->{left})
+    my $right = tree_depth($node->{right})
+    1 + ($left > $right ? $left : $right)
+}
+
+fn tree_sum($node) {
+    return 0 unless $node
+    $node->{value} + tree_sum($node->{left}) + tree_sum($node->{right})
+}
+
+fn tree_count($node) {
+    return 0 unless $node
+    1 + tree_count($node->{left}) + tree_count($node->{right})
+}
+
+fn make_tree($val, $left, $right) {
+    +{ value => $val, left => $left, right => $right }
+}
+
+fn is_even_rec($n) {
+    return 1 if $n == 0
+    is_odd_rec($n - 1)
+}
+
+fn is_odd_rec($n) {
+    return 0 if $n == 0
+    is_even_rec($n - 1)
+}
+
+fn ackermann($m, $n) {
+    return $n + 1 if $m == 0
+    return ackermann($m - 1, 1) if $n == 0
+    ackermann($m - 1, ackermann($m, $n - 1))
+}
+
+fn flatten_nested($arr) {
+    my @result
+    for my $item (@$arr) {
+        if (ref($item) eq "ARRAY") {
+            my $sub = flatten_nested($item)
+            push @result, @$sub
+        } else {
+            push @result, $item
+        }
+    }
+    my $ret = [@result]
+    $ret
+}
+
+fn deep_clone($data) {
+    return $data unless ref($data)
+    if (ref($data) eq "ARRAY") {
+        my @cloned = map { deep_clone($_) } @$data
+        my $ret = [@cloned]
+        return $ret
+    }
+    if (ref($data) eq "HASH") {
+        my $clone = {}
+        for my $k (keys %$data) {
+            $clone->{$k} = deep_clone($data->{$k})
+        }
+        return $clone
+    }
+    $data
+}
+
+fn pascals_row($n) {
+    return [1] if $n == 0
+    return [1, 1] if $n == 1
+    my $prev = pascals_row($n - 1)
+    my @row = (1)
+    my $i = 1
+    while ($i < $n) {
+        my $val = $prev->[$i - 1] + $prev->[$i]
+        push @row, $val
+        $i++
+    }
+    push @row, 1
+    my $result = [@row]
+    $result
+}
+
+fn hanoi_count($n) {
+    return 0 if $n == 0
+    2 * hanoi_count($n - 1) + 1
+}

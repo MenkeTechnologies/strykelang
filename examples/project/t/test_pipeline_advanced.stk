@@ -1,0 +1,281 @@
+#!/usr/bin/env stryke
+# t/test_pipeline_advanced.stk — pipeline and functional composition tests
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HIGHER ORDER FUNCTIONS - Direct implementations
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $double = fn($x) { $x * 2 }
+my $inc = fn($x) { $x + 1 }
+my $square = fn($x) { $x * $x }
+my $is_even = fn($x) { $x % 2 == 0 }
+my $is_positive = fn($x) { $x > 0 }
+
+assert_eq $double->(5), 10, "double 5"
+assert_eq $inc->(5), 6, "inc 5"
+assert_eq $square->(4), 16, "square 4"
+assert_eq $is_even->(4), 1, "4 is even"
+assert_eq $is_even->(5), 0, "5 not even"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MAP / GREP / REDUCE - Using builtins
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @nums = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+
+my @doubled = map { $_ * 2 } @nums
+assert_eq scalar(@doubled), 10, "map count"
+assert_eq $doubled[0], 2, "map first"
+assert_eq $doubled[9], 20, "map last"
+
+my @evens = grep { $_ % 2 == 0 } @nums
+assert_eq scalar(@evens), 5, "grep evens count"
+assert_eq $evens[0], 2, "grep first even"
+assert_eq $evens[4], 10, "grep last even"
+
+my $sum_all = sum(@nums)
+assert_eq $sum_all, 55, "sum 1..10"
+
+my $max_val = max(@nums)
+assert_eq $max_val, 10, "max"
+
+my $min_val = min(@nums)
+assert_eq $min_val, 1, "min"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CHAINED OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @chain1 = map { $_ * 2 } grep { $_ % 2 == 0 } @nums
+assert_eq scalar(@chain1), 5, "chain count"
+assert_eq $chain1[0], 4, "chain first (2*2)"
+assert_eq $chain1[4], 20, "chain last (10*2)"
+
+my $chain_sum = sum(map { $_ * $_ } grep { $_ > 5 } @nums)
+assert_eq $chain_sum, 330, "chain sum of squares >5"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PIPELINE OPERATOR
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $piped = 1..10 |> grep { $_ % 2 == 0 } |> map { $_ * $_ } |> sum
+assert_eq $piped, 220, "pipeline sum of even squares"
+
+my @piped_arr = 1..5 |> map { $_ * 3 }
+assert_eq scalar(@piped_arr), 5, "pipeline to array count"
+assert_eq $piped_arr[0], 3, "pipeline array first"
+assert_eq $piped_arr[4], 15, "pipeline array last"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# REDUCE PATTERN
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn reduce_fn($fn, $init, @items) {
+    my $acc = $init
+    for my $item (@items) {
+        $acc = $fn->($acc, $item)
+    }
+    $acc
+}
+
+my $add_fn = fn($a, $b) { $a + $b }
+my $mul_fn = fn($a, $b) { $a * $b }
+
+assert_eq reduce_fn($add_fn, 0, 1, 2, 3, 4, 5), 15, "reduce sum"
+assert_eq reduce_fn($mul_fn, 1, 1, 2, 3, 4, 5), 120, "reduce product"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SCAN PATTERN (running totals)
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn scan_fn($fn, $init, @items) {
+    my @results = ($init)
+    my $acc = $init
+    for my $item (@items) {
+        $acc = $fn->($acc, $item)
+        push @results, $acc
+    }
+    @results
+}
+
+my @running = scan_fn($add_fn, 0, 1, 2, 3, 4, 5)
+assert_eq scalar(@running), 6, "scan count"
+assert_eq $running[0], 0, "scan init"
+assert_eq $running[1], 1, "scan after 1"
+assert_eq $running[3], 6, "scan after 3"
+assert_eq $running[5], 15, "scan final"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PARTITION PATTERN
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn partition_fn($pred, @items) {
+    my @true_part
+    my @false_part
+    for my $item (@items) {
+        if ($pred->($item)) {
+            push @true_part, $item
+        } else {
+            push @false_part, $item
+        }
+    }
+    my $t = [@true_part]
+    my $f = [@false_part]
+    ($t, $f)
+}
+
+my ($part_evens, $part_odds) = partition_fn($is_even, @nums)
+assert_eq scalar(@$part_evens), 5, "partition evens"
+assert_eq scalar(@$part_odds), 5, "partition odds"
+assert_eq $part_evens->[0], 2, "first even"
+assert_eq $part_odds->[0], 1, "first odd"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAKE WHILE PATTERN
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn take_while_fn($pred, @items) {
+    my @result
+    for my $item (@items) {
+        last unless $pred->($item)
+        push @result, $item
+    }
+    @result
+}
+
+fn drop_while_fn($pred, @items) {
+    my @result
+    my $dropping = 1
+    for my $item (@items) {
+        if ($dropping && $pred->($item)) {
+            next
+        }
+        $dropping = 0
+        push @result, $item
+    }
+    @result
+}
+
+my $lt5 = fn($x) { $x < 5 }
+my @taken = take_while_fn($lt5, 1, 2, 3, 4, 5, 6, 7)
+assert_eq scalar(@taken), 4, "take_while count"
+assert_eq $taken[0], 1, "take_while first"
+assert_eq $taken[3], 4, "take_while last"
+
+my @dropped = drop_while_fn($lt5, 1, 2, 3, 4, 5, 6, 7)
+assert_eq scalar(@dropped), 3, "drop_while count"
+assert_eq $dropped[0], 5, "drop_while first"
+assert_eq $dropped[2], 7, "drop_while last"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FIND PATTERNS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn find_first_fn($pred, @items) {
+    for my $item (@items) {
+        return $item if $pred->($item)
+    }
+    undef
+}
+
+fn find_index_fn($pred, @items) {
+    for my $i (0..scalar(@items)-1) {
+        return $i if $pred->($items[$i])
+    }
+    -1
+}
+
+fn count_if_fn($pred, @items) {
+    my $count = 0
+    for my $item (@items) {
+        $count++ if $pred->($item)
+    }
+    $count
+}
+
+my $gt5 = fn($x) { $x > 5 }
+assert_eq find_first_fn($gt5, @nums), 6, "find first >5"
+assert_eq find_index_fn($gt5, @nums), 5, "find index >5"
+assert_eq count_if_fn($is_even, @nums), 5, "count evens"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ALL / ANY / NONE
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn all_fn($pred, @items) {
+    for my $item (@items) {
+        return 0 unless $pred->($item)
+    }
+    1
+}
+
+fn any_fn($pred, @items) {
+    for my $item (@items) {
+        return 1 if $pred->($item)
+    }
+    0
+}
+
+fn none_fn($pred, @items) {
+    for my $item (@items) {
+        return 0 if $pred->($item)
+    }
+    1
+}
+
+assert_eq all_fn($is_positive, @nums), 1, "all positive"
+assert_eq all_fn($is_even, @nums), 0, "not all even"
+assert_eq any_fn($gt5, @nums), 1, "any >5"
+assert_eq any_fn(fn($x) { $x > 100 }, @nums), 0, "none >100"
+
+my $is_neg = fn($x) { $x < 0 }
+assert_eq none_fn($is_neg, @nums), 1, "none negative"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CHUNKING
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn chunk_fn($n, @items) {
+    my @chunks
+    my @current
+    for my $item (@items) {
+        push @current, $item
+        if (scalar(@current) == $n) {
+            my $c = [@current]
+            push @chunks, $c
+            @current = ()
+        }
+    }
+    if (scalar(@current)) {
+        my $c = [@current]
+        push @chunks, $c
+    }
+    @chunks
+}
+
+my @chunked = chunk_fn(3, 1, 2, 3, 4, 5, 6, 7, 8)
+assert_eq scalar(@chunked), 3, "chunk count"
+my $c0 = $chunked[0]
+my $c1 = $chunked[1]
+my $c2 = $chunked[2]
+assert_eq scalar(@$c0), 3, "chunk 0 size"
+assert_eq scalar(@$c1), 3, "chunk 1 size"
+assert_eq scalar(@$c2), 2, "chunk 2 size"
+assert_eq $c0->[0], 1, "chunk 0 first"
+assert_eq $c2->[1], 8, "chunk 2 last"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FREQUENCIES
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @letters = qw(a b a c a b a)
+my %freq
+for my $letter (@letters) {
+    $freq{$letter} = 0 unless exists $freq{$letter}
+    $freq{$letter}++
+}
+assert_eq $freq{a}, 4, "freq a"
+assert_eq $freq{b}, 2, "freq b"
+assert_eq $freq{c}, 1, "freq c"
+
+test_run

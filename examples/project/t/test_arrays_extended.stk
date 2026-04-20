@@ -1,0 +1,260 @@
+# t/test_arrays_extended.stk — comprehensive array tests
+
+require "./lib/arrays_extended.stk"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARRAY CREATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @list = arr_from_list()
+assert_eq scalar(@list), 5, "from list count"
+assert_eq $list[0], 1, "from list first"
+assert_eq $list[4], 5, "from list last"
+
+my @range = arr_from_range()
+assert_eq scalar(@range), 10, "from range count"
+assert_eq $range[0], 1, "from range first"
+assert_eq $range[9], 10, "from range last"
+
+my @qw = arr_from_qw()
+assert_eq scalar(@qw), 3, "from qw count"
+assert_eq $qw[0], "one", "from qw first"
+
+my @empty = arr_empty()
+assert_eq scalar(@empty), 0, "empty count"
+
+my @single = arr_single()
+assert_eq scalar(@single), 1, "single count"
+assert_eq $single[0], 42, "single value"
+
+my @flat = arr_nested_flatten()
+assert_eq scalar(@flat), 4, "nested flatten count"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PUSH AND POP
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @push1 = arr_push_one()
+assert_eq scalar(@push1), 4, "push one count"
+assert_eq $push1[3], 4, "push one value"
+
+my @push_many = arr_push_many()
+assert_eq scalar(@push_many), 5, "push many count"
+
+my @push_arr = arr_push_array()
+assert_eq scalar(@push_arr), 4, "push array count"
+
+my @pop_res = arr_pop()
+assert_eq $pop_res[0], 3, "pop value"
+assert_eq $pop_res[1], 2, "pop remaining"
+
+assert_eq arr_pop_empty(), 0, "pop empty undef"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SHIFT AND UNSHIFT
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @shift_res = arr_shift()
+assert_eq $shift_res[0], 1, "shift value"
+assert_eq $shift_res[1], 2, "shift remaining"
+
+assert_eq arr_shift_empty(), 0, "shift empty undef"
+
+my @unshift1 = arr_unshift_one()
+assert_eq scalar(@unshift1), 3, "unshift one count"
+assert_eq $unshift1[0], 1, "unshift one first"
+
+my @unshift_many = arr_unshift_many()
+assert_eq scalar(@unshift_many), 5, "unshift many count"
+assert_eq $unshift_many[0], 1, "unshift many first"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPLICE
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @splice_remove = arr_splice_remove()
+assert_eq $splice_remove[0], "2,3", "splice remove removed"
+assert_eq $splice_remove[1], "1,4,5", "splice remove remaining"
+
+my @splice_insert = arr_splice_insert()
+assert_eq scalar(@splice_insert), 5, "splice insert count"
+assert_eq join(",", @splice_insert), "1,2,3,4,5", "splice insert result"
+
+my @splice_replace = arr_splice_replace()
+assert_eq join(",", @splice_replace), "1,a,b,5", "splice replace"
+
+my @splice_end = arr_splice_delete_to_end()
+assert_eq $splice_end[0], "3,4,5", "splice end removed"
+assert_eq $splice_end[1], "1,2", "splice end remaining"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SLICES
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @slice_idx = arr_slice_indices()
+assert_eq join(",", @slice_idx), "20,40", "slice indices"
+
+my @slice_range = arr_slice_range()
+assert_eq join(",", @slice_range), "2,3,4,5", "slice range"
+
+my @slice_neg = arr_slice_negative()
+assert_eq join(",", @slice_neg), "4,5", "slice negative"
+
+my @slice_assign = arr_slice_assign()
+assert_eq $slice_assign[1], 20, "slice assign 1"
+assert_eq $slice_assign[3], 40, "slice assign 3"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SORT
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @sort_def = arr_sort_default()
+assert_eq $sort_def[0], "apple", "sort default first"
+assert_eq $sort_def[2], "cherry", "sort default last"
+
+my @sort_num = arr_sort_numeric()
+assert_eq $sort_num[0], 1, "sort numeric first"
+assert_eq $sort_num[7], 9, "sort numeric last"
+
+my @sort_rev = arr_sort_reverse_numeric()
+assert_eq $sort_rev[0], 9, "sort reverse first"
+assert_eq $sort_rev[7], 1, "sort reverse last"
+
+my @sort_len = arr_sort_by_length()
+assert_eq $sort_len[0], "c", "sort by length first"
+assert_eq $sort_len[3], "dddd", "sort by length last"
+
+my @sort_ci = arr_sort_case_insensitive()
+assert_eq $sort_ci[0], "Apple", "sort ci first"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# REVERSE
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @rev = arr_reverse()
+assert_eq $rev[0], 5, "reverse first"
+assert_eq $rev[4], 1, "reverse last"
+
+my @rev_str = arr_reverse_string()
+assert_eq join(",", @rev_str), "c,b,a", "reverse string"
+
+my @rev_place = arr_reverse_in_place()
+assert_eq join(",", @rev_place), "3,2,1", "reverse in place"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MAP AND GREP
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @map_double = arr_map_double()
+assert_eq join(",", @map_double), "2,4,6,8,10", "map double"
+
+my @map_uc = arr_map_transform()
+assert_eq join(",", @map_uc), "A,B,C", "map transform"
+
+my @grep_even = arr_grep_even()
+assert_eq join(",", @grep_even), "2,4,6", "grep even"
+
+my @grep_def = arr_grep_defined()
+assert_eq scalar(@grep_def), 3, "grep defined count"
+
+my @grep_re = arr_grep_regex()
+assert_eq scalar(@grep_re), 2, "grep regex count"
+
+assert_eq arr_first_match(), 4, "first match"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# JOIN AND SPLIT
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq arr_join_comma(), "1,2,3", "join comma"
+assert_eq arr_join_empty(), "abc", "join empty"
+assert_eq arr_join_newline(), "line1\nline2\nline3", "join newline"
+
+my @split_comma = arr_split_comma()
+assert_eq scalar(@split_comma), 3, "split comma count"
+
+my @split_ws = arr_split_ws()
+assert_eq scalar(@split_ws), 3, "split ws count"
+
+my @split_lim = arr_split_limit()
+assert_eq scalar(@split_lim), 2, "split limit count"
+assert_eq $split_lim[1], "b,c,d", "split limit rest"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARRAY FUNCTIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq arr_length(), 5, "length"
+assert_eq arr_last_index(), 4, "last index"
+
+my @ctx = arr_wantarray_context()
+assert_eq $ctx[0], 3, "wantarray scalar"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# UNIQUE AND DEDUPE
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @uniq = arr_unique()
+assert_eq scalar(@uniq), 4, "unique count"
+assert_eq join(",", @uniq), "1,2,3,4", "unique values"
+
+my @uniq_str = arr_unique_strings()
+assert_eq scalar(@uniq_str), 4, "unique strings count"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARRAY UTILITIES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq arr_sum(), 15, "sum"
+assert_eq arr_min(), 1, "min"
+assert_eq arr_max(), 9, "max"
+assert_eq arr_any_match(), 1, "any match"
+assert_eq arr_all_match(), 1, "all match"
+assert_eq arr_index_of(), 2, "index of"
+
+my @flatten = arr_flatten()
+assert_eq scalar(@flatten), 6, "flatten count"
+assert_eq join(",", @flatten), "1,2,3,4,5,6", "flatten values"
+
+my @zipped = arr_zip()
+assert_eq scalar(@zipped), 6, "zip count"
+assert_eq join(",", @zipped), "1,a,2,b,3,c", "zip values"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ADDITIONAL EDGE CASES
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Empty array operations
+my @e = ()
+assert_eq scalar(@e), 0, "empty scalar"
+assert_eq join(",", @e), "", "empty join"
+
+# Single element
+my @s = (42)
+assert_eq $s[0], 42, "single access"
+assert_eq $s[-1], 42, "single neg access"
+
+# Array in boolean
+assert_eq @e ? 1 : 0, 0, "empty array false"
+assert_eq @s ? 1 : 0, 1, "nonempty array true"
+
+# Array assignment from scalar
+my @from_scalar = (5)
+assert_eq scalar(@from_scalar), 1, "from scalar count"
+
+# Nested array flattening
+my @n1 = (1, 2)
+my @n2 = (@n1, 3, 4)
+assert_eq scalar(@n2), 4, "nested flatten 2"
+
+# Array copy
+my @orig = (1, 2, 3)
+my @copy = @orig
+$copy[0] = 10
+assert_eq $orig[0], 1, "copy independent"
+
+# Range in array context
+my @r = (1..5)
+assert_eq scalar(@r), 5, "range context count"
+
+test_run

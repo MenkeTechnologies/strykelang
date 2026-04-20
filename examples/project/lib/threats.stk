@@ -2,10 +2,10 @@
 
 enum ThreatLevel { HIGH, WARN, OK }
 
-fn analyze_threats ($sys, $net, $disks) {
+fn analyze_threats ($sys, $net, $disks, $mem_free) {
     my @threats
+    $mem_free //= mem_free()
 
-    # Disk space warnings
     for my $d (@$disks) {
         if ($d->{use_pct} > 95) {
             push @threats, { level => "HIGH", message => "$d->{mount} is $d->{use_pct}% full — critical" }
@@ -28,7 +28,6 @@ fn analyze_threats ($sys, $net, $disks) {
     }
 
     # Memory check
-    my $mem_free = mem_free()
     my $mem_total = $sys->{ram_bytes}
     if ($mem_total > 0) {
         my $mem_pct = ($mem_total - $mem_free) / $mem_total * 100

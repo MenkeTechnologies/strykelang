@@ -1,0 +1,305 @@
+# t/test_operators.stk — comprehensive operator tests
+
+require "./lib/operators.stk"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARITHMETIC OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq add_int(2, 3), 5, "add int"
+assert_eq add_int(-5, 3), -2, "add int negative"
+assert_eq add_int(0, 0), 0, "add zero"
+
+assert_eq sub_int(10, 4), 6, "sub int"
+assert_eq sub_int(4, 10), -6, "sub int negative result"
+assert_eq sub_int(5, 5), 0, "sub to zero"
+
+assert_eq mul_int(6, 7), 42, "mul int"
+assert_eq mul_int(-3, 4), -12, "mul int negative"
+assert_eq mul_int(0, 100), 0, "mul by zero"
+assert_eq mul_int(1, 42), 42, "mul by one"
+
+assert_eq div_int(20, 4), 5, "div int"
+assert_eq div_int(10, 3), 3.3333333333333335, "div int fractional"
+assert_eq div_int(-12, 4), -3, "div int negative"
+
+assert_eq mod_int(17, 5), 2, "mod int"
+assert_eq mod_int(20, 4), 0, "mod int even"
+assert_eq mod_int(7, 3), 1, "mod int"
+
+assert_eq pow_int(2, 10), 1024, "pow int"
+assert_eq pow_int(3, 3), 27, "pow int"
+assert_eq pow_int(10, 0), 1, "pow zero"
+assert_eq pow_int(5, 1), 5, "pow one"
+
+assert_eq neg_int(5), -5, "neg positive"
+assert_eq neg_int(-5), 5, "neg negative"
+assert_eq neg_int(0), 0, "neg zero"
+
+assert_near add_float(1.5, 2.5), 4.0, 0.001, "add float"
+assert_near sub_float(5.5, 2.2), 3.3, 0.001, "sub float"
+assert_near mul_float(2.5, 4.0), 10.0, 0.001, "mul float"
+assert_near div_float(7.5, 2.5), 3.0, 0.001, "div float"
+
+assert_eq int_div(17, 5), 3, "int div"
+assert_eq int_div(20, 3), 6, "int div"
+
+assert_eq mixed_arithmetic(2, 3, 4), 14, "mixed 2+3*4"
+assert_eq parenthesized(2, 3, 4), 20, "paren (2+3)*4"
+assert_eq chained_ops(10, 5, 3, 2), 14, "chained 10+5-3+2"
+assert_eq complex_expr(3, 4, 5), 5, "complex (9+16)/5"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NUMERIC COMPARISON OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq num_eq(5, 5), 1, "5 == 5"
+assert_eq num_eq(5, 6), 0, "5 == 6"
+assert_eq num_eq(0, 0), 1, "0 == 0"
+assert_eq num_eq(-1, -1), 1, "-1 == -1"
+
+assert_eq num_ne(5, 6), 1, "5 != 6"
+assert_eq num_ne(5, 5), 0, "5 != 5"
+
+assert_eq num_lt(3, 5), 1, "3 < 5"
+assert_eq num_lt(5, 3), 0, "5 < 3"
+assert_eq num_lt(5, 5), 0, "5 < 5"
+
+assert_eq num_le(3, 5), 1, "3 <= 5"
+assert_eq num_le(5, 5), 1, "5 <= 5"
+assert_eq num_le(6, 5), 0, "6 <= 5"
+
+assert_eq num_gt(5, 3), 1, "5 > 3"
+assert_eq num_gt(3, 5), 0, "3 > 5"
+assert_eq num_gt(5, 5), 0, "5 > 5"
+
+assert_eq num_ge(5, 3), 1, "5 >= 3"
+assert_eq num_ge(5, 5), 1, "5 >= 5"
+assert_eq num_ge(3, 5), 0, "3 >= 5"
+
+assert_eq spaceship(1, 2), -1, "1 <=> 2"
+assert_eq spaceship(2, 2), 0, "2 <=> 2"
+assert_eq spaceship(3, 2), 1, "3 <=> 2"
+
+assert_eq compare_chain(1, 2, 3), 1, "1<2<3"
+assert_eq compare_chain(1, 3, 2), 0, "1<3<2 false"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STRING COMPARISON OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq str_eq("abc", "abc"), 1, "abc eq abc"
+assert_eq str_eq("abc", "xyz"), 0, "abc eq xyz"
+assert_eq str_eq("", ""), 1, "empty eq empty"
+
+assert_eq str_ne("abc", "xyz"), 1, "abc ne xyz"
+assert_eq str_ne("abc", "abc"), 0, "abc ne abc"
+
+assert_eq str_lt("abc", "xyz"), 1, "abc lt xyz"
+assert_eq str_lt("xyz", "abc"), 0, "xyz lt abc"
+assert_eq str_lt("abc", "abd"), 1, "abc lt abd"
+
+assert_eq str_le("abc", "abc"), 1, "abc le abc"
+assert_eq str_le("abc", "abd"), 1, "abc le abd"
+assert_eq str_le("abd", "abc"), 0, "abd le abc"
+
+assert_eq str_gt("xyz", "abc"), 1, "xyz gt abc"
+assert_eq str_gt("abc", "xyz"), 0, "abc gt xyz"
+
+assert_eq str_ge("abc", "abc"), 1, "abc ge abc"
+assert_eq str_ge("xyz", "abc"), 1, "xyz ge abc"
+
+assert_eq str_cmp("abc", "xyz"), -1, "abc cmp xyz"
+assert_eq str_cmp("abc", "abc"), 0, "abc cmp abc"
+assert_eq str_cmp("xyz", "abc"), 1, "xyz cmp abc"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LOGICAL OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq logical_and(1, 2), 2, "1 && 2"
+assert_eq logical_and(0, 2), 0, "0 && 2"
+assert_eq logical_and(1, 0), 0, "1 && 0"
+
+assert_eq logical_or(0, 2), 2, "0 || 2"
+assert_eq logical_or(1, 2), 1, "1 || 2"
+assert_eq logical_or(0, 0), 0, "0 || 0"
+
+assert_eq logical_not(0), 1, "!0"
+assert_eq logical_not(1), 0, "!1"
+assert_eq logical_not(""), 1, "!empty"
+
+assert_eq low_prec_and(1, 2), 2, "1 and 2"
+assert_eq low_prec_or(0, 2), 2, "0 or 2"
+assert_eq low_prec_not(0), 1, "not 0"
+
+assert_eq defined_or(undef, "default"), "default", "undef // default"
+assert_eq defined_or("value", "default"), "value", "value // default"
+assert_eq defined_or(0, "default"), 0, "0 // default"
+assert_eq defined_or("", "default"), "", "empty // default"
+
+assert_eq short_circuit_and(0), 0, "and short circuit false"
+assert_eq short_circuit_and(1), 1, "and short circuit true"
+assert_eq short_circuit_or(1), 0, "or short circuit true"
+assert_eq short_circuit_or(0), 1, "or short circuit false"
+
+assert_eq nested_logical(1, 1, 0), 1, "(1&&1)||0"
+assert_eq nested_logical(0, 1, 1), 1, "(0&&1)||1"
+assert_eq nested_logical(0, 0, 0), 0, "(0&&0)||0"
+
+assert_eq complex_logical(1, 1, 0, 0), 1, "(1&&1)||(0&&0)"
+assert_eq complex_logical(0, 0, 1, 1), 1, "(0&&0)||(1&&1)"
+assert_eq complex_logical(0, 0, 0, 0), 0, "(0&&0)||(0&&0)"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BITWISE OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq bit_and(0b1100, 0b1010), 0b1000, "bit and"
+assert_eq bit_or(0b1100, 0b1010), 0b1110, "bit or"
+assert_eq bit_xor(0b1100, 0b1010), 0b0110, "bit xor"
+
+assert_eq left_shift(1, 4), 16, "1 << 4"
+assert_eq left_shift(3, 2), 12, "3 << 2"
+assert_eq right_shift(16, 2), 4, "16 >> 2"
+assert_eq right_shift(255, 4), 15, "255 >> 4"
+
+assert_eq bit_mask(0xFF, 0x0F), 0x0F, "mask"
+assert_eq bit_set(0, 3), 8, "set bit 3"
+assert_eq bit_clear(0xFF, 3), 0xF7, "clear bit 3"
+assert_eq bit_toggle(0xF0, 4), 0xE0, "toggle bit 4"
+assert_eq bit_test(8, 3), 1, "test bit 3 set"
+assert_eq bit_test(7, 3), 0, "test bit 3 clear"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STRING OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq str_concat("hello", "world"), "helloworld", "concat"
+assert_eq str_concat("", "test"), "test", "concat empty left"
+assert_eq str_concat("test", ""), "test", "concat empty right"
+
+assert_eq concat_three("a", "b", "c"), "abc", "concat three"
+assert_eq concat_with_space("hello", "world"), "hello world", "concat space"
+
+assert_eq repeat_str("ab", 3), "ababab", "repeat 3"
+assert_eq repeat_str("x", 5), "xxxxx", "repeat 5"
+assert_eq repeat_str("abc", 0), "", "repeat 0"
+assert_eq repeat_str("abc", 1), "abc", "repeat 1"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ASSIGNMENT OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq compound_add(), 8, "+="
+assert_eq compound_sub(), 6, "-="
+assert_eq compound_mul(), 12, "*="
+assert_eq compound_div(), 5, "/="
+assert_eq compound_mod(), 2, "%="
+assert_eq compound_pow(), 8, "**="
+assert_eq compound_concat(), "hello world", ".="
+assert_eq compound_repeat(), "ababab", "x repeat"
+assert_eq compound_or(), 42, "||="
+assert_eq compound_and(), 10, "&&="
+assert_eq compound_defined_or(), "default", "//="
+assert_eq compound_bit_and(), 0x0F, "&="
+assert_eq compound_bit_or(), 0xFF, "|="
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INCREMENT/DECREMENT OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @pre_inc = pre_increment()
+assert_eq $pre_inc[0], 6, "pre inc x"
+assert_eq $pre_inc[1], 6, "pre inc y"
+
+my @post_inc = post_increment()
+assert_eq $post_inc[0], 6, "post inc x"
+assert_eq $post_inc[1], 5, "post inc y"
+
+my @pre_dec = pre_decrement()
+assert_eq $pre_dec[0], 4, "pre dec x"
+assert_eq $pre_dec[1], 4, "pre dec y"
+
+my @post_dec = post_decrement()
+assert_eq $post_dec[0], 4, "post dec x"
+assert_eq $post_dec[1], 5, "post dec y"
+
+assert_eq increment_in_expr(), 12, "inc in expr"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TERNARY OPERATOR
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq ternary_true(), "yes", "ternary true"
+assert_eq ternary_false(), "no", "ternary false"
+
+assert_eq ternary_expr(1), "truthy", "ternary 1"
+assert_eq ternary_expr(0), "falsy", "ternary 0"
+assert_eq ternary_expr("str"), "truthy", "ternary str"
+assert_eq ternary_expr(""), "falsy", "ternary empty"
+
+assert_eq nested_ternary(-5), "negative", "nested ternary neg"
+assert_eq nested_ternary(0), "zero", "nested ternary zero"
+assert_eq nested_ternary(5), "positive", "nested ternary pos"
+
+assert_eq ternary_with_ops(10, 3), 7, "ternary ops 10>3"
+assert_eq ternary_with_ops(3, 10), 7, "ternary ops 3<10"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# RANGE OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @r1 = range_inclusive(1, 5)
+assert_eq scalar(@r1), 5, "range 1..5 count"
+assert_eq $r1[0], 1, "range first"
+assert_eq $r1[4], 5, "range last"
+
+assert_eq range_sum(1, 10), 55, "range sum 1..10"
+assert_eq range_sum(1, 100), 5050, "range sum 1..100"
+
+assert_eq range_char(), "abcde", "char range"
+
+my @rev = range_reverse(1, 5)
+assert_eq $rev[0], 5, "reverse range first"
+assert_eq $rev[4], 1, "reverse range last"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LIST OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq list_assign(), 6, "list assign"
+
+my @swapped = list_swap()
+assert_eq $swapped[0], 2, "swap a"
+assert_eq $swapped[1], 1, "swap b"
+
+assert_eq comma_operator(), 3, "comma op"
+assert_eq list_in_scalar(), 5, "list in scalar"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPECIAL OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq not_not(0), 0, "!!0"
+assert_eq not_not(1), 1, "!!1"
+assert_eq not_not("hello"), 1, "!!str"
+assert_eq not_not(""), 0, "!!empty"
+
+assert_eq stringify(42), "42", "stringify int"
+assert_eq numify("42"), 42, "numify str"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# OPERATOR PRECEDENCE
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq prec_mul_add(), 14, "2+3*4 = 14"
+assert_eq prec_pow_mul(), 18, "2*3**2 = 18"
+
+assert_eq prec_compare_and(), 1, "(1<2)&&(3<4)"
+assert_eq prec_or_and(), 0, "0||1&&0"
+assert_eq prec_not_and(), 1, "!0&&1"
+assert_eq prec_assign_ternary(), "a", "assign ternary"
+assert_eq prec_concat_repeat(), "abcdcd", "concat repeat"
+
+test_run

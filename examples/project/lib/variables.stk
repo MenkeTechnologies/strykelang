@@ -1,0 +1,459 @@
+# lib/variables.stk — comprehensive variable tests
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SCALAR VARIABLES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn scalar_int { my $x = 42; $x }
+fn scalar_float { my $x = 3.14; $x }
+fn scalar_string { my $x = "hello"; $x }
+fn scalar_undef { my $x; defined($x) ? 1 : 0 }
+
+fn scalar_assign_chain {
+    my $a = my $b = my $c = 5
+    $a + $b + $c
+}
+
+fn scalar_multiple_assign {
+    my $x = 1
+    my $y = 2
+    my $z = 3
+    $x + $y + $z
+}
+
+fn scalar_reassign {
+    my $x = 1
+    $x = 2
+    $x = 3
+    $x
+}
+
+fn scalar_interpolate {
+    my $name = "world"
+    "hello $name"
+}
+
+fn scalar_interpolate_expr {
+    my $x = 5
+    "x is $x and x+1 is " . ($x + 1)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARRAY VARIABLES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn array_literal { my @a = (1, 2, 3); @a }
+fn array_empty { my @a = (); scalar(@a) }
+fn array_single { my @a = (42); $a[0] }
+
+fn array_access {
+    my @a = (10, 20, 30, 40, 50)
+    $a[2]
+}
+
+fn array_negative_index {
+    my @a = (1, 2, 3, 4, 5)
+    $a[-1]
+}
+
+fn array_length {
+    my @a = (1, 2, 3, 4, 5)
+    scalar(@a)
+}
+
+fn array_last_index {
+    my @a = (1, 2, 3, 4, 5)
+    $#a
+}
+
+fn array_modify {
+    my @a = (1, 2, 3)
+    $a[1] = 20
+    $a[1]
+}
+
+fn array_extend {
+    my @a = (1, 2, 3)
+    $a[5] = 6
+    scalar(@a)
+}
+
+fn array_flatten {
+    my @a = (1, 2)
+    my @b = (3, 4)
+    my @c = (@a, @b)
+    scalar(@c)
+}
+
+fn array_in_scalar {
+    my @a = (1, 2, 3, 4, 5)
+    my $count = @a
+    $count
+}
+
+fn array_slice {
+    my @a = (10, 20, 30, 40, 50)
+    my @s = @a[1, 3]
+    join(",", @s)
+}
+
+fn array_range_slice {
+    my @a = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+    my @s = @a[2..5]
+    join(",", @s)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HASH VARIABLES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn hash_literal {
+    my %h = (a => 1, b => 2, c => 3)
+    $h{b}
+}
+
+fn hash_empty {
+    my %h = ()
+    scalar(keys %h)
+}
+
+fn hash_access {
+    my %h = (name => "Alice", age => 30)
+    $h{name}
+}
+
+fn hash_modify {
+    my %h = (x => 1)
+    $h{x} = 10
+    $h{x}
+}
+
+fn hash_add_key {
+    my %h = (a => 1)
+    $h{b} = 2
+    $h{b}
+}
+
+fn hash_keys {
+    my %h = (a => 1, b => 2, c => 3)
+    scalar(keys %h)
+}
+
+fn hash_values {
+    my %h = (a => 1, b => 2, c => 3)
+    my @v = sort { $a <=> $b } values %h
+    join(",", @v)
+}
+
+fn hash_slice {
+    my %h = (a => 1, b => 2, c => 3, d => 4)
+    my @vals = @h{qw(a c)}
+    join(",", @vals)
+}
+
+fn hash_exists {
+    my %h = (a => 1, b => undef)
+    my $a = exists $h{a} ? 1 : 0
+    my $b = exists $h{b} ? 1 : 0
+    my $c = exists $h{c} ? 1 : 0
+    "$a$b$c"
+}
+
+fn hash_delete_val {
+    my %h = (a => 1, b => 2, c => 3)
+    my $deleted = delete $h{b}
+    $deleted
+}
+
+fn hash_delete_count {
+    my %h = (a => 1, b => 2, c => 3)
+    delete $h{b}
+    scalar(keys %h)
+}
+
+fn hash_from_array {
+    my @list = qw(a 1 b 2 c 3)
+    my %h = @list
+    my $val = $h{b}
+    $val
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# REFERENCES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn scalar_ref {
+    my $x = 42
+    my $ref = \$x
+    $$ref
+}
+
+fn scalar_ref_modify {
+    my $x = 10
+    my $ref = \$x
+    $$ref = 20
+    $x
+}
+
+fn array_ref_literal {
+    my $aref = [1, 2, 3]
+    $aref->[1]
+}
+
+fn array_ref_from_array {
+    my @a = (1, 2, 3)
+    my $ref = \@a
+    $ref->[2]
+}
+
+fn array_ref_deref {
+    my $aref = [10, 20, 30]
+    my @copy = @$aref
+    join(",", @copy)
+}
+
+fn hash_ref_literal {
+    my $href = {a => 1, b => 2}
+    $href->{b}
+}
+
+fn hash_ref_from_hash {
+    my %h = (x => 10, y => 20)
+    my $ref = \%h
+    $ref->{x}
+}
+
+fn hash_ref_deref {
+    my $href = {a => 1, b => 2}
+    my %copy = %$href
+    $copy{a}
+}
+
+fn nested_array_ref {
+    my $aref = [[1, 2], [3, 4], [5, 6]]
+    $aref->[1][1]
+}
+
+fn nested_hash_ref {
+    my $href = {
+        outer => {
+            inner => "value"
+        }
+    }
+    $href->{outer}{inner}
+}
+
+fn mixed_nested {
+    my $data = {
+        users => [
+            {name => "Alice", scores => [90, 85, 92]},
+            {name => "Bob", scores => [78, 82, 88]}
+        ]
+    }
+    $data->{users}[0]{scores}[2]
+}
+
+fn ref_type_scalar {
+    my $x = 42
+    ref(\$x)
+}
+
+fn ref_type_array {
+    my @a = (1, 2, 3)
+    ref(\@a)
+}
+
+fn ref_type_hash {
+    my %h = (a => 1)
+    ref(\%h)
+}
+
+fn ref_type_anon_array {
+    ref([1, 2, 3])
+}
+
+fn ref_type_anon_hash {
+    ref({a => 1})
+}
+
+fn code_ref {
+    my $add = fn { $_0 + $_1 }
+    $add->(3, 4)
+}
+
+fn code_ref_closure {
+    my $x = 10
+    my $add_x = fn { $_0 + $x }
+    $add_x->(5)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VARIABLE SCOPING
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn lexical_scope {
+    my $x = "outer"
+    {
+        my $x = "inner"
+    }
+    $x
+}
+
+fn nested_scope {
+    my $a = 1
+    {
+        my $b = 2
+        {
+            my $c = 3
+            $a + $b + $c
+        }
+    }
+}
+
+fn scope_shadow {
+    my $x = 10
+    my $inner_result
+    {
+        my $x = 20
+        $inner_result = $x
+    }
+    ($x, $inner_result)
+}
+
+fn our_variable {
+    our $pkg_var = 42
+    $pkg_var
+}
+
+fn local_scope {
+    our $global = "outer"
+    my $inner_val = "inner"
+    ($global, $inner_val)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPECIAL VARIABLES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn underscore_default {
+    $_ = "test"
+    uc
+}
+
+fn topic_in_map {
+    my @nums = (1, 2, 3)
+    my @doubled = map { $_ * 2 } @nums
+    join(",", @doubled)
+}
+
+fn topic_in_grep {
+    my @nums = (1, 2, 3, 4, 5, 6)
+    my @evens = grep { $_ % 2 == 0 } @nums
+    join(",", @evens)
+}
+
+fn argv_like {
+    my @args = qw(one two three)
+    join(",", @args)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DECLARATION MODIFIERS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn my_list_decl {
+    my ($a, $b, $c) = (1, 2, 3)
+    $a + $b + $c
+}
+
+fn my_array_decl {
+    my @arr = (1, 2, 3)
+    scalar(@arr)
+}
+
+fn my_hash_decl {
+    my %hash = (a => 1, b => 2)
+    scalar(keys %hash)
+}
+
+fn my_mixed_init {
+    my $x = 1
+    my @a = (2, 3)
+    my %h = (k => 4)
+    $x + $a[0] + $h{k}
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# AUTOVIVIFICATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn autoviv_hash {
+    my %h = (a => {b => {c => "deep"}})
+    $h{a}{b}{c}
+}
+
+fn autoviv_array {
+    my @a
+    $a[2] = ["x", "y", "z", "nested"]
+    $a[2][3]
+}
+
+fn autoviv_mixed {
+    my %data = (users => [{name => "Alice"}])
+    $data{users}[0]{name}
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SIGIL COERCION
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn array_to_scalar_count {
+    my @a = (1, 2, 3, 4, 5)
+    my $count = @a
+    $count
+}
+
+fn hash_to_scalar {
+    my %h = (a => 1, b => 2, c => 3)
+    my $info = %h
+    defined($info) ? 1 : 0
+}
+
+fn scalar_force {
+    my @a = (1, 2, 3)
+    scalar(@a)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VARIABLE OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn defined_check {
+    my $a = 42
+    my $b
+    my $da = defined($a) ? 1 : 0
+    my $db = defined($b) ? 1 : 0
+    "$da$db"
+}
+
+fn undef_var {
+    my $x = 42
+    undef $x
+    defined($x) ? 1 : 0
+}
+
+fn ref_check {
+    my $scalar = 42
+    my @array = (1, 2)
+    my %hash = (a => 1)
+    my $aref = [1, 2]
+    my $href = {a => 1}
+
+    my $r1 = ref(\$scalar)
+    my $r2 = ref(\@array)
+    my $r3 = ref(\%hash)
+    my $r4 = ref($aref)
+    my $r5 = ref($href)
+    
+    "$r1,$r2,$r3,$r4,$r5"
+}

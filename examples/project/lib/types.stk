@@ -1,0 +1,203 @@
+# lib/types.stk — type system showcase: all stryke types with implicit returns
+
+# ── Scalar returns ───────────────────────────────────────────────────
+
+fn ret_int { 42 }
+fn ret_float { 3.14159 }
+fn ret_str { "hello world" }
+fn ret_undef { undef }
+fn ret_bool_true { 1 == 1 }
+fn ret_bool_false { 1 == 0 }
+
+# ── Array returns ────────────────────────────────────────────────────
+
+fn ret_list { (1, 2, 3, 4, 5) }
+fn ret_empty_list { () }
+fn ret_nested_list { ((1, 2), (3, 4)) }
+
+# ── Hash returns (via list context) ──────────────────────────────────
+
+fn ret_hash_as_list { (a => 1, b => 2, c => 3) }
+
+# ── Array refs ───────────────────────────────────────────────────────
+
+fn ret_aref { [10, 20, 30] }
+fn ret_nested_aref { [[1, 2], [3, 4], [5, 6]] }
+fn ret_mixed_aref { ["str", 42, [1, 2], { x => 9 }] }
+
+# ── Hash refs (use +{} for implicit return) ──────────────────────────
+
+fn ret_href { +{ name => "test", value => 100 } }
+fn ret_nested_href { +{ outer => { inner => { deep => 42 } } } }
+fn ret_href_with_aref { +{ items => [1, 2, 3], meta => { count => 3 } } }
+
+# Hash refs with reserved bareword keys (q, qq, qw, qx, qr, tr, y, s, m)
+fn ret_href_reserved_keys {
+    +{
+        q  => "quote",
+        qq => "double quote",
+        qw => "quote words",
+        qx => "backtick",
+        qr => "regex",
+        tr => "transliterate",
+        y  => "also tr",
+        s  => "substitute",
+        m  => "match",
+    }
+}
+
+# ── Structs ──────────────────────────────────────────────────────────
+
+struct Vec3 { x, y, z }
+struct Person { name, age, email }
+struct Config { host => Str, port => Int, debug => Int }
+
+fn ret_struct { Vec3(1, 2, 3) }
+fn ret_struct_named { Person(name => "Alice", age => 30, email => "alice@example.com") }
+fn ret_struct_typed { Config(host => "localhost", port => 8080, debug => 0) }
+
+fn make_point($x, $y, $z) { Vec3($x, $y, $z) }
+fn make_person($n, $a) { Person(name => $n, age => $a, email => "$n@test.com") }
+
+# ── Enums ────────────────────────────────────────────────────────────
+
+enum Result { Ok, Err }
+enum Option { Some, None }
+enum TrafficLight { Red, Yellow, Green }
+
+fn ret_enum_ok { Result::Ok }
+fn ret_enum_err { Result::Err }
+
+fn traffic_next($light) {
+    match ($light) {
+        TrafficLight::Red()    => TrafficLight::Green
+        TrafficLight::Yellow() => TrafficLight::Red
+        TrafficLight::Green()  => TrafficLight::Yellow
+    }
+}
+
+fn option_map($opt, $fn) {
+    match ($opt) {
+        Option::Some() => Option::Some
+        Option::None() => Option::None
+    }
+}
+
+# ── Sets ─────────────────────────────────────────────────────────────
+
+fn ret_set { set(1, 2, 3, 4, 5) }
+fn ret_string_set { set("apple", "banana", "cherry") }
+
+fn set_contains($s, $val) { $s->has($val) }
+fn set_size($s) { $s->len }
+
+# ── Code refs ────────────────────────────────────────────────────────
+
+fn ret_coderef { fn { 99 } }
+fn ret_coderef_with_arg { fn ($x) { $x * 2 } }
+fn ret_closure {
+    my $n = 10
+    fn { $n * $n }
+}
+
+fn make_adder($n) { fn ($x) { $x + $n } }
+fn make_multiplier($n) { fn ($x) { $x * $n } }
+
+# ── Blessed refs ─────────────────────────────────────────────────────
+
+fn ret_blessed { bless { val => 42 }, "MyClass" }
+fn ret_blessed_aref { bless [1, 2, 3], "MyArray" }
+
+# ── Complex nested structures ────────────────────────────────────────
+
+fn ret_complex {
+    my $the_set = set(10, 11, 12)
+    my $the_code = fn { "lambda" }
+    +{
+        scalars => {
+            int   => 42,
+            float => 3.14,
+            str   => "hello",
+        },
+        arrays => [[1, 2], [3, 4], [5, 6]],
+        struct => Vec3(7, 8, 9),
+        set    => $the_set,
+        code   => $the_code,
+    }
+}
+
+# ── Conditional implicit returns ─────────────────────────────────────
+
+fn abs_val($n) {
+    if ($n < 0) { -$n } else { $n }
+}
+
+fn clamp_val($val, $lo, $hi) {
+    if ($val < $lo) { $lo }
+    elsif ($val > $hi) { $hi }
+    else { $val }
+}
+
+fn sign($n) {
+    if ($n > 0) { 1 }
+    elsif ($n < 0) { -1 }
+    else { 0 }
+}
+
+# ── Loop-based returns ───────────────────────────────────────────────
+
+fn first_even(@nums) {
+    for my $n (@nums) {
+        return $n if $n % 2 == 0
+    }
+    undef
+}
+
+fn all_positive(@nums) {
+    for my $n (@nums) {
+        return 0 if $n <= 0
+    }
+    1
+}
+
+# ── Recursive returns ────────────────────────────────────────────────
+
+fn factorial($n) {
+    if ($n <= 1) { 1 }
+    else { $n * factorial($n - 1) }
+}
+
+fn fib($n) {
+    if ($n <= 1) { $n }
+    else { fib($n - 1) + fib($n - 2) }
+}
+
+# ── Method chaining returns ──────────────────────────────────────────
+
+class Builder {
+    parts: Array = []
+
+    fn add($part) {
+        push @{$self->parts}, $part
+        $self
+    }
+
+    fn build {
+        join("-", @{$self->parts})
+    }
+}
+
+fn new_builder { Builder() }
+
+# ── Ternary implicit returns ─────────────────────────────────────────
+
+fn ternary_example($cond) { $cond ? "yes" : "no" }
+fn nested_ternary($n) { $n > 0 ? "positive" : $n < 0 ? "negative" : "zero" }
+
+# ── Expression-bodied functions ──────────────────────────────────────
+
+fn double($x) { $x * 2 }
+fn square($x) { $x * $x }
+fn cube($x) { $x * $x * $x }
+fn greet($name) { "Hello, $name!" }
+fn full_name($first, $last) { "$first $last" }

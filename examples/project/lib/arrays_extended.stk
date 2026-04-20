@@ -1,0 +1,368 @@
+# lib/arrays_extended.stk — comprehensive array operations
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARRAY CREATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn arr_from_list { my @a = (1, 2, 3, 4, 5); @a }
+fn arr_from_range { my @a = 1..10; @a }
+fn arr_from_qw { my @a = qw(one two three); @a }
+fn arr_empty { my @a = (); @a }
+fn arr_single { my @a = (42); @a }
+fn arr_nested_flatten { my @a = (1, (2, 3), 4); @a }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PUSH AND POP
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn arr_push_one {
+    my @a = (1, 2, 3)
+    push @a, 4
+    @a
+}
+
+fn arr_push_many {
+    my @a = (1, 2)
+    push @a, 3, 4, 5
+    @a
+}
+
+fn arr_push_array {
+    my @a = (1, 2)
+    my @b = (3, 4)
+    push @a, @b
+    @a
+}
+
+fn arr_pop {
+    my @a = (1, 2, 3)
+    my $last = pop @a
+    ($last, scalar(@a))
+}
+
+fn arr_pop_empty {
+    my @a = ()
+    my $x = pop @a
+    defined($x) ? 1 : 0
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SHIFT AND UNSHIFT
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn arr_shift {
+    my @a = (1, 2, 3)
+    my $first = shift @a
+    ($first, scalar(@a))
+}
+
+fn arr_shift_empty {
+    my @a = ()
+    my $x = shift @a
+    defined($x) ? 1 : 0
+}
+
+fn arr_unshift_one {
+    my @a = (2, 3)
+    unshift @a, 1
+    @a
+}
+
+fn arr_unshift_many {
+    my @a = (4, 5)
+    unshift @a, 1, 2, 3
+    @a
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPLICE
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn arr_splice_remove {
+    my @a = (1, 2, 3, 4, 5)
+    my @removed = splice @a, 1, 2
+    (join(",", @removed), join(",", @a))
+}
+
+fn arr_splice_insert {
+    my @a = (1, 4, 5)
+    splice @a, 1, 0, 2, 3
+    @a
+}
+
+fn arr_splice_replace {
+    my @a = (1, 2, 3, 4, 5)
+    splice @a, 1, 3, "a", "b"
+    @a
+}
+
+fn arr_splice_delete_to_end {
+    my @a = (1, 2, 3, 4, 5)
+    my @removed = splice @a, 2
+    (join(",", @removed), join(",", @a))
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SLICES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn arr_slice_indices {
+    my @a = (10, 20, 30, 40, 50)
+    @a[1, 3]
+}
+
+fn arr_slice_range {
+    my @a = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+    @a[2..5]
+}
+
+fn arr_slice_negative {
+    my @a = (1, 2, 3, 4, 5)
+    @a[-2, -1]
+}
+
+fn arr_slice_assign {
+    my @a = (1, 2, 3, 4, 5)
+    @a[1, 3] = (20, 40)
+    @a
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SORT
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn arr_sort_default {
+    my @a = qw(banana apple cherry)
+    sort @a
+}
+
+fn arr_sort_numeric {
+    my @a = (3, 1, 4, 1, 5, 9, 2, 6)
+    sort { $a <=> $b } @a
+}
+
+fn arr_sort_reverse_numeric {
+    my @a = (3, 1, 4, 1, 5, 9, 2, 6)
+    sort { $b <=> $a } @a
+}
+
+fn arr_sort_by_length {
+    my @a = qw(bb aaa c dddd)
+    sort { length($a) <=> length($b) } @a
+}
+
+fn arr_sort_case_insensitive {
+    my @a = qw(Apple banana Cherry)
+    sort { lc($a) cmp lc($b) } @a
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# REVERSE
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn arr_reverse {
+    my @a = (1, 2, 3, 4, 5)
+    reverse @a
+}
+
+fn arr_reverse_string {
+    my @a = qw(a b c)
+    reverse @a
+}
+
+fn arr_reverse_in_place {
+    my @a = (1, 2, 3)
+    @a = reverse @a
+    @a
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MAP AND GREP
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn arr_map_double {
+    my @a = (1, 2, 3, 4, 5)
+    map { $_ * 2 } @a
+}
+
+fn arr_map_transform {
+    my @a = qw(a b c)
+    map { uc($_) } @a
+}
+
+fn arr_map_to_hash_values {
+    my @a = (1, 2, 3)
+    map { $_ => $_ * $_ } @a
+}
+
+fn arr_grep_even {
+    my @a = (1, 2, 3, 4, 5, 6)
+    grep { $_ % 2 == 0 } @a
+}
+
+fn arr_grep_defined {
+    my @a = (1, undef, 2, undef, 3)
+    grep { defined } @a
+}
+
+fn arr_grep_regex {
+    my @a = qw(apple banana cherry apricot)
+    grep { /^a/ } @a
+}
+
+fn arr_first_match {
+    my @a = (1, 2, 3, 4, 5)
+    my @found = grep { $_ > 3 } @a
+    $found[0]
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# JOIN AND SPLIT
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn arr_join_comma {
+    my @a = (1, 2, 3)
+    join(",", @a)
+}
+
+fn arr_join_empty {
+    my @a = qw(a b c)
+    join("", @a)
+}
+
+fn arr_join_newline {
+    my @a = qw(line1 line2 line3)
+    join("\n", @a)
+}
+
+fn arr_split_comma {
+    split(/,/, "a,b,c")
+}
+
+fn arr_split_ws {
+    split(/\s+/, "one two three")
+}
+
+fn arr_split_limit {
+    split(/,/, "a,b,c,d", 2)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARRAY FUNCTIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn arr_length {
+    my @a = (1, 2, 3, 4, 5)
+    scalar(@a)
+}
+
+fn arr_last_index {
+    my @a = (1, 2, 3, 4, 5)
+    $#a
+}
+
+fn arr_wantarray_context {
+    my @a = (1, 2, 3)
+    my $count = @a
+    ($count, scalar(@a))
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# UNIQUE AND DEDUPE
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn arr_unique {
+    my @a = (1, 2, 2, 3, 3, 3, 4)
+    my %seen
+    grep { !$seen{$_}++ } @a
+}
+
+fn arr_unique_strings {
+    my @a = qw(a b a c b d)
+    my %seen
+    grep { !$seen{$_}++ } @a
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARRAY UTILITIES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn arr_sum {
+    my @a = (1, 2, 3, 4, 5)
+    my $sum = 0
+    for my $n (@a) {
+        $sum += $n
+    }
+    $sum
+}
+
+fn arr_min {
+    my @a = (3, 1, 4, 1, 5, 9)
+    my $min = $a[0]
+    for my $n (@a) {
+        $min = $n if $n < $min
+    }
+    $min
+}
+
+fn arr_max {
+    my @a = (3, 1, 4, 1, 5, 9)
+    my $max = $a[0]
+    for my $n (@a) {
+        $max = $n if $n > $max
+    }
+    $max
+}
+
+fn arr_any_match {
+    my @a = (1, 3, 5, 7, 9)
+    my $found = 0
+    for my $n (@a) {
+        if ($n > 5) {
+            $found = 1
+            last
+        }
+    }
+    $found
+}
+
+fn arr_all_match {
+    my @a = (2, 4, 6, 8)
+    my $all = 1
+    for my $n (@a) {
+        if ($n % 2 != 0) {
+            $all = 0
+            last
+        }
+    }
+    $all
+}
+
+fn arr_index_of {
+    my @a = qw(a b c d e)
+    my $idx = -1
+    for my $i (0..$#a) {
+        if ($a[$i] eq "c") {
+            $idx = $i
+            last
+        }
+    }
+    $idx
+}
+
+fn arr_flatten {
+    my @a = (1, 2)
+    my @b = (3, 4)
+    my @c = (5, 6)
+    (@a, @b, @c)
+}
+
+fn arr_zip {
+    my @a = (1, 2, 3)
+    my @b = qw(a b c)
+    my @result
+    for my $i (0..$#a) {
+        push @result, $a[$i], $b[$i]
+    }
+    @result
+}

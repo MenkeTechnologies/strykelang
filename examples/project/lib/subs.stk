@@ -1,0 +1,185 @@
+# lib/subs.stk — subroutine tests
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BASIC SUBROUTINES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn no_args { 42 }
+fn one_arg($x) { $x * 2 }
+fn two_args($x, $y) { $x + $y }
+fn three_args($a, $b, $c) { $a * $b + $c }
+
+fn explicit_return($x) {
+    return $x * 2
+}
+
+fn early_return($x) {
+    if ($x < 0) {
+        return "negative"
+    }
+    "non-negative"
+}
+
+fn multiple_returns($x) {
+    if ($x < 0) { return "neg" }
+    if ($x == 0) { return "zero" }
+    return "pos"
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DEFAULT ARGUMENTS (using //= inside function)
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn with_default($x, $y) { $y //= 10; $x + $y }
+fn all_defaults($a, $b, $c) { $a //= 1; $b //= 2; $c //= 3; $a + $b + $c }
+
+fn default_expr($x, $y) { $y //= $x * 2; $x + $y }
+
+fn default_string($name) { $name //= "World"; "Hello, $name!" }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARRAY AND HASH ARGUMENTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn array_arg(@arr) { scalar(@arr) }
+fn hash_arg(%h) { scalar(keys %h) }
+
+fn mixed_args($x, @rest) {
+    my $sum = $x
+    for my $r (@rest) {
+        $sum += $r
+    }
+    $sum
+}
+
+fn scalar_and_array($name, @items) {
+    "$name: " . join(",", @items)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# RETURN VALUES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn return_scalar { 42 }
+fn return_array { (1, 2, 3) }
+fn return_hash { (a => 1, b => 2) }
+
+fn return_ref { [1, 2, 3] }
+fn return_hash_ref { {a => 1, b => 2} }
+
+fn return_multiple { (1, "two", 3.0) }
+
+fn return_in_context {
+    if (wantarray()) {
+        return (1, 2, 3)
+    }
+    return "scalar"
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# RECURSION
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn factorial($n) {
+    if ($n <= 1) {
+        return 1
+    }
+    $n * factorial($n - 1)
+}
+
+fn fibonacci($n) {
+    if ($n <= 1) {
+        return $n
+    }
+    fibonacci($n - 1) + fibonacci($n - 2)
+}
+
+fn sum_to($n) {
+    if ($n <= 0) {
+        return 0
+    }
+    $n + sum_to($n - 1)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ANONYMOUS SUBS (CODEREFS)
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn get_adder($n) {
+    fn { $_0 + $n }
+}
+
+fn get_multiplier($n) {
+    fn { $_0 * $n }
+}
+
+fn apply_twice($fn, $x) {
+    $fn->($fn->($x))
+}
+
+fn compose($f, $g) {
+    fn { $f->($g->($_0)) }
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HIGHER ORDER FUNCTIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn apply_to_each($fn, @items) {
+    map { $fn->($_) } @items
+}
+
+fn filter_with($fn, @items) {
+    grep { $fn->($_) } @items
+}
+
+fn reduce_with($fn, $init, @items) {
+    my $acc = $init
+    for my $item (@items) {
+        $acc = $fn->($acc, $item)
+    }
+    $acc
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CALLING CONVENTIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn call_with_list { join(",", one_arg(5), two_args(2, 3)) }
+
+fn nested_calls { one_arg(two_args(1, 2)) }
+
+fn call_in_expression { 10 + one_arg(5) }
+
+fn method_chain_style {
+    my @arr = (1, 2, 3)
+    scalar(@arr)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPECIAL CASES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn void_return {
+    my $x = 1
+}
+
+fn implicit_return { 42 }
+
+fn block_return {
+    {
+        42
+    }
+}
+
+fn if_return($cond) {
+    if ($cond) {
+        "true"
+    } else {
+        "false"
+    }
+}
+
+fn ternary_return($cond) {
+    $cond ? "yes" : "no"
+}
