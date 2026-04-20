@@ -56,9 +56,9 @@ pub(crate) struct MapStreamIterator {
     pending: Mutex<VecDeque<PerlValue>>,
     mode: MapStreamMode,
     interp: Mutex<Interpreter>,
-    capture: Vec<(String, PerlValue)>,
-    atomic_arrays: Vec<(String, AtomicArray)>,
-    atomic_hashes: Vec<(String, AtomicHash)>,
+    _capture: Vec<(String, PerlValue)>,
+    _atomic_arrays: Vec<(String, AtomicArray)>,
+    _atomic_hashes: Vec<(String, AtomicHash)>,
     peel: bool,
 }
 
@@ -81,9 +81,9 @@ impl MapStreamIterator {
             pending: Mutex::new(VecDeque::new()),
             mode: MapStreamMode::Block(sub),
             interp: Mutex::new(interp),
-            capture,
-            atomic_arrays,
-            atomic_hashes,
+            _capture: capture,
+            _atomic_arrays: atomic_arrays,
+            _atomic_hashes: atomic_hashes,
             peel,
         }
     }
@@ -106,9 +106,9 @@ impl MapStreamIterator {
             pending: Mutex::new(VecDeque::new()),
             mode: MapStreamMode::Expr(expr),
             interp: Mutex::new(interp),
-            capture,
-            atomic_arrays,
-            atomic_hashes,
+            _capture: capture,
+            _atomic_arrays: atomic_arrays,
+            _atomic_hashes: atomic_hashes,
             peel,
         }
     }
@@ -191,9 +191,9 @@ pub(crate) struct FilterStreamIterator {
     source: Arc<dyn PerlIterator>,
     mode: FilterStreamMode,
     interp: Mutex<Interpreter>,
-    capture: Vec<(String, PerlValue)>,
-    atomic_arrays: Vec<(String, AtomicArray)>,
-    atomic_hashes: Vec<(String, AtomicHash)>,
+    _capture: Vec<(String, PerlValue)>,
+    _atomic_arrays: Vec<(String, AtomicArray)>,
+    _atomic_hashes: Vec<(String, AtomicHash)>,
 }
 
 impl FilterStreamIterator {
@@ -213,9 +213,9 @@ impl FilterStreamIterator {
             source,
             mode: FilterStreamMode::Block(sub),
             interp: Mutex::new(interp),
-            capture,
-            atomic_arrays,
-            atomic_hashes,
+            _capture: capture,
+            _atomic_arrays: atomic_arrays,
+            _atomic_hashes: atomic_hashes,
         }
     }
 
@@ -235,9 +235,9 @@ impl FilterStreamIterator {
             source,
             mode: FilterStreamMode::Expr(expr),
             interp: Mutex::new(interp),
-            capture,
-            atomic_arrays,
-            atomic_hashes,
+            _capture: capture,
+            _atomic_arrays: atomic_arrays,
+            _atomic_hashes: atomic_hashes,
         }
     }
 }
@@ -731,9 +731,9 @@ pub(crate) struct TapIterator {
     source: Arc<dyn PerlIterator>,
     sub: Arc<PerlSub>,
     interp: Mutex<Interpreter>,
-    capture: Vec<(String, PerlValue)>,
-    atomic_arrays: Vec<(String, AtomicArray)>,
-    atomic_hashes: Vec<(String, AtomicHash)>,
+    _capture: Vec<(String, PerlValue)>,
+    _atomic_arrays: Vec<(String, AtomicArray)>,
+    _atomic_hashes: Vec<(String, AtomicHash)>,
 }
 
 impl TapIterator {
@@ -753,9 +753,9 @@ impl TapIterator {
             source,
             sub,
             interp: Mutex::new(interp),
-            capture,
-            atomic_arrays,
-            atomic_hashes,
+            _capture: capture,
+            _atomic_arrays: atomic_arrays,
+            _atomic_hashes: atomic_hashes,
         }
     }
 }

@@ -2362,6 +2362,107 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "cyber_skull" => "`cyber_skull` — neon skull ASCII art with glitch effects. Args: [size]. Size: \"small\" (default) or \"large\".\n\n```perl\np cyber_skull()          # small skull\np cyber_skull(\"large\")   # large skull\n```",
         "cyber_eye" => "`cyber_eye` — cyberpunk all-seeing eye motif with layered glow. Args: [size]. Size: \"small\" (default) or \"large\".\n\n```perl\np cyber_eye()          # small eye\np cyber_eye(\"large\")   # large eye\n```",
 
+        // ── Charts (extended) ────────────────────────────────────────────
+        "donut_svg" | "donut" => "`donut_svg` (alias `donut`) — SVG donut chart with percentage labels. Accepts labels+values or a hashref.\n\n```perl\ndonut_svg([\"A\",\"B\",\"C\"], [50,30,20], \"Share\") |> to_file(\"donut.svg\")\n{Rust => 45, Go => 30} |> donut(\"Languages\") |> to_file(\"donut.svg\")\n```",
+        "area_svg" | "area_chart" => "`area_svg` (alias `area_chart`) — SVG filled area chart. Args: xs, ys [, title].\n\n```perl\nmy @x = 0..20\nmy @y = map { sin($_ * 0.3) } @x\narea_svg(\\@x, \\@y, \"Wave\") |> to_file(\"area.svg\")\n```",
+        "hbar_svg" | "hbar" => "`hbar_svg` (alias `hbar`) — SVG horizontal bar chart. Accepts labels+values or a hashref.\n\n```perl\nhbar_svg([\"Rust\",\"Go\",\"C++\"], [45,30,25], \"Speed\") |> to_file(\"hbar.svg\")\n{alpha => 10, beta => 20} |> hbar |> to_file(\"hbar.svg\")\n```",
+        "radar_svg" | "radar" | "spider" => "`radar_svg` (aliases `radar`, `spider`) — SVG radar/spider chart. Args: labels, values [, title].\n\n```perl\nradar_svg([\"Atk\",\"Def\",\"Spd\",\"HP\",\"MP\"], [8,6,9,5,7], \"Stats\") |> to_file(\"radar.svg\")\n```",
+        "candlestick_svg" | "candlestick" | "ohlc" => "`candlestick_svg` (aliases `candlestick`, `ohlc`) — SVG candlestick OHLC chart. Args: array of [open,high,low,close] [, title].\n\n```perl\ncandlestick_svg([[100,110,95,105],[105,115,100,112]], \"Stock\") |> to_file(\"ohlc.svg\")\n```",
+        "violin_svg" | "violin" => "`violin_svg` (alias `violin`) — SVG violin plot from array of arrays showing distribution shape.\n\n```perl\nviolin_svg([rnorm(200), rnorm(200, 2)], \"Distributions\") |> to_file(\"violin.svg\")\n```",
+        "cor_heatmap" | "cor_matrix_svg" => "`cor_heatmap` (alias `cor_matrix_svg`) — SVG correlation matrix heatmap. Computes pairwise correlations and renders as heatmap.\n\n```perl\ncor_heatmap([rnorm(100), rnorm(100), rnorm(100)], \"Correlations\") |> to_file(\"cor.svg\")\n```",
+        "stacked_bar_svg" | "stacked_bar" => "`stacked_bar_svg` (alias `stacked_bar`) — SVG stacked bar chart. Args: labels, series (array of arrays) [, title].\n\n```perl\nstacked_bar_svg([\"Q1\",\"Q2\",\"Q3\"], [[10,20,30],[5,15,25]], \"Revenue\") |> to_file(\"stacked.svg\")\n```",
+        "wordcloud_svg" | "wordcloud" | "wcloud" => "`wordcloud_svg` (aliases `wordcloud`, `wcloud`) — SVG word cloud from frequency hashref. Word size scales with frequency.\n\n```perl\n{rust => 50, go => 30, python => 40} |> wordcloud(\"Languages\") |> to_file(\"cloud.svg\")\n```",
+        "treemap_svg" | "treemap" => "`treemap_svg` (alias `treemap`) — SVG treemap from frequency hashref. Area proportional to values.\n\n```perl\n{src => 500, tests => 200, docs => 100} |> treemap(\"Codebase\") |> to_file(\"tree.svg\")\n```",
+
+        // ── Preview ──────────────────────────────────────────────────────
+        "preview" | "pvw" => "`preview` (alias `pvw`) — wrap SVG/HTML content in a cyberpunk-styled page and open in the default browser.\n\n```perl\nscatter_svg([1,2,3], [1,4,9]) |> preview\nbar_svg([\"A\",\"B\"], [10,20]) |> pvw\n```",
+
+        // ── Audio ────────────────────────────────────────────────────────
+        "audio_convert" | "aconv" => "`audio_convert` (alias `aconv`) — convert audio files between WAV, FLAC, AIFF, and MP3 formats.\n\n```perl\naudio_convert(\"song.flac\", \"song.mp3\")\naconv(\"input.wav\", \"output.mp3\")\n```",
+        "audio_info" | "ainfo" => "`audio_info` (alias `ainfo`) — get audio file metadata (duration, sample rate, channels, format) as a hashref.\n\n```perl\nmy $info = ainfo(\"song.mp3\")\np $info->{duration}      # seconds\np $info->{sample_rate}   # e.g. 44100\n```",
+        "id3_read" | "id3" => "`id3_read` (alias `id3`) — read ID3 tags from an MP3 file as a hashref (title, artist, album, year, etc.).\n\n```perl\nmy $tags = id3(\"song.mp3\")\np \"$tags->{artist} - $tags->{title}\"\n```",
+        "id3_write" | "id3w" => "`id3_write` (alias `id3w`) — write ID3 tags to an MP3 file from a hashref.\n\n```perl\nid3w(\"song.mp3\", {title => \"New Title\", artist => \"Artist\", year => \"2026\"})\n```",
+
+        // ── Network ─────────────────────────────────────────────────────
+        "net_interfaces" | "net_ifs" | "ifconfig" => "`net_interfaces` (aliases `net_ifs`, `ifconfig`) — list all network interfaces with name, IPs, MAC, and status.\n\n```perl\nmy @ifs = net_ifs()\nfor (@ifs) { p \"$_->{name}: $_->{ipv4}\" }\n```",
+        "net_ipv4" | "myip" | "myip4" => "`net_ipv4` (aliases `myip`, `myip4`) — return the first non-loopback IPv4 address as a string.\n\n```perl\np myip()   # e.g. 192.168.1.42\n```",
+        "net_ipv6" | "myip6" => "`net_ipv6` (alias `myip6`) — return the first non-loopback IPv6 address as a string.\n\n```perl\np myip6()   # e.g. fe80::1\n```",
+        "net_mac" | "mymac" => "`net_mac` (alias `mymac`) — return the first non-loopback MAC address.\n\n```perl\np mymac()   # e.g. aa:bb:cc:dd:ee:ff\n```",
+        "net_public_ip" | "pubip" | "extip" => "`net_public_ip` (aliases `pubip`, `extip`) — fetch your public IP address via HTTP.\n\n```perl\np pubip()   # e.g. 203.0.113.42\n```",
+        "net_dns" | "dns_resolve" | "resolve" => "`net_dns` (aliases `dns_resolve`, `resolve`) — resolve a hostname to IP addresses.\n\n```perl\nmy @ips = resolve(\"github.com\")\np @ips\n```",
+        "net_reverse_dns" | "rdns" => "`net_reverse_dns` (alias `rdns`) — reverse DNS lookup via UDP PTR query.\n\n```perl\np rdns(\"8.8.8.8\")   # dns.google\n```",
+        "net_ping" | "ping" => "`net_ping` (alias `ping`) — TCP connect ping to host:port. Returns array of RTT measurements in ms.\n\n```perl\nmy @rtt = ping(\"google.com\", 443, 5)   # 5 pings\np mean(@rtt)\n```",
+        "net_port_open" | "port_open" => "`net_port_open` (alias `port_open`) — check if a TCP port is open on a host. Returns boolean.\n\n```perl\np port_open(\"localhost\", 8080)   # 1 or 0\n```",
+        "net_ports_scan" | "port_scan" | "portscan" => "`net_ports_scan` (aliases `port_scan`, `portscan`) — scan a range of TCP ports on a host. Returns list of open ports.\n\n```perl\nmy @open = port_scan(\"localhost\", 80, 443)\np @open   # e.g. 80, 443\n```",
+        "net_latency" | "tcplat" => "`net_latency` (alias `tcplat`) — measure TCP connect latency to host:port in milliseconds.\n\n```perl\np tcplat(\"google.com\", 443)   # e.g. 12.5\n```",
+        "net_download" | "download" | "wget" => "`net_download` (aliases `download`, `wget`) — download a URL to a local file via ureq.\n\n```perl\nwget(\"https://example.com/data.csv\", \"data.csv\")\n```",
+        "net_headers" | "http_headers" => "`net_headers` (alias `http_headers`) — fetch HTTP response headers as a hashref.\n\n```perl\nmy $h = http_headers(\"https://example.com\")\np $h->{\"content-type\"}\n```",
+        "net_dns_servers" | "dns_servers" => "`net_dns_servers` (alias `dns_servers`) — return the system's configured DNS server addresses.\n\n```perl\nmy @dns = dns_servers()\np @dns   # e.g. 8.8.8.8, 8.8.4.4\n```",
+        "net_gateway" | "gateway" => "`net_gateway` (alias `gateway`) — return the default gateway IP address.\n\n```perl\np gateway()   # e.g. 192.168.1.1\n```",
+        "net_whois" | "whois" => "`net_whois` (alias `whois`) — WHOIS lookup via raw TCP connection on port 43.\n\n```perl\np whois(\"example.com\")\n```",
+        "net_hostname" => "`net_hostname` — return the system hostname.\n\n```perl\np net_hostname()   # e.g. my-macbook.local\n```",
+        "smtp_send" | "send_email" | "email" => "`smtp_send` (aliases `send_email`, `email`) — send an email via SMTP with TLS. Takes a hashref with to, from, subject, body, and SMTP connection fields.\n\n```perl\nsmtp_send({to => \"bob@ex.com\", from => \"me@ex.com\", subject => \"Hi\",\n  body => \"Hello!\", smtp_host => \"smtp.ex.com\", smtp_port => 587,\n  smtp_user => \"me@ex.com\", smtp_pass => $pass})\n```",
+
+        // ── Markup / Web Scraping ───────────────────────────────────────
+        "html_parse" | "parse_html" => "`html_parse` (alias `parse_html`) — parse an HTML string into an array of element hashrefs with tag, text, and attrs.\n\n```perl\nmy @els = html_parse(slurp(\"page.html\"))\nfor (@els) { p \"$_->{tag}: $_->{text}\" }\n```",
+        "css_select" | "css" | "qs" | "query_selector" => "`css_select` (aliases `css`, `qs`, `query_selector`) — query parsed HTML with a CSS selector. Returns matching elements as hashrefs with tag, text, attrs, and html.\n\n```perl\nmy @links = css_select(slurp(\"page.html\"), \"a.nav\")\nfor (@links) { p \"$_->{tag} $_->{attrs}{href}\" }\n```",
+        "xml_parse" | "parse_xml" => "`xml_parse` (alias `parse_xml`) — parse an XML string into a nested hashref tree with tag, text, attrs, and children.\n\n```perl\nmy $root = xml_parse(slurp(\"data.xml\"))\np $root->{tag}\nfor (@{$root->{children}}) { p $_->{text} }\n```",
+        "xpath" | "xml_select" => "`xpath` (alias `xml_select`) — query XML with XPath-like expressions (//tag, //tag[@attr='val']). Returns matching nodes as hashrefs.\n\n```perl\nmy @items = xpath(slurp(\"feed.xml\"), \"//item\")\nfor (@items) { p $_->{text} }\n```",
+
+        // ── Date extensions ─────────────────────────────────────────────
+        "dateseq" | "dseq" => "`dateseq` (alias `dseq`) — generate a sequence of dates. Args: start, end [, step]. Step defaults to 1 day.\n\n```perl\nmy @days = dseq(\"2026-01-01\", \"2026-01-07\")\np @days\n```",
+        "dategrep" | "dgrep" => "`dategrep` (alias `dgrep`) — filter a list of date strings by a pattern or range.\n\n```perl\nmy @jan = dgrep(\"2026-01\", @dates)\n```",
+        "dateround" | "dround" => "`dateround` (alias `dround`) — round date strings to a unit (day, hour, month, etc.).\n\n```perl\np dround(\"2026-04-19T14:35:22\", \"hour\")   # 2026-04-19T15:00:00\n```",
+        "datesort" | "dsort" => "`datesort` (alias `dsort`) — sort date strings chronologically.\n\n```perl\nmy @sorted = dsort(\"2026-03-01\", \"2026-01-15\", \"2026-02-10\")\np @sorted\n```",
+
+        // ── Git ─────────────────────────────────────────────────────────
+        "git_log" | "glog" => "`git_log` (alias `glog`) — get the last N commits as an array of hashrefs (hash, author, date, message).\n\n```perl\nmy @commits = glog(10)\nfor (@commits) { p \"$_->{hash} $_->{message}\" }\n```",
+        "git_status" | "gst" => "`git_status` (alias `gst`) — get working tree status as an array of hashrefs (path, status).\n\n```perl\nmy @st = gst()\nfor (@st) { p \"$_->{status} $_->{path}\" }\n```",
+        "git_diff" | "gdiff" => "`git_diff` (alias `gdiff`) — get the current diff as a string.\n\n```perl\np gdiff()\ngdiff() |> lines |> grep /^\\+/ |> e p\n```",
+        "git_branches" | "gbr" => "`git_branches` (alias `gbr`) — list all branches as an array of strings.\n\n```perl\nmy @br = gbr()\np @br\n```",
+        "git_tags" | "gtags" => "`git_tags` (alias `gtags`) — list all tags as an array of strings.\n\n```perl\nmy @tags = gtags()\np @tags\n```",
+        "git_blame" | "gblame" => "`git_blame` (alias `gblame`) — blame a file, returning per-line annotation.\n\n```perl\np gblame(\"src/main.rs\")\n```",
+        "git_authors" | "gauthors" => "`git_authors` (alias `gauthors`) — list unique authors sorted by commit count as hashrefs.\n\n```perl\nmy @authors = gauthors()\nfor (@authors) { p \"$_->{name}: $_->{count}\" }\n```",
+        "git_files" | "gfiles" => "`git_files` (alias `gfiles`) — list all tracked files in the repo.\n\n```perl\nmy @files = gfiles()\np scalar @files   # total tracked files\n```",
+        "git_show" | "gshow" => "`git_show` (alias `gshow`) — show details of a commit (message, diff, author).\n\n```perl\np gshow(\"HEAD\")\np gshow(\"abc1234\")\n```",
+        "git_root" | "groot" => "`git_root` (alias `groot`) — return the repository root path.\n\n```perl\np groot()   # e.g. /home/user/project\n```",
+
+        // ── System ──────────────────────────────────────────────────────
+        "mounts" | "disk_mounts" | "filesystems" => "`mounts` (aliases `disk_mounts`, `filesystems`) — list mounted filesystems with usage (total, used, available).\n\n```perl\nmy @m = mounts()\nfor (@m) { p \"$_->{mount}: $_->{used}/$_->{total}\" }\n```",
+        "thread_count" | "nthreads" => "`thread_count` (alias `nthreads`) — return the rayon thread pool size.\n\n```perl\np nthreads()   # e.g. 8\n```",
+        "pool_info" | "par_info" => "`pool_info` (alias `par_info`) — return thread pool details as a hashref (threads, queued, active).\n\n```perl\nmy $info = par_info()\np $info->{threads}\n```",
+        "par_bench" | "pbench" => "`par_bench` (alias `pbench`) — run a parallel throughput benchmark and return results.\n\n```perl\nmy $result = pbench(1000000)\np $result->{ops_per_sec}\n```",
+        "to_pdf" => "`to_pdf` — generate a PDF from text, SVG, or structured data. Returns raw PDF bytes.\n\n```perl\n\"Hello World\" |> to_pdf |> to_file(\"out.pdf\")\nscatter_svg([1,2,3], [1,4,9]) |> to_pdf |> to_file(\"plot.pdf\")\n```",
+        "jq" => "`jq` — alias for `json_jq`. Query JSON data with jq-style expressions.\n\n```perl\nmy $data = json_decode(slurp(\"data.json\"))\np jq($data, \".items[].name\")\n```",
+
+        // ── Directory Size ──────────────────────────────────────────────
+        "du" | "dir_size" => "`du` (alias `dir_size`) — compute the total size of a directory tree in bytes, recursively walking all files.\n\n```perl\nmy $bytes = du(\"/usr/local\")\np \"$bytes bytes\"\n```",
+        "du_tree" | "dir_sizes" => "`du_tree` (alias `dir_sizes`) — return directory sizes as an array of hashrefs `{path, size}`, sorted descending by size. Each entry is an immediate child directory.\n\n```perl\nmy @dirs = du_tree(\"/usr/local\")\nfor (@dirs) { p \"$_->{path}: $_->{size}\" }\n```",
+
+        // ── Process ─────────────────────────────────────────────────────
+        "process_list" | "ps" | "procs" => "`process_list` (aliases `ps`, `procs`) — list running processes as an array of hashrefs with `{pid, name, uid}` keys.\n\n```perl\nmy @procs = ps()\nfor (@procs) { p \"$_->{pid} $_->{name}\" }\n```",
+
+        // ── PDF ─────────────────────────────────────────────────────────
+        "pdf_text" | "pdf_read" | "pdf_extract" => "`pdf_text` (aliases `pdf_read`, `pdf_extract`) — extract all text content from a PDF file and return it as a string.\n\n```perl\nmy $text = pdf_text(\"report.pdf\")\np $text |> lines |> cnt   # number of lines\n```",
+        "pdf_pages" => "`pdf_pages` — return the number of pages in a PDF file.\n\n```perl\np pdf_pages(\"report.pdf\")   # e.g. 42\n```",
+
+        // ── Testing ─────────────────────────────────────────────────────
+        "assert_eq" | "aeq" => "`assert_eq` (alias `aeq`) — assert that two values are equal as strings. Takes A, B, and an optional message. Fails the test with a diff if A ne B.\n\n```perl\nassert_eq $got, $expected, \"username matches\"\naeq length(@arr), 3\n```",
+        "assert_ne" | "ane" => "`assert_ne` (alias `ane`) — assert that two values are not equal as strings. Takes A, B, and an optional message. Fails if A eq B.\n\n```perl\nassert_ne $token, \"\", \"token must not be empty\"\nane $a, $b\n```",
+        "assert_ok" | "aok" => "`assert_ok` (alias `aok`) — assert that a value is truthy (defined and non-zero/non-empty). Fails if the value is falsy or undef.\n\n```perl\nassert_ok $result, \"fetch returned data\"\naok $user->{active}\n```",
+        "assert_err" => "`assert_err` — assert that a value is falsy or undef. The inverse of `assert_ok`. Useful for verifying error conditions or absent values.\n\n```perl\nassert_err $deleted_user, \"user should be gone\"\nassert_err 0\n```",
+        "assert_true" | "atrue" => "`assert_true` (alias `atrue`) — alias for `assert_ok`. Assert that a value is truthy.\n\n```perl\nassert_true $connected, \"should be connected\"\natrue $flag\n```",
+        "assert_false" | "afalse" => "`assert_false` (alias `afalse`) — alias for `assert_err`. Assert that a value is falsy or undef.\n\n```perl\nassert_false $error, \"no error expected\"\nafalse $disabled\n```",
+        "assert_gt" => "`assert_gt` — assert that the first numeric value is strictly greater than the second. Fails with the actual values on mismatch.\n\n```perl\nassert_gt $elapsed, 0, \"elapsed must be positive\"\nassert_gt scalar(@results), 10\n```",
+        "assert_lt" => "`assert_lt` — assert that the first numeric value is strictly less than the second.\n\n```perl\nassert_lt $latency, 100, \"latency under 100ms\"\nassert_lt $errors, $threshold\n```",
+        "assert_ge" => "`assert_ge` — assert that the first numeric value is greater than or equal to the second.\n\n```perl\nassert_ge $count, 1, \"at least one result\"\nassert_ge $version, 2\n```",
+        "assert_le" => "`assert_le` — assert that the first numeric value is less than or equal to the second.\n\n```perl\nassert_le $memory, $limit, \"within memory budget\"\nassert_le length($buf), 4096\n```",
+        "assert_match" | "amatch" => "`assert_match` (alias `amatch`) — assert that a string matches a regex pattern. Fails with the actual string and pattern on mismatch.\n\n```perl\nassert_match $email, qr/\\@/, \"must contain @\"\namatch $line, qr/^OK/\n```",
+        "assert_contains" | "acontains" => "`assert_contains` (alias `acontains`) — assert that a string contains a given substring. Fails with both values on mismatch.\n\n```perl\nassert_contains $html, \"<title>\", \"page has title\"\nacontains $log, \"SUCCESS\"\n```",
+        "assert_near" | "anear" => "`assert_near` (alias `anear`) — assert that two floats are approximately equal within an epsilon tolerance (default 1e-9). Essential for floating-point comparisons.\n\n```perl\nassert_near 0.1 + 0.2, 0.3, 1e-10, \"float add\"\nanear $pi, 3.14159, 1e-5\n```",
+        "assert_dies" | "adies" => "`assert_dies` (alias `adies`) — assert that a block throws an error. Passes if the block dies, fails if it returns normally.\n\n```perl\nassert_dies { die \"boom\" } \"should throw\"\nadies { 1 / 0 }\n```",
+        "test_run" | "run_tests" => "`test_run` (alias `run_tests`) — print a test summary with pass/fail counts and exit with code 1 if any test failed. Call at the end of a test file to report results.\n\n```perl\n# ... assertions above ...\ntest_run   # prints summary, exits 1 on failure\n```",
+
         _ => return None,
     };
     Some(md)
@@ -2658,6 +2759,7 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
             "dataframe",
             "sqlite",
             "digits",
+            "letters",
             "sentences",
             "paragraphs",
             "sections",
@@ -3057,6 +3159,8 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
             "seekdir",
             "telldir",
             "rewinddir",
+            "du",
+            "du_tree",
         ],
     ),
     (
@@ -3082,6 +3186,7 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
             "getpriority",
             "setpriority",
             "syscall",
+            "process_list",
         ],
     ),
     ("Pack / Binary", &["pack", "unpack", "vec"]),
@@ -3095,6 +3200,113 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
             "log_trace",
             "log_json",
             "log_level",
+        ],
+    ),
+    (
+        "Charts (SVG)",
+        &[
+            "scatter_svg",
+            "line_svg",
+            "plot_svg",
+            "hist_svg",
+            "boxplot_svg",
+            "bar_svg",
+            "pie_svg",
+            "heatmap_svg",
+            "donut_svg",
+            "area_svg",
+            "hbar_svg",
+            "radar_svg",
+            "candlestick_svg",
+            "violin_svg",
+            "cor_heatmap",
+            "stacked_bar_svg",
+            "wordcloud_svg",
+            "treemap_svg",
+            "preview",
+        ],
+    ),
+    (
+        "Audio",
+        &["audio_convert", "audio_info", "id3_read", "id3_write"],
+    ),
+    (
+        "Network Utilities",
+        &[
+            "net_interfaces",
+            "net_ipv4",
+            "net_ipv6",
+            "net_mac",
+            "net_public_ip",
+            "net_dns",
+            "net_reverse_dns",
+            "net_ping",
+            "net_port_open",
+            "net_ports_scan",
+            "net_latency",
+            "net_download",
+            "net_headers",
+            "net_dns_servers",
+            "net_gateway",
+            "net_whois",
+            "net_hostname",
+            "smtp_send",
+        ],
+    ),
+    (
+        "Markup / Web Scraping",
+        &["html_parse", "css_select", "xml_parse", "xpath"],
+    ),
+    (
+        "Date Utilities",
+        &["dateseq", "dategrep", "dateround", "datesort"],
+    ),
+    (
+        "Git",
+        &[
+            "git_log",
+            "git_status",
+            "git_diff",
+            "git_branches",
+            "git_tags",
+            "git_blame",
+            "git_authors",
+            "git_files",
+            "git_show",
+            "git_root",
+        ],
+    ),
+    (
+        "System",
+        &[
+            "mounts",
+            "thread_count",
+            "pool_info",
+            "par_bench",
+            "to_pdf",
+            "pdf_text",
+            "pdf_pages",
+            "jq",
+        ],
+    ),
+    (
+        "Testing",
+        &[
+            "assert_eq",
+            "assert_ne",
+            "assert_ok",
+            "assert_err",
+            "assert_true",
+            "assert_false",
+            "assert_gt",
+            "assert_lt",
+            "assert_ge",
+            "assert_le",
+            "assert_match",
+            "assert_contains",
+            "assert_near",
+            "assert_dies",
+            "test_run",
         ],
     ),
 ];
@@ -3421,6 +3633,61 @@ fn push_snippet_completions(filter: &str, items: &mut Vec<CompletionItem>) {
             "open",
             "open my \\$${1:fh}, '${2|<,>,>>|}', '${3:file}' or die \"Cannot open: \\$!\";",
             "Open filehandle (snippet)",
+        ),
+        (
+            "scatter_svg",
+            "scatter_svg([${1:xs}], [${2:ys}], \"${3:Title}\") |> to_file(\"${4:plot}.svg\")",
+            "SVG scatter plot (snippet)",
+        ),
+        (
+            "bar_svg",
+            "bar_svg([${1:labels}], [${2:values}], \"${3:Title}\") |> to_file(\"${4:chart}.svg\")",
+            "SVG bar chart (snippet)",
+        ),
+        (
+            "preview",
+            "${1:svg_expr} |> preview",
+            "Preview SVG in browser (snippet)",
+        ),
+        (
+            "port_scan",
+            "my @open = port_scan(\"${1:host}\", ${2:80}, ${3:443})\np @open",
+            "Scan TCP port range (snippet)",
+        ),
+        (
+            "git_log",
+            "my @commits = glog(${1:10})\nfor (@commits) { p \"\\$_->{hash} \\$_->{message}\" }",
+            "Git log (snippet)",
+        ),
+        (
+            "net_ping",
+            "my @rtt = ping(\"${1:host}\", ${2:443}, ${3:5})\np mean(@rtt)",
+            "TCP ping with RTT (snippet)",
+        ),
+        (
+            "wget",
+            "wget(\"${1:url}\", \"${2:output_file}\")",
+            "Download URL to file (snippet)",
+        ),
+        (
+            "id3",
+            "my \\$tags = id3(\"${1:file.mp3}\")\np \"\\$tags->{artist} - \\$tags->{title}\"",
+            "Read MP3 ID3 tags (snippet)",
+        ),
+        (
+            "donut_svg",
+            "${1:hashref} |> donut(\"${2:Title}\") |> to_file(\"${3:donut}.svg\")",
+            "SVG donut chart (snippet)",
+        ),
+        (
+            "wordcloud",
+            "${1:freq_hash} |> wordcloud(\"${2:Title}\") |> to_file(\"${3:cloud}.svg\")",
+            "SVG word cloud (snippet)",
+        ),
+        (
+            "test",
+            "#!/usr/bin/env stryke\n\n${1:# test description}\nassert_eq ${2:got}, ${3:expected}, \"${4:label}\"\nassert_ok ${5:value}, \"${6:is truthy}\"\nassert_dies { ${7:die \"boom\"} } \"${8:should throw}\"\n\ntest_run\n",
+            "Test file scaffold (snippet)",
         ),
     ];
     for (kw, body, detail) in SNIPS {

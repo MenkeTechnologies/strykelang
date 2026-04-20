@@ -9844,28 +9844,69 @@ fn builtin_cov2cor(args: &[PerlValue]) -> PerlResult<PerlValue> {
 // SVG Plotting — terminal-friendly, pipe-friendly, zero dependencies
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SVG_W: f64 = 600.0;
-const SVG_H: f64 = 400.0;
-const SVG_PAD: f64 = 60.0;
+const SVG_W: f64 = 800.0;
+const SVG_H: f64 = 500.0;
+const SVG_PAD: f64 = 70.0;
+
+// Cyberpunk color palette (matches docs/hud-static.css)
+const BG_PRIMARY: &str = "#05050a";
+const BG_CARD: &str = "#0d0d1a";
+const CYAN: &str = "#05d9e8";
+const ACCENT: &str = "#ff2a6d";
+#[allow(dead_code)]
+const MAGENTA: &str = "#d300c5";
+const GREEN: &str = "#39ff14";
+const TEXT: &str = "#e0f0ff";
+const TEXT_DIM: &str = "#7a8ba8";
+const TEXT_MUTED: &str = "#3d4f6a";
+const BORDER: &str = "#1a1a3e";
+const CHART_COLORS: &[&str] = &[
+    "#05d9e8", "#ff2a6d", "#39ff14", "#d300c5", "#ff6b9d", "#05d9e8", "#ff073a", "#f0f", "#fa0",
+    "#5ff",
+];
 
 fn svg_header(w: f64, h: f64, title: &str) -> String {
     format!(
-        r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" font-family="monospace" font-size="11">
-<rect width="{w}" height="{h}" fill="#1a1a2e"/>
-<text x="{tx}" y="20" fill="#0ff" font-size="14" text-anchor="middle">{title}</text>
+        r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}">
+<defs>
+  <filter id="glow"><feGaussianBlur stdDeviation="2" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="{BG_PRIMARY}"/><stop offset="100%" stop-color="{BG_CARD}"/></linearGradient>
+</defs>
+<rect width="{w}" height="{h}" fill="url(#bgGrad)"/>
+<text x="{tx}" y="28" fill="{CYAN}" font-family="'Orbitron','Share Tech Mono',monospace" font-size="16" font-weight="700" text-anchor="middle" letter-spacing="2" filter="url(#glow)">{title}</text>
 "##,
         tx = w / 2.0
     )
 }
 
 fn svg_footer() -> &'static str {
-    "</svg>"
+    concat!(
+        r##"<text x="790" y="490" fill="#05d9e8" font-family="'Orbitron','Share Tech Mono',monospace" font-size="11" font-weight="700" text-anchor="end" letter-spacing="3" filter="url(#glow)" opacity="0.5">STRYKE</text>"##,
+        "\n</svg>"
+    )
+}
+
+/// Extract (labels, values) from a hashref, sorted by value descending.
+fn hashref_to_labels_values(arg: &PerlValue) -> Option<(Vec<String>, Vec<f64>)> {
+    if let Some(hr) = arg.as_hash_ref() {
+        let map = hr.read();
+        let mut pairs: Vec<(String, f64)> = map
+            .iter()
+            .map(|(k, v)| (k.clone(), v.to_number()))
+            .collect();
+        pairs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let labels = pairs.iter().map(|(k, _)| k.clone()).collect();
+        let values = pairs.iter().map(|(_, v)| *v).collect();
+        Some((labels, values))
+    } else {
+        None
+    }
 }
 
 fn svg_axis_lines(x0: f64, _y0: f64, x1: f64, y1: f64) -> String {
     format!(
-        r##"<line x1="{x0}" y1="{y1}" x2="{x1}" y2="{y1}" stroke="#555" stroke-width="1"/>
-<line x1="{x0}" y1="30" x2="{x0}" y2="{y1}" stroke="#555" stroke-width="1"/>
+        r##"<line x1="{x0}" y1="{y1}" x2="{x1}" y2="{y1}" stroke="{BORDER}" stroke-width="1"/>
+<line x1="{x0}" y1="40" x2="{x0}" y2="{y1}" stroke="{BORDER}" stroke-width="1"/>
 "##
     )
 }
@@ -9881,24 +9922,24 @@ fn svg_tick_labels(
     py1: f64,
     n_ticks: usize,
 ) -> String {
-    let ph = py1 - 30.0;
+    let ph = py1 - 40.0;
     let mut s = String::new();
     for i in 0..=n_ticks {
         let frac = i as f64 / n_ticks as f64;
         let xv = x_min + frac * (x_max - x_min);
         let px = px0 + frac * (px1 - px0);
         s += &format!(
-            r##"<text x="{px:.1}" y="{ly}" fill="#888" font-size="9" text-anchor="middle">{xv:.4}</text>
+            r##"<text x="{px:.1}" y="{ly}" fill="{TEXT_DIM}" font-family="'Share Tech Mono',monospace" font-size="10" text-anchor="middle">{xv:.4}</text>
 "##,
-            ly = py1 + 14.0,
+            ly = py1 + 16.0,
         );
         let yv = y_min + frac * (y_max - y_min);
         let py = py1 - frac * ph;
         s += &format!(
-            r##"<text x="{lx}" y="{py:.1}" fill="#888" font-size="9" text-anchor="end" dominant-baseline="middle">{yv:.4}</text>
-<line x1="{px0}" y1="{py:.1}" x2="{px1}" y2="{py:.1}" stroke="#333" stroke-width="0.5" stroke-dasharray="3,3"/>
+            r##"<text x="{lx}" y="{py:.1}" fill="{TEXT_DIM}" font-family="'Share Tech Mono',monospace" font-size="10" text-anchor="end" dominant-baseline="middle">{yv:.4}</text>
+<line x1="{px0}" y1="{py:.1}" x2="{px1}" y2="{py:.1}" stroke="{TEXT_MUTED}" stroke-width="0.3" stroke-dasharray="4,4" opacity="0.5"/>
 "##,
-            lx = px0 - 5.0,
+            lx = px0 - 6.0,
         );
     }
     s
@@ -9928,7 +9969,7 @@ fn builtin_scatter_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let y_max = ys.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
     let x_range = (x_max - x_min).max(1e-10);
     let y_range = (y_max - y_min).max(1e-10);
-    let (px0, py0, px1, py1) = (SVG_PAD, 30.0, SVG_W - 20.0, SVG_H - SVG_PAD);
+    let (px0, py0, px1, py1) = (SVG_PAD, 40.0, SVG_W - 30.0, SVG_H - SVG_PAD);
     let pw = px1 - px0;
     let ph = py1 - py0;
 
@@ -9938,7 +9979,9 @@ fn builtin_scatter_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
     for i in 0..n {
         let px = px0 + (xs[i] - x_min) / x_range * pw;
         let py = py1 - (ys[i] - y_min) / y_range * ph;
-        svg += &format!(r##"<circle cx="{px:.1}" cy="{py:.1}" r="3" fill="#0ff" opacity="0.7"/>"##);
+        svg += &format!(
+            r##"<circle cx="{px:.1}" cy="{py:.1}" r="4" fill="{CYAN}" opacity="0.85" filter="url(#glow)"/>"##
+        );
         svg.push('\n');
     }
     svg += svg_footer();
@@ -10013,10 +10056,16 @@ fn builtin_plot_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `hist_svg VEC [, bins [, title]]` — SVG histogram.
 fn builtin_hist_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let data: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
-        .iter()
-        .map(|v| v.to_number())
-        .collect();
+    let first = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    // Auto-detect hashref from freq() — render as labeled bar chart.
+    if let Some((labels, values)) = hashref_to_labels_values(&first) {
+        let title = args
+            .get(1)
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "Histogram".to_string());
+        return builtin_bar_svg_inner(&labels, &values, &title);
+    }
+    let data: Vec<f64> = arg_to_vec(&first).iter().map(|v| v.to_number()).collect();
     let n_bins = args
         .get(1)
         .map(|v| v.to_number() as usize)
@@ -10038,23 +10087,24 @@ fn builtin_hist_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
         counts[idx.min(n_bins - 1)] += 1;
     }
     let max_count = *counts.iter().max().unwrap_or(&1) as f64;
-    let (px0, _py0, px1, py1) = (SVG_PAD, 30.0, SVG_W - 20.0, SVG_H - SVG_PAD);
+    let (px0, _py0, px1, py1) = (SVG_PAD, 40.0, SVG_W - 30.0, SVG_H - SVG_PAD);
     let pw = px1 - px0;
-    let ph = py1 - 30.0;
+    let ph = py1 - 40.0;
     let bar_w = pw / n_bins as f64;
 
     let mut svg = svg_header(SVG_W, SVG_H, &title);
-    svg += &svg_axis_lines(px0, 30.0, px1, py1);
-    svg += &svg_tick_labels(d_min, d_max, 0.0, max_count, px0, 30.0, px1, py1, 5);
+    svg += &svg_axis_lines(px0, 40.0, px1, py1);
+    svg += &svg_tick_labels(d_min, d_max, 0.0, max_count, px0, 40.0, px1, py1, 5);
     for (i, &c) in counts.iter().enumerate() {
         let bh = (c as f64 / max_count) * ph;
         let bx = px0 + i as f64 * bar_w;
         let by = py1 - bh;
         svg += &format!(
-            r##"<rect x="{bx:.1}" y="{by:.1}" width="{bw:.1}" height="{bh:.1}" fill="#0ff" opacity="0.7" stroke="#1a1a2e" stroke-width="1"/>"##,
+            r##"<rect x="{bx:.1}" y="{by:.1}" width="{bw:.1}" height="{bh:.1}" fill="{CYAN}" opacity="0.8" stroke="{BG_PRIMARY}" stroke-width="1" rx="1"/>
+<rect x="{bx:.1}" y="{by:.1}" width="{bw:.1}" height="1.5" fill="{CYAN}" filter="url(#glow)" opacity="0.9"/>
+"##,
             bw = bar_w * 0.9,
         );
-        svg.push('\n');
     }
     svg += svg_footer();
     Ok(PerlValue::string(svg))
@@ -10199,11 +10249,64 @@ fn builtin_boxplot_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 /// `bar_svg LABELS, VALUES [, title]` — SVG bar chart.
+fn builtin_bar_svg_inner(labels: &[String], values: &[f64], title: &str) -> PerlResult<PerlValue> {
+    let n = labels.len().min(values.len());
+    if n == 0 {
+        return Ok(PerlValue::string(String::new()));
+    }
+    let v_max = values.iter().cloned().fold(0.0f64, f64::max).max(1e-10);
+    let (px0, _py0, px1, py1) = (SVG_PAD, 40.0, SVG_W - 30.0, SVG_H - SVG_PAD);
+    let pw = px1 - px0;
+    let ph = py1 - 40.0;
+    let bar_w = (pw / n as f64) * 0.7;
+    let gap = pw / n as f64;
+
+    let mut svg = svg_header(SVG_W, SVG_H, title);
+    svg += &svg_axis_lines(px0, 40.0, px1, py1);
+    for i in 0..n {
+        let bh = (values[i] / v_max) * ph;
+        let bx = px0 + (i as f64 + 0.5) * gap - bar_w / 2.0;
+        let by = py1 - bh;
+        let color = CHART_COLORS[i % CHART_COLORS.len()];
+        svg += &format!(
+            r##"<rect x="{bx:.1}" y="{by:.1}" width="{bar_w:.1}" height="{bh:.1}" fill="{color}" opacity="0.85" rx="2"/>
+<rect x="{bx:.1}" y="{by:.1}" width="{bar_w:.1}" height="2" fill="{color}" filter="url(#glow)" opacity="0.9"/>
+"##,
+        );
+        svg += &format!(
+            r##"<text x="{cx:.1}" y="{vy:.1}" fill="{TEXT}" font-family="'Share Tech Mono',monospace" font-size="10" text-anchor="middle">{v:.0}</text>
+"##,
+            cx = bx + bar_w / 2.0,
+            vy = by - 6.0,
+            v = values[i]
+        );
+        let label = if labels[i].len() > 10 {
+            &labels[i][..10]
+        } else {
+            &labels[i]
+        };
+        svg += &format!(
+            r##"<text x="{cx:.1}" y="{ly}" fill="{TEXT_DIM}" font-family="'Share Tech Mono',monospace" font-size="10" text-anchor="middle">{label}</text>
+"##,
+            cx = px0 + (i as f64 + 0.5) * gap,
+            ly = py1 + 16.0
+        );
+    }
+    svg += svg_footer();
+    Ok(PerlValue::string(svg))
+}
+
 fn builtin_bar_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let labels: Vec<String> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
-        .iter()
-        .map(|v| v.to_string())
-        .collect();
+    let first = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    // Auto-detect hashref — e.g. `freq(...) |> bar_svg`
+    if let Some((labels, values)) = hashref_to_labels_values(&first) {
+        let title = args
+            .get(1)
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "Bar Chart".to_string());
+        return builtin_bar_svg_inner(&labels, &values, &title);
+    }
+    let labels: Vec<String> = arg_to_vec(&first).iter().map(|v| v.to_string()).collect();
     let values: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -10212,68 +10315,31 @@ fn builtin_bar_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
         .get(2)
         .map(|v| v.to_string())
         .unwrap_or_else(|| "Bar Chart".to_string());
-    let n = labels.len().min(values.len());
-    if n == 0 {
-        return Ok(PerlValue::string(String::new()));
-    }
-    let v_max = values.iter().cloned().fold(0.0f64, f64::max).max(1e-10);
-    let (px0, _py0, px1, py1) = (SVG_PAD, 30.0, SVG_W - 20.0, SVG_H - SVG_PAD);
-    let pw = px1 - px0;
-    let ph = py1 - 30.0;
-    let bar_w = (pw / n as f64) * 0.7;
-    let gap = pw / n as f64;
-    let colors = [
-        "#0ff", "#f0f", "#0f0", "#ff0", "#f55", "#55f", "#fa0", "#5ff",
-    ];
-
-    let mut svg = svg_header(SVG_W, SVG_H, &title);
-    svg += &svg_axis_lines(px0, 30.0, px1, py1);
-    for i in 0..n {
-        let bh = (values[i] / v_max) * ph;
-        let bx = px0 + (i as f64 + 0.5) * gap - bar_w / 2.0;
-        let by = py1 - bh;
-        svg += &format!(
-            r##"<rect x="{bx:.1}" y="{by:.1}" width="{bar_w:.1}" height="{bh:.1}" fill="{color}" opacity="0.8"/>"##,
-            color = colors[i % colors.len()]
-        );
-        svg.push('\n');
-        svg += &format!(
-            r##"<text x="{cx:.1}" y="{vy:.1}" fill="#fff" font-size="9" text-anchor="middle">{v:.1}</text>"##,
-            cx = bx + bar_w / 2.0,
-            vy = by - 4.0,
-            v = values[i]
-        );
-        svg.push('\n');
-        let label = if labels[i].len() > 8 {
-            &labels[i][..8]
-        } else {
-            &labels[i]
-        };
-        svg += &format!(
-            r##"<text x="{cx:.1}" y="{ly}" fill="#888" font-size="9" text-anchor="middle">{label}</text>"##,
-            cx = px0 + (i as f64 + 0.5) * gap,
-            ly = py1 + 14.0
-        );
-        svg.push('\n');
-    }
-    svg += svg_footer();
-    Ok(PerlValue::string(svg))
+    builtin_bar_svg_inner(&labels, &values, &title)
 }
 
 /// `pie_svg LABELS, VALUES [, title]` — SVG pie chart.
 fn builtin_pie_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let labels: Vec<String> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
-        .iter()
-        .map(|v| v.to_string())
-        .collect();
-    let values: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
-        .iter()
-        .map(|v| v.to_number())
-        .collect();
-    let title = args
-        .get(2)
-        .map(|v| v.to_string())
-        .unwrap_or_else(|| "Pie Chart".to_string());
+    let first = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    // Auto-detect hashref — e.g. `freq(...) |> pie_svg`
+    let (labels, values, title) = if let Some((l, v)) = hashref_to_labels_values(&first) {
+        let t = args
+            .get(1)
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "Pie Chart".to_string());
+        (l, v, t)
+    } else {
+        let l: Vec<String> = arg_to_vec(&first).iter().map(|v| v.to_string()).collect();
+        let v: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+            .iter()
+            .map(|v| v.to_number())
+            .collect();
+        let t = args
+            .get(2)
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "Pie Chart".to_string());
+        (l, v, t)
+    };
     let n = labels.len().min(values.len());
     if n == 0 {
         return Ok(PerlValue::string(String::new()));
@@ -10284,10 +10350,7 @@ fn builtin_pie_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
     let cx = SVG_W / 2.0;
     let cy = SVG_H / 2.0 + 10.0;
-    let r = 140.0;
-    let colors = [
-        "#0ff", "#f0f", "#0f0", "#ff0", "#f55", "#55f", "#fa0", "#5ff", "#f80", "#8f0",
-    ];
+    let r = 180.0;
 
     let mut svg = svg_header(SVG_W, SVG_H, &title);
     let mut angle = -std::f64::consts::FRAC_PI_2;
@@ -10298,22 +10361,22 @@ fn builtin_pie_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
         let x2 = cx + r * (angle + sweep).cos();
         let y2 = cy + r * (angle + sweep).sin();
         let large = if sweep > std::f64::consts::PI { 1 } else { 0 };
+        let color = CHART_COLORS[i % CHART_COLORS.len()];
         svg += &format!(
-            r##"<path d="M{cx},{cy} L{x1:.1},{y1:.1} A{r},{r} 0 {large},1 {x2:.1},{y2:.1} Z" fill="{color}" opacity="0.8" stroke="#1a1a2e" stroke-width="1.5"/>"##,
-            color = colors[i % colors.len()]
+            r##"<path d="M{cx},{cy} L{x1:.1},{y1:.1} A{r},{r} 0 {large},1 {x2:.1},{y2:.1} Z" fill="{color}" opacity="0.85" stroke="{BG_PRIMARY}" stroke-width="2"/>"##,
         );
         svg.push('\n');
         let mid = angle + sweep / 2.0;
-        let lx = cx + r * 0.65 * mid.cos();
-        let ly = cy + r * 0.65 * mid.sin();
+        let lx = cx + r * 0.6 * mid.cos();
+        let ly = cy + r * 0.6 * mid.sin();
         let pct = values[i] / total * 100.0;
-        let label = if labels[i].len() > 6 {
-            &labels[i][..6]
+        let label = if labels[i].len() > 8 {
+            &labels[i][..8]
         } else {
             &labels[i]
         };
         svg += &format!(
-            r##"<text x="{lx:.1}" y="{ly:.1}" fill="#fff" font-size="9" text-anchor="middle" dominant-baseline="middle">{label} {pct:.0}%</text>"##
+            r##"<text x="{lx:.1}" y="{ly:.1}" fill="{TEXT}" font-family="'Share Tech Mono',monospace" font-size="10" text-anchor="middle" dominant-baseline="middle">{label} {pct:.0}%</text>"##
         );
         svg.push('\n');
         angle += sweep;
@@ -10368,6 +10431,793 @@ fn builtin_heatmap_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
             let cy = py0 + i as f64 * cell_h;
             svg += &format!(
                 r##"<rect x="{cx:.1}" y="{cy:.1}" width="{cell_w:.1}" height="{cell_h:.1}" fill="rgb({cr},{cg},{cb})" stroke="#1a1a2e" stroke-width="0.5"/>"##
+            );
+            svg.push('\n');
+        }
+    }
+    svg += svg_footer();
+    Ok(PerlValue::string(svg))
+}
+
+// ── Additional chart types ─────────────────────────────────────────────
+
+/// `donut_svg LABELS, VALUES [, title]` or `donut_svg HASHREF [, title]` — SVG donut chart.
+fn builtin_donut_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let first = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let (labels, values, title) = if let Some((l, v)) = hashref_to_labels_values(&first) {
+        let t = args
+            .get(1)
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "Donut Chart".into());
+        (l, v, t)
+    } else {
+        let l: Vec<String> = arg_to_vec(&first).iter().map(|v| v.to_string()).collect();
+        let v: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+            .iter()
+            .map(|v| v.to_number())
+            .collect();
+        let t = args
+            .get(2)
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "Donut Chart".into());
+        (l, v, t)
+    };
+    let n = labels.len().min(values.len());
+    if n == 0 {
+        return Ok(PerlValue::string(String::new()));
+    }
+    let total: f64 = values.iter().sum();
+    if total <= 0.0 {
+        return Ok(PerlValue::string(String::new()));
+    }
+    let cx = SVG_W / 2.0;
+    let cy = SVG_H / 2.0 + 10.0;
+    let r_outer = 180.0;
+    let r_inner = 110.0;
+    let mut svg = svg_header(SVG_W, SVG_H, &title);
+    let mut angle = -std::f64::consts::FRAC_PI_2;
+    for i in 0..n {
+        let sweep = 2.0 * std::f64::consts::PI * values[i] / total;
+        let cos_a = angle.cos();
+        let sin_a = angle.sin();
+        let cos_b = (angle + sweep).cos();
+        let sin_b = (angle + sweep).sin();
+        let large = if sweep > std::f64::consts::PI { 1 } else { 0 };
+        let color = CHART_COLORS[i % CHART_COLORS.len()];
+        svg += &format!(
+            r##"<path d="M{x1:.1},{y1:.1} A{ro},{ro} 0 {large},1 {x2:.1},{y2:.1} L{x3:.1},{y3:.1} A{ri},{ri} 0 {large},0 {x4:.1},{y4:.1} Z" fill="{color}" opacity="0.85" stroke="{BG_PRIMARY}" stroke-width="2"/>"##,
+            x1 = cx + r_outer * cos_a,
+            y1 = cy + r_outer * sin_a,
+            x2 = cx + r_outer * cos_b,
+            y2 = cy + r_outer * sin_b,
+            x3 = cx + r_inner * cos_b,
+            y3 = cy + r_inner * sin_b,
+            x4 = cx + r_inner * cos_a,
+            y4 = cy + r_inner * sin_a,
+            ro = r_outer,
+            ri = r_inner,
+        );
+        svg.push('\n');
+        let mid = angle + sweep / 2.0;
+        let lr = (r_outer + r_inner) / 2.0;
+        let lx = cx + lr * mid.cos();
+        let ly = cy + lr * mid.sin();
+        let pct = values[i] / total * 100.0;
+        if pct > 3.0 {
+            let label = if labels[i].len() > 8 {
+                &labels[i][..8]
+            } else {
+                &labels[i]
+            };
+            svg += &format!(
+                r##"<text x="{lx:.1}" y="{ly:.1}" fill="{TEXT}" font-family="'Share Tech Mono',monospace" font-size="10" text-anchor="middle" dominant-baseline="middle">{label} {pct:.0}%</text>"##
+            );
+            svg.push('\n');
+        }
+        angle += sweep;
+    }
+    svg += svg_footer();
+    Ok(PerlValue::string(svg))
+}
+
+/// `area_svg VALUES [, title]` — SVG filled area chart.
+fn builtin_area_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let data: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_number())
+        .collect();
+    let title = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "Area Chart".into());
+    let n = data.len();
+    if n < 2 {
+        return Ok(PerlValue::string(String::new()));
+    }
+    let y_min = data.iter().cloned().fold(f64::INFINITY, f64::min);
+    let y_max = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let y_range = (y_max - y_min).max(1e-10);
+    let (px0, _py0, px1, py1) = (SVG_PAD, 40.0, SVG_W - 30.0, SVG_H - SVG_PAD);
+    let pw = px1 - px0;
+    let ph = py1 - 40.0;
+    let mut svg = svg_header(SVG_W, SVG_H, &title);
+    svg += &svg_axis_lines(px0, 40.0, px1, py1);
+    svg += &svg_tick_labels(0.0, (n - 1) as f64, y_min, y_max, px0, 40.0, px1, py1, 5);
+    // Area fill
+    let mut path = format!("M{px0:.1},{py1:.1}");
+    for (i, &v) in data.iter().enumerate() {
+        let px = px0 + (i as f64 / (n - 1) as f64) * pw;
+        let py = py1 - ((v - y_min) / y_range) * ph;
+        path += &format!(" L{px:.1},{py:.1}");
+    }
+    path += &format!(" L{px1:.1},{py1:.1} Z");
+    svg += &format!(r##"<path d="{path}" fill="{CYAN}" opacity="0.2"/>"##);
+    svg.push('\n');
+    // Line on top
+    let mut line_path = String::new();
+    for (i, &v) in data.iter().enumerate() {
+        let px = px0 + (i as f64 / (n - 1) as f64) * pw;
+        let py = py1 - ((v - y_min) / y_range) * ph;
+        if i == 0 {
+            line_path += &format!("M{px:.1},{py:.1}");
+        } else {
+            line_path += &format!(" L{px:.1},{py:.1}");
+        }
+    }
+    svg += &format!(
+        r##"<path d="{line_path}" fill="none" stroke="{CYAN}" stroke-width="2" filter="url(#glow)"/>"##
+    );
+    svg.push('\n');
+    svg += svg_footer();
+    Ok(PerlValue::string(svg))
+}
+
+/// `hbar_svg LABELS, VALUES [, title]` or `hbar_svg HASHREF [, title]` — horizontal bar chart.
+fn builtin_hbar_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let first = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let (labels, values, title) = if let Some((l, v)) = hashref_to_labels_values(&first) {
+        let t = args
+            .get(1)
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "Horizontal Bar Chart".into());
+        (l, v, t)
+    } else {
+        let l: Vec<String> = arg_to_vec(&first).iter().map(|v| v.to_string()).collect();
+        let v: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+            .iter()
+            .map(|v| v.to_number())
+            .collect();
+        let t = args
+            .get(2)
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "Horizontal Bar Chart".into());
+        (l, v, t)
+    };
+    let n = labels.len().min(values.len());
+    if n == 0 {
+        return Ok(PerlValue::string(String::new()));
+    }
+    let v_max = values.iter().cloned().fold(0.0f64, f64::max).max(1e-10);
+    let label_area = 80.0;
+    let (px0, py0, px1, py1) = (label_area + 10.0, 40.0, SVG_W - 30.0, SVG_H - 30.0);
+    let pw = px1 - px0;
+    let ph = py1 - py0;
+    let bar_h = (ph / n as f64) * 0.7;
+    let gap = ph / n as f64;
+    let mut svg = svg_header(SVG_W, SVG_H, &title);
+    for i in 0..n {
+        let bw = (values[i] / v_max) * pw;
+        let by = py0 + (i as f64 + 0.5) * gap - bar_h / 2.0;
+        let color = CHART_COLORS[i % CHART_COLORS.len()];
+        svg += &format!(
+            r##"<rect x="{px0:.1}" y="{by:.1}" width="{bw:.1}" height="{bar_h:.1}" fill="{color}" opacity="0.85" rx="2"/>
+<rect x="{px0:.1}" y="{by:.1}" width="2" height="{bar_h:.1}" fill="{color}" filter="url(#glow)" opacity="0.9"/>
+"##
+        );
+        svg += &format!(
+            r##"<text x="{vx:.1}" y="{cy:.1}" fill="{TEXT}" font-family="'Share Tech Mono',monospace" font-size="10" dominant-baseline="middle">{v:.0}</text>
+"##,
+            vx = px0 + bw + 6.0,
+            cy = by + bar_h / 2.0,
+            v = values[i]
+        );
+        let label = if labels[i].len() > 10 {
+            &labels[i][..10]
+        } else {
+            &labels[i]
+        };
+        svg += &format!(
+            r##"<text x="{lx:.1}" y="{cy:.1}" fill="{TEXT_DIM}" font-family="'Share Tech Mono',monospace" font-size="10" text-anchor="end" dominant-baseline="middle">{label}</text>
+"##,
+            lx = label_area,
+            cy = py0 + (i as f64 + 0.5) * gap
+        );
+    }
+    svg += svg_footer();
+    Ok(PerlValue::string(svg))
+}
+
+/// `radar_svg LABELS, VALUES [, title]` — SVG radar/spider chart.
+fn builtin_radar_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let first = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let (labels, values, title) = if let Some((l, v)) = hashref_to_labels_values(&first) {
+        let t = args
+            .get(1)
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "Radar Chart".into());
+        (l, v, t)
+    } else {
+        let l: Vec<String> = arg_to_vec(&first).iter().map(|v| v.to_string()).collect();
+        let v: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
+            .iter()
+            .map(|v| v.to_number())
+            .collect();
+        let t = args
+            .get(2)
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "Radar Chart".into());
+        (l, v, t)
+    };
+    let n = labels.len().min(values.len());
+    if n < 3 {
+        return Ok(PerlValue::string(String::new()));
+    }
+    let v_max = values.iter().cloned().fold(0.0f64, f64::max).max(1e-10);
+    let cx = SVG_W / 2.0;
+    let cy = SVG_H / 2.0 + 10.0;
+    let r = 180.0;
+    let mut svg = svg_header(SVG_W, SVG_H, &title);
+    // Grid rings
+    for ring in 1..=4 {
+        let rr = r * ring as f64 / 4.0;
+        let mut ring_path = String::new();
+        for i in 0..n {
+            let angle =
+                -std::f64::consts::FRAC_PI_2 + 2.0 * std::f64::consts::PI * i as f64 / n as f64;
+            let px = cx + rr * angle.cos();
+            let py = cy + rr * angle.sin();
+            if i == 0 {
+                ring_path += &format!("M{px:.1},{py:.1}");
+            } else {
+                ring_path += &format!(" L{px:.1},{py:.1}");
+            }
+        }
+        ring_path += " Z";
+        svg += &format!(
+            r##"<path d="{ring_path}" fill="none" stroke="{BORDER}" stroke-width="0.5"/>"##
+        );
+        svg.push('\n');
+    }
+    // Axis lines + labels
+    for i in 0..n {
+        let angle = -std::f64::consts::FRAC_PI_2 + 2.0 * std::f64::consts::PI * i as f64 / n as f64;
+        let px = cx + r * angle.cos();
+        let py = cy + r * angle.sin();
+        svg += &format!(
+            r##"<line x1="{cx}" y1="{cy}" x2="{px:.1}" y2="{py:.1}" stroke="{BORDER}" stroke-width="0.5"/>"##
+        );
+        svg.push('\n');
+        let lx = cx + (r + 18.0) * angle.cos();
+        let ly = cy + (r + 18.0) * angle.sin();
+        let label = if labels[i].len() > 8 {
+            &labels[i][..8]
+        } else {
+            &labels[i]
+        };
+        svg += &format!(
+            r##"<text x="{lx:.1}" y="{ly:.1}" fill="{TEXT_DIM}" font-family="'Share Tech Mono',monospace" font-size="10" text-anchor="middle" dominant-baseline="middle">{label}</text>"##
+        );
+        svg.push('\n');
+    }
+    // Data polygon
+    let mut data_path = String::new();
+    for i in 0..n {
+        let angle = -std::f64::consts::FRAC_PI_2 + 2.0 * std::f64::consts::PI * i as f64 / n as f64;
+        let vr = r * (values[i] / v_max);
+        let px = cx + vr * angle.cos();
+        let py = cy + vr * angle.sin();
+        if i == 0 {
+            data_path += &format!("M{px:.1},{py:.1}");
+        } else {
+            data_path += &format!(" L{px:.1},{py:.1}");
+        }
+    }
+    data_path += " Z";
+    svg += &format!(
+        r##"<path d="{data_path}" fill="{CYAN}" opacity="0.2" stroke="{CYAN}" stroke-width="2" filter="url(#glow)"/>"##
+    );
+    svg.push('\n');
+    // Data points
+    for i in 0..n {
+        let angle = -std::f64::consts::FRAC_PI_2 + 2.0 * std::f64::consts::PI * i as f64 / n as f64;
+        let vr = r * (values[i] / v_max);
+        let px = cx + vr * angle.cos();
+        let py = cy + vr * angle.sin();
+        svg += &format!(
+            r##"<circle cx="{px:.1}" cy="{py:.1}" r="4" fill="{ACCENT}" filter="url(#glow)"/>"##
+        );
+        svg.push('\n');
+    }
+    svg += svg_footer();
+    Ok(PerlValue::string(svg))
+}
+
+/// `candlestick_svg DATA [, title]` — SVG candlestick/OHLC chart.
+/// DATA is array of arrayrefs [open, high, low, close] or hashrefs {o,h,l,c}.
+fn builtin_candlestick_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let raw = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let title = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "Candlestick".into());
+    struct Candle {
+        o: f64,
+        h: f64,
+        l: f64,
+        c: f64,
+    }
+    let mut candles = Vec::new();
+    for item in &raw {
+        if let Some(hr) = item.as_hash_ref() {
+            let h = hr.read();
+            candles.push(Candle {
+                o: h.get("o")
+                    .or(h.get("open"))
+                    .map(|v| v.to_number())
+                    .unwrap_or(0.0),
+                h: h.get("h")
+                    .or(h.get("high"))
+                    .map(|v| v.to_number())
+                    .unwrap_or(0.0),
+                l: h.get("l")
+                    .or(h.get("low"))
+                    .map(|v| v.to_number())
+                    .unwrap_or(0.0),
+                c: h.get("c")
+                    .or(h.get("close"))
+                    .map(|v| v.to_number())
+                    .unwrap_or(0.0),
+            });
+        } else if let Some(ar) = item.as_array_ref() {
+            let a = ar.read();
+            if a.len() >= 4 {
+                candles.push(Candle {
+                    o: a[0].to_number(),
+                    h: a[1].to_number(),
+                    l: a[2].to_number(),
+                    c: a[3].to_number(),
+                });
+            }
+        }
+    }
+    let n = candles.len();
+    if n == 0 {
+        return Ok(PerlValue::string(String::new()));
+    }
+    let all_min = candles.iter().map(|c| c.l).fold(f64::INFINITY, f64::min);
+    let all_max = candles
+        .iter()
+        .map(|c| c.h)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let price_range = (all_max - all_min).max(1e-10);
+    let (px0, _py0, px1, py1) = (SVG_PAD, 40.0, SVG_W - 30.0, SVG_H - SVG_PAD);
+    let pw = px1 - px0;
+    let ph = py1 - 40.0;
+    let cw = pw / n as f64;
+    let mut svg = svg_header(SVG_W, SVG_H, &title);
+    svg += &svg_axis_lines(px0, 40.0, px1, py1);
+    svg += &svg_tick_labels(0.0, n as f64, all_min, all_max, px0, 40.0, px1, py1, 5);
+    for (i, c) in candles.iter().enumerate() {
+        let cx = px0 + (i as f64 + 0.5) * cw;
+        let wick_top = py1 - ((c.h - all_min) / price_range) * ph;
+        let wick_bot = py1 - ((c.l - all_min) / price_range) * ph;
+        svg += &format!(
+            r##"<line x1="{cx:.1}" y1="{wt:.1}" x2="{cx:.1}" y2="{wb:.1}" stroke="{TEXT_DIM}" stroke-width="1"/>"##,
+            wt = wick_top,
+            wb = wick_bot
+        );
+        svg.push('\n');
+        let body_top = py1 - ((c.o.max(c.c) - all_min) / price_range) * ph;
+        let body_bot = py1 - ((c.o.min(c.c) - all_min) / price_range) * ph;
+        let body_h = (body_bot - body_top).max(1.0);
+        let color = if c.c >= c.o { GREEN } else { ACCENT };
+        let bw = cw * 0.6;
+        svg += &format!(
+            r##"<rect x="{bx:.1}" y="{body_top:.1}" width="{bw:.1}" height="{body_h:.1}" fill="{color}" opacity="0.9" rx="1"/>"##,
+            bx = cx - bw / 2.0
+        );
+        svg.push('\n');
+    }
+    svg += svg_footer();
+    Ok(PerlValue::string(svg))
+}
+
+/// `violin_svg GROUPS [, title]` — SVG violin plot. GROUPS is array of arrays.
+fn builtin_violin_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let groups_raw = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let title = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "Violin Plot".into());
+    let groups: Vec<Vec<f64>> = groups_raw
+        .iter()
+        .map(|g| {
+            let mut v: Vec<f64> = arg_to_vec(g).iter().map(|x| x.to_number()).collect();
+            v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            v
+        })
+        .collect();
+    let ng = groups.len();
+    if ng == 0 {
+        return Ok(PerlValue::string(String::new()));
+    }
+    let all_min = groups
+        .iter()
+        .flat_map(|g| g.iter())
+        .cloned()
+        .fold(f64::INFINITY, f64::min);
+    let all_max = groups
+        .iter()
+        .flat_map(|g| g.iter())
+        .cloned()
+        .fold(f64::NEG_INFINITY, f64::max);
+    let val_range = (all_max - all_min).max(1e-10);
+    let (px0, _py0, px1, py1) = (SVG_PAD, 40.0, SVG_W - 30.0, SVG_H - SVG_PAD);
+    let pw = px1 - px0;
+    let ph = py1 - 40.0;
+    let group_w = pw / ng as f64;
+    let n_bins = 20;
+    let mut svg = svg_header(SVG_W, SVG_H, &title);
+    svg += &svg_axis_lines(px0, 40.0, px1, py1);
+    for (gi, group) in groups.iter().enumerate() {
+        if group.is_empty() {
+            continue;
+        }
+        let gcx = px0 + (gi as f64 + 0.5) * group_w;
+        let max_half_w = group_w * 0.4;
+        // KDE approximation via histogram
+        let mut bins = vec![0usize; n_bins];
+        for &v in group {
+            let idx = (((v - all_min) / val_range) * (n_bins - 1) as f64).round() as usize;
+            bins[idx.min(n_bins - 1)] += 1;
+        }
+        let bin_max = *bins.iter().max().unwrap_or(&1) as f64;
+        let color = CHART_COLORS[gi % CHART_COLORS.len()];
+        // Build left and right paths
+        let mut left_pts = Vec::new();
+        let mut right_pts = Vec::new();
+        for (bi, &count) in bins.iter().enumerate() {
+            let y = py1 - (bi as f64 / (n_bins - 1) as f64) * ph;
+            let w = (count as f64 / bin_max) * max_half_w;
+            left_pts.push((gcx - w, y));
+            right_pts.push((gcx + w, y));
+        }
+        let mut path = format!("M{:.1},{:.1}", left_pts[0].0, left_pts[0].1);
+        for &(x, y) in &left_pts[1..] {
+            path += &format!(" L{x:.1},{y:.1}");
+        }
+        for &(x, y) in right_pts.iter().rev() {
+            path += &format!(" L{x:.1},{y:.1}");
+        }
+        path += " Z";
+        svg += &format!(
+            r##"<path d="{path}" fill="{color}" opacity="0.3" stroke="{color}" stroke-width="1.5"/>"##
+        );
+        svg.push('\n');
+        // Median line
+        let median_idx = group.len() / 2;
+        let median = group[median_idx];
+        let my = py1 - ((median - all_min) / val_range) * ph;
+        svg += &format!(
+            r##"<line x1="{x1:.1}" y1="{my:.1}" x2="{x2:.1}" y2="{my:.1}" stroke="{TEXT}" stroke-width="2" filter="url(#glow)"/>"##,
+            x1 = gcx - max_half_w * 0.6,
+            x2 = gcx + max_half_w * 0.6
+        );
+        svg.push('\n');
+        svg += &format!(
+            r##"<text x="{gcx:.1}" y="{ly}" fill="{TEXT_DIM}" font-family="'Share Tech Mono',monospace" font-size="10" text-anchor="middle">G{gi}</text>"##,
+            ly = py1 + 16.0,
+            gi = gi + 1
+        );
+        svg.push('\n');
+    }
+    svg += svg_footer();
+    Ok(PerlValue::string(svg))
+}
+
+/// `cor_heatmap DATA [, title]` — correlation matrix heatmap from column data.
+/// DATA is array of arrays (columns). Computes Pearson correlation between each pair.
+fn builtin_cor_heatmap(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let cols_raw = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let title = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "Correlation Matrix".into());
+    let cols: Vec<Vec<f64>> = cols_raw
+        .iter()
+        .map(|c| arg_to_vec(c).iter().map(|x| x.to_number()).collect())
+        .collect();
+    let nc = cols.len();
+    if nc < 2 {
+        return Ok(PerlValue::string(String::new()));
+    }
+    // Compute correlation matrix
+    let mut cor = vec![vec![0.0f64; nc]; nc];
+    for i in 0..nc {
+        for j in 0..nc {
+            if i == j {
+                cor[i][j] = 1.0;
+                continue;
+            }
+            let n = cols[i].len().min(cols[j].len());
+            if n == 0 {
+                continue;
+            }
+            let mx: f64 = cols[i][..n].iter().sum::<f64>() / n as f64;
+            let my: f64 = cols[j][..n].iter().sum::<f64>() / n as f64;
+            let mut cov = 0.0;
+            let mut sx = 0.0;
+            let mut sy = 0.0;
+            for k in 0..n {
+                let dx = cols[i][k] - mx;
+                let dy = cols[j][k] - my;
+                cov += dx * dy;
+                sx += dx * dx;
+                sy += dy * dy;
+            }
+            cor[i][j] = if sx > 0.0 && sy > 0.0 {
+                cov / (sx.sqrt() * sy.sqrt())
+            } else {
+                0.0
+            };
+        }
+    }
+    let (px0, py0, px1, py1) = (SVG_PAD + 20.0, 50.0, SVG_W - 30.0, SVG_H - 30.0);
+    let cell_w = (px1 - px0) / nc as f64;
+    let cell_h = (py1 - py0) / nc as f64;
+    let mut svg = svg_header(SVG_W, SVG_H, &title);
+    for i in 0..nc {
+        for j in 0..nc {
+            let v = cor[i][j];
+            // Diverging: blue (-1) → dark (0) → red (+1)
+            let (cr, cg, cb) = if v >= 0.0 {
+                let t = v.min(1.0);
+                ((255.0 * t) as u8, (42.0 * t) as u8, (109.0 * t) as u8) // accent red
+            } else {
+                let t = (-v).min(1.0);
+                ((5.0 * t) as u8, (217.0 * t) as u8, (232.0 * t) as u8) // cyan
+            };
+            let cx = px0 + j as f64 * cell_w;
+            let cy = py0 + i as f64 * cell_h;
+            svg += &format!(
+                r##"<rect x="{cx:.1}" y="{cy:.1}" width="{cell_w:.1}" height="{cell_h:.1}" fill="rgb({cr},{cg},{cb})" stroke="{BG_PRIMARY}" stroke-width="1" rx="2"/>"##
+            );
+            svg.push('\n');
+            svg += &format!(
+                r##"<text x="{tx:.1}" y="{ty:.1}" fill="{TEXT}" font-family="'Share Tech Mono',monospace" font-size="10" text-anchor="middle" dominant-baseline="middle">{v:.2}</text>"##,
+                tx = cx + cell_w / 2.0,
+                ty = cy + cell_h / 2.0
+            );
+            svg.push('\n');
+        }
+        // Row/col labels
+        svg += &format!(
+            r##"<text x="{lx:.1}" y="{ly:.1}" fill="{TEXT_DIM}" font-family="'Share Tech Mono',monospace" font-size="10" text-anchor="end" dominant-baseline="middle">C{i}</text>"##,
+            lx = px0 - 6.0,
+            ly = py0 + (i as f64 + 0.5) * cell_h,
+            i = i + 1
+        );
+        svg.push('\n');
+        svg += &format!(
+            r##"<text x="{lx:.1}" y="{ly}" fill="{TEXT_DIM}" font-family="'Share Tech Mono',monospace" font-size="10" text-anchor="middle">C{i}</text>"##,
+            lx = px0 + (i as f64 + 0.5) * cell_w,
+            ly = py0 - 6.0,
+            i = i + 1
+        );
+        svg.push('\n');
+    }
+    svg += svg_footer();
+    Ok(PerlValue::string(svg))
+}
+
+/// `stacked_bar_svg LABELS, [VALUES1, VALUES2, ...] [, title]` — SVG stacked bar chart.
+fn builtin_stacked_bar_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let labels: Vec<String> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter()
+        .map(|v| v.to_string())
+        .collect();
+    let mut series: Vec<Vec<f64>> = Vec::new();
+    let mut title = "Stacked Bar Chart".to_string();
+    for arg in args.iter().skip(1) {
+        let v = arg_to_vec(arg);
+        if !v.is_empty() && v[0].to_number() != 0.0 || v.len() > 1 {
+            series.push(v.iter().map(|x| x.to_number()).collect());
+        } else {
+            title = arg.to_string();
+        }
+    }
+    let n = labels.len();
+    if n == 0 || series.is_empty() {
+        return Ok(PerlValue::string(String::new()));
+    }
+    // Compute totals per bar
+    let totals: Vec<f64> = (0..n)
+        .map(|i| {
+            series
+                .iter()
+                .map(|s| s.get(i).copied().unwrap_or(0.0))
+                .sum()
+        })
+        .collect();
+    let v_max = totals.iter().cloned().fold(0.0f64, f64::max).max(1e-10);
+    let (px0, _py0, px1, py1) = (SVG_PAD, 40.0, SVG_W - 30.0, SVG_H - SVG_PAD);
+    let pw = px1 - px0;
+    let ph = py1 - 40.0;
+    let bar_w = (pw / n as f64) * 0.7;
+    let gap = pw / n as f64;
+    let mut svg = svg_header(SVG_W, SVG_H, &title);
+    svg += &svg_axis_lines(px0, 40.0, px1, py1);
+    for i in 0..n {
+        let bx = px0 + (i as f64 + 0.5) * gap - bar_w / 2.0;
+        let mut y_offset = 0.0;
+        for (si, s) in series.iter().enumerate() {
+            let val = s.get(i).copied().unwrap_or(0.0);
+            let bh = (val / v_max) * ph;
+            let by = py1 - y_offset - bh;
+            let color = CHART_COLORS[si % CHART_COLORS.len()];
+            svg += &format!(
+                r##"<rect x="{bx:.1}" y="{by:.1}" width="{bar_w:.1}" height="{bh:.1}" fill="{color}" opacity="0.85" rx="1"/>"##
+            );
+            svg.push('\n');
+            y_offset += bh;
+        }
+        let label = if labels[i].len() > 8 {
+            &labels[i][..8]
+        } else {
+            &labels[i]
+        };
+        svg += &format!(
+            r##"<text x="{cx:.1}" y="{ly}" fill="{TEXT_DIM}" font-family="'Share Tech Mono',monospace" font-size="10" text-anchor="middle">{label}</text>"##,
+            cx = px0 + (i as f64 + 0.5) * gap,
+            ly = py1 + 16.0
+        );
+        svg.push('\n');
+    }
+    svg += svg_footer();
+    Ok(PerlValue::string(svg))
+}
+
+/// `wordcloud_svg HASHREF [, title]` — SVG word cloud from frequency hash.
+fn builtin_wordcloud_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let first = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let title = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "Word Cloud".into());
+    let (words, freqs) = if let Some((l, v)) = hashref_to_labels_values(&first) {
+        (l, v)
+    } else {
+        return Ok(PerlValue::string(String::new()));
+    };
+    let n = words.len().min(80); // Cap at 80 words
+    if n == 0 {
+        return Ok(PerlValue::string(String::new()));
+    }
+    let f_max = freqs[0].max(1.0);
+    let mut svg = svg_header(SVG_W, SVG_H, &title);
+    // Simple spiral placement
+    let cx = SVG_W / 2.0;
+    let cy = SVG_H / 2.0 + 10.0;
+    for i in 0..n {
+        let t = i as f64 * 0.7;
+        let r = 15.0 + t * 8.0;
+        let angle = t * 2.4;
+        let x = cx + r * angle.cos();
+        let y = cy + r * angle.sin();
+        if x < 10.0 || x > SVG_W - 10.0 || y < 30.0 || y > SVG_H - 10.0 {
+            continue;
+        }
+        let size = 10.0 + (freqs[i] / f_max) * 30.0;
+        let color = CHART_COLORS[i % CHART_COLORS.len()];
+        let word = if words[i].len() > 15 {
+            &words[i][..15]
+        } else {
+            &words[i]
+        };
+        svg += &format!(
+            r##"<text x="{x:.1}" y="{y:.1}" fill="{color}" font-family="'Share Tech Mono',monospace" font-size="{size:.0}" text-anchor="middle" dominant-baseline="middle" opacity="0.9">{word}</text>"##
+        );
+        svg.push('\n');
+    }
+    svg += svg_footer();
+    Ok(PerlValue::string(svg))
+}
+
+/// `treemap_svg HASHREF [, title]` — SVG treemap from frequency/value hash.
+fn builtin_treemap_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let first = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let title = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "Treemap".into());
+    let (labels, values) = if let Some((l, v)) = hashref_to_labels_values(&first) {
+        (l, v)
+    } else {
+        return Ok(PerlValue::string(String::new()));
+    };
+    let n = labels.len().min(30);
+    if n == 0 {
+        return Ok(PerlValue::string(String::new()));
+    }
+    let total: f64 = values[..n].iter().sum();
+    if total <= 0.0 {
+        return Ok(PerlValue::string(String::new()));
+    }
+    let (px0, py0, px1, py1) = (20.0, 45.0, SVG_W - 20.0, SVG_H - 20.0);
+    let mut svg = svg_header(SVG_W, SVG_H, &title);
+    // Simple squarified-ish layout: slice alternating horizontal/vertical
+    struct Rect {
+        x: f64,
+        y: f64,
+        w: f64,
+        h: f64,
+    }
+    let _rects = vec![Rect {
+        x: px0,
+        y: py0,
+        w: px1 - px0,
+        h: py1 - py0,
+    }];
+    let _items: Vec<(usize, f64)> = (0..n).map(|i| (i, values[i])).collect();
+    let mut placed: Vec<(usize, f64, f64, f64, f64)> = Vec::new();
+    // Simple slice layout
+    let mut remaining = Rect {
+        x: px0,
+        y: py0,
+        w: px1 - px0,
+        h: py1 - py0,
+    };
+    let mut remaining_total = total;
+    for idx in 0..n {
+        let frac = values[idx] / remaining_total;
+        let (rx, ry, rw, rh);
+        if remaining.w >= remaining.h {
+            rw = remaining.w * frac;
+            rh = remaining.h;
+            rx = remaining.x;
+            ry = remaining.y;
+            remaining.x += rw;
+            remaining.w -= rw;
+        } else {
+            rw = remaining.w;
+            rh = remaining.h * frac;
+            rx = remaining.x;
+            ry = remaining.y;
+            remaining.y += rh;
+            remaining.h -= rh;
+        }
+        remaining_total -= values[idx];
+        if remaining_total <= 0.0 {
+            remaining_total = 1e-10;
+        }
+        placed.push((idx, rx, ry, rw, rh));
+    }
+    for &(idx, rx, ry, rw, rh) in &placed {
+        let color = CHART_COLORS[idx % CHART_COLORS.len()];
+        svg += &format!(
+            r##"<rect x="{rx:.1}" y="{ry:.1}" width="{rw:.1}" height="{rh:.1}" fill="{color}" opacity="0.7" stroke="{BG_PRIMARY}" stroke-width="2" rx="3"/>"##
+        );
+        svg.push('\n');
+        if rw > 30.0 && rh > 15.0 {
+            let label = if labels[idx].len() > (rw / 7.0) as usize {
+                &labels[idx][..(rw / 7.0) as usize]
+            } else {
+                &labels[idx]
+            };
+            svg += &format!(
+                r##"<text x="{tx:.1}" y="{ty:.1}" fill="{TEXT}" font-family="'Share Tech Mono',monospace" font-size="10" text-anchor="middle" dominant-baseline="middle">{label}</text>"##,
+                tx = rx + rw / 2.0,
+                ty = ry + rh / 2.0
             );
             svg.push('\n');
         }
