@@ -2986,6 +2986,9 @@ impl Interpreter {
         if p.is_absolute() {
             return self.require_absolute_path(p, line);
         }
+        if t.starts_with("./") || t.starts_with("../") {
+            return self.require_relative_path(p, line);
+        }
         if Self::looks_like_version_only(t) {
             return Ok(PerlValue::integer(1));
         }
@@ -3044,6 +3047,19 @@ impl Interpreter {
         r?;
         self.invoke_require_hook("require__after", &key, line)?;
         Ok(PerlValue::integer(1))
+    }
+
+    fn require_relative_path(&mut self, path: &Path, line: usize) -> PerlResult<PerlValue> {
+        if !path.exists() {
+            return Err(PerlError::runtime(
+                format!(
+                    "Can't locate {} (relative path does not exist)",
+                    path.display()
+                ),
+                line,
+            ));
+        }
+        self.require_absolute_path(path, line)
     }
 
     fn require_from_inc(&mut self, relpath: &str, line: usize) -> PerlResult<PerlValue> {
@@ -7018,6 +7034,16 @@ impl Interpreter {
                         self.subs.insert(fq, sub);
                     }
                 }
+                // Set @ClassName::ISA so MRO/isa resolution works.
+                if !def.extends.is_empty() {
+                    let isa_key = format!("{}::ISA", def.name);
+                    let parents: Vec<PerlValue> = def
+                        .extends
+                        .iter()
+                        .map(|p| PerlValue::string(p.clone()))
+                        .collect();
+                    self.scope.declare_array(&isa_key, parents);
+                }
                 self.class_defs.insert(def.name.clone(), Arc::new(def));
                 Ok(PerlValue::UNDEF)
             }
@@ -9782,7 +9808,7 @@ impl Interpreter {
                 }
             }
             ExprKind::SortExpr { cmp, list } => {
-                let list_val = self.eval_expr(list)?;
+                let list_val = self.eval_expr_ctx(list, WantarrayCtx::List)?;
                 let mut items = list_val.to_list();
                 match cmp {
                     Some(SortComparator::Code(code_expr)) => {
@@ -12589,6 +12615,28 @@ impl Interpreter {
             )
             .into());
         }
+        // Struct field access via hash deref syntax: $struct->{field}
+        if let Some(s) = container.as_struct_inst() {
+            if let Some(idx) = s.def.field_index(key) {
+                return Ok(s.get_field(idx).unwrap_or(PerlValue::UNDEF));
+            }
+            return Err(PerlError::runtime(
+                format!("struct {} has no field `{}`", s.def.name, key),
+                line,
+            )
+            .into());
+        }
+        // Class instance field access via hash deref: $obj->{field}
+        if let Some(c) = container.as_class_inst() {
+            if let Some(idx) = c.def.field_index(key) {
+                return Ok(c.get_field(idx).unwrap_or(PerlValue::UNDEF));
+            }
+            return Err(PerlError::runtime(
+                format!("class {} has no field `{}`", c.def.name, key),
+                line,
+            )
+            .into());
+        }
         Err(PerlError::runtime("Can't use arrow deref on non-hash-ref", line).into())
     }
 
@@ -13213,6 +13261,16 @@ impl Interpreter {
                 } else {
                     let u = val.to_int().max(0) as usize;
                     self.regex_pos.insert(key, Some(u));
+                }
+                Ok(PerlValue::UNDEF)
+            }
+            // List assignment: `($a, $b, ...) = (val1, val2, ...)`
+            // RHS is already fully evaluated — distribute elements to targets.
+            ExprKind::List(targets) => {
+                let items = val.to_list();
+                for (i, t) in targets.iter().enumerate() {
+                    let v = items.get(i).cloned().unwrap_or(PerlValue::UNDEF);
+                    self.assign_value(t, v)?;
                 }
                 Ok(PerlValue::UNDEF)
             }
@@ -17019,8 +17077,10 @@ impl Interpreter {
         if let Some(p) = &mut self.profiler {
             p.enter_sub(&sub.name);
         }
-        // Pass wantarray context for the implicit return (last expression in block).
-        let result = self.exec_block_no_scope_with_tail(&sub.body, self.wantarray_kind);
+        // Always evaluate the function body's last expression in List context so
+        // `@array` returns the array contents, not the count. The caller adapts the
+        // return value to their own wantarray context after receiving it.
+        let result = self.exec_block_no_scope_with_tail(&sub.body, WantarrayCtx::List);
         if let (Some(p), Some(t0)) = (&mut self.profiler, t0) {
             p.exit_sub(t0.elapsed());
         }

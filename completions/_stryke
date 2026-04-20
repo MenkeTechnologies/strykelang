@@ -141,6 +141,8 @@ _stryke() {
       local -a subcmds
       subcmds=(
         'build:compile a Perl script into a standalone executable binary'
+        'run:run ./main.stk'
+        'test:run all tests in t/**.stk'
         'convert:convert Perl source to idiomatic stryke syntax with |> pipes'
         'deconvert:convert stryke source to vanilla perl syntax'
         'docs:built-in documentation browser (st docs pmap)'

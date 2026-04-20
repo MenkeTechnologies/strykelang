@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+# t/test_builtins.stk — test stryke builtin functions
+
+# Math builtins
+assert_eq sum(1..10), 55, "sum"
+assert_eq min(3, 1, 4, 1, 5), 1, "min"
+assert_eq max(3, 1, 4, 1, 5), 5, "max"
+assert_near avg(2, 4, 6), 4.0, 0.001, "avg"
+assert_ok is_prime(17), "17 is prime"
+assert_false is_prime(15), "15 not prime"
+
+# String builtins
+assert_eq uc("hello"), "HELLO", "uc"
+assert_eq lc("HELLO"), "hello", "lc"
+assert_eq ucfirst("hello"), "Hello", "ucfirst"
+assert_eq rev("abcd"), "dcba", "rev string"
+assert_eq trim("  hi  "), "hi", "trim"
+assert_eq length("hello"), 5, "length"
+
+# Array builtins
+assert_eq join(",", sort(3, 1, 2)), "1,2,3", "sort + join"
+assert_eq join(",", reverse(1, 2, 3)), "3,2,1", "reverse list"
+assert_eq scalar(uniq(1, 2, 2, 3, 3, 3)), 3, "uniq count"
+
+# Encoding
+assert_eq hex_encode("hi"), "6869", "hex encode"
+assert_eq hex_decode("6869"), "hi", "hex decode"
+assert_eq base64_encode("hello"), "aGVsbG8=", "base64 encode"
+assert_eq base64_decode("aGVsbG8="), "hello", "base64 decode"
+
+# Pipeline
+my $result = sum(map { $_ * 2 } 1..5)
+assert_eq $result, 30, "pipeline map+sum"
+
+# Pipe forward with builtins
+my $piped = 1..10 |> grep { $_ % 2 == 0 } |> map { $_ * $_ } |> sum
+assert_eq $piped, 220, "pipe grep map sum"
+
+# Thread macro with builtins
+my $threaded = (~> (1..10) grep { $_ > 5 } sum)
+assert_eq $threaded, 40, "thread macro grep sum"
+
+# Streaming maps
+my @s = range(1, 5) |> maps { $_ * 3 }
+assert_eq scalar(@s), 5, "maps count"
+
+# JSON roundtrip
+my $decoded = json_decode(to_json({a => 1}))
+assert_eq $decoded->{a}, 1, "json roundtrip"
+
+# Regex
+assert_match '\d+', "abc123", "regex match"
+
+# File ops
+my $tmp = tempfile()
+spurt($tmp, "test content")
+assert_eq slurp($tmp), "test content", "spurt + slurp"
+unlink $tmp
+
+# System
+assert_gt num_cpus(), 0, "has cpus"
+assert_ok defined(cwd()), "cwd defined"
+
+# String transforms via thread macro
+my $transformed = (~> " hello world " trim uc)
+assert_eq $transformed, "HELLO WORLD", "thread trim uc"
+
+# Case conversion
+assert_eq camel_case("hello_world"), "helloWorld", "camel_case"
+assert_eq snake_case("helloWorld"), "hello_world", "snake_case"
+assert_eq kebab_case("helloWorld"), "hello-world", "kebab_case"
+
+test_run

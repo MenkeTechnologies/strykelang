@@ -90,12 +90,24 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+  stryke-test:
+    name: Stryke project tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked
+      - name: Run stryke test on example project
+        run: ./target/release/s test examples/project/t
+
   release-build:
     name: Release Build
     # Only blocks on real-bug signals. fmt / clippy are advisory (see
     # their `continue-on-error`); listing them here would make the entire
     # release pipeline wait on cosmetic lints.
-    needs: [check, test, doc, parity]
+    needs: [check, test, doc, parity, stryke-test]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:

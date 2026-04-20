@@ -1,0 +1,56 @@
+# lib/strings.stk — string utilities: regex, pipelines, transforms
+
+fn slugify_str {
+    my $s = lc(shift)
+    $s =~ s/[^a-z0-9]+/-/g
+    $s =~ s/^-|-$//g
+    $s
+}
+
+fn get_initials {
+    my $name = shift
+    join("", map { uc(substr($_, 0, 1)) } split(/\s+/, $name))
+}
+
+fn truncate_str {
+    my ($s, $max) = @_
+    $max //= 50
+    length($s) > $max ? substr($s, 0, $max - 1) . "~" : $s
+}
+
+fn repeat_str {
+    my ($s, $n) = @_
+    $s x ($n // 1)
+}
+
+fn pad_center {
+    my ($s, $width) = @_
+    my $pad = $width - length($s)
+    return $s if $pad <= 0
+    my $left = int($pad / 2)
+    my $right = $pad - $left
+    (" " x $left) . $s . (" " x $right)
+}
+
+# Caesar cipher with shift amount — works on a-z only
+fn caesar_cipher {
+    my ($text, $shift) = @_
+    $shift //= 13
+    my @chars = split("", $text)
+    my @out = map {
+        if ($_ =~ /[a-z]/) {
+            chr(((ord($_) - ord("a") + $shift) % 26) + ord("a"))
+        } elsif ($_ =~ /[A-Z]/) {
+            chr(((ord($_) - ord("A") + $shift) % 26) + ord("A"))
+        } else {
+            $_
+        }
+    } @chars
+    join("", @out)
+}
+
+# Count vowels in a string via pipeline
+fn count_vowels {
+    my $s = shift
+    scalar(grep { $_ =~ /[aeiouAEIOU]/ } split("", $s))
+}

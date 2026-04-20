@@ -1,0 +1,96 @@
+#!/usr/bin/env stryke
+# main.stk — STRYKE SYSTEM RECON
+# A cyberpunk system reconnaissance tool.
+# Scans your machine, network, git repos, and generates a visual report.
+#
+# Run:   s examples/project/main.stk
+# Test:  s test examples/project/t
+
+require "./lib/scanner.stk"
+require "./lib/reporter.stk"
+require "./lib/threats.stk"
+
+my $banner = cyber_banner("STRYKE RECON v1.0")
+print "$banner\n"
+
+p "\n\x1b[36m[PHASE 1] SYSTEM SCAN\x1b[0m"
+p "\x1b[36m" . ("─" x 50) . "\x1b[0m"
+
+my $sys = scan_system()
+p "  \x1b[33mHOST\x1b[0m     " . $sys->{hostname}
+p "  \x1b[33mOS\x1b[0m       " . $sys->{os} . " " . $sys->{arch}
+p "  \x1b[33mCPUs\x1b[0m     " . $sys->{cpus} . " cores (" . $sys->{perf_cores} . "P + " . $sys->{eff_cores} . "E)"
+p "  \x1b[33mRAM\x1b[0m      " . $sys->{ram}
+p "  \x1b[33mUPTIME\x1b[0m   " . $sys->{uptime}
+
+p "\n\x1b[36m[PHASE 2] DISK RECON\x1b[0m"
+p "\x1b[36m" . ("─" x 50) . "\x1b[0m"
+
+my @disks = scan_disks()
+for my $d (@disks) {
+    my $bar = usage_bar($d->{use_pct}, 20)
+    printf "  \x1b[33m%-12s\x1b[0m %s %5.1f%% %s\n", $d->{mount}, $bar, $d->{use_pct}, $d->{free_h}
+}
+
+p "\n\x1b[36m[PHASE 3] NETWORK SCAN\x1b[0m"
+p "\x1b[36m" . ("─" x 50) . "\x1b[0m"
+
+my $net = scan_network()
+p "  \x1b[33mIPv4\x1b[0m     " . $net->{ipv4}
+p "  \x1b[33mMAC\x1b[0m      " . $net->{mac}
+p "  \x1b[33mGATEWAY\x1b[0m  " . $net->{gateway}
+p "  \x1b[33mDNS\x1b[0m      " . $net->{dns}
+
+my @ifaces = scan_interfaces()
+for my $iface (@ifaces) {
+    next unless $iface->{up}
+    printf "  \x1b[35m%-10s\x1b[0m %s\n", $iface->{name}, $iface->{ipv4} // "no ipv4"
+}
+
+p "\n\x1b[36m[PHASE 4] PROCESS INTEL\x1b[0m"
+p "\x1b[36m" . ("─" x 50) . "\x1b[0m"
+
+my @procs = scan_top_processes(10)
+printf "  \x1b[33m%-8s %-20s\x1b[0m\n", "PID", "NAME"
+for my $proc (@procs) {
+    printf "  %-8s %-20s\n", $proc->{pid}, $proc->{name}
+}
+
+p "\n\x1b[36m[PHASE 5] GIT INTEL\x1b[0m"
+p "\x1b[36m" . ("─" x 50) . "\x1b[0m"
+
+my $git = scan_git()
+if ($git->{is_repo}) {
+    p "  \x1b[33mROOT\x1b[0m     " . $git->{root}
+    p "  \x1b[33mBRANCH\x1b[0m   " . $git->{branch}
+    p "  \x1b[33mCOMMITS\x1b[0m  " . $git->{total_commits}
+    p "  \x1b[33mFILES\x1b[0m    " . $git->{total_files}
+    p "  \x1b[33mAUTHORS\x1b[0m"
+    for my $a (@{$git->{top_authors}}) {
+        printf "    \x1b[35m%-20s\x1b[0m %d commits\n", $a->{name}, $a->{commits}
+    }
+    p "  \x1b[33mRECENT\x1b[0m"
+    for my $c (@{$git->{recent}}) {
+        printf "    \x1b[90m%s\x1b[0m %s\n", $c->{short}, $c->{message}
+    }
+} else {
+    p "  \x1b[90m(not a git repo)\x1b[0m"
+}
+
+p "\n\x1b[36m[PHASE 6] THREAT ANALYSIS\x1b[0m"
+p "\x1b[36m" . ("─" x 50) . "\x1b[0m"
+
+my @threats = analyze_threats($sys, $net, \@disks)
+for my $t (@threats) {
+    my $color = $t->{level} eq "HIGH" ? "\x1b[31m" : $t->{level} eq "WARN" ? "\x1b[33m" : "\x1b[32m"
+    printf "  %s[%s]\x1b[0m %s\n", $color, $t->{level}, $t->{message}
+}
+
+p "\n\x1b[36m[PHASE 7] REPORT\x1b[0m"
+p "\x1b[36m" . ("─" x 50) . "\x1b[0m"
+
+my $report = generate_report($sys, $net, \@disks, $git, \@threats)
+p "  report: " . $report
+
+my $end_banner = cyber_banner("RECON COMPLETE")
+print "\n$end_banner\n"

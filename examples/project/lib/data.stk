@@ -1,0 +1,71 @@
+# lib/data.stk — data processing: pipelines, aggregation, grouping
+
+fn word_freq_map {
+    my $freq = {}
+    $freq->{$_}++ for @_
+    $freq
+}
+
+fn group_records {
+    my ($key, @records) = @_
+    my $groups = {}
+    for my $r (@records) {
+        my $k = $r->{$key} // "unknown"
+        $groups->{$k} = [] unless exists $groups->{$k}
+        push @{$groups->{$k}}, $r
+    }
+    $groups
+}
+
+fn summarize_list {
+    my @data = @_
+    my $n = scalar @data
+    return {} unless $n
+    my $total = sum(@data);
+    +{
+        count  => $n,
+        sum    => $total,
+        mean   => $total / $n,
+        min    => min(@data),
+        max    => max(@data),
+        median => median(@data),
+    }
+}
+
+# Build a hash from parallel key/value arrays
+fn zip_to_hash {
+    my ($keys, $vals) = @_
+    my $h = {}
+    for my $i (0..scalar(@$keys) - 1) {
+        $h->{$keys->[$i]} = $vals->[$i]
+    }
+    $h
+}
+
+# Partition an array into two: [matching, non-matching]
+fn split_by_pred {
+    my ($pred, @items) = @_
+    my $yes = []
+    my $no = []
+    for my $item (@items) {
+        local $_ = $item
+        if ($pred->($item)) {
+            push @$yes, $item
+        } else {
+            push @$no, $item
+        }
+    }
+    [$yes, $no]
+}
+
+# Running total of a numeric array
+fn running_total {
+    my @data = @_
+    my @result
+    my $acc = 0
+    for my $v (@data) {
+        $acc += $v
+        push @result, $acc
+    }
+    @result
+}

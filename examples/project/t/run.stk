@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# t/run.stk — run all test files in the t/ directory
+#
+# Usage: s examples/project/t/run.stk
+
+my $dir = dirname($0)
+my @test_files = glob("$dir/test_*.stk") |> sort
+my $total = scalar @test_files
+my $failed = 0
+
+p "Running $total test files...\n"
+
+for my $f (@test_files) {
+    printf "── %s ──\n", basename($f)
+    my $exit = system("s", $f)
+    if ($exit != 0) {
+        $failed++
+    }
+    p ""
+}
+
+p "═══════════════════════════"
+if ($failed == 0) {
+    printf "\x1b[32m✓ All %d test files passed\x1b[0m\n", $total
+} else {
+    printf "\x1b[31m✗ %d of %d test files failed\x1b[0m\n", $failed, $total
+    exit(1)
+}

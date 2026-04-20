@@ -1,0 +1,138 @@
+#!/usr/bin/env stryke
+# t/test_models.stk — OOP tests: enums, structs, classes, inheritance
+
+require "./lib/models.stk"
+
+# ── Enum tests ───────────────────────────────────────────────────────
+
+my $active = Status::Active()
+my $inactive = Status::Inactive()
+my $pending = Status::Pending()
+
+# Enum matching — all variants covered
+my $label = match ($active) {
+    Status::Active() => "on",
+    Status::Inactive() => "off",
+    Status::Pending() => "wait",
+}
+assert_eq $label, "on", "enum match active"
+
+my $dir_label = match (Direction::North()) {
+    Direction::North() => "N",
+    Direction::South() => "S",
+    Direction::East() => "E",
+    Direction::West() => "W",
+}
+assert_eq $dir_label, "N", "enum match direction"
+
+# Enum match with wildcard
+my $is_active = match ($pending) {
+    Status::Active() => 1,
+    _ => 0,
+}
+assert_eq $is_active, 0, "enum wildcard non-active"
+
+# ── Struct tests ─────────────────────────────────────────────────────
+
+my $pt = Point->new(x => 3, y => 4)
+assert_eq $pt->x, 3, "struct point x"
+assert_eq $pt->y, 4, "struct point y"
+
+my $cfg = Config->new(host => "localhost", port => 8080, debug => 1)
+assert_eq $cfg->host, "localhost", "struct config host"
+assert_eq $cfg->port, 8080, "struct config port"
+assert_eq $cfg->debug, 1, "struct config debug"
+
+# ── Class instantiation ─────────────────────────────────────────────
+
+my $circle = Circle(name => "c1", radius => 5)
+assert_near $circle->area(), 78.53975, 0.01, "circle area"
+assert_near $circle->circumference(), 31.4159, 0.01, "circle circumference"
+assert_eq $circle->name, "c1", "circle name"
+
+my $rect = Rectangle(name => "r1", width => 6, height => 4)
+assert_eq $rect->area(), 24, "rect area"
+assert_eq $rect->perimeter(), 20, "rect perimeter"
+assert_false $rect->is_square(), "rect is not square"
+
+# ── Inheritance ──────────────────────────────────────────────────────
+
+assert_ok $circle->isa("Shape"), "circle isa Shape"
+assert_ok $circle->isa("Circle"), "circle isa Circle"
+assert_ok $rect->isa("Shape"), "rect isa Shape"
+assert_ok $rect->isa("Rectangle"), "rect isa Rectangle"
+
+# Describe (polymorphic)
+assert_contains $circle->describe(), "Circle", "circle describe"
+assert_contains $rect->describe(), "Rect", "rect describe"
+
+# ── Static methods ───────────────────────────────────────────────────
+
+my $unit = Circle::unit_circle()
+assert_eq $unit->radius, 1, "unit circle radius"
+assert_eq $unit->name, "unit", "unit circle name"
+
+my $sq = Rectangle::create_square(5)
+assert_eq $sq->area(), 25, "square area"
+assert_ok $sq->is_square(), "square is square"
+
+# ── Traits ───────────────────────────────────────────────────────────
+
+assert_ok $circle->does("Describable"), "circle does Describable"
+assert_ok $rect->does("Describable"), "rect does Describable"
+
+# ── Static field (Counter) ───────────────────────────────────────────
+
+my $c1 = Counter(label => "hits")
+my $c2 = Counter(label => "misses")
+assert_gt Counter::total(), 0, "counter total tracked"
+
+$c1->increment()
+$c1->increment()
+$c1->increment()
+assert_eq $c1->value, 3, "counter increment"
+
+$c1->decrement()
+assert_eq $c1->value, 2, "counter decrement"
+assert_eq $c1->describe(), "hits=2", "counter describe"
+
+# ── Vec2 operator overloading ───────────────────────────────────────
+
+my $v1 = Vec2(x => 1, y => 2)
+my $v2 = Vec2(x => 3, y => 4)
+my $v3 = $v1 + $v2
+assert_eq $v3->x, 4, "vec2 add x"
+assert_eq $v3->y, 6, "vec2 add y"
+
+my $v4 = $v2 - $v1
+assert_eq $v4->x, 2, "vec2 sub x"
+assert_eq $v4->y, 2, "vec2 sub y"
+
+assert_ok $v1 == Vec2(x => 1, y => 2), "vec2 eq"
+assert_eq $v1->dot_product($v2), 11, "vec2 dot product"
+assert_eq "$v1", "(1,2)", "vec2 stringify"
+
+# ── Clone and functional update ──────────────────────────────────────
+
+my $r_orig = Rectangle(name => "orig", width => 10, height => 5)
+my $r_clone = $r_orig->clone()
+$r_clone->width(20)
+assert_eq $r_orig->width, 10, "clone does not affect original"
+assert_eq $r_clone->width, 20, "clone has new value"
+
+my $r_updated = $r_orig->with(height => 8)
+assert_eq $r_updated->height, 8, "functional update height"
+assert_eq $r_updated->width, 10, "functional update preserves width"
+
+# ── Reflection ───────────────────────────────────────────────────────
+
+my @circle_fields = $circle->fields()
+assert_contains join(",", @circle_fields), "radius", "circle has radius field"
+
+my @circle_methods = $circle->methods()
+assert_gt scalar(@circle_methods), 0, "circle has methods"
+
+my @parents = $circle->superclass()
+assert_contains join(",", @parents), "Shape", "circle parent is Shape"
+
+test_run

@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# t/test_strings.stk — string library tests
+
+require "./lib/strings.stk"
+
+# Slugify
+assert_eq slugify_str("Hello World"), "hello-world", "basic slug"
+assert_eq slugify_str("  Foo  BAR  "), "foo-bar", "slug trims"
+assert_eq slugify_str("One---Two"), "one-two", "slug collapses dashes"
+
+# Initials
+assert_eq get_initials("Menke Technologies"), "MT", "two word initials"
+assert_eq get_initials("John Fitzgerald Kennedy"), "JFK", "three word initials"
+
+# Truncate
+assert_eq truncate_str("hello", 10), "hello", "no truncate needed"
+assert_eq length(truncate_str("a" x 100, 20)), 20, "truncated length"
+
+# Repeat
+assert_eq repeat_str("ab", 3), "ababab", "repeat 3x"
+assert_eq repeat_str("x", 1), "x", "repeat 1x"
+
+# Pad center
+assert_eq length(pad_center("hi", 10)), 10, "pad center width"
+assert_contains pad_center("hi", 10), "hi", "pad center content"
+
+# Caesar cipher
+assert_eq caesar_cipher("abc", 1), "bcd", "caesar shift 1"
+assert_eq caesar_cipher("xyz", 3), "abc", "caesar wrap around"
+assert_eq caesar_cipher("Hello", 13), "Uryyb", "rot13"
+assert_eq caesar_cipher(caesar_cipher("test", 7), 19), "test", "caesar roundtrip"
+
+# Count vowels
+assert_eq count_vowels("hello"), 2, "vowels in hello"
+assert_eq count_vowels("xyz"), 0, "no vowels"
+assert_eq count_vowels("AEIOU"), 5, "all upper vowels"
+
+# Pipeline: slugify via pipe
+my $slug = "  Hello World!  " |> trim |> slugify_str
+assert_eq $slug, "hello-world", "piped slugify"
+
+test_run

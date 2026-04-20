@@ -1,0 +1,43 @@
+# lib/reporter.stk — generate HTML/PDF recon reports
+
+fn generate_report {
+    my ($sys, $net, $disks, $git, $threats) = @_
+    my @lines
+    push @lines, "STRYKE RECON REPORT"
+    push @lines, "═══════════════════"
+    push @lines, ""
+    push @lines, "SYSTEM"
+    push @lines, "  Host:    $sys->{hostname}"
+    push @lines, "  OS:      $sys->{os} $sys->{arch}"
+    push @lines, "  CPUs:    $sys->{cpus}"
+    push @lines, "  RAM:     $sys->{ram}"
+    push @lines, "  Uptime:  $sys->{uptime}"
+    push @lines, ""
+    push @lines, "NETWORK"
+    push @lines, "  IPv4:    $net->{ipv4}"
+    push @lines, "  MAC:     $net->{mac}"
+    push @lines, "  Gateway: $net->{gateway}"
+    push @lines, "  DNS:     $net->{dns}"
+    push @lines, ""
+    push @lines, "DISKS"
+    for my $d (@$disks) {
+        push @lines, sprintf("  %-12s %5.1f%%  %s", $d->{mount}, $d->{use_pct}, $d->{free_h})
+    }
+    push @lines, ""
+    if ($git->{is_repo}) {
+        push @lines, "GIT"
+        push @lines, "  Branch:  $git->{branch}"
+        push @lines, "  Commits: $git->{total_commits}"
+        push @lines, "  Files:   $git->{total_files}"
+        push @lines, ""
+    }
+    push @lines, "THREATS"
+    for my $t (@$threats) {
+        push @lines, "  [$t->{level}] $t->{message}"
+    }
+
+    my $text = join("\n", @lines)
+    my $path = tempfile() . ".pdf"
+    to_pdf($text, $path)
+    $path
+}

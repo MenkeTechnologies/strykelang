@@ -838,6 +838,7 @@ pub(crate) fn head_tail_take_impl(
         list.extend(args[0].to_list());
         (1, list)
     } else {
+        // Count is always the last argument: `take(@list, N)` / `@list |> take N`
         let raw = args[args.len() - 1].to_int();
         let mut list = Vec::new();
         for a in &args[..args.len() - 1] {

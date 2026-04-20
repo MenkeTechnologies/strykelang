@@ -1,0 +1,111 @@
+# lib/scanner.stk — system reconnaissance functions
+
+fn scan_system {
+    my $info = pool_info()
+    my $ram_bytes = mem_total()
+    my $ram = human_bytes($ram_bytes)
+    my $up_secs = sys_uptime()
+    my $uptime = human_duration($up_secs);
+    +{
+        hostname   => gethostname(),
+        os         => os_name(),
+        arch       => $info->{arch},
+        cpus       => $info->{cpus},
+        perf_cores => $info->{perf_cores} // "?",
+        eff_cores  => $info->{eff_cores} // "?",
+        ram        => $ram,
+        ram_bytes  => $ram_bytes,
+        uptime     => $uptime,
+        uptime_sec => $up_secs,
+    }
+}
+
+fn scan_disks {
+    my @raw = mounts()
+    my @result
+    for my $m (@raw) {
+        next unless $m->{total} > 0
+        next if $m->{mount} =~ /^\/dev$/
+        next if $m->{fs_type} =~ /^(devfs|autofs|tmpfs)$/
+        my $entry = {
+            mount   => $m->{mount},
+            device  => $m->{device},
+            fs_type => $m->{fs_type},
+            total   => $m->{total},
+            used    => $m->{used},
+            free    => $m->{total} - $m->{used},
+            use_pct => $m->{use_pct},
+            total_h => human_bytes($m->{total}),
+            free_h  => human_bytes($m->{total} - $m->{used}) . " free",
+        }
+        push @result, $entry
+    }
+    @result
+}
+
+fn scan_network {
+    +{
+        ipv4    => net_ipv4() // "unknown",
+        ipv6    => net_ipv6() // "none",
+        mac     => net_mac() // "unknown",
+        gateway => net_gateway() // "unknown",
+        dns     => join(", ", net_dns_servers()),
+    }
+}
+
+fn scan_interfaces {
+    my @raw = net_interfaces()
+    @raw
+}
+
+fn scan_top_processes {
+    my $n = shift
+    $n = 10 unless defined($n)
+    my @procs = process_list()
+    return () unless @procs
+    my @result
+    my $count = 0
+    for my $p (reverse @procs) {
+        last if $count >= $n
+        push @result, $p
+        $count++
+    }
+    @result
+}
+
+fn scan_git {
+    my $result = { is_repo => 0 }
+    eval {
+        my $root = git_root()
+        $result->{is_repo} = 1
+        $result->{root} = $root
+
+        my @branches = git_branches()
+        my @head = grep { $_->{is_head} } @branches
+        $result->{branch} = @head ? $head[0]->{name} : "detached"
+
+        my @log = git_log(5)
+        $result->{recent} = \@log
+
+        my @all_log = git_log(10000)
+        $result->{total_commits} = scalar(@all_log)
+
+        my @files = git_files()
+        $result->{total_files} = scalar(@files)
+
+        my @authors = git_authors()
+        my @top3 = take(@authors, 3)
+        $result->{top_authors} = \@top3
+    }
+    $result
+}
+
+fn usage_bar {
+    my ($pct, $width) = @_
+    $width //= 20
+    my $filled = int($pct / 100 * $width)
+    my $empty = $width - $filled
+    my $color = $pct > 90 ? "\x1b[31m" : $pct > 70 ? "\x1b[33m" : "\x1b[32m"
+    my $bar = $color . ("█" x $filled) . ("\x1b[90m" . ("░" x $empty)) . "\x1b[0m"
+    $bar
+}
