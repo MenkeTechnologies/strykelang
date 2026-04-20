@@ -1,0 +1,60 @@
+# lib/math.stk — math utilities: memoization, closures, higher-order functions
+
+my %_fib_memo
+
+fn fib {
+    my $n = shift
+    return $n if $n <= 1
+    return $_fib_memo{$n} if exists $_fib_memo{$n}
+    $_fib_memo{$n} = fib($n - 1) + fib($n - 2)
+}
+
+fn factorial {
+    my $n = shift
+    my $r = 1
+    $r *= $_ for 1..$n
+    $r
+}
+
+fn primes_under {
+    my $max = shift
+    my @result = grep { is_prime($_) } 2..$max
+    @result
+}
+
+fn gcd_of {
+    my ($a, $b) = @_
+    while ($b) {
+        my $tmp = $b
+        $b = $a % $b
+        $a = $tmp
+    }
+    $a
+}
+
+fn lcm_of {
+    my ($a, $b) = @_
+    $a / gcd_of($a, $b) * $b
+}
+
+# Returns a closure that adds $n to its argument
+fn make_adder {
+    my $n = shift
+    sub { $_[0] + $n }
+}
+
+# Higher-order: apply a function N times to a value
+fn apply_n {
+    my ($f, $n, $val) = @_
+    $val = $f->($val) for 1..$n
+    $val
+}
+
+# Newton's method square root via closure + iterate
+fn sqrt_newton {
+    my $x = shift
+    return 0 if $x == 0
+    my $guess = $x / 2.0
+    my $refine = sub { ($guess + $x / $guess) / 2.0 }
+    apply_n($refine, 20, $guess)
+}

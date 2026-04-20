@@ -1,0 +1,49 @@
+# lib/threats.stk — threat analysis engine
+
+enum ThreatLevel { HIGH, WARN, OK }
+
+fn analyze_threats {
+    my ($sys, $net, $disks) = @_
+    my @threats
+
+    # Disk space warnings
+    for my $d (@$disks) {
+        if ($d->{use_pct} > 95) {
+            push @threats, { level => "HIGH", message => "$d->{mount} is $d->{use_pct}% full — critical" }
+        } elsif ($d->{use_pct} > 85) {
+            push @threats, { level => "WARN", message => "$d->{mount} is $d->{use_pct}% full" }
+        }
+    }
+
+    # Network checks
+    if ($net->{gateway} eq "unknown") {
+        push @threats, { level => "HIGH", message => "No default gateway detected" }
+    }
+    if ($net->{dns} eq "") {
+        push @threats, { level => "WARN", message => "No DNS servers configured" }
+    }
+
+    # Uptime check
+    if ($sys->{uptime_sec} > 30 * 86400) {
+        push @threats, { level => "WARN", message => "System uptime > 30 days — consider reboot" }
+    }
+
+    # Memory check
+    my $mem_free = mem_free()
+    my $mem_total = $sys->{ram_bytes}
+    if ($mem_total > 0) {
+        my $mem_pct = ($mem_total - $mem_free) / $mem_total * 100
+        if ($mem_pct > 95) {
+            push @threats, { level => "HIGH", message => sprintf("Memory %.0f%% used", $mem_pct) }
+        } elsif ($mem_pct > 80) {
+            push @threats, { level => "WARN", message => sprintf("Memory %.0f%% used", $mem_pct) }
+        }
+    }
+
+    # All clear
+    if (!@threats) {
+        push @threats, { level => "OK", message => "All systems nominal" }
+    }
+
+    @threats
+}

@@ -389,6 +389,16 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut Interpreter) -> PerlR
                 interp.subs.insert(fq, sub);
             }
         }
+        // Set @ClassName::ISA so MRO/isa resolution works.
+        if !def.extends.is_empty() {
+            let isa_key = format!("{}::ISA", def.name);
+            let parents: Vec<crate::value::PerlValue> = def
+                .extends
+                .iter()
+                .map(|p| crate::value::PerlValue::string(p.clone()))
+                .collect();
+            interp.scope.declare_array(&isa_key, parents);
+        }
         interp
             .class_defs
             .insert(def.name.clone(), std::sync::Arc::new(def));

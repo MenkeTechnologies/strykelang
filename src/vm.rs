@@ -2004,7 +2004,8 @@ impl<'a> VM<'a> {
                     } else {
                         self.interp.scope.declare_array("_", argv.clone());
                         self.interp.scope.set_closure_args(&argv);
-                        self.interp.exec_block_no_scope(&sub.body)
+                        self.interp
+                            .exec_block_no_scope_with_tail(&sub.body, WantarrayCtx::List)
                     };
                     self.interp.wantarray_kind = saved_wa;
                     self.interp.scope_pop_hook();

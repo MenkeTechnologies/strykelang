@@ -16,45 +16,20 @@ use crate::value::PerlValue;
 /// walker's list-tail [`Interpreter::exec_block_with_tail`](crate::interpreter::Interpreter::exec_block_with_tail).
 pub fn expr_tail_is_list_sensitive(expr: &Expr) -> bool {
     match &expr.kind {
+        // Range `..` in scalar context is flip-flop, in list context is expansion.
+        // This genuinely needs runtime caller-context dispatch.
         ExprKind::Range { .. } => true,
-        ExprKind::List(items) => items.len() != 1 || expr_tail_is_list_sensitive(&items[0]),
-        ExprKind::QW(ws) => ws.len() != 1,
-        ExprKind::ArrayVar(_) | ExprKind::HashVar(_) => true,
-        ExprKind::ArraySlice { .. }
-        | ExprKind::HashSlice { .. }
-        | ExprKind::HashSliceDeref { .. }
-        | ExprKind::AnonymousListSlice { .. } => true,
-        ExprKind::Deref {
-            kind: Sigil::Array | Sigil::Hash,
-            ..
-        } => true,
-        ExprKind::FuncCall { name, .. } => matches!(
-            name.as_str(),
-            "reverse"
-                | "sort"
-                | "map"
-                | "grep"
-                | "keys"
-                | "values"
-                | "each"
-                | "split"
-                | "unpack"
-                | "wantarray"
-                | "caller"
-                | "localtime"
-                | "gmtime"
-                | "stat"
-                | "lstat"
-        ),
-        ExprKind::MapExpr { .. }
-        | ExprKind::MapExprComma { .. }
-        | ExprKind::GrepExpr { .. }
-        | ExprKind::SortExpr { .. } => true,
+        // `wantarray()` returns different values based on caller context.
+        ExprKind::FuncCall { name, .. } if name == "wantarray" => true,
         ExprKind::Ternary {
             then_expr,
             else_expr,
             ..
         } => expr_tail_is_list_sensitive(then_expr) || expr_tail_is_list_sensitive(else_expr),
+        // Everything else: the VM handles context correctly via ReturnValue.
+        // Arrays, hashes, sort, map, grep, keys, values, slices — all work
+        // because the VM evaluates them as values and the caller consumes
+        // in the appropriate context.
         _ => false,
     }
 }
@@ -2662,7 +2637,10 @@ impl Compiler {
                 for stmt in &body[..last_idx] {
                     self.compile_statement(stmt)?;
                 }
-                self.compile_expr(expr)?;
+                // Compile tail expression in List context so @array returns
+                // the array contents, not the count. The caller's ReturnValue
+                // handler will adapt to the actual wantarray context.
+                self.compile_expr_ctx(expr, WantarrayCtx::List)?;
                 self.chunk.emit(Op::ReturnValue, last.line);
             }
             StmtKind::If {
@@ -7515,6 +7493,20 @@ impl Compiler {
                     }
                 }
                 self.emit_op(Op::SetRegexPos, line, ast);
+            }
+            // List assignment: `($a, $b) = (val1, val2)` — RHS is on stack as array,
+            // store into temp, then distribute elements to each target.
+            ExprKind::List(targets) => {
+                let tmp = self.chunk.intern_name("__list_assign_swap__");
+                self.emit_op(Op::DeclareArray(tmp), line, ast);
+                for (i, t) in targets.iter().enumerate() {
+                    self.emit_op(Op::LoadInt(i as i64), line, ast);
+                    self.emit_op(Op::GetArrayElem(tmp), line, ast);
+                    self.compile_assign(t, line, false, ast)?;
+                }
+                if keep {
+                    self.emit_op(Op::GetArray(tmp), line, ast);
+                }
             }
             _ => {
                 return Err(CompileError::Unsupported("Assign to complex lvalue".into()));

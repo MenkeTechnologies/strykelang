@@ -9061,127 +9061,27 @@ fn builtin_du_tree(
 /// `process_list` — list running processes as array of hashrefs.
 #[cfg(unix)]
 fn builtin_process_list(_line: usize) -> PerlResult<PerlValue> {
+    use sysinfo::System;
+    let mut sys = System::new();
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
     let mut result = Vec::new();
-    #[cfg(target_os = "linux")]
-    {
-        if let Ok(entries) = std::fs::read_dir("/proc") {
-            for entry in entries.flatten() {
-                let name = entry.file_name().to_string_lossy().to_string();
-                if let Ok(pid) = name.parse::<i64>() {
-                    let mut h = indexmap::IndexMap::new();
-                    h.insert("pid".into(), PerlValue::integer(pid));
-                    // Read comm (process name)
-                    if let Ok(comm) = std::fs::read_to_string(format!("/proc/{}/comm", pid)) {
-                        h.insert("name".into(), PerlValue::string(comm.trim().to_string()));
-                    }
-                    // Read cmdline
-                    if let Ok(cmdline) = std::fs::read_to_string(format!("/proc/{}/cmdline", pid)) {
-                        h.insert(
-                            "cmdline".into(),
-                            PerlValue::string(cmdline.replace('\0', " ").trim().to_string()),
-                        );
-                    }
-                    // Read status for uid, state, memory
-                    if let Ok(status) = std::fs::read_to_string(format!("/proc/{}/status", pid)) {
-                        for line in status.lines() {
-                            if let Some(rest) = line.strip_prefix("Uid:\t") {
-                                if let Some(uid) = rest.split_whitespace().next() {
-                                    h.insert(
-                                        "uid".into(),
-                                        PerlValue::integer(uid.parse().unwrap_or(0)),
-                                    );
-                                }
-                            } else if let Some(rest) = line.strip_prefix("State:\t") {
-                                h.insert(
-                                    "state".into(),
-                                    PerlValue::string(
-                                        rest.chars().next().unwrap_or('?').to_string(),
-                                    ),
-                                );
-                            } else if let Some(rest) = line.strip_prefix("VmRSS:\t") {
-                                if let Some(kb) = rest.split_whitespace().next() {
-                                    h.insert(
-                                        "rss_kb".into(),
-                                        PerlValue::integer(kb.trim().parse().unwrap_or(0)),
-                                    );
-                                }
-                            }
-                        }
-                    }
-                    result.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
-                }
-            }
+    for (pid, proc_) in sys.processes() {
+        let mut h = indexmap::IndexMap::new();
+        h.insert("pid".into(), PerlValue::integer(pid.as_u32() as i64));
+        h.insert(
+            "name".into(),
+            PerlValue::string(proc_.name().to_string_lossy().to_string()),
+        );
+        h.insert("cpu".into(), PerlValue::float(proc_.cpu_usage() as f64));
+        h.insert("mem".into(), PerlValue::integer(proc_.memory() as i64));
+        h.insert(
+            "status".into(),
+            PerlValue::string(format!("{:?}", proc_.status())),
+        );
+        if let Some(parent) = proc_.parent() {
+            h.insert("ppid".into(), PerlValue::integer(parent.as_u32() as i64));
         }
-    }
-    #[cfg(target_os = "macos")]
-    {
-        // Use sysctl KERN_PROC to list processes without forking
-        let mut mib = [libc::CTL_KERN, libc::KERN_PROC, libc::KERN_PROC_ALL, 0];
-        let mut size: libc::size_t = 0;
-        // First call: get required buffer size
-        if unsafe {
-            libc::sysctl(
-                mib.as_mut_ptr(),
-                4,
-                std::ptr::null_mut(),
-                &mut size,
-                std::ptr::null_mut(),
-                0,
-            )
-        } != 0
-        {
-            return Ok(PerlValue::array(vec![]));
-        }
-        let mut buf: Vec<u8> = vec![0u8; size];
-        if unsafe {
-            libc::sysctl(
-                mib.as_mut_ptr(),
-                4,
-                buf.as_mut_ptr() as *mut _,
-                &mut size,
-                std::ptr::null_mut(),
-                0,
-            )
-        } != 0
-        {
-            return Ok(PerlValue::array(vec![]));
-        }
-        // sizeof(kinfo_proc) on arm64 macOS = 648
-        let kinfo_size = 648usize;
-        let count = size / kinfo_size;
-        for i in 0..count {
-            let base = i * kinfo_size;
-            if base + kinfo_size > buf.len() {
-                break;
-            }
-            // kp_proc.p_pid at offset 72 (i32)
-            let pid = i32::from_ne_bytes([
-                buf[base + 72],
-                buf[base + 73],
-                buf[base + 74],
-                buf[base + 75],
-            ]) as i64;
-            // kp_proc.p_comm at offset 103 (16-byte C string)
-            let comm_start = base + 103;
-            let comm_end = (comm_start..comm_start + 16)
-                .find(|&j| buf.get(j).copied() == Some(0))
-                .unwrap_or(comm_start + 16);
-            let name = String::from_utf8_lossy(&buf[comm_start..comm_end]).to_string();
-            // kp_eproc.e_ucred.cr_uid at offset 304 (u32)
-            let uid = u32::from_ne_bytes([
-                buf[base + 304],
-                buf[base + 305],
-                buf[base + 306],
-                buf[base + 307],
-            ]) as i64;
-            if pid > 0 {
-                let mut h = indexmap::IndexMap::new();
-                h.insert("pid".into(), PerlValue::integer(pid));
-                h.insert("name".into(), PerlValue::string(name));
-                h.insert("uid".into(), PerlValue::integer(uid));
-                result.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
-            }
-        }
+        result.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
     }
     result.sort_by(|a, b| {
         let ap = a
@@ -9195,11 +9095,6 @@ fn builtin_process_list(_line: usize) -> PerlResult<PerlValue> {
         ap.cmp(&bp)
     });
     Ok(PerlValue::array(result))
-}
-
-#[cfg(not(unix))]
-fn builtin_process_list(_line: usize) -> PerlResult<PerlValue> {
-    Ok(PerlValue::array(vec![]))
 }
 
 // ── Testing framework ──────────────────────────────────────────────────

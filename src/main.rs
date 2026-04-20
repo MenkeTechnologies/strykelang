@@ -1107,6 +1107,159 @@ fn main() {
         process::exit(run_doc_subcommand(&args[2..]));
     }
 
+    // `stryke run` — run main.stk in current directory (or specified file).
+    if args.len() >= 2 && args[1] == "run" {
+        let script = if args.len() >= 3 {
+            args[2].clone()
+        } else {
+            // Search for main.stk, then src/main.stk
+            if std::path::Path::new("main.stk").exists() {
+                "main.stk".to_string()
+            } else if std::path::Path::new("src/main.stk").exists() {
+                "src/main.stk".to_string()
+            } else {
+                eprintln!("stryke run: no main.stk found (checked ./main.stk and ./src/main.stk)");
+                process::exit(1);
+            }
+        };
+        // Re-exec self with the script path — isolated interpreter per run.
+        let exe = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from(&args[0]));
+        let mut cmd = process::Command::new(exe);
+        cmd.arg(&script);
+        if args.len() > 3 {
+            cmd.args(&args[3..]);
+        }
+        let status = cmd.status().unwrap_or_else(|e| {
+            eprintln!("stryke run: {}", e);
+            process::exit(1);
+        });
+        process::exit(status.code().unwrap_or(1));
+    }
+
+    // `stryke test [FILE|DIR]` — run test files.
+    if args.len() >= 2 && args[1] == "test" {
+        let target = if args.len() >= 3 {
+            args[2].clone()
+        } else {
+            // Search for t/ directory
+            if std::path::Path::new("t").is_dir() {
+                "t".to_string()
+            } else if std::path::Path::new("tests").is_dir() {
+                "tests".to_string()
+            } else {
+                eprintln!("stryke test: no t/ or tests/ directory found");
+                process::exit(1);
+            }
+        };
+        let target_path = std::path::Path::new(&target);
+        let test_files: Vec<String> = if target_path.is_dir() {
+            let mut files: Vec<String> = std::fs::read_dir(target_path)
+                .unwrap_or_else(|e| {
+                    eprintln!("stryke test: {}: {}", target, e);
+                    process::exit(1);
+                })
+                .filter_map(|e| e.ok())
+                .map(|e| e.path().to_string_lossy().to_string())
+                .filter(|p| {
+                    let name = std::path::Path::new(p)
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    (name.starts_with("test_") || name.starts_with("t_"))
+                        && (name.ends_with(".stk")
+                            || name.ends_with(".st")
+                            || name.ends_with(".pl"))
+                })
+                .collect();
+            files.sort();
+            files
+        } else {
+            vec![target]
+        };
+        if test_files.is_empty() {
+            eprintln!("stryke test: no test files found");
+            process::exit(1);
+        }
+        let total = test_files.len();
+        let mut failed = 0;
+        let mut total_pass = 0usize;
+        let mut total_fail = 0usize;
+        eprintln!(
+            "\x1b[36mRunning {} test file{}\x1b[0m\n",
+            total,
+            if total == 1 { "" } else { "s" }
+        );
+        for f in &test_files {
+            let name = std::path::Path::new(f)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| f.clone());
+            eprintln!("\x1b[1m── {} ──\x1b[0m", name);
+            // Resolve exe to absolute path. Try current_exe first, then
+            // canonicalize args[0], then fall back to bare args[0] (PATH lookup).
+            let exe = std::env::current_exe()
+                .ok()
+                .filter(|p| p.exists())
+                .or_else(|| std::fs::canonicalize(&args[0]).ok())
+                .unwrap_or_else(|| std::path::PathBuf::from(&args[0]));
+            let script_abs =
+                std::fs::canonicalize(f).unwrap_or_else(|_| std::path::PathBuf::from(f));
+            // Project root = parent of t/ directory, so `require "./lib/..."` works.
+            let project_root = script_abs
+                .parent() // t/
+                .and_then(|p| p.parent()) // project/
+                .unwrap_or(std::path::Path::new("."));
+            // Capture stderr to count assertions
+            let output = process::Command::new(&exe)
+                .arg(&script_abs)
+                .current_dir(project_root)
+                .stderr(process::Stdio::piped())
+                .output();
+            match output {
+                Ok(out) => {
+                    let stderr = String::from_utf8_lossy(&out.stderr);
+                    // Print the stderr (test output)
+                    eprint!("{}", stderr);
+                    // Count ✓ and ✗ in output
+                    total_pass += stderr.matches('✓').count().saturating_sub(1); // -1 for summary line
+                    total_fail += stderr
+                        .matches('✗')
+                        .count()
+                        .saturating_sub(if out.status.success() { 0 } else { 1 });
+                    if !out.status.success() {
+                        failed += 1;
+                    }
+                }
+                Err(e) => {
+                    eprintln!("  failed to run: {}", e);
+                    failed += 1;
+                }
+            }
+            eprintln!();
+        }
+        let grand_total = total_pass + total_fail;
+        eprintln!("═══════════════════════════════");
+        if failed == 0 {
+            eprintln!(
+                "\x1b[32m✓ All {} test file{} passed ({} assertions)\x1b[0m",
+                total,
+                if total == 1 { "" } else { "s" },
+                grand_total
+            );
+            process::exit(0);
+        } else {
+            eprintln!(
+                "\x1b[31m✗ {} of {} test file{} failed ({} passed, {} failed)\x1b[0m",
+                failed,
+                total,
+                if total == 1 { "" } else { "s" },
+                total_pass,
+                total_fail
+            );
+            process::exit(1);
+        }
+    }
+
     // `stryke serve PORT SCRIPT` or `stryke serve PORT -e CODE` subcommand.
     if args.len() >= 2 && args[1] == "serve" {
         process::exit(run_serve_subcommand(&args[2..]));

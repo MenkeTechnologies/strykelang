@@ -1,0 +1,52 @@
+#!/usr/bin/env stryke
+# t/test_data.stk — data library tests
+
+require "./lib/data.stk"
+
+# Word frequencies
+my $freq = word_freq_map(qw(a b a c a b))
+assert_eq $freq->{a}, 3, "freq a=3"
+assert_eq $freq->{b}, 2, "freq b=2"
+assert_eq $freq->{c}, 1, "freq c=1"
+
+# Summarize
+my $stats = summarize_list(1, 2, 3, 4, 5)
+assert_eq $stats->{count}, 5, "count"
+assert_eq $stats->{sum}, 15, "sum"
+assert_eq $stats->{mean}, 3, "mean"
+assert_eq $stats->{min}, 1, "min"
+assert_eq $stats->{max}, 5, "max"
+assert_eq $stats->{median}, 3, "median"
+
+# Zip to hash
+my $zipped = zip_to_hash(["a", "b", "c"], [1, 2, 3])
+assert_eq $zipped->{a}, 1, "zip a"
+assert_eq $zipped->{b}, 2, "zip b"
+assert_eq $zipped->{c}, 3, "zip c"
+
+# Partition
+my $parts = split_by_pred(sub { $_[0] > 3 }, 1, 2, 3, 4, 5, 6)
+assert_eq scalar(@{$parts->[0]}), 3, "partition yes count"
+assert_eq scalar(@{$parts->[1]}), 3, "partition no count"
+assert_eq $parts->[0]->[0], 4, "partition first match"
+
+# Running total
+my @rt = running_total(1, 2, 3, 4, 5)
+assert_eq $rt[0], 1, "running total first"
+assert_eq $rt[2], 6, "running total third"
+assert_eq $rt[4], 15, "running total last"
+
+# Group by
+my $alice = { name => "Alice", dept => "eng" }
+my $bob = { name => "Bob", dept => "eng" }
+my $carol = { name => "Carol", dept => "sales" }
+my @people = ($alice, $bob, $carol)
+my $grouped = group_records("dept", @people)
+assert_eq scalar(@{$grouped->{eng}}), 2, "group eng count"
+assert_eq scalar(@{$grouped->{sales}}), 1, "group sales count"
+
+# Pipeline: summarize via pipe
+my $piped_stats = (10, 20, 30, 40, 50) |> summarize_list
+assert_eq $piped_stats->{mean}, 30, "piped summarize mean"
+
+test_run

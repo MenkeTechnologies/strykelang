@@ -1,0 +1,124 @@
+# lib/collections.stk — sets, hash pipelines, higher-order functions
+
+# ── Set operations ───────────────────────────────────────────────────
+
+fn union_sets {
+    my $a = $_[0]
+    my $b = $_[1]
+    my @combined
+    for my $x (@$a) { push @combined, $x }
+    for my $x (@$b) { push @combined, $x }
+    my @result = uniq(@combined)
+    @result
+}
+
+fn intersect_sets {
+    my $a = $_[0]
+    my $b = $_[1]
+    my $in_b = {}
+    for my $x (@$b) { $in_b->{$x} = 1 }
+    my @result
+    for my $x (@$a) {
+        push @result, $x if exists $in_b->{$x}
+    }
+    @result
+}
+
+fn diff_sets {
+    my $a = $_[0]
+    my $b = $_[1]
+    my $in_b = {}
+    for my $x (@$b) { $in_b->{$x} = 1 }
+    my @result
+    for my $x (@$a) {
+        push @result, $x unless exists $in_b->{$x}
+    }
+    @result
+}
+
+# ── Hash pipeline utilities ─────────────────────────────────────────
+
+# Invert a hash (swap keys and values), returns hashref
+fn flip_hash {
+    my %h = @_
+    my $inv = {}
+    for my $k (keys %h) {
+        $inv->{$h{$k}} = $k
+    }
+    $inv
+}
+
+# Select only certain keys from a hash
+fn extract_keys {
+    my $href = $_[0]
+    my @keys
+    for my $i (1..scalar(@_) - 1) {
+        push @keys, $_[$i]
+    }
+    my $result = {}
+    for my $k (@keys) {
+        $result->{$k} = $href->{$k} if exists $href->{$k}
+    }
+    $result
+}
+
+# Map over hash values, keeping keys
+fn apply_to_values {
+    my $href = $_[0]
+    my $fn = $_[1]
+    my $result = {}
+    for my $k (keys %$href) {
+        $result->{$k} = $fn->($href->{$k})
+    }
+    $result
+}
+
+# ── Higher-order collection functions ────────────────────────────────
+
+# Compose two functions: compose_fns(f, g) returns sub { f(g(x)) }
+fn compose_fns {
+    my $f = $_[0]
+    my $g = $_[1]
+    sub { $f->($g->($_[0])) }
+}
+
+# Apply a list of transforms to a value (left fold of functions)
+fn apply_pipeline {
+    my $val = shift
+    my @fns = @_
+    for my $fn (@fns) {
+        $val = $fn->($val)
+    }
+    $val
+}
+
+# Count occurrences — returns arrayref of [value, count] pairs
+fn count_occurrences {
+    my @items = @_
+    my $freq = {}
+    for my $item (@items) {
+        $freq->{$item} = ($freq->{$item} // 0) + 1
+    }
+    my @pairs
+    for my $k (keys %$freq) {
+        my $pair = [$k, $freq->{$k}]
+        push @pairs, $pair
+    }
+    [@pairs]
+}
+
+# Split an array into groups of N
+fn split_chunks {
+    my $n = shift
+    my @items = @_
+    my @chunks
+    while (scalar @items) {
+        my @group
+        for my $i (1..$n) {
+            last unless scalar @items
+            push @group, shift @items
+        }
+        push @chunks, [@group]
+    }
+    @chunks
+}

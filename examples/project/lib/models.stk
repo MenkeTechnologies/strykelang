@@ -1,0 +1,102 @@
+# lib/models.stk — OOP: enums, structs, classes, inheritance, traits
+
+# ── Enums ────────────────────────────────────────────────────────────
+
+enum Status { Active, Inactive, Pending }
+
+enum Direction { North, South, East, West }
+
+# ── Structs ──────────────────────────────────────────────────────────
+
+struct Point { x, y }
+
+struct Config {
+    host => Str,
+    port => Int,
+    debug => Int
+}
+
+# ── Traits ───────────────────────────────────────────────────────────
+
+trait Describable {
+    fn describe
+}
+
+# ── Abstract base class ─────────────────────────────────────────────
+
+abstract class Shape {
+    name: Str = "shape"
+
+    fn area
+
+    fn describe { "Shape(" . $self->name . ", area=" . $self->area() . ")" }
+}
+
+# ── Concrete classes with inheritance ────────────────────────────────
+
+class Circle extends Shape impl Describable {
+    radius: Int = 1
+
+    fn area { 3.14159 * $self->radius * $self->radius }
+
+    fn circumference { 2 * 3.14159 * $self->radius }
+
+    fn describe { "Circle(r=" . $self->radius . ", area=" . $self->area() . ")" }
+
+    fn Self.unit_circle {
+        Circle(name => "unit", radius => 1)
+    }
+}
+
+class Rectangle extends Shape impl Describable {
+    width: Int = 1
+    height: Int = 1
+
+    fn area { $self->width * $self->height }
+
+    fn perimeter { 2 * ($self->width + $self->height) }
+
+    fn is_square { $self->width == $self->height }
+
+    fn describe { "Rect(" . $self->width . "x" . $self->height . ", area=" . $self->area() . ")" }
+
+    fn Self.create_square($side) {
+        Rectangle(name => "square", width => $side, height => $side)
+    }
+}
+
+# ── Class with BUILD hook and static field ──────────────────────────
+
+class Counter {
+    static total: Int = 0
+    label: Str = "default"
+    value: Int = 0
+
+    fn BUILD {
+        Counter::total(Counter::total() + 1)
+    }
+
+    fn increment {
+        $self->value($self->value + 1)
+        $self
+    }
+
+    fn decrement {
+        $self->value($self->value - 1)
+        $self
+    }
+
+    fn describe { $self->label . "=" . $self->value }
+}
+
+# ── Operator overloading ────────────────────────────────────────────
+
+class Vec2 {
+    x: Int
+    y: Int
+    fn op_add($other) { Vec2(x => $self->x + $other->x, y => $self->y + $other->y) }
+    fn op_sub($other) { Vec2(x => $self->x - $other->x, y => $self->y - $other->y) }
+    fn op_eq($other) { $self->x == $other->x && $self->y == $other->y }
+    fn dot_product($other) { ($self->x * $other->x) + ($self->y * $other->y) }
+    fn stringify { "(" . $self->x . "," . $self->y . ")" }
+}

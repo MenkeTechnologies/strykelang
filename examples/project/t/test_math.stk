@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+# t/test_math.stk — math library tests
+
+require "./lib/math.stk"
+
+# Fibonacci with memoization
+assert_eq fib(0), 0, "fib(0)"
+assert_eq fib(1), 1, "fib(1)"
+assert_eq fib(10), 55, "fib(10)"
+assert_eq fib(20), 6765, "fib(20)"
+
+# Factorial
+assert_eq factorial(0), 1, "0!"
+assert_eq factorial(5), 120, "5!"
+assert_eq factorial(8), 40320, "8!"
+
+# Primes
+my @p = primes_under(20)
+assert_eq scalar(@p), 8, "primes under 20 count"
+assert_eq $p[0], 2, "first prime"
+assert_eq $p[-1], 19, "last prime under 20"
+
+# GCD / LCM
+assert_eq gcd_of(12, 8), 4, "gcd(12,8)"
+assert_eq gcd_of(17, 13), 1, "gcd(17,13) coprime"
+assert_eq lcm_of(4, 6), 12, "lcm(4,6)"
+assert_eq lcm_of(7, 5), 35, "lcm(7,5)"
+
+# Closures: make_adder
+my $add5 = make_adder(5)
+assert_eq $add5->(10), 15, "adder closure"
+assert_eq $add5->(0), 5, "adder closure zero"
+
+# Higher-order: apply_n
+my $double = sub { $_[0] * 2 }
+assert_eq apply_n($double, 3, 1), 8, "apply_n double 3x"
+assert_eq apply_n($double, 0, 5), 5, "apply_n 0 times"
+
+# Pipeline: primes summed via pipe
+my $prime_sum = primes_under(10) |> sum
+assert_eq $prime_sum, 17, "primes under 10 sum"
+
+test_run
