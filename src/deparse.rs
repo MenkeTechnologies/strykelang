@@ -647,6 +647,12 @@ fn deparse_params(buf: &mut String, params: &[SubSigParam]) {
                     buf.push_str(&t.display_name());
                 }
             }
+            SubSigParam::Array(name) => {
+                let _ = write!(buf, "@{}", name);
+            }
+            SubSigParam::Hash(name) => {
+                let _ = write!(buf, "%{}", name);
+            }
             SubSigParam::ArrayDestruct(elems) => {
                 buf.push('[');
                 for (j, elem) in elems.iter().enumerate() {

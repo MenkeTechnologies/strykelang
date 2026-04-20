@@ -475,6 +475,8 @@ impl StaticAnalyzer {
     fn declare_param(&mut self, param: &SubSigParam) {
         match param {
             SubSigParam::Scalar(name, _) => self.declare_scalar(name),
+            SubSigParam::Array(name) => self.declare_array(name),
+            SubSigParam::Hash(name) => self.declare_hash(name),
             SubSigParam::ArrayDestruct(elems) => {
                 for e in elems {
                     match e {

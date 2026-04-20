@@ -3743,6 +3743,12 @@ fn collect_sub_params(params: &[SubSigParam], idx: &mut CompletionIndex) {
             SubSigParam::Scalar(n, _ty) => {
                 idx.scalars.insert(n.clone());
             }
+            SubSigParam::Array(n) => {
+                idx.arrays.insert(n.clone());
+            }
+            SubSigParam::Hash(n) => {
+                idx.hashes.insert(n.clone());
+            }
             SubSigParam::ArrayDestruct(elems) => collect_array_pattern(elems, idx),
             SubSigParam::HashDestruct(pairs) => {
                 for (_key, name) in pairs {

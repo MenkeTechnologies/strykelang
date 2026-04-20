@@ -25,7 +25,7 @@ assert_eq $zipped->{b}, 2, "zip b"
 assert_eq $zipped->{c}, 3, "zip c"
 
 # Partition
-my $parts = split_by_pred(sub { $_[0] > 3 }, 1, 2, 3, 4, 5, 6)
+my $parts = split_by_pred(fn { $_0 > 3 }, 1, 2, 3, 4, 5, 6)
 assert_eq scalar(@{$parts->[0]}), 3, "partition yes count"
 assert_eq scalar(@{$parts->[1]}), 3, "partition no count"
 assert_eq $parts->[0]->[0], 4, "partition first match"

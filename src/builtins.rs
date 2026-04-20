@@ -3955,6 +3955,12 @@ fn stringify_value(buf: &mut String, val: &PerlValue) {
                             buf.push_str(&t.display_name());
                         }
                     }
+                    crate::ast::SubSigParam::Array(name) => {
+                        let _ = write!(buf, "@{}", name);
+                    }
+                    crate::ast::SubSigParam::Hash(name) => {
+                        let _ = write!(buf, "%{}", name);
+                    }
                     crate::ast::SubSigParam::ArrayDestruct(_) => buf.push_str("[...]"),
                     crate::ast::SubSigParam::HashDestruct(_) => buf.push_str("{...}"),
                 }

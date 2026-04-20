@@ -3542,6 +3542,7 @@ impl Parser {
         match self.peek() {
             Token::LBrace | Token::LBracket => true,
             Token::ScalarVar(name) if name != "$$" && name != ")" => true,
+            Token::ArrayVar(_) | Token::HashVar(_) => true,
             _ => false,
         }
     }
@@ -3606,6 +3607,14 @@ impl Parser {
                         None
                     };
                     params.push(SubSigParam::Scalar(name, ty));
+                }
+                Token::ArrayVar(name) => {
+                    self.advance();
+                    params.push(SubSigParam::Array(name));
+                }
+                Token::HashVar(name) => {
+                    self.advance();
+                    params.push(SubSigParam::Hash(name));
                 }
                 Token::LBracket => {
                     self.advance();
