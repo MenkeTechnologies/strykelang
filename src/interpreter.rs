@@ -605,6 +605,8 @@ pub struct Interpreter {
     pub profiler: Option<Profiler>,
     /// Per-module `our @EXPORT` / `our @EXPORT_OK` (Exporter-style). Absent key → legacy import-all.
     pub(crate) module_export_lists: HashMap<String, ModuleExportLists>,
+    /// Virtual modules: path → source (for AOT bundles). Checked before filesystem in `require`.
+    pub(crate) virtual_modules: HashMap<String, String>,
     /// `tie %name, ...` — object that implements FETCH/STORE for that hash.
     pub(crate) tied_hashes: HashMap<String, PerlValue>,
     /// `tie $name` — TIESCALAR object for FETCH/STORE.
@@ -1344,6 +1346,7 @@ impl Interpreter {
             wantarray_kind: WantarrayCtx::Scalar,
             profiler: None,
             module_export_lists: HashMap::new(),
+            virtual_modules: HashMap::new(),
             tied_hashes: HashMap::new(),
             tied_scalars: HashMap::new(),
             tied_arrays: HashMap::new(),
@@ -1573,6 +1576,7 @@ impl Interpreter {
             wantarray_kind: self.wantarray_kind,
             profiler: None,
             module_export_lists: self.module_export_lists.clone(),
+            virtual_modules: self.virtual_modules.clone(),
             tied_hashes: self.tied_hashes.clone(),
             tied_scalars: self.tied_scalars.clone(),
             tied_arrays: self.tied_arrays.clone(),
@@ -3068,6 +3072,23 @@ impl Interpreter {
             return Ok(PerlValue::integer(1));
         }
         self.invoke_require_hook("require__before", relpath, line)?;
+
+        // Check virtual modules first (AOT bundles).
+        if let Some(code) = self.virtual_modules.get(relpath).cloned() {
+            let code = crate::data_section::strip_perl_end_marker(&code);
+            self.scope.set_hash_element(
+                "INC",
+                relpath,
+                PerlValue::string(format!("(virtual)/{}", relpath)),
+            )?;
+            let saved_pkg = self.scope.get_scalar("__PACKAGE__");
+            let r = crate::parse_and_run_string_in_file(code, self, relpath);
+            let _ = self.scope.set_scalar("__PACKAGE__", saved_pkg);
+            r?;
+            self.invoke_require_hook("require__after", relpath, line)?;
+            return Ok(PerlValue::integer(1));
+        }
+
         for dir in self.inc_directories() {
             let full = Path::new(&dir).join(relpath);
             if full.is_file() {
@@ -3097,6 +3118,11 @@ impl Interpreter {
             ),
             line,
         ))
+    }
+
+    /// Register a virtual module (for AOT bundles). Path should be relative like "lib/foo.stk".
+    pub fn register_virtual_module(&mut self, path: String, source: String) {
+        self.virtual_modules.insert(path, source);
     }
 
     /// Pragmas (`use strict 'refs'`, `use feature`) or load a `.pm` file (`use Foo::Bar`).
@@ -5330,10 +5356,6 @@ impl Interpreter {
                 line,
             )));
         }
-        let warmup = (n / 10).clamp(1, 10);
-        for _ in 0..warmup {
-            self.exec_block(body)?;
-        }
         let mut samples = Vec::with_capacity(n);
         for _ in 0..n {
             let start = std::time::Instant::now();
@@ -5349,8 +5371,8 @@ impl Interpreter {
             .min(n - 1);
         let p99_ms = sorted[p99_idx];
         Ok(PerlValue::string(format!(
-            "bench: n={} warmup={} min={:.6}ms mean={:.6}ms p99={:.6}ms",
-            n, warmup, min_ms, mean, p99_ms
+            "bench: n={} min={:.6}ms mean={:.6}ms p99={:.6}ms",
+            n, min_ms, mean, p99_ms
         )))
     }
 
@@ -16821,8 +16843,23 @@ impl Interpreter {
         let mut i = 0usize;
         for p in &sub.params {
             match p {
-                SubSigParam::Scalar(name, ty) => {
-                    let val = argv.get(i).cloned().unwrap_or(PerlValue::UNDEF);
+                SubSigParam::Scalar(name, ty, default) => {
+                    let val = if i < argv.len() {
+                        argv[i].clone()
+                    } else if let Some(default_expr) = default {
+                        match self.eval_expr(default_expr) {
+                            Ok(v) => v,
+                            Err(FlowOrError::Error(e)) => return Err(e),
+                            Err(FlowOrError::Flow(_)) => {
+                                return Err(PerlError::runtime(
+                                    "unexpected control flow in parameter default",
+                                    line,
+                                ))
+                            }
+                        }
+                    } else {
+                        PerlValue::UNDEF
+                    };
                     i += 1;
                     if let Some(t) = ty {
                         if let Err(e) = t.check_value(&val) {
@@ -16835,15 +16872,49 @@ impl Interpreter {
                     let n = self.english_scalar_name(name);
                     self.scope.declare_scalar(n, val);
                 }
-                SubSigParam::Array(name) => {
-                    let rest: Vec<PerlValue> = argv[i..].to_vec();
-                    i = argv.len();
+                SubSigParam::Array(name, default) => {
+                    let rest: Vec<PerlValue> = if i < argv.len() {
+                        let r = argv[i..].to_vec();
+                        i = argv.len();
+                        r
+                    } else if let Some(default_expr) = default {
+                        let val = match self.eval_expr_ctx(default_expr, WantarrayCtx::List) {
+                            Ok(v) => v,
+                            Err(FlowOrError::Error(e)) => return Err(e),
+                            Err(FlowOrError::Flow(_)) => {
+                                return Err(PerlError::runtime(
+                                    "unexpected control flow in parameter default",
+                                    line,
+                                ))
+                            }
+                        };
+                        val.to_list()
+                    } else {
+                        vec![]
+                    };
                     let aname = self.stash_array_name_for_package(name);
                     self.scope.declare_array(&aname, rest);
                 }
-                SubSigParam::Hash(name) => {
-                    let rest: Vec<PerlValue> = argv[i..].to_vec();
-                    i = argv.len();
+                SubSigParam::Hash(name, default) => {
+                    let rest: Vec<PerlValue> = if i < argv.len() {
+                        let r = argv[i..].to_vec();
+                        i = argv.len();
+                        r
+                    } else if let Some(default_expr) = default {
+                        let val = match self.eval_expr_ctx(default_expr, WantarrayCtx::List) {
+                            Ok(v) => v,
+                            Err(FlowOrError::Error(e)) => return Err(e),
+                            Err(FlowOrError::Flow(_)) => {
+                                return Err(PerlError::runtime(
+                                    "unexpected control flow in parameter default",
+                                    line,
+                                ))
+                            }
+                        };
+                        val.to_list()
+                    } else {
+                        vec![]
+                    };
                     let mut map = IndexMap::new();
                     let mut j = 0;
                     while j + 1 < rest.len() {
@@ -17271,8 +17342,23 @@ impl Interpreter {
         let mut i = 0;
         for param in params {
             match param {
-                SubSigParam::Scalar(name, ty_opt) => {
-                    let v = argv.get(i).cloned().unwrap_or(PerlValue::UNDEF);
+                SubSigParam::Scalar(name, ty_opt, default) => {
+                    let v = if i < argv.len() {
+                        argv[i].clone()
+                    } else if let Some(default_expr) = default {
+                        match self.eval_expr(default_expr) {
+                            Ok(v) => v,
+                            Err(FlowOrError::Error(e)) => return Err(e),
+                            Err(FlowOrError::Flow(_)) => {
+                                return Err(PerlError::runtime(
+                                    "unexpected control flow in parameter default",
+                                    line,
+                                ))
+                            }
+                        }
+                    } else {
+                        PerlValue::UNDEF
+                    };
                     i += 1;
                     if let Some(ty) = ty_opt {
                         ty.check_value(&v).map_err(|msg| {
@@ -17285,15 +17371,49 @@ impl Interpreter {
                     let n = self.english_scalar_name(name);
                     self.scope.declare_scalar(n, v);
                 }
-                SubSigParam::Array(name) => {
-                    let rest: Vec<PerlValue> = argv[i..].to_vec();
-                    i = argv.len();
+                SubSigParam::Array(name, default) => {
+                    let rest: Vec<PerlValue> = if i < argv.len() {
+                        let r = argv[i..].to_vec();
+                        i = argv.len();
+                        r
+                    } else if let Some(default_expr) = default {
+                        let val = match self.eval_expr_ctx(default_expr, WantarrayCtx::List) {
+                            Ok(v) => v,
+                            Err(FlowOrError::Error(e)) => return Err(e),
+                            Err(FlowOrError::Flow(_)) => {
+                                return Err(PerlError::runtime(
+                                    "unexpected control flow in parameter default",
+                                    line,
+                                ))
+                            }
+                        };
+                        val.to_list()
+                    } else {
+                        vec![]
+                    };
                     let aname = self.stash_array_name_for_package(name);
                     self.scope.declare_array(&aname, rest);
                 }
-                SubSigParam::Hash(name) => {
-                    let rest: Vec<PerlValue> = argv[i..].to_vec();
-                    i = argv.len();
+                SubSigParam::Hash(name, default) => {
+                    let rest: Vec<PerlValue> = if i < argv.len() {
+                        let r = argv[i..].to_vec();
+                        i = argv.len();
+                        r
+                    } else if let Some(default_expr) = default {
+                        let val = match self.eval_expr_ctx(default_expr, WantarrayCtx::List) {
+                            Ok(v) => v,
+                            Err(FlowOrError::Error(e)) => return Err(e),
+                            Err(FlowOrError::Flow(_)) => {
+                                return Err(PerlError::runtime(
+                                    "unexpected control flow in parameter default",
+                                    line,
+                                ))
+                            }
+                        };
+                        val.to_list()
+                    } else {
+                        vec![]
+                    };
                     let mut map = IndexMap::new();
                     let mut j = 0;
                     while j + 1 < rest.len() {

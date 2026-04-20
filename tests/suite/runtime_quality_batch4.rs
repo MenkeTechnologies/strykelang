@@ -278,12 +278,14 @@ fn repeat_assign_from_expression() {
 }
 
 #[test]
-fn chained_comparison_via_and() {
+fn explicit_and_comparison_chain_true() {
+    // Explicit && still works (in addition to new Raku-style chained comparisons)
     assert_eq!(eval_int("1 < 2 && 2 < 3"), 1);
 }
 
 #[test]
-fn chained_comparison_false_middle() {
+fn explicit_and_comparison_chain_false() {
+    // Explicit && still works (in addition to new Raku-style chained comparisons)
     assert_eq!(eval_int("1 < 2 && 2 > 3"), 0);
 }
 

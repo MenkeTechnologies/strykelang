@@ -444,17 +444,20 @@ fn print_cyberpunk_help() {
     println!(
         "  serve [PORT] [SCRIPT]  {G}//{N} HTTP server (stryke serve, stryke serve 8080 app.stk)"
     );
+    println!("  fmt [-i] FILE...       {G}//{N} Format source files (stryke fmt -i .)");
+    println!(
+        "  bench [FILE|DIR]       {G}//{N} Run benchmarks from bench/ or benches/ (stryke bench)"
+    );
+    println!("  init [NAME]            {G}//{N} Scaffold a new project (stryke init myapp)");
+    println!(
+        "  repl [--load FILE]     {G}//{N} Interactive REPL with optional pre-load (stryke repl)"
+    );
     println!(
         "  --remote-worker        {G}//{N} Persistent cluster worker (stdio); only arg after {bin}"
     );
     println!(
         "  --remote-worker-v1     {G}//{N} Legacy one-shot worker (stdio); only arg after {bin}"
     );
-    if matches!(bin, "stryke" | "st" | "s") {
-        println!(
-            "  (no switches, TTY stdin) {G}//{N} Interactive REPL (readline; exit with quit or EOF)"
-        );
-    }
     println!("{C}  ── PARALLEL EXTENSIONS (stryke) ─────────────────────{N}");
     println!("  -j N                   {G}//{N} Set number of parallel threads (rayon)");
     println!(
@@ -1064,9 +1067,16 @@ fn main() {
     // program: all command-line args become `@ARGV` for the embedded script. The probe
     // costs one file open + one 32-byte read (~50 µs) on the no-trailer path.
     if let Ok(exe) = std::env::current_exe() {
-        if let Some(embedded) = stryke::aot::try_load_embedded(&exe) {
+        if let Some(payload) = stryke::aot::try_load_embedded(&exe) {
             let argv: Vec<String> = std::env::args().skip(1).collect();
-            process::exit(run_embedded_script(embedded, argv));
+            match payload {
+                stryke::aot::EmbeddedPayload::Script(embedded) => {
+                    process::exit(run_embedded_script(embedded, argv));
+                }
+                stryke::aot::EmbeddedPayload::Bundle(bundle) => {
+                    process::exit(run_embedded_bundle(bundle, argv));
+                }
+            }
         }
     }
 
@@ -1107,6 +1117,26 @@ fn main() {
         process::exit(run_doc_subcommand(&args[2..]));
     }
 
+    // `stryke fmt [-i] FILE...` — format stryke source files.
+    if args.len() >= 2 && args[1] == "fmt" {
+        process::exit(run_fmt_subcommand(&args[2..]));
+    }
+
+    // `stryke bench [FILE|DIR]` — discover and run benchmark files.
+    if args.len() >= 2 && args[1] == "bench" {
+        process::exit(run_bench_subcommand(&args[0], &args[2..]));
+    }
+
+    // `stryke init [NAME]` — scaffold a new stryke project.
+    if args.len() >= 2 && args[1] == "init" {
+        process::exit(run_init_subcommand(&args[2..]));
+    }
+
+    // `stryke repl [--load FILE]` — explicit REPL entry.
+    if args.len() >= 2 && args[1] == "repl" {
+        process::exit(run_repl_subcommand(&args[2..]));
+    }
+
     // `stryke run` — run main.stk in current directory (or specified file).
     if args.len() >= 2 && args[1] == "run" {
         let script = if args.len() >= 3 {
@@ -1134,6 +1164,11 @@ fn main() {
             process::exit(1);
         });
         process::exit(status.code().unwrap_or(1));
+    }
+
+    // `stryke prun FILE...` — run multiple files in parallel.
+    if args.len() >= 2 && args[1] == "prun" {
+        process::exit(run_prun_subcommand(&args[0], &args[2..]));
     }
 
     // `stryke test [FILE|DIR]` — run test files.
@@ -1276,6 +1311,36 @@ fn main() {
         process::exit(run_serve_subcommand(&args[2..]));
     }
 
+    // `stryke check FILE...` — parse + compile without executing.
+    if args.len() >= 2 && args[1] == "check" {
+        process::exit(run_check_subcommand(&args[2..]));
+    }
+
+    // `stryke disasm FILE` — disassemble bytecode.
+    if args.len() >= 2 && args[1] == "disasm" {
+        process::exit(run_disasm_subcommand(&args[2..]));
+    }
+
+    // `stryke profile FILE` — run with profiling and output structured data.
+    if args.len() >= 2 && args[1] == "profile" {
+        process::exit(run_profile_subcommand(&args[0], &args[2..]));
+    }
+
+    // `stryke lsp` — start Language Server Protocol over stdio.
+    if args.len() >= 2 && args[1] == "lsp" {
+        process::exit(stryke::run_lsp_stdio());
+    }
+
+    // `stryke completions [SHELL]` — emit shell completions.
+    if args.len() >= 2 && args[1] == "completions" {
+        process::exit(run_completions_subcommand(&args[2..]));
+    }
+
+    // `stryke ast FILE` — dump AST as JSON.
+    if args.len() >= 2 && args[1] == "ast" {
+        process::exit(run_ast_subcommand(&args[2..]));
+    }
+
     // Fast path: `stryke SCRIPT [ARGS...]` with no dashes anywhere — the common case, and
     // clap parsing is the dominant term on `print "hello\n"` (it knocks ~1ms off the
     // startup bench). We can't bypass clap when any flag is present, so fall through to the
@@ -1357,7 +1422,76 @@ fn main() {
             .ok();
     }
 
-    let is_repl = matches!(env!("CARGO_BIN_NAME"), "stryke" | "st" | "s")
+    // Multi-file execution: `st *.stk` runs all files.
+    // Use `-j N` for parallel execution: `st -j4 *.stk`
+    // Only triggers when ALL args are existing script files on disk.
+    // `st file.stk ARG1 ARG2` still works because ARG1/ARG2 won't exist as files.
+    if cli.script.is_some()
+        && cli.execute.is_empty()
+        && cli.execute_features.is_empty()
+        && !cli.line_mode
+        && !cli.print_mode
+        && !cli.args.is_empty()
+    {
+        let script = cli.script.as_ref().unwrap();
+        let is_stk_ext = |p: &str| {
+            p.ends_with(".stk") || p.ends_with(".pl") || p.ends_with(".pm") || p.ends_with(".t")
+        };
+        let is_existing_script = |p: &str| is_stk_ext(p) && Path::new(p).is_file();
+
+        if is_existing_script(script) && cli.args.iter().all(|a| is_existing_script(a)) {
+            let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from(&args[0]));
+            let mut all_files = vec![script.clone()];
+            all_files.extend(cli.args.iter().cloned());
+
+            // Parallel execution when -j is specified
+            let failed = if cli.threads.is_some() {
+                use std::sync::atomic::{AtomicUsize, Ordering};
+                let failed = AtomicUsize::new(0);
+                all_files.par_iter().for_each(|f| {
+                    let status = process::Command::new(&exe).arg(f).status();
+                    match status {
+                        Ok(s) if !s.success() => {
+                            failed.fetch_add(1, Ordering::Relaxed);
+                        }
+                        Err(e) => {
+                            eprintln!("{}: {}", f, e);
+                            failed.fetch_add(1, Ordering::Relaxed);
+                        }
+                        _ => {}
+                    }
+                });
+                failed.load(Ordering::Relaxed)
+            } else {
+                // Sequential execution (default)
+                let mut failed = 0usize;
+                for f in &all_files {
+                    let status = process::Command::new(&exe).arg(f).status();
+                    match status {
+                        Ok(s) if !s.success() => failed += 1,
+                        Err(e) => {
+                            eprintln!("{}: {}", f, e);
+                            failed += 1;
+                        }
+                        _ => {}
+                    }
+                }
+                failed
+            };
+            process::exit(if failed > 0 { 1 } else { 0 });
+        }
+    }
+
+    // Check both compile-time binary name and runtime invocation name for REPL trigger.
+    // This handles symlinks like `s` -> `stryke` and `st` -> `stryke`.
+    let runtime_bin_name = args
+        .first()
+        .and_then(|p| Path::new(p).file_name())
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let is_stryke_bin = matches!(env!("CARGO_BIN_NAME"), "stryke" | "st" | "s")
+        || matches!(runtime_bin_name.as_str(), "stryke" | "st" | "s");
+    let is_repl = is_stryke_bin
         && cli.script.is_none()
         && cli.execute.is_empty()
         && cli.execute_features.is_empty()
@@ -1725,11 +1859,479 @@ fn run_embedded_script(embedded: stryke::aot::EmbeddedScript, argv: Vec<String>)
     }
 }
 
-/// `stryke build SCRIPT [-o OUT]` — compile a Perl script into a standalone binary by
-/// copying the currently-running `stryke` and appending a zstd-compressed source trailer.
-/// The resulting file behaves as a native program: all CLI args go to the embedded script.
+/// Run an embedded bundle (v2 AOT) — registers all bundled files as virtual modules,
+/// then executes the entry point.
+fn run_embedded_bundle(bundle: stryke::aot::EmbeddedBundle, argv: Vec<String>) -> i32 {
+    let entry_source = match bundle.files.get(&bundle.entry) {
+        Some(s) => s.clone(),
+        None => {
+            eprintln!("stryke: bundle missing entry point: {}", bundle.entry);
+            return 255;
+        }
+    };
+
+    let program = match stryke::parse_with_file(&entry_source, &bundle.entry) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("{}", e);
+            return 255;
+        }
+    };
+
+    let mut interp = Interpreter::new();
+    interp.set_file(&bundle.entry);
+    interp.program_name = bundle.entry.clone();
+    interp.argv = argv.clone();
+    interp.scope.declare_array(
+        "ARGV",
+        argv.into_iter()
+            .map(stryke::value::PerlValue::string)
+            .collect(),
+    );
+    interp.scope.declare_array(
+        "INC",
+        vec![stryke::value::PerlValue::string(".".to_string())],
+    );
+
+    for (path, source) in &bundle.files {
+        interp.register_virtual_module(path.clone(), source.clone());
+    }
+
+    match interp.execute(&program) {
+        Ok(_) => {
+            let _ = interp.run_global_teardown();
+            let _ = io::stdout().flush();
+            0
+        }
+        Err(e) => match e.kind {
+            ErrorKind::Exit(code) => code,
+            ErrorKind::Die => {
+                eprint!("{}", e);
+                255
+            }
+            _ => {
+                eprintln!("{}", e);
+                255
+            }
+        },
+    }
+}
+
+/// `stryke check FILE...` — parse + compile without executing.
+/// Reports errors with file:line:col format suitable for CI and editor integration.
+fn run_check_subcommand(args: &[String]) -> i32 {
+    if args.is_empty() {
+        eprintln!("usage: stryke check FILE...");
+        eprintln!();
+        eprintln!("Parse and compile stryke/perl files without executing.");
+        eprintln!("Reports warnings and errors with file:line:col format.");
+        eprintln!();
+        eprintln!("Options:");
+        eprintln!("  -q, --quiet    Only output errors, no success messages");
+        eprintln!("  --json         Output diagnostics as JSON (one object per line)");
+        return 0;
+    }
+
+    let mut files: Vec<String> = Vec::new();
+    let mut quiet = false;
+    let mut json_output = false;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "-q" | "--quiet" => quiet = true,
+            "--json" => json_output = true,
+            "-h" | "--help" => {
+                eprintln!("usage: stryke check FILE...");
+                return 0;
+            }
+            s if !s.starts_with('-') => files.push(s.to_string()),
+            other => {
+                eprintln!("stryke check: unknown option: {}", other);
+                return 2;
+            }
+        }
+        i += 1;
+    }
+
+    if files.is_empty() {
+        eprintln!("stryke check: no files specified");
+        return 2;
+    }
+
+    let mut errors = 0;
+    for file in &files {
+        let source = match std::fs::read_to_string(file) {
+            Ok(s) => s,
+            Err(e) => {
+                if json_output {
+                    println!(
+                        r#"{{"file":"{}","line":0,"col":0,"severity":"error","message":"{}"}}"#,
+                        file,
+                        e.to_string().replace('"', "\\\"")
+                    );
+                } else {
+                    eprintln!("{}:0:0: error: {}", file, e);
+                }
+                errors += 1;
+                continue;
+            }
+        };
+
+        let program = match stryke::parse_with_file(&source, file) {
+            Ok(p) => p,
+            Err(e) => {
+                if json_output {
+                    println!(
+                        r#"{{"file":"{}","line":{},"col":0,"severity":"error","message":"{}"}}"#,
+                        file,
+                        e.line,
+                        e.to_string().replace('"', "\\\"").replace('\n', "\\n")
+                    );
+                } else {
+                    eprintln!("{}:{}:0: error: {}", file, e.line, e);
+                }
+                errors += 1;
+                continue;
+            }
+        };
+
+        let mut interp = Interpreter::new();
+        interp.set_file(file);
+        match stryke::lint_program(&program, &mut interp) {
+            Ok(()) => {
+                if !quiet && !json_output {
+                    eprintln!("{}: OK", file);
+                }
+            }
+            Err(e) => {
+                if json_output {
+                    println!(
+                        r#"{{"file":"{}","line":{},"col":0,"severity":"error","message":"{}"}}"#,
+                        file,
+                        e.line,
+                        e.to_string().replace('"', "\\\"").replace('\n', "\\n")
+                    );
+                } else {
+                    eprintln!("{}:{}:0: error: {}", file, e.line, e);
+                }
+                errors += 1;
+            }
+        }
+    }
+
+    if errors > 0 {
+        if !quiet && !json_output {
+            eprintln!();
+            eprintln!(
+                "{} error{} in {} file{}",
+                errors,
+                if errors == 1 { "" } else { "s" },
+                files.len(),
+                if files.len() == 1 { "" } else { "s" }
+            );
+        }
+        1
+    } else {
+        if !quiet && !json_output && files.len() > 1 {
+            eprintln!();
+            eprintln!("All {} files OK", files.len());
+        }
+        0
+    }
+}
+
+/// `stryke disasm FILE` — disassemble bytecode.
+fn run_disasm_subcommand(args: &[String]) -> i32 {
+    let mut file: Option<String> = None;
+    let mut show_jit = false;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--jit" => show_jit = true,
+            "-h" | "--help" => {
+                println!("usage: stryke disasm [--jit] FILE");
+                println!();
+                println!("Disassemble stryke bytecode for a file.");
+                println!();
+                println!("Options:");
+                println!("  --jit    Also show Cranelift IR (when JIT is enabled)");
+                return 0;
+            }
+            s if !s.starts_with('-') && file.is_none() => file = Some(s.to_string()),
+            other => {
+                eprintln!("stryke disasm: unknown option: {}", other);
+                return 2;
+            }
+        }
+        i += 1;
+    }
+
+    let Some(file) = file else {
+        eprintln!("usage: stryke disasm [--jit] FILE");
+        return 2;
+    };
+
+    let source = match std::fs::read_to_string(&file) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("stryke disasm: {}: {}", file, e);
+            return 1;
+        }
+    };
+
+    let program = match stryke::parse_with_file(&source, &file) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("{}", e);
+            return 1;
+        }
+    };
+
+    let mut interp = Interpreter::new();
+    interp.set_file(&file);
+    if let Err(e) = stryke::lint_program(&program, &mut interp) {
+        eprintln!("{}", e);
+        return 1;
+    }
+
+    let comp = stryke::compiler::Compiler::new().with_source_file(file.clone());
+    let chunk = match comp.compile_program(&program) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("compile error: {:?}", e);
+            return 1;
+        }
+    };
+
+    println!("=== Bytecode for {} ===", file);
+    println!("{}", chunk.disassemble());
+
+    if show_jit {
+        println!();
+        println!("=== Cranelift IR ===");
+        println!("(JIT IR dump not yet implemented)");
+    }
+
+    0
+}
+
+/// `stryke prun FILE...` — run multiple files in parallel.
+fn run_prun_subcommand(exe_arg: &str, args: &[String]) -> i32 {
+    if args.is_empty() || args[0] == "-h" || args[0] == "--help" {
+        println!("usage: stryke prun FILE...");
+        println!();
+        println!("Run multiple stryke files in parallel using all available cores.");
+        println!();
+        println!("Examples:");
+        println!("  stryke prun *.stk              # run all .stk files in parallel");
+        println!("  stryke prun a.stk b.stk c.stk  # run specific files in parallel");
+        println!();
+        println!("For sequential execution, use: stryke *.stk");
+        println!("For parallel with thread limit: stryke -j4 *.stk");
+        return if args.is_empty() { 2 } else { 0 };
+    }
+
+    let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from(exe_arg));
+    let files: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
+
+    if files.is_empty() {
+        eprintln!("stryke prun: no files specified");
+        return 2;
+    }
+
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let failed = AtomicUsize::new(0);
+    let total = files.len();
+
+    eprintln!(
+        "\x1b[36mRunning {} file{} in parallel\x1b[0m",
+        total,
+        if total == 1 { "" } else { "s" }
+    );
+
+    files.par_iter().for_each(|f| {
+        let status = process::Command::new(&exe)
+            .arg(f)
+            .stdout(process::Stdio::inherit())
+            .stderr(process::Stdio::inherit())
+            .status();
+        match status {
+            Ok(s) if !s.success() => {
+                failed.fetch_add(1, Ordering::Relaxed);
+            }
+            Err(e) => {
+                eprintln!("{}: {}", f, e);
+                failed.fetch_add(1, Ordering::Relaxed);
+            }
+            _ => {}
+        }
+    });
+
+    let failed_count = failed.load(Ordering::Relaxed);
+    if failed_count > 0 {
+        eprintln!("\x1b[31m✗ {} of {} failed\x1b[0m", failed_count, total);
+        1
+    } else {
+        eprintln!("\x1b[32m✓ All {} completed\x1b[0m", total);
+        0
+    }
+}
+
+/// `stryke profile FILE` — run with profiling and output structured data.
+fn run_profile_subcommand(exe_arg: &str, args: &[String]) -> i32 {
+    let mut file: Option<String> = None;
+    let mut output: Option<String> = None;
+    let mut flame = false;
+    let mut json = false;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "-o" | "--output" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("stryke profile: -o requires an argument");
+                    return 2;
+                }
+                output = Some(args[i].clone());
+            }
+            "--flame" => flame = true,
+            "--json" => json = true,
+            "-h" | "--help" => {
+                println!("usage: stryke profile [OPTIONS] FILE");
+                println!();
+                println!("Run a file with profiling enabled and output structured data.");
+                println!();
+                println!("Options:");
+                println!("  -o, --output FILE   Write output to FILE instead of stdout/stderr");
+                println!("  --flame             Generate flamegraph SVG");
+                println!("  --json              Output profile data as JSON");
+                return 0;
+            }
+            s if !s.starts_with('-') && file.is_none() => file = Some(s.to_string()),
+            other => {
+                eprintln!("stryke profile: unknown option: {}", other);
+                return 2;
+            }
+        }
+        i += 1;
+    }
+
+    let Some(file) = file else {
+        eprintln!("usage: stryke profile [OPTIONS] FILE");
+        return 2;
+    };
+
+    let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from(exe_arg));
+    let mut cmd = process::Command::new(exe);
+
+    if flame {
+        cmd.arg("--flame");
+    } else {
+        cmd.arg("--profile");
+    }
+    cmd.arg(&file);
+
+    if let Some(ref out) = output {
+        if flame {
+            let out_file = match std::fs::File::create(out) {
+                Ok(f) => f,
+                Err(e) => {
+                    eprintln!("stryke profile: cannot create {}: {}", out, e);
+                    return 1;
+                }
+            };
+            cmd.stdout(out_file);
+        }
+    }
+
+    let status = match cmd.status() {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("stryke profile: {}", e);
+            return 1;
+        }
+    };
+
+    if json && !flame {
+        eprintln!("(--json profile output not yet implemented; use --flame -o file.svg for structured output)");
+    }
+
+    status.code().unwrap_or(1)
+}
+
+/// `stryke completions [SHELL]` — emit shell completions.
+fn run_completions_subcommand(args: &[String]) -> i32 {
+    let shell = args.first().map(|s| s.as_str()).unwrap_or("");
+    match shell {
+        "zsh" | "" => {
+            let completions = include_str!("../completions/_stryke");
+            println!("{}", completions);
+            0
+        }
+        "-h" | "--help" => {
+            println!("usage: stryke completions [SHELL]");
+            println!();
+            println!("Emit shell completions to stdout.");
+            println!();
+            println!("Supported shells:");
+            println!("  zsh   (default)");
+            println!();
+            println!("Examples:");
+            println!("  stryke completions zsh > /usr/local/share/zsh/site-functions/_stryke");
+            println!("  stryke completions >> ~/.zshrc");
+            0
+        }
+        other => {
+            eprintln!("stryke completions: unsupported shell: {}", other);
+            eprintln!("Supported: zsh");
+            2
+        }
+    }
+}
+
+/// `stryke ast FILE` — dump AST as JSON.
+fn run_ast_subcommand(args: &[String]) -> i32 {
+    if args.is_empty() || args[0] == "-h" || args[0] == "--help" {
+        println!("usage: stryke ast FILE");
+        println!();
+        println!("Parse a file and dump the AST as JSON to stdout.");
+        return if args.is_empty() { 2 } else { 0 };
+    }
+
+    let file = &args[0];
+    let source = match std::fs::read_to_string(file) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("{}: {}", file, e);
+            return 1;
+        }
+    };
+
+    let program = match stryke::parse_with_file(&source, file) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("{}", e);
+            return 1;
+        }
+    };
+
+    match serde_json::to_string_pretty(&program) {
+        Ok(json) => {
+            println!("{}", json);
+            0
+        }
+        Err(e) => {
+            eprintln!("stryke ast: failed to serialize: {}", e);
+            1
+        }
+    }
+}
+
+/// `stryke build SCRIPT [-o OUT]` or `stryke build --project DIR [-o OUT]`
+/// Compile a Perl script (or project with lib/) into a standalone binary.
 fn run_build_subcommand(args: &[String]) -> i32 {
     let mut script: Option<String> = None;
+    let mut project_dir: Option<String> = None;
     let mut out: Option<String> = None;
     let mut i = 0usize;
     while i < args.len() {
@@ -1742,8 +2344,17 @@ fn run_build_subcommand(args: &[String]) -> i32 {
                 }
                 out = Some(args[i].clone());
             }
+            "--project" | "-p" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("stryke build: --project requires a directory argument");
+                    return 2;
+                }
+                project_dir = Some(args[i].clone());
+            }
             "-h" | "--help" => {
                 println!("usage: stryke build SCRIPT [-o OUTPUT]");
+                println!("       stryke build --project DIR [-o OUTPUT]");
                 println!();
                 println!(
                     "Compile a Perl script into a standalone executable binary. The output is"
@@ -1756,40 +2367,69 @@ fn run_build_subcommand(args: &[String]) -> i32 {
                 );
                 println!("no perl, no stryke, no @INC setup required.");
                 println!();
+                println!("Options:");
+                println!("  --project DIR   Bundle main.stk + lib/*.stk (excludes t/ tests)");
+                println!();
                 println!("Examples:");
                 println!("  stryke build app.pl                     # → ./app");
                 println!("  stryke build app.pl -o /usr/local/bin/app");
+                println!("  stryke build --project ./myapp -o myapp # bundle project");
                 return 0;
             }
-            s if script.is_none() && !s.starts_with('-') => script = Some(s.to_string()),
+            s if script.is_none() && project_dir.is_none() && !s.starts_with('-') => {
+                script = Some(s.to_string())
+            }
             other => {
                 eprintln!("stryke build: unknown argument: {}", other);
                 eprintln!("usage: stryke build SCRIPT [-o OUTPUT]");
+                eprintln!("       stryke build --project DIR [-o OUTPUT]");
                 return 2;
             }
         }
         i += 1;
     }
-    let Some(script) = script else {
-        eprintln!("stryke build: missing SCRIPT");
-        eprintln!("usage: stryke build SCRIPT [-o OUTPUT]");
-        return 2;
-    };
-    let script_path = PathBuf::from(&script);
-    let out_path = PathBuf::from(out.unwrap_or_else(|| {
-        script_path
-            .file_stem()
-            .map(|s| s.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "a.out".to_string())
-    }));
-    match stryke::aot::build(&script_path, &out_path) {
-        Ok(p) => {
-            eprintln!("stryke build: wrote {}", p.display());
-            0
+
+    if let Some(dir) = project_dir {
+        let project_path = PathBuf::from(&dir);
+        let out_path = PathBuf::from(out.unwrap_or_else(|| {
+            project_path
+                .file_name()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "a.out".to_string())
+        }));
+        match stryke::aot::build_project(&project_path, &out_path) {
+            Ok(p) => {
+                eprintln!("stryke build: wrote {}", p.display());
+                0
+            }
+            Err(e) => {
+                eprintln!("{}", e);
+                1
+            }
         }
-        Err(e) => {
-            eprintln!("{}", e);
-            1
+    } else {
+        let Some(script) = script else {
+            eprintln!("stryke build: missing SCRIPT or --project DIR");
+            eprintln!("usage: stryke build SCRIPT [-o OUTPUT]");
+            eprintln!("       stryke build --project DIR [-o OUTPUT]");
+            return 2;
+        };
+        let script_path = PathBuf::from(&script);
+        let out_path = PathBuf::from(out.unwrap_or_else(|| {
+            script_path
+                .file_stem()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "a.out".to_string())
+        }));
+        match stryke::aot::build(&script_path, &out_path) {
+            Ok(p) => {
+                eprintln!("stryke build: wrote {}", p.display());
+                0
+            }
+            Err(e) => {
+                eprintln!("{}", e);
+                1
+            }
         }
     }
 }
@@ -3077,6 +3717,420 @@ fn strip_shebang_and_extract(content: &str, extract: bool) -> String {
     } else {
         content.to_string()
     }
+}
+
+/// `stryke fmt [-i] [-w WIDTH] FILE...` — format stryke source files.
+fn run_fmt_subcommand(args: &[String]) -> i32 {
+    let mut files: Vec<String> = Vec::new();
+    let mut in_place = false;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "-i" | "--in-place" => in_place = true,
+            "-h" | "--help" => {
+                println!("usage: stryke fmt [-i] FILE...");
+                println!();
+                println!("Format stryke source files (parse → pretty-print).");
+                println!();
+                println!("Options:");
+                println!("  -i, --in-place   Rewrite files in place (default: print to stdout)");
+                println!();
+                println!("Examples:");
+                println!("  stryke fmt app.stk              # print formatted source to stdout");
+                println!("  stryke fmt -i lib/*.stk          # rewrite files in place");
+                println!("  stryke fmt -i .                  # format all .stk files recursively");
+                return 0;
+            }
+            s if s.starts_with('-') => {
+                eprintln!("stryke fmt: unknown option: {}", s);
+                eprintln!("usage: stryke fmt [-i] FILE...");
+                return 2;
+            }
+            s => files.push(s.to_string()),
+        }
+        i += 1;
+    }
+    if files.is_empty() {
+        eprintln!("stryke fmt: no input files");
+        eprintln!("usage: stryke fmt [-i] FILE...");
+        return 2;
+    }
+    // Expand directory arguments: recursively collect .stk/.pl/.pm files.
+    let mut expanded: Vec<String> = Vec::new();
+    for f in &files {
+        let p = std::path::Path::new(f);
+        if p.is_dir() {
+            collect_stryke_files(p, &mut expanded);
+        } else {
+            expanded.push(f.clone());
+        }
+    }
+    if expanded.is_empty() {
+        eprintln!("stryke fmt: no .stk/.pl/.pm files found");
+        return 1;
+    }
+    let mut errors = 0;
+    for f in &expanded {
+        let code = match std::fs::read_to_string(f) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("stryke fmt: {}: {}", f, e);
+                errors += 1;
+                continue;
+            }
+        };
+        let program = match stryke::parse_with_file(&code, f) {
+            Ok(p) => p,
+            Err(e) => {
+                eprintln!("stryke fmt: {}: {}", f, e);
+                errors += 1;
+                continue;
+            }
+        };
+        let formatted = stryke::convert_to_stryke(&program);
+        if in_place {
+            if formatted == code {
+                continue; // already formatted
+            }
+            if let Err(e) = std::fs::write(f, &formatted) {
+                eprintln!("stryke fmt: {}: {}", f, e);
+                errors += 1;
+            } else {
+                eprintln!("  formatted {}", f);
+            }
+        } else {
+            print!("{}", formatted);
+        }
+    }
+    if errors > 0 {
+        1
+    } else {
+        0
+    }
+}
+
+/// Recursively collect `.stk`, `.pl`, `.pm` files from a directory.
+fn collect_stryke_files(dir: &std::path::Path, out: &mut Vec<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    let mut paths: Vec<std::path::PathBuf> =
+        entries.filter_map(|e| e.ok()).map(|e| e.path()).collect();
+    paths.sort();
+    for p in paths {
+        if p.is_dir() {
+            // Skip hidden dirs and common noise.
+            let name = p
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
+            if name.starts_with('.') || name == "target" || name == "node_modules" {
+                continue;
+            }
+            collect_stryke_files(&p, out);
+        } else if let Some(ext) = p.extension() {
+            let ext = ext.to_string_lossy();
+            if ext == "stk" || ext == "pl" || ext == "pm" {
+                out.push(p.to_string_lossy().to_string());
+            }
+        }
+    }
+}
+
+/// `stryke bench [FILE|DIR]` — discover and run benchmark files with timing.
+fn run_bench_subcommand(argv0: &str, args: &[String]) -> i32 {
+    if !args.is_empty() && (args[0] == "-h" || args[0] == "--help") {
+        println!("usage: stryke bench [FILE|DIR]");
+        println!();
+        println!("Discover and run benchmark files. Looks for bench_*.stk / b_*.stk");
+        println!("in bench/ or benches/ directories (or a specified path).");
+        println!();
+        println!("Each file is run and timed. Use the `bench {{ }}` builtin inside");
+        println!("files for micro-benchmarks with iteration counts and ops/sec.");
+        println!();
+        println!("Examples:");
+        println!("  stryke bench                    # auto-discover bench/ or benches/");
+        println!("  stryke bench bench/bench_sort.stk  # run a single benchmark");
+        println!("  stryke bench benches/            # run all in a directory");
+        return 0;
+    }
+    let target = if !args.is_empty() {
+        args[0].clone()
+    } else if std::path::Path::new("bench").is_dir() {
+        "bench".to_string()
+    } else if std::path::Path::new("benches").is_dir() {
+        "benches".to_string()
+    } else {
+        eprintln!("stryke bench: no bench/ or benches/ directory found");
+        return 1;
+    };
+    let target_path = std::path::Path::new(&target);
+    let bench_files: Vec<String> = if target_path.is_dir() {
+        let mut files: Vec<String> = std::fs::read_dir(target_path)
+            .unwrap_or_else(|e| {
+                eprintln!("stryke bench: {}: {}", target, e);
+                process::exit(1);
+            })
+            .filter_map(|e| e.ok())
+            .map(|e| e.path().to_string_lossy().to_string())
+            .filter(|p| {
+                let name = std::path::Path::new(p)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                (name.starts_with("bench_") || name.starts_with("b_"))
+                    && (name.ends_with(".stk") || name.ends_with(".st") || name.ends_with(".pl"))
+            })
+            .collect();
+        files.sort();
+        files
+    } else {
+        vec![target]
+    };
+    if bench_files.is_empty() {
+        eprintln!("stryke bench: no benchmark files found (bench_*.stk or b_*.stk)");
+        return 1;
+    }
+    let total = bench_files.len();
+    let mut failed = 0;
+    eprintln!(
+        "\x1b[36mRunning {} benchmark{}\x1b[0m\n",
+        total,
+        if total == 1 { "" } else { "s" }
+    );
+    let exe = std::env::current_exe()
+        .ok()
+        .filter(|p| p.exists())
+        .or_else(|| std::fs::canonicalize(argv0).ok())
+        .unwrap_or_else(|| PathBuf::from(argv0));
+    for f in &bench_files {
+        let name = std::path::Path::new(f)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| f.clone());
+        eprint!("\x1b[1m── {} ──\x1b[0m ", name);
+        let script_abs = std::fs::canonicalize(f).unwrap_or_else(|_| PathBuf::from(f));
+        let project_root = script_abs
+            .parent()
+            .and_then(|p| p.parent())
+            .unwrap_or(std::path::Path::new("."));
+        let start = std::time::Instant::now();
+        let output = process::Command::new(&exe)
+            .arg(&script_abs)
+            .args(&args[1..])
+            .current_dir(project_root)
+            .stderr(process::Stdio::piped())
+            .stdout(process::Stdio::piped())
+            .output();
+        let elapsed = start.elapsed();
+        match output {
+            Ok(out) => {
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                if out.status.success() {
+                    eprintln!("\x1b[32m{:.3}s\x1b[0m", elapsed.as_secs_f64());
+                } else {
+                    eprintln!("\x1b[31mFAILED ({:.3}s)\x1b[0m", elapsed.as_secs_f64());
+                    failed += 1;
+                }
+                // Print benchmark output (stderr first, then stdout).
+                if !stderr.is_empty() {
+                    eprint!("{}", stderr);
+                }
+                if !stdout.is_empty() {
+                    print!("{}", stdout);
+                }
+            }
+            Err(e) => {
+                eprintln!("\x1b[31mfailed to run: {}\x1b[0m", e);
+                failed += 1;
+            }
+        }
+        eprintln!();
+    }
+    eprintln!("═══════════════════════════════");
+    if failed == 0 {
+        eprintln!(
+            "\x1b[32m✓ All {} benchmark{} completed\x1b[0m",
+            total,
+            if total == 1 { "" } else { "s" }
+        );
+        0
+    } else {
+        eprintln!(
+            "\x1b[31m✗ {} of {} benchmark{} failed\x1b[0m",
+            failed,
+            total,
+            if total == 1 { "" } else { "s" }
+        );
+        1
+    }
+}
+
+/// `stryke init [NAME]` — scaffold a new stryke project.
+fn run_init_subcommand(args: &[String]) -> i32 {
+    if !args.is_empty() && (args[0] == "-h" || args[0] == "--help") {
+        println!("usage: stryke init [NAME]");
+        println!();
+        println!("Create a new stryke project directory with:");
+        println!("  NAME/main.stk      — entry point");
+        println!("  NAME/lib/          — library modules");
+        println!("  NAME/t/            — test directory");
+        println!("  NAME/bench/        — benchmark files");
+        println!("  NAME/.gitignore    — ignore build artifacts");
+        println!();
+        println!("If NAME is omitted, initializes the current directory.");
+        println!();
+        println!("Examples:");
+        println!("  stryke init myapp        # create myapp/ project");
+        println!("  stryke init              # init in current directory");
+        return 0;
+    }
+    let project_dir = if !args.is_empty() {
+        let dir = PathBuf::from(&args[0]);
+        if dir.exists() && !dir.is_dir() {
+            eprintln!(
+                "stryke init: {} already exists and is not a directory",
+                args[0]
+            );
+            return 1;
+        }
+        if let Err(e) = std::fs::create_dir_all(&dir) {
+            eprintln!("stryke init: {}: {}", args[0], e);
+            return 1;
+        }
+        dir
+    } else {
+        PathBuf::from(".")
+    };
+    let name = if !args.is_empty() {
+        args[0].clone()
+    } else {
+        std::env::current_dir()
+            .ok()
+            .and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
+            .unwrap_or_else(|| "stryke_project".to_string())
+    };
+    // Create main.stk
+    let main_path = project_dir.join("main.stk");
+    if !main_path.exists() {
+        let main_content = format!("#!/usr/bin/env stryke\n\np \"hello from {}!\"\n", name);
+        if let Err(e) = std::fs::write(&main_path, main_content) {
+            eprintln!("stryke init: {}: {}", main_path.display(), e);
+            return 1;
+        }
+        eprintln!("  created {}", main_path.display());
+    }
+    // Create lib/ directory
+    let lib_dir = project_dir.join("lib");
+    if !lib_dir.exists() {
+        if let Err(e) = std::fs::create_dir_all(&lib_dir) {
+            eprintln!("stryke init: {}: {}", lib_dir.display(), e);
+            return 1;
+        }
+        eprintln!("  created {}/", lib_dir.display());
+    }
+    // Create t/ directory
+    let test_dir = project_dir.join("t");
+    if !test_dir.exists() {
+        if let Err(e) = std::fs::create_dir_all(&test_dir) {
+            eprintln!("stryke init: {}: {}", test_dir.display(), e);
+            return 1;
+        }
+        eprintln!("  created {}/", test_dir.display());
+    }
+    // Create bench/ directory
+    let bench_dir = project_dir.join("bench");
+    if !bench_dir.exists() {
+        if let Err(e) = std::fs::create_dir_all(&bench_dir) {
+            eprintln!("stryke init: {}: {}", bench_dir.display(), e);
+            return 1;
+        }
+        eprintln!("  created {}/", bench_dir.display());
+    }
+    // Create a sample test
+    let test_path = test_dir.join("test_main.stk");
+    if !test_path.exists() {
+        let test_content =
+            "#!/usr/bin/env stryke\n\nuse Test\n\nok 1, \"it works\"\n\ndone_testing()\n";
+        if let Err(e) = std::fs::write(&test_path, test_content) {
+            eprintln!("stryke init: {}: {}", test_path.display(), e);
+            return 1;
+        }
+        eprintln!("  created {}", test_path.display());
+    }
+    // Create .gitignore
+    let gi_path = project_dir.join(".gitignore");
+    if !gi_path.exists() {
+        let gi_content = "# stryke build artifacts\n/target/\n*.pec\n";
+        if let Err(e) = std::fs::write(&gi_path, gi_content) {
+            eprintln!("stryke init: {}: {}", gi_path.display(), e);
+            return 1;
+        }
+        eprintln!("  created {}", gi_path.display());
+    }
+    eprintln!(
+        "\x1b[32m✓ Initialized stryke project{}\x1b[0m",
+        if !args.is_empty() {
+            format!(" in {}/", name)
+        } else {
+            String::new()
+        }
+    );
+    eprintln!();
+    eprintln!("  stryke run           # run main.stk");
+    eprintln!("  stryke test          # run tests in t/");
+    eprintln!("  stryke build main.stk  # compile to standalone binary");
+    0
+}
+
+/// `stryke repl [--load FILE]` — explicit REPL entry with optional pre-load.
+fn run_repl_subcommand(args: &[String]) -> i32 {
+    let mut load_file: Option<String> = None;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--load" | "-l" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("stryke repl: --load requires a file argument");
+                    return 2;
+                }
+                load_file = Some(args[i].clone());
+            }
+            "-h" | "--help" => {
+                println!("usage: stryke repl [--load FILE]");
+                println!();
+                println!("Start the interactive REPL (readline, history, tab completion).");
+                println!();
+                println!("Options:");
+                println!("  -l, --load FILE  Evaluate FILE before entering the REPL");
+                println!();
+                println!("Examples:");
+                println!("  stryke repl                   # start REPL");
+                println!("  stryke repl --load lib.stk    # pre-load a library, then REPL");
+                return 0;
+            }
+            other => {
+                eprintln!("stryke repl: unknown option: {}", other);
+                eprintln!("usage: stryke repl [--load FILE]");
+                return 2;
+            }
+        }
+        i += 1;
+    }
+    // Build a Cli struct for the REPL, optionally with a pre-load script.
+    let mut cli = Cli::default();
+    if let Some(ref path) = load_file {
+        if !std::path::Path::new(path).exists() {
+            eprintln!("stryke repl: file not found: {}", path);
+            return 1;
+        }
+        // Use -e to pre-execute: `require "FILE";`
+        cli.execute.push(format!("require {:?}", path));
+    }
+    repl::run(&cli);
+    0
 }
 
 /// Heuristic: does this string look like inline code rather than a filename?

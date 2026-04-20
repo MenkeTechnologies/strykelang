@@ -106,4 +106,53 @@ my ($after_outer, $inner_val) = shadowing_with_modification()
 assert_eq $after_outer, 20, "shadowing outer modified"
 assert_eq $inner_val, 105, "shadowing inner modified"
 
+# ── State variables ───────────────────────────────────────────────
+
+assert_eq counter_with_state(), 1, "state counter first"
+assert_eq counter_with_state(), 2, "state counter second"
+assert_eq counter_with_state(), 3, "state counter third"
+
+assert_eq accumulator_state(10), 10, "state accumulator first"
+assert_eq accumulator_state(5), 15, "state accumulator second"
+assert_eq accumulator_state(25), 40, "state accumulator third"
+
+assert_eq fibonacci_state(), 0, "fibonacci state 0"
+assert_eq fibonacci_state(), 1, "fibonacci state 1"
+assert_eq fibonacci_state(), 1, "fibonacci state 2"
+assert_eq fibonacci_state(), 2, "fibonacci state 3"
+assert_eq fibonacci_state(), 3, "fibonacci state 4"
+assert_eq fibonacci_state(), 5, "fibonacci state 5"
+
+my $id1 = unique_id()
+my $id2 = unique_id()
+my $id3 = unique_id()
+assert_eq $id1, "id_1", "unique id 1"
+assert_eq $id2, "id_2", "unique id 2"
+assert_eq $id3, "id_3", "unique id 3"
+
+assert_eq memoized_factorial(5), 120, "memoized factorial 5"
+assert_eq memoized_factorial(6), 720, "memoized factorial 6"
+assert_eq memoized_factorial(0), 1, "memoized factorial 0"
+assert_eq memoized_factorial(1), 1, "memoized factorial 1"
+
+assert_eq running_average(10), 10, "running average first"
+assert_eq running_average(20), 15, "running average second"
+assert_eq running_average(30), 20, "running average third"
+
+assert_eq toggle_state(), "ON", "toggle state first"
+assert_eq toggle_state(), "OFF", "toggle state second"
+assert_eq toggle_state(), "ON", "toggle state third"
+
+my @buf1 = ring_buffer_state(1)
+assert_eq scalar(@buf1), 1, "ring buffer size 1"
+my @buf2 = ring_buffer_state(2)
+assert_eq scalar(@buf2), 2, "ring buffer size 2"
+ring_buffer_state(3)
+ring_buffer_state(4)
+ring_buffer_state(5)
+my @buf5 = ring_buffer_state(6)
+assert_eq scalar(@buf5), 5, "ring buffer max size"
+assert_eq $buf5[0], 2, "ring buffer oldest is 2"
+assert_eq $buf5[4], 6, "ring buffer newest is 6"
+
 test_run

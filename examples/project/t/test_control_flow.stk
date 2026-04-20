@@ -63,7 +63,33 @@ my @post_count = postfix_while_countdown()
 assert_eq scalar(@post_count), 5, "postfix while length"
 assert_eq $post_count[0], 5, "postfix while first"
 
-# ── Given/when (match) ─────────────────────────────────────────────
+# ── Given/when (Perl 5.10+ switch) ─────────────────────────────────
+
+assert_eq day_type_given("Saturday"), "weekend", "given Saturday"
+assert_eq day_type_given("Sunday"), "weekend", "given Sunday"
+assert_eq day_type_given("Monday"), "weekday", "given Monday"
+assert_eq day_type_given("Friday"), "weekday", "given Friday"
+assert_eq day_type_given("holiday"), "unknown", "given unknown"
+
+assert_eq http_status_given(200), "OK", "given http 200"
+assert_eq http_status_given(404), "Not Found", "given http 404"
+assert_eq http_status_given(500), "Internal Server Error", "given http 500"
+assert_eq http_status_given(999), "Unknown Status", "given http unknown"
+
+assert_eq classify_char_given("5"), "digit", "given char digit"
+assert_eq classify_char_given("a"), "lower", "given char lower"
+assert_eq classify_char_given("Z"), "upper", "given char upper"
+assert_eq classify_char_given(" "), "space", "given char space"
+assert_eq classify_char_given("!"), "other", "given char other"
+
+assert_eq nested_given(1, 1), "1-1", "nested given 1-1"
+assert_eq nested_given(1, 2), "1-2", "nested given 1-2"
+assert_eq nested_given(1, 9), "1-?", "nested given 1-?"
+assert_eq nested_given(2, 1), "2-1", "nested given 2-1"
+assert_eq nested_given(2, 9), "2-?", "nested given 2-?"
+assert_eq nested_given(9, 9), "?-?", "nested given ?-?"
+
+# ── Match expression (stryke native) ───────────────────────────────
 
 assert_eq day_type("Saturday"), "weekend", "match Saturday"
 assert_eq day_type("Sunday"), "weekend", "match Sunday"

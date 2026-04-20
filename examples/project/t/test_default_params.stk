@@ -1,0 +1,107 @@
+#!/usr/bin/env stryke
+# t/test_default_params.stk — tests for default parameter values and chained comparisons
+
+require "./lib/default_params.stk"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SCALAR DEFAULTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq scalar_default(10), 52, "scalar default used"
+assert_eq scalar_default(10, 5), 15, "scalar default overridden"
+
+assert_eq scalar_default_expr(5), 15, "default expr uses earlier param"
+assert_eq scalar_default_expr(5, 3), 8, "default expr overridden"
+
+assert_eq scalar_default_string("hello"), "hello!", "string default used"
+assert_eq scalar_default_string("hi", "?"), "hi?", "string default overridden"
+
+assert_eq scalar_typed_default(50), 150, "typed default used"
+assert_eq scalar_typed_default(50, 25), 75, "typed default overridden"
+
+assert_eq multiple_defaults(100), 130, "multiple defaults all used"
+assert_eq multiple_defaults(100, 5), 125, "multiple defaults one override"
+assert_eq multiple_defaults(100, 5, 3), 108, "multiple defaults all override"
+
+assert_eq default_uses_var(7), 14, "default references earlier param"
+assert_eq default_uses_var(7, 3), 10, "default override earlier param"
+
+assert_eq default_with_ternary(5), 5, "ternary default positive"
+assert_eq default_with_ternary(-5), 5, "ternary default negative"
+assert_eq default_with_ternary(3, 2), 6, "ternary default overridden"
+
+assert_eq default_call_fn(1), 100, "default calls function"
+assert_eq default_call_fn(1, 9), 10, "default fn call overridden"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARRAY DEFAULTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq array_default("items"), "items: 1,2,3", "array default used"
+assert_eq array_default("items", 7, 8, 9), "items: 7,8,9", "array default overridden"
+
+assert_eq array_default_range(10), 25, "array range default"
+assert_eq array_default_range(10, 1, 2), 13, "array range override"
+
+assert_eq array_default_empty(5), 5, "empty array default"
+assert_eq array_default_empty(5, 1, 2, 3), 8, "empty array override"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HASH DEFAULTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq hash_default("test"), "test: debug=0 verbose=1", "hash default used"
+assert_eq hash_default("test", debug => 1, verbose => 0), "test: debug=1 verbose=0", "hash default overridden"
+
+assert_eq hash_default_access("a"), 10, "hash default access a"
+assert_eq hash_default_access("b"), 20, "hash default access b"
+assert_eq hash_default_access("c"), -1, "hash default access missing"
+assert_eq hash_default_access("x", x => 99), 99, "hash default override access"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CHAINED COMPARISONS (Raku-style)
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq in_range(50, 0, 100), 1, "in range middle"
+assert_eq in_range(0, 0, 100), 1, "in range min"
+assert_eq in_range(100, 0, 100), 1, "in range max"
+assert_eq in_range(-1, 0, 100), 0, "out of range low"
+assert_eq in_range(101, 0, 100), 0, "out of range high"
+
+assert_eq three_way_check(1, 2, 3), 1, "1 < 2 < 3 true"
+assert_eq three_way_check(1, 3, 2), 0, "1 < 3 < 2 false"
+assert_eq three_way_check(3, 2, 1), 0, "3 < 2 < 1 false"
+
+assert_eq descending_check(3, 2, 1), 1, "3 > 2 > 1 true"
+assert_eq descending_check(1, 2, 3), 0, "1 > 2 > 3 false"
+assert_eq descending_check(3, 1, 2), 0, "3 > 1 > 2 false"
+
+assert_eq mixed_compare(5), 1, "0 < 5 <= 10 true"
+assert_eq mixed_compare(10), 1, "0 < 10 <= 10 true"
+assert_eq mixed_compare(0), 0, "0 < 0 <= 10 false"
+assert_eq mixed_compare(11), 0, "0 < 11 <= 10 false"
+
+assert_eq string_range("m"), 1, "a le m le z true"
+assert_eq string_range("a"), 1, "a le a le z true"
+assert_eq string_range("z"), 1, "a le z le z true"
+
+assert_eq chained_four(1, 2, 3, 4), 1, "1 < 2 < 3 < 4 true"
+assert_eq chained_four(1, 2, 4, 3), 0, "1 < 2 < 4 < 3 false"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EDGE CASES
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Zero should not trigger default
+fn zero_ok($x, $y = 99) { $y }
+assert_eq zero_ok(1, 0), 0, "zero does not trigger default"
+
+# Empty string should not trigger default
+fn empty_str_ok($x, $s = "default") { $s }
+assert_eq empty_str_ok(1, ""), "", "empty string does not trigger default"
+
+# Explicit undef should not trigger default (Perl behavior)
+fn undef_ok($x, $y = "default") { defined($y) ? $y : "got_undef" }
+assert_eq undef_ok(1, undef), "got_undef", "explicit undef does not trigger default"
+
+p "All default parameter tests passed!"

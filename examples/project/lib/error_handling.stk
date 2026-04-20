@@ -1,7 +1,147 @@
-# lib/error_handling.stk — error handling tests
+# lib/error_handling.stk — error handling, try/catch, const variables
 
 # ══════════════════════════════════════════════════════════════════════════════
-# EVAL BLOCK
+# CONST VARIABLES (compile-time constants)
+# ══════════════════════════════════════════════════════════════════════════════
+
+const my $PI = 3.14159265358979
+const my $E = 2.71828182845905
+const my $GOLDEN_RATIO = 1.61803398874989
+const my $MAX_RETRIES = 3
+const my $TIMEOUT_SECONDS = 30
+const my $APP_NAME = "StrykeDemo"
+const my $VERSION = "1.0.0"
+
+fn get_pi { $PI }
+fn get_e { $E }
+fn get_golden_ratio { $GOLDEN_RATIO }
+fn get_max_retries { $MAX_RETRIES }
+fn get_timeout { $TIMEOUT_SECONDS }
+fn get_app_name { $APP_NAME }
+fn get_version { $VERSION }
+
+fn circle_area($r) {
+    $PI * $r * $r
+}
+
+fn circle_circumference($r) {
+    2 * $PI * $r
+}
+
+fn exponential_growth($initial, $rate, $time) {
+    $initial * ($E ** ($rate * $time))
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TRY/CATCH (stryke native exception handling)
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn try_catch_basic {
+    my $result
+    try {
+        $result = 42
+    } catch ($e) {
+        $result = -1
+    }
+    $result
+}
+
+fn try_catch_with_die {
+    my $caught = 0
+    try {
+        die "intentional error"
+    } catch ($e) {
+        $caught = 1
+    }
+    $caught
+}
+
+fn try_catch_error_message {
+    my $msg = ""
+    try {
+        die "specific error message"
+    } catch ($e) {
+        $msg = $e
+    }
+    $msg =~ /specific error/ ? 1 : 0
+}
+
+fn try_catch_nested {
+    my $result = ""
+    try {
+        try {
+            die "inner"
+        } catch ($e1) {
+            $result .= "caught-inner;"
+            die "rethrow"
+        }
+    } catch ($e2) {
+        $result .= "caught-outer"
+    }
+    $result
+}
+
+fn try_catch_no_error {
+    my $value = 0
+    try {
+        $value = 100
+    } catch ($e) {
+        $value = -1
+    }
+    $value
+}
+
+fn safe_divide_try($a, $b) {
+    my $result
+    try {
+        die "division by zero" if $b == 0
+        $result = $a / $b
+    } catch ($e) {
+        $result = undef
+    }
+    $result
+}
+
+fn try_catch_finally_pattern {
+    my @log
+    try {
+        push @log, "try"
+        die "oops"
+    } catch ($e) {
+        push @log, "catch"
+    }
+    push @log, "after"
+    join(",", @log)
+}
+
+fn try_catch_return_from_try {
+    try {
+        return "from-try"
+    } catch ($e) {
+        return "from-catch"
+    }
+    "after"
+}
+
+fn try_catch_return_from_catch {
+    try {
+        die "error"
+    } catch ($e) {
+        return "from-catch"
+    }
+    "after"
+}
+
+fn multiple_try_catch {
+    my $count = 0
+    try { die "1" } catch ($e) { $count++ }
+    try { die "2" } catch ($e) { $count++ }
+    try { $count += 10 } catch ($e) { $count-- }
+    $count
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EVAL BLOCK (Perl 5 style)
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn eval_success {

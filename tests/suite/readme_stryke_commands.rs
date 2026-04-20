@@ -28,7 +28,7 @@ fn assert_success(label: &str, out: &std::process::Output) {
 }
 
 #[test]
-fn readme_fo_dash_e_print_hello() {
+fn readme_stryke_dash_e_print_hello() {
     let out = Command::new(stryke())
         .args(["-e", r#"print "Hello, world!\n""#])
         .output()
@@ -38,7 +38,7 @@ fn readme_fo_dash_e_print_hello() {
 }
 
 #[test]
-fn readme_fo_script_plus_argv() {
+fn readme_stryke_script_plus_argv() {
     let out = Command::new(stryke())
         .arg(fib())
         .args(["arg1", "arg2"])
@@ -48,7 +48,7 @@ fn readme_fo_script_plus_argv() {
 }
 
 #[test]
-fn readme_fo_lane_autosplit_field0() {
+fn readme_stryke_lane_autosplit_field0() {
     let mut child = Command::new(stryke())
         .args(["-lane", "print $F[0]"])
         .stdin(Stdio::piped())
@@ -63,7 +63,7 @@ fn readme_fo_lane_autosplit_field0() {
 }
 
 #[test]
-fn readme_fo_syntax_check() {
+fn readme_stryke_syntax_check() {
     let out = Command::new(stryke())
         .arg("-c")
         .arg(fib())
@@ -75,7 +75,7 @@ fn readme_fo_syntax_check() {
 }
 
 #[test]
-fn readme_fo_lint() {
+fn readme_stryke_lint() {
     let out = Command::new(stryke())
         .arg("--lint")
         .arg(fib())
@@ -90,7 +90,7 @@ fn readme_fo_lint() {
 }
 
 #[test]
-fn readme_fo_disasm() {
+fn readme_stryke_disasm() {
     let out = Command::new(stryke())
         .arg("--disasm")
         .arg(fib())
@@ -105,7 +105,7 @@ fn readme_fo_disasm() {
 }
 
 #[test]
-fn readme_fo_ast_json() {
+fn readme_stryke_ast_json() {
     let out = Command::new(stryke())
         .arg("--ast")
         .arg(fib())
@@ -120,7 +120,7 @@ fn readme_fo_ast_json() {
 }
 
 #[test]
-fn readme_fo_fmt() {
+fn readme_stryke_fmt() {
     let out = Command::new(stryke())
         .arg("--fmt")
         .arg(fib())
@@ -135,7 +135,7 @@ fn readme_fo_fmt() {
 }
 
 #[test]
-fn readme_fo_profile() {
+fn readme_stryke_profile() {
     let out = Command::new(stryke())
         .arg("--profile")
         .arg(fib())
@@ -150,7 +150,7 @@ fn readme_fo_profile() {
 }
 
 #[test]
-fn readme_fo_explain_e0001() {
+fn readme_stryke_explain_e0001() {
     let out = Command::new(stryke())
         .args(["--explain", "E0001"])
         .output()
@@ -164,7 +164,7 @@ fn readme_fo_explain_e0001() {
 }
 
 #[test]
-fn readme_fo_ne_uc_topic() {
+fn readme_stryke_ne_uc_topic() {
     let mut child = Command::new(stryke())
         .args(["-ne", "print uc $_"])
         .stdin(Stdio::piped())
@@ -179,7 +179,7 @@ fn readme_fo_ne_uc_topic() {
 }
 
 #[test]
-fn readme_fo_subst_pipe() {
+fn readme_stryke_subst_pipe() {
     // README: `cat f.txt | stryke -pe 's/foo/bar/g'` — transform lines from stdin.
     let mut child = Command::new(stryke())
         .args(["-pe", "s/foo/bar/g"])
@@ -200,8 +200,8 @@ fn readme_fo_subst_pipe() {
 }
 
 #[test]
-fn readme_fo_i_two_files() {
-    let dir = std::env::temp_dir().join(format!("readme_fo_i2_{}", std::process::id()));
+fn readme_stryke_i_two_files() {
+    let dir = std::env::temp_dir().join(format!("readme_stryke_i2_{}", std::process::id()));
     fs::create_dir_all(&dir).unwrap();
     let a = dir.join("file1");
     let b = dir.join("file2");
@@ -221,8 +221,8 @@ fn readme_fo_i_two_files() {
 }
 
 #[test]
-fn readme_fo_i_bak_glob_txt() {
-    let dir = std::env::temp_dir().join(format!("readme_fo_ibak_{}", std::process::id()));
+fn readme_stryke_i_bak_glob_txt() {
+    let dir = std::env::temp_dir().join(format!("readme_stryke_ibak_{}", std::process::id()));
     fs::create_dir_all(&dir).unwrap();
     let t = dir.join("z.txt");
     fs::write(&t, "x\n").unwrap();
@@ -241,7 +241,7 @@ fn readme_fo_i_bak_glob_txt() {
 }
 
 #[test]
-fn readme_fo_a_f_autosplit() {
+fn readme_stryke_a_f_autosplit() {
     let mut child = Command::new(stryke())
         .args(["-aF:", "-ne", "print $F[1]"])
         .stdin(Stdio::piped())
@@ -256,7 +256,7 @@ fn readme_fo_a_f_autosplit() {
 }
 
 #[test]
-fn readme_fo_j_pmap() {
+fn readme_stryke_j_pmap() {
     let out = Command::new(stryke())
         .args([
             "-j",
@@ -271,11 +271,11 @@ fn readme_fo_j_pmap() {
 }
 
 #[test]
-fn readme_fo_examples_scripts() {
+fn readme_stryke_examples_scripts() {
     for rel in [
-        "examples/fibonacci.pl",
-        "examples/text_processing.pl",
-        "examples/parallel_demo.pl",
+        "examples/fibonacci.stk",
+        "examples/text_processing.stk",
+        "examples/parallel_demo.stk",
     ] {
         let path = repo_root().join(rel);
         let out = Command::new(stryke()).arg(&path).output().expect("spawn");
