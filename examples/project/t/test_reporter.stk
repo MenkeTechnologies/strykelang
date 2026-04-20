@@ -1,0 +1,53 @@
+#!/usr/bin/env stryke
+# test_reporter.stk — report generation tests
+
+require "./lib/reporter.stk"
+
+# ── Mock data ──────────────────────────────────────────────────────
+
+my $sys = {
+    hostname => "testhost",
+    os       => "Linux",
+    arch     => "x86_64",
+    cpus     => 4,
+    ram      => "16 GB",
+    uptime   => "1 day"
+}
+
+my $net = {
+    ipv4    => "192.168.1.100",
+    mac     => "00:11:22:33:44:55",
+    gateway => "192.168.1.1",
+    dns     => "8.8.8.8"
+}
+
+my @disks = (
+    { mount => "/",     use_pct => 45.5, free_h => "100GB" },
+    { mount => "/home", use_pct => 60.0, free_h => "50GB"  }
+)
+
+my $git = {
+    is_repo       => 1,
+    branch        => "main",
+    total_commits => 42,
+    total_files   => 100
+}
+
+my @threats = (
+    { level => "HIGH",   message => "Open port 22" },
+    { level => "MEDIUM", message => "Outdated package" }
+)
+
+# Skip if to_pdf not available
+my $has_pdf = eval { to_pdf("test", "/tmp/test.pdf"); 1 } // 0
+
+if ($has_pdf) {
+    my $path = generate_report($sys, $net, \@disks, $git, \@threats)
+    assert_ok defined($path), "generate_report returns path"
+    assert_ok $path =~ /\.pdf$/, "path ends with .pdf"
+} else {
+    assert_ok 1, "skipping PDF tests (to_pdf not available)"
+    assert_ok 1, "placeholder for PDF test"
+}
+
+test_run

@@ -149,7 +149,7 @@
             <span class="sep">/</span>
             <a href="https://docs.rs/strykelang" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line" id="strykeBuildLine">stryke v0.7.11 · Rust-powered · Rayon work-stealing · Cranelift JIT · Perl 5 compat surface + pipe-forward sugar</p>
+          <p class="docs-build-line" id="strykeBuildLine">stryke v0.8.0 · Rust-powered · Rayon work-stealing · Cranelift JIT · Perl 5 compat surface + pipe-forward sugar</p>
         </div>
         <div class="tutorial-toolbar">
           <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -656,7 +656,7 @@ p $d-&gt;isa("Cat")                      <span class="comment"># ""  (false)</sp
           <li><strong>Bytecode cache</strong> — <code>STRYKE_BC_CACHE=1</code> skips parse + compile on warm starts via on-disk <code>.pec</code> bundles.</li>
           <li><strong>Distributed compute</strong> — <code>cluster([...])</code> builds an SSH worker pool; <code>pmap_on $cluster { } @list</code> fans a map across persistent remote workers with fault tolerance.</li>
           <li><strong>Shared state</strong> — <code>mysync</code> declares atomic variables safe to mutate from parallel workers.</li>
-          <li><strong>Language server</strong> — <code>s --lsp</code> runs an LSP server over stdio with diagnostics, hover, completion. The five reflection hashes above are part of the completion surface.</li>
+          <li><strong>Language server</strong> — <code>s lsp</code> (or <code>s --lsp</code>) runs an LSP server over stdio with diagnostics, hover, completion. The five reflection hashes above are part of the completion surface.</li>
         </ul>
       </section>
 
@@ -674,9 +674,26 @@ p $d-&gt;isa("Cat")                      <span class="comment"># ""  (false)</sp
 --no-jit               // disable Cranelift JIT (bytecode interpreter only)
 --compat               // Perl 5 strict-compat: disable all stryke extensions
 -n / -p / -i           // stdin line-mode + in-place edit
---lsp                  // run language server over stdio
-s build SCRIPT -o OUT // standalone binary
-s --remote-worker     // worker process for distributed cluster</pre>
+-j N                   // parallel threads for multi-file execution
+
+// Subcommands
+s build SCRIPT -o OUT  // AOT compile to standalone binary
+s build --project DIR  // bundle project (main.stk + lib/) into binary
+s check FILE...        // parse + compile without executing (CI/editor)
+s disasm FILE          // disassemble bytecode
+s profile FILE         // run with profiling (--flame for SVG)
+s fmt -i FILE...       // format source files in place
+s bench                // run benchmarks from bench/ or benches/
+s test                 // run tests from t/
+s init NAME            // scaffold new project (lib/, bench/, t/)
+s repl --load FILE     // REPL with pre-loaded file
+s lsp                  // language server over stdio
+s completions zsh      // emit shell completions
+s ast FILE             // dump AST as JSON
+s prun FILE...         // run multiple files in parallel
+s convert FILE...      // convert Perl to stryke syntax
+s deconvert FILE...    // convert stryke back to Perl
+s --remote-worker      // worker process for distributed cluster</pre>
       </section>
 
       <section class="tutorial-section">

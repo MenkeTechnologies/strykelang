@@ -1,0 +1,48 @@
+#!/usr/bin/env stryke
+# test_threading.stk — tests for threading operators ~> and ->>
+
+require "./lib/threading.stk"
+
+# ── Thread-first ~> tests ──────────────────────────────────────────
+
+assert_eq thread_first_simple(), 10, "thread first simple"
+assert_eq thread_first_chain(), 40, "thread first chain"
+assert_eq thread_first_string(), "HELLO WORLD", "thread first string"
+assert_eq thread_first_math(), 12.5, "thread first math"
+assert_eq thread_first_with_args(), "hellohellohello", "thread first with args"
+assert_eq thread_first_mixed(), "Hello", "thread first mixed"
+assert_eq thread_first_numeric(), 8, "thread first numeric"
+assert_eq thread_first_array_sum(), 15, "thread first array sum"
+assert_eq thread_first_filter_sum(), 40, "thread first filter sum"
+assert_eq thread_first_map_sum(), 30, "thread first map sum"
+assert_eq thread_first_complex(), 1540, "thread first complex"
+
+# ── Thread-first ->> tests ─────────────────────────────────────────
+
+assert_eq arrow_thread_simple(), 15, "arrow thread simple"
+assert_eq arrow_thread_filter(), 30, "arrow thread filter"
+assert_eq arrow_thread_map(), 55, "arrow thread map"
+assert_eq arrow_thread_chain(), 315, "arrow thread chain"
+assert_eq arrow_thread_to_array(), 5, "arrow thread to array"
+assert_eq arrow_thread_string_join(), "abcd", "arrow thread string join"
+assert_eq arrow_thread_sort(), 1, "arrow thread sort"
+assert_eq arrow_thread_reverse(), 3, "arrow thread reverse"
+assert_eq arrow_thread_nested(), 75, "arrow thread nested"
+
+# ── Pipeline |> tests ──────────────────────────────────────────────
+
+assert_eq pipeline_simple(), 20, "pipeline simple"
+assert_eq pipeline_string(), "OLLEH", "pipeline string"
+assert_eq pipeline_array(), 30, "pipeline array"
+assert_eq pipeline_filter(), 30, "pipeline filter"
+assert_eq pipeline_complex(), 105, "pipeline complex"
+assert_eq pipeline_with_transform(), "Hello world", "pipeline with transform"
+assert_ok pipeline_multi_step() > 0, "pipeline multi step"
+
+# ── Comparison tests ───────────────────────────────────────────────
+
+assert_eq threading_comparison(), 1, "threading comparison"
+assert_eq threading_vs_traditional(), 1, "threading vs traditional"
+assert_eq nested_threading(), 30, "nested threading"
+
+test_run

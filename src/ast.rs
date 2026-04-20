@@ -62,12 +62,13 @@ impl GrepBuiltinKeyword {
 /// Named parameter in `sub name (SIG ...) { }` — stryke extension (not Perl 5 prototype syntax).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SubSigParam {
-    /// `$name` or `$name: Type` — one positional scalar from `@_`, optionally typed.
-    Scalar(String, Option<PerlTypeName>),
-    /// `@name` — slurps remaining positional args into an array.
-    Array(String),
-    /// `%name` — slurps remaining positional args into a hash (key-value pairs).
-    Hash(String),
+    /// `$name`, `$name: Type`, or `$name = default` — one positional scalar from `@_`,
+    /// optionally typed and/or with a default value.
+    Scalar(String, Option<PerlTypeName>, Option<Box<Expr>>),
+    /// `@name` or `@name = (default, list)` — slurps remaining positional args into an array.
+    Array(String, Option<Box<Expr>>),
+    /// `%name` or `%name = (key => val, ...)` — slurps remaining positional args into a hash.
+    Hash(String, Option<Box<Expr>>),
     /// `[ $a, @tail, ... ]` — next argument must be array-like; same element rules as algebraic `match`.
     ArrayDestruct(Vec<MatchArrayElem>),
     /// `{ k => $v, ... }` — next argument must be a hash or hashref; keys bind to listed scalars.

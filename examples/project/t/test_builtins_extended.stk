@@ -1,107 +1,151 @@
 #!/usr/bin/env stryke
-# t/test_data_structs.stk — tests for data_structures.stk
-
-require "./lib/data_structures.stk"
-
-# ══════════════════════════════════════════════════════════════════════════════
-# NESTED ARRAYS
-# ══════════════════════════════════════════════════════════════════════════════
-
-assert_eq nested_array_access(), 3, "nested array access [1][0]"
-assert_eq nested_array_depth3(), 6, "nested array depth3 [1][0][1]"
-assert_eq nested_array_modify(), 99, "nested array modify"
-assert_eq nested_array_push(), 2, "nested array push count"
-assert_eq nested_array_count(), 3, "nested array count"
+# t/test_builtins_extended.stk — tests for extended stryke builtins
+# All tests work in headless CI with no network
 
 # ══════════════════════════════════════════════════════════════════════════════
-# NESTED HASHES
+# SERIALIZATION - YAML
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq nested_hash_access(), 2, "nested hash access {a}{y}"
-assert_eq nested_hash_depth3(), "deep", "nested hash depth3"
-assert_eq nested_hash_modify(), 99, "nested hash modify"
-assert_eq nested_hash_add_key(), "value", "nested hash add key"
-assert_eq nested_hash_keys(), 3, "nested hash keys count"
+my $yaml_data = {name => "Alice", age => 30, tags => ["a", "b"]}
+my $yaml_str = to_yaml($yaml_data)
+assert_ok $yaml_str =~ /name/, "to_yaml contains key"
+assert_ok $yaml_str =~ /Alice/, "to_yaml contains value"
+
+my $yaml_parsed = from_yaml($yaml_str)
+assert_eq $yaml_parsed->{name}, "Alice", "from_yaml name"
+assert_eq $yaml_parsed->{age}, 30, "from_yaml age"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ARRAY OF HASHES (AOH)
+# SERIALIZATION - TOML
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq aoh_access(), "Alice", "aoh access name"
-assert_eq aoh_modify(), 99, "aoh modify"
-assert_ok defined(aoh_iterate()), "aoh iterate"
-assert_ok defined(aoh_grep()), "aoh grep"
-assert_ok defined(aoh_map()), "aoh map"
+my $toml_data = {title => "Config", debug => 1}
+my $toml_str = to_toml($toml_data)
+assert_ok $toml_str =~ /title/, "to_toml contains key"
+
+my $toml_parsed = from_toml($toml_str)
+assert_eq $toml_parsed->{title}, "Config", "from_toml title"
+assert_eq $toml_parsed->{debug}, 1, "from_toml debug"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# HASH OF ARRAYS (HOA)
+# SERIALIZATION - XML
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_ok defined(hoa_access()), "hoa access"
-assert_ok hoa_keys() >= 1, "hoa keys"
-assert_ok hoa_push() >= 1, "hoa push"
-assert_ok defined(hoa_modify()), "hoa modify"
-assert_ok defined(hoa_join()), "hoa join"
+my $xml_data = {root => {item => "value"}}
+my $xml_str = to_xml($xml_data)
+assert_ok $xml_str =~ /</, "to_xml contains tag"
+
+my $xml_parsed = from_xml($xml_str)
+assert_ok defined($xml_parsed), "from_xml parses"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# HASH OF HASHES (HOH)
+# SERIALIZATION - HTML/TABLE
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_ok defined(hoh_access()), "hoh access"
-assert_ok defined(hoh_modify()), "hoh modify"
-assert_ok defined(hoh_add_inner()), "hoh add inner"
-assert_ok defined(hoh_iterate()), "hoh iterate"
+my @table_data = (
+    {name => "Alice", score => 95},
+    {name => "Bob", score => 87}
+)
+my $html = to_html(@table_data)
+assert_ok $html =~ /table/, "to_html generates table"
+assert_ok $html =~ /Alice/, "to_html contains data"
+
+my $table = to_table(@table_data)
+assert_ok defined($table), "to_table returns string"
+assert_ok $table =~ /Alice/, "to_table contains data"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# BUILD FUNCTIONS
+# UTILITIES - CLAMP/ENUMERATE/WINDOWED
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_ok defined(build_records()), "build records"
-assert_ok defined(build_array_of_arrays()), "build array of arrays"
-assert_ok defined(build_hash_of_arrays()), "build hash of arrays"
+assert_eq clamp_int(5, 0, 10), 5, "clamp in range"
+assert_eq clamp_int(-5, 0, 10), 0, "clamp below min"
+assert_eq clamp_int(15, 0, 10), 10, "clamp above max"
+assert_eq clamp_int(0, 0, 10), 0, "clamp at min"
+assert_eq clamp_int(10, 0, 10), 10, "clamp at max"
+
+my @enum = enumerate(qw(a b c))
+assert_eq scalar(@enum), 3, "enumerate count"
+assert_eq $enum[0][0], 0, "enumerate index 0"
+assert_eq $enum[0][1], "a", "enumerate value 0"
+assert_eq $enum[2][0], 2, "enumerate index 2"
+assert_eq $enum[2][1], "c", "enumerate value 2"
+
+my @wins = (1, 2, 3, 4) |> windowed(2)
+assert_eq scalar(@wins), 3, "windowed count"
+assert_eq $wins[0][0], 1, "windowed first pair 0"
+assert_eq $wins[0][1], 2, "windowed first pair 1"
+assert_eq $wins[2][0], 3, "windowed last pair 0"
+assert_eq $wins[2][1], 4, "windowed last pair 1"
+
+my @wins3 = (1, 2, 3, 4, 5) |> windowed(3)
+assert_eq scalar(@wins3), 3, "windowed(3) count"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# FILTER/SORT/GROUP
+# PARALLEL - PMAP_CHUNKED
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_ok defined(filter_by_field()), "filter by field"
-assert_ok defined(sort_by_field()), "sort by field"
-assert_ok defined(group_by_key()), "group by key"
-assert_ok defined(transform_records()), "transform records"
+my @chunked = pmap_chunked 2 { $_ * 2 } (1, 2, 3, 4, 5, 6)
+assert_eq scalar(@chunked), 6, "pmap_chunked count"
+assert_eq $chunked[0], 2, "pmap_chunked first"
+assert_eq $chunked[5], 12, "pmap_chunked last"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TRAVERSAL
+# PARALLEL - BARRIER
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_ok traverse_array_sum() > 0, "traverse array sum"
-assert_ok traverse_hash_values() > 0, "traverse hash values"
-assert_ok defined(traverse_mixed()), "traverse mixed"
+my $bar = barrier(2)
+assert_ok defined($bar), "barrier creates object"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# REFERENCES
+# FILE - TEMPDIR/TEMPFILE
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_ok defined(ref_deref_array()), "ref deref array"
-assert_ok defined(ref_deref_hash()), "ref deref hash"
-assert_ok defined(ref_to_nested()), "ref to nested"
-assert_ok defined(ref_copy_vs_alias()), "ref copy vs alias"
+my $tdir = tempdir()
+assert_ok(-d $tdir, "tempdir creates directory")
+assert_ok $tdir =~ m{/}, "tempdir is path"
+
+my $tfile = tempfile()
+assert_ok defined($tfile), "tempfile returns path"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# COMPLEX EXAMPLES
+# VISUALIZATION - SPARKLINE/BAR_CHART (returns string, no display)
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_ok defined(complex_config()), "complex config"
-assert_ok defined(complex_tree()), "complex tree"
-assert_ok defined(complex_graph()), "complex graph"
-assert_ok defined(complex_records()), "complex records"
+my $spark = sparkline(1, 2, 3, 4, 5, 4, 3, 2, 1)
+assert_ok defined($spark), "sparkline returns string"
+assert_ok length($spark) > 0, "sparkline not empty"
+
+my $bars = bar_chart({A => 10, B => 20})
+assert_ok defined($bars), "bar_chart returns string"
+assert_ok $bars =~ /A/, "bar_chart contains label"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# EDGE CASES
+# DEBUG - DDUMP
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_ok defined(mixed_types()), "mixed types"
-assert_ok defined(undef_in_structure()), "undef in structure"
-assert_ok defined(empty_nested_array()), "empty nested array"
-assert_ok defined(empty_nested_hash()), "empty nested hash"
+my $dump = ddump({a => 1, b => [2, 3]})
+assert_ok defined($dump), "ddump returns string"
+assert_ok $dump =~ /a/, "ddump contains key"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PIPELINE
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @pipe_result = pipeline(1, 2, 3, 4, 5)
+    ->filter(fn { $_ > 2 })
+    ->map(fn { $_ * 10 })
+    ->collect()
+assert_eq scalar(@pipe_result), 3, "pipeline filter+map count"
+assert_eq $pipe_result[0], 30, "pipeline first result"
+assert_eq $pipe_result[2], 50, "pipeline last result"
+
+my @par_pipe = par_pipeline(1, 2, 3, 4)
+    ->filter(fn { $_ % 2 == 0 })
+    ->map(fn { $_ * 2 })
+    ->collect()
+assert_eq scalar(@par_pipe), 2, "par_pipeline count"
+assert_eq $par_pipe[0], 4, "par_pipeline first"
+assert_eq $par_pipe[1], 8, "par_pipeline second"
 
 test_run

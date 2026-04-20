@@ -1,0 +1,156 @@
+# lib/benchmarks.stk — bench blocks and performance testing
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BENCH BLOCKS (stryke native microbenchmarking)
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn bench_simple_addition {
+    bench { 1 + 1 } 1000
+}
+
+fn bench_multiplication {
+    bench { 7 * 13 } 1000
+}
+
+fn bench_string_concat {
+    bench { "hello" . " " . "world" } 1000
+}
+
+fn bench_array_push {
+    my @arr
+    bench { push @arr, 42 } 100
+    scalar @arr
+}
+
+fn bench_hash_insert {
+    my %h
+    my $i = 0
+    bench { $h{$i++} = "value" } 100
+    scalar keys %h
+}
+
+fn bench_function_call {
+    fn add($a, $b) { $a + $b }
+    bench { add(3, 4) } 1000
+}
+
+fn bench_regex_match {
+    my $str = "hello world 12345"
+    bench { $str =~ /\d+/ } 1000
+}
+
+fn bench_loop_sum {
+    bench {
+        my $sum = 0
+        for my $i (1..10) { $sum += $i }
+        $sum
+    } 100
+}
+
+fn bench_map_transform {
+    my @input = (1..10)
+    bench { map { $_ * 2 } @input } 100
+}
+
+fn bench_grep_filter {
+    my @input = (1..20)
+    bench { grep { $_ % 2 == 0 } @input } 100
+}
+
+fn bench_sort_small {
+    my @input = (5, 2, 8, 1, 9, 3, 7, 4, 6)
+    bench { sort @input } 100
+}
+
+fn bench_hash_lookup {
+    my %data = map { $_ => $_ * 2 } (1..100)
+    bench { $data{50} } 1000
+}
+
+fn bench_array_access {
+    my @data = (1..100)
+    bench { $data[50] } 1000
+}
+
+fn bench_string_length {
+    my $str = "a" x 1000
+    bench { length($str) } 1000
+}
+
+fn bench_string_substr {
+    my $str = "hello world this is a test string"
+    bench { substr($str, 6, 5) } 1000
+}
+
+fn bench_sprintf {
+    bench { sprintf("%d + %d = %d", 2, 3, 5) } 1000
+}
+
+fn bench_join {
+    my @parts = qw(a b c d e)
+    bench { join("-", @parts) } 1000
+}
+
+fn bench_split {
+    my $str = "a-b-c-d-e"
+    bench { split(/-/, $str) } 1000
+}
+
+fn bench_closure_call {
+    my $fn = fn ($x) { $x * 2 }
+    bench { $fn->(42) } 1000
+}
+
+fn bench_nested_loops {
+    bench {
+        my $sum = 0
+        for my $i (1..5) {
+            for my $j (1..5) {
+                $sum += $i * $j
+            }
+        }
+        $sum
+    } 100
+}
+
+fn bench_pipeline {
+    bench {
+        (1..10) |> map { $_ * 2 } |> grep { $_ > 5 } |> sum
+    } 100
+}
+
+fn bench_threading {
+    bench {
+        ~> (1..10) map { $_ ** 2 } sum
+    } 100
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COMPARATIVE BENCHMARKS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn compare_loop_vs_map {
+    my @input = (1..100)
+    
+    my $loop_result = bench {
+        my @out
+        for my $x (@input) { push @out, $x * 2 }
+        @out
+    } 50
+    
+    my $map_result = bench {
+        map { $_ * 2 } @input
+    } 50
+    
+    "loop vs map comparison complete"
+}
+
+fn compare_hash_vs_array {
+    my %hash = map { $_ => 1 } (1..100)
+    my @array = (1..100)
+    
+    bench { exists $hash{50} } 500
+    bench { grep { $_ == 50 } @array } 500
+    
+    "hash vs array lookup comparison"
+}

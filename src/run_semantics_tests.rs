@@ -1526,7 +1526,7 @@ fn heap_numeric_comparator_pops_sorted() {
 }
 
 #[test]
-fn heap_block_comparator_readme_form() {
+fn heap_block_comparator_readme_strykerm() {
     let s = r#"
         my $pq = heap({ $a <=> $b });
         $pq->push(3);

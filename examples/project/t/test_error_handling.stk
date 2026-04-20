@@ -1,6 +1,48 @@
-# t/test_error_handling.stk — error handling tests
+# t/test_error_handling.stk — error handling, try/catch, const tests
 
 require "./lib/error_handling.stk"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CONST VARIABLES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq get_pi(), 3.14159265358979, "const pi"
+assert_eq get_e(), 2.71828182845905, "const e"
+assert_eq get_golden_ratio(), 1.61803398874989, "const golden ratio"
+assert_eq get_max_retries(), 3, "const max retries"
+assert_eq get_timeout(), 30, "const timeout"
+assert_eq get_app_name(), "StrykeDemo", "const app name"
+assert_eq get_version(), "1.0.0", "const version"
+
+my $area = circle_area(2)
+assert_eq int($area * 100) / 100, 12.56, "circle area"
+
+my $circ = circle_circumference(1)
+assert_eq int($circ * 100) / 100, 6.28, "circle circumference"
+
+my $growth = exponential_growth(100, 0.1, 1)
+assert_eq int($growth), 110, "exponential growth"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TRY/CATCH
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq try_catch_basic(), 42, "try catch basic"
+assert_eq try_catch_with_die(), 1, "try catch with die"
+assert_eq try_catch_error_message(), 1, "try catch error message"
+assert_eq try_catch_nested(), "caught-inner;caught-outer", "try catch nested"
+assert_eq try_catch_no_error(), 100, "try catch no error"
+
+my $div_result = safe_divide_try(10, 2)
+assert_eq $div_result, 5, "safe divide try ok"
+
+my $div_zero = safe_divide_try(10, 0)
+assert_eq defined($div_zero) ? 1 : 0, 0, "safe divide try zero"
+
+assert_eq try_catch_finally_pattern(), "try,catch,after", "try catch finally pattern"
+assert_eq try_catch_return_from_try(), "from-try", "try catch return from try"
+assert_eq try_catch_return_from_catch(), "from-catch", "try catch return from catch"
+assert_eq multiple_try_catch(), 12, "multiple try catch"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # EVAL BLOCK
