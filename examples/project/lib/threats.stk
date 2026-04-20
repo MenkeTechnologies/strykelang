@@ -2,8 +2,7 @@
 
 enum ThreatLevel { HIGH, WARN, OK }
 
-fn analyze_threats {
-    my ($sys, $net, $disks) = @_
+fn analyze_threats ($sys, $net, $disks) {
     my @threats
 
     # Disk space warnings

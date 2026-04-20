@@ -58,8 +58,7 @@ fn scan_interfaces {
     @raw
 }
 
-fn scan_top_processes {
-    my $n = shift
+fn scan_top_processes ($n) {
     $n = 10 unless defined($n)
     my @procs = process_list()
     return () unless @procs
