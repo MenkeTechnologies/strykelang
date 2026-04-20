@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# test_benchmarks.stk — tests for bench blocks
+
+require "./lib/benchmarks.stk"
+
+# ── Bench block tests ──────────────────────────────────────────────
+# Each bench function returns a timing string or value
+# We just verify they run without error and return something
+
+assert_ok defined(bench_simple_addition()), "bench simple addition"
+assert_ok defined(bench_multiplication()), "bench multiplication"
+assert_ok defined(bench_string_concat()), "bench string concat"
+assert_eq bench_array_push(), 100, "bench array push returns count"
+assert_eq bench_hash_insert(), 100, "bench hash insert returns count"
+assert_ok defined(bench_function_call()), "bench function call"
+assert_ok defined(bench_regex_match()), "bench regex match"
+assert_ok defined(bench_loop_sum()), "bench loop sum"
+assert_ok defined(bench_map_transform()), "bench map transform"
+assert_ok defined(bench_grep_filter()), "bench grep filter"
+assert_ok defined(bench_sort_small()), "bench sort small"
+assert_ok defined(bench_hash_lookup()), "bench hash lookup"
+assert_ok defined(bench_array_access()), "bench array access"
+assert_ok defined(bench_string_length()), "bench string length"
+assert_ok defined(bench_string_substr()), "bench string substr"
+assert_ok defined(bench_sprintf()), "bench sprintf"
+assert_ok defined(bench_join()), "bench join"
+assert_ok defined(bench_split()), "bench split"
+assert_ok defined(bench_closure_call()), "bench closure call"
+assert_ok defined(bench_nested_loops()), "bench nested loops"
+assert_ok defined(bench_pipeline()), "bench pipeline"
+assert_ok defined(bench_threading()), "bench threading"
+
+# ── Comparative benchmarks ─────────────────────────────────────────
+
+assert_ok defined(compare_loop_vs_map()), "compare loop vs map"
+assert_ok defined(compare_hash_vs_array()), "compare hash vs array"
+
+test_run

@@ -1149,6 +1149,11 @@ fma
 fmadd
 fmf
 fmod
+fcsv
+fj
+ftoml
+fx
+fy
 fndalli
 fndidxs
 fndl
@@ -1182,8 +1187,13 @@ frequencies
 from_base
 from_bin
 from_code_point
+from_csv
 from_csv_line
 from_digits
+from_json
+from_toml
+from_xml
+from_yaml
 from_hex
 from_oct
 from_pairs

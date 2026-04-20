@@ -19,16 +19,34 @@ pub fn format_program(p: &Program) -> String {
 pub(crate) fn format_sub_sig_param(p: &SubSigParam) -> String {
     use crate::ast::MatchArrayElem;
     match p {
-        SubSigParam::Scalar(name, ty) => {
+        SubSigParam::Scalar(name, ty, default) => {
             let mut s = format!("${}", name);
             if let Some(t) = ty {
                 s.push_str(": ");
                 s.push_str(&t.display_name());
             }
+            if let Some(d) = default {
+                s.push_str(" = ");
+                s.push_str(&format_expr(d));
+            }
             s
         }
-        SubSigParam::Array(name) => format!("@{}", name),
-        SubSigParam::Hash(name) => format!("%{}", name),
+        SubSigParam::Array(name, default) => {
+            let mut s = format!("@{}", name);
+            if let Some(d) = default {
+                s.push_str(" = ");
+                s.push_str(&format_expr(d));
+            }
+            s
+        }
+        SubSigParam::Hash(name, default) => {
+            let mut s = format!("%{}", name);
+            if let Some(d) = default {
+                s.push_str(" = ");
+                s.push_str(&format_expr(d));
+            }
+            s
+        }
         SubSigParam::ArrayDestruct(elems) => {
             let inner = elems
                 .iter()

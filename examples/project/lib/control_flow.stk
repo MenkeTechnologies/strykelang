@@ -177,7 +177,67 @@ fn postfix_while_countdown {
     @result
 }
 
-# ── Given/when (match) ─────────────────────────────────────────────
+# ── Given/when (Perl 5.10+ switch) ─────────────────────────────────
+
+fn day_type_given($day) {
+    given ($day) {
+        when ("Saturday") { return "weekend" }
+        when ("Sunday")   { return "weekend" }
+        when ("Monday")   { return "weekday" }
+        when ("Tuesday")  { return "weekday" }
+        when ("Wednesday") { return "weekday" }
+        when ("Thursday") { return "weekday" }
+        when ("Friday")   { return "weekday" }
+        default { return "unknown" }
+    }
+}
+
+fn http_status_given($code) {
+    given ($code) {
+        when (200) { return "OK" }
+        when (201) { return "Created" }
+        when (204) { return "No Content" }
+        when (400) { return "Bad Request" }
+        when (401) { return "Unauthorized" }
+        when (403) { return "Forbidden" }
+        when (404) { return "Not Found" }
+        when (500) { return "Internal Server Error" }
+        default    { return "Unknown Status" }
+    }
+}
+
+fn classify_char_given($c) {
+    given ($c) {
+        when (/^[0-9]$/) { return "digit" }
+        when (/^[a-z]$/) { return "lower" }
+        when (/^[A-Z]$/) { return "upper" }
+        when (/^\s$/)    { return "space" }
+        default          { return "other" }
+    }
+}
+
+fn nested_given($a, $b) {
+    my $result
+    given ($a) {
+        when (1) {
+            given ($b) {
+                when (1) { $result = "1-1" }
+                when (2) { $result = "1-2" }
+                default  { $result = "1-?" }
+            }
+        }
+        when (2) {
+            given ($b) {
+                when (1) { $result = "2-1" }
+                default  { $result = "2-?" }
+            }
+        }
+        default { $result = "?-?" }
+    }
+    $result
+}
+
+# ── Match expression (stryke native) ───────────────────────────────
 
 fn day_type($day) {
     match ($day) {

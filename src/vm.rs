@@ -813,8 +813,8 @@ impl<'a> VM<'a> {
     }
 
     /// Call operands are pushed so the rightmost syntactic argument is on top. Restore
-    /// left-to-right order, then flatten list-valued operands (`qw/.../`, list literals) into
-    /// successive scalars — matching Perl's argument list for simple calls. Reversing after
+    /// left-to-right order, then flatten list-valued operands (`qw/.../`, list literals, hashes)
+    /// into successive scalars — matching Perl's argument list for simple calls. Reversing after
     /// flattening would incorrectly reverse elements inside expanded lists.
     fn pop_call_operands_flattened(&mut self, argc: usize) -> Vec<PerlValue> {
         let mut slots = Vec::with_capacity(argc);
@@ -826,6 +826,11 @@ impl<'a> VM<'a> {
         for v in slots {
             if let Some(items) = v.as_array_vec() {
                 out.extend(items);
+            } else if let Some(h) = v.as_hash_map() {
+                for (k, val) in h {
+                    out.push(PerlValue::string(k));
+                    out.push(val);
+                }
             } else {
                 out.push(v);
             }

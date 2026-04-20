@@ -1,0 +1,85 @@
+# lib/default_params.stk — default parameter value tests
+# Tests fn foo($x = value) syntax (stryke extension)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SCALAR DEFAULTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn scalar_default($x, $y = 42) { $x + $y }
+
+fn scalar_default_expr($x, $y = $x * 2) { $x + $y }
+
+fn scalar_default_string($prefix, $suffix = "!") { "$prefix$suffix" }
+
+fn scalar_typed_default($x, $y: Int = 100) { $x + $y }
+
+fn multiple_defaults($a, $b = 10, $c = 20) { $a + $b + $c }
+
+fn default_uses_var($base, $mult = $base) { $base + $mult }
+
+fn default_with_ternary($a, $b = $a > 0 ? 1 : -1) { $a * $b }
+
+fn default_call_fn($x, $y = get_default_value()) { $x + $y }
+fn get_default_value { 99 }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARRAY DEFAULTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn array_default($prefix, @items = (1, 2, 3)) {
+    "$prefix: " . join(",", @items)
+}
+
+fn array_default_range($n, @vals = (1..5)) {
+    $n + sum(@vals)
+}
+
+fn array_default_empty($x, @rest = ()) {
+    $x + scalar(@rest)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HASH DEFAULTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn hash_default($name, %opts = (debug => 0, verbose => 1)) {
+    my $d = $opts{debug} // 0
+    my $v = $opts{verbose} // 0
+    "$name: debug=$d verbose=$v"
+}
+
+fn hash_default_access($key, %data = (a => 10, b => 20)) {
+    $data{$key} // -1
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CHAINED COMPARISONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Note: stryke passes $_ implicitly when calling with no explicit args,
+# so we need a dummy first param or explicit call patterns
+fn in_range($x, $min, $max) {
+    $min <= $x <= $max
+}
+
+fn three_way_check($a, $b, $c) {
+    $a < $b < $c
+}
+
+fn descending_check($a, $b, $c) {
+    $a > $b > $c
+}
+
+fn mixed_compare($x) {
+    0 < $x <= 10
+}
+
+fn string_range($s) {
+    "a" le $s le "z"
+}
+
+fn chained_four($a, $b, $c, $d) {
+    $a < $b < $c < $d
+}
+
+1

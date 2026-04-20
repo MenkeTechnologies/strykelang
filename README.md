@@ -41,7 +41,7 @@ The 2nd fastest dynamic language runtime ever benchmarked — behind only Mike P
 - [\[0x0E\] Inline Rust FFI (`rust { ... }`)](#0x0e-inline-rust-ffi-rust-----)
 - [\[0x0F\] Bytecode Cache (`.pec`)](#0x0f-bytecode-cache-pec)
 - [\[0x10\] Distributed `pmap_on` over SSH (`cluster`)](#0x10-distributed-pmap_on-over-ssh-cluster)
-- [\[0x11\] Language Server (`--lsp`)](#0x11-language-server---lsp)
+- [\[0x11\] Language Server (`stryke lsp`)](#0x11-language-server-stryke-lsp)
 - [\[0x12\] Language Reflection](#0x12-language-reflection)
 - [\[0xFF\] License](#0xff-license)
 
@@ -147,7 +147,23 @@ stryke serve                                # static file server for $PWD on por
 stryke serve 8080 app.stk                   # HTTP server with handler script
 stryke serve 3000 -e '"hello " . $req->{path}'  # one-liner HTTP server
 stryke build script.stk -o myapp             # bake into a standalone binary ([0x0D])
-stryke --lsp                                # language server over stdio ([0x11])
+stryke fmt -i .                              # format all .stk files recursively in place
+stryke fmt lib/utils.stk                     # print formatted source to stdout
+stryke check *.stk                           # parse + compile without executing (CI/editor)
+stryke disasm script.stk                     # disassemble bytecode (learning/debugging)
+stryke profile script.stk                    # run with profiling, structured output
+stryke profile --flame script.stk -o out.svg # flamegraph to file
+stryke bench                                 # run all benchmarks in bench/ or benches/
+stryke init myapp                            # scaffold a new project (lib/, bench/, t/)
+stryke repl                                  # start interactive REPL explicitly
+stryke repl --load lib.stk                   # pre-load a library, then enter REPL
+stryke lsp                                   # language server over stdio ([0x11])
+stryke completions zsh                       # emit zsh completions to stdout
+stryke ast script.stk                        # dump AST as JSON
+stryke prun *.stk                            # run multiple files in parallel
+stryke -j 4 *.stk                             # run multiple files in parallel (4 threads)
+stryke convert app.pl                        # convert Perl to stryke syntax with |> pipes
+stryke deconvert app.stk                     # convert stryke back to Perl syntax
 STRYKE_BC_CACHE=1 stryke app.stk             # warm starts skip parse + compile ([0x0F])
 ```
 
@@ -713,13 +729,26 @@ stryke-specific long flags:
 | `--no-jit` | Disable Cranelift JIT (bytecode interpreter only) |
 | `--compat` | Perl 5 strict-compatibility mode: disable all stryke extensions (`\|>`, `struct`, `enum`, `match`, `pmap`, `#{expr}`, etc.) |
 | `--explain CODE` | Print expanded hint for an error code (e.g. `E0001`) |
-| `--lsp` | Language server over stdio ([\[0x11\]](#0x11-language-server---lsp)) |
+| `--lsp` | Language server over stdio ([\[0x11\]](#0x11-language-server-stryke-lsp)) |
 | `-j N` / `--threads N` | Set number of parallel threads (rayon) |
 | `--remote-worker` | Persistent cluster worker over stdio ([\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster)) |
 | `--remote-worker-v1` | Legacy one-shot cluster worker over stdio |
 | `build SCRIPT [-o OUT]` | AOT compile script to standalone binary ([\[0x0D\]](#0x0d-standalone-binaries-stryke-build)) |
 | `doc [TOPIC]` | Interactive reference book with vim-style navigation (`stryke doc`, `stryke doc pmap`, `stryke doc --toc`) |
 | `serve [PORT] [SCRIPT]` | HTTP server (default port 8000): static files (`stryke serve`), script (`stryke serve 8080 app.stk`), one-liner (`stryke serve 3000 -e 'EXPR'`) |
+| `fmt [-i] FILE...` | Format source files in place or to stdout (`stryke fmt -i .` formats all recursively) |
+| `check FILE...` | Parse + compile without executing; report errors with `file:line:col` (CI/editor integration) |
+| `disasm FILE` | Disassemble bytecode to stderr (learning the VM, debugging perf) |
+| `profile [--flame] [--json] FILE` | Run with profiling; `--flame` generates SVG, `-o FILE` writes to file |
+| `bench [FILE\|DIR]` | Discover and run benchmarks from `bench/` or `benches/` (`bench_*.stk`, `b_*.stk`) |
+| `init [NAME]` | Scaffold a new project: `main.stk`, `lib/`, `bench/`, `t/`, `.gitignore` |
+| `repl [--load FILE]` | Start interactive REPL explicitly, with optional pre-loaded file |
+| `lsp` | Start Language Server Protocol over stdio (equivalent to `--lsp`) |
+| `completions [SHELL]` | Emit shell completions to stdout (`stryke completions zsh > _stryke`) |
+| `ast FILE` | Dump parsed AST as JSON to stdout |
+| `prun FILE...` | Run multiple script files in parallel using all cores |
+| `convert [-i] FILE...` | Convert Perl source to stryke syntax with `\|>` pipes |
+| `deconvert [-i] FILE...` | Convert stryke `.stk` files back to standard Perl syntax |
 
 ![stryke -h](img/stryke-help.png)
 
@@ -734,13 +763,13 @@ Scalars `$x`, arrays `@a`, hashes `%h`, refs `\$x`/`\@a`/`\%h`/`\&sub`, anon `[.
 `if`/`elsif`/`else`/`unless`, `while`/`until`, `do { } while/until`, C-style `for`, `foreach`, `last`/`next`/`redo` with labels, postfix `if`/`unless`/`while`/`until`/`for`, ternary, `try { } catch ($err) { } finally { }`, `given`/`when`/`default`, algebraic `match (EXPR) { PATTERN [if EXPR] => EXPR, ... }` (regex, array, hash, wildcard, literal patterns; bindings scoped per arm; exhaustive enum variant checking), `eval_timeout SECS { ... }`.
 
 #### Operators
-Arithmetic, string `.`/`x`, comparison, `eq`/`ne`/`lt`/`gt`/`cmp`, logical `&&`/`||`/`//`/`!`/`and`/`or`/`not`, bitwise (`|`/`&` are set ops on native `Set`), assignment + compound (`+=`, `.=`, `//=`, …), regex `=~`/`!~`, range `..` / `...` (incl. flip-flop with `eof`), arrow `->`, **pipe-forward `|>`** (stryke extension — threads the LHS as the **first** argument of the RHS call; see [Extensions beyond stock Perl 5](#extensions-beyond-stock-perl-5)).
+Arithmetic, string `.`/`x`, comparison (including **Raku-style chained comparisons** like `1 < $x < 10`), `eq`/`ne`/`lt`/`gt`/`cmp`, logical `&&`/`||`/`//`/`!`/`and`/`or`/`not`, bitwise (`|`/`&` are set ops on native `Set`), assignment + compound (`+=`, `.=`, `//=`, …), regex `=~`/`!~`, range `..` / `...` (incl. flip-flop with `eof`), arrow `->`, **pipe-forward `|>`** (stryke extension — threads the LHS as the **first** argument of the RHS call; see [Extensions beyond stock Perl 5](#extensions-beyond-stock-perl-5)).
 
 #### Regex engine
 Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anchor (no `/m`) is rewritten to `(?:\n?\z)`. Match `=~`, dynamic `$str =~ $pat`, substitution `s///`, transliteration `tr///`, flags `g`/`i`/`m`/`s`/`x`/`e`/`r`, captures `$1`…`$n`, named groups → `%+`/`$+{name}`, `\Q...\E`, `quotemeta`, `m//`/`qr//`. The `/r` flag (non-destructive) returns the modified string instead of the match count — auto-injected when `s///` or `tr///` appear as pipe-forward RHS. Bare `/pat/` in statement/boolean context is `$_ =~ /pat/`.
 
 #### Subroutines
-`sub name { }` with optional prototype, anon subs/closures, implicit return of last expression (VM), `@_`/`shift`/`return`, postfix `return ... if COND`, `AUTOLOAD` with `$AUTOLOAD` set to the FQN.
+`sub name { }` / `fn name { }` with optional prototype, **typed parameters** (`fn add($a: Int, $b: Int)`), **default parameter values** (`fn greet($name = "world")`), anon subs/closures, implicit return of last expression (VM), `@_`/`shift`/`return`, postfix `return ... if COND`, `AUTOLOAD` with `$AUTOLOAD` set to the FQN.
 
 #### Built-ins (selected)
 
@@ -816,9 +845,11 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **Standalone binaries** ([\[0x0D\]](#0x0d-standalone-binaries-stryke-build)): `stryke build SCRIPT -o OUT` bakes a script into a self-contained executable.
 - **Inline Rust FFI** ([\[0x0E\]](#0x0e-inline-rust-ffi-rust-----)): `rust { pub extern "C" fn ... }` blocks compile to a cdylib on first run, dlopen + register as Perl-callable subs.
 - **Bytecode cache** ([\[0x0F\]](#0x0f-bytecode-cache-pec)): `STRYKE_BC_CACHE=1` skips parse + compile on warm starts via on-disk `.pec` bundles.
-- **Language server** ([\[0x11\]](#0x11-language-server---lsp)): `stryke --lsp` runs an LSP server over stdio with diagnostics, hover, completion.
+- **Language server** ([\[0x11\]](#0x11-language-server-stryke-lsp)): `stryke lsp` runs an LSP server over stdio with diagnostics, hover, completion.
 - `mysync` shared state ([\[0x04\]](#0x04-shared-state-mysync)).
 - `frozen my` (or `const my` — same thing, more familiar spelling), `typed my`, `struct`, `enum`, `class` (full OOP with `extends`/`impl`), `trait`, algebraic `match`, `try/catch/finally`, `eval_timeout`, `retry`, `rate_limit`, `every`, `gen { ... yield }`.
+- **Raku-style chained comparisons** — `1 < $x < 10` desugars to `(1 < $x) && ($x < 10)` at parse time. Works with all comparison operators (`<`, `<=`, `>`, `>=`, `lt`, `le`, `gt`, `ge`) and chains of any length.
+- **Default parameter values** — `fn greet($name = "world")`, `fn range(@vals = (1,2,3))`, `fn config(%opts = (debug => 0))`. Defaults evaluated at call time when argument not provided.
 - **Functional composition** — `compose`, `partial`, `curry`, `memoize`, `once`, `constantly`, `complement`, `juxt`, `fnil`:
 
   ```perl
@@ -1795,16 +1826,16 @@ stryke --remote-worker-v1                # legacy one-shot session for compat te
 
 ---
 
-## [0x11] LANGUAGE SERVER (`--lsp`)
+## [0x11] LANGUAGE SERVER (`stryke lsp`)
 
-`stryke --lsp` runs an LSP server over stdio. Hooks into the existing parser, lexer, and symbol table — no separate analyzer to maintain. Surfaces:
+`stryke lsp` (or `stryke --lsp`) runs an LSP server over stdio. Hooks into the existing parser, lexer, and symbol table — no separate analyzer to maintain. Surfaces:
 
 - **Diagnostics** on save (parse + compile errors with line / column / message)
 - **Hover docs** for builtins (`pmap`, `cluster`, `fetch_json`, `dataframe`, …) — including the parallel and cluster primitives from sections [\[0x03\]](#0x03-parallel-primitives) and [\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster)
 - **Symbol lookup** for subs and packages within the open file
 - **Completion** for built-in function names and the keywords listed in [\[0x08\]](#0x08-supported-perl-features)
 
-Wire it into VS Code, JetBrains, or any LSP-aware editor by pointing the client at `stryke --lsp` as the language-server command. There is no `Cargo.toml`-style separate `stryke-lsp` binary in v1 — the same `stryke` you run scripts with also acts as its own language server when invoked with `--lsp`.
+Wire it into VS Code, JetBrains, or any LSP-aware editor by pointing the client at `stryke lsp` (or `stryke --lsp`) as the language-server command. There is no separate `stryke-lsp` binary — the same `stryke` you run scripts with also acts as its own language server.
 
 ```jsonc
 // .vscode/settings.json
