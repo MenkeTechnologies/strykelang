@@ -1733,11 +1733,6 @@ impl Parser {
                             | "last"
                             | "next"
                             | "redo"
-                            | "die"
-                            | "warn"
-                            | "print"
-                            | "say"
-                            | "p"
                     ) =>
                 {
                     break
@@ -2491,6 +2486,16 @@ impl Parser {
                 name: "ddump".to_string(),
                 args: vec![arg],
             },
+            "say" | "p" => ExprKind::Say {
+                handle: None,
+                args: vec![arg],
+            },
+            "print" => ExprKind::Print {
+                handle: None,
+                args: vec![arg],
+            },
+            "warn" => ExprKind::Warn(vec![arg]),
+            "die" => ExprKind::Die(vec![arg]),
             "stringify" | "str" => ExprKind::FuncCall {
                 name: "stringify".to_string(),
                 args: vec![arg],
@@ -2588,15 +2593,6 @@ impl Parser {
             // Datetime
             "datetime_utc" | "utc" => ExprKind::FuncCall {
                 name: "datetime_utc".to_string(),
-                args: vec![arg],
-            },
-            // Output
-            "p" | "say" => ExprKind::Say {
-                handle: None,
-                args: vec![arg],
-            },
-            "print" | "pr" => ExprKind::Print {
-                handle: None,
                 args: vec![arg],
             },
             // Bare `e` / `fore` / `ep` in thread context: foreach element, say it.

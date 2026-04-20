@@ -7596,3 +7596,30 @@ fn array_sparse_assign_leaves_intermediate_slots_undef() {
         "1-2-x-9"
     );
 }
+
+// ── Thread macro with p/say/print/warn/die stages ──
+
+#[test]
+fn thread_macro_inc_p_stage() {
+    assert_eq!(eval_int(r#"my $x = t 10 inc; $x"#), 11);
+}
+
+#[test]
+fn thread_macro_inc_say_stage() {
+    assert_eq!(eval_int(r#"t 10 inc say; 1"#), 1);
+}
+
+#[test]
+fn thread_macro_inc_print_stage() {
+    assert_eq!(eval_int(r#"t 10 inc print; 1"#), 1);
+}
+
+#[test]
+fn thread_macro_dec_p_stage() {
+    assert_eq!(eval_int(r#"my $x = t 10 dec; $x"#), 9);
+}
+
+#[test]
+fn thread_macro_chained_inc_dec_p() {
+    assert_eq!(eval_int(r#"my $x = t 5 inc inc dec; $x"#), 6);
+}
