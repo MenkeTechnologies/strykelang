@@ -1,0 +1,335 @@
+# lib/file_ops.stk — file operation tests
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SLURP (READ ENTIRE FILE)
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn slurp_self {
+    my $content = slurp("./lib/file_ops.stk")
+    defined($content) ? 1 : 0
+}
+
+fn slurp_has_content {
+    my $content = slurp("./lib/file_ops.stk")
+    length($content) > 100 ? 1 : 0
+}
+
+fn slurp_missing {
+    my $content = eval { slurp("/nonexistent/file/path") }
+    $@ ? 1 : 0
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPEW (WRITE ENTIRE FILE)
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn spew_and_read {
+    my $tmpfile = "/tmp/stryke_test_spew_$$.txt"
+    spurt($tmpfile, "hello world")
+    my $content = slurp($tmpfile)
+    unlink($tmpfile)
+    $content
+}
+
+fn spew_overwrite {
+    my $tmpfile = "/tmp/stryke_test_over_$$.txt"
+    spurt($tmpfile, "first")
+    spurt($tmpfile, "second")
+    my $content = slurp($tmpfile)
+    unlink($tmpfile)
+    $content
+}
+
+fn spew_multiline {
+    my $tmpfile = "/tmp/stryke_test_multi_$$.txt"
+    spurt($tmpfile, "line1\nline2\nline3\n")
+    my $content = slurp($tmpfile)
+    unlink($tmpfile)
+    my @lines = split(/\n/, $content)
+    scalar(@lines)
+}
+
+fn spew_empty {
+    my $tmpfile = "/tmp/stryke_test_empty_$$.txt"
+    spurt($tmpfile, "")
+    my $content = slurp($tmpfile)
+    unlink($tmpfile)
+    length($content)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FILE TEST OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn file_exists_true { -e "./lib/file_ops.stk" ? 1 : 0 }
+fn file_exists_false { -e "/nonexistent/file" ? 1 : 0 }
+
+fn file_is_file { -f "./lib/file_ops.stk" ? 1 : 0 }
+fn file_is_dir { -d "./lib" ? 1 : 0 }
+fn file_is_readable { -r "./lib/file_ops.stk" ? 1 : 0 }
+fn file_is_writable { -w "/tmp" ? 1 : 0 }
+
+fn test_file_has_size {
+    my @s = stat("./lib/file_ops.stk")
+    scalar(@s) > 0 && $s[7] > 0 ? 1 : 0
+}
+
+fn dir_not_file { -f "./lib" ? 0 : 1 }
+fn file_not_dir { -d "./lib/file_ops.stk" ? 0 : 1 }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GLOB
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn glob_lib_files {
+    my @files = glob("./lib/*.stk")
+    scalar(@files) > 5 ? 1 : 0
+}
+
+fn glob_test_files {
+    my @files = glob("./t/test_*.stk")
+    scalar(@files) > 10 ? 1 : 0
+}
+
+fn glob_no_match {
+    my @files = glob("./nonexistent/*.xyz")
+    scalar(@files)
+}
+
+fn glob_single {
+    my @files = glob("./lib/file_ops.stk")
+    scalar(@files)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STAT
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn stat_file {
+    my @s = stat("./lib/file_ops.stk")
+    scalar(@s) > 0 ? 1 : 0
+}
+
+fn stat_size {
+    my @s = stat("./lib/file_ops.stk")
+    $s[7] > 0 ? 1 : 0
+}
+
+fn stat_missing {
+    my @s = stat("/nonexistent/file")
+    scalar(@s)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# UNLINK
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn unlink_created {
+    my $tmpfile = "/tmp/stryke_unlink_test_$$.txt"
+    spurt($tmpfile, "test")
+    my $exists_before = -e $tmpfile ? 1 : 0
+    unlink($tmpfile)
+    my $exists_after = -e $tmpfile ? 1 : 0
+    $exists_before == 1 && $exists_after == 0 ? 1 : 0
+}
+
+fn unlink_missing {
+    my $result = unlink("/nonexistent/file/to/delete")
+    $result == 0 ? 1 : 0
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MKDIR / RMDIR
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn mkdir_and_rmdir {
+    my $dir = "/tmp/stryke_mkdir_test_$$"
+    mkdir($dir)
+    my $is_dir = -d $dir ? 1 : 0
+    rmdir($dir)
+    my $gone = -d $dir ? 0 : 1
+    $is_dir && $gone ? 1 : 0
+}
+
+fn mkdir_exists {
+    -d "/tmp" ? 1 : 0
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CWD / CHDIR
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn cwd_defined {
+    my $d = cwd()
+    defined($d) ? 1 : 0
+}
+
+fn cwd_not_empty {
+    my $d = cwd()
+    length($d) > 0 ? 1 : 0
+}
+
+fn cwd_contains_project {
+    my $d = cwd()
+    $d =~ /project/ ? 1 : 0
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BASENAME / DIRNAME
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn basename_simple { basename("/foo/bar/baz.txt") }
+fn basename_no_path { basename("file.txt") }
+fn basename_trailing_slash { basename("/foo/bar/") }
+
+fn dirname_simple { dirname("/foo/bar/baz.txt") }
+fn dirname_no_path { dirname("file.txt") }
+fn dirname_root { dirname("/foo") }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# OPEN / CLOSE / READ / WRITE (FILEHANDLE STYLE)
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn open_read_close {
+    my $tmpfile = "/tmp/stryke_open_test_$$.txt"
+    spurt($tmpfile, "hello from file")
+    open(my $fh, "<", $tmpfile)
+    my $line = <$fh>
+    close($fh)
+    unlink($tmpfile)
+    $line =~ /hello/ ? 1 : 0
+}
+
+fn open_write_close {
+    my $tmpfile = "/tmp/stryke_write_test_$$.txt"
+    open(my $fh, ">", $tmpfile)
+    print $fh "written via handle"
+    close($fh)
+    my $content = slurp($tmpfile)
+    unlink($tmpfile)
+    $content =~ /written/ ? 1 : 0
+}
+
+fn open_append {
+    my $tmpfile = "/tmp/stryke_append_test_$$.txt"
+    spurt($tmpfile, "first\n")
+    open(my $fh, ">>", $tmpfile)
+    print $fh "second\n"
+    close($fh)
+    my $content = slurp($tmpfile)
+    unlink($tmpfile)
+    $content =~ /first/ && $content =~ /second/ ? 1 : 0
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LINES (READ FILE AS ARRAY via slurp/split)
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn lines_count {
+    my $tmpfile = "/tmp/stryke_lines_$$.txt"
+    spurt($tmpfile, "line1\nline2\nline3")
+    my $content = slurp($tmpfile)
+    my @lines = split(/\n/, $content)
+    unlink($tmpfile)
+    scalar(@lines)
+}
+
+fn lines_content {
+    my $tmpfile = "/tmp/stryke_lines2_$$.txt"
+    spurt($tmpfile, "alpha\nbeta\ngamma")
+    my $content = slurp($tmpfile)
+    my @lines = split(/\n/, $content)
+    unlink($tmpfile)
+    $lines[1] =~ /beta/ ? 1 : 0
+}
+
+fn lines_empty_file {
+    my $tmpfile = "/tmp/stryke_empty_$$.txt"
+    spurt($tmpfile, "")
+    my $content = slurp($tmpfile)
+    unlink($tmpfile)
+    length($content)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TEMP FILE OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn temp_write_read {
+    my $tmpfile = "/tmp/stryke_temp_wr_$$.txt"
+    spurt($tmpfile, "temp data 12345")
+    my $back = slurp($tmpfile)
+    unlink($tmpfile)
+    $back eq "temp data 12345" ? 1 : 0
+}
+
+fn temp_binary_like {
+    my $tmpfile = "/tmp/stryke_binary_$$.bin"
+    my $data = "ABCD"
+    spurt($tmpfile, $data)
+    my $back = slurp($tmpfile)
+    unlink($tmpfile)
+    length($back) == 4 ? 1 : 0
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PATH OPERATIONS (manual since no builtins)
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn path_join_manual {
+    my $p = "/foo" . "/" . "bar" . "/" . "baz.txt"
+    $p eq "/foo/bar/baz.txt" ? 1 : 0
+}
+
+fn path_cwd_is_absolute {
+    my $d = cwd()
+    $d =~ /^\// ? 1 : 0
+}
+
+fn path_basename_ext {
+    my $f = "file.txt"
+    basename($f) eq "file.txt" ? 1 : 0
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# RENAME / COPY
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn rename_file {
+    my $src = "/tmp/stryke_rename_src_$$.txt"
+    my $dst = "/tmp/stryke_rename_dst_$$.txt"
+    spurt($src, "rename test")
+    rename($src, $dst)
+    my $src_gone = -e $src ? 0 : 1
+    my $dst_exists = -e $dst ? 1 : 0
+    my $content = slurp($dst)
+    unlink($dst)
+    $src_gone && $dst_exists && $content eq "rename test" ? 1 : 0
+}
+
+fn copy_file {
+    my $src = "/tmp/stryke_copy_src_$$.txt"
+    my $dst = "/tmp/stryke_copy_dst_$$.txt"
+    spurt($src, "copy test")
+    copy($src, $dst)
+    my $src_exists = -e $src ? 1 : 0
+    my $dst_exists = -e $dst ? 1 : 0
+    my $content = slurp($dst)
+    unlink($src)
+    unlink($dst)
+    $src_exists && $dst_exists && $content eq "copy test" ? 1 : 0
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FIND FILES (via glob)
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn find_lib_via_glob {
+    my @files = glob("./lib/*.stk")
+    scalar(@files) > 5 ? 1 : 0
+}
+
+fn find_test_via_glob {
+    my @files = glob("./t/*.stk")
+    scalar(@files) > 20 ? 1 : 0
+}

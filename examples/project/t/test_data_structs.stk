@@ -1,0 +1,106 @@
+# t/test_data_structs.stk — complex data structure tests
+
+require "./lib/data_structures.stk"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NESTED ARRAYS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq nested_array_access(), 3, "nested array access"
+assert_eq nested_array_depth3(), 6, "nested array depth3"
+assert_eq nested_array_modify(), 99, "nested array modify"
+assert_eq nested_array_push(), 2, "nested array push"
+assert_eq nested_array_count(), 3, "nested array count"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NESTED HASHES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq nested_hash_access(), 2, "nested hash access"
+assert_eq nested_hash_depth3(), "deep", "nested hash depth3"
+assert_eq nested_hash_modify(), 99, "nested hash modify"
+assert_eq nested_hash_add_key(), "value", "nested hash add key"
+assert_eq nested_hash_keys(), 3, "nested hash keys"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARRAY OF HASHES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq aoh_access(), "Alice", "aoh access"
+assert_eq aoh_modify(), 99, "aoh modify"
+assert_eq aoh_iterate(), 6, "aoh iterate"
+assert_eq aoh_map(), "2,4,6", "aoh map"
+assert_eq aoh_grep(), 2, "aoh grep"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HASH OF ARRAYS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq hoa_access(), 2, "hoa access"
+assert_eq hoa_modify(), 99, "hoa modify"
+assert_eq hoa_push(), 3, "hoa push"
+assert_eq hoa_join(), "a-b-c", "hoa join"
+assert_eq hoa_keys(), 3, "hoa keys"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HASH OF HASHES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq hoh_access(), "admin", "hoh access"
+assert_eq hoh_modify(), 99, "hoh modify"
+assert_eq hoh_add_inner(), "value", "hoh add inner"
+assert_eq hoh_iterate(), 3, "hoh iterate"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COMPLEX STRUCTURES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq complex_tree(), 5, "complex tree"
+assert_eq complex_graph(), 2, "complex graph"
+assert_eq complex_config(), 8080, "complex config"
+assert_eq complex_records(), 3, "complex records"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# REFERENCE OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq ref_to_nested(), "HASH", "ref to nested"
+assert_eq ref_copy_vs_alias(), 99, "ref copy vs alias"
+assert_eq ref_deref_array(), 3, "ref deref array"
+assert_eq ref_deref_hash(), 1, "ref deref hash"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STRUCTURE TRAVERSAL
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq traverse_array_sum(), 21, "traverse array sum"
+assert_eq traverse_hash_values(), 6, "traverse hash values"
+assert_eq traverse_mixed(), 6, "traverse mixed"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STRUCTURE BUILDING
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq build_array_of_arrays(), 3, "build array of arrays"
+assert_eq build_hash_of_arrays(), 3, "build hash of arrays"
+assert_eq build_records(), "item2", "build records"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STRUCTURE MANIPULATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq filter_by_field(), 2, "filter by field"
+assert_eq transform_records(), 4, "transform records"
+assert_eq sort_by_field(), 1, "sort by field"
+assert_eq group_by_key(), 2, "group by key"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EDGE CASES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq empty_nested_array(), 0, "empty nested array"
+assert_eq empty_nested_hash(), 0, "empty nested hash"
+assert_eq undef_in_structure(), 0, "undef in structure"
+assert_eq mixed_types(), 1, "mixed types"
+
+test_run

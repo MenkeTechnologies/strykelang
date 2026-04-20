@@ -47,6 +47,6 @@ fn apply_n ($f, $n, $val) {
 fn sqrt_newton ($x) {
     return 0 if $x == 0
     my $guess = $x / 2.0
-    my $refine = fn { ($guess + $x / $guess) / 2.0 }
+    my $refine = fn ($g) { ($g + $x / $g) / 2.0 }
     apply_n($refine, 20, $guess)
 }

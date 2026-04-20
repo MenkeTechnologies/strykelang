@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+# t/test_functional.stk — functional programming and pipeline tests
+
+require "./lib/collections.stk"
+require "./lib/math.stk"
+require "./lib/strings.stk"
+
+# ── Map / Grep / Reduce ──────────────────────────────────────────────
+
+my @nums = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+
+# Double even numbers
+my @doubled_evens = map { $_ * 2 } grep { $_ % 2 == 0 } @nums
+assert_eq scalar(@doubled_evens), 5, "map grep count"
+assert_eq $doubled_evens[0], 4, "first doubled even"
+assert_eq $doubled_evens[-1], 20, "last doubled even"
+
+# Sum of squares of primes under 10
+my $prime_sq_sum = primes_under(10) |> map { $_ * $_ } |> sum
+# primes: 2, 3, 5, 7
+# squares: 4, 9, 25, 49
+# sum: 4+9+25+49 = 87
+assert_eq $prime_sq_sum, 87, "prime squares sum"
+
+# ── Advanced Pipelines ───────────────────────────────────────────────
+
+my @words = qw(apple banana cherry date elderberry fig grape)
+
+# Longest word length
+my $max_len = @words |> map { length($_) } |> max
+assert_eq $max_len, 10, "max word length (elderberry)"
+
+# Words containing 'a' slugified and joined
+my $result = @words 
+    |> grep { $_ =~ /a/ } 
+    |> map { slugify_str($_) } 
+    |> sort 
+    |> join(":")
+
+# words with 'a': apple, banana, date, grape
+# slugified: apple, banana, date, grape
+# sorted: apple, banana, date, grape
+# joined: apple:banana:date:grape
+assert_eq $result, "apple:banana:date:grape", "complex string pipeline"
+
+# ── Function Composition ─────────────────────────────────────────────
+
+my $f = fn { $_0 + 2 }
+my $g = fn { $_0 * 3 }
+my $h = compose_fns($f, $g) # f(g(x)) = (x * 3) + 2
+assert_eq $h->(5), 17, "compose f(g(5))"
+
+my $h2 = compose_fns($g, $f) # g(f(x)) = (x + 2) * 3
+assert_eq $h2->(5), 21, "compose g(f(5))"
+
+# ── Partial Application / Closures ───────────────────────────────────
+
+my $add10 = make_adder(10)
+my $apply_twice = fn ($func, $val) { $func->($func->($val)) }
+assert_eq $apply_twice->($add10, 5), 25, "partial apply twice"
+
+# ── Set Operations ───────────────────────────────────────────────────
+
+my @s1 = (1, 2, 3, 4, 5)
+my @s2 = (4, 5, 6, 7, 8)
+my @s3 = (2, 4, 6, 8, 10)
+
+# (s1 intersection s2) union s3
+my @inter = intersect_sets(\@s1, \@s2) # (4, 5)
+my @final = union_sets(\@inter, \@s3)  # (4, 5, 2, 6, 8, 10)
+assert_eq scalar(@final), 6, "combined set operations"
+
+test_run

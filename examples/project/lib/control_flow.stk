@@ -1,0 +1,288 @@
+# lib/control_flow.stk — loops, conditionals, and flow control
+
+# ── Basic if/elsif/else ────────────────────────────────────────────
+
+fn classify_number($n) {
+    if ($n > 0) {
+        "positive"
+    } elsif ($n < 0) {
+        "negative"
+    } else {
+        "zero"
+    }
+}
+
+fn grade_score($score) {
+    if ($score >= 90) {
+        "A"
+    } elsif ($score >= 80) {
+        "B"
+    } elsif ($score >= 70) {
+        "C"
+    } elsif ($score >= 60) {
+        "D"
+    } else {
+        "F"
+    }
+}
+
+fn unless_example($val) {
+    my $result = "default"
+    unless ($val) {
+        $result = "was falsy"
+    }
+    $result
+}
+
+# ── Ternary operator ───────────────────────────────────────────────
+
+fn ternary_simple($cond) {
+    $cond ? "yes" : "no"
+}
+
+fn ternary_nested($n) {
+    $n > 0 ? "positive" : $n < 0 ? "negative" : "zero"
+}
+
+fn ternary_expr($a, $b) {
+    ($a > $b) ? $a - $b : $b - $a
+}
+
+# ── Postfix conditionals ───────────────────────────────────────────
+
+fn postfix_if_true {
+    my $result = 0
+    $result = 42 if 1
+    $result
+}
+
+fn postfix_if_false {
+    my $result = 99
+    $result = 42 if 0
+    $result
+}
+
+fn postfix_unless_true {
+    my $result = 0
+    $result = 42 unless 1
+    $result
+}
+
+fn postfix_unless_false {
+    my $result = 0
+    $result = 42 unless 0
+    $result
+}
+
+# ── For loops ──────────────────────────────────────────────────────
+
+fn sum_range($start, $end) {
+    my $sum = 0
+    for my $i ($start..$end) {
+        $sum += $i
+    }
+    $sum
+}
+
+fn count_evens(@nums) {
+    my $count = 0
+    for my $n (@nums) {
+        $count++ if $n % 2 == 0
+    }
+    $count
+}
+
+fn for_c_style_sum($n) {
+    my $sum = 0
+    for (my $i = 1; $i <= $n; $i++) {
+        $sum += $i
+    }
+    $sum
+}
+
+fn for_with_next {
+    my $sum = 0
+    for my $i (1..10) {
+        next if $i % 2 == 0
+        $sum += $i
+    }
+    $sum
+}
+
+fn for_with_last {
+    my $sum = 0
+    for my $i (1..100) {
+        last if $i > 10
+        $sum += $i
+    }
+    $sum
+}
+
+# ── While loops ────────────────────────────────────────────────────
+
+fn while_countdown($n) {
+    my @result
+    while ($n > 0) {
+        push @result, $n
+        $n--
+    }
+    @result
+}
+
+fn while_with_last {
+    my $count = 0
+    my $sum = 0
+    while (1) {
+        $count++
+        $sum += $count
+        last if $count >= 5
+    }
+    $sum
+}
+
+fn while_with_next {
+    my $i = 0
+    my $sum = 0
+    while ($i < 10) {
+        $i++
+        next if $i % 2 == 0
+        $sum += $i
+    }
+    $sum
+}
+
+fn until_example($target) {
+    my $n = 0
+    until ($n >= $target) {
+        $n += 2
+    }
+    $n
+}
+
+# ── Postfix loops ──────────────────────────────────────────────────
+
+fn postfix_for_sum {
+    my $sum = 0
+    $sum += $_ for (1, 2, 3, 4, 5)
+    $sum
+}
+
+fn postfix_while_countdown {
+    my @result
+    my $n = 5
+    do {
+        push @result, $n
+        $n--
+    } while ($n > 0)
+    @result
+}
+
+# ── Given/when (match) ─────────────────────────────────────────────
+
+fn day_type($day) {
+    match ($day) {
+        "Saturday" | "Sunday" => "weekend"
+        "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" => "weekday"
+        _ => "unknown"
+    }
+}
+
+fn number_word($n) {
+    match ($n) {
+        1 => "one"
+        2 => "two"
+        3 => "three"
+        _ => "many"
+    }
+}
+
+# ── Nested loops ───────────────────────────────────────────────────
+
+fn multiplication_table_sum($size) {
+    my $sum = 0
+    for my $i (1..$size) {
+        for my $j (1..$size) {
+            $sum += $i * $j
+        }
+    }
+    $sum
+}
+
+fn find_pair_sum($target, @nums) {
+    my $len = scalar @nums
+    for my $i (0..$len-2) {
+        for my $j ($i+1..$len-1) {
+            if ($nums[$i] + $nums[$j] == $target) {
+                return ($nums[$i], $nums[$j])
+            }
+        }
+    }
+    ()
+}
+
+# ── Return in various contexts ─────────────────────────────────────
+
+fn early_return($n) {
+    return "negative" if $n < 0
+    return "zero" if $n == 0
+    return "small" if $n < 10
+    "large"
+}
+
+fn return_from_loop(@nums) {
+    for my $n (@nums) {
+        return $n if $n > 100
+    }
+    -1
+}
+
+fn return_list_from_loop($count) {
+    my @result
+    for my $i (1..$count) {
+        return @result if $i > 5
+        push @result, $i * 2
+    }
+    @result
+}
+
+# ── Complex control flow ───────────────────────────────────────────
+
+fn fizzbuzz($n) {
+    my @result
+    for my $i (1..$n) {
+        if ($i % 15 == 0) {
+            push @result, "FizzBuzz"
+        } elsif ($i % 3 == 0) {
+            push @result, "Fizz"
+        } elsif ($i % 5 == 0) {
+            push @result, "Buzz"
+        } else {
+            push @result, $i
+        }
+    }
+    @result
+}
+
+fn collatz_steps($n) {
+    my $steps = 0
+    while ($n != 1) {
+        if ($n % 2 == 0) {
+            $n = $n / 2
+        } else {
+            $n = 3 * $n + 1
+        }
+        $steps++
+    }
+    $steps
+}
+
+fn find_primes($limit) {
+    my @primes
+    OUTER: for my $n (2..$limit) {
+        for my $p (@primes) {
+            next OUTER if $n % $p == 0
+        }
+        push @primes, $n
+    }
+    @primes
+}

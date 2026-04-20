@@ -8096,6 +8096,8 @@ impl<'a> VM<'a> {
                     i64::from_str_radix(&s[2..], 16).unwrap_or(0)
                 } else if s.starts_with("0b") || s.starts_with("0B") {
                     i64::from_str_radix(&s[2..], 2).unwrap_or(0)
+                } else if s.starts_with("0o") || s.starts_with("0O") {
+                    i64::from_str_radix(&s[2..], 8).unwrap_or(0)
                 } else {
                     i64::from_str_radix(s.trim_start_matches('0'), 8).unwrap_or(0)
                 };
@@ -8150,16 +8152,30 @@ impl<'a> VM<'a> {
                     .to_string();
                 let s = iter.next().unwrap_or(PerlValue::UNDEF).to_string();
                 let lim = iter.next().map(|v| v.to_int() as usize);
-                let re =
-                    regex::Regex::new(&pat).unwrap_or_else(|_| regex::Regex::new(" ").unwrap());
-                let parts: Vec<PerlValue> = if let Some(l) = lim {
-                    re.splitn(&s, l)
-                        .map(|p| PerlValue::string(p.to_string()))
-                        .collect()
+
+                // Special case: empty pattern splits into characters (Perl behavior)
+                let parts: Vec<PerlValue> = if pat.is_empty() {
+                    let chars: Vec<PerlValue> = s
+                        .chars()
+                        .map(|c| PerlValue::string(c.to_string()))
+                        .collect();
+                    if let Some(l) = lim {
+                        chars.into_iter().take(l).collect()
+                    } else {
+                        chars
+                    }
                 } else {
-                    re.split(&s)
-                        .map(|p| PerlValue::string(p.to_string()))
-                        .collect()
+                    let re =
+                        regex::Regex::new(&pat).unwrap_or_else(|_| regex::Regex::new(" ").unwrap());
+                    if let Some(l) = lim {
+                        re.splitn(&s, l)
+                            .map(|p| PerlValue::string(p.to_string()))
+                            .collect()
+                    } else {
+                        re.split(&s)
+                            .map(|p| PerlValue::string(p.to_string()))
+                            .collect()
+                    }
                 };
                 Ok(PerlValue::array(parts))
             }

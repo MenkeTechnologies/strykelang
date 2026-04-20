@@ -1,0 +1,184 @@
+#!/usr/bin/env stryke
+# t/test_interpolation.stk — string interpolation edge cases and patterns
+
+require "./lib/interpolation.stk"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BASIC SCALAR INTERPOLATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq simple_scalar_interp("World"), "Hello, World!", "simple scalar"
+assert_eq simple_scalar_interp("Stryke"), "Hello, Stryke!", "simple scalar 2"
+assert_eq simple_scalar_interp(""), "Hello, !", "empty string interp"
+
+assert_eq scalar_in_sentence(5), "Found 5 items", "scalar in sentence"
+assert_eq scalar_in_sentence(0), "Found 0 items", "zero in sentence"
+assert_eq scalar_in_sentence(100), "Found 100 items", "100 in sentence"
+
+assert_eq multiple_scalars(1, 2, 3), "1 + 2 = 3", "multiple scalars"
+assert_eq multiple_scalars("a", "b", "ab"), "a + b = ab", "string scalars"
+
+assert_eq adjacent_scalars("foo", "bar"), "foobar", "adjacent scalars"
+assert_eq adjacent_scalars("", "bar"), "bar", "empty adjacent"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARRAY AND HASH INTERPOLATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @arr = (10, 20, 30, 40, 50)
+assert_eq array_element_interp(@arr), "First: 10, Last: 50", "array element interp"
+
+my %person = (name => "Alice", age => 30)
+my $person_name = $person{name}
+my $person_age = $person{age}
+assert_eq "Name: $person_name, Age: $person_age", "Name: Alice, Age: 30", "hash value interp"
+
+my $ref = +{ key => "value" }
+assert_eq nested_ref_interp($ref), "Value: value", "nested ref interp"
+
+my $aref = [100, 200, 300]
+assert_eq array_ref_elem_interp($aref), "Element: 100", "array ref elem interp"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EXPRESSIONS IN STRINGS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq expression_in_string(5), "Double of 5 is 10", "expression precomputed"
+assert_eq expression_in_string(0), "Double of 0 is 0", "expression zero"
+
+assert_eq conditional_building(1), "Result: yes", "conditional true"
+assert_eq conditional_building(0), "Result: no", "conditional false"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ESCAPE SEQUENCES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq escape_dollar(), "\$var is a variable", "escape dollar"
+assert_eq escape_at(), "\@arr is an array", "escape at"
+assert_eq escape_backslash(), "path\\to\\file", "escape backslash"
+
+assert_eq newline_string(), "line1\nline2\nline3", "newline string"
+assert_eq tab_string(), "col1\tcol2\tcol3", "tab string"
+assert_eq mixed_escapes(), "tab:\there\nnewline", "mixed escapes"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SINGLE QUOTES AND Q OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq single_quote_literal(), 'no $interpolation here', "single quote"
+assert_eq single_quote_escapes(), "can't stop", "single quote escape"
+
+assert_eq q_operator_basic(), "literal string", "q operator"
+assert_eq qq_operator_interp("World"), "Hello, World!", "qq operator"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HEREDOC STYLE
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $heredoc = heredoc_style()
+assert_contains $heredoc, "line1", "heredoc line1"
+assert_contains $heredoc, "line2", "heredoc line2"
+assert_contains $heredoc, "line3", "heredoc line3"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# POSITION AND REPETITION
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq repeated_var("x"), "x x x", "repeated var"
+assert_eq repeated_var("abc"), "abc abc abc", "repeated var longer"
+
+assert_eq var_at_end(42), "value = 42", "var at end"
+assert_eq var_at_start(42), "42 is the value", "var at start"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EDGE CASES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq empty_string_interp(), "empty: ''", "empty string"
+assert_eq undef_string_interp(), "undef: ''", "undef as empty"
+
+assert_eq numeric_interp(42), "number: 42", "numeric interp"
+assert_eq float_interp(3.14), "float: 3.14", "float interp"
+assert_eq negative_interp(-5), "negative: -5", "negative interp"
+assert_eq zero_interp(), "zero: 0", "zero interp"
+
+assert_eq concat_vs_interp("foo", "bar"), 1, "concat equals interp"
+assert_eq concat_vs_interp("", "bar"), 1, "concat equals interp empty"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TEMPLATE PATTERNS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq template_basic("Bob", 25, "NYC"), "My name is Bob, I am 25 years old, and I live in NYC.", "template basic"
+
+my @fruits = qw(apple banana cherry)
+assert_eq template_with_loop(@fruits), "Items: apple, banana, cherry", "template with loop"
+
+assert_eq build_table_row("a", "b", "c"), "| a | b | c |", "table row"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# JSON/HTML BUILDING
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq build_json_like("name", "test"), '{"name": "test"}', "json like"
+assert_eq build_html_tag("p", "hello"), "<p>hello</p>", "html tag"
+assert_eq build_html_tag("span", "text"), "<span>text</span>", "html span"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPRINTF FORMATTING
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq sprintf_int(42), "42", "sprintf int"
+assert_eq sprintf_int(-5), "-5", "sprintf negative int"
+
+assert_eq sprintf_float(3.14159), "3.14", "sprintf float"
+assert_eq sprintf_float(2.0), "2.00", "sprintf float whole"
+
+assert_eq sprintf_hex(255), "ff", "sprintf hex"
+assert_eq sprintf_hex(16), "10", "sprintf hex 16"
+
+assert_eq sprintf_padded(42), "00042", "sprintf padded"
+assert_eq sprintf_padded(1), "00001", "sprintf padded 1"
+assert_eq sprintf_padded(12345), "12345", "sprintf padded full"
+
+assert_eq sprintf_string("hello"), "'hello'", "sprintf string"
+
+assert_eq sprintf_multiple("Alice", 30), "Alice is 30 years old", "sprintf multiple"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INLINE INTERPOLATION TESTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $name = "test"
+assert_eq "name: $name", "name: test", "inline interp"
+
+my $x = 10
+my $y = 20
+assert_eq "$x + $y = " . ($x + $y), "10 + 20 = 30", "mixed interp concat"
+
+my @nums = (1, 2, 3)
+my $first = $nums[0]
+assert_eq "first is $first", "first is 1", "array access interp"
+
+my %data = (key => "value")
+my $val = $data{key}
+assert_eq "key = $val", "key = value", "hash access interp"
+
+my $msg = "outer"
+my $inner = fn {
+    my $msg = "inner"
+    "from closure: $msg"
+}
+assert_eq $inner->(), "from closure: inner", "closure interp"
+assert_eq "outer: $msg", "outer: outer", "outer scope preserved"
+
+my $multiline = "first
+second
+third"
+assert_contains $multiline, "first", "multiline first"
+assert_contains $multiline, "second", "multiline second"
+
+my $special = "tab:\there"
+assert_contains $special, "\t", "tab char"
+
+test_run

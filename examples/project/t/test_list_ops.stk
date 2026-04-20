@@ -1,0 +1,181 @@
+# t/test_list_ops.stk — list operation tests
+
+require "./lib/list_ops.stk"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MAP
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq map_double(), "2,4,6,8,10", "map double"
+assert_eq map_square(), "1,4,9,16", "map square"
+assert_eq map_string(), "A,B,C", "map string"
+assert_eq map_length(), "3,3,5", "map length"
+assert_eq map_empty(), 0, "map empty"
+assert_eq map_to_hash_key(), 6, "map to hash key"
+assert_eq map_conditional(), "0,0,3,4,5", "map conditional"
+assert_eq map_chained(), "3,5,7", "map chained"
+assert_eq map_with_index(), "a0,b1,c2", "map with index"
+assert_eq map_flatten(), "1,10,2,20,3,30", "map flatten"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GREP
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq grep_positive(), "1,2", "grep positive"
+assert_eq grep_even(), "2,4,6", "grep even"
+assert_eq grep_string_match(), "apple,banana,date", "grep string match"
+assert_eq grep_defined(), "1,2,3", "grep defined"
+assert_eq grep_true(), 2, "grep true"
+assert_eq grep_empty(), 0, "grep empty"
+assert_eq grep_none_match(), 0, "grep none match"
+assert_eq grep_all_match(), 3, "grep all match"
+assert_eq grep_count(), 5, "grep count"
+assert_eq grep_chained(), "4,6,8,10", "grep chained"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SORT
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq sort_numeric(), "1,1,2,3,4,5,6,9", "sort numeric"
+assert_eq sort_numeric_desc(), "5,4,3,1,1", "sort numeric desc"
+assert_eq sort_string(), "apple,banana,cherry", "sort string"
+assert_eq sort_string_cmp(), "Apple,banana,cherry", "sort string cmp"
+assert_eq sort_string_desc(), "cherry,banana,apple", "sort string desc"
+assert_eq sort_case_insensitive(), "apple,Banana,Cherry", "sort case insensitive"
+assert_eq sort_by_length(), "a,e,bb,dd,ccc", "sort by length"
+assert_eq sort_empty(), 0, "sort empty"
+assert_eq sort_single(), 42, "sort single"
+assert_eq sort_stable_check(), 1, "sort stable check"
+assert_eq sort_preserves_original(), 3, "sort preserves original"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# REVERSE
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq reverse_array(), "5,4,3,2,1", "reverse array"
+assert_eq reverse_array_empty(), 0, "reverse array empty"
+assert_eq reverse_array_single(), 42, "reverse array single"
+assert_eq reverse_string_scalar(), "olleh", "reverse string scalar"
+assert_eq reverse_preserves(), 1, "reverse preserves"
+assert_eq reverse_twice(), "1,2,3", "reverse twice"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# JOIN
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq join_comma(), "1,2,3", "join comma"
+assert_eq join_space(), "hello world", "join space"
+assert_eq join_empty_sep(), "abc", "join empty sep"
+assert_eq join_empty_array(), "", "join empty array"
+assert_eq join_single(), "42", "join single"
+assert_eq join_multi_char(), "1 - 2 - 3", "join multi char"
+assert_eq join_with_undef(), "1,,3", "join with undef"
+assert_eq join_mixed_types(), "1|hello|3.14", "join mixed types"
+assert_eq join_newline(), 17, "join newline"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPLIT
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq split_comma(), "a|b|c", "split comma"
+assert_eq split_space(), 2, "split space"
+assert_eq split_regex(), "a,b,c", "split regex"
+assert_eq split_limit(), 2, "split limit"
+assert_eq split_limit_rest(), "b,c,d", "split limit rest"
+assert_eq split_no_match(), 1, "split no match"
+# stryke split behavior differs from Perl for empty strings
+assert_eq split_empty_string(), 1, "split empty string"
+assert_eq split_trailing_empty(), 3, "split trailing empty"
+assert_eq split_multiple_delim(), "a|b|c", "split multiple delim"
+assert_eq split_at_start(), 3, "split at start"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PUSH
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq push_single(), "1,2,3", "push single"
+assert_eq push_multiple(), "1,2,3,4", "push multiple"
+assert_eq push_returns(), 3, "push returns"
+assert_eq push_empty(), 1, "push empty"
+assert_eq push_array(), "1,2,3,4", "push array"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# POP
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq pop_returns(), 3, "pop returns"
+assert_eq pop_modifies(), "1,2", "pop modifies"
+assert_eq pop_empty(), 0, "pop empty"
+assert_eq pop_single(), 1, "pop single"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SHIFT
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq shift_returns(), 1, "shift returns"
+assert_eq shift_modifies(), "2,3", "shift modifies"
+assert_eq shift_empty(), 0, "shift empty"
+assert_eq shift_single(), 1, "shift single"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# UNSHIFT
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq unshift_single(), "1,2,3", "unshift single"
+assert_eq unshift_multiple(), "1,2,3,4", "unshift multiple"
+assert_eq unshift_returns(), 3, "unshift returns"
+assert_eq unshift_empty(), 1, "unshift empty"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPLICE
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq splice_remove(), "2,3", "splice remove"
+assert_eq splice_remove_result(), "1,4,5", "splice remove result"
+assert_eq splice_insert(), "1,2,3,4,5", "splice insert"
+assert_eq splice_replace(), "1,a,b,c,4,5", "splice replace"
+assert_eq splice_to_end(), "3,4,5", "splice to end"
+assert_eq splice_negative(), "4,5", "splice negative"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# WANTARRAY IN LIST OPS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq list_in_scalar(), 3, "list in scalar"
+assert_eq list_in_scalar_grep(), 3, "list in scalar grep"
+assert_eq list_in_scalar_map(), 3, "list in scalar map"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COMBINED OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq map_grep_combo(), "4,8,12", "map grep combo"
+assert_eq sort_grep_combo(), "3,5,8,9", "sort grep combo"
+assert_eq map_sort_combo(), "10,20,30", "map sort combo"
+assert_eq reverse_sort_combo(), "5,4,3,1,1", "reverse sort combo"
+assert_eq join_map_combo(), "2-4-6", "join map combo"
+assert_eq split_join_round(), "a,b,c", "split join round"
+assert_eq transform_pipeline(), "100,64,36,16,4", "transform pipeline"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# REDUCE / FOLD PATTERNS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq reduce_sum(), 15, "reduce sum"
+assert_eq reduce_product(), 120, "reduce product"
+assert_eq reduce_max(), 9, "reduce max"
+assert_eq reduce_min(), 1, "reduce min"
+assert_eq reduce_concat(), "abc", "reduce concat"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EDGE CASES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq map_returns_empty(), 0, "map returns empty"
+assert_eq grep_regex_match(), "bar,baz", "grep regex match"
+assert_eq sort_with_undef(), "1,2,3", "sort with undef"
+assert_eq nested_map(), "1,2,3,2,4,6", "nested map"
+assert_eq first_match(), 3, "first match"
+assert_eq last_match(), 5, "last match"
+
+test_run

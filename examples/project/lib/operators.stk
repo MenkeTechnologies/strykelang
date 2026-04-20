@@ -1,0 +1,344 @@
+# lib/operators.stk — comprehensive operator tests
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARITHMETIC OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn add_int($a, $b) { $a + $b }
+fn sub_int($a, $b) { $a - $b }
+fn mul_int($a, $b) { $a * $b }
+fn div_int($a, $b) { $a / $b }
+fn mod_int($a, $b) { $a % $b }
+fn pow_int($a, $b) { $a ** $b }
+fn neg_int($a) { -$a }
+
+fn add_float($a, $b) { $a + $b }
+fn sub_float($a, $b) { $a - $b }
+fn mul_float($a, $b) { $a * $b }
+fn div_float($a, $b) { $a / $b }
+
+fn int_div($a, $b) { int($a / $b) }
+
+fn mixed_arithmetic($a, $b, $c) {
+    $a + $b * $c
+}
+
+fn parenthesized($a, $b, $c) {
+    ($a + $b) * $c
+}
+
+fn chained_ops($a, $b, $c, $d) {
+    $a + $b - $c + $d
+}
+
+fn complex_expr($a, $b, $c) {
+    ($a ** 2 + $b ** 2) / $c
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NUMERIC COMPARISON OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn num_eq($a, $b) { $a == $b ? 1 : 0 }
+fn num_ne($a, $b) { $a != $b ? 1 : 0 }
+fn num_lt($a, $b) { $a < $b ? 1 : 0 }
+fn num_le($a, $b) { $a <= $b ? 1 : 0 }
+fn num_gt($a, $b) { $a > $b ? 1 : 0 }
+fn num_ge($a, $b) { $a >= $b ? 1 : 0 }
+
+fn spaceship($a, $b) { $a <=> $b }
+
+fn compare_chain($a, $b, $c) {
+    ($a < $b) && ($b < $c) ? 1 : 0
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STRING COMPARISON OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn str_eq($a, $b) { $a eq $b ? 1 : 0 }
+fn str_ne($a, $b) { $a ne $b ? 1 : 0 }
+fn str_lt($a, $b) { $a lt $b ? 1 : 0 }
+fn str_le($a, $b) { $a le $b ? 1 : 0 }
+fn str_gt($a, $b) { $a gt $b ? 1 : 0 }
+fn str_ge($a, $b) { $a ge $b ? 1 : 0 }
+
+fn str_cmp($a, $b) { $a cmp $b }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LOGICAL OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn logical_and($a, $b) { $a && $b }
+fn logical_or($a, $b) { $a || $b }
+fn logical_not($a) { !$a ? 1 : 0 }
+
+fn low_prec_and($a, $b) { $a and $b }
+fn low_prec_or($a, $b) { $a or $b }
+fn low_prec_not($a) { not $a ? 1 : 0 }
+
+fn defined_or($a, $b) { $a // $b }
+
+fn short_circuit_and($a) {
+    my $side_effect = 0
+    $a && ($side_effect = 1)
+    $side_effect
+}
+
+fn short_circuit_or($a) {
+    my $side_effect = 0
+    $a || ($side_effect = 1)
+    $side_effect
+}
+
+fn nested_logical($a, $b, $c) {
+    ($a && $b) || $c
+}
+
+fn complex_logical($a, $b, $c, $d) {
+    ($a && $b) || ($c && $d)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BITWISE OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn bit_and($a, $b) { $a & $b }
+fn bit_or($a, $b) { $a | $b }
+fn bit_xor($a, $b) { $a ^ $b }
+fn bit_not($a) { ~$a }
+
+fn left_shift($a, $n) { $a << $n }
+fn right_shift($a, $n) { $a >> $n }
+
+fn bit_mask($val, $mask) { $val & $mask }
+fn bit_set($val, $bit) { $val | (1 << $bit) }
+fn bit_clear($val, $bit) { $val & ~(1 << $bit) }
+fn bit_toggle($val, $bit) { $val ^ (1 << $bit) }
+fn bit_test($val, $bit) { ($val & (1 << $bit)) ? 1 : 0 }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STRING OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn str_concat($a, $b) { $a . $b }
+fn concat_three($a, $b, $c) { $a . $b . $c }
+fn repeat_str($s, $n) { $s x $n }
+
+fn concat_with_space($a, $b) { $a . " " . $b }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ASSIGNMENT OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn compound_add {
+    my $x = 5
+    $x += 3
+    $x
+}
+
+fn compound_sub {
+    my $x = 10
+    $x -= 4
+    $x
+}
+
+fn compound_mul {
+    my $x = 3
+    $x *= 4
+    $x
+}
+
+fn compound_div {
+    my $x = 20
+    $x /= 4
+    $x
+}
+
+fn compound_mod {
+    my $x = 17
+    $x %= 5
+    $x
+}
+
+fn compound_pow {
+    my $x = 2
+    $x **= 3
+    $x
+}
+
+fn compound_concat {
+    my $s = "hello"
+    $s .= " world"
+    $s
+}
+
+fn compound_repeat {
+    my $s = "ab"
+    $s = $s x 3
+    $s
+}
+
+fn compound_or {
+    my $x = 0
+    $x ||= 42
+    $x
+}
+
+fn compound_and {
+    my $x = 5
+    $x &&= 10
+    $x
+}
+
+fn compound_defined_or {
+    my $x
+    $x //= "default"
+    $x
+}
+
+fn compound_bit_and {
+    my $x = 0xFF
+    $x &= 0x0F
+    $x
+}
+
+fn compound_bit_or {
+    my $x = 0x0F
+    $x |= 0xF0
+    $x
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INCREMENT/DECREMENT OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn pre_increment {
+    my $x = 5
+    my $y = ++$x
+    ($x, $y)
+}
+
+fn post_increment {
+    my $x = 5
+    my $y = $x++
+    ($x, $y)
+}
+
+fn pre_decrement {
+    my $x = 5
+    my $y = --$x
+    ($x, $y)
+}
+
+fn post_decrement {
+    my $x = 5
+    my $y = $x--
+    ($x, $y)
+}
+
+fn increment_in_expr {
+    my $x = 5
+    my $y = $x++ + ++$x
+    $y
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TERNARY OPERATOR
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn ternary_true { 1 ? "yes" : "no" }
+fn ternary_false { 0 ? "yes" : "no" }
+
+fn ternary_expr($cond) { $cond ? "truthy" : "falsy" }
+
+fn nested_ternary($n) {
+    $n < 0 ? "negative" : $n == 0 ? "zero" : "positive"
+}
+
+fn ternary_with_ops($a, $b) {
+    $a > $b ? $a - $b : $b - $a
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# RANGE OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn range_inclusive($a, $b) {
+    my @r = $a..$b
+    @r
+}
+
+fn range_sum($a, $b) {
+    my $sum = 0
+    for my $i ($a..$b) {
+        $sum += $i
+    }
+    $sum
+}
+
+fn range_char {
+    my @chars = "a".."e"
+    join("", @chars)
+}
+
+fn range_reverse($a, $b) {
+    my @r = reverse($a..$b)
+    @r
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LIST OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn list_assign {
+    my ($a, $b, $c) = (1, 2, 3)
+    $a + $b + $c
+}
+
+fn list_swap {
+    my ($a, $b) = (1, 2)
+    ($a, $b) = ($b, $a)
+    ($a, $b)
+}
+
+fn comma_operator {
+    my $x = (1, 2, 3)
+    $x
+}
+
+fn list_in_scalar {
+    my @arr = (1, 2, 3, 4, 5)
+    scalar(@arr)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPECIAL OPERATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn not_not($val) { !!$val ? 1 : 0 }
+
+fn double_tilde($val) { ~~$val }
+
+fn stringify($val) { "" . $val }
+fn numify($val) { 0 + $val }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# OPERATOR PRECEDENCE
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn prec_mul_add { 2 + 3 * 4 }
+fn prec_pow_mul { 2 * 3 ** 2 }
+fn prec_neg_pow { -2 ** 2 }
+
+fn prec_compare_and { 1 < 2 && 3 < 4 ? 1 : 0 }
+fn prec_or_and { 0 || 1 && 0 ? 1 : 0 }
+
+fn prec_not_and { !0 && 1 ? 1 : 0 }
+
+fn prec_assign_ternary {
+    my $x = 1 ? "a" : "b"
+    $x
+}
+
+fn prec_concat_repeat { "ab" . "cd" x 2 }

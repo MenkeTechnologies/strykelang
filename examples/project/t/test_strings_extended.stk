@@ -1,0 +1,297 @@
+# t/test_strings_extended.stk — comprehensive string tests
+
+require "./lib/strings_extended.stk"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BASIC STRING OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq str_length("hello"), 5, "length 5"
+assert_eq str_length(""), 0, "length 0"
+assert_eq str_length("a"), 1, "length 1"
+
+assert_eq str_reverse("hello"), "olleh", "reverse"
+assert_eq str_reverse(""), "", "reverse empty"
+assert_eq str_reverse("a"), "a", "reverse single"
+
+assert_eq str_repeat("ab", 3), "ababab", "repeat 3"
+assert_eq str_repeat("x", 5), "xxxxx", "repeat 5"
+assert_eq str_repeat("abc", 0), "", "repeat 0"
+
+assert_eq str_concat_two("hello", "world"), "helloworld", "concat two"
+assert_eq str_concat_many("a", "b", "c", "d"), "abcd", "concat many"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CASE CONVERSION
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq str_uc("hello"), "HELLO", "uc"
+assert_eq str_uc("Hello World"), "HELLO WORLD", "uc mixed"
+assert_eq str_uc(""), "", "uc empty"
+
+assert_eq str_lc("HELLO"), "hello", "lc"
+assert_eq str_lc("Hello World"), "hello world", "lc mixed"
+assert_eq str_lc(""), "", "lc empty"
+
+assert_eq str_ucfirst("hello"), "Hello", "ucfirst"
+assert_eq str_ucfirst("HELLO"), "HELLO", "ucfirst caps"
+assert_eq str_ucfirst(""), "", "ucfirst empty"
+
+assert_eq str_lcfirst("HELLO"), "hELLO", "lcfirst"
+assert_eq str_lcfirst("hello"), "hello", "lcfirst lower"
+
+assert_eq to_title_case("hello world"), "Hello World", "title case"
+assert_eq to_title_case("HELLO WORLD"), "Hello World", "title from caps"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SUBSTRING OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq str_substr("hello world", 0, 5), "hello", "substr start"
+assert_eq str_substr("hello world", 6, 5), "world", "substr mid"
+assert_eq str_substr("hello world", 6, 100), "world", "substr beyond"
+
+assert_eq str_substr_to_end("hello world", 6), "world", "substr to end"
+assert_eq str_substr_negative("hello world", -5), "world", "substr negative"
+
+assert_eq str_replace_substr("hello world", 6, 5, "there"), "hello there", "substr replace"
+
+assert_eq str_first_n("hello world", 5), "hello", "first n"
+assert_eq str_last_n("hello world", 5), "world", "last n"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INDEX OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq str_index("hello world", "o"), 4, "index found"
+assert_eq str_index("hello world", "x"), -1, "index not found"
+assert_eq str_index("hello world", "world"), 6, "index substr"
+
+assert_eq str_index_from("hello world", "o", 5), 7, "index from"
+assert_eq str_rindex("hello world", "o"), 7, "rindex"
+assert_eq str_rindex("hello world", "l"), 9, "rindex l"
+
+assert_eq str_contains("hello world", "wor"), 1, "contains yes"
+assert_eq str_contains("hello world", "xyz"), 0, "contains no"
+
+assert_eq str_starts_with("hello world", "hello"), 1, "starts with yes"
+assert_eq str_starts_with("hello world", "world"), 0, "starts with no"
+
+assert_eq str_ends_with("hello world", "world"), 1, "ends with yes"
+assert_eq str_ends_with("hello world", "hello"), 0, "ends with no"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TRIM OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq str_trim("  hello  "), "hello", "trim both"
+assert_eq str_trim("hello"), "hello", "trim none"
+assert_eq str_trim("   "), "", "trim all ws"
+
+assert_eq str_ltrim("  hello  "), "hello  ", "ltrim"
+assert_eq str_rtrim("  hello  "), "  hello", "rtrim"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CHOMP AND CHOP
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq str_chomp("hello\n"), "hello", "chomp newline"
+assert_eq str_chomp("hello"), "hello", "chomp no newline"
+
+my @chop_res = str_chop("hello")
+assert_eq $chop_res[0], "hell", "chop result"
+assert_eq $chop_res[1], "o", "chop char"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CHARACTER OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq str_chr(65), "A", "chr A"
+assert_eq str_chr(97), "a", "chr a"
+assert_eq str_chr(48), "0", "chr 0"
+
+assert_eq str_ord("A"), 65, "ord A"
+assert_eq str_ord("a"), 97, "ord a"
+assert_eq str_ord("0"), 48, "ord 0"
+
+my @chars = str_to_chars("abc")
+assert_eq scalar(@chars), 3, "to chars count"
+assert_eq $chars[0], "a", "to chars first"
+
+assert_eq str_from_chars("a", "b", "c"), "abc", "from chars"
+
+assert_eq str_char_at("hello", 0), "h", "char at 0"
+assert_eq str_char_at("hello", 4), "o", "char at 4"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PADDING AND ALIGNMENT
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq str_pad_left("123", 6, "0"), "000123", "pad left"
+assert_eq str_pad_left("12345", 3, "0"), "12345", "pad left overflow"
+
+assert_eq str_pad_right("abc", 6, "."), "abc...", "pad right"
+assert_eq str_center("x", 5, "-"), "--x--", "center"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPRINTF FORMATTING
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq str_sprintf_int(42), "42", "sprintf int"
+assert_eq str_sprintf_padded(42, 5), "   42", "sprintf padded"
+assert_eq str_sprintf_zero_pad(42, 5), "00042", "sprintf zero pad"
+assert_eq str_sprintf_float(3.14159, 2), "3.14", "sprintf float"
+assert_eq str_sprintf_hex(255), "ff", "sprintf hex"
+assert_eq str_sprintf_HEX(255), "FF", "sprintf HEX"
+assert_eq str_sprintf_oct(8), "10", "sprintf oct"
+assert_eq str_sprintf_bin(5), "101", "sprintf bin"
+assert_eq str_sprintf_str("hello"), "hello", "sprintf str"
+assert_eq str_sprintf_str_width("hi", 5), "   hi", "sprintf str width"
+assert_eq str_sprintf_percent(), "%", "sprintf percent"
+assert_eq str_sprintf_multi("Alice", 30, 95.5), "Alice is 30 years old with score 95.50", "sprintf multi"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PACK AND UNPACK
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq str_pack_a("hello"), "hello     ", "pack A10"
+my @unpack_multi = str_unpack_multi("abcde12345")
+assert_eq $unpack_multi[0], "abcde", "unpack first"
+assert_eq $unpack_multi[1], "12345", "unpack second"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NUMERIC CONVERSIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq str_hex("ff"), 255, "hex ff"
+assert_eq str_hex("0xff"), 255, "hex 0xff"
+assert_eq str_hex("10"), 16, "hex 10"
+
+assert_eq str_oct("10"), 8, "oct 10"
+assert_eq str_oct("777"), 511, "oct 777"
+assert_eq str_oct("0o10"), 8, "oct 0o10"
+
+assert_eq str_int("42.9"), 42, "int truncate"
+assert_eq str_int("-3.7"), -3, "int neg"
+
+assert_eq str_to_num("42"), 42, "to num"
+assert_eq num_to_str(42), "42", "to str"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# QUOTE OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq str_quotemeta("a.b*c"), "a\\.b\\*c", "quotemeta"
+assert_eq str_q(), "hello world", "q{}"
+assert_eq str_qq(), "hello world", "qq{}"
+
+my @qw_res = str_qw()
+assert_eq scalar(@qw_res), 3, "qw count"
+assert_eq $qw_res[0], "one", "qw first"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INTERPOLATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq str_interp_scalar(), "Hello, Alice!", "interp scalar"
+assert_eq str_interp_array_elem(), "Second: b", "interp array elem"
+assert_eq str_interp_hash_elem(), "Key: value", "interp hash elem"
+assert_eq str_interp_braces(), "testing", "interp braces"
+assert_eq str_no_interp(), q{$x stays literal}, "no interp"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPLIT AND JOIN
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @chars_split = str_split_char("abc")
+assert_eq scalar(@chars_split), 3, "split char count"
+assert_eq $chars_split[1], "b", "split char mid"
+
+my @delim_split = str_split_delim("a,b,c", ",")
+assert_eq scalar(@delim_split), 3, "split delim count"
+
+my @ws_split = str_split_ws("one  two   three")
+assert_eq scalar(@ws_split), 3, "split ws count"
+
+my @limit_split = str_split_limit("a,b,c,d", ",", 2)
+assert_eq scalar(@limit_split), 2, "split limit count"
+assert_eq $limit_split[1], "b,c,d", "split limit rest"
+
+assert_eq str_join(",", "a", "b", "c"), "a,b,c", "join comma"
+assert_eq str_join_empty("a", "b", "c"), "abc", "join empty"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TRANSLITERATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq str_tr_basic("hello"), "HELLO", "tr basic"
+assert_eq str_tr_delete("hello"), "hll", "tr delete"
+assert_eq str_tr_count("hello world"), 3, "tr count"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COMPARISON
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq str_eq_op("abc", "abc"), 1, "eq true"
+assert_eq str_eq_op("abc", "xyz"), 0, "eq false"
+assert_eq str_ne_op("abc", "xyz"), 1, "ne true"
+assert_eq str_lt_op("abc", "bcd"), 1, "lt true"
+assert_eq str_gt_op("xyz", "abc"), 1, "gt true"
+assert_eq str_le_op("abc", "abc"), 1, "le equal"
+assert_eq str_ge_op("abc", "abc"), 1, "ge equal"
+assert_eq str_cmp_op("abc", "abc"), 0, "cmp equal"
+assert_eq str_cmp_op("abc", "xyz"), -1, "cmp less"
+assert_eq str_cmp_op("xyz", "abc"), 1, "cmp greater"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# UTILITY FUNCTIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq str_is_empty(""), 1, "is empty true"
+assert_eq str_is_empty("x"), 0, "is empty false"
+
+assert_eq str_is_blank("   "), 1, "is blank ws"
+assert_eq str_is_blank(""), 1, "is blank empty"
+assert_eq str_is_blank("x"), 0, "is blank false"
+
+assert_eq str_count_char("hello", "l"), 2, "count char"
+assert_eq str_count_char("hello", "x"), 0, "count char none"
+
+assert_eq str_word_count("one two three"), 3, "word count"
+assert_eq str_word_count("  one   two  "), 2, "word count ws"
+
+my @lines = str_lines("one\ntwo\nthree")
+assert_eq scalar(@lines), 3, "lines count"
+assert_eq $lines[1], "two", "lines mid"
+
+assert_eq str_truncate("hello world", 8, "..."), "hello...", "truncate"
+assert_eq str_truncate("hi", 10, "..."), "hi", "truncate no-op"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ADDITIONAL EDGE CASES
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Empty string handling
+assert_eq length(""), 0, "empty length"
+assert_eq "" . "", "", "empty concat"
+assert_eq "" x 5, "", "empty repeat"
+
+# Unicode-like (ASCII subset)
+assert_eq uc("café"), "CAFÉ", "uc unicode"
+
+# Numeric string conversions
+assert_eq "42" + 0, 42, "str to num add"
+assert_eq 0 + "3.14", 3.14, "str to float"
+assert_eq "10" * 2, 20, "str mul"
+
+# String comparison edge cases
+assert_eq "10" lt "9" ? 1 : 0, 1, "string 10 lt 9"
+assert_eq "10" <=> "9", 1, "numeric 10 > 9"
+
+# Boolean string contexts
+assert_eq "" ? 1 : 0, 0, "empty string false"
+assert_eq "0" ? 1 : 0, 0, "zero string false"
+assert_eq " " ? 1 : 0, 1, "space string true"
+assert_eq "false" ? 1 : 0, 1, "false string true"
+
+test_run

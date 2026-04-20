@@ -1535,12 +1535,46 @@ impl Lexer {
                         return Ok(Token::FormatDecl { name: fname, lines });
                     }
                     "qw" => {
+                        // `qw` followed by `=>` is an autoquoted hash key, not qw().
+                        let start_pos = self.pos;
+                        self.skip_whitespace_only();
+                        if let Some(c) = self.peek() {
+                            if c == '=' && self.peek_at(1) == Some('>') {
+                                self.pos = start_pos;
+                                self.last_was_term = true;
+                                return Ok(Token::Ident(ident));
+                            }
+                            if matches!(c, ';' | ',' | ')' | ']' | '}' | '\n') {
+                                self.pos = start_pos;
+                                self.last_was_term = true;
+                                return Ok(Token::Ident(ident));
+                            }
+                        }
+                        self.pos = start_pos; // restore for read_qw
                         let tok = self.read_qw()?;
                         self.last_was_term = true;
                         return Ok(tok);
                     }
                     "qq" | "q" => {
+                        // `q` / `qq` followed by `=>` is an autoquoted hash key, not a quote operator.
+                        // Also treat as identifier if followed by terminators like `;`, `,`, `)`, etc.
+                        // Must check AFTER skipping whitespace to handle `q => 5`.
+                        let start_pos = self.pos;
                         self.skip_whitespace_only();
+                        if let Some(c) = self.peek() {
+                            // `=` followed by `>` is fat comma — `q` is a bareword key
+                            if c == '=' && self.peek_at(1) == Some('>') {
+                                self.pos = start_pos; // restore position
+                                self.last_was_term = true;
+                                return Ok(Token::Ident(ident));
+                            }
+                            // Other terminators: `q` is an identifier
+                            if matches!(c, ';' | ',' | ')' | ']' | '}' | '\n') {
+                                self.pos = start_pos;
+                                self.last_was_term = true;
+                                return Ok(Token::Ident(ident));
+                            }
+                        }
                         let delim = self.advance().ok_or_else(|| {
                             self.syntax_err("Expected delimiter after q/qq", self.line)
                         })?;
@@ -1563,7 +1597,21 @@ impl Lexer {
                         return Ok(Token::SingleString(s));
                     }
                     "qx" => {
+                        // `qx` followed by `=>` is an autoquoted hash key.
+                        let start_pos = self.pos;
                         self.skip_whitespace_only();
+                        if let Some(c) = self.peek() {
+                            if c == '=' && self.peek_at(1) == Some('>') {
+                                self.pos = start_pos;
+                                self.last_was_term = true;
+                                return Ok(Token::Ident(ident));
+                            }
+                            if matches!(c, ';' | ',' | ')' | ']' | '}' | '\n') {
+                                self.pos = start_pos;
+                                self.last_was_term = true;
+                                return Ok(Token::Ident(ident));
+                            }
+                        }
                         let delim = self.advance().ok_or_else(|| {
                             self.syntax_err("Expected delimiter after qx", self.line)
                         })?;
@@ -1579,7 +1627,21 @@ impl Lexer {
                         return Ok(Token::BacktickString(s));
                     }
                     "qr" => {
+                        // `qr` followed by `=>` is an autoquoted hash key.
+                        let start_pos = self.pos;
                         self.skip_whitespace_only();
+                        if let Some(c) = self.peek() {
+                            if c == '=' && self.peek_at(1) == Some('>') {
+                                self.pos = start_pos;
+                                self.last_was_term = true;
+                                return Ok(Token::Ident(ident));
+                            }
+                            if matches!(c, ';' | ',' | ')' | ']' | '}' | '\n') {
+                                self.pos = start_pos;
+                                self.last_was_term = true;
+                                return Ok(Token::Ident(ident));
+                            }
+                        }
                         let delim = self.advance().ok_or_else(|| {
                             self.syntax_err("Expected delimiter after qr", self.line)
                         })?;
@@ -1596,6 +1658,23 @@ impl Lexer {
                         return Ok(Token::Regex(pattern, flags, delim));
                     }
                     "m" => {
+                        // `m` followed by terminators is a bareword, not match operator.
+                        // Must check AFTER skipping whitespace to handle `m => "val"`.
+                        let start_pos = self.pos;
+                        self.skip_whitespace_only();
+                        if let Some(d) = self.peek() {
+                            if d == '=' && self.peek_at(1) == Some('>') {
+                                self.pos = start_pos;
+                                self.last_was_term = true;
+                                return Ok(Token::Ident(ident));
+                            }
+                            if matches!(d, ';' | ',' | ')' | ']' | '}' | '>' | ':' | '\n') {
+                                self.pos = start_pos;
+                                self.last_was_term = true;
+                                return Ok(Token::Ident(ident));
+                            }
+                        }
+                        self.pos = start_pos;
                         // m/pattern/flags — try parsing as regex, but backtrack if
                         // unterminated (handles thread stages where `/m/` is a grep filter)
                         if self.suppress_m_regex == 0 {
@@ -1654,6 +1733,23 @@ impl Lexer {
                         return Ok(Token::Ident(ident));
                     }
                     "s" => {
+                        // `s` followed by terminators is a bareword, not substitution.
+                        // Must check AFTER skipping whitespace to handle `s => "val"`.
+                        let start_pos = self.pos;
+                        self.skip_whitespace_only();
+                        if let Some(d) = self.peek() {
+                            if d == '=' && self.peek_at(1) == Some('>') {
+                                self.pos = start_pos;
+                                self.last_was_term = true;
+                                return Ok(Token::Ident(ident));
+                            }
+                            if matches!(d, ';' | ',' | ')' | ']' | '}' | '>' | ':' | '\n') {
+                                self.pos = start_pos;
+                                self.last_was_term = true;
+                                return Ok(Token::Ident(ident));
+                            }
+                        }
+                        self.pos = start_pos;
                         // s/pattern/replacement/flags
                         if let Some(delim) = self.peek() {
                             if !delim.is_alphanumeric() && delim != '_' && delim != ' ' {
@@ -1718,21 +1814,29 @@ impl Lexer {
                         return Ok(Token::Ident(ident));
                     }
                     "tr" | "y" => {
-                        // `y` is both transliteration (y///) and a valid package/typeglob name (`Foo::y`).
-                        // If the next byte cannot start a tr/y body, treat as a plain identifier.
-                        // Includes newline for semicolon-less code like `$obj->y\n`.
-                        if ident == "y" {
-                            if let Some(d) = self.peek() {
-                                if matches!(d, ';' | '=' | ',' | ')' | ']' | '}' | '>' | ':' | '\n')
-                                {
-                                    self.last_was_term = true;
-                                    return Ok(Token::Ident(ident));
-                                }
-                            } else {
+                        // `tr` / `y` followed by terminators is a bareword, not transliteration.
+                        // Check BEFORE skipping whitespace to catch newlines (implicit semicolon).
+                        if let Some(d) = self.peek() {
+                            if matches!(d, ';' | ',' | ')' | ']' | '}' | '>' | ':' | '\n') {
+                                self.last_was_term = true;
+                                return Ok(Token::Ident(ident));
+                            }
+                        } else {
+                            self.last_was_term = true;
+                            return Ok(Token::Ident(ident));
+                        }
+                        // Now skip whitespace to check for `=>` or `=`
+                        let start_pos = self.pos;
+                        self.skip_whitespace_only();
+                        if let Some(d) = self.peek() {
+                            // `=` alone (not `==` comparison) means assignment — y is an identifier
+                            if d == '=' && self.peek_at(1) != Some('=') {
+                                self.pos = start_pos;
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
                             }
                         }
+                        self.pos = start_pos;
                         // tr/from/to/flags
                         if let Some(delim) = self.peek() {
                             if !delim.is_alphanumeric() && delim != '_' && delim != ' ' {

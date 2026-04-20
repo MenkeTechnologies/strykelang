@@ -9147,10 +9147,7 @@ fn builtin_assert_eq(
         test_pass(&msg);
         Ok(PerlValue::integer(1))
     } else {
-        test_fail(
-            &msg,
-            &format!("got '{}', expected '{}'", a.to_string(), b.to_string()),
-        );
+        test_fail(&msg, &format!("got '{}', expected '{}'", a, b));
         Ok(PerlValue::integer(0))
     }
 }
@@ -9168,7 +9165,7 @@ fn builtin_assert_ne(
         test_pass(&msg);
         Ok(PerlValue::integer(1))
     } else {
-        test_fail(&msg, &format!("both equal '{}'", a.to_string()));
+        test_fail(&msg, &format!("both equal '{}'", a));
         Ok(PerlValue::integer(0))
     }
 }
@@ -9185,7 +9182,7 @@ fn builtin_assert_ok(
         test_pass(&msg);
         Ok(PerlValue::integer(1))
     } else {
-        test_fail(&msg, &format!("got falsy: '{}'", a.to_string()));
+        test_fail(&msg, &format!("got falsy: '{}'", a));
         Ok(PerlValue::integer(0))
     }
 }
@@ -9202,7 +9199,7 @@ fn builtin_assert_err(
         test_pass(&msg);
         Ok(PerlValue::integer(1))
     } else {
-        test_fail(&msg, &format!("expected falsy, got '{}'", a.to_string()));
+        test_fail(&msg, &format!("expected falsy, got '{}'", a));
         Ok(PerlValue::integer(0))
     }
 }
@@ -9509,11 +9506,7 @@ fn builtin_net_interfaces() -> PerlResult<PerlValue> {
         }
         h.insert(
             "up".to_string(),
-            PerlValue::integer(if info.flags & libc::IFF_UP as i32 != 0 {
-                1
-            } else {
-                0
-            }),
+            PerlValue::integer(if info.flags & libc::IFF_UP != 0 { 1 } else { 0 }),
         );
         result.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
     }
@@ -23904,7 +23897,7 @@ fn pdf_content_to_lines(val: &PerlValue) -> Vec<String> {
         let mut lines = Vec::new();
         let max_key = guard.keys().map(|k| k.len()).max().unwrap_or(0);
         for (k, v) in guard.iter() {
-            lines.push(format!("{:width$}  {}", k, v.to_string(), width = max_key));
+            lines.push(format!("{:width$}  {}", k, v, width = max_key));
         }
         return lines;
     }

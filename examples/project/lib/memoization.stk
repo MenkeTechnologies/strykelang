@@ -1,0 +1,186 @@
+# lib/memoization.stk — memoization patterns and caching utilities
+
+fn make_memoized($fn) {
+    my %cache
+    fn {
+        my $key = join("\x00", @_)
+        return $cache{$key} if exists $cache{$key}
+        $cache{$key} = $fn->(@_)
+    }
+}
+
+my %_fib_cache
+fn fib_memo($n) {
+    return $n if $n <= 1
+    return $_fib_cache{$n} if exists $_fib_cache{$n}
+    $_fib_cache{$n} = fib_memo($n - 1) + fib_memo($n - 2)
+}
+
+fn fib_no_memo($n) {
+    return $n if $n <= 1
+    fib_no_memo($n - 1) + fib_no_memo($n - 2)
+}
+
+fn make_cached_adder {
+    my %cache
+    my $calls = 0
+
+    my $add = fn($a, $b) {
+        my $key = "$a,$b"
+        unless (exists $cache{$key}) {
+            $calls++
+            $cache{$key} = $a + $b
+        }
+        $cache{$key}
+    }
+
+    my $get_calls = fn { $calls }
+    my $clear = fn { %cache = (); $calls = 0 }
+
+    +{ add => $add, calls => $get_calls, clear => $clear }
+}
+
+my %_fact_cache = (0 => 1, 1 => 1)
+fn factorial_memo($n) {
+    return $_fact_cache{$n} if exists $_fact_cache{$n}
+    $_fact_cache{$n} = $n * factorial_memo($n - 1)
+}
+
+fn make_lru_cache($max_size) {
+    my @keys_order
+    my %cache
+
+    my $get = fn($key) {
+        return undef unless exists $cache{$key}
+        @keys_order = grep { $_ ne $key } @keys_order
+        push @keys_order, $key
+        $cache{$key}
+    }
+
+    my $set = fn($key, $val) {
+        if (exists $cache{$key}) {
+            @keys_order = grep { $_ ne $key } @keys_order
+        } elsif (scalar(@keys_order) >= $max_size) {
+            my $oldest = shift @keys_order
+            delete $cache{$oldest}
+        }
+        $cache{$key} = $val
+        push @keys_order, $key
+    }
+
+    my $size = fn { scalar(keys %cache) }
+    my $keys = fn { [@keys_order] }
+
+    +{ get => $get, set => $set, size => $size, keys => $keys }
+}
+
+fn make_ttl_cache($ttl_seconds) {
+    my %cache
+    my %timestamps
+
+    my $now = fn { time() }
+
+    my $get = fn($key) {
+        return undef unless exists $cache{$key}
+        my $age = $now->() - $timestamps{$key}
+        if ($age > $ttl_seconds) {
+            delete $cache{$key}
+            delete $timestamps{$key}
+            return undef
+        }
+        $cache{$key}
+    }
+
+    my $set = fn($key, $val) {
+        $cache{$key} = $val
+        $timestamps{$key} = $now->()
+    }
+
+    my $size = fn { scalar(keys %cache) }
+
+    +{ get => $get, set => $set, size => $size }
+}
+
+my %_prime_cache
+fn is_prime_memo($n) {
+    return 0 if $n < 2
+    return $_prime_cache{$n} if exists $_prime_cache{$n}
+
+    my $sqrt = int(sqrt($n))
+    for my $i (2..$sqrt) {
+        if ($n % $i == 0) {
+            $_prime_cache{$n} = 0
+            return 0
+        }
+    }
+    $_prime_cache{$n} = 1
+    1
+}
+
+fn make_call_counter($fn) {
+    my $count = 0
+
+    my $wrapped = fn {
+        $count++
+        $fn->(@_)
+    }
+
+    my $get_count = fn { $count }
+    my $reset = fn { $count = 0 }
+
+    +{ call => $wrapped, count => $get_count, reset => $reset }
+}
+
+fn make_once($fn) {
+    my $called = 0
+    my $result
+
+    fn {
+        unless ($called) {
+            $result = $fn->(@_)
+            $called = 1
+        }
+        $result
+    }
+}
+
+my %_collatz_cache
+fn collatz_memo($n) {
+    return 0 if $n == 1
+    return $_collatz_cache{$n} if exists $_collatz_cache{$n}
+
+    my $next = $n % 2 == 0 ? $n / 2 : 3 * $n + 1
+    $_collatz_cache{$n} = 1 + collatz_memo($next)
+}
+
+fn nth_fibonacci_memo($n) {
+    fib_memo($n)
+}
+
+fn sum_fibs_memo($n) {
+    my $sum = 0
+    for my $i (1..$n) {
+        $sum += fib_memo($i)
+    }
+    $sum
+}
+
+fn count_primes_memo($max) {
+    my $count = 0
+    for my $n (2..$max) {
+        $count++ if is_prime_memo($n)
+    }
+    $count
+}
+
+fn make_debounced($delay_ms, $fn) {
+    my $last_call = 0
+
+    fn {
+        my $now = time() * 1000
+        if ($now - $last_call >= $delay_ms) {
+            $last_call = $now
+            $fn->(@_)
+        }
+    }
+}

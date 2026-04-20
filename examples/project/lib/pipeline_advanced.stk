@@ -1,0 +1,265 @@
+# lib/pipeline_advanced.stk — advanced pipeline and functional composition patterns
+
+fn identity($x) { $x }
+
+fn constantly($val) {
+    fn { $val }
+}
+
+fn flip($fn) {
+    fn($a, $b) { $fn->($b, $a) }
+}
+
+fn partial($fn, $first) {
+    fn { $fn->($first, @_) }
+}
+
+fn partial_right($fn, $last) {
+    fn { $fn->(@_, $last) }
+}
+
+fn curry2($fn) {
+    fn($a) {
+        fn($b) {
+            $fn->($a, $b)
+        }
+    }
+}
+
+fn curry3($fn) {
+    fn($a) {
+        fn($b) {
+            fn($c) {
+                $fn->($a, $b, $c)
+            }
+        }
+    }
+}
+
+fn uncurry2($fn) {
+    fn($a, $b) {
+        $fn->($a)->($b)
+    }
+}
+
+fn compose2($f, $g) {
+    fn { $f->($g->(@_)) }
+}
+
+fn compose_all(@fns) {
+    return \&identity unless scalar(@fns)
+    return $fns[0] if scalar(@fns) == 1
+
+    my $result = $fns[-1]
+    for my $i (reverse(0..scalar(@fns)-2)) {
+        my $f = $fns[$i]
+        my $g = $result
+        $result = fn { $f->($g->(@_)) }
+    }
+    $result
+}
+
+fn pipe_all(@fns) {
+    return \&identity unless scalar(@fns)
+    return $fns[0] if scalar(@fns) == 1
+
+    my $result = $fns[0]
+    for my $i (1..scalar(@fns)-1) {
+        my $f = $result
+        my $g = $fns[$i]
+        $result = fn { $g->($f->(@_)) }
+    }
+    $result
+}
+
+fn filter_map($filter, $mapper, @items) {
+    my @result
+    for my $item (@items) {
+        if ($filter->($item)) {
+            push @result, $mapper->($item)
+        }
+    }
+    @result
+}
+
+fn reduce_right($fn, $init, @items) {
+    my $acc = $init
+    for my $item (reverse @items) {
+        $acc = $fn->($item, $acc)
+    }
+    $acc
+}
+
+fn scan($fn, $init, @items) {
+    my @results = ($init)
+    my $acc = $init
+    for my $item (@items) {
+        $acc = $fn->($acc, $item)
+        push @results, $acc
+    }
+    @results
+}
+
+fn take_while($pred, @items) {
+    my @result
+    for my $item (@items) {
+        last unless $pred->($item)
+        push @result, $item
+    }
+    @result
+}
+
+fn drop_while($pred, @items) {
+    my @result
+    my $dropping = 1
+    for my $item (@items) {
+        if ($dropping && $pred->($item)) {
+            next
+        }
+        $dropping = 0
+        push @result, $item
+    }
+    @result
+}
+
+fn partition_by($pred, @items) {
+    my @true_items
+    my @false_items
+    for my $item (@items) {
+        if ($pred->($item)) {
+            push @true_items, $item
+        } else {
+            push @false_items, $item
+        }
+    }
+    ([@true_items], [@false_items])
+}
+
+fn group_by_fn($key_fn, @items) {
+    my $groups = {}
+    for my $item (@items) {
+        my $key = $key_fn->($item)
+        unless (exists $groups->{$key}) {
+            $groups->{$key} = []
+        }
+        my $arr = $groups->{$key}
+        push @$arr, $item
+    }
+    $groups
+}
+
+fn find_first($pred, @items) {
+    for my $item (@items) {
+        return $item if $pred->($item)
+    }
+    undef
+}
+
+fn find_last($pred, @items) {
+    my $found
+    for my $item (@items) {
+        $found = $item if $pred->($item)
+    }
+    $found
+}
+
+fn find_index($pred, @items) {
+    for my $i (0..$#items) {
+        return $i if $pred->($items[$i])
+    }
+    -1
+}
+
+fn count_if($pred, @items) {
+    my $count = 0
+    for my $item (@items) {
+        $count++ if $pred->($item)
+    }
+    $count
+}
+
+fn all_match($pred, @items) {
+    for my $item (@items) {
+        return 0 unless $pred->($item)
+    }
+    1
+}
+
+fn any_match($pred, @items) {
+    for my $item (@items) {
+        return 1 if $pred->($item)
+    }
+    0
+}
+
+fn none_match($pred, @items) {
+    for my $item (@items) {
+        return 0 if $pred->($item)
+    }
+    1
+}
+
+fn adjacent_pairs(@items) {
+    my @pairs
+    for my $i (0..$#items-1) {
+        push @pairs, [$items[$i], $items[$i+1]]
+    }
+    @pairs
+}
+
+fn chunk($n, @items) {
+    my @chunks
+    my @current
+    for my $item (@items) {
+        push @current, $item
+        if (scalar(@current) == $n) {
+            push @chunks, [@current]
+            @current = ()
+        }
+    }
+    push @chunks, [@current] if scalar(@current)
+    @chunks
+}
+
+fn interleave($a, $b) {
+    my @result
+    my $len = scalar(@$a) > scalar(@$b) ? scalar(@$a) : scalar(@$b)
+    for my $i (0..$len-1) {
+        push @result, $a->[$i] if $i < scalar(@$a)
+        push @result, $b->[$i] if $i < scalar(@$b)
+    }
+    @result
+}
+
+fn window($size, @items) {
+    my @windows
+    for my $i (0..scalar(@items)-$size) {
+        my @w
+        for my $j (0..$size-1) {
+            push @w, $items[$i + $j]
+        }
+        push @windows, [@w]
+    }
+    @windows
+}
+
+fn frequencies(@items) {
+    my %freq
+    for my $item (@items) {
+        $freq{$item}++
+    }
+    \%freq
+}
+
+fn most_common(@items) {
+    my $freq = frequencies(@items)
+    my $max_count = 0
+    my $most
+    for my $k (keys %$freq) {
+        if ($freq->{$k} > $max_count) {
+            $max_count = $freq->{$k}
+            $most = $k
+        }
+    }
+    $most
+}

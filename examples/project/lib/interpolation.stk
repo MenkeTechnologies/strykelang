@@ -1,0 +1,188 @@
+# lib/interpolation.stk — string interpolation patterns and edge cases
+
+fn simple_scalar_interp($name) {
+    "Hello, $name!"
+}
+
+fn scalar_in_sentence($count) {
+    "Found $count items"
+}
+
+fn multiple_scalars($a, $b, $c) {
+    "$a + $b = $c"
+}
+
+fn adjacent_scalars($x, $y) {
+    "$x$y"
+}
+
+fn scalar_with_method($s) {
+    my $len = length($s)
+    "String '$s' has $len characters"
+}
+
+fn array_element_interp(@arr) {
+    "First: $arr[0], Last: $arr[-1]"
+}
+
+fn hash_value_interp(%h) {
+    my $name = $h{name}
+    my $age = $h{age}
+    "Name: $name, Age: $age"
+}
+
+fn nested_ref_interp($ref) {
+    "Value: $ref->{key}"
+}
+
+fn array_ref_elem_interp($aref) {
+    "Element: $aref->[0]"
+}
+
+fn expression_in_string($x) {
+    my $y = $x * 2
+    "Double of $x is $y"
+}
+
+fn conditional_building($cond) {
+    my $msg = $cond ? "yes" : "no"
+    "Result: $msg"
+}
+
+fn escape_dollar {
+    "\$var is a variable"
+}
+
+fn escape_at {
+    "\@arr is an array"
+}
+
+fn escape_backslash {
+    "path\\to\\file"
+}
+
+fn newline_string {
+    "line1\nline2\nline3"
+}
+
+fn tab_string {
+    "col1\tcol2\tcol3"
+}
+
+fn mixed_escapes {
+    "tab:\there\nnewline"
+}
+
+fn single_quote_literal {
+    'no $interpolation here'
+}
+
+fn single_quote_escapes {
+    'can\'t stop'
+}
+
+fn q_operator_basic {
+    q{literal string}
+}
+
+fn qq_operator_interp($name) {
+    qq{Hello, $name!}
+}
+
+fn heredoc_style {
+    my $text = "line1
+line2
+line3"
+    $text
+}
+
+fn repeated_var($v) {
+    "$v $v $v"
+}
+
+fn var_at_end($x) {
+    "value = $x"
+}
+
+fn var_at_start($x) {
+    "$x is the value"
+}
+
+fn empty_string_interp {
+    my $e = ""
+    "empty: '$e'"
+}
+
+fn undef_string_interp {
+    my $u = undef
+    my $s = defined($u) ? $u : ""
+    "undef: '$s'"
+}
+
+fn numeric_interp($n) {
+    "number: $n"
+}
+
+fn float_interp($f) {
+    "float: $f"
+}
+
+fn negative_interp($n) {
+    "negative: $n"
+}
+
+fn zero_interp {
+    my $z = 0
+    "zero: $z"
+}
+
+fn concat_vs_interp($a, $b) {
+    my $interp = "$a$b"
+    my $concat = $a . $b
+    $interp eq $concat ? 1 : 0
+}
+
+fn template_basic($name, $age, $city) {
+    "My name is $name, I am $age years old, and I live in $city."
+}
+
+fn template_with_loop(@items) {
+    my $list = join(", ", @items)
+    "Items: $list"
+}
+
+fn build_table_row($col1, $col2, $col3) {
+    "| $col1 | $col2 | $col3 |"
+}
+
+fn build_json_like($key, $val) {
+    qq{{"$key": "$val"}}
+}
+
+fn build_html_tag($tag, $content) {
+    "<$tag>$content</$tag>"
+}
+
+fn sprintf_int($n) {
+    sprintf("%d", $n)
+}
+
+fn sprintf_float($f) {
+    sprintf("%.2f", $f)
+}
+
+fn sprintf_hex($n) {
+    sprintf("%x", $n)
+}
+
+fn sprintf_padded($n) {
+    sprintf("%05d", $n)
+}
+
+fn sprintf_string($s) {
+    sprintf("'%s'", $s)
+}
+
+fn sprintf_multiple($name, $age) {
+    sprintf("%s is %d years old", $name, $age)
+}

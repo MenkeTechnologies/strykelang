@@ -1,0 +1,479 @@
+# lib/builtins_core.stk — core builtin function tests
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DEFINED
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn defined_scalar_set { my $x = 1; defined($x) ? 1 : 0 }
+fn defined_scalar_zero { my $x = 0; defined($x) ? 1 : 0 }
+fn defined_scalar_empty { my $x = ""; defined($x) ? 1 : 0 }
+fn defined_scalar_undef { my $x; defined($x) ? 1 : 0 }
+fn defined_after_undef { my $x = 1; $x = undef; defined($x) ? 1 : 0 }
+
+fn defined_array_elem_exists { my @a = (1, 2, 3); defined($a[1]) ? 1 : 0 }
+fn defined_array_elem_missing { my @a = (1, 2, 3); defined($a[10]) ? 1 : 0 }
+fn defined_array_elem_undef { my @a = (1, undef, 3); defined($a[1]) ? 1 : 0 }
+
+fn defined_hash_key_exists { my %h = (a => 1); defined($h{a}) ? 1 : 0 }
+fn defined_hash_key_missing { my %h = (a => 1); defined($h{z}) ? 1 : 0 }
+fn defined_hash_key_undef { my %h = (a => undef); defined($h{a}) ? 1 : 0 }
+
+fn defined_expr_result { defined(1 + 1) ? 1 : 0 }
+fn defined_string_result { defined("hello") ? 1 : 0 }
+fn defined_sub_result { defined(fn { 1 }) ? 1 : 0 }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# REF
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn ref_scalar { my $x = 1; ref(\$x) }
+fn ref_array { my @a = (1, 2); ref(\@a) }
+fn ref_hash { my %h = (a => 1); ref(\%h) }
+fn ref_code { my $f = fn { 1 }; ref($f) }
+fn ref_anon_array { ref([1, 2, 3]) }
+fn ref_anon_hash { ref({a => 1}) }
+
+fn ref_not_ref { my $x = 1; ref($x) eq "" ? 1 : 0 }
+fn ref_string { my $s = "hello"; ref($s) eq "" ? 1 : 0 }
+fn ref_number { ref(42) eq "" ? 1 : 0 }
+
+fn ref_nested_array { my $r = [[1, 2], [3, 4]]; ref($r->[0]) }
+fn ref_nested_hash { my $r = {a => {b => 1}}; ref($r->{a}) }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LENGTH
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn length_empty { length("") }
+fn length_one { length("a") }
+fn length_multi { length("hello") }
+fn length_spaces { length("  ") }
+fn length_unicode { length("café") }
+fn length_newline { length("a\nb") }
+fn length_tab { length("a\tb") }
+
+fn length_number { length(12345) }
+fn length_float { length(3.14159) }
+fn length_negative { length(-42) }
+
+fn length_var {
+    my $s = "test"
+    length($s)
+}
+
+fn length_concat {
+    my $a = "foo"
+    my $b = "bar"
+    length($a . $b)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SCALAR
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn scalar_array_count { my @a = (1, 2, 3, 4, 5); scalar(@a) }
+fn scalar_array_empty { my @a = (); scalar(@a) }
+fn scalar_array_one { my @a = (42); scalar(@a) }
+
+fn scalar_hash_info { my %h = (a => 1, b => 2); scalar(keys %h) }
+
+fn scalar_string { scalar("hello") }
+fn scalar_number { scalar(42) }
+
+fn scalar_reverse_str { scalar(reverse("hello")) }
+fn scalar_reverse_arr { my @a = (1, 2, 3); my @r = reverse(@a); scalar(@r) }
+
+fn scalar_force {
+    my @a = (1, 2, 3)
+    my $count = @a
+    $count
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# WANTARRAY
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn returns_context {
+    wantarray ? "list" : "scalar"
+}
+
+fn wantarray_in_scalar {
+    my $x = returns_context()
+    $x
+}
+
+fn wantarray_in_list {
+    my @a = returns_context()
+    $a[0]
+}
+
+fn wantarray_nested {
+    my $inner = fn { wantarray ? "list" : "scalar" }
+    my $result = $inner->()
+    $result
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CALLER
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn caller_basic {
+    my @c = caller()
+    defined($c[0]) ? 1 : 0
+}
+
+fn caller_in_sub {
+    my $inner = fn {
+        my @c = caller()
+        scalar(@c) > 0 ? 1 : 0
+    }
+    $inner->()
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EXISTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn exists_hash_true { my %h = (a => 1, b => 2); exists $h{a} ? 1 : 0 }
+fn exists_hash_false { my %h = (a => 1, b => 2); exists $h{z} ? 1 : 0 }
+fn exists_hash_undef_val { my %h = (a => undef); exists $h{a} ? 1 : 0 }
+
+fn exists_array_true { my @a = (1, 2, 3); exists $a[1] ? 1 : 0 }
+fn exists_array_false { my @a = (1, 2, 3); exists $a[10] ? 1 : 0 }
+
+fn exists_after_delete {
+    my %h = (a => 1, b => 2)
+    delete $h{a}
+    exists $h{a} ? 1 : 0
+}
+
+fn exists_nested {
+    my %h = (a => {b => 1})
+    exists $h{a}{b} ? 1 : 0
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DELETE
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn delete_hash_returns {
+    my %h = (a => 1, b => 2, c => 3)
+    delete $h{b}
+}
+
+fn delete_hash_removes {
+    my %h = (a => 1, b => 2, c => 3)
+    delete $h{b}
+    scalar(keys %h)
+}
+
+fn delete_hash_missing {
+    my %h = (a => 1)
+    my $r = delete $h{z}
+    defined($r) ? 1 : 0
+}
+
+fn delete_array_elem {
+    my @a = (1, 2, 3, 4, 5)
+    my $r = delete $a[2]
+    $r
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# UNDEF
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn undef_returns { defined(undef) ? 1 : 0 }
+
+fn undef_scalar {
+    my $x = 42
+    $x = undef
+    defined($x) ? 1 : 0
+}
+
+fn undef_in_list {
+    my @a = (1, undef, 3)
+    defined($a[1]) ? 1 : 0
+}
+
+fn undef_comparison {
+    my $x
+    $x eq "" ? 1 : 0
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BOOLEAN CONTEXT
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn bool_zero { 0 ? 1 : 0 }
+fn bool_one { 1 ? 1 : 0 }
+fn bool_empty_str { "" ? 1 : 0 }
+fn bool_zero_str { "0" ? 1 : 0 }
+fn bool_space_str { " " ? 1 : 0 }
+fn bool_text { "hello" ? 1 : 0 }
+fn bool_undef { my $x; $x ? 1 : 0 }
+
+fn bool_empty_array { my @a = (); @a ? 1 : 0 }
+fn bool_nonempty_array { my @a = (1); @a ? 1 : 0 }
+
+fn bool_negative { -1 ? 1 : 0 }
+fn bool_float_zero { 0.0 ? 1 : 0 }
+fn bool_float_nonzero { 0.1 ? 1 : 0 }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CHR AND ORD
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn chr_A { chr(65) }
+fn chr_a { chr(97) }
+fn chr_space { chr(32) }
+fn chr_newline { chr(10) }
+fn chr_zero { chr(48) }
+
+fn ord_A { ord("A") }
+fn ord_a { ord("a") }
+fn ord_space { ord(" ") }
+fn ord_zero { ord("0") }
+fn ord_multi { ord("hello") }
+
+fn chr_ord_roundtrip {
+    my $c = "X"
+    chr(ord($c)) eq $c ? 1 : 0
+}
+
+fn ord_chr_roundtrip {
+    my $n = 72
+    ord(chr($n)) == $n ? 1 : 0
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HEX AND OCT
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn hex_simple { hex("10") }
+fn hex_ff { hex("ff") }
+fn hex_FF { hex("FF") }
+fn hex_0x { hex("0x10") }
+fn hex_zero { hex("0") }
+
+fn oct_simple { oct("10") }
+fn oct_777 { oct("777") }
+fn oct_zero { oct("0") }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INT
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn int_positive { int(3.7) }
+fn int_negative { int(-3.7) }
+fn int_already { int(42) }
+fn int_small { int(0.9) }
+fn int_zero { int(0.0) }
+
+fn int_string { int("3.14") }
+fn int_string_neg { int("-2.9") }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ABS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn abs_positive { abs(42) }
+fn abs_negative { abs(-42) }
+fn abs_zero { abs(0) }
+fn abs_float_pos { abs(3.14) }
+fn abs_float_neg { abs(-3.14) }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SQRT
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn sqrt_4 { sqrt(4) }
+fn sqrt_9 { sqrt(9) }
+fn sqrt_2 { int(sqrt(2) * 1000) }
+fn sqrt_0 { sqrt(0) }
+fn sqrt_1 { sqrt(1) }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PACK AND UNPACK
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn pack_char { pack("A3", "abc") }
+fn pack_int { length(pack("N", 12345)) }
+
+fn unpack_char {
+    my $s = "hello"
+    my @c = unpack("A5", $s)
+    $c[0]
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# QUOTEMETA
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn quotemeta_special { quotemeta('a.b') =~ /\\\./ ? 1 : 0 }
+fn quotemeta_plain { quotemeta("abc") }
+fn quotemeta_star { quotemeta("a*b") =~ /\\\*/ ? 1 : 0 }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LVALUE OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn lvalue_substr {
+    my $s = "hello world"
+    substr($s, 0, 5, "hi")
+    $s
+}
+
+fn lvalue_increment {
+    my $x = 5
+    $x++
+    $x
+}
+
+fn lvalue_decrement {
+    my $x = 5
+    $x--
+    $x
+}
+
+fn lvalue_add_assign {
+    my $x = 10
+    $x += 5
+    $x
+}
+
+fn lvalue_concat_assign {
+    my $s = "hello"
+    $s .= " world"
+    $s
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CHOP AND CHOMP
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn chop_returns {
+    my $s = "hello"
+    chop($s)
+}
+
+fn chop_modifies {
+    my $s = "hello"
+    chop($s)
+    $s
+}
+
+fn chomp_newline {
+    my $s = "hello\n"
+    chomp($s)
+    $s
+}
+
+fn chomp_no_newline {
+    my $s = "hello"
+    chomp($s)
+    $s
+}
+
+fn chomp_returns {
+    my $s = "hello\n"
+    chomp($s)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPRINTF
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn sprintf_d { sprintf("%d", 42) }
+fn sprintf_s { sprintf("%s", "hello") }
+fn sprintf_f { sprintf("%.2f", 3.14159) }
+fn sprintf_x { sprintf("%x", 255) }
+fn sprintf_X { sprintf("%X", 255) }
+fn sprintf_o { sprintf("%o", 8) }
+fn sprintf_b { sprintf("%b", 5) }
+
+fn sprintf_padded { sprintf("%5d", 42) }
+fn sprintf_zero_pad { sprintf("%05d", 42) }
+fn sprintf_left_align { sprintf("%-5d", 42) }
+
+fn sprintf_multi { sprintf("%s=%d", "x", 10) }
+fn sprintf_percent { sprintf("%%") }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# UC/LC/UCFIRST/LCFIRST
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn uc_lower { uc("hello") }
+fn uc_mixed { uc("HeLLo") }
+fn uc_already { uc("HELLO") }
+
+fn lc_upper { lc("HELLO") }
+fn lc_mixed { lc("HeLLo") }
+fn lc_already { lc("hello") }
+
+fn ucfirst_lower { ucfirst("hello") }
+fn ucfirst_upper { ucfirst("HELLO") }
+
+fn lcfirst_upper { lcfirst("HELLO") }
+fn lcfirst_lower { lcfirst("hello") }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# REVERSE
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn reverse_string { scalar(reverse("hello")) }
+fn reverse_empty { scalar(reverse("")) }
+fn reverse_single { scalar(reverse("x")) }
+fn reverse_palindrome { scalar(reverse("radar")) }
+
+fn reverse_array_count {
+    my @a = (1, 2, 3, 4, 5)
+    my @r = reverse(@a)
+    scalar(@r)
+}
+
+fn reverse_array_first {
+    my @a = (1, 2, 3, 4, 5)
+    my @r = reverse(@a)
+    $r[0]
+}
+
+fn reverse_array_last {
+    my @a = (1, 2, 3, 4, 5)
+    my @r = reverse(@a)
+    $r[-1]
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INDEX AND RINDEX
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn index_found { index("hello", "ll") }
+fn index_not_found { index("hello", "x") }
+fn index_start { index("hello", "h") }
+fn index_end { index("hello", "o") }
+fn index_empty { index("hello", "") }
+
+fn index_from { index("hello hello", "hello", 1) }
+
+fn rindex_found { rindex("hello hello", "hello") }
+fn rindex_not_found { rindex("hello", "x") }
+fn rindex_from { rindex("hello hello", "hello", 5) }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SUBSTR
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn substr_basic { substr("hello", 1, 3) }
+fn substr_start { substr("hello", 0, 2) }
+fn substr_to_end { substr("hello", 2) }
+fn substr_negative { substr("hello", -2) }
+fn substr_neg_len { substr("hello", 1, -1) }
+
+fn substr_replace {
+    my $s = "hello"
+    substr($s, 1, 3, "XYZ")
+    $s
+}
+
+fn substr_beyond { substr("hi", 0, 10) }

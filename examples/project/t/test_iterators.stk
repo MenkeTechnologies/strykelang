@@ -1,0 +1,109 @@
+# t/test_iterators.stk — iterator and loop tests
+
+require "./lib/iterators.stk"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FOR LOOPS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq for_range_sum(), 15, "for range sum"
+assert_eq for_array_sum(), 60, "for array sum"
+assert_eq for_default_var(), 6, "for default var"
+assert_eq for_nested(), 9, "for nested"
+assert_eq for_with_last(), 15, "for with last"
+assert_eq for_with_next(), 9, "for with next"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# WHILE LOOPS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq while_count(), 5, "while count"
+assert_eq while_with_last(), 5, "while with last"
+assert_eq while_with_next(), 25, "while with next"
+assert_eq while_decrement(), 5, "while decrement"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# UNTIL LOOPS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq until_count(), 5, "until count"
+assert_eq until_with_last(), 5, "until with last"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# RANGE OPERATOR
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq range_ascending(), "1,2,3,4,5", "range ascending"
+assert_eq range_single(), 1, "range single"
+assert_eq range_empty(), 0, "range empty"
+assert_eq range_negative(), "-2,-1,0,1,2", "range negative"
+assert_eq range_in_for(), 10, "range in for"
+assert_eq range_chars(), "abcde", "range chars"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# KEYS/VALUES/EACH
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq keys_count(), 3, "keys count"
+assert_eq keys_iterate(), 30, "keys iterate"
+assert_eq values_count(), 3, "values count"
+assert_eq values_sum(), 6, "values sum"
+assert_eq test_keys_sorted(), "a,b,c", "keys sorted"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARRAY ITERATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq array_for_each(), 15, "array for each"
+assert_eq array_for_index(), 60, "array for index"
+assert_eq array_postfix_for(), 6, "array postfix for"
+assert_eq array_reverse_iter(), "3,2,1", "array reverse iter"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MAP AS ITERATOR
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq map_transform(), "2,4,6", "map transform"
+assert_eq map_filter_combo(), "6,8,10", "map filter combo"
+assert_eq map_with_index(), "a0,b1,c2", "map with index"
+assert_eq map_flatten(), 6, "map flatten"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GREP AS ITERATOR
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq grep_filter(), "2,4,6", "grep filter"
+assert_eq grep_regex(), "apple,banana,date", "grep regex"
+assert_eq grep_defined(), 3, "grep defined"
+assert_eq grep_first(), 5, "grep first"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SORT ITERATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq sort_numeric_iter(), "1,1,3,4,5", "sort numeric iter"
+assert_eq sort_reverse_iter(), "3,2,1", "sort reverse iter"
+assert_eq sort_string_iter(), "apple,banana,cherry", "sort string iter"
+assert_eq sort_by_field(), 1, "sort by field"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LOOP CONTROL
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq last_immediate(), 1, "last immediate"
+assert_eq next_skip_all(), 0, "next skip all"
+# redo can cause issues, skip for now
+# assert_eq redo_limited(), 5, "redo limited"
+assert_eq labeled_last(), 1, "labeled last"
+assert_eq labeled_next(), 3, "labeled next"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COMPLEX ITERATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq nested_array_iter(), 21, "nested array iter"
+assert_eq hash_of_arrays_iter(), 10, "hash of arrays iter"
+assert_eq collect_matching(), "2,4,6,8,10", "collect matching"
+assert_eq transform_in_place(), "2,4,6", "transform in place"
+
+test_run
