@@ -11181,6 +11181,7 @@ impl Parser {
             | "fan" | "fan_cap" | "par_lines" | "par_walk" | "par_sed"
             | "par_find_files" | "par_line_count" | "pwatch" | "par_pipeline_stream"
             | "glob_par" | "ppool" | "barrier" | "pipeline" | "cluster"
+            | "pmaps" | "pflat_maps" | "pgreps"
             // ── functional / iterator ───────────────────────────────────────
             | "fore" | "e" | "ep" | "flat_map" | "flat_maps" | "maps" | "filter" | "f" | "find_all" | "reduce" | "fold"
             | "inject" | "collect" | "uniq" | "distinct" | "any" | "all" | "none"
@@ -11203,7 +11204,7 @@ impl Parser {
             | "frequencies" | "freq" | "interleave" | "ddump" | "stringify" | "str" | "top"
             | "to_json" | "to_csv" | "to_toml" | "to_yaml" | "to_xml"
             | "to_html" | "to_markdown" | "to_table" | "xopen"
-            | "clip" | "clipboard" | "paste" | "pbcopy" | "pbpaste"
+            | "clip" | "clipboard" | "paste" | "pbcopy" | "pbpaste" | "preview"
             | "sparkline" | "spark" | "bar_chart" | "bars" | "flame" | "flamechart"
             | "histo" | "gauge" | "spinner" | "spinner_start" | "spinner_stop"
             | "to_hash" | "to_set"
@@ -11224,6 +11225,21 @@ impl Parser {
             | "par_fetch" | "par_csv_read" | "par_pipeline"
             | "json_encode" | "json_decode" | "json_jq"
             | "http_request" | "serve" | "ssh"
+            | "html_parse" | "css_select" | "xml_parse" | "xpath"
+            | "smtp_send"
+            | "net_interfaces" | "net_ipv4" | "net_ipv6" | "net_mac"
+            | "net_public_ip" | "net_dns" | "net_reverse_dns"
+            | "net_ping" | "net_port_open" | "net_ports_scan"
+            | "net_latency" | "net_download" | "net_headers"
+            | "net_dns_servers" | "net_gateway" | "net_whois" | "net_hostname"
+            // ── git ─────────────────────────────────────────────────────────
+            | "git_log" | "git_status" | "git_diff" | "git_branches"
+            | "git_tags" | "git_blame" | "git_authors" | "git_files"
+            | "git_show" | "git_root"
+            // ── audio / media ───────────────────────────────────────────────
+            | "audio_convert" | "audio_info" | "id3_read" | "id3_write"
+            // ── pdf ─────────────────────────────────────────────────────────
+            | "to_pdf" | "pdf_text" | "pdf_pages"
             // ── serialization (stryke-only encoders) ────────────────────────
             | "toml_encode" | "toml_decode"
             | "yaml_encode" | "yaml_decode"
@@ -11303,6 +11319,7 @@ impl Parser {
             | "datetime_from_epoch"
             | "datetime_parse_rfc3339" | "datetime_parse_local"
             | "datetime_strftime"
+            | "dateseq" | "dategrep" | "dateround" | "datesort"
             // ── jwt ─────────────────────────────────────────────────────────
             | "jwt_encode" | "jwt_decode" | "jwt_decode_unsafe"
             // ── logging ─────────────────────────────────────────────────────
@@ -11312,6 +11329,15 @@ impl Parser {
             | "async" | "spawn" | "trace" | "timer" | "bench"
             | "eval_timeout" | "retry" | "rate_limit" | "every"
             | "gen" | "watch"
+            // ── testing framework ────────────────────────────────────────────
+            | "assert_eq" | "assert_ne" | "assert_ok" | "assert_err"
+            | "assert_true" | "assert_false"
+            | "assert_gt" | "assert_lt" | "assert_ge" | "assert_le"
+            | "assert_match" | "assert_contains" | "assert_near" | "assert_dies"
+            | "test_run"
+            // ── system info ─────────────────────────────────────────────────
+            | "mounts" | "du" | "du_tree" | "process_list"
+            | "thread_count" | "pool_info" | "par_bench"
             // ── I/O extensions ──────────────────────────────────────────────
             | "slurp" | "cat" | "c" | "capture" | "pager" | "pg" | "less"
             | "stdin"
@@ -12067,6 +12093,14 @@ impl Parser {
             | "plot_svg" | "hist_svg" | "histogram_svg"
             | "boxplot_svg" | "box_plot" | "bar_svg" | "barchart_svg"
             | "pie_svg" | "pie_chart" | "heatmap_svg" | "heatmap"
+            | "donut_svg" | "donut" | "area_svg" | "area_chart"
+            | "hbar_svg" | "hbar" | "radar_svg" | "radar" | "spider"
+            | "candlestick_svg" | "candlestick" | "ohlc"
+            | "violin_svg" | "violin" | "cor_heatmap" | "cor_matrix_svg"
+            | "stacked_bar_svg" | "stacked_bar"
+            | "wordcloud_svg" | "wordcloud" | "wcloud"
+            | "treemap_svg" | "treemap"
+            | "pvw"
             // ── Cyberpunk terminal art ────────────────────────────────
             | "cyber_city" | "cyber_grid" | "cyber_rain" | "matrix_rain"
             | "cyber_glitch" | "glitch_text" | "cyber_banner" | "neon_banner"

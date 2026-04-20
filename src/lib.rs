@@ -374,6 +374,21 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut Interpreter) -> PerlR
             let key = format!("{}::{}", def.name, sf.name);
             interp.scope.declare_scalar(&key, val);
         }
+        // Register class methods into subs so method dispatch finds them.
+        for m in &def.methods {
+            if let Some(ref body) = m.body {
+                let fq = format!("{}::{}", def.name, m.name);
+                let sub = std::sync::Arc::new(crate::value::PerlSub {
+                    name: fq.clone(),
+                    params: m.params.clone(),
+                    body: body.clone(),
+                    closure_env: None,
+                    prototype: None,
+                    fib_like: None,
+                });
+                interp.subs.insert(fq, sub);
+            }
+        }
         interp
             .class_defs
             .insert(def.name.clone(), std::sync::Arc::new(def));

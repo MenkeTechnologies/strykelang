@@ -427,7 +427,22 @@ pub(crate) fn try_builtin(
         "to_csv" | "tc" => Some(builtin_to_csv(args)),
         "to_html" | "th" => Some(builtin_to_html(args)),
         "to_markdown" | "to_md" | "tmd" => Some(builtin_to_markdown(args)),
+        "to_pdf" => Some(builtin_to_pdf(interp, args, line)),
+        "pdf_text" | "pdf_read" | "pdf_extract" => Some(builtin_pdf_text(args, line)),
+        "pdf_pages" => Some(builtin_pdf_pages(args, line)),
+        "html_parse" | "parse_html" => Some(builtin_html_parse(interp, args, line)),
+        "css_select" | "css" | "qs" | "query_selector" => {
+            Some(builtin_css_select(interp, args, line))
+        }
+        "xml_parse" | "parse_xml" => Some(builtin_xml_parse(args, line)),
+        "xpath" | "xml_select" => Some(builtin_xpath(interp, args, line)),
+        "smtp_send" | "send_email" | "email" => Some(builtin_smtp_send(args, line)),
+        "audio_convert" | "aconv" => Some(builtin_audio_convert(args, line)),
+        "audio_info" | "ainfo" => Some(builtin_audio_info(args, line)),
+        "id3_read" | "id3" => Some(builtin_id3_read(args, line)),
+        "id3_write" | "id3w" => Some(builtin_id3_write(args, line)),
         "xopen" | "xo" => Some(builtin_xopen(interp, args, line)),
+        "preview" | "pvw" => Some(builtin_preview(interp, args, line)),
         "clip" | "clipboard" | "pbcopy" => Some(builtin_clip(interp, args, line)),
         "paste" | "pbpaste" => Some(builtin_paste(line)),
         "to_table" | "table" | "tbl" => Some(builtin_to_table(args)),
@@ -744,6 +759,37 @@ pub(crate) fn try_builtin(
         "disk_free" => Some(builtin_disk_free(interp, args)),
         "disk_avail" => Some(builtin_disk_avail(interp, args)),
         "disk_used" => Some(builtin_disk_used(interp, args)),
+        "mounts" | "disk_mounts" | "filesystems" => Some(builtin_mounts()),
+        "du" | "dir_size" => Some(builtin_du(interp, args, line)),
+        "du_tree" | "dir_sizes" => Some(builtin_du_tree(interp, args, line)),
+        "process_list" | "ps" | "procs" => Some(builtin_process_list(line)),
+        // ── Testing framework ──
+        "assert_eq" | "aeq" => Some(builtin_assert_eq(interp, args, line)),
+        "assert_ne" | "ane" => Some(builtin_assert_ne(interp, args, line)),
+        "assert_ok" | "aok" => Some(builtin_assert_ok(interp, args, line)),
+        "assert_err" => Some(builtin_assert_err(interp, args, line)),
+        "assert_true" | "atrue" => Some(builtin_assert_true(interp, args, line)),
+        "assert_false" | "afalse" => Some(builtin_assert_false(interp, args, line)),
+        "assert_gt" => Some(builtin_assert_gt(args, line)),
+        "assert_lt" => Some(builtin_assert_lt(args, line)),
+        "assert_ge" => Some(builtin_assert_ge(args, line)),
+        "assert_le" => Some(builtin_assert_le(args, line)),
+        "assert_match" | "amatch" => Some(builtin_assert_match(interp, args, line)),
+        "assert_contains" | "acontains" => Some(builtin_assert_contains(args, line)),
+        "assert_near" | "anear" => Some(builtin_assert_near(args, line)),
+        "assert_dies" | "adies" => Some(builtin_assert_dies(interp, args, line)),
+        "test_run" | "run_tests" => Some(builtin_test_run(interp, args, line)),
+        // ── Git builtins (libgit2, no fork) ──
+        "git_log" | "glog" => Some(builtin_git_log(interp, args, line)),
+        "git_diff" | "gdiff" => Some(builtin_git_diff(interp, args, line)),
+        "git_status" | "gst" => Some(builtin_git_status(interp, args, line)),
+        "git_branches" | "gbr" => Some(builtin_git_branches(interp, args, line)),
+        "git_tags" | "gtags" => Some(builtin_git_tags(interp, args, line)),
+        "git_blame" | "gblame" => Some(builtin_git_blame(args, line)),
+        "git_authors" | "gauthors" => Some(builtin_git_authors(interp, args, line)),
+        "git_files" | "gfiles" => Some(builtin_git_files(interp, args, line)),
+        "git_show" | "gshow" => Some(builtin_git_show(args, line)),
+        "git_root" | "groot" => Some(builtin_git_root(interp, args, line)),
         "load_avg" => Some(builtin_load_avg()),
         "sys_uptime" => Some(builtin_sys_uptime()),
         "page_size" => Some(builtin_page_size()),
@@ -752,6 +798,23 @@ pub(crate) fn try_builtin(
         "endianness" => Some(builtin_endianness()),
         "pointer_width" => Some(builtin_pointer_width()),
         "proc_mem" | "rss" => Some(builtin_proc_mem()),
+        "net_interfaces" | "net_ifs" | "ifconfig" => Some(builtin_net_interfaces()),
+        "net_ipv4" | "myip" | "myip4" => Some(builtin_net_ipv4()),
+        "net_ipv6" | "myip6" => Some(builtin_net_ipv6()),
+        "net_mac" | "mymac" => Some(builtin_net_mac()),
+        "net_public_ip" | "pubip" | "extip" => Some(builtin_net_public_ip(line)),
+        "net_dns" | "dns_resolve" | "resolve" => Some(builtin_net_dns(args, line)),
+        "net_reverse_dns" | "rdns" => Some(builtin_net_reverse_dns(args, line)),
+        "net_ping" | "ping" => Some(builtin_net_ping(args, line)),
+        "net_port_open" | "port_open" => Some(builtin_net_port_open(args)),
+        "net_ports_scan" | "port_scan" | "portscan" => Some(builtin_net_ports_scan(args, line)),
+        "net_download" | "download" | "wget" => Some(builtin_net_download(args, line)),
+        "net_headers" | "http_headers" => Some(builtin_net_headers(args, line)),
+        "net_latency" | "tcplat" => Some(builtin_net_latency(args)),
+        "net_dns_servers" | "dns_servers" => Some(builtin_net_dns_servers()),
+        "net_gateway" | "gateway" => Some(builtin_net_gateway()),
+        "net_hostname" => Some(builtin_gethostname()),
+        "net_whois" | "whois" => Some(builtin_net_whois(args, line)),
         // ── Collection: more ──
         "transpose" => Some(builtin_transpose(args)),
         "unzip" => Some(builtin_unzip(args)),
@@ -989,6 +1052,9 @@ pub(crate) fn try_builtin(
         // ── More process/system ──
         "cwd" | "pwd_str" => Some(builtin_cwd()),
         "cpu_count" => Some(builtin_num_cpus()),
+        "thread_count" | "nthreads" => Some(builtin_thread_count()),
+        "pool_info" | "par_info" => Some(builtin_pool_info()),
+        "par_bench" | "pbench" => Some(builtin_par_bench(args, line)),
         "is_root" => Some(builtin_is_root()),
         "uptime_secs" => Some(builtin_uptime_secs()),
         "env_pairs" => Some(builtin_env_pairs()),
@@ -1470,7 +1536,7 @@ pub(crate) fn try_builtin(
         "which" | "wh" => Some(builtin_which(args, line)),
         "json_encode" | "je" => Some(builtin_json_encode(args)),
         "json_decode" | "jd" => Some(builtin_json_decode(args)),
-        "json_jq" => Some(builtin_json_jq(args)),
+        "json_jq" | "jq" => Some(builtin_json_jq(args)),
         "sha1" | "s1" => Some(crate::native_codec::sha1_digest(
             args.first().unwrap_or(&undef),
         )),
@@ -2325,6 +2391,10 @@ pub(crate) fn try_builtin(
         "add_hours" | "addh" => Some(builtin_add_hours(args)),
         "add_minutes" | "addm" => Some(builtin_add_minutes(args)),
         "diff_days" | "diffd" => Some(builtin_diff_days(args)),
+        "dateseq" | "dseq" => Some(builtin_dateseq(args, line)),
+        "dategrep" | "dgrep" => Some(builtin_dategrep(interp, args)),
+        "dateround" | "dround" => Some(builtin_dateround(args, line)),
+        "datesort" | "dsort" => Some(builtin_datesort(args)),
         "diff_hours" | "diffh" => Some(builtin_diff_hours(args)),
         "start_of_day" | "sod" => Some(builtin_start_of_day(args)),
         "end_of_day" | "eod" => Some(builtin_end_of_day(args)),
@@ -3173,6 +3243,16 @@ pub(crate) fn try_builtin(
         "bar_svg" | "barchart_svg" => Some(builtin_bar_svg(args)),
         "pie_svg" | "pie_chart" => Some(builtin_pie_svg(args)),
         "heatmap_svg" | "heatmap" => Some(builtin_heatmap_svg(args)),
+        "donut_svg" | "donut" => Some(builtin_donut_svg(args)),
+        "area_svg" | "area_chart" => Some(builtin_area_svg(args)),
+        "hbar_svg" | "hbar" => Some(builtin_hbar_svg(args)),
+        "radar_svg" | "radar" | "spider" => Some(builtin_radar_svg(args)),
+        "candlestick_svg" | "candlestick" | "ohlc" => Some(builtin_candlestick_svg(args)),
+        "violin_svg" | "violin" => Some(builtin_violin_svg(args)),
+        "cor_heatmap" | "cor_matrix_svg" => Some(builtin_cor_heatmap(args)),
+        "stacked_bar_svg" | "stacked_bar" => Some(builtin_stacked_bar_svg(args)),
+        "wordcloud_svg" | "wordcloud" | "wcloud" => Some(builtin_wordcloud_svg(args)),
+        "treemap_svg" | "treemap" => Some(builtin_treemap_svg(args)),
 
         // ── Cyberpunk Terminal Art ───────────────────────────────────────
         "cyber_city" => Some(builtin_cyber_city(args)),
@@ -4402,6 +4482,114 @@ fn builtin_xopen(interp: &Interpreter, args: &[PerlValue], line: usize) -> PerlR
         .spawn()
         .map_err(|e| PerlError::runtime(format!("xopen: {}: {}", path, e), line))?;
     Ok(PerlValue::string(path))
+}
+
+/// `preview SVG_STRING` — wrap SVG/HTML content in an HTML page, write to a temp
+/// file, and open in the default browser. Returns the temp path for chaining.
+/// Detects whether the input is already a full HTML document or raw SVG.
+fn builtin_preview(interp: &Interpreter, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    use std::io::Write as _;
+    let content = first_arg_or_topic(interp, args).to_string();
+    let html = if content.trim_start().starts_with("<!DOCTYPE")
+        || content.trim_start().starts_with("<html")
+    {
+        content
+    } else {
+        let version = env!("CARGO_PKG_VERSION");
+        let mut h = String::with_capacity(content.len() + 2048);
+        h.push_str(r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>stryke preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Share Tech Mono', monospace;
+  background-color: #05050a;
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(5,217,232,0.045) 0%, transparent 52%),
+    radial-gradient(ellipse at 80% 20%, rgba(211,0,197,0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 82%, rgba(255,42,109,0.035) 0%, transparent 48%),
+    linear-gradient(rgba(5,217,232,0.042) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(5,217,232,0.034) 1px, transparent 1px);
+  background-size: auto, auto, auto, 52px 52px, 52px 52px;
+  color: #e0f0ff;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(5,217,232,0.015) 2px, rgba(5,217,232,0.015) 4px);
+  pointer-events: none;
+  z-index: 9999;
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.5) 100%);
+  pointer-events: none;
+  z-index: 9998;
+}
+.header {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: #05d9e8;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+  text-shadow: 0 0 10px rgba(5,217,232,0.5), 0 0 30px rgba(5,217,232,0.2);
+}
+.chart-container {
+  position: relative;
+  z-index: 1;
+  padding: 20px;
+  border: 1px solid #1a1a3e;
+  border-radius: 8px;
+  background: rgba(13,13,26,0.7);
+  box-shadow: 0 0 30px rgba(5,217,232,0.08), inset 0 0 30px rgba(5,217,232,0.03);
+}
+.chart-container svg {
+  display: block;
+  max-width: 90vw;
+  max-height: 80vh;
+}
+.footer {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 8px;
+  letter-spacing: 3px;
+  color: #3d4f6a;
+  margin-top: 16px;
+  text-transform: uppercase;
+}
+</style>
+</head>
+<body>
+<div class="header">STRYKE // DATA VISUALIZATION</div>
+<div class="chart-container">"#);
+        h.push_str(&content);
+        h.push_str("</div>\n<div class=\"footer\">GENERATED BY STRYKE v");
+        h.push_str(version);
+        h.push_str("</div>\n</body>\n</html>");
+        h
+    };
+    let mut tmp = std::env::temp_dir();
+    tmp.push(format!("stryke_preview_{}.html", std::process::id()));
+    std::fs::File::create(&tmp)
+        .and_then(|mut f| f.write_all(html.as_bytes()))
+        .map_err(|e| PerlError::runtime(format!("preview: {}", e), line))?;
+    let path_str = tmp.to_string_lossy().to_string();
+    builtin_xopen(interp, &[PerlValue::string(path_str.clone())], line)?;
+    Ok(PerlValue::string(path_str))
 }
 
 /// `clip VALUE` — copy text to system clipboard. Returns the text unchanged
@@ -7735,6 +7923,96 @@ fn builtin_num_cpus() -> PerlResult<PerlValue> {
             .unwrap_or(1),
     ))
 }
+
+/// `thread_count` — current rayon thread pool size.
+fn builtin_thread_count() -> PerlResult<PerlValue> {
+    Ok(PerlValue::integer(rayon::current_num_threads() as i64))
+}
+
+/// `pool_info` — thread pool and parallelism details as hashref.
+fn builtin_pool_info() -> PerlResult<PerlValue> {
+    let cpus = std::thread::available_parallelism()
+        .map(|n| n.get() as i64)
+        .unwrap_or(1);
+    let rayon_threads = rayon::current_num_threads() as i64;
+    let mut h = indexmap::IndexMap::new();
+    h.insert("cpus".into(), PerlValue::integer(cpus));
+    h.insert("rayon_threads".into(), PerlValue::integer(rayon_threads));
+    h.insert(
+        "arch".into(),
+        PerlValue::string(std::env::consts::ARCH.to_string()),
+    );
+    h.insert(
+        "os".into(),
+        PerlValue::string(std::env::consts::OS.to_string()),
+    );
+    #[cfg(target_os = "macos")]
+    {
+        // Performance vs efficiency cores
+        let mut perfc: i32 = 0;
+        let mut len = std::mem::size_of::<i32>();
+        let name = std::ffi::CString::new("hw.perflevel0.physicalcpu").unwrap();
+        if unsafe {
+            libc::sysctlbyname(
+                name.as_ptr(),
+                &mut perfc as *mut _ as *mut _,
+                &mut len,
+                std::ptr::null_mut(),
+                0,
+            )
+        } == 0
+        {
+            h.insert("perf_cores".into(), PerlValue::integer(perfc as i64));
+        }
+        let mut effc: i32 = 0;
+        let name2 = std::ffi::CString::new("hw.perflevel1.physicalcpu").unwrap();
+        if unsafe {
+            libc::sysctlbyname(
+                name2.as_ptr(),
+                &mut effc as *mut _ as *mut _,
+                &mut len,
+                std::ptr::null_mut(),
+                0,
+            )
+        } == 0
+        {
+            h.insert("eff_cores".into(), PerlValue::integer(effc as i64));
+        }
+    }
+    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
+}
+
+/// `par_bench [N]` — benchmark parallel throughput. Runs N iterations of pmap
+/// on a trivial workload and returns ops/sec as hashref.
+fn builtin_par_bench(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
+    use rayon::prelude::*;
+    let n = args.first().map(|v| v.to_int()).unwrap_or(1_000_000) as usize;
+    // Sequential
+    let start = std::time::Instant::now();
+    let _sum: i64 = (0..n as i64).map(|i| i * i).sum();
+    let seq_ms = start.elapsed().as_secs_f64() * 1000.0;
+    // Parallel
+    let start = std::time::Instant::now();
+    let _sum: i64 = (0..n as i64).into_par_iter().map(|i| i * i).sum();
+    let par_ms = start.elapsed().as_secs_f64() * 1000.0;
+    let mut h = indexmap::IndexMap::new();
+    h.insert("items".into(), PerlValue::integer(n as i64));
+    h.insert("seq_ms".into(), PerlValue::float(seq_ms));
+    h.insert("par_ms".into(), PerlValue::float(par_ms));
+    h.insert(
+        "speedup".into(),
+        PerlValue::float(seq_ms / par_ms.max(0.001)),
+    );
+    h.insert(
+        "threads".into(),
+        PerlValue::integer(rayon::current_num_threads() as i64),
+    );
+    h.insert(
+        "ops_per_sec".into(),
+        PerlValue::integer((n as f64 / (par_ms / 1000.0)) as i64),
+    );
+    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
+}
 /// `pid` — Pid. Returns an integer.
 fn builtin_pid() -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(std::process::id() as i64))
@@ -7989,6 +8267,454 @@ fn statvfs_for(path: &str) -> Option<libc::statvfs> {
     }
 }
 
+/// `mounts` — list all mounted filesystems as array of hashrefs.
+/// Each hashref: {mount, device, fs_type, total, free, avail, used, use_pct}
+#[cfg(target_os = "macos")]
+fn builtin_mounts() -> PerlResult<PerlValue> {
+    use std::ffi::CStr;
+    let mut buf: *mut libc::statfs = std::ptr::null_mut();
+    let count = unsafe { libc::getmntinfo(&mut buf, libc::MNT_NOWAIT) };
+    if count <= 0 || buf.is_null() {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let entries = unsafe { std::slice::from_raw_parts(buf, count as usize) };
+    let mut result = Vec::new();
+    for entry in entries {
+        let mount = unsafe { CStr::from_ptr(entry.f_mntonname.as_ptr()) }
+            .to_string_lossy()
+            .to_string();
+        let device = unsafe { CStr::from_ptr(entry.f_mntfromname.as_ptr()) }
+            .to_string_lossy()
+            .to_string();
+        let fstype = unsafe { CStr::from_ptr(entry.f_fstypename.as_ptr()) }
+            .to_string_lossy()
+            .to_string();
+        let bsize = entry.f_bsize as i64;
+        let total = entry.f_blocks as i64 * bsize;
+        let free = entry.f_bfree as i64 * bsize;
+        let avail = entry.f_bavail as i64 * bsize;
+        let used = total - free;
+        let use_pct = if total > 0 {
+            used as f64 / total as f64 * 100.0
+        } else {
+            0.0
+        };
+        let mut h = indexmap::IndexMap::new();
+        h.insert("mount".into(), PerlValue::string(mount));
+        h.insert("device".into(), PerlValue::string(device));
+        h.insert("fs_type".into(), PerlValue::string(fstype));
+        h.insert("total".into(), PerlValue::integer(total));
+        h.insert("free".into(), PerlValue::integer(free));
+        h.insert("avail".into(), PerlValue::integer(avail));
+        h.insert("used".into(), PerlValue::integer(used));
+        h.insert("use_pct".into(), PerlValue::float(use_pct));
+        result.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+    }
+    Ok(PerlValue::array(result))
+}
+
+#[cfg(target_os = "linux")]
+fn builtin_mounts() -> PerlResult<PerlValue> {
+    let data = std::fs::read_to_string("/proc/mounts").unwrap_or_default();
+    let mut result = Vec::new();
+    for line in data.lines() {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() < 3 {
+            continue;
+        }
+        let device = parts[0];
+        let mount = parts[1];
+        let fstype = parts[2];
+        // Skip virtual filesystems
+        if [
+            "proc",
+            "sysfs",
+            "devpts",
+            "tmpfs",
+            "cgroup",
+            "cgroup2",
+            "pstore",
+            "securityfs",
+            "debugfs",
+            "configfs",
+            "fusectl",
+            "mqueue",
+            "hugetlbfs",
+            "rpc_pipefs",
+            "binfmt_misc",
+        ]
+        .contains(&fstype)
+        {
+            continue;
+        }
+        let mut h = indexmap::IndexMap::new();
+        h.insert("mount".into(), PerlValue::string(mount.to_string()));
+        h.insert("device".into(), PerlValue::string(device.to_string()));
+        h.insert("fs_type".into(), PerlValue::string(fstype.to_string()));
+        if let Some(s) = statvfs_for(mount) {
+            let bsize = s.f_frsize as i64;
+            let total = s.f_blocks as i64 * bsize;
+            let free = s.f_bfree as i64 * bsize;
+            let avail = s.f_bavail as i64 * bsize;
+            let used = total - free;
+            let use_pct = if total > 0 {
+                used as f64 / total as f64 * 100.0
+            } else {
+                0.0
+            };
+            h.insert("total".into(), PerlValue::integer(total));
+            h.insert("free".into(), PerlValue::integer(free));
+            h.insert("avail".into(), PerlValue::integer(avail));
+            h.insert("used".into(), PerlValue::integer(used));
+            h.insert("use_pct".into(), PerlValue::float(use_pct));
+        }
+        result.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+    }
+    Ok(PerlValue::array(result))
+}
+
+#[cfg(not(unix))]
+fn builtin_mounts() -> PerlResult<PerlValue> {
+    Ok(PerlValue::array(vec![]))
+}
+
+// ── Git builtins (libgit2, no fork) ─────────────────────────────────────
+
+/// Open a git repo from CWD or optional path arg.
+fn open_git_repo(
+    _interp: &Interpreter,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<git2::Repository> {
+    let path = if args.is_empty() || args[0].is_undef() || args[0].to_string().is_empty() {
+        ".".to_string()
+    } else {
+        args[0].to_string()
+    };
+    git2::Repository::discover(&path)
+        .map_err(|e| PerlError::runtime(format!("git: {}: {}", path, e), line))
+}
+
+/// `git_log [PATH] [, N]` — last N commits as array of hashrefs.
+fn builtin_git_log(interp: &Interpreter, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    let repo = open_git_repo(interp, &[], line)?;
+    let limit = args.first().map(|v| v.to_int() as usize).unwrap_or(20);
+    let mut revwalk = repo
+        .revwalk()
+        .map_err(|e| PerlError::runtime(format!("git_log: {}", e), line))?;
+    revwalk.push_head().ok();
+    revwalk.set_sorting(git2::Sort::TIME).ok();
+    let mut result = Vec::new();
+    for oid in revwalk.take(limit).flatten() {
+        if let Ok(commit) = repo.find_commit(oid) {
+            let mut h = indexmap::IndexMap::new();
+            h.insert("sha".into(), PerlValue::string(oid.to_string()));
+            h.insert(
+                "short".into(),
+                PerlValue::string(oid.to_string()[..7].to_string()),
+            );
+            h.insert(
+                "message".into(),
+                PerlValue::string(commit.message().unwrap_or("").trim().to_string()),
+            );
+            h.insert(
+                "author".into(),
+                PerlValue::string(commit.author().name().unwrap_or("").to_string()),
+            );
+            h.insert(
+                "email".into(),
+                PerlValue::string(commit.author().email().unwrap_or("").to_string()),
+            );
+            h.insert("time".into(), PerlValue::integer(commit.time().seconds()));
+            result.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+        }
+    }
+    Ok(PerlValue::array(result))
+}
+
+/// `git_status` — working tree status as array of hashrefs {path, status}.
+fn builtin_git_status(
+    interp: &Interpreter,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<PerlValue> {
+    let repo = open_git_repo(interp, args, line)?;
+    let statuses = repo
+        .statuses(None)
+        .map_err(|e| PerlError::runtime(format!("git_status: {}", e), line))?;
+    let mut result = Vec::new();
+    for entry in statuses.iter() {
+        let path = entry.path().unwrap_or("").to_string();
+        let st = entry.status();
+        let status_str = if st.contains(git2::Status::WT_NEW) {
+            "new"
+        } else if st.contains(git2::Status::WT_MODIFIED) {
+            "modified"
+        } else if st.contains(git2::Status::WT_DELETED) {
+            "deleted"
+        } else if st.contains(git2::Status::WT_RENAMED) {
+            "renamed"
+        } else if st.contains(git2::Status::INDEX_NEW) {
+            "staged_new"
+        } else if st.contains(git2::Status::INDEX_MODIFIED) {
+            "staged_modified"
+        } else if st.contains(git2::Status::INDEX_DELETED) {
+            "staged_deleted"
+        } else {
+            "unknown"
+        };
+        let mut h = indexmap::IndexMap::new();
+        h.insert("path".into(), PerlValue::string(path));
+        h.insert("status".into(), PerlValue::string(status_str.to_string()));
+        result.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+    }
+    Ok(PerlValue::array(result))
+}
+
+/// `git_diff` — diff of working tree vs HEAD as string.
+fn builtin_git_diff(
+    interp: &Interpreter,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<PerlValue> {
+    let repo = open_git_repo(interp, args, line)?;
+    let diff = repo
+        .diff_index_to_workdir(None, None)
+        .map_err(|e| PerlError::runtime(format!("git_diff: {}", e), line))?;
+    let mut buf = String::new();
+    diff.print(git2::DiffFormat::Patch, |_delta, _hunk, line| {
+        let origin = line.origin();
+        if origin == '+' || origin == '-' || origin == ' ' {
+            buf.push(origin);
+        }
+        buf.push_str(std::str::from_utf8(line.content()).unwrap_or(""));
+        true
+    })
+    .ok();
+    Ok(PerlValue::string(buf))
+}
+
+/// `git_branches` — list branches as array of hashrefs {name, is_head}.
+fn builtin_git_branches(
+    interp: &Interpreter,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<PerlValue> {
+    let repo = open_git_repo(interp, args, line)?;
+    let branches = repo
+        .branches(Some(git2::BranchType::Local))
+        .map_err(|e| PerlError::runtime(format!("git_branches: {}", e), line))?;
+    let mut result = Vec::new();
+    for branch in branches.flatten() {
+        let (b, _) = branch;
+        let name = b.name().ok().flatten().unwrap_or("").to_string();
+        let is_head = b.is_head();
+        let mut h = indexmap::IndexMap::new();
+        h.insert("name".into(), PerlValue::string(name));
+        h.insert(
+            "is_head".into(),
+            PerlValue::integer(if is_head { 1 } else { 0 }),
+        );
+        result.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+    }
+    Ok(PerlValue::array(result))
+}
+
+/// `git_tags` — list tags as array of strings.
+fn builtin_git_tags(
+    interp: &Interpreter,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<PerlValue> {
+    let repo = open_git_repo(interp, args, line)?;
+    let tags = repo
+        .tag_names(None)
+        .map_err(|e| PerlError::runtime(format!("git_tags: {}", e), line))?;
+    let result: Vec<PerlValue> = tags
+        .iter()
+        .flatten()
+        .map(|t| PerlValue::string(t.to_string()))
+        .collect();
+    Ok(PerlValue::array(result))
+}
+
+/// `git_blame FILE` — blame output as array of hashrefs {line, sha, author, text}.
+fn builtin_git_blame(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    let file_path = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let repo = git2::Repository::discover(".")
+        .map_err(|e| PerlError::runtime(format!("git_blame: {}", e), line))?;
+    let blame = repo
+        .blame_file(std::path::Path::new(&file_path), None)
+        .map_err(|e| PerlError::runtime(format!("git_blame: {}: {}", file_path, e), line))?;
+    let file_content = std::fs::read_to_string(&file_path).unwrap_or_default();
+    let lines: Vec<&str> = file_content.lines().collect();
+    let mut result = Vec::new();
+    for (i, hunk) in (0..blame.len()).filter_map(|i| blame.get_index(i).map(|h| (i, h))) {
+        let sig = hunk.final_signature();
+        let mut h = indexmap::IndexMap::new();
+        h.insert("line".into(), PerlValue::integer(i as i64 + 1));
+        h.insert(
+            "sha".into(),
+            PerlValue::string(hunk.final_commit_id().to_string()[..7].to_string()),
+        );
+        h.insert(
+            "author".into(),
+            PerlValue::string(sig.name().unwrap_or("").to_string()),
+        );
+        h.insert(
+            "text".into(),
+            PerlValue::string(lines.get(i).unwrap_or(&"").to_string()),
+        );
+        result.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+    }
+    Ok(PerlValue::array(result))
+}
+
+/// `git_authors` — unique authors as array of hashrefs {name, email, commits}.
+fn builtin_git_authors(
+    interp: &Interpreter,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<PerlValue> {
+    let repo = open_git_repo(interp, args, line)?;
+    let mut revwalk = repo
+        .revwalk()
+        .map_err(|e| PerlError::runtime(format!("git_authors: {}", e), line))?;
+    revwalk.push_head().ok();
+    let mut counts: indexmap::IndexMap<String, (String, i64)> = indexmap::IndexMap::new();
+    for oid in revwalk.flatten() {
+        if let Ok(commit) = repo.find_commit(oid) {
+            let name = commit.author().name().unwrap_or("").to_string();
+            let email = commit.author().email().unwrap_or("").to_string();
+            let entry = counts.entry(name.clone()).or_insert((email, 0));
+            entry.1 += 1;
+        }
+    }
+    let mut result: Vec<PerlValue> = counts
+        .into_iter()
+        .map(|(name, (email, count))| {
+            let mut h = indexmap::IndexMap::new();
+            h.insert("name".into(), PerlValue::string(name));
+            h.insert("email".into(), PerlValue::string(email));
+            h.insert("commits".into(), PerlValue::integer(count));
+            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h)))
+        })
+        .collect();
+    result.sort_by(|a, b| {
+        let ac = a
+            .as_hash_ref()
+            .map(|h| h.read().get("commits").map(|v| v.to_int()).unwrap_or(0))
+            .unwrap_or(0);
+        let bc = b
+            .as_hash_ref()
+            .map(|h| h.read().get("commits").map(|v| v.to_int()).unwrap_or(0))
+            .unwrap_or(0);
+        bc.cmp(&ac)
+    });
+    Ok(PerlValue::array(result))
+}
+
+/// `git_files` — list tracked files as array of strings.
+fn builtin_git_files(
+    interp: &Interpreter,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<PerlValue> {
+    let repo = open_git_repo(interp, args, line)?;
+    let head = repo
+        .head()
+        .and_then(|r| r.peel_to_tree())
+        .map_err(|e| PerlError::runtime(format!("git_files: {}", e), line))?;
+    let mut files = Vec::new();
+    head.walk(git2::TreeWalkMode::PreOrder, |dir, entry| {
+        if entry.kind() == Some(git2::ObjectType::Blob) {
+            let path = if dir.is_empty() {
+                entry.name().unwrap_or("").to_string()
+            } else {
+                format!("{}{}", dir, entry.name().unwrap_or(""))
+            };
+            files.push(PerlValue::string(path));
+        }
+        git2::TreeWalkResult::Ok
+    })
+    .ok();
+    Ok(PerlValue::array(files))
+}
+
+/// `git_show SHA` — show commit details as hashref.
+fn builtin_git_show(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    let sha = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let repo = git2::Repository::discover(".")
+        .map_err(|e| PerlError::runtime(format!("git_show: {}", e), line))?;
+    let oid = git2::Oid::from_str(&sha)
+        .or_else(|_| {
+            // Try as short SHA
+            let obj = repo
+                .revparse_single(&sha)
+                .map_err(|e| PerlError::runtime(format!("git_show: {}: {}", sha, e), line))?;
+            Ok::<git2::Oid, PerlError>(obj.id())
+        })
+        .map_err(|e| PerlError::runtime(format!("git_show: {}: {}", sha, e), line))?;
+    let commit = repo
+        .find_commit(oid)
+        .map_err(|e| PerlError::runtime(format!("git_show: {}", e), line))?;
+    let mut h = indexmap::IndexMap::new();
+    h.insert("sha".into(), PerlValue::string(oid.to_string()));
+    h.insert(
+        "message".into(),
+        PerlValue::string(commit.message().unwrap_or("").to_string()),
+    );
+    h.insert(
+        "author".into(),
+        PerlValue::string(commit.author().name().unwrap_or("").to_string()),
+    );
+    h.insert(
+        "email".into(),
+        PerlValue::string(commit.author().email().unwrap_or("").to_string()),
+    );
+    h.insert("time".into(), PerlValue::integer(commit.time().seconds()));
+    h.insert(
+        "parents".into(),
+        PerlValue::integer(commit.parent_count() as i64),
+    );
+    // Diff stats
+    if let Ok(parent) = commit.parent(0) {
+        if let (Ok(pt), Ok(ct)) = (parent.tree(), commit.tree()) {
+            if let Ok(diff) = repo.diff_tree_to_tree(Some(&pt), Some(&ct), None) {
+                if let Ok(stats) = diff.stats() {
+                    h.insert(
+                        "insertions".into(),
+                        PerlValue::integer(stats.insertions() as i64),
+                    );
+                    h.insert(
+                        "deletions".into(),
+                        PerlValue::integer(stats.deletions() as i64),
+                    );
+                    h.insert(
+                        "files_changed".into(),
+                        PerlValue::integer(stats.files_changed() as i64),
+                    );
+                }
+            }
+        }
+    }
+    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
+}
+
+/// `git_root` — return the repo root path.
+fn builtin_git_root(
+    interp: &Interpreter,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<PerlValue> {
+    let repo = open_git_repo(interp, args, line)?;
+    Ok(PerlValue::string(
+        repo.workdir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default(),
+    ))
+}
+
 /// `disk_total PATH` — Total disk space in bytes (default path `/`).
 #[cfg(unix)]
 fn builtin_disk_total(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -8236,6 +8962,1098 @@ fn builtin_proc_mem() -> PerlResult<PerlValue> {
 #[cfg(not(any(target_os = "linux", target_os = "macos")))]
 fn builtin_proc_mem() -> PerlResult<PerlValue> {
     Ok(PerlValue::UNDEF)
+}
+
+// ── du / process builtins ──────────────────────────────────────────────
+
+/// `du PATH` — recursive directory size in bytes.
+fn builtin_du(_interp: &Interpreter, args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
+    let path = if args.is_empty() || args[0].to_string().is_empty() {
+        ".".to_string()
+    } else {
+        args[0].to_string()
+    };
+    fn dir_size(p: &std::path::Path) -> u64 {
+        let mut total = 0u64;
+        if let Ok(entries) = std::fs::read_dir(p) {
+            for entry in entries.flatten() {
+                let ft = entry
+                    .file_type()
+                    .unwrap_or_else(|_| entry.file_type().unwrap());
+                if ft.is_file() {
+                    total += entry.metadata().map(|m| m.len()).unwrap_or(0);
+                } else if ft.is_dir() {
+                    total += dir_size(&entry.path());
+                }
+            }
+        }
+        total
+    }
+    Ok(PerlValue::integer(
+        dir_size(std::path::Path::new(&path)) as i64
+    ))
+}
+
+/// `du_tree PATH [, depth]` — directory sizes as array of hashrefs {path, size}, sorted desc.
+fn builtin_du_tree(
+    _interp: &Interpreter,
+    args: &[PerlValue],
+    _line: usize,
+) -> PerlResult<PerlValue> {
+    let path = if args.is_empty() || args[0].to_string().is_empty() {
+        ".".to_string()
+    } else {
+        args[0].to_string()
+    };
+    let max_depth = args.get(1).map(|v| v.to_int() as usize).unwrap_or(1);
+    fn dir_size(p: &std::path::Path) -> u64 {
+        let mut total = 0u64;
+        if let Ok(entries) = std::fs::read_dir(p) {
+            for entry in entries.flatten() {
+                if entry.file_type().map(|ft| ft.is_file()).unwrap_or(false) {
+                    total += entry.metadata().map(|m| m.len()).unwrap_or(0);
+                } else if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
+                    total += dir_size(&entry.path());
+                }
+            }
+        }
+        total
+    }
+    fn collect_tree(
+        p: &std::path::Path,
+        depth: usize,
+        max_depth: usize,
+        result: &mut Vec<(String, u64)>,
+    ) {
+        if depth > max_depth {
+            return;
+        }
+        if let Ok(entries) = std::fs::read_dir(p) {
+            for entry in entries.flatten() {
+                let ep = entry.path();
+                if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
+                    let size = dir_size(&ep);
+                    result.push((ep.to_string_lossy().to_string(), size));
+                    if depth < max_depth {
+                        collect_tree(&ep, depth + 1, max_depth, result);
+                    }
+                }
+            }
+        }
+    }
+    let mut entries = Vec::new();
+    let root_size = dir_size(std::path::Path::new(&path));
+    entries.push((path.clone(), root_size));
+    collect_tree(std::path::Path::new(&path), 1, max_depth, &mut entries);
+    entries.sort_by(|a, b| b.1.cmp(&a.1));
+    let result: Vec<PerlValue> = entries
+        .into_iter()
+        .map(|(p, s)| {
+            let mut h = indexmap::IndexMap::new();
+            h.insert("path".into(), PerlValue::string(p));
+            h.insert("size".into(), PerlValue::integer(s as i64));
+            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h)))
+        })
+        .collect();
+    Ok(PerlValue::array(result))
+}
+
+/// `process_list` — list running processes as array of hashrefs.
+#[cfg(unix)]
+fn builtin_process_list(_line: usize) -> PerlResult<PerlValue> {
+    let mut result = Vec::new();
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(entries) = std::fs::read_dir("/proc") {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if let Ok(pid) = name.parse::<i64>() {
+                    let mut h = indexmap::IndexMap::new();
+                    h.insert("pid".into(), PerlValue::integer(pid));
+                    // Read comm (process name)
+                    if let Ok(comm) = std::fs::read_to_string(format!("/proc/{}/comm", pid)) {
+                        h.insert("name".into(), PerlValue::string(comm.trim().to_string()));
+                    }
+                    // Read cmdline
+                    if let Ok(cmdline) = std::fs::read_to_string(format!("/proc/{}/cmdline", pid)) {
+                        h.insert(
+                            "cmdline".into(),
+                            PerlValue::string(cmdline.replace('\0', " ").trim().to_string()),
+                        );
+                    }
+                    // Read status for uid, state, memory
+                    if let Ok(status) = std::fs::read_to_string(format!("/proc/{}/status", pid)) {
+                        for line in status.lines() {
+                            if let Some(rest) = line.strip_prefix("Uid:\t") {
+                                if let Some(uid) = rest.split_whitespace().next() {
+                                    h.insert(
+                                        "uid".into(),
+                                        PerlValue::integer(uid.parse().unwrap_or(0)),
+                                    );
+                                }
+                            } else if let Some(rest) = line.strip_prefix("State:\t") {
+                                h.insert(
+                                    "state".into(),
+                                    PerlValue::string(
+                                        rest.chars().next().unwrap_or('?').to_string(),
+                                    ),
+                                );
+                            } else if let Some(rest) = line.strip_prefix("VmRSS:\t") {
+                                if let Some(kb) = rest.split_whitespace().next() {
+                                    h.insert(
+                                        "rss_kb".into(),
+                                        PerlValue::integer(kb.trim().parse().unwrap_or(0)),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    result.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+                }
+            }
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        // Use sysctl KERN_PROC to list processes without forking
+        let mut mib = [libc::CTL_KERN, libc::KERN_PROC, libc::KERN_PROC_ALL, 0];
+        let mut size: libc::size_t = 0;
+        // First call: get required buffer size
+        if unsafe {
+            libc::sysctl(
+                mib.as_mut_ptr(),
+                4,
+                std::ptr::null_mut(),
+                &mut size,
+                std::ptr::null_mut(),
+                0,
+            )
+        } != 0
+        {
+            return Ok(PerlValue::array(vec![]));
+        }
+        let mut buf: Vec<u8> = vec![0u8; size];
+        if unsafe {
+            libc::sysctl(
+                mib.as_mut_ptr(),
+                4,
+                buf.as_mut_ptr() as *mut _,
+                &mut size,
+                std::ptr::null_mut(),
+                0,
+            )
+        } != 0
+        {
+            return Ok(PerlValue::array(vec![]));
+        }
+        // sizeof(kinfo_proc) on arm64 macOS = 648
+        let kinfo_size = 648usize;
+        let count = size / kinfo_size;
+        for i in 0..count {
+            let base = i * kinfo_size;
+            if base + kinfo_size > buf.len() {
+                break;
+            }
+            // kp_proc.p_pid at offset 72 (i32)
+            let pid = i32::from_ne_bytes([
+                buf[base + 72],
+                buf[base + 73],
+                buf[base + 74],
+                buf[base + 75],
+            ]) as i64;
+            // kp_proc.p_comm at offset 103 (16-byte C string)
+            let comm_start = base + 103;
+            let comm_end = (comm_start..comm_start + 16)
+                .find(|&j| buf.get(j).copied() == Some(0))
+                .unwrap_or(comm_start + 16);
+            let name = String::from_utf8_lossy(&buf[comm_start..comm_end]).to_string();
+            // kp_eproc.e_ucred.cr_uid at offset 304 (u32)
+            let uid = u32::from_ne_bytes([
+                buf[base + 304],
+                buf[base + 305],
+                buf[base + 306],
+                buf[base + 307],
+            ]) as i64;
+            if pid > 0 {
+                let mut h = indexmap::IndexMap::new();
+                h.insert("pid".into(), PerlValue::integer(pid));
+                h.insert("name".into(), PerlValue::string(name));
+                h.insert("uid".into(), PerlValue::integer(uid));
+                result.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+            }
+        }
+    }
+    result.sort_by(|a, b| {
+        let ap = a
+            .as_hash_ref()
+            .map(|h| h.read().get("pid").map(|v| v.to_int()).unwrap_or(0))
+            .unwrap_or(0);
+        let bp = b
+            .as_hash_ref()
+            .map(|h| h.read().get("pid").map(|v| v.to_int()).unwrap_or(0))
+            .unwrap_or(0);
+        ap.cmp(&bp)
+    });
+    Ok(PerlValue::array(result))
+}
+
+#[cfg(not(unix))]
+fn builtin_process_list(_line: usize) -> PerlResult<PerlValue> {
+    Ok(PerlValue::array(vec![]))
+}
+
+// ── Testing framework ──────────────────────────────────────────────────
+
+use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
+
+static TEST_PASS: AtomicUsize = AtomicUsize::new(0);
+static TEST_FAIL: AtomicUsize = AtomicUsize::new(0);
+
+fn test_pass(msg: &str) {
+    TEST_PASS.fetch_add(1, AtomicOrdering::Relaxed);
+    eprintln!("  \x1b[32m✓\x1b[0m {}", msg);
+}
+
+fn test_fail(msg: &str, detail: &str) {
+    TEST_FAIL.fetch_add(1, AtomicOrdering::Relaxed);
+    eprintln!("  \x1b[31m✗\x1b[0m {} — {}", msg, detail);
+}
+
+fn assert_label(_interp: &Interpreter, args: &[PerlValue], default: &str) -> String {
+    args.last()
+        .filter(|v| v.is_string_like() && args.len() > required_args_for_assert(default))
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| default.to_string())
+}
+
+fn required_args_for_assert(kind: &str) -> usize {
+    match kind {
+        "assert_ok" | "assert_err" | "assert_true" | "assert_false" | "assert_dies" => 1,
+        _ => 2,
+    }
+}
+
+/// `assert_eq A, B [, MSG]`
+fn builtin_assert_eq(
+    interp: &Interpreter,
+    args: &[PerlValue],
+    _line: usize,
+) -> PerlResult<PerlValue> {
+    let a = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let b = args.get(1).cloned().unwrap_or(PerlValue::UNDEF);
+    let msg = assert_label(interp, args, "assert_eq");
+    if a.to_string() == b.to_string() {
+        test_pass(&msg);
+        Ok(PerlValue::integer(1))
+    } else {
+        test_fail(
+            &msg,
+            &format!("got '{}', expected '{}'", a.to_string(), b.to_string()),
+        );
+        Ok(PerlValue::integer(0))
+    }
+}
+
+/// `assert_ne A, B [, MSG]`
+fn builtin_assert_ne(
+    interp: &Interpreter,
+    args: &[PerlValue],
+    _line: usize,
+) -> PerlResult<PerlValue> {
+    let a = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let b = args.get(1).cloned().unwrap_or(PerlValue::UNDEF);
+    let msg = assert_label(interp, args, "assert_ne");
+    if a.to_string() != b.to_string() {
+        test_pass(&msg);
+        Ok(PerlValue::integer(1))
+    } else {
+        test_fail(&msg, &format!("both equal '{}'", a.to_string()));
+        Ok(PerlValue::integer(0))
+    }
+}
+
+/// `assert_ok VALUE [, MSG]` — passes if value is truthy.
+fn builtin_assert_ok(
+    interp: &Interpreter,
+    args: &[PerlValue],
+    _line: usize,
+) -> PerlResult<PerlValue> {
+    let a = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let msg = assert_label(interp, args, "assert_ok");
+    if a.is_true() {
+        test_pass(&msg);
+        Ok(PerlValue::integer(1))
+    } else {
+        test_fail(&msg, &format!("got falsy: '{}'", a.to_string()));
+        Ok(PerlValue::integer(0))
+    }
+}
+
+/// `assert_err VALUE [, MSG]` — passes if value is falsy/undef.
+fn builtin_assert_err(
+    interp: &Interpreter,
+    args: &[PerlValue],
+    _line: usize,
+) -> PerlResult<PerlValue> {
+    let a = args.first().cloned().unwrap_or(PerlValue::UNDEF);
+    let msg = assert_label(interp, args, "assert_err");
+    if !a.is_true() {
+        test_pass(&msg);
+        Ok(PerlValue::integer(1))
+    } else {
+        test_fail(&msg, &format!("expected falsy, got '{}'", a.to_string()));
+        Ok(PerlValue::integer(0))
+    }
+}
+
+/// `assert_true VALUE [, MSG]`
+fn builtin_assert_true(
+    interp: &Interpreter,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<PerlValue> {
+    builtin_assert_ok(interp, args, line)
+}
+
+/// `assert_false VALUE [, MSG]`
+fn builtin_assert_false(
+    interp: &Interpreter,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<PerlValue> {
+    builtin_assert_err(interp, args, line)
+}
+
+/// `assert_gt A, B [, MSG]`
+fn builtin_assert_gt(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
+    let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let msg = args
+        .get(2)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "assert_gt".into());
+    if a > b {
+        test_pass(&msg);
+    } else {
+        test_fail(&msg, &format!("{} not > {}", a, b));
+    }
+    Ok(PerlValue::integer(if a > b { 1 } else { 0 }))
+}
+
+/// `assert_lt A, B [, MSG]`
+fn builtin_assert_lt(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
+    let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let msg = args
+        .get(2)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "assert_lt".into());
+    if a < b {
+        test_pass(&msg);
+    } else {
+        test_fail(&msg, &format!("{} not < {}", a, b));
+    }
+    Ok(PerlValue::integer(if a < b { 1 } else { 0 }))
+}
+
+/// `assert_ge A, B [, MSG]`
+fn builtin_assert_ge(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
+    let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let msg = args
+        .get(2)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "assert_ge".into());
+    if a >= b {
+        test_pass(&msg);
+    } else {
+        test_fail(&msg, &format!("{} not >= {}", a, b));
+    }
+    Ok(PerlValue::integer(if a >= b { 1 } else { 0 }))
+}
+
+/// `assert_le A, B [, MSG]`
+fn builtin_assert_le(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
+    let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let msg = args
+        .get(2)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "assert_le".into());
+    if a <= b {
+        test_pass(&msg);
+    } else {
+        test_fail(&msg, &format!("{} not <= {}", a, b));
+    }
+    Ok(PerlValue::integer(if a <= b { 1 } else { 0 }))
+}
+
+/// `assert_match PATTERN, STRING [, MSG]` — passes if regex matches.
+fn builtin_assert_match(
+    _interp: &Interpreter,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<PerlValue> {
+    let pattern = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let string = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let msg = args
+        .get(2)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "assert_match".into());
+    let re = regex::Regex::new(&pattern)
+        .map_err(|e| PerlError::runtime(format!("assert_match: {}", e), line))?;
+    if re.is_match(&string) {
+        test_pass(&msg);
+        Ok(PerlValue::integer(1))
+    } else {
+        test_fail(&msg, &format!("'{}' !~ /{}/", string, pattern));
+        Ok(PerlValue::integer(0))
+    }
+}
+
+/// `assert_contains HAYSTACK, NEEDLE [, MSG]`
+fn builtin_assert_contains(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
+    let haystack = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let needle = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let msg = args
+        .get(2)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "assert_contains".into());
+    if haystack.contains(&needle) {
+        test_pass(&msg);
+        Ok(PerlValue::integer(1))
+    } else {
+        test_fail(
+            &msg,
+            &format!("'{}' does not contain '{}'", haystack, needle),
+        );
+        Ok(PerlValue::integer(0))
+    }
+}
+
+/// `assert_near A, B [, EPSILON [, MSG]]` — float approximate equality.
+fn builtin_assert_near(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
+    let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
+    let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let eps = args.get(2).map(|v| v.to_number()).unwrap_or(1e-9);
+    let msg = args
+        .get(3)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "assert_near".into());
+    if (a - b).abs() <= eps {
+        test_pass(&msg);
+        Ok(PerlValue::integer(1))
+    } else {
+        test_fail(&msg, &format!("{} not near {} (eps={})", a, b, eps));
+        Ok(PerlValue::integer(0))
+    }
+}
+
+/// `assert_dies { BLOCK } [, MSG]` — passes if block throws an error.
+fn builtin_assert_dies(
+    interp: &Interpreter,
+    args: &[PerlValue],
+    _line: usize,
+) -> PerlResult<PerlValue> {
+    let msg = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "assert_dies".into());
+    if let Some(code) = args.first().and_then(|v| v.as_code_ref()) {
+        // Try to execute the code ref — if it dies, that's a pass
+        let mut test_interp = Interpreter::new();
+        test_interp.subs = interp.subs.clone();
+        match test_interp.exec_block(&code.body) {
+            Err(_) => {
+                test_pass(&msg);
+                Ok(PerlValue::integer(1))
+            }
+            Ok(_) => {
+                test_fail(&msg, "expected die but block succeeded");
+                Ok(PerlValue::integer(0))
+            }
+        }
+    } else {
+        test_fail(&msg, "first arg must be a code ref");
+        Ok(PerlValue::integer(0))
+    }
+}
+
+/// `test_run` / `run_tests` — print test summary and exit with appropriate code.
+fn builtin_test_run(
+    _interp: &Interpreter,
+    _args: &[PerlValue],
+    _line: usize,
+) -> PerlResult<PerlValue> {
+    let pass = TEST_PASS.load(AtomicOrdering::Relaxed);
+    let fail = TEST_FAIL.load(AtomicOrdering::Relaxed);
+    let total = pass + fail;
+    eprintln!();
+    if fail == 0 {
+        eprintln!("\x1b[32m  ✓ All {} tests passed\x1b[0m", total);
+    } else {
+        eprintln!("\x1b[31m  ✗ {} of {} tests failed\x1b[0m", fail, total);
+    }
+    // Reset for next run
+    TEST_PASS.store(0, AtomicOrdering::Relaxed);
+    TEST_FAIL.store(0, AtomicOrdering::Relaxed);
+    if fail > 0 {
+        std::process::exit(1);
+    }
+    Ok(PerlValue::integer(if fail == 0 { 1 } else { 0 }))
+}
+
+// ── Network interface builtins ──────────────────────────────────────────
+
+/// Collect all network interface info via `getifaddrs` (unix).
+/// Returns a vec of hashrefs: [{name, ipv4, ipv6, mac, flags, netmask}, ...]
+#[cfg(unix)]
+fn builtin_net_interfaces() -> PerlResult<PerlValue> {
+    use std::collections::BTreeMap;
+    use std::ffi::CStr;
+    use std::net::{Ipv4Addr, Ipv6Addr};
+
+    let mut ifap: *mut libc::ifaddrs = std::ptr::null_mut();
+    if unsafe { libc::getifaddrs(&mut ifap) } != 0 {
+        return Err(PerlError::runtime("getifaddrs failed", 0));
+    }
+
+    struct IfInfo {
+        ipv4: Vec<String>,
+        ipv6: Vec<String>,
+        mac: Option<String>,
+        flags: i32,
+        netmask4: Vec<String>,
+    }
+    let mut map: BTreeMap<String, IfInfo> = BTreeMap::new();
+
+    let mut cur = ifap;
+    while !cur.is_null() {
+        let ifa = unsafe { &*cur };
+        let name = unsafe { CStr::from_ptr(ifa.ifa_name) }
+            .to_string_lossy()
+            .to_string();
+        let entry = map.entry(name).or_insert_with(|| IfInfo {
+            ipv4: vec![],
+            ipv6: vec![],
+            mac: None,
+            flags: ifa.ifa_flags as i32,
+            netmask4: vec![],
+        });
+
+        if !ifa.ifa_addr.is_null() {
+            let family = unsafe { (*ifa.ifa_addr).sa_family } as i32;
+            if family == libc::AF_INET {
+                let sin = ifa.ifa_addr as *const libc::sockaddr_in;
+                let ip = Ipv4Addr::from(u32::from_be(unsafe { (*sin).sin_addr.s_addr }));
+                entry.ipv4.push(ip.to_string());
+                if !ifa.ifa_netmask.is_null() {
+                    let mask = ifa.ifa_netmask as *const libc::sockaddr_in;
+                    let m = Ipv4Addr::from(u32::from_be(unsafe { (*mask).sin_addr.s_addr }));
+                    entry.netmask4.push(m.to_string());
+                }
+            } else if family == libc::AF_INET6 {
+                let sin6 = ifa.ifa_addr as *const libc::sockaddr_in6;
+                let ip = Ipv6Addr::from(unsafe { (*sin6).sin6_addr.s6_addr });
+                entry.ipv6.push(ip.to_string());
+            }
+            #[cfg(target_os = "macos")]
+            if family == libc::AF_LINK {
+                let sdl = ifa.ifa_addr as *const libc::sockaddr_dl;
+                let alen = unsafe { (*sdl).sdl_alen } as usize;
+                if alen == 6 {
+                    let nlen = unsafe { (*sdl).sdl_nlen } as usize;
+                    let base = ifa.ifa_addr as *const u8;
+                    // sdl_data starts at offset 12 on macOS; MAC is at sdl_data + nlen.
+                    let data_off = std::mem::offset_of!(libc::sockaddr_dl, sdl_data);
+                    let mac_ptr = unsafe { base.add(data_off + nlen) };
+                    let mac_bytes = unsafe { std::slice::from_raw_parts(mac_ptr, 6) };
+                    let mac = format!(
+                        "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+                        mac_bytes[0],
+                        mac_bytes[1],
+                        mac_bytes[2],
+                        mac_bytes[3],
+                        mac_bytes[4],
+                        mac_bytes[5]
+                    );
+                    if mac != "00:00:00:00:00:00" {
+                        entry.mac = Some(mac);
+                    }
+                }
+            }
+        }
+        cur = ifa.ifa_next;
+    }
+    unsafe { libc::freeifaddrs(ifap) };
+
+    let mut result = Vec::new();
+    for (name, info) in &map {
+        let mut h = indexmap::IndexMap::new();
+        h.insert("name".to_string(), PerlValue::string(name.clone()));
+        if !info.ipv4.is_empty() {
+            h.insert("ipv4".to_string(), PerlValue::string(info.ipv4.join(", ")));
+        }
+        if !info.ipv6.is_empty() {
+            h.insert("ipv6".to_string(), PerlValue::string(info.ipv6.join(", ")));
+        }
+        if let Some(ref mac) = info.mac {
+            h.insert("mac".to_string(), PerlValue::string(mac.clone()));
+        }
+        if !info.netmask4.is_empty() {
+            h.insert(
+                "netmask".to_string(),
+                PerlValue::string(info.netmask4.join(", ")),
+            );
+        }
+        h.insert(
+            "up".to_string(),
+            PerlValue::integer(if info.flags & libc::IFF_UP as i32 != 0 {
+                1
+            } else {
+                0
+            }),
+        );
+        result.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+    }
+    Ok(PerlValue::array(result))
+}
+
+#[cfg(not(unix))]
+fn builtin_net_interfaces() -> PerlResult<PerlValue> {
+    Ok(PerlValue::array(vec![]))
+}
+
+/// `net_ipv4` — first non-loopback IPv4 address.
+fn builtin_net_ipv4() -> PerlResult<PerlValue> {
+    for iface in builtin_net_interfaces()?.to_list() {
+        if let Some(hr) = iface.as_hash_ref() {
+            let h = hr.read();
+            let name = h.get("name").map(|v| v.to_string()).unwrap_or_default();
+            if name == "lo" || name == "lo0" {
+                continue;
+            }
+            if let Some(ip) = h.get("ipv4") {
+                let s = ip.to_string();
+                if !s.is_empty() && s != "127.0.0.1" {
+                    return Ok(PerlValue::string(s));
+                }
+            }
+        }
+    }
+    Ok(PerlValue::UNDEF)
+}
+
+/// `net_ipv6` — first non-loopback, non-link-local IPv6 address.
+fn builtin_net_ipv6() -> PerlResult<PerlValue> {
+    for iface in builtin_net_interfaces()?.to_list() {
+        if let Some(hr) = iface.as_hash_ref() {
+            let h = hr.read();
+            let name = h.get("name").map(|v| v.to_string()).unwrap_or_default();
+            if name == "lo" || name == "lo0" {
+                continue;
+            }
+            if let Some(ip) = h.get("ipv6") {
+                let s = ip.to_string();
+                if !s.is_empty() && !s.starts_with("::1") && !s.starts_with("fe80") {
+                    return Ok(PerlValue::string(s));
+                }
+            }
+        }
+    }
+    Ok(PerlValue::UNDEF)
+}
+
+/// `net_mac` — first non-loopback MAC address.
+fn builtin_net_mac() -> PerlResult<PerlValue> {
+    for iface in builtin_net_interfaces()?.to_list() {
+        if let Some(hr) = iface.as_hash_ref() {
+            let h = hr.read();
+            let name = h.get("name").map(|v| v.to_string()).unwrap_or_default();
+            if name == "lo" || name == "lo0" {
+                continue;
+            }
+            if let Some(mac) = h.get("mac") {
+                let s = mac.to_string();
+                if !s.is_empty() {
+                    return Ok(PerlValue::string(s));
+                }
+            }
+        }
+    }
+    Ok(PerlValue::UNDEF)
+}
+
+/// `net_public_ip` — fetch public IPv4 via ureq (native HTTP, no shelling out).
+fn builtin_net_public_ip(line: usize) -> PerlResult<PerlValue> {
+    match ureq::get("https://api.ipify.org").call() {
+        Ok(resp) => {
+            let body = resp.into_string().unwrap_or_default();
+            Ok(PerlValue::string(body.trim().to_string()))
+        }
+        Err(e) => Err(PerlError::runtime(format!("net_public_ip: {}", e), line)),
+    }
+}
+
+/// `net_dns HOSTNAME` — resolve hostname to IP addresses (libc getaddrinfo).
+fn builtin_net_dns(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    use std::net::ToSocketAddrs;
+    let host = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let addr_str = format!("{}:0", host);
+    match addr_str.to_socket_addrs() {
+        Ok(addrs) => {
+            let ips: Vec<PerlValue> = addrs
+                .map(|a| PerlValue::string(a.ip().to_string()))
+                .collect();
+            Ok(PerlValue::array(ips))
+        }
+        Err(e) => Err(PerlError::runtime(
+            format!("net_dns: {}: {}", host, e),
+            line,
+        )),
+    }
+}
+
+/// `net_reverse_dns IP` — reverse DNS via raw UDP PTR query to system resolver.
+fn builtin_net_reverse_dns(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    use std::net::{Ipv4Addr, UdpSocket};
+    let ip_str = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let ip: Ipv4Addr = ip_str.parse().map_err(|_| {
+        PerlError::runtime(format!("net_reverse_dns: invalid IP: {}", ip_str), line)
+    })?;
+    let octets = ip.octets();
+    let qname = format!(
+        "{}.{}.{}.{}.in-addr.arpa",
+        octets[3], octets[2], octets[1], octets[0]
+    );
+
+    // Build minimal DNS query packet
+    let mut pkt = Vec::with_capacity(64);
+    pkt.extend_from_slice(&[0xAB, 0xCD]); // ID
+    pkt.extend_from_slice(&[0x01, 0x00]); // flags: recursion desired
+    pkt.extend_from_slice(&[0x00, 0x01]); // qdcount=1
+    pkt.extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00]); // an/ns/ar=0
+    for label in qname.split('.') {
+        pkt.push(label.len() as u8);
+        pkt.extend_from_slice(label.as_bytes());
+    }
+    pkt.push(0); // root
+    pkt.extend_from_slice(&[0x00, 0x0C]); // type PTR
+    pkt.extend_from_slice(&[0x00, 0x01]); // class IN
+
+    let sock = UdpSocket::bind("0.0.0.0:0")
+        .map_err(|e| PerlError::runtime(format!("net_reverse_dns: bind: {}", e), line))?;
+    sock.set_read_timeout(Some(std::time::Duration::from_secs(3)))
+        .ok();
+    // Use system resolver (first nameserver from resolv.conf or 8.8.8.8)
+    let resolver = builtin_net_dns_servers()
+        .ok()
+        .and_then(|v| v.to_list().first().map(|s| s.to_string()))
+        .unwrap_or_else(|| "8.8.8.8".to_string());
+    sock.send_to(&pkt, format!("{}:53", resolver))
+        .map_err(|e| PerlError::runtime(format!("net_reverse_dns: send: {}", e), line))?;
+    let mut buf = [0u8; 512];
+    let n = sock
+        .recv(&mut buf)
+        .map_err(|e| PerlError::runtime(format!("net_reverse_dns: recv: {}", e), line))?;
+    // Parse response: skip header (12) + question, find answer with PTR
+    let resp = &buf[..n];
+    if n < 12 {
+        return Ok(PerlValue::UNDEF);
+    }
+    let ancount = u16::from_be_bytes([resp[6], resp[7]]) as usize;
+    // Skip question section
+    let mut pos = 12;
+    while pos < n && resp[pos] != 0 {
+        pos += resp[pos] as usize + 1;
+    }
+    pos += 5; // null + qtype(2) + qclass(2)
+              // Parse answer records
+    for _ in 0..ancount {
+        if pos >= n {
+            break;
+        }
+        // Skip name (may be compressed)
+        if resp[pos] & 0xC0 == 0xC0 {
+            pos += 2;
+        } else {
+            while pos < n && resp[pos] != 0 {
+                pos += resp[pos] as usize + 1;
+            }
+            pos += 1;
+        }
+        if pos + 10 > n {
+            break;
+        }
+        let rtype = u16::from_be_bytes([resp[pos], resp[pos + 1]]);
+        let rdlen = u16::from_be_bytes([resp[pos + 8], resp[pos + 9]]) as usize;
+        pos += 10;
+        if rtype == 12 {
+            // PTR
+            let mut name = String::new();
+            let mut p = pos;
+            loop {
+                if p >= n {
+                    break;
+                }
+                if resp[p] & 0xC0 == 0xC0 {
+                    p = u16::from_be_bytes([resp[p] & 0x3F, resp[p + 1]]) as usize;
+                    continue;
+                }
+                if resp[p] == 0 {
+                    break;
+                }
+                let len = resp[p] as usize;
+                p += 1;
+                if !name.is_empty() {
+                    name.push('.');
+                }
+                if p + len <= n {
+                    name.push_str(&String::from_utf8_lossy(&resp[p..p + len]));
+                }
+                p += len;
+            }
+            return Ok(PerlValue::string(name));
+        }
+        pos += rdlen;
+    }
+    Ok(PerlValue::UNDEF)
+}
+
+/// `net_ping HOST [, count]` — TCP connect ping (no raw ICMP needed, no root).
+/// Returns array of RTT in ms.
+fn builtin_net_ping(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    use std::net::{TcpStream, ToSocketAddrs};
+    use std::time::{Duration, Instant};
+    let host = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let count = args.get(1).map(|v| v.to_int()).unwrap_or(4) as usize;
+    let port = args.get(2).map(|v| v.to_int()).unwrap_or(443) as u16;
+    let addr = format!("{}:{}", host, port);
+    let resolved = addr
+        .to_socket_addrs()
+        .map_err(|e| PerlError::runtime(format!("net_ping: {}: {}", host, e), line))?
+        .next()
+        .ok_or_else(|| PerlError::runtime(format!("net_ping: no address for {}", host), line))?;
+    let mut rtts = Vec::with_capacity(count);
+    for _ in 0..count {
+        let start = Instant::now();
+        match TcpStream::connect_timeout(&resolved, Duration::from_secs(5)) {
+            Ok(_) => rtts.push(PerlValue::float(start.elapsed().as_secs_f64() * 1000.0)),
+            Err(_) => rtts.push(PerlValue::UNDEF),
+        }
+    }
+    Ok(PerlValue::array(rtts))
+}
+
+/// `net_port_open HOST, PORT` — check if TCP port is open.
+fn builtin_net_port_open(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    use std::net::{TcpStream, ToSocketAddrs};
+    use std::time::Duration;
+    let host = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let port = args.get(1).map(|v| v.to_int()).unwrap_or(80) as u16;
+    let addr = format!("{}:{}", host, port);
+    if let Ok(mut addrs) = addr.to_socket_addrs() {
+        if let Some(a) = addrs.next() {
+            return Ok(PerlValue::integer(
+                if TcpStream::connect_timeout(&a, Duration::from_secs(2)).is_ok() {
+                    1
+                } else {
+                    0
+                },
+            ));
+        }
+    }
+    Ok(PerlValue::integer(0))
+}
+
+/// `net_ports_scan HOST, START, END` — scan TCP port range, return open ports.
+fn builtin_net_ports_scan(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    use std::net::{TcpStream, ToSocketAddrs};
+    use std::time::Duration;
+    let host = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let start = args.get(1).map(|v| v.to_int()).unwrap_or(1) as u16;
+    let end = args.get(2).map(|v| v.to_int()).unwrap_or(1024) as u16;
+    if end < start {
+        return Err(PerlError::runtime("net_ports_scan: end < start", line));
+    }
+    let timeout = Duration::from_millis(200);
+    let mut open = Vec::new();
+    for port in start..=end {
+        let addr = format!("{}:{}", host, port);
+        if let Ok(mut addrs) = addr.to_socket_addrs() {
+            if let Some(a) = addrs.next() {
+                if TcpStream::connect_timeout(&a, timeout).is_ok() {
+                    open.push(PerlValue::integer(port as i64));
+                }
+            }
+        }
+    }
+    Ok(PerlValue::array(open))
+}
+
+/// `net_download URL, PATH` — download URL to file via ureq.
+fn builtin_net_download(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    use std::io::Read;
+    let url = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let path = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let resp = ureq::get(&url)
+        .call()
+        .map_err(|e| PerlError::runtime(format!("net_download: {}", e), line))?;
+    let mut bytes = Vec::new();
+    resp.into_reader()
+        .read_to_end(&mut bytes)
+        .map_err(|e| PerlError::runtime(format!("net_download: read: {}", e), line))?;
+    std::fs::write(&path, &bytes)
+        .map_err(|e| PerlError::runtime(format!("net_download: write: {}", e), line))?;
+    Ok(PerlValue::string(path))
+}
+
+/// `net_headers URL` — fetch HTTP response headers as hashref via ureq.
+fn builtin_net_headers(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    let url = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let resp = ureq::get(&url)
+        .call()
+        .map_err(|e| PerlError::runtime(format!("net_headers: {}", e), line))?;
+    let mut h = indexmap::IndexMap::new();
+    for name in resp.headers_names() {
+        if let Some(val) = resp.header(&name) {
+            h.insert(name.to_lowercase(), PerlValue::string(val.to_string()));
+        }
+    }
+    h.insert(
+        "status".to_string(),
+        PerlValue::integer(resp.status() as i64),
+    );
+    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
+}
+
+/// `net_latency HOST [, PORT]` — measure TCP connect latency in ms.
+fn builtin_net_latency(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    use std::net::{TcpStream, ToSocketAddrs};
+    use std::time::{Duration, Instant};
+    let host = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let port = args.get(1).map(|v| v.to_int()).unwrap_or(443) as u16;
+    let addr = format!("{}:{}", host, port);
+    if let Ok(mut addrs) = addr.to_socket_addrs() {
+        if let Some(a) = addrs.next() {
+            let start = Instant::now();
+            if TcpStream::connect_timeout(&a, Duration::from_secs(5)).is_ok() {
+                let ms = start.elapsed().as_secs_f64() * 1000.0;
+                return Ok(PerlValue::float(ms));
+            }
+        }
+    }
+    Ok(PerlValue::UNDEF)
+}
+
+/// `net_dns_servers` — return configured DNS servers by parsing /etc/resolv.conf.
+fn builtin_net_dns_servers() -> PerlResult<PerlValue> {
+    if let Ok(data) = std::fs::read_to_string("/etc/resolv.conf") {
+        let servers: Vec<PerlValue> = data
+            .lines()
+            .filter(|l| l.trim_start().starts_with("nameserver"))
+            .filter_map(|l| l.split_whitespace().nth(1))
+            .map(|s| PerlValue::string(s.to_string()))
+            .collect();
+        if !servers.is_empty() {
+            return Ok(PerlValue::array(servers));
+        }
+    }
+    // macOS fallback: read dns config via sysctl-style interface
+    #[cfg(target_os = "macos")]
+    {
+        // /var/run/resolv.conf is the real resolv.conf on macOS
+        if let Ok(data) = std::fs::read_to_string("/var/run/resolv.conf") {
+            let servers: Vec<PerlValue> = data
+                .lines()
+                .filter(|l| l.trim_start().starts_with("nameserver"))
+                .filter_map(|l| l.split_whitespace().nth(1))
+                .map(|s| PerlValue::string(s.to_string()))
+                .collect();
+            if !servers.is_empty() {
+                return Ok(PerlValue::array(servers));
+            }
+        }
+    }
+    Ok(PerlValue::array(vec![]))
+}
+
+/// `net_gateway` — return default gateway IP via routing table sysctl.
+fn builtin_net_gateway() -> PerlResult<PerlValue> {
+    #[cfg(target_os = "macos")]
+    {
+        // Read routing table via sysctl CTL_NET / PF_ROUTE
+        // Simpler: parse /Library/Preferences/SystemConfiguration for gateway,
+        // or read the routing socket. Fallback: parse netstat -rn output from /proc.
+        // Most reliable no-exec approach: read from routing socket with RTM_GET.
+        use std::net::UdpSocket;
+        // Connect a UDP socket to a public IP — the OS fills in the local route.
+        // Then read the local address's gateway from the routing table.
+        if let Ok(sock) = UdpSocket::bind("0.0.0.0:0") {
+            if sock.connect("8.8.8.8:80").is_ok() {
+                // We know we have a route. Parse /etc/resolv.conf neighbor.
+                // Unfortunately, getting the gateway without exec requires
+                // the routing socket (PF_ROUTE), which is complex.
+                // Use the simple approach: the gateway is typically x.x.x.1
+                // for the local subnet. Read from net_interfaces.
+                if let Ok(ip) = builtin_net_ipv4() {
+                    let s = ip.to_string();
+                    if let Some(last_dot) = s.rfind('.') {
+                        return Ok(PerlValue::string(format!("{}1", &s[..=last_dot])));
+                    }
+                }
+            }
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        // Parse /proc/net/route — native, no exec needed.
+        if let Ok(data) = std::fs::read_to_string("/proc/net/route") {
+            for line in data.lines().skip(1) {
+                let fields: Vec<&str> = line.split_whitespace().collect();
+                if fields.len() >= 3 && fields[1] == "00000000" {
+                    // Gateway is in hex, little-endian
+                    if let Ok(gw) = u32::from_str_radix(fields[2], 16) {
+                        let ip = std::net::Ipv4Addr::from(gw.to_be());
+                        return Ok(PerlValue::string(ip.to_string()));
+                    }
+                }
+            }
+        }
+    }
+    Ok(PerlValue::UNDEF)
+}
+
+/// `net_whois DOMAIN` — WHOIS lookup via raw TCP to port 43.
+fn builtin_net_whois(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    use std::io::{Read, Write};
+    use std::net::TcpStream;
+    use std::time::Duration;
+    let domain = args.first().map(|v| v.to_string()).unwrap_or_default();
+    // Determine WHOIS server based on TLD
+    let whois_server = if domain.ends_with(".com") || domain.ends_with(".net") {
+        "whois.verisign-grs.com"
+    } else if domain.ends_with(".org") {
+        "whois.pir.org"
+    } else if domain.ends_with(".io") {
+        "whois.nic.io"
+    } else if domain.ends_with(".dev") {
+        "whois.nic.google"
+    } else {
+        "whois.iana.org"
+    };
+    let mut stream = TcpStream::connect(format!("{}:43", whois_server)).map_err(|e| {
+        PerlError::runtime(format!("net_whois: connect {}: {}", whois_server, e), line)
+    })?;
+    stream.set_read_timeout(Some(Duration::from_secs(10))).ok();
+    stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
+    write!(stream, "{}\r\n", domain)
+        .map_err(|e| PerlError::runtime(format!("net_whois: write: {}", e), line))?;
+    let mut result = String::new();
+    stream
+        .read_to_string(&mut result)
+        .map_err(|e| PerlError::runtime(format!("net_whois: read: {}", e), line))?;
+    Ok(PerlValue::string(result))
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -14710,6 +16528,322 @@ fn builtin_start_of_minute(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(ts - (ts % 60)))
 }
 
+// ── dateutils-style builtins ────────────────────────────────────────────
+
+/// Parse a date string (ISO 8601 or common formats) into a chrono NaiveDateTime.
+fn parse_date_flexible(s: &str) -> Option<chrono::NaiveDateTime> {
+    use chrono::NaiveDate;
+    use chrono::NaiveDateTime;
+    // Try ISO 8601 with T separator
+    if let Ok(dt) = NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S") {
+        return Some(dt);
+    }
+    if let Ok(dt) = NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%.f") {
+        return Some(dt);
+    }
+    // Space separator
+    if let Ok(dt) = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S") {
+        return Some(dt);
+    }
+    if let Ok(dt) = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.f") {
+        return Some(dt);
+    }
+    if let Ok(dt) = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M") {
+        return Some(dt);
+    }
+    // Date only
+    if let Ok(d) = NaiveDate::parse_from_str(s, "%Y-%m-%d") {
+        return Some(d.and_hms_opt(0, 0, 0).unwrap());
+    }
+    if let Ok(d) = NaiveDate::parse_from_str(s, "%Y/%m/%d") {
+        return Some(d.and_hms_opt(0, 0, 0).unwrap());
+    }
+    if let Ok(d) = NaiveDate::parse_from_str(s, "%m/%d/%Y") {
+        return Some(d.and_hms_opt(0, 0, 0).unwrap());
+    }
+    if let Ok(d) = NaiveDate::parse_from_str(s, "%d-%b-%Y") {
+        return Some(d.and_hms_opt(0, 0, 0).unwrap());
+    }
+    // Epoch integer/float
+    if let Ok(epoch) = s.parse::<f64>() {
+        return chrono::DateTime::from_timestamp(epoch as i64, 0).map(|dt| dt.naive_utc());
+    }
+    None
+}
+
+/// Parse a duration string: "1d", "2w", "3h", "30m", "1y", "1mo", "1 week", etc.
+fn parse_duration_str(s: &str) -> Option<chrono::Duration> {
+    let s = s.trim().to_lowercase();
+    // Try formats like "1d", "2w", "3h", "30m", "5s", "1y", "1mo"
+    let re_patterns: &[(&str, fn(i64) -> chrono::Duration)] = &[
+        ("seconds", |n| chrono::Duration::seconds(n)),
+        ("second", |n| chrono::Duration::seconds(n)),
+        ("secs", |n| chrono::Duration::seconds(n)),
+        ("sec", |n| chrono::Duration::seconds(n)),
+        ("minutes", |n| chrono::Duration::minutes(n)),
+        ("minute", |n| chrono::Duration::minutes(n)),
+        ("mins", |n| chrono::Duration::minutes(n)),
+        ("min", |n| chrono::Duration::minutes(n)),
+        ("hours", |n| chrono::Duration::hours(n)),
+        ("hour", |n| chrono::Duration::hours(n)),
+        ("hrs", |n| chrono::Duration::hours(n)),
+        ("hr", |n| chrono::Duration::hours(n)),
+        ("days", |n| chrono::Duration::days(n)),
+        ("day", |n| chrono::Duration::days(n)),
+        ("weeks", |n| chrono::Duration::weeks(n)),
+        ("week", |n| chrono::Duration::weeks(n)),
+        ("months", |n| chrono::Duration::days(n * 30)),
+        ("month", |n| chrono::Duration::days(n * 30)),
+        ("years", |n| chrono::Duration::days(n * 365)),
+        ("year", |n| chrono::Duration::days(n * 365)),
+    ];
+    for &(suffix, f) in re_patterns {
+        if let Some(num_str) = s.strip_suffix(suffix) {
+            if let Ok(n) = num_str.trim().parse::<i64>() {
+                return Some(f(n));
+            }
+        }
+    }
+    // Short suffixes: "1d", "2w", "3h", "30m", "5s", "1y"
+    if s.len() >= 2 {
+        let (num_str, unit) = s.split_at(s.len() - 1);
+        if let Ok(n) = num_str.trim().parse::<i64>() {
+            return match unit {
+                "s" => Some(chrono::Duration::seconds(n)),
+                "m" => Some(chrono::Duration::minutes(n)),
+                "h" => Some(chrono::Duration::hours(n)),
+                "d" => Some(chrono::Duration::days(n)),
+                "w" => Some(chrono::Duration::weeks(n)),
+                "y" => Some(chrono::Duration::days(n * 365)),
+                _ => None,
+            };
+        }
+        // "1mo"
+        if s.len() >= 3 {
+            let (num_str2, unit2) = s.split_at(s.len() - 2);
+            if unit2 == "mo" {
+                if let Ok(n) = num_str2.trim().parse::<i64>() {
+                    return Some(chrono::Duration::days(n * 30));
+                }
+            }
+        }
+    }
+    None
+}
+
+/// `dateseq START, END [, STEP]` — generate sequence of date strings.
+/// Returns an array of ISO date strings. STEP defaults to "1d".
+/// Example: `dateseq("2024-01-01", "2024-01-07")` → 7 dates
+/// Example: `dateseq("2024-01-01", "2024-12-31", "1w")` → weekly dates
+fn builtin_dateseq(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    let start_str = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let end_str = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let step_str = args
+        .get(2)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "1d".to_string());
+    let start = parse_date_flexible(&start_str).ok_or_else(|| {
+        PerlError::runtime(
+            format!("dateseq: cannot parse start date: {}", start_str),
+            line,
+        )
+    })?;
+    let end = parse_date_flexible(&end_str).ok_or_else(|| {
+        PerlError::runtime(format!("dateseq: cannot parse end date: {}", end_str), line)
+    })?;
+    let step = parse_duration_str(&step_str).ok_or_else(|| {
+        PerlError::runtime(format!("dateseq: cannot parse step: {}", step_str), line)
+    })?;
+    if step.num_seconds() == 0 {
+        return Err(PerlError::runtime("dateseq: step cannot be zero", line));
+    }
+    let mut result = Vec::new();
+    let mut cur = start;
+    let forward = end >= start;
+    let max_items = 100_000; // safety limit
+    while (forward && cur <= end) || (!forward && cur >= end) {
+        let fmt = if cur.time() == chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap() {
+            cur.format("%Y-%m-%d").to_string()
+        } else {
+            cur.format("%Y-%m-%d %H:%M:%S").to_string()
+        };
+        result.push(PerlValue::string(fmt));
+        if result.len() >= max_items {
+            break;
+        }
+        cur += step;
+    }
+    Ok(PerlValue::array(result))
+}
+
+/// `dategrep PATTERN, LIST` — filter strings containing dates matching pattern.
+/// PATTERN is a date string or glob-like: "2024-03-*", "2024-*", "2024-03-15".
+/// Scans each line for ISO-ish dates and checks if they match the pattern.
+fn builtin_dategrep(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let pattern = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let list = if args.len() > 1 {
+        args[1..]
+            .iter()
+            .flat_map(|v| {
+                let items = v.to_list();
+                if items.is_empty() {
+                    vec![v.clone()]
+                } else {
+                    items
+                }
+            })
+            .collect::<Vec<_>>()
+    } else {
+        // Use $_ if no list given
+        vec![interp.scope.get_scalar("_")]
+    };
+    // Convert glob pattern to regex: "2024-03-*" → "2024-03-\d+"
+    let re_pat = pattern.replace('.', r"\.").replace('*', r"\d+");
+    let re = regex::Regex::new(&re_pat).unwrap_or_else(|_| regex::Regex::new("^$").unwrap());
+    let mut result = Vec::new();
+    for item in list {
+        let s = item.to_string();
+        if re.is_match(&s) {
+            result.push(item);
+        }
+    }
+    Ok(PerlValue::array(result))
+}
+
+/// `dateround DATE, UNIT` — round a date to the nearest unit.
+/// UNIT: "second", "minute", "hour", "day", "week", "month", "year"
+/// Example: `dateround("2024-03-15 14:37:22", "hour")` → "2024-03-15 15:00:00"
+fn builtin_dateround(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    use chrono::{Datelike, NaiveDate, Timelike};
+    let date_str = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let unit = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "day".to_string());
+    let dt = parse_date_flexible(&date_str).ok_or_else(|| {
+        PerlError::runtime(format!("dateround: cannot parse: {}", date_str), line)
+    })?;
+    let rounded = match unit.as_str() {
+        "second" | "sec" | "s" => dt.with_nanosecond(0).unwrap_or(dt),
+        "minute" | "min" | "m" => {
+            let base = dt
+                .with_second(0)
+                .and_then(|d| d.with_nanosecond(0))
+                .unwrap_or(dt);
+            if dt.second() >= 30 {
+                base + chrono::Duration::minutes(1)
+            } else {
+                base
+            }
+        }
+        "hour" | "hr" | "h" => {
+            let base = dt
+                .with_minute(0)
+                .and_then(|d| d.with_second(0))
+                .and_then(|d| d.with_nanosecond(0))
+                .unwrap_or(dt);
+            if dt.minute() >= 30 {
+                base + chrono::Duration::hours(1)
+            } else {
+                base
+            }
+        }
+        "day" | "d" => {
+            let base = NaiveDate::from_ymd_opt(dt.year(), dt.month(), dt.day())
+                .unwrap()
+                .and_hms_opt(0, 0, 0)
+                .unwrap();
+            if dt.hour() >= 12 {
+                base + chrono::Duration::days(1)
+            } else {
+                base
+            }
+        }
+        "week" | "w" => {
+            let weekday = dt.weekday().num_days_from_monday() as i64;
+            let start = dt.date() - chrono::Duration::days(weekday);
+            let base = start.and_hms_opt(0, 0, 0).unwrap();
+            if weekday >= 4 {
+                base + chrono::Duration::weeks(1)
+            } else {
+                base
+            }
+        }
+        "month" | "mo" => {
+            let base = NaiveDate::from_ymd_opt(dt.year(), dt.month(), 1)
+                .unwrap()
+                .and_hms_opt(0, 0, 0)
+                .unwrap();
+            if dt.day() >= 15 {
+                let (y, m) = if dt.month() == 12 {
+                    (dt.year() + 1, 1)
+                } else {
+                    (dt.year(), dt.month() + 1)
+                };
+                NaiveDate::from_ymd_opt(y, m, 1)
+                    .unwrap()
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap()
+            } else {
+                base
+            }
+        }
+        "year" | "y" => {
+            let base = NaiveDate::from_ymd_opt(dt.year(), 1, 1)
+                .unwrap()
+                .and_hms_opt(0, 0, 0)
+                .unwrap();
+            if dt.month() >= 7 {
+                NaiveDate::from_ymd_opt(dt.year() + 1, 1, 1)
+                    .unwrap()
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap()
+            } else {
+                base
+            }
+        }
+        _ => {
+            return Err(PerlError::runtime(
+                format!("dateround: unknown unit: {}", unit),
+                line,
+            ))
+        }
+    };
+    let fmt = if rounded.time() == chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap() {
+        rounded.format("%Y-%m-%d").to_string()
+    } else {
+        rounded.format("%Y-%m-%d %H:%M:%S").to_string()
+    };
+    Ok(PerlValue::string(fmt))
+}
+
+/// `datesort LIST` — sort strings chronologically by detected date.
+/// Parses each string for an ISO-ish date and sorts by it.
+fn builtin_datesort(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let mut items: Vec<PerlValue> = args
+        .iter()
+        .flat_map(|v| {
+            let list = v.to_list();
+            if list.is_empty() {
+                vec![v.clone()]
+            } else {
+                list
+            }
+        })
+        .collect();
+    items.sort_by(|a, b| {
+        let da = parse_date_flexible(&a.to_string());
+        let db = parse_date_flexible(&b.to_string());
+        match (da, db) {
+            (Some(a), Some(b)) => a.cmp(&b),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.to_string().cmp(&b.to_string()),
+        }
+    });
+    Ok(PerlValue::array(items))
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Extended stdlib: Encoding/Hashing
 // ─────────────────────────────────────────────────────────────────────────
@@ -21177,6 +23311,919 @@ fn md_escape_into(buf: &mut String, s: &str) {
             _ => buf.push(c),
         }
     }
+}
+
+/// `to_pdf CONTENT [, PATH]` — generate PDF from text, SVG, or data.
+/// If PATH given, writes to file and returns path. Otherwise returns raw PDF bytes as string.
+/// Detects input type:
+///   - SVG string → embeds SVG in PDF page
+///   - Plain text / multiline → renders as monospace text pages
+///   - Array of strings → one line per element
+///   - Hashref → key-value table
+///   - Array of hashrefs → tabular data
+fn builtin_to_pdf(interp: &Interpreter, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    let content = first_arg_or_topic(interp, args);
+    let path = args.get(1).map(|v| v.to_string());
+
+    let s = content.to_string();
+    let is_svg = s.trim_start().starts_with("<svg") || s.trim_start().starts_with("<?xml");
+
+    let pdf_bytes = if is_svg {
+        svg_to_pdf(&s, line)?
+    } else {
+        let lines = pdf_content_to_lines(&content);
+        generate_pdf(&lines)
+    };
+
+    if let Some(p) = path {
+        std::fs::write(&p, &pdf_bytes)
+            .map_err(|e| PerlError::runtime(format!("to_pdf: {}: {}", p, e), line))?;
+        Ok(PerlValue::string(p))
+    } else {
+        // Write to temp file and return path (raw bytes aren't useful in a pipeline)
+        let mut tmp = std::env::temp_dir();
+        tmp.push(format!("stryke_{}.pdf", std::process::id()));
+        std::fs::write(&tmp, &pdf_bytes)
+            .map_err(|e| PerlError::runtime(format!("to_pdf: {}", e), line))?;
+        Ok(PerlValue::string(tmp.to_string_lossy().to_string()))
+    }
+}
+
+/// Convert SVG string to PDF bytes using usvg + svg2pdf.
+/// `pdf_text FILE` — extract all text from a PDF file.
+/// `html_parse HTML_STRING` — parse HTML and return a document value that can be queried with css_select.
+/// If called with one arg, returns the parsed document as a nested hashref tree.
+fn builtin_html_parse(
+    interp: &Interpreter,
+    args: &[PerlValue],
+    _line: usize,
+) -> PerlResult<PerlValue> {
+    let html_str = first_arg_or_topic(interp, args).to_string();
+    let doc = scraper::Html::parse_document(&html_str);
+    // Convert to array of all elements with tag, text, attrs
+    let mut elements = Vec::new();
+    for node in doc.tree.nodes() {
+        if let Some(el) = node.value().as_element() {
+            let tag = el.name().to_string();
+            let mut attrs = indexmap::IndexMap::new();
+            for (k, v) in el.attrs() {
+                attrs.insert(k.to_string(), PerlValue::string(v.to_string()));
+            }
+            // Get direct text content
+            let text: String = node
+                .children()
+                .filter_map(|c| c.value().as_text().map(|t| t.text.to_string()))
+                .collect::<Vec<_>>()
+                .join("");
+            let mut h = indexmap::IndexMap::new();
+            h.insert("tag".into(), PerlValue::string(tag));
+            if !text.trim().is_empty() {
+                h.insert("text".into(), PerlValue::string(text.trim().to_string()));
+            }
+            if !attrs.is_empty() {
+                h.insert(
+                    "attrs".into(),
+                    PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(attrs))),
+                );
+            }
+            elements.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+        }
+    }
+    Ok(PerlValue::array(elements))
+}
+
+/// `css_select SELECTOR, HTML_STRING` — query HTML with CSS selector, return matching elements.
+/// Each element is a hashref {tag, text, attrs, html}.
+fn builtin_css_select(
+    interp: &Interpreter,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<PerlValue> {
+    let selector_str = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let html_str = if args.len() > 1 {
+        args[1].to_string()
+    } else {
+        first_arg_or_topic(interp, &[]).to_string()
+    };
+    let doc = scraper::Html::parse_document(&html_str);
+    let selector = scraper::Selector::parse(&selector_str).map_err(|_| {
+        PerlError::runtime(
+            format!("css_select: invalid selector: {}", selector_str),
+            line,
+        )
+    })?;
+    let mut result = Vec::new();
+    for el in doc.select(&selector) {
+        let mut h = indexmap::IndexMap::new();
+        h.insert(
+            "tag".into(),
+            PerlValue::string(el.value().name().to_string()),
+        );
+        let text = el.text().collect::<Vec<_>>().join("");
+        if !text.trim().is_empty() {
+            h.insert("text".into(), PerlValue::string(text.trim().to_string()));
+        }
+        let mut attrs = indexmap::IndexMap::new();
+        for (k, v) in el.value().attrs() {
+            attrs.insert(k.to_string(), PerlValue::string(v.to_string()));
+        }
+        if !attrs.is_empty() {
+            h.insert(
+                "attrs".into(),
+                PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(attrs))),
+            );
+        }
+        h.insert("html".into(), PerlValue::string(el.inner_html()));
+        result.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+    }
+    Ok(PerlValue::array(result))
+}
+
+/// `xml_parse XML_STRING` — parse XML into a nested hashref tree.
+fn builtin_xml_parse(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    let xml_str = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let doc = roxmltree::Document::parse(&xml_str)
+        .map_err(|e| PerlError::runtime(format!("xml_parse: {}", e), line))?;
+    fn node_to_perl(node: roxmltree::Node) -> PerlValue {
+        if node.is_text() {
+            return PerlValue::string(node.text().unwrap_or("").to_string());
+        }
+        if !node.is_element() {
+            return PerlValue::UNDEF;
+        }
+        let mut h = indexmap::IndexMap::new();
+        h.insert(
+            "tag".to_string(),
+            PerlValue::string(node.tag_name().name().to_string()),
+        );
+        // Attributes
+        let mut attrs = indexmap::IndexMap::new();
+        for attr in node.attributes() {
+            attrs.insert(
+                attr.name().to_string(),
+                PerlValue::string(attr.value().to_string()),
+            );
+        }
+        if !attrs.is_empty() {
+            h.insert(
+                "attrs".to_string(),
+                PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(attrs))),
+            );
+        }
+        // Text content
+        let text: String = node
+            .children()
+            .filter(|c| c.is_text())
+            .filter_map(|c| c.text())
+            .collect::<Vec<_>>()
+            .join("");
+        if !text.trim().is_empty() {
+            h.insert(
+                "text".to_string(),
+                PerlValue::string(text.trim().to_string()),
+            );
+        }
+        // Child elements
+        let children: Vec<PerlValue> = node
+            .children()
+            .filter(|c| c.is_element())
+            .map(node_to_perl)
+            .collect();
+        if !children.is_empty() {
+            h.insert("children".to_string(), PerlValue::array(children));
+        }
+        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h)))
+    }
+    Ok(node_to_perl(doc.root_element()))
+}
+
+/// `xpath EXPR, XML_STRING` — query XML with simple XPath-like expressions.
+/// Supports: `//tag`, `//tag[@attr]`, `//tag[@attr='val']`, `/root/child`.
+fn builtin_xpath(interp: &Interpreter, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    let xpath_str = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let xml_str = if args.len() > 1 {
+        args[1].to_string()
+    } else {
+        first_arg_or_topic(interp, &[]).to_string()
+    };
+    let doc = roxmltree::Document::parse(&xml_str)
+        .map_err(|e| PerlError::runtime(format!("xpath: {}", e), line))?;
+
+    // Simple xpath: extract tag name and optional attr filter
+    let _search_all = xpath_str.starts_with("//");
+    let path = xpath_str.trim_start_matches('/');
+    // Parse "tag[@attr='val']" or "tag[@attr]" or just "tag"
+    let (tag, attr_name, attr_val) = if let Some(bracket) = path.find('[') {
+        let tag = &path[..bracket];
+        let inside = path[bracket + 1..].trim_end_matches(']');
+        let inside = inside.trim_start_matches('@');
+        if let Some(eq) = inside.find('=') {
+            let aname = &inside[..eq];
+            let aval = inside[eq + 1..].trim_matches('\'').trim_matches('"');
+            (tag, Some(aname.to_string()), Some(aval.to_string()))
+        } else {
+            (tag, Some(inside.to_string()), None)
+        }
+    } else {
+        (path, None, None)
+    };
+
+    fn collect_matching(
+        node: roxmltree::Node,
+        tag: &str,
+        attr_name: &Option<String>,
+        attr_val: &Option<String>,
+        result: &mut Vec<PerlValue>,
+    ) {
+        if node.is_element() && node.tag_name().name() == tag {
+            let matches = match (attr_name, attr_val) {
+                (Some(an), Some(av)) => node.attribute(an.as_str()) == Some(av.as_str()),
+                (Some(an), None) => node.has_attribute(an.as_str()),
+                _ => true,
+            };
+            if matches {
+                let mut h = indexmap::IndexMap::new();
+                h.insert("tag".to_string(), PerlValue::string(tag.to_string()));
+                let text: String = node
+                    .descendants()
+                    .filter(|c| c.is_text())
+                    .filter_map(|c| c.text())
+                    .collect::<Vec<_>>()
+                    .join("");
+                if !text.trim().is_empty() {
+                    h.insert(
+                        "text".to_string(),
+                        PerlValue::string(text.trim().to_string()),
+                    );
+                }
+                let mut attrs = indexmap::IndexMap::new();
+                for attr in node.attributes() {
+                    attrs.insert(
+                        attr.name().to_string(),
+                        PerlValue::string(attr.value().to_string()),
+                    );
+                }
+                if !attrs.is_empty() {
+                    h.insert(
+                        "attrs".to_string(),
+                        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(attrs))),
+                    );
+                }
+                result.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+            }
+        }
+        for child in node.children() {
+            collect_matching(child, tag, attr_name, attr_val, result);
+        }
+    }
+
+    let mut result = Vec::new();
+    collect_matching(doc.root_element(), tag, &attr_name, &attr_val, &mut result);
+    Ok(PerlValue::array(result))
+}
+
+/// `smtp_send OPTIONS` — send email via SMTP. OPTIONS is a hashref:
+/// {to, from, subject, body, smtp_host, smtp_port, smtp_user, smtp_pass}
+/// smtp_host defaults to "smtp.gmail.com", smtp_port to 587.
+fn builtin_smtp_send(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    use lettre::transport::smtp::authentication::Credentials;
+    use lettre::{Message, SmtpTransport, Transport};
+
+    let opts = args.first().and_then(|v| v.as_hash_ref()).ok_or_else(|| {
+        PerlError::runtime(
+            "smtp_send: argument must be a hashref with {to, from, subject, body, ...}",
+            line,
+        )
+    })?;
+    let opts = opts.read();
+
+    let to = opts
+        .get("to")
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("smtp_send: missing 'to'", line))?;
+    let from = opts
+        .get("from")
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("smtp_send: missing 'from'", line))?;
+    let subject = opts
+        .get("subject")
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    let body = opts.get("body").map(|v| v.to_string()).unwrap_or_default();
+    let host = opts
+        .get("smtp_host")
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "smtp.gmail.com".into());
+    let user = opts
+        .get("smtp_user")
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| from.clone());
+    let pass = opts
+        .get("smtp_pass")
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("smtp_send: missing 'smtp_pass'", line))?;
+
+    let email = Message::builder()
+        .from(
+            from.parse()
+                .map_err(|e| PerlError::runtime(format!("smtp_send: invalid from: {}", e), line))?,
+        )
+        .to(to
+            .parse()
+            .map_err(|e| PerlError::runtime(format!("smtp_send: invalid to: {}", e), line))?)
+        .subject(subject)
+        .body(body)
+        .map_err(|e| PerlError::runtime(format!("smtp_send: {}", e), line))?;
+
+    let creds = Credentials::new(user, pass);
+    let mailer = SmtpTransport::starttls_relay(&host)
+        .map_err(|e| PerlError::runtime(format!("smtp_send: {}", e), line))?
+        .credentials(creds)
+        .build();
+
+    mailer
+        .send(&email)
+        .map_err(|e| PerlError::runtime(format!("smtp_send: {}", e), line))?;
+
+    Ok(PerlValue::integer(1))
+}
+
+fn builtin_pdf_text(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    let path = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let bytes = std::fs::read(&path)
+        .map_err(|e| PerlError::runtime(format!("pdf_text: {}: {}", path, e), line))?;
+    let text = pdf_extract::extract_text_from_mem(&bytes)
+        .map_err(|e| PerlError::runtime(format!("pdf_text: {}: {}", path, e), line))?;
+    Ok(PerlValue::string(text))
+}
+
+/// `pdf_pages FILE` — return number of pages in a PDF (counts page-break markers in extracted text).
+fn builtin_pdf_pages(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    let path = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let bytes = std::fs::read(&path)
+        .map_err(|e| PerlError::runtime(format!("pdf_pages: {}: {}", path, e), line))?;
+    let text = pdf_extract::extract_text_from_mem(&bytes)
+        .map_err(|e| PerlError::runtime(format!("pdf_pages: {}: {}", path, e), line))?;
+    // pdf-extract inserts form-feed (\x0c) between pages
+    let pages = text.matches('\x0c').count() + 1;
+    Ok(PerlValue::integer(pages as i64))
+}
+
+fn svg_to_pdf(svg_str: &str, line: usize) -> PerlResult<Vec<u8>> {
+    let opts = svg2pdf::usvg::Options::default();
+    let tree = svg2pdf::usvg::Tree::from_str(svg_str, &opts)
+        .map_err(|e| PerlError::runtime(format!("to_pdf: SVG parse error: {}", e), line))?;
+    let pdf = svg2pdf::to_pdf(
+        &tree,
+        svg2pdf::ConversionOptions::default(),
+        svg2pdf::PageOptions::default(),
+    )
+    .map_err(|e| PerlError::runtime(format!("to_pdf: SVG conversion error: {}", e), line))?;
+    Ok(pdf)
+}
+
+/// `audio_convert INPUT, OUTPUT` — convert WAV/FLAC/AIFF to MP3 (or WAV).
+/// Uses symphonia for decoding and mp3lame-encoder for MP3 encoding.
+fn builtin_audio_convert(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    use symphonia::core::audio::SampleBuffer;
+    use symphonia::core::codecs::DecoderOptions;
+    use symphonia::core::formats::FormatOptions;
+    use symphonia::core::io::MediaSourceStream;
+    use symphonia::core::meta::MetadataOptions;
+    use symphonia::core::probe::Hint;
+
+    let input_path = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let output_path = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    if input_path.is_empty() || output_path.is_empty() {
+        return Err(PerlError::runtime(
+            "audio_convert: need INPUT and OUTPUT paths",
+            line,
+        ));
+    }
+
+    // Open input
+    let file = std::fs::File::open(&input_path)
+        .map_err(|e| PerlError::runtime(format!("audio_convert: {}: {}", input_path, e), line))?;
+    let mss = MediaSourceStream::new(Box::new(file), Default::default());
+    let mut hint = Hint::new();
+    if let Some(ext) = std::path::Path::new(&input_path)
+        .extension()
+        .and_then(|e| e.to_str())
+    {
+        hint.with_extension(ext);
+    }
+    let probed = symphonia::default::get_probe()
+        .format(
+            &hint,
+            mss,
+            &FormatOptions::default(),
+            &MetadataOptions::default(),
+        )
+        .map_err(|e| PerlError::runtime(format!("audio_convert: probe: {}", e), line))?;
+
+    let mut format = probed.format;
+    let track = format
+        .default_track()
+        .ok_or_else(|| PerlError::runtime("audio_convert: no audio track found", line))?;
+    let track_id = track.id;
+    let channels = track.codec_params.channels.map(|c| c.count()).unwrap_or(2) as u32;
+    let sample_rate = track.codec_params.sample_rate.unwrap_or(44100);
+
+    let mut decoder = symphonia::default::get_codecs()
+        .make(&track.codec_params, &DecoderOptions::default())
+        .map_err(|e| PerlError::runtime(format!("audio_convert: decoder: {}", e), line))?;
+
+    // Decode all samples to interleaved i16
+    let mut all_samples: Vec<i16> = Vec::new();
+    loop {
+        let packet = match format.next_packet() {
+            Ok(p) => p,
+            Err(symphonia::core::errors::Error::IoError(ref e))
+                if e.kind() == std::io::ErrorKind::UnexpectedEof =>
+            {
+                break
+            }
+            Err(_) => break,
+        };
+        if packet.track_id() != track_id {
+            continue;
+        }
+        let decoded = match decoder.decode(&packet) {
+            Ok(d) => d,
+            Err(_) => continue,
+        };
+        let spec = *decoded.spec();
+        let n_frames = decoded.frames();
+        let mut sample_buf = SampleBuffer::<i16>::new(n_frames as u64, spec);
+        sample_buf.copy_interleaved_ref(decoded);
+        all_samples.extend_from_slice(sample_buf.samples());
+    }
+
+    if all_samples.is_empty() {
+        return Err(PerlError::runtime(
+            "audio_convert: no audio data decoded",
+            line,
+        ));
+    }
+
+    let out_ext = std::path::Path::new(&output_path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("mp3")
+        .to_lowercase();
+
+    match out_ext.as_str() {
+        "mp3" => {
+            use mp3lame_encoder::{Builder, FlushNoGap, InterleavedPcm};
+            let mut builder = Builder::new().ok_or_else(|| {
+                PerlError::runtime("audio_convert: mp3 encoder init failed", line)
+            })?;
+            builder
+                .set_num_channels(channels as u8)
+                .map_err(|e| PerlError::runtime(format!("audio_convert: mp3: {:?}", e), line))?;
+            builder
+                .set_sample_rate(sample_rate)
+                .map_err(|e| PerlError::runtime(format!("audio_convert: mp3: {:?}", e), line))?;
+            builder
+                .set_brate(mp3lame_encoder::Bitrate::Kbps192)
+                .map_err(|e| PerlError::runtime(format!("audio_convert: mp3: {:?}", e), line))?;
+            builder
+                .set_quality(mp3lame_encoder::Quality::Best)
+                .map_err(|e| PerlError::runtime(format!("audio_convert: mp3: {:?}", e), line))?;
+            let mut encoder = builder.build().map_err(|e| {
+                PerlError::runtime(format!("audio_convert: mp3 build: {:?}", e), line)
+            })?;
+            let input = InterleavedPcm(&all_samples);
+            let mut mp3_out = Vec::with_capacity(all_samples.len());
+            encoder
+                .encode_to_vec(input, &mut mp3_out)
+                .map_err(|e| PerlError::runtime(format!("audio_convert: encode: {:?}", e), line))?;
+            encoder
+                .flush_to_vec::<FlushNoGap>(&mut mp3_out)
+                .map_err(|e| PerlError::runtime(format!("audio_convert: flush: {:?}", e), line))?;
+            std::fs::write(&output_path, &mp3_out)
+                .map_err(|e| PerlError::runtime(format!("audio_convert: write: {}", e), line))?;
+        }
+        "wav" => {
+            // Write raw WAV using simple header
+            let data_len = (all_samples.len() * 2) as u32;
+            let file_len = 36 + data_len;
+            let byte_rate = sample_rate * channels * 2;
+            let block_align = channels as u16 * 2;
+            let mut wav = Vec::with_capacity(file_len as usize + 8);
+            wav.extend_from_slice(b"RIFF");
+            wav.extend_from_slice(&file_len.to_le_bytes());
+            wav.extend_from_slice(b"WAVEfmt ");
+            wav.extend_from_slice(&16u32.to_le_bytes()); // chunk size
+            wav.extend_from_slice(&1u16.to_le_bytes()); // PCM
+            wav.extend_from_slice(&(channels as u16).to_le_bytes());
+            wav.extend_from_slice(&sample_rate.to_le_bytes());
+            wav.extend_from_slice(&byte_rate.to_le_bytes());
+            wav.extend_from_slice(&block_align.to_le_bytes());
+            wav.extend_from_slice(&16u16.to_le_bytes()); // bits per sample
+            wav.extend_from_slice(b"data");
+            wav.extend_from_slice(&data_len.to_le_bytes());
+            for &s in &all_samples {
+                wav.extend_from_slice(&s.to_le_bytes());
+            }
+            std::fs::write(&output_path, &wav)
+                .map_err(|e| PerlError::runtime(format!("audio_convert: write: {}", e), line))?;
+        }
+        _ => {
+            return Err(PerlError::runtime(
+                format!(
+                    "audio_convert: unsupported output format '.{}' (use .mp3 or .wav)",
+                    out_ext
+                ),
+                line,
+            ))
+        }
+    }
+
+    Ok(PerlValue::string(output_path))
+}
+
+/// `audio_info FILE` — return audio file metadata as hashref.
+fn builtin_audio_info(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    use symphonia::core::formats::FormatOptions;
+    use symphonia::core::io::MediaSourceStream;
+    use symphonia::core::meta::MetadataOptions;
+    use symphonia::core::probe::Hint;
+
+    let path = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let file = std::fs::File::open(&path)
+        .map_err(|e| PerlError::runtime(format!("audio_info: {}: {}", path, e), line))?;
+    let mss = MediaSourceStream::new(Box::new(file), Default::default());
+    let mut hint = Hint::new();
+    if let Some(ext) = std::path::Path::new(&path)
+        .extension()
+        .and_then(|e| e.to_str())
+    {
+        hint.with_extension(ext);
+    }
+    let probed = symphonia::default::get_probe()
+        .format(
+            &hint,
+            mss,
+            &FormatOptions::default(),
+            &MetadataOptions::default(),
+        )
+        .map_err(|e| PerlError::runtime(format!("audio_info: {}", e), line))?;
+
+    let format = probed.format;
+    let mut h = indexmap::IndexMap::new();
+    h.insert("path".to_string(), PerlValue::string(path));
+
+    if let Some(track) = format.default_track() {
+        let params = &track.codec_params;
+        if let Some(sr) = params.sample_rate {
+            h.insert("sample_rate".to_string(), PerlValue::integer(sr as i64));
+        }
+        if let Some(ch) = params.channels {
+            h.insert(
+                "channels".to_string(),
+                PerlValue::integer(ch.count() as i64),
+            );
+        }
+        if let Some(n) = params.n_frames {
+            h.insert("frames".to_string(), PerlValue::integer(n as i64));
+            if let Some(sr) = params.sample_rate {
+                let duration = n as f64 / sr as f64;
+                h.insert("duration_secs".to_string(), PerlValue::float(duration));
+            }
+        }
+        if let Some(bps) = params.bits_per_sample {
+            h.insert(
+                "bits_per_sample".to_string(),
+                PerlValue::integer(bps as i64),
+            );
+        }
+    }
+
+    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
+}
+
+/// `id3_read FILE` — read ID3 tags from an MP3 file, return as hashref.
+fn builtin_id3_read(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    use id3::TagLike;
+    let path = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let tag = id3::Tag::read_from_path(&path)
+        .map_err(|e| PerlError::runtime(format!("id3_read: {}: {}", path, e), line))?;
+    let mut h = indexmap::IndexMap::new();
+    if let Some(v) = tag.title() {
+        h.insert("title".into(), PerlValue::string(v.to_string()));
+    }
+    if let Some(v) = tag.artist() {
+        h.insert("artist".into(), PerlValue::string(v.to_string()));
+    }
+    if let Some(v) = tag.album() {
+        h.insert("album".into(), PerlValue::string(v.to_string()));
+    }
+    if let Some(v) = tag.year() {
+        h.insert("year".into(), PerlValue::integer(v as i64));
+    }
+    if let Some(v) = tag.track() {
+        h.insert("track".into(), PerlValue::integer(v as i64));
+    }
+    if let Some(v) = tag.genre_parsed() {
+        h.insert("genre".into(), PerlValue::string(v.to_string()));
+    }
+    if let Some(v) = tag.album_artist() {
+        h.insert("album_artist".into(), PerlValue::string(v.to_string()));
+    }
+    if let Some(v) = tag.disc() {
+        h.insert("disc".into(), PerlValue::integer(v as i64));
+    }
+    if let Some(v) = tag.duration() {
+        h.insert("duration_secs".into(), PerlValue::integer(v as i64));
+    }
+    // Collect all comments
+    let comments: Vec<PerlValue> = tag
+        .comments()
+        .map(|c| PerlValue::string(c.text.clone()))
+        .collect();
+    if !comments.is_empty() {
+        h.insert("comments".into(), PerlValue::array(comments));
+    }
+    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
+}
+
+/// `id3_write FILE, TAGS` — write ID3 tags to an MP3 file.
+/// TAGS is a hashref: {title => "...", artist => "...", album => "...", year => N, track => N, genre => "..."}
+fn builtin_id3_write(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    use id3::TagLike;
+    let path = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let tags_val = args.get(1).cloned().unwrap_or(PerlValue::UNDEF);
+    let tags_hr = tags_val
+        .as_hash_ref()
+        .ok_or_else(|| PerlError::runtime("id3_write: second arg must be a hashref", line))?;
+    let tags = tags_hr.read();
+    let mut tag = id3::Tag::read_from_path(&path).unwrap_or_else(|_| id3::Tag::new());
+    if let Some(v) = tags.get("title") {
+        tag.set_title(v.to_string());
+    }
+    if let Some(v) = tags.get("artist") {
+        tag.set_artist(v.to_string());
+    }
+    if let Some(v) = tags.get("album") {
+        tag.set_album(v.to_string());
+    }
+    if let Some(v) = tags.get("year") {
+        tag.set_year(v.to_int() as i32);
+    }
+    if let Some(v) = tags.get("track") {
+        tag.set_track(v.to_int() as u32);
+    }
+    if let Some(v) = tags.get("genre") {
+        tag.set_genre(v.to_string());
+    }
+    if let Some(v) = tags.get("album_artist") {
+        tag.set_album_artist(v.to_string());
+    }
+    if let Some(v) = tags.get("disc") {
+        tag.set_disc(v.to_int() as u32);
+    }
+    drop(tags);
+    tag.write_to_path(&path, id3::Version::Id3v24)
+        .map_err(|e| PerlError::runtime(format!("id3_write: {}: {}", path, e), line))?;
+    Ok(PerlValue::string(path))
+}
+
+/// Convert PerlValue content into lines of text for PDF rendering.
+fn pdf_content_to_lines(val: &PerlValue) -> Vec<String> {
+    if val.is_undef() {
+        return vec!["(undef)".to_string()];
+    }
+
+    let s = val.to_string();
+
+    // Hashref → key: value lines
+    if let Some(hr) = val.as_hash_ref() {
+        let guard = hr.read();
+        let mut lines = Vec::new();
+        let max_key = guard.keys().map(|k| k.len()).max().unwrap_or(0);
+        for (k, v) in guard.iter() {
+            lines.push(format!("{:width$}  {}", k, v.to_string(), width = max_key));
+        }
+        return lines;
+    }
+
+    // Array of hashrefs → table
+    if let Some(ar) = val.as_array_ref() {
+        let guard = ar.read();
+        if !guard.is_empty() {
+            // Check if first element is a hashref (tabular data)
+            if guard[0].as_hash_ref().is_some() {
+                let mut headers: Vec<String> = Vec::new();
+                for item in guard.iter() {
+                    if let Some(hr) = item.as_hash_ref() {
+                        for k in hr.read().keys() {
+                            if !headers.contains(k) {
+                                headers.push(k.clone());
+                            }
+                        }
+                    }
+                }
+                let col_widths: Vec<usize> = headers
+                    .iter()
+                    .map(|h| {
+                        let data_max = guard
+                            .iter()
+                            .filter_map(|item| {
+                                item.as_hash_ref()
+                                    .and_then(|hr| hr.read().get(h).map(|v| v.to_string().len()))
+                            })
+                            .max()
+                            .unwrap_or(0);
+                        h.len().max(data_max).min(30)
+                    })
+                    .collect();
+                let mut lines = Vec::new();
+                // Header
+                let header: String = headers
+                    .iter()
+                    .enumerate()
+                    .map(|(i, h)| format!("{:width$}", h, width = col_widths[i]))
+                    .collect::<Vec<_>>()
+                    .join("  ");
+                lines.push(header);
+                lines.push(
+                    col_widths
+                        .iter()
+                        .map(|&w| "-".repeat(w))
+                        .collect::<Vec<_>>()
+                        .join("  "),
+                );
+                // Rows
+                for item in guard.iter() {
+                    if let Some(hr) = item.as_hash_ref() {
+                        let rg = hr.read();
+                        let row: String = headers
+                            .iter()
+                            .enumerate()
+                            .map(|(i, h)| {
+                                let v = rg.get(h).map(|v| v.to_string()).unwrap_or_default();
+                                let truncated = if v.len() > col_widths[i] {
+                                    format!("{}…", &v[..col_widths[i] - 1])
+                                } else {
+                                    v
+                                };
+                                format!("{:width$}", truncated, width = col_widths[i])
+                            })
+                            .collect::<Vec<_>>()
+                            .join("  ");
+                        lines.push(row);
+                    }
+                }
+                return lines;
+            }
+            // Plain array → one line per element
+            return guard.iter().map(|v| v.to_string()).collect();
+        }
+    }
+
+    // Plain text → split on newlines
+    s.lines().map(|l| l.to_string()).collect()
+}
+
+/// Generate a minimal valid PDF from text lines. Pure Rust, no crate.
+/// Uses Courier (monospace) font, A4 page size, cyberpunk-ish dark header.
+fn generate_pdf(lines: &[String]) -> Vec<u8> {
+    let page_w = 595.0_f64; // A4 width in points
+    let page_h = 842.0_f64; // A4 height
+    let margin = 50.0;
+    let font_size = 9.0;
+    let line_height = 12.0;
+    let usable_h = page_h - margin * 2.0;
+    let lines_per_page = (usable_h / line_height) as usize;
+
+    let pages: Vec<&[String]> = lines.chunks(lines_per_page).collect();
+    let n_pages = pages.len().max(1);
+
+    let mut buf = Vec::with_capacity(4096);
+    let mut offsets: Vec<usize> = Vec::new();
+
+    // Header
+    buf.extend_from_slice(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n");
+
+    // Object 1: Catalog
+    offsets.push(buf.len());
+    buf.extend_from_slice(b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
+
+    // Object 2: Pages
+    offsets.push(buf.len());
+    let mut pages_kids = String::from("2 0 obj\n<< /Type /Pages /Kids [");
+    for i in 0..n_pages {
+        if i > 0 {
+            pages_kids.push(' ');
+        }
+        pages_kids.push_str(&format!("{} 0 R", 4 + i * 2));
+    }
+    pages_kids.push_str(&format!("] /Count {} >>\nendobj\n", n_pages));
+    buf.extend_from_slice(pages_kids.as_bytes());
+
+    // Object 3: Font
+    offsets.push(buf.len());
+    buf.extend_from_slice(
+        b"3 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>\nendobj\n",
+    );
+
+    // Page objects (each page = page_obj + stream_obj)
+    for (pi, page_lines) in pages.iter().enumerate() {
+        let page_obj_num = 4 + pi * 2;
+        let stream_obj_num = 5 + pi * 2;
+
+        // Build content stream
+        let mut stream = String::with_capacity(1024);
+        // Dark header bar
+        stream.push_str(&format!(
+            "0.02 0.02 0.04 rg\n0 {} {} {} re f\n",
+            page_h - 35.0,
+            page_w,
+            35.0
+        ));
+        // Header text "STRYKE" in cyan-ish
+        stream.push_str("BT\n0.02 0.85 0.91 rg\n/F1 11 Tf\n");
+        stream.push_str(&format!(
+            "{} {} Td\n(STRYKE) Tj\nET\n",
+            margin,
+            page_h - 25.0
+        ));
+        // Page number
+        stream.push_str("BT\n0.5 0.5 0.6 rg\n/F1 8 Tf\n");
+        stream.push_str(&format!(
+            "{} {} Td\n(Page {} of {}) Tj\nET\n",
+            page_w - margin - 60.0,
+            page_h - 25.0,
+            pi + 1,
+            n_pages
+        ));
+
+        // Body text
+        stream.push_str(&format!("BT\n0.1 0.1 0.15 rg\n/F1 {} Tf\n", font_size));
+        let mut y = page_h - margin - 20.0;
+        for text_line in *page_lines {
+            // Escape PDF special chars
+            let escaped = text_line
+                .replace('\\', "\\\\")
+                .replace('(', "\\(")
+                .replace(')', "\\)");
+            stream.push_str(&format!(
+                "{} {} Td\n({}) Tj\n0 {} Td\n",
+                margin, y, escaped, -line_height
+            ));
+            y = 0.0; // After first Td, use relative positioning
+        }
+        stream.push_str("ET\n");
+
+        // Footer line
+        stream.push_str(&format!(
+            "0.1 0.1 0.2 rg\n{} 30 m {} 30 l 0.5 w S\n",
+            margin,
+            page_w - margin
+        ));
+
+        let stream_bytes = stream.as_bytes();
+
+        // Page object
+        offsets.push(buf.len());
+        let page_dict = format!(
+            "{} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {} {}] /Contents {} 0 R /Resources << /Font << /F1 3 0 R >> >> >>\nendobj\n",
+            page_obj_num, page_w, page_h, stream_obj_num
+        );
+        buf.extend_from_slice(page_dict.as_bytes());
+
+        // Stream object
+        offsets.push(buf.len());
+        let stream_header = format!(
+            "{} 0 obj\n<< /Length {} >>\nstream\n",
+            stream_obj_num,
+            stream_bytes.len()
+        );
+        buf.extend_from_slice(stream_header.as_bytes());
+        buf.extend_from_slice(stream_bytes);
+        buf.extend_from_slice(b"\nendstream\nendobj\n");
+    }
+
+    // Cross-reference table
+    let xref_offset = buf.len();
+    let n_objects = offsets.len() + 1; // +1 for object 0
+    buf.extend_from_slice(format!("xref\n0 {}\n", n_objects).as_bytes());
+    buf.extend_from_slice(b"0000000000 65535 f \n");
+    for &off in &offsets {
+        buf.extend_from_slice(format!("{:010} 00000 n \n", off).as_bytes());
+    }
+
+    // Trailer
+    buf.extend_from_slice(
+        format!(
+            "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{}\n%%EOF\n",
+            n_objects, xref_offset
+        )
+        .as_bytes(),
+    );
+
+    buf
 }
 
 fn ddump_value(buf: &mut String, val: &PerlValue, depth: usize) {

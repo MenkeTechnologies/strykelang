@@ -7003,6 +7003,21 @@ impl Interpreter {
                     let key = format!("{}::{}", def.name, sf.name);
                     self.scope.declare_scalar(&key, val);
                 }
+                // Register class methods into self.subs so method dispatch finds them.
+                for m in &def.methods {
+                    if let Some(ref body) = m.body {
+                        let fq = format!("{}::{}", def.name, m.name);
+                        let sub = Arc::new(PerlSub {
+                            name: fq.clone(),
+                            params: m.params.clone(),
+                            body: body.clone(),
+                            closure_env: None,
+                            prototype: None,
+                            fib_like: None,
+                        });
+                        self.subs.insert(fq, sub);
+                    }
+                }
                 self.class_defs.insert(def.name.clone(), Arc::new(def));
                 Ok(PerlValue::UNDEF)
             }

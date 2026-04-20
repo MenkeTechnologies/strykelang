@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.7.8 · 3174 topics · 25 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.7.9 · 3251 topics · 33 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -173,7 +173,7 @@
         <li><a href="#ch-streaming-iterators">Streaming Iterators</a> <span class="chapter-count">24</span></li>
         <li><a href="#ch-list-operations">List Operations</a> <span class="chapter-count">62</span></li>
         <li><a href="#ch-stryke-extensions">stryke Extensions</a> <span class="chapter-count">19</span></li>
-        <li><a href="#ch-data-serialization">Data &amp; Serialization</a> <span class="chapter-count">39</span></li>
+        <li><a href="#ch-data-serialization">Data &amp; Serialization</a> <span class="chapter-count">40</span></li>
         <li><a href="#ch-http-networking">HTTP &amp; Networking</a> <span class="chapter-count">23</span></li>
         <li><a href="#ch-crypto-encoding">Crypto &amp; Encoding</a> <span class="chapter-count">133</span></li>
         <li><a href="#ch-special-math-functions">Special Math Functions</a> <span class="chapter-count">12</span></li>
@@ -187,11 +187,19 @@
         <li><a href="#ch-cluster-distributed">Cluster / Distributed</a> <span class="chapter-count">4</span></li>
         <li><a href="#ch-datetime">Datetime</a> <span class="chapter-count">15</span></li>
         <li><a href="#ch-math">Math</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-file-system">File System</a> <span class="chapter-count">32</span></li>
-        <li><a href="#ch-process">Process</a> <span class="chapter-count">20</span></li>
+        <li><a href="#ch-file-system">File System</a> <span class="chapter-count">34</span></li>
+        <li><a href="#ch-process">Process</a> <span class="chapter-count">21</span></li>
         <li><a href="#ch-pack-binary">Pack / Binary</a> <span class="chapter-count">3</span></li>
         <li><a href="#ch-logging">Logging</a> <span class="chapter-count">7</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">2609</span></li>
+        <li><a href="#ch-charts-svg">Charts (SVG)</a> <span class="chapter-count">19</span></li>
+        <li><a href="#ch-audio">Audio</a> <span class="chapter-count">4</span></li>
+        <li><a href="#ch-network-utilities">Network Utilities</a> <span class="chapter-count">18</span></li>
+        <li><a href="#ch-markup-web-scraping">Markup / Web Scraping</a> <span class="chapter-count">4</span></li>
+        <li><a href="#ch-date-utilities">Date Utilities</a> <span class="chapter-count">4</span></li>
+        <li><a href="#ch-git">Git</a> <span class="chapter-count">10</span></li>
+        <li><a href="#ch-system">System</a> <span class="chapter-count">8</span></li>
+        <li><a href="#ch-testing">Testing</a> <span class="chapter-count">15</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">2600</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -1549,7 +1557,7 @@ capture(&quot;ps aux&quot;) |&gt; lines |&gt; map { columns } |&gt; tbl |&gt; p
     </section>
     <section class="tutorial-section" id="ch-data-serialization">
       <h2>Data &amp; Serialization</h2>
-      <p class="chapter-meta">39 topics</p>
+      <p class="chapter-meta">40 topics</p>
       <article class="doc-entry" id="doc-json-encode">
         <h3><a class="doc-anchor" href="#doc-json-encode">#</a> <code>json_encode</code></h3>
         <p><code>json_encode</code> serializes any Perl data structure — hashrefs, arrayrefs, nested combinations, numbers, strings, booleans, and undef — into a compact JSON string. It uses a fast Rust-backed serializer so it is significantly faster than <code>JSON::XS</code> for large payloads. The output is always valid UTF-8 JSON suitable for writing to files, sending over HTTP, or piping to other tools. Use <code>json_decode</code> to round-trip back.</p>
@@ -1787,6 +1795,13 @@ sqlite(&quot;app.db&quot;, &quot;SELECT count(*) as n FROM users&quot;) |&gt; dd
         <pre><code class="lang-perl">p join &quot;&quot;, digits(&quot;phone: 555-1234&quot;)     # 5551234
 &quot;abc123def456&quot; |&gt; digits |&gt; cnt |&gt; p     # 6
 cat(&quot;log.txt&quot;) |&gt; digits |&gt; freq |&gt; bars |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-letters">
+        <h3><a class="doc-anchor" href="#doc-letters">#</a> <code>letters</code></h3>
+        <p><code>letters</code> (alias <code>lts</code>) extracts all alphabetic characters from a string and returns them as a list. Filters out digits, punctuation, whitespace — keeps only letters.</p>
+        <pre><code class="lang-perl">p join &quot;&quot;, letters(&quot;h3ll0 w0rld!&quot;)   # hllwrld
+&quot;abc123DEF&quot; |&gt; letters |&gt; cnt |&gt; p   # 6
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-sentences">
@@ -5015,7 +5030,7 @@ srand()                     # re-seed from entropy
     </section>
     <section class="tutorial-section" id="ch-file-system">
       <h2>File System</h2>
-      <p class="chapter-meta">32 topics</p>
+      <p class="chapter-meta">34 topics</p>
       <article class="doc-entry" id="doc-basename">
         <h3><a class="doc-anchor" href="#doc-basename">#</a> <code>basename</code></h3>
         <p>Extract the filename component from a path, stripping all leading directory segments. The short alias <code>bn</code> keeps one-liner pipelines terse. If an optional suffix argument is provided, that suffix is also stripped from the result, which is handy for removing extensions.</p>
@@ -5325,10 +5340,24 @@ closedir($dh)
 p &quot;$count entries&quot;
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-du">
+        <h3><a class="doc-anchor" href="#doc-du">#</a> <code>du</code></h3>
+        <p><code>du</code> (alias <code>dir_size</code>) — compute the total size of a directory tree in bytes, recursively walking all files.</p>
+        <pre><code class="lang-perl">my $bytes = du(&quot;/usr/local&quot;)
+p &quot;$bytes bytes&quot;
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-du-tree">
+        <h3><a class="doc-anchor" href="#doc-du-tree">#</a> <code>du_tree</code></h3>
+        <p><code>du_tree</code> (alias <code>dir_sizes</code>) — return directory sizes as an array of hashrefs <code>{path, size}</code>, sorted descending by size. Each entry is an immediate child directory.</p>
+        <pre><code class="lang-perl">my @dirs = du_tree(&quot;/usr/local&quot;)
+for (@dirs) { p &quot;$_-&gt;{path}: $_-&gt;{size}&quot; }
+</code></pre>
+      </article>
     </section>
     <section class="tutorial-section" id="ch-process">
       <h2>Process</h2>
-      <p class="chapter-meta">20 topics</p>
+      <p class="chapter-meta">21 topics</p>
       <article class="doc-entry" id="doc-system">
         <h3><a class="doc-anchor" href="#doc-system">#</a> <code>system</code></h3>
         <p>Execute a command in a subshell and wait for it to complete, returning the exit status. A return value of <code>0</code> means success; non-zero indicates failure. The exit status is encoded as <code>$? &gt;&gt; 8</code> for the actual exit code. Use backticks or <code>capture</code> if you need the command&#39;s output.</p>
@@ -5535,6 +5564,13 @@ p $pid                     # same as $$
 syscall(162)               # flush filesystem caches
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-process-list">
+        <h3><a class="doc-anchor" href="#doc-process-list">#</a> <code>process_list</code></h3>
+        <p><code>process_list</code> (aliases <code>ps</code>, <code>procs</code>) — list running processes as an array of hashrefs with <code>{pid, name, uid}</code> keys.</p>
+        <pre><code class="lang-perl">my @procs = ps()
+for (@procs) { p &quot;$_-&gt;{pid} $_-&gt;{name}&quot; }
+</code></pre>
+      </article>
     </section>
     <section class="tutorial-section" id="ch-pack-binary">
       <h2>Pack / Binary</h2>
@@ -5644,9 +5680,588 @@ log_info(&quot;hidden&quot;)    # not printed
 </code></pre>
       </article>
     </section>
+    <section class="tutorial-section" id="ch-charts-svg">
+      <h2>Charts (SVG)</h2>
+      <p class="chapter-meta">19 topics</p>
+      <article class="doc-entry" id="doc-scatter-svg">
+        <h3><a class="doc-anchor" href="#doc-scatter-svg">#</a> <code>scatter_svg</code></h3>
+        <p><code>scatter_svg</code> (alias <code>scatter_plot</code>) — generate an SVG scatter plot. Args: xs, ys [, title]. Dark theme, auto-scaled axes.</p>
+        <pre><code class="lang-perl">scatter_svg([1,2,3,4], [1,4,9,16], &quot;Squares&quot;) |&gt; to_file(&quot;scatter.svg&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-line-svg">
+        <h3><a class="doc-anchor" href="#doc-line-svg">#</a> <code>line_svg</code></h3>
+        <p><code>line_svg</code> (alias <code>line_plot</code>) — generate an SVG line plot. Args: xs, ys [, title].</p>
+        <pre><code class="lang-perl">my @x = map { $_ * 0.1 } 0..100
+my @y = map { sin($_) } @x
+line_svg(\@x, \@y, &quot;Sine&quot;) |&gt; to_file(&quot;sine.svg&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-plot-svg">
+        <h3><a class="doc-anchor" href="#doc-plot-svg">#</a> <code>plot_svg</code></h3>
+        <p><code>plot_svg</code> — SVG line plot with auto X axis (0..n-1). Args: ys [, title].</p>
+        <pre><code class="lang-perl">plot_svg([map { $_ ** 2 } 0..50], &quot;Parabola&quot;) |&gt; to_file(&quot;plot.svg&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hist-svg">
+        <h3><a class="doc-anchor" href="#doc-hist-svg">#</a> <code>hist_svg</code></h3>
+        <p><code>hist_svg</code> (alias <code>histogram_svg</code>) — SVG histogram with auto-binning (sqrt rule). Args: data [, bins, title].</p>
+        <pre><code class="lang-perl">rnorm(1000) |&gt; hist_svg(30, &quot;Normal&quot;) |&gt; to_file(&quot;hist.svg&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-boxplot-svg">
+        <h3><a class="doc-anchor" href="#doc-boxplot-svg">#</a> <code>boxplot_svg</code></h3>
+        <p><code>boxplot_svg</code> (alias <code>box_plot</code>) — SVG box-and-whisker plot with IQR whiskers and outlier detection. Args: groups [, title]. Groups is array of arrays.</p>
+        <pre><code class="lang-perl">boxplot_svg([[1,2,3,4,5], [3,4,5,6,20]], &quot;Compare&quot;) |&gt; to_file(&quot;box.svg&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-bar-svg">
+        <h3><a class="doc-anchor" href="#doc-bar-svg">#</a> <code>bar_svg</code></h3>
+        <p><code>bar_svg</code> (alias <code>barchart_svg</code>) — SVG bar chart with labeled bars and value annotations. Args: labels, values [, title].</p>
+        <pre><code class="lang-perl">bar_svg([&quot;Rust&quot;,&quot;Go&quot;,&quot;C++&quot;], [45,30,25], &quot;Languages&quot;) |&gt; to_file(&quot;bar.svg&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pie-svg">
+        <h3><a class="doc-anchor" href="#doc-pie-svg">#</a> <code>pie_svg</code></h3>
+        <p><code>pie_svg</code> (alias <code>pie_chart</code>) — SVG pie chart with percentage labels. Args: labels, values [, title].</p>
+        <pre><code class="lang-perl">pie_svg([&quot;A&quot;,&quot;B&quot;,&quot;C&quot;], [50,30,20]) |&gt; to_file(&quot;pie.svg&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-heatmap-svg">
+        <h3><a class="doc-anchor" href="#doc-heatmap-svg">#</a> <code>heatmap_svg</code></h3>
+        <p><code>heatmap_svg</code> (alias <code>heatmap</code>) — SVG heatmap with blue-cyan-yellow-red colormap. Args: matrix [, title].</p>
+        <pre><code class="lang-perl">heatmap_svg(cor_mat($data), &quot;Correlation&quot;) |&gt; to_file(&quot;heat.svg&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-donut-svg">
+        <h3><a class="doc-anchor" href="#doc-donut-svg">#</a> <code>donut_svg</code></h3>
+        <p><code>donut_svg</code> (alias <code>donut</code>) — SVG donut chart with percentage labels. Accepts labels+values or a hashref.</p>
+        <pre><code class="lang-perl">donut_svg([&quot;A&quot;,&quot;B&quot;,&quot;C&quot;], [50,30,20], &quot;Share&quot;) |&gt; to_file(&quot;donut.svg&quot;)
+{Rust =&gt; 45, Go =&gt; 30} |&gt; donut(&quot;Languages&quot;) |&gt; to_file(&quot;donut.svg&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-area-svg">
+        <h3><a class="doc-anchor" href="#doc-area-svg">#</a> <code>area_svg</code></h3>
+        <p><code>area_svg</code> (alias <code>area_chart</code>) — SVG filled area chart. Args: xs, ys [, title].</p>
+        <pre><code class="lang-perl">my @x = 0..20
+my @y = map { sin($_ * 0.3) } @x
+area_svg(\@x, \@y, &quot;Wave&quot;) |&gt; to_file(&quot;area.svg&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hbar-svg">
+        <h3><a class="doc-anchor" href="#doc-hbar-svg">#</a> <code>hbar_svg</code></h3>
+        <p><code>hbar_svg</code> (alias <code>hbar</code>) — SVG horizontal bar chart. Accepts labels+values or a hashref.</p>
+        <pre><code class="lang-perl">hbar_svg([&quot;Rust&quot;,&quot;Go&quot;,&quot;C++&quot;], [45,30,25], &quot;Speed&quot;) |&gt; to_file(&quot;hbar.svg&quot;)
+{alpha =&gt; 10, beta =&gt; 20} |&gt; hbar |&gt; to_file(&quot;hbar.svg&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-radar-svg">
+        <h3><a class="doc-anchor" href="#doc-radar-svg">#</a> <code>radar_svg</code></h3>
+        <p><code>radar_svg</code> (aliases <code>radar</code>, <code>spider</code>) — SVG radar/spider chart. Args: labels, values [, title].</p>
+        <pre><code class="lang-perl">radar_svg([&quot;Atk&quot;,&quot;Def&quot;,&quot;Spd&quot;,&quot;HP&quot;,&quot;MP&quot;], [8,6,9,5,7], &quot;Stats&quot;) |&gt; to_file(&quot;radar.svg&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-candlestick-svg">
+        <h3><a class="doc-anchor" href="#doc-candlestick-svg">#</a> <code>candlestick_svg</code></h3>
+        <p><code>candlestick_svg</code> (aliases <code>candlestick</code>, <code>ohlc</code>) — SVG candlestick OHLC chart. Args: array of [open,high,low,close] [, title].</p>
+        <pre><code class="lang-perl">candlestick_svg([[100,110,95,105],[105,115,100,112]], &quot;Stock&quot;) |&gt; to_file(&quot;ohlc.svg&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-violin-svg">
+        <h3><a class="doc-anchor" href="#doc-violin-svg">#</a> <code>violin_svg</code></h3>
+        <p><code>violin_svg</code> (alias <code>violin</code>) — SVG violin plot from array of arrays showing distribution shape.</p>
+        <pre><code class="lang-perl">violin_svg([rnorm(200), rnorm(200, 2)], &quot;Distributions&quot;) |&gt; to_file(&quot;violin.svg&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cor-heatmap">
+        <h3><a class="doc-anchor" href="#doc-cor-heatmap">#</a> <code>cor_heatmap</code></h3>
+        <p><code>cor_heatmap</code> (alias <code>cor_matrix_svg</code>) — SVG correlation matrix heatmap. Computes pairwise correlations and renders as heatmap.</p>
+        <pre><code class="lang-perl">cor_heatmap([rnorm(100), rnorm(100), rnorm(100)], &quot;Correlations&quot;) |&gt; to_file(&quot;cor.svg&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stacked-bar-svg">
+        <h3><a class="doc-anchor" href="#doc-stacked-bar-svg">#</a> <code>stacked_bar_svg</code></h3>
+        <p><code>stacked_bar_svg</code> (alias <code>stacked_bar</code>) — SVG stacked bar chart. Args: labels, series (array of arrays) [, title].</p>
+        <pre><code class="lang-perl">stacked_bar_svg([&quot;Q1&quot;,&quot;Q2&quot;,&quot;Q3&quot;], [[10,20,30],[5,15,25]], &quot;Revenue&quot;) |&gt; to_file(&quot;stacked.svg&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-wordcloud-svg">
+        <h3><a class="doc-anchor" href="#doc-wordcloud-svg">#</a> <code>wordcloud_svg</code></h3>
+        <p><code>wordcloud_svg</code> (aliases <code>wordcloud</code>, <code>wcloud</code>) — SVG word cloud from frequency hashref. Word size scales with frequency.</p>
+        <pre><code class="lang-perl">{rust =&gt; 50, go =&gt; 30, python =&gt; 40} |&gt; wordcloud(&quot;Languages&quot;) |&gt; to_file(&quot;cloud.svg&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-treemap-svg">
+        <h3><a class="doc-anchor" href="#doc-treemap-svg">#</a> <code>treemap_svg</code></h3>
+        <p><code>treemap_svg</code> (alias <code>treemap</code>) — SVG treemap from frequency hashref. Area proportional to values.</p>
+        <pre><code class="lang-perl">{src =&gt; 500, tests =&gt; 200, docs =&gt; 100} |&gt; treemap(&quot;Codebase&quot;) |&gt; to_file(&quot;tree.svg&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-preview">
+        <h3><a class="doc-anchor" href="#doc-preview">#</a> <code>preview</code></h3>
+        <p><code>preview</code> (alias <code>pvw</code>) — wrap SVG/HTML content in a cyberpunk-styled page and open in the default browser.</p>
+        <pre><code class="lang-perl">scatter_svg([1,2,3], [1,4,9]) |&gt; preview
+bar_svg([&quot;A&quot;,&quot;B&quot;], [10,20]) |&gt; pvw
+</code></pre>
+      </article>
+    </section>
+    <section class="tutorial-section" id="ch-audio">
+      <h2>Audio</h2>
+      <p class="chapter-meta">4 topics</p>
+      <article class="doc-entry" id="doc-audio-convert">
+        <h3><a class="doc-anchor" href="#doc-audio-convert">#</a> <code>audio_convert</code></h3>
+        <p><code>audio_convert</code> (alias <code>aconv</code>) — convert audio files between WAV, FLAC, AIFF, and MP3 formats.</p>
+        <pre><code class="lang-perl">audio_convert(&quot;song.flac&quot;, &quot;song.mp3&quot;)
+aconv(&quot;input.wav&quot;, &quot;output.mp3&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-audio-info">
+        <h3><a class="doc-anchor" href="#doc-audio-info">#</a> <code>audio_info</code></h3>
+        <p><code>audio_info</code> (alias <code>ainfo</code>) — get audio file metadata (duration, sample rate, channels, format) as a hashref.</p>
+        <pre><code class="lang-perl">my $info = ainfo(&quot;song.mp3&quot;)
+p $info-&gt;{duration}      # seconds
+p $info-&gt;{sample_rate}   # e.g. 44100
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-id3-read">
+        <h3><a class="doc-anchor" href="#doc-id3-read">#</a> <code>id3_read</code></h3>
+        <p><code>id3_read</code> (alias <code>id3</code>) — read ID3 tags from an MP3 file as a hashref (title, artist, album, year, etc.).</p>
+        <pre><code class="lang-perl">my $tags = id3(&quot;song.mp3&quot;)
+p &quot;$tags-&gt;{artist} - $tags-&gt;{title}&quot;
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-id3-write">
+        <h3><a class="doc-anchor" href="#doc-id3-write">#</a> <code>id3_write</code></h3>
+        <p><code>id3_write</code> (alias <code>id3w</code>) — write ID3 tags to an MP3 file from a hashref.</p>
+        <pre><code class="lang-perl">id3w(&quot;song.mp3&quot;, {title =&gt; &quot;New Title&quot;, artist =&gt; &quot;Artist&quot;, year =&gt; &quot;2026&quot;})
+</code></pre>
+      </article>
+    </section>
+    <section class="tutorial-section" id="ch-network-utilities">
+      <h2>Network Utilities</h2>
+      <p class="chapter-meta">18 topics</p>
+      <article class="doc-entry" id="doc-net-interfaces">
+        <h3><a class="doc-anchor" href="#doc-net-interfaces">#</a> <code>net_interfaces</code></h3>
+        <p><code>net_interfaces</code> (aliases <code>net_ifs</code>, <code>ifconfig</code>) — list all network interfaces with name, IPs, MAC, and status.</p>
+        <pre><code class="lang-perl">my @ifs = net_ifs()
+for (@ifs) { p &quot;$_-&gt;{name}: $_-&gt;{ipv4}&quot; }
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-net-ipv4">
+        <h3><a class="doc-anchor" href="#doc-net-ipv4">#</a> <code>net_ipv4</code></h3>
+        <p><code>net_ipv4</code> (aliases <code>myip</code>, <code>myip4</code>) — return the first non-loopback IPv4 address as a string.</p>
+        <pre><code class="lang-perl">p myip()   # e.g. 192.168.1.42
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-net-ipv6">
+        <h3><a class="doc-anchor" href="#doc-net-ipv6">#</a> <code>net_ipv6</code></h3>
+        <p><code>net_ipv6</code> (alias <code>myip6</code>) — return the first non-loopback IPv6 address as a string.</p>
+        <pre><code class="lang-perl">p myip6()   # e.g. fe80::1
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-net-mac">
+        <h3><a class="doc-anchor" href="#doc-net-mac">#</a> <code>net_mac</code></h3>
+        <p><code>net_mac</code> (alias <code>mymac</code>) — return the first non-loopback MAC address.</p>
+        <pre><code class="lang-perl">p mymac()   # e.g. aa:bb:cc:dd:ee:ff
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-net-public-ip">
+        <h3><a class="doc-anchor" href="#doc-net-public-ip">#</a> <code>net_public_ip</code></h3>
+        <p><code>net_public_ip</code> (aliases <code>pubip</code>, <code>extip</code>) — fetch your public IP address via HTTP.</p>
+        <pre><code class="lang-perl">p pubip()   # e.g. 203.0.113.42
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-net-dns">
+        <h3><a class="doc-anchor" href="#doc-net-dns">#</a> <code>net_dns</code></h3>
+        <p><code>net_dns</code> (aliases <code>dns_resolve</code>, <code>resolve</code>) — resolve a hostname to IP addresses.</p>
+        <pre><code class="lang-perl">my @ips = resolve(&quot;github.com&quot;)
+p @ips
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-net-reverse-dns">
+        <h3><a class="doc-anchor" href="#doc-net-reverse-dns">#</a> <code>net_reverse_dns</code></h3>
+        <p><code>net_reverse_dns</code> (alias <code>rdns</code>) — reverse DNS lookup via UDP PTR query.</p>
+        <pre><code class="lang-perl">p rdns(&quot;8.8.8.8&quot;)   # dns.google
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-net-ping">
+        <h3><a class="doc-anchor" href="#doc-net-ping">#</a> <code>net_ping</code></h3>
+        <p><code>net_ping</code> (alias <code>ping</code>) — TCP connect ping to host:port. Returns array of RTT measurements in ms.</p>
+        <pre><code class="lang-perl">my @rtt = ping(&quot;google.com&quot;, 443, 5)   # 5 pings
+p mean(@rtt)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-net-port-open">
+        <h3><a class="doc-anchor" href="#doc-net-port-open">#</a> <code>net_port_open</code></h3>
+        <p><code>net_port_open</code> (alias <code>port_open</code>) — check if a TCP port is open on a host. Returns boolean.</p>
+        <pre><code class="lang-perl">p port_open(&quot;localhost&quot;, 8080)   # 1 or 0
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-net-ports-scan">
+        <h3><a class="doc-anchor" href="#doc-net-ports-scan">#</a> <code>net_ports_scan</code></h3>
+        <p><code>net_ports_scan</code> (aliases <code>port_scan</code>, <code>portscan</code>) — scan a range of TCP ports on a host. Returns list of open ports.</p>
+        <pre><code class="lang-perl">my @open = port_scan(&quot;localhost&quot;, 80, 443)
+p @open   # e.g. 80, 443
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-net-latency">
+        <h3><a class="doc-anchor" href="#doc-net-latency">#</a> <code>net_latency</code></h3>
+        <p><code>net_latency</code> (alias <code>tcplat</code>) — measure TCP connect latency to host:port in milliseconds.</p>
+        <pre><code class="lang-perl">p tcplat(&quot;google.com&quot;, 443)   # e.g. 12.5
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-net-download">
+        <h3><a class="doc-anchor" href="#doc-net-download">#</a> <code>net_download</code></h3>
+        <p><code>net_download</code> (aliases <code>download</code>, <code>wget</code>) — download a URL to a local file via ureq.</p>
+        <pre><code class="lang-perl">wget(&quot;https://example.com/data.csv&quot;, &quot;data.csv&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-net-headers">
+        <h3><a class="doc-anchor" href="#doc-net-headers">#</a> <code>net_headers</code></h3>
+        <p><code>net_headers</code> (alias <code>http_headers</code>) — fetch HTTP response headers as a hashref.</p>
+        <pre><code class="lang-perl">my $h = http_headers(&quot;https://example.com&quot;)
+p $h-&gt;{&quot;content-type&quot;}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-net-dns-servers">
+        <h3><a class="doc-anchor" href="#doc-net-dns-servers">#</a> <code>net_dns_servers</code></h3>
+        <p><code>net_dns_servers</code> (alias <code>dns_servers</code>) — return the system&#39;s configured DNS server addresses.</p>
+        <pre><code class="lang-perl">my @dns = dns_servers()
+p @dns   # e.g. 8.8.8.8, 8.8.4.4
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-net-gateway">
+        <h3><a class="doc-anchor" href="#doc-net-gateway">#</a> <code>net_gateway</code></h3>
+        <p><code>net_gateway</code> (alias <code>gateway</code>) — return the default gateway IP address.</p>
+        <pre><code class="lang-perl">p gateway()   # e.g. 192.168.1.1
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-net-whois">
+        <h3><a class="doc-anchor" href="#doc-net-whois">#</a> <code>net_whois</code></h3>
+        <p><code>net_whois</code> (alias <code>whois</code>) — WHOIS lookup via raw TCP connection on port 43.</p>
+        <pre><code class="lang-perl">p whois(&quot;example.com&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-net-hostname">
+        <h3><a class="doc-anchor" href="#doc-net-hostname">#</a> <code>net_hostname</code></h3>
+        <p><code>net_hostname</code> — return the system hostname.</p>
+        <pre><code class="lang-perl">p net_hostname()   # e.g. my-macbook.local
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-smtp-send">
+        <h3><a class="doc-anchor" href="#doc-smtp-send">#</a> <code>smtp_send</code></h3>
+        <p><code>smtp_send</code> (aliases <code>send_email</code>, <code>email</code>) — send an email via SMTP with TLS. Takes a hashref with to, from, subject, body, and SMTP connection fields.</p>
+        <pre><code class="lang-perl">smtp_send({to =&gt; &quot;bob@ex.com&quot;, from =&gt; &quot;me@ex.com&quot;, subject =&gt; &quot;Hi&quot;,
+  body =&gt; &quot;Hello!&quot;, smtp_host =&gt; &quot;smtp.ex.com&quot;, smtp_port =&gt; 587,
+  smtp_user =&gt; &quot;me@ex.com&quot;, smtp_pass =&gt; $pass})
+</code></pre>
+      </article>
+    </section>
+    <section class="tutorial-section" id="ch-markup-web-scraping">
+      <h2>Markup / Web Scraping</h2>
+      <p class="chapter-meta">4 topics</p>
+      <article class="doc-entry" id="doc-html-parse">
+        <h3><a class="doc-anchor" href="#doc-html-parse">#</a> <code>html_parse</code></h3>
+        <p><code>html_parse</code> (alias <code>parse_html</code>) — parse an HTML string into an array of element hashrefs with tag, text, and attrs.</p>
+        <pre><code class="lang-perl">my @els = html_parse(slurp(&quot;page.html&quot;))
+for (@els) { p &quot;$_-&gt;{tag}: $_-&gt;{text}&quot; }
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-css-select">
+        <h3><a class="doc-anchor" href="#doc-css-select">#</a> <code>css_select</code></h3>
+        <p><code>css_select</code> (aliases <code>css</code>, <code>qs</code>, <code>query_selector</code>) — query parsed HTML with a CSS selector. Returns matching elements as hashrefs with tag, text, attrs, and html.</p>
+        <pre><code class="lang-perl">my @links = css_select(slurp(&quot;page.html&quot;), &quot;a.nav&quot;)
+for (@links) { p &quot;$_-&gt;{tag} $_-&gt;{attrs}{href}&quot; }
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-xml-parse">
+        <h3><a class="doc-anchor" href="#doc-xml-parse">#</a> <code>xml_parse</code></h3>
+        <p><code>xml_parse</code> (alias <code>parse_xml</code>) — parse an XML string into a nested hashref tree with tag, text, attrs, and children.</p>
+        <pre><code class="lang-perl">my $root = xml_parse(slurp(&quot;data.xml&quot;))
+p $root-&gt;{tag}
+for (@{$root-&gt;{children}}) { p $_-&gt;{text} }
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-xpath">
+        <h3><a class="doc-anchor" href="#doc-xpath">#</a> <code>xpath</code></h3>
+        <p><code>xpath</code> (alias <code>xml_select</code>) — query XML with XPath-like expressions (//tag, //tag[@attr=&#39;val&#39;]). Returns matching nodes as hashrefs.</p>
+        <pre><code class="lang-perl">my @items = xpath(slurp(&quot;feed.xml&quot;), &quot;//item&quot;)
+for (@items) { p $_-&gt;{text} }
+</code></pre>
+      </article>
+    </section>
+    <section class="tutorial-section" id="ch-date-utilities">
+      <h2>Date Utilities</h2>
+      <p class="chapter-meta">4 topics</p>
+      <article class="doc-entry" id="doc-dateseq">
+        <h3><a class="doc-anchor" href="#doc-dateseq">#</a> <code>dateseq</code></h3>
+        <p><code>dateseq</code> (alias <code>dseq</code>) — generate a sequence of dates. Args: start, end [, step]. Step defaults to 1 day.</p>
+        <pre><code class="lang-perl">my @days = dseq(&quot;2026-01-01&quot;, &quot;2026-01-07&quot;)
+p @days
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-dategrep">
+        <h3><a class="doc-anchor" href="#doc-dategrep">#</a> <code>dategrep</code></h3>
+        <p><code>dategrep</code> (alias <code>dgrep</code>) — filter a list of date strings by a pattern or range.</p>
+        <pre><code class="lang-perl">my @jan = dgrep(&quot;2026-01&quot;, @dates)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-dateround">
+        <h3><a class="doc-anchor" href="#doc-dateround">#</a> <code>dateround</code></h3>
+        <p><code>dateround</code> (alias <code>dround</code>) — round date strings to a unit (day, hour, month, etc.).</p>
+        <pre><code class="lang-perl">p dround(&quot;2026-04-19T14:35:22&quot;, &quot;hour&quot;)   # 2026-04-19T15:00:00
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-datesort">
+        <h3><a class="doc-anchor" href="#doc-datesort">#</a> <code>datesort</code></h3>
+        <p><code>datesort</code> (alias <code>dsort</code>) — sort date strings chronologically.</p>
+        <pre><code class="lang-perl">my @sorted = dsort(&quot;2026-03-01&quot;, &quot;2026-01-15&quot;, &quot;2026-02-10&quot;)
+p @sorted
+</code></pre>
+      </article>
+    </section>
+    <section class="tutorial-section" id="ch-git">
+      <h2>Git</h2>
+      <p class="chapter-meta">10 topics</p>
+      <article class="doc-entry" id="doc-git-log">
+        <h3><a class="doc-anchor" href="#doc-git-log">#</a> <code>git_log</code></h3>
+        <p><code>git_log</code> (alias <code>glog</code>) — get the last N commits as an array of hashrefs (hash, author, date, message).</p>
+        <pre><code class="lang-perl">my @commits = glog(10)
+for (@commits) { p &quot;$_-&gt;{hash} $_-&gt;{message}&quot; }
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-git-status">
+        <h3><a class="doc-anchor" href="#doc-git-status">#</a> <code>git_status</code></h3>
+        <p><code>git_status</code> (alias <code>gst</code>) — get working tree status as an array of hashrefs (path, status).</p>
+        <pre><code class="lang-perl">my @st = gst()
+for (@st) { p &quot;$_-&gt;{status} $_-&gt;{path}&quot; }
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-git-diff">
+        <h3><a class="doc-anchor" href="#doc-git-diff">#</a> <code>git_diff</code></h3>
+        <p><code>git_diff</code> (alias <code>gdiff</code>) — get the current diff as a string.</p>
+        <pre><code class="lang-perl">p gdiff()
+gdiff() |&gt; lines |&gt; grep /^\+/ |&gt; e p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-git-branches">
+        <h3><a class="doc-anchor" href="#doc-git-branches">#</a> <code>git_branches</code></h3>
+        <p><code>git_branches</code> (alias <code>gbr</code>) — list all branches as an array of strings.</p>
+        <pre><code class="lang-perl">my @br = gbr()
+p @br
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-git-tags">
+        <h3><a class="doc-anchor" href="#doc-git-tags">#</a> <code>git_tags</code></h3>
+        <p><code>git_tags</code> (alias <code>gtags</code>) — list all tags as an array of strings.</p>
+        <pre><code class="lang-perl">my @tags = gtags()
+p @tags
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-git-blame">
+        <h3><a class="doc-anchor" href="#doc-git-blame">#</a> <code>git_blame</code></h3>
+        <p><code>git_blame</code> (alias <code>gblame</code>) — blame a file, returning per-line annotation.</p>
+        <pre><code class="lang-perl">p gblame(&quot;src/main.rs&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-git-authors">
+        <h3><a class="doc-anchor" href="#doc-git-authors">#</a> <code>git_authors</code></h3>
+        <p><code>git_authors</code> (alias <code>gauthors</code>) — list unique authors sorted by commit count as hashrefs.</p>
+        <pre><code class="lang-perl">my @authors = gauthors()
+for (@authors) { p &quot;$_-&gt;{name}: $_-&gt;{count}&quot; }
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-git-files">
+        <h3><a class="doc-anchor" href="#doc-git-files">#</a> <code>git_files</code></h3>
+        <p><code>git_files</code> (alias <code>gfiles</code>) — list all tracked files in the repo.</p>
+        <pre><code class="lang-perl">my @files = gfiles()
+p scalar @files   # total tracked files
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-git-show">
+        <h3><a class="doc-anchor" href="#doc-git-show">#</a> <code>git_show</code></h3>
+        <p><code>git_show</code> (alias <code>gshow</code>) — show details of a commit (message, diff, author).</p>
+        <pre><code class="lang-perl">p gshow(&quot;HEAD&quot;)
+p gshow(&quot;abc1234&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-git-root">
+        <h3><a class="doc-anchor" href="#doc-git-root">#</a> <code>git_root</code></h3>
+        <p><code>git_root</code> (alias <code>groot</code>) — return the repository root path.</p>
+        <pre><code class="lang-perl">p groot()   # e.g. /home/user/project
+</code></pre>
+      </article>
+    </section>
+    <section class="tutorial-section" id="ch-system">
+      <h2>System</h2>
+      <p class="chapter-meta">8 topics</p>
+      <article class="doc-entry" id="doc-mounts">
+        <h3><a class="doc-anchor" href="#doc-mounts">#</a> <code>mounts</code></h3>
+        <p><code>mounts</code> (aliases <code>disk_mounts</code>, <code>filesystems</code>) — list mounted filesystems with usage (total, used, available).</p>
+        <pre><code class="lang-perl">my @m = mounts()
+for (@m) { p &quot;$_-&gt;{mount}: $_-&gt;{used}/$_-&gt;{total}&quot; }
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-thread-count">
+        <h3><a class="doc-anchor" href="#doc-thread-count">#</a> <code>thread_count</code></h3>
+        <p><code>thread_count</code> (alias <code>nthreads</code>) — return the rayon thread pool size.</p>
+        <pre><code class="lang-perl">p nthreads()   # e.g. 8
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pool-info">
+        <h3><a class="doc-anchor" href="#doc-pool-info">#</a> <code>pool_info</code></h3>
+        <p><code>pool_info</code> (alias <code>par_info</code>) — return thread pool details as a hashref (threads, queued, active).</p>
+        <pre><code class="lang-perl">my $info = par_info()
+p $info-&gt;{threads}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-par-bench">
+        <h3><a class="doc-anchor" href="#doc-par-bench">#</a> <code>par_bench</code></h3>
+        <p><code>par_bench</code> (alias <code>pbench</code>) — run a parallel throughput benchmark and return results.</p>
+        <pre><code class="lang-perl">my $result = pbench(1000000)
+p $result-&gt;{ops_per_sec}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-to-pdf">
+        <h3><a class="doc-anchor" href="#doc-to-pdf">#</a> <code>to_pdf</code></h3>
+        <p><code>to_pdf</code> — generate a PDF from text, SVG, or structured data. Returns raw PDF bytes.</p>
+        <pre><code class="lang-perl">&quot;Hello World&quot; |&gt; to_pdf |&gt; to_file(&quot;out.pdf&quot;)
+scatter_svg([1,2,3], [1,4,9]) |&gt; to_pdf |&gt; to_file(&quot;plot.pdf&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pdf-text">
+        <h3><a class="doc-anchor" href="#doc-pdf-text">#</a> <code>pdf_text</code></h3>
+        <p><code>pdf_text</code> (aliases <code>pdf_read</code>, <code>pdf_extract</code>) — extract all text content from a PDF file and return it as a string.</p>
+        <pre><code class="lang-perl">my $text = pdf_text(&quot;report.pdf&quot;)
+p $text |&gt; lines |&gt; cnt   # number of lines
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pdf-pages">
+        <h3><a class="doc-anchor" href="#doc-pdf-pages">#</a> <code>pdf_pages</code></h3>
+        <p><code>pdf_pages</code> — return the number of pages in a PDF file.</p>
+        <pre><code class="lang-perl">p pdf_pages(&quot;report.pdf&quot;)   # e.g. 42
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-jq">
+        <h3><a class="doc-anchor" href="#doc-jq">#</a> <code>jq</code></h3>
+        <p><code>jq</code> — alias for <code>json_jq</code>. Query JSON data with jq-style expressions.</p>
+        <pre><code class="lang-perl">my $data = json_decode(slurp(&quot;data.json&quot;))
+p jq($data, &quot;.items[].name&quot;)
+</code></pre>
+      </article>
+    </section>
+    <section class="tutorial-section" id="ch-testing">
+      <h2>Testing</h2>
+      <p class="chapter-meta">15 topics</p>
+      <article class="doc-entry" id="doc-assert-eq">
+        <h3><a class="doc-anchor" href="#doc-assert-eq">#</a> <code>assert_eq</code></h3>
+        <p><code>assert_eq</code> (alias <code>aeq</code>) — assert that two values are equal as strings. Takes A, B, and an optional message. Fails the test with a diff if A ne B.</p>
+        <pre><code class="lang-perl">assert_eq $got, $expected, &quot;username matches&quot;
+aeq length(@arr), 3
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-assert-ne">
+        <h3><a class="doc-anchor" href="#doc-assert-ne">#</a> <code>assert_ne</code></h3>
+        <p><code>assert_ne</code> (alias <code>ane</code>) — assert that two values are not equal as strings. Takes A, B, and an optional message. Fails if A eq B.</p>
+        <pre><code class="lang-perl">assert_ne $token, &quot;&quot;, &quot;token must not be empty&quot;
+ane $a, $b
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-assert-ok">
+        <h3><a class="doc-anchor" href="#doc-assert-ok">#</a> <code>assert_ok</code></h3>
+        <p><code>assert_ok</code> (alias <code>aok</code>) — assert that a value is truthy (defined and non-zero/non-empty). Fails if the value is falsy or undef.</p>
+        <pre><code class="lang-perl">assert_ok $result, &quot;fetch returned data&quot;
+aok $user-&gt;{active}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-assert-err">
+        <h3><a class="doc-anchor" href="#doc-assert-err">#</a> <code>assert_err</code></h3>
+        <p><code>assert_err</code> — assert that a value is falsy or undef. The inverse of <code>assert_ok</code>. Useful for verifying error conditions or absent values.</p>
+        <pre><code class="lang-perl">assert_err $deleted_user, &quot;user should be gone&quot;
+assert_err 0
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-assert-true">
+        <h3><a class="doc-anchor" href="#doc-assert-true">#</a> <code>assert_true</code></h3>
+        <p><code>assert_true</code> (alias <code>atrue</code>) — alias for <code>assert_ok</code>. Assert that a value is truthy.</p>
+        <pre><code class="lang-perl">assert_true $connected, &quot;should be connected&quot;
+atrue $flag
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-assert-false">
+        <h3><a class="doc-anchor" href="#doc-assert-false">#</a> <code>assert_false</code></h3>
+        <p><code>assert_false</code> (alias <code>afalse</code>) — alias for <code>assert_err</code>. Assert that a value is falsy or undef.</p>
+        <pre><code class="lang-perl">assert_false $error, &quot;no error expected&quot;
+afalse $disabled
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-assert-gt">
+        <h3><a class="doc-anchor" href="#doc-assert-gt">#</a> <code>assert_gt</code></h3>
+        <p><code>assert_gt</code> — assert that the first numeric value is strictly greater than the second. Fails with the actual values on mismatch.</p>
+        <pre><code class="lang-perl">assert_gt $elapsed, 0, &quot;elapsed must be positive&quot;
+assert_gt scalar(@results), 10
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-assert-lt">
+        <h3><a class="doc-anchor" href="#doc-assert-lt">#</a> <code>assert_lt</code></h3>
+        <p><code>assert_lt</code> — assert that the first numeric value is strictly less than the second.</p>
+        <pre><code class="lang-perl">assert_lt $latency, 100, &quot;latency under 100ms&quot;
+assert_lt $errors, $threshold
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-assert-ge">
+        <h3><a class="doc-anchor" href="#doc-assert-ge">#</a> <code>assert_ge</code></h3>
+        <p><code>assert_ge</code> — assert that the first numeric value is greater than or equal to the second.</p>
+        <pre><code class="lang-perl">assert_ge $count, 1, &quot;at least one result&quot;
+assert_ge $version, 2
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-assert-le">
+        <h3><a class="doc-anchor" href="#doc-assert-le">#</a> <code>assert_le</code></h3>
+        <p><code>assert_le</code> — assert that the first numeric value is less than or equal to the second.</p>
+        <pre><code class="lang-perl">assert_le $memory, $limit, &quot;within memory budget&quot;
+assert_le length($buf), 4096
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-assert-match">
+        <h3><a class="doc-anchor" href="#doc-assert-match">#</a> <code>assert_match</code></h3>
+        <p><code>assert_match</code> (alias <code>amatch</code>) — assert that a string matches a regex pattern. Fails with the actual string and pattern on mismatch.</p>
+        <pre><code class="lang-perl">assert_match $email, qr/\@/, &quot;must contain @&quot;
+amatch $line, qr/^OK/
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-assert-contains">
+        <h3><a class="doc-anchor" href="#doc-assert-contains">#</a> <code>assert_contains</code></h3>
+        <p><code>assert_contains</code> (alias <code>acontains</code>) — assert that a string contains a given substring. Fails with both values on mismatch.</p>
+        <pre><code class="lang-perl">assert_contains $html, &quot;&lt;title&gt;&quot;, &quot;page has title&quot;
+acontains $log, &quot;SUCCESS&quot;
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-assert-near">
+        <h3><a class="doc-anchor" href="#doc-assert-near">#</a> <code>assert_near</code></h3>
+        <p><code>assert_near</code> (alias <code>anear</code>) — assert that two floats are approximately equal within an epsilon tolerance (default 1e-9). Essential for floating-point comparisons.</p>
+        <pre><code class="lang-perl">assert_near 0.1 + 0.2, 0.3, 1e-10, &quot;float add&quot;
+anear $pi, 3.14159, 1e-5
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-assert-dies">
+        <h3><a class="doc-anchor" href="#doc-assert-dies">#</a> <code>assert_dies</code></h3>
+        <p><code>assert_dies</code> (alias <code>adies</code>) — assert that a block throws an error. Passes if the block dies, fails if it returns normally.</p>
+        <pre><code class="lang-perl">assert_dies { die &quot;boom&quot; } &quot;should throw&quot;
+adies { 1 / 0 }
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-test-run">
+        <h3><a class="doc-anchor" href="#doc-test-run">#</a> <code>test_run</code></h3>
+        <p><code>test_run</code> (alias <code>run_tests</code>) — print a test summary with pass/fail counts and exit with code 1 if any test failed. Call at the end of a test file to report results.</p>
+        <pre><code class="lang-perl"># ... assertions above ...
+test_run   # prints summary, exits 1 on failure
+</code></pre>
+      </article>
+    </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">2609 topics</p>
+      <p class="chapter-meta">2600 topics</p>
       <article class="doc-entry" id="doc-stryke-rust-compile">
         <h3><a class="doc-anchor" href="#doc-stryke-rust-compile">#</a> <code>__stryke_rust_compile</code></h3>
         <p><code>__stryke_rust_compile</code> — internal builtin.</p>
@@ -6780,12 +7395,6 @@ p au / 1000      # ~149.6 million km
         <pre><code class="lang-perl">my $filtered = bpf(\@signal, 0.1, 0.3)
 </code></pre>
       </article>
-      <article class="doc-entry" id="doc-bar-svg">
-        <h3><a class="doc-anchor" href="#doc-bar-svg">#</a> <code>bar_svg</code></h3>
-        <p><code>bar_svg</code> (alias <code>barchart_svg</code>) — SVG bar chart with labeled bars and value annotations. Args: labels, values [, title].</p>
-        <pre><code class="lang-perl">bar_svg([&quot;Rust&quot;,&quot;Go&quot;,&quot;C++&quot;], [45,30,25], &quot;Languages&quot;) |&gt; to_file(&quot;bar.svg&quot;)
-</code></pre>
-      </article>
       <article class="doc-entry" id="doc-bar-to-pascals">
         <h3><a class="doc-anchor" href="#doc-bar-to-pascals">#</a> <code>bar_to_pascals</code></h3>
         <p><code>bar_to_pascals</code> — file stat / path builtin.</p>
@@ -7523,12 +8132,6 @@ p bond_price(1000, 0.05, 0.06, 10)   # ~926 (discount)
         <pre><code class="lang-perl">my $result = both $x 
 # or in a pipeline:
 @list |&gt; map both |&gt; p
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-box-plot">
-        <h3><a class="doc-anchor" href="#doc-box-plot">#</a> <code>box_plot</code></h3>
-        <p><code>boxplot_svg</code> (alias <code>box_plot</code>) — SVG box-and-whisker plot with IQR whiskers and outlier detection. Args: groups [, title]. Groups is array of arrays.</p>
-        <pre><code class="lang-perl">boxplot_svg([[1,2,3,4,5], [3,4,5,6,20]], &quot;Compare&quot;) |&gt; to_file(&quot;box.svg&quot;)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-bracket">
@@ -12910,12 +13513,6 @@ p haversine(40.7128, -74.0060, 34.0522, -118.2437)
 @list |&gt; map heat_index |&gt; p
 </code></pre>
       </article>
-      <article class="doc-entry" id="doc-heatmap">
-        <h3><a class="doc-anchor" href="#doc-heatmap">#</a> <code>heatmap</code></h3>
-        <p><code>heatmap_svg</code> (alias <code>heatmap</code>) — SVG heatmap with blue-cyan-yellow-red colormap. Args: matrix [, title].</p>
-        <pre><code class="lang-perl">heatmap_svg(cor_mat($data), &quot;Correlation&quot;) |&gt; to_file(&quot;heat.svg&quot;)
-</code></pre>
-      </article>
       <article class="doc-entry" id="doc-heron">
         <h3><a class="doc-anchor" href="#doc-heron">#</a> <code>heron</code></h3>
         <p><code>heron</code> — geometry / physics builtin. Alias for <code>heron_area</code>.</p>
@@ -12989,12 +13586,6 @@ my $ac_only = hpf(\@with_dc, 0.1)
         <pre><code class="lang-perl">my $result = hist $x 
 # or in a pipeline:
 @list |&gt; map hist |&gt; p
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-hist-svg">
-        <h3><a class="doc-anchor" href="#doc-hist-svg">#</a> <code>hist_svg</code></h3>
-        <p><code>hist_svg</code> (alias <code>histogram_svg</code>) — SVG histogram with auto-binning (sqrt rule). Args: data [, bins, title].</p>
-        <pre><code class="lang-perl">rnorm(1000) |&gt; hist_svg(30, &quot;Normal&quot;) |&gt; to_file(&quot;hist.svg&quot;)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-histogram">
@@ -16029,13 +16620,6 @@ keys %b |&gt; grep { $b{$_} eq &quot;parallel&quot; } |&gt; pager
 slurp(&quot;README.md&quot;) |&gt; pager
 </code></pre>
       </article>
-      <article class="doc-entry" id="doc-letters">
-        <h3><a class="doc-anchor" href="#doc-letters">#</a> <code>letters</code></h3>
-        <p><code>letters</code> (alias <code>lts</code>) extracts all alphabetic characters from a string and returns them as a list. Filters out digits, punctuation, whitespace — keeps only letters.</p>
-        <pre><code class="lang-perl">p join &quot;&quot;, letters(&quot;h3ll0 w0rld!&quot;)   # hllwrld
-&quot;abc123DEF&quot; |&gt; letters |&gt; cnt |&gt; p   # 6
-</code></pre>
-      </article>
       <article class="doc-entry" id="doc-letters-lc">
         <h3><a class="doc-anchor" href="#doc-letters-lc">#</a> <code>letters_lc</code></h3>
         <p><code>letters_lc</code> extracts only lowercase letters from a string.</p>
@@ -16100,14 +16684,6 @@ p ly / au        # ~63241 AU
         <p><code>line_intersection($x1, $y1, $x2, $y2, $x3, $y3, $x4, $y4)</code> — finds the intersection point of two lines defined by points (x1,y1)-(x2,y2) and (x3,y3)-(x4,y4). Returns [$x, $y] or undef if parallel.</p>
         <pre><code class="lang-perl">my $pt = line_intersection(0, 0, 1, 1, 0, 1, 1, 0)
 p @$pt   # (0.5, 0.5)
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-line-plot">
-        <h3><a class="doc-anchor" href="#doc-line-plot">#</a> <code>line_plot</code></h3>
-        <p><code>line_svg</code> (alias <code>line_plot</code>) — generate an SVG line plot. Args: xs, ys [, title].</p>
-        <pre><code class="lang-perl">my @x = map { $_ * 0.1 } 0..100
-my @y = map { sin($_) } @x
-line_svg(\@x, \@y, &quot;Sine&quot;) |&gt; to_file(&quot;sine.svg&quot;)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-linear-regression">
@@ -19567,12 +20143,6 @@ p pexp(5, 0.5)   # P(wait ≤ 5 with avg wait 2)
 @list |&gt; map pid |&gt; p
 </code></pre>
       </article>
-      <article class="doc-entry" id="doc-pie-chart">
-        <h3><a class="doc-anchor" href="#doc-pie-chart">#</a> <code>pie_chart</code></h3>
-        <p><code>pie_svg</code> (alias <code>pie_chart</code>) — SVG pie chart with percentage labels. Args: labels, values [, title].</p>
-        <pre><code class="lang-perl">pie_svg([&quot;A&quot;,&quot;B&quot;,&quot;C&quot;], [50,30,20]) |&gt; to_file(&quot;pie.svg&quot;)
-</code></pre>
-      </article>
       <article class="doc-entry" id="doc-pig-latin">
         <h3><a class="doc-anchor" href="#doc-pig-latin">#</a> <code>pig_latin</code></h3>
         <p><code>pig_latin</code> — string processing (uncategorized batch) builtin.</p>
@@ -19687,12 +20257,6 @@ p $msg   # hello from child
         <h3><a class="doc-anchor" href="#doc-plnorm">#</a> <code>plnorm</code></h3>
         <p><code>plnorm</code> — log-normal CDF. P(X ≤ x) for LogN(mu, sigma). Args: x, mu, sigma.</p>
         <pre><code class="lang-perl">p plnorm(1, 0, 1)   # 0.5 (median of LogN(0,1))
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-plot-svg">
-        <h3><a class="doc-anchor" href="#doc-plot-svg">#</a> <code>plot_svg</code></h3>
-        <p><code>plot_svg</code> — SVG line plot with auto X axis (0..n-1). Args: ys [, title].</p>
-        <pre><code class="lang-perl">plot_svg([map { $_ ** 2 } 0..50], &quot;Parabola&quot;) |&gt; to_file(&quot;plot.svg&quot;)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-plur">
@@ -22011,12 +22575,6 @@ p @$p   # (4, 6)
         <pre><code class="lang-perl">my $result = scanr $x 
 # or in a pipeline:
 @list |&gt; map scanr |&gt; p
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-scatter-plot">
-        <h3><a class="doc-anchor" href="#doc-scatter-plot">#</a> <code>scatter_plot</code></h3>
-        <p><code>scatter_svg</code> (alias <code>scatter_plot</code>) — generate an SVG scatter plot. Args: xs, ys [, title]. Dark theme, auto-scaled axes.</p>
-        <pre><code class="lang-perl">scatter_svg([1,2,3,4], [1,4,9,16], &quot;Squares&quot;) |&gt; to_file(&quot;scatter.svg&quot;)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-scentroid">
