@@ -33,8 +33,7 @@ fn summarize_list {
 }
 
 # Build a hash from parallel key/value arrays
-fn zip_to_hash {
-    my ($keys, $vals) = @_
+fn zip_to_hash ($keys, $vals) {
     my $h = {}
     for my $i (0..scalar(@$keys) - 1) {
         $h->{$keys->[$i]} = $vals->[$i]

@@ -2,28 +2,24 @@
 
 my %_fib_memo
 
-fn fib {
-    my $n = shift
+fn fib ($n) {
     return $n if $n <= 1
     return $_fib_memo{$n} if exists $_fib_memo{$n}
     $_fib_memo{$n} = fib($n - 1) + fib($n - 2)
 }
 
-fn factorial {
-    my $n = shift
+fn factorial ($n) {
     my $r = 1
     $r *= $_ for 1..$n
     $r
 }
 
-fn primes_under {
-    my $max = shift
+fn primes_under ($max) {
     my @result = grep { is_prime($_) } 2..$max
     @result
 }
 
-fn gcd_of {
-    my ($a, $b) = @_
+fn gcd_of ($a, $b) {
     while ($b) {
         my $tmp = $b
         $b = $a % $b
@@ -32,27 +28,23 @@ fn gcd_of {
     $a
 }
 
-fn lcm_of {
-    my ($a, $b) = @_
+fn lcm_of ($a, $b) {
     $a / gcd_of($a, $b) * $b
 }
 
 # Returns a closure that adds $n to its argument
-fn make_adder {
-    my $n = shift
+fn make_adder ($n) {
     sub { $_[0] + $n }
 }
 
 # Higher-order: apply a function N times to a value
-fn apply_n {
-    my ($f, $n, $val) = @_
+fn apply_n ($f, $n, $val) {
     $val = $f->($val) for 1..$n
     $val
 }
 
 # Newton's method square root via closure + iterate
-fn sqrt_newton {
-    my $x = shift
+fn sqrt_newton ($x) {
     return 0 if $x == 0
     my $guess = $x / 2.0
     my $refine = sub { ($guess + $x / $guess) / 2.0 }
