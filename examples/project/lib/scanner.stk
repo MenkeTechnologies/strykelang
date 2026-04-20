@@ -5,7 +5,7 @@ fn scan_system {
     my $ram_bytes = mem_total()
     my $ram = human_bytes($ram_bytes)
     my $up_secs = sys_uptime()
-    my $uptime = human_duration($up_secs);
+    my $uptime = human_duration($up_secs)
     +{
         hostname   => gethostname(),
         os         => os_name(),

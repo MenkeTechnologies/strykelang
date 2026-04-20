@@ -5,9 +5,9 @@ use crate::run;
 #[test]
 fn test_pchannel_interpreter_roundtrip() {
     let code = r#"
-        my ($tx, $rx) = pchannel();
-        $tx->send(42);
-        $rx->recv();
+        my ($tx, $rx) = pchannel()
+        $tx->send(42)
+        $rx->recv()
     "#;
     assert_eq!(run(code).expect("run").to_int(), 42);
 }
@@ -26,11 +26,11 @@ fn test_pchannel_bounded() {
 #[test]
 fn test_pselect_interpreter() {
     let code = r#"
-        my ($tx1, $rx1) = pchannel();
-        my ($tx2, $rx2) = pchannel();
-        $tx2->send("ok");
-        my ($val, $idx) = pselect($rx1, $rx2);
-        "$val:$idx";
+        my ($tx1, $rx1) = pchannel()
+        my ($tx2, $rx2) = pchannel()
+        $tx2->send("ok")
+        my ($val, $idx) = pselect($rx1, $rx2)
+        "$val:$idx"
     "#;
     assert_eq!(run(code).expect("run").to_string(), "ok:1");
 }
@@ -38,12 +38,12 @@ fn test_pselect_interpreter() {
 #[test]
 fn test_ppool_interpreter() {
     let code = r#"
-        my $pool = ppool(2);
+        my $pool = ppool(2)
         for my $i (1..3) {
-            $pool->submit(sub { $_ * 10 }, $i);
+            $pool->submit(sub { $_ * 10 }, $i)
         }
-        my @res = $pool->collect();
-        join(",", sort { $a <=> $b } @res);
+        my @res = $pool->collect()
+        join(",", sort { $a <=> $b } @res)
     "#;
     assert_eq!(run(code).expect("run").to_string(), "10,20,30");
 }
@@ -53,10 +53,10 @@ fn test_pwatch_helpers() {
     // pwatch is hard to test without real FS events, but we can test the error cases.
     let code = r#"
         sub cb { 1 }
-        my $failed = 0;
-        eval { pwatch("/no/such/dir/likely/*.log", \&cb) };
+        my $failed = 0
+        eval { pwatch("/no/such/dir/likely/*.log", \&cb) }
         if ($@) { $failed = 1; }
-        $failed;
+        $failed
     "#;
     assert_eq!(run(code).expect("run").to_int(), 1);
 }

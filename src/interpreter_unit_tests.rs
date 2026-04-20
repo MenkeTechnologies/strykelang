@@ -9,10 +9,10 @@ use crate::value::PerlValue;
 fn destroy_runs_when_lexical_overwritten_with_undef() {
     let mut i = Interpreter::new();
     let prog = parse(
-        r#"$main::d = 0;
+        r#"$main::d = 0
         sub Dtor::DESTROY { $main::d = $main::d + 1 }
-        my $o = bless {}, "Dtor";
-        $o = undef;
+        my $o = bless {}, "Dtor"
+        $o = undef
         $main::d"#,
     )
     .unwrap();
@@ -36,7 +36,7 @@ fn destroy_runs_when_lexical_overwritten_with_undef() {
 #[test]
 fn our_isa_stores_c_isa_for_parents_of_class() {
     let mut i = Interpreter::new();
-    let prog = parse("package C; our @ISA = qw(P); 1;").unwrap();
+    let prog = parse("package C; our @ISA = qw(P); 1").unwrap();
     i.execute_tree(&prog).unwrap();
     assert_eq!(i.parents_of_class("C"), vec!["P".to_string()]);
 }
@@ -46,14 +46,14 @@ fn super_fixture_succeeds_on_tree_execute_path() {
     let mut i = Interpreter::new();
     let prog = parse(
         r#"
-        package P;
+        package P
         sub meth { 10 }
-        package C;
-        our @ISA = qw(P);
+        package C
+        our @ISA = qw(P)
         sub meth { my $s = shift; $s->SUPER::meth + 5 }
-        package main;
-        my $o = bless {}, "C";
-        $o->meth();
+        package main
+        my $o = bless {}, "C"
+        $o->meth()
     "#,
     )
     .unwrap();
@@ -67,7 +67,7 @@ fn execute_tree_sets_global_phase_start_run_end() {
     let prog = parse(
         r#"
         BEGIN { $main::g = ${^GLOBAL_PHASE} }
-        $main::m = ${^GLOBAL_PHASE};
+        $main::m = ${^GLOBAL_PHASE}
         END { $main::e = ${^GLOBAL_PHASE} }
         "#,
     )
@@ -81,7 +81,7 @@ fn execute_tree_sets_global_phase_start_run_end() {
 #[test]
 fn qualify_sub_key_preserves_package_qualified_sub_name() {
     let mut i = Interpreter::new();
-    let prog = parse("package JSON::PP; 1;").unwrap();
+    let prog = parse("package JSON::PP; 1").unwrap();
     i.execute_tree(&prog).unwrap();
     assert_eq!(i.qualify_sub_key("B::GV::SAFENAME"), "B::GV::SAFENAME");
     assert_eq!(i.qualify_sub_key("safename"), "JSON::PP::safename");
@@ -126,7 +126,7 @@ fn set_file_updates_file_field() {
 
 #[test]
 fn execute_tree_computed_expression() {
-    let p = parse("7 * 6;").expect("parse");
+    let p = parse("7 * 6").expect("parse");
     let mut i = Interpreter::new();
     let v = i.execute_tree(&p).expect("execute_tree");
     assert_eq!(v.to_int(), 42);
@@ -134,7 +134,7 @@ fn execute_tree_computed_expression() {
 
 #[test]
 fn execute_tree_my_scalar_sequence() {
-    let p = parse("my $a = 10; my $b = 32; $a + $b;").expect("parse");
+    let p = parse("my $a = 10; my $b = 32; $a + $b").expect("parse");
     let mut i = Interpreter::new();
     let v = i.execute_tree(&p).expect("execute_tree");
     assert_eq!(v.to_int(), 42);
@@ -142,7 +142,7 @@ fn execute_tree_my_scalar_sequence() {
 
 #[test]
 fn execute_tree_registers_sub_for_later_call() {
-    let p = parse("sub times6 { return $_0 * 6; } times6(7);").expect("parse");
+    let p = parse("sub times6 { return $_0 * 6; } times6(7)").expect("parse");
     let mut i = Interpreter::new();
     let v = i.execute_tree(&p).expect("execute_tree");
     assert_eq!(v.to_int(), 42);
@@ -150,8 +150,8 @@ fn execute_tree_registers_sub_for_later_call() {
 
 #[test]
 fn execute_preserves_scope_scalar_across_two_parses() {
-    let p1 = parse("my $interp_unit_x = 41;").expect("parse");
-    let p2 = parse("$interp_unit_x + 1;").expect("parse");
+    let p1 = parse("my $interp_unit_x = 41").expect("parse");
+    let p2 = parse("$interp_unit_x + 1").expect("parse");
     let mut i = Interpreter::new();
     i.execute_tree(&p1).expect("first");
     let v = i.execute_tree(&p2).expect("second");
@@ -175,7 +175,7 @@ format STDOUT =
 @<<<< @>>>>
 1, 2
 .
-1;
+1
 "#,
     )
     .expect("parse");
@@ -259,7 +259,7 @@ fn compile_regex_dollar_in_class_is_literal() {
 fn end_foreach_iterates_list_context() {
     let mut i = Interpreter::new();
     let prog = parse(
-        r#"$main::end_out = "";
+        r#"$main::end_out = ""
 END { foreach $k (1..3) { $main::end_out .= "k=$k " } }"#,
     )
     .expect("parse");

@@ -1137,7 +1137,7 @@ fn main() {
     }
 
     // `stryke test [FILE|DIR]` — run test files.
-    if args.len() >= 2 && args[1] == "test" {
+    if args.len() >= 2 && (args[1] == "test" || args[1] == "t") {
         let target = if args.len() >= 3 {
             args[2].clone()
         } else {

@@ -942,7 +942,7 @@ mod tests {
 
     #[test]
     fn undefined_scalar_detected() {
-        let r = lint("say $undefined;");
+        let r = lint("say $undefined");
         assert!(r.is_err());
         let e = r.unwrap_err();
         assert_eq!(e.kind, ErrorKind::UndefinedVariable);
@@ -951,12 +951,12 @@ mod tests {
 
     #[test]
     fn defined_scalar_ok() {
-        assert!(lint("my $x = 1; say $x;").is_ok());
+        assert!(lint("my $x = 1; say $x").is_ok());
     }
 
     #[test]
     fn undefined_sub_detected() {
-        let r = lint("nonexistent_function();");
+        let r = lint("nonexistent_function()");
         assert!(r.is_err());
         let e = r.unwrap_err();
         assert_eq!(e.kind, ErrorKind::UndefinedSubroutine);
@@ -965,21 +965,21 @@ mod tests {
 
     #[test]
     fn defined_sub_ok() {
-        assert!(lint("sub foo { 1 } foo();").is_ok());
+        assert!(lint("sub foo { 1 } foo()").is_ok());
     }
 
     #[test]
     fn builtin_sub_ok() {
-        assert!(lint("say 'hello';").is_ok());
-        assert!(lint("print 'hello';").is_ok());
-        assert!(lint("my @x = map { $_ * 2 } 1..3;").is_ok());
+        assert!(lint("say 'hello'").is_ok());
+        assert!(lint("print 'hello'").is_ok());
+        assert!(lint("my @x = map { $_ * 2 } 1..3").is_ok());
     }
 
     #[test]
     fn special_vars_ok() {
-        assert!(lint("say $_;").is_ok());
-        assert!(lint("say @_;").is_ok());
-        assert!(lint("say $a <=> $b;").is_ok());
+        assert!(lint("say $_").is_ok());
+        assert!(lint("say @_").is_ok());
+        assert!(lint("say $a <=> $b").is_ok());
     }
 
     #[test]
@@ -989,42 +989,42 @@ mod tests {
 
     #[test]
     fn sub_params_in_scope() {
-        assert!(lint("sub foo($x) { say $x; } foo(1);").is_ok());
+        assert!(lint("sub foo($x) { say $x; } foo(1)").is_ok());
     }
 
     #[test]
     fn assignment_declares_var() {
-        assert!(lint("$x = 1; say $x;").is_ok());
+        assert!(lint("$x = 1; say $x").is_ok());
     }
 
     #[test]
     fn builtin_inc_ok() {
-        assert!(lint("my $x = 1; inc($x);").is_ok());
+        assert!(lint("my $x = 1; inc($x)").is_ok());
     }
 
     #[test]
     fn builtin_dec_ok() {
-        assert!(lint("my $x = 1; dec($x);").is_ok());
+        assert!(lint("my $x = 1; dec($x)").is_ok());
     }
 
     #[test]
     fn builtin_rev_ok() {
-        assert!(lint("my $s = rev 'hello';").is_ok());
+        assert!(lint("my $s = rev 'hello'").is_ok());
     }
 
     #[test]
     fn builtin_p_alias_for_say_ok() {
-        assert!(lint("p 'hello';").is_ok());
+        assert!(lint("p 'hello'").is_ok());
     }
 
     #[test]
     fn builtin_t_thread_ok() {
-        assert!(lint("t 1 inc inc;").is_ok());
+        assert!(lint("t 1 inc inc").is_ok());
     }
 
     #[test]
     fn thread_with_undefined_var_detected() {
-        let r = lint("t $undefined inc;");
+        let r = lint("t $undefined inc");
         assert!(r.is_err());
     }
 
@@ -1035,18 +1035,18 @@ mod tests {
 
     #[test]
     fn interpolated_string_undefined_var() {
-        let r = lint(r#"say "hello $undefined";"#);
+        let r = lint(r#"say "hello $undefined""#);
         assert!(r.is_err());
     }
 
     #[test]
     fn interpolated_string_defined_var_ok() {
-        assert!(lint(r#"my $x = 1; say "hello $x";"#).is_ok());
+        assert!(lint(r#"my $x = 1; say "hello $x""#).is_ok());
     }
 
     #[test]
     fn coderef_params_in_scope() {
-        assert!(lint("my $f = sub ($x) { say $x; }; $f->(1);").is_ok());
+        assert!(lint("my $f = sub ($x) { say $x; }; $f->(1)").is_ok());
     }
 
     #[test]
@@ -1056,56 +1056,56 @@ mod tests {
 
     #[test]
     fn hash_element_access_ok() {
-        assert!(lint("my %h = (a => 1); say $h{a};").is_ok());
+        assert!(lint("my %h = (a => 1); say $h{a}").is_ok());
     }
 
     #[test]
     fn array_element_access_ok() {
-        assert!(lint("my @a = (1, 2, 3); say $a[0];").is_ok());
+        assert!(lint("my @a = (1, 2, 3); say $a[0]").is_ok());
     }
 
     #[test]
     fn undefined_hash_detected() {
-        let r = lint("say $undefined_hash{key};");
+        let r = lint("say $undefined_hash{key}");
         assert!(r.is_err());
     }
 
     #[test]
     fn undefined_array_detected() {
-        let r = lint("say $undefined_array[0];");
+        let r = lint("say $undefined_array[0]");
         assert!(r.is_err());
     }
 
     #[test]
     fn map_with_topic_ok() {
-        assert!(lint("my @x = map { $_ * 2 } 1..3;").is_ok());
+        assert!(lint("my @x = map { $_ * 2 } 1..3").is_ok());
     }
 
     #[test]
     fn grep_with_topic_ok() {
-        assert!(lint("my @x = grep { $_ > 1 } 1..3;").is_ok());
+        assert!(lint("my @x = grep { $_ > 1 } 1..3").is_ok());
     }
 
     #[test]
     fn sort_with_ab_ok() {
-        assert!(lint("my @x = sort { $a <=> $b } 1..3;").is_ok());
+        assert!(lint("my @x = sort { $a <=> $b } 1..3").is_ok());
     }
 
     #[test]
     fn ternary_undefined_var_detected() {
-        let r = lint("my $x = $undefined ? 1 : 0;");
+        let r = lint("my $x = $undefined ? 1 : 0");
         assert!(r.is_err());
     }
 
     #[test]
     fn binop_undefined_var_detected() {
-        let r = lint("my $x = 1 + $undefined;");
+        let r = lint("my $x = 1 + $undefined");
         assert!(r.is_err());
     }
 
     #[test]
     fn postfix_if_undefined_detected() {
-        let r = lint("say 'x' if $undefined;");
+        let r = lint("say 'x' if $undefined");
         assert!(r.is_err());
     }
 
@@ -1126,52 +1126,52 @@ mod tests {
 
     #[test]
     fn arrow_deref_ok() {
-        assert!(lint("my $h = { a => 1 }; say $h->{a};").is_ok());
+        assert!(lint("my $h = { a => 1 }; say $h->{a}").is_ok());
     }
 
     #[test]
     fn method_call_ok() {
-        assert!(lint("my $obj = bless {}, 'Foo'; $obj->method();").is_ok());
+        assert!(lint("my $obj = bless {}, 'Foo'; $obj->method()").is_ok());
     }
 
     #[test]
     fn push_builtin_ok() {
-        assert!(lint("my @a; push @a, 1, 2, 3;").is_ok());
+        assert!(lint("my @a; push @a, 1, 2, 3").is_ok());
     }
 
     #[test]
     fn splice_builtin_ok() {
-        assert!(lint("my @a = (1, 2, 3); splice @a, 1, 1, 'x';").is_ok());
+        assert!(lint("my @a = (1, 2, 3); splice @a, 1, 1, 'x'").is_ok());
     }
 
     #[test]
     fn substr_builtin_ok() {
-        assert!(lint("my $s = 'hello'; say substr($s, 0, 2);").is_ok());
+        assert!(lint("my $s = 'hello'; say substr($s, 0, 2)").is_ok());
     }
 
     #[test]
     fn sprintf_builtin_ok() {
-        assert!(lint("my $s = sprintf('%d', 42);").is_ok());
+        assert!(lint("my $s = sprintf('%d', 42)").is_ok());
     }
 
     #[test]
     fn range_ok() {
-        assert!(lint("my @a = 1..10;").is_ok());
+        assert!(lint("my @a = 1..10").is_ok());
     }
 
     #[test]
     fn qw_ok() {
-        assert!(lint("my @a = qw(a b c);").is_ok());
+        assert!(lint("my @a = qw(a b c)").is_ok());
     }
 
     #[test]
     fn regex_ok() {
-        assert!(lint("my $x = 'hello'; $x =~ /ell/;").is_ok());
+        assert!(lint("my $x = 'hello'; $x =~ /ell/").is_ok());
     }
 
     #[test]
     fn anonymous_sub_captures_outer_var() {
-        assert!(lint("my $x = 1; my $f = sub { say $x; };").is_ok());
+        assert!(lint("my $x = 1; my $f = sub { say $x; }").is_ok());
     }
 
     #[test]
@@ -1181,31 +1181,31 @@ mod tests {
 
     #[test]
     fn our_var_ok() {
-        assert!(lint("our $VERSION = '1.0';").is_ok());
+        assert!(lint("our $VERSION = '1.0'").is_ok());
     }
 
     #[test]
     fn local_var_ok() {
-        assert!(lint("local $/ = undef;").is_ok());
+        assert!(lint("local $/ = undef").is_ok());
     }
 
     #[test]
     fn chained_method_calls_ok() {
-        assert!(lint("my $x = Foo->new->bar->baz;").is_ok());
+        assert!(lint("my $x = Foo->new->bar->baz").is_ok());
     }
 
     #[test]
     fn list_assignment_ok() {
-        assert!(lint("my ($a, $b, $c) = (1, 2, 3); say $a + $b + $c;").is_ok());
+        assert!(lint("my ($a, $b, $c) = (1, 2, 3); say $a + $b + $c").is_ok());
     }
 
     #[test]
     fn hash_slice_ok() {
-        assert!(lint("my %h = (a => 1, b => 2); my @v = @h{qw(a b)};").is_ok());
+        assert!(lint("my %h = (a => 1, b => 2); my @v = @h{qw(a b)}").is_ok());
     }
 
     #[test]
     fn array_slice_ok() {
-        assert!(lint("my @a = (1, 2, 3, 4); my @b = @a[0, 2];").is_ok());
+        assert!(lint("my @a = (1, 2, 3, 4); my @b = @a[0, 2]").is_ok());
     }
 }

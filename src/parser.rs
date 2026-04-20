@@ -358,6 +358,26 @@ impl Parser {
         )
     }
 
+    /// True when the next token is on a different line from `stmt_line` and could
+    /// start a new statement. More permissive than `next_is_new_stmt_keyword` —
+    /// includes sigil-prefixed variables like `$var`, `@arr`, `%hash`.
+    fn next_is_new_statement_start(&self, stmt_line: usize) -> bool {
+        if crate::compat_mode() {
+            return false;
+        }
+        if self.peek_line() == stmt_line {
+            return false;
+        }
+        matches!(
+            self.peek(),
+            Token::ScalarVar(_)
+                | Token::DerefScalarVar(_)
+                | Token::ArrayVar(_)
+                | Token::HashVar(_)
+                | Token::LBrace
+        ) || self.next_is_new_stmt_keyword(stmt_line)
+    }
+
     // ── Top level ──
 
     pub fn parse_program(&mut self) -> PerlResult<Program> {
@@ -4909,7 +4929,7 @@ impl Parser {
                 }
                 let mut imports = Vec::new();
                 if !matches!(self.peek(), Token::Semicolon | Token::Eof)
-                    && !self.next_is_new_stmt_keyword(tok_line)
+                    && !self.next_is_new_statement_start(tok_line)
                 {
                     loop {
                         if matches!(self.peek(), Token::Semicolon | Token::Eof) {
@@ -4959,7 +4979,7 @@ impl Parser {
         }
         let mut imports = Vec::new();
         if !matches!(self.peek(), Token::Semicolon | Token::Eof)
-            && !self.next_is_new_stmt_keyword(tok_line)
+            && !self.next_is_new_statement_start(tok_line)
         {
             loop {
                 if matches!(self.peek(), Token::Semicolon | Token::Eof) {
@@ -6154,9 +6174,11 @@ impl Parser {
     fn parse_addition(&mut self) -> PerlResult<Expr> {
         let mut left = self.parse_multiplication()?;
         loop {
+            // Implicit semicolon: `-` or `+` on a new line is a unary operator on
+            // the next statement, not a binary operator continuing this expression.
             let op = match self.peek() {
-                Token::Plus => BinOp::Add,
-                Token::Minus => BinOp::Sub,
+                Token::Plus if self.peek_line() == self.prev_line() => BinOp::Add,
+                Token::Minus if self.peek_line() == self.prev_line() => BinOp::Sub,
                 Token::Dot => BinOp::Concat,
                 _ => break,
             };
@@ -6181,7 +6203,9 @@ impl Parser {
             let op = match self.peek() {
                 Token::Star => BinOp::Mul,
                 Token::Slash if self.suppress_slash_as_div == 0 => BinOp::Div,
-                Token::Percent => BinOp::Mod,
+                // Implicit semicolon: `%` on a new line is a hash dereference or hash
+                // sigil for the next statement, not modulo operator on this expression.
+                Token::Percent if self.peek_line() == self.prev_line() => BinOp::Mod,
                 Token::X => {
                     let line = left.line;
                     self.advance();
@@ -6601,6 +6625,11 @@ impl Parser {
         loop {
             match self.peek().clone() {
                 Token::Increment => {
+                    // Implicit semicolon: `++` on a new line is a prefix operator
+                    // on the next statement, not postfix on the previous expression.
+                    if self.peek_line() > self.prev_line() {
+                        break;
+                    }
                     let line = expr.line;
                     self.advance();
                     expr = Expr {
@@ -6612,6 +6641,11 @@ impl Parser {
                     };
                 }
                 Token::Decrement => {
+                    // Implicit semicolon: `--` on a new line is a prefix operator
+                    // on the next statement, not postfix on the previous expression.
+                    if self.peek_line() > self.prev_line() {
+                        break;
+                    }
                     let line = expr.line;
                     self.advance();
                     expr = Expr {
@@ -7738,10 +7772,14 @@ impl Parser {
                 })
             }
             "undef" => {
-                if matches!(
-                    self.peek(),
-                    Token::ScalarVar(_) | Token::ArrayVar(_) | Token::HashVar(_)
-                ) {
+                // `undef $var` sets `$var` to undef — but a variable on a new line
+                // is a separate statement (implicit semicolon), not an argument.
+                if self.peek_line() == self.prev_line()
+                    && matches!(
+                        self.peek(),
+                        Token::ScalarVar(_) | Token::ArrayVar(_) | Token::HashVar(_)
+                    )
+                {
                     let _ = self.advance();
                 }
                 Ok(Expr {
@@ -12527,6 +12565,7 @@ impl Parser {
     /// no-arg method call; we must not consume that `+` as the start of a first argument.
     fn parse_method_arg_list_no_paren(&mut self) -> PerlResult<Vec<Expr>> {
         let mut args = Vec::new();
+        let call_line = self.prev_line();
         loop {
             // `$g->next { ... }` — `{` starts the enclosing statement's block, not an anonymous
             // hash argument to `next` (paren-less method call has no args here).
@@ -12552,6 +12591,11 @@ impl Parser {
             if args.is_empty()
                 && (self.peek_method_arg_infix_terminator() || matches!(self.peek(), Token::Comma))
             {
+                break;
+            }
+            // Implicit semicolon: if no args collected yet and next token is on a different
+            // line, treat newline as statement boundary. Allows `$p->method\nnext_stmt`.
+            if args.is_empty() && self.peek_line() > call_line {
                 break;
             }
             args.push(self.parse_assign_expr()?);
@@ -13646,25 +13690,25 @@ mod tests {
 
     #[test]
     fn parse_semicolons_only() {
-        let p = parse_ok(";;;");
+        let p = parse_ok(";;");
         assert!(p.statements.len() <= 3);
     }
 
     #[test]
     fn parse_simple_scalar_assignment() {
-        let p = parse_ok("$x = 1;");
+        let p = parse_ok("$x = 1");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_simple_array_assignment() {
-        let p = parse_ok("@arr = (1, 2, 3);");
+        let p = parse_ok("@arr = (1, 2, 3)");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_simple_hash_assignment() {
-        let p = parse_ok("%h = (a => 1, b => 2);");
+        let p = parse_ok("%h = (a => 1, b => 2)");
         assert_eq!(p.statements.len(), 1);
     }
 
@@ -13692,7 +13736,7 @@ mod tests {
 
     #[test]
     fn parse_anonymous_sub() {
-        let p = parse_ok("my $f = sub { 1 };");
+        let p = parse_ok("my $f = sub { 1 }");
         assert_eq!(p.statements.len(), 1);
     }
 
@@ -13762,7 +13806,7 @@ mod tests {
 
     #[test]
     fn parse_package_statement() {
-        let p = parse_ok("package Foo::Bar;");
+        let p = parse_ok("package Foo::Bar");
         assert_eq!(p.statements.len(), 1);
         match &p.statements[0].kind {
             StmtKind::Package { name } => assert_eq!(name, "Foo::Bar"),
@@ -13772,121 +13816,121 @@ mod tests {
 
     #[test]
     fn parse_use_statement() {
-        let p = parse_ok("use strict;");
+        let p = parse_ok("use strict");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_no_statement() {
-        let p = parse_ok("no warnings;");
+        let p = parse_ok("no warnings");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_require_bareword() {
-        let p = parse_ok("require Foo::Bar;");
+        let p = parse_ok("require Foo::Bar");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_require_string() {
-        let p = parse_ok(r#"require "foo.pl";"#);
+        let p = parse_ok(r#"require "foo.pl""#);
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_eval_block() {
-        let p = parse_ok("eval { 1 };");
+        let p = parse_ok("eval { 1 }");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_eval_string() {
-        let p = parse_ok(r#"eval "1 + 2";"#);
+        let p = parse_ok(r#"eval "1 + 2""#);
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_qw_word_list() {
-        let p = parse_ok("my @a = qw(foo bar baz);");
+        let p = parse_ok("my @a = qw(foo bar baz)");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_q_string() {
-        let p = parse_ok("my $s = q{hello};");
+        let p = parse_ok("my $s = q{hello}");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_qq_string() {
-        let p = parse_ok(r#"my $s = qq(hello $x);"#);
+        let p = parse_ok(r#"my $s = qq(hello $x)"#);
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_regex_match() {
-        let p = parse_ok(r#"$x =~ /foo/;"#);
+        let p = parse_ok(r#"$x =~ /foo/"#);
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_regex_substitution() {
-        let p = parse_ok(r#"$x =~ s/foo/bar/g;"#);
+        let p = parse_ok(r#"$x =~ s/foo/bar/g"#);
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_transliterate() {
-        let p = parse_ok(r#"$x =~ tr/a-z/A-Z/;"#);
+        let p = parse_ok(r#"$x =~ tr/a-z/A-Z/"#);
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_ternary_operator() {
-        let p = parse_ok("my $x = $a ? 1 : 2;");
+        let p = parse_ok("my $x = $a ? 1 : 2");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_arrow_method_call() {
-        let p = parse_ok("$obj->method();");
+        let p = parse_ok("$obj->method()");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_arrow_deref_hash() {
-        let p = parse_ok("$r->{key};");
+        let p = parse_ok("$r->{key}");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_arrow_deref_array() {
-        let p = parse_ok("$r->[0];");
+        let p = parse_ok("$r->[0]");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_chained_arrow_deref() {
-        let p = parse_ok("$r->{a}[0]{b};");
+        let p = parse_ok("$r->{a}[0]{b}");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_my_multiple_vars() {
-        let p = parse_ok("my ($a, $b, $c) = (1, 2, 3);");
+        let p = parse_ok("my ($a, $b, $c) = (1, 2, 3)");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_our_scalar() {
-        let p = parse_ok("our $VERSION = '1.0';");
+        let p = parse_ok("our $VERSION = '1.0'");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_local_scalar() {
-        let p = parse_ok("local $/ = undef;");
+        let p = parse_ok("local $/ = undef");
         assert_eq!(p.statements.len(), 1);
     }
 
@@ -13898,25 +13942,25 @@ mod tests {
 
     #[test]
     fn parse_postfix_if() {
-        let p = parse_ok("print 1 if $x;");
+        let p = parse_ok("print 1 if $x");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_postfix_unless() {
-        let p = parse_ok("die 'error' unless $ok;");
+        let p = parse_ok("die 'error' unless $ok");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_postfix_while() {
-        let p = parse_ok("$x++ while $x < 10;");
+        let p = parse_ok("$x++ while $x < 10");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_postfix_for() {
-        let p = parse_ok("print for @arr;");
+        let p = parse_ok("print for @arr");
         assert_eq!(p.statements.len(), 1);
     }
 
@@ -13940,49 +13984,49 @@ mod tests {
 
     #[test]
     fn parse_caller_builtin() {
-        let p = parse_ok("my @c = caller;");
+        let p = parse_ok("my @c = caller");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_ref_to_array() {
-        let p = parse_ok("my $r = \\@arr;");
+        let p = parse_ok("my $r = \\@arr");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_ref_to_hash() {
-        let p = parse_ok("my $r = \\%hash;");
+        let p = parse_ok("my $r = \\%hash");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_ref_to_scalar() {
-        let p = parse_ok("my $r = \\$x;");
+        let p = parse_ok("my $r = \\$x");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_deref_scalar() {
-        let p = parse_ok("my $v = $$r;");
+        let p = parse_ok("my $v = $$r");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_deref_array() {
-        let p = parse_ok("my @a = @$r;");
+        let p = parse_ok("my @a = @$r");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_deref_hash() {
-        let p = parse_ok("my %h = %$r;");
+        let p = parse_ok("my %h = %$r");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_blessed_ref() {
-        let p = parse_ok("bless $r, 'Foo';");
+        let p = parse_ok("bless $r, 'Foo'");
         assert_eq!(p.statements.len(), 1);
     }
 
@@ -14000,37 +14044,37 @@ mod tests {
 
     #[test]
     fn parse_do_block() {
-        let p = parse_ok("my $x = do { 1 + 2 };");
+        let p = parse_ok("my $x = do { 1 + 2 }");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_do_file() {
-        let p = parse_ok(r#"do "foo.pl";"#);
+        let p = parse_ok(r#"do "foo.pl""#);
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_map_expression() {
-        let p = parse_ok("my @b = map { $_ * 2 } @a;");
+        let p = parse_ok("my @b = map { $_ * 2 } @a");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_grep_expression() {
-        let p = parse_ok("my @b = grep { $_ > 0 } @a;");
+        let p = parse_ok("my @b = grep { $_ > 0 } @a");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_sort_expression() {
-        let p = parse_ok("my @b = sort { $a <=> $b } @a;");
+        let p = parse_ok("my @b = sort { $a <=> $b } @a");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_pipe_forward() {
-        let p = parse_ok("@a |> map { $_ * 2 };");
+        let p = parse_ok("@a |> map { $_ * 2 }");
         assert_eq!(p.statements.len(), 1);
     }
 

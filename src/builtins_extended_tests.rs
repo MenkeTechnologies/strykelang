@@ -154,9 +154,9 @@ fn test_color_builtins() {
 #[test]
 fn test_matrix_builtins() {
     let code = r#"
-        my $m = [[1, 2], [3, 4]];
-        my $t = matrix_transpose($m);
-        matrix_sum($t);
+        my $m = [[1, 2], [3, 4]]
+        my $t = matrix_transpose($m)
+        matrix_sum($t)
     "#;
     assert_eq!(run(code).expect("run").to_int(), 10);
 
@@ -312,10 +312,10 @@ fn test_more_matrix_builtins() {
         2
     );
     let code = r#"
-        my $m1 = [[1, 2], [3, 4]];
-        my $m2 = [[5, 6], [7, 8]];
-        my $res = matrix_hadamard($m1, $m2);
-        $res->[0]->[1];
+        my $m1 = [[1, 2], [3, 4]]
+        my $m2 = [[5, 6], [7, 8]]
+        my $res = matrix_hadamard($m1, $m2)
+        $res->[0]->[1]
     "#;
     assert_eq!(run(code).expect("run").to_int(), 12);
     let inv_code = r#"
@@ -566,11 +566,11 @@ fn test_automata_builtins() {
 #[test]
 fn test_jwt_builtins() {
     let code = r#"
-        my $payload = { sub => "1234567890", name => "John Doe", admin => 1 };
-        my $secret = "secret";
-        my $token = jwt_encode($payload, $secret);
-        my $decoded = jwt_decode($token, $secret);
-        $decoded->{name};
+        my $payload = { sub => "1234567890", name => "John Doe", admin => 1 }
+        my $secret = "secret"
+        my $token = jwt_encode($payload, $secret)
+        my $decoded = jwt_decode($token, $secret)
+        $decoded->{name}
     "#;
     assert_eq!(run(code).expect("run").to_string(), "John Doe");
 

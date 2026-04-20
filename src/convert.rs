@@ -1469,32 +1469,32 @@ mod tests {
     #[test]
     fn unary_builtin_direct() {
         // Single-stage: direct call syntax
-        assert_eq!(convert("uc($x);"), "uc $x");
-        assert_eq!(convert("length($str);"), "length $str");
+        assert_eq!(convert("uc($x)"), "uc $x");
+        assert_eq!(convert("length($str)"), "length $str");
     }
 
     #[test]
     fn nested_unary_direct() {
         // 2-stage: direct call syntax (inner-to-outer order)
-        let out = convert("uc(lc($x));");
+        let out = convert("uc(lc($x))");
         assert_eq!(out, "lc uc $x");
     }
 
     #[test]
     fn nested_builtin_chain_thread() {
-        let out = convert("chomp(lc(uc($x)));");
+        let out = convert("chomp(lc(uc($x)))");
         assert_eq!(out, "t $x uc lc chomp");
     }
 
     #[test]
     fn deeply_nested_thread() {
-        let out = convert("length(chomp(lc(uc($x))));");
+        let out = convert("length(chomp(lc(uc($x))))");
         assert_eq!(out, "t $x uc lc chomp length");
     }
 
     #[test]
     fn map_grep_sort_thread() {
-        let out = convert("sort { $a <=> $b } map { $_ * 2 } grep { $_ > 0 } @numbers;");
+        let out = convert("sort { $a <=> $b } map { $_ * 2 } grep { $_ > 0 } @numbers");
         assert!(out.contains("t @numbers grep"));
         assert!(out.contains(" map"));
         assert!(out.contains(" sort"));
@@ -1502,14 +1502,14 @@ mod tests {
 
     #[test]
     fn join_direct() {
-        let out = convert(r#"join(",", sort(@arr));"#);
+        let out = convert(r#"join(",", sort(@arr))"#);
         // 2-stage: direct call (inner-to-outer)
         assert!(out.contains("sort join \",\" @arr"));
     }
 
     #[test]
     fn no_semicolons() {
-        let out = convert("my $x = 1;\nmy $y = 2;");
+        let out = convert("my $x = 1;\nmy $y = 2");
         assert!(!out.contains(';'));
         assert!(out.contains("my $x = 1"));
         assert!(out.contains("my $y = 2"));
@@ -1517,14 +1517,14 @@ mod tests {
 
     #[test]
     fn assignment_rhs_direct() {
-        let out = convert("my $x = uc(lc($str));");
+        let out = convert("my $x = uc(lc($str))");
         // 2-stage: direct call
         assert_eq!(out, "my $x = lc uc $str");
     }
 
     #[test]
     fn chain_in_subexpression_parenthesized() {
-        let out = convert("$x + uc(lc($str));");
+        let out = convert("$x + uc(lc($str))");
         // 2-stage chain should be parenthesized inside the binary op.
         assert!(out.contains("(lc uc $str)"));
     }
@@ -1548,20 +1548,20 @@ mod tests {
 
     #[test]
     fn method_call_preserved() {
-        let out = convert("$obj->method($x);");
+        let out = convert("$obj->method($x)");
         assert!(out.contains("->method"));
     }
 
     #[test]
     fn substitution_r_flag_direct() {
         // Single stage: direct syntax
-        let out = convert(r#"($str =~ s/old/new/r);"#);
+        let out = convert(r#"($str =~ s/old/new/r)"#);
         assert!(out.contains("s/old/new/r $str"));
     }
 
     #[test]
     fn user_func_call_direct() {
-        let out = convert("sub trim { } trim(uc($x));");
+        let out = convert("sub trim { } trim(uc($x))");
         assert!(out.contains("fn trim"));
         // 2-stage: direct call (inner-to-outer)
         assert!(out.contains("uc trim $x"));
@@ -1569,7 +1569,7 @@ mod tests {
 
     #[test]
     fn user_func_extra_args_direct() {
-        let out = convert("sub process { } process(uc($x), 42);");
+        let out = convert("sub process { } process(uc($x), 42)");
         assert!(out.contains("fn process"));
         // Direct call (inner-to-outer): uc process 42 $x
         assert!(out.contains("uc process 42 $x"));
@@ -1577,7 +1577,7 @@ mod tests {
 
     #[test]
     fn map_grep_sort_chain_thread() {
-        let out = convert("join(',', sort { $a <=> $b } map { $_ * 2 } grep { $_ > 0 } @nums);");
+        let out = convert("join(',', sort { $a <=> $b } map { $_ * 2 } grep { $_ > 0 } @nums)");
         assert!(out.contains("t @nums grep"));
         assert!(out.contains(" map"));
         assert!(out.contains(" sort"));
@@ -1587,13 +1587,13 @@ mod tests {
     #[test]
     fn reduce_direct() {
         // Single stage with block: direct syntax
-        let out = convert("use List::Util 'reduce';\nreduce { $a + $b } @nums;");
+        let out = convert("use List::Util 'reduce';\nreduce { $a + $b } @nums");
         assert!(out.contains("reduce {\n$a + $b\n} @nums"));
     }
 
     #[test]
     fn shebang_prepended() {
-        let p = parse("print 1;").expect("parse failed");
+        let p = parse("print 1").expect("parse failed");
         let out = convert_program(&p);
         assert!(out.starts_with("#!/usr/bin/env stryke\n"));
     }
@@ -1607,7 +1607,7 @@ mod tests {
 
     #[test]
     fn binop_no_parens_at_top() {
-        let out = convert("my $x = $a + $b;");
+        let out = convert("my $x = $a + $b");
         // At top level / assignment RHS, no parens around binop
         assert!(out.contains("= $a + $b"));
         assert!(!out.contains("= ($a + $b)"));
@@ -1644,7 +1644,7 @@ mod tests {
 
     #[test]
     fn output_delim_preserves_original_when_none() {
-        let out = convert("$x =~ s#old#new#g;");
+        let out = convert("$x =~ s#old#new#g");
         assert_eq!(out, "$x =~ s#old#new#g");
     }
 }
