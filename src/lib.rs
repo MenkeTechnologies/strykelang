@@ -679,3 +679,27 @@ mod run_semantics_more;
 
 #[cfg(test)]
 mod value_extra_tests;
+
+#[cfg(test)]
+mod lexer_extra_tests;
+
+#[cfg(test)]
+mod parser_extra_tests;
+
+#[cfg(test)]
+mod builtins_extra_tests;
+
+#[cfg(test)]
+mod thread_extra_tests;
+
+#[cfg(test)]
+mod error_extra_tests;
+
+#[cfg(test)]
+mod oo_extra_tests;
+
+#[cfg(test)]
+mod regex_extra_tests;
+
+#[cfg(test)]
+mod aot_extra_tests;
