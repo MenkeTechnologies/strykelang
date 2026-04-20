@@ -1,0 +1,149 @@
+# lib/error_handling.stk — error handling tests
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EVAL BLOCK
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn eval_success {
+    my $result = eval { 42 }
+    $result
+}
+
+fn eval_with_die {
+    my $result = eval { die "error message" }
+    defined($result) ? "defined" : "undef"
+}
+
+fn eval_captures_error {
+    eval { die "test error" }
+    $@ =~ /test error/ ? 1 : 0
+}
+
+fn eval_clears_error {
+    eval { die "first" }
+    eval { 1 }
+    $@ eq "" ? 1 : 0
+}
+
+fn eval_nested {
+    my $outer = eval {
+        my $inner = eval { die "inner" }
+        "outer ok"
+    }
+    $outer
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DIE AND WARN
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn die_in_eval {
+    my $caught = 0
+    eval {
+        die "intentional"
+        $caught = -1
+    }
+    $caught == 0 && $@ =~ /intentional/ ? 1 : 0
+}
+
+fn die_with_object {
+    my $obj = {code => 500, msg => "error"}
+    my $result = eval { die $obj }
+    ref($@) eq "HASH" ? 1 : 0
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ERROR HANDLING PATTERNS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn try_catch_pattern {
+    my $result = eval {
+        die "oops"
+    }
+    if ($@) {
+        return "caught: $@"
+    }
+    return "success: $result"
+}
+
+fn safe_division($a, $b) {
+    my $result = eval {
+        die "division by zero" if $b == 0
+        $a / $b
+    }
+    if ($@) {
+        return undef
+    }
+    return $result
+}
+
+fn with_cleanup {
+    my $cleaned = 0
+    eval {
+        die "error"
+    }
+    $cleaned = 1
+    $cleaned
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ERROR PROPAGATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn inner_throws {
+    die "from inner"
+}
+
+fn outer_catches {
+    my $result = eval { inner_throws() }
+    $@ =~ /from inner/ ? 1 : 0
+}
+
+fn rethrow {
+    eval {
+        eval { die "original" }
+        die $@ if $@
+    }
+    $@ =~ /original/ ? 1 : 0
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CONDITIONAL ERRORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn validate_positive($n) {
+    if ($n < 0) {
+        die "must be positive"
+    }
+    $n
+}
+
+fn validate_in_range($n, $min, $max) {
+    if ($n < $min || $n > $max) {
+        die "out of range: $n not in [$min, $max]"
+    }
+    $n
+}
+
+fn validate_non_empty($s) {
+    if (!defined($s) || $s eq "") {
+        die "must not be empty"
+    }
+    $s
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# RETURN VS DIE
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn return_or_die($should_die) {
+    if ($should_die) {
+        die "dying"
+    }
+    return "returning"
+}
+
+fn early_die($cond) {
+    die "early" if $cond
+    "reached end"
+}

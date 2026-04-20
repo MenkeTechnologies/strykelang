@@ -1,0 +1,329 @@
+# t/test_builtins_core.stk — core builtin function tests
+
+require "./lib/builtins_core.stk"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DEFINED
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq defined_scalar_set(), 1, "defined scalar set"
+assert_eq defined_scalar_zero(), 1, "defined scalar zero"
+assert_eq defined_scalar_empty(), 1, "defined scalar empty"
+assert_eq defined_scalar_undef(), 0, "defined scalar undef"
+assert_eq defined_after_undef(), 0, "defined after undef"
+
+assert_eq defined_array_elem_exists(), 1, "defined array elem exists"
+assert_eq defined_array_elem_missing(), 0, "defined array elem missing"
+assert_eq defined_array_elem_undef(), 0, "defined array elem undef"
+
+assert_eq defined_hash_key_exists(), 1, "defined hash key exists"
+assert_eq defined_hash_key_missing(), 0, "defined hash key missing"
+assert_eq defined_hash_key_undef(), 0, "defined hash key undef"
+
+assert_eq defined_expr_result(), 1, "defined expr result"
+assert_eq defined_string_result(), 1, "defined string result"
+assert_eq defined_sub_result(), 1, "defined sub result"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# REF
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq ref_scalar(), "SCALAR", "ref scalar"
+assert_eq ref_array(), "ARRAY", "ref array"
+assert_eq ref_hash(), "HASH", "ref hash"
+assert_eq ref_code(), "CODE", "ref code"
+assert_eq ref_anon_array(), "ARRAY", "ref anon array"
+assert_eq ref_anon_hash(), "HASH", "ref anon hash"
+
+assert_eq ref_not_ref(), 1, "ref not ref"
+assert_eq ref_string(), 1, "ref string"
+assert_eq ref_number(), 1, "ref number"
+
+assert_eq ref_nested_array(), "ARRAY", "ref nested array"
+assert_eq ref_nested_hash(), "HASH", "ref nested hash"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LENGTH
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq length_empty(), 0, "length empty"
+assert_eq length_one(), 1, "length one"
+assert_eq length_multi(), 5, "length multi"
+assert_eq length_spaces(), 2, "length spaces"
+# length("café") returns 5 bytes not 4 chars in stryke
+assert_eq length_unicode(), 5, "length unicode"
+assert_eq length_newline(), 3, "length newline"
+assert_eq length_tab(), 3, "length tab"
+
+assert_eq length_number(), 5, "length number"
+assert_eq length_float(), 7, "length float"
+assert_eq length_negative(), 3, "length negative"
+
+assert_eq length_var(), 4, "length var"
+assert_eq length_concat(), 6, "length concat"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SCALAR
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq scalar_array_count(), 5, "scalar array count"
+assert_eq scalar_array_empty(), 0, "scalar array empty"
+assert_eq scalar_array_one(), 1, "scalar array one"
+
+assert_eq scalar_hash_info(), 2, "scalar hash info"
+
+assert_eq scalar_string(), "hello", "scalar string"
+assert_eq scalar_number(), 42, "scalar number"
+
+assert_eq scalar_reverse_str(), "olleh", "scalar reverse str"
+assert_eq scalar_reverse_arr(), 3, "scalar reverse arr"
+
+assert_eq scalar_force(), 3, "scalar force"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# WANTARRAY
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq wantarray_in_scalar(), "scalar", "wantarray in scalar"
+assert_eq wantarray_in_list(), "list", "wantarray in list"
+assert_eq wantarray_nested(), "scalar", "wantarray nested"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CALLER
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq caller_basic(), 1, "caller basic"
+assert_eq caller_in_sub(), 1, "caller in sub"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EXISTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq exists_hash_true(), 1, "exists hash true"
+assert_eq exists_hash_false(), 0, "exists hash false"
+assert_eq exists_hash_undef_val(), 1, "exists hash undef val"
+
+assert_eq exists_array_true(), 1, "exists array true"
+assert_eq exists_array_false(), 0, "exists array false"
+
+assert_eq exists_after_delete(), 0, "exists after delete"
+assert_eq exists_nested(), 1, "exists nested"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DELETE
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq delete_hash_returns(), 2, "delete hash returns"
+assert_eq delete_hash_removes(), 2, "delete hash removes"
+assert_eq delete_hash_missing(), 0, "delete hash missing"
+assert_eq delete_array_elem(), 3, "delete array elem"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# UNDEF
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq undef_returns(), 0, "undef returns"
+assert_eq undef_scalar(), 0, "undef scalar"
+assert_eq undef_in_list(), 0, "undef in list"
+assert_eq undef_comparison(), 1, "undef comparison"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BOOLEAN CONTEXT
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq bool_zero(), 0, "bool zero"
+assert_eq bool_one(), 1, "bool one"
+assert_eq bool_empty_str(), 0, "bool empty str"
+assert_eq bool_zero_str(), 0, "bool zero str"
+assert_eq bool_space_str(), 1, "bool space str"
+assert_eq bool_text(), 1, "bool text"
+assert_eq bool_undef(), 0, "bool undef"
+
+assert_eq bool_empty_array(), 0, "bool empty array"
+assert_eq bool_nonempty_array(), 1, "bool nonempty array"
+
+assert_eq bool_negative(), 1, "bool negative"
+assert_eq bool_float_zero(), 0, "bool float zero"
+assert_eq bool_float_nonzero(), 1, "bool float nonzero"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CHR AND ORD
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq chr_A(), "A", "chr A"
+assert_eq chr_a(), "a", "chr a"
+assert_eq chr_space(), " ", "chr space"
+assert_eq chr_newline(), "\n", "chr newline"
+assert_eq chr_zero(), "0", "chr zero"
+
+assert_eq ord_A(), 65, "ord A"
+assert_eq ord_a(), 97, "ord a"
+assert_eq ord_space(), 32, "ord space"
+assert_eq ord_zero(), 48, "ord zero"
+assert_eq ord_multi(), 104, "ord multi"
+
+assert_eq chr_ord_roundtrip(), 1, "chr ord roundtrip"
+assert_eq ord_chr_roundtrip(), 1, "ord chr roundtrip"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HEX AND OCT
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq hex_simple(), 16, "hex simple"
+assert_eq hex_ff(), 255, "hex ff"
+assert_eq hex_FF(), 255, "hex FF"
+assert_eq hex_0x(), 16, "hex 0x"
+assert_eq hex_zero(), 0, "hex zero"
+
+assert_eq oct_simple(), 8, "oct simple"
+assert_eq oct_777(), 511, "oct 777"
+assert_eq oct_zero(), 0, "oct zero"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INT
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq int_positive(), 3, "int positive"
+assert_eq int_negative(), -3, "int negative"
+assert_eq int_already(), 42, "int already"
+assert_eq int_small(), 0, "int small"
+assert_eq int_zero(), 0, "int zero"
+
+assert_eq int_string(), 3, "int string"
+assert_eq int_string_neg(), -2, "int string neg"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ABS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq abs_positive(), 42, "abs positive"
+assert_eq abs_negative(), 42, "abs negative"
+assert_eq abs_zero(), 0, "abs zero"
+assert_eq abs_float_pos(), 3.14, "abs float pos"
+assert_eq abs_float_neg(), 3.14, "abs float neg"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SQRT
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq sqrt_4(), 2, "sqrt 4"
+assert_eq sqrt_9(), 3, "sqrt 9"
+assert_eq sqrt_2(), 1414, "sqrt 2"
+assert_eq sqrt_0(), 0, "sqrt 0"
+assert_eq sqrt_1(), 1, "sqrt 1"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PACK AND UNPACK
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq pack_char(), "abc", "pack char"
+assert_eq pack_int(), 4, "pack int"
+assert_eq unpack_char(), "hello", "unpack char"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# QUOTEMETA
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq quotemeta_special(), 1, "quotemeta special"
+assert_eq quotemeta_plain(), "abc", "quotemeta plain"
+assert_eq quotemeta_star(), 1, "quotemeta star"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LVALUE OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq lvalue_substr(), "hi world", "lvalue substr"
+assert_eq lvalue_increment(), 6, "lvalue increment"
+assert_eq lvalue_decrement(), 4, "lvalue decrement"
+assert_eq lvalue_add_assign(), 15, "lvalue add assign"
+assert_eq lvalue_concat_assign(), "hello world", "lvalue concat assign"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CHOP AND CHOMP
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq chop_returns(), "o", "chop returns"
+assert_eq chop_modifies(), "hell", "chop modifies"
+assert_eq chomp_newline(), "hello", "chomp newline"
+assert_eq chomp_no_newline(), "hello", "chomp no newline"
+assert_eq chomp_returns(), 1, "chomp returns"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPRINTF
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq sprintf_d(), "42", "sprintf d"
+assert_eq sprintf_s(), "hello", "sprintf s"
+assert_eq sprintf_f(), "3.14", "sprintf f"
+assert_eq sprintf_x(), "ff", "sprintf x"
+assert_eq sprintf_X(), "FF", "sprintf X"
+assert_eq sprintf_o(), "10", "sprintf o"
+assert_eq sprintf_b(), "101", "sprintf b"
+
+assert_eq sprintf_padded(), "   42", "sprintf padded"
+assert_eq sprintf_zero_pad(), "00042", "sprintf zero pad"
+assert_eq sprintf_left_align(), "42   ", "sprintf left align"
+
+assert_eq sprintf_multi(), "x=10", "sprintf multi"
+assert_eq sprintf_percent(), "%", "sprintf percent"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# UC/LC/UCFIRST/LCFIRST
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq uc_lower(), "HELLO", "uc lower"
+assert_eq uc_mixed(), "HELLO", "uc mixed"
+assert_eq uc_already(), "HELLO", "uc already"
+
+assert_eq lc_upper(), "hello", "lc upper"
+assert_eq lc_mixed(), "hello", "lc mixed"
+assert_eq lc_already(), "hello", "lc already"
+
+assert_eq ucfirst_lower(), "Hello", "ucfirst lower"
+assert_eq ucfirst_upper(), "HELLO", "ucfirst upper"
+
+assert_eq lcfirst_upper(), "hELLO", "lcfirst upper"
+assert_eq lcfirst_lower(), "hello", "lcfirst lower"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# REVERSE
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq reverse_string(), "olleh", "reverse string"
+assert_eq reverse_empty(), "", "reverse empty"
+assert_eq reverse_single(), "x", "reverse single"
+assert_eq reverse_palindrome(), "radar", "reverse palindrome"
+
+assert_eq reverse_array_count(), 5, "reverse array count"
+assert_eq reverse_array_first(), 5, "reverse array first"
+assert_eq reverse_array_last(), 1, "reverse array last"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INDEX AND RINDEX
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq index_found(), 2, "index found"
+assert_eq index_not_found(), -1, "index not found"
+assert_eq index_start(), 0, "index start"
+assert_eq index_end(), 4, "index end"
+assert_eq index_empty(), 0, "index empty"
+
+assert_eq index_from(), 6, "index from"
+
+assert_eq rindex_found(), 6, "rindex found"
+assert_eq rindex_not_found(), -1, "rindex not found"
+assert_eq rindex_from(), 0, "rindex from"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SUBSTR
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq substr_basic(), "ell", "substr basic"
+assert_eq substr_start(), "he", "substr start"
+assert_eq substr_to_end(), "llo", "substr to end"
+assert_eq substr_negative(), "lo", "substr negative"
+assert_eq substr_neg_len(), "ell", "substr neg len"
+assert_eq substr_replace(), "hXYZo", "substr replace"
+assert_eq substr_beyond(), "hi", "substr beyond"
+
+test_run

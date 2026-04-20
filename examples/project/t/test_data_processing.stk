@@ -1,0 +1,65 @@
+#!/usr/bin/env stryke
+# t/test_data_processing.stk — data processing tests
+
+require "./lib/data.stk"
+
+# ── Word Frequency ───────────────────────────────────────────────────
+
+my @text = qw(apple banana apple cherry banana apple)
+my $freq = word_freq_map(@text)
+assert_eq $freq->{apple}, 3, "freq apple"
+assert_eq $freq->{banana}, 2, "freq banana"
+assert_eq $freq->{cherry}, 1, "freq cherry"
+
+# ── Grouping ─────────────────────────────────────────────────────────
+
+my @logs = (
+    +{ level => "INFO", msg => "started" },
+    +{ level => "ERROR", msg => "failed" },
+    +{ level => "INFO", msg => "running" },
+    +{ level => "WARN", msg => "slow" },
+    +{ level => "ERROR", msg => "retry" },
+)
+
+my $groups = group_records("level", @logs)
+assert_eq scalar(@{$groups->{INFO}}), 2, "group INFO count"
+assert_eq scalar(@{$groups->{ERROR}}), 2, "group ERROR count"
+assert_eq scalar(@{$groups->{WARN}}), 1, "group WARN count"
+
+# ── Summarization ────────────────────────────────────────────────────
+
+my @nums = (10, 20, 30, 40, 50, 60, 70, 80, 90, 100)
+my $stats = summarize_list(@nums)
+assert_eq $stats->{count}, 10, "stats count"
+assert_eq $stats->{sum}, 550, "stats sum"
+assert_eq $stats->{mean}, 55, "stats mean"
+assert_eq $stats->{min}, 10, "stats min"
+assert_eq $stats->{max}, 100, "stats max"
+
+# ── Zip to Hash ──────────────────────────────────────────────────────
+
+my @keys = ("name", "version", "author")
+my @vals = ("stryke", "1.0", "menke")
+my $meta = zip_to_hash(\@keys, \@vals)
+assert_eq $meta->{name}, "stryke", "zip name"
+assert_eq $meta->{version}, "1.0", "zip version"
+assert_eq $meta->{author}, "menke", "zip author"
+
+# ── Split by Predicate (Partition) ───────────────────────────────────
+
+my $parts = split_by_pred(fn { $_0 % 2 == 0 }, 1..10)
+my @evens = @{$parts->[0]}
+my @odds = @{$parts->[1]}
+assert_eq scalar(@evens), 5, "partition evens count"
+assert_eq scalar(@odds), 5, "partition odds count"
+assert_eq $evens[0], 2, "first even"
+assert_eq $odds[0], 1, "first odd"
+
+# ── Running Total ────────────────────────────────────────────────────
+
+my @rt = running_total(1, 1, 1, 1, 1)
+assert_eq $rt[0], 1, "rt 1"
+assert_eq $rt[2], 3, "rt 3"
+assert_eq $rt[4], 5, "rt 5"
+
+test_run

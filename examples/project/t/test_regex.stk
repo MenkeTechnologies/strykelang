@@ -1,0 +1,120 @@
+#!/usr/bin/env stryke
+# t/test_regex.stk — tests for regex patterns and matching
+
+require "./lib/regex.stk"
+
+# ── Basic matching ─────────────────────────────────────────────────
+
+assert_ok contains_digit("abc123"), "contains digit yes"
+assert_false contains_digit("abcdef"), "contains digit no"
+
+assert_ok contains_word("hello world", "world"), "contains word yes"
+assert_false contains_word("helloworld", "world"), "contains word boundary"
+
+assert_ok starts_with("hello world", "hello"), "starts with yes"
+assert_false starts_with("hello world", "world"), "starts with no"
+
+assert_ok ends_with("hello world", "world"), "ends with yes"
+assert_false ends_with("hello world", "hello"), "ends with no"
+
+my $email = q{test@example.com}
+assert_ok is_email_like($email), "email valid"
+assert_false is_email_like("not-an-email"), "email invalid"
+
+assert_ok is_phone_like("555-123-4567"), "phone valid"
+assert_false is_phone_like("5551234567"), "phone invalid"
+
+# ── Capture groups ─────────────────────────────────────────────────
+
+my @nums = extract_numbers("abc123def456")
+assert_eq scalar(@nums), 2, "extract numbers count"
+assert_eq $nums[0], "123", "extract numbers first"
+assert_eq $nums[1], "456", "extract numbers second"
+
+assert_eq extract_first_word("hello world"), "hello", "first word"
+assert_eq extract_first_word("  spaced"), "", "first word spaces"
+
+my ($key, $val) = parse_key_value("name = John Doe")
+assert_eq $key, "name", "parse kv key"
+assert_eq $val, "John Doe", "parse kv value"
+
+assert_eq extract_between_parens("func(arg)"), "arg", "between parens"
+assert_eq extract_between_parens("no parens"), "", "between parens none"
+
+# ── Substitution ───────────────────────────────────────────────────
+
+assert_eq replace_digits_with("abc123def456", "X"), "abcXXXdefXXX", "replace digits var"
+assert_eq trim_whitespace("  hello  "), "hello", "trim whitespace"
+assert_eq normalize_spaces("too   many    spaces"), "too many spaces", "normalize spaces"
+assert_eq camel_to_snake("camelCaseString"), "camel_case_string", "camel to snake"
+assert_eq snake_to_camel("snake_case_string"), "snakeCaseString", "snake to camel"
+
+# ── Split with regex ───────────────────────────────────────────────
+
+my @words = split_on_whitespace("one  two   three")
+assert_eq scalar(@words), 3, "split whitespace count"
+assert_eq $words[0], "one", "split whitespace first"
+
+my @items = split_on_commas("a, b,  c")
+assert_eq scalar(@items), 3, "split commas count"
+assert_eq $items[2], "c", "split commas last"
+
+my @sentences = split_sentences("Hello! How are you? Fine")
+assert_eq scalar(@sentences), 3, "split sentences count"
+
+# ── Pattern flags ──────────────────────────────────────────────────
+
+assert_ok match_case_insensitive("HELLO", "hello"), "case insensitive"
+assert_eq count_matches("abracadabra", "a"), 5, "count a matches"
+assert_eq count_matches("hello", "l"), 2, "count l matches"
+
+# ── Character classes ──────────────────────────────────────────────
+
+assert_eq count_vowels("hello"), 2, "count vowels"
+assert_eq count_consonants("hello"), 3, "count consonants"
+
+assert_ok is_alphanumeric("abc123"), "alphanumeric yes"
+assert_false is_alphanumeric("abc-123"), "alphanumeric no"
+
+assert_ok is_hex("deadBEEF"), "hex valid"
+assert_false is_hex("ghijk"), "hex invalid"
+
+# ── Anchors and boundaries ─────────────────────────────────────────
+
+assert_eq count_words("hello world"), 2, "count words"
+assert_eq count_words("one two three"), 3, "count words spaces"
+
+assert_eq first_line("first\nsecond\nthird"), "first", "first line"
+
+my @lines = extract_lines("a\nb\nc")
+assert_eq scalar(@lines), 3, "extract lines count"
+assert_eq $lines[1], "b", "extract lines middle"
+
+# ── Lookahead simulation ───────────────────────────────────────────
+
+my @nums_letter = numbers_followed_by_letter("1a 2b 3 4c")
+assert_eq scalar(@nums_letter), 3, "nums before letter count"
+
+my @before_colon = words_before_colon("key1: val key2: val")
+assert_eq scalar(@before_colon), 2, "words before colon count"
+assert_eq $before_colon[0], "key1", "words before colon first"
+
+# ── Complex patterns ───────────────────────────────────────────────
+
+my ($year, $month, $day) = parse_date("2024-03-15")
+assert_eq $year, "2024", "parse date year"
+assert_eq $month, "03", "parse date month"
+assert_eq $day, "15", "parse date day"
+
+my ($h, $m, $s) = parse_time("14:30:45")
+assert_eq $h, "14", "parse time hour"
+assert_eq $m, "30", "parse time minute"
+assert_eq $s, "45", "parse time second"
+
+my @urls = extract_urls("Visit https://example.com or http://test.org")
+assert_eq scalar(@urls), 2, "extract urls count"
+
+assert_eq mask_digits("phone: 555-1234"), "phone: XXX-XXXX", "mask digits"
+assert_eq reverse_words("hello world"), "world hello", "reverse words"
+
+test_run

@@ -1,0 +1,349 @@
+# lib/hashes_extended.stk — comprehensive hash operations
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HASH CREATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn hash_from_pairs { my %h = (a => 1, b => 2, c => 3); \%h }
+fn hash_from_list { my %h = qw(a 1 b 2 c 3); \%h }
+fn hash_empty { my %h = (); \%h }
+fn hash_single { my %h = (key => "value"); \%h }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# KEYS AND VALUES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn hash_keys {
+    my %h = (a => 1, b => 2, c => 3)
+    sort keys %h
+}
+
+fn hash_values {
+    my %h = (a => 1, b => 2, c => 3)
+    sort { $a <=> $b } values %h
+}
+
+fn hash_keys_count {
+    my %h = (a => 1, b => 2, c => 3, d => 4)
+    scalar(keys %h)
+}
+
+fn hash_values_sum {
+    my %h = (a => 1, b => 2, c => 3)
+    my $sum = 0
+    for my $v (values %h) {
+        $sum += $v
+    }
+    $sum
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EXISTS AND DEFINED
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn hash_exists_true {
+    my %h = (a => 1, b => undef)
+    exists $h{a} ? 1 : 0
+}
+
+fn hash_exists_undef {
+    my %h = (a => 1, b => undef)
+    exists $h{b} ? 1 : 0
+}
+
+fn hash_exists_false {
+    my %h = (a => 1)
+    exists $h{z} ? 1 : 0
+}
+
+fn hash_defined_true {
+    my %h = (a => 1)
+    defined $h{a} ? 1 : 0
+}
+
+fn hash_defined_false {
+    my %h = (a => undef)
+    defined($h{a}) ? 1 : 0
+}
+
+fn hash_defined_missing {
+    my %h = (a => 1)
+    defined($h{z}) ? 1 : 0
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DELETE
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn hash_delete_returns {
+    my %h = (a => 1, b => 2, c => 3)
+    my $deleted = delete $h{b}
+    $deleted
+}
+
+fn hash_delete_removes {
+    my %h = (a => 1, b => 2, c => 3)
+    delete $h{b}
+    exists $h{b} ? 1 : 0
+}
+
+fn hash_delete_undef {
+    my %h = (a => 1)
+    my $deleted = delete $h{z}
+    defined($deleted) ? 1 : 0
+}
+
+fn hash_delete_multiple {
+    my %h = (a => 1, b => 2, c => 3, d => 4)
+    delete $h{a}
+    delete $h{c}
+    scalar(keys %h)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SLICES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn hash_slice_values {
+    my %h = (a => 1, b => 2, c => 3, d => 4)
+    my @vals = @h{qw(a c)}
+    @vals
+}
+
+fn hash_slice_assign {
+    my %h = (a => 1, b => 2)
+    @h{qw(c d)} = (3, 4)
+    scalar(keys %h)
+}
+
+fn hash_slice_mixed {
+    my %h = (a => 1, b => 2, c => 3)
+    my @vals = @h{qw(a z c)}
+    join(",", map { defined($_) ? $_ : "U" } @vals)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MODIFICATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn hash_modify_value {
+    my %h = (x => 10)
+    $h{x} = 20
+    $h{x}
+}
+
+fn hash_add_new_key {
+    my %h = (a => 1)
+    $h{b} = 2
+    $h{b}
+}
+
+fn hash_increment {
+    my %h = (count => 0)
+    $h{count}++
+    $h{count}++
+    $h{count}
+}
+
+fn hash_compound_assign {
+    my %h = (x => 10)
+    $h{x} += 5
+    $h{x}
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ITERATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn hash_iterate_keys {
+    my %h = (a => 1, b => 2, c => 3)
+    my $sum = 0
+    for my $k (keys %h) {
+        $sum += $h{$k}
+    }
+    $sum
+}
+
+fn hash_iterate_values {
+    my %h = (a => 1, b => 2, c => 3)
+    my $sum = 0
+    for my $v (values %h) {
+        $sum += $v
+    }
+    $sum
+}
+
+fn hash_iterate_sorted {
+    my %h = (c => 3, a => 1, b => 2)
+    my @result
+    for my $k (sort keys %h) {
+        push @result, "$k=$h{$k}"
+    }
+    join(",", @result)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CONVERSION
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn hash_to_array {
+    my %h = (a => 1, b => 2)
+    my @arr = %h
+    scalar(@arr)
+}
+
+fn array_to_hash {
+    my @arr = qw(a 1 b 2 c 3)
+    my %h = @arr
+    $h{b}
+}
+
+fn hash_to_ref {
+    my %h = (x => 10, y => 20)
+    my $ref = \%h
+    $ref->{x}
+}
+
+fn ref_to_hash {
+    my $ref = {a => 1, b => 2}
+    my %h = %$ref
+    $h{a}
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MERGING
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn hash_merge {
+    my %h1 = (a => 1, b => 2)
+    my %h2 = (c => 3, d => 4)
+    my %merged
+    for my $k (keys %h1) { $merged{$k} = $h1{$k} }
+    for my $k (keys %h2) { $merged{$k} = $h2{$k} }
+    scalar(keys %merged)
+}
+
+fn hash_merge_override {
+    my %h1 = (a => 1, b => 2)
+    my %h2 = (b => 20, c => 3)
+    my %merged
+    for my $k (keys %h1) { $merged{$k} = $h1{$k} }
+    for my $k (keys %h2) { $merged{$k} = $h2{$k} }
+    $merged{b}
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FILTERING
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn hash_grep_keys {
+    my %h = (apple => 1, banana => 2, apricot => 3, cherry => 4)
+    my @keys = grep { /^a/ } keys %h
+    scalar(@keys)
+}
+
+fn hash_grep_values {
+    my %h = (a => 1, b => 2, c => 3, d => 4)
+    my @big = grep { $h{$_} > 2 } keys %h
+    scalar(@big)
+}
+
+fn hash_map_values {
+    my %h = (a => 1, b => 2)
+    $h{a} * 2
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INVERSION
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn hash_invert {
+    my %h = (a => 1, b => 2, c => 3)
+    my %inv = reverse %h
+    $inv{2}
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NESTED HASHES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn hash_nested_access {
+    my %h = (
+        outer => {
+            inner => "value"
+        }
+    )
+    $h{outer}{inner}
+}
+
+fn hash_nested_modify {
+    my %h = (level1 => {level2 => 10})
+    $h{level1}{level2} = 20
+    $h{level1}{level2}
+}
+
+fn hash_nested_add {
+    my %h = (a => {})
+    $h{a}{b} = {c => "deep"}
+    $h{a}{b}{c}
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# KEY TYPES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn hash_numeric_key {
+    my %h = (42 => "answer")
+    $h{42}
+}
+
+fn hash_string_numeric_key {
+    my %h
+    $h{42} = "a"
+    $h{"42"} = "b"
+    $h{42}
+}
+
+fn hash_complex_key {
+    my %h = ("key with spaces" => 1)
+    $h{"key with spaces"}
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# UTILITIES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn hash_is_empty {
+    my %h = ()
+    scalar(keys %h) == 0 ? 1 : 0
+}
+
+fn hash_has_key {
+    my %h = (a => 1, b => 2)
+    exists $h{a} ? 1 : 0
+}
+
+fn hash_get_or_default {
+    my %h = (a => 1)
+    my $val = $h{b} // "default"
+    $val
+}
+
+fn hash_count_by {
+    my @items = qw(a b a c a b)
+    my %counts
+    for my $item (@items) {
+        $counts{$item}++
+    }
+    $counts{a}
+}
+
+fn hash_group_by {
+    my @nums = (1, 2, 3, 4, 5, 6)
+    my %groups = (even => [], odd => [])
+    for my $n (@nums) {
+        my $key = $n % 2 == 0 ? "even" : "odd"
+        push @{$groups{$key}}, $n
+    }
+    scalar(@{$groups{even}})
+}

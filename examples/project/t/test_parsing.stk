@@ -1,0 +1,83 @@
+#!/usr/bin/env stryke
+# t/test_parsing.stk — semicolon-less parsing edge case tests
+
+require "./lib/parsing.stk"
+
+# ── Newline as statement terminator ──────────────────────────────────
+
+assert_eq multi_stmt_newlines(), 6, "multi stmt newlines"
+assert_eq chained_assignments(), 30, "chained assignments"
+
+# ── Prefix/postfix operators across newlines ─────────────────────────
+
+assert_eq prefix_inc_newline(), 6, "prefix inc newline"
+assert_eq postfix_inc_newline(), 6, "postfix inc newline"
+assert_eq mixed_inc_dec(), 11, "mixed inc dec"
+
+# ── Method calls without parens ──────────────────────────────────────
+
+assert_eq method_call_newlines(), 7, "method call newlines"
+assert_eq method_chain_newlines(), 2, "method chain newlines"
+
+# ── Hash/array access across newlines ────────────────────────────────
+
+assert_eq hash_access_newlines(), 6, "hash access newlines"
+assert_eq array_access_newlines(), 60, "array access newlines"
+assert_eq nested_access_newlines(), "Alice: 100", "nested access newlines"
+
+# ── Binary operators that could be unary ─────────────────────────────
+
+assert_eq binary_plus_newlines(), 30, "binary plus newlines"
+assert_eq binary_minus_newlines(), 20, "binary minus newlines"
+assert_eq unary_minus_newlines(), -5, "unary minus newlines"
+assert_eq mixed_plus_minus(), 20, "mixed plus minus"
+
+# ── Modulo vs hash deref ─────────────────────────────────────────────
+
+assert_eq modulo_newlines(), 2, "modulo newlines"
+assert_eq hash_after_modulo(), 1, "hash after modulo"
+
+# ── Control flow without braces ──────────────────────────────────────
+
+assert_eq single_line_if(), 1, "single line if"
+assert_eq single_line_unless(), 0, "single line unless"
+assert_eq single_line_while(), 6, "single line while"
+assert_eq single_line_for(), 15, "single line for"
+
+# ── Function calls with/without parens ───────────────────────────────
+
+assert_eq call_with_parens(), 14, "call with parens"
+assert_eq call_without_parens(), 5, "call without parens"
+assert_eq nested_calls(), 30, "nested calls"
+
+# ── String operations ────────────────────────────────────────────────
+
+assert_eq string_concat_newlines(), "Hello World", "string concat newlines"
+assert_eq string_repeat_newlines(), "ababab", "string repeat newlines"
+assert_eq interpolation_newlines(), "Name: Test, Value: 42", "interpolation newlines"
+
+# ── Regex operations ─────────────────────────────────────────────────
+
+assert_ok regex_match_newlines(), "regex match newlines"
+assert_eq regex_subst_newlines(), "hello universe", "regex subst newlines"
+
+# ── List operations ──────────────────────────────────────────────────
+
+assert_eq list_ops_newlines(), 6, "list ops newlines"
+assert_eq push_pop_newlines(), 5, "push pop newlines"
+assert_eq shift_unshift_newlines(), 0, "shift unshift newlines"
+
+# ── Ternary across newlines ──────────────────────────────────────────
+
+assert_eq ternary_multiline(1), "true branch", "ternary multiline true"
+assert_eq ternary_multiline(0), "false branch", "ternary multiline false"
+assert_eq nested_ternary_multiline(5), "positive", "nested ternary positive"
+assert_eq nested_ternary_multiline(-5), "negative", "nested ternary negative"
+assert_eq nested_ternary_multiline(0), "zero", "nested ternary zero"
+
+# ── Complex expressions ──────────────────────────────────────────────
+
+assert_eq complex_expr(), 26, "complex expr"
+assert_eq complex_with_calls(), 15, "complex with calls"
+
+test_run

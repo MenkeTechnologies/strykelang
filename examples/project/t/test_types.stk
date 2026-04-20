@@ -1,0 +1,228 @@
+#!/usr/bin/env stryke
+# t/test_types.stk — comprehensive implicit return tests for all stryke types
+
+require "./lib/types.stk"
+
+# ── Scalar returns ───────────────────────────────────────────────────
+
+assert_eq ret_int(), 42, "implicit return int"
+assert_near ret_float(), 3.14159, 0.0001, "implicit return float"
+assert_eq ret_str(), "hello world", "implicit return string"
+assert_false defined(ret_undef()), "implicit return undef"
+assert_ok ret_bool_true(), "implicit return true"
+assert_false ret_bool_false(), "implicit return false"
+
+# ── Array returns ────────────────────────────────────────────────────
+
+my @list = ret_list()
+assert_eq scalar(@list), 5, "implicit return list length"
+assert_eq $list[0], 1, "implicit return list first"
+assert_eq $list[4], 5, "implicit return list last"
+
+my @empty = ret_empty_list()
+assert_eq scalar(@empty), 0, "implicit return empty list"
+
+# ── Hash returns ─────────────────────────────────────────────────────
+
+my %h = ret_hash_as_list()
+assert_eq $h{a}, 1, "implicit return hash a"
+assert_eq $h{b}, 2, "implicit return hash b"
+assert_eq $h{c}, 3, "implicit return hash c"
+
+# ── Array refs ───────────────────────────────────────────────────────
+
+my $ar = ret_aref()
+assert_eq ref($ar), "ARRAY", "implicit return aref type"
+assert_eq scalar(@$ar), 3, "implicit return aref length"
+assert_eq $ar->[0], 10, "implicit return aref first"
+assert_eq $ar->[2], 30, "implicit return aref last"
+
+my $nested_ar = ret_nested_aref()
+assert_eq $nested_ar->[0][0], 1, "nested aref [0][0]"
+assert_eq $nested_ar->[1][1], 4, "nested aref [1][1]"
+assert_eq $nested_ar->[2][0], 5, "nested aref [2][0]"
+
+my $mixed = ret_mixed_aref()
+assert_eq $mixed->[0], "str", "mixed aref string"
+assert_eq $mixed->[1], 42, "mixed aref int"
+assert_eq $mixed->[2][1], 2, "mixed aref nested array"
+assert_eq $mixed->[3]{x}, 9, "mixed aref nested hash"
+
+# ── Hash refs ────────────────────────────────────────────────────────
+
+my $hr = ret_href()
+assert_eq ref($hr), "HASH", "implicit return href type"
+assert_eq $hr->{name}, "test", "implicit return href name"
+assert_eq $hr->{value}, 100, "implicit return href value"
+
+my $nested_hr = ret_nested_href()
+assert_eq $nested_hr->{outer}{inner}{deep}, 42, "nested href deep access"
+
+my $complex_hr = ret_href_with_aref()
+assert_eq $complex_hr->{items}[0], 1, "href with aref first item"
+assert_eq $complex_hr->{meta}{count}, 3, "href nested meta"
+
+# ── Hash refs with reserved bareword keys ────────────────────────────
+
+my $reserved = ret_href_reserved_keys()
+assert_eq $reserved->{q}, "quote", "reserved key q"
+assert_eq $reserved->{qq}, "double quote", "reserved key qq"
+assert_eq $reserved->{qw}, "quote words", "reserved key qw"
+assert_eq $reserved->{qx}, "backtick", "reserved key qx"
+assert_eq $reserved->{qr}, "regex", "reserved key qr"
+assert_eq $reserved->{tr}, "transliterate", "reserved key tr"
+assert_eq $reserved->{y}, "also tr", "reserved key y"
+assert_eq $reserved->{s}, "substitute", "reserved key s"
+assert_eq $reserved->{m}, "match", "reserved key m"
+
+# ── Structs ──────────────────────────────────────────────────────────
+
+my $v = ret_struct()
+assert_eq $v->x, 1, "struct x"
+assert_eq $v->y, 2, "struct y"
+assert_eq $v->z, 3, "struct z"
+
+my $person = ret_struct_named()
+assert_eq $person->name, "Alice", "struct person name"
+assert_eq $person->age, 30, "struct person age"
+assert_eq $person->email, "alice@example.com", "struct person email"
+
+my $cfg = ret_struct_typed()
+assert_eq $cfg->host, "localhost", "struct config host"
+assert_eq $cfg->port, 8080, "struct config port"
+
+my $pt = make_point(10, 20, 30)
+assert_eq $pt->x, 10, "make_point x"
+assert_eq $pt->z, 30, "make_point z"
+
+my $p = make_person("Bob", 25)
+assert_eq $p->name, "Bob", "make_person name"
+assert_eq $p->age, 25, "make_person age"
+
+# ── Enums ────────────────────────────────────────────────────────────
+
+my $ok = ret_enum_ok()
+my $err = ret_enum_err()
+assert_eq "$ok", "Result::Ok", "enum Ok stringifies"
+assert_eq "$err", "Result::Err", "enum Err stringifies"
+
+my $green = TrafficLight::Green
+my $next = traffic_next($green)
+assert_eq "$next", "TrafficLight::Yellow", "traffic light next from green"
+
+my $red = TrafficLight::Red
+my $next2 = traffic_next($red)
+assert_eq "$next2", "TrafficLight::Green", "traffic light next from red"
+
+# ── Sets ─────────────────────────────────────────────────────────────
+
+my $s = ret_set()
+assert_ok $s->has(3), "set has 3"
+assert_false $s->has(99), "set does not have 99"
+assert_eq $s->len(), 5, "set length"
+
+my $str_set = ret_string_set()
+assert_ok $str_set->has("banana"), "string set has banana"
+assert_false $str_set->has("orange"), "string set no orange"
+
+my $test_set = set(1, 2, 3)
+assert_ok set_contains($test_set, 2), "set_contains wrapper"
+my $size_set = set(1, 2, 3, 4, 5)
+assert_eq set_size($size_set), 5, "set_size wrapper"
+
+# ── Code refs ────────────────────────────────────────────────────────
+
+my $cr = ret_coderef()
+assert_eq ref($cr), "CODE", "coderef type"
+assert_eq $cr->(), 99, "coderef call"
+
+my $cr_arg = ret_coderef_with_arg()
+assert_eq $cr_arg->(5), 10, "coderef with arg"
+
+my $closure = ret_closure()
+assert_eq $closure->(), 100, "closure captures outer var"
+
+my $add5 = make_adder(5)
+assert_eq $add5->(10), 15, "curried adder"
+assert_eq $add5->(0), 5, "curried adder zero"
+
+my $times3 = make_multiplier(3)
+assert_eq $times3->(7), 21, "curried multiplier"
+
+# ── Blessed refs ─────────────────────────────────────────────────────
+
+my $blessed = ret_blessed()
+assert_eq ref($blessed), "MyClass", "blessed ref class"
+assert_eq $blessed->{val}, 42, "blessed ref value"
+
+my $blessed_ar = ret_blessed_aref()
+assert_eq ref($blessed_ar), "MyArray", "blessed aref class"
+assert_eq $blessed_ar->[1], 2, "blessed aref access"
+
+# ── Complex nested structures ────────────────────────────────────────
+
+my $complex = ret_complex()
+assert_eq $complex->{scalars}{int}, 42, "complex scalars.int"
+assert_eq $complex->{scalars}{str}, "hello", "complex scalars.str"
+assert_eq $complex->{arrays}[0][0], 1, "complex arrays[0][0]"
+assert_eq $complex->{struct}->x, 7, "complex struct.x"
+my $cset = $complex->{set}
+assert_ok $cset->has(11), "complex set has 11"
+my $cfn = $complex->{code}
+assert_eq $cfn->(), "lambda", "complex code call"
+
+# ── Conditional implicit returns ─────────────────────────────────────
+
+assert_eq abs_val(5), 5, "abs positive"
+assert_eq abs_val(-5), 5, "abs negative"
+assert_eq abs_val(0), 0, "abs zero"
+
+assert_eq clamp_val(5, 0, 10), 5, "clamp_val in range"
+assert_eq clamp_val(-5, 0, 10), 0, "clamp_val below"
+assert_eq clamp_val(15, 0, 10), 10, "clamp_val above"
+
+assert_eq sign(10), 1, "sign positive"
+assert_eq sign(-10), -1, "sign negative"
+assert_eq sign(0), 0, "sign zero"
+
+# ── Loop-based returns ───────────────────────────────────────────────
+
+assert_eq first_even(1, 3, 5, 6, 7), 6, "first even found"
+assert_false defined(first_even(1, 3, 5)), "first even none"
+
+assert_ok all_positive(1, 2, 3), "all positive true"
+assert_false all_positive(1, -2, 3), "all positive false"
+
+# ── Recursive returns ────────────────────────────────────────────────
+
+assert_eq factorial(0), 1, "factorial 0"
+assert_eq factorial(1), 1, "factorial 1"
+assert_eq factorial(5), 120, "factorial 5"
+
+assert_eq fib(0), 0, "fib 0"
+assert_eq fib(1), 1, "fib 1"
+assert_eq fib(10), 55, "fib 10"
+
+# ── Method chaining returns ──────────────────────────────────────────
+
+my $builder = new_builder()
+my $result = $builder->add("a")->add("b")->add("c")->build()
+assert_eq $result, "a-b-c", "builder chain"
+
+# ── Ternary implicit returns ─────────────────────────────────────────
+
+assert_eq ternary_example(1), "yes", "ternary true"
+assert_eq ternary_example(0), "no", "ternary false"
+assert_eq nested_ternary(5), "positive", "nested ternary positive"
+assert_eq nested_ternary(-5), "negative", "nested ternary negative"
+assert_eq nested_ternary(0), "zero", "nested ternary zero"
+
+# ── Expression-bodied functions ──────────────────────────────────────
+
+assert_eq double(21), 42, "double"
+assert_eq square(7), 49, "square"
+assert_eq cube(3), 27, "cube"
+assert_eq greet("World"), "Hello, World!", "greet"
+assert_eq full_name("John", "Doe"), "John Doe", "full_name"
+
+test_run

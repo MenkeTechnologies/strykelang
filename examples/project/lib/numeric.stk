@@ -1,0 +1,374 @@
+# lib/numeric.stk — numeric operation tests
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INT
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn int_pos_floor { int(3.7) }
+fn int_pos_exact { int(5.0) }
+fn int_neg_toward_zero { int(-3.7) }
+fn int_neg_exact { int(-5.0) }
+fn int_zero { int(0.0) }
+fn int_small_pos { int(0.1) }
+fn int_small_neg { int(-0.1) }
+fn int_large { int(1234567.89) }
+
+fn int_string_pos { int("42.7") }
+fn int_string_neg { int("-3.14") }
+fn int_string_mixed { int("123abc") }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ABS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn abs_positive { abs(42) }
+fn abs_negative { abs(-42) }
+fn abs_zero { abs(0) }
+fn abs_float_pos { abs(3.14) }
+fn abs_float_neg { abs(-3.14) }
+fn abs_large { abs(-1000000) }
+fn abs_small { abs(-0.001) }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SQRT
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn sqrt_perfect_4 { sqrt(4) }
+fn sqrt_perfect_9 { sqrt(9) }
+fn sqrt_perfect_16 { sqrt(16) }
+fn sqrt_perfect_25 { sqrt(25) }
+fn sqrt_perfect_100 { sqrt(100) }
+fn sqrt_one { sqrt(1) }
+fn sqrt_zero { sqrt(0) }
+fn sqrt_two_approx { int(sqrt(2) * 10000) }
+fn sqrt_large { int(sqrt(1000000)) }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SIN / COS / TAN
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn sin_zero { int(sin(0) * 1000) }
+fn sin_pi_half { int(sin(3.14159265 / 2) * 1000) }
+fn sin_pi { int(sin(3.14159265) * 1000) }
+
+fn cos_zero { int(cos(0) * 1000) }
+fn cos_pi_half { int(cos(3.14159265 / 2) * 1000) }
+fn cos_pi { int(cos(3.14159265) * 1000) }
+
+fn tan_zero { int(tan(0) * 1000) }
+fn tan_pi_quarter { int(tan(3.14159265 / 4) * 1000) }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ATAN / ATAN2
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn atan_zero { int(atan(0) * 1000) }
+fn atan_one { int(atan(1) * 1000) }
+fn atan2_quadrant1 { int(atan2(1, 1) * 1000) }
+fn atan2_quadrant2 { int(atan2(1, -1) * 1000) }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LOG / EXP
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn log_one { int(log(1) * 1000) }
+fn log_e { int(log(2.71828) * 1000) }
+fn log_10 { int(log(10) * 1000) }
+
+fn exp_zero { int(exp(0) * 1000) }
+fn exp_one { int(exp(1) * 1000) }
+fn exp_two { int(exp(2) * 100) }
+
+fn log_exp_roundtrip { int(log(exp(3)) * 1000) }
+fn exp_log_roundtrip { int(exp(log(5)) * 1000) }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# POWER / EXPONENTIATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn pow_2_3 { 2 ** 3 }
+fn pow_3_2 { 3 ** 2 }
+fn pow_10_2 { 10 ** 2 }
+fn pow_2_10 { 2 ** 10 }
+fn pow_neg { (-2) ** 3 }
+fn pow_zero_exp { 5 ** 0 }
+fn pow_one_exp { 5 ** 1 }
+fn pow_float { int((2.5 ** 2) * 100) }
+fn pow_fractional { int((4 ** 0.5) * 1000) }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MODULO
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn mod_simple { 10 % 3 }
+fn mod_exact { 9 % 3 }
+fn mod_larger { 3 % 10 }
+fn mod_negative { (-10) % 3 }
+fn mod_by_negative { 10 % (-3) }
+fn mod_one { 17 % 1 }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# RAND / SRAND
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn rand_bounded {
+    my $r = rand()
+    $r >= 0 && $r < 1 ? 1 : 0
+}
+
+fn rand_multiple_diff {
+    my $r1 = rand()
+    my $r2 = rand()
+    my $r3 = rand()
+    ($r1 != $r2 || $r2 != $r3) ? 1 : 0
+}
+
+fn rand_with_max {
+    my $r = rand(100)
+    $r >= 0 && $r < 100 ? 1 : 0
+}
+
+fn rand_int_range {
+    my $r = int(rand(10))
+    $r >= 0 && $r <= 9 ? 1 : 0
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MIN / MAX
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn min_two { min(5, 3) }
+fn min_many { min(5, 3, 8, 1, 9) }
+fn min_negative { min(-5, -3, -8) }
+fn min_same { min(5, 5, 5) }
+fn min_one { min(42) }
+
+fn max_two { max(5, 3) }
+fn max_many { max(5, 3, 8, 1, 9) }
+fn max_negative { max(-5, -3, -8) }
+fn max_same { max(5, 5, 5) }
+fn max_one { max(42) }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FLOOR / CEIL / ROUND
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn floor_pos { floor(3.7) }
+fn floor_neg { floor(-3.7) }
+fn floor_exact { floor(5.0) }
+
+fn ceil_pos { ceil(3.2) }
+fn ceil_neg { ceil(-3.2) }
+fn ceil_exact { ceil(5.0) }
+
+fn round_up { round(3.6) }
+fn round_down { round(3.4) }
+fn round_half { round(3.5) }
+fn round_neg { round(-3.6) }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NUMERIC COMPARISON
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn cmp_equal { 5 == 5 ? 1 : 0 }
+fn cmp_not_equal { 5 != 3 ? 1 : 0 }
+fn cmp_less { 3 < 5 ? 1 : 0 }
+fn cmp_greater { 5 > 3 ? 1 : 0 }
+fn cmp_less_eq { 5 <= 5 ? 1 : 0 }
+fn cmp_greater_eq { 5 >= 3 ? 1 : 0 }
+
+fn cmp_float_equal { 3.14 == 3.14 ? 1 : 0 }
+fn cmp_float_not_equal { 3.14 != 2.71 ? 1 : 0 }
+
+fn spaceship_less { 3 <=> 5 }
+fn spaceship_equal { 5 <=> 5 }
+fn spaceship_greater { 5 <=> 3 }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARITHMETIC
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn add_int { 5 + 3 }
+fn add_float { int((2.5 + 1.5) * 10) }
+fn add_negative { 5 + (-3) }
+
+fn sub_int { 5 - 3 }
+fn sub_float { int((5.5 - 2.3) * 10) }
+fn sub_negative { 5 - (-3) }
+
+fn mul_int { 5 * 3 }
+fn mul_float { int((2.5 * 2) * 10) }
+fn mul_negative { 5 * (-3) }
+fn mul_zero { 5 * 0 }
+
+fn div_int { 10 / 2 }
+fn div_float { int((7 / 2) * 10) }
+fn div_negative { (-10) / 2 }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INCREMENT / DECREMENT
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn inc_post {
+    my $x = 5
+    my $y = $x++
+    $y
+}
+
+fn inc_post_after {
+    my $x = 5
+    $x++
+    $x
+}
+
+fn inc_pre {
+    my $x = 5
+    my $y = ++$x
+    $y
+}
+
+fn dec_post {
+    my $x = 5
+    my $y = $x--
+    $y
+}
+
+fn dec_post_after {
+    my $x = 5
+    $x--
+    $x
+}
+
+fn dec_pre {
+    my $x = 5
+    my $y = --$x
+    $y
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COMPOUND ASSIGNMENT
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn assign_add {
+    my $x = 5
+    $x += 3
+    $x
+}
+
+fn assign_sub {
+    my $x = 10
+    $x -= 3
+    $x
+}
+
+fn assign_mul {
+    my $x = 4
+    $x *= 3
+    $x
+}
+
+fn assign_div {
+    my $x = 12
+    $x /= 3
+    $x
+}
+
+fn assign_mod {
+    my $x = 10
+    $x %= 3
+    $x
+}
+
+fn assign_pow {
+    my $x = 2
+    $x **= 3
+    $x
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BITWISE
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn test_bit_and { 12 & 10 }
+fn test_bit_or { 12 | 10 }
+fn test_bit_xor { 12 ^ 10 }
+fn bit_not { ~0 }
+fn bit_lshift { 1 << 4 }
+fn bit_rshift { 16 >> 2 }
+
+fn bit_assign_and {
+    my $x = 12
+    $x &= 10
+    $x
+}
+
+fn bit_assign_or {
+    my $x = 12
+    $x |= 3
+    $x
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HEX / OCT / BIN
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn hex_simple { hex("ff") }
+fn test_hex_upper { hex("FF") }
+fn hex_prefix { hex("0xff") }
+fn hex_zero { hex("0") }
+
+fn oct_simple { oct("77") }
+fn oct_zero { oct("0") }
+
+fn sprintf_hex { sprintf("%x", 255) }
+fn sprintf_oct { sprintf("%o", 64) }
+fn sprintf_bin { sprintf("%b", 10) }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NUMERIC EDGE CASES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn zero_div_protected {
+    my $result = eval { 1 / 0 }
+    $@ ? 1 : 0
+}
+
+fn large_number { 1000000 * 1000000 > 0 ? 1 : 0 }
+fn small_fraction { 0.0001 > 0 ? 1 : 0 }
+
+fn infinity_check {
+    my $big = 1e308 * 10
+    $big > 1e308 ? 1 : 0
+}
+
+fn negative_zero { -0 == 0 ? 1 : 0 }
+
+fn precision_test {
+    my $a = 0.1 + 0.2
+    $a > 0.29 && $a < 0.31 ? 1 : 0
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SUM / PRODUCT HELPERS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn sum_array {
+    my @a = (1, 2, 3, 4, 5)
+    my $sum = 0
+    $sum += $_ for @a
+    $sum
+}
+
+fn product_array {
+    my @a = (1, 2, 3, 4, 5)
+    my $prod = 1
+    $prod *= $_ for @a
+    $prod
+}
+
+fn average_array {
+    my @a = (2, 4, 6, 8, 10)
+    my $sum = 0
+    $sum += $_ for @a
+    $sum / scalar(@a)
+}

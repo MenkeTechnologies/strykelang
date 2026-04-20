@@ -1,0 +1,205 @@
+# t/test_variables.stk — comprehensive variable tests
+
+require "./lib/variables.stk"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SCALAR VARIABLES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq scalar_int(), 42, "scalar int"
+assert_near scalar_float(), 3.14, 0.001, "scalar float"
+assert_eq scalar_string(), "hello", "scalar string"
+assert_eq scalar_undef(), 0, "scalar undef"
+
+assert_eq scalar_assign_chain(), 15, "assign chain"
+assert_eq scalar_multiple_assign(), 6, "multiple assign"
+assert_eq scalar_reassign(), 3, "reassign"
+
+assert_eq scalar_interpolate(), "hello world", "interpolate"
+assert_eq scalar_interpolate_expr(), "x is 5 and x+1 is 6", "interpolate expr"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARRAY VARIABLES
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @lit = array_literal()
+assert_eq scalar(@lit), 3, "array literal count"
+assert_eq $lit[0], 1, "array literal first"
+assert_eq $lit[2], 3, "array literal last"
+
+assert_eq array_empty(), 0, "array empty"
+assert_eq array_single(), 42, "array single"
+assert_eq array_access(), 30, "array access"
+assert_eq array_negative_index(), 5, "array neg index"
+assert_eq array_length(), 5, "array length"
+assert_eq array_last_index(), 4, "array last index"
+assert_eq array_modify(), 20, "array modify"
+assert_eq array_extend(), 6, "array extend"
+assert_eq array_flatten(), 4, "array flatten"
+assert_eq array_in_scalar(), 5, "array in scalar"
+assert_eq array_slice(), "20,40", "array slice"
+assert_eq array_range_slice(), "2,3,4,5", "array range slice"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HASH VARIABLES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq hash_literal(), 2, "hash literal"
+assert_eq hash_empty(), 0, "hash empty"
+assert_eq hash_access(), "Alice", "hash access"
+assert_eq hash_modify(), 10, "hash modify"
+assert_eq hash_add_key(), 2, "hash add key"
+assert_eq hash_keys(), 3, "hash keys"
+assert_eq hash_values(), "1,2,3", "hash values"
+assert_eq hash_slice(), "1,3", "hash slice"
+assert_eq hash_exists(), "110", "hash exists"
+
+assert_eq hash_delete_val(), 2, "hash delete val"
+assert_eq hash_delete_count(), 2, "hash delete count"
+
+assert_eq hash_from_array(), 2, "hash from list"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# REFERENCES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq scalar_ref(), 42, "scalar ref"
+assert_eq scalar_ref_modify(), 20, "scalar ref modify"
+
+assert_eq array_ref_literal(), 2, "array ref literal"
+assert_eq array_ref_from_array(), 3, "array ref from array"
+assert_eq array_ref_deref(), "10,20,30", "array ref deref"
+
+assert_eq hash_ref_literal(), 2, "hash ref literal"
+assert_eq hash_ref_from_hash(), 10, "hash ref from hash"
+assert_eq hash_ref_deref(), 1, "hash ref deref"
+
+assert_eq nested_array_ref(), 4, "nested array ref"
+assert_eq nested_hash_ref(), "value", "nested hash ref"
+assert_eq mixed_nested(), 92, "mixed nested"
+
+assert_eq ref_type_scalar(), "SCALAR", "ref type scalar"
+assert_eq ref_type_array(), "ARRAY", "ref type array"
+assert_eq ref_type_hash(), "HASH", "ref type hash"
+assert_eq ref_type_anon_array(), "ARRAY", "ref type anon array"
+assert_eq ref_type_anon_hash(), "HASH", "ref type anon hash"
+
+assert_eq code_ref(), 7, "code ref"
+assert_eq code_ref_closure(), 15, "code ref closure"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VARIABLE SCOPING
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq lexical_scope(), "outer", "lexical scope"
+assert_eq nested_scope(), 6, "nested scope"
+
+my @shadow = scope_shadow()
+assert_eq $shadow[0], 10, "scope shadow outer"
+assert_eq $shadow[1], 20, "scope shadow inner"
+
+assert_eq our_variable(), 42, "our variable"
+
+my @local_res = local_scope()
+assert_eq $local_res[0], "outer", "local restored"
+assert_eq $local_res[1], "inner", "local inner"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPECIAL VARIABLES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq underscore_default(), "TEST", "underscore default"
+assert_eq topic_in_map(), "2,4,6", "topic in map"
+assert_eq topic_in_grep(), "2,4,6", "topic in grep"
+assert_eq argv_like(), "one,two,three", "argv like"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DECLARATION MODIFIERS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq my_list_decl(), 6, "my list decl"
+assert_eq my_array_decl(), 3, "my array decl"
+assert_eq my_hash_decl(), 2, "my hash decl"
+assert_eq my_mixed_init(), 7, "my mixed init"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# AUTOVIVIFICATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq autoviv_hash(), "deep", "autoviv hash"
+assert_eq autoviv_array(), "nested", "autoviv array"
+assert_eq autoviv_mixed(), "Alice", "autoviv mixed"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SIGIL COERCION
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq array_to_scalar_count(), 5, "array to scalar"
+assert_eq hash_to_scalar(), 1, "hash to scalar"
+assert_eq scalar_force(), 3, "scalar force"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VARIABLE OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq defined_check(), "10", "defined check"
+assert_eq undef_var(), 0, "undef var"
+assert_eq ref_check(), "SCALAR,ARRAY,HASH,ARRAY,HASH", "ref check"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ADDITIONAL EDGE CASES
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Empty string vs undef
+my $empty = ""
+my $zero = 0
+my $undef_var
+assert_eq defined($empty) ? 1 : 0, 1, "empty string defined"
+assert_eq defined($zero) ? 1 : 0, 1, "zero defined"
+assert_eq defined($undef_var) ? 1 : 0, 0, "undef undefined"
+
+# Boolean contexts
+assert_eq "" ? 1 : 0, 0, "empty string false"
+assert_eq "0" ? 1 : 0, 0, "string zero false"
+assert_eq 0 ? 1 : 0, 0, "zero false"
+assert_eq "1" ? 1 : 0, 1, "string one true"
+assert_eq 1 ? 1 : 0, 1, "one true"
+assert_eq "hello" ? 1 : 0, 1, "non-empty true"
+
+# Array/hash in boolean
+my @empty_arr = ()
+my @nonempty_arr = (1)
+my %empty_hash = ()
+my %nonempty_hash = (a => 1)
+
+assert_eq @empty_arr ? 1 : 0, 0, "empty array false"
+assert_eq @nonempty_arr ? 1 : 0, 1, "nonempty array true"
+assert_eq scalar(keys %empty_hash), 0, "empty hash keys"
+assert_eq scalar(keys %nonempty_hash), 1, "nonempty hash keys"
+
+# Numeric string coercion
+assert_eq "42" + 0, 42, "numeric string add"
+assert_eq "3.14" + 0, 3.14, "float string add"
+assert_eq "10abc" + 0, 10, "partial numeric"
+
+# String numeric coercion
+assert_eq 42 . "", "42", "int to string"
+assert_eq 3.14 . "", "3.14", "float to string"
+
+# Multiple array assignment
+my @a1 = (1, 2, 3)
+my @a2 = (4, 5, 6)
+assert_eq scalar(@a1), 3, "multi array a1"
+assert_eq scalar(@a2), 3, "multi array a2"
+
+# Hash key types
+my %mixed_keys = (
+    "string" => 1,
+    42 => 2,
+    3.14 => 3
+)
+assert_eq $mixed_keys{"string"}, 1, "string key"
+assert_eq $mixed_keys{42}, 2, "numeric key"
+assert_eq $mixed_keys{3.14}, 3, "float key"
+
+test_run

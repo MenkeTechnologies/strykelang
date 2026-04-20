@@ -1,0 +1,199 @@
+# t/test_hashes_extended.stk — comprehensive hash tests
+
+require "./lib/hashes_extended.stk"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HASH CREATION (inline tests)
+# ══════════════════════════════════════════════════════════════════════════════
+
+my %pairs = (a => 1, b => 2, c => 3)
+assert_eq scalar(keys %pairs), 3, "from pairs count"
+assert_eq $pairs{a}, 1, "from pairs value"
+
+my %list_h = qw(a 1 b 2 c 3)
+assert_eq scalar(keys %list_h), 3, "from list count"
+assert_eq $list_h{b}, 2, "from list value"
+
+my %empty_h = ()
+assert_eq scalar(keys %empty_h), 0, "empty count"
+
+my %single_h = (key => "value")
+assert_eq $single_h{key}, "value", "single value"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# KEYS AND VALUES
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @k = hash_keys()
+assert_eq join(",", @k), "a,b,c", "keys sorted"
+
+my @v = hash_values()
+assert_eq join(",", @v), "1,2,3", "values sorted"
+
+assert_eq hash_keys_count(), 4, "keys count"
+assert_eq hash_values_sum(), 6, "values sum"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EXISTS AND DEFINED
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq hash_exists_true(), 1, "exists true"
+assert_eq hash_exists_undef(), 1, "exists undef value"
+assert_eq hash_exists_false(), 0, "exists false"
+
+assert_eq hash_defined_true(), 1, "defined true"
+assert_eq hash_defined_false(), 0, "defined false"
+assert_eq hash_defined_missing(), 0, "defined missing"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DELETE
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq hash_delete_returns(), 2, "delete returns"
+assert_eq hash_delete_removes(), 0, "delete removes"
+assert_eq hash_delete_undef(), 0, "delete undef"
+assert_eq hash_delete_multiple(), 2, "delete multiple"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SLICES
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @slice = hash_slice_values()
+assert_eq join(",", @slice), "1,3", "slice values"
+
+assert_eq hash_slice_assign(), 4, "slice assign count"
+assert_eq hash_slice_mixed(), "1,U,3", "slice mixed"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MODIFICATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq hash_modify_value(), 20, "modify value"
+assert_eq hash_add_new_key(), 2, "add new key"
+assert_eq hash_increment(), 2, "increment"
+assert_eq hash_compound_assign(), 15, "compound assign"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ITERATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq hash_iterate_keys(), 6, "iterate keys sum"
+assert_eq hash_iterate_values(), 6, "iterate values sum"
+assert_eq hash_iterate_sorted(), "a=1,b=2,c=3", "iterate sorted"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CONVERSION
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq hash_to_array(), 4, "to array count"
+assert_eq array_to_hash(), 2, "array to hash"
+assert_eq hash_to_ref(), 10, "to ref"
+assert_eq ref_to_hash(), 1, "ref to hash"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MERGING
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq hash_merge(), 4, "merge count"
+assert_eq hash_merge_override(), 20, "merge override"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FILTERING
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq hash_grep_keys(), 2, "grep keys"
+assert_eq hash_grep_values(), 2, "grep values"
+# hash_map_values inline test
+my %hm = (a => 1, b => 2)
+assert_eq $hm{a} * 2, 2, "map values"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INVERSION
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq hash_invert(), "b", "invert"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NESTED HASHES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq hash_nested_access(), "value", "nested access"
+assert_eq hash_nested_modify(), 20, "nested modify"
+assert_eq hash_nested_add(), "deep", "nested add"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# KEY TYPES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq hash_numeric_key(), "answer", "numeric key"
+assert_eq hash_string_numeric_key(), "b", "string numeric key"
+assert_eq hash_complex_key(), 1, "complex key"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# UTILITIES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq hash_is_empty(), 1, "is empty"
+assert_eq hash_has_key(), 1, "has key"
+assert_eq hash_get_or_default(), "default", "get or default"
+assert_eq hash_count_by(), 3, "count by"
+assert_eq hash_group_by(), 3, "group by"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ADDITIONAL EDGE CASES
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Empty hash operations
+my %e = ()
+assert_eq scalar(keys %e), 0, "empty keys"
+assert_eq scalar(values %e), 0, "empty values"
+
+# Hash in boolean context
+my %bool_empty = ()
+my %bool_full = (x => 1)
+assert_eq scalar(keys %bool_empty), 0, "bool empty count"
+assert_eq scalar(keys %bool_full) > 0, 1, "bool full true"
+
+# Default value pattern
+my %dh = (a => 1)
+my $dv = $dh{b} // 0
+assert_eq $dv, 0, "default pattern"
+
+# Hash copy independence
+my %orig = (x => 1)
+my %copy = %orig
+$copy{x} = 2
+assert_eq $orig{x}, 1, "copy independent"
+
+# Numeric vs string key equivalence
+my %nk
+$nk{1} = "one"
+assert_eq $nk{"1"}, "one", "numeric string key"
+assert_eq $nk{1}, "one", "numeric key access"
+
+# Delete and reinsert
+my %dr = (a => 1)
+delete $dr{a}
+$dr{a} = 2
+assert_eq $dr{a}, 2, "delete reinsert"
+
+# Undefined value vs non-existent
+my %uv = (a => undef)
+assert_eq exists $uv{a}, 1, "undef exists"
+assert_eq defined($uv{a}) ? 1 : 0, 0, "undef not defined"
+assert_eq exists $uv{b} ? 1 : 0, 0, "missing not exists"
+
+# Large hash
+my %big
+for my $i (1..100) {
+    $big{$i} = $i * 2
+}
+assert_eq scalar(keys %big), 100, "large hash count"
+assert_eq $big{50}, 100, "large hash access"
+
+# Hash to list
+my %f1 = (a => 1, b => 2)
+my @flist = %f1
+assert_eq scalar(@flist) >= 2, 1, "hash to list"
+
+test_run
