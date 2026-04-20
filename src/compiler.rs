@@ -17,19 +17,50 @@ use crate::value::PerlValue;
 pub fn expr_tail_is_list_sensitive(expr: &Expr) -> bool {
     match &expr.kind {
         // Range `..` in scalar context is flip-flop, in list context is expansion.
-        // This genuinely needs runtime caller-context dispatch.
         ExprKind::Range { .. } => true,
-        // `wantarray()` returns different values based on caller context.
-        ExprKind::FuncCall { name, .. } if name == "wantarray" => true,
+        // Multi-element list: `($a, $b)` returns 2 values in list, last in scalar.
+        ExprKind::List(items) => items.len() != 1 || expr_tail_is_list_sensitive(&items[0]),
+        ExprKind::QW(ws) => ws.len() != 1,
+        // Deref of array/hash: `@$ref` / `%$ref`.
+        ExprKind::Deref {
+            kind: Sigil::Array | Sigil::Hash,
+            ..
+        } => true,
+        // Slices always produce lists.
+        ExprKind::ArraySlice { .. }
+        | ExprKind::HashSlice { .. }
+        | ExprKind::HashSliceDeref { .. }
+        | ExprKind::AnonymousListSlice { .. } => true,
+        // Map/grep/sort blocks need list-context tail evaluation.
+        ExprKind::MapExpr { .. }
+        | ExprKind::MapExprComma { .. }
+        | ExprKind::GrepExpr { .. }
+        | ExprKind::SortExpr { .. } => true,
+        // FuncCalls that return lists in list context, scalars in scalar context.
+        ExprKind::FuncCall { name, .. } => matches!(
+            name.as_str(),
+            "wantarray"
+                | "reverse"
+                | "sort"
+                | "map"
+                | "grep"
+                | "keys"
+                | "values"
+                | "each"
+                | "split"
+                | "caller"
+                | "localtime"
+                | "gmtime"
+                | "stat"
+                | "lstat"
+        ),
         ExprKind::Ternary {
             then_expr,
             else_expr,
             ..
         } => expr_tail_is_list_sensitive(then_expr) || expr_tail_is_list_sensitive(else_expr),
-        // Everything else: the VM handles context correctly via ReturnValue.
-        // Arrays, hashes, sort, map, grep, keys, values, slices — all work
-        // because the VM evaluates them as values and the caller consumes
-        // in the appropriate context.
+        // ArrayVar, HashVar, slices — handled by VM's ReturnValue + List context
+        // compilation. Do NOT fall back to tree-walker for these.
         _ => false,
     }
 }

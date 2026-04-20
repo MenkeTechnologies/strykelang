@@ -8281,17 +8281,21 @@ impl<'a> VM<'a> {
             }
             Some(BuiltinId::Substr) => {
                 let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+                let slen = s.len() as i64;
                 let off = args.get(1).map(|v| v.to_int()).unwrap_or(0);
-                let start = if off < 0 {
-                    (s.len() as i64 + off).max(0) as usize
+                let start = if off < 0 { (slen + off).max(0) } else { off }.min(slen) as usize;
+
+                let end = if let Some(l_val) = args.get(2) {
+                    let l = l_val.to_int();
+                    if l < 0 {
+                        (slen + l).max(start as i64)
+                    } else {
+                        (start as i64 + l).min(slen)
+                    }
                 } else {
-                    off as usize
-                };
-                let len = args
-                    .get(2)
-                    .map(|v| v.to_int() as usize)
-                    .unwrap_or(s.len() - start);
-                let end = (start + len).min(s.len());
+                    slen
+                } as usize;
+
                 Ok(PerlValue::string(
                     s.get(start..end).unwrap_or("").to_string(),
                 ))
