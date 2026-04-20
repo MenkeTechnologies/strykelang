@@ -1,0 +1,188 @@
+# lib/oop.stk — classes, methods, structs, enums
+
+# ── Basic struct ───────────────────────────────────────────────────
+
+struct Point { x, y }
+
+fn make_point($x, $y) {
+    Point($x, $y)
+}
+
+fn calc_distance($p1, $p2) {
+    my $dx = $p2->x - $p1->x
+    my $dy = $p2->y - $p1->y
+    sqrt($dx * $dx + $dy * $dy)
+}
+
+fn point_add($p1, $p2) {
+    Point($p1->x + $p2->x, $p1->y + $p2->y)
+}
+
+fn point_scale($p, $factor) {
+    Point($p->x * $factor, $p->y * $factor)
+}
+
+# ── Struct with defaults ───────────────────────────────────────────
+
+struct Rectangle { width=0, height=0 }
+
+fn make_rect($w, $h) {
+    Rectangle($w, $h)
+}
+
+fn rect_area($r) {
+    $r->width * $r->height
+}
+
+fn rect_perimeter($r) {
+    2 * ($r->width + $r->height)
+}
+
+fn rect_is_square($r) {
+    $r->width == $r->height ? 1 : 0
+}
+
+# ── Nested structs ─────────────────────────────────────────────────
+
+struct Circle { center, radius }
+
+fn make_circle($cx, $cy, $r) {
+    my $center = Point($cx, $cy)
+    Circle($center, $r)
+}
+
+fn circle_area($c) {
+    3.14159 * $c->radius * $c->radius
+}
+
+fn circle_contains_point($c, $p) {
+    my $dx = $p->x - $c->center->x
+    my $dy = $p->y - $c->center->y
+    my $dist = sqrt($dx * $dx + $dy * $dy)
+    $dist <= $c->radius ? 1 : 0
+}
+
+# ── Struct with computed fields ────────────────────────────────────
+
+struct Person { name, age }
+
+fn make_person($name, $age) {
+    Person($name, $age)
+}
+
+fn person_greet($p) {
+    "Hello, my name is " . $p->name
+}
+
+fn person_is_adult($p) {
+    $p->age >= 18 ? 1 : 0
+}
+
+fn person_birthday($p) {
+    Person($p->name, $p->age + 1)
+}
+
+# ── Enum basics ────────────────────────────────────────────────────
+
+enum Color { Red, Green, Blue }
+
+fn color_name($c) {
+    match ($c) {
+        Color::Red() => "red"
+        Color::Green() => "green"
+        Color::Blue() => "blue"
+        _ => "unknown"
+    }
+}
+
+fn is_primary($c) {
+    match ($c) {
+        Color::Red() => 1
+        Color::Green() => 1
+        Color::Blue() => 1
+        _ => 0
+    }
+}
+
+# ── Simple enums ───────────────────────────────────────────────────
+
+enum Status { Pending, Running, Done, Failed }
+
+fn status_name($s) {
+    match ($s) {
+        Status::Pending() => "pending"
+        Status::Running() => "running"
+        Status::Done() => "done"
+        Status::Failed() => "failed"
+        _ => "unknown"
+    }
+}
+
+fn status_is_complete($s) {
+    match ($s) {
+        Status::Done() => 1
+        Status::Failed() => 1
+        _ => 0
+    }
+}
+
+# ── Builder pattern with struct ────────────────────────────────────
+
+struct Config { host, port, timeout }
+
+fn config_builder {
+    +{ host => "localhost", port => 8080, timeout => 30 }
+}
+
+fn config_with_host($builder, $host) {
+    $builder->{host} = $host
+    $builder
+}
+
+fn config_with_port($builder, $port) {
+    $builder->{port} = $port
+    $builder
+}
+
+fn config_build($builder) {
+    Config($builder->{host}, $builder->{port}, $builder->{timeout})
+}
+
+# ── Status transitions ─────────────────────────────────────────────
+
+fn status_next($s) {
+    match ($s) {
+        Status::Pending() => Status::Running
+        Status::Running() => Status::Done
+        _ => $s
+    }
+}
+
+# ── Complex struct operations ──────────────────────────────────────
+
+struct Vector3 { x, y, z }
+
+fn vec3_new($x, $y, $z) {
+    Vector3($x, $y, $z)
+}
+
+fn vec3_add($v1, $v2) {
+    Vector3($v1->x + $v2->x, $v1->y + $v2->y, $v1->z + $v2->z)
+}
+
+fn vec3_dot($v1, $v2) {
+    $v1->x * $v2->x + $v1->y * $v2->y + $v1->z * $v2->z
+}
+
+fn vec3_length($v) {
+    sqrt($v->x * $v->x + $v->y * $v->y + $v->z * $v->z)
+}
+
+fn vec3_normalize($v) {
+    my $len = vec3_length($v)
+    if ($len > 0) {
+        Vector3($v->x / $len, $v->y / $len, $v->z / $len)
+    } else {
+        $v
+    }
+}

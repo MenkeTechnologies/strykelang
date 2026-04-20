@@ -1,0 +1,107 @@
+#!/usr/bin/env stryke
+# t/test_closures.stk — tests for closures and lexical scope
+
+require "./lib/closures.stk"
+
+# ── Basic closure capture ──────────────────────────────────────────
+
+my $counter = make_counter()
+assert_eq $counter->(), 1, "counter first call"
+assert_eq $counter->(), 2, "counter second call"
+assert_eq $counter->(), 3, "counter third call"
+
+my $counter2 = make_counter()
+assert_eq $counter2->(), 1, "second counter independent"
+assert_eq $counter->(), 4, "first counter still works"
+
+my $counter10 = make_counter_with_start(10)
+assert_eq $counter10->(), 11, "counter with start"
+assert_eq $counter10->(), 12, "counter with start increments"
+
+my $add5 = make_adder(5)
+assert_eq $add5->(10), 15, "adder closure"
+assert_eq $add5->(0), 5, "adder with zero"
+assert_eq $add5->(-3), 2, "adder with negative"
+
+my $times3 = make_multiplier(3)
+assert_eq $times3->(4), 12, "multiplier closure"
+assert_eq $times3->(0), 0, "multiplier with zero"
+
+# ── Multiple closures sharing state (scalars work) ─────────────────
+
+my ($inc, $get) = make_counter_pair()
+assert_eq $get->(), 0, "counter pair initial"
+$inc->()
+assert_eq $get->(), 1, "counter pair after inc"
+$inc->()
+$inc->()
+assert_eq $get->(), 3, "counter pair after multiple inc"
+
+# ── Nested closures ────────────────────────────────────────────────
+
+my $add_outer = make_nested_adder(100)
+my $add_middle = $add_outer->(10)
+assert_eq $add_middle->(1), 111, "nested adder"
+
+my $curry = make_curried_multiply()
+my $step1 = $curry->(2)
+my $step2 = $step1->(3)
+assert_eq $step2->(4), 24, "curried multiply"
+
+# ── Closure over loop variable ─────────────────────────────────────
+
+my @loop_fns = make_closures_in_loop()
+assert_eq scalar(@loop_fns), 5, "loop closures count"
+
+my @explicit_fns = make_closures_with_explicit_capture()
+assert_eq $explicit_fns[0]->(), 10, "explicit capture 0"
+assert_eq $explicit_fns[1]->(), 20, "explicit capture 1"
+assert_eq $explicit_fns[2]->(), 30, "explicit capture 2"
+assert_eq $explicit_fns[3]->(), 40, "explicit capture 3"
+assert_eq $explicit_fns[4]->(), 50, "explicit capture 4"
+
+# ── Closure modifying outer scope ──────────────────────────────────
+
+assert_eq closure_modifies_outer(), 18, "closure modifies outer"
+
+# ── Higher-order functions ─────────────────────────────────────────
+
+my $double = fn  ($x) { $x * 2 }
+my $inc_fn = fn  ($x) { $x + 1 }
+
+my $double_then_inc = compose($inc_fn, $double)
+assert_eq $double_then_inc->(5), 11, "compose double then inc"
+
+my $inc_then_double = pipe_fn($inc_fn, $double)
+assert_eq $inc_then_double->(5), 12, "pipe inc then double"
+
+my $quad = apply_twice($double)
+assert_eq $quad->(3), 12, "apply twice"
+
+my $times8 = apply_n_times($double, 3)
+assert_eq $times8->(1), 8, "apply n times"
+
+# ── Closure returning closure ──────────────────────────────────────
+
+my $acc = make_accumulator()
+my $get1 = $acc->(10)
+assert_eq $get1->(), 10, "accumulator first"
+my $get2 = $acc->(5)
+assert_eq $get2->(), 15, "accumulator second"
+assert_eq $get1->(), 15, "accumulator shared state"
+
+my $toggle = make_toggle()
+assert_eq $toggle->(), "on", "toggle first"
+assert_eq $toggle->(), "off", "toggle second"
+assert_eq $toggle->(), "on", "toggle third"
+
+# ── Lexical scope shadowing ────────────────────────────────────────
+
+my ($r1, $r2, $r3) = outer_scope_test()
+assert_eq $r1, "outer", "scope test outer"
+assert_eq $r2, "inner", "scope test inner"
+assert_eq $r3, "outer", "scope test outer preserved"
+
+my ($after_outer, $inner_val) = shadowing_with_modification()
+assert_eq $after_outer, 20, "shadowing outer modified"
+assert_eq $inner_val, 105, "shadowing inner modified"

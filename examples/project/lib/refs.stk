@@ -1,0 +1,233 @@
+# lib/refs.stk — references and dereferencing
+
+# ── Scalar references ──────────────────────────────────────────────
+
+fn make_scalar_ref($val) {
+    \$val
+}
+
+fn deref_scalar($ref) {
+    $$ref
+}
+
+fn modify_through_ref($ref, $new_val) {
+    $$ref = $new_val
+}
+
+# ── Array references ───────────────────────────────────────────────
+
+fn make_array_ref {
+    [1, 2, 3, 4, 5]
+}
+
+fn array_ref_length($aref) {
+    scalar @$aref
+}
+
+fn array_ref_element($aref, $idx) {
+    $aref->[$idx]
+}
+
+fn array_ref_push($aref, $val) {
+    push @$aref, $val
+    $aref
+}
+
+fn array_ref_pop($aref) {
+    pop @$aref
+}
+
+fn array_ref_slice($aref, $start, $end) {
+    my @result = @{$aref}[$start..$end]
+    \@result
+}
+
+# ── Hash references ────────────────────────────────────────────────
+
+fn make_hash_ref {
+    +{ name => "test", value => 42, active => 1 }
+}
+
+fn hash_ref_get($href, $key) {
+    $href->{$key}
+}
+
+fn hash_ref_set($href, $key, $val) {
+    $href->{$key} = $val
+    $href
+}
+
+fn hash_ref_keys($href) {
+    my @k = keys %$href
+    @k
+}
+
+fn hash_ref_values($href) {
+    my @v = values %$href
+    @v
+}
+
+fn hash_ref_exists($href, $key) {
+    exists $href->{$key} ? 1 : 0
+}
+
+fn hash_ref_delete($href, $key) {
+    delete $href->{$key}
+}
+
+# ── Nested references ──────────────────────────────────────────────
+
+fn make_nested_structure {
+    +{
+        users => [
+            +{ name => "Alice", age => 30 },
+            +{ name => "Bob", age => 25 },
+        ],
+        config => +{
+            debug => 1,
+            timeout => 60,
+        },
+    }
+}
+
+fn nested_get_user($data, $idx) {
+    $data->{users}->[$idx]
+}
+
+fn nested_get_user_name($data, $idx) {
+    $data->{users}->[$idx]->{name}
+}
+
+fn nested_get_config($data, $key) {
+    $data->{config}->{$key}
+}
+
+fn nested_add_user($data, $name, $age) {
+    push @{$data->{users}}, +{ name => $name, age => $age }
+    $data
+}
+
+# ── Code references ────────────────────────────────────────────────
+
+fn make_code_ref {
+    sub ($x) { $x * 2 }
+}
+
+fn call_code_ref($cref, $arg) {
+    $cref->($arg)
+}
+
+fn make_named_sub_ref {
+    \&array_ref_length
+}
+
+# ── Reference type checking ────────────────────────────────────────
+
+fn ref_type($ref) {
+    ref($ref)
+}
+
+fn is_array_ref($ref) {
+    ref($ref) eq "ARRAY" ? 1 : 0
+}
+
+fn is_hash_ref($ref) {
+    ref($ref) eq "HASH" ? 1 : 0
+}
+
+fn is_code_ref($ref) {
+    ref($ref) eq "CODE" ? 1 : 0
+}
+
+fn is_scalar_ref($ref) {
+    ref($ref) eq "SCALAR" ? 1 : 0
+}
+
+# ── Autovivification ───────────────────────────────────────────────
+
+fn autoviv_array {
+    my $data = +{ items => [] }
+    $data->{items}->[0] = "first"
+    $data->{items}->[1] = "second"
+    $data
+}
+
+fn autoviv_hash {
+    my $data = +{ nested => { deep => {} } }
+    $data->{nested}->{deep}->{value} = 42
+    $data
+}
+
+# ── Reference counting / aliasing ──────────────────────────────────
+
+fn alias_test {
+    my @arr = (1, 2, 3)
+    my $ref1 = \@arr
+    my $ref2 = $ref1
+    push @$ref2, 4
+    scalar @arr
+}
+
+fn modify_alias {
+    my %hash = (a => 1)
+    my $ref = \%hash
+    $ref->{b} = 2
+    $hash{a} + $hash{b}
+}
+
+# ── Complex data structures ────────────────────────────────────────
+
+fn make_tree_node($val, $left, $right) {
+    +{ value => $val, left => $left, right => $right }
+}
+
+fn tree_sum($node) {
+    if (!defined $node) { return 0 }
+    my $v = $node->{value} // 0
+    my $l = 0
+    if (exists $node->{left} && defined $node->{left}) {
+        $l = tree_sum($node->{left})
+    }
+    my $r = 0
+    if (exists $node->{right} && defined $node->{right}) {
+        $r = tree_sum($node->{right})
+    }
+    $v + $l + $r
+}
+
+fn make_linked_list(@vals) {
+    my $head = undef
+    for my $v (reverse @vals) {
+        $head = +{ value => $v, next => $head }
+    }
+    $head
+}
+
+fn list_length($head) {
+    my $count = 0
+    my $curr = $head
+    while (defined $curr) {
+        $count++
+        $curr = $curr->{next}
+    }
+    $count
+}
+
+fn list_to_array($head) {
+    my @result
+    my $curr = $head
+    while (defined $curr) {
+        push @result, $curr->{value}
+        $curr = $curr->{next}
+    }
+    @result
+}
+
+# ── WeakRef-like patterns ──────────────────────────────────────────
+
+fn circular_safe {
+    my $a = +{ name => "A" }
+    my $b = +{ name => "B" }
+    $a->{ref} = $b
+    $a->{name} . "-" . $b->{name}
+}

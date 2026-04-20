@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+# t/test_data_structures.stk — tests for tree and list structures
+
+require "./lib/refs.stk"
+
+# ── Linked List Tests ───────────────────────────────────────────────
+
+my @input = (10, 20, 30, 40, 50)
+my $list = make_linked_list(@input)
+
+assert_eq list_length($list), 5, "list length"
+my @output = list_to_array($list)
+assert_eq $output[0], 10, "list to array first"
+assert_eq $output[4], 50, "list to array last"
+assert_eq scalar(@output), 5, "list to array count"
+
+# ── Tree Tests ──────────────────────────────────────────────────────
+
+# Building a simple binary tree:
+#       10
+#      /  \
+#     5    15
+#    / \     \
+#   2   7     20
+
+my $root = make_tree_node(10,
+    make_tree_node(5,
+        make_tree_node(2, undef, undef),
+        make_tree_node(7, undef, undef)
+    ),
+    make_tree_node(15,
+        undef,
+        make_tree_node(20, undef, undef)
+    )
+)
+
+assert_eq $root->{value}, 10, "root value"
+assert_eq $root->{left}->{value}, 5, "left child value"
+assert_eq $root->{left}->{left}->{value}, 2, "left-left child value"
+assert_eq $root->{right}->{right}->{value}, 20, "right-right child value"
+
+my $total = tree_sum($root)
+# 10 + 5 + 2 + 7 + 15 + 20 = 59
+assert_eq $total, 59, "tree sum"
+
+# ── Autovivification Tests ──────────────────────────────────────────
+
+my $av_array = autoviv_array()
+assert_eq $av_array->{items}->[0], "first", "autoviv array 0"
+assert_eq $av_array->{items}->[1], "second", "autoviv array 1"
+
+my $av_hash = autoviv_hash()
+assert_eq $av_hash->{nested}->{deep}->{value}, 42, "autoviv hash deep"
+
+# ── Aliasing and References ─────────────────────────────────────────
+
+assert_eq alias_test(), 4, "alias test (push modifies original)"
+assert_eq modify_alias(), 3, "modify alias (1 + 2)"
+
+test_run

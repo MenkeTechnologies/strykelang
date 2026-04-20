@@ -40,4 +40,10 @@ assert_eq apply_n($double, 0, 5), 5, "apply_n 0 times"
 my $prime_sum = primes_under(10) |> sum
 assert_eq $prime_sum, 17, "primes under 10 sum"
 
+# Square root (Newton's method)
+assert_near sqrt_newton(4), 2, 0.001, "sqrt(4)"
+assert_near sqrt_newton(2), 1.4142, 0.001, "sqrt(2)"
+assert_near sqrt_newton(100), 10, 0.001, "sqrt(100)"
+assert_eq sqrt_newton(0), 0, "sqrt(0)"
+
 test_run
