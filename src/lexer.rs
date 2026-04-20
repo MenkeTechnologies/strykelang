@@ -1899,6 +1899,7 @@ impl Lexer {
                     | "typed"
                     | "our"
                     | "local"
+                    | "state"
                     | "return"
                     | "print"
                     | "pr"

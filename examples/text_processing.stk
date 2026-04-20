@@ -7,9 +7,9 @@ print "upper: ", $text |> uc, "\n"
 print "lower: ", $text |> lc, "\n"
 print "ucfirst: ", $text |> ucfirst, "\n"
 print "length: ", $text |> len, "\n"
-print "substr(0,9): ", substr $text, 0, 9), "\n"
-print "index(fox): ", index $text, "fox"), "\n"
-print "reverse: ", (split "", $text  |> reverse) |> join "", "\n"
+print "substr(0,9): ", substr $text, 0, 9, "\n"
+print "index(fox): ", index $text, "fox", "\n"
+print "reverse: ", split "", $text  |> reverse |> join "", "\n"
 
 my @words = split " ", $text
 print "word count: ", @words |> scalar, "\n"
@@ -20,7 +20,7 @@ print "substituted: ${copy}\n"
 if ($text =~ /(\w+)\s+(\w+)$/) {
     print "last two words: ${1} ${2}\n"
 }
-my @long_words = @words |> grep { $_ |> length > 3 }
+my @long_words = @words |> grep { length $_ > 3 }
 print "long words: ", @long_words |> join ", ", "\n"
-my @lengths = @words |> map { $_ |> length }
+my @lengths = @words |> map { length $_ }
 print "word lengths: ", @lengths |> join ", ", "\n"
