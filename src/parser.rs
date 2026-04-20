@@ -7780,7 +7780,17 @@ impl Parser {
                         Token::ScalarVar(_) | Token::ArrayVar(_) | Token::HashVar(_)
                     )
                 {
-                    let _ = self.advance();
+                    let target = self.parse_primary()?;
+                    return Ok(Expr {
+                        kind: ExprKind::Assign {
+                            target: Box::new(target),
+                            value: Box::new(Expr {
+                                kind: ExprKind::Undef,
+                                line,
+                            }),
+                        },
+                        line,
+                    });
                 }
                 Ok(Expr {
                     kind: ExprKind::Undef,
@@ -10553,10 +10563,16 @@ impl Parser {
                     })
                 }
             }
-            "wantarray" => Ok(Expr {
-                kind: ExprKind::Wantarray,
-                line,
-            }),
+            "wantarray" => {
+                if matches!(self.peek(), Token::LParen) {
+                    self.advance();
+                    self.expect(&Token::RParen)?;
+                }
+                Ok(Expr {
+                    kind: ExprKind::Wantarray,
+                    line,
+                })
+            }
             "sub" | "fn" => {
                 // Anonymous sub/fn — optional prototype `sub () { }` (e.g. Carp.pm `*X = sub () { 1 }`)
                 let (params, _prototype) = self.parse_sub_sig_or_prototype_opt()?;

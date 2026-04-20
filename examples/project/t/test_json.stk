@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+# t/test_json.stk — JSON encoding and decoding tests
+
+# ── Basic Scalar Roundtrip ──────────────────────────────────────────
+
+my $s1 = "hello world"
+my $j1 = json_encode($s1)
+assert_eq json_decode($j1), $s1, "json string roundtrip"
+
+my $n1 = 42
+my $j2 = json_encode($n1)
+assert_eq json_decode($j2), $n1, "json number roundtrip"
+
+# ── Array Roundtrip ─────────────────────────────────────────────────
+
+my $aref = [1, 2, "three", [4, 5]]
+my $j3 = json_encode($aref)
+# json_decode on an array returns a list, so we wrap it in [] to get a ref
+my $res_arr = [json_decode($j3)]
+assert_eq ref($res_arr), "ARRAY", "decoded array ref"
+assert_eq scalar(@$res_arr), 4, "decoded array length"
+assert_eq $res_arr->[2], "three", "decoded array element"
+assert_eq $res_arr->[3]->[1], 5, "decoded nested array element"
+
+# ── Hash Roundtrip ──────────────────────────────────────────────────
+
+my $hash = {
+    name => "Stryke",
+    version => 1.0,
+    features => ["fast", "cyberpunk"],
+    meta => { author => "Wizard" }
+}
+my $j4 = json_encode($hash)
+my $res_hash = json_decode($j4)
+
+assert_eq ref($res_hash), "HASH", "decoded hash is HASH ref"
+assert_eq $res_hash->{name}, "Stryke", "decoded hash value"
+assert_eq $res_hash->{features}->[1], "cyberpunk", "decoded nested value"
+assert_eq $res_hash->{meta}->{author}, "Wizard", "decoded deep nested value"
+
+# ── Edge Cases ──────────────────────────────────────────────────────
+
+# Empty structures
+assert_eq json_encode([]), "[]", "encode empty array"
+assert_eq json_encode({}), "{}", "encode empty hash"
+
+my @empty_arr = json_decode("[]")
+assert_eq scalar(@empty_arr), 0, "decode empty array"
+
+my $empty_hash = json_decode("{}")
+assert_eq scalar(keys %$empty_hash), 0, "decode empty hash"
+
+# Null / Undef
+my $null_val = undef
+# In JSON, undef usually encodes to null
+my $j5 = json_encode($null_val)
+assert_eq $j5, "null", "encode undef to null"
+assert_false defined(json_decode($j5)), "decode null to undef"
+
+test_run

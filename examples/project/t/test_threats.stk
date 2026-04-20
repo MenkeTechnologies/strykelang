@@ -8,24 +8,24 @@ my $sys = { hostname => "test", os => "linux", cpus => 8, ram => "16GB", ram_byt
 my $net = { ipv4 => "192.168.1.100", mac => "aa:bb:cc:dd:ee:ff", gateway => "192.168.1.1", dns => "8.8.8.8" }
 my @disks = ({ mount => "/", use_pct => 45, total => 500000000000, used => 225000000000, free_h => "275 GB free" })
 
-my @threats = analyze_threats($sys, $net, \@disks)
+my @threats = analyze_threats($sys, $net, \@disks, 8000000000)
 assert_eq $threats[0]->{level}, "OK", "healthy system is OK"
 
 # Mock: disk almost full
 my @bad_disks = ({ mount => "/", use_pct => 97, total => 500000000000, used => 485000000000, free_h => "15 GB free" })
-my @disk_threats = analyze_threats($sys, $net, \@bad_disks)
+my @disk_threats = analyze_threats($sys, $net, \@bad_disks, 8000000000)
 assert_eq $disk_threats[0]->{level}, "HIGH", "97% disk is HIGH"
 assert_contains $disk_threats[0]->{message}, "critical", "critical message"
 
 # Mock: no gateway
 my $bad_net = { ipv4 => "192.168.1.100", mac => "aa:bb:cc:dd:ee:ff", gateway => "unknown", dns => "8.8.8.8" }
-my @net_threats = analyze_threats($sys, $bad_net, \@disks)
+my @net_threats = analyze_threats($sys, $bad_net, \@disks, 8000000000)
 my @high = grep { $_->{level} eq "HIGH" } @net_threats
 assert_gt scalar(@high), 0, "no gateway is HIGH"
 
 # Mock: long uptime
 my $old_sys = { %$sys, uptime_sec => 60 * 86400 }
-my @up_threats = analyze_threats($old_sys, $net, \@disks)
+my @up_threats = analyze_threats($old_sys, $net, \@disks, 8000000000)
 my @warns = grep { $_->{level} eq "WARN" } @up_threats
 assert_gt scalar(@warns), 0, "60 day uptime is WARN"
 

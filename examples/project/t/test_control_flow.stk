@@ -1,0 +1,120 @@
+#!/usr/bin/env stryke
+# t/test_control_flow.stk — tests for loops, conditionals, flow control
+
+require "./lib/control_flow.stk"
+
+# ── Basic if/elsif/else ────────────────────────────────────────────
+
+assert_eq classify_number(5), "positive", "classify positive"
+assert_eq classify_number(-3), "negative", "classify negative"
+assert_eq classify_number(0), "zero", "classify zero"
+
+assert_eq grade_score(95), "A", "grade A"
+assert_eq grade_score(85), "B", "grade B"
+assert_eq grade_score(75), "C", "grade C"
+assert_eq grade_score(65), "D", "grade D"
+assert_eq grade_score(55), "F", "grade F"
+
+assert_eq unless_example(0), "was falsy", "unless falsy"
+assert_eq unless_example(1), "default", "unless truthy"
+
+# ── Ternary operator ───────────────────────────────────────────────
+
+assert_eq ternary_simple(1), "yes", "ternary true"
+assert_eq ternary_simple(0), "no", "ternary false"
+assert_eq ternary_nested(5), "positive", "nested ternary pos"
+assert_eq ternary_nested(-5), "negative", "nested ternary neg"
+assert_eq ternary_nested(0), "zero", "nested ternary zero"
+assert_eq ternary_expr(10, 3), 7, "ternary expr a>b"
+assert_eq ternary_expr(3, 10), 7, "ternary expr a<b"
+
+# ── Postfix conditionals ───────────────────────────────────────────
+
+assert_eq postfix_if_true(), 42, "postfix if true"
+assert_eq postfix_if_false(), 99, "postfix if false"
+assert_eq postfix_unless_true(), 0, "postfix unless true"
+assert_eq postfix_unless_false(), 42, "postfix unless false"
+
+# ── For loops ──────────────────────────────────────────────────────
+
+assert_eq sum_range(1, 10), 55, "sum 1..10"
+assert_eq sum_range(5, 5), 5, "sum single"
+assert_eq count_evens(1, 2, 3, 4, 5, 6), 3, "count evens"
+assert_eq for_c_style_sum(10), 55, "c-style for"
+assert_eq for_with_next(), 25, "for with next"
+assert_eq for_with_last(), 55, "for with last"
+
+# ── While loops ────────────────────────────────────────────────────
+
+my @countdown = while_countdown(5)
+assert_eq scalar(@countdown), 5, "countdown length"
+assert_eq $countdown[0], 5, "countdown first"
+assert_eq $countdown[4], 1, "countdown last"
+
+assert_eq while_with_last(), 15, "while with last"
+assert_eq while_with_next(), 25, "while with next"
+assert_eq until_example(10), 10, "until example"
+
+# ── Postfix loops ──────────────────────────────────────────────────
+
+assert_eq postfix_for_sum(), 15, "postfix for sum"
+
+my @post_count = postfix_while_countdown()
+assert_eq scalar(@post_count), 5, "postfix while length"
+assert_eq $post_count[0], 5, "postfix while first"
+
+# ── Given/when (match) ─────────────────────────────────────────────
+
+assert_eq day_type("Saturday"), "weekend", "match Saturday"
+assert_eq day_type("Sunday"), "weekend", "match Sunday"
+assert_eq day_type("Monday"), "weekday", "match Monday"
+assert_eq day_type("Wednesday"), "weekday", "match Wednesday"
+assert_eq day_type("holiday"), "unknown", "match unknown"
+
+assert_eq number_word(1), "one", "match 1"
+assert_eq number_word(2), "two", "match 2"
+assert_eq number_word(3), "three", "match 3"
+assert_eq number_word(99), "many", "match default"
+
+# ── Nested loops ───────────────────────────────────────────────────
+
+assert_eq multiplication_table_sum(3), 36, "mult table 3x3"
+assert_eq multiplication_table_sum(1), 1, "mult table 1x1"
+
+my ($a, $b) = find_pair_sum(10, 1, 2, 3, 7, 8)
+assert_eq $a + $b, 10, "find pair sum"
+
+my @no_pair = find_pair_sum(100, 1, 2, 3)
+assert_eq scalar(@no_pair), 0, "find pair no match"
+
+# ── Return in various contexts ─────────────────────────────────────
+
+assert_eq early_return(-5), "negative", "early return neg"
+assert_eq early_return(0), "zero", "early return zero"
+assert_eq early_return(5), "small", "early return small"
+assert_eq early_return(100), "large", "early return large"
+
+assert_eq return_from_loop(50, 75, 150, 200), 150, "return from loop found"
+assert_eq return_from_loop(1, 2, 3), -1, "return from loop not found"
+
+my @limited = return_list_from_loop(10)
+assert_eq scalar(@limited), 5, "return list limited"
+assert_eq $limited[0], 2, "return list first"
+
+# ── Complex control flow ───────────────────────────────────────────
+
+my @fb = fizzbuzz(15)
+assert_eq scalar(@fb), 15, "fizzbuzz length"
+assert_eq $fb[0], 1, "fizzbuzz 1"
+assert_eq $fb[2], "Fizz", "fizzbuzz 3"
+assert_eq $fb[4], "Buzz", "fizzbuzz 5"
+assert_eq $fb[14], "FizzBuzz", "fizzbuzz 15"
+
+assert_eq collatz_steps(1), 0, "collatz 1"
+assert_eq collatz_steps(2), 1, "collatz 2"
+assert_eq collatz_steps(6), 8, "collatz 6"
+
+my @primes = find_primes(20)
+assert_eq scalar(@primes), 8, "primes up to 20 count"
+assert_eq $primes[0], 2, "first prime"
+assert_eq $primes[7], 19, "eighth prime"

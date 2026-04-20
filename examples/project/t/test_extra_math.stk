@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# test_extra_math.stk — more math tests
+
+require "./lib/math.stk"
+
+# Test fib
+assert_eq fib(0), 0, "fib 0"
+assert_eq fib(1), 1, "fib 1"
+assert_eq fib(5), 5, "fib 5"
+assert_eq fib(10), 55, "fib 10"
+
+# Test factorial
+assert_eq factorial(0), 1, "fact 0"
+assert_eq factorial(1), 1, "fact 1"
+assert_eq factorial(5), 120, "fact 5"
+
+# Test primes_under
+my @p_list = primes_under(10)
+assert_eq scalar(@p_list), 4, "primes count under 10"
+assert_eq join(",", @p_list), "2,3,5,7", "primes list"
+
+# Test gcd and lcm
+assert_eq gcd_of(12, 18), 6, "gcd 12, 18"
+assert_eq gcd_of(101, 103), 1, "gcd 101, 103"
+assert_eq lcm_of(4, 6), 12, "lcm 4, 6"
+
+# Test make_adder
+my $add5 = make_adder(5)
+assert_eq $add5->(10), 15, "adder 5 + 10"
+
+# Test apply_n
+my $double_fn = fn ($n) { $n * 2 }
+assert_eq apply_n($double_fn, 3, 2), 16, "apply double 3 times to 2"
+
+# Test sqrt_newton
+assert_near sqrt_newton(2), 1.41421356, 0.000001, "sqrt 2"
+assert_near sqrt_newton(100), 10.0, 0.000001, "sqrt 100"
+
+test_run

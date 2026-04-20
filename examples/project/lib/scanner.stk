@@ -99,8 +99,7 @@ fn scan_git {
     $result
 }
 
-fn usage_bar {
-    my ($pct, $width) = @_
+fn usage_bar ($pct, $width) {
     $width //= 20
     my $filled = int($pct / 100 * $width)
     my $empty = $width - $filled

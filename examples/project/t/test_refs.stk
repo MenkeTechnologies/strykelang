@@ -1,0 +1,110 @@
+#!/usr/bin/env stryke
+# t/test_refs.stk — tests for references and dereferencing
+
+require "./lib/refs.stk"
+
+# ── Array references ───────────────────────────────────────────────
+
+my $aref = make_array_ref()
+assert_eq ref_type($aref), "ARRAY", "aref is ARRAY"
+assert_eq array_ref_length($aref), 5, "aref length"
+assert_eq array_ref_element($aref, 0), 1, "aref element 0"
+assert_eq array_ref_element($aref, 4), 5, "aref element 4"
+
+my $pushed = array_ref_push($aref, 6)
+assert_eq array_ref_length($pushed), 6, "aref after push"
+
+my $popped = array_ref_pop($aref)
+assert_eq $popped, 6, "aref pop value"
+assert_eq array_ref_length($aref), 5, "aref after pop"
+
+# ── Hash references ────────────────────────────────────────────────
+
+my $href = make_hash_ref()
+assert_eq ref_type($href), "HASH", "href is HASH"
+assert_eq hash_ref_get($href, "name"), "test", "href get name"
+assert_eq hash_ref_get($href, "value"), 42, "href get value"
+
+my $modified = hash_ref_set($href, "value", 100)
+assert_eq hash_ref_get($modified, "value"), 100, "href after set"
+
+assert_ok hash_ref_exists($href, "name"), "href exists name"
+assert_false hash_ref_exists($href, "missing"), "href not exists missing"
+
+my @hkeys = hash_ref_keys($href)
+assert_eq scalar(@hkeys), 3, "href keys count"
+
+hash_ref_delete($href, "active")
+assert_false hash_ref_exists($href, "active"), "href after delete"
+
+# ── Nested references ──────────────────────────────────────────────
+
+my $nested = make_nested_structure()
+assert_eq ref_type($nested), "HASH", "nested is HASH"
+
+my $user0 = nested_get_user($nested, 0)
+assert_eq $user0->{name}, "Alice", "nested user 0 name"
+
+assert_eq nested_get_user_name($nested, 1), "Bob", "nested user 1 name"
+assert_eq nested_get_config($nested, "debug"), 1, "nested config debug"
+assert_eq nested_get_config($nested, "timeout"), 60, "nested config timeout"
+
+my $with_charlie = nested_add_user($nested, "Charlie", 35)
+assert_eq nested_get_user_name($with_charlie, 2), "Charlie", "nested added user"
+
+# ── Code references ────────────────────────────────────────────────
+
+my $cref = make_code_ref()
+assert_eq ref_type($cref), "CODE", "cref is CODE"
+assert_eq call_code_ref($cref, 5), 10, "call code ref"
+assert_eq call_code_ref($cref, 0), 0, "call code ref zero"
+
+my $named_ref = make_named_sub_ref()
+assert_eq ref_type($named_ref), "CODE", "named ref is CODE"
+
+# ── Reference type checking ────────────────────────────────────────
+
+my $arr = [1, 2, 3]
+my $hsh = +{ a => 1 }
+my $code = sub { 42 }
+
+assert_ok is_array_ref($arr), "is_array_ref true"
+assert_false is_array_ref($hsh), "is_array_ref false for hash"
+
+assert_ok is_hash_ref($hsh), "is_hash_ref true"
+assert_false is_hash_ref($arr), "is_hash_ref false for array"
+
+assert_ok is_code_ref($code), "is_code_ref true"
+assert_false is_code_ref($arr), "is_code_ref false"
+
+# ── Manual nested creation ─────────────────────────────────────────
+
+my $manual_nested = +{ items => ["first", "second"] }
+assert_eq $manual_nested->{items}->[0], "first", "manual nested first"
+assert_eq $manual_nested->{items}->[1], "second", "manual nested second"
+
+# ── Reference aliasing ─────────────────────────────────────────────
+
+assert_eq alias_test(), 4, "alias modifies original"
+assert_eq modify_alias(), 3, "hash alias modifies"
+
+# ── Complex data structures ────────────────────────────────────────
+
+my $leaf1 = make_tree_node(1, undef, undef)
+assert_eq $leaf1->{value}, 1, "tree node value"
+
+my $branch = make_tree_node(4, $leaf1, undef)
+assert_eq $branch->{value}, 4, "tree branch value"
+assert_eq $branch->{left}->{value}, 1, "tree branch left value"
+
+my $list = make_linked_list(1, 2, 3, 4, 5)
+assert_eq list_length($list), 5, "linked list length"
+
+my @list_arr = list_to_array($list)
+assert_eq scalar(@list_arr), 5, "list to array length"
+assert_eq $list_arr[0], 1, "list to array first"
+assert_eq $list_arr[4], 5, "list to array last"
+
+# ── Circular reference safety ──────────────────────────────────────
+
+assert_eq circular_safe(), "A-B", "circular safe"
