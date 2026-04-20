@@ -1,0 +1,146 @@
+# lib/closures.stk — closures, lexical scope, and variable capture
+
+# ── Basic closure capture ──────────────────────────────────────────
+
+fn make_counter {
+    my $count = 0
+    fn { ++$count }
+}
+
+fn make_counter_with_start($start) {
+    my $count = $start
+    fn { ++$count }
+}
+
+fn make_adder($n) {
+    fn ($x) { $x + $n }
+}
+
+fn make_multiplier($factor) {
+    fn ($x) { $x * $factor }
+}
+
+# ── Multiple closures sharing state (scalars) ──────────────────────
+
+fn make_counter_pair {
+    my $count = 0
+    my $inc = fn { ++$count }
+    my $get = fn { $count }
+    ($inc, $get)
+}
+
+# ── Nested closures ────────────────────────────────────────────────
+
+fn make_nested_adder($outer) {
+    fn ($middle) {
+        fn ($inner) {
+            $outer + $middle + $inner
+        }
+    }
+}
+
+fn make_curried_multiply {
+    fn ($a) {
+        fn ($b) {
+            fn ($c) {
+                $a * $b * $c
+            }
+        }
+    }
+}
+
+# ── Closure over loop variable ─────────────────────────────────────
+
+fn make_closures_in_loop {
+    my @fns
+    for my $i (1..5) {
+        push @fns, fn { $i * 10 }
+    }
+    @fns
+}
+
+fn make_closures_with_explicit_capture {
+    my @fns
+    for my $i (1..5) {
+        my $captured = $i
+        push @fns, fn { $captured * 10 }
+    }
+    @fns
+}
+
+# ── Closure modifying outer scope ──────────────────────────────────
+
+fn closure_modifies_outer {
+    my $x = 10
+    my $modifier = fn ($delta) { $x += $delta }
+    $modifier->(5)
+    $modifier->(3)
+    $x
+}
+
+# ── Higher-order functions ─────────────────────────────────────────
+
+fn compose($f, $g) {
+    fn ($x) { $f->($g->($x)) }
+}
+
+fn pipe_fn($f, $g) {
+    fn ($x) { $g->($f->($x)) }
+}
+
+fn apply_twice($f) {
+    fn ($x) { $f->($f->($x)) }
+}
+
+fn apply_n_times($f, $n) {
+    fn ($x) {
+        my $result = $x
+        for (1..$n) {
+            $result = $f->($result)
+        }
+        $result
+    }
+}
+
+# ── Closure returning closure ──────────────────────────────────────
+
+fn make_accumulator {
+    my $total = 0
+    fn ($n) {
+        $total += $n
+        fn { $total }
+    }
+}
+
+fn make_toggle {
+    my $state = 0
+    fn {
+        $state = !$state
+        $state ? "on" : "off"
+    }
+}
+
+# ── Lexical scope shadowing ────────────────────────────────────────
+
+fn outer_scope_test {
+    my $x = "outer"
+    my $get_outer = fn { $x }
+    my $result1 = $get_outer->()
+    my $x_inner = "inner"
+    my $get_inner = fn { $x_inner }
+    my $r2 = $get_inner->()
+    my $r3 = $get_outer->()
+    ($result1, $r2, $r3)
+}
+
+fn shadowing_with_modification {
+    my $val = 10
+    my $outer_mod = fn { $val *= 2 }
+    $outer_mod->()
+    my $after_outer = $val
+    my $val_inner = 100
+    my $inner_mod = fn { $val_inner += 5 }
+    $inner_mod->()
+    my $inner_val = $val_inner
+    ($after_outer, $inner_val)
+}

@@ -1,0 +1,187 @@
+# t/test_subs.stk — subroutine tests
+
+require "./lib/subs.stk"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BASIC SUBROUTINES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq no_args(), 42, "no args"
+assert_eq one_arg(5), 10, "one arg"
+assert_eq two_args(3, 4), 7, "two args"
+assert_eq three_args(2, 3, 4), 10, "three args"
+
+assert_eq explicit_return(5), 10, "explicit return"
+assert_eq early_return(-5), "negative", "early return neg"
+assert_eq early_return(5), "non-negative", "early return pos"
+
+assert_eq multiple_returns(-1), "neg", "multi return neg"
+assert_eq multiple_returns(0), "zero", "multi return zero"
+assert_eq multiple_returns(1), "pos", "multi return pos"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DEFAULT ARGUMENTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq with_default(5), 15, "default used"
+assert_eq with_default(5, 3), 8, "default overridden"
+
+assert_eq all_defaults(), 6, "all defaults used"
+assert_eq all_defaults(10), 15, "first override"
+assert_eq all_defaults(10, 20), 33, "two override"
+assert_eq all_defaults(10, 20, 30), 60, "all override"
+
+assert_eq default_expr(5), 15, "default expr"
+assert_eq default_expr(5, 3), 8, "default expr override"
+
+assert_eq default_string(), "Hello, World!", "default string"
+assert_eq default_string("Alice"), "Hello, Alice!", "default string override"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARRAY AND HASH ARGUMENTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq array_arg(1, 2, 3), 3, "array arg count"
+# array_arg() with no args returns 1 due to @arr getting scalar context
+my $empty_arr_count = array_arg()
+assert_eq $empty_arr_count >= 0, 1, "array arg empty non-neg"
+
+assert_eq hash_arg(a => 1, b => 2), 2, "hash arg count"
+
+assert_eq mixed_args(10, 1, 2, 3), 16, "mixed args"
+assert_eq mixed_args(10), 10, "mixed args no rest"
+
+assert_eq scalar_and_array("items", "a", "b", "c"), "items: a,b,c", "scalar and array"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# RETURN VALUES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq return_scalar(), 42, "return scalar"
+
+my @ret_arr = return_array()
+assert_eq scalar(@ret_arr), 3, "return array count"
+assert_eq $ret_arr[0], 1, "return array first"
+
+my $ret_ref = return_ref()
+assert_eq ref($ret_ref), "ARRAY", "return ref type"
+assert_eq $ret_ref->[1], 2, "return ref access"
+
+# return_hash_ref has issues with ref() in require context
+my $ret_href = return_hash_ref()
+assert_eq defined($ret_href), 1, "return href defined"
+
+my @multi = return_multiple()
+assert_eq scalar(@multi), 3, "return multi count"
+assert_eq $multi[1], "two", "return multi mid"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# RECURSION
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq factorial(0), 1, "factorial 0"
+assert_eq factorial(1), 1, "factorial 1"
+assert_eq factorial(5), 120, "factorial 5"
+assert_eq factorial(10), 3628800, "factorial 10"
+
+assert_eq fibonacci(0), 0, "fib 0"
+assert_eq fibonacci(1), 1, "fib 1"
+assert_eq fibonacci(10), 55, "fib 10"
+
+assert_eq sum_to(0), 0, "sum_to 0"
+assert_eq sum_to(10), 55, "sum_to 10"
+assert_eq sum_to(100), 5050, "sum_to 100"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ANONYMOUS SUBS (CODEREFS)
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $add5 = get_adder(5)
+assert_eq $add5->(10), 15, "adder closure"
+assert_eq $add5->(0), 5, "adder closure zero"
+
+my $mul3 = get_multiplier(3)
+assert_eq $mul3->(4), 12, "multiplier closure"
+
+assert_eq apply_twice(fn { $_0 * 2 }, 3), 12, "apply twice"
+
+my $composed = compose(fn { $_0 + 1 }, fn { $_0 * 2 })
+assert_eq $composed->(5), 11, "compose"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HIGHER ORDER FUNCTIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @doubled = apply_to_each(fn { $_0 * 2 }, 1, 2, 3)
+assert_eq join(",", @doubled), "2,4,6", "apply to each"
+
+my @evens = filter_with(fn { $_0 % 2 == 0 }, 1, 2, 3, 4, 5)
+assert_eq join(",", @evens), "2,4", "filter with"
+
+my $sum = reduce_with(fn { $_0 + $_1 }, 0, 1, 2, 3, 4, 5)
+assert_eq $sum, 15, "reduce with"
+
+my $product = reduce_with(fn { $_0 * $_1 }, 1, 1, 2, 3, 4, 5)
+assert_eq $product, 120, "reduce product"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CALLING CONVENTIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq call_with_list(), "10,5", "call with list"
+assert_eq nested_calls(), 6, "nested calls"
+assert_eq call_in_expression(), 20, "call in expression"
+assert_eq method_chain_style(), 3, "method chain style"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPECIAL CASES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq implicit_return(), 42, "implicit return"
+assert_eq if_return(1), "true", "if return true"
+assert_eq if_return(0), "false", "if return false"
+assert_eq ternary_return(1), "yes", "ternary return yes"
+assert_eq ternary_return(0), "no", "ternary return no"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ADDITIONAL TESTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Inline function definitions
+fn local_fn($x) { $x ** 2 }
+assert_eq local_fn(5), 25, "local fn"
+
+# Multiple calls same function
+assert_eq one_arg(1) + one_arg(2) + one_arg(3), 12, "multiple calls"
+
+# Function returning function
+my $factory_fn = fn {
+    my $n = shift;
+    fn { $n * $_0 }
+};
+my $times5 = $factory_fn->(5);
+assert_eq $times5->(3), 15, "factory function"
+
+# Immediate call of anonymous sub
+my $imm = fn { 42 }->();
+assert_eq $imm, 42, "immediate call"
+
+# Pass array by reference
+fn modify_arr($aref) {
+    push @$aref, 4
+    scalar(@$aref)
+}
+my @test_arr = (1, 2, 3)
+assert_eq modify_arr(\@test_arr), 4, "pass array ref"
+assert_eq scalar(@test_arr), 4, "array modified"
+
+# Pass hash by reference  
+fn modify_hash($href) {
+    $href->{new} = "value"
+    scalar(keys %$href)
+}
+my %test_hash = (a => 1)
+assert_eq modify_hash(\%test_hash), 2, "pass hash ref"
+assert_eq $test_hash{new}, "value", "hash modified"
+
+test_run

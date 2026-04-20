@@ -376,6 +376,7 @@ pub(crate) fn assign_rhs_wantarray(target: &Expr) -> WantarrayCtx {
             }
         }
         ExprKind::Typeglob(_) | ExprKind::TypeglobExpr(_) => WantarrayCtx::Scalar,
+        ExprKind::List(_) => WantarrayCtx::List,
         _ => WantarrayCtx::Scalar,
     }
 }
@@ -5001,8 +5002,9 @@ impl Interpreter {
         if flags.contains('e') {
             return self.regex_subst_execute_eval(s, re.as_ref(), replacement, flags, target, line);
         }
-        let replacement =
-            normalize_replacement_backrefs(&self.expand_env_braces_in_subst(replacement, line)?);
+        let replacement = self.expand_env_braces_in_subst(replacement, line)?;
+        let replacement = self.interpolate_replacement_string(&replacement);
+        let replacement = normalize_replacement_backrefs(&replacement);
         let last_caps = if flags.contains('g') {
             let mut rows = Vec::new();
             let mut last = None;
@@ -5135,15 +5137,26 @@ impl Interpreter {
         let _ = line;
         let from_chars = Self::tr_expand_ranges(from);
         let to_chars = Self::tr_expand_ranges(to);
+        let delete_mode = flags.contains('d');
         let mut count = 0i64;
         let new_s: String = s
             .chars()
-            .map(|c| {
+            .filter_map(|c| {
                 if let Some(pos) = from_chars.iter().position(|&fc| fc == c) {
                     count += 1;
-                    to_chars.get(pos).or(to_chars.last()).copied().unwrap_or(c)
+                    if delete_mode {
+                        // /d — delete characters that match but have no replacement
+                        if pos < to_chars.len() {
+                            Some(to_chars[pos])
+                        } else {
+                            None // delete this character
+                        }
+                    } else {
+                        // Normal mode: use last char in to_chars if pos exceeds, or keep original
+                        Some(to_chars.get(pos).or(to_chars.last()).copied().unwrap_or(c))
+                    }
                 } else {
-                    c
+                    Some(c)
                 }
             })
             .collect();
@@ -5151,9 +5164,7 @@ impl Interpreter {
             // /r — non-destructive: return the modified string, leave target unchanged
             Ok(PerlValue::string(new_s))
         } else {
-            if !flags.contains('d') {
-                self.assign_value(target, PerlValue::string(new_s))?;
-            }
+            self.assign_value(target, PerlValue::string(new_s))?;
             Ok(PerlValue::integer(count))
         }
     }
@@ -6122,8 +6133,7 @@ impl Interpreter {
                 unreachable!("regex arms are handled in eval_algebraic_match")
             }
             MatchPattern::Value(expr) => {
-                let pv = self.eval_expr(expr)?;
-                if self.smartmatch_when(subject, &pv) {
+                if self.match_pattern_value_alternation(subject, expr, line)? {
                     Ok(Some(vec![]))
                 } else {
                     Ok(None)
@@ -6157,6 +6167,29 @@ impl Interpreter {
                 )]))
             }
         }
+    }
+
+    /// Handle pattern alternation (e.g., `"foo" | "bar" | "baz"`) in match patterns.
+    /// If the expression is a BitOr chain, recursively check if subject matches any alternative.
+    fn match_pattern_value_alternation(
+        &mut self,
+        subject: &PerlValue,
+        expr: &Expr,
+        line: usize,
+    ) -> Result<bool, FlowOrError> {
+        if let ExprKind::BinOp {
+            left,
+            op: BinOp::BitOr,
+            right,
+        } = &expr.kind
+        {
+            if self.match_pattern_value_alternation(subject, left, line)? {
+                return Ok(true);
+            }
+            return self.match_pattern_value_alternation(subject, right, line);
+        }
+        let pv = self.eval_expr(expr)?;
+        Ok(self.smartmatch_when(subject, &pv))
     }
 
     /// Array value for algebraic `match`, including `\@name` array references (binding refs).
@@ -11017,6 +11050,8 @@ impl Interpreter {
                     i64::from_str_radix(&s[2..], 16).unwrap_or(0)
                 } else if s.starts_with("0b") || s.starts_with("0B") {
                     i64::from_str_radix(&s[2..], 2).unwrap_or(0)
+                } else if s.starts_with("0o") || s.starts_with("0O") {
+                    i64::from_str_radix(&s[2..], 8).unwrap_or(0)
                 } else {
                     i64::from_str_radix(s.trim_start_matches('0'), 8).unwrap_or(0)
                 };
@@ -11639,7 +11674,7 @@ impl Interpreter {
                 }
                 let mut vals = Vec::new();
                 for e in exprs {
-                    let v = self.eval_expr(e)?;
+                    let v = self.eval_expr_ctx(e, WantarrayCtx::List)?;
                     if let Some(items) = v.as_array_vec() {
                         vals.extend(items);
                     } else {
@@ -17470,11 +17505,18 @@ impl Interpreter {
             off as usize
         };
         let len = if let Some(l) = length {
-            self.eval_expr(l)?.to_int() as usize
+            let len_val = self.eval_expr(l)?.to_int();
+            if len_val < 0 {
+                // Negative length: count from end of string
+                let remaining = s.len().saturating_sub(start) as i64;
+                (remaining + len_val).max(0) as usize
+            } else {
+                len_val as usize
+            }
         } else {
             s.len().saturating_sub(start)
         };
-        let end = (start + len).min(s.len());
+        let end = start.saturating_add(len).min(s.len());
         let result = s.get(start..end).unwrap_or("").to_string();
         if let Some(rep) = replacement {
             let rep_s = self.eval_expr(rep)?.to_string();
@@ -18426,6 +18468,71 @@ impl Interpreter {
             line,
         )
         .map_err(FlowOrError::Error)
+    }
+
+    /// Interpolate `$var` in s/// replacement strings, preserving numeric backrefs ($1, $2, etc.).
+    fn interpolate_replacement_string(&self, replacement: &str) -> String {
+        let mut out = String::with_capacity(replacement.len());
+        let chars: Vec<char> = replacement.chars().collect();
+        let mut i = 0;
+        while i < chars.len() {
+            if chars[i] == '\\' && i + 1 < chars.len() {
+                out.push(chars[i]);
+                out.push(chars[i + 1]);
+                i += 2;
+                continue;
+            }
+            if chars[i] == '$' && i + 1 < chars.len() {
+                let start = i;
+                i += 1;
+                if chars[i].is_ascii_digit() {
+                    out.push('$');
+                    while i < chars.len() && chars[i].is_ascii_digit() {
+                        out.push(chars[i]);
+                        i += 1;
+                    }
+                    continue;
+                }
+                if chars[i] == '&' || chars[i] == '`' || chars[i] == '\'' {
+                    out.push('$');
+                    out.push(chars[i]);
+                    i += 1;
+                    continue;
+                }
+                if !chars[i].is_alphanumeric() && chars[i] != '_' && chars[i] != '{' {
+                    out.push('$');
+                    continue;
+                }
+                let mut name = String::new();
+                if chars[i] == '{' {
+                    i += 1;
+                    while i < chars.len() && chars[i] != '}' {
+                        name.push(chars[i]);
+                        i += 1;
+                    }
+                    if i < chars.len() {
+                        i += 1;
+                    }
+                } else {
+                    while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
+                        name.push(chars[i]);
+                        i += 1;
+                    }
+                }
+                if !name.is_empty() && !name.chars().all(|c| c.is_ascii_digit()) {
+                    let val = self.scope.get_scalar(&name);
+                    out.push_str(&val.to_string());
+                } else if !name.is_empty() {
+                    out.push_str(&replacement[start..i]);
+                } else {
+                    out.push('$');
+                }
+                continue;
+            }
+            out.push(chars[i]);
+            i += 1;
+        }
+        out
     }
 
     /// Interpolate `$var` / `@var` in regex patterns (Perl double-quote-like interpolation).

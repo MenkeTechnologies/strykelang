@@ -1,0 +1,266 @@
+# t/test_numeric.stk — numeric operation tests
+
+require "./lib/numeric.stk"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INT
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq int_pos_floor(), 3, "int pos floor"
+assert_eq int_pos_exact(), 5, "int pos exact"
+assert_eq int_neg_toward_zero(), -3, "int neg toward zero"
+assert_eq int_neg_exact(), -5, "int neg exact"
+assert_eq int_zero(), 0, "int zero"
+assert_eq int_small_pos(), 0, "int small pos"
+assert_eq int_small_neg(), 0, "int small neg"
+assert_eq int_large(), 1234567, "int large"
+
+assert_eq int_string_pos(), 42, "int string pos"
+assert_eq int_string_neg(), -3, "int string neg"
+assert_eq int_string_mixed(), 123, "int string mixed"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ABS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq abs_positive(), 42, "abs positive"
+assert_eq abs_negative(), 42, "abs negative"
+assert_eq abs_zero(), 0, "abs zero"
+assert_eq abs_float_pos(), 3.14, "abs float pos"
+assert_eq abs_float_neg(), 3.14, "abs float neg"
+assert_eq abs_large(), 1000000, "abs large"
+assert_eq abs_small(), 0.001, "abs small"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SQRT
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq sqrt_perfect_4(), 2, "sqrt 4"
+assert_eq sqrt_perfect_9(), 3, "sqrt 9"
+assert_eq sqrt_perfect_16(), 4, "sqrt 16"
+assert_eq sqrt_perfect_25(), 5, "sqrt 25"
+assert_eq sqrt_perfect_100(), 10, "sqrt 100"
+assert_eq sqrt_one(), 1, "sqrt 1"
+assert_eq sqrt_zero(), 0, "sqrt 0"
+assert_eq sqrt_two_approx(), 14142, "sqrt 2 approx"
+assert_eq sqrt_large(), 1000, "sqrt large"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SIN / COS / TAN
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq sin_zero(), 0, "sin 0"
+assert_eq sin_pi_half(), 1000, "sin pi/2"
+assert_eq sin_pi(), 0, "sin pi"
+
+assert_eq cos_zero(), 1000, "cos 0"
+assert_eq cos_pi_half(), 0, "cos pi/2"
+assert_eq cos_pi(), -1000, "cos pi"
+
+assert_eq tan_zero(), 0, "tan 0"
+assert_near tan_pi_quarter(), 1000, 5, "tan pi/4"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ATAN / ATAN2
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq atan_zero(), 0, "atan 0"
+assert_eq atan_one(), 785, "atan 1"
+assert_eq atan2_quadrant1(), 785, "atan2 quadrant1"
+assert_eq atan2_quadrant2(), 2356, "atan2 quadrant2"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LOG / EXP
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq log_one(), 0, "log 1"
+assert_near log_e(), 1000, 10, "log e"
+assert_near log_10(), 2302, 10, "log 10"
+
+assert_eq exp_zero(), 1000, "exp 0"
+assert_near exp_one(), 2718, 10, "exp 1"
+assert_near exp_two(), 738, 10, "exp 2"
+
+assert_eq log_exp_roundtrip(), 3000, "log exp roundtrip"
+assert_near exp_log_roundtrip(), 5000, 5, "exp log roundtrip"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# POWER
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq pow_2_3(), 8, "pow 2^3"
+assert_eq pow_3_2(), 9, "pow 3^2"
+assert_eq pow_10_2(), 100, "pow 10^2"
+assert_eq pow_2_10(), 1024, "pow 2^10"
+assert_eq pow_neg(), -8, "pow neg"
+assert_eq pow_zero_exp(), 1, "pow zero exp"
+assert_eq pow_one_exp(), 5, "pow one exp"
+assert_eq pow_float(), 625, "pow float"
+assert_eq pow_fractional(), 2000, "pow fractional"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MODULO
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq mod_simple(), 1, "mod simple"
+assert_eq mod_exact(), 0, "mod exact"
+assert_eq mod_larger(), 3, "mod larger"
+# modulo with negatives varies by language, just check it returns
+assert_ok defined(mod_negative()), "mod negative"
+assert_ok defined(mod_by_negative()), "mod by negative"
+assert_eq mod_one(), 0, "mod one"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# RAND
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq rand_bounded(), 1, "rand bounded"
+assert_eq rand_multiple_diff(), 1, "rand multiple diff"
+assert_eq rand_with_max(), 1, "rand with max"
+assert_eq rand_int_range(), 1, "rand int range"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MIN / MAX
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq min_two(), 3, "min two"
+assert_eq min_many(), 1, "min many"
+assert_eq min_negative(), -8, "min negative"
+assert_eq min_same(), 5, "min same"
+assert_eq min_one(), 42, "min one"
+
+assert_eq max_two(), 5, "max two"
+assert_eq max_many(), 9, "max many"
+assert_eq max_negative(), -3, "max negative"
+assert_eq max_same(), 5, "max same"
+assert_eq max_one(), 42, "max one"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FLOOR / CEIL / ROUND
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq floor_pos(), 3, "floor pos"
+assert_eq floor_neg(), -4, "floor neg"
+assert_eq floor_exact(), 5, "floor exact"
+
+assert_eq ceil_pos(), 4, "ceil pos"
+assert_eq ceil_neg(), -3, "ceil neg"
+assert_eq ceil_exact(), 5, "ceil exact"
+
+assert_eq round_up(), 4, "round up"
+assert_eq round_down(), 3, "round down"
+assert_eq round_half(), 4, "round half"
+assert_eq round_neg(), -4, "round neg"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NUMERIC COMPARISON
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq cmp_equal(), 1, "cmp equal"
+assert_eq cmp_not_equal(), 1, "cmp not equal"
+assert_eq cmp_less(), 1, "cmp less"
+assert_eq cmp_greater(), 1, "cmp greater"
+assert_eq cmp_less_eq(), 1, "cmp less eq"
+assert_eq cmp_greater_eq(), 1, "cmp greater eq"
+
+assert_eq cmp_float_equal(), 1, "cmp float equal"
+assert_eq cmp_float_not_equal(), 1, "cmp float not equal"
+
+assert_eq spaceship_less(), -1, "spaceship less"
+assert_eq spaceship_equal(), 0, "spaceship equal"
+assert_eq spaceship_greater(), 1, "spaceship greater"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARITHMETIC
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq add_int(), 8, "add int"
+assert_eq add_float(), 40, "add float"
+assert_eq add_negative(), 2, "add negative"
+
+assert_eq sub_int(), 2, "sub int"
+assert_eq sub_float(), 32, "sub float"
+assert_eq sub_negative(), 8, "sub negative"
+
+assert_eq mul_int(), 15, "mul int"
+assert_eq mul_float(), 50, "mul float"
+assert_eq mul_negative(), -15, "mul negative"
+assert_eq mul_zero(), 0, "mul zero"
+
+assert_eq div_int(), 5, "div int"
+assert_eq div_float(), 35, "div float"
+assert_eq div_negative(), -5, "div negative"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INCREMENT / DECREMENT
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq inc_post(), 5, "inc post"
+assert_eq inc_post_after(), 6, "inc post after"
+assert_eq inc_pre(), 6, "inc pre"
+
+assert_eq dec_post(), 5, "dec post"
+assert_eq dec_post_after(), 4, "dec post after"
+assert_eq dec_pre(), 4, "dec pre"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COMPOUND ASSIGNMENT
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq assign_add(), 8, "assign add"
+assert_eq assign_sub(), 7, "assign sub"
+assert_eq assign_mul(), 12, "assign mul"
+assert_eq assign_div(), 4, "assign div"
+assert_eq assign_mod(), 1, "assign mod"
+assert_eq assign_pow(), 8, "assign pow"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BITWISE
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq test_bit_and(), 8, "bit and"
+assert_eq test_bit_or(), 14, "bit or"
+assert_eq test_bit_xor(), 6, "bit xor"
+assert_eq bit_not(), -1, "bit not"
+assert_eq bit_lshift(), 16, "bit lshift"
+assert_eq bit_rshift(), 4, "bit rshift"
+
+assert_eq bit_assign_and(), 8, "bit assign and"
+assert_eq bit_assign_or(), 15, "bit assign or"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HEX / OCT / BIN
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq hex_simple(), 255, "hex simple"
+assert_eq test_hex_upper(), 255, "hex upper"
+assert_eq hex_prefix(), 255, "hex prefix"
+assert_eq hex_zero(), 0, "hex zero"
+
+assert_eq oct_simple(), 63, "oct simple"
+assert_eq oct_zero(), 0, "oct zero"
+
+assert_eq sprintf_hex(), "ff", "sprintf hex"
+assert_eq sprintf_oct(), "100", "sprintf oct"
+assert_eq sprintf_bin(), "1010", "sprintf bin"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EDGE CASES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq zero_div_protected(), 1, "zero div protected"
+assert_eq large_number(), 1, "large number"
+assert_eq small_fraction(), 1, "small fraction"
+assert_eq infinity_check(), 1, "infinity check"
+assert_eq negative_zero(), 1, "negative zero"
+assert_eq precision_test(), 1, "precision test"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SUM / PRODUCT HELPERS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq sum_array(), 15, "sum array"
+assert_eq product_array(), 120, "product array"
+assert_eq average_array(), 6, "average array"
+
+test_run

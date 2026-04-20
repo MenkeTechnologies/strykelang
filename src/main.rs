@@ -1220,12 +1220,23 @@ fn main() {
                     let stderr = String::from_utf8_lossy(&out.stderr);
                     // Print the stderr (test output)
                     eprint!("{}", stderr);
-                    // Count ✓ and ✗ in output
-                    total_pass += stderr.matches('✓').count().saturating_sub(1); // -1 for summary line
-                    total_fail += stderr
-                        .matches('✗')
-                        .count()
-                        .saturating_sub(if out.status.success() { 0 } else { 1 });
+                    // Count ✓ and ✗ in output (only lines starting with "  ✓" or "  ✗")
+                    for line in stderr.lines() {
+                        let trimmed = line.trim_start();
+                        if trimmed.starts_with("\x1b[32m✓\x1b[0m") || trimmed.starts_with("✓") {
+                            // Check it's not the summary "✓ All X tests" line
+                            if !trimmed.contains("All ") && !trimmed.contains(" passed") {
+                                total_pass += 1;
+                            }
+                        } else if trimmed.starts_with("\x1b[31m✗\x1b[0m")
+                            || trimmed.starts_with("✗")
+                        {
+                            // Check it's not the summary "✗ X of Y tests failed" line
+                            if !trimmed.contains(" of ") || !trimmed.contains(" failed") {
+                                total_fail += 1;
+                            }
+                        }
+                    }
                     if !out.status.success() {
                         failed += 1;
                     }

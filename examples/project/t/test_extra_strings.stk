@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# test_extra_strings.stk — more string tests
+
+require "./lib/strings.stk"
+
+# Test slugify_str
+assert_eq slugify_str("Hello World!"), "hello-world", "slugify basic"
+assert_eq slugify_str("---Foo BAR---"), "foo-bar", "slugify trim"
+
+# Test get_initials
+assert_eq get_initials("John Doe"), "JD", "initials JD"
+assert_eq get_initials("alan turing"), "AT", "initials AT"
+
+# Test truncate_str
+my $long_str = "this is a very long string that should be truncated"
+assert_eq truncate_str($long_str, 10), "this is a~", "truncate 10"
+assert_eq truncate_str("short", 10), "short", "no truncate"
+
+# Test repeat_str
+assert_eq repeat_str("abc", 3), "abcabcabc", "repeat 3"
+
+# Test pad_center
+assert_eq pad_center("hi", 6), "  hi  ", "pad 6"
+assert_eq pad_center("hi", 5), " hi  ", "pad 5"
+
+# Test caesar_cipher
+assert_eq caesar_cipher("abc", 1), "bcd", "caesar +1"
+assert_eq caesar_cipher("Hello", 13), "Uryyb", "caesar ROT13"
+
+# Test count_vowels
+assert_eq count_vowels("apple"), 2, "vowels apple"
+assert_eq count_vowels("xyz"), 0, "vowels xyz"
+
+test_run

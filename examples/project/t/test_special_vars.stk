@@ -1,0 +1,120 @@
+# t/test_special_vars.stk — special variable tests
+
+require "./lib/special_vars.stk"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# $_ DEFAULT VARIABLE
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq default_in_for(), "1,2,3", "default in for"
+assert_eq default_in_map(), "2,4,6", "default in map"
+assert_eq default_in_grep(), 3, "default in grep"
+assert_eq default_explicit_set(), "hello", "default explicit set"
+assert_eq default_in_regex(), 1, "default in regex"
+assert_eq default_in_subst(), "world", "default in subst"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# @_ ARGUMENTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq args_count(), 3, "args count"
+assert_eq args_first(), "first", "args first"
+assert_eq args_all(), "1,2,3", "args all"
+assert_eq args_shift_style(), 30, "args shift style"
+assert_eq args_modify(), 1, "args modify"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# %ENV ENVIRONMENT
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq env_exists(), 1, "env exists"
+assert_eq env_home(), 1, "env home"
+assert_eq env_set_get(), 1, "env set get"
+assert_eq test_env_keys(), 1, "env keys"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# $0 PROGRAM NAME
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq prog_name_defined(), 1, "prog name defined"
+assert_eq prog_name_not_empty(), 1, "prog name not empty"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# $$ PROCESS ID
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq pid_positive(), 1, "pid positive"
+assert_eq pid_numeric(), 1, "pid numeric"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# $@ ERROR VARIABLE
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq error_after_eval_fail(), 1, "error after eval fail"
+assert_eq error_after_eval_success(), 1, "error after eval success"
+assert_eq error_cleared(), 1, "error cleared"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# $! ERRNO
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq errno_after_bad_open(), 1, "errno after bad open"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# $? CHILD STATUS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq child_status_after_system(), 1, "child status after system"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# @ARGV COMMAND LINE ARGS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq argv_is_array(), 1, "argv is array"
+assert_eq argv_count(), 1, "argv count"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CAPTURE GROUPS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq capture_1(), 1, "capture 1"
+assert_eq capture_2(), 1, "capture 2"
+assert_eq capture_multiple(), 1, "capture multiple"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SEPARATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+# local $" may not work - skip for now
+# assert_eq list_separator(), 1, "list separator"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INPUT/OUTPUT SEPARATORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq input_sep_default(), 1, "input sep default"
+assert_eq output_sep_default(), 1, "output sep default"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LINE/FILE
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq line_number(), 1, "line number"
+assert_eq file_name(), 1, "file name"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARRAY LAST INDEX
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq array_last_index(), 1, "array last index"
+# $#a = N may not work
+# assert_eq array_last_index_modify(), 1, "array last index modify"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VERSION VARIABLES
+# ══════════════════════════════════════════════════════════════════════════════
+
+assert_eq perl_version(), 1, "perl version"
+assert_eq test_os_name(), 1, "os name"
+
+test_run

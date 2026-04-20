@@ -8096,6 +8096,8 @@ impl<'a> VM<'a> {
                     i64::from_str_radix(&s[2..], 16).unwrap_or(0)
                 } else if s.starts_with("0b") || s.starts_with("0B") {
                     i64::from_str_radix(&s[2..], 2).unwrap_or(0)
+                } else if s.starts_with("0o") || s.starts_with("0O") {
+                    i64::from_str_radix(&s[2..], 8).unwrap_or(0)
                 } else {
                     i64::from_str_radix(s.trim_start_matches('0'), 8).unwrap_or(0)
                 };

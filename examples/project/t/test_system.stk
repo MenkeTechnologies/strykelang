@@ -1,0 +1,67 @@
+#!/usr/bin/env stryke
+# t/test_system.stk — system builtins and environment tests
+
+# ── Host and OS ────────────────────────────────────────────────────
+
+my $hostname = gethostname()
+assert_ok length($hostname) > 0, "hostname is not empty"
+
+my $os = os_name()
+assert_ok length($os) > 0, "os_name is not empty"
+assert_ok $os =~ /^(macos|linux|windows|freebsd|openbsd|netbsd|android|ios)$/i, "os_name is recognized"
+
+# ── CPU and Memory ─────────────────────────────────────────────────
+
+my $info = pool_info()
+assert_ok exists $info->{cpus}, "pool_info has cpus"
+assert_gt $info->{cpus}, 0, "cpus count > 0"
+assert_ok exists $info->{arch}, "pool_info has arch"
+
+my $total_mem = mem_total()
+assert_gt $total_mem, 0, "total memory > 0"
+
+my $free_mem = mem_free()
+assert_gt $free_mem, 0, "free memory > 0"
+assert_gt $total_mem, $free_mem, "total memory > free memory"
+
+# ── Uptime ─────────────────────────────────────────────────────────
+
+my $uptime = sys_uptime()
+assert_gt $uptime, 0, "uptime > 0"
+
+# ── Network Basics ─────────────────────────────────────────────────
+
+my $ipv4 = net_ipv4()
+if (defined $ipv4) {
+    assert_ok $ipv4 =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/, "valid ipv4 format"
+}
+
+my $mac = net_mac()
+if (defined $mac) {
+    assert_ok $mac =~ /^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$/, "valid mac format"
+}
+
+my @interfaces = net_interfaces()
+assert_gt scalar(@interfaces), 0, "has network interfaces"
+
+# ── Filesystem ─────────────────────────────────────────────────────
+
+my $cwd = cwd()
+assert_ok defined($cwd), "cwd is defined"
+assert_ok -d $cwd, "cwd is a directory"
+
+my $tmp = tempfile()
+assert_ok defined($tmp), "tempfile returns a path"
+spurt($tmp, "stryke test")
+assert_eq slurp($tmp), "stryke test", "spurt/slurp roundtrip"
+assert_ok -f $tmp, "tempfile exists as a file"
+
+# ── Process Intel ──────────────────────────────────────────────────
+
+my @procs = process_list()
+assert_gt scalar(@procs), 0, "process list is not empty"
+# Find our own process (approximately by name 's' or 'stryke')
+my @found = grep { $_->{name} =~ /s/ } @procs
+assert_gt scalar(@found), 0, "found at least one process with 's' in name"
+
+test_run

@@ -1,0 +1,51 @@
+#!/usr/bin/env stryke
+# t/test_algorithms.stk — algorithm implementation tests
+
+require "./lib/control_flow.stk"
+
+# ── FizzBuzz ────────────────────────────────────────────────────────
+
+my @fb = fizzbuzz(15)
+assert_eq scalar(@fb), 15, "fizzbuzz count"
+assert_eq $fb[0], 1, "fizzbuzz 1"
+assert_eq $fb[2], "Fizz", "fizzbuzz 3"
+assert_eq $fb[4], "Buzz", "fizzbuzz 5"
+assert_eq $fb[14], "FizzBuzz", "fizzbuzz 15"
+
+# ── Collatz ─────────────────────────────────────────────────────────
+
+assert_eq collatz_steps(1), 0, "collatz 1"
+assert_eq collatz_steps(6), 8, "collatz 6 (6->3->10->5->16->8->4->2->1)"
+assert_eq collatz_steps(27), 111, "collatz 27"
+
+# ── Prime Finding ───────────────────────────────────────────────────
+
+my @primes = find_primes(50)
+assert_eq scalar(@primes), 15, "primes under 50 count"
+assert_eq $primes[0], 2, "first prime"
+assert_eq $primes[-1], 47, "last prime under 50"
+
+# ── Fibonacci (Iterative comparison) ────────────────────────────────
+
+require "./lib/math.stk"
+assert_eq fib(10), 55, "fib 10"
+assert_eq fib(20), 6765, "fib 20"
+
+# ── GCD / LCM complex cases ─────────────────────────────────────────
+
+assert_eq gcd_of(1071, 462), 21, "gcd large"
+assert_eq lcm_of(21, 6), 42, "lcm basic"
+
+# ── Find Pair Sum ───────────────────────────────────────────────────
+
+my @nums = (1, 5, 8, 12, 14, 20)
+my @pair = find_pair_sum(20, @nums)
+assert_eq scalar(@pair), 2, "find_pair_sum count"
+# 8 + 12 = 20
+my $sum = $pair[0] + $pair[1]
+assert_eq $sum, 20, "pair sum matches"
+
+my @no_pair = find_pair_sum(100, @nums)
+assert_eq scalar(@no_pair), 0, "find_pair_sum no match"
+
+test_run

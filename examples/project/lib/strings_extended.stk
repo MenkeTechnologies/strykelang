@@ -1,0 +1,318 @@
+# lib/strings_extended.stk — comprehensive string operations
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BASIC STRING OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn str_length($s) { length($s) }
+fn str_reverse($s) { scalar(reverse($s)) }
+fn str_repeat($s, $n) { $s x $n }
+
+fn str_concat_two($a, $b) { $a . $b }
+fn str_concat_many(@parts) { join("", @parts) }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CASE CONVERSION
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn str_uc($s) { uc($s) }
+fn str_lc($s) { lc($s) }
+fn str_ucfirst($s) { ucfirst($s) }
+fn str_lcfirst($s) { lcfirst($s) }
+
+fn to_title_case($s) {
+    join(" ", map { ucfirst(lc($_)) } split(/\s+/, $s))
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SUBSTRING OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn str_substr($s, $start, $len) { substr($s, $start, $len) }
+fn str_substr_to_end($s, $start) { substr($s, $start) }
+fn str_substr_negative($s, $offset) { substr($s, $offset) }
+
+fn str_replace_substr($s, $start, $len, $repl) {
+    my $result = $s
+    substr($result, $start, $len, $repl)
+    $result
+}
+
+fn str_first_n($s, $n) { substr($s, 0, $n) }
+fn str_last_n($s, $n) { substr($s, -$n) }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INDEX OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn str_index($s, $substr) { index($s, $substr) }
+fn str_index_from($s, $substr, $pos) { index($s, $substr, $pos) }
+fn str_rindex($s, $substr) { rindex($s, $substr) }
+
+fn str_contains($s, $substr) { index($s, $substr) >= 0 ? 1 : 0 }
+fn str_starts_with($s, $prefix) { index($s, $prefix) == 0 ? 1 : 0 }
+fn str_ends_with($s, $suffix) { rindex($s, $suffix) == length($s) - length($suffix) ? 1 : 0 }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TRIM OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn str_trim($s) {
+    my $result = $s
+    $result =~ s/^\s+//
+    $result =~ s/\s+$//
+    $result
+}
+
+fn str_ltrim($s) {
+    my $result = $s
+    $result =~ s/^\s+//
+    $result
+}
+
+fn str_rtrim($s) {
+    my $result = $s
+    $result =~ s/\s+$//
+    $result
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CHOMP AND CHOP
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn str_chomp($s) {
+    my $result = $s
+    chomp($result)
+    $result
+}
+
+fn str_chop($s) {
+    my $result = $s
+    my $char = chop($result)
+    ($result, $char)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CHARACTER OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn str_chr($n) { chr($n) }
+fn str_ord($s) { ord($s) }
+
+fn str_to_chars($s) {
+    my @chars = ()
+    for my $i (0 .. length($s) - 1) {
+        push @chars, substr($s, $i, 1)
+    }
+    @chars
+}
+
+fn str_from_chars(@chars) { join("", @chars) }
+
+fn str_char_at($s, $i) { substr($s, $i, 1) }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PADDING AND ALIGNMENT
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn str_pad_left($s, $width, $char) {
+    my $pad = $width - length($s)
+    $pad > 0 ? ($char x $pad) . $s : $s
+}
+
+fn str_pad_right($s, $width, $char) {
+    my $pad = $width - length($s)
+    $pad > 0 ? $s . ($char x $pad) : $s
+}
+
+fn str_center($s, $width, $char) {
+    my $pad = $width - length($s)
+    if ($pad <= 0) {
+        return $s
+    }
+    my $left = int($pad / 2)
+    my $right = $pad - $left
+    ($char x $left) . $s . ($char x $right)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPRINTF FORMATTING
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn str_sprintf_int($n) { sprintf("%d", $n) }
+fn str_sprintf_padded($n, $w) { sprintf("%${w}d", $n) }
+fn str_sprintf_zero_pad($n, $w) { sprintf("%0${w}d", $n) }
+fn str_sprintf_float($n, $p) { sprintf("%.${p}f", $n) }
+fn str_sprintf_hex($n) { sprintf("%x", $n) }
+fn str_sprintf_HEX($n) { sprintf("%X", $n) }
+fn str_sprintf_oct($n) { sprintf("%o", $n) }
+fn str_sprintf_bin($n) { sprintf("%b", $n) }
+fn str_sprintf_str($s) { sprintf("%s", $s) }
+fn str_sprintf_str_width($s, $w) { sprintf("%${w}s", $s) }
+fn str_sprintf_percent { sprintf("%%") }
+
+fn str_sprintf_multi($name, $age, $score) {
+    sprintf("%s is %d years old with score %.2f", $name, $age, $score)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PACK AND UNPACK
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn str_pack_a($s) { pack("A10", $s) }
+fn str_pack_Z($s) { pack("Z10", $s) }
+fn str_pack_n($n) { pack("n", $n) }
+fn str_pack_N($n) { pack("N", $n) }
+
+fn str_unpack_a($packed) { unpack("A10", $packed) }
+fn str_unpack_n($packed) { unpack("n", $packed) }
+
+fn str_pack_multi($s1, $s2) { pack("A5 A5", $s1, $s2) }
+fn str_unpack_multi($packed) {
+    my @parts = unpack("A5 A5", $packed)
+    @parts
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NUMERIC CONVERSIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn str_hex($s) { hex($s) }
+fn str_oct($s) { oct($s) }
+fn str_int($s) { int($s) }
+
+fn str_to_num($s) { 0 + $s }
+fn num_to_str($n) { "" . $n }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# QUOTE OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn str_quotemeta($s) { quotemeta($s) }
+
+fn str_q { q{hello world} }
+fn str_qq { my $x = "world"; qq{hello $x} }
+fn str_qw { my @w = qw(one two three); @w }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INTERPOLATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn str_interp_scalar {
+    my $name = "Alice"
+    "Hello, $name!"
+}
+
+fn str_interp_array_elem {
+    my @arr = qw(a b c)
+    "Second: $arr[1]"
+}
+
+fn str_interp_hash_elem {
+    my %h = (key => "value")
+    "Key: $h{key}"
+}
+
+fn str_interp_escape {
+    "Tab:\tNewline:\nBackslash:\\"
+}
+
+fn str_interp_braces {
+    my $word = "test"
+    "${word}ing"
+}
+
+fn str_no_interp {
+    my $x = "not interpolated"
+    q{$x stays literal}
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPLIT AND JOIN
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn str_split_char($s) {
+    my @chars = ()
+    for my $i (0 .. length($s) - 1) {
+        push @chars, substr($s, $i, 1)
+    }
+    @chars
+}
+fn str_split_delim($s, $d) { split(/$d/, $s) }
+fn str_split_ws($s) { split(/\s+/, $s) }
+fn str_split_limit($s, $d, $n) { split(/$d/, $s, $n) }
+
+fn str_join($sep, @parts) { join($sep, @parts) }
+fn str_join_empty(@parts) { join("", @parts) }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TRANSLITERATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn str_tr_basic($s) {
+    my $result = $s
+    $result =~ tr/a-z/A-Z/
+    $result
+}
+
+fn str_tr_delete($s) {
+    my $result = $s
+    $result =~ tr/aeiou//d
+    $result
+}
+
+fn str_tr_count($s) {
+    my $count = ($s =~ tr/aeiou//)
+    $count
+}
+
+fn str_tr_squeeze($s) {
+    my $result = $s
+    $result =~ tr/a-z//s
+    $result
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COMPARISON
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn str_eq_op($a, $b) { $a eq $b ? 1 : 0 }
+fn str_ne_op($a, $b) { $a ne $b ? 1 : 0 }
+fn str_lt_op($a, $b) { $a lt $b ? 1 : 0 }
+fn str_gt_op($a, $b) { $a gt $b ? 1 : 0 }
+fn str_le_op($a, $b) { $a le $b ? 1 : 0 }
+fn str_ge_op($a, $b) { $a ge $b ? 1 : 0 }
+fn str_cmp_op($a, $b) { $a cmp $b }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# UTILITY FUNCTIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn str_is_empty($s) { length($s) == 0 ? 1 : 0 }
+fn str_is_blank($s) { $s =~ /^\s*$/ ? 1 : 0 }
+
+fn str_count_char($s, $char) {
+    my $count = 0
+    for my $c (split(//, $s)) {
+        $count++ if $c eq $char
+    }
+    $count
+}
+
+fn str_word_count($s) {
+    my @words = split(/\s+/, $s)
+    @words = grep { length($_) > 0 } @words
+    scalar(@words)
+}
+
+fn str_lines($s) {
+    my @lines = split(/\n/, $s)
+    @lines
+}
+
+fn str_truncate($s, $max, $suffix) {
+    if (length($s) <= $max) {
+        return $s
+    }
+    substr($s, 0, $max - length($suffix)) . $suffix
+}
