@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# t/test_linked_list.stk — test recursive linked list
+
+require "./lib/linked_list.stk"
+
+# ── Construction ───────────────────────────────────────────────────
+my $l0 = Nil()
+assert_true $l0->is_empty(), "Nil is empty"
+
+my $l1 = Cons(val => 42, next => $l0)
+assert_false $l1->is_empty(), "Cons is not empty"
+assert_eq $l1->head(), 42, "head is 42"
+assert_true $l1->tail()->is_empty(), "tail is Nil"
+
+# ── list_new helper ───────────────────────────────────────────────
+my $list = list_new(1, 2, 3)
+assert_eq list_length($list), 3, "list length 3"
+assert_eq $list->head(), 1, "first is 1"
+assert_eq $list->tail()->head(), 2, "second is 2"
+assert_eq $list->tail()->tail()->head(), 3, "third is 3"
+
+# ── list_map ──────────────────────────────────────────────────────
+my $mapped = list_map(fn ($x) { $x * 2 }, $list)
+assert_eq $mapped->head(), 2, "mapped first"
+assert_eq $mapped->tail()->head(), 4, "mapped second"
+assert_eq $mapped->tail()->tail()->head(), 6, "mapped third"
+
+# ── list_to_array ─────────────────────────────────────────────────
+my @arr = list_to_array($mapped)
+assert_eq join(",", @arr), "2,4,6", "list to array"
+
+# ── recursive to_str ──────────────────────────────────────────────
+assert_eq $list->to_str(), "[1, 2, 3]", "recursive to_str"
+assert_eq $l0->to_str(), "[]", "Nil to_str"
+
+test_run

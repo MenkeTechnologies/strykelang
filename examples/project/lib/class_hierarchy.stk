@@ -1,0 +1,1003 @@
+# lib/class_hierarchy.stk — deep class hierarchies, inheritance, composition
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TRAITS FOR BEHAVIORS
+# ══════════════════════════════════════════════════════════════════════════════
+
+trait Drawable {
+    fn draw;
+    fn bounds;
+}
+
+trait Serializable {
+    fn to_json;
+    fn from_json;
+}
+
+trait Comparable {
+    fn compare;
+    fn equals;
+}
+
+trait Cloneable {
+    fn clone;
+}
+
+trait Visitor {
+    fn visit;
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BASE ENTITY HIERARCHY (3 levels deep)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class Entity impl Serializable, Comparable {
+    id: Int
+    created_at: Int = 0
+    
+    fn Self.next_id {
+        state $counter = 0
+        $counter += 1
+        $counter
+    }
+    
+    fn to_json {
+        '{"id":' . $self->id . ',"created_at":' . $self->created_at . '}'
+    }
+    
+    fn from_json($json) { undef }
+    
+    fn compare($other) {
+        $self->id <=> $other->id
+    }
+    
+    fn equals($other) {
+        $self->id == $other->id
+    }
+}
+
+class NamedEntity extends Entity {
+    name: Str = ""
+    description: Str = ""
+    
+    fn to_json {
+        '{"id":' . $self->id . ',"name":"' . $self->name . '","description":"' . $self->description . '"}'
+    }
+    
+    fn display_name {
+        $self->name . " (#" . $self->id . ")"
+    }
+}
+
+class TaggedEntity extends NamedEntity {
+    tags: Array = []
+    metadata: Hash = {}
+    
+    fn add_tag($tag) {
+        push @{$self->tags}, $tag
+        $self
+    }
+    
+    fn has_tag($tag) {
+        for my $t (@{$self->tags}) {
+            return 1 if $t eq $tag
+        }
+        0
+    }
+    
+    fn set_meta($key, $value) {
+        $self->metadata->{$key} = $value
+        $self
+    }
+    
+    fn get_meta($key) {
+        $self->metadata->{$key}
+    }
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GEOMETRY HIERARCHY WITH COMPOSITION
+# ══════════════════════════════════════════════════════════════════════════════
+
+class Coordinate impl Cloneable {
+    x: Float = 0.0
+    y: Float = 0.0
+    z: Float = 0.0
+    
+    fn clone {
+        Coordinate(x => $self->x, y => $self->y, z => $self->z)
+    }
+    
+    fn distance_to($other) {
+        my $dx = $other->x - $self->x
+        my $dy = $other->y - $self->y
+        my $dz = $other->z - $self->z
+        sqrt($dx * $dx + $dy * $dy + $dz * $dz)
+    }
+    
+    fn translate($dx, $dy, $dz) {
+        Coordinate(
+            x => $self->x + $dx,
+            y => $self->y + $dy,
+            z => $self->z + $dz
+        )
+    }
+    
+    fn to_str {
+        "(" . $self->x . ", " . $self->y . ", " . $self->z . ")"
+    }
+}
+
+class BoundingBox {
+    min: Coordinate
+    max: Coordinate
+    
+    fn width { $self->max->x - $self->min->x }
+    fn height { $self->max->y - $self->min->y }
+    fn depth { $self->max->z - $self->min->z }
+    
+    fn volume {
+        $self->width() * $self->height() * $self->depth()
+    }
+    
+    fn contains($point) {
+        $point->x >= $self->min->x && $point->x <= $self->max->x &&
+        $point->y >= $self->min->y && $point->y <= $self->max->y &&
+        $point->z >= $self->min->z && $point->z <= $self->max->z
+    }
+    
+    fn intersects($other) {
+        $self->min->x <= $other->max->x && $self->max->x >= $other->min->x &&
+        $self->min->y <= $other->max->y && $self->max->y >= $other->min->y &&
+        $self->min->z <= $other->max->z && $self->max->z >= $other->min->z
+    }
+    
+    fn center {
+        Coordinate(
+            x => ($self->min->x + $self->max->x) / 2,
+            y => ($self->min->y + $self->max->y) / 2,
+            z => ($self->min->z + $self->max->z) / 2
+        )
+    }
+}
+
+class Shape impl Drawable {
+    position: Coordinate
+    color: Str = "black"
+    visible: Int = 1
+    
+    fn draw { "Drawing shape at " . $self->position->to_str() }
+    fn bounds { undef }
+    fn area { 0 }
+    fn perimeter { 0 }
+    
+    fn move_to($x, $y, $z) {
+        $self->position(Coordinate(x => $x, y => $y, z => $z))
+        $self
+    }
+    
+    fn move_by($dx, $dy, $dz) {
+        $self->position($self->position->translate($dx, $dy, $dz))
+        $self
+    }
+}
+
+class Shape2D extends Shape {
+    rotation: Float = 0.0
+    
+    fn rotate($degrees) {
+        $self->rotation(($self->rotation + $degrees) % 360)
+        $self
+    }
+    
+    fn bounds {
+        BoundingBox(
+            min => Coordinate(x => $self->position->x, y => $self->position->y, z => 0),
+            max => Coordinate(x => $self->position->x, y => $self->position->y, z => 0)
+        )
+    }
+}
+
+class Rectangle2D extends Shape2D {
+    width: Float
+    height: Float
+    
+    fn area { $self->width * $self->height }
+    fn perimeter { 2 * ($self->width + $self->height) }
+    fn diagonal { sqrt($self->width * $self->width + $self->height * $self->height) }
+    
+    fn draw {
+        "Drawing rectangle " . $self->width . "x" . $self->height . " at " . $self->position->to_str()
+    }
+    
+    fn bounds {
+        BoundingBox(
+            min => $self->position->clone(),
+            max => Coordinate(
+                x => $self->position->x + $self->width,
+                y => $self->position->y + $self->height,
+                z => 0
+            )
+        )
+    }
+    
+    fn is_square { $self->width == $self->height ? 1 : 0 }
+}
+
+class Circle2D extends Shape2D {
+    radius: Float
+    
+    fn area { 3.14159265 * $self->radius * $self->radius }
+    fn perimeter { 2 * 3.14159265 * $self->radius }
+    fn diameter { 2 * $self->radius }
+    
+    fn draw {
+        "Drawing circle r=" . $self->radius . " at " . $self->position->to_str()
+    }
+    
+    fn bounds {
+        BoundingBox(
+            min => Coordinate(
+                x => $self->position->x - $self->radius,
+                y => $self->position->y - $self->radius,
+                z => 0
+            ),
+            max => Coordinate(
+                x => $self->position->x + $self->radius,
+                y => $self->position->y + $self->radius,
+                z => 0
+            )
+        )
+    }
+    
+    fn contains_point($x, $y) {
+        my $dx = $x - $self->position->x
+        my $dy = $y - $self->position->y
+        ($dx * $dx + $dy * $dy) <= ($self->radius * $self->radius)
+    }
+}
+
+class Polygon2D extends Shape2D {
+    vertices: Array = []
+    
+    fn add_vertex($coord) {
+        push @{$self->vertices}, $coord
+        $self
+    }
+    
+    fn vertex_count { scalar(@{$self->vertices}) }
+    
+    fn draw {
+        "Drawing polygon with " . $self->vertex_count() . " vertices"
+    }
+}
+
+class Triangle2D extends Polygon2D {
+    fn area {
+        my @v = @{$self->vertices}
+        return 0 if scalar(@v) < 3
+        my $x1 = $v[0]->x; my $y1 = $v[0]->y
+        my $x2 = $v[1]->x; my $y2 = $v[1]->y
+        my $x3 = $v[2]->x; my $y3 = $v[2]->y
+        abs(($x1 * ($y2 - $y3) + $x2 * ($y3 - $y1) + $x3 * ($y1 - $y2)) / 2)
+    }
+    
+    fn draw { "Drawing triangle" }
+}
+
+class Shape3D extends Shape {
+    scale: Float = 1.0
+    
+    fn volume { 0 }
+    fn surface_area { 0 }
+}
+
+class Cube3D extends Shape3D {
+    side: Float
+    
+    fn volume { $self->side ** 3 }
+    fn surface_area { 6 * $self->side * $self->side }
+    
+    fn draw {
+        "Drawing cube side=" . $self->side . " at " . $self->position->to_str()
+    }
+    
+    fn bounds {
+        my $half = $self->side / 2
+        BoundingBox(
+            min => Coordinate(
+                x => $self->position->x - $half,
+                y => $self->position->y - $half,
+                z => $self->position->z - $half
+            ),
+            max => Coordinate(
+                x => $self->position->x + $half,
+                y => $self->position->y + $half,
+                z => $self->position->z + $half
+            )
+        )
+    }
+}
+
+class Sphere3D extends Shape3D {
+    radius: Float
+    
+    fn volume { (4.0 / 3.0) * 3.14159265 * $self->radius ** 3 }
+    fn surface_area { 4 * 3.14159265 * $self->radius * $self->radius }
+    
+    fn draw {
+        "Drawing sphere r=" . $self->radius . " at " . $self->position->to_str()
+    }
+    
+    fn bounds {
+        BoundingBox(
+            min => Coordinate(
+                x => $self->position->x - $self->radius,
+                y => $self->position->y - $self->radius,
+                z => $self->position->z - $self->radius
+            ),
+            max => Coordinate(
+                x => $self->position->x + $self->radius,
+                y => $self->position->y + $self->radius,
+                z => $self->position->z + $self->radius
+            )
+        )
+    }
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ORGANIZATION HIERARCHY (4 levels with composition)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class Address {
+    street: Str
+    city: Str
+    state: Str
+    zip: Str
+    country: Str = "USA"
+    
+    fn to_str {
+        $self->street . ", " . $self->city . ", " . $self->state . " " . $self->zip
+    }
+    
+    fn is_domestic { $self->country eq "USA" ? 1 : 0 }
+}
+
+class ContactInfo {
+    email: Str
+    phone: Str
+    address: Address = undef
+    
+    fn has_address { defined($self->address) ? 1 : 0 }
+    
+    fn to_str {
+        my $s = "Email: " . $self->email . ", Phone: " . $self->phone
+        if ($self->has_address()) {
+            $s .= ", Address: " . $self->address->to_str()
+        }
+        $s
+    }
+}
+
+class Person extends TaggedEntity {
+    contact: ContactInfo = undef
+    birth_year: Int = 1990
+    
+    fn age($current_year) {
+        $current_year - $self->birth_year
+    }
+    
+    fn has_contact { defined($self->contact) ? 1 : 0 }
+}
+
+class Employee extends Person {
+    employee_id: Str
+    department: Str
+    salary: Float = 0.0
+    hire_date: Str
+    manager: Employee = undef
+    direct_reports: Array = []
+    
+    fn has_manager { defined($self->manager) ? 1 : 0 }
+    
+    fn add_report($emp) {
+        push @{$self->direct_reports}, $emp
+        $emp->manager($self)
+        $self
+    }
+    
+    fn report_count { scalar(@{$self->direct_reports}) }
+    
+    fn total_reports {
+        my $count = $self->report_count()
+        for my $r (@{$self->direct_reports}) {
+            $count += $r->total_reports()
+        }
+        $count
+    }
+    
+    fn is_manager { $self->report_count() > 0 ? 1 : 0 }
+    
+    fn chain_of_command {
+        my @chain
+        my $current = $self
+        while (defined($current)) {
+            push @chain, $current
+            $current = $current->manager
+        }
+        @chain
+    }
+    
+    fn to_json {
+        '{"id":' . $self->id . ',"name":"' . $self->name . '","employee_id":"' . $self->employee_id . '","department":"' . $self->department . '","salary":' . $self->salary . '}'
+    }
+}
+
+class Manager extends Employee {
+    budget: Float = 0.0
+    
+    fn team_salary {
+        my $total = 0
+        for my $r (@{$self->direct_reports}) {
+            $total += $r->salary
+        }
+        $total
+    }
+    
+    fn remaining_budget {
+        $self->budget - $self->team_salary()
+    }
+}
+
+class Executive extends Manager {
+    title: Str
+    bonus_pct: Float = 0.0
+    assistant: Employee = undef
+    
+    fn total_compensation {
+        $self->salary * (1 + $self->bonus_pct / 100)
+    }
+    
+    fn has_assistant { defined($self->assistant) ? 1 : 0 }
+    
+    fn org_size {
+        1 + $self->total_reports()
+    }
+}
+
+class Department extends NamedEntity {
+    head: Manager = undef
+    employees: Array = []
+    budget: Float = 0.0
+    parent: Department = undef
+    sub_departments: Array = []
+    
+    fn add_employee($emp) {
+        push @{$self->employees}, $emp
+        $emp->department($self->name)
+        $self
+    }
+    
+    fn employee_count { scalar(@{$self->employees}) }
+    
+    fn add_sub_department($dept) {
+        push @{$self->sub_departments}, $dept
+        $dept->parent($self)
+        $self
+    }
+    
+    fn total_employees {
+        my $count = $self->employee_count()
+        for my $sub (@{$self->sub_departments}) {
+            $count += $sub->total_employees()
+        }
+        $count
+    }
+    
+    fn total_salary {
+        my $sum = 0
+        for my $e (@{$self->employees}) {
+            $sum += $e->salary
+        }
+        for my $sub (@{$self->sub_departments}) {
+            $sum += $sub->total_salary()
+        }
+        $sum
+    }
+    
+    fn depth {
+        my $max_depth = 0
+        for my $sub (@{$self->sub_departments}) {
+            my $d = $sub->depth()
+            $max_depth = $d if $d > $max_depth
+        }
+        1 + $max_depth
+    }
+}
+
+class Company extends TaggedEntity {
+    ceo: Executive = undef
+    departments: Array = []
+    founded_year: Int
+    headquarters: Address = undef
+    
+    fn add_department($dept) {
+        push @{$self->departments}, $dept
+        $self
+    }
+    
+    fn department_count { scalar(@{$self->departments}) }
+    
+    fn total_employees {
+        my $count = 0
+        for my $d (@{$self->departments}) {
+            $count += $d->total_employees()
+        }
+        $count + (defined($self->ceo) ? 1 : 0)
+    }
+    
+    fn total_payroll {
+        my $sum = 0
+        for my $d (@{$self->departments}) {
+            $sum += $d->total_salary()
+        }
+        $sum += $self->ceo->total_compensation() if defined($self->ceo)
+        $sum
+    }
+    
+    fn find_employee($emp_id) {
+        for my $d (@{$self->departments}) {
+            for my $e (@{$d->employees}) {
+                return $e if $e->employee_id eq $emp_id
+            }
+        }
+        undef
+    }
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DOCUMENT/NODE HIERARCHY (tree structure with mixed node types)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class DocumentNode impl Visitor {
+    parent: DocumentNode = undef
+    children: Array = []
+    
+    fn add_child($node) {
+        push @{$self->children}, $node
+        $node->parent($self)
+        $self
+    }
+    
+    fn child_count { scalar(@{$self->children}) }
+    fn is_leaf { $self->child_count() == 0 ? 1 : 0 }
+    fn is_root { !defined($self->parent) ? 1 : 0 }
+    
+    fn depth {
+        my $d = 0
+        my $current = $self
+        while (defined($current->parent)) {
+            $d += 1
+            $current = $current->parent
+        }
+        $d
+    }
+    
+    fn visit($visitor) { $visitor->($self) }
+    
+    fn traverse($visitor) {
+        $self->visit($visitor)
+        for my $child (@{$self->children}) {
+            $child->traverse($visitor)
+        }
+    }
+    
+    fn node_count {
+        my $count = 1
+        for my $child (@{$self->children}) {
+            $count += $child->node_count()
+        }
+        $count
+    }
+    
+    fn render { "" }
+}
+
+class TextNode extends DocumentNode {
+    text: Str
+    
+    fn render { $self->text }
+    fn length { length($self->text) }
+}
+
+class ElementNode extends DocumentNode {
+    tag: Str
+    attributes: Hash = {}
+    
+    fn set_attr($key, $value) {
+        $self->attributes->{$key} = $value
+        $self
+    }
+    
+    fn get_attr($key) {
+        $self->attributes->{$key}
+    }
+    
+    fn render {
+        my $attrs = ""
+        for my $k (keys %{$self->attributes}) {
+            $attrs .= " " . $k . '="' . $self->attributes->{$k} . '"'
+        }
+        my $content = ""
+        for my $child (@{$self->children}) {
+            $content .= $child->render()
+        }
+        "<" . $self->tag . $attrs . ">" . $content . "</" . $self->tag . ">"
+    }
+}
+
+class ContainerNode extends ElementNode {
+    layout: Str = "block"
+    
+    fn is_inline { $self->layout eq "inline" ? 1 : 0 }
+}
+
+class FormNode extends ContainerNode {
+    action: Str
+    method: Str = "POST"
+    inputs: Array = []
+    
+    fn add_input($input) {
+        push @{$self->inputs}, $input
+        $self->add_child($input)
+        $self
+    }
+    
+    fn render {
+        $self->set_attr("action", $self->action)
+        $self->set_attr("method", $self->method)
+        $self->tag("form")
+        $self->SUPER::render()
+    }
+}
+
+class InputNode extends ElementNode {
+    input_type: Str = "text"
+    input_name: Str
+    value: Str = ""
+    required: Int = 0
+    
+    fn render {
+        $self->tag("input")
+        $self->set_attr("type", $self->input_type)
+        $self->set_attr("name", $self->input_name)
+        $self->set_attr("value", $self->value) if $self->value
+        $self->set_attr("required", "required") if $self->required
+        "<input" . join("", map { ' ' . $_ . '="' . $self->attributes->{$_} . '"' } keys %{$self->attributes}) . " />"
+    }
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VEHICLE HIERARCHY (multiple inheritance, deep chain)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class Engine {
+    horsepower: Int
+    fuel_type: Str = "gasoline"
+    displacement: Float
+    
+    fn power_to_weight($weight) {
+        $self->horsepower / $weight * 1000
+    }
+    
+    fn is_electric { $self->fuel_type eq "electric" ? 1 : 0 }
+}
+
+class Transmission {
+    gear_count: Int
+    trans_type: Str = "automatic"
+    
+    fn is_manual { $self->trans_type eq "manual" ? 1 : 0 }
+}
+
+class Vehicle extends TaggedEntity {
+    vin: Str
+    year: Int
+    make: Str
+    model: Str
+    weight: Float
+    engine: Engine = undef
+    transmission: Transmission = undef
+    
+    fn full_name { $self->year . " " . $self->make . " " . $self->model }
+    
+    fn has_engine { defined($self->engine) ? 1 : 0 }
+    fn has_transmission { defined($self->transmission) ? 1 : 0 }
+    
+    fn power_to_weight {
+        return 0 unless $self->has_engine()
+        $self->engine->power_to_weight($self->weight)
+    }
+}
+
+class LandVehicle extends Vehicle {
+    wheel_count: Int = 4
+    drivetrain: Str = "FWD"
+}
+
+class Car extends LandVehicle {
+    body_style: Str
+    door_count: Int = 4
+    passenger_capacity: Int = 5
+    
+    fn is_coupe { $self->door_count == 2 ? 1 : 0 }
+    fn is_sedan { $self->door_count == 4 && $self->body_style eq "sedan" ? 1 : 0 }
+}
+
+class Truck extends LandVehicle {
+    bed_length: Float
+    towing_capacity: Float
+    payload_capacity: Float
+    
+    fn is_heavy_duty { $self->towing_capacity > 10000 ? 1 : 0 }
+}
+
+class SportsCar extends Car {
+    top_speed: Float
+    zero_to_sixty: Float
+    
+    fn is_supercar { $self->top_speed > 200 && $self->zero_to_sixty < 3.0 ? 1 : 0 }
+}
+
+class ElectricCar extends Car {
+    battery_capacity: Float
+    range: Float
+    charge_time: Float
+    
+    fn efficiency { $self->range / $self->battery_capacity }
+}
+
+trait Luxury {
+    fn luxury_features;
+}
+
+trait Performance {
+    fn performance_stats;
+}
+
+class LuxurySportsCar extends SportsCar impl Luxury, Performance {
+    interior_material: Str = "leather"
+    sound_system: Str = "premium"
+    
+    fn luxury_features {
+        "Interior: " . $self->interior_material . ", Sound: " . $self->sound_system
+    }
+    
+    fn performance_stats {
+        "Top Speed: " . $self->top_speed . " mph, 0-60: " . $self->zero_to_sixty . "s"
+    }
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HELPER FUNCTIONS FOR HIERARCHY OPERATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn build_org_chart {
+    my $ceo = Executive(
+        id => 1,
+        name => "Alice Johnson",
+        employee_id => "CEO001",
+        department => "Executive",
+        salary => 500000.0,
+        hire_date => "2010-01-15",
+        title => "Chief Executive Officer",
+        bonus_pct => 50.0,
+        budget => 1000000.0
+    )
+    
+    my $cto = Executive(
+        id => 2,
+        name => "Bob Smith",
+        employee_id => "CTO001",
+        department => "Technology",
+        salary => 350000.0,
+        hire_date => "2012-03-01",
+        title => "Chief Technology Officer",
+        bonus_pct => 30.0,
+        budget => 500000.0
+    )
+    
+    my $eng_mgr = Manager(
+        id => 3,
+        name => "Carol Williams",
+        employee_id => "MGR001",
+        department => "Engineering",
+        salary => 180000.0,
+        hire_date => "2015-06-01",
+        budget => 200000.0
+    )
+    
+    my $dev1 = Employee(
+        id => 4,
+        name => "Dave Brown",
+        employee_id => "ENG001",
+        department => "Engineering",
+        salary => 120000.0,
+        hire_date => "2018-02-15"
+    )
+    
+    my $dev2 = Employee(
+        id => 5,
+        name => "Eve Davis",
+        employee_id => "ENG002",
+        department => "Engineering",
+        salary => 115000.0,
+        hire_date => "2019-08-01"
+    )
+    
+    $ceo->add_report($cto)
+    $cto->add_report($eng_mgr)
+    $eng_mgr->add_report($dev1)
+    $eng_mgr->add_report($dev2)
+    
+    my $company = Company(
+        id => 100,
+        name => "TechCorp",
+        founded_year => 2005,
+        ceo => $ceo
+    )
+    
+    my $eng_dept = Department(
+        id => 200,
+        name => "Engineering",
+        head => $eng_mgr,
+        budget => 500000.0
+    )
+    $eng_dept->add_employee($eng_mgr)
+    $eng_dept->add_employee($dev1)
+    $eng_dept->add_employee($dev2)
+    
+    $company->add_department($eng_dept)
+    
+    $company
+}
+
+fn build_shape_scene {
+    my @shapes
+    
+    push @shapes, Rectangle2D(
+        position => Coordinate(x => 0, y => 0, z => 0),
+        width => 100.0,
+        height => 50.0,
+        color => "red"
+    )
+    
+    push @shapes, Circle2D(
+        position => Coordinate(x => 200, y => 100, z => 0),
+        radius => 30.0,
+        color => "blue"
+    )
+    
+    push @shapes, Cube3D(
+        position => Coordinate(x => 50, y => 50, z => 50),
+        side => 20.0,
+        color => "green"
+    )
+    
+    push @shapes, Sphere3D(
+        position => Coordinate(x => 100, y => 100, z => 100),
+        radius => 25.0,
+        color => "yellow"
+    )
+    
+    [@shapes]
+}
+
+fn build_vehicle_fleet {
+    my @vehicles
+    
+    my $sports = LuxurySportsCar(
+        id => 1,
+        name => "Speed Demon",
+        vin => "VIN001",
+        year => 2024,
+        make => "Ferrari",
+        model => "F8",
+        weight => 3200.0,
+        body_style => "coupe",
+        door_count => 2,
+        top_speed => 211.0,
+        zero_to_sixty => 2.9,
+        interior_material => "Alcantara",
+        sound_system => "JBL Pro",
+        engine => Engine(horsepower => 710, fuel_type => "gasoline", displacement => 3.9),
+        transmission => Transmission(gear_count => 7, trans_type => "dual-clutch")
+    )
+    push @vehicles, $sports
+    
+    my $electric = ElectricCar(
+        id => 2,
+        name => "Eco Runner",
+        vin => "VIN002",
+        year => 2024,
+        make => "Tesla",
+        model => "Model S",
+        weight => 4800.0,
+        body_style => "sedan",
+        door_count => 4,
+        battery_capacity => 100.0,
+        range => 400.0,
+        charge_time => 0.5,
+        engine => Engine(horsepower => 670, fuel_type => "electric", displacement => 0),
+        transmission => Transmission(gear_count => 1, trans_type => "automatic")
+    )
+    push @vehicles, $electric
+    
+    my $truck = Truck(
+        id => 3,
+        name => "Work Horse",
+        vin => "VIN003",
+        year => 2024,
+        make => "Ford",
+        model => "F-250",
+        weight => 7500.0,
+        bed_length => 8.0,
+        towing_capacity => 15000.0,
+        payload_capacity => 3500.0,
+        wheel_count => 4,
+        drivetrain => "4WD",
+        engine => Engine(horsepower => 475, fuel_type => "diesel", displacement => 6.7),
+        transmission => Transmission(gear_count => 10, trans_type => "automatic")
+    )
+    push @vehicles, $truck
+    
+    [@vehicles]
+}
+
+fn build_html_document {
+    my $html = ElementNode(tag => "html")
+    
+    my $head = ElementNode(tag => "head")
+    my $title = ElementNode(tag => "title")
+    $title->add_child(TextNode(text => "Test Page"))
+    $head->add_child($title)
+    
+    my $body = ElementNode(tag => "body")
+    
+    my $header = ContainerNode(tag => "header", layout => "block")
+    my $h1 = ElementNode(tag => "h1")
+    $h1->add_child(TextNode(text => "Welcome"))
+    $header->add_child($h1)
+    
+    my $form = FormNode(tag => "form", action => "/submit")
+    $form->add_input(InputNode(input_type => "text", input_name => "username", required => 1))
+    $form->add_input(InputNode(input_type => "password", input_name => "password", required => 1))
+    $form->add_input(InputNode(input_type => "submit", input_name => "submit", value => "Login"))
+    
+    $body->add_child($header)
+    $body->add_child($form)
+    
+    $html->add_child($head)
+    $html->add_child($body)
+    
+    $html
+}
+
+fn total_shape_area($shapes) {
+    my $total = 0
+    for my $s (@$shapes) {
+        $total += $s->area()
+    }
+    $total
+}
+
+fn shapes_in_bounds($shapes, $bbox) {
+    my @result
+    for my $s (@$shapes) {
+        my $shape_bounds = $s->bounds()
+        if ($bbox->intersects($shape_bounds)) {
+            push @result, $s
+        }
+    }
+    [@result]
+}

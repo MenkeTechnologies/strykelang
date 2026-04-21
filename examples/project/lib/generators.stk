@@ -1,0 +1,39 @@
+# lib/generators.stk — basic lazy generators
+
+# NOTE: Resuming inside loops or using external variables in gen { } 
+# is currently limited in the tree interpreter.
+
+# ── range10_12_gen: returns 10, 11, 12 ─────
+fn range10_12_gen {
+    gen {
+        yield 10;
+        yield 11;
+        yield 12;
+    }
+}
+
+# ── simple_fib_gen: first few fibonacci numbers ─────
+fn simple_fib_gen {
+    gen {
+        yield 0;
+        yield 1;
+        yield 1;
+        yield 2;
+        yield 3;
+        yield 5;
+        yield 8;
+    }
+}
+
+# ── take_gen: take N values from a generator ─────
+fn take_gen($n, $g) {
+    my @res;
+    for (1..$n) {
+        my $next = $g->next();
+        # $next is [value, more_flag]
+        # more_flag is 1 if yielded, 0 if exhausted
+        last unless $next->[1];
+        push @res, $next->[0];
+    }
+    @res;
+}
