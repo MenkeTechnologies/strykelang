@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.8.0 · 3256 topics · 33 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.8.3 · 3259 topics · 33 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -199,7 +199,7 @@
         <li><a href="#ch-git">Git</a> <span class="chapter-count">10</span></li>
         <li><a href="#ch-system">System</a> <span class="chapter-count">8</span></li>
         <li><a href="#ch-testing">Testing</a> <span class="chapter-count">15</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">2600</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">2603</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -609,10 +609,10 @@ my @data = stdin |&gt; grep /INFO/ |&gt; collect
       </article>
       <article class="doc-entry" id="doc-filter">
         <h3><a class="doc-anchor" href="#doc-filter">#</a> <code>filter</code></h3>
-        <p><code>filter { BLOCK } LIST</code> — stryke-native lazy filter that returns a pull iterator, functionally identical to <code>greps</code> but named for familiarity with Rust/Ruby/JS conventions. Use <code>filter</code> or <code>greps</code> interchangeably in <code>|&gt;</code> chains; both are streaming and both set <code>$_</code> in the block. The result must be consumed with <code>collect</code>, <code>e p</code>, <code>foreach</code>, or another terminal. Prefer <code>filter</code> when writing stryke-idiomatic code; prefer <code>grep</code>/<code>greps</code> when porting from Perl.</p>
+        <p><code>filter</code> (alias <code>fi</code>) <code>{ BLOCK } LIST</code> — stryke-native lazy filter that returns a pull iterator, functionally identical to <code>greps</code> but named for familiarity with Rust/Ruby/JS conventions. Use <code>filter</code> or <code>greps</code> interchangeably in <code>|&gt;</code> chains; both are streaming and both set <code>$_</code> in the block. The result must be consumed with <code>collect</code>, <code>e p</code>, <code>foreach</code>, or another terminal. Prefer <code>filter</code> when writing stryke-idiomatic code; prefer <code>grep</code>/<code>greps</code> when porting from Perl.</p>
         <pre><code class="lang-perl">my @big = 1..1000 |&gt; filter { $_ &gt; 990 } |&gt; collect
 @big |&gt; e p   # 991 992 993 994 995 996 997 998 999 1000
-1..50 |&gt; filter { $_ % 2 } |&gt; take 5 |&gt; e p   # 1 3 5 7 9
+1..50 |&gt; fi { $_ % 2 } |&gt; take 5 |&gt; e p   # 1 3 5 7 9
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-tap">
@@ -6319,7 +6319,7 @@ test_run   # prints summary, exits 1 on failure
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">2600 topics</p>
+      <p class="chapter-meta">2603 topics</p>
       <article class="doc-entry" id="doc-stryke-rust-compile">
         <h3><a class="doc-anchor" href="#doc-stryke-rust-compile">#</a> <code>__stryke_rust_compile</code></h3>
         <p><code>__stryke_rust_compile</code> — internal builtin.</p>
@@ -7820,7 +7820,7 @@ p j1(1.84) # ≈ 0.582 (first max)
       <article class="doc-entry" id="doc-bisect">
         <h3><a class="doc-anchor" href="#doc-bisect">#</a> <code>bisect</code></h3>
         <p><code>bisection</code> (alias <code>bisect</code>) finds a root of f(x)=0 in [a,b] via the bisection method. Takes a code ref, a, b, and optional tolerance.</p>
-        <pre><code class="lang-perl">my $root = bisect(sub { $_[0]**2 - 2 }, 1, 2)  # √2 ≈ 1.4142
+        <pre><code class="lang-perl">my $root = bisect(fn { $_[0]**2 - 2 }, 1, 2)  # √2 ≈ 1.4142
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-bit-and">
@@ -10965,7 +10965,7 @@ my $D2 = dist_mat([[0,0],[1,1]], &quot;manhattan&quot;)  # Manhattan
       <article class="doc-entry" id="doc-do-call">
         <h3><a class="doc-anchor" href="#doc-do-call">#</a> <code>do_call</code></h3>
         <p><code>do_call</code> — call a function with args from a list. Like R&#39;s do.call().</p>
-        <pre><code class="lang-perl">my $result = docall(sub { $_[0] + $_[1] }, [3, 4])  # 7
+        <pre><code class="lang-perl">my $result = docall(fn { $_[0] + $_[1] }, [3, 4])  # 7
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-doppler">
@@ -11757,7 +11757,7 @@ p escvel(1.989e30, 6.96e8)      # ~617 km/s (Sun)
       <article class="doc-entry" id="doc-euler-method">
         <h3><a class="doc-anchor" href="#doc-euler-method">#</a> <code>euler_method</code></h3>
         <p><code>euler_ode</code> (alias <code>euler_method</code>) solves an ODE dy/dt = f(t,y) using the Euler method. Returns [[t,y], ...].</p>
-        <pre><code class="lang-perl">my $sol = euler_ode(sub { $_[1] }, 0, 1, 0.01, 100)  # exponential growth
+        <pre><code class="lang-perl">my $sol = euler_ode(fn { $_[1] }, 0, 1, 0.01, 100)  # exponential growth
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-euler-number">
@@ -11866,7 +11866,7 @@ p escvel(1.989e30, 6.96e8)      # ~617 km/s (Sun)
       </article>
       <article class="doc-entry" id="doc-f">
         <h3><a class="doc-anchor" href="#doc-f">#</a> <code>f</code></h3>
-        <p><code>f</code> — functional / iterator builtin.</p>
+        <p><code>f</code> — filesystem extensions builtin.</p>
         <pre><code class="lang-perl">my $result = f $x 
 # or in a pipeline:
 @list |&gt; map f |&gt; p
@@ -13051,7 +13051,7 @@ p gini(0, 0, 0, 100)   # ~0.75 (high inequality)
       <article class="doc-entry" id="doc-golden">
         <h3><a class="doc-anchor" href="#doc-golden">#</a> <code>golden</code></h3>
         <p><code>golden_section</code> (aliases <code>golden</code>, <code>gss</code>) finds the minimum of f on [a,b] via golden-section search.</p>
-        <pre><code class="lang-perl">my $xmin = golden(sub { ($_[0]-3)**2 }, 0, 10)  # 3.0
+        <pre><code class="lang-perl">my $xmin = golden(fn { ($_[0]-3)**2 }, 0, 10)  # 3.0
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-golden-ratio">
@@ -17512,6 +17512,14 @@ p remap(75, 0, 100, 0, 255)   # 191.25 (percent to byte)
 @list |&gt; map matches_regex |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-matmul">
+        <h3><a class="doc-anchor" href="#doc-matmul">#</a> <code>matmul</code></h3>
+        <p><code>matmul</code> — extended stdlib builtin. Alias for <code>matrix_mul</code>.</p>
+        <pre><code class="lang-perl">my $result = matmul $x 
+# or in a pipeline:
+@list |&gt; map matmul |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-matrix-add">
         <h3><a class="doc-anchor" href="#doc-matrix-add">#</a> <code>matrix_add</code></h3>
         <p><code>matrix_add</code> — extended stdlib builtin.</p>
@@ -17612,6 +17620,14 @@ p remap(75, 0, 100, 0, 255)   # 191.25 (percent to byte)
         <pre><code class="lang-perl">my $result = matrix_min $x 
 # or in a pipeline:
 @list |&gt; map matrix_min |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-matrix-mul">
+        <h3><a class="doc-anchor" href="#doc-matrix-mul">#</a> <code>matrix_mul</code></h3>
+        <p><code>matrix_mul</code> — extended stdlib builtin.</p>
+        <pre><code class="lang-perl">my $result = matrix_mul $x 
+# or in a pipeline:
+@list |&gt; map matrix_mul |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-matrix-mult">
@@ -18238,6 +18254,14 @@ p mish(-1)   # -0.3034
         <pre><code class="lang-perl">my $result = ml_to_liters $input 
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-mm">
+        <h3><a class="doc-anchor" href="#doc-mm">#</a> <code>mm</code></h3>
+        <p><code>mm</code> — extended stdlib builtin. Alias for <code>matrix_mul</code>.</p>
+        <pre><code class="lang-perl">my $result = mm $x 
+# or in a pipeline:
+@list |&gt; map mm |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-mmap">
         <h3><a class="doc-anchor" href="#doc-mmap">#</a> <code>mmap</code></h3>
         <p><code>mmap</code> — matrix operations (uncategorized batch) builtin. Alias for <code>matrix_map</code>.</p>
@@ -18750,7 +18774,7 @@ p powmod(3, 13, 50)    # 7
       <article class="doc-entry" id="doc-newton">
         <h3><a class="doc-anchor" href="#doc-newton">#</a> <code>newton</code></h3>
         <p><code>newton_method</code> (aliases <code>newton</code>, <code>newton_raphson</code>) finds a root via Newton-Raphson. Takes f, f&#39;, x0, and optional tolerance.</p>
-        <pre><code class="lang-perl">my $root = newton(sub { $_[0]**2 - 2 }, sub { 2*$_[0] }, 1.5)  # √2
+        <pre><code class="lang-perl">my $root = newton(fn { $_[0]**2 - 2 }, fn { 2*$_[0] }, 1.5)  # √2
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-newtons-to-lbf">
@@ -22006,7 +22030,7 @@ my $down = resample(\@signal, 0.5) # halve sample rate
         <h3><a class="doc-anchor" href="#doc-rk4">#</a> <code>rk4</code></h3>
         <p><code>rk4</code> (aliases <code>runge_kutta</code>, <code>rk4_ode</code>) solves an ODE dy/dt = f(t,y) using 4th-order Runge-Kutta. Returns [[t,y], ...].</p>
         <pre><code class="lang-perl"># dy/dt = -y, y(0) = 1 → y = e^(-t)
-my $sol = rk4(sub { -$_[1] }, 0, 1, 0.1, 100)
+my $sol = rk4(fn { -$_[1] }, 0, 1, 0.1, 100)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-rl-time-constant">
@@ -22555,7 +22579,7 @@ my @y = @{rnorm(100, 50, 10)}   # mean=50, sd=10
       <article class="doc-entry" id="doc-sapply">
         <h3><a class="doc-anchor" href="#doc-sapply">#</a> <code>sapply</code></h3>
         <p><code>sapply</code> — apply a function to each element, return a vector. Like R&#39;s sapply().</p>
-        <pre><code class="lang-perl">my @sq = @{sapply([1,2,3,4], sub { $_[0] ** 2 })}  # [1,4,9,16]
+        <pre><code class="lang-perl">my @sq = @{sapply([1,2,3,4], fn { $_[0] ** 2 })}  # [1,4,9,16]
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-sat01">
@@ -24377,7 +24401,7 @@ p $t{a}  # 3
       <article class="doc-entry" id="doc-tapply">
         <h3><a class="doc-anchor" href="#doc-tapply">#</a> <code>tapply</code></h3>
         <p><code>tapply</code> — apply a function by group. Takes data, group labels, and function. Returns hash. Like R&#39;s tapply().</p>
-        <pre><code class="lang-perl">my %means = %{tapply([1,2,3,4], [&quot;a&quot;,&quot;a&quot;,&quot;b&quot;,&quot;b&quot;], sub { avg(@{$_[0]}) })}
+        <pre><code class="lang-perl">my %means = %{tapply([1,2,3,4], [&quot;a&quot;,&quot;a&quot;,&quot;b&quot;,&quot;b&quot;], fn { avg(@{$_[0]}) })}
 p $means{a}  # 1.5
 p $means{b}  # 3.5
 </code></pre>
@@ -25936,7 +25960,7 @@ p scalar wha(&quot;perl&quot;)        # number of perls on PATH
       <article class="doc-entry" id="doc-which-fn">
         <h3><a class="doc-anchor" href="#doc-which-fn">#</a> <code>which_fn</code></h3>
         <p><code>which_fn</code> — return indices where a predicate is true. Like R&#39;s which().</p>
-        <pre><code class="lang-perl">my @idx = @{which_fn([1,5,3,8,2], sub { $_[0] &gt; 3 })}  # [1, 3]
+        <pre><code class="lang-perl">my @idx = @{which_fn([1,5,3,8,2], fn { $_[0] &gt; 3 })}  # [1, 3]
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-white">

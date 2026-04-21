@@ -283,7 +283,7 @@ fn range_char {
 }
 
 fn range_reverse($a, $b) {
-    my @r = reverse($a..$b)
+    my @r = rev($a..$b)
     @r
 }
 

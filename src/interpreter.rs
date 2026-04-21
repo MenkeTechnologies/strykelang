@@ -9951,26 +9951,57 @@ impl Interpreter {
                 }
                 Ok(PerlValue::array(items))
             }
-            ExprKind::ScalarReverse(expr) => {
-                let val = self.eval_expr_ctx(expr, WantarrayCtx::List)?;
-                // Lazy: wrap iterator without materializing
+            ExprKind::Rev(expr) => {
+                // Eval in scalar context first to preserve set/hash/array ref types
+                let val = self.eval_expr_ctx(expr, WantarrayCtx::Scalar)?;
                 if val.is_iterator() {
                     return Ok(PerlValue::iterator(Arc::new(
-                        crate::value::ScalarReverseIterator::new(val.into_iterator()),
+                        crate::value::RevIterator::new(val.into_iterator()),
                     )));
                 }
-                let items = val.to_list();
-                if items.len() <= 1 {
-                    let s = if items.is_empty() {
-                        String::new()
-                    } else {
-                        items[0].to_string()
-                    };
-                    Ok(PerlValue::string(s.chars().rev().collect()))
-                } else {
-                    let mut items = items;
+                if let Some(s) = crate::value::set_payload(&val) {
+                    let mut out = crate::value::PerlSet::new();
+                    for (k, v) in s.iter().rev() {
+                        out.insert(k.clone(), v.clone());
+                    }
+                    return Ok(PerlValue::set(Arc::new(out)));
+                }
+                if let Some(ar) = val.as_array_ref() {
+                    let items: Vec<_> = ar.read().iter().rev().cloned().collect();
+                    return Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+                        items,
+                    ))));
+                }
+                if let Some(hr) = val.as_hash_ref() {
+                    let mut out: indexmap::IndexMap<String, PerlValue> = indexmap::IndexMap::new();
+                    for (k, v) in hr.read().iter() {
+                        out.insert(v.to_string(), PerlValue::string(k.clone()));
+                    }
+                    return Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(out))));
+                }
+                // Re-eval in list context for bare arrays/hashes
+                let val = self.eval_expr_ctx(expr, WantarrayCtx::List)?;
+                if let Some(hm) = val.as_hash_map() {
+                    let mut out: indexmap::IndexMap<String, PerlValue> = indexmap::IndexMap::new();
+                    for (k, v) in hm.iter() {
+                        out.insert(v.to_string(), PerlValue::string(k.clone()));
+                    }
+                    return Ok(PerlValue::hash(out));
+                }
+                if val.as_array_vec().is_some() {
+                    let mut items = val.to_list();
                     items.reverse();
                     Ok(PerlValue::array(items))
+                } else {
+                    let items = val.to_list();
+                    if items.len() > 1 {
+                        let mut items = items;
+                        items.reverse();
+                        Ok(PerlValue::array(items))
+                    } else {
+                        let s = val.to_string();
+                        Ok(PerlValue::string(s.chars().rev().collect()))
+                    }
                 }
             }
             ExprKind::ReverseExpr(list) => {

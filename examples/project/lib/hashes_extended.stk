@@ -256,7 +256,7 @@ fn hash_vals_map {
 
 fn hash_invert {
     my %h = (a => 1, b => 2, c => 3)
-    my %inv = reverse %h
+    my %inv = rev %h
     $inv{2}
 }
 

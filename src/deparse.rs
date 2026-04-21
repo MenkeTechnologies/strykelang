@@ -1164,7 +1164,7 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
             buf.push_str("reverse ");
             deparse_expr_into(buf, e);
         }
-        ExprKind::ScalarReverse(e) => {
+        ExprKind::Rev(e) => {
             buf.push_str("rev ");
             deparse_expr_into(buf, e);
         }

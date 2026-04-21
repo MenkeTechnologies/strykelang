@@ -475,7 +475,7 @@ fn accepts_hex_oct_int_abs_sqrt_chr_ord() {
 fn accepts_join_split_reverse_sort_block() {
     p("join ',', (1,2)");
     p("split /,/, 'a,b'");
-    p("reverse (1,2)");
+    p("rev (1,2)");
     p("reversed (1,2)");
     p("sort { $a <=> $b } (2,1)");
 }

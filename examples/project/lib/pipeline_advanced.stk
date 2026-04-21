@@ -51,7 +51,7 @@ fn compose_all(@fns) {
     return $fns[0] if scalar(@fns) == 1
 
     my $result = $fns[-1]
-    for my $i (reverse(0..scalar(@fns)-2)) {
+    for my $i (rev(0..scalar(@fns)-2)) {
         my $f = $fns[$i]
         my $g = $result
         $result = fn { $f($g(@_)) }
@@ -84,7 +84,7 @@ fn pipe_all(@fns) {
 
 # fn reduce_right($fn, $init, @items) {
 #     my $acc = $init
-#     for my $item (reverse @items) {
+#     for my $item (rev @items) {
 #         $acc = $fn($item, $acc)
 #     }
 #     $acc

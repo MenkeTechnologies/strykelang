@@ -775,7 +775,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
 | Category | Functions |
 | --- | --- |
-| Array | `push`, `pop`, `shift`, `unshift`, `splice`, `reverse`, `rev` (scalar reverse), `sort`, `map`, `grep`, `filter`, `reduce`, `fold`, `fore`, `e`, `preduce`, `scalar`, `partition`, `min_by`, `max_by`, `zip_with`, `interleave`, `frequencies`, `tally`, `count_by`, `pluck`, `grep_v` |
+| Array | `push`, `pop`, `shift`, `unshift`, `splice`, `rev` (scalar reverse), `sort`, `map`, `grep`, `filter`, `reduce`, `fold`, `fore`, `e`, `preduce`, `scalar`, `partition`, `min_by`, `max_by`, `zip_with`, `interleave`, `frequencies`, `tally`, `count_by`, `pluck`, `grep_v` |
 | Hash | `keys`, `values`, `each`, `delete`, `exists`, `select_keys`, `top`, `deep_clone`/`dclone`, `deep_merge`/`dmerge`, `deep_equal`/`deq` |
 | Functional | `compose`/`comp`, `partial`, `curry`, `memoize`/`memo`, `once`, `constantly`, `complement`, `juxt`, `fnil` |
 | String | `chomp`, `chop`, `length`, `substr`, `index`, `rindex`, `split`, `join`, `sprintf`, `printf`, `uc`/`lc`/`ucfirst`/`lcfirst`, `chr`, `ord`, `hex`, `oct`, `crypt`, `fc`, `pos`, `study`, `quotemeta`, `trim`, `lines`, `words`, `chars`, `digits`, `numbers`, `graphemes`, `columns`, `sentences`, `paragraphs`, `sections`, `snake_case`, `camel_case`, `kebab_case` |
@@ -854,13 +854,13 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   ```perl
   my $f = compose(fn { $_ + 1 }, fn { $_ * 2 })
-  $f->(5)  # 11 (double then inc)
+  $f(5)  # 11 (double then inc)
 
   my $add5 = partial(fn { $_[0] + $_[1] }, 5)
-  $add5->(3)  # 8
+  $add5(3)  # 8
 
   my $cadd = curry(fn { $_[0] + $_[1] }, 2)
-  $cadd->(1)->(2)  # 3
+  $cadd(1)(2)  # 3
 
   my $fib = memoize(fn { ... })  # cached by args
   my $init = once(fn { expensive_setup() })  # called at most once
@@ -1194,8 +1194,8 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   # "d-lrow-olleh"
 
   # String list operations
-  ~> ("apple","banana","cherry","date") shuffle reverse minstr p  # apple
-  ~> ("apple","banana","cherry","date") shuffle reverse maxstr p  # date
+  ~> ("apple","banana","cherry","date") shuffle rev minstr p  # apple
+  ~> ("apple","banana","cherry","date") shuffle rev maxstr p  # date
   ```
 
   **Sorting and aggregation:**
@@ -1316,7 +1316,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   | `p` | `say` | `len` | `length` | `cc` | `camel_case` |
   | `pr` | `print` | `ufc` | `ucfirst` | `kc` | `kebab_case` |
   | | | `lfc` | `lcfirst` | `qm` | `quotemeta` |
-  | **List** | | `rv` | `reverse` | | |
+  | **List** | | `rev` | |
   | `gr` | `grep` | `ch` | `chars` | **Serialize** | |
   | `so` | `sort` | `ln` | `lines` | `tj` | `to_json` |
   | `rd` | `reduce` | `wd` | `words` | `ty` | `to_yaml` |

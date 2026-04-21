@@ -1020,7 +1020,7 @@ pub fn format_expr(e: &Expr) -> String {
             None => format!("sort {}", format_expr(list)),
         },
         ExprKind::ReverseExpr(e) => format!("reverse {}", format_expr(e)),
-        ExprKind::ScalarReverse(e) => format!("rev {}", format_expr(e)),
+        ExprKind::Rev(e) => format!("rev {}", format_expr(e)),
         ExprKind::JoinExpr { separator, list } => {
             format!("join({}, {})", format_expr(separator), format_expr(list))
         }

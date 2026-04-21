@@ -172,17 +172,17 @@ impl PerlIterator for FsWalkIterator {
 }
 
 /// Wraps a source iterator, applying `scalar reverse` (char-reverse) to each string.
-pub struct ScalarReverseIterator {
+pub struct RevIterator {
     source: Arc<dyn PerlIterator>,
 }
 
-impl ScalarReverseIterator {
+impl RevIterator {
     pub fn new(source: Arc<dyn PerlIterator>) -> Self {
         Self { source }
     }
 }
 
-impl PerlIterator for ScalarReverseIterator {
+impl PerlIterator for RevIterator {
     fn next_item(&self) -> Option<PerlValue> {
         let item = self.source.next_item()?;
         let s = item.to_string();

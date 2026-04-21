@@ -2,11 +2,11 @@
 # Rosetta Code: Reverse a String
 
 fn rev_string($s) {
-    ~> $s >{split //, $_} reverse |> join ""
+    ~> $s >{split //, $_} rev |> join ""
 }
 
 fn rev_words($s) {
-    ~> $s >{split /\s+/, $_} reverse |> join " "
+    ~> $s >{split /\s+/, $_} rev |> join " "
 }
 
 fn rev_each_word($s) {

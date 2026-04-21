@@ -224,7 +224,7 @@ fn array_postfix_for {
 fn array_reverse_iter {
     my @arr = (1, 2, 3)
     my @result = ()
-    for my $x (reverse @arr) {
+    for my $x (rev @arr) {
         push @result, $x
     }
     join(",", @result)
@@ -291,7 +291,7 @@ fn sort_numeric_iter {
 
 fn sort_reverse_iter {
     my @arr = (1, 2, 3)
-    join(",", reverse sort { $a <=> $b } @arr)
+    join(",", rev sort { $a <=> $b } @arr)
 }
 
 fn sort_string_iter {

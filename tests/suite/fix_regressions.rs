@@ -689,13 +689,13 @@ fn delete_and_exists_on_hash_through_ref() {
 // ── Text builtins ──
 
 #[test]
-fn reverse_scalar_reverses_string_bytes_not_list() {
-    assert_eq!(eval_string(r#"scalar reverse "Perl""#), "lreP");
+fn rev_scalar_revs_string_bytes_not_list() {
+    assert_eq!(eval_string(r#"scalar rev "Perl""#), "lreP");
 }
 
 #[test]
 fn reverse_list_reverses_element_order() {
-    assert_eq!(eval_string(r#"join "", reverse (1, 2, 3)"#), "321");
+    assert_eq!(eval_string(r#"join "", rev (1, 2, 3)"#), "321");
 }
 
 #[test]
@@ -1633,7 +1633,7 @@ fn qw_list_joins_with_custom_separator() {
 
 #[test]
 fn reverse_list_of_words_concatenates_cba() {
-    assert_eq!(eval_string(r#"join "", reverse qw(a b c)"#), "cba");
+    assert_eq!(eval_string(r#"join "", rev qw(a b c)"#), "cba");
 }
 
 #[test]
@@ -3390,7 +3390,7 @@ fn scalar_preincrement_returns_incremented_value() {
 
 #[test]
 fn reverse_sort_applies_after_lexical_sort() {
-    assert_eq!(eval_string(r#"join "", reverse sort qw(c a b)"#), "cba");
+    assert_eq!(eval_string(r#"join "", rev sort qw(c a b)"#), "cba");
 }
 
 #[test]
@@ -3932,7 +3932,7 @@ fn reverse_list_assigns_back_into_named_array() {
         eval_string(
             r#"no strict 'vars';
             my @r = (1, 2, 3);
-            @r = reverse @r;
+            @r = rev @r;
             join "", @r"#
         ),
         "321"
@@ -4328,7 +4328,7 @@ fn dot_concatenation_interleaves_scalar_string_and_number() {
 
 #[test]
 fn reverse_range_list_orders_descending_when_two_elements() {
-    assert_eq!(eval_string(r#"join "", reverse 1..2"#), "21");
+    assert_eq!(eval_string(r#"join "", rev 1..2"#), "21");
 }
 
 #[test]
@@ -4830,7 +4830,7 @@ fn last_index_special_minus_one_on_empty_array() {
 
 #[test]
 fn reverse_list_literal_joins_inverted_order() {
-    assert_eq!(eval_string(r#"join "", reverse (1, 2, 3)"#), "321");
+    assert_eq!(eval_string(r#"join "", rev (1, 2, 3)"#), "321");
 }
 
 #[test]
@@ -4839,7 +4839,7 @@ fn reverse_assign_back_mutates_named_array() {
         eval_string(
             r#"no strict 'vars';
             my @m = (1, 2, 3);
-            @m = reverse @m;
+            @m = rev @m;
             join "", @m"#
         ),
         "321"
@@ -5440,7 +5440,7 @@ fn sort_rebinds_named_array_to_sorted_order() {
 
 #[test]
 fn reverse_sort_inverts_lexical_ordering() {
-    assert_eq!(eval_string(r#"join "", reverse sort qw(p o m)"#), "pom");
+    assert_eq!(eval_string(r#"join "", rev sort qw(p o m)"#), "pom");
 }
 
 #[test]
@@ -5934,7 +5934,7 @@ fn unpack_hex_template_encodes_bytes_to_nibbles() {
 
 #[test]
 fn reverse_range_list_inverts_numeric_order() {
-    assert_eq!(eval_string(r#"join "", reverse 1 .. 3"#), "321");
+    assert_eq!(eval_string(r#"join "", rev 1 .. 3"#), "321");
 }
 
 // ── `map`/`reverse`/slice/`cmp`/`tr`/`s`, hash `values`, `push`, subscript, trig, `grep`, sparse arrays, division ──
@@ -5947,7 +5947,7 @@ fn map_squares_two_topics_into_concatenated_digits() {
 #[test]
 fn map_identity_reverses_qw_order() {
     assert_eq!(
-        eval_string(r#"join "", map { $_ } reverse qw(fr8_x fr8_y fr8_z)"#),
+        eval_string(r#"join "", map { $_ } rev qw(fr8_x fr8_y fr8_z)"#),
         "fr8_zfr8_yfr8_x"
     );
 }
@@ -6717,7 +6717,7 @@ fn scalar_reverse_list_stringifies_concatenated_digits() {
         eval_string(
             r#"no strict 'vars';
             my @c = (1, 2, 3);
-            scalar reverse @c"#
+            scalar rev @c"#
         ),
         "321"
     );
@@ -6906,7 +6906,7 @@ fn sum_first_and_last_array_element_via_negative_index() {
 #[test]
 fn reverse_bare_qw_joins_opposite_order() {
     assert_eq!(
-        eval_string(r#"join "", reverse qw(fr12_p fr12_q fr12_r)"#),
+        eval_string(r#"join "", rev qw(fr12_p fr12_q fr12_r)"#),
         "fr12_rfr12_qfr12_p"
     );
 }
@@ -6947,7 +6947,7 @@ fn map_block_uc_without_explicit_dollarunderscore() {
 #[test]
 fn reverse_map_adds_ten_then_reverses_numeric_list_order() {
     assert_eq!(
-        eval_string(r#"join "", reverse map { $_ + 10 } (1, 2, 3)"#),
+        eval_string(r#"join "", rev map { $_ + 10 } (1, 2, 3)"#),
         "131211"
     );
 }

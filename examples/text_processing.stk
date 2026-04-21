@@ -9,7 +9,7 @@ print "ucfirst: ", $text |> ucfirst, "\n"
 print "length: ", $text |> len, "\n"
 print "substr(0,9): ", substr $text, 0, 9, "\n"
 print "index(fox): ", index $text, "fox", "\n"
-print "reverse: ", split "", $text  |> reverse |> join "", "\n"
+print "reverse: ", split "", $text  |> rev |> join "", "\n"
 
 my @words = split " ", $text
 print "word count: ", @words |> scalar, "\n"

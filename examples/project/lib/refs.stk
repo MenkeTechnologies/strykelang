@@ -196,7 +196,7 @@ fn tree_sum($node) {
 
 fn make_linked_list(@vals) {
     my $head = undef
-    for my $v (reverse @vals) {
+    for my $v (rev @vals) {
         $head = { value => $v, next => $head }
     }
     $head

@@ -5,7 +5,7 @@
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn str_length($s) { length($s) }
-fn str_reverse($s) { scalar(reverse($s)) }
+fn str_reverse($s) { scalar(rev($s)) }
 fn str_repeat($s, $n) { $s x $n }
 
 fn str_concat_two($a, $b) { $a . $b }

@@ -79,8 +79,8 @@ fn scalar_hash_info { my %h = (a => 1, b => 2); scalar(keys %h) }
 fn scalar_string { scalar("hello") }
 fn scalar_number { scalar(42) }
 
-fn scalar_reverse_str { scalar(reverse("hello")) }
-fn scalar_reverse_arr { my @a = (1, 2, 3); my @r = reverse(@a); scalar(@r) }
+fn scalar_reverse_str { scalar(rev("hello")) }
+fn scalar_reverse_arr { my @a = (1, 2, 3); my @r = rev(@a); scalar(@r) }
 
 fn scalar_force {
     my @a = (1, 2, 3)
@@ -415,25 +415,25 @@ fn lcfirst_lower { lcfirst("hello") }
 # REVERSE
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn reverse_string { scalar(reverse("hello")) }
-fn reverse_empty { scalar(reverse("")) }
-fn reverse_single { scalar(reverse("x")) }
-fn reverse_palindrome { scalar(reverse("radar")) }
+fn reverse_string { scalar(rev("hello")) }
+fn reverse_empty { scalar(rev("")) }
+fn reverse_single { scalar(rev("x")) }
+fn reverse_palindrome { scalar(rev("radar")) }
 
 fn reverse_array_count {
     my @a = (1, 2, 3, 4, 5)
-    my @r = reverse(@a)
+    my @r = rev(@a)
     scalar @r}
 
 fn reverse_array_first {
     my @a = (1, 2, 3, 4, 5)
-    my @r = reverse(@a)
+    my @r = rev(@a)
     $r[0]
 }
 
 fn reverse_array_last {
     my @a = (1, 2, 3, 4, 5)
-    my @r = reverse(@a)
+    my @r = rev(@a)
     $r[-1]
 }
 

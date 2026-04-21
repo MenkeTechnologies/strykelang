@@ -8,7 +8,7 @@ fn my_luhn_check($num) {
         next unless $d =~ /\d/
         push @digits, int($d)
     }
-    @digits = reverse @digits
+    @digits = rev @digits
     my $sum = 0
     for my $i (0..$#digits) {
         my $d = $digits[$i]

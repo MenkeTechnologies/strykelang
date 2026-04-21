@@ -83,7 +83,7 @@ fn sort_array() {
 
 #[test]
 fn reverse_array() {
-    assert_eq!(eval_string(r#"join(",", reverse(1,2,3))"#), "3,2,1");
+    assert_eq!(eval_string(r#"join(",", rev(1,2,3))"#), "3,2,1");
 }
 
 #[test]

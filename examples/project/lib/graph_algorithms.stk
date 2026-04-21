@@ -35,8 +35,8 @@ fn adv_dfs($graph, $start_node) {
             push @visited, $curr
             
             my $neighbors = $graph->{$curr} // []
-            # Push in reverse to maintain same order as recursive DFS if desired
-            for my $i (reverse 0..scalar(@$neighbors)-1) {
+            # Push in reversed to maintain same order as recursive DFS if desired
+            for my $i (rev 0..scalar(@$neighbors)-1) {
                 my $neighbor = $neighbors->[$i]
                 unless (exists $seen{$neighbor}) {
                     push @stack, $neighbor

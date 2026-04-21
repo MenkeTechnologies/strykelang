@@ -40,8 +40,8 @@ fn lcfirst_ucfirst() {
 
 #[test]
 fn reverse_string_vs_list_context() {
-    assert_eq!(eval_string(r#"scalar reverse "abc""#), "cba");
-    assert_eq!(eval_int("scalar reverse (1, 2, 3)"), 321);
+    assert_eq!(eval_string(r#"scalar rev "abc""#), "cba");
+    assert_eq!(eval_int("scalar rev (1, 2, 3)"), 321);
 }
 
 #[test]

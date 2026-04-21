@@ -3,7 +3,7 @@
 
 fn pal_check($s) {
     my $clean = lc($s) =~ s/[^a-z0-9]//gr
-    my $rev = ~> $clean >{split //, $_} reverse |> join ""
+    my $rev = ~> $clean >{split //, $_} rev |> join ""
     $clean eq $rev
 }
 

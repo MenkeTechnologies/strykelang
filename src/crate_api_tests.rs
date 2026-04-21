@@ -486,7 +486,7 @@ fn try_vm_execute_scalar_values_hash_count() {
 
 #[test]
 fn try_vm_execute_join_reverse_list() {
-    let p = parse(r#"join(",", reverse (30, 20, 10))"#).expect("parse");
+    let p = parse(r#"join(",", rev (30, 20, 10))"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "reverse list then join should compile on VM");
@@ -1189,7 +1189,7 @@ fn try_vm_execute_lc_uc_concat() {
 
 #[test]
 fn try_vm_execute_scalar_reverse_string() {
-    let p = parse(r#"scalar reverse "Perl""#).expect("parse");
+    let p = parse(r#"scalar rev "Perl""#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
@@ -5118,7 +5118,9 @@ fn run_join_reverse_sort_numbers() {
         "1-2-3"
     );
     assert_eq!(
-        run(r#"scalar reverse (1, 2, 3)"#).expect("run").to_string(),
+        run(r#"join "", reversed (1, 2, 3)"#)
+            .expect("run")
+            .to_string(),
         "321"
     );
 }

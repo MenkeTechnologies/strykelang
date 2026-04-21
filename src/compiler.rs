@@ -5708,9 +5708,14 @@ impl Compiler {
                 self.compile_expr(e)?;
                 self.emit_op(Op::CallBuiltin(BuiltinId::Ref as u16, 1), line, Some(root));
             }
-            ExprKind::ScalarReverse(e) => {
+            ExprKind::Rev(e) => {
+                // Compile in list context to get arrays/hashes as collections
                 self.compile_expr_ctx(e, WantarrayCtx::List)?;
-                self.emit_op(Op::RevOp, line, Some(root));
+                if ctx == WantarrayCtx::List {
+                    self.emit_op(Op::RevListOp, line, Some(root));
+                } else {
+                    self.emit_op(Op::RevScalarOp, line, Some(root));
+                }
             }
             ExprKind::ReverseExpr(e) => {
                 self.compile_expr_ctx(e, WantarrayCtx::List)?;

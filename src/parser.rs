@@ -222,10 +222,10 @@ impl Parser {
             ExprKind::Lstat(_) => expr,
             ExprKind::Readlink(_) => expr,
             // rev with empty list should use $_
-            ExprKind::ScalarReverse(ref inner) => {
+            ExprKind::Rev(ref inner) => {
                 if matches!(inner.kind, ExprKind::List(ref v) if v.is_empty()) {
                     Expr {
-                        kind: ExprKind::ScalarReverse(Box::new(topic())),
+                        kind: ExprKind::Rev(Box::new(topic())),
                         line,
                     }
                 } else {
@@ -2345,8 +2345,15 @@ impl Parser {
             "each" => ExprKind::Each(Box::new(arg)),
             "pop" => ExprKind::Pop(Box::new(arg)),
             "shift" => ExprKind::Shift(Box::new(arg)),
-            "reverse" | "reversed" | "rv" => ExprKind::ReverseExpr(Box::new(arg)),
-            "rev" => ExprKind::ScalarReverse(Box::new(arg)),
+            "reverse" => {
+                if !crate::compat_mode() {
+                    return Err(
+                        self.syntax_err("`reverse` is not valid stryke; use `rev` instead", line)
+                    );
+                }
+                ExprKind::ReverseExpr(Box::new(arg))
+            }
+            "reversed" | "rv" | "rev" => ExprKind::Rev(Box::new(arg)),
             "sort" | "so" => ExprKind::SortExpr {
                 cmp: None,
                 list: Box::new(arg),
@@ -5804,7 +5811,7 @@ impl Parser {
             ExprKind::Delete(_) => ExprKind::Delete(Box::new(lhs)),
             ExprKind::Exists(_) => ExprKind::Exists(Box::new(lhs)),
             ExprKind::ReverseExpr(_) => ExprKind::ReverseExpr(Box::new(lhs)),
-            ExprKind::ScalarReverse(_) => ExprKind::ScalarReverse(Box::new(lhs)),
+            ExprKind::Rev(_) => ExprKind::Rev(Box::new(lhs)),
             ExprKind::Slurp(_) => ExprKind::Slurp(Box::new(lhs)),
             ExprKind::Capture(_) => ExprKind::Capture(Box::new(lhs)),
             ExprKind::Qx(_) => ExprKind::Qx(Box::new(lhs)),
@@ -6066,8 +6073,14 @@ impl Parser {
 
             // ── Bareword function name → plain unary call ──────────────────────
             ExprKind::Bareword(name) => match name.as_str() {
-                "rv" | "reverse" | "reversed" => ExprKind::ReverseExpr(Box::new(lhs)),
-                "rev" => ExprKind::ScalarReverse(Box::new(lhs)),
+                "reverse" => {
+                    if !crate::compat_mode() {
+                        return Err(self
+                            .syntax_err("`reverse` is not valid stryke; use `rev` instead", line));
+                    }
+                    ExprKind::ReverseExpr(Box::new(lhs))
+                }
+                "rv" | "reversed" | "rev" => ExprKind::Rev(Box::new(lhs)),
                 "uq" | "uniq" | "distinct" => ExprKind::FuncCall {
                     name: "uniq".to_string(),
                     args: vec![lhs],
@@ -8704,11 +8717,16 @@ impl Parser {
                     self.parse_one_arg_or_default()?
                 };
                 Ok(Expr {
-                    kind: ExprKind::ScalarReverse(Box::new(a)),
+                    kind: ExprKind::Rev(Box::new(a)),
                     line,
                 })
             }
-            "reverse" | "reversed" => {
+            "reverse" => {
+                if !crate::compat_mode() {
+                    return Err(
+                        self.syntax_err("`reverse` is not valid stryke; use `rev` instead", line)
+                    );
+                }
                 // On the RHS of `|>`, the operand is supplied by the piped LHS.
                 let a = if self.in_pipe_rhs()
                     && matches!(
@@ -8725,6 +8743,26 @@ impl Parser {
                 };
                 Ok(Expr {
                     kind: ExprKind::ReverseExpr(Box::new(a)),
+                    line,
+                })
+            }
+            "reversed" | "rv" => {
+                // On the RHS of `|>`, the operand is supplied by the piped LHS.
+                let a = if self.in_pipe_rhs()
+                    && matches!(
+                        self.peek(),
+                        Token::Semicolon
+                            | Token::RBrace
+                            | Token::RParen
+                            | Token::Eof
+                            | Token::PipeForward
+                    ) {
+                    self.pipe_placeholder_list(line)
+                } else {
+                    self.parse_one_arg()?
+                };
+                Ok(Expr {
+                    kind: ExprKind::Rev(Box::new(a)),
                     line,
                 })
             }

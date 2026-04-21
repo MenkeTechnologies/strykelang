@@ -19,7 +19,7 @@ assert_eq length("hello"), 5, "length"
 
 # Array builtins
 assert_eq join(",", sort(3, 1, 2)), "1,2,3", "sort + join"
-assert_eq join(",", reverse(1, 2, 3)), "3,2,1", "reverse list"
+assert_eq join(",", rev(1, 2, 3)), "3,2,1", "reverse list"
 assert_eq scalar(uniq(1, 2, 2, 3, 3, 3)), 3, "uniq count"
 
 # Encoding

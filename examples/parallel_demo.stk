@@ -9,7 +9,7 @@ print "pmap: first 10 doubled = ", @doubled[0 .. 9] |> join ", ", "\n"
 my @evens = @data |> pgrep $_ % 2 == 0
 print "pgrep: ", @evens |> scalar, " even numbers found\n"
 
-my @sorted = @data |> reverse |> psort { $a <=> $b }
+my @sorted = @data |> rev |> psort { $a <=> $b }
 
 print "psort: first 10 = ", @sorted[(0 .. 9)] |> join ", ", "\n"
 print "pfor: processing...\n"

@@ -94,8 +94,8 @@ fn sort_default_lexical_strings() {
 
 #[test]
 fn reverse_list_vs_string_reverse() {
-    assert_eq!(eval_string(r#"join(",", reverse(1,2,3))"#), "3,2,1");
-    assert_eq!(eval_string(r#"reverse("ab")"#), "ba");
+    assert_eq!(eval_string(r#"join(",", rev(1,2,3))"#), "3,2,1");
+    assert_eq!(eval_string(r#"rev("ab")"#), "ba");
 }
 
 #[test]

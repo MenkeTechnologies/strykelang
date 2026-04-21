@@ -105,7 +105,7 @@ parse_smoke_cases! {
     parse_smoke_095 => "ord 'A';";
     parse_smoke_096 => "join ',', (1,2);";
     parse_smoke_097 => "split /,/, 'a,b';";
-    parse_smoke_098 => "reverse (1,2);";
+    parse_smoke_098 => "rev (1,2);";
     parse_smoke_099 => "sort { $a <=> $b } (2,1);";
     parse_smoke_100 => "grep { $_ =~ /./ } (1);";
     parse_smoke_101 => "map { $_ * 2 } (1);";

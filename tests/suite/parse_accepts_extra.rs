@@ -166,7 +166,7 @@ fn accepts_join_empty_string() {
 
 #[test]
 fn accepts_reverse_scalar_context_keyword() {
-    p("scalar reverse 'abc'");
+    p("scalar rev 'abc'");
 }
 
 #[test]

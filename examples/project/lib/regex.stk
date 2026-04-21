@@ -220,5 +220,5 @@ fn mask_digits($str) {
 
 fn words_reversed($str) {
     my @words = split(/\s+/, $str)
-    join(" ", reverse @words)
+    join(" ", rev @words)
 }

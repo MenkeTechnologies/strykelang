@@ -162,17 +162,17 @@ fn arr_sort_case_insensitive {
 
 fn arr_reverse {
     my @a = (1, 2, 3, 4, 5)
-    reverse @a
+    rev @a
 }
 
 fn arr_reverse_string {
     my @a = qw(a b c)
-    reverse @a
+    rev @a
 }
 
 fn arr_reverse_in_place {
     my @a = (1, 2, 3)
-    @a = reverse @a
+    @a = rev @a
     @a
 }
 
