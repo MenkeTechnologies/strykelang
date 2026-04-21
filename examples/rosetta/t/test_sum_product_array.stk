@@ -1,0 +1,47 @@
+#!/usr/bin/env stryke  
+# Rosetta Code: Sum and product of an array
+
+fn sum_product_demo() {
+    "Sum and Product of Array Examples:" |> p
+    
+    my @numbers = (1, 2, 3, 4, 5)
+    "Array: " . join(", ", @numbers) |> p
+    
+    # Sum using reduce
+    my $sum = @numbers |> sum
+    "Sum: $sum" |> p
+    
+    # Product using reduce 
+    my $product = @numbers |> product
+    "Product: $product" |> p
+    
+    # Manual sum calculation
+    my $manual_sum = 0
+    for my $n (@numbers) {
+        $manual_sum += $n
+    }
+    "Manual sum: $manual_sum" |> p
+    
+    # Manual product calculation
+    my $manual_product = 1
+    for my $n (@numbers) {
+        $manual_product *= $n
+    }
+    "Manual product: $manual_product" |> p
+    
+    # Threading example
+    my $threaded_sum = ~> @numbers sum
+    
+    # Different arrays
+    my @decimals = (1.5, 2.5, 3.5)
+    "Decimals: " . join(", ", @decimals) |> p
+    "Decimal sum: " . (@decimals |> sum) |> p
+    "Decimal product: " . (@decimals |> product) |> p
+    
+    my @mixed = (-2, 0, 3, 7)
+    "Mixed (with negative/zero): " . join(", ", @mixed) |> p
+    "Mixed sum: " . (@mixed |> sum) |> p
+    "Mixed product: " . (@mixed |> product) |> p
+}
+
+sum_product_demo

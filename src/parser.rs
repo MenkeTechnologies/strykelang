@@ -1732,16 +1732,24 @@ impl Parser {
             expr?
         };
 
+        // Track line where the last stage ended (initially the input expression's line).
+        let mut last_stage_end_line = self.prev_line();
+
         // Parse stages until we hit a statement terminator
         loop {
+            // Newline termination: if the next token is on a different line than where
+            // the previous stage ended, the thread macro terminates. This allows
+            // `~> @arr map { $_ * 2 }` on one line followed by `my @b = ...` on the next
+            // without requiring a semicolon.
+            if self.peek_line() > last_stage_end_line {
+                break;
+            }
+
             // Check for terminators - |> ends thread and allows piping the result.
             // Variables ($x, @x, %x) and declaration keywords (my, our, local, state)
             // cannot be stages, so they implicitly terminate the thread macro.
-            // This allows `my $a = ~> LIST sum` followed by `my $b = ...` on the next
-            // line without requiring a semicolon after the thread expression.
             match self.peek() {
                 Token::Semicolon
-                | Token::Newline
                 | Token::RBrace
                 | Token::RParen
                 | Token::RBracket
@@ -1847,6 +1855,7 @@ impl Parser {
                                 line: stage_line,
                             };
                             result = stage;
+                            last_stage_end_line = self.prev_line();
                             continue;
                         }
                         if parts.len() >= 4 && parts[1] == "tr" {
@@ -1862,6 +1871,7 @@ impl Parser {
                                 line: stage_line,
                             };
                             result = stage;
+                            last_stage_end_line = self.prev_line();
                             continue;
                         }
                         return Err(
@@ -2230,6 +2240,7 @@ impl Parser {
                     ));
                 }
             };
+            last_stage_end_line = self.prev_line();
         }
 
         if pipe_rhs_wrap {

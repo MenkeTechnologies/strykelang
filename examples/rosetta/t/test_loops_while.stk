@@ -1,0 +1,59 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Loops/While
+
+fn while_loop_examples() {
+    "While Loop Examples:" |> p
+    
+    # Basic while loop
+    "1. Count to 5:" |> p
+    my $i = 1
+    while ($i <= 5) {
+        "   $i" |> p
+        $i++
+    }
+    
+    # While loop with condition check
+    "2. Double until > 100:" |> p
+    my $num = 3
+    while ($num <= 100) {
+        "   $num" |> p
+        $num *= 2
+    }
+    
+    # While loop processing array
+    "3. Process array elements:" |> p
+    my @items = ("first", "second", "third")
+    my $index = 0
+    while ($index < scalar(@items)) {
+        "   Item $index: $items[$index]" |> p
+        $index++
+    }
+    
+    # While loop with pattern matching
+    "4. Extract digits from string:" |> p
+    my $text = "a1b2c3d"
+    my $pos = 0
+    while ($text =~ /(\d)/g) {
+        "   Found digit: $1" |> p
+    }
+    
+    # Do-while equivalent (using do block)
+    "5. Do-while style (execute at least once):" |> p
+    my $x = 10
+    do {
+        "   $x is >= 10" |> p
+        $x -= 5
+    } while ($x >= 10)
+    
+    # While with complex condition
+    "6. While with multiple conditions:" |> p
+    my $a = 1
+    my $b = 10
+    while ($a < 5 && $b > 5) {
+        "   a=$a, b=$b" |> p
+        $a++
+        $b--
+    }
+}
+
+while_loop_examples

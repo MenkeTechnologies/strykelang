@@ -1,0 +1,8 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Empty Program
+# 
+# This demonstrates the minimal valid Stryke program.
+# The simplest program that does nothing but is syntactically correct.
+
+# The empty program - just the shebang line is sufficient
+# In Stryke, a program can be completely empty and still valid

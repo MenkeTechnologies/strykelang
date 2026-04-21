@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Comments
+
+# This is a single line comment in Stryke
+
+fn show_comments() {
+    # This function demonstrates different comment styles
+    "Comments demonstrated:" |> p
+    "1. Hash (#) for single line comments" |> p
+    "2. Multi-line with multiple # lines" |> p
+    
+    my $x = 42  # Inline comment after code
+    "Value with inline comment: $x" |> p
+}
+
+# Multi-line comment using multiple # lines:
+# This is line 1 of a multi-line comment
+# This is line 2 of a multi-line comment
+# This is line 3 of a multi-line comment
+
+show_comments
+
+# Comments are essential for code documentation
+# They explain the 'why', not just the 'what'
