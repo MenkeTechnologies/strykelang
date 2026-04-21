@@ -82,7 +82,7 @@ fn test_aot_build_invalid_script() {
     let script = dir.join("invalid.pl");
     let out = dir.join("out.exe");
 
-    fs::write(&script, "sub { !!! syntax error !!! }").unwrap();
+    fs::write(&script, "fn { !!! syntax error !!! }").unwrap();
 
     let res = build(&script, &out);
     assert!(res.is_err());

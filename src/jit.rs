@@ -4511,7 +4511,7 @@ mod tests {
 
     #[test]
     fn try_run_linear_sub_implicit_undef_returns_undef() {
-        // Mimics `sub { }` tail: LoadUndef; ReturnValue
+        // Mimics `fn { }` tail: LoadUndef; ReturnValue
         let ops = vec![Op::LoadUndef, Op::ReturnValue];
         let v = try_run_linear_sub(&ops, 0, None, None, None, &[], &[], std::ptr::null_mut())
             .expect("sub jit");
@@ -4520,7 +4520,7 @@ mod tests {
 
     #[test]
     fn try_run_linear_sub_void_bare_return() {
-        // `sub { return; }` — first op is Return, empty segment.
+        // `fn { return; }` — first op is Return, empty segment.
         let ops = vec![Op::Return];
         let v = try_run_linear_sub(&ops, 0, None, None, None, &[], &[], std::ptr::null_mut())
             .expect("void sub jit");

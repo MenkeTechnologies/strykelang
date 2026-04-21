@@ -1,0 +1,63 @@
+#!/usr/bin/env stryke
+# t/test_random.stk — random number generation
+
+# Coin flip returns 0 or 1
+my $flip = coin_flip()
+assert_ok $flip == 0 || $flip == 1, "coin_flip is 0 or 1"
+
+# Dice roll (default 6-sided)
+my $roll = dice_roll()
+assert_ge $roll, 1, "dice >= 1"
+assert_le $roll, 6, "dice <= 6"
+
+# Dice roll with custom sides
+my $d20 = dice_roll(20)
+assert_ge $d20, 1, "d20 >= 1"
+assert_le $d20, 20, "d20 <= 20"
+
+# Random int in range
+my $ri = random_int(10, 20)
+assert_ge $ri, 10, "random_int >= 10"
+assert_le $ri, 20, "random_int <= 20"
+
+# Random float between 0 and 1
+my $rf = random_float()
+assert_ge $rf, 0, "random_float >= 0"
+assert_lt $rf, 1, "random_float < 1"
+
+# Random bool
+my $rb = random_bool()
+assert_ok $rb == 0 || $rb == 1, "random_bool is 0 or 1"
+
+# Random between (inclusive)
+my $between = random_between(5, 15)
+assert_ge $between, 5, "random_between >= 5"
+assert_le $between, 15, "random_between <= 15"
+
+# Random choice from list
+my @choices = ("apple", "banana", "cherry")
+my $choice = random_choice(@choices)
+assert_ok $choice eq "apple" || $choice eq "banana" || $choice eq "cherry", "random_choice valid"
+
+# Random string
+my $rs = random_string(10)
+assert_eq length($rs), 10, "random_string length"
+
+# Random alpha string
+my $ra = random_alpha(8)
+assert_eq length($ra), 8, "random_alpha length"
+assert_ok $ra =~ /^[a-zA-Z]+$/, "random_alpha only letters"
+
+# Random digit
+my $rd = random_digit()
+assert_ge $rd, 0, "random_digit >= 0"
+assert_le $rd, 9, "random_digit <= 9"
+
+# Multiple random calls should vary (statistical test)
+my %flips
+for (1..100) {
+    $flips{coin_flip()}++
+}
+assert_ok exists $flips{0} && exists $flips{1}, "coin_flip produces both 0 and 1"
+
+test_run

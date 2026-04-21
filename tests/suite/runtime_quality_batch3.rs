@@ -188,7 +188,7 @@ fn array_single_subscript_second_elem() {
 
 #[test]
 fn anon_sub_invoked_with_arrow() {
-    assert_eq!(eval_int(r#"(sub { my $x = shift @_; $x * 3 })->(4)"#), 12);
+    assert_eq!(eval_int(r#"(fn { my $x = shift @_; $x * 3 })->(4)"#), 12);
 }
 
 #[test]

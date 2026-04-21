@@ -139,12 +139,12 @@ fn accepts_pfor_bareword_stmt_in_block() {
 
 #[test]
 fn accepts_pwatch_glob_and_sub() {
-    p(r#"pwatch "/var/log/*.log", fn { say $_ }"#);
+    p(r#"pwatch "/var/log/*.log", fn { p $_ }"#);
 }
 
 #[test]
 fn accepts_watch_literal_and_block() {
-    p(r#"watch "/tmp/x", { say }"#);
+    p(r#"watch "/tmp/x", { p }"#);
 }
 
 #[test]

@@ -60,7 +60,7 @@ parse_batch3! {
     parse_b3_049 => "sysread F, $buf, 10, 0;";
     parse_b3_050 => "my @pair = each %ENV;";
     parse_b3_051 => "no strict 'refs';";
-    parse_b3_052 => "say 1;";
+    parse_b3_052 => "p 1;";
     parse_b3_053 => "dbmopen(%H, 'f', 0644);";
     parse_b3_054 => "dbmclose %H;";
     parse_b3_055 => "syscall(1, 1, 'x', 1);";

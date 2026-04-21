@@ -53,7 +53,7 @@ fn range_hash_slice_deref_string_keys_read() {
 #[test]
 fn range_return_list_context() {
     assert_eq!(
-        rs(r#"sub foo { return 1..$_0; }
+        rs(r#"fn foo { return 1..$_0; }
                join ",", foo(4);"#),
         "1,2,3,4"
     );
@@ -73,7 +73,7 @@ fn range_array_slice_reverse_range_index() {
 #[test]
 fn range_sub_call_args_flatten_range() {
     assert_eq!(
-        ri(r#"sub foo { return scalar @_; }
+        ri(r#"fn foo { return scalar @_; }
                foo(1..10);"#),
         10
     );
@@ -1681,7 +1681,7 @@ fn pipeline_filter_map_take_collect() {
     assert_eq!(ri(s), 38);
 }
 
-/// Bare `{ }` blocks and `pipeline(@arr)` (flattened) — same semantics as `sub { }` + scalars.
+/// Bare `{ }` blocks and `pipeline(@arr)` (flattened) — same semantics as `fn { }` + scalars.
 #[test]
 fn pipeline_chain_bare_blocks_and_array_source() {
     let s = r#"
@@ -1701,8 +1701,8 @@ fn pipeline_parallel_pgrep_pmap_psort() {
     let s = r#"
         my @r = pipeline(3, 1, 4)
             ->pgrep(fn { $_ > 1 })
-            ->pmap(sub { $_ + 10 })
-            ->psort(sub { $a <=> $b })
+            ->pmap(fn { $_ + 10 })
+            ->psort(fn { $a <=> $b })
             ->collect();
         scalar @r;
     "#;
@@ -1712,14 +1712,14 @@ fn pipeline_parallel_pgrep_pmap_psort() {
 #[test]
 fn pipeline_preduce_collect_scalar() {
     assert_eq!(
-        ri(r#"pipeline(1, 2, 3, 4)->preduce(sub { $a + $b })->collect();"#),
+        ri(r#"pipeline(1, 2, 3, 4)->preduce(fn { $a + $b })->collect();"#),
         10
     );
 }
 
 #[test]
 fn pipeline_chaining_rejects_ops_after_preduce() {
-    assert!(run(r#"pipeline(1, 2)->preduce(sub { $a + $b })->map(sub { $_ });"#,).is_err());
+    assert!(run(r#"pipeline(1, 2)->preduce(fn { $a + $b })->map(fn { $_ });"#,).is_err());
 }
 
 /// `->name` with no args resolves a package subroutine and applies it like `map` (`$_` each item).
@@ -1736,7 +1736,7 @@ fn pipeline_user_sub_in_chain() {
 #[test]
 fn pipeline_grep_alias_matches_filter() {
     let s = r#"
-        my @r = pipeline(1, 2, 3, 4)->grep(sub { $_ % 2 == 0 })->collect();
+        my @r = pipeline(1, 2, 3, 4)->grep(fn { $_ % 2 == 0 })->collect();
         scalar @r;
     "#;
     assert_eq!(ri(s), 2);
@@ -1813,7 +1813,7 @@ fn typed_sub_params_runtime_checks() {
         format!("{}", e).contains("expected Int"),
         "error should mention Int"
     );
-    let e2 = run(r#"sub foo ($s: Str) { $s } foo(123)"#).expect_err("type mismatch");
+    let e2 = run(r#"fn foo ($s: Str) { $s } foo(123)"#).expect_err("type mismatch");
     assert!(
         format!("{}", e2).contains("expected Str"),
         "error should mention Str"
@@ -3432,7 +3432,7 @@ fn local_ors_affects_say() {
     // say uses $\ and $\ is restored on block exit.
     // rs() only returns last value, so we must print inside and capture or similar.
     // Actually, I'll use a script that manually checks it.
-    assert_eq!(rs(r#"{ local $\ = "!"; say "hi" } "#), "1");
+    assert_eq!(rs(r#"{ local $\ = "!"; p "hi" } "#), "1");
 }
 
 #[test]
@@ -3480,7 +3480,7 @@ EOF
 #[test]
 fn compose_right_to_left() {
     let s = r#"
-        my $f = compose(sub { $_[0] + 1 }, sub { $_[0] * 2 });
+        my $f = compose(fn { $_[0] + 1 }, fn { $_[0] * 2 });
         $f->(5);
     "#;
     assert_eq!(ri(s), 11); // double(5)=10, inc(10)=11
@@ -3489,7 +3489,7 @@ fn compose_right_to_left() {
 #[test]
 fn compose_single_fn() {
     let s = r#"
-        my $f = compose(sub { $_[0] * 3 });
+        my $f = compose(fn { $_[0] * 3 });
         $f->(7);
     "#;
     assert_eq!(ri(s), 21);
@@ -3498,7 +3498,7 @@ fn compose_single_fn() {
 #[test]
 fn partial_prepends_args() {
     let s = r#"
-        my $add = sub { $_[0] + $_1 };
+        my $add = fn { $_[0] + $_1 };
         my $add5 = partial($add, 5);
         $add5->(3);
     "#;
@@ -3517,7 +3517,7 @@ fn constantly_ignores_args() {
 #[test]
 fn complement_negates() {
     let s = r#"
-        my $even = sub { $_[0] % 2 == 0 };
+        my $even = fn { $_[0] % 2 == 0 };
         my $odd = complement($even);
         $odd->(3);
     "#;
@@ -3527,7 +3527,7 @@ fn complement_negates() {
 #[test]
 fn juxt_collects_results() {
     let s = r#"
-        my $j = juxt(sub { $_[0] + 1 }, sub { $_[0] * 2 });
+        my $j = juxt(fn { $_[0] + 1 }, fn { $_[0] * 2 });
         join ",", $j->(5);
     "#;
     assert_eq!(rs(s), "6,10");
@@ -3536,7 +3536,7 @@ fn juxt_collects_results() {
 #[test]
 fn memoize_caches() {
     let s = r#"
-        my $f = memoize(sub { $_[0] * $_[0] });
+        my $f = memoize(fn { $_[0] * $_[0] });
         my $a = $f->(5);
         my $b = $f->(5);
         my $c = $f->(3);
@@ -3548,7 +3548,7 @@ fn memoize_caches() {
 #[test]
 fn curry_accumulates_args() {
     let s = r#"
-        my $add = curry(sub { $_[0] + $_1 }, 2);
+        my $add = curry(fn { $_[0] + $_1 }, 2);
         my $add5 = $add->(5);
         $add5->(3);
     "#;
@@ -3558,7 +3558,7 @@ fn curry_accumulates_args() {
 #[test]
 fn curry_immediate_when_enough_args() {
     let s = r#"
-        my $add = curry(sub { $_[0] + $_1 }, 2);
+        my $add = curry(fn { $_[0] + $_1 }, 2);
         $add->(5, 3);
     "#;
     assert_eq!(ri(s), 8);
@@ -3567,7 +3567,7 @@ fn curry_immediate_when_enough_args() {
 #[test]
 fn curry_multiple_stages() {
     let s = r#"
-        my $add3 = curry(sub { $_[0] + $_1 + $_2 }, 3);
+        my $add3 = curry(fn { $_[0] + $_1 + $_2 }, 3);
         my $f1 = $add3->(1);
         my $f2 = $f1->(10);
         $f2->(100);
@@ -3578,7 +3578,7 @@ fn curry_multiple_stages() {
 #[test]
 fn fnil_replaces_undef() {
     let s = r#"
-        my $f = fnil(sub { $_[0] + $_1 }, 10, 20);
+        my $f = fnil(fn { $_[0] + $_1 }, 10, 20);
         join ",", $f->(undef, undef), $f->(5, undef), $f->(undef, 5), $f->(5, 5);
     "#;
     assert_eq!(rs(s), "30,25,15,10");
@@ -3587,7 +3587,7 @@ fn fnil_replaces_undef() {
 #[test]
 fn fnil_with_string_defaults() {
     let s = r#"
-        my $greet = fnil(sub { "Hello, $_[0]!" }, "World");
+        my $greet = fnil(fn { "Hello, $_[0]!" }, "World");
         $greet->(undef) . " " . $greet->("Alice");
     "#;
     assert_eq!(rs(s), "Hello, World! Hello, Alice!");
@@ -3596,7 +3596,7 @@ fn fnil_with_string_defaults() {
 #[test]
 fn once_calls_only_once() {
     let s = r#"
-        my $f = once(sub { 42 });
+        my $f = once(fn { 42 });
         my $a = $f->();
         my $b = $f->();
         "$a,$b";
@@ -3735,7 +3735,7 @@ fn math_factorial() {
 #[test]
 fn functional_complement_variadic() {
     let s = r#"
-        my $none_even = complement(sub { 
+        my $none_even = complement(fn { 
             my $any = 0;
             for (@_) { if ($_ % 2 == 0) { $any = 1; last } }
             $any;
@@ -3757,7 +3757,7 @@ fn functional_constantly_variadic() {
 #[test]
 fn functional_juxt_multi_args() {
     let s = r#"
-        my $stats = juxt(sub { $_[0] + $_1 }, sub { $_[0] * $_1 });
+        my $stats = juxt(fn { $_[0] + $_1 }, fn { $_[0] * $_1 });
         my @res = $stats->(10, 5);
         join ",", @res;
     "#;
@@ -4056,7 +4056,7 @@ fn compat_mode_udf_shadowing() {
 #[test]
 fn pipeline_filter_alias_to_grep() {
     let s = r#"
-        my @r = pipeline(1, 2, 3, 4, 5)->filter(sub { $_ % 2 == 1 })->collect();
+        my @r = pipeline(1, 2, 3, 4, 5)->filter(fn { $_ % 2 == 1 })->collect();
         join ",", @r;
     "#;
     assert_eq!(rs(s), "1,3,5");
@@ -4066,7 +4066,7 @@ fn pipeline_filter_alias_to_grep() {
 fn dataframe_filter_alias() {
     let s = r#"
         my $df = df [{a => 1}, {a => 2}, {a => 3}];
-        my $df2 = $df->filter(sub { $_->{a} > 1 });
+        my $df2 = $df->filter(fn { $_->{a} > 1 });
         $df2->nrow;
     "#;
     assert_eq!(ri(s), 2);
@@ -4093,7 +4093,7 @@ fn fi_keyword_with_block() {
 #[test]
 fn pipeline_f_with_regex() {
     let s = r#"
-        my @r = pipeline("apple", "banana", "cherry")->f(sub { /a/ })->collect();
+        my @r = pipeline("apple", "banana", "cherry")->f(fn { /a/ })->collect();
         join ",", @r;
     "#;
     assert_eq!(rs(s), "apple,banana");
@@ -4102,7 +4102,7 @@ fn pipeline_f_with_regex() {
 #[test]
 fn pipeline_f_alias_for_filter() {
     let s = r#"
-        my @r = pipeline(1, 2, 3, 4)->f(sub { $_ > 2 })->collect();
+        my @r = pipeline(1, 2, 3, 4)->f(fn { $_ > 2 })->collect();
         join ",", @r;
     "#;
     assert_eq!(rs(s), "3,4");
@@ -4181,7 +4181,7 @@ fn core_builtins_defined_ref_variations() {
     assert_eq!(ri("defined('')"), 1);
     assert_eq!(rs("ref([])"), "ARRAY");
     assert_eq!(rs("ref({})"), "HASH");
-    assert_eq!(rs("ref(sub {})"), "CODE");
+    assert_eq!(rs("ref(fn {})"), "CODE");
 }
 
 #[test]
@@ -4291,7 +4291,7 @@ fn core_builtins_list_util_pairs() {
     assert_eq!(rs("join(',', pairvalues(a => 1, b => 2))"), "1,2");
     // pairmap
     assert_eq!(
-        rs("join(',', pairmap sub { $a . $b }, (a => 1, b => 2))"),
+        rs("join(',', pairmap fn { $a . $b }, (a => 1, b => 2))"),
         "a1,b2"
     );
 }
@@ -4362,9 +4362,9 @@ fn core_builtins_math_more_trig() {
 fn core_builtins_functional_accumulate() {
     // accumulate (1, 2, 3, 4) -> (1, 3, 6, 10)
     assert_eq!(rs("join(',', accumulate(1, 2, 3, 4))"), "1,3,6,10");
-    // accumulate sub { $_[0] * $_[1] }, 1..4 -> (1, 2, 6, 24)
+    // accumulate fn { $_[0] * $_[1] }, 1..4 -> (1, 2, 6, 24)
     assert_eq!(
-        rs("join(',', accumulate(sub { $_[0] * $_1 }, 1, 2, 3, 4))"),
+        rs("join(',', accumulate(fn { $_[0] * $_1 }, 1, 2, 3, 4))"),
         "1,2,6,24"
     );
 }

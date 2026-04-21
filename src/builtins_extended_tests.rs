@@ -636,7 +636,7 @@ fn test_list_util_builtins() {
     );
     assert_eq!(run("sum0()").expect("run").to_int(), 0);
     assert_eq!(
-        run("join(',', reductions sub { $_[0] + $_[1] }, (1, 2, 3))")
+        run("join(',', reductions fn { $_[0] + $_[1] }, (1, 2, 3))")
             .expect("run")
             .to_string(),
         "1,3,6"
@@ -956,7 +956,7 @@ fn test_extended_matrix_batch5() {
     );
     // matrix_map
     assert_eq!(
-        run("my @m = matrix_map(sub { $_[0] * 2 }, [[1, 2], [3, 4]]); join(',', map { join('', @$_) } @m)")
+        run("my @m = matrix_map(fn { $_[0] * 2 }, [[1, 2], [3, 4]]); join(',', map { join('', @$_) } @m)")
             .expect("run")
             .to_string(),
         "24,68"
@@ -1125,7 +1125,7 @@ fn test_extended_collections_batch8() {
     // group_consecutive_by { $_ % 2 } 1, 3, 2, 4, 5
     // [1, 3] (odd), [2, 4] (even), [5] (odd)
     let group = r#"
-        my @g = group_consecutive_by(sub { $_[0] % 2 }, 1, 3, 2, 4, 5);
+        my @g = group_consecutive_by(fn { $_[0] % 2 }, 1, 3, 2, 4, 5);
         join('|', @g);
     "#;
     assert_eq!(run(group).expect("run").to_string(), "13|24|5");

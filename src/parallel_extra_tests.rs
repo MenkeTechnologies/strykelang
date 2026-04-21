@@ -92,10 +92,10 @@ fn test_pchannel_try_recv() {
 fn test_ppool_shutdown() {
     let code = r#"
         my $pool = ppool(1)
-        $pool->submit(sub { 1 })
+        $pool->submit(fn { 1 })
         $pool->shutdown()
         # Subsequent submit should fail or be no-op
-        eval { $pool->submit(sub { 2 }) }
+        eval { $pool->submit(fn { 2 }) }
         $@ ? "failed" : "ok"
     "#;
     // Depending on implementation, it might throw or just not run.

@@ -1,0 +1,53 @@
+#!/usr/bin/env stryke
+# t/test_hash_advanced.stk — advanced hash operations
+
+# Pick and omit keys
+my $h = {a => 1, b => 2, c => 3, d => 4}
+my $picked = pick_keys($h, "a", "c")
+assert_eq scalar(keys %$picked), 2, "pick_keys count"
+assert_eq $picked->{a}, 1, "picked has a"
+assert_eq $picked->{c}, 3, "picked has c"
+
+my $omitted = omit_keys($h, "a", "c")
+assert_eq scalar(keys %$omitted), 2, "omit_keys count"
+assert_eq $omitted->{b}, 2, "omitted has b"
+assert_eq $omitted->{d}, 4, "omitted has d"
+
+# Hash size
+assert_eq hash_size($h), 4, "hash_size"
+assert_eq hash_size({}), 0, "hash_size empty"
+
+# Hash from pairs
+my $from_pairs = hash_from_pairs(["a", 1], ["b", 2], ["c", 3])
+assert_eq $from_pairs->{a}, 1, "hash_from_pairs a"
+assert_eq $from_pairs->{b}, 2, "hash_from_pairs b"
+assert_eq $from_pairs->{c}, 3, "hash_from_pairs c"
+
+# Pairs from hash
+my @pairs = pairs_from_hash({x => 10, y => 20})
+assert_eq scalar(@pairs), 2, "pairs_from_hash count"
+
+# Hash equality
+assert_ok hash_eq({a => 1, b => 2}, {b => 2, a => 1}), "hash_eq same"
+assert_false hash_eq({a => 1}, {a => 2}), "hash_eq diff value"
+assert_false hash_eq({a => 1}, {b => 1}), "hash_eq diff key"
+assert_false hash_eq({a => 1}, {a => 1, b => 2}), "hash_eq diff size"
+
+# Empty hash check
+assert_ok is_empty_hash({}), "empty hash"
+assert_false is_empty_hash({a => 1}), "non-empty hash"
+
+# Sorted keys/values
+my $unsorted = {c => 3, a => 1, b => 2}
+my @ks = keys_sorted($unsorted)
+assert_eq join(",", @ks), "a,b,c", "keys_sorted"
+my @vs = values_sorted($unsorted)
+assert_eq join(",", @vs), "1,2,3", "values_sorted"
+
+# Remove keys (returns new hash)
+my $removed = remove_keys({a => 1, b => 2, c => 3}, "b")
+assert_eq scalar(keys %$removed), 2, "remove_keys count"
+assert_false exists $removed->{b}, "b was removed"
+assert_ok exists $removed->{a}, "a still exists"
+
+test_run

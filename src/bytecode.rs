@@ -602,11 +602,11 @@ pub enum Op {
         n_rx: u8,
         has_timeout: bool,
     },
-    /// `par_lines PATH, sub { } [, progress => EXPR]` — index into [`Chunk::par_lines_entries`]; stack: \[\] → `undef`
+    /// `par_lines PATH, fn { } [, progress => EXPR]` — index into [`Chunk::par_lines_entries`]; stack: \[\] → `undef`
     ParLines(u16),
-    /// `par_walk PATH, sub { } [, progress => EXPR]` — index into [`Chunk::par_walk_entries`]; stack: \[\] → `undef`
+    /// `par_walk PATH, fn { } [, progress => EXPR]` — index into [`Chunk::par_walk_entries`]; stack: \[\] → `undef`
     ParWalk(u16),
-    /// `pwatch GLOB, sub { }` — index into [`Chunk::pwatch_entries`]; stack: \[\] → result
+    /// `pwatch GLOB, fn { }` — index into [`Chunk::pwatch_entries`]; stack: \[\] → result
     Pwatch(u16),
     /// fan N { BLOCK } — block_idx; stack: \[progress_flag, count\] (`progress_flag` is 0/1)
     FanWithBlock(u16),
@@ -913,7 +913,7 @@ pub enum BuiltinId {
     GlobPar,
     /// `deque()` — empty deque.
     DequeNew,
-    /// `heap(sub { })` — empty heap with comparator.
+    /// `heap(fn { })` — empty heap with comparator.
     HeapNew,
     /// `pipeline(...)` — lazy iterator (filter/map/take/collect).
     Pipeline,
@@ -1051,13 +1051,13 @@ pub struct Chunk {
     pub algebraic_match_subject_bytecode_ranges: Vec<Option<(usize, usize)>>,
     /// Nested / runtime `sub` declarations (see [`Op::RuntimeSubDecl`]).
     pub runtime_sub_decls: Vec<RuntimeSubDecl>,
-    /// Stryke `sub ($a, …)` / hash-destruct params for [`Op::MakeCodeRef`] (second operand is pool index).
+    /// Stryke `fn ($a, …)` / hash-destruct params for [`Op::MakeCodeRef`] (second operand is pool index).
     pub code_ref_sigs: Vec<Vec<SubSigParam>>,
-    /// `par_lines PATH, sub { } [, progress => EXPR]` — evaluated by interpreter inside VM.
+    /// `par_lines PATH, fn { } [, progress => EXPR]` — evaluated by interpreter inside VM.
     pub par_lines_entries: Vec<(Expr, Expr, Option<Expr>)>,
-    /// `par_walk PATH, sub { } [, progress => EXPR]` — evaluated by interpreter inside VM.
+    /// `par_walk PATH, fn { } [, progress => EXPR]` — evaluated by interpreter inside VM.
     pub par_walk_entries: Vec<(Expr, Expr, Option<Expr>)>,
-    /// `pwatch GLOB, sub { }` — evaluated by interpreter inside VM.
+    /// `pwatch GLOB, fn { }` — evaluated by interpreter inside VM.
     pub pwatch_entries: Vec<(Expr, Expr)>,
     /// `substr $var, OFF, LEN, REPL` — four-arg form (mutates `LHS`); evaluated by interpreter inside VM.
     pub substr_four_arg_entries: Vec<(Expr, Expr, Option<Expr>, Expr)>,
@@ -1285,7 +1285,7 @@ impl Chunk {
         idx
     }
 
-    /// `par_lines PATH, sub { } [, progress => EXPR]` — returns pool index for [`Op::ParLines`].
+    /// `par_lines PATH, fn { } [, progress => EXPR]` — returns pool index for [`Op::ParLines`].
     pub fn add_par_lines_entry(
         &mut self,
         path: Expr,
@@ -1297,7 +1297,7 @@ impl Chunk {
         idx
     }
 
-    /// `par_walk PATH, sub { } [, progress => EXPR]` — returns pool index for [`Op::ParWalk`].
+    /// `par_walk PATH, fn { } [, progress => EXPR]` — returns pool index for [`Op::ParWalk`].
     pub fn add_par_walk_entry(
         &mut self,
         path: Expr,
@@ -1309,7 +1309,7 @@ impl Chunk {
         idx
     }
 
-    /// `pwatch GLOB, sub { }` — returns pool index for [`Op::Pwatch`].
+    /// `pwatch GLOB, fn { }` — returns pool index for [`Op::Pwatch`].
     pub fn add_pwatch_entry(&mut self, path: Expr, callback: Expr) -> u16 {
         let idx = self.pwatch_entries.len() as u16;
         self.pwatch_entries.push((path, callback));
@@ -1344,7 +1344,7 @@ impl Chunk {
         idx
     }
 
-    /// Pool index for [`Op::MakeCodeRef`] signature (`stryke` extension); use empty vec for legacy `sub { }`.
+    /// Pool index for [`Op::MakeCodeRef`] signature (`stryke` extension); use empty vec for legacy `fn { }`.
     pub fn add_code_ref_sig(&mut self, params: Vec<SubSigParam>) -> u16 {
         let idx = self.code_ref_sigs.len();
         if idx > u16::MAX as usize {
