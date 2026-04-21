@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Luhn Test
+
+fn luhn($n) {
+    my @d = ~> { $n } split // reverse
+    my $sum = ~> { 0..$#d } map {
+        my $d = $d[$_]
+        $_ % 2 == 1 ? ($d *= 2) > 9 ? $d - 9 : $d : $d
+    } sum
+    $sum % 10 == 0
+}
+
+~> { (49927398716, 49927398717, 1234567812345670) } fore {
+    p "$_: " . (luhn($_) ? "valid" : "invalid")
+}

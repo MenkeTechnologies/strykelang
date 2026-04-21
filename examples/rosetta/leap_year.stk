@@ -1,0 +1,7 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Leap Year
+
+fn is_leap($y) { $y % 4 == 0 && ($y % 100 != 0 || $y % 400 == 0) }
+
+p "Leap years 2000-2030:"
+~> { 2000..2030 } filter { is_leap } join ", " p

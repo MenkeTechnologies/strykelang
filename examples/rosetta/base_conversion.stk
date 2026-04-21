@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Non-decimal Radices / Convert
+
+my @dig = ~> { "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" } split //
+
+fn to_base($n, $b) {
+    my $r = ""
+    while ($n > 0) { $r = $dig[$n % $b] . $r; $n = int($n / $b) }
+    $r || "0"
+}
+
+fn from_base($s, $b) {
+    my %v
+    $v{$dig[$_]} = $_ for 0..$#dig
+    ~> { uc($s) } split // reduce { $a * $b + $v{$b} } // 0
+}
+
+my $n = 255
+p "Decimal $n:"
+~> { [[2,"Binary"], [8,"Octal"], [16,"Hex"], [36,"Base36"]] } fore {
+    p "  $_->[1]: " . to_base($n, $_->[0])
+}

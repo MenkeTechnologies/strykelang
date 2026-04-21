@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Longest Common Subsequence
+
+fn lcs($a, $b) {
+    my @a = ~> { $a } split //
+    my @b = ~> { $b } split //
+    my @dp
+    ~> { 0..@a } fore { $dp[$_] = [(0) x (@b + 1)] }
+    ~> { 1..@a } fore {
+        my $i = $_
+        ~> { 1..@b } fore {
+            $dp[$i][$_] = $a[$i-1] eq $b[$_-1]
+                ? $dp[$i-1][$_-1] + 1
+                : max($dp[$i-1][$_], $dp[$i][$_-1])
+        }
+    }
+    my ($i, $j, $res) = (@a, @b, "")
+    while ($i > 0 && $j > 0) {
+        if ($a[$i-1] eq $b[$j-1]) {
+            $res = $a[$i-1] . $res
+            $i--; $j--
+        } elsif ($dp[$i-1][$j] > $dp[$i][$j-1]) { $i-- }
+        else { $j-- }
+    }
+    $res
+}
+
+p "LCS('thisisatest', 'testing123testing') = " . lcs("thisisatest", "testing123testing")

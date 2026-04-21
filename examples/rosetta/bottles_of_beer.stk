@@ -1,18 +1,11 @@
 #!/usr/bin/env stryke
 # Rosetta Code: 99 Bottles of Beer
 
-for (my $i = 99; $i >= 1; $i--) {
-    my $next = $i - 1;
-    my $s = $i == 1 ? "" : "s";
-    my $ns = $next == 1 ? "" : "s";
-    
-    printf "%d bottle%s of beer on the wall, %d bottle%s of beer.\n", $i, $s, $i, $s;
-    if ($next > 0) {
-        printf "Take one down and pass it around, %d bottle%s of beer on the wall.\n\n", $next, $ns;
-    } else {
-        printf "Take one down and pass it around, no more bottles of beer on the wall.\n\n";
-    }
+fn bottles($n) {
+    $n == 0 ? "no more bottles" : $n == 1 ? "1 bottle" : "$n bottles"
 }
 
-print "No more bottles of beer on the wall, no more bottles of beer.\n";
-print "Go to the store and buy some more, 99 bottles of beer on the wall.\n";
+~> { reverse 1..99 } fore {
+    p bottles($_) . " of beer on the wall, " . bottles($_) . " of beer."
+    p "Take one down, pass it around, " . bottles($_ - 1) . " of beer on the wall.\n"
+}

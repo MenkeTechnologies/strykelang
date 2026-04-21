@@ -1,13 +1,10 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Greatest Common Divisor
 
-fn gcd($a, $b) {
-    while ($b) {
-        ($a, $b) = ($b, $a % $b);
-    }
-    return $a;
+fn my_gcd($a, $b) {
+    $b == 0 ? $a : my_gcd($b, $a % $b)
 }
 
-printf "gcd(12, 8)    = %d\n", gcd(12, 8);
-printf "gcd(14, 15)   = %d\n", gcd(14, 15);
-printf "gcd(1071, 462) = %d\n", gcd(1071, 462);
+fn my_lcm($a, $b) {
+    $a * $b / my_gcd($a, $b)
+}

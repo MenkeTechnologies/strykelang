@@ -1,30 +1,21 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Sieve of Eratosthenes
 
-fn sieve($limit) {
-    my @primes;
-    my @is_prime;
-    
-    for (0..$limit) { push @is_prime, 1; }
-    $is_prime[0] = 0;
-    $is_prime[1] = 0;
+fn my_sieve($limit) {
+    my @is_prime
+    push @is_prime, 0 for 0..1
+    push @is_prime, 1 for 2..$limit
     
     for (my $p = 2; $p * $p <= $limit; $p++) {
-        if ($is_prime[$p]) {
-            for (my $i = $p * $p; $i <= $limit; $i += $p) {
-                $is_prime[$i] = 0;
-            }
+        next unless $is_prime[$p]
+        for (my $i = $p * $p; $i <= $limit; $i += $p) {
+            $is_prime[$i] = 0
         }
     }
     
-    for (my $i = 2; $i <= $limit; $i++) {
-        if ($is_prime[$i]) {
-            push @primes, $i;
-        }
+    my @primes
+    for my $i (2..$limit) {
+        push @primes, $i if $is_prime[$i]
     }
-    
-    return @primes;
+    @primes
 }
-
-my @p = sieve(100);
-print "Primes up to 100: " . join(", ", @p) . "\n";

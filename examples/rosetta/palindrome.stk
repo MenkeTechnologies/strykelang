@@ -1,12 +1,8 @@
 #!/usr/bin/env stryke
-# Rosetta Code: Palindrome
+# Rosetta Code: Palindrome Detection
 
-fn is_palindrome($s) {
-    my $clean = lc($s =~ s/[^a-z0-9]//gr);
-    return $clean eq reverse($clean);
-}
-
-my @samples = ("Racecar", "A man, a plan, a canal: Panama", "Hello", "No 'x' in Nixon");
-for my $s (@samples) {
-    printf "'%s' is palindrome: %d\n", $s, is_palindrome($s);
+fn pal_check($s) {
+    my $clean = lc($s) =~ s/[^a-z0-9]//gr
+    my $rev = $clean |> split // |> reverse |> join ""
+    $clean eq $rev
 }

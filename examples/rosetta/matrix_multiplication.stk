@@ -1,34 +1,35 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Matrix Multiplication
 
-fn matrix_mul($a, $b) {
-    my $r1 = scalar(@$a);
-    my $c1 = scalar(@{$a->[0]});
-    my $r2 = scalar(@$b);
-    my $c2 = scalar(@{$b->[0]});
+fn mat_mul(\@a, \@b) {
+    my $rows_a = @a
+    my $cols_a = @{$a[0]}
+    my $cols_b = @{$b[0]}
     
-    die "Invalid dimensions" if $c1 != $r2;
-    
-    my @res;
-    for my $i (0..$r1-1) {
-        my @row;
-        for my $j (0..$c2-1) {
-            my $sum = 0;
-            for my $k (0..$c1-1) {
-                $sum += $a->[$i]->[$k] * $b->[$k]->[$j];
-            }
-            push @row, $sum;
+    my @result
+    for my $i (0..$rows_a-1) {
+        $result[$i] = []
+        for my $j (0..$cols_b-1) {
+            my $sum = 0
+            $sum += $a[$i][$k] * $b[$k][$j] for 0..$cols_a-1
+            $result[$i][$j] = $sum
         }
-        push @res, \@row;
     }
-    return \@res;
+    @result
 }
 
-my $m1 = [[1, 2], [3, 4]];
-my $m2 = [[5, 6], [7, 8]];
-my $res = matrix_mul($m1, $m2);
-
-print "Resulting Matrix:\n";
-for my $row (@$res) {
-    print "[" . join(", ", @$row) . "]\n";
+fn mat_print(\@m) {
+    for my $row (@m) {
+        p "  [" . join(", ", map { sprintf "%3d", $_ } @$row) . "]"
+    }
 }
+
+my @a = ([1, 2], [3, 4], [5, 6])
+my @b = ([1, 2, 3], [4, 5, 6])
+
+p "Matrix A:"
+mat_print(\@a)
+p "Matrix B:"
+mat_print(\@b)
+p "A × B:"
+mat_print([mat_mul(\@a, \@b)])

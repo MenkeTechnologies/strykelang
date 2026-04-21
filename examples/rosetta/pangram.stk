@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pangram Checker
+
+fn is_pangram($s) {
+    my %seen
+    ~> { $s } lc split // grep { /[a-z]/ } fore { $seen{$_} = 1 }
+    keys(%seen) == 26
+}
+
+~> { (
+    "The quick brown fox jumps over the lazy dog",
+    "Pack my box with five dozen liquor jugs",
+    "Hello World"
+) } fore {
+    p (is_pangram($_) ? "pangram" : "not") . ": $_"
+}

@@ -2,23 +2,14 @@
 # Rosetta Code: Balanced Brackets
 
 fn is_balanced($s) {
-    my $depth = 0;
-    my @chars = split("", $s);
-    for my $c (@chars) {
-        if ($c eq "[") {
-            $depth++;
-        } elsif ($c eq "]") {
-            $depth--;
-            return 0 if $depth < 0;
-        }
+    my $d = 0
+    ~> { $s } split // fore {
+        $d += $_ eq '[' ? 1 : $_ eq ']' ? -1 : 0
+        return 0 if $d < 0
     }
-    return $depth == 0;
+    $d == 0
 }
 
-my @test_strings = (
-    "[]", "[[]]", "[[][]]", "][", "][][", "[]][[]", "[", "]", ""
-);
-
-for my $t (@test_strings) {
-    printf "'%s' is %s\n", $t, is_balanced($t) ? "balanced" : "not balanced";
+~> { ("", "[]", "[][]", "[[][]]", "][", "][][", "[]][[]") } fore {
+    p "'$_' → " . (is_balanced($_) ? "balanced" : "unbalanced")
 }

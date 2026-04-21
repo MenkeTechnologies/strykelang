@@ -1,16 +1,18 @@
 #!/usr/bin/env stryke
-# Rosetta Code: Primality Check
+# Rosetta Code: Primality by Trial Division
 
-fn is_prime($n) {
-    return 0 if $n < 2;
-    return 1 if $n == 2;
-    return 0 if $n % 2 == 0;
-    for (my $i = 3; $i * $i <= $n; $i += 2) {
-        return 0 if $n % $i == 0;
+fn prime_check($n) {
+    return 0 if $n < 2
+    return 1 if $n < 4
+    return 0 if $n % 2 == 0
+    my $i = 3
+    while ($i * $i <= $n) {
+        return 0 if $n % $i == 0
+        $i += 2
     }
-    return 1;
+    1
 }
 
-print "Primes between 1 and 50:\n";
-my @primes = grep { is_prime($_) } (1..50);
-print join(", ", @primes) . "\n";
+fn list_primes($max) {
+    2..$max |> filter { prime_check($_) }
+}

@@ -1,25 +1,20 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Classes
 
-class Animal {
-    name;
-    fn speak { "Animal sound" }
+class Point {
+    field x: Int = 0
+    field y: Int = 0
+    
+    method move($dx, $dy) {
+        $self->x($self->x + $dx)
+        $self->y($self->y + $dy)
+        $self
+    }
+    
+    method to_string { "(" . $self->x . ", " . $self->y . ")" }
 }
 
-class Dog extends Animal {
-    fn speak { "Woof!" }
-}
-
-class Cat extends Animal {
-    fn speak { "Meow!" }
-}
-
-my @animals = (
-    Dog(name => "Rex"),
-    Cat(name => "Mittens"),
-    Animal(name => "Generic")
-);
-
-for my $a (@animals) {
-    printf "%s says: %s\n", $a->name, $a->speak();
-}
+my $p = Point->new(x => 3, y => 4)
+p "Initial: " . $p->to_string
+$p->move(2, -1)
+p "After move(2,-1): " . $p->to_string

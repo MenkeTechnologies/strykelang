@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Count Occurrences of a Substring
+
+fn count_substr($str, $sub) {
+    my $c = 0
+    my $p = 0
+    while (($p = index($str, $sub, $p)) != -1) { $c++; $p++ }
+    $c
+}
+
+my $t = "the three truths"
+p "'$t' contains 'th' " . count_substr($t, "th") . " times"

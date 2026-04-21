@@ -2,22 +2,16 @@
 # Rosetta Code: Prime Decomposition
 
 fn factorize($n) {
-    my @factors;
-    my $d = 2;
-    while ($n > 1) {
-        while ($n % $d == 0) {
-            push @factors, $d;
-            $n /= $d;
-        }
-        $d++;
-        if ($d * $d > $n && $n > 1) {
-            push @factors, $n;
-            last;
-        }
+    my @f
+    my $d = 2
+    while ($d * $d <= $n) {
+        while ($n % $d == 0) { push @f, $d; $n /= $d }
+        $d++
     }
-    return @factors;
+    push @f, $n if $n > 1
+    @f
 }
 
-my $val = 12345678;
-my @f = factorize($val);
-printf "Prime factors of %d: %s\n", $val, join(" * ", @f);
+~> { (12, 100, 1001, 65536) } fore {
+    p "$_ = " . (~> { factorize($_) } join " × ")
+}

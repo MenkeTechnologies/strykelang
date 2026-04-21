@@ -1,12 +1,14 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Anagrams
 
-fn are_anagrams($s1, $s2) {
-    my $normalize = fn ($s) {
-        join("", sort split("", lc($s =~ s/\s//gr)))
-    };
-    return $normalize->($s1) eq $normalize->($s2);
+fn sorted_chars($s) { ~> { $s } lc split // sort join "" }
+
+fn find_anagrams(@words) {
+    my %g
+    ~> { @words } fore { push @{$g{sorted_chars($_)}}, $_ }
+    ~> { values %g } grep { @$_ > 1 }
 }
 
-printf "'Listen' and 'Silent' are anagrams: %d\n", are_anagrams("Listen", "Silent");
-printf "'Hello' and 'World' are anagrams: %d\n", are_anagrams("Hello", "World");
+my @words = qw(evil vile live veil opts tops stop pots spot cat act tac dog)
+p "Anagram groups:"
+~> { find_anagrams(@words) } fore { p "  " . (~> { @$_ } join ", ") }

@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Kaprekar Numbers
+
+fn is_kaprekar($n) {
+    return 1 if $n == 1
+    my $sq = "$n" * $n
+    my $len = length($sq)
+    ~> { 1..$len-1 } any {
+        my $l = substr($sq, 0, $_) || 0
+        my $r = substr($sq, $_)
+        $r !~ /^0+$/ && $l + $r == $n
+    }
+}
+
+p "Kaprekar numbers < 10000:"
+~> { 1..9999 } filter { is_kaprekar } join ", " p

@@ -1,29 +1,28 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Mandelbrot Set (ASCII)
 
-my $max_iter = 50;
-my $width = 80;
-my $height = 40;
-
-for (my $y = 0; $y < $height; $y++) {
-    my $ci = ($y / $height) * 2.0 - 1.0;
-    for (my $x = 0; $x < $width; $x++) {
-        my $cr = ($x / $width) * 3.0 - 2.0;
-        my ($zr, $zi) = (0.0, 0.0);
-        my $i = 0;
-        
-        while ($i < $max_iter && ($zr*$zr + $zi*$zi) < 4.0) {
-            my $tr = $zr*$zr - $zi*$zi + $cr;
-            $zi = 2.0*$zr*$zi + $ci;
-            $zr = $tr;
-            $i++;
-        }
-        
-        if ($i == $max_iter) {
-            print "#";
-        } else {
-            print " ";
-        }
+fn mandelbrot($cx, $cy, $max_iter) {
+    my ($x, $y) = (0, 0)
+    my $iter = 0
+    while ($x*$x + $y*$y <= 4 && $iter < $max_iter) {
+        my $tmp = $x*$x - $y*$y + $cx
+        $y = 2*$x*$y + $cy
+        $x = $tmp
+        $iter++
     }
-    print "\n";
+    $iter
+}
+
+my @chars = split //, ' .:-=+*#%@'
+my $max = 80
+
+for my $row (0..23) {
+    my $cy = ($row - 12) / 12 * 1.5
+    my $line = ""
+    for my $col (0..79) {
+        my $cx = ($col - 50) / 30 * 2.5
+        my $i = mandelbrot($cx, $cy, $max)
+        $line .= $chars[$i * (@chars - 1) / $max]
+    }
+    p $line
 }

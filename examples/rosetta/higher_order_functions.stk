@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Higher-order Functions
+
+fn apply($f, $x) { $f->($x) }
+fn compose($f, $g) { fn ($x) { $f->($g->($x)) } }
+
+my $double = fn ($x) { $x * 2 }
+my $square = fn ($x) { $x * $x }
+my $inc = fn ($x) { $x + 1 }
+
+p "apply(double, 5) = " . apply($double, 5)
+p "compose(double, square)(3) = " . compose($double, $square)->(3)
+
+my $pipeline = compose($double, compose($square, $inc))
+p "double(square(inc(4))) = " . $pipeline->(4)

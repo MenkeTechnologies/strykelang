@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Nth Root (Newton-Raphson)
+
+fn nth_root($n, $a, $prec) {
+    $prec //= 1e-10
+    my $x = $a / $n
+    while (1) {
+        my $dx = ($a / ($x ** ($n-1)) - $x) / $n
+        $x += $dx
+        last if abs($dx) < $prec
+    }
+    $x
+}
+
+~> { [[5,34], [3,27], [2,2]] } fore {
+    my ($n, $a) = @$_
+    p "root($n, $a) = " . nth_root($n, $a)
+}

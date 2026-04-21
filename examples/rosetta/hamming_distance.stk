@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Hamming Distance
+
+fn hamming($a, $b) {
+    die "Strings must be equal length" if length($a) != length($b)
+    my @a = ~> { $a } split //
+    my @b = ~> { $b } split //
+    ~> { 0..$#a } filter { $a[$_] ne $b[$_] } scalar
+}
+
+~> { [["karolin","kathrin"], ["1011101","1001001"], ["2173896","2233796"]] } fore {
+    my ($a, $b) = @$_
+    p "hamming('$a', '$b') = " . hamming($a, $b)
+}

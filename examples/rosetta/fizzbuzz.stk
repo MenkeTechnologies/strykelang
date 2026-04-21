@@ -1,18 +1,13 @@
 #!/usr/bin/env stryke
 # Rosetta Code: FizzBuzz
 
-fn fizzbuzz($n) {
-    for my $i (1..$n) {
-        if ($i % 15 == 0) {
-            print "FizzBuzz\n";
-        } elsif ($i % 3 == 0) {
-            print "Fizz\n";
-        } elsif ($i % 5 == 0) {
-            print "Buzz\n";
-        } else {
-            print "$i\n";
-        }
-    }
+fn my_fizzbuzz($n) {
+    $n % 15 == 0 ? "FizzBuzz"
+  : $n % 3 == 0  ? "Fizz"
+  : $n % 5 == 0  ? "Buzz"
+  : $n
 }
 
-fizzbuzz(100);
+fn fizzbuzz_list($max) {
+    1..$max |> map { my_fizzbuzz($_) }
+}

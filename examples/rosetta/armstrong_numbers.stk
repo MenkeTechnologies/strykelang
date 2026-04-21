@@ -1,0 +1,11 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Armstrong/Narcissistic Numbers
+
+fn is_armstrong($n) {
+    my @d = ~> { $n } split // 
+    my $len = @d
+    ~> { @d } map { $_ ** $len } sum == $n
+}
+
+p "Armstrong numbers 1-999:"
+~> { 1..999 } filter { is_armstrong } join ", " p

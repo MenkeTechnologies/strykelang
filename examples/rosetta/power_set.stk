@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Power Set
+
+fn powerset(@s) {
+    return ([]) unless @s
+    my $first = shift @s
+    my @rest = powerset(@s)
+    (@rest, ~> { @rest } map { [$first, @$_] })
+}
+
+p "Power set of {1,2,3}:"
+~> { powerset(1,2,3) } fore { p "  {" . (~> { @$_ } join ", ") . "}" }
