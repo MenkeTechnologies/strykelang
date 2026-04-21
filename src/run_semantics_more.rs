@@ -174,12 +174,12 @@ fn sort_strings_joined() {
 
 #[test]
 fn reverse_list_joined() {
-    assert_eq!(rs(r#"join(",", reverse(1, 2, 3));"#), "3,2,1");
+    assert_eq!(rs(r#"join(",", rev(1, 2, 3));"#), "3,2,1");
 }
 
 #[test]
 fn reverse_scalar_string() {
-    assert_eq!(rs(r#"reverse("ab");"#), "ba");
+    assert_eq!(rs(r#"rev("ab");"#), "ba");
 }
 
 #[test]

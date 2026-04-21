@@ -64,7 +64,7 @@ fn scan_top_processes ($n) {
     return () unless @procs
     my @result
     my $count = 0
-    for my $p (reverse @procs) {
+    for my $p (rev @procs) {
         last if $count >= $n
         push @result, $p
         $count++

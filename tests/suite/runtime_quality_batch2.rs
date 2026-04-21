@@ -350,10 +350,7 @@ fn int_truncates_positive_float() {
 
 #[test]
 fn reverse_array_in_list_context_join() {
-    assert_eq!(
-        eval_string(r#"my @a = (1, 2, 3); join "", reverse @a"#),
-        "321"
-    );
+    assert_eq!(eval_string(r#"my @a = (1, 2, 3); join "", rev @a"#), "321");
 }
 
 #[test]

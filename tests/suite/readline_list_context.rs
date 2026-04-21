@@ -112,7 +112,7 @@ fn diamond_list_context_join_concatenates_full_input() {
 fn reverse_diamond_list_context_slurps_then_reverses_line_order() {
     let exe = stryke_exe();
     let mut child = Command::new(exe)
-        .args(["-e", r#"my @a = reverse <>; print $a[0]"#])
+        .args(["-e", r#"my @a = rev <>; print $a[0]"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -242,7 +242,7 @@ fn open_file_reverse_readline_list_vm_matches_tree_walker() {
     let code = format!(
         r#"
         open F, '<', '{ps}';
-        my @a = reverse <F>;
+        my @a = rev <F>;
         close F;
         $a[0];
     "#
@@ -336,7 +336,7 @@ fn explicit_scalar_diamond_reads_one_line_from_pipe() {
 fn reverse_stdin_list_context_matches_diamond() {
     let exe = stryke_exe();
     let mut child = Command::new(exe)
-        .args(["-e", r#"my @a = reverse <STDIN>; print $a[0]"#])
+        .args(["-e", r#"my @a = rev <STDIN>; print $a[0]"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()

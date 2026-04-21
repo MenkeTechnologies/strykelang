@@ -119,7 +119,7 @@ fn bare_distinct_alias_matches_uniq() {
 fn reversed_alias_matches_reverse_list() {
     assert_eq!(eval_string(r#"(1, 2, 3) |> reversed |> join ','"#), "3,2,1");
     assert_eq!(
-        eval_string(r#"(1, 2, 3) |> reverse |> join ','"#),
+        eval_string(r#"(1, 2, 3) |> rev |> join ','"#),
         eval_string(r#"(1, 2, 3) |> reversed |> join ','"#)
     );
 }
@@ -807,10 +807,7 @@ fn thread_uniq_shuffle_reverse() {
         eval_string(r#"thread (1,1,2,2,3,3) uniq |> join ",""#),
         "1,2,3"
     );
-    assert_eq!(
-        eval_string(r#"thread (1,2,3) reverse |> join ",""#),
-        "3,2,1"
-    );
+    assert_eq!(eval_string(r#"thread (1,2,3) rev |> join ",""#), "3,2,1");
 }
 
 #[test]

@@ -949,7 +949,7 @@ pub enum ExprKind {
     },
     ReverseExpr(Box<Expr>),
     /// `rev EXPR` — always string-reverse (scalar reverse), stryke extension.
-    ScalarReverse(Box<Expr>),
+    Rev(Box<Expr>),
     JoinExpr {
         separator: Box<Expr>,
         list: Box<Expr>,

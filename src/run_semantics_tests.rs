@@ -64,7 +64,7 @@ fn range_return_list_context() {
 fn range_array_slice_reverse_range_index() {
     assert_eq!(
         rs(r#"my @a = (10, 20, 30, 40, 50);
-               join ",", @a[reverse 1..3];"#),
+               join ",", @a[rev 1..3];"#),
         "40,30,20"
     );
 }
@@ -146,7 +146,7 @@ fn range_descending_numeric_is_empty() {
 #[test]
 fn range_anon_array_ref_reverse_range() {
     assert_eq!(
-        rs(r#"my $r = [reverse 1..5];
+        rs(r#"my $r = [rev 1..5];
                join ",", @$r;"#),
         "5,4,3,2,1"
     );
@@ -2815,7 +2815,7 @@ fn perl_compat_reverse_sort_aref_list_context() {
     assert_eq!(
         ri(r#"no strict 'vars';
         my $v = [1, 2, 3];
-        my @t = reverse @$v;
+        my @t = rev @$v;
         $t[0];"#),
         3
     );
@@ -4124,8 +4124,8 @@ fn core_builtins_case_mapping() {
 
 #[test]
 fn core_builtins_reverse() {
-    assert_eq!(rs("scalar reverse('abc')"), "cba");
-    assert_eq!(rs("join('', reverse('a', 'b', 'c'))"), "cba");
+    assert_eq!(rs("scalar rev('abc')"), "cba");
+    assert_eq!(rs("join('', rev('a', 'b', 'c'))"), "cba");
 }
 
 #[test]

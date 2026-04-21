@@ -35,7 +35,7 @@ class Cons impl List {
 
 fn list_new(@vals) {
     my $curr = Nil();
-    for my $v (reverse @vals) {
+    for my $v (rev @vals) {
         $curr = Cons(val => $v, next => $curr);
     }
     $curr;

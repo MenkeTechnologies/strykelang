@@ -237,7 +237,7 @@ fn join_three_way() {
 
 #[test]
 fn reverse_empty_array_join() {
-    assert_eq!(eval_string(r#"my @e = (); join(",", reverse @e)"#), "");
+    assert_eq!(eval_string(r#"my @e = (); join(",", rev @e)"#), "");
 }
 
 #[test]

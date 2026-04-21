@@ -197,34 +197,35 @@ fn sort_preserves_original {
 
 fn reverse_array {
     my @a = (1, 2, 3, 4, 5)
-    my @r = reverse(@a)
+    my @r = rev(@a)
     join(",", @r)
 }
 
 fn reverse_array_empty {
     my @a = ()
-    my @r = reverse(@a)
-    scalar @r}
+    my @r = rev(@a)
+    scalar @r
+}
 
 fn reverse_array_single {
     my @a = (42)
-    my @r = reverse(@a)
+    my @r = rev(@a)
     $r[0]
 }
 
 fn reverse_string_scalar {
-    scalar(reverse("hello"))
+    rev("hello")
 }
 
 fn reverse_preserves {
     my @a = (1, 2, 3)
-    my @r = reverse(@a)
+    my @r = rev(@a)
     $a[0]
 }
 
 fn reverse_twice {
     my @a = (1, 2, 3)
-    my @r = reverse(reverse(@a))
+    my @r = rev(rev(@a))
     join(",", @r)
 }
 
@@ -524,7 +525,7 @@ fn map_sort_combo {
 
 fn reverse_sort_combo {
     my @a = (3, 1, 4, 1, 5)
-    my @r = reverse(sort { $a <=> $b } @a)
+    my @r = rev(sort { $a <=> $b } @a)
     join(",", @r)
 }
 

@@ -115,7 +115,7 @@ parse_batch2! {
 parse_batch2! {
     parse_batch2_101 => "split /\\s+/, 'a b';";
     parse_batch2_102 => "join '-', ('a', 'b');";
-    parse_batch2_103 => "reverse (1, 2, 3);";
+    parse_batch2_103 => "rev (1, 2, 3);";
     parse_batch2_104 => "sort (3, 1, 2);";
     parse_batch2_105 => "grep { $_ > 0 } (1, -1, 2);";
     parse_batch2_106 => "map { $_ * 2 } (1, 2);";

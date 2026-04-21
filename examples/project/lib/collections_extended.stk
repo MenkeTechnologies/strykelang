@@ -66,7 +66,7 @@ fn ext_first_where($fn, @items) {
 
 # ── ext_last_where: returns last element matching a predicate ─────
 fn ext_last_where($fn, @items) {
-    my @reversed = reverse @items
+    my @reversed = rev @items
     for my $item (@reversed) {
         if ($fn($item)) {
             return $item

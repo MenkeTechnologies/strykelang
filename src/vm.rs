@@ -6302,9 +6302,15 @@ impl<'a> VM<'a> {
                     }
                     Op::ReverseListOp => {
                         let val = self.pop();
-                        let mut items = val.to_list();
-                        items.reverse();
-                        self.push(PerlValue::array(items));
+                        if val.is_iterator() {
+                            self.push(PerlValue::iterator(std::sync::Arc::new(
+                                crate::value::RevIterator::new(val.into_iterator()),
+                            )));
+                        } else {
+                            let mut items = val.to_list();
+                            items.reverse();
+                            self.push(PerlValue::array(items));
+                        }
                         Ok(())
                     }
                     Op::ReverseScalarOp => {
@@ -6314,26 +6320,75 @@ impl<'a> VM<'a> {
                         self.push(PerlValue::string(s.chars().rev().collect()));
                         Ok(())
                     }
-                    Op::RevOp => {
+                    Op::RevListOp => {
                         let val = self.pop();
                         if val.is_iterator() {
                             self.push(PerlValue::iterator(std::sync::Arc::new(
-                                crate::value::ScalarReverseIterator::new(val.into_iterator()),
+                                crate::value::RevIterator::new(val.into_iterator()),
+                            )));
+                        } else if let Some(s) = crate::value::set_payload(&val) {
+                            let mut out = crate::value::PerlSet::new();
+                            for (k, v) in s.iter().rev() {
+                                out.insert(k.clone(), v.clone());
+                            }
+                            self.push(PerlValue::set(std::sync::Arc::new(out)));
+                        } else if let Some(ar) = val.as_array_ref() {
+                            let items: Vec<_> = ar.read().iter().rev().cloned().collect();
+                            self.push(PerlValue::array_ref(std::sync::Arc::new(
+                                parking_lot::RwLock::new(items),
+                            )));
+                        } else if let Some(hr) = val.as_hash_ref() {
+                            let mut out: indexmap::IndexMap<String, PerlValue> =
+                                indexmap::IndexMap::new();
+                            for (k, v) in hr.read().iter() {
+                                out.insert(v.to_string(), PerlValue::string(k.clone()));
+                            }
+                            self.push(PerlValue::hash_ref(std::sync::Arc::new(
+                                parking_lot::RwLock::new(out),
+                            )));
+                        } else if let Some(hm) = val.as_hash_map() {
+                            let mut out: indexmap::IndexMap<String, PerlValue> =
+                                indexmap::IndexMap::new();
+                            for (k, v) in hm.iter() {
+                                out.insert(v.to_string(), PerlValue::string(k.clone()));
+                            }
+                            self.push(PerlValue::hash(out));
+                        } else if val.as_array_vec().is_some() {
+                            let mut items = val.to_list();
+                            items.reverse();
+                            self.push(PerlValue::array(items));
+                        } else {
+                            let s = val.to_string();
+                            self.push(PerlValue::string(s.chars().rev().collect()));
+                        }
+                        Ok(())
+                    }
+                    Op::RevScalarOp => {
+                        let val = self.pop();
+                        if let Some(s) = crate::value::set_payload(&val) {
+                            let mut out = crate::value::PerlSet::new();
+                            for (k, v) in s.iter().rev() {
+                                out.insert(k.clone(), v.clone());
+                            }
+                            self.push(PerlValue::set(std::sync::Arc::new(out)));
+                        } else if let Some(ar) = val.as_array_ref() {
+                            let items: Vec<_> = ar.read().iter().rev().cloned().collect();
+                            self.push(PerlValue::array_ref(std::sync::Arc::new(
+                                parking_lot::RwLock::new(items),
+                            )));
+                        } else if let Some(hr) = val.as_hash_ref() {
+                            let mut out: indexmap::IndexMap<String, PerlValue> =
+                                indexmap::IndexMap::new();
+                            for (k, v) in hr.read().iter() {
+                                out.insert(v.to_string(), PerlValue::string(k.clone()));
+                            }
+                            self.push(PerlValue::hash_ref(std::sync::Arc::new(
+                                parking_lot::RwLock::new(out),
                             )));
                         } else {
                             let items = val.to_list();
-                            if items.len() <= 1 {
-                                let s = if items.is_empty() {
-                                    String::new()
-                                } else {
-                                    items[0].to_string()
-                                };
-                                self.push(PerlValue::string(s.chars().rev().collect()));
-                            } else {
-                                let mut items = items;
-                                items.reverse();
-                                self.push(PerlValue::array(items));
-                            }
+                            let s: String = items.iter().map(|v| v.to_string()).collect();
+                            self.push(PerlValue::string(s.chars().rev().collect()));
                         }
                         Ok(())
                     }

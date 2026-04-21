@@ -520,7 +520,7 @@ fn foreach_reverse_range_product() {
     assert_eq!(
         eval_int(
             r#"my $p = 1;
-               foreach my $n (reverse 1..3) {
+               foreach my $n (rev 1..3) {
                    $p = $p * $n;
                }
                $p"#,

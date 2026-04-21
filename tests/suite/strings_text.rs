@@ -233,5 +233,5 @@ fn join_empty_list() {
 
 #[test]
 fn reverse_string() {
-    assert_eq!(eval_string(r#"reverse("abc")"#), "cba");
+    assert_eq!(eval_string(r#"rev("abc")"#), "cba");
 }

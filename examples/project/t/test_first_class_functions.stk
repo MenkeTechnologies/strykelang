@@ -1,0 +1,482 @@
+# t/test_first_class_functions.stk — comprehensive tests for first-class function capabilities
+#
+# Demonstrates that functions in stryke are first-class citizens:
+# - Can be assigned to variables
+# - Can be stored in arrays, hashes, and other data structures
+# - Can be passed as arguments to other functions
+# - Can be returned from functions
+# - Can be created anonymously (lambdas)
+# - Support closures (capture lexical scope)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FUNCTIONS AS VALUES — assign to scalars
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $double = fn($x) { $x * 2 }
+my $square = fn($x) { $x * $x }
+my $add = fn($a, $b) { $a + $b }
+
+assert_eq $double(5), 10, "fn in scalar: double"
+assert_eq $square(4), 16, "fn in scalar: square"
+assert_eq $add(3, 7), 10, "fn in scalar: add"
+
+# Reassign function to different variable
+my $f = $double
+assert_eq $f(6), 12, "fn reassigned to new var"
+
+# Overwrite variable with different function
+$f = $square
+assert_eq $f(5), 25, "fn var overwritten"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FUNCTIONS IN ARRAYS
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @fn_array = (
+    fn($x) { $x + 1 },
+    fn($x) { $x * 2 },
+    fn($x) { $x * $x },
+    fn($x) { $x - 1 },
+)
+
+assert_eq $fn_array[0](10), 11, "fn in array[0]: +1"
+assert_eq $fn_array[1](10), 20, "fn in array[1]: *2"
+assert_eq $fn_array[2](10), 100, "fn in array[2]: square"
+assert_eq $fn_array[3](10), 9, "fn in array[3]: -1"
+
+# Iterate and apply all functions
+my @results = ()
+for my $fn (@fn_array) {
+    push @results, $fn(5)
+}
+assert_eq join(",", @results), "6,10,25,4", "iterate fn array"
+
+# Push function to array
+push @fn_array, fn($x) { $x / 2 }
+assert_eq $fn_array[4](10), 5, "pushed fn to array"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FUNCTIONS IN HASHES
+# ══════════════════════════════════════════════════════════════════════════════
+
+my %fn_hash = (
+    inc    => fn($x) { $x + 1 },
+    dec    => fn($x) { $x - 1 },
+    double => fn($x) { $x * 2 },
+    negate => fn($x) { -$x },
+    abs    => fn($x) { $x < 0 ? -$x : $x },
+)
+
+assert_eq $fn_hash{inc}(10), 11, "fn in hash: inc"
+assert_eq $fn_hash{dec}(10), 9, "fn in hash: dec"
+assert_eq $fn_hash{double}(10), 20, "fn in hash: double"
+assert_eq $fn_hash{negate}(5), -5, "fn in hash: negate"
+assert_eq $fn_hash{abs}(-7), 7, "fn in hash: abs"
+
+# Dynamic dispatch by name
+my $op = "double"
+assert_eq $fn_hash{$op}(8), 16, "dynamic fn dispatch"
+
+# Add function to hash
+$fn_hash{triple} = fn($x) { $x * 3 }
+assert_eq $fn_hash{triple}(4), 12, "added fn to hash"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FUNCTIONS IN NESTED STRUCTURES
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $nested = {
+    math => {
+        basic => {
+            add => fn($a, $b) { $a + $b },
+            sub => fn($a, $b) { $a - $b },
+        },
+        advanced => {
+            pow => fn($base, $exp) {
+                my $result = 1
+                for (1..$exp) { $result *= $base }
+                $result
+            },
+        },
+    },
+    string => {
+        ops => [
+            fn($s) { uc($s) },
+            fn($s) { lc($s) },
+            fn($s) { rev($s) },
+        ],
+    },
+}
+
+assert_eq $nested->{math}{basic}{add}(3, 4), 7, "nested hash fn: add"
+assert_eq $nested->{math}{basic}{sub}(10, 3), 7, "nested hash fn: sub"
+assert_eq $nested->{math}{advanced}{pow}(2, 8), 256, "nested hash fn: pow"
+assert_eq $nested->{string}{ops}[0]("hello"), "HELLO", "nested array fn: uc"
+assert_eq $nested->{string}{ops}[1]("WORLD"), "world", "nested array fn: lc"
+assert_eq $nested->{string}{ops}[2]("abc"), "cba", "nested array fn: reverse"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FUNCTIONS AS ARGUMENTS (Higher-Order Functions)
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn apply_fn($fn, $x) { $fn($x) }
+fn apply_fn2($fn, $a, $b) { $fn($a, $b) }
+fn apply_fn_twice($fn, $x) { $fn($fn($x)) }
+fn apply_fn_n_times($fn, $x, $n) {
+    my $result = $x
+    for (1..$n) { $result = $fn($result) }
+    $result
+}
+
+assert_eq apply_fn(fn($x) { $x * 3 }, 7), 21, "fn as arg: apply"
+assert_eq apply_fn2(fn($a, $b) { $a - $b }, 10, 3), 7, "fn as arg: apply2"
+assert_eq apply_fn_twice(fn($x) { $x + 1 }, 5), 7, "fn as arg: apply_twice"
+assert_eq apply_fn_n_times(fn($x) { $x * 2 }, 1, 10), 1024, "fn as arg: apply_n_times"
+
+# map with custom function
+my @nums = (1, 2, 3, 4, 5)
+my @squared = map { $_ * $_ } @nums
+assert_eq join(",", @squared), "1,4,9,16,25", "map with block"
+
+fn my_map($fn, @list) {
+    my @out = ()
+    for my $x (@list) { push @out, $fn($x) }
+    @out
+}
+my @tripled = my_map(fn($x) { $x * 3 }, 1, 2, 3)
+assert_eq join(",", @tripled), "3,6,9", "custom map with fn arg"
+
+# filter with custom function
+fn my_filter($pred, @list) {
+    my @out = ()
+    for my $x (@list) { 
+        push @out, $x if $pred($x)
+    }
+    @out
+}
+my @evens = my_filter(fn($x) { $x % 2 == 0 }, 1, 2, 3, 4, 5, 6)
+assert_eq join(",", @evens), "2,4,6", "custom filter with fn arg"
+
+# reduce with custom function
+fn my_reduce($fn, $init, @list) {
+    my $acc = $init
+    for my $x (@list) { $acc = $fn($acc, $x) }
+    $acc
+}
+my $sum = my_reduce(fn($a, $b) { $a + $b }, 0, 1, 2, 3, 4, 5)
+assert_eq $sum, 15, "custom reduce: sum"
+my $product = my_reduce(fn($a, $b) { $a * $b }, 1, 1, 2, 3, 4, 5)
+assert_eq $product, 120, "custom reduce: product"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FUNCTIONS RETURNING FUNCTIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn make_adder($n) {
+    fn($x) { $x + $n }
+}
+
+fn make_multiplier($n) {
+    fn($x) { $x * $n }
+}
+
+fn make_power($exp) {
+    fn($base) {
+        my $result = 1
+        for (1..$exp) { $result *= $base }
+        $result
+    }
+}
+
+my $add10 = make_adder(10)
+my $add100 = make_adder(100)
+assert_eq $add10(5), 15, "fn returns fn: add10"
+assert_eq $add100(5), 105, "fn returns fn: add100"
+
+my $times5 = make_multiplier(5)
+my $times7 = make_multiplier(7)
+assert_eq $times5(3), 15, "fn returns fn: times5"
+assert_eq $times7(3), 21, "fn returns fn: times7"
+
+my $cube = make_power(3)
+my $fourth = make_power(4)
+assert_eq $cube(2), 8, "fn returns fn: cube"
+assert_eq $fourth(2), 16, "fn returns fn: fourth power"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FUNCTION COMPOSITION
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn compose_fns($f, $g) {
+    fn($x) { $f($g($x)) }
+}
+
+fn pipe_fns($g, $f) {
+    fn($x) { $f($g($x)) }
+}
+
+my $inc = fn($x) { $x + 1 }
+my $dbl = fn($x) { $x * 2 }
+
+my $inc_then_dbl = pipe_fns($inc, $dbl)
+my $dbl_then_inc = pipe_fns($dbl, $inc)
+
+assert_eq $inc_then_dbl(5), 12, "pipe: inc then dbl: (5+1)*2=12"
+assert_eq $dbl_then_inc(5), 11, "pipe: dbl then inc: (5*2)+1=11"
+
+my $composed = compose_fns($dbl, $inc)
+assert_eq $composed(5), 12, "compose: dbl(inc(5))=12"
+
+# Chain multiple compositions
+fn compose_all_fns(@fns) {
+    my $result = fn($x) { $x }
+    for my $fn (rev @fns) {
+        my $prev = $result
+        $result = fn($x) { $fn($prev($x)) }
+    }
+    $result
+}
+
+my $chain = compose_all_fns(
+    fn($x) { $x + 1 },
+    fn($x) { $x * 2 },
+    fn($x) { $x + 3 },
+)
+assert_eq $chain(5), 17, "compose_all: ((5+3)*2)+1=17"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CLOSURES — capturing lexical scope
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn make_counter {
+    my $count = 0
+    fn { ++$count }
+}
+
+my $counter1 = make_counter()
+my $counter2 = make_counter()
+
+assert_eq $counter1(), 1, "closure counter1: 1"
+assert_eq $counter1(), 2, "closure counter1: 2"
+assert_eq $counter1(), 3, "closure counter1: 3"
+assert_eq $counter2(), 1, "closure counter2: independent"
+assert_eq $counter1(), 4, "closure counter1: 4"
+
+# Closure with getter/setter - using arrayref for mutable state
+fn make_box($initial) {
+    my $state = [$initial]
+    my $get = fn { $state->[0] }
+    my $set = fn($v) { $state->[0] = $v }
+    { get => $get, set => $set }
+}
+
+my $box = make_box(42)
+assert_eq $box->{get}(), 42, "closure box: initial"
+$box->{set}(100)
+assert_eq $box->{get}(), 100, "closure box: after set"
+
+# Multiple closures sharing state - using arrayref for items
+fn make_stack {
+    my $items = []
+    {
+        push_item => fn($v) { push @$items, $v },
+        pop_item  => fn { pop @$items },
+        peek => fn { $items->[-1] },
+        size => fn { scalar(@$items) },
+    }
+}
+
+my $stack = make_stack()
+$stack->{push_item}(1)
+$stack->{push_item}(2)
+$stack->{push_item}(3)
+assert_eq $stack->{size}(), 3, "closure stack: size"
+assert_eq $stack->{peek}(), 3, "closure stack: peek"
+assert_eq $stack->{pop_item}(), 3, "closure stack: pop"
+assert_eq $stack->{size}(), 2, "closure stack: size after pop"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PARTIAL APPLICATION / CURRYING
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn curry2($fn) {
+    fn($a) { fn($b) { $fn($a, $b) } }
+}
+
+fn curry3($fn) {
+    fn($a) { fn($b) { fn($c) { $fn($a, $b, $c) } } }
+}
+
+my $curried_add = curry2(fn($a, $b) { $a + $b })
+my $add5_curried = $curried_add(5)
+assert_eq $add5_curried(3), 8, "curried add: 5+3"
+assert_eq $curried_add(10)(20), 30, "curried add: 10+20"
+
+my $curried_sum3 = curry3(fn($a, $b, $c) { $a + $b + $c })
+assert_eq $curried_sum3(1)(2)(3), 6, "curried sum3: 1+2+3"
+
+# Partial application helper
+fn partial_left($fn, $first) {
+    fn { $fn($first, @_) }
+}
+
+my $div = fn($a, $b) { $a / $b }
+my $half = partial_left($div, 1)
+# Note: partial_left puts first arg first, so half(x) = 1/x... let's fix:
+fn partial_right($fn, $last) {
+    fn($first) { $fn($first, $last) }
+}
+my $halve = partial_right($div, 2)
+assert_eq $halve(10), 5, "partial right: 10/2"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FUNCTIONS IN CLASS FIELDS
+# ══════════════════════════════════════════════════════════════════════════════
+
+class Calculator {
+    operation: Any = undef
+    
+    fn set_op($op) { $self->operation($op) }
+    fn calc($a, $b) { 
+        my $op = $self->operation()
+        $op($a, $b)
+    }
+}
+
+my $calc = Calculator()
+$calc->set_op(fn($a, $b) { $a + $b })
+assert_eq $calc->calc(3, 4), 7, "fn in class field: add"
+
+$calc->set_op(fn($a, $b) { $a * $b })
+assert_eq $calc->calc(3, 4), 12, "fn in class field: mul"
+
+$calc->set_op(fn($a, $b) { $a ** $b })
+assert_eq $calc->calc(2, 10), 1024, "fn in class field: pow"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FUNCTION IDENTITY AND REFERENCES
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $fn_a = fn { 42 }
+my $fn_b = $fn_a
+my $fn_c = fn { 42 }
+
+assert_eq ref($fn_a), "CODE", "fn ref type is CODE"
+assert_eq ref($fn_b), "CODE", "copied fn ref type is CODE"
+assert_ok defined($fn_a), "fn is defined"
+
+# Same reference
+assert_eq $fn_a(), $fn_b(), "same fn reference: same result"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# IMMEDIATELY INVOKED FUNCTION EXPRESSIONS (IIFE)
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $iife_result = fn { 42 * 2 }()
+assert_eq $iife_result, 84, "IIFE: immediate call"
+
+my $iife_with_arg = fn($x) { $x * $x }(7)
+assert_eq $iife_with_arg, 49, "IIFE with arg"
+
+# IIFE for scoped computation
+my $computed = fn {
+    my $a = 10
+    my $b = 20
+    my $c = 30
+    $a + $b + $c
+}()
+assert_eq $computed, 60, "IIFE for scoped computation"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FUNCTIONS WITH VARIADIC ARGUMENTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $sum_all = fn { 
+    my $total = 0
+    for my $x (@_) { $total += $x }
+    $total
+}
+
+assert_eq $sum_all(1), 1, "variadic fn: 1 arg"
+assert_eq $sum_all(1, 2), 3, "variadic fn: 2 args"
+assert_eq $sum_all(1, 2, 3, 4, 5), 15, "variadic fn: 5 args"
+
+my $join_all = fn {
+    my $sep = shift @_
+    join($sep, @_)
+}
+assert_eq $join_all("-", "a", "b", "c"), "a-b-c", "variadic fn: join"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LISTING FUNCTIONS / INTROSPECTION
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Store functions in registry
+my %registry = ()
+$registry{double} = fn($x) { $x * 2 }
+$registry{triple} = fn($x) { $x * 3 }
+$registry{square} = fn($x) { $x * $x }
+
+my @fn_names = sort keys %registry
+assert_eq join(",", @fn_names), "double,square,triple", "list fn names from hash"
+
+# Apply all registered functions to a value
+my %results = ()
+for my $name (keys %registry) {
+    $results{$name} = $registry{$name}(4)
+}
+assert_eq $results{double}, 8, "registry apply: double"
+assert_eq $results{triple}, 12, "registry apply: triple"
+assert_eq $results{square}, 16, "registry apply: square"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FUNCTION PIPELINES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn fn_pipeline($val, @fns) {
+    my $result = $val
+    for my $fn (@fns) {
+        $result = $fn($result)
+    }
+    $result
+}
+
+my $pipe_result = fn_pipeline(
+    5,
+    fn($x) { $x + 1 },      # 6
+    fn($x) { $x * 2 },      # 12
+    fn($x) { $x - 4 },      # 8
+    fn($x) { $x / 2 },      # 4
+)
+assert_eq $pipe_result, 4, "function pipeline"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MEMOIZATION WRAPPER
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn memoize_fn($fn) {
+    my $cache = {}
+    fn($x) {
+        unless (exists $cache->{$x}) {
+            $cache->{$x} = $fn($x)
+        }
+        $cache->{$x}
+    }
+}
+
+# Use arrayref to track call count (scalar capture limitation)
+my $calls = [0]
+my $expensive = fn($x) {
+    $calls->[0]++
+    $x * $x
+}
+
+my $memoized = memoize_fn($expensive)
+assert_eq $memoized(5), 25, "memoized: first call"
+assert_eq $calls->[0], 1, "memoized: one underlying call"
+assert_eq $memoized(5), 25, "memoized: cached call"
+assert_eq $calls->[0], 1, "memoized: still one underlying call"
+assert_eq $memoized(6), 36, "memoized: new arg"
+assert_eq $calls->[0], 2, "memoized: two underlying calls"
+
+test_run()

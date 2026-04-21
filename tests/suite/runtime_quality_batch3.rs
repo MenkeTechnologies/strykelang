@@ -406,7 +406,7 @@ fn scalar_parenthesized_list_is_last_element() {
 #[test]
 fn sort_numeric_block_then_reverse_join() {
     assert_eq!(
-        eval_string(r#"join "", reverse sort { $a <=> $b } (3, 1, 2)"#),
+        eval_string(r#"join "", rev sort { $a <=> $b } (3, 1, 2)"#),
         "321"
     );
 }
