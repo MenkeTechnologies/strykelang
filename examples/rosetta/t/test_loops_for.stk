@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Loops/For
+
+fn for_loop_examples() {
+    "For Loop Examples:" |> p
+    
+    # Basic for loop with range
+    "1. Basic range (1 to 5):" |> p
+    for my $i (1..5) {
+        "   $i" |> p
+    }
+    
+    # For loop with array
+    "2. Loop over array:" |> p
+    my @fruits = ("apple", "banana", "cherry")
+    for my $fruit (@fruits) {
+        "   $fruit" |> p
+    }
+    
+    # For loop with step (using threading for filter)
+    "3. Even numbers 2 to 10:" |> p
+    for my $n (~> (1..10) grep { $_ % 2 == 0 }) {
+        "   $n" |> p
+    }
+    
+    # Traditional for loop equivalent
+    "4. Traditional for loop (0 to 4):" |> p
+    my $i = 0
+    while ($i < 5) {
+        "   Index: $i" |> p
+        $i++
+    }
+    
+    # For loop with hash
+    "5. Hash iteration:" |> p
+    my %colors = (red => "#FF0000", green => "#00FF00", blue => "#0000FF")
+    for my $color (keys %colors) {
+        "   $color: $colors{$color}" |> p
+    }
+    
+    # Reverse for loop using threading
+    "6. Reverse iteration:" |> p
+    for my $i (~> (1..5) rev) {
+        "   $i" |> p
+    }
+    
+    # Nested for loops
+    "7. Nested loops (multiplication table 2x2):" |> p
+    for my $i (1..2) {
+        for my $j (1..2) {
+            ("   $i x $j = " . ($i * $j)) |> p
+        }
+    }
+}
+
+for_loop_examples

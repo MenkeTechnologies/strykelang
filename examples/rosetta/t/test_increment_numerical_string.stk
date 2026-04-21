@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Increment a numerical string
+
+fn increment_string_demo() {
+    "Increment Numerical String Examples:" |> p
+    
+    # Basic string to number conversion and increment
+    my $str1 = "42"
+    my $num1 = $str1 + 1
+    "String '$str1' incremented: $num1" |> p
+    
+    # Decimal numbers
+    my $str2 = "3.14159"
+    my $num2 = $str2 + 0.1
+    "String '$str2' + 0.1: $num2" |> p
+    
+    # Leading zeros preservation
+    my $str3 = "0042"
+    my $incremented = sprintf("%04d", $str3 + 1)
+    "String '$str3' incremented (preserving format): $incremented" |> p
+    
+    # Negative numbers
+    my $str4 = "-15"
+    my $num4 = $str4 + 1
+    "String '$str4' incremented: $num4" |> p
+    
+    # Large numbers
+    my $str5 = "999999999999999"
+    my $num5 = $str5 + 1
+    "Large string '$str5' incremented: $num5" |> p
+    
+    # Hexadecimal (if supported)
+    my $hex_str = "FF"
+    my $hex_num = hex($hex_str) + 1
+    "Hex '$hex_str' incremented: $hex_num (decimal)" |> p
+    
+    # Array of string numbers
+    my @str_numbers = ("1", "10", "100", "1000")
+    "Array increment:" |> p
+    for my $s (@str_numbers) {
+        my $inc = $s + 1
+        "  '$s' -> $inc" |> p
+    }
+    
+    # Threading example
+    my $result = ~> "2023" >{ $_ + 1 }
+}
+
+increment_string_demo

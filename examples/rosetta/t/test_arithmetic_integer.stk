@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Arithmetic/Integer
+
+fn arithmetic_demo() {
+    "Integer Arithmetic Examples:" |> p
+    
+    my $a = 17
+    my $b = 5
+    
+    "a = $a, b = $b" |> p
+    
+    # Basic arithmetic operations
+    "Addition: $a + $b = " . ($a + $b) |> p
+    "Subtraction: $a - $b = " . ($a - $b) |> p
+    "Multiplication: $a * $b = " . ($a * $b) |> p
+    "Division: $a / $b = " . ($a / $b) |> p
+    "Integer division: $a ÷ $b = " . int($a / $b) |> p
+    "Modulo: $a % $b = " . ($a % $b) |> p
+    "Exponentiation: $a ** $b = " . ($a ** $b) |> p
+    
+    # Bitwise operations
+    "Bitwise AND: $a & $b = " . ($a & $b) |> p
+    "Bitwise OR: $a | $b = " . ($a | $b) |> p
+    "Bitwise XOR: $a ^ $b = " . ($a ^ $b) |> p
+    "Left shift: $a << 2 = " . ($a << 2) |> p
+    "Right shift: $a >> 2 = " . ($a >> 2) |> p
+    
+    # Assignment operators
+    my $c = $a
+    $c += $b
+    "After +=: $c" |> p
+    
+    $c -= $b  
+    "After -=: $c" |> p
+    
+    $c *= 2
+    "After *=: $c" |> p
+    
+    $c /= 2
+    "After /=: $c" |> p
+    
+    # Increment/decrement
+    my $x = 10
+    "Pre-increment: " . ++$x |> p
+    "Post-increment: " . $x++ . " (x is now $x)" |> p
+    "Pre-decrement: " . --$x |> p
+    "Post-decrement: " . $x-- . " (x is now $x)" |> p
+}
+
+arithmetic_demo

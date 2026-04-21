@@ -1171,46 +1171,53 @@ fn main() {
         process::exit(run_prun_subcommand(&args[0], &args[2..]));
     }
 
-    // `stryke test [FILE|DIR]` — run test files.
+    // `stryke test [FILE|DIR...]` — run test files.
     if args.len() >= 2 && (args[1] == "test" || args[1] == "t") {
-        let target = if args.len() >= 3 {
-            args[2].clone()
+        let targets: Vec<String> = if args.len() >= 3 {
+            // Multiple targets supported; skip non-existent paths silently
+            args[2..]
+                .iter()
+                .filter(|t| std::path::Path::new(t).exists())
+                .cloned()
+                .collect()
         } else {
             // Search for t/ directory
             if std::path::Path::new("t").is_dir() {
-                "t".to_string()
+                vec!["t".to_string()]
             } else if std::path::Path::new("tests").is_dir() {
-                "tests".to_string()
+                vec!["tests".to_string()]
             } else {
                 eprintln!("stryke test: no t/ or tests/ directory found");
                 process::exit(1);
             }
         };
-        let target_path = std::path::Path::new(&target);
-        let test_files: Vec<String> = if target_path.is_dir() {
-            let mut files: Vec<String> = std::fs::read_dir(target_path)
-                .unwrap_or_else(|e| {
-                    eprintln!("stryke test: {}: {}", target, e);
-                    process::exit(1);
-                })
-                .filter_map(|e| e.ok())
-                .map(|e| e.path().to_string_lossy().to_string())
-                .filter(|p| {
-                    let name = std::path::Path::new(p)
-                        .file_name()
-                        .map(|n| n.to_string_lossy().to_string())
-                        .unwrap_or_default();
-                    (name.starts_with("test_") || name.starts_with("t_"))
-                        && (name.ends_with(".stk")
-                            || name.ends_with(".st")
-                            || name.ends_with(".pl"))
-                })
-                .collect();
-            files.sort();
-            files
-        } else {
-            vec![target]
-        };
+        if targets.is_empty() {
+            eprintln!("stryke test: no valid paths found");
+            process::exit(1);
+        }
+        let mut test_files: Vec<String> = Vec::new();
+        for target in &targets {
+            let target_path = std::path::Path::new(target);
+            if target_path.is_dir() {
+                if let Ok(entries) = std::fs::read_dir(target_path) {
+                    for entry in entries.filter_map(|e| e.ok()) {
+                        let path = entry.path().to_string_lossy().to_string();
+                        let name = entry.file_name().to_string_lossy().to_string();
+                        if (name.starts_with("test_") || name.starts_with("t_"))
+                            && (name.ends_with(".stk")
+                                || name.ends_with(".st")
+                                || name.ends_with(".pl"))
+                        {
+                            test_files.push(path);
+                        }
+                    }
+                }
+            } else {
+                test_files.push(target.clone());
+            }
+        }
+        test_files.sort();
+        test_files.dedup();
         if test_files.is_empty() {
             eprintln!("stryke test: no test files found");
             process::exit(1);

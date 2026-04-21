@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sierpinski Triangle
+
+fn sierpinski_triangle($n) {
+    for my $i (0..$n-1) {
+        for my $s (0..$n-$i-2) { print " " }
+        
+        my $c = 1
+        for my $j (0..$i) {
+            if ($c % 2 == 1) {
+                print "* "
+            } else {
+                print "  "
+            }
+            $c = $c * ($i - $j) / ($j + 1)
+        }
+        print "\n"
+    }
+}
+
+print "Sierpinski Triangle (8 rows):\n"
+sierpinski_triangle 8
+print "\nSierpinski Triangle (16 rows):\n" 
+sierpinski_triangle 16

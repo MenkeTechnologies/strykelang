@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Arrays
+
+fn array_examples() {
+    "Array Examples in Stryke:" |> p
+    
+    # Array creation and initialization
+    my @empty = ()
+    my @numbers = (1, 2, 3, 4, 5)
+    my @strings = ("hello", "world", "stryke")
+    my @mixed = (42, "text", 3.14, "more")
+    
+    "1. Array Creation:" |> p
+    ("   Empty array: " . scalar(@empty) . " elements") |> p
+    ("   Numbers: " . join(", ", @numbers)) |> p
+    ("   Strings: " . join(", ", @strings)) |> p
+    ("   Mixed: " . join(", ", @mixed)) |> p
+    
+    # Array access
+    "2. Array Access:" |> p
+    "   First number: $numbers[0]" |> p
+    "   Last string: $strings[-1]" |> p
+    "   Second mixed: $mixed[1]" |> p
+    
+    # Array modification
+    push @numbers, 6, 7
+    pop @strings
+    unshift @numbers, 0
+    
+    "3. After Modifications:" |> p
+    ("   Numbers (push 6,7, unshift 0): " . join(", ", @numbers)) |> p
+    ("   Strings (pop last): " . join(", ", @strings)) |> p
+    
+    # Array slicing
+    my @slice = @numbers[2..4]
+    "4. Array Slicing:" |> p
+    ("   Slice [2..4]: " . join(", ", @slice)) |> p
+    
+    # Array length/size
+    my $length = scalar(@numbers)
+    my $last_index = $#numbers
+    
+    "5. Array Size:" |> p
+    "   Length: $length" |> p
+    "   Last index: $last_index" |> p
+    
+    # Array operations with threading (proper multi-stage use)
+    my @doubled = ~> @numbers map { $_ * 2 };
+    my @filtered = ~> @numbers grep { $_ > 3 };
+    
+    "6. Array Operations:" |> p
+    ("   Doubled: " . join(", ", @doubled)) |> p
+    ("   Filtered (>3): " . join(", ", @filtered)) |> p
+}
+
+array_examples

@@ -1,0 +1,76 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Conditional Structures
+
+fn conditional_examples() {
+    "Conditional Structure Examples:" |> p
+    
+    my $x = 42
+    my $y = 7
+    
+    # Basic if statement
+    "1. Basic if:" |> p
+    if ($x > 40) {
+        "   x is greater than 40" |> p
+    }
+    
+    # If-else
+    "2. If-else:" |> p
+    if ($y > 10) {
+        "   y is greater than 10" |> p
+    } else {
+        "   y is not greater than 10" |> p
+    }
+    
+    # If-elsif-else chain
+    "3. If-elsif-else:" |> p
+    if ($x < 0) {
+        "   x is negative" |> p
+    } elsif ($x == 0) {
+        "   x is zero" |> p
+    } elsif ($x < 50) {
+        "   x is positive and less than 50" |> p
+    } else {
+        "   x is 50 or greater" |> p
+    }
+    
+    # Ternary operator
+    "4. Ternary operator:" |> p
+    my $result = $x > $y ? "x is larger" : "y is larger or equal"
+    "   $result" |> p
+    
+    # Logical operators
+    "5. Logical combinations:" |> p
+    if ($x > 0 && $y > 0) {
+        "   Both x and y are positive" |> p
+    }
+    
+    if ($x == 42 || $y == 42) {
+        "   At least one is 42" |> p
+    }
+    
+    # Unless (negative if)
+    "6. Unless statement:" |> p
+    unless ($x < 0) {
+        "   x is not negative" |> p
+    }
+    
+    # Switch-like structure using given/when (if supported)
+    "7. Switch-like with if-elsif:" |> p
+    my $grade = "B"
+    if ($grade eq "A") {
+        "   Excellent!" |> p
+    } elsif ($grade eq "B") {
+        "   Good job!" |> p
+    } elsif ($grade eq "C") {
+        "   Average" |> p
+    } else {
+        "   Unknown grade" |> p
+    }
+    
+    # Postfix conditionals
+    "8. Postfix conditions:" |> p
+    "   x is even" |> p if $x % 2 == 0
+    "   y is odd" |> p unless $y % 2 == 0
+}
+
+conditional_examples

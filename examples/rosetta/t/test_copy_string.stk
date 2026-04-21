@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Copy a string
+
+fn string_copy_demo() {
+    "String Copy Examples:" |> p
+    
+    # Basic string assignment (copy)
+    my $original = "Hello, World!"
+    my $copy1 = $original
+    
+    "Original: '$original'" |> p
+    "Copy 1: '$copy1'" |> p
+    
+    # Explicit string copy using substr
+    my $copy2 = substr($original, 0)
+    "Copy 2 (substr): '$copy2'" |> p
+    
+    # Copy using string interpolation
+    my $copy3 = "$original"
+    "Copy 3 (interpolation): '$copy3'" |> p
+    
+    # Copy using concatenation
+    my $copy4 = "" . $original
+    "Copy 4 (concatenation): '$copy4'" |> p
+    
+    # Deep copy demonstration
+    "Modifying original..." |> p
+    $original = "Modified!"
+    
+    "After modification:" |> p
+    "Original: '$original'" |> p
+    "Copy 1: '$copy1'" |> p
+    "Copy 2: '$copy2'" |> p
+    "Copy 3: '$copy3'" |> p
+    "Copy 4: '$copy4'" |> p
+    
+    # Array of strings copy
+    my @strings = ("apple", "banana", "cherry")
+    my @copied_strings = @strings  # Array copy
+    
+    "Array copy:" |> p
+    "Original array: " . join(", ", @strings) |> p
+    "Copied array: " . join(", ", @copied_strings) |> p
+    
+    # Modify original array
+    $strings[0] = "apricot"
+    "After modifying original array:" |> p
+    "Original: " . join(", ", @strings) |> p
+    "Copy: " . join(", ", @copied_strings) |> p
+    
+    # Threading example
+    my $threaded_copy = ~> $copy1 >{ "$_" }
+}
+
+string_copy_demo

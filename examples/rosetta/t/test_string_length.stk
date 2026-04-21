@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: String length
+
+fn string_length_demo() {
+    "String Length Examples:" |> p
+    
+    # Basic string length
+    my $str1 = "Hello, World!"
+    "String: '$str1'" |> p
+    "Length: " . ($str1 |> len) |> p
+    
+    # Empty string
+    my $empty = ""
+    "Empty string length: " . ($empty |> len) |> p
+    
+    # String with spaces
+    my $spaces = "   hello   "
+    "String with spaces: '$spaces'" |> p
+    "Length: " . ($spaces |> len) |> p
+    
+    # Unicode characters (if supported)
+    my $unicode = "café"
+    "Unicode string: '$unicode'" |> p
+    "Length: " . ($unicode |> len) |> p
+    
+    # Very long string
+    my $long_str = "x" x 1000
+    "Long string (1000 x's) length: " . ($long_str |> len) |> p
+    
+    # String with special characters
+    my $special = "Line 1\nLine 2\tTabbed"
+    "Special chars: '$special'" |> p
+    "Length: " . ($special |> len) |> p
+    
+    # Array of strings and their lengths
+    my @strings = ("a", "ab", "abc", "abcd")
+    "String length array:" |> p
+    for my $s (@strings) {
+        "  '$s' -> " . ($s |> len) |> p
+    }
+    
+    # Threading example
+    my $threaded_length = ~> "Stryke Language" len
+    
+    # Length of numbers converted to strings
+    my $num_str = "12345"
+    "Number as string '$num_str' length: " . ($num_str |> len) |> p
+}
+
+string_length_demo
