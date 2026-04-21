@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+# Rosetta Code: URL Encoding/Decoding
+
+fn url_encode($s) {
+    ~> { $s } split // map {
+        /[A-Za-z0-9\-_.~]/ ? $_ : sprintf("%%%02X", ord($_))
+    } join ""
+}
+
+fn url_decode($s) { $s =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/ger }
+
+my $orig = "http://foo bar/"
+p "Original: $orig"
+~> { $orig } url_encode { p "Encoded:  $_" } url_decode { p "Decoded:  $_" }

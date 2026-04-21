@@ -1,18 +1,15 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Bubble Sort
 
-fn bubble_sort(@list) {
-    my $n = scalar(@list);
-    for (my $i = 0; $i < $n - 1; $i++) {
-        for (my $j = 0; $j < $n - $i - 1; $j++) {
-            if ($list[$j] > $list[$j + 1]) {
-                ($list[$j], $list[$j+1]) = ($list[$j+1], $list[$j]);
-            }
+fn bubble(@a) {
+    for my $i (0..$#a-1) {
+        for my $j (0..$#a-$i-1) {
+            ($a[$j], $a[$j+1]) = ($a[$j+1], $a[$j]) if $a[$j] > $a[$j+1]
         }
     }
-    return @list;
+    @a
 }
 
-my @unsorted = (5, 1, 4, 2, 8, -3, 0);
-my @sorted = bubble_sort(@unsorted);
-print "Bubble Sort: " . join(", ", @sorted) . "\n";
+my @u = (64, 34, 25, 12, 22, 11, 90)
+p "Original: " . (~> { @u } join ", ")
+p "Sorted:   " . (~> { bubble(@u) } join ", ")

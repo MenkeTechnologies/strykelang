@@ -1,21 +1,12 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Letter Frequency
 
-fn letter_frequency($text) {
-    my %freq;
-    my @chars = split("", $text);
-    for my $c (@chars) {
-        if ($c =~ /[a-zA-Z]/) {
-            $freq{lc($c)}++;
-        }
-    }
-    return \%freq;
+fn freq($text) {
+    my %f
+    ~> { $text } lc split // grep { /[a-z]/ } fore { $f{$_}++ }
+    %f
 }
 
-my $sample = "The quick brown fox jumps over the lazy dog.";
-my $res = letter_frequency($sample);
-
-print "Letter frequencies:\n";
-for my $k (sort keys %$res) {
-    printf "%s: %d\n", $k, $res->{$k};
-}
+my %f = freq("The quick brown fox jumps over the lazy dog")
+p "Letter frequencies:"
+~> { %f } keys sort fore { p "  $_: $f{$_}" }

@@ -1,16 +1,15 @@
 #!/usr/bin/env stryke
-# Rosetta Code: Fibonacci Sequence (Recursive with Memoization)
+# Rosetta Code: Fibonacci Sequence
 
-my %memo;
-
-fn fib($n) {
-    return $n if $n <= 1;
-    return $memo{$n} if exists $memo{$n};
-    
-    $memo{$n} = fib($n - 1) + fib($n - 2);
-    return $memo{$n};
+fn my_fib($n) {
+    return $n if $n <= 1
+    my_fib($n - 1) + my_fib($n - 2)
 }
 
-for my $i (0..20) {
-    printf "fib(%d) = %d\n", $i, fib($i);
+fn fib_iter($n) {
+    my ($a, $b) = (0, 1)
+    for my $i (1..$n) {
+        ($a, $b) = ($b, $a + $b)
+    }
+    $a
 }

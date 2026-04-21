@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Collatz Conjecture (Hailstone Sequence)
+
+fn collatz_seq($n) {
+    my @seq = ($n)
+    while ($n != 1) {
+        $n = $n % 2 == 0 ? $n / 2 : 3 * $n + 1
+        push @seq, $n
+    }
+    @seq
+}
+
+fn collatz_len($n) {
+    my $len = 1
+    while ($n != 1) {
+        $n = $n % 2 == 0 ? $n / 2 : 3 * $n + 1
+        $len++
+    }
+    $len
+}

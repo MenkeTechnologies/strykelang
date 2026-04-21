@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Triangle Classification
+
+fn classify($a, $b, $c) {
+    my @s = ~> { ($a,$b,$c) } sort { $a <=> $b }
+    return "invalid" if $s[0] + $s[1] <= $s[2]
+    return "equilateral" if $a == $b && $b == $c
+    return "isosceles" if $a == $b || $b == $c || $a == $c
+    "scalene"
+}
+
+~> { ([3,3,3], [3,4,5], [5,5,3], [1,2,3], [1,1,10]) } fore {
+    my ($a,$b,$c) = @$_
+    p "($a,$b,$c) → " . classify($a,$b,$c)
+}

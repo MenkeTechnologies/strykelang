@@ -1,0 +1,6 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Reverse a String
+
+fn rev($s) { ~> { $s } split // reverse join "" }
+
+~> { qw(asdf hello rosetta) } fore { p "'$_' → '" . rev($_) . "'" }

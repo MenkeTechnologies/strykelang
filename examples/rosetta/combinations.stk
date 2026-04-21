@@ -1,0 +1,13 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Combinations
+
+fn comb($k, @xs) {
+    return ([]) if $k == 0
+    return () if @xs < $k
+    my ($first, @rest) = @xs
+    my @with = ~> { comb($k-1, @rest) } map { [$first, @$_] }
+    (@with, comb($k, @rest))
+}
+
+p "C(5,3):"
+~> { comb(3, 1..5) } fore { p "  (" . (~> { @$_ } join ", ") . ")" }

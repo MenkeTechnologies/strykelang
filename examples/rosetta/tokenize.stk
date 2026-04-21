@@ -1,0 +1,9 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Tokenize a String
+
+my $s = "Hello,How,Are,You,Today"
+p "Original: $s"
+p "Tokens:"
+~> { $s } split /,/ fore { p "  - $_" }
+p "Rejoined with '.':"
+~> { $s } split /,/ join "." p

@@ -1,13 +1,23 @@
 #!/usr/bin/env stryke
-# Rosetta Code: Averages/Arithmetic mean
+# Rosetta Code: Averages (Mean, Median, Mode)
 
-fn mean(@list) {
-    return 0 if scalar(@list) == 0;
-    my $sum = 0;
-    $sum += $_ for @list;
-    return $sum / scalar(@list);
+fn mean(@n) { ~> { @n } sum |> { $_ / @n } }
+
+fn median(@n) {
+    my @s = ~> { @n } sort { $a <=> $b }
+    my $m = int(@s / 2)
+    @s % 2 ? $s[$m] : ($s[$m-1] + $s[$m]) / 2
 }
 
-my @nums = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
-printf "Mean of 1..10: %g\n", mean(@nums);
-printf "Mean of (3, 1, 4, 1, 5, 9): %g\n", mean(3, 1, 4, 1, 5, 9);
+fn mode(@n) {
+    my %f
+    ~> { @n } fore { $f{$_}++ }
+    my $max = ~> { values %f } max
+    ~> { keys %f } grep { $f{$_} == $max }
+}
+
+my @d = (1, 2, 3, 4, 5, 5, 6, 7, 8, 9)
+p "Data: " . (~> { @d } join ", ")
+p "Mean:   " . mean(@d)
+p "Median: " . median(@d)
+p "Mode:   " . (~> { mode(@d) } join ", ")

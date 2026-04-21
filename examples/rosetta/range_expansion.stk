@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Range Expansion
+
+fn expand($str) {
+    ~> { $str } split /,/ map {
+        /^(-?\d+)-(-?\d+)$/ ? ($1..$2) : $_
+    }
+}
+
+my $r = "-6,-3-1,3-5,7-11,14,15,17-20"
+p "Range: $r"
+p "Expanded: " . (~> { expand($r) } join ", ")

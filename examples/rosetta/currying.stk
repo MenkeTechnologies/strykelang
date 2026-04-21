@@ -1,18 +1,18 @@
 #!/usr/bin/env stryke
-# Rosetta Code: Currying
+# Rosetta Code: Currying and Partial Application
 
-fn multiply($x, $y) {
-    return $x * $y;
+fn curry($f) {
+    fn ($x) { fn ($y) { $f->($x, $y) } }
 }
 
-# In Stryke, we can use closures for currying
-fn curry_multiply($x) {
-    return fn ($y) { multiply($x, $y) };
-}
+fn add($x, $y) { $x + $y }
+fn mul($x, $y) { $x * $y }
 
-my $triple = curry_multiply(3);
-my $double = curry_multiply(2);
+my $add5 = curry(\&add)->(5)
+my $mul3 = curry(\&mul)->(3)
 
-printf "3 * 10 = %d\n", $triple->(10);
-printf "2 * 10 = %d\n", $double->(10);
-printf "3 * 4  = %d\n", $triple->(4);
+p "add5(10) = " . $add5->(10)
+p "mul3(7) = " . $mul3->(7)
+
+# Pipeline with partial application
+p "Pipeline: " . (10 |> $add5 |> $mul3)

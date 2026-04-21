@@ -1,0 +1,13 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Happy Numbers
+
+fn sum_sq($n) { ~> { $n } split // map { $_ * $_ } sum }
+
+fn is_happy($n) {
+    my %seen
+    while ($n != 1 && !$seen{$n}++) { $n = sum_sq($n) }
+    $n == 1
+}
+
+p "First 8 happy numbers:"
+~> { 1..1000 } filter { is_happy } take 8 join ", " p

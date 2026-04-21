@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Chaos Game (Sierpinski Triangle)
+
+my $size = 40
+my @canvas
+for (1..$size) { push @canvas, [(" ") x ($size * 2)] }
+
+my @vertices = ([0, $size - 1], [$size - 1, 0], [$size * 2 - 1, $size - 1])
+
+my ($x, $y) = ($size, int($size / 2))
+
+for (1..5000) {
+    my $v = $vertices[int(rand(3))]
+    $x = int(($x + $v->[0]) / 2)
+    $y = int(($y + $v->[1]) / 2)
+    $canvas[$y][$x] = "*" if $y >= 0 && $y < $size
+}
+
+p "Sierpinski Triangle (Chaos Game):"
+for my $row (@canvas) {
+    p join "", @$row
+}

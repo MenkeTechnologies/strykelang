@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Run-length Encoding
+
+fn rle_encode($s) {
+    $s =~ s/((.)\2*)/length($1) . $2/ger
+}
+
+fn rle_decode($s) {
+    $s =~ s/(\d+)(.)/$2 x $1/ger
+}
+
+my $orig = "WWWWWWWWWWWWBWWWWWWWWWWWWBBBWWWWWWWWWWWWWWWWWWWWWWWWB"
+my $enc = rle_encode($orig)
+my $dec = rle_decode($enc)
+
+p "Original: $orig"
+p "Encoded:  $enc"
+p "Decoded:  $dec"
+p "Match: " . ($orig eq $dec ? "yes" : "no")

@@ -2,12 +2,11 @@
 # Rosetta Code: Towers of Hanoi
 
 fn hanoi($n, $from, $to, $via) {
-    if ($n > 0) {
-        hanoi($n - 1, $from, $via, $to);
-        printf "Move disk %d from %s to %s\n", $n, $from, $to;
-        hanoi($n - 1, $via, $to, $from);
-    }
+    return if $n == 0
+    hanoi($n-1, $from, $via, $to)
+    p "Move disk $n from $from to $to"
+    hanoi($n-1, $via, $to, $from)
 }
 
-print "Towers of Hanoi (3 disks):\n";
-hanoi(3, "A", "C", "B");
+p "Towers of Hanoi (3 disks):"
+hanoi(3, 'A', 'C', 'B')

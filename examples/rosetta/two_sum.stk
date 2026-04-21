@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Two Sum Problem
+
+fn two_sum(\@nums, $target) {
+    my %seen
+    ~> { 0..$#nums } first {
+        my $c = $target - $nums[$_]
+        exists $seen{$c} ? 1 : ($seen{$nums[$_]} = $_) && 0
+    } |> { defined $_ ? ($seen{$target - $nums[$_]}, $_) : () }
+}
+
+my @nums = (2, 7, 11, 15)
+my @r = two_sum(\@nums, 9)
+p "Array: " . (~> { @nums } join ", ")
+p "Target: 9 → indices: " . (~> { @r } join ", ")

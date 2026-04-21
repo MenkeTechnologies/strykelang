@@ -1,0 +1,9 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Catalan Numbers
+
+fn fact($n) { $n <= 1 ? 1 : ~> { 1..$n } reduce { $a * $b } }
+
+fn catalan($n) { fact(2*$n) / (fact($n+1) * fact($n)) }
+
+p "Catalan numbers 0-15:"
+~> { 0..15 } map { catalan } join ", " p

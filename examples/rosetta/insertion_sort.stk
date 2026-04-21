@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Insertion Sort
+
+fn insertion(@a) {
+    for my $i (1..$#a) {
+        my $key = $a[$i]
+        my $j = $i - 1
+        while ($j >= 0 && $a[$j] > $key) {
+            $a[$j+1] = $a[$j]
+            $j--
+        }
+        $a[$j+1] = $key
+    }
+    @a
+}
+
+my @u = (5, 2, 4, 6, 1, 3)
+p "Original: " . (~> { @u } join ", ")
+p "Sorted:   " . (~> { insertion(@u) } join ", ")

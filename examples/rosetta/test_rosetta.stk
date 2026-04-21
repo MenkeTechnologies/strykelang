@@ -1,0 +1,96 @@
+#!/usr/bin/env stryke
+# t/test_rosetta.stk — Comprehensive tests for Rosetta Code examples
+
+# ── Math Utilities ────────────────────────────────────────────────
+
+require "../../rosetta/averages.stk"
+assert_eq mean(1, 2, 3, 4, 5), 3, "rosetta: mean 1..5"
+assert_eq mean(10, 20), 15, "rosetta: mean 10,20"
+
+require "../../rosetta/gcd.stk"
+assert_eq gcd(12, 8), 4, "rosetta: gcd(12, 8)"
+assert_eq gcd(1071, 462), 21, "rosetta: gcd large"
+
+require "../../rosetta/factorial.stk"
+assert_eq factorial(5), 120, "rosetta: factorial(5)"
+assert_eq factorial(0), 1, "rosetta: factorial(0)"
+
+require "../../rosetta/fibonacci.stk"
+assert_eq fib(10), 55, "rosetta: fib(10)"
+
+require "../../rosetta/perfect_numbers.stk"
+assert_true is_perfect(6), "rosetta: 6 is perfect"
+assert_true is_perfect(28), "rosetta: 28 is perfect"
+assert_false is_perfect(10), "rosetta: 10 is not perfect"
+
+require "../../rosetta/prime_check.stk"
+assert_true is_prime(7), "rosetta: 7 is prime"
+assert_true is_prime(13), "rosetta: 13 is prime"
+assert_false is_prime(15), "rosetta: 15 is not prime"
+
+require "../../rosetta/sieve.stk"
+my @p = sieve(20)
+assert_eq join(",", @p), "2,3,5,7,11,13,17,19", "rosetta: sieve to 20"
+
+require "../../rosetta/prime_decomposition.stk"
+my @factors = factorize(12)
+assert_eq join(",", @factors), "2,2,3", "rosetta: factorize 12"
+
+# ── String Utilities ──────────────────────────────────────────────
+
+require "../../rosetta/palindrome.stk"
+assert_true is_palindrome("Racecar"), "rosetta: Racecar is palindrome"
+assert_false is_palindrome("Hello"), "rosetta: Hello is not palindrome"
+
+require "../../rosetta/anagrams.stk"
+assert_true are_anagrams("Listen", "Silent"), "rosetta: anagrams Listen/Silent"
+assert_false are_anagrams("Apple", "Orange"), "rosetta: not anagrams"
+
+require "../../rosetta/letter_frequency.stk"
+my $freq = letter_frequency("aa b")
+assert_eq $freq->{a}, 2, "rosetta: freq 'a'"
+assert_eq $freq->{b}, 1, "rosetta: freq 'b'"
+
+require "../../rosetta/balanced_brackets.stk"
+assert_true is_balanced("[[]]"), "rosetta: brackets balanced"
+assert_false is_balanced("]["), "rosetta: brackets not balanced"
+
+# ── Algorithms ────────────────────────────────────────────────────
+
+require "../../rosetta/binary_search.stk"
+my @arr = (10, 20, 30, 40, 50)
+assert_eq my_binary_search(30, @arr), 2, "rosetta: binsearch found"
+assert_eq my_binary_search(25, @arr), -1, "rosetta: binsearch not found"
+
+require "../../rosetta/bubble_sort.stk"
+my @sorted_b = bubble_sort(5, 3, 1, 4, 2)
+assert_eq join(",", @sorted_b), "1,2,3,4,5", "rosetta: bubble_sort"
+
+require "../../rosetta/quicksort.stk"
+my @sorted_q = quicksort(10, -1, 5, 2)
+assert_eq join(",", @sorted_q), "-1,2,5,10", "rosetta: quicksort"
+
+require "../../rosetta/topological_sort.stk"
+my $deps = { a => ["b"], b => [] }
+my @order = topo_sort($deps)
+# Order should end with 'a' since it depends on 'b'
+assert_eq $order[-1], "a", "rosetta: topo sort dependency"
+
+require "../../rosetta/matrix_multiplication.stk"
+my $m1 = [[1, 2], [3, 4]]
+my $m2 = [[5, 6], [7, 8]]
+my $mres = matrix_mul($m1, $m2)
+assert_eq $mres->[0]->[0], 19, "rosetta: matrix_mul 0,0" # 1*5 + 2*7 = 19
+assert_eq $mres->[1]->[1], 50, "rosetta: matrix_mul 1,1" # 3*6 + 4*8 = 50
+
+# ── Advanced Features ─────────────────────────────────────────────
+
+require "../../rosetta/classes.stk"
+my $dog = Dog(name => "Buddy")
+assert_eq $dog->speak(), "Woof!", "rosetta: class inheritance speak"
+
+require "../../rosetta/currying.stk"
+my $triple = curry_multiply(3)
+assert_eq $triple->(5), 15, "rosetta: currying triple"
+
+test_run
