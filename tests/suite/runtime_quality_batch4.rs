@@ -366,13 +366,13 @@ fn string_ne_force_string_compare() {
 
 #[test]
 fn list_util_first_with_coderef_finds_element() {
-    assert_eq!(eval_int(r#"List::Util::first(sub { $_ > 2 }, 1, 2, 3)"#), 3);
+    assert_eq!(eval_int(r#"List::Util::first(fn { $_ > 2 }, 1, 2, 3)"#), 3);
 }
 
 #[test]
 fn list_util_none_with_coderef_no_match() {
     assert_eq!(
-        eval_int(r#"List::Util::none(sub { $_ > 10 }, 1, 2, 3) ? 1 : 0"#),
+        eval_int(r#"List::Util::none(fn { $_ > 10 }, 1, 2, 3) ? 1 : 0"#),
         1
     );
 }
@@ -380,7 +380,7 @@ fn list_util_none_with_coderef_no_match() {
 #[test]
 fn list_util_any_with_coderef_one_hit() {
     assert_eq!(
-        eval_int(r#"List::Util::any(sub { $_ == 2 }, 1, 2, 3) ? 1 : 0"#),
+        eval_int(r#"List::Util::any(fn { $_ == 2 }, 1, 2, 3) ? 1 : 0"#),
         1
     );
 }
@@ -388,7 +388,7 @@ fn list_util_any_with_coderef_one_hit() {
 #[test]
 fn list_util_all_with_coderef_all_positive() {
     assert_eq!(
-        eval_int(r#"List::Util::all(sub { $_ > 0 }, 1, 2, 3) ? 1 : 0"#),
+        eval_int(r#"List::Util::all(fn { $_ > 0 }, 1, 2, 3) ? 1 : 0"#),
         1
     );
 }
@@ -396,7 +396,7 @@ fn list_util_all_with_coderef_all_positive() {
 #[test]
 fn list_util_notall_with_coderef_all_match() {
     assert_eq!(
-        eval_int(r#"List::Util::notall(sub { $_ > 0 }, 1, 2, 3) ? 1 : 0"#),
+        eval_int(r#"List::Util::notall(fn { $_ > 0 }, 1, 2, 3) ? 1 : 0"#),
         0
     );
 }

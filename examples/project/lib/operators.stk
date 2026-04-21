@@ -303,7 +303,9 @@ fn list_swap {
 }
 
 fn comma_operator {
-    my $x = (1, 2, 3)
+    # In stryke mode, use explicit last-element syntax
+    my @list = (1, 2, 3)
+    my $x = $list[-1]
     $x
 }
 

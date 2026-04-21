@@ -14,7 +14,7 @@ fn stryke_reads_full_multiline_script_from_stdin_pipe() {
         .spawn()
         .expect("spawn stryke");
 
-    let script = "#!/usr/bin/env perl\nsay 1;\nsay 2;\n";
+    let script = "#!/usr/bin/env perl\np 1;\np 2;\n";
     let mut stdin = child.stdin.take().expect("stdin");
     stdin.write_all(script.as_bytes()).unwrap();
     drop(stdin);
@@ -63,7 +63,7 @@ fn pe_reads_full_multiline_script_from_stdin_pipe() {
         .spawn()
         .expect("spawn stryke");
 
-    let script = "#!/usr/bin/env perl\nsay 1;\nsay 2;\n";
+    let script = "#!/usr/bin/env perl\np 1;\np 2;\n";
     let mut stdin = child.stdin.take().expect("stdin");
     stdin.write_all(script.as_bytes()).unwrap();
     drop(stdin);

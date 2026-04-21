@@ -1,0 +1,52 @@
+#!/usr/bin/env stryke
+# t/test_conversions.stk — unit conversion builtins
+
+# Temperature conversions
+assert_eq c_to_f(0), 32, "0C = 32F"
+assert_eq c_to_f(100), 212, "100C = 212F"
+assert_near f_to_c(32), 0, 0.01, "32F = 0C"
+assert_near f_to_c(212), 100, 0.01, "212F = 100C"
+assert_near c_to_k(0), 273.15, 0.01, "0C = 273.15K"
+assert_near k_to_c(273.15), 0, 0.01, "273.15K = 0C"
+assert_near f_to_k(32), 273.15, 0.01, "32F = 273.15K"
+assert_near k_to_f(273.15), 32, 0.01, "273.15K = 32F"
+
+# Distance conversions
+assert_near miles_to_km(1), 1.60934, 0.001, "1 mile = 1.609 km"
+assert_near km_to_miles(1.60934), 1, 0.001, "1.609 km = 1 mile"
+assert_near feet_to_m(1), 0.3048, 0.001, "1 foot = 0.3048 m"
+assert_near m_to_feet(0.3048), 1, 0.001, "0.3048 m = 1 foot"
+assert_near inches_to_cm(1), 2.54, 0.01, "1 inch = 2.54 cm"
+assert_near cm_to_inches(2.54), 1, 0.01, "2.54 cm = 1 inch"
+assert_near yards_to_m(1), 0.9144, 0.001, "1 yard = 0.9144 m"
+assert_near m_to_yards(0.9144), 1, 0.001, "0.9144 m = 1 yard"
+
+# Weight conversions
+assert_near kg_to_lbs(1), 2.20462, 0.001, "1 kg = 2.205 lbs"
+assert_near lbs_to_kg(2.20462), 1, 0.001, "2.205 lbs = 1 kg"
+assert_near g_to_oz(28.3495), 1, 0.01, "28.35 g = 1 oz"
+assert_near oz_to_g(1), 28.3495, 0.01, "1 oz = 28.35 g"
+
+# Data size conversions
+assert_eq bytes_to_kb(1024), 1, "1024 bytes = 1 KB"
+assert_eq kb_to_bytes(1), 1024, "1 KB = 1024 bytes"
+assert_eq bytes_to_mb(1048576), 1, "1048576 bytes = 1 MB"
+assert_eq mb_to_bytes(1), 1048576, "1 MB = 1048576 bytes"
+assert_eq bytes_to_gb(1073741824), 1, "1073741824 bytes = 1 GB"
+assert_eq gb_to_bytes(1), 1073741824, "1 GB = 1073741824 bytes"
+assert_eq bits_to_bytes(8), 1, "8 bits = 1 byte"
+assert_eq bytes_to_bits(1), 8, "1 byte = 8 bits"
+
+# Time conversions
+assert_eq seconds_to_minutes(60), 1, "60 seconds = 1 minute"
+assert_eq minutes_to_seconds(1), 60, "1 minute = 60 seconds"
+assert_eq seconds_to_hours(3600), 1, "3600 seconds = 1 hour"
+assert_eq hours_to_seconds(1), 3600, "1 hour = 3600 seconds"
+assert_eq seconds_to_days(86400), 1, "86400 seconds = 1 day"
+assert_eq days_to_seconds(1), 86400, "1 day = 86400 seconds"
+assert_eq minutes_to_hours(60), 1, "60 minutes = 1 hour"
+assert_eq hours_to_minutes(1), 60, "1 hour = 60 minutes"
+assert_eq hours_to_days(24), 1, "24 hours = 1 day"
+assert_eq days_to_hours(1), 24, "1 day = 24 hours"
+
+test_run

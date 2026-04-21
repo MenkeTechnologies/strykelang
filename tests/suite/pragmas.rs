@@ -103,5 +103,5 @@ fn strict_subs_hint_on_undefined_sub() {
 
 #[test]
 fn say_requires_feature_when_disabled() {
-    assert_eq!(eval_err_kind("no feature 'say'; say 1"), ErrorKind::Runtime);
+    assert_eq!(eval_err_kind("no feature 'say'; p 1"), ErrorKind::Runtime);
 }

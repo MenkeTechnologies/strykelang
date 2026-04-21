@@ -315,7 +315,7 @@ fn sub_util_set_subname_returns_coderef_still_invokable() {
     assert_eq!(
         eval_int(
             r#"
-            my $f = sub { 41 };
+            my $f = fn { 41 };
             my $g = Sub::Util::set_subname("main::x", $f);
             $g->() + 1;
         "#
@@ -329,7 +329,7 @@ fn sub_util_subname_alias_returns_second_arg() {
     assert_eq!(
         eval_int(
             r#"
-            my $f = sub { 3 };
+            my $f = fn { 3 };
             my $h = Sub::Util::subname("pkg::y", $f);
             $h->() + 4;
         "#
@@ -1392,8 +1392,8 @@ fn list_util_max_min_product_combine() {
 
 #[test]
 fn list_util_any_all_with_coderef() {
-    assert_eq!(eval_int(r#"List::Util::any(sub { $_ > 2 }, 1, 2, 3)"#), 1);
-    assert_eq!(eval_int(r#"List::Util::all(sub { $_ > 0 }, 1, 2, 3)"#), 1);
+    assert_eq!(eval_int(r#"List::Util::any(fn { $_ > 2 }, 1, 2, 3)"#), 1);
+    assert_eq!(eval_int(r#"List::Util::all(fn { $_ > 0 }, 1, 2, 3)"#), 1);
 }
 
 // ── Math: `cos` at zero ──
@@ -1579,9 +1579,9 @@ fn list_util_head_and_tail_take_slice_ends() {
 
 #[test]
 fn list_util_none_and_notall_predicates() {
-    assert_eq!(eval_int(r#"List::Util::none(sub { $_ < 0 }, 1, 2, 3)"#), 1);
+    assert_eq!(eval_int(r#"List::Util::none(fn { $_ < 0 }, 1, 2, 3)"#), 1);
     assert_eq!(
-        eval_int(r#"List::Util::notall(sub { $_ > 0 }, 1, -1, 2)"#),
+        eval_int(r#"List::Util::notall(fn { $_ > 0 }, 1, -1, 2)"#),
         1
     );
 }
@@ -2900,7 +2900,7 @@ fn sprintf_plus_f_positive_float_snapshot() {
 
 #[test]
 fn ref_anon_subroutine_is_code() {
-    assert_eq!(eval_string(r#"ref sub { 1 }"#), "CODE");
+    assert_eq!(eval_string(r#"ref fn { 1 }"#), "CODE");
 }
 
 #[test]
@@ -3104,7 +3104,7 @@ fn coderef_invoked_with_arrow_operator() {
     assert_eq!(
         eval_int(
             r#"no strict 'vars';
-            my $f = sub { 9 };
+            my $f = fn { 9 };
             $f->()"#
         ),
         9
@@ -5134,8 +5134,8 @@ fn coderef_call_ampersand_and_arrow() {
     assert_eq!(
         eval_string(
             r#"no strict 'vars';
-            my $f = sub { return 3; };
-            my $g = sub { 5 };
+            my $f = fn { return 3; };
+            my $g = fn { 5 };
             join "", &$f(), $g->()"#
         ),
         "35"
@@ -5242,15 +5242,17 @@ fn unary_plus_is_numeric_noop() {
 
 #[test]
 fn scalar_assign_from_paren_list_keeps_last_element() {
-    assert_eq!(
-        eval_int(
-            r#"no strict 'vars';
+    // In stryke mode, `$z = (1,2,3)` is a syntax error — use `$z = (list)[-1]` explicitly.
+    // Test that the compat mode (Perl 5) preserves the "last element" behavior.
+    stryke::set_compat_mode(true);
+    let result = eval_int(
+        r#"no strict 'vars';
             my $z;
             $z = (1, 2, 3);
-            $z"#
-        ),
-        3
+            $z"#,
     );
+    stryke::set_compat_mode(false);
+    assert_eq!(result, 3);
 }
 
 #[test]
@@ -5774,7 +5776,7 @@ fn defined_or_assign_leaves_defined_positive_unchanged() {
 #[test]
 fn list_util_all_true_under_upper_bound() {
     assert_eq!(
-        eval_int(r#"0 + List::Util::all(sub { $_ < 10 }, 1, 2, 3)"#),
+        eval_int(r#"0 + List::Util::all(fn { $_ < 10 }, 1, 2, 3)"#),
         1
     );
 }
@@ -7600,13 +7602,13 @@ fn array_sparse_assign_leaves_intermediate_slots_undef() {
 // ── Thread macro with p/say/print/warn/die stages ──
 
 #[test]
-fn thread_macro_inc_p_stage() {
+fn thread_macro_inc_stage() {
     assert_eq!(eval_int(r#"my $x = t 10 inc; $x"#), 11);
 }
 
 #[test]
-fn thread_macro_inc_say_stage() {
-    assert_eq!(eval_int(r#"t 10 inc say; 1"#), 1);
+fn thread_macro_inc_p_stage() {
+    assert_eq!(eval_int(r#"t 10 inc p; 1"#), 1);
 }
 
 #[test]

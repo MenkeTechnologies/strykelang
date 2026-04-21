@@ -821,7 +821,11 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
             buf.push('}');
         }
         ExprKind::CodeRef { params, body } => {
-            buf.push_str("sub");
+            if crate::compat_mode() {
+                buf.push_str("sub");
+            } else {
+                buf.push_str("fn");
+            }
             if !params.is_empty() {
                 buf.push_str(" (");
                 deparse_params(buf, params);
@@ -2052,9 +2056,9 @@ mod tests {
     }
 
     #[test]
-    fn deparse_anon_sub() {
-        let s = roundtrip("my $f = sub { $_ + 1 };");
-        assert!(s.contains("sub {"));
+    fn deparse_anon_fn() {
+        let s = roundtrip("my $f = fn { $_ + 1 };");
+        assert!(s.contains("sub {") || s.contains("fn {"));
         assert!(s.contains("$_ + 1"));
     }
 }

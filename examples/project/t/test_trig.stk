@@ -1,0 +1,53 @@
+#!/usr/bin/env stryke
+# t/test_trig.stk — trigonometric and hyperbolic functions
+
+my $pi = 3.14159265358979
+
+# Basic trig
+assert_near sin(0), 0, 0.0001, "sin(0)"
+assert_near sin($pi / 2), 1, 0.0001, "sin(pi/2)"
+assert_near sin($pi), 0, 0.0001, "sin(pi)"
+assert_near cos(0), 1, 0.0001, "cos(0)"
+assert_near cos($pi / 2), 0, 0.0001, "cos(pi/2)"
+assert_near cos($pi), -1, 0.0001, "cos(pi)"
+assert_near tan(0), 0, 0.0001, "tan(0)"
+assert_near tan($pi / 4), 1, 0.0001, "tan(pi/4)"
+
+# Inverse trig
+assert_near asin(0), 0, 0.0001, "asin(0)"
+assert_near asin(1), $pi / 2, 0.0001, "asin(1)"
+assert_near acos(1), 0, 0.0001, "acos(1)"
+assert_near acos(0), $pi / 2, 0.0001, "acos(0)"
+assert_near atan(0), 0, 0.0001, "atan(0)"
+assert_near atan(1), $pi / 4, 0.0001, "atan(1)"
+
+# Hyperbolic
+assert_near sinh(0), 0, 0.0001, "sinh(0)"
+assert_near cosh(0), 1, 0.0001, "cosh(0)"
+assert_near tanh(0), 0, 0.0001, "tanh(0)"
+assert_near tanh(100), 1, 0.0001, "tanh(large) -> 1"
+
+# Inverse hyperbolic
+assert_near asinh(0), 0, 0.0001, "asinh(0)"
+assert_near acosh(1), 0, 0.0001, "acosh(1)"
+assert_near atanh(0), 0, 0.0001, "atanh(0)"
+
+# Degree/radian conversion
+assert_near degrees($pi), 180, 0.0001, "pi rad = 180 deg"
+assert_near degrees($pi / 2), 90, 0.0001, "pi/2 rad = 90 deg"
+assert_near radians(180), $pi, 0.0001, "180 deg = pi rad"
+assert_near radians(90), $pi / 2, 0.0001, "90 deg = pi/2 rad"
+assert_near radians(360), 2 * $pi, 0.0001, "360 deg = 2pi rad"
+
+# Special float checks
+assert_ok is_finite(1.0), "1.0 is finite"
+assert_ok is_finite(0), "0 is finite"
+assert_false is_nan(1.0), "1.0 is not NaN"
+assert_false is_infinite(1.0), "1.0 is not infinite"
+
+# Hypot (Pythagorean)
+assert_near hypot(3, 4), 5, 0.0001, "3-4-5 triangle"
+assert_near hypot(5, 12), 13, 0.0001, "5-12-13 triangle"
+assert_near hypot(1, 1), sqrt(2), 0.0001, "1-1-sqrt2 triangle"
+
+test_run

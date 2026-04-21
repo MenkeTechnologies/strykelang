@@ -113,7 +113,7 @@ fn bare_slash_case_insensitive_flag() {
 #[test]
 fn bare_slash_sub_body_statement_match() {
     assert_eq!(
-        eval_string(r#"my $c = sub { $_ = "ab"; /(a)/; $1 }; $c->()"#),
+        eval_string(r#"my $c = fn { $_ = "ab"; /(a)/; $1 }; $c->()"#),
         "a"
     );
 }

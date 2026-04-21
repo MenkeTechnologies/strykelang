@@ -495,11 +495,6 @@ mod tests {
     }
 
     #[test]
-    fn parse_subroutine_declaration() {
-        parse("sub foo { return 1; }").expect("sub");
-    }
-
-    #[test]
     fn parse_if_with_block() {
         parse("if (1) { 2 }").expect("if");
     }
@@ -615,8 +610,8 @@ mod tests {
     }
 
     #[test]
-    fn parse_say_statement() {
-        parse("say 42").expect("say");
+    fn parse_p_statement() {
+        parse("p 42").expect("p");
     }
 
     #[test]

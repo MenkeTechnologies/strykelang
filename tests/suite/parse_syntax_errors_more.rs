@@ -36,7 +36,7 @@ fn missing_comma_in_list() {
 
 #[test]
 fn statement_anonymous_sub_empty_prototype_parses() {
-    assert!(stryke::parse("sub () { }").is_ok());
+    assert!(stryke::parse("fn () { }").is_ok());
 }
 
 #[test]

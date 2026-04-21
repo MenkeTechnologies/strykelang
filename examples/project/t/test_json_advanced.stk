@@ -1,0 +1,48 @@
+#!/usr/bin/env stryke
+# t/test_json_advanced.stk — JSON operations
+
+# Pretty print
+my $data = {name => "test", items => [1, 2, 3]}
+my $pretty = json_pretty($data)
+assert_ok $pretty =~ /name/, "json_pretty has key"
+assert_ok $pretty =~ /items/, "json_pretty has items"
+
+# Minify
+my $minified = json_minify($pretty)
+assert_ok length($minified) > 0, "minified has content"
+
+# Escape
+assert_eq escape_json("hello\nworld"), 'hello\\nworld', "escape newline"
+assert_eq escape_json('say "hi"'), 'say \\"hi\\"', "escape quotes"
+assert_eq escape_json("tab\there"), 'tab\\there', "escape tab"
+
+# Roundtrip
+my $complex = {
+    string => "hello",
+    number => 42,
+    float => 3.14,
+    bool_t => 1,
+    bool_f => 0,
+    null_v => undef,
+    array => [1, "two", 3],
+    nested => {a => 1, b => 2}
+}
+my $json_str = to_json($complex)
+my $decoded = json_decode($json_str)
+assert_eq $decoded->{string}, "hello", "roundtrip string"
+assert_eq $decoded->{number}, 42, "roundtrip number"
+assert_near $decoded->{float}, 3.14, 0.001, "roundtrip float"
+assert_eq $decoded->{array}[1], "two", "roundtrip array"
+assert_eq $decoded->{nested}{a}, 1, "roundtrip nested"
+
+# Empty structures
+assert_eq to_json([]), "[]", "empty array"
+assert_eq to_json({}), "{}", "empty hash"
+
+# Unicode
+my $unicode = {emoji => "hello"}
+my $u_json = to_json($unicode)
+my $u_decoded = json_decode($u_json)
+assert_eq $u_decoded->{emoji}, "hello", "unicode roundtrip"
+
+test_run

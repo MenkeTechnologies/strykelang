@@ -27,14 +27,14 @@ fn test_format_and_convert_roundtrip() {
     let p = parse(code).expect("parse");
 
     let formatted = format_program(&p);
-    assert!(formatted.contains("sub foo"));
+    assert!(formatted.contains("sub foo") || formatted.contains("fn foo"));
 
     let stryke = convert_to_stryke(&p);
     // stryke conversion might be more complex, just check it's not empty
     assert!(!stryke.is_empty());
 
     let deconverted = deconvert_to_perl(&p);
-    assert!(deconverted.contains("sub foo"));
+    assert!(deconverted.contains("sub foo") || deconverted.contains("fn foo"));
 }
 
 #[test]

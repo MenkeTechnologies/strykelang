@@ -489,7 +489,8 @@ impl Parser {
                     }
                     s
                 }
-                "sub" | "fn" => self.parse_sub_decl()?,
+                "sub" => self.parse_sub_decl(true)?,
+                "fn" => self.parse_sub_decl(false)?,
                 "struct" => {
                     if crate::compat_mode() {
                         return Err(self.syntax_err(
@@ -1608,7 +1609,7 @@ impl Parser {
         self.advance(); // defer
         let body = self.parse_block()?;
         self.eat(&Token::Semicolon);
-        // Desugar: defer { BLOCK } → defer__internal(sub { BLOCK })
+        // Desugar: defer { BLOCK } → defer__internal(fn { BLOCK })
         let coderef = Expr {
             kind: ExprKind::CodeRef {
                 params: vec![],
@@ -1745,7 +1746,7 @@ impl Parser {
 
             // Parse a stage and apply it to result via pipe
             match self.peek().clone() {
-                // `>{ block }` — standalone anonymous block (sugar for sub { })
+                // `>{ block }` — standalone anonymous block (sugar for fn { })
                 Token::ArrowBrace => {
                     self.advance(); // consume `>{`
                     let mut stmts = Vec::new();
@@ -1765,9 +1766,26 @@ impl Parser {
                     };
                     result = self.pipe_forward_apply(result, code_ref, stage_line)?;
                 }
-                // `sub { block }` or `fn { block }` — explicit anonymous block
-                Token::Ident(ref name) if name == "sub" || name == "fn" => {
+                // `fn { block }` — only valid in compat mode
+                Token::Ident(ref name) if name == "sub" => {
+                    if !crate::compat_mode() {
+                        return Err(self.syntax_err(
+                            "`fn {}` anonymous subroutine is not valid stryke; use `fn {}` instead",
+                            stage_line,
+                        ));
+                    }
                     self.advance(); // consume `sub`
+                    let (params, _prototype) = self.parse_sub_sig_or_prototype_opt()?;
+                    let body = self.parse_block()?;
+                    let code_ref = Expr {
+                        kind: ExprKind::CodeRef { params, body },
+                        line: stage_line,
+                    };
+                    result = self.pipe_forward_apply(result, code_ref, stage_line)?;
+                }
+                // `fn { block }` — stryke anonymous function
+                Token::Ident(ref name) if name == "fn" => {
+                    self.advance(); // consume `fn`
                     let (params, _prototype) = self.parse_sub_sig_or_prototype_opt()?;
                     let body = self.parse_block()?;
                     let code_ref = Expr {
@@ -2173,7 +2191,7 @@ impl Parser {
                 tok => {
                     return Err(self.syntax_err(
                         format!(
-                            "thread: expected stage (ident, sub {{}}, s///, tr///, or /re/), got {:?}",
+                            "thread: expected stage (ident, fn {{}}, s///, tr///, or /re/), got {:?}",
                             tok
                         ),
                         stage_line,
@@ -2183,7 +2201,7 @@ impl Parser {
         }
 
         if pipe_rhs_wrap {
-            // Wrap as `sub { …stages threaded from $_[0]… }` so the outer
+            // Wrap as `fn { …stages threaded from $_[0]… }` so the outer
             // `pipe_forward_apply` can invoke it with `lhs` as the arg.
             let body_line = result.line;
             return Ok(Expr {
@@ -2487,7 +2505,16 @@ impl Parser {
                 name: "ddump".to_string(),
                 args: vec![arg],
             },
-            "say" | "p" => ExprKind::Say {
+            "say" => {
+                if !crate::compat_mode() {
+                    return Err(self.syntax_err("`say` is not valid stryke; use `p` instead", line));
+                }
+                ExprKind::Say {
+                    handle: None,
+                    args: vec![arg],
+                }
+            }
+            "p" => ExprKind::Say {
                 handle: None,
                 args: vec![arg],
             },
@@ -3833,9 +3860,9 @@ impl Parser {
         Ok(())
     }
 
-    fn parse_sub_decl(&mut self) -> PerlResult<Statement> {
+    fn parse_sub_decl(&mut self, is_sub_keyword: bool) -> PerlResult<Statement> {
         let line = self.peek_line();
-        self.advance(); // 'sub'
+        self.advance(); // 'sub' or 'fn'
         match self.peek().clone() {
             Token::Ident(_) => {
                 let name = self.parse_package_qualified_identifier()?;
@@ -3858,7 +3885,14 @@ impl Parser {
                 })
             }
             Token::LParen | Token::LBrace | Token::Colon => {
-                // Statement-level anonymous sub: `sub { }`, `sub () { }`, `sub :lvalue { }`
+                // In non-compat mode, `fn {}` anonymous is not allowed — must use `fn {}`
+                if is_sub_keyword && !crate::compat_mode() {
+                    return Err(self.syntax_err(
+                        "`fn {}` anonymous subroutine is not valid stryke; use `fn {}` instead",
+                        line,
+                    ));
+                }
+                // Statement-level anonymous sub: `fn { }`, `sub () { }`, `sub :lvalue { }`
                 let (params, _prototype) = self.parse_sub_sig_or_prototype_opt()?;
                 self.parse_sub_attributes()?;
                 let body = self.parse_block()?;
@@ -4767,6 +4801,43 @@ impl Parser {
                 }
             }
             let val = self.parse_expression()?;
+            // Validate assignment for single variable declarations (not destructuring)
+            // `my ($a, $b) = (1, 2)` is destructuring, not scalar-from-list
+            if !crate::compat_mode() && decls.len() == 1 {
+                let decl = &decls[0];
+                let target_kind = match decl.sigil {
+                    Sigil::Scalar => ExprKind::ScalarVar(decl.name.clone()),
+                    Sigil::Array => ExprKind::ArrayVar(decl.name.clone()),
+                    Sigil::Hash => ExprKind::HashVar(decl.name.clone()),
+                    Sigil::Typeglob => {
+                        // Skip validation for typeglob
+                        if decls.len() == 1 {
+                            decls[0].initializer = Some(val);
+                        } else {
+                            for d in &mut decls {
+                                d.initializer = Some(val.clone());
+                            }
+                        }
+                        return Ok(Statement {
+                            label: None,
+                            kind: match keyword {
+                                "my" => StmtKind::My(decls),
+                                "mysync" => StmtKind::MySync(decls),
+                                "our" => StmtKind::Our(decls),
+                                "local" => StmtKind::Local(decls),
+                                "state" => StmtKind::State(decls),
+                                _ => unreachable!(),
+                            },
+                            line,
+                        });
+                    }
+                };
+                let target = Expr {
+                    kind: target_kind,
+                    line,
+                };
+                self.validate_assignment(&target, &val, line)?;
+            }
             if decls.len() == 1 {
                 decls[0].initializer = Some(val);
             } else {
@@ -5184,6 +5255,7 @@ impl Parser {
             Token::Assign => {
                 self.advance();
                 let right = self.parse_assign_expr()?;
+                self.validate_assignment(&expr, &right, line)?;
                 Ok(Expr {
                     kind: ExprKind::Assign {
                         target: Box::new(expr),
@@ -7845,7 +7917,13 @@ impl Parser {
                 })
             }
             "print" | "pr" => self.parse_print_like(|h, a| ExprKind::Print { handle: h, args: a }),
-            "say" | "p" => self.parse_print_like(|h, a| ExprKind::Say { handle: h, args: a }),
+            "say" => {
+                if !crate::compat_mode() {
+                    return Err(self.syntax_err("`say` is not valid stryke; use `p` instead", line));
+                }
+                self.parse_print_like(|h, a| ExprKind::Say { handle: h, args: a })
+            }
+            "p" => self.parse_print_like(|h, a| ExprKind::Say { handle: h, args: a }),
             "printf" => self.parse_print_like(|h, a| ExprKind::Printf { handle: h, args: a }),
             "die" => {
                 let args = self.parse_list_until_terminator()?;
@@ -10732,8 +10810,24 @@ impl Parser {
                     line,
                 })
             }
-            "sub" | "fn" => {
-                // Anonymous sub/fn — optional prototype `sub () { }` (e.g. Carp.pm `*X = sub () { 1 }`)
+            "sub" => {
+                // In non-compat mode, `sub {}` is not valid — must use `fn {}`
+                if !crate::compat_mode() {
+                    return Err(self.syntax_err(
+                        "`sub {}` anonymous subroutine is not valid stryke; use `fn {}` instead",
+                        line,
+                    ));
+                }
+                // Anonymous sub — optional prototype `sub () { }` (e.g. Carp.pm `*X = sub () { 1 }`)
+                let (params, _prototype) = self.parse_sub_sig_or_prototype_opt()?;
+                let body = self.parse_block()?;
+                Ok(Expr {
+                    kind: ExprKind::CodeRef { params, body },
+                    line,
+                })
+            }
+            "fn" => {
+                // Anonymous fn — stryke syntax for anonymous subroutines
                 let (params, _prototype) = self.parse_sub_sig_or_prototype_opt()?;
                 let body = self.parse_block()?;
                 Ok(Expr {
@@ -12384,6 +12478,124 @@ impl Parser {
         Ok(())
     }
 
+    /// Validate assignment to %hash in non-compat mode.
+    /// Rejects: scalar, string, arrayref, hashref, coderef, undef, odd-length list.
+    fn validate_hash_assignment(&self, value: &Expr, line: usize) -> PerlResult<()> {
+        match &value.kind {
+            ExprKind::Integer(_) | ExprKind::Float(_) => {
+                return Err(self.syntax_err(
+                    "cannot assign scalar to hash — use %h = (key => value) or %h = %{$hashref}",
+                    line,
+                ));
+            }
+            ExprKind::String(_) | ExprKind::InterpolatedString(_) | ExprKind::Bareword(_) => {
+                return Err(self.syntax_err(
+                    "cannot assign string to hash — use %h = (key => value) or %h = %{$hashref}",
+                    line,
+                ));
+            }
+            ExprKind::ArrayRef(_) => {
+                return Err(self.syntax_err(
+                    "cannot assign arrayref to hash — use %h = @{$arrayref} for even-length list",
+                    line,
+                ));
+            }
+            ExprKind::ScalarRef(inner) => {
+                if matches!(inner.kind, ExprKind::ArrayVar(_)) {
+                    return Err(self.syntax_err(
+                        "cannot assign \\@array to hash — use %h = @array for even-length list",
+                        line,
+                    ));
+                }
+                if matches!(inner.kind, ExprKind::HashVar(_)) {
+                    return Err(self.syntax_err(
+                        "cannot assign \\%hash to hash — use %h = %other directly",
+                        line,
+                    ));
+                }
+            }
+            ExprKind::HashRef(_) => {
+                return Err(self.syntax_err(
+                    "cannot assign hashref to hash — use %h = %{$hashref} to dereference",
+                    line,
+                ));
+            }
+            ExprKind::CodeRef { .. } => {
+                return Err(self.syntax_err("cannot assign coderef to hash", line));
+            }
+            ExprKind::Undef => {
+                return Err(
+                    self.syntax_err("cannot assign undef to hash — use %h = () to empty", line)
+                );
+            }
+            ExprKind::List(items) if items.len() % 2 != 0 => {
+                if !items.iter().any(|e| {
+                    matches!(
+                        e.kind,
+                        ExprKind::ArrayVar(_)
+                            | ExprKind::HashVar(_)
+                            | ExprKind::FuncCall { .. }
+                            | ExprKind::Deref { .. }
+                            | ExprKind::ScalarVar(_)
+                    )
+                }) {
+                    return Err(self.syntax_err(
+                        format!(
+                            "odd-length list ({} elements) in hash assignment — missing value for last key",
+                            items.len()
+                        ),
+                        line,
+                    ));
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// Validate assignment to @array in non-compat mode.
+    /// Rejects: undef (likely a mistake — use `@a = ()` to empty).
+    /// Note: bare scalars like `@a = 2` are allowed since Perl coerces them to single-element lists.
+    /// Note: `@a = {hashref}` is allowed as a common pattern for single-element arrays.
+    fn validate_array_assignment(&self, value: &Expr, line: usize) -> PerlResult<()> {
+        if let ExprKind::Undef = &value.kind {
+            return Err(
+                self.syntax_err("cannot assign undef to array — use @a = () to empty", line)
+            );
+        }
+        Ok(())
+    }
+
+    /// Validate assignment to $scalar in non-compat mode.
+    /// Rejects: list literals (Perl 5 silently returns last element — footgun).
+    fn validate_scalar_assignment(&self, value: &Expr, line: usize) -> PerlResult<()> {
+        if let ExprKind::List(items) = &value.kind {
+            if items.len() > 1 {
+                return Err(self.syntax_err(
+                    format!(
+                        "cannot assign {}-element list to scalar — Perl 5 silently takes last element; use ($x) = (list) or $x = $list[-1]",
+                        items.len()
+                    ),
+                    line,
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Validate an assignment based on target type (in non-compat mode only).
+    fn validate_assignment(&self, target: &Expr, value: &Expr, line: usize) -> PerlResult<()> {
+        if crate::compat_mode() {
+            return Ok(());
+        }
+        match &target.kind {
+            ExprKind::HashVar(_) => self.validate_hash_assignment(value, line),
+            ExprKind::ArrayVar(_) => self.validate_array_assignment(value, line),
+            ExprKind::ScalarVar(_) => self.validate_scalar_assignment(value, line),
+            _ => Ok(()),
+        }
+    }
+
     /// Parse a block OR a blockless comparison expression for sort/psort/heap.
     /// Blockless: `$a <=> $b` or `$a cmp $b` or any expression → wrapped as a Block.
     /// Also accepts a bare function name: `psort my_cmp, @list`.
@@ -13962,8 +14174,8 @@ mod tests {
     }
 
     #[test]
-    fn parse_anonymous_sub() {
-        let p = parse_ok("my $f = sub { 1 }");
+    fn parse_anonymous_fn() {
+        let p = parse_ok("my $f = fn { 1 }");
         assert_eq!(p.statements.len(), 1);
     }
 

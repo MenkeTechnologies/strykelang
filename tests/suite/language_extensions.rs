@@ -393,7 +393,7 @@ fn tap_peek_pass_through_and_pipe() {
     assert_eq!(eval_int(r#"scalar tap { 1 } (1, 2, 3)"#), 3);
     assert_eq!(
         eval_string(
-            r#"join ',', pipeline(1, 2, 3)->peek(sub { 1 })->map(sub { $_ * 2 })->collect()"#
+            r#"join ',', pipeline(1, 2, 3)->peek(fn { 1 })->map(fn { $_ * 2 })->collect()"#
         ),
         "2,4,6"
     );
@@ -1025,7 +1025,7 @@ fn dunder_sub_basic_recursion() {
     // fib(10) = 55
     assert_eq!(
         eval_int(
-            r#"my $fib = sub { my $n = $_[0]; $n < 2 ? $n : __SUB__->($n-1) + __SUB__->($n-2) };
+            r#"my $fib = fn { my $n = $_[0]; $n < 2 ? $n : __SUB__->($n-1) + __SUB__->($n-2) };
                $fib->(10)"#
         ),
         55
@@ -1037,7 +1037,7 @@ fn dunder_sub_factorial() {
     // 5! = 120
     assert_eq!(
         eval_int(
-            r#"my $fact = sub { my $n = shift; $n <= 1 ? 1 : $n * __SUB__->($n - 1) };
+            r#"my $fact = fn { my $n = shift; $n <= 1 ? 1 : $n * __SUB__->($n - 1) };
                $fact->(5)"#
         ),
         120
@@ -1314,7 +1314,7 @@ fn try_catch_error_var() {
 #[test]
 fn coderef_with_params() {
     assert_eq!(
-        eval_int(r#"my $add = sub ($a, $b) { $a + $b }; $add->(3, 4)"#),
+        eval_int(r#"my $add = fn ($a, $b) { $a + $b }; $add->(3, 4)"#),
         7
     );
 }
