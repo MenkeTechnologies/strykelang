@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Prime Decomposition (Factorization)
+
+fn prime_factors($n) {
+    my @factors
+    my $d = 2
+    while ($d * $d <= $n) {
+        while ($n % $d == 0) {
+            push @factors, $d
+            $n = int($n / $d)
+        }
+        $d++
+    }
+    push @factors, $n if $n > 1
+    @factors
+}
+
+fn is_prime_via_factors($n) {
+    return 0 if $n < 2
+    my @f = prime_factors($n)
+    scalar(@f) == 1 && $f[0] == $n
+}
+
+my @f12 = prime_factors(12)
+assert_eq join("*", @f12), "2*2*3", "12 = 2*2*3"
+
+my @f100 = prime_factors(100)
+assert_eq join("*", @f100), "2*2*5*5", "100 = 2*2*5*5"
+
+my @f17 = prime_factors(17)
+assert_eq join("*", @f17), "17", "17 is prime"
+
+my @f1 = prime_factors(1)
+assert_eq scalar(@f1), 0, "1 has no prime factors"
+
+my @f84 = prime_factors(84)
+assert_eq join("*", @f84), "2*2*3*7", "84 = 2*2*3*7"
+
+assert_ok is_prime_via_factors(17), "17 is prime"
+assert_ok is_prime_via_factors(97), "97 is prime"
+assert_ok !is_prime_via_factors(100), "100 is not prime"
+
+test_run

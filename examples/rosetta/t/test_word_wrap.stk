@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Word Wrap
+
+fn word_wrap($text, $width) {
+    my @words = $text |> split /\s+/
+    my @lines
+    my $line = ""
+    
+    for my $word (@words) {
+        if (length($line) == 0) {
+            $line = $word
+        } elsif (length($line) + 1 + length($word) <= $width) {
+            $line .= " $word"
+        } else {
+            push @lines, $line
+            $line = $word
+        }
+    }
+    push @lines, $line if length($line) > 0
+    join "\n", @lines
+}
+
+my $text = "The quick brown fox jumps over the lazy dog"
+
+my $w10 = word_wrap($text, 10)
+my @lines10 = $w10 |> split /\n/
+assert_ok (grep { length($_) <= 10 } @lines10) == scalar(@lines10), "all lines <= 10"
+
+my $w20 = word_wrap($text, 20)
+my @lines20 = $w20 |> split /\n/
+assert_ok (grep { length($_) <= 20 } @lines20) == scalar(@lines20), "all lines <= 20"
+
+my $w80 = word_wrap($text, 80)
+assert_eq $w80, $text, "width >= text keeps single line"
+
+my $short = word_wrap("hi", 10)
+assert_eq $short, "hi", "short text"
+
+test_run

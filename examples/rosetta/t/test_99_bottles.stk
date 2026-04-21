@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: 99 Bottles of Beer
+
+fn bottles($n) {
+    $n == 0 ? "no more bottles"
+  : $n == 1 ? "1 bottle"
+  : "$n bottles"
+}
+
+fn verse($n) {
+    my $b = bottles($n)
+    my $b1 = bottles($n - 1)
+    my $take = $n == 1 ? "it" : "one"
+    "$b of beer on the wall, $b of beer.\n" .
+    "Take $take down and pass it around, $b1 of beer on the wall."
+}
+
+fn song($from, $to) {
+    $from..$to |> map { verse($_) } |> join "\n\n"
+}
+
+assert_eq bottles(99), "99 bottles", "bottles(99)"
+assert_eq bottles(1), "1 bottle", "bottles(1)"
+assert_eq bottles(0), "no more bottles", "bottles(0)"
+
+my $v99 = verse(99)
+assert_ok $v99 =~ /99 bottles/, "verse 99 contains 99 bottles"
+assert_ok $v99 =~ /98 bottles/, "verse 99 mentions 98"
+
+my $v1 = verse(1)
+assert_ok $v1 =~ /1 bottle of beer/, "verse 1 is singular"
+assert_ok $v1 =~ /Take it down/, "verse 1 uses 'it'"
+
+test_run

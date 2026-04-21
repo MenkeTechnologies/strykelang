@@ -1,0 +1,31 @@
+#!/usr/bin/env stryke
+# Rosetta Code: String Case
+
+fn to_upper($s) { uc($s) }
+fn to_lower($s) { lc($s) }
+
+fn to_title($s) {
+    $s |> split /\s+/ |> map { ucfirst(lc($_)) } |> join " "
+}
+
+fn my_swap_case($s) {
+    $s |> split // |> map {
+        $_ eq uc($_) ? lc($_) : uc($_)
+    } |> join ""
+}
+
+assert_eq to_upper("hello"), "HELLO", "upper"
+assert_eq to_lower("HELLO"), "hello", "lower"
+assert_eq to_upper("Hello World"), "HELLO WORLD", "upper phrase"
+assert_eq to_lower("Hello World"), "hello world", "lower phrase"
+
+assert_eq to_title("hello world"), "Hello World", "title case"
+assert_eq to_title("THE QUICK BROWN FOX"), "The Quick Brown Fox", "title from upper"
+
+assert_eq my_swap_case("Hello"), "hELLO", "swap case hello"
+assert_eq my_swap_case("HeLLo WoRLD"), "hEllO wOrld", "swap mixed"
+
+assert_eq ucfirst("hello"), "Hello", "ucfirst"
+assert_eq lcfirst("HELLO"), "hELLO", "lcfirst"
+
+test_run

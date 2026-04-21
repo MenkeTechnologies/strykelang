@@ -1,0 +1,32 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Flatten a List
+
+fn flatten(@list) {
+    my @result
+    for my $item (@list) {
+        if (ref($item) eq 'ARRAY') {
+            push @result, flatten(@$item)
+        } else {
+            push @result, $item
+        }
+    }
+    @result
+}
+
+my @nested = ([1, 2], [3, [4, 5]], 6)
+my @flat = flatten(@nested)
+assert_eq join(",", @flat), "1,2,3,4,5,6", "flatten nested"
+
+my @simple = (1, 2, 3)
+my @flat_simple = flatten(@simple)
+assert_eq join(",", @flat_simple), "1,2,3", "flatten simple"
+
+my @deep = ([[[1]]], [[2]], [3], 4)
+my @flat_deep = flatten(@deep)
+assert_eq join(",", @flat_deep), "1,2,3,4", "flatten deep"
+
+my @empty_nested = ([], [1], [], [2, 3], [])
+my @flat_empty = flatten(@empty_nested)
+assert_eq join(",", @flat_empty), "1,2,3", "flatten with empties"
+
+test_run

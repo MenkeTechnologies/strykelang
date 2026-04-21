@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Leap Year
+
+fn leap_check($year) {
+    $year % 4 == 0 && ($year % 100 != 0 || $year % 400 == 0)
+}
+
+fn leap_years_in_range($start, $end) {
+    $start..$end |> filter { leap_check($_) }
+}
+
+assert_ok leap_check(2000), "2000 is leap (div by 400)"
+assert_ok leap_check(2024), "2024 is leap"
+assert_ok leap_check(2020), "2020 is leap"
+
+assert_ok !leap_check(1900), "1900 is not leap (div by 100)"
+assert_ok !leap_check(2023), "2023 is not leap"
+assert_ok !leap_check(2100), "2100 is not leap"
+
+my @leaps = leap_years_in_range(2020, 2030)
+assert_eq join(",", @leaps), "2020,2024,2028", "leaps 2020-2030"
+
+test_run

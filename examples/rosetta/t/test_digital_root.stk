@@ -1,0 +1,32 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Digital Root
+
+fn sum_digits($n) {
+    "$n" |> split // |> map { int($_) } |> reduce { $a + $b }
+}
+
+fn digital_root($n) {
+    my $persistence = 0
+    while ($n >= 10) {
+        $n = sum_digits($n)
+        $persistence++
+    }
+    ($n, $persistence)
+}
+
+my ($root, $pers) = digital_root(627615)
+assert_eq $root, 9, "digital root of 627615"
+assert_eq $pers, 2, "persistence of 627615"
+
+($root, $pers) = digital_root(39)
+assert_eq $root, 3, "digital root of 39"
+assert_eq $pers, 2, "persistence of 39"
+
+($root, $pers) = digital_root(9)
+assert_eq $root, 9, "digital root of 9"
+assert_eq $pers, 0, "persistence of 9"
+
+($root, $pers) = digital_root(999999999999)
+assert_eq $root, 9, "digital root of 999999999999"
+
+test_run

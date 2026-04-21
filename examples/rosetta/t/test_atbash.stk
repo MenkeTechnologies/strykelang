@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Atbash Cipher
+
+fn my_atbash($s) {
+    $s |> split // |> map {
+        $_ =~ /[A-Z]/ ? chr(90 - (ord($_) - 65))
+      : $_ =~ /[a-z]/ ? chr(122 - (ord($_) - 97))
+      : $_
+    } |> join ""
+}
+
+assert_eq my_atbash("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), "ZYXWVUTSRQPONMLKJIHGFEDCBA", "upper alphabet"
+assert_eq my_atbash("abcdefghijklmnopqrstuvwxyz"), "zyxwvutsrqponmlkjihgfedcba", "lower alphabet"
+assert_eq my_atbash("Hello"), "Svool", "atbash Hello"
+assert_eq my_atbash("Svool"), "Hello", "atbash Svool"
+
+assert_eq my_atbash("Test 123!"), "Gvhg 123!", "with non-alpha"
+assert_eq my_atbash(""), "", "empty"
+
+my $original = "The quick brown fox"
+assert_eq my_atbash(my_atbash($original)), $original, "atbash is self-inverse"
+
+test_run

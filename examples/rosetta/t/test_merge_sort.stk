@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Merge Sort
+
+fn merge(@left, @right) {
+    my @result
+    while (@left && @right) {
+        if ($left[0] <= $right[0]) {
+            push @result, shift @left
+        } else {
+            push @result, shift @right
+        }
+    }
+    (@result, @left, @right)
+}
+
+fn merge_sort(@arr) {
+    return @arr if scalar(@arr) <= 1
+    
+    my $mid = int(scalar(@arr) / 2)
+    my @left = @arr[0..$mid-1]
+    my @right = @arr[$mid..$#arr]
+    
+    @left = merge_sort(@left)
+    @right = merge_sort(@right)
+    
+    merge(@left, @right)
+}
+
+my @sorted = merge_sort(38, 27, 43, 3, 9, 82, 10)
+assert_eq join(",", @sorted), "3,9,10,27,38,43,82", "merge sort"
+
+my @single = merge_sort(42)
+assert_eq join(",", @single), "42", "single element"
+
+my @already = merge_sort(1, 2, 3, 4, 5)
+assert_eq join(",", @already), "1,2,3,4,5", "already sorted"
+
+my @reverse = merge_sort(5, 4, 3, 2, 1)
+assert_eq join(",", @reverse), "1,2,3,4,5", "reverse"
+
+my @dups = merge_sort(3, 1, 4, 1, 5, 9, 2, 6)
+assert_eq join(",", @dups), "1,1,2,3,4,5,6,9", "with duplicates"
+
+test_run

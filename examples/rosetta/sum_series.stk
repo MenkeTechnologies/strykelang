@@ -1,7 +1,0 @@
-#!/usr/bin/env stryke
-# Rosetta Code: Sum of a Series (1/k² from 1 to 1000)
-
-fn sum_series($n) { ~> { 1..$n } map { 1 / ($_ * $_) } sum }
-
-p "Sum 1/k² for k=1..1000: " . sum_series(1000)
-p "π²/6 ≈ " . (3.14159265358979 ** 2 / 6)

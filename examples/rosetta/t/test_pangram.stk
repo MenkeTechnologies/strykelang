@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pangram Checker
+
+fn is_pangram($s) {
+    my $lower = lc($s)
+    for my $c ('a'..'z') {
+        return 0 unless index($lower, $c) >= 0
+    }
+    1
+}
+
+fn missing_letters($s) {
+    my $lower = lc($s)
+    'a'..'z' |> filter { index($lower, $_) < 0 }
+}
+
+assert_ok is_pangram("The quick brown fox jumps over the lazy dog"), "classic pangram"
+assert_ok is_pangram("Pack my box with five dozen liquor jugs"), "another pangram"
+assert_ok is_pangram("Sphinx of black quartz, judge my vow"), "sphinx pangram"
+
+assert_ok !is_pangram("The quick brown fox"), "not a pangram"
+assert_ok !is_pangram("Hello World"), "hello world not pangram"
+
+my @missing = missing_letters("The quick brown fox")
+assert_ok scalar(@missing) > 0, "has missing letters"
+assert_ok (grep { $_ eq 'z' } @missing), "z is missing"
+
+test_run

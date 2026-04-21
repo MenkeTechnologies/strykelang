@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: FizzBuzz
+
+fn my_fizzbuzz($n) {
+    $n % 15 == 0 ? "FizzBuzz"
+  : $n % 3 == 0  ? "Fizz"
+  : $n % 5 == 0  ? "Buzz"
+  : $n
+}
+
+fn fizzbuzz_list($max) {
+    1..$max |> map { my_fizzbuzz($_) }
+}
+
+assert_eq my_fizzbuzz(1), 1, "fizzbuzz(1)"
+assert_eq my_fizzbuzz(3), "Fizz", "fizzbuzz(3)"
+assert_eq my_fizzbuzz(5), "Buzz", "fizzbuzz(5)"
+assert_eq my_fizzbuzz(15), "FizzBuzz", "fizzbuzz(15)"
+assert_eq my_fizzbuzz(7), 7, "fizzbuzz(7)"
+
+my @list = fizzbuzz_list(15)
+assert_eq $list[2], "Fizz", "list[3] is Fizz"
+assert_eq $list[14], "FizzBuzz", "list[15] is FizzBuzz"
+
+test_run

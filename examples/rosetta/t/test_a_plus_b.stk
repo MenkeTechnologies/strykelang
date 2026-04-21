@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+# Rosetta Code: A+B
+
+fn a_plus_b($a, $b) {
+    $a + $b
+}
+
+fn my_sum_list(@nums) {
+    @nums |> reduce { $a + $b }
+}
+
+assert_eq a_plus_b(2, 3), 5, "2+3=5"
+assert_eq a_plus_b(-5, 10), 5, "-5+10=5"
+assert_eq a_plus_b(0, 0), 0, "0+0=0"
+assert_eq a_plus_b(1000000, 1), 1000001, "large numbers"
+
+assert_eq my_sum_list(1, 2, 3, 4, 5), 15, "sum 1..5"
+assert_eq my_sum_list(10, 20, 30), 60, "sum 10,20,30"
+
+test_run

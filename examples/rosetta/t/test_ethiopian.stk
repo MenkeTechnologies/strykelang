@@ -1,0 +1,31 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Ethiopian Multiplication
+
+fn halve($n) { int($n / 2) }
+fn double($n) { $n * 2 }
+fn is_odd($n) { $n % 2 != 0 }
+
+fn ethiopian_multiply($a, $b) {
+    my $result = 0
+    while ($a >= 1) {
+        $result += $b if is_odd($a)
+        $a = halve($a)
+        $b = double($b)
+    }
+    $result
+}
+
+assert_eq ethiopian_multiply(17, 34), 578, "17 * 34 = 578"
+assert_eq ethiopian_multiply(12, 15), 180, "12 * 15 = 180"
+assert_eq ethiopian_multiply(1, 100), 100, "1 * 100 = 100"
+assert_eq ethiopian_multiply(100, 1), 100, "100 * 1 = 100"
+assert_eq ethiopian_multiply(7, 8), 56, "7 * 8 = 56"
+assert_eq ethiopian_multiply(99, 99), 9801, "99 * 99 = 9801"
+
+assert_eq halve(10), 5, "halve 10"
+assert_eq halve(17), 8, "halve 17"
+assert_eq double(5), 10, "double 5"
+assert_ok is_odd(17), "17 is odd"
+assert_ok !is_odd(34), "34 is not odd"
+
+test_run

@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: 100 Doors
+
+fn doors_puzzle($n) {
+    my @doors
+    push @doors, 0 for 1..$n
+    
+    for my $pass (1..$n) {
+        for (my $i = $pass; $i <= $n; $i += $pass) {
+            $doors[$i - 1] = !$doors[$i - 1]
+        }
+    }
+    
+    1..$n |> filter { $doors[$_ - 1] }
+}
+
+fn doors_optimized($n) {
+    1..$n |> filter { my $s = sqrt($_); $s == int($s) }
+}
+
+my @result = doors_puzzle(100)
+assert_eq join(",", @result), "1,4,9,16,25,36,49,64,81,100", "100 doors puzzle"
+
+my @opt = doors_optimized(100)
+assert_eq join(",", @opt), "1,4,9,16,25,36,49,64,81,100", "optimized (perfect squares)"
+
+my @small = doors_puzzle(10)
+assert_eq join(",", @small), "1,4,9", "10 doors"
+
+test_run

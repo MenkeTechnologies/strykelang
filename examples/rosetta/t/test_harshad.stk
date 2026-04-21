@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Harshad (Niven) Numbers
+
+fn digit_sum($n) {
+    "$n" |> split // |> map { int($_) } |> reduce { $a + $b }
+}
+
+fn is_harshad($n) {
+    $n % digit_sum($n) == 0
+}
+
+fn harshad_numbers($count) {
+    my @harshad
+    my $n = 1
+    while (scalar(@harshad) < $count) {
+        push @harshad, $n if is_harshad($n)
+        $n++
+    }
+    @harshad
+}
+
+assert_ok is_harshad(1), "1 is harshad"
+assert_ok is_harshad(2), "2 is harshad"
+assert_ok is_harshad(10), "10 is harshad"
+assert_ok is_harshad(12), "12 is harshad (12/3=4)"
+assert_ok is_harshad(18), "18 is harshad (18/9=2)"
+assert_ok is_harshad(20), "20 is harshad"
+assert_ok is_harshad(21), "21 is harshad"
+
+assert_ok !is_harshad(11), "11 is not harshad"
+assert_ok !is_harshad(13), "13 is not harshad"
+
+my @first20 = harshad_numbers(20)
+assert_eq join(",", @first20), "1,2,3,4,5,6,7,8,9,10,12,18,20,21,24,27,30,36,40,42", "first 20 harshad"
+
+test_run

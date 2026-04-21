@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Palindrome Detection
+
+fn pal_check($s) {
+    my $clean = lc($s) =~ s/[^a-z0-9]//gr
+    my $rev = $clean |> split // |> reverse |> join ""
+    $clean eq $rev
+}
+
+assert_ok pal_check("racecar"), "racecar is palindrome"
+assert_ok pal_check("A man a plan a canal Panama"), "panama phrase"
+assert_ok pal_check("Was it a car or a cat I saw"), "car/cat phrase"
+assert_ok !pal_check("hello"), "hello is not palindrome"
+assert_ok !pal_check("world"), "world is not palindrome"
+
+test_run

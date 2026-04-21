@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Absolute Value
+
+fn my_abs($n) {
+    $n < 0 ? -$n : $n
+}
+
+fn my_sign($n) {
+    $n > 0 ? 1 : $n < 0 ? -1 : 0
+}
+
+assert_eq abs(5), 5, "abs(5)"
+assert_eq abs(-5), 5, "abs(-5)"
+assert_eq abs(0), 0, "abs(0)"
+assert_eq abs(-3.14), 3.14, "abs(-3.14)"
+assert_eq abs(3.14), 3.14, "abs(3.14)"
+
+assert_eq my_abs(-100), 100, "custom abs"
+assert_eq my_abs(100), 100, "custom abs positive"
+
+assert_eq my_sign(10), 1, "sign positive"
+assert_eq my_sign(-10), -1, "sign negative"
+assert_eq my_sign(0), 0, "sign zero"
+
+my @nums = (-5, -3, 0, 2, 4)
+my @absolutes = @nums |> map { abs($_) }
+assert_eq join(",", @absolutes), "5,3,0,2,4", "map abs"
+
+test_run

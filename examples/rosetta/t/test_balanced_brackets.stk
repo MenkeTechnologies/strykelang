@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Balanced Brackets
+
+fn is_balanced($s) {
+    my $depth = 0
+    for my $c ($s |> split //) {
+        $depth++ if $c eq '['
+        $depth-- if $c eq ']'
+        return 0 if $depth < 0
+    }
+    $depth == 0
+}
+
+assert_ok is_balanced(""), "empty is balanced"
+assert_ok is_balanced("[]"), "[] is balanced"
+assert_ok is_balanced("[[]]"), "[[]] is balanced"
+assert_ok is_balanced("[][]"), "[][] is balanced"
+assert_ok is_balanced("[[][]]"), "[[][]] is balanced"
+
+assert_ok !is_balanced("]["), "][ is not balanced"
+assert_ok !is_balanced("[]]"), "[]] is not balanced"
+assert_ok !is_balanced("["), "[ alone is not balanced"
+
+test_run

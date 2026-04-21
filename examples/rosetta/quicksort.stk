@@ -1,6 +1,0 @@
-#!/usr/bin/env stryke
-# Rosetta Code: Sorting (using built-in sort with numeric comparator)
-
-fn numeric_sort {
-    sort { $a <=> $b } @_
-}

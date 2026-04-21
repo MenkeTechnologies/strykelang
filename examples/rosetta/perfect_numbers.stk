@@ -1,8 +1,0 @@
-#!/usr/bin/env stryke
-# Rosetta Code: Perfect Numbers
-
-fn divisors($n) { ~> { 1..int($n/2) } filter { $n % $_ == 0 } }
-fn is_perfect($n) { ~> { divisors($n) } sum == $n }
-
-p "Perfect numbers < 10000:"
-~> { 2..9999 } filter { is_perfect } join ", " p
