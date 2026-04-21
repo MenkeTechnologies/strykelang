@@ -554,6 +554,10 @@ impl PerlTypeName {
                 }
             }
             Self::Struct(name) => {
+                // Allow undef for struct/class types (nullable pattern)
+                if v.is_undef() {
+                    return Ok(());
+                }
                 if let Some(s) = v.as_struct_inst() {
                     if s.def.name == *name {
                         Ok(())
@@ -569,11 +573,22 @@ impl PerlTypeName {
                     } else {
                         Err(format!("expected {}, got enum {}", name, e.def.name))
                     }
+                } else if let Some(c) = v.as_class_inst() {
+                    // Check class name and full inheritance hierarchy
+                    if c.isa(name) {
+                        Ok(())
+                    } else {
+                        Err(format!("expected {}, got {}", name, c.def.name))
+                    }
                 } else {
                     Err(format!("expected {}, got {}", name, v.type_name()))
                 }
             }
             Self::Enum(name) => {
+                // Allow undef for enum types (nullable pattern)
+                if v.is_undef() {
+                    return Ok(());
+                }
                 if let Some(e) = v.as_enum_inst() {
                     if e.def.name == *name {
                         Ok(())

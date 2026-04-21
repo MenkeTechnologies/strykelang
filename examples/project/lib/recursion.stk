@@ -112,7 +112,7 @@ fn tree_count($node) {
 }
 
 fn make_tree($val, $left, $right) {
-    +{ value => $val, left => $left, right => $right }
+    { value => $val, left => $left, right => $right }
 }
 
 fn is_even_rec($n) {

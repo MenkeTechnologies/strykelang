@@ -97,7 +97,7 @@ fn tasks_in_array {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn points_in_hash {
-    +{
+    {
         origin => Point(0, 0),
         north  => Point(0, 1),
         east   => Point(1, 0),
@@ -107,7 +107,7 @@ fn points_in_hash {
 }
 
 fn person_lookup {
-    +{
+    {
         alice => Person("Alice", 30),
         bob   => Person("Bob", 25),
         carol => Person("Carol", 35),
@@ -119,7 +119,7 @@ fn get_person_age($lookup, $name) {
 }
 
 fn task_registry {
-    +{
+    {
         "TASK-001" => Task(1, "Initialize", Priority::High),
         "TASK-002" => Task(2, "Configure", Priority::Medium),
         "TASK-003" => Task(3, "Validate", Priority::Low),
@@ -174,7 +174,7 @@ fn count_priority($tasks, $target) {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn priority_labels {
-    +{
+    {
         low      => Priority::Low,
         medium   => Priority::Medium,
         high     => Priority::High,
@@ -183,7 +183,7 @@ fn priority_labels {
 }
 
 fn status_by_id {
-    +{
+    {
         0 => Status::Todo,
         1 => Status::InProgress,
         2 => Status::Done,
@@ -192,7 +192,7 @@ fn status_by_id {
 }
 
 fn color_codes {
-    +{
+    {
         red   => Color::Red,
         green => Color::Green,
         blue  => Color::Blue,
@@ -241,7 +241,7 @@ fn apply_discount_all($products, $pct) {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn employee_directory {
-    +{
+    {
         "emp001" => Employee(name => "Alice", department => "Eng", salary => 100000),
         "emp002" => Employee(name => "Bob", department => "Mkt", salary => 80000),
         "emp003" => Employee(name => "Carol", department => "Eng", salary => 95000),
@@ -249,7 +249,7 @@ fn employee_directory {
 }
 
 fn product_by_sku {
-    +{
+    {
         "SKU001" => Product(sku => "SKU001", name => "Widget", price => 1999),
         "SKU002" => Product(sku => "SKU002", name => "Gadget", price => 2999),
     }
@@ -309,7 +309,7 @@ fn sum_nested_points($grid) {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn point_groups {
-    +{
+    {
         quadrant1 => [Point(1, 1), Point(2, 2), Point(3, 3)],
         quadrant2 => [Point(-1, 1), Point(-2, 2)],
         quadrant3 => [Point(-1, -1), Point(-2, -2)],
@@ -318,7 +318,7 @@ fn point_groups {
 }
 
 fn team_structure {
-    +{
+    {
         engineering => [
             Person("Alice", 30),
             Person("Bob", 28),
@@ -473,17 +473,17 @@ fn tree_to_array($node) {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn organization_chart {
-    +{
+    {
         ceo => Employee(name => "Alice", department => "Executive", salary => 500000),
-        departments => +{
-            engineering => +{
+        departments => {
+            engineering => {
                 lead => Employee(name => "Bob", department => "Engineering", salary => 200000),
                 teams => [
                     Team(name => "Backend")->add_member(Person("Carol", 30))->add_member(Person("Dave", 28)),
                     Team(name => "Frontend")->add_member(Person("Eve", 32))->add_member(Person("Frank", 26)),
                 ],
             },
-            marketing => +{
+            marketing => {
                 lead => Employee(name => "Grace", department => "Marketing", salary => 180000),
                 teams => [
                     Team(name => "Brand")->add_member(Person("Hank", 35)),
@@ -495,7 +495,7 @@ fn organization_chart {
 }
 
 fn project_board {
-    +{
+    {
         todo => [
             Task(1, "Design API", Priority::High),
             Task(2, "Write docs", Priority::Low),
@@ -574,12 +574,12 @@ fn flatten_point_matrix($matrix) {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn region_offices {
-    +{
-        "us" => +{
+    {
+        "us" => {
             "ny" => Employee(name => "Alice", department => "Sales", salary => 90000),
             "ca" => Employee(name => "Bob", department => "Sales", salary => 95000),
         },
-        "eu" => +{
+        "eu" => {
             "uk" => Employee(name => "Carol", department => "Sales", salary => 85000),
             "de" => Employee(name => "Dave", department => "Sales", salary => 88000),
         },
@@ -604,9 +604,9 @@ fn total_regional_salary($offices, $region) {
 
 fn mixed_struct_types {
     [
-        +{ type => "point", data => Point(1, 2) },
-        +{ type => "person", data => Person("Alice", 30) },
-        +{ type => "task", data => Task(1, "Test", Priority::High) },
+        { type => "point", data => Point(1, 2) },
+        { type => "person", data => Person("Alice", 30) },
+        { type => "task", data => Task(1, "Test", Priority::High) },
     ]
 }
 
@@ -652,5 +652,5 @@ fn partition_by_age($people, $threshold) {
             push @old, $p
         }
     }
-    +{ young => [@young], old => [@old] }
+    { young => [@young], old => [@old] }
 }

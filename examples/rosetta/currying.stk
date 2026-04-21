@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Currying
+
+fn multiply($x, $y) {
+    return $x * $y;
+}
+
+# In Stryke, we can use closures for currying
+fn curry_multiply($x) {
+    return fn ($y) { multiply($x, $y) };
+}
+
+my $triple = curry_multiply(3);
+my $double = curry_multiply(2);
+
+printf "3 * 10 = %d\n", $triple->(10);
+printf "2 * 10 = %d\n", $double->(10);
+printf "3 * 4  = %d\n", $triple->(4);

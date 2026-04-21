@@ -20,7 +20,7 @@ fn summarize_list (@data) {
     my $n = scalar @data
     return {} unless $n
     my $total = sum(@data)
-    +{
+    {
         count  => $n,
         sum    => $total,
         mean   => $total / $n,

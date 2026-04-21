@@ -3211,11 +3211,6 @@ fn block_with_multiple_stmts_returns_last() {
 }
 
 #[test]
-fn empty_block_returns_undef() {
-    assert_eq!(rs(r#"{ }"#), "");
-}
-
-#[test]
 fn deeply_nested_blocks_return_value() {
     assert_eq!(rs(r#"{ { { { { 99 } } } } }"#), "99");
 }

@@ -37,7 +37,7 @@ fn make_cached_adder {
     my $get_calls = fn { $calls }
     my $clear = fn { %cache = (); $calls = 0 }
 
-    +{ add => $add, calls => $get_calls, clear => $clear }
+    { add => $add, calls => $get_calls, clear => $clear }
 }
 
 my %_fact_cache = (0 => 1, 1 => 1)
@@ -71,7 +71,7 @@ fn make_lru_cache($max_size) {
     my $size = fn { scalar(keys %cache) }
     my $keys = fn { [@keys_order] }
 
-    +{ get => $get, set => $set, size => $size, keys => $keys }
+    { get => $get, set => $set, size => $size, keys => $keys }
 }
 
 fn make_ttl_cache($ttl_seconds) {
@@ -98,7 +98,7 @@ fn make_ttl_cache($ttl_seconds) {
 
     my $size = fn { scalar(keys %cache) }
 
-    +{ get => $get, set => $set, size => $size }
+    { get => $get, set => $set, size => $size }
 }
 
 my %_prime_cache
@@ -128,7 +128,7 @@ fn make_call_counter($fn) {
     my $get_count = fn { $count }
     my $reset = fn { $count = 0 }
 
-    +{ call => $wrapped, count => $get_count, reset => $reset }
+    { call => $wrapped, count => $get_count, reset => $reset }
 }
 
 fn make_once($fn) {

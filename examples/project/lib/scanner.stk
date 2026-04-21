@@ -6,7 +6,7 @@ fn scan_system {
     my $ram = human_bytes $ram_bytes
     my $up_secs = sys_uptime()
     my $uptime = human_duration $up_secs
-    +{
+    {
         hostname   => gethostname(),
         os         => os_name(),
         arch       => $info->{arch},
@@ -44,7 +44,7 @@ fn scan_disks {
 }
 
 fn scan_network {
-    +{
+    {
         ipv4    => net_ipv4() // "unknown",
         ipv6    => net_ipv6() // "none",
         mac     => net_mac() // "unknown",

@@ -297,6 +297,30 @@ impl Parser {
         }
     }
 
+    /// Check if `{ ... }` starting at current position looks like a hashref rather than a block.
+    /// Heuristics (assuming current token is `{`):
+    /// - `{ bareword =>` → hashref
+    /// - `{ "string" =>` → hashref
+    /// - `{ $var =>` → hashref
+    /// - `{ 0 =>` → hashref (numeric key)
+    /// - `{ %hash }` or `{ %hash, ...}` → hashref (spread)
+    /// - `{ }` (empty) → hashref
+    fn looks_like_hashref(&self) -> bool {
+        debug_assert!(matches!(self.peek(), Token::LBrace));
+        let tok1 = self.peek_at(1);
+        let tok2 = self.peek_at(2);
+        match tok1 {
+            Token::RBrace => true,
+            Token::Ident(_)
+            | Token::SingleString(_)
+            | Token::DoubleString(_)
+            | Token::ScalarVar(_)
+            | Token::Integer(_) => matches!(tok2, Token::FatArrow),
+            Token::HashVar(_) => matches!(tok2, Token::RBrace | Token::Comma),
+            _ => false,
+        }
+    }
+
     fn expect(&mut self, expected: &Token) -> PerlResult<usize> {
         let (tok, line) = self.advance();
         if std::mem::discriminant(&tok) == std::mem::discriminant(expected) {
@@ -827,14 +851,22 @@ impl Parser {
                 }
             },
             Token::LBrace => {
-                let block = self.parse_block()?;
-                let stmt = Statement {
-                    label: None,
-                    kind: StmtKind::Block(block),
-                    line,
-                };
-                // `{ … } if EXPR` / `{ … } unless EXPR` — same postfix rule as `do { } if …` (not `if (`).
-                self.parse_stmt_postfix_modifier(stmt)?
+                // Disambiguate hashref `{ k => v }` from block `{ stmt; stmt }`.
+                // If it looks like a hashref, parse as expression; otherwise parse as block.
+                if self.looks_like_hashref() {
+                    let expr = self.parse_expression()?;
+                    let stmt = self.maybe_postfix_modifier(expr)?;
+                    self.parse_stmt_postfix_modifier(stmt)?
+                } else {
+                    let block = self.parse_block()?;
+                    let stmt = Statement {
+                        label: None,
+                        kind: StmtKind::Block(block),
+                        line,
+                    };
+                    // `{ … } if EXPR` / `{ … } unless EXPR` — same postfix rule as `do { } if …` (not `if (`).
+                    self.parse_stmt_postfix_modifier(stmt)?
+                }
             }
             _ => {
                 let expr = self.parse_expression()?;
@@ -7191,6 +7223,11 @@ impl Parser {
                     if self.suppress_scalar_hash_brace > 0 {
                         break;
                     }
+                    // Implicit semicolon: `{` on a new line is a new statement (block/hashref),
+                    // not a hash subscript on the preceding expression.
+                    if self.peek_line() > self.prev_line() {
+                        break;
+                    }
                     // `$h{k}`, or chained `$h{k2}{k3}` / `$r->{a}{b}` / `$a[0]{k}` — second+ `{…}` is
                     // hash subscript on the scalar value (same as `-> { … }` without extra `->`).
                     let line = expr.line;
@@ -10857,6 +10894,8 @@ impl Parser {
                     && !(matches!(self.peek(), Token::Ident(ref kw) if kw == "sub")
                         && matches!(self.peek_at(1), Token::Ident(_)))
                     && !(self.suppress_parenless_call > 0 && matches!(self.peek(), Token::Ident(_)))
+                    && !(matches!(self.peek(), Token::LBrace)
+                        && self.peek_line() > self.prev_line())
                 {
                     // Perl allows func arg without parens
                     // Guard: `sub <name> { }` is a named sub declaration (new
@@ -10865,6 +10904,8 @@ impl Parser {
                     // barewords (used by thread macro so `t Color::Red p` treats
                     // `p` as a stage, not an argument to the enum variant), but
                     // still allows `{` for struct/hash literals like `t Foo { x => 1 } p`.
+                    // Guard: `{` on a new line is a new statement (hashref/block),
+                    // not an argument to the preceding bareword call.
                     let args = self.parse_list_until_terminator()?;
                     Ok(Expr {
                         kind: ExprKind::FuncCall { name, args },

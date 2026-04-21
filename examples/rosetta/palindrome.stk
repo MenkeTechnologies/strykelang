@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Palindrome
+
+fn is_palindrome($s) {
+    my $clean = lc($s =~ s/[^a-z0-9]//gr);
+    return $clean eq reverse($clean);
+}
+
+my @samples = ("Racecar", "A man, a plan, a canal: Panama", "Hello", "No 'x' in Nixon");
+for my $s (@samples) {
+    printf "'%s' is palindrome: %d\n", $s, is_palindrome($s);
+}

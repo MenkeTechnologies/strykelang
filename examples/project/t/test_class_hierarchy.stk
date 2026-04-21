@@ -1,0 +1,332 @@
+#!/usr/bin/env stryke
+# t/test_class_hierarchy.stk — tests for deep class hierarchies with inheritance/composition
+
+require "./lib/class_hierarchy.stk"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ENTITY HIERARCHY (3 levels)
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $entity = Entity(id => 1, created_at => 1000)
+assert_eq $entity->id, 1, "entity id"
+assert_eq $entity->created_at, 1000, "entity created_at"
+assert_ok $entity->to_json() =~ /id/, "entity to_json"
+
+my $named = NamedEntity(id => 2, name => "Test", description => "A test entity")
+assert_eq $named->name, "Test", "named_entity name"
+assert_eq $named->display_name(), "Test (#2)", "named_entity display_name"
+
+my $tagged = TaggedEntity(id => 3, name => "Tagged Item", description => "Has tags")
+$tagged->add_tag("important")
+$tagged->add_tag("reviewed")
+assert_ok $tagged->has_tag("important"), "tagged has_tag true"
+assert_false $tagged->has_tag("missing"), "tagged has_tag false"
+
+$tagged->set_meta("priority", 5)
+assert_eq $tagged->get_meta("priority"), 5, "tagged get_meta"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COORDINATE AND BOUNDING BOX
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $c1 = Coordinate(x => 0, y => 0, z => 0)
+my $c2 = Coordinate(x => 3, y => 4, z => 0)
+assert_eq $c1->distance_to($c2), 5, "coordinate distance"
+assert_eq $c1->to_str(), "(0, 0, 0)", "coordinate to_str"
+
+my $c3 = $c1->translate(10, 20, 30)
+assert_eq $c3->x, 10, "translate x"
+assert_eq $c3->y, 20, "translate y"
+assert_eq $c3->z, 30, "translate z"
+
+my $cloned = $c2->clone()
+assert_eq $cloned->x, 3, "clone x"
+assert_eq $cloned->y, 4, "clone y"
+
+my $bbox = BoundingBox(min => Coordinate(x => 0, y => 0, z => 0), max => Coordinate(x => 10, y => 10, z => 10))
+assert_eq $bbox->width(), 10, "bbox width"
+assert_eq $bbox->height(), 10, "bbox height"
+assert_eq $bbox->depth(), 10, "bbox depth"
+assert_eq $bbox->volume(), 1000, "bbox volume"
+
+assert_ok $bbox->contains(Coordinate(x => 5, y => 5, z => 5)), "bbox contains inside"
+assert_false $bbox->contains(Coordinate(x => 15, y => 5, z => 5)), "bbox contains outside"
+
+my $center = $bbox->center()
+assert_eq $center->x, 5, "bbox center x"
+assert_eq $center->y, 5, "bbox center y"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SHAPE HIERARCHY (2D shapes)
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $rect = Rectangle2D(position => Coordinate(x => 0, y => 0, z => 0), width => 10.0, height => 5.0, color => "red")
+assert_eq $rect->area(), 50, "rectangle area"
+assert_eq $rect->perimeter(), 30, "rectangle perimeter"
+assert_near $rect->diagonal(), 11.18, 0.01, "rectangle diagonal"
+assert_false $rect->is_square(), "rectangle is_square false"
+
+my $square = Rectangle2D(position => Coordinate(x => 0, y => 0, z => 0), width => 7.0, height => 7.0)
+assert_ok $square->is_square(), "square is_square true"
+
+my $circle = Circle2D(position => Coordinate(x => 100, y => 100, z => 0), radius => 10.0, color => "blue")
+assert_near $circle->area(), 314.159, 0.01, "circle area"
+assert_near $circle->perimeter(), 62.83, 0.01, "circle perimeter"
+assert_eq $circle->diameter(), 20, "circle diameter"
+assert_ok $circle->contains_point(100, 100), "circle contains center"
+assert_ok $circle->contains_point(105, 100), "circle contains edge"
+assert_false $circle->contains_point(200, 200), "circle contains outside"
+
+my $rect_bounds = $rect->bounds()
+assert_eq $rect_bounds->min->x, 0, "rect bounds min x"
+assert_eq $rect_bounds->max->x, 10, "rect bounds max x"
+
+$rect->move_by(5, 5, 0)
+assert_eq $rect->position->x, 5, "move_by x"
+assert_eq $rect->position->y, 5, "move_by y"
+
+$circle->rotate(45)
+assert_eq $circle->rotation, 45, "rotate 45"
+$circle->rotate(360)
+assert_eq $circle->rotation, 45, "rotate wraparound"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SHAPE HIERARCHY (3D shapes)
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $cube = Cube3D(position => Coordinate(x => 0, y => 0, z => 0), side => 10.0)
+assert_eq $cube->volume(), 1000, "cube volume"
+assert_eq $cube->surface_area(), 600, "cube surface_area"
+
+my $sphere = Sphere3D(position => Coordinate(x => 50, y => 50, z => 50), radius => 5.0)
+assert_near $sphere->volume(), 523.598, 0.01, "sphere volume"
+assert_near $sphere->surface_area(), 314.159, 0.01, "sphere surface_area"
+
+my $sphere_bounds = $sphere->bounds()
+assert_eq $sphere_bounds->min->x, 45, "sphere bounds min x"
+assert_eq $sphere_bounds->max->x, 55, "sphere bounds max x"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# POLYGON AND TRIANGLE
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $triangle = Triangle2D(position => Coordinate(x => 0, y => 0, z => 0))
+$triangle->add_vertex(Coordinate(x => 0, y => 0, z => 0))
+$triangle->add_vertex(Coordinate(x => 4, y => 0, z => 0))
+$triangle->add_vertex(Coordinate(x => 0, y => 3, z => 0))
+assert_eq $triangle->vertex_count(), 3, "triangle vertex_count"
+assert_eq $triangle->area(), 6, "triangle area (3-4-5)"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ADDRESS AND CONTACT INFO (composition)
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $addr = Address(street => "123 Main St", city => "Springfield", region => "IL", zip => "62701")
+assert_eq $addr->to_str(), "123 Main St, Springfield, IL 62701", "address to_str"
+assert_ok $addr->is_domestic(), "address is_domestic"
+
+my $intl_addr = Address(street => "10 Downing St", city => "London", region => "UK", zip => "SW1A 2AA", country => "UK")
+assert_false $intl_addr->is_domestic(), "intl address not domestic"
+
+my $contact = ContactInfo(email => "test@example.com", phone => "555-1234", address => $addr)
+assert_ok $contact->has_address(), "contact has_address"
+my $contact_str = $contact->to_str()
+assert_ok index($contact_str, "test") != -1, "contact to_str has email"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EMPLOYEE HIERARCHY (4 levels deep)
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $emp1 = Employee(id => 100, name => "John Developer", employee_id => "DEV001", department => "Engineering", salary => 100000.0, hire_date => "2020-01-15")
+assert_eq $emp1->name, "John Developer", "employee name"
+assert_eq $emp1->salary, 100000, "employee salary"
+assert_false $emp1->has_manager(), "employee no manager"
+assert_false $emp1->is_manager(), "employee not manager"
+
+my $mgr = Manager(id => 101, name => "Jane Manager", employee_id => "MGR001", department => "Engineering", salary => 150000.0, hire_date => "2018-06-01", budget => 300000.0)
+$mgr->add_report($emp1)
+assert_ok $emp1->has_manager(), "employee now has manager"
+assert_eq $emp1->manager->name, "Jane Manager", "employee manager name"
+assert_ok $mgr->is_manager(), "manager is_manager"
+assert_eq $mgr->report_count(), 1, "manager report_count"
+
+my $emp2 = Employee(id => 102, name => "Bob Coder", employee_id => "DEV002", department => "Engineering", salary => 95000.0, hire_date => "2021-03-20")
+$mgr->add_report($emp2)
+assert_eq $mgr->report_count(), 2, "manager 2 reports"
+assert_eq $mgr->team_salary(), 195000, "manager team_salary"
+assert_eq $mgr->remaining_budget(), 105000, "manager remaining_budget"
+
+my $exec = Executive(id => 103, name => "Alice CEO", employee_id => "CEO001", department => "Executive", salary => 300000.0, hire_date => "2015-01-01", title => "Chief Executive Officer", bonus_pct => 40.0, budget => 1000000.0)
+$exec->add_report($mgr)
+assert_eq $exec->total_compensation(), 420000, "executive total_compensation"
+assert_eq $exec->total_reports(), 3, "executive total_reports (recursive)"
+assert_eq $exec->org_size(), 4, "executive org_size"
+
+my $chain = $emp1->chain_of_command()
+assert_eq scalar(@$chain), 3, "chain_of_command length"
+assert_eq $chain->[0]->name, "John Developer", "chain[0] is self"
+assert_eq $chain->[1]->name, "Jane Manager", "chain[1] is manager"
+assert_eq $chain->[2]->name, "Alice CEO", "chain[2] is exec"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DEPARTMENT HIERARCHY (nested departments)
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $tech_dept = Department(id => 200, name => "Technology", budget => 500000.0)
+my $eng_dept = Department(id => 201, name => "Engineering", budget => 300000.0)
+my $qa_dept = Department(id => 202, name => "QA", budget => 100000.0)
+
+$tech_dept->add_sub_department($eng_dept)
+$tech_dept->add_sub_department($qa_dept)
+
+assert_eq $eng_dept->parent->name, "Technology", "subdept parent"
+assert_eq scalar(@{$tech_dept->sub_departments}), 2, "tech_dept sub count"
+
+my $qa_eng = Employee(id => 300, name => "QA Person", employee_id => "QA001", department => "QA", salary => 80000.0, hire_date => "2022-01-01")
+$qa_dept->add_employee($qa_eng)
+
+$eng_dept->add_employee($emp1)
+$eng_dept->add_employee($emp2)
+
+assert_eq $tech_dept->total_employees(), 3, "tech_dept total_employees (nested)"
+assert_eq $tech_dept->total_salary(), 275000, "tech_dept total_salary"
+assert_eq $tech_dept->depth(), 2, "tech_dept depth"
+assert_eq $qa_dept->depth(), 1, "qa_dept depth (leaf)"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COMPANY WITH FULL HIERARCHY
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $company = build_org_chart()
+assert_eq $company->name, "TechCorp", "company name"
+assert_eq $company->founded_year, 2005, "company founded_year"
+assert_eq $company->department_count(), 1, "company department_count"
+assert_ok defined($company->ceo), "company has ceo"
+assert_eq $company->ceo->name, "Alice Johnson", "company ceo name"
+
+my $found_emp = $company->find_employee("ENG001")
+assert_ok defined($found_emp), "find_employee found"
+assert_eq $found_emp->name, "Dave Brown", "find_employee name"
+
+my $not_found = $company->find_employee("MISSING")
+assert_false defined($not_found), "find_employee not found"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DOCUMENT NODE HIERARCHY (tree traversal)
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $root = DocumentNode()
+my $child1 = DocumentNode()
+my $child2 = DocumentNode()
+my $grandchild = DocumentNode()
+
+$root->add_child($child1)
+$root->add_child($child2)
+$child1->add_child($grandchild)
+
+assert_ok $root->is_root(), "root is_root"
+assert_false $child1->is_root(), "child not is_root"
+assert_ok $grandchild->is_leaf(), "grandchild is_leaf"
+assert_false $child1->is_leaf(), "child1 not is_leaf"
+assert_eq $root->child_count(), 2, "root child_count"
+assert_eq $grandchild->depth(), 2, "grandchild depth"
+assert_eq $root->node_count(), 4, "root node_count (recursive)"
+
+my $text_node = TextNode(text => "Hello World")
+assert_eq $text_node->render(), "Hello World", "text_node render"
+assert_eq $text_node->length(), 11, "text_node length"
+
+my $elem = ElementNode(tag => "div")
+$elem->set_attr("class", "container")
+$elem->add_child(TextNode(text => "Content"))
+assert_eq $elem->get_attr("class"), "container", "element get_attr"
+assert_ok $elem->render() =~ /<div class="container">Content<\/div>/, "element render"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VEHICLE HIERARCHY (deep inheritance + multiple traits)
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $engine = Engine(horsepower => 300, fuel_type => "gasoline", displacement => 3.5)
+assert_eq $engine->horsepower, 300, "engine horsepower"
+assert_false $engine->is_electric(), "engine not electric"
+assert_eq $engine->power_to_weight(3000), 100, "engine power_to_weight"
+
+my $elec_engine = Engine(horsepower => 500, fuel_type => "electric", displacement => 0)
+assert_ok $elec_engine->is_electric(), "electric engine is_electric"
+
+my $trans = Transmission(gear_count => 6, trans_type => "manual")
+assert_ok $trans->is_manual(), "transmission is_manual"
+
+my $car = Car(id => 1, name => "Family Car", vin => "VIN123", year => 2023, make => "Honda", model => "Accord", weight => 3300.0, body_style => "sedan", door_count => 4, engine => $engine, transmission => $trans)
+assert_eq $car->full_name(), "2023 Honda Accord", "car full_name"
+assert_ok $car->is_sedan(), "car is_sedan"
+assert_false $car->is_coupe(), "car not is_coupe"
+assert_ok $car->has_engine(), "car has_engine"
+assert_near $car->power_to_weight(), 90.9, 0.1, "car power_to_weight"
+
+my $truck = Truck(id => 2, name => "Work Truck", vin => "VIN456", year => 2023, make => "Ford", model => "F-350", weight => 8000.0, bed_length => 8.0, towing_capacity => 20000.0, payload_capacity => 4000.0, drivetrain => "4WD")
+assert_ok $truck->is_heavy_duty(), "truck is_heavy_duty"
+assert_eq $truck->drivetrain, "4WD", "truck drivetrain"
+
+my $sports = SportsCar(id => 3, name => "Speed Machine", vin => "VIN789", year => 2024, make => "Porsche", model => "911", weight => 3200.0, body_style => "coupe", door_count => 2, top_speed => 190.0, zero_to_sixty => 3.5)
+assert_false $sports->is_supercar(), "porsche not supercar"
+
+my $supercar = SportsCar(id => 4, name => "Hypercar", vin => "VINABC", year => 2024, make => "Bugatti", model => "Chiron", weight => 4400.0, body_style => "coupe", door_count => 2, top_speed => 261.0, zero_to_sixty => 2.4)
+assert_ok $supercar->is_supercar(), "bugatti is_supercar"
+
+my $electric = ElectricCar(id => 5, name => "Eco", vin => "VINDEF", year => 2024, make => "Tesla", model => "Model 3", weight => 4000.0, body_style => "sedan", door_count => 4, battery_capacity => 75.0, range => 350.0, charge_time => 0.5)
+assert_near $electric->efficiency(), 4.666, 0.01, "electric efficiency"
+
+my $luxury_sports = LuxurySportsCar(id => 6, name => "Dream Car", vin => "VINGHI", year => 2024, make => "Ferrari", model => "SF90", weight => 3500.0, body_style => "coupe", door_count => 2, top_speed => 211.0, zero_to_sixty => 2.5, interior_material => "carbon fiber", sound_system => "Burmester")
+assert_ok $luxury_sports->luxury_features() =~ /carbon fiber/, "luxury_features"
+assert_ok $luxury_sports->performance_stats() =~ /211/, "performance_stats"
+assert_ok $luxury_sports->is_supercar(), "luxury supercar"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BUILD HELPER FUNCTIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $shapes = build_shape_scene()
+assert_eq scalar(@$shapes), 4, "build_shape_scene count"
+assert_ok $shapes->[0]->isa("Rectangle2D"), "shape[0] is Rectangle2D"
+assert_ok $shapes->[1]->isa("Circle2D"), "shape[1] is Circle2D"
+assert_ok $shapes->[2]->isa("Cube3D"), "shape[2] is Cube3D"
+assert_ok $shapes->[3]->isa("Sphere3D"), "shape[3] is Sphere3D"
+
+my $total_area = total_shape_area($shapes)
+assert_ok $total_area > 0, "total_shape_area positive"
+
+my $fleet = build_vehicle_fleet()
+assert_eq scalar(@$fleet), 3, "build_vehicle_fleet count"
+assert_ok $fleet->[0]->isa("LuxurySportsCar"), "fleet[0] is LuxurySportsCar"
+assert_ok $fleet->[1]->isa("ElectricCar"), "fleet[1] is ElectricCar"
+assert_ok $fleet->[2]->isa("Truck"), "fleet[2] is Truck"
+
+my $doc = build_html_document()
+assert_ok $doc->isa("ElementNode"), "doc is ElementNode"
+assert_eq $doc->child_count(), 2, "doc has head and body"
+assert_ok $doc->node_count() > 5, "doc has multiple nodes"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TRAIT CHECKS (isa and does)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# isa works for self and immediate parent
+assert_ok $rect->isa("Shape2D"), "rect isa Shape2D (parent)"
+assert_ok $rect->isa("Rectangle2D"), "rect isa Rectangle2D (self)"
+
+assert_ok $cube->isa("Shape3D"), "cube isa Shape3D"
+assert_ok $cube->isa("Cube3D"), "cube isa Cube3D (self)"
+
+# does works for directly implemented traits
+assert_ok $luxury_sports->does("Luxury"), "luxury_sports does Luxury"
+assert_ok $luxury_sports->does("Performance"), "luxury_sports does Performance"
+
+# verify the inheritance chain exists via method calls (alternative to deep isa)
+assert_ok defined($rect->position), "rect has position (from Shape)"
+assert_ok defined($rect->rotation), "rect has rotation (from Shape2D)"
+assert_ok defined($cube->scale), "cube has scale (from Shape3D)"
+assert_ok defined($exec->salary), "exec has salary (from Employee)"
+assert_ok defined($exec->name), "exec has name (from Person/NamedEntity)"
+
+test_run

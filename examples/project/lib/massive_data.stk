@@ -1,0 +1,144 @@
+# lib/massive_data.stk — Massive, deeply nested data structures
+
+struct Moon { name, mass, radius }
+struct Planet { name, type, moons }
+
+class StarSystem {
+    name;
+    star_type;
+    planets; # Array ref
+}
+
+fn ss_total_moons($self) {
+    my $count = 0;
+    my $plist = $self->planets;
+    for my $p (@$plist) {
+        my $mlist = $p->moons;
+        $count += scalar(@$mlist);
+    }
+    return $count;
+}
+
+class Sector {
+    id;
+    coordinates; # Array ref
+    systems;     # Hash ref
+}
+
+fn sector_total_planets($self) {
+    my $count = 0;
+    my $smap = $self->systems;
+    for my $s (values %$smap) {
+        my $plist = $s->planets;
+        $count += scalar(@$plist);
+    }
+    return $count;
+}
+
+class Galaxy {
+    name;
+    sectors; # Array ref
+}
+
+fn galaxy_stats($self) {
+    my $seclist = $self->sectors;
+    my $s_count = scalar(@$seclist);
+    my $sys_count = 0;
+    my $p_count = 0;
+    my $m_count = 0;
+    
+    for my $sec (@$seclist) {
+        my $smap = $sec->{systems};
+        $sys_count += scalar(keys %$smap);
+        $p_count += sector_total_planets($sec);
+        for my $sys (values %$smap) {
+            $m_count += ss_total_moons($sys);
+        }
+    }
+    
+    return {
+        sectors => $s_count,
+        systems => $sys_count,
+        planets => $p_count,
+        moons   => $m_count
+    };
+}
+
+# ── Factory Functions ──────────────────────────────────────────────
+
+fn generate_massive_galaxy($num_sectors, $sys_per_sector) {
+    my $sectors = [];
+    for (my $i = 1; $i <= $num_sectors; $i++) {
+        my $systems = {};
+        for (my $j = 1; $j <= $sys_per_sector; $j++) {
+            my $planets = [];
+            for (my $k = 1; $k <= 3; $k++) {
+                my $moons = [];
+                for (my $l = 1; $l <= 2; $l++) {
+                    push @$moons, Moon(
+                        name => "Moon-$i-$j-$k-$l",
+                        mass => rand(100),
+                        radius => rand(10)
+                    );
+                }
+                push @$planets, Planet(
+                    name => "Planet-$i-$j-$k",
+                    type => "Terrestrial",
+                    moons => $moons
+                );
+            }
+            my $sys_name = "System-$i-$j";
+            $systems->{$sys_name} = StarSystem(
+                name => $sys_name,
+                star_type => "G-Type",
+                planets => $planets
+            );
+        }
+        push @$sectors, Sector(
+            id => "Sector-$i",
+            coordinates => [rand(100), rand(100), rand(100)],
+            systems => $systems
+        );
+    }
+    
+    return Galaxy(name => "Andromeda", sectors => $sectors);
+}
+
+# ── Complex Graph Structures ──────────────────────────────────────
+
+class Node {
+    id;
+    value;
+    edges; # Array ref
+}
+
+fn create_linked_mesh($size) {
+    my @nodes;
+    for (my $i = 0; $i < $size; $i++) {
+        push @nodes, Node(id => $i, value => rand(1000), edges => []);
+    }
+    
+    for (my $i = 0; $i < $size; $i++) {
+        my $elist = $nodes[$i]->edges;
+        my $next = ($i + 1) % $size;
+        push @$elist, $nodes[$next];
+        
+        my $prev = ($i - 1 + $size) % $size;
+        push @$elist, $nodes[$prev];
+        
+        my $jump = ($i + 5) % $size;
+        push @$elist, $nodes[$jump];
+    }
+    
+    return @nodes;
+}
+
+fn traverse_mesh($start_node, $depth) {
+    return 0 if $depth <= 0;
+    my $sum = $start_node->value;
+    my $elist = $start_node->edges;
+    for my $neighbor (@$elist) {
+        $sum += traverse_mesh($neighbor, $depth - 1);
+    }
+    return $sum;
+}

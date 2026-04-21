@@ -1,0 +1,11 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Factorial
+
+fn factorial($n) {
+    return 1 if $n == 0;
+    return $n * factorial($n - 1);
+}
+
+for my $i (0..10) {
+    printf "%d! = %d\n", $i, factorial($i);
+}

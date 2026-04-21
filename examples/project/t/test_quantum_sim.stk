@@ -1,0 +1,59 @@
+#!/usr/bin/env stryke
+# t/test_quantum_sim.stk — Stress testing quantum universe simulator
+
+require "./lib/quantum_sim.stk"
+
+# ── 1. Vector Math ────────────────────────────────────────────────
+
+my $v = Vector3(x => 3, y => 4, z => 0)
+assert_eq my_q_vector_magnitude($v), 5, "Vector magnitude"
+
+my $vn = my_q_vector_normalize($v)
+assert_eq $vn->x, 0.6, "Normalized x"
+assert_eq $vn->y, 0.8, "Normalized y"
+
+# ── 2. Particle Entanglement ──────────────────────────────────────
+
+my $p1 = Particle(id => "A", qstate => "SUPERPOSITION", position => $v, entangled => [], energy => 100)
+my $p2 = Particle(id => "B", qstate => "SUPERPOSITION", position => $v, entangled => [], energy => 200)
+
+particle_entangle($p1, $p2)
+assert_eq scalar(@{$p1->entangled}), 1, "Entangled length A"
+assert_eq $p1->entangled->[0], "B", "Entangled with B"
+assert_eq $p2->entangled->[0], "A", "Entangled with A"
+
+# ── 3. Particle Observation (Collapse) ────────────────────────────
+
+my $obs = particle_observe($p1)
+assert_true ($obs->{qstate} eq "UP" || $obs->{qstate} eq "DOWN"), "Observation collapses qstate"
+assert_eq $obs->{energy}, 50, "Observation halves energy"
+
+# ── 4. Wave Function Generator ────────────────────────────────────
+
+my $gen = wave_function_generator(10, 3)
+my $r1 = $gen->()
+my $r2 = $gen->()
+my $r3 = $gen->()
+my $r4 = $gen->()
+
+assert_true defined($r1->[0]), "Wave iter 1"
+assert_true $r1->[1], "Wave more 1"
+assert_false $r4->[1], "Wave iter 4 ends"
+
+# ── 5. Full Universe Simulation (Async/Parallel/Pipelines) ────────
+
+my $u = universe_initialize(20) # 20 particles
+
+assert_eq scalar(keys %{$u->particles}), 20, "Universe particles initialized"
+
+my $start = el()
+my $epoch_res = universe_simulate_epoch($u)
+my $elapsed = el() - $start
+
+assert_eq $epoch_res->{epoch}, 1, "Epoch incremented"
+assert_eq scalar(keys %{$epoch_res->{raw_results}}), 20, "Raw results size"
+assert_true defined($epoch_res->{survivors}), "Filtered survivors count defined"
+# The async operations should allow the 20 particles to be processed quickly
+assert_true ($elapsed < 1.0), "Parallel processing was fast enough"
+
+test_run

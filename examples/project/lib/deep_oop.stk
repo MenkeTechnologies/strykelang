@@ -1,0 +1,110 @@
+# lib/deep_oop.stk — Extremely deep and complex OOP hierarchies
+
+# ── Traits (Interfaces) ───────────────────────────────────────────
+
+trait Identifiable { fn id; fn type_name; }
+trait Serializable { fn to_json; }
+
+# ── Base Hierarchy ────────────────────────────────────────────────
+
+class BaseNode impl Identifiable, Serializable {
+    uuid;
+    name;
+    
+    fn id { $self->uuid }
+    fn type_name { "BaseNode" }
+    fn to_json { 
+        "{ \"uuid\": \"" . $self->uuid . "\", \"name\": \"" . $self->name . "\" }"
+    }
+}
+
+class SpatialNode extends BaseNode {
+    posX;
+    posY;
+    posZ;
+    
+    fn type_name { "SpatialNode" }
+    fn get_pos { ($self->posX, $self->posY, $self->posZ) }
+}
+
+class PhysicsBody extends SpatialNode {
+    mass;
+    velocity;
+    
+    fn type_name { "PhysicsBody" }
+    fn get_velocity { $self->velocity }
+}
+
+class Actor extends PhysicsBody {
+    health;
+    level;
+    
+    fn type_name { "Actor" }
+    fn is_alive { $self->health > 0 }
+}
+
+class Humanoid extends Actor {
+    species;
+    faction;
+    
+    fn type_name { "Humanoid" }
+    fn greet { "Greetings, I am " . $self->name }
+}
+
+class Player extends Humanoid {
+    xp;
+    inventory;
+    
+    fn type_name { "Player" }
+    fn get_xp { $self->xp }
+}
+
+class Hero extends Player {
+    class_name;
+    ultimate_power;
+    
+    fn type_name { "Hero" }
+    fn use_ultimate { "ACTIVATED" }
+}
+
+# ── Mixins via Multiple Inheritance ───────────────────────────────
+
+class MagicUser {
+    mana;
+    fn cast_spell($name) { "Casting $name!" }
+}
+
+class Flyer {
+    altitude;
+    fn takeoff { "Airborne" }
+}
+
+# Intermediate mixin
+class CombatFlyer extends Flyer {
+    weapon_system;
+    fn fire { "BOOM" }
+}
+
+# Extremely complex multiple inheritance
+class ArchMageHero extends Hero, MagicUser, CombatFlyer {
+    fn type_name { "ArchMageHero" }
+    fn ultimate_magic { "FIREBALL_STORM" }
+}
+
+# ── Deep Composition ──────────────────────────────────────────────
+
+class Weapon {
+    name;
+    damage;
+}
+
+class CharacterSheet {
+    weapon;
+    fn get_weapon_name { $self->weapon->name }
+}
+
+class ComplexNPC extends Humanoid {
+    sheet;
+    fn type_name { "ComplexNPC" }
+    fn weapon_name { $self->sheet->get_weapon_name() }
+}

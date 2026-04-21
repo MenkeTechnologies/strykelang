@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Primality Check
+
+fn is_prime($n) {
+    return 0 if $n < 2;
+    return 1 if $n == 2;
+    return 0 if $n % 2 == 0;
+    for (my $i = 3; $i * $i <= $n; $i += 2) {
+        return 0 if $n % $i == 0;
+    }
+    return 1;
+}
+
+print "Primes between 1 and 50:\n";
+my @primes = grep { is_prime($_) } (1..50);
+print join(", ", @primes) . "\n";

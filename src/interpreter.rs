@@ -14244,7 +14244,13 @@ impl Interpreter {
             values.push(val);
         }
 
-        let instance = PerlValue::class_inst(Arc::new(ClassInstance::new(Arc::clone(def), values)));
+        // Compute full ISA chain for type checking
+        let isa_chain = self.mro_linearize(&def.name);
+        let instance = PerlValue::class_inst(Arc::new(ClassInstance::new_with_isa(
+            Arc::clone(def),
+            values,
+            isa_chain,
+        )));
 
         // Call BUILD hooks: parent BUILD first, then child BUILD
         let build_chain = self.collect_build_chain(def);
@@ -14934,7 +14940,11 @@ impl Interpreter {
                         i += 2;
                     }
                     return Some(Ok(PerlValue::class_inst(Arc::new(
-                        crate::value::ClassInstance::new(Arc::clone(&c.def), new_values),
+                        crate::value::ClassInstance::new_with_isa(
+                            Arc::clone(&c.def),
+                            new_values,
+                            c.isa_chain.clone(),
+                        ),
                     ))));
                 }
                 "to_hash" => {
@@ -14975,7 +14985,11 @@ impl Interpreter {
                     }
                     let new_values = c.get_values().iter().map(|v| v.deep_clone()).collect();
                     return Some(Ok(PerlValue::class_inst(Arc::new(
-                        crate::value::ClassInstance::new(Arc::clone(&c.def), new_values),
+                        crate::value::ClassInstance::new_with_isa(
+                            Arc::clone(&c.def),
+                            new_values,
+                            c.isa_chain.clone(),
+                        ),
                     ))));
                 }
                 "isa" => {
@@ -14983,7 +14997,7 @@ impl Interpreter {
                         return Some(Err(PerlError::runtime("isa requires one argument", line)));
                     }
                     let class_name = args[0].to_string();
-                    let is_a = c.def.name == class_name || c.def.extends.contains(&class_name);
+                    let is_a = c.isa(&class_name);
                     return Some(Ok(if is_a {
                         PerlValue::integer(1)
                     } else {

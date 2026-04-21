@@ -2,7 +2,7 @@
 
 fn make_traffic_light {
     my $state = "red"
-    my $transitions = +{
+    my $transitions = {
         red    => "green",
         green  => "yellow",
         yellow => "red",
@@ -15,7 +15,7 @@ fn make_traffic_light {
     my $current = fn { $state }
     my $is_stop = fn { $state eq "red" || $state eq "yellow" }
 
-    +{ next => $next, current => $current, is_stop => $is_stop }
+    { next => $next, current => $current, is_stop => $is_stop }
 }
 
 fn make_door_fsm {
@@ -50,7 +50,7 @@ fn make_door_fsm {
 
     my $status = fn { $locked ? "locked" : $state }
 
-    +{ open => $open, close => $close, lock => $lock, unlock => $unlock, status => $status }
+    { open => $open, close => $close, lock => $lock, unlock => $unlock, status => $status }
 }
 
 fn make_counter_fsm($min, $max) {
@@ -76,7 +76,7 @@ fn make_counter_fsm($min, $max) {
     my $at_min = fn { $value == $min }
     my $at_max = fn { $value == $max }
 
-    +{ inc => $increment, dec => $decrement, reset => $reset, get => $get, at_min => $at_min, at_max => $at_max }
+    { inc => $increment, dec => $decrement, reset => $reset, get => $get, at_min => $at_min, at_max => $at_max }
 }
 
 fn make_toggle_fsm {
@@ -91,7 +91,7 @@ fn make_toggle_fsm {
     my $turn_on = fn { $on = 1 }
     my $turn_off = fn { $on = 0 }
 
-    +{ toggle => $toggle, is_on => $is_on, on => $turn_on, off => $turn_off }
+    { toggle => $toggle, is_on => $is_on, on => $turn_on, off => $turn_off }
 }
 
 fn make_parser_fsm {
@@ -129,7 +129,7 @@ fn make_parser_fsm {
     my $get_tokens = fn { $tokens }
     my $reset = fn { $state = "start"; $tokens = [] }
 
-    +{ feed => $feed, tokens => $get_tokens, reset => $reset }
+    { feed => $feed, tokens => $get_tokens, reset => $reset }
 }
 
 fn make_vending_machine($price) {
@@ -159,10 +159,10 @@ fn make_vending_machine($price) {
     }
 
     my $status = fn {
-        +{ balance => $balance, dispensed => $item_dispensed }
+        { balance => $balance, dispensed => $item_dispensed }
     }
 
-    +{ insert => $insert, dispense => $dispense, refund => $refund, status => $status }
+    { insert => $insert, dispense => $dispense, refund => $refund, status => $status }
 }
 
 fn make_game_state {
@@ -210,7 +210,7 @@ fn make_game_state {
     my $get_score = fn { $score }
     my $get_lives = fn { $lives }
 
-    +{
+    {
         start => $start, add_score => $add_score, lose_life => $lose_life,
         pause => $pause, resume => $resume,
         state => $get_state, score => $get_score, lives => $get_lives
@@ -246,7 +246,7 @@ fn make_connection_fsm {
         "failed (retry $retries)"
     }
 
-    my $status = fn { +{ state => $state, retries => $retries } }
+    my $status = fn { { state => $state, retries => $retries } }
 
-    +{ connect => $connect, connected => $connected, disconnect => $disconnect, fail => $fail, status => $status }
+    { connect => $connect, connected => $connected, disconnect => $disconnect, fail => $fail, status => $status }
 }

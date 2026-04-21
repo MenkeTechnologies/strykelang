@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: QuickSort
+
+fn quicksort(@list) {
+    return @list if scalar(@list) <= 1;
+    
+    my $pivot = shift @list;
+    my @left;
+    my @right;
+    
+    for my $item (@list) {
+        if ($item < $pivot) {
+            push @left, $item;
+        } else {
+            push @right, $item;
+        }
+    }
+    
+    return (quicksort(@left), $pivot, quicksort(@right));
+}
+
+my @unsorted = (4, 65, 2, -31, 0, 99, 2, 83, 782, 1);
+my @sorted = quicksort(@unsorted);
+print "Sorted: " . join(", ", @sorted) . "\n";

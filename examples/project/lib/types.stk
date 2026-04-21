@@ -25,15 +25,15 @@ fn ret_aref { [10, 20, 30] }
 fn ret_nested_aref { [[1, 2], [3, 4], [5, 6]] }
 fn ret_mixed_aref { ["str", 42, [1, 2], { x => 9 }] }
 
-# ── Hash refs (use +{} for implicit return) ──────────────────────────
+# ── Hash refs (use {} for implicit return) ──────────────────────────
 
-fn ret_href { +{ name => "test", value => 100 } }
-fn ret_nested_href { +{ outer => { inner => { deep => 42 } } } }
-fn ret_href_with_aref { +{ items => [1, 2, 3], meta => { count => 3 } } }
+fn ret_href { { name => "test", value => 100 } }
+fn ret_nested_href { { outer => { inner => { deep => 42 } } } }
+fn ret_href_with_aref { { items => [1, 2, 3], meta => { count => 3 } } }
 
 # Hash refs with reserved bareword keys (q, qq, qw, qx, qr, tr, y, s, m)
 fn ret_href_reserved_keys {
-    +{
+    {
         q  => "quote",
         qq => "double quote",
         qw => "quote words",
@@ -113,7 +113,7 @@ fn ret_blessed_aref { bless [1, 2, 3], "MyArray" }
 fn ret_complex {
     my $the_set = set(10, 11, 12)
     my $the_code = fn { "lambda" }
-    +{
+    {
         scalars => {
             int   => 42,
             float => 3.14,

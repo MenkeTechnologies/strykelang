@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Prime Decomposition
+
+fn factorize($n) {
+    my @factors;
+    my $d = 2;
+    while ($n > 1) {
+        while ($n % $d == 0) {
+            push @factors, $d;
+            $n /= $d;
+        }
+        $d++;
+        if ($d * $d > $n && $n > 1) {
+            push @factors, $n;
+            last;
+        }
+    }
+    return @factors;
+}
+
+my $val = 12345678;
+my @f = factorize($val);
+printf "Prime factors of %d: %s\n", $val, join(" * ", @f);
