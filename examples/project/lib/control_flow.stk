@@ -307,7 +307,7 @@ fn return_list_from_loop($count) {
 
 # ── Complex control flow ───────────────────────────────────────────
 
-fn fizzbuzz($n) {
+fn fizz_buzz($n) {
     my @result
     for my $i (1..$n) {
         if ($i % 15 == 0) {

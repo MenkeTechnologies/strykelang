@@ -1051,7 +1051,7 @@ mod tests {
 
     #[test]
     fn nested_sub_scope() {
-        assert!(lint("sub outer { my $x = 1; sub inner { say $x; } }").is_ok());
+        assert!(lint("sub wrap { my $x = 1; sub inner { say $x; } }").is_ok());
     }
 
     #[test]
@@ -1176,7 +1176,7 @@ mod tests {
 
     #[test]
     fn state_var_ok() {
-        assert!(lint("sub counter { state $n = 0; $n++; }").is_ok());
+        assert!(lint("sub my_counter { state $n = 0; $n++; }").is_ok());
     }
 
     #[test]

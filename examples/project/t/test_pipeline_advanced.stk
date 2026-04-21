@@ -178,7 +178,7 @@ fn find_first_fn($pred, @items) {
     undef
 }
 
-fn find_index_fn($pred, @items) {
+fn find_idx_fn($pred, @items) {
     for my $i (0..scalar(@items)-1) {
         return $i if $pred->($items[$i])
     }

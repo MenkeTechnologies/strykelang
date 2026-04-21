@@ -1219,9 +1219,9 @@ fn try_vm_execute_use_overload_add_and_qq_stringify() {
     let p = parse(
         r#"
         package O
-        use overload '+' => 'add', '""' => 'str'
-        sub add { my ($a, $b) = @_; $a->{n} + $b }
-        sub str { "" . $_0->{n} }
+        use overload '+' => 'add_op', '""' => 'to_str'
+        sub add_op { my ($a, $b) = @_; $a->{n} + $b }
+        sub to_str { "" . $_0->{n} }
         package main
         my $x = O->new(n => 3)
         "$x" . ":" . ($x + 1)
@@ -1243,8 +1243,8 @@ fn try_vm_execute_use_overload_unary_neg() {
     let p = parse(
         r#"
         package O
-        use overload 'neg' => 'negate'
-        sub negate { 77 }
+        use overload 'neg' => 'negate_op'
+        sub negate_op { 77 }
         package main
         my $o = bless {}, "O"
         -$o

@@ -1214,6 +1214,7 @@ impl Parser {
                 | "dirs"
                 | "dr"
                 | "f"
+                | "fi"
                 | "files"
                 | "filesf"
                 | "filter"
@@ -2644,11 +2645,11 @@ impl Parser {
                     line,
                 })
             }
-            "grep" | "greps" | "filter" | "f" | "find_all" | "gr" => {
+            "grep" | "greps" | "filter" | "fi" | "find_all" | "gr" => {
                 let keyword = match name {
                     "grep" | "gr" => crate::ast::GrepBuiltinKeyword::Grep,
                     "greps" => crate::ast::GrepBuiltinKeyword::Greps,
-                    "filter" | "f" => crate::ast::GrepBuiltinKeyword::Filter,
+                    "filter" | "fi" => crate::ast::GrepBuiltinKeyword::Filter,
                     "find_all" => crate::ast::GrepBuiltinKeyword::FindAll,
                     _ => unreachable!(),
                 };
@@ -3838,6 +3839,9 @@ impl Parser {
         match self.peek().clone() {
             Token::Ident(_) => {
                 let name = self.parse_package_qualified_identifier()?;
+                if !crate::compat_mode() {
+                    self.check_udf_shadows_builtin(&name, line)?;
+                }
                 self.declared_subs.insert(name.clone());
                 let (params, prototype) = self.parse_sub_sig_or_prototype_opt()?;
                 self.parse_sub_attributes()?;
@@ -4841,13 +4845,18 @@ impl Parser {
                 frozen: false,
                 type_annotation: None,
             },
-            (Token::HashVar(name), _) => VarDecl {
-                sigil: Sigil::Hash,
-                name,
-                initializer: None,
-                frozen: false,
-                type_annotation: None,
-            },
+            (Token::HashVar(name), line) => {
+                if !crate::compat_mode() {
+                    self.check_hash_shadows_reserved(&name, line)?;
+                }
+                VarDecl {
+                    sigil: Sigil::Hash,
+                    name,
+                    initializer: None,
+                    frozen: false,
+                    type_annotation: None,
+                }
+            }
             (Token::Star, _line) => {
                 let name = match self.advance() {
                     (Token::Ident(n), _) => n,
@@ -8770,11 +8779,11 @@ impl Parser {
                 }
                 self.parse_algebraic_match_expr(line)
             }
-            "grep" | "greps" | "filter" | "f" | "find_all" => {
+            "grep" | "greps" | "filter" | "fi" | "find_all" => {
                 let keyword = match name.as_str() {
                     "grep" => crate::ast::GrepBuiltinKeyword::Grep,
                     "greps" => crate::ast::GrepBuiltinKeyword::Greps,
-                    "filter" | "f" => crate::ast::GrepBuiltinKeyword::Filter,
+                    "filter" | "fi" => crate::ast::GrepBuiltinKeyword::Filter,
                     "find_all" => crate::ast::GrepBuiltinKeyword::FindAll,
                     _ => unreachable!(),
                 };
@@ -10559,7 +10568,7 @@ impl Parser {
                     line,
                 })
             }
-            "filesf" => {
+            "filesf" | "f" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
@@ -11396,7 +11405,7 @@ impl Parser {
             | "glob_par" | "ppool" | "barrier" | "pipeline" | "cluster"
             | "pmaps" | "pflat_maps" | "pgreps"
             // ── functional / iterator ───────────────────────────────────────
-            | "fore" | "e" | "ep" | "flat_map" | "flat_maps" | "maps" | "filter" | "f" | "find_all" | "reduce" | "fold"
+            | "fore" | "e" | "ep" | "flat_map" | "flat_maps" | "maps" | "filter" | "fi" | "find_all" | "reduce" | "fold"
             | "inject" | "collect" | "uniq" | "distinct" | "any" | "all" | "none"
             | "first" | "detect" | "find" | "compact" | "concat" | "chain" | "reject" | "flatten" | "set"
             | "min_by" | "max_by" | "sort_by" | "tally" | "find_index"
@@ -11428,7 +11437,7 @@ impl Parser {
             | "dedup" | "nth" | "tail" | "take" | "drop" | "tee" | "range"
             | "inc" | "dec" | "elapsed"
             // ── filesystem extensions ───────────────────────────────────────
-            | "files" | "filesf" | "fr" | "dirs" | "d" | "dr" | "sym_links"
+            | "files" | "filesf" | "f" | "fr" | "dirs" | "d" | "dr" | "sym_links"
             | "sockets" | "pipes" | "block_devices" | "char_devices"
             | "basename" | "dirname" | "fileparse" | "realpath" | "canonpath"
             | "copy" | "move" | "spurt" | "read_bytes" | "which"
@@ -12322,6 +12331,57 @@ impl Parser {
             => Some(name),
             _ => None,
         }
+    }
+
+    /// Reserved hash names that cannot be shadowed by user declarations.
+    /// These are stryke's reflection hashes populated from builtins metadata.
+    fn is_reserved_hash_name(name: &str) -> bool {
+        matches!(
+            name,
+            "b" | "pc"
+                | "e"
+                | "a"
+                | "d"
+                | "c"
+                | "p"
+                | "all"
+                | "stryke::builtins"
+                | "stryke::perl_compats"
+                | "stryke::extensions"
+                | "stryke::aliases"
+                | "stryke::descriptions"
+                | "stryke::categories"
+                | "stryke::primaries"
+                | "stryke::all"
+        )
+    }
+
+    /// Check if a UDF name shadows a stryke builtin and error if so.
+    /// Called only in non-compat mode — compat mode allows shadowing for Perl 5 parity.
+    fn check_udf_shadows_builtin(&self, name: &str, line: usize) -> PerlResult<()> {
+        if Self::is_known_bareword(name) || Self::is_try_builtin_name(name) {
+            return Err(self.syntax_err(
+                format!(
+                    "cannot define sub `{name}`: shadows stryke builtin (use --compat for Perl 5 mode)"
+                ),
+                line,
+            ));
+        }
+        Ok(())
+    }
+
+    /// Check if a hash name shadows a reserved stryke hash and error if so.
+    /// Called only in non-compat mode.
+    fn check_hash_shadows_reserved(&self, name: &str, line: usize) -> PerlResult<()> {
+        if Self::is_reserved_hash_name(name) {
+            return Err(self.syntax_err(
+                format!(
+                    "cannot declare hash `%{name}`: shadows stryke reserved hash (use --compat for Perl 5 mode)"
+                ),
+                line,
+            ));
+        }
+        Ok(())
     }
 
     /// Parse a block OR a blockless comparison expression for sort/psort/heap.
@@ -14103,7 +14163,7 @@ mod tests {
 
     #[test]
     fn parse_state_variable() {
-        let p = parse_ok("sub counter { state $n = 0; $n++ }");
+        let p = parse_ok("sub my_counter { state $n = 0; $n++ }");
         assert_eq!(p.statements.len(), 1);
     }
 

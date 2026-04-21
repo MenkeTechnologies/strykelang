@@ -300,7 +300,7 @@ fn split_space {
     scalar(@r)
 }
 
-fn split_regex {
+fn split_re {
     my @r = split(/\s+/, "a  b   c")
     join(",", @r)
 }

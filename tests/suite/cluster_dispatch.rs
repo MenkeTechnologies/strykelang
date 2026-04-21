@@ -661,10 +661,10 @@ fn worker_session_runs_subs_prelude_once_visible_to_jobs() {
     .unwrap();
     let _ = read_typed_frame(&mut stdout).unwrap();
 
-    // SESSION_INIT defines a sub `triple`. Subsequent JOBs must see it.
+    // SESSION_INIT defines a sub `tripl`. Subsequent JOBs must see it.
     let init = SessionInit {
-        subs_prelude: "sub triple { return $_[0] * 3 }".to_string(),
-        block_src: "triple($_);".to_string(),
+        subs_prelude: "sub tripl { return $_[0] * 3 }".to_string(),
+        block_src: "tripl($_);".to_string(),
         capture: vec![],
     };
     send_msg(&mut stdin, frame_kind::SESSION_INIT, &init).unwrap();
@@ -723,8 +723,8 @@ fn dispatcher_runs_against_fake_ssh_with_two_slots() {
     let items: Vec<serde_json::Value> = (1..=20i64).map(|i| serde_json::json!(i)).collect();
     let result = run_cluster(
         &cluster,
-        "sub sq { return $_[0] * $_[0] }".to_string(),
-        "sq($_);".to_string(),
+        "sub square_val { return $_[0] * $_[0] }".to_string(),
+        "square_val($_);".to_string(),
         vec![],
         items,
     );

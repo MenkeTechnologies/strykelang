@@ -8,8 +8,8 @@ fn ampersand_sub_invokes_named_sub() {
     assert_eq!(
         eval_int(
             r#"no strict 'vars';
-            sub tally { 40 }
-            tally() + &tally"#,
+            sub count_up { 40 }
+            count_up() + &count_up"#,
         ),
         80
     );
@@ -31,13 +31,13 @@ fn backslash_ampersand_yields_coderef_and_call() {
 #[test]
 fn vm_program_compiles_subroutine_code_ref() {
     let code = r#"no strict 'vars';
-        sub f { 1 }
-        \&f"#;
+        sub foo { 1 }
+        \&foo"#;
     let program = stryke::parse(code).expect("parse");
     let mut interp = Interpreter::new();
     assert!(
         stryke::try_vm_execute(&program, &mut interp).is_some(),
-        "expected bytecode VM for \\\\&f expression"
+        "expected bytecode VM for \\\\&foo expression"
     );
 }
 

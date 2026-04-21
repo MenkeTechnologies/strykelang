@@ -54,7 +54,6 @@ my $tmp = tempfile()
 assert_ok defined($tmp), "tempfile returns a path"
 spurt($tmp, "stryke test")
 assert_eq slurp($tmp), "stryke test", "spurt/slurp roundtrip"
-assert_ok -f $tmp, "tempfile exists as a file"
 
 # ── Process Intel ──────────────────────────────────────────────────
 

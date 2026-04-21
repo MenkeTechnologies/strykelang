@@ -252,8 +252,8 @@ fn map_in_scalar_context_is_element_count() {
 fn defined_ampersand_sub() {
     assert_eq!(
         eval_int(
-            r#"sub f { 1 }
-               defined &f ? 1 : 0"#,
+            r#"sub foo { 1 }
+               defined &foo ? 1 : 0"#,
         ),
         1
     );

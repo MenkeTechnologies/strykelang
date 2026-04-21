@@ -4,6 +4,7 @@
 // docs are normalized to `crate::…` paths and public-only links.
 #![allow(rustdoc::private_intra_doc_links)]
 #![allow(rustdoc::broken_intra_doc_links)]
+#![allow(clippy::needless_range_loop)]
 
 pub mod aot;
 pub mod ast;

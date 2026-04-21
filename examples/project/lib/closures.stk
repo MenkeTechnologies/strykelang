@@ -136,7 +136,7 @@ fn closure_modifies_outer {
 
 # ── Higher-order functions ─────────────────────────────────────────
 
-fn compose($f, $g) {
+fn compose_fns($f, $g) {
     fn ($x) { $f->($g->($x)) }
 }
 

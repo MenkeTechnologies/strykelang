@@ -253,19 +253,19 @@ mod tests {
     #[test]
     fn detect_and_eval_fib_style() {
         let code =
-            "sub fib { my $n = shift @_; return $n if $n <= 1; return fib($n-1) + fib($n-2); }";
+            "sub fib_n { my $n = shift @_; return $n if $n <= 1; return fib_n($n-1) + fib_n($n-2); }";
         let program = parse(code).expect("parse");
         let sub_stmt = program.statements.iter().find_map(|s| {
             if let StmtKind::SubDecl { name, body, .. } = &s.kind {
-                if name == "fib" {
+                if name == "fib_n" {
                     return Some(body.clone());
                 }
             }
             None
         });
-        let body = sub_stmt.expect("sub fib");
+        let body = sub_stmt.expect("sub fib_n");
         let ps = PerlSub {
-            name: "fib".into(),
+            name: "fib_n".into(),
             params: vec![],
             body,
             closure_env: None,

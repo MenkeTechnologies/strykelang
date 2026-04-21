@@ -4949,8 +4949,8 @@ fn builtin_gamma_approx(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
         }
         let z = z - 1.0;
         let mut x = c[0];
-        for i in 1..(g + 2) {
-            x += c[i] / (z + i as f64);
+        for (i, &ci) in c.iter().enumerate().skip(1).take(g + 1) {
+            x += ci / (z + i as f64);
         }
         let t = z + g as f64 + 0.5;
         (2.0 * std::f64::consts::PI).sqrt() * t.powf(z + 0.5) * (-t).exp() * x
@@ -7078,11 +7078,11 @@ fn builtin_softplus(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 fn builtin_hard_sigmoid(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
-    Ok(PerlValue::float((x / 6.0 + 0.5).max(0.0).min(1.0)))
+    Ok(PerlValue::float((x / 6.0 + 0.5).clamp(0.0, 1.0)))
 }
 fn builtin_hard_swish(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
-    Ok(PerlValue::float(x * (x + 3.0).max(0.0).min(6.0) / 6.0))
+    Ok(PerlValue::float(x * (x + 3.0).clamp(0.0, 6.0) / 6.0))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -7110,7 +7110,7 @@ fn builtin_bessel_j0(args: &[PerlValue]) -> PerlResult<PerlValue> {
         let q = -0.1562499995e-1
             + y * (0.1430488765e-3
                 + y * (-0.6911147651e-5 + y * (0.7621095161e-6 - y * 0.934935152e-7)));
-        (0.636619772 / x).sqrt() * (xx.cos() * p - z * xx.sin() * q)
+        (std::f64::consts::FRAC_2_PI / x).sqrt() * (xx.cos() * p - z * xx.sin() * q)
     };
     Ok(PerlValue::float(result))
 }
@@ -7139,7 +7139,7 @@ fn builtin_bessel_j1(args: &[PerlValue]) -> PerlResult<PerlValue> {
         let q = 0.04687499995
             + y * (-0.2002690873e-3
                 + y * (0.8449199096e-5 + y * (-0.88228987e-6 + y * 0.105787412e-6)));
-        let ans = (0.636619772 / ax).sqrt() * (xx.cos() * p - z * xx.sin() * q);
+        let ans = (std::f64::consts::FRAC_2_PI / ax).sqrt() * (xx.cos() * p - z * xx.sin() * q);
         if x < 0.0 {
             -ans
         } else {
@@ -7746,7 +7746,7 @@ fn builtin_punif(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
-    Ok(PerlValue::float(((x - a) / (b - a)).max(0.0).min(1.0)))
+    Ok(PerlValue::float(((x - a) / (b - a)).clamp(0.0, 1.0)))
 }
 
 /// `pexp x, rate` — exponential CDF.
@@ -8939,7 +8939,7 @@ fn builtin_pgamma(args: &[PerlValue]) -> PerlResult<PerlValue> {
         }
     }
     let result = z.powf(shape) * (-z).exp() * sum / lgamma_fn(shape).exp();
-    Ok(PerlValue::float(result.min(1.0).max(0.0)))
+    Ok(PerlValue::float(result.clamp(0.0, 1.0)))
 }
 
 /// `pbeta x, a, b` — beta CDF (regularized incomplete beta).
@@ -8963,7 +8963,7 @@ fn builtin_pbeta(args: &[PerlValue]) -> PerlResult<PerlValue> {
         sum += t.powf(a - 1.0) * (1.0 - t).powf(b - 1.0);
     }
     let result = sum * dx / ln_beta.exp();
-    Ok(PerlValue::float(result.min(1.0).max(0.0)))
+    Ok(PerlValue::float(result.clamp(0.0, 1.0)))
 }
 
 fn builtin_pchisq(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -8997,7 +8997,7 @@ fn builtin_pt(args: &[PerlValue]) -> PerlResult<PerlValue> {
         let t = lo + (i as f64 + 0.5) * dx;
         sum += coeff * (1.0 + t * t / df).powf(-(df + 1.0) / 2.0);
     }
-    Ok(PerlValue::float((sum * dx).min(1.0).max(0.0)))
+    Ok(PerlValue::float((sum * dx).clamp(0.0, 1.0)))
 }
 
 fn builtin_pf(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -9260,7 +9260,7 @@ fn builtin_qbeta(args: &[PerlValue]) -> PerlResult<PerlValue> {
         }
         let dx = (cdf - p) / pdf;
         x -= dx;
-        x = x.max(1e-12).min(1.0 - 1e-12);
+        x = x.clamp(1e-12, 1.0 - 1e-12);
         if dx.abs() < 1e-10 {
             break;
         }
@@ -9911,6 +9911,7 @@ fn svg_axis_lines(x0: f64, _y0: f64, x1: f64, y1: f64) -> String {
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn svg_tick_labels(
     x_min: f64,
     x_max: f64,
@@ -10069,7 +10070,7 @@ fn builtin_hist_svg(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n_bins = args
         .get(1)
         .map(|v| v.to_number() as usize)
-        .unwrap_or_else(|| (data.len() as f64).sqrt().ceil().max(5.0).min(50.0) as usize);
+        .unwrap_or_else(|| (data.len() as f64).sqrt().ceil().clamp(5.0, 50.0) as usize);
     let title = args
         .get(2)
         .map(|v| v.to_string())

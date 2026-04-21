@@ -7855,7 +7855,7 @@ mod tests {
 
     #[test]
     fn compile_sub_postfix_inc_emits_post_inc_slot() {
-        let chunk = compile_snippet("sub f { my $x = 0; $x++; return $x; }").expect("compile");
+        let chunk = compile_snippet("sub foo { my $x = 0; $x++; return $x; }").expect("compile");
         assert!(
             chunk.ops.iter().any(|o| matches!(o, Op::PostIncSlot(_))),
             "expected PostIncSlot in compiled sub body, ops={:?}",

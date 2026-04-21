@@ -15,10 +15,10 @@ fn power_rec($base, $exp) {
     $base * power_rec($base, $exp - 1)
 }
 
-fn count_digits($n) {
+fn digit_count($n) {
     $n = abs($n)
     return 1 if $n < 10
-    1 + count_digits(int($n / 10))
+    1 + digit_count(int($n / 10))
 }
 
 fn sum_digits($n) {
@@ -145,17 +145,17 @@ fn flatten_nested($arr) {
     $ret
 }
 
-fn deep_clone($data) {
+fn clone_deep($data) {
     return $data unless ref($data)
     if (ref($data) eq "ARRAY") {
-        my @cloned = map { deep_clone($_) } @$data
+        my @cloned = map { clone_deep($_) } @$data
         my $ret = [@cloned]
         return $ret
     }
     if (ref($data) eq "HASH") {
         my $clone = {}
         for my $k (keys %$data) {
-            $clone->{$k} = deep_clone($data->{$k})
+            $clone->{$k} = clone_deep($data->{$k})
         }
         return $clone
     }

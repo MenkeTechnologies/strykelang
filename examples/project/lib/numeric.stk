@@ -292,7 +292,7 @@ fn assign_pow {
 fn test_bit_and { 12 & 10 }
 fn test_bit_or { 12 | 10 }
 fn test_bit_xor { 12 ^ 10 }
-fn bit_not { ~0 }
+fn test_bit_not { ~0 }
 fn bit_lshift { 1 << 4 }
 fn bit_rshift { 16 >> 2 }
 

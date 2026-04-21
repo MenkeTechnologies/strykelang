@@ -1436,21 +1436,21 @@ impl Interpreter {
         let primaries_map = crate::builtins::primaries_hash_map();
         let all_map = crate::builtins::all_hash_map();
         self.scope
-            .declare_hash_global("stryke::builtins", builtins_map.clone());
+            .declare_hash_global_frozen("stryke::builtins", builtins_map.clone());
         self.scope
-            .declare_hash_global("stryke::perl_compats", perl_compats_map.clone());
+            .declare_hash_global_frozen("stryke::perl_compats", perl_compats_map.clone());
         self.scope
-            .declare_hash_global("stryke::extensions", extensions_map.clone());
+            .declare_hash_global_frozen("stryke::extensions", extensions_map.clone());
         self.scope
-            .declare_hash_global("stryke::aliases", aliases_map.clone());
+            .declare_hash_global_frozen("stryke::aliases", aliases_map.clone());
         self.scope
-            .declare_hash_global("stryke::descriptions", descriptions_map.clone());
+            .declare_hash_global_frozen("stryke::descriptions", descriptions_map.clone());
         self.scope
-            .declare_hash_global("stryke::categories", categories_map.clone());
+            .declare_hash_global_frozen("stryke::categories", categories_map.clone());
         self.scope
-            .declare_hash_global("stryke::primaries", primaries_map.clone());
+            .declare_hash_global_frozen("stryke::primaries", primaries_map.clone());
         self.scope
-            .declare_hash_global("stryke::all", all_map.clone());
+            .declare_hash_global_frozen("stryke::all", all_map.clone());
         // Short aliases: only declare if no user-declared hash with that name
         // exists, to avoid overwriting `my %e` etc.
         for (name, val) in [
@@ -1464,7 +1464,7 @@ impl Interpreter {
             ("all", all_map),
         ] {
             if !self.scope.any_frame_has_hash(name) {
-                self.scope.declare_hash_global(name, val);
+                self.scope.declare_hash_global_frozen(name, val);
             }
         }
     }
@@ -6197,7 +6197,7 @@ impl Interpreter {
         &mut self,
         subject: &PerlValue,
         expr: &Expr,
-        line: usize,
+        _line: usize,
     ) -> Result<bool, FlowOrError> {
         if let ExprKind::BinOp {
             left,
@@ -6205,10 +6205,10 @@ impl Interpreter {
             right,
         } = &expr.kind
         {
-            if self.match_pattern_value_alternation(subject, left, line)? {
+            if self.match_pattern_value_alternation(subject, left, _line)? {
                 return Ok(true);
             }
-            return self.match_pattern_value_alternation(subject, right, line);
+            return self.match_pattern_value_alternation(subject, right, _line);
         }
         let pv = self.eval_expr(expr)?;
         Ok(self.smartmatch_when(subject, &pv))

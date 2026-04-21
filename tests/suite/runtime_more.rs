@@ -308,8 +308,8 @@ fn sub_adds_two_via_return() {
 fn sub_calls_sub() {
     assert_eq!(
         eval_int(
-            "sub inc { my $x = shift @_; return $x + 1; } \
-             sub twice { my $y = shift @_; return inc($y) + inc($y); } \
+            "sub incr { my $x = shift @_; return $x + 1; } \
+             sub twice { my $y = shift @_; return incr($y) + incr($y); } \
              twice(5)",
         ),
         12

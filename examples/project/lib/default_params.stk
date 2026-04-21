@@ -58,7 +58,7 @@ fn hash_default_access($key, %data = (a => 10, b => 20)) {
 
 # Note: stryke passes $_ implicitly when calling with no explicit args,
 # so we need a dummy first param or explicit call patterns
-fn in_range($x, $min, $max) {
+fn check_in_range($x, $min, $max) {
     $min <= $x <= $max
 }
 

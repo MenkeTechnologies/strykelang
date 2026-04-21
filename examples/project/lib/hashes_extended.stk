@@ -4,8 +4,8 @@
 # HASH CREATION
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn hash_from_pairs { my %h = (a => 1, b => 2, c => 3); \%h }
-fn hash_from_list { my %h = qw(a 1 b 2 c 3); \%h }
+fn pairs_to_hash { my %h = (a => 1, b => 2, c => 3); \%h }
+fn list_to_hash { my %h = qw(a 1 b 2 c 3); \%h }
 fn hash_empty { my %h = (); \%h }
 fn hash_single { my %h = (key => "value"); \%h }
 
@@ -248,7 +248,7 @@ fn hash_grep_values {
     scalar(@big)
 }
 
-fn hash_map_values {
+fn hash_vals_map {
     my %h = (a => 1, b => 2)
     $h{a} * 2
 }

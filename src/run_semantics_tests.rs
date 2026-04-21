@@ -1746,9 +1746,9 @@ fn pipeline_grep_alias_matches_filter() {
 fn pipeline_qualified_sub_chain() {
     let s = r#"
         package P;
-        sub triple { $_ * 3 }
+        sub tripl { $_ * 3 }
         package main;
-        my @r = pipeline(1, 2)->P::triple->collect();
+        my @r = pipeline(1, 2)->P::tripl->collect();
         $r[0] + $r[1];
     "#;
     assert_eq!(ri(s), 9);
@@ -1905,13 +1905,13 @@ fn runtime_push_isa_updates_method_resolution() {
     assert_eq!(
         ri(r#"
         package P;
-        sub ping { 42 }
+        sub pong { 42 }
         package C;
         our @ISA;
         push @C::ISA, "P";
         package main;
         my $o = bless {}, "C";
-        $o->ping()
+        $o->pong()
     "#),
         42
     );
@@ -2049,9 +2049,9 @@ fn perl_compat_use_overload_combined_coderef() {
     assert_eq!(
         ri(r#"
         package O;
-        use overload '+' => \&add, '""' => \&stringify;
-        sub add { my ($a, $b) = @_; $a->{n} + $b->{n} }
-        sub stringify { "v" . $_0->{n} }
+        use overload '+' => \&add_op, '""' => \&to_str;
+        sub add_op { my ($a, $b) = @_; $a->{n} + $b->{n} }
+        sub to_str { "v" . $_0->{n} }
         package main;
         my $a = O->new(n => 2);
         my $b = O->new(n => 3);
@@ -2062,9 +2062,9 @@ fn perl_compat_use_overload_combined_coderef() {
     assert_eq!(
         rs(r#"
         package O;
-        use overload '+' => \&add, '""' => \&stringify;
-        sub add { my ($a, $b) = @_; $a->{n} + $b->{n} }
-        sub stringify { "v" . $_0->{n} }
+        use overload '+' => \&add_op, '""' => \&to_str;
+        sub add_op { my ($a, $b) = @_; $a->{n} + $b->{n} }
+        sub to_str { "v" . $_0->{n} }
         package main;
         my $o = bless { n => 7 }, "O";
         "$o"
@@ -2156,8 +2156,8 @@ fn perl_compat_use_overload_unary_neg() {
     assert_eq!(
         ri(r#"
         package O;
-        use overload 'neg' => 'negate';
-        sub negate { my ($x) = @_; 42 }
+        use overload 'neg' => 'negate_op';
+        sub negate_op { my ($x) = @_; 42 }
         package main;
         my $o = bless {}, "O";
         -$o;
@@ -2364,8 +2364,8 @@ fn perl_compat_use_overload_dispatches_ne_and_spaceship() {
     assert_eq!(
         ri(r#"
         package O;
-        use overload 'ne' => 'one', '<=>' => 'osp';
-        sub one { my ($a, $b) = @_; 1 }
+        use overload 'ne' => 'cmp_ne', '<=>' => 'osp';
+        sub cmp_ne { my ($a, $b) = @_; 1 }
         sub osp { my ($a, $b) = @_; $a->{n} <=> $b }
         package main;
         my $o = O->new(n => 9);
@@ -3373,9 +3373,9 @@ fn local_in_subroutine() {
     assert_eq!(
         rs(r#"
             our $x = 10;
-            sub outer { local $x = 20; inner() }
-            sub inner { $x }
-            outer() . "|" . $x
+            sub wrap { local $x = 20; inner_fn() }
+            sub inner_fn { $x }
+            wrap() . "|" . $x
         "#),
         "20|10"
     );
@@ -4082,9 +4082,9 @@ fn grep_with_regex_block() {
 }
 
 #[test]
-fn f_keyword_with_block() {
+fn fi_keyword_with_block() {
     let s = r#"
-        my @r = f { /a/ } ("apple", "banana", "cherry");
+        my @r = fi { /a/ } ("apple", "banana", "cherry");
         join ",", @r;
     "#;
     assert_eq!(rs(s), "apple,banana");

@@ -10,11 +10,11 @@ fn contains_word($str, $word) {
     $str =~ /\b$word\b/ ? 1 : 0
 }
 
-fn starts_with($str, $prefix) {
+fn has_prefix($str, $prefix) {
     $str =~ /^$prefix/ ? 1 : 0
 }
 
-fn ends_with($str, $suffix) {
+fn has_suffix($str, $suffix) {
     $str =~ /$suffix$/ ? 1 : 0
 }
 
@@ -75,19 +75,19 @@ fn trim_whitespace($str) {
     $result
 }
 
-fn normalize_spaces($str) {
+fn spaces_normalize($str) {
     my $result = $str
     $result =~ s/\s+/ /g
     $result
 }
 
-fn camel_to_snake($str) {
+fn camelcase_to_snake($str) {
     my $result = $str
     $result =~ s/([a-z])([A-Z])/${1}_${2}/g
     lc($result)
 }
 
-fn snake_to_camel($str) {
+fn snake_to_camelcase($str) {
     my $result = $str
     $result =~ s/_([a-z])/uc($1)/ge
     $result
@@ -127,12 +127,12 @@ fn match_multiline($str, $pattern) {
 
 # ── Character classes ──────────────────────────────────────────────
 
-fn count_vowels($str) {
+fn vowels_count($str) {
     my @v = ($str =~ /[aeiouAEIOU]/g)
     scalar @v
 }
 
-fn count_consonants($str) {
+fn consonants_count($str) {
     my @c = ($str =~ /[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]/g)
     scalar @c
 }
@@ -147,7 +147,7 @@ fn is_hex($str) {
 
 # ── Anchors and boundaries ─────────────────────────────────────────
 
-fn count_words($str) {
+fn words_count($str) {
     my @words = ($str =~ /\b\w+\b/g)
     scalar @words
 }
@@ -219,7 +219,7 @@ fn mask_digits($str) {
     $result
 }
 
-fn reverse_words($str) {
+fn words_reversed($str) {
     my @words = split(/\s+/, $str)
     join(" ", reverse @words)
 }

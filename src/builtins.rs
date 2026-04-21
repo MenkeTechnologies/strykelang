@@ -9065,7 +9065,7 @@ fn builtin_du_tree(
     let root_size = dir_size(std::path::Path::new(&path));
     entries.push((path.clone(), root_size));
     collect_tree(std::path::Path::new(&path), 1, max_depth, &mut entries);
-    entries.sort_by(|a, b| b.1.cmp(&a.1));
+    entries.sort_by_key(|entry| std::cmp::Reverse(entry.1));
     let result: Vec<PerlValue> = entries
         .into_iter()
         .map(|(p, s)| {
@@ -16479,11 +16479,13 @@ fn parse_date_flexible(s: &str) -> Option<chrono::NaiveDateTime> {
     None
 }
 
+type DurationPattern = (&'static str, fn(i64) -> chrono::Duration);
+
 /// Parse a duration string: "1d", "2w", "3h", "30m", "1y", "1mo", "1 week", etc.
 fn parse_duration_str(s: &str) -> Option<chrono::Duration> {
     let s = s.trim().to_lowercase();
     // Try formats like "1d", "2w", "3h", "30m", "5s", "1y", "1mo"
-    let re_patterns: &[(&str, fn(i64) -> chrono::Duration)] = &[
+    let re_patterns: &[DurationPattern] = &[
         ("seconds", |n| chrono::Duration::seconds(n)),
         ("second", |n| chrono::Duration::seconds(n)),
         ("secs", |n| chrono::Duration::seconds(n)),
@@ -22953,8 +22955,7 @@ fn parse_json_value(s: &str) -> PerlResult<PerlValue> {
                 .replace("\\t", "\t")
                 .replace("\\r", "\r")
                 .replace("\\\"", "\"")
-                .replace("\\\\", "\\")
-                .into(),
+                .replace("\\\\", "\\"),
         ));
     }
     if let Ok(n) = s.parse::<i64>() {
@@ -23110,7 +23111,7 @@ fn parse_yaml(s: &str) -> PerlResult<PerlValue> {
     if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
         let inner = &s[1..s.len() - 1];
         return Ok(PerlValue::string(
-            inner.replace("\\n", "\n").replace("\\\"", "\"").into(),
+            inner.replace("\\n", "\n").replace("\\\"", "\""),
         ));
     }
     if s.starts_with("- ") || s.starts_with("-\n") {
@@ -23128,11 +23129,11 @@ fn parse_yaml_array(s: &str) -> PerlResult<PerlValue> {
     let mut in_item = false;
     for line in s.lines() {
         let trimmed = line.trim_start();
-        if trimmed.starts_with("- ") {
+        if let Some(stripped) = trimmed.strip_prefix("- ") {
             if in_item && !current.is_empty() {
                 items.push(parse_yaml(&current)?);
             }
-            current = trimmed[2..].to_string();
+            current = stripped.to_string();
             in_item = true;
         } else if in_item {
             current.push('\n');
@@ -23244,7 +23245,7 @@ fn parse_toml_value(s: &str) -> PerlValue {
     }
     if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
         let inner = &s[1..s.len() - 1];
-        return PerlValue::string(inner.replace("\\n", "\n").replace("\\\"", "\"").into());
+        return PerlValue::string(inner.replace("\\n", "\n").replace("\\\"", "\""));
     }
     if s.starts_with('[') && s.ends_with(']') {
         let inner = &s[1..s.len() - 1];
@@ -23318,17 +23319,14 @@ fn parse_xml_element(s: &str) -> PerlResult<(PerlValue, &str)> {
     if !s.starts_with('<') {
         let end = s.find('<').unwrap_or(s.len());
         let text = xml_unescape(s[..end].trim());
-        return Ok((PerlValue::string(text.into()), &s[end..]));
+        return Ok((PerlValue::string(text), &s[end..]));
     }
     let tag_end = s
         .find('>')
         .ok_or_else(|| PerlError::runtime("Invalid XML: unclosed tag", 0))?;
     let tag_content = &s[1..tag_end];
-    if tag_content.ends_with('/') {
-        let tag_name = tag_content[..tag_content.len() - 1]
-            .split_whitespace()
-            .next()
-            .unwrap_or("");
+    if let Some(stripped) = tag_content.strip_suffix('/') {
+        let tag_name = stripped.split_whitespace().next().unwrap_or("");
         let hash: indexmap::IndexMap<String, PerlValue> = indexmap::IndexMap::new();
         let hash = Arc::new(RwLock::new(hash));
         hash.write().insert(tag_name.to_string(), PerlValue::UNDEF);
@@ -23355,7 +23353,7 @@ fn parse_xml_element(s: &str) -> PerlResult<(PerlValue, &str)> {
         let hash = Arc::new(RwLock::new(hash));
         hash.write().insert(
             tag_name.to_string(),
-            PerlValue::string(xml_unescape(content).into()),
+            PerlValue::string(xml_unescape(content)),
         );
         return Ok((PerlValue::hash_ref(hash), rest));
     }
