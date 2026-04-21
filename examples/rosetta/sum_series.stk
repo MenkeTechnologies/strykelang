@@ -1,0 +1,11 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sum of a Series
+
+# Task: Sum 1/x^2 for x=1..1000
+my $sum = 0;
+for my $x (1..1000) {
+    $sum += 1 / ($x * $x);
+}
+
+printf "Sum of 1/x^2 for x=1..1000: %.10f\n", $sum;
+printf "Approx pi^2 / 6:          %.10f\n", (3.1415926535 ** 2) / 6;

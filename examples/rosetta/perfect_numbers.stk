@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Perfect Numbers
+
+fn is_perfect($n) {
+    return 0 if $n < 2;
+    my $sum = 1;
+    for (my $i = 2; $i * $i <= $n; $i++) {
+        if ($n % $i == 0) {
+            $sum += $i;
+            my $q = $n / $i;
+            $sum += $q if $q != $i;
+        }
+    }
+    return $sum == $n;
+}
+
+print "Perfect numbers up to 10000:\n";
+for my $i (1..10000) {
+    if (is_perfect($i)) {
+        print "$i\n";
+    }
+}

@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Regular Expressions
+
+my $text = "The quick brown fox jumps over the lazy dog.";
+
+# Test for match
+if ($text =~ /quick/) {
+    print "Matched 'quick'\n";
+}
+
+# Global match (extract all 3-letter words)
+my @words3 = $text =~ /\b\w{3}\b/g;
+print "3-letter words: " . join(", ", @words3) . "\n";
+
+# Replacement (gr modifier returns the result without modifying original)
+my $new_text = $text =~ s/fox/wolf/gr;
+print "Original: $text\n";
+print "Replaced: $new_text\n";

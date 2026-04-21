@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Topological Sort
+
+fn topo_sort($deps) {
+    my @result;
+    my %visited;
+    my %visiting;
+    
+    my $visit = fn ($node) {
+        my $self_fn = $_callee;
+        return if $visited{$node};
+        die "Cycle detected" if $visiting{$node};
+        
+        $visiting{$node} = 1;
+        if (exists $deps->{$node}) {
+            for my $dep (@{$deps->{$node}}) {
+                $self_fn->($dep);
+            }
+        }
+        delete $visiting{$node};
+        $visited{$node} = 1;
+        push @result, $node;
+    };
+    
+    for my $node (keys %$deps) {
+        $visit->($node);
+    }
+    
+    return @result;
+}
+
+my $dependencies = {
+    "desktops" => ["workstation", "laptop"],
+    "workstation" => ["server"],
+    "laptop" => ["server"],
+    "server" => [],
+    "router" => ["server", "modem"],
+    "modem" => []
+};
+
+my @order = topo_sort($dependencies);
+print "Execution order: " . join(" -> ", @order) . "\n";

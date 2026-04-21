@@ -45,7 +45,7 @@ fn array_ref_slice($aref, $start, $end) {
 # ── Hash references ────────────────────────────────────────────────
 
 fn make_hash_ref {
-    +{ name => "test", value => 42, active => 1 }
+    { name => "test", value => 42, active => 1 }
 }
 
 fn hash_ref_get($href, $key) {
@@ -78,12 +78,12 @@ fn hash_ref_delete($href, $key) {
 # ── Nested references ──────────────────────────────────────────────
 
 fn make_nested_structure {
-    +{
+    {
         users => [
-            +{ name => "Alice", age => 30 },
-            +{ name => "Bob", age => 25 },
+            { name => "Alice", age => 30 },
+            { name => "Bob", age => 25 },
         ],
-        config => +{
+        config => {
             debug => 1,
             timeout => 60,
         },
@@ -103,7 +103,7 @@ fn nested_get_config($data, $key) {
 }
 
 fn nested_add_user($data, $name, $age) {
-    push @{$data->{users}}, +{ name => $name, age => $age }
+    push @{$data->{users}}, { name => $name, age => $age }
     $data
 }
 
@@ -145,14 +145,14 @@ fn is_scalar_ref($ref) {
 # ── Autovivification ───────────────────────────────────────────────
 
 fn autoviv_array {
-    my $data = +{ items => [] }
+    my $data = { items => [] }
     $data->{items}->[0] = "first"
     $data->{items}->[1] = "second"
     $data
 }
 
 fn autoviv_hash {
-    my $data = +{ nested => { deep => {} } }
+    my $data = { nested => { deep => {} } }
     $data->{nested}->{deep}->{value} = 42
     $data
 }
@@ -177,7 +177,7 @@ fn modify_alias {
 # ── Complex data structures ────────────────────────────────────────
 
 fn make_tree_node($val, $left, $right) {
-    +{ value => $val, left => $left, right => $right }
+    { value => $val, left => $left, right => $right }
 }
 
 fn tree_sum($node) {
@@ -197,7 +197,7 @@ fn tree_sum($node) {
 fn make_linked_list(@vals) {
     my $head = undef
     for my $v (reverse @vals) {
-        $head = +{ value => $v, next => $head }
+        $head = { value => $v, next => $head }
     }
     $head
 }
@@ -225,8 +225,8 @@ fn list_to_array($head) {
 # ── WeakRef-like patterns ──────────────────────────────────────────
 
 fn circular_safe {
-    my $a = +{ name => "A" }
-    my $b = +{ name => "B" }
+    my $a = { name => "A" }
+    my $b = { name => "B" }
     $a->{ref} = $b
     $a->{name} . "-" . $b->{name}
 }

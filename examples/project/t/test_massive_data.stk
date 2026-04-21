@@ -1,0 +1,90 @@
+#!/usr/bin/env stryke
+# t/test_massive_data.stk — Stress testing massive data structures
+
+require "./lib/massive_data.stk"
+
+# ── 1. Hierarchical Data: The Galaxy ──────────────────────────────
+
+my $num_sectors = 10
+my $sys_per_sector = 5
+# Total Systems = 50
+# Total Planets = 50 * 3 = 150
+# Total Moons = 150 * 2 = 300
+
+my $galaxy = generate_massive_galaxy($num_sectors, $sys_per_sector)
+
+assert_eq $galaxy->name, "Andromeda", "Galaxy name"
+my $stats = galaxy_stats($galaxy)
+
+assert_eq $stats->{sectors}, 10, "Stats: sectors"
+assert_eq $stats->{systems}, 50, "Stats: systems"
+assert_eq $stats->{planets}, 150, "Stats: planets"
+assert_eq $stats->{moons}, 300, "Stats: moons"
+
+# ── 2. Deep Access ────────────────────────────────────────────────
+
+my $s1 = $galaxy->sectors->[0]
+my $sys_map = $s1->systems
+my @sys_names = keys %$sys_map
+my $sys1 = $sys_map->{$sys_names[0]}
+my $p1 = $sys1->planets->[0]
+my $m1 = $p1->moons->[0]
+
+assert_true defined($m1->name), "Deep moon access"
+assert_true $m1->mass < 100, "Moon mass check"
+
+# ── 3. Cross-linked Mesh (Cyclic Graph) ───────────────────────────
+
+my $mesh_size = 20
+my @nodes = create_linked_mesh($mesh_size)
+
+assert_eq scalar(@nodes), 20, "Mesh size"
+assert_eq scalar(@{$nodes[0]->edges}), 3, "Node degree"
+
+# Test traversal (depth-limited to avoid infinite recursion in cycles)
+my $sum = traverse_mesh($nodes[0], 3)
+assert_gt $sum, 0, "Graph traversal sum"
+
+# Verify references are stable
+my $n0 = $nodes[0]
+my $neighbor = $n0->edges->[0]
+# Cycle: nodes[0] -> nodes[1] -> nodes[0]
+my $back = $neighbor->edges->[1]
+assert_eq $n0->id, $back->id, "Stable circular references"
+
+# ── 4. Mass Transformation ─────────────────────────────────────────
+
+# Extract all moon names from the entire galaxy using nested map
+my $seclist = $galaxy->sectors;
+my @all_moon_names = map {
+    my $sec = $_;
+    my $smap = $sec->systems;
+    map {
+        my $sys = $_;
+        my $plist = $sys->planets;
+        map {
+            my $plan = $_;
+            my $mlist = $plan->moons;
+            map { $_->name } @$mlist
+        } @$plist
+    } values %$smap
+} @$seclist
+
+assert_eq scalar(@all_moon_names), 300, "Extracted all moon names"
+assert_true $all_moon_names[0] =~ /^Moon-/, "Moon naming pattern"
+
+# ── 5. Stressing Hash of Hashes ───────────────────────────────────
+
+my %big_map
+for (1..1000) {
+    my $inner = {}
+    for my $j (1..10) {
+        $inner->{"k$j"} = "val-$_-$j"
+    }
+    $big_map{"key-$_"} = $inner
+}
+
+assert_eq scalar(keys %big_map), 1000, "Large hash count"
+assert_eq $big_map{"key-500"}->{"k5"}, "val-500-5", "Large hash deep lookup"
+
+test_run

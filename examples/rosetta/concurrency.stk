@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Async/Await (Concurrency)
+
+fn slow_task($id, $seconds) {
+    print "Task $id starting (sleep $seconds)...\n";
+    sleep $seconds;
+    return "Result from $id";
+}
+
+my $start = el();
+
+# Launch tasks in parallel
+my $t1 = async { slow_task(1, 0.5) };
+my $t2 = async { slow_task(2, 0.3) };
+my $t3 = async { slow_task(3, 0.1) };
+
+# Await results
+my @results = (await($t1), await($t2), await($t3));
+my $elapsed = el() - $start;
+
+print "All results: " . join(", ", @results) . "\n";
+printf "Total elapsed time: %.2f seconds (should be ~0.5)\n", $elapsed;

@@ -337,15 +337,18 @@ pub(crate) fn struct_new_with_defaults(
     for (idx, field) in def.fields.iter().enumerate() {
         if values[idx].is_undef() {
             if let Some(dv) = defaults.get(idx).and_then(|o| o.as_ref()) {
-                field.ty.check_value(dv).map_err(|msg| {
-                    PerlError::type_error(
-                        format!(
-                            "struct {} field `{}` default: {}",
-                            def.name, field.name, msg
-                        ),
-                        line,
-                    )
-                })?;
+                // Skip type check if default is undef (nullable field pattern)
+                if !dv.is_undef() {
+                    field.ty.check_value(dv).map_err(|msg| {
+                        PerlError::type_error(
+                            format!(
+                                "struct {} field `{}` default: {}",
+                                def.name, field.name, msg
+                            ),
+                            line,
+                        )
+                    })?;
+                }
                 values[idx] = dv.clone();
             } else if field.default.is_none() && !matches!(field.ty, crate::ast::PerlTypeName::Any)
             {

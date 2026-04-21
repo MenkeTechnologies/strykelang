@@ -914,6 +914,8 @@ impl Clone for EnumInstance {
 pub struct ClassInstance {
     pub def: Arc<ClassDef>,
     pub values: RwLock<Vec<PerlValue>>,
+    /// Full ISA chain for this class (all ancestors, computed at instantiation).
+    pub isa_chain: Vec<String>,
 }
 
 impl ClassInstance {
@@ -921,7 +923,26 @@ impl ClassInstance {
         Self {
             def,
             values: RwLock::new(values),
+            isa_chain: Vec::new(),
         }
+    }
+
+    pub fn new_with_isa(
+        def: Arc<ClassDef>,
+        values: Vec<PerlValue>,
+        isa_chain: Vec<String>,
+    ) -> Self {
+        Self {
+            def,
+            values: RwLock::new(values),
+            isa_chain,
+        }
+    }
+
+    /// Check if this instance is-a given class name (direct or inherited).
+    #[inline]
+    pub fn isa(&self, name: &str) -> bool {
+        self.def.name == name || self.isa_chain.contains(&name.to_string())
     }
 
     #[inline]
@@ -964,6 +985,7 @@ impl Clone for ClassInstance {
         Self {
             def: Arc::clone(&self.def),
             values: RwLock::new(self.values.read().clone()),
+            isa_chain: self.isa_chain.clone(),
         }
     }
 }

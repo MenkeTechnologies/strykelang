@@ -131,7 +131,7 @@ fn status_is_complete($s) {
 struct Config { host, port, timeout }
 
 fn config_builder {
-    +{ host => "localhost", port => 8080, timeout => 30 }
+    { host => "localhost", port => 8080, timeout => 30 }
 }
 
 fn config_with_host($builder, $host) {

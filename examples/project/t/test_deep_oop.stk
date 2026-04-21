@@ -1,0 +1,79 @@
+#!/usr/bin/env stryke
+# t/test_deep_oop.stk — Comprehensive deep OOP stress test
+
+require "./lib/deep_oop.stk"
+
+# ── 1. Deep Inheritance Chain (7 levels) ───────────────────────────
+# BaseNode -> SpatialNode -> PhysicsBody -> Actor -> Humanoid -> Player -> Hero
+
+my $hero = Hero(
+    uuid => "h1",
+    name => "Arthur",
+    posX => 10.0,
+    posY => 20.0,
+    posZ => 0.0,
+    mass => 80.0,
+    velocity => 0.0,
+    health => 500,
+    level => 10,
+    species => "Human",
+    faction => "Order",
+    xp => 50,
+    inventory => [],
+    class_name => "Paladin",
+    ultimate_power => 0
+)
+
+assert_eq $hero->name, "Arthur", "L1: BaseNode property"
+assert_eq $hero->posX, 10.0, "L2: SpatialNode property"
+assert_eq $hero->mass, 80.0, "L3: PhysicsBody property"
+assert_eq $hero->health, 500, "L4: Actor property"
+assert_eq $hero->species, "Human", "L5: Humanoid property"
+assert_eq $hero->xp, 50, "L6: Player property"
+assert_eq $hero->class_name, "Paladin", "L7: Hero property"
+
+assert_eq $hero->type_name(), "Hero", "Polymorphism: deepest override"
+
+# ── 2. Trait Verification ──────────────────────────────────────────
+
+# Note: Inherited trait checks via 'does' currently have limitations in deep hierarchies
+assert_eq $hero->id(), "h1", "Trait method via inheritance"
+
+# ── 3. Multiple Inheritance & Mixins ───────────────────────────────
+
+my $mage = ArchMageHero(
+    uuid => "m1",
+    name => "Gandalf",
+    mana => 200,
+    posX => 0, posY => 0, posZ => 0, mass => 70, velocity => 0,
+    health => 100, level => 20, species => "Maia", faction => "Good",
+    xp => 1000, inventory => [], class_name => "Wizard",
+    ultimate_power => 100, altitude => 0, weapon_system => "Staff"
+)
+
+assert_eq $mage->mana, 200, "Mixin: MagicUser property"
+assert_eq $mage->cast_spell("Fireball"), "Casting Fireball!", "Mixin: MagicUser method"
+assert_eq $mage->takeoff(), "Airborne", "Mixin: Flyer method"
+assert_eq $mage->fire(), "BOOM", "Inherited Mixin method"
+assert_eq $mage->ultimate_magic(), "FIREBALL_STORM", "Mage ultimate"
+
+# ── 4. Type & Instance Reflection ──────────────────────────────────
+
+assert_true $mage->isa("ArchMageHero"), "isa self"
+assert_true $mage->isa("Hero"),         "isa Hero (Direct parent)"
+assert_true $mage->isa("MagicUser"),    "isa MagicUser (Mixin parent)"
+assert_true $mage->isa("CombatFlyer"),  "isa CombatFlyer (Mixin parent)"
+
+# ── 5. Deep Composition & Cross-Object Access ──────────────────────
+
+my $w = Weapon(name => "Excalibur", damage => 99)
+my $cs = CharacterSheet(weapon => $w)
+my $npc = ComplexNPC(
+    uuid => "n1", name => "Guardsman", sheet => $cs,
+    posX => 0, posY => 0, posZ => 0, mass => 100, velocity => 0,
+    health => 200, level => 10, species => "Human", faction => "Guard"
+)
+
+assert_eq $npc->weapon_name(), "Excalibur", "NPC deep composition access"
+
+test_run

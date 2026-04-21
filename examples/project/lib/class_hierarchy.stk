@@ -129,8 +129,8 @@ class Coordinate impl Cloneable {
 }
 
 class BoundingBox {
-    min: Coordinate
-    max: Coordinate
+    min: Any
+    max: Any
     
     fn width { $self->max->x - $self->min->x }
     fn height { $self->max->y - $self->min->y }
@@ -253,7 +253,9 @@ class Circle2D extends Shape2D {
     fn contains_point($x, $y) {
         my $dx = $x - $self->position->x
         my $dy = $y - $self->position->y
-        ($dx * $dx + $dy * $dy) <= ($self->radius * $self->radius)
+        my $dist_sq = $dx * $dx + $dy * $dy
+        my $rad_sq = $self->radius * $self->radius
+        $dist_sq <= $rad_sq ? 1 : 0
     }
 }
 
@@ -352,12 +354,12 @@ class Sphere3D extends Shape3D {
 class Address {
     street: Str
     city: Str
-    state: Str
+    region: Str
     zip: Str
     country: Str = "USA"
     
     fn to_str {
-        $self->street . ", " . $self->city . ", " . $self->state . " " . $self->zip
+        $self->street . ", " . $self->city . ", " . $self->region . " " . $self->zip
     }
     
     fn is_domestic { $self->country eq "USA" ? 1 : 0 }
@@ -425,7 +427,7 @@ class Employee extends Person {
             push @chain, $current
             $current = $current->manager
         }
-        @chain
+        return [@chain]
     }
     
     fn to_json {
@@ -611,7 +613,7 @@ class TextNode extends DocumentNode {
 }
 
 class ElementNode extends DocumentNode {
-    tag: Str
+    tag: Str = ""
     attributes: Hash = {}
     
     fn set_attr($key, $value) {
@@ -662,13 +664,13 @@ class FormNode extends ContainerNode {
 }
 
 class InputNode extends ElementNode {
+    tag: Str = "input"
     input_type: Str = "text"
     input_name: Str
     value: Str = ""
     required: Int = 0
     
     fn render {
-        $self->tag("input")
         $self->set_attr("type", $self->input_type)
         $self->set_attr("name", $self->input_name)
         $self->set_attr("value", $self->value) if $self->value
@@ -890,7 +892,7 @@ fn build_shape_scene {
         color => "yellow"
     )
     
-    [@shapes]
+    return [@shapes]
 }
 
 fn build_vehicle_fleet {
@@ -951,7 +953,7 @@ fn build_vehicle_fleet {
     )
     push @vehicles, $truck
     
-    [@vehicles]
+    return [@vehicles]
 }
 
 fn build_html_document {
@@ -999,5 +1001,5 @@ fn shapes_in_bounds($shapes, $bbox) {
             push @result, $s
         }
     }
-    [@result]
+    return [@result]
 }
