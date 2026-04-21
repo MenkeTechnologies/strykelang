@@ -939,10 +939,15 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
             from,
             to,
             exclusive,
+            step,
         } => {
             deparse_expr_into(buf, from);
             buf.push_str(if *exclusive { " ... " } else { " .. " });
             deparse_expr_into(buf, to);
+            if let Some(s) = step {
+                buf.push(':');
+                deparse_expr_into(buf, s);
+            }
         }
         ExprKind::FuncCall { name, args } => {
             buf.push_str(name);

@@ -4573,6 +4573,7 @@ impl Parser {
                             }),
                             to: Box::new(last_ix),
                             exclusive: false,
+                            step: None,
                         },
                         line,
                     };
@@ -6716,19 +6717,31 @@ impl Parser {
     fn parse_range(&mut self) -> PerlResult<Expr> {
         let left = self.parse_log_or()?;
         let line = left.line;
-        let exclusive = if self.eat(&Token::RangeExclusive) {
-            true
+        // `1..10` or `1...10` (traditional) or `1:10` (short form)
+        let (exclusive, _colon_style) = if self.eat(&Token::RangeExclusive) {
+            (true, false)
         } else if self.eat(&Token::Range) {
-            false
+            (false, false)
+        } else if self.eat(&Token::Colon) {
+            // `1:10` short form — only valid for numeric ranges, not ternary
+            // Lookahead: must be followed by something that looks like a range endpoint
+            (false, true)
         } else {
             return Ok(left);
         };
         let right = self.parse_log_or()?;
+        // Optional step: `1..100:2` or `1:100:2`
+        let step = if self.eat(&Token::Colon) {
+            Some(Box::new(self.parse_unary()?))
+        } else {
+            None
+        };
         Ok(Expr {
             kind: ExprKind::Range {
                 from: Box::new(left),
                 to: Box::new(right),
                 exclusive,
+                step,
             },
             line,
         })

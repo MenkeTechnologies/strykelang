@@ -8939,12 +8939,39 @@ impl Interpreter {
                 from,
                 to,
                 exclusive,
+                step,
             } => {
                 if ctx == WantarrayCtx::List {
                     let f = self.eval_expr(from)?;
                     let t = self.eval_expr(to)?;
-                    let list = perl_list_range_expand(f, t);
-                    Ok(PerlValue::array(list))
+                    if let Some(s) = step {
+                        let step_val = self.eval_expr(s)?.to_int();
+                        let from_i = f.to_int();
+                        let to_i = t.to_int();
+                        let list = if step_val == 0 {
+                            vec![]
+                        } else if step_val > 0 {
+                            (from_i..=to_i)
+                                .step_by(step_val as usize)
+                                .map(PerlValue::integer)
+                                .collect()
+                        } else {
+                            std::iter::successors(Some(from_i), |&x| {
+                                let next = x - step_val.abs();
+                                if next >= to_i {
+                                    Some(next)
+                                } else {
+                                    None
+                                }
+                            })
+                            .map(PerlValue::integer)
+                            .collect()
+                        };
+                        Ok(PerlValue::array(list))
+                    } else {
+                        let list = perl_list_range_expand(f, t);
+                        Ok(PerlValue::array(list))
+                    }
                 } else {
                     let key = std::ptr::from_ref(expr) as usize;
                     match (&from.kind, &to.kind) {

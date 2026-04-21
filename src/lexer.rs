@@ -97,6 +97,10 @@ impl Lexer {
                 while self.pos < self.input.len() && self.input[self.pos] != '\n' {
                     self.pos += 1;
                 }
+            } else if ch == '\\' && self.peek_at(1) == Some('\n') {
+                // Backslash-newline: line continuation (shell-style)
+                // Don't increment line — continued line is logically part of the same line
+                self.pos += 2;
             } else if ch.is_whitespace() {
                 if ch == '\n' {
                     self.line += 1;
@@ -1470,6 +1474,12 @@ impl Lexer {
             }
             '\\' => {
                 self.advance();
+                // Backslash-newline: line continuation (shell-style)
+                // Don't increment line — continued line is logically part of the same line
+                if self.peek() == Some('\n') {
+                    self.pos += 1; // skip newline without incrementing self.line
+                    return self.next_token();
+                }
                 self.last_was_term = false;
                 Ok(Token::Backslash)
             }

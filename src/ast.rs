@@ -820,11 +820,14 @@ pub enum ExprKind {
     },
 
     // Range: `1..10` / `1...10` — in scalar context, `...` is the exclusive flip-flop (Perl `sed`-style).
+    // With step: `1..100:2` (1,3,5,...,99) or `100..1:-1` (100,99,...,1).
     Range {
         from: Box<Expr>,
         to: Box<Expr>,
         #[serde(default)]
         exclusive: bool,
+        #[serde(default)]
+        step: Option<Box<Expr>>,
     },
 
     /// `my $x = EXPR` (or `our` / `state` / `local`) used as an *expression* —

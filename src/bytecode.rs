@@ -340,6 +340,7 @@ pub enum Op {
     RuntimeErrorConst(u16),
     MakeHash(u16), // pop N key-value pairs, push as Hash
     Range,         // stack: [from, to] → Array
+    RangeStep,     // stack: [from, to, step] → Array (stepped range)
     /// Scalar `..` / `...` flip-flop (numeric bounds vs `$.` — [`Interpreter::scalar_flipflop_dot_line`]).
     /// Stack: `[from, to]` (ints); pushes `1` or `0`. `u16` indexes flip-flop slots; `u8` is `1` for `...`
     /// (exclusive: right bound only after `$.` is strictly past the line where the left bound matched).

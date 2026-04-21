@@ -664,9 +664,12 @@ impl StaticAnalyzer {
                     self.analyze_expr(index);
                 }
             }
-            ExprKind::Range { from, to, .. } => {
+            ExprKind::Range { from, to, step, .. } => {
                 self.analyze_expr(from);
                 self.analyze_expr(to);
+                if let Some(s) = step {
+                    self.analyze_expr(s);
+                }
             }
             ExprKind::InterpolatedString(parts) => {
                 for part in parts {
