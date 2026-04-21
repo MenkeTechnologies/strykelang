@@ -1,0 +1,82 @@
+#!/usr/bin/env stryke
+# t/test_math_extended.stk — extended math functions
+
+# Rounding
+assert_eq round(3.7), 4, "round up"
+assert_eq round(3.2), 3, "round down"
+assert_eq round(3.5), 4, "round half up"
+assert_eq floor(3.9), 3, "floor"
+assert_eq floor(-3.1), -4, "floor negative"
+assert_eq ceil(3.1), 4, "ceil"
+assert_eq ceil(-3.9), -3, "ceil negative"
+assert_eq trunc(3.9), 3, "trunc positive"
+assert_eq trunc(-3.9), -3, "trunc negative"
+
+# GCD and LCM
+assert_eq gcd(48, 18), 6, "gcd 48,18"
+assert_eq gcd(100, 25), 25, "gcd 100,25"
+assert_eq lcm(4, 6), 12, "lcm 4,6"
+assert_eq lcm(3, 5), 15, "lcm 3,5"
+
+# Power and roots
+assert_eq squared(5), 25, "squared"
+assert_eq cubed(3), 27, "cubed"
+assert_eq expt(2, 10), 1024, "2^10"
+assert_eq sqrt(16), 4, "sqrt 16"
+assert_near cbrt(27), 3, 0.001, "cbrt 27"
+assert_near hypot(3, 4), 5, 0.001, "hypot 3,4,5"
+
+# Factorial and fibonacci
+assert_eq factorial(5), 120, "5!"
+assert_eq factorial(0), 1, "0!"
+assert_eq fibonacci(10), 55, "fib(10)"
+assert_eq fibonacci(0), 0, "fib(0)"
+assert_eq fibonacci(1), 1, "fib(1)"
+
+# Primality
+assert_ok is_prime(2), "2 is prime"
+assert_ok is_prime(17), "17 is prime"
+assert_ok is_prime(97), "97 is prime"
+assert_false is_prime(1), "1 not prime"
+assert_false is_prime(4), "4 not prime"
+assert_false is_prime(100), "100 not prime"
+
+# Perfect square
+assert_ok is_square(16), "16 is square"
+assert_ok is_square(1), "1 is square"
+assert_ok is_square(0), "0 is square"
+assert_false is_square(15), "15 not square"
+
+# Statistics
+assert_near avg(1, 2, 3, 4, 5), 3, 0.001, "avg"
+assert_near median(1, 2, 3, 4, 5), 3, 0.001, "median odd"
+assert_near median(1, 2, 3, 4), 2.5, 0.001, "median even"
+assert_near stddev(2, 4, 4, 4, 5, 5, 7, 9), 2, 0.01, "stddev"
+assert_near variance(2, 4, 4, 4, 5, 5, 7, 9), 4, 0.01, "variance"
+
+# Min/max/sum/product
+assert_eq min(5, 2, 8, 1, 9), 1, "min"
+assert_eq max(5, 2, 8, 1, 9), 9, "max"
+assert_eq sum(1, 2, 3, 4, 5), 15, "sum"
+
+# Clamp - skip, tested in test_builtins_extended.stk
+
+# Normalize
+my @normalized = normalize(0, 50, 100)
+assert_near $normalized[0], 0, 0.001, "normalize min"
+assert_near $normalized[1], 0.5, 0.001, "normalize mid"
+assert_near $normalized[2], 1, 0.001, "normalize max"
+
+# Percent (what % is a of b)
+assert_eq percent(25, 200), 12.5, "25 is 12.5% of 200"
+assert_eq percent(50, 100), 50, "50 is 50% of 100"
+
+# Inverse
+assert_near inverse(2), 0.5, 0.001, "1/2"
+assert_near inverse(4), 0.25, 0.001, "1/4"
+
+# Abs diff
+assert_eq abs_diff(10, 3), 7, "abs_diff 10-3"
+assert_eq abs_diff(3, 10), 7, "abs_diff 3-10"
+
+test_run

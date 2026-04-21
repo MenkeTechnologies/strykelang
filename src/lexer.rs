@@ -2276,9 +2276,9 @@ mod tests {
     /// `q(sub ($) { 1 })` — nested `()` must not end at the `)` in `($)` (core `Carp.pm`).
     #[test]
     fn tokenize_q_paren_balances_nested_parens_in_prototype() {
-        let mut l = Lexer::new("q(sub ($) { 1 })");
+        let mut l = Lexer::new("q(fn ($) { 1 })");
         let t = l.tokenize().expect("tokenize");
-        assert!(matches!(t[0].0, Token::SingleString(ref s) if s == "sub ($) { 1 }"));
+        assert!(matches!(t[0].0, Token::SingleString(ref s) if s == "fn ($) { 1 }"));
     }
 
     /// `qw( (SV*)x )` — nested `()` inside `qw(...)` (core `B.pm`).

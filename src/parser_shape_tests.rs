@@ -539,7 +539,7 @@ fn expr_print_say() {
         first_expr_kind("print 1;"),
         ExprKind::Print { .. }
     ));
-    assert!(matches!(first_expr_kind("say 1;"), ExprKind::Say { .. }));
+    assert!(matches!(first_expr_kind("p 1;"), ExprKind::Say { .. }));
 }
 
 #[test]

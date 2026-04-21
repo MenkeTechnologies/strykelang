@@ -1,0 +1,656 @@
+# lib/nested_oop.stk — classes, structs, enums inside collections
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STRUCTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+struct Point { x, y }
+struct Person { name, age }
+struct Task { id, title, priority }
+struct Node { value, children }
+struct Edge { from, to, weight }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ENUMS
+# ══════════════════════════════════════════════════════════════════════════════
+
+enum Priority { Low, Medium, High, Critical }
+enum Status { Todo, InProgress, Done, Blocked }
+enum Color { Red, Green, Blue }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CLASSES
+# ══════════════════════════════════════════════════════════════════════════════
+
+class Employee {
+    name: Str
+    department: Str
+    salary: Int = 0
+
+    fn describe { $self->name . " (" . $self->department . ")" }
+}
+
+class Product {
+    sku: Str
+    name: Str
+    price: Int
+
+    fn discount($pct) { Product(sku => $self->sku, name => $self->name, price => int($self->price * (100 - $pct) / 100)) }
+}
+
+class TreeNode {
+    value: Int
+    left: Any = undef
+    right: Any = undef
+
+    fn is_leaf { !defined($self->left) && !defined($self->right) }
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STRUCTS IN ARRAYS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn points_in_array {
+    my @points = (
+        Point(1, 2),
+        Point(3, 4),
+        Point(5, 6),
+    )
+    @points
+}
+
+fn points_in_arrayref {
+    [Point(10, 20), Point(30, 40), Point(50, 60)]
+}
+
+fn sum_point_coords(@points) {
+    my $sum = 0
+    for my $p (@points) {
+        $sum += $p->x + $p->y
+    }
+    $sum
+}
+
+fn map_points_to_distances(@points) {
+    map { sqrt($_->x * $_->x + $_->y * $_->y) } @points
+}
+
+fn filter_points_in_quadrant(@points) {
+    grep { $_->x > 0 && $_->y > 0 } @points
+}
+
+fn sort_points_by_x(@points) {
+    sort { $a->x <=> $b->x } @points
+}
+
+fn tasks_in_array {
+    [
+        Task(1, "Setup", Priority::High),
+        Task(2, "Build", Priority::Medium),
+        Task(3, "Test", Priority::Low),
+        Task(4, "Deploy", Priority::Critical),
+    ]
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STRUCTS IN HASHES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn points_in_hash {
+    +{
+        origin => Point(0, 0),
+        north  => Point(0, 1),
+        east   => Point(1, 0),
+        south  => Point(0, -1),
+        west   => Point(-1, 0),
+    }
+}
+
+fn person_lookup {
+    +{
+        alice => Person("Alice", 30),
+        bob   => Person("Bob", 25),
+        carol => Person("Carol", 35),
+    }
+}
+
+fn get_person_age($lookup, $name) {
+    $lookup->{$name}->age
+}
+
+fn task_registry {
+    +{
+        "TASK-001" => Task(1, "Initialize", Priority::High),
+        "TASK-002" => Task(2, "Configure", Priority::Medium),
+        "TASK-003" => Task(3, "Validate", Priority::Low),
+    }
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STRUCTS IN SETS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn unique_priorities {
+    set(Priority::High, Priority::Medium, Priority::Low, Priority::High)
+}
+
+fn unique_statuses {
+    set(Status::Todo, Status::InProgress, Status::Done, Status::Todo)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ENUMS IN ARRAYS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn priority_queue {
+    [Priority::Critical, Priority::High, Priority::Medium, Priority::Low]
+}
+
+fn color_palette {
+    [Color::Red, Color::Green, Color::Blue]
+}
+
+fn status_workflow {
+    [Status::Todo, Status::InProgress, Status::Done]
+}
+
+fn count_priority($tasks, $target) {
+    my $count = 0
+    for my $t (@$tasks) {
+        my $matches = match ($t->priority) {
+            Priority::Critical() => match ($target) { Priority::Critical() => 1, _ => 0 }
+            Priority::High() => match ($target) { Priority::High() => 1, _ => 0 }
+            Priority::Medium() => match ($target) { Priority::Medium() => 1, _ => 0 }
+            Priority::Low() => match ($target) { Priority::Low() => 1, _ => 0 }
+            _ => 0
+        }
+        $count += $matches
+    }
+    $count
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ENUMS IN HASHES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn priority_labels {
+    +{
+        low      => Priority::Low,
+        medium   => Priority::Medium,
+        high     => Priority::High,
+        critical => Priority::Critical,
+    }
+}
+
+fn status_by_id {
+    +{
+        0 => Status::Todo,
+        1 => Status::InProgress,
+        2 => Status::Done,
+        3 => Status::Blocked,
+    }
+}
+
+fn color_codes {
+    +{
+        red   => Color::Red,
+        green => Color::Green,
+        blue  => Color::Blue,
+    }
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CLASSES IN ARRAYS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn employee_roster {
+    [
+        Employee(name => "Alice", department => "Engineering", salary => 100000),
+        Employee(name => "Bob", department => "Marketing", salary => 80000),
+        Employee(name => "Carol", department => "Engineering", salary => 95000),
+        Employee(name => "Dave", department => "Sales", salary => 75000),
+    ]
+}
+
+fn product_catalog {
+    [
+        Product(sku => "SKU001", name => "Widget", price => 1999),
+        Product(sku => "SKU002", name => "Gadget", price => 2999),
+        Product(sku => "SKU003", name => "Gizmo", price => 3999),
+    ]
+}
+
+fn filter_by_department($roster, $dept) {
+    [grep { $_->department eq $dept } @$roster]
+}
+
+fn total_salary($roster) {
+    my $sum = 0
+    for my $e (@$roster) {
+        $sum += $e->salary
+    }
+    $sum
+}
+
+fn apply_discount_all($products, $pct) {
+    [map { $_->discount($pct) } @$products]
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CLASSES IN HASHES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn employee_directory {
+    +{
+        "emp001" => Employee(name => "Alice", department => "Eng", salary => 100000),
+        "emp002" => Employee(name => "Bob", department => "Mkt", salary => 80000),
+        "emp003" => Employee(name => "Carol", department => "Eng", salary => 95000),
+    }
+}
+
+fn product_by_sku {
+    +{
+        "SKU001" => Product(sku => "SKU001", name => "Widget", price => 1999),
+        "SKU002" => Product(sku => "SKU002", name => "Gadget", price => 2999),
+    }
+}
+
+fn get_employee_name($dir, $id) {
+    $dir->{$id}->name
+}
+
+fn update_salary($dir, $id, $new_salary) {
+    $dir->{$id}->salary($new_salary)
+    $dir
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NESTED STRUCTS IN ARRAYS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn tree_as_struct {
+    Node(
+        10,
+        [
+            Node(5, [Node(2, []), Node(7, [])]),
+            Node(15, [Node(12, []), Node(20, [])]),
+        ]
+    )
+}
+
+fn graph_edges {
+    [
+        Edge(Point(0, 0), Point(1, 1), 10),
+        Edge(Point(1, 1), Point(2, 0), 15),
+        Edge(Point(2, 0), Point(0, 0), 20),
+    ]
+}
+
+fn nested_points {
+    [
+        [Point(0, 0), Point(1, 0), Point(2, 0)],
+        [Point(0, 1), Point(1, 1), Point(2, 1)],
+        [Point(0, 2), Point(1, 2), Point(2, 2)],
+    ]
+}
+
+fn sum_nested_points($grid) {
+    my $sum = 0
+    for my $row (@$grid) {
+        for my $p (@$row) {
+            $sum += $p->x + $p->y
+        }
+    }
+    $sum
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NESTED STRUCTS IN HASHES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn point_groups {
+    +{
+        quadrant1 => [Point(1, 1), Point(2, 2), Point(3, 3)],
+        quadrant2 => [Point(-1, 1), Point(-2, 2)],
+        quadrant3 => [Point(-1, -1), Point(-2, -2)],
+        quadrant4 => [Point(1, -1), Point(2, -2)],
+    }
+}
+
+fn team_structure {
+    +{
+        engineering => [
+            Person("Alice", 30),
+            Person("Bob", 28),
+        ],
+        marketing => [
+            Person("Carol", 35),
+        ],
+        sales => [
+            Person("Dave", 40),
+            Person("Eve", 32),
+        ],
+    }
+}
+
+fn count_team_members($structure) {
+    my $total = 0
+    for my $team (keys %$structure) {
+        $total += scalar(@{$structure->{$team}})
+    }
+    $total
+}
+
+fn get_oldest_in_team($structure, $team) {
+    my @members = @{$structure->{$team}}
+    my $oldest = $members[0]
+    for my $m (@members) {
+        if ($m->age > $oldest->age) {
+            $oldest = $m
+        }
+    }
+    $oldest
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CLASSES WITH COLLECTION FIELDS
+# ══════════════════════════════════════════════════════════════════════════════
+
+class Team {
+    name: Str
+    members: Array = []
+
+    fn add_member($person) {
+        push @{$self->members}, $person
+        $self
+    }
+
+    fn size { scalar(@{$self->members}) }
+
+    fn avg_age {
+        my $sum = 0
+        for my $m (@{$self->members}) {
+            $sum += $m->age
+        }
+        $sum / $self->size()
+    }
+}
+
+class Graph {
+    nodes: Array = []
+    edges: Hash = {}
+
+    fn add_node($id) {
+        push @{$self->nodes}, $id
+        my $e = $self->edges
+        $e->{$id} = []
+        $self
+    }
+
+    fn add_edge($from, $to) {
+        my $e = $self->edges
+        my $arr = $e->{$from}
+        push @$arr, $to
+        $self
+    }
+
+    fn neighbors($id) {
+        my $e = $self->edges
+        @{$e->{$id}}
+    }
+
+    fn node_count { scalar(@{$self->nodes}) }
+}
+
+class TaskQueue {
+    items: Array = []
+
+    fn enqueue($task) {
+        push @{$self->items}, $task
+        $self
+    }
+
+    fn dequeue {
+        shift @{$self->items}
+    }
+
+    fn peek {
+        $self->items->[0]
+    }
+
+    fn is_empty {
+        scalar(@{$self->items}) == 0 ? 1 : 0
+    }
+
+    fn size { scalar(@{$self->items}) }
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BINARY TREE WITH CLASS NODES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn build_binary_tree {
+    TreeNode(
+        value => 10,
+        left => TreeNode(
+            value => 5,
+            left => TreeNode(value => 2),
+            right => TreeNode(value => 7),
+        ),
+        right => TreeNode(
+            value => 15,
+            left => TreeNode(value => 12),
+            right => TreeNode(value => 20),
+        ),
+    )
+}
+
+fn tree_sum($node) {
+    if (!defined($node)) {
+        return 0
+    }
+    $node->value + tree_sum($node->left) + tree_sum($node->right)
+}
+
+fn tree_depth($node) {
+    if (!defined($node)) {
+        return 0
+    }
+    my $left_depth = tree_depth($node->left)
+    my $right_depth = tree_depth($node->right)
+    1 + ($left_depth > $right_depth ? $left_depth : $right_depth)
+}
+
+fn tree_to_array($node) {
+    if (!defined($node)) {
+        return ()
+    }
+    (tree_to_array($node->left), $node->value, tree_to_array($node->right))
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COMPLEX NESTED STRUCTURES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn organization_chart {
+    +{
+        ceo => Employee(name => "Alice", department => "Executive", salary => 500000),
+        departments => +{
+            engineering => +{
+                lead => Employee(name => "Bob", department => "Engineering", salary => 200000),
+                teams => [
+                    Team(name => "Backend")->add_member(Person("Carol", 30))->add_member(Person("Dave", 28)),
+                    Team(name => "Frontend")->add_member(Person("Eve", 32))->add_member(Person("Frank", 26)),
+                ],
+            },
+            marketing => +{
+                lead => Employee(name => "Grace", department => "Marketing", salary => 180000),
+                teams => [
+                    Team(name => "Brand")->add_member(Person("Hank", 35)),
+                ],
+            },
+        },
+        status => Status::InProgress,
+    }
+}
+
+fn project_board {
+    +{
+        todo => [
+            Task(1, "Design API", Priority::High),
+            Task(2, "Write docs", Priority::Low),
+        ],
+        in_progress => [
+            Task(3, "Implement auth", Priority::Critical),
+        ],
+        done => [
+            Task(4, "Setup CI", Priority::Medium),
+            Task(5, "Create repo", Priority::Low),
+        ],
+    }
+}
+
+fn move_task($board, $task_id, $from_col, $to_col) {
+    my @from_tasks = @{$board->{$from_col}}
+    my @remaining
+    my $moved_task
+    for my $t (@from_tasks) {
+        if ($t->id == $task_id) {
+            $moved_task = $t
+        } else {
+            push @remaining, $t
+        }
+    }
+    $board->{$from_col} = [@remaining]
+    push @{$board->{$to_col}}, $moved_task if defined($moved_task)
+    $board
+}
+
+fn count_tasks_by_priority($board, $priority) {
+    my $count = 0
+    for my $col (keys %$board) {
+        for my $t (@{$board->{$col}}) {
+            my $matches = match ($t->priority) {
+                Priority::Critical() => match ($priority) { Priority::Critical() => 1, _ => 0 }
+                Priority::High() => match ($priority) { Priority::High() => 1, _ => 0 }
+                Priority::Medium() => match ($priority) { Priority::Medium() => 1, _ => 0 }
+                Priority::Low() => match ($priority) { Priority::Low() => 1, _ => 0 }
+                _ => 0
+            }
+            $count += $matches
+        }
+    }
+    $count
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARRAY OF ARRAYS OF STRUCTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn matrix_of_points {
+    my @matrix
+    for my $i (0..2) {
+        my @row
+        for my $j (0..2) {
+            push @row, Point($i, $j)
+        }
+        push @matrix, [@row]
+    }
+    [@matrix]
+}
+
+fn flatten_point_matrix($matrix) {
+    my @flat
+    for my $row (@$matrix) {
+        for my $p (@$row) {
+            push @flat, $p
+        }
+    }
+    @flat
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HASH OF HASHES OF CLASSES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn region_offices {
+    +{
+        "us" => +{
+            "ny" => Employee(name => "Alice", department => "Sales", salary => 90000),
+            "ca" => Employee(name => "Bob", department => "Sales", salary => 95000),
+        },
+        "eu" => +{
+            "uk" => Employee(name => "Carol", department => "Sales", salary => 85000),
+            "de" => Employee(name => "Dave", department => "Sales", salary => 88000),
+        },
+    }
+}
+
+fn get_regional_employee($offices, $region, $office) {
+    $offices->{$region}{$office}
+}
+
+fn total_regional_salary($offices, $region) {
+    my $sum = 0
+    for my $office (keys %{$offices->{$region}}) {
+        $sum += $offices->{$region}{$office}->salary
+    }
+    $sum
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MIXED COLLECTIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn mixed_struct_types {
+    [
+        +{ type => "point", data => Point(1, 2) },
+        +{ type => "person", data => Person("Alice", 30) },
+        +{ type => "task", data => Task(1, "Test", Priority::High) },
+    ]
+}
+
+fn process_mixed($items) {
+    my @results
+    for my $item (@$items) {
+        my $result = match ($item->{type}) {
+            "point" => "Point(" . $item->{data}->x . "," . $item->{data}->y . ")"
+            "person" => "Person:" . $item->{data}->name
+            "task" => "Task#" . $item->{data}->id
+            _ => "unknown"
+        }
+        push @results, $result
+    }
+    @results
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STRUCT/CLASS TRANSFORMATION PIPELINES
+# ══════════════════════════════════════════════════════════════════════════════
+
+fn transform_points($points, $scale, $offset_x, $offset_y) {
+    [map {
+        Point($_->x * $scale + $offset_x, $_->y * $scale + $offset_y)
+    } @$points]
+}
+
+fn filter_adults($people) {
+    [grep { $_->age >= 18 } @$people]
+}
+
+fn sort_by_age($people) {
+    [sort { $a->age <=> $b->age } @$people]
+}
+
+fn partition_by_age($people, $threshold) {
+    my @young
+    my @old
+    for my $p (@$people) {
+        if ($p->age < $threshold) {
+            push @young, $p
+        } else {
+            push @old, $p
+        }
+    }
+    +{ young => [@young], old => [@old] }
+}

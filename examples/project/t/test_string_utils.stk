@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+# t/test_string_utils.stk — string manipulation utilities
+
+# Case transformations
+assert_eq capitalize("hello world"), "Hello world", "capitalize"
+assert_eq title_case("hello world"), "Hello World", "title_case"
+assert_eq swap_case("HeLLo"), "hEllO", "swap_case"
+
+# Whitespace handling
+assert_eq squish("  hello   world  "), "hello world", "squish"
+assert_eq trim("  hello  "), "hello", "trim"
+
+# Padding and alignment
+assert_eq pad_left("hi", 5, "0"), "000hi", "pad_left with 0"
+assert_eq pad_left("hi", 5), "   hi", "pad_left default space"
+assert_eq pad_right("hi", 5, "0"), "hi000", "pad_right with 0"
+assert_eq pad_right("hi", 5), "hi   ", "pad_right default space"
+assert_eq center("hi", 6), "  hi  ", "center"
+
+# Truncation (uses unicode ellipsis)
+assert_eq truncate_at("hello world", 5), "hell…", "truncate_at"
+assert_eq ellipsis("hello world", 8), "hello w…", "ellipsis"
+
+# String info
+assert_eq char_count("hello"), 5, "char_count"
+assert_eq word_count("hello world foo"), 3, "word_count"
+assert_eq line_count("a\nb\nc"), 3, "line_count"
+
+# Quoting
+assert_eq quote("hello"), "\"hello\"", "quote"
+assert_eq single_quote("hello"), "'hello'", "single_quote"
+assert_eq unquote("\"hello\""), "hello", "unquote double"
+assert_eq unquote("'hello'"), "hello", "unquote single"
+
+# Prefix/suffix
+assert_eq strip_prefix("hello", "hel"), "lo", "strip_prefix"
+assert_eq strip_prefix("hello", "xyz"), "hello", "strip_prefix no match"
+assert_eq strip_suffix("hello", "lo"), "hel", "strip_suffix"
+assert_eq strip_suffix("hello", "xyz"), "hello", "strip_suffix no match"
+assert_eq ensure_prefix("world", "hello "), "hello world", "ensure_prefix adds"
+assert_eq ensure_prefix("hello world", "hello "), "hello world", "ensure_prefix already"
+assert_eq ensure_suffix("hello", " world"), "hello world", "ensure_suffix adds"
+assert_eq ensure_suffix("hello world", " world"), "hello world", "ensure_suffix already"
+
+# Extraction
+assert_eq extract_between("[hello]", "[", "]"), "hello", "extract_between brackets"
+assert_eq extract_between("<tag>content</tag>", "<tag>", "</tag>"), "content", "extract_between tags"
+
+# Repeat
+assert_eq repeat("ab", 3), "ababab", "repeat"
+assert_eq repeat("x", 5), "xxxxx", "repeat single char"
+
+# Reverse
+assert_eq reverse_str("hello"), "olleh", "reverse_str"
+assert_eq rev("hello"), "olleh", "rev string"
+
+# Path utilities
+assert_eq path_ext("/foo/bar.txt"), "txt", "path_ext"
+assert_eq path_ext("file.tar.gz"), "gz", "path_ext double"
+assert_eq path_stem("/foo/bar.txt"), "bar", "path_stem"
+assert_eq path_parent("/foo/bar/baz.txt"), "/foo/bar", "path_parent"
+assert_eq path_join("/foo", "bar", "baz.txt"), "/foo/bar/baz.txt", "path_join"
+
+my $parts = path_split("/foo/bar/baz")
+assert_eq scalar(@$parts), 4, "path_split count"
+
+# Validation
+assert_ok is_valid_email('test@example.com'), "valid email"
+assert_false is_valid_email('invalid'), "invalid email"
+assert_ok is_valid_url("https://example.com"), "valid url"
+assert_false is_valid_url("not a url"), "invalid url"
+
+test_run

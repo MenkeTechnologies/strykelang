@@ -134,20 +134,20 @@ assert_eq set_size($size_set), 5, "set_size wrapper"
 
 my $cr = ret_coderef()
 assert_eq ref($cr), "CODE", "coderef type"
-assert_eq $cr->(), 99, "coderef call"
+assert_eq $cr(), 99, "coderef call"
 
 my $cr_arg = ret_coderef_with_arg()
-assert_eq $cr_arg->(5), 10, "coderef with arg"
+assert_eq $cr_arg(5), 10, "coderef with arg"
 
 my $closure = ret_closure()
-assert_eq $closure->(), 100, "closure captures outer var"
+assert_eq $closure(), 100, "closure captures outer var"
 
 my $add5 = make_adder(5)
-assert_eq $add5->(10), 15, "curried adder"
-assert_eq $add5->(0), 5, "curried adder zero"
+assert_eq $add5(10), 15, "curried adder"
+assert_eq $add5(0), 5, "curried adder zero"
 
 my $times3 = make_multiplier(3)
-assert_eq $times3->(7), 21, "curried multiplier"
+assert_eq $times3(7), 21, "curried multiplier"
 
 # ── Blessed refs ─────────────────────────────────────────────────────
 
@@ -169,7 +169,7 @@ assert_eq $complex->{struct}->x, 7, "complex struct.x"
 my $cset = $complex->{set}
 assert_ok $cset->has(11), "complex set has 11"
 my $cfn = $complex->{code}
-assert_eq $cfn->(), "lambda", "complex code call"
+assert_eq $cfn(), "lambda", "complex code call"
 
 # ── Conditional implicit returns ─────────────────────────────────────
 

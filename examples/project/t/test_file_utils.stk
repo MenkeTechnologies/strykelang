@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+# t/test_file_utils.stk — file system utilities
+
+# Create temp file for testing
+my $tmp = tempfile
+spurt $tmp, "test content here"
+
+# File existence
+assert_ok -e $tmp, "file exists"
+
+# File size
+my $size = file_size $tmp
+assert_gt $size, 0, "file_size > 0"
+assert_eq $size, 17, "file_size exact"
+
+# File times
+my $mtime = file_mtime $tmp
+assert_gt $mtime, 0, "mtime > 0"
+my $atime = file_atime $tmp
+assert_gt $atime, 0, "atime > 0"
+
+# Permissions (may vary by system)
+assert_ok is_readable $tmp, "file is readable"
+assert_ok is_writable $tmp, "file is writable"
+
+# Path checks
+assert_ok path_is_abs "/foo/bar", "/foo/bar is absolute"
+assert_ok path_is_abs $tmp, "tempfile path is absolute"
+assert_false path_is_abs "relative/path", "relative is not absolute"
+assert_ok path_is_rel "relative/path", "relative is relative"
+assert_false path_is_rel "/absolute/path", "absolute is not relative"
+
+# Path operations
+assert_eq path_ext("file.txt"), "txt", "path_ext"
+assert_eq path_ext("archive.tar.gz"), "gz", "path_ext double"
+assert_eq path_stem("file.txt"), "file", "path_stem"
+assert_eq path_stem("/path/to/file.txt"), "file", "path_stem with dir"
+assert_eq path_parent("/foo/bar/baz"), "/foo/bar", "path_parent"
+
+# Path join
+assert_eq path_join("/foo", "bar", "baz"), "/foo/bar/baz", "path_join"
+assert_eq path_join("a", "b", "c"), "a/b/c", "path_join relative"
+
+# Basename and dirname
+assert_eq basename("/foo/bar/file.txt"), "file.txt", "basename"
+assert_eq dirname("/foo/bar/file.txt"), "/foo/bar", "dirname"
+
+# Tempdir
+my $tmpdir = tempdir
+assert_ok length $tmpdir > 0, "tempdir returns path"
+
+# Cleanup
+unlink $tmp
+
+test_run

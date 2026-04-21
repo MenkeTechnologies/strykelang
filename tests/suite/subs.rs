@@ -143,7 +143,7 @@ fn sub_stryke_signature_prototype_builtin_undef() {
 
 #[test]
 fn anon_sub_stryke_signature() {
-    assert_eq!(eval_int(r#"my $f = sub ($n) { $n * 7 }; $f->(6)"#), 42);
+    assert_eq!(eval_int(r#"my $f = fn ($n) { $n * 7 }; $f->(6)"#), 42);
 }
 
 #[test]

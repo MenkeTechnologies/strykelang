@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+# t/test_ansi.stk — ANSI color and formatting
+
+# Color codes wrap text
+my $red = ansi_red("error")
+assert_ok $red =~ /\e\[31m/, "ansi_red has code"
+assert_ok $red =~ /error/, "ansi_red has text"
+assert_ok $red =~ /\e\[0m/, "ansi_red has reset"
+
+my $green = ansi_green("success")
+assert_ok $green =~ /\e\[32m/, "ansi_green has code"
+
+my $yellow = ansi_yellow("warning")
+assert_ok $yellow =~ /\e\[33m/, "ansi_yellow has code"
+
+my $blue = ansi_blue("info")
+assert_ok $blue =~ /\e\[34m/, "ansi_blue has code"
+
+my $magenta = ansi_magenta("special")
+assert_ok $magenta =~ /\e\[35m/, "ansi_magenta has code"
+
+my $cyan = ansi_cyan("highlight")
+assert_ok $cyan =~ /\e\[36m/, "ansi_cyan has code"
+
+# Text styles
+my $bold = ansi_bold("important")
+assert_ok $bold =~ /\e\[1m/, "ansi_bold has code"
+
+my $dim = ansi_dim("subtle")
+assert_ok $dim =~ /\e\[2m/, "ansi_dim has code"
+
+my $underline = ansi_underline("link")
+assert_ok $underline =~ /\e\[4m/, "ansi_underline has code"
+
+# Strip ANSI codes
+my $stripped = strip_ansi $red
+assert_eq $stripped, "error", "strip_ansi removes codes"
+assert_eq strip_ansi("plain text"), "plain text", "strip_ansi plain unchanged"
+
+# RGB colors
+my $rgb_text = rgb(255, 0, 0, "red text")
+assert_ok length($rgb_text) > length("red text"), "rgb adds codes"
+
+# Color conversion
+assert_eq rgb_to_hex(255, 0, 0), "#ff0000", "rgb_to_hex red"
+assert_eq rgb_to_hex(0, 255, 0), "#00ff00", "rgb_to_hex green"
+assert_eq rgb_to_hex(0, 0, 255), "#0000ff", "rgb_to_hex blue"
+
+my $rgb = hex_to_rgb("#ff0000")
+assert_eq $rgb->[0], 255, "hex_to_rgb red r"
+assert_eq $rgb->[1], 0, "hex_to_rgb red g"
+assert_eq $rgb->[2], 0, "hex_to_rgb red b"
+
+my $rgb2 = hex_to_rgb("#00ff00")
+assert_eq $rgb2->[1], 255, "hex_to_rgb green g"
+
+test_run

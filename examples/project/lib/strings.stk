@@ -1,7 +1,7 @@
 # lib/strings.stk — string utilities: regex, pipelines, transforms
 
 fn slugify_str ($str) {
-    my $s = lc($str)
+    my $s = lc $str
     $s =~ s/[^a-z0-9]+/-/g
     $s =~ s/^-|-$//g
     $s

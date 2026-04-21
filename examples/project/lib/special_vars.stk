@@ -45,17 +45,17 @@ fn default_in_subst {
 
 fn args_count {
     my $inner = fn { scalar(@_) }
-    $inner->(1, 2, 3)
+    $inner(1, 2, 3)
 }
 
 fn args_first {
     my $inner = fn { $_0 }
-    $inner->("first", "second")
+    $inner("first", "second")
 }
 
 fn args_all {
     my $inner = fn { join(",", @_) }
-    $inner->(1, 2, 3)
+    $inner(1, 2, 3)
 }
 
 fn args_shift_style {
@@ -64,13 +64,13 @@ fn args_shift_style {
         my $b = shift
         $a + $b
     }
-    $inner->(10, 20)
+    $inner(10, 20)
 }
 
 fn args_modify {
     my $inner = fn { $_0 = 999; 1 }
     my $x = 1
-    $inner->($x)
+    $inner($x)
     # Note: whether $x is modified depends on aliasing semantics
     1
 }

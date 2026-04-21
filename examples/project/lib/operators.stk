@@ -303,14 +303,15 @@ fn list_swap {
 }
 
 fn comma_operator {
-    my $x = (1, 2, 3)
+    # In stryke mode, use explicit last-element syntax
+    my @list = (1, 2, 3)
+    my $x = $list[-1]
     $x
 }
 
 fn list_in_scalar {
     my @arr = (1, 2, 3, 4, 5)
-    scalar(@arr)
-}
+    scalar @arr}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SPECIAL OPERATORS

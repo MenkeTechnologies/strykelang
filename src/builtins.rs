@@ -3945,7 +3945,11 @@ fn stringify_value(buf: &mut String, val: &PerlValue) {
     }
 
     if let Some(cr) = val.as_code_ref() {
-        buf.push_str("sub");
+        if crate::compat_mode() {
+            buf.push_str("sub");
+        } else {
+            buf.push_str("fn");
+        }
         if !cr.params.is_empty() {
             buf.push_str(" (");
             for (i, p) in cr.params.iter().enumerate() {

@@ -133,13 +133,11 @@ fn range_ascending {
 
 fn range_single {
     my @r = (5..5)
-    scalar(@r)
-}
+    scalar @r}
 
 fn range_empty {
     my @r = (5..1)
-    scalar(@r)
-}
+    scalar @r}
 
 fn range_negative {
     my @r = (-2..2)

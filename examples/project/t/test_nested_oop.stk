@@ -1,0 +1,325 @@
+#!/usr/bin/env stryke
+# t/test_nested_oop.stk — tests for classes, structs, enums inside collections
+
+require "./lib/nested_oop.stk"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STRUCTS IN ARRAYS
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @points = points_in_array()
+assert_eq scalar(@points), 3, "points_in_array count"
+assert_eq $points[0]->x, 1, "points_in_array[0].x"
+assert_eq $points[1]->y, 4, "points_in_array[1].y"
+assert_eq $points[2]->x, 5, "points_in_array[2].x"
+
+my $pts_ref = points_in_arrayref()
+assert_eq scalar(@$pts_ref), 3, "points_in_arrayref count"
+assert_eq $pts_ref->[0]->x, 10, "points_in_arrayref->[0].x"
+assert_eq $pts_ref->[2]->y, 60, "points_in_arrayref->[2].y"
+
+assert_eq sum_point_coords(@points), 21, "sum_point_coords"
+
+my @distances = map_points_to_distances(@points)
+assert_near $distances[0], 2.236, 0.01, "distance point 0"
+assert_near $distances[1], 5.0, 0.01, "distance point 1"
+
+my @filtered = filter_points_in_quadrant(@points)
+assert_eq scalar(@filtered), 3, "filter quadrant 1"
+
+my @sorted = sort_points_by_x(@points)
+assert_eq $sorted[0]->x, 1, "sort by x first"
+assert_eq $sorted[2]->x, 5, "sort by x last"
+
+my $tasks = tasks_in_array()
+assert_eq scalar(@$tasks), 4, "tasks_in_array count"
+assert_eq $tasks->[0]->title, "Setup", "task 0 title"
+assert_eq $tasks->[3]->id, 4, "task 3 id"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STRUCTS IN HASHES
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $pts_hash = points_in_hash()
+assert_eq $pts_hash->{origin}->x, 0, "points_hash origin.x"
+assert_eq $pts_hash->{origin}->y, 0, "points_hash origin.y"
+assert_eq $pts_hash->{north}->y, 1, "points_hash north.y"
+assert_eq $pts_hash->{east}->x, 1, "points_hash east.x"
+
+my $people = person_lookup()
+assert_eq $people->{alice}->name, "Alice", "person_lookup alice.name"
+assert_eq $people->{bob}->age, 25, "person_lookup bob.age"
+assert_eq get_person_age($people, "carol"), 35, "get_person_age carol"
+
+my $task_reg = task_registry()
+assert_eq $task_reg->{"TASK-001"}->title, "Initialize", "task_registry title"
+assert_eq $task_reg->{"TASK-002"}->id, 2, "task_registry id"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ENUMS IN ARRAYS
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $pq = priority_queue()
+assert_eq scalar(@$pq), 4, "priority_queue count"
+
+my $colors = color_palette()
+assert_eq scalar(@$colors), 3, "color_palette count"
+
+my $workflow = status_workflow()
+assert_eq scalar(@$workflow), 3, "status_workflow count"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ENUMS IN HASHES
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $priority_map = priority_labels()
+assert_eq scalar(keys %$priority_map), 4, "priority_labels key count"
+
+my $status_map = status_by_id()
+assert_eq scalar(keys %$status_map), 4, "status_by_id key count"
+
+my $color_map = color_codes()
+assert_eq scalar(keys %$color_map), 3, "color_codes key count"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CLASSES IN ARRAYS
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $roster = employee_roster()
+assert_eq scalar(@$roster), 4, "employee_roster count"
+assert_eq $roster->[0]->name, "Alice", "roster[0].name"
+assert_eq $roster->[1]->department, "Marketing", "roster[1].department"
+assert_eq $roster->[2]->salary, 95000, "roster[2].salary"
+
+my $catalog = product_catalog()
+assert_eq scalar(@$catalog), 3, "product_catalog count"
+assert_eq $catalog->[0]->sku, "SKU001", "catalog[0].sku"
+assert_eq $catalog->[1]->price, 2999, "catalog[1].price"
+
+my $eng_only = filter_by_department($roster, "Engineering")
+assert_eq scalar(@$eng_only), 2, "filter_by_department Engineering"
+
+assert_eq total_salary($roster), 350000, "total_salary"
+
+my $discounted = apply_discount_all($catalog, 10)
+assert_eq $discounted->[0]->price, 1799, "discount 10% on widget"
+assert_eq $discounted->[1]->price, 2699, "discount 10% on gadget"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CLASSES IN HASHES
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $dir = employee_directory()
+assert_eq scalar(keys %$dir), 3, "employee_directory key count"
+assert_eq $dir->{"emp001"}->name, "Alice", "directory emp001.name"
+assert_eq $dir->{"emp002"}->department, "Mkt", "directory emp002.department"
+
+assert_eq get_employee_name($dir, "emp003"), "Carol", "get_employee_name"
+
+my $products = product_by_sku()
+assert_eq $products->{"SKU001"}->name, "Widget", "product_by_sku Widget"
+assert_eq $products->{"SKU002"}->price, 2999, "product_by_sku Gadget price"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NESTED STRUCTS IN ARRAYS
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $tree = tree_as_struct()
+assert_eq $tree->value, 10, "tree root value"
+assert_eq scalar(@{$tree->children}), 2, "tree root children count"
+assert_eq $tree->children->[0]->value, 5, "tree left child"
+assert_eq $tree->children->[1]->value, 15, "tree right child"
+
+my $edges = graph_edges()
+assert_eq scalar(@$edges), 3, "graph_edges count"
+assert_eq $edges->[0]->weight, 10, "edge 0 weight"
+assert_eq $edges->[0]->from->x, 0, "edge 0 from.x"
+assert_eq $edges->[1]->to->x, 2, "edge 1 to.x"
+
+my $grid = nested_points()
+assert_eq scalar(@$grid), 3, "nested_points rows"
+assert_eq scalar(@{$grid->[0]}), 3, "nested_points cols"
+assert_eq $grid->[1][1]->x, 1, "grid[1][1].x"
+assert_eq $grid->[2][2]->y, 2, "grid[2][2].y"
+
+assert_eq sum_nested_points($grid), 18, "sum_nested_points"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NESTED STRUCTS IN HASHES
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $groups = point_groups()
+assert_eq scalar(@{$groups->{quadrant1}}), 3, "point_groups q1 count"
+assert_eq scalar(@{$groups->{quadrant2}}), 2, "point_groups q2 count"
+assert_eq $groups->{quadrant1}[0]->x, 1, "point_groups q1[0].x"
+assert_eq $groups->{quadrant3}[1]->y, -2, "point_groups q3[1].y"
+
+my $teams = team_structure()
+assert_eq scalar(@{$teams->{engineering}}), 2, "team_structure eng count"
+assert_eq scalar(@{$teams->{sales}}), 2, "team_structure sales count"
+assert_eq $teams->{marketing}[0]->name, "Carol", "team_structure mkt[0].name"
+
+assert_eq count_team_members($teams), 5, "count_team_members"
+
+my $oldest_eng = get_oldest_in_team($teams, "engineering")
+assert_eq $oldest_eng->name, "Alice", "oldest in engineering"
+assert_eq $oldest_eng->age, 30, "oldest in engineering age"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CLASSES WITH COLLECTION FIELDS
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $team = Team(name => "DevOps")
+$team->add_member(Person("Alice", 30))
+$team->add_member(Person("Bob", 25))
+$team->add_member(Person("Carol", 35))
+
+assert_eq $team->name, "DevOps", "team name"
+assert_eq $team->size(), 3, "team size"
+assert_eq $team->avg_age(), 30, "team avg_age"
+
+my $graph = Graph()
+$graph->add_node("a")
+$graph->add_node("b")
+$graph->add_node("c")
+$graph->add_edge("a", "b")
+$graph->add_edge("b", "c")
+
+assert_eq $graph->node_count(), 3, "graph node_count"
+my @a_neighbors = $graph->neighbors("a")
+assert_eq scalar(@a_neighbors), 1, "graph neighbors(a) count"
+my @b_neighbors = $graph->neighbors("b")
+assert_eq scalar(@b_neighbors), 1, "graph neighbors(b) count"
+
+my $queue = TaskQueue()
+$queue->enqueue(Task(1, "First", Priority::Low))
+$queue->enqueue(Task(2, "Second", Priority::High))
+$queue->enqueue(Task(3, "Third", Priority::Medium))
+
+assert_eq $queue->size(), 3, "queue size"
+assert_false $queue->is_empty(), "queue not empty"
+assert_eq $queue->peek()->id, 1, "queue peek"
+
+my $dequeued = $queue->dequeue()
+assert_eq $dequeued->id, 1, "queue dequeue"
+assert_eq $queue->size(), 2, "queue size after dequeue"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BINARY TREE WITH CLASS NODES
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $btree = build_binary_tree()
+assert_eq $btree->value, 10, "btree root value"
+assert_eq $btree->left->value, 5, "btree left value"
+assert_eq $btree->right->value, 15, "btree right value"
+assert_eq $btree->left->left->value, 2, "btree left.left value"
+assert_ok $btree->left->left->is_leaf(), "btree leaf check"
+
+assert_eq tree_sum($btree), 71, "tree_sum"
+assert_eq tree_depth($btree), 3, "tree_depth"
+
+my @inorder = tree_to_array($btree)
+assert_eq scalar(@inorder), 7, "tree_to_array count"
+assert_eq $inorder[0], 2, "inorder first"
+assert_eq $inorder[3], 10, "inorder middle"
+assert_eq $inorder[6], 20, "inorder last"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COMPLEX NESTED STRUCTURES
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $org = organization_chart()
+assert_eq $org->{ceo}->name, "Alice", "org ceo name"
+assert_eq $org->{ceo}->salary, 500000, "org ceo salary"
+assert_eq $org->{departments}{engineering}{lead}->name, "Bob", "org eng lead"
+assert_eq scalar(@{$org->{departments}{engineering}{teams}}), 2, "org eng teams count"
+assert_eq $org->{departments}{engineering}{teams}[0]->name, "Backend", "org eng team 0 name"
+
+my $board = project_board()
+assert_eq scalar(@{$board->{todo}}), 2, "board todo count"
+assert_eq scalar(@{$board->{in_progress}}), 1, "board in_progress count"
+assert_eq scalar(@{$board->{done}}), 2, "board done count"
+assert_eq $board->{todo}[0]->title, "Design API", "board todo[0] title"
+assert_eq $board->{in_progress}[0]->id, 3, "board in_progress[0] id"
+
+my $moved_board = move_task($board, 1, "todo", "in_progress")
+assert_eq scalar(@{$moved_board->{todo}}), 1, "after move todo count"
+assert_eq scalar(@{$moved_board->{in_progress}}), 2, "after move in_progress count"
+
+assert_eq count_tasks_by_priority($board, Priority::Low), 2, "count low priority"
+assert_eq count_tasks_by_priority($board, Priority::High), 1, "count high priority"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARRAY OF ARRAYS OF STRUCTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $matrix = matrix_of_points()
+assert_eq scalar(@$matrix), 3, "matrix rows"
+assert_eq scalar(@{$matrix->[0]}), 3, "matrix cols"
+assert_eq $matrix->[0][0]->x, 0, "matrix[0][0].x"
+assert_eq $matrix->[2][2]->x, 2, "matrix[2][2].x"
+assert_eq $matrix->[1][2]->y, 2, "matrix[1][2].y"
+
+my @flat = flatten_point_matrix($matrix)
+assert_eq scalar(@flat), 9, "flatten_point_matrix count"
+assert_eq $flat[0]->x, 0, "flat[0].x"
+assert_eq $flat[8]->x, 2, "flat[8].x"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HASH OF HASHES OF CLASSES
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $offices = region_offices()
+assert_eq $offices->{"us"}{"ny"}->name, "Alice", "offices us.ny.name"
+assert_eq $offices->{"eu"}{"de"}->salary, 88000, "offices eu.de.salary"
+
+my $carol = get_regional_employee($offices, "eu", "uk")
+assert_eq $carol->name, "Carol", "get_regional_employee"
+
+assert_eq total_regional_salary($offices, "us"), 185000, "total_regional_salary us"
+assert_eq total_regional_salary($offices, "eu"), 173000, "total_regional_salary eu"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MIXED COLLECTIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+my $mixed = mixed_struct_types()
+assert_eq scalar(@$mixed), 3, "mixed_struct_types count"
+assert_eq $mixed->[0]{type}, "point", "mixed[0].type"
+assert_eq $mixed->[1]{data}->name, "Alice", "mixed[1].data.name"
+assert_eq $mixed->[2]{data}->id, 1, "mixed[2].data.id"
+
+my @processed = process_mixed($mixed)
+assert_eq scalar(@processed), 3, "process_mixed count"
+assert_eq $processed[0], "Point(1,2)", "processed[0]"
+assert_eq $processed[1], "Person:Alice", "processed[1]"
+assert_eq $processed[2], "Task#1", "processed[2]"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TRANSFORMATION PIPELINES
+# ══════════════════════════════════════════════════════════════════════════════
+
+my @input_pts = (Point(1, 1), Point(2, 2), Point(3, 3))
+my $transformed = transform_points([@input_pts], 2, 10, 20)
+assert_eq $transformed->[0]->x, 12, "transform x"
+assert_eq $transformed->[0]->y, 22, "transform y"
+assert_eq $transformed->[2]->x, 16, "transform[2].x"
+
+my @people_list = (
+    Person("Alice", 30),
+    Person("Bob", 15),
+    Person("Carol", 25),
+    Person("Dave", 17),
+)
+my $adults = filter_adults([@people_list])
+assert_eq scalar(@$adults), 2, "filter_adults count"
+
+my $sorted_people = sort_by_age([@people_list])
+assert_eq $sorted_people->[0]->name, "Bob", "sort_by_age first"
+assert_eq $sorted_people->[3]->name, "Alice", "sort_by_age last"
+
+my $partitioned = partition_by_age([@people_list], 20)
+assert_eq scalar(@{$partitioned->{young}}), 2, "partition young"
+assert_eq scalar(@{$partitioned->{old}}), 2, "partition old"
+
+test_run

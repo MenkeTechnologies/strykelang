@@ -1,0 +1,46 @@
+#!/usr/bin/env stryke
+# t/test_hash_utils.stk — hash manipulation utilities
+
+# Basic hash operations
+my %h = (a => 1, b => 2, c => 3)
+assert_eq scalar(keys %h), 3, "hash keys count"
+assert_ok exists $h{a}, "key exists"
+assert_false exists $h{z}, "key doesn't exist"
+
+# Has key predicates (use anonymous hash)
+assert_ok has_key({a => 1, b => 2, c => 3}, "a"), "has_key a"
+assert_false has_key({a => 1, b => 2, c => 3}, "z"), "has_key z missing"
+assert_ok has_any_key({a => 1, b => 2, c => 3}, "z", "a", "y"), "has_any_key finds a"
+assert_false has_any_key({a => 1, b => 2, c => 3}, "x", "y", "z"), "has_any_key none"
+assert_ok has_all_keys({a => 1, b => 2, c => 3}, "a", "b"), "has_all_keys a,b"
+assert_false has_all_keys({a => 1, b => 2, c => 3}, "a", "z"), "has_all_keys a,z missing z"
+
+# Invert hash (returns hashref)
+my $inverted = invert({a => 1, b => 2, c => 3})
+assert_eq $inverted->{1}, "a", "invert 1 => a"
+assert_eq $inverted->{2}, "b", "invert 2 => b"
+
+# Merge hash (returns hashref)
+my $merged = merge_hash({a => 1, b => 2}, {b => 20, c => 3})
+assert_eq $merged->{a}, 1, "merge keeps a"
+assert_eq $merged->{b}, 20, "merge overwrites b"
+assert_eq $merged->{c}, 3, "merge adds c"
+
+# Select keys (returns hashref)
+my $selected = select_keys({a => 1, b => 2, c => 3}, "a", "c")
+assert_eq scalar(keys %$selected), 2, "select_keys count"
+assert_ok exists $selected->{a}, "select_keys has a"
+assert_ok exists $selected->{c}, "select_keys has c"
+assert_false exists $selected->{b}, "select_keys excludes b"
+
+# Hash in list context
+my @kv = %h
+assert_eq scalar(@kv), 6, "hash to list has 6 elements"
+
+# Delete and return
+my %del = (x => 10, y => 20)
+my $deleted = delete $del{x}
+assert_eq $deleted, 10, "delete returns value"
+assert_false exists $del{x}, "delete removes key"
+
+test_run

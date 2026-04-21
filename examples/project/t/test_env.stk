@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+# t/test_env.stk — environment and CLI utilities
+
+# Environment variables
+assert_ok env_has("HOME"), "HOME env var exists"
+assert_ok env_has("PATH"), "PATH env var exists"
+my $home = env_get("HOME")
+assert_ok length($home) > 0, "HOME has value"
+assert_ok $home =~ m{^/}, "HOME starts with /"
+
+my $path = env_get("PATH")
+assert_ok length($path) > 0, "PATH has value"
+assert_ok $path =~ /:/, "PATH contains colons"
+
+# Non-existent var
+assert_false env_has("UNLIKELY_VAR_NAME_12345"), "fake var doesn't exist"
+my $missing = env_get("UNLIKELY_VAR_NAME_12345")
+assert_false defined($missing) && length($missing) > 0, "missing var is empty"
+
+# Environment keys
+my @keys = env_keys()
+assert_gt scalar(@keys), 0, "env_keys returns list"
+assert_ok grep { $_ eq "HOME" } @keys, "env_keys includes HOME"
+assert_ok grep { $_ eq "PATH" } @keys, "env_keys includes PATH"
+
+# Command existence
+assert_ok cmd_exists("ls"), "ls command exists"
+assert_ok cmd_exists("cat"), "cat command exists"
+assert_false cmd_exists("nonexistent_cmd_12345"), "fake cmd doesn't exist"
+
+# TTY checks (may vary in CI)
+my $stdin_tty = has_stdin_tty()
+my $stdout_tty = has_stdout_tty()
+my $stderr_tty = has_stderr_tty()
+assert_ok defined($stdin_tty), "has_stdin_tty returns defined"
+assert_ok defined($stdout_tty), "has_stdout_tty returns defined"
+assert_ok defined($stderr_tty), "has_stderr_tty returns defined"
+
+# Script name
+my $script = script_name()
+assert_ok defined($script), "script_name defined"
+
+test_run

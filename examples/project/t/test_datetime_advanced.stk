@@ -1,0 +1,80 @@
+#!/usr/bin/env stryke
+# t/test_datetime_advanced.stk — date/time operations
+
+# Today, yesterday, tomorrow (return days since epoch)
+my $today = today
+assert_gt $today, 0, "today > 0"
+
+my $yesterday = yesterday
+assert_eq $yesterday, $today - 1, "yesterday = today - 1"
+
+my $tomorrow = tomorrow
+assert_eq $tomorrow, $today + 1, "tomorrow = today + 1"
+
+# Weekend/weekday (returns 0 or 1 based on day of week)
+my $is_wkend = is_weekend
+my $is_wkday = is_weekday
+assert_ok defined $is_wkend, "is_weekend returns defined"
+assert_ok defined $is_wkday, "is_weekday returns defined"
+assert_ok ($is_wkend + $is_wkday) == 1, "either weekend or weekday"
+
+# Time functions
+my $now = time
+assert_gt $now, 1600000000, "time > 2020"
+my $ms = now_ms
+assert_gt $ms, 1600000000000, "now_ms > 2020 in ms"
+my $us = now_us
+assert_gt $us, 1600000000000000, "now_us > 2020 in us"
+my $ns = now_ns
+assert_gt $ns, 0, "now_ns > 0"
+
+# Epoch
+my $epoch = unix_epoch
+assert_gt $epoch, 1600000000, "epoch > 2020"
+my $epoch_ms = unix_epoch_ms
+assert_gt $epoch_ms, 1600000000000, "epoch_ms > 2020"
+
+# Leap year
+assert_ok is_leap_year 2000, "2000 leap"
+assert_ok is_leap_year 2024, "2024 leap"
+assert_ok is_leap_year 2400, "2400 leap"
+assert_false is_leap_year 1900, "1900 not leap"
+assert_false is_leap_year 2100, "2100 not leap"
+assert_false is_leap_year 2023, "2023 not leap"
+
+# Days in month
+assert_eq days_in_month(2024, 1), 31, "jan 31 days"
+assert_eq days_in_month(2024, 2), 29, "feb leap 29 days"
+assert_eq days_in_month(2023, 2), 28, "feb non-leap 28 days"
+assert_eq days_in_month(2024, 4), 30, "apr 30 days"
+assert_eq days_in_month(2024, 6), 30, "jun 30 days"
+assert_eq days_in_month(2024, 9), 30, "sep 30 days"
+assert_eq days_in_month(2024, 11), 30, "nov 30 days"
+assert_eq days_in_month(2024, 12), 31, "dec 31 days"
+
+# Month names
+assert_eq month_name(1), "January", "month 1"
+assert_eq month_name(6), "June", "month 6"
+assert_eq month_name(12), "December", "month 12"
+assert_eq month_short(1), "Jan", "month 1 short"
+assert_eq month_short(6), "Jun", "month 6 short"
+
+# Weekday names
+assert_eq weekday_name(0), "Sunday", "day 0"
+assert_eq weekday_name(1), "Monday", "day 1"
+assert_eq weekday_name(5), "Friday", "day 5"
+assert_eq weekday_name(6), "Saturday", "day 6"
+assert_eq weekday_short(0), "Sun", "day 0 short"
+assert_eq weekday_short(5), "Fri", "day 5 short"
+
+# Quarter
+assert_eq quarter_of(1), 1, "jan Q1"
+assert_eq quarter_of(3), 1, "mar Q1"
+assert_eq quarter_of(4), 2, "apr Q2"
+assert_eq quarter_of(6), 2, "jun Q2"
+assert_eq quarter_of(7), 3, "jul Q3"
+assert_eq quarter_of(9), 3, "sep Q3"
+assert_eq quarter_of(10), 4, "oct Q4"
+assert_eq quarter_of(12), 4, "dec Q4"
+
+test_run

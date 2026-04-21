@@ -39,7 +39,7 @@ fn make_adder ($n) {
 
 # Higher-order: apply a function N times to a value
 fn apply_n ($f, $n, $val) {
-    $val = $f->($val) for 1..$n
+    $val = $f($val) for 1..$n
     $val
 }
 

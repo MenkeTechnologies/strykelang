@@ -1,0 +1,65 @@
+#!/usr/bin/env stryke
+# t/test_pipeline.stk — pipeline and iterator operations
+
+# Basic pipeline with collect
+my @result = 1..10 |> map { $_ * 2 } |> collect
+assert_eq scalar(@result), 10, "pipeline map collect count"
+assert_eq $result[0], 2, "pipeline first"
+assert_eq $result[9], 20, "pipeline last"
+
+# Filter + map chain
+my @evens_squared = 1..10 |> grep { $_ % 2 == 0 } |> map { $_ * $_ } |> collect
+assert_eq scalar(@evens_squared), 5, "grep+map count"
+assert_eq $evens_squared[0], 4, "2^2"
+assert_eq $evens_squared[4], 100, "10^2"
+
+# Sum via pipeline
+my $total = 1..10 |> sum
+assert_eq $total, 55, "pipeline sum"
+
+# Filter then sum
+my $even_sum = 1..10 |> grep { $_ % 2 == 0 } |> sum
+assert_eq $even_sum, 30, "filtered sum"
+
+# Take and drop
+my @first3 = 1..10 |> take(3) |> collect
+assert_eq join(",", @first3), "1,2,3", "take 3"
+
+my @after3 = 1..10 |> drop(3) |> collect
+assert_eq join(",", @after3), "4,5,6,7,8,9,10", "drop 3"
+
+# Take while / drop while
+my @tw = 1..10 |> take_while { $_ < 5 } |> collect
+assert_eq join(",", @tw), "1,2,3,4", "take_while < 5"
+
+my @dw = 1..10 |> drop_while { $_ < 5 } |> collect
+assert_eq join(",", @dw), "5,6,7,8,9,10", "drop_while < 5"
+
+# Reduce
+my $product = 1..5 |> reduce { $a * $b }
+assert_eq $product, 120, "reduce product"
+
+# Scan (running totals)
+my @running = 1..5 |> scan { $a + $b } |> collect
+assert_eq scalar(@running), 6, "scan count"
+assert_eq $running[0], 1, "scan first"
+assert_eq $running[5], 15, "scan last"
+
+# First / find
+my $first_even = 1..10 |> first { $_ % 2 == 0 }
+assert_eq $first_even, 2, "first even"
+
+my $found = 1..10 |> find { $_ > 7 }
+assert_eq $found, 8, "find > 7"
+
+# All / any / none (via pipeline methods)
+my $all_pos = 1..5 |> all { $_ > 0 }
+assert_ok $all_pos, "all positive"
+my $any_3 = 1..5 |> any { $_ == 3 }
+assert_ok $any_3, "any == 3"
+
+# Uniq via pipeline
+my @uniq_result = (1, 2, 2, 3, 3, 3) |> uniq |> collect
+assert_eq scalar(@uniq_result), 3, "pipeline uniq"
+
+test_run

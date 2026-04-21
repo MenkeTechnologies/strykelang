@@ -554,7 +554,7 @@ def main() -> None:
                     s.push_str(h);
                     s.push_str(": ");
                 }
-                s.push_str("say ");
+                s.push_str("p ");
                 s.push_str(&format_expr_list(args));
                 s
             }""",

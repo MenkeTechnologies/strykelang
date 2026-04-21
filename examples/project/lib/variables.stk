@@ -58,7 +58,7 @@ fn array_negative_index {
 
 fn array_length {
     my @a = (1, 2, 3, 4, 5)
-    scalar(@a)
+    scalar @a
 }
 
 fn array_last_index {
@@ -75,14 +75,14 @@ fn array_modify {
 fn array_extend {
     my @a = (1, 2, 3)
     $a[5] = 6
-    scalar(@a)
+    scalar @a
 }
 
 fn array_flatten {
     my @a = (1, 2)
     my @b = (3, 4)
     my @c = (@a, @b)
-    scalar(@c)
+    scalar @c
 }
 
 fn array_in_scalar {
@@ -278,13 +278,13 @@ fn ref_type_anon_hash {
 
 fn code_ref {
     my $add = fn { $_0 + $_1 }
-    $add->(3, 4)
+    $add(3, 4)
 }
 
 fn code_ref_closure {
     my $x = 10
     my $add_x = fn { $_0 + $x }
-    $add_x->(5)
+    $add_x(5)
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -368,7 +368,7 @@ fn my_list_decl {
 
 fn my_array_decl {
     my @arr = (1, 2, 3)
-    scalar(@arr)
+    scalar @arr
 }
 
 fn my_hash_decl {
@@ -421,7 +421,7 @@ fn hash_to_scalar {
 
 fn scalar_force {
     my @a = (1, 2, 3)
-    scalar(@a)
+    scalar @a
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -452,8 +452,8 @@ fn ref_check {
     my $r1 = ref(\$scalar)
     my $r2 = ref(\@array)
     my $r3 = ref(\%hash)
-    my $r4 = ref($aref)
-    my $r5 = ref($href)
+    my $r4 = ref $aref
+    my $r5 = ref $href
     
     "$r1,$r2,$r3,$r4,$r5"
 }

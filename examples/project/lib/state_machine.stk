@@ -113,7 +113,7 @@ fn make_parser_fsm {
                 $tokens->[$last_idx] .= $char
             } else {
                 $state = "start"
-                $feed->($char) if $char =~ /\S/
+                $feed($char) if $char =~ /\S/
             }
         } elsif ($state eq "word") {
             if ($char =~ /[a-zA-Z0-9]/) {
@@ -121,7 +121,7 @@ fn make_parser_fsm {
                 $tokens->[$last_idx] .= $char
             } else {
                 $state = "start"
-                $feed->($char) if $char =~ /\S/
+                $feed($char) if $char =~ /\S/
             }
         }
     }

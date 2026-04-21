@@ -7,21 +7,21 @@ fn constantly($val) {
 }
 
 fn flip($fn) {
-    fn($a, $b) { $fn->($b, $a) }
+    fn($a, $b) { $fn($b, $a) }
 }
 
 fn partial($fn, $first) {
-    fn { $fn->($first, @_) }
+    fn { $fn($first, @_) }
 }
 
 fn partial_right($fn, $last) {
-    fn { $fn->(@_, $last) }
+    fn { $fn(@_, $last) }
 }
 
 fn curry2($fn) {
     fn($a) {
         fn($b) {
-            $fn->($a, $b)
+            $fn($a, $b)
         }
     }
 }
@@ -30,7 +30,7 @@ fn curry3($fn) {
     fn($a) {
         fn($b) {
             fn($c) {
-                $fn->($a, $b, $c)
+                $fn($a, $b, $c)
             }
         }
     }
@@ -38,12 +38,12 @@ fn curry3($fn) {
 
 fn uncurry2($fn) {
     fn($a, $b) {
-        $fn->($a)->($b)
+        $fn($a)($b)
     }
 }
 
 fn compose2($f, $g) {
-    fn { $f->($g->(@_)) }
+    fn { $f($g(@_)) }
 }
 
 fn compose_all(@fns) {
@@ -54,7 +54,7 @@ fn compose_all(@fns) {
     for my $i (reverse(0..scalar(@fns)-2)) {
         my $f = $fns[$i]
         my $g = $result
-        $result = fn { $f->($g->(@_)) }
+        $result = fn { $f($g(@_)) }
     }
     $result
 }
@@ -67,7 +67,7 @@ fn pipe_all(@fns) {
     for my $i (1..scalar(@fns)-1) {
         my $f = $result
         my $g = $fns[$i]
-        $result = fn { $g->($f->(@_)) }
+        $result = fn { $g($f(@_)) }
     }
     $result
 }
@@ -75,8 +75,8 @@ fn pipe_all(@fns) {
 fn filter_map($filter, $mapper, @items) {
     my @result
     for my $item (@items) {
-        if ($filter->($item)) {
-            push @result, $mapper->($item)
+        if ($filter($item)) {
+            push @result, $mapper($item)
         }
     }
     @result
@@ -85,7 +85,7 @@ fn filter_map($filter, $mapper, @items) {
 fn reduce_right($fn, $init, @items) {
     my $acc = $init
     for my $item (reverse @items) {
-        $acc = $fn->($item, $acc)
+        $acc = $fn($item, $acc)
     }
     $acc
 }
@@ -94,7 +94,7 @@ fn scan($fn, $init, @items) {
     my @results = ($init)
     my $acc = $init
     for my $item (@items) {
-        $acc = $fn->($acc, $item)
+        $acc = $fn($acc, $item)
         push @results, $acc
     }
     @results
@@ -103,7 +103,7 @@ fn scan($fn, $init, @items) {
 fn take_while($pred, @items) {
     my @result
     for my $item (@items) {
-        last unless $pred->($item)
+        last unless $pred($item)
         push @result, $item
     }
     @result
@@ -113,7 +113,7 @@ fn drop_while($pred, @items) {
     my @result
     my $dropping = 1
     for my $item (@items) {
-        if ($dropping && $pred->($item)) {
+        if ($dropping && $pred($item)) {
             next
         }
         $dropping = 0
@@ -126,7 +126,7 @@ fn partition_by($pred, @items) {
     my @true_items
     my @false_items
     for my $item (@items) {
-        if ($pred->($item)) {
+        if ($pred($item)) {
             push @true_items, $item
         } else {
             push @false_items, $item
@@ -138,7 +138,7 @@ fn partition_by($pred, @items) {
 fn group_by_fn($key_fn, @items) {
     my $groups = {}
     for my $item (@items) {
-        my $key = $key_fn->($item)
+        my $key = $key_fn($item)
         unless (exists $groups->{$key}) {
             $groups->{$key} = []
         }
@@ -150,7 +150,7 @@ fn group_by_fn($key_fn, @items) {
 
 fn find_first($pred, @items) {
     for my $item (@items) {
-        return $item if $pred->($item)
+        return $item if $pred($item)
     }
     undef
 }
@@ -158,14 +158,14 @@ fn find_first($pred, @items) {
 fn find_last($pred, @items) {
     my $found
     for my $item (@items) {
-        $found = $item if $pred->($item)
+        $found = $item if $pred($item)
     }
     $found
 }
 
 fn find_index($pred, @items) {
     for my $i (0..$#items) {
-        return $i if $pred->($items[$i])
+        return $i if $pred($items[$i])
     }
     -1
 }
@@ -173,28 +173,28 @@ fn find_index($pred, @items) {
 fn count_if($pred, @items) {
     my $count = 0
     for my $item (@items) {
-        $count++ if $pred->($item)
+        $count++ if $pred($item)
     }
     $count
 }
 
 fn all_match($pred, @items) {
     for my $item (@items) {
-        return 0 unless $pred->($item)
+        return 0 unless $pred($item)
     }
     1
 }
 
 fn any_match($pred, @items) {
     for my $item (@items) {
-        return 1 if $pred->($item)
+        return 1 if $pred($item)
     }
     0
 }
 
 fn none_match($pred, @items) {
     for my $item (@items) {
-        return 0 if $pred->($item)
+        return 0 if $pred($item)
     }
     1
 }

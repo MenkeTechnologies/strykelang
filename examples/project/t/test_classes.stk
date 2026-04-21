@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# t/test_classes.stk — full OOP tests
+
+require "./lib/classes.stk"
+
+# ── Basic Class & Construction ─────────────────────────────────────
+my $a = Animal(name => "Leo", age => 5)
+assert_eq $a->name, "Leo", "animal name"
+assert_eq $a->age, 5, "animal age"
+assert_eq $a->speak(), "Animal sound", "animal speak"
+assert_eq $a->to_str(), "Leo (5)", "animal to_str"
+
+# ── Inheritance & Overriding ───────────────────────────────────────
+my $d = Dog(name => "Rex", age => 3, breed => "Labrador")
+assert_eq $d->name, "Rex", "dog inherits name"
+assert_eq $d->breed, "Labrador", "dog has breed"
+assert_eq $d->speak(), "Woof! I am Rex", "dog overrides speak"
+assert_eq $d->fetch("ball"), "Rex fetched the ball", "dog new method"
+
+# ── Multiple Inheritance ───────────────────────────────────────────
+my $rd = RoboDog(name => "Sparky", model => "v2")
+assert_eq $rd->name, "Sparky", "robodog inherits name from dog"
+assert_eq $rd->model, "v2", "robodog inherits model from robot"
+assert_eq $rd->speak(), "Beep Woof", "robodog overrides speak"
+assert_eq $rd->battery(), "90%", "robodog inherits from robot"
+
+# ── Static Methods ─────────────────────────────────────────────────
+assert_eq SpeciesInfo::count(), 1000, "static method call"
+assert_eq SpeciesInfo::classify("Mammal"), "Species: Mammal", "static method with arg"
+
+# ── Visibility ─────────────────────────────────────────────────────
+my $v = Vault(id => 123, secret => "swordfish")
+assert_eq $v->id, 123, "field access"
+assert_eq $v->get_secret(), "swordfish", "field via getter"
+$v->set_secret("newpass")
+assert_eq $v->get_secret(), "newpass", "field via setter"
+
+# ── isa & does checks ──────────────────────────────────────────────
+assert_true $d->isa("Dog"), "dog isa Dog"
+assert_true $d->isa("Animal"), "dog isa Animal (parent)"
+assert_true $rd->isa("Robot"), "robodog isa Robot (multiple)"
+assert_true $a->does("Speakable"), "animal does Speakable trait"
+
+# ── Traits & Polymorphism ──────────────────────────────────────────
+my $sq = Square(side => 10.0)
+my $ci = Circle(radius => 5.0)
+assert_eq $sq->area(), 100.0, "square area"
+assert_near $ci->area(), 78.53975, 0.001, "circle area"
+
+test_run

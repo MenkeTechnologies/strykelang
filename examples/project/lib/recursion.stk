@@ -16,13 +16,13 @@ fn power_rec($base, $exp) {
 }
 
 fn digit_count($n) {
-    $n = abs($n)
+    $n = abs $n
     return 1 if $n < 10
     1 + digit_count(int($n / 10))
 }
 
 fn sum_digits($n) {
-    $n = abs($n)
+    $n = abs $n
     return $n if $n < 10
     ($n % 10) + sum_digits(int($n / 10))
 }

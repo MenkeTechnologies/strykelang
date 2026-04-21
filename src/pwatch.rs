@@ -1,4 +1,4 @@
-//! Parallel file notifications for `pwatch GLOB, sub { ... }` (notify + rayon).
+//! Parallel file notifications for `pwatch GLOB, fn { ... }` (notify + rayon).
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};

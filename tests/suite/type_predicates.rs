@@ -18,8 +18,8 @@ fn predicate_is_hash() {
 
 #[test]
 fn predicate_is_code() {
-    assert_eq!(eval_int("is_code(sub {})"), 1);
-    assert_eq!(eval_int("is_coderef(sub {})"), 1);
+    assert_eq!(eval_int("is_code(fn {})"), 1);
+    assert_eq!(eval_int("is_coderef(fn {})"), 1);
     assert_eq!(eval_int("is_code([])"), 0);
 }
 
@@ -27,7 +27,7 @@ fn predicate_is_code() {
 fn predicate_is_ref() {
     assert_eq!(eval_int("is_ref([])"), 1);
     assert_eq!(eval_int("is_ref({})"), 1);
-    assert_eq!(eval_int("is_ref(sub {})"), 1);
+    assert_eq!(eval_int("is_ref(fn {})"), 1);
     assert_eq!(eval_int("is_ref(42)"), 0);
 }
 

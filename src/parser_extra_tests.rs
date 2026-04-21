@@ -54,8 +54,8 @@ fn test_nested_structures_parsing() {
 
 #[test]
 fn test_pipe_forward_basic_desugaring() {
-    // 42 |> say  should desugar to say(42)
-    let k = first_expr_kind("42 |> say;");
+    // 42 |> p  should desugar to p(42)
+    let k = first_expr_kind("42 |> p;");
     if let ExprKind::Say { args, .. } = k {
         assert_eq!(args.len(), 1);
         assert!(matches!(args[0].kind, ExprKind::Integer(42)));
@@ -86,7 +86,7 @@ fn test_ternary_precedence() {
 
 #[test]
 fn test_sub_call_no_parens() {
-    let k = first_expr_kind("say 42;");
+    let k = first_expr_kind("p 42;");
     if let ExprKind::Say { args, .. } = k {
         assert_eq!(args.len(), 1);
     } else {

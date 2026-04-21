@@ -194,7 +194,7 @@ fn run_source(
             break;
         }
         // Like `ppool` workers: run the sub body with `exec_block_no_scope` so closure
-        // state (e.g. `my $n` in `source => sub { ... }`) persists across pulls. `call_sub`
+        // state (e.g. `my $n` in `source => fn { ... }`) persists across pulls. `call_sub`
         // would push/pop frames each iteration and break that persistence.
         let v = match interp.exec_block_no_scope(&source.body) {
             Ok(v) => v,

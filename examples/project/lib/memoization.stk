@@ -5,7 +5,7 @@ fn make_memoized($fn) {
     fn {
         my $key = join("\x00", @_)
         return $cache{$key} if exists $cache{$key}
-        $cache{$key} = $fn->(@_)
+        $cache{$key} = $fn(@_)
     }
 }
 
@@ -82,7 +82,7 @@ fn make_ttl_cache($ttl_seconds) {
 
     my $get = fn($key) {
         return undef unless exists $cache{$key}
-        my $age = $now->() - $timestamps{$key}
+        my $age = $now() - $timestamps{$key}
         if ($age > $ttl_seconds) {
             delete $cache{$key}
             delete $timestamps{$key}
@@ -93,7 +93,7 @@ fn make_ttl_cache($ttl_seconds) {
 
     my $set = fn($key, $val) {
         $cache{$key} = $val
-        $timestamps{$key} = $now->()
+        $timestamps{$key} = $now()
     }
 
     my $size = fn { scalar(keys %cache) }
@@ -122,7 +122,7 @@ fn make_call_counter($fn) {
 
     my $wrapped = fn {
         $count++
-        $fn->(@_)
+        $fn(@_)
     }
 
     my $get_count = fn { $count }
@@ -137,7 +137,7 @@ fn make_once($fn) {
 
     fn {
         unless ($called) {
-            $result = $fn->(@_)
+            $result = $fn(@_)
             $called = 1
         }
         $result
@@ -180,7 +180,7 @@ fn make_debounced($delay_ms, $fn) {
         my $now = time() * 1000
         if ($now - $last_call >= $delay_ms) {
             $last_call = $now
-            $fn->(@_)
+            $fn(@_)
         }
     }
 }

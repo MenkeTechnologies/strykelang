@@ -4,17 +4,17 @@
 # ── Basic Scalar Roundtrip ──────────────────────────────────────────
 
 my $s1 = "hello world"
-my $j1 = json_encode($s1)
+my $j1 = json_encode $s1
 assert_eq json_decode($j1), $s1, "json string roundtrip"
 
 my $n1 = 42
-my $j2 = json_encode($n1)
+my $j2 = json_encode $n1
 assert_eq json_decode($j2), $n1, "json number roundtrip"
 
 # ── Array Roundtrip ─────────────────────────────────────────────────
 
 my $aref = [1, 2, "three", [4, 5]]
-my $j3 = json_encode($aref)
+my $j3 = json_encode $aref
 # json_decode on an array returns a list, so we wrap it in [] to get a ref
 my $res_arr = [json_decode($j3)]
 assert_eq ref($res_arr), "ARRAY", "decoded array ref"
@@ -30,8 +30,8 @@ my $hash = {
     features => ["fast", "cyberpunk"],
     meta => { author => "Wizard" }
 }
-my $j4 = json_encode($hash)
-my $res_hash = json_decode($j4)
+my $j4 = json_encode $hash
+my $res_hash = json_decode $j4
 
 assert_eq ref($res_hash), "HASH", "decoded hash is HASH ref"
 assert_eq $res_hash->{name}, "Stryke", "decoded hash value"
@@ -53,7 +53,7 @@ assert_eq scalar(keys %$empty_hash), 0, "decode empty hash"
 # Null / Undef
 my $null_val = undef
 # In JSON, undef usually encodes to null
-my $j5 = json_encode($null_val)
+my $j5 = json_encode $null_val
 assert_eq $j5, "null", "encode undef to null"
 assert_false defined(json_decode($j5)), "decode null to undef"
 

@@ -7,11 +7,11 @@
 # ══════════════════════════════════════════════════════════════════════════════
 
 my $yaml_data = {name => "Alice", age => 30, tags => ["a", "b"]}
-my $yaml_str = to_yaml($yaml_data)
+my $yaml_str = to_yaml $yaml_data
 assert_ok $yaml_str =~ /name/, "to_yaml contains key"
 assert_ok $yaml_str =~ /Alice/, "to_yaml contains value"
 
-my $yaml_parsed = from_yaml($yaml_str)
+my $yaml_parsed = from_yaml $yaml_str
 assert_eq $yaml_parsed->{name}, "Alice", "from_yaml name"
 assert_eq $yaml_parsed->{age}, 30, "from_yaml age"
 
@@ -20,10 +20,10 @@ assert_eq $yaml_parsed->{age}, 30, "from_yaml age"
 # ══════════════════════════════════════════════════════════════════════════════
 
 my $toml_data = {title => "Config", debug => 1}
-my $toml_str = to_toml($toml_data)
+my $toml_str = to_toml $toml_data
 assert_ok $toml_str =~ /title/, "to_toml contains key"
 
-my $toml_parsed = from_toml($toml_str)
+my $toml_parsed = from_toml $toml_str
 assert_eq $toml_parsed->{title}, "Config", "from_toml title"
 assert_eq $toml_parsed->{debug}, 1, "from_toml debug"
 
@@ -32,10 +32,10 @@ assert_eq $toml_parsed->{debug}, 1, "from_toml debug"
 # ══════════════════════════════════════════════════════════════════════════════
 
 my $xml_data = {root => {item => "value"}}
-my $xml_str = to_xml($xml_data)
+my $xml_str = to_xml $xml_data
 assert_ok $xml_str =~ /</, "to_xml contains tag"
 
-my $xml_parsed = from_xml($xml_str)
+my $xml_parsed = from_xml $xml_str
 assert_ok defined($xml_parsed), "from_xml parses"
 
 # ══════════════════════════════════════════════════════════════════════════════

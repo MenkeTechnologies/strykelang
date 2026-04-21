@@ -129,7 +129,7 @@ fn require_strict_noop() {
 
 #[test]
 fn say_returns_true() {
-    assert_eq!(eval_int("say 0"), 1);
+    assert_eq!(eval_int("p 0"), 1);
 }
 
 #[test]
@@ -266,14 +266,14 @@ fn stringify_eval_roundtrip_nested() {
 #[test]
 fn stringify_coderef_simple() {
     let s = eval_string("str fn {$_ + 1}");
-    assert!(s.contains("sub"));
+    assert!(s.contains("sub") || s.contains("fn"));
     assert!(s.contains("$_ + 1"));
 }
 
 #[test]
 fn stringify_coderef_with_params() {
     let s = eval_string("str fn ($x) { $x * 2 }");
-    assert!(s.contains("sub"));
+    assert!(s.contains("sub") || s.contains("fn"));
     assert!(s.contains("$x"));
     assert!(s.contains("$x * 2"));
 }

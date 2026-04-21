@@ -1,0 +1,54 @@
+#!/usr/bin/env stryke
+# t/test_bitwise.stk — bitwise operations and base conversions
+
+# Base conversions
+assert_eq to_bin(5), "101", "5 to binary"
+assert_eq to_bin(255), "11111111", "255 to binary"
+assert_eq to_hex(255), "ff", "255 to hex"
+assert_eq to_hex(16), "10", "16 to hex"
+assert_eq to_oct(8), "10", "8 to octal"
+assert_eq to_oct(64), "100", "64 to octal"
+
+assert_eq from_bin("101"), 5, "binary 101 = 5"
+assert_eq from_bin("11111111"), 255, "binary 11111111 = 255"
+assert_eq from_hex("ff"), 255, "hex ff = 255"
+assert_eq from_hex("10"), 16, "hex 10 = 16"
+assert_eq from_oct("10"), 8, "octal 10 = 8"
+assert_eq from_oct("100"), 64, "octal 100 = 64"
+
+# Arbitrary base
+assert_eq to_base(10, 2), "1010", "10 base 2"
+assert_eq to_base(255, 16), "ff", "255 base 16"
+assert_eq from_base("1010", 2), 10, "1010 base 2 = 10"
+assert_eq from_base("ff", 16), 255, "ff base 16 = 255"
+
+# Bit operations
+assert_eq bit_and(0b1100, 0b1010), 0b1000, "bit_and"
+assert_eq bit_or(0b1100, 0b1010), 0b1110, "bit_or"
+assert_eq bit_xor(0b1100, 0b1010), 0b0110, "bit_xor"
+assert_eq bit_not(0), -1, "bit_not 0"
+
+assert_eq shift_left(1, 4), 16, "1 << 4 = 16"
+assert_eq shift_right(16, 4), 1, "16 >> 4 = 1"
+assert_eq shift_left(0b0001, 3), 0b1000, "shift left by 3"
+assert_eq shift_right(0b1000, 3), 0b0001, "shift right by 3"
+
+# Bit manipulation
+assert_eq bit_set(0, 0), 1, "set bit 0"
+assert_eq bit_set(0, 3), 8, "set bit 3"
+assert_eq bit_clear(0b1111, 0), 0b1110, "clear bit 0"
+assert_eq bit_clear(0b1111, 2), 0b1011, "clear bit 2"
+assert_eq bit_toggle(0b1010, 0), 0b1011, "toggle bit 0 on"
+assert_eq bit_toggle(0b1010, 1), 0b1000, "toggle bit 1 off"
+assert_ok bit_test(0b1010, 1), "bit 1 is set"
+assert_false bit_test(0b1010, 0), "bit 0 is not set"
+
+# Bit counting
+assert_eq bits_count(0b1010), 2, "popcount of 1010"
+assert_eq bits_count(0b11111111), 8, "popcount of 8 ones"
+assert_eq bits_count(0), 0, "popcount of 0"
+assert_eq bit_length(0b1010), 4, "bit length of 1010"
+assert_eq bit_length(255), 8, "bit length of 255"
+assert_eq bit_length(1), 1, "bit length of 1"
+
+test_run

@@ -253,8 +253,7 @@ fn arr_split_limit {
 
 fn arr_length {
     my @a = (1, 2, 3, 4, 5)
-    scalar(@a)
-}
+    scalar @a}
 
 fn arr_last_index {
     my @a = (1, 2, 3, 4, 5)

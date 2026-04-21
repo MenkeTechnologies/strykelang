@@ -169,7 +169,7 @@ my $inner = fn {
     my $msg = "inner"
     "from closure: $msg"
 }
-assert_eq $inner->(), "from closure: inner", "closure interp"
+assert_eq $inner(), "from closure: inner", "closure interp"
 assert_eq "outer: $msg", "outer: outer", "outer scope preserved"
 
 my $multiline = "first

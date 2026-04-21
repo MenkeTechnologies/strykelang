@@ -9398,24 +9398,47 @@ impl Interpreter {
                 // Builtins read [`Self::wantarray_kind`] (VM sets it too); thread `ctx` through.
                 let saved_wa = self.wantarray_kind;
                 self.wantarray_kind = ctx;
-                // User-defined subs shadow builtins (correct Perl semantics).
+                // Builtins first — immune to monkey-patching (matches VM dispatch order).
+                // In compat mode, user subs shadow builtins (Perl 5 semantics).
+                if !crate::compat_mode() {
+                    if matches!(
+                        name.as_str(),
+                        "take_while" | "drop_while" | "skip_while" | "reject" | "tap" | "peek"
+                    ) {
+                        let r =
+                            self.list_higher_order_block_builtin(name.as_str(), &arg_vals, line);
+                        self.wantarray_kind = saved_wa;
+                        return r.map_err(Into::into);
+                    }
+                    if let Some(r) =
+                        crate::builtins::try_builtin(self, name.as_str(), &arg_vals, line)
+                    {
+                        self.wantarray_kind = saved_wa;
+                        return r.map_err(Into::into);
+                    }
+                }
                 if let Some(sub) = self.resolve_sub_by_name(name) {
                     self.wantarray_kind = saved_wa;
                     let args = self.with_topic_default_args(arg_vals);
                     return self.call_sub(&sub, args, ctx, line);
                 }
-                if matches!(
-                    name.as_str(),
-                    "take_while" | "drop_while" | "skip_while" | "reject" | "tap" | "peek"
-                ) {
-                    let r = self.list_higher_order_block_builtin(name.as_str(), &arg_vals, line);
-                    self.wantarray_kind = saved_wa;
-                    return r.map_err(Into::into);
-                }
-                if let Some(r) = crate::builtins::try_builtin(self, name.as_str(), &arg_vals, line)
-                {
-                    self.wantarray_kind = saved_wa;
-                    return r.map_err(Into::into);
+                // Compat mode: check builtins after user subs (Perl 5 semantics).
+                if crate::compat_mode() {
+                    if matches!(
+                        name.as_str(),
+                        "take_while" | "drop_while" | "skip_while" | "reject" | "tap" | "peek"
+                    ) {
+                        let r =
+                            self.list_higher_order_block_builtin(name.as_str(), &arg_vals, line);
+                        self.wantarray_kind = saved_wa;
+                        return r.map_err(Into::into);
+                    }
+                    if let Some(r) =
+                        crate::builtins::try_builtin(self, name.as_str(), &arg_vals, line)
+                    {
+                        self.wantarray_kind = saved_wa;
+                        return r.map_err(Into::into);
+                    }
                 }
                 self.wantarray_kind = saved_wa;
                 self.call_named_sub(name, arg_vals, line, ctx)

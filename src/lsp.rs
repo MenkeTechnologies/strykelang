@@ -507,7 +507,7 @@ fn walk_stmt(
     match &stmt.kind {
         StmtKind::SubDecl { name, body, .. } => {
             symbols.push(sym(
-                format!("sub {name}"),
+                format!("fn {name}"),
                 SymbolKind::FUNCTION,
                 uri,
                 source,
@@ -2155,13 +2155,13 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "cumtrapz" | "cumulative_trapz" => "`cumtrapz` cumulative trapezoidal integration. Returns running integral array.\n\n```perl\nmy @y = (1, 2, 3, 4)\nmy @F = @{cumtrapz(\\@y)}  # [0, 1.5, 4.0, 7.5]\n```",
 
         // ── Optimization ─────────────────────────────────────────────────
-        "bisection" | "bisect" => "`bisection` (alias `bisect`) finds a root of f(x)=0 in [a,b] via the bisection method. Takes a code ref, a, b, and optional tolerance.\n\n```perl\nmy $root = bisect(sub { $_[0]**2 - 2 }, 1, 2)  # √2 ≈ 1.4142\n```",
-        "newton_method" | "newton" | "newton_raphson" => "`newton_method` (aliases `newton`, `newton_raphson`) finds a root via Newton-Raphson. Takes f, f', x0, and optional tolerance.\n\n```perl\nmy $root = newton(sub { $_[0]**2 - 2 }, sub { 2*$_[0] }, 1.5)  # √2\n```",
-        "golden_section" | "golden" | "gss" => "`golden_section` (aliases `golden`, `gss`) finds the minimum of f on [a,b] via golden-section search.\n\n```perl\nmy $xmin = golden(sub { ($_[0]-3)**2 }, 0, 10)  # 3.0\n```",
+        "bisection" | "bisect" => "`bisection` (alias `bisect`) finds a root of f(x)=0 in [a,b] via the bisection method. Takes a code ref, a, b, and optional tolerance.\n\n```perl\nmy $root = bisect(fn { $_[0]**2 - 2 }, 1, 2)  # √2 ≈ 1.4142\n```",
+        "newton_method" | "newton" | "newton_raphson" => "`newton_method` (aliases `newton`, `newton_raphson`) finds a root via Newton-Raphson. Takes f, f', x0, and optional tolerance.\n\n```perl\nmy $root = newton(fn { $_[0]**2 - 2 }, fn { 2*$_[0] }, 1.5)  # √2\n```",
+        "golden_section" | "golden" | "gss" => "`golden_section` (aliases `golden`, `gss`) finds the minimum of f on [a,b] via golden-section search.\n\n```perl\nmy $xmin = golden(fn { ($_[0]-3)**2 }, 0, 10)  # 3.0\n```",
 
         // ── ODE Solvers ──────────────────────────────────────────────────
-        "rk4" | "runge_kutta" | "rk4_ode" => "`rk4` (aliases `runge_kutta`, `rk4_ode`) solves an ODE dy/dt = f(t,y) using 4th-order Runge-Kutta. Returns [[t,y], ...].\n\n```perl\n# dy/dt = -y, y(0) = 1 → y = e^(-t)\nmy $sol = rk4(sub { -$_[1] }, 0, 1, 0.1, 100)\n```",
-        "euler_ode" | "euler_method" => "`euler_ode` (alias `euler_method`) solves an ODE dy/dt = f(t,y) using the Euler method. Returns [[t,y], ...].\n\n```perl\nmy $sol = euler_ode(sub { $_[1] }, 0, 1, 0.01, 100)  # exponential growth\n```",
+        "rk4" | "runge_kutta" | "rk4_ode" => "`rk4` (aliases `runge_kutta`, `rk4_ode`) solves an ODE dy/dt = f(t,y) using 4th-order Runge-Kutta. Returns [[t,y], ...].\n\n```perl\n# dy/dt = -y, y(0) = 1 → y = e^(-t)\nmy $sol = rk4(fn { -$_[1] }, 0, 1, 0.1, 100)\n```",
+        "euler_ode" | "euler_method" => "`euler_ode` (alias `euler_method`) solves an ODE dy/dt = f(t,y) using the Euler method. Returns [[t,y], ...].\n\n```perl\nmy $sol = euler_ode(fn { $_[1] }, 0, 1, 0.01, 100)  # exponential growth\n```",
 
         // ── Graph Algorithms ─────────────────────────────────────────────
         "dijkstra" | "shortest_path" => "`dijkstra` (alias `shortest_path`) computes shortest paths from a source node. Graph is a hash of {node => [[neighbor, weight], ...]}. Returns {node => distance}.\n\n```perl\nmy $g = {A => [[\"B\",1],[\"C\",4]], B => [[\"C\",2]], C => []}\nmy $d = dijkstra($g, \"A\")  # {A=>0, B=>1, C=>3}\n```",
@@ -2253,7 +2253,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "cummax" => "`cummax` — cumulative maximum. Each element is the max of all elements up to that position.\n\n```perl\np cummax([3,1,4,1,5,9])  # [3,3,4,4,5,9]\n```",
         "cummin" => "`cummin` — cumulative minimum.\n\n```perl\np cummin([9,5,1,4,3])  # [9,5,1,1,1]\n```",
         "scale_vec" | "scale" => "`scale` — standardize a vector: (x - mean) / sd. Like R's scale().\n\n```perl\nmy @z = @{scale([10,20,30])}  # [-1, 0, 1]\n```",
-        "which_fn" => "`which_fn` — return indices where a predicate is true. Like R's which().\n\n```perl\nmy @idx = @{which_fn([1,5,3,8,2], sub { $_[0] > 3 })}  # [1, 3]\n```",
+        "which_fn" => "`which_fn` — return indices where a predicate is true. Like R's which().\n\n```perl\nmy @idx = @{which_fn([1,5,3,8,2], fn { $_[0] > 3 })}  # [1, 3]\n```",
         "tabulate" => "`tabulate` — frequency table of values. Returns hash of value => count. Like R's table().\n\n```perl\nmy %t = %{tabulate([qw(a b a c b a)])}\np $t{a}  # 3\n```",
         "duplicated" | "duped" => "`duplicated` — boolean array: 1 if element appeared earlier in the vector, 0 otherwise. Like R's duplicated().\n\n```perl\np duplicated([1,2,3,2,1])  # [0,0,0,1,1]\n```",
         "seq_fn" => "`seq_fn` — generate a numeric sequence from, to, by. Like R's seq().\n\n```perl\nmy @s = @{seq_fn(1, 10, 2)}  # [1,3,5,7,9]\nmy @r = @{seq_fn(5, 1, -1)}  # [5,4,3,2,1]\n```",
@@ -2272,9 +2272,9 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "binom_test" | "binomtest" => "`binom_test` — exact binomial test. Returns two-sided p-value. Like R's binom.test().\n\n```perl\nmy $p = binomtest(7, 10, 0.5)  # p-value for 7/10 successes vs p=0.5\n```",
 
         // ── R base: apply family ─────────────────────────────────────────
-        "sapply" => "`sapply` — apply a function to each element, return a vector. Like R's sapply().\n\n```perl\nmy @sq = @{sapply([1,2,3,4], sub { $_[0] ** 2 })}  # [1,4,9,16]\n```",
-        "tapply" => "`tapply` — apply a function by group. Takes data, group labels, and function. Returns hash. Like R's tapply().\n\n```perl\nmy %means = %{tapply([1,2,3,4], [\"a\",\"a\",\"b\",\"b\"], sub { avg(@{$_[0]}) })}\np $means{a}  # 1.5\np $means{b}  # 3.5\n```",
-        "do_call" | "docall" => "`do_call` — call a function with args from a list. Like R's do.call().\n\n```perl\nmy $result = docall(sub { $_[0] + $_[1] }, [3, 4])  # 7\n```",
+        "sapply" => "`sapply` — apply a function to each element, return a vector. Like R's sapply().\n\n```perl\nmy @sq = @{sapply([1,2,3,4], fn { $_[0] ** 2 })}  # [1,4,9,16]\n```",
+        "tapply" => "`tapply` — apply a function by group. Takes data, group labels, and function. Returns hash. Like R's tapply().\n\n```perl\nmy %means = %{tapply([1,2,3,4], [\"a\",\"a\",\"b\",\"b\"], fn { avg(@{$_[0]}) })}\np $means{a}  # 1.5\np $means{b}  # 3.5\n```",
+        "do_call" | "docall" => "`do_call` — call a function with args from a list. Like R's do.call().\n\n```perl\nmy $result = docall(fn { $_[0] + $_[1] }, [3, 4])  # 7\n```",
 
         // ── R base: ML / clustering ──────────────────────────────────────
         "kmeans" => "`kmeans` — k-means clustering (Lloyd's algorithm). Takes array of points and k. Returns cluster assignments. Like R's kmeans().\n\n```perl\nmy @clusters = @{kmeans([[0,0],[1,0],[10,10],[11,10]], 2)}\n# [0,0,1,1] — two clusters\n```",
@@ -3454,7 +3454,7 @@ fn qualified_sub_completions(
         items.push(CompletionItem {
             label: fqn.clone(),
             kind: Some(CompletionItemKind::FUNCTION),
-            detail: Some("sub (qualified)".to_string()),
+            detail: Some("fn (qualified)".to_string()),
             documentation: doc,
             ..Default::default()
         });

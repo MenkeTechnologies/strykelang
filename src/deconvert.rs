@@ -57,14 +57,14 @@ mod tests {
 
     #[test]
     fn deconvert_fn_to_sub() {
-        let out = deconvert("sub foo { 42 }");
+        let out = deconvert("fn foo { 42 }");
         assert!(out.contains("sub foo"));
         assert!(out.contains("42"));
     }
 
     #[test]
     fn deconvert_say() {
-        let out = deconvert("say 'hello';");
+        let out = deconvert("p 'hello';");
         assert!(out.contains("say"));
         assert!(out.contains("hello"));
     }

@@ -990,19 +990,19 @@ pub enum ExprKind {
         list: Box<Expr>,
         progress: Option<Box<Expr>>,
     },
-    /// `par_lines PATH, sub { ... } [, progress => EXPR]` — optional stderr progress (per line).
+    /// `par_lines PATH, fn { ... } [, progress => EXPR]` — optional stderr progress (per line).
     ParLinesExpr {
         path: Box<Expr>,
         callback: Box<Expr>,
         progress: Option<Box<Expr>>,
     },
-    /// `par_walk PATH, sub { ... } [, progress => EXPR]` — parallel recursive directory walk; `$_` is each path.
+    /// `par_walk PATH, fn { ... } [, progress => EXPR]` — parallel recursive directory walk; `$_` is each path.
     ParWalkExpr {
         path: Box<Expr>,
         callback: Box<Expr>,
         progress: Option<Box<Expr>>,
     },
-    /// `pwatch GLOB, sub { ... }` — notify-based watcher (tree-walker only).
+    /// `pwatch GLOB, fn { ... }` — notify-based watcher (tree-walker only).
     PwatchExpr {
         path: Box<Expr>,
         callback: Box<Expr>,
