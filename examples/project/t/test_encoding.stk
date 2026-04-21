@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+# t/test_encoding.stk — encoding and hashing
+
+# Hex encoding
+assert_eq hex_encode("hello"), "68656c6c6f", "hex encode hello"
+assert_eq hex_decode("68656c6c6f"), "hello", "hex decode hello"
+assert_eq hex_encode(""), "", "hex encode empty"
+assert_eq hex_decode(""), "", "hex decode empty"
+
+# Base64 encoding
+assert_eq base64_encode("hello"), "aGVsbG8=", "base64 encode"
+assert_eq base64_decode("aGVsbG8="), "hello", "base64 decode"
+assert_eq base64_encode("a"), "YQ==", "base64 single char"
+assert_eq base64_decode("YQ=="), "a", "base64 decode single"
+assert_eq base64_encode(""), "", "base64 encode empty"
+
+# URL encoding
+my $url_encoded = url_encode("hello world?foo=bar")
+assert_ok index($url_encoded, "%20") >= 0 || index($url_encoded, "+") >= 0, "url_encode space"
+my $url_decoded = url_decode $url_encoded
+assert_eq $url_decoded, "hello world?foo=bar", "url roundtrip"
+
+# SHA hashes
+my $sha256 = sha256("hello")
+assert_eq length($sha256), 64, "sha256 length"
+my $sha512 = sha512("hello")
+assert_eq length($sha512), 128, "sha512 length"
+my $sha1 = sha1("hello")
+assert_eq length($sha1), 40, "sha1 length"
+
+# MD5
+my $md5 = md5("hello")
+assert_eq length($md5), 32, "md5 length"
+
+# CRC32
+my $crc = crc32("hello")
+assert_ok $crc > 0, "crc32 returns number"
+
+# UUID
+my $uuid = uuid()
+assert_eq length($uuid), 36, "uuid length with dashes"
+assert_ok $uuid =~ /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/, "uuid format"
+
+# Multiple UUIDs are unique
+my $uuid2 = uuid()
+assert_ok $uuid ne $uuid2, "uuids are unique"
+
+# JSON roundtrip
+my $data = {name => "test", values => [1, 2, 3], nested => {a => 1}}
+my $json = to_json $data
+assert_ok length($json) > 0, "to_json produces output"
+my $decoded = json_decode $json
+assert_eq $decoded->{name}, "test", "json roundtrip name"
+assert_eq $decoded->{values}[1], 2, "json roundtrip array"
+assert_eq $decoded->{nested}{a}, 1, "json roundtrip nested"
+
+test_run

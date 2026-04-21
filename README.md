@@ -299,7 +299,7 @@ my @r = @huge |> pmap_on $cluster heavy
 **Outer topic `$_<`** — inside nested blocks (`fan`, `fan_cap`, `map`, `grep`, `>{}`), `$_` is rebound per iteration. Use `$_<` to access the **previous** topic, `$_<<` for two levels up, up to `$_<<<<` (4 levels). This is a stryke extension — stock Perl 5 has no equivalent.
 
 ```perl
-~> 10 >{fan `say "outer topic is $_< and inner topic is $_"`}
+~> 10 >{fan `p "outer topic is $_< and inner topic is $_"`}
 
 $_ = 100
 my @r = fan_cap 3 { $_< }  # each worker sees outer topic → (100, 100, 100)
@@ -470,13 +470,13 @@ p cyber_eye("large")              # all-seeing eye motif
 class Animal {
     name: Str
     age: Int = 0
-    fn speak { say "Animal: " . $self->name }
+    fn speak { p "Animal: " . $self->name }
 }
 
 # Inheritance with extends
 class Dog extends Animal {
     breed: Str = "Mixed"
-    fn bark { say "Woof! I am " . $self->name }
+    fn bark { p "Woof! I am " . $self->name }
     fn speak { say $self->name . " barks!" }  # override
 }
 

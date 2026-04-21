@@ -449,7 +449,7 @@ fn accepts_sprintf_printf_print_say() {
     p("sprintf '%d', 1");
     p("printf '%d', 1");
     p("print 1");
-    p("say 1");
+    p("p 1");
 }
 
 #[test]

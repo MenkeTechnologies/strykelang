@@ -1,0 +1,46 @@
+#!/usr/bin/env stryke
+# t/test_statistics.stk — statistical functions
+
+my @data = (2, 4, 4, 4, 5, 5, 7, 9)
+
+# Central tendency
+assert_eq sum(@data), 40, "sum"
+assert_near avg(@data), 5, 0.001, "avg/mean"
+assert_near median(@data), 4.5, 0.001, "median"
+assert_eq mode_val(@data), 4, "mode_val"
+
+# Spread
+assert_near variance(@data), 4, 0.001, "variance"
+assert_near stddev(@data), 2, 0.001, "stddev"
+
+# Min/max
+assert_eq min(@data), 2, "min"
+assert_eq max(@data), 9, "max"
+my $minmax = min_max(@data)
+assert_eq $minmax->[0], 2, "min_max[0]"
+assert_eq $minmax->[1], 9, "min_max[1]"
+
+# Percentiles
+assert_eq percentile(0, @data), 2, "percentile 0 (min)"
+assert_eq percentile(100, @data), 9, "percentile 100 (max)"
+assert_near percentile(50, 1, 2, 3, 4, 5), 3, 0.1, "percentile 50 (median)"
+
+# Means
+assert_near geometric_mean(2, 8), 4, 0.001, "geometric_mean"
+assert_near geometric_mean(1, 3, 9), 3, 0.001, "geometric_mean 3 vals"
+assert_near harmonic_mean(1, 4, 4), 2, 0.001, "harmonic_mean"
+
+# Normalize
+my @normalized = normalize(0, 50, 100)
+assert_near $normalized[0], 0, 0.001, "normalize min"
+assert_near $normalized[1], 0.5, 0.001, "normalize mid"
+assert_near $normalized[2], 1, 0.001, "normalize max"
+
+# Range
+assert_eq range_of(3, 7, 1, 9, 4), 8, "range_of"
+
+# With absolute values (returns value with min/max abs)
+assert_eq min_abs(-5, 3, -2, 4), 2, "min_abs"
+assert_eq max_abs(-5, 3, -2, 4), 5, "max_abs"
+
+test_run

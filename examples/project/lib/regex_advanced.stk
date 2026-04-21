@@ -82,8 +82,7 @@ fn flag_case_insensitive { "HELLO" =~ /hello/i ? 1 : 0 }
 fn flag_global_count {
     my $s = "aaa"
     my @matches = $s =~ /a/g
-    scalar(@matches)
-}
+    scalar @matches}
 
 fn flag_multiline { "foo\nbar" =~ /^bar/m ? 1 : 0 }
 
@@ -169,8 +168,7 @@ fn tr_squeeze {
 
 fn split_regex_ws {
     my @parts = split(/\s+/, "hello   world")
-    scalar(@parts)
-}
+    scalar @parts}
 
 fn split_regex_delim {
     my @parts = split(/[,;]/, "a,b;c")
@@ -179,13 +177,11 @@ fn split_regex_delim {
 
 fn split_regex_limit {
     my @parts = split(/,/, "a,b,c,d", 2)
-    scalar(@parts)
-}
+    scalar @parts}
 
 fn split_regex_capture {
     my @parts = split(/(\s+)/, "a b c")
-    scalar(@parts)
-}
+    scalar @parts}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # MATCH IN LIST CONTEXT
@@ -193,8 +189,7 @@ fn split_regex_capture {
 
 fn match_list_context {
     my @matches = "hello world" =~ /(\w+)/g
-    scalar(@matches)
-}
+    scalar @matches}
 
 fn match_list_first {
     my @matches = "hello world" =~ /(\w+)/g

@@ -71,9 +71,9 @@ assert_eq is_prime_memo(101), 1, "101 cached"
 # ══════════════════════════════════════════════════════════════════════════════
 
 my $double = fn($x) { $x * 2 }
-assert_eq $double->(5), 10, "double 5"
-assert_eq $double->(10), 20, "double 10"
-assert_eq $double->(1), 2, "double 1"
+assert_eq $double(5), 10, "double 5"
+assert_eq $double(10), 20, "double 10"
+assert_eq $double(1), 2, "double 1"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # MEMOIZATION CONCEPT TEST
@@ -112,8 +112,8 @@ assert_eq count_primes_memo(100), 25, "count primes <= 100"
 # ══════════════════════════════════════════════════════════════════════════════
 
 my $add_fn = fn($a, $b) { $a + $b }
-assert_eq $add_fn->(1, 2), 3, "add 1+2"
-assert_eq $add_fn->(3, 4), 7, "add 3+4"
-assert_eq $add_fn->(0, 0), 0, "add 0+0"
+assert_eq $add_fn(1, 2), 3, "add 1+2"
+assert_eq $add_fn(3, 4), 7, "add 3+4"
+assert_eq $add_fn(0, 0), 0, "add 0+0"
 
 test_run

@@ -363,7 +363,7 @@ pub fn build_subs_prelude(subs: &HashMap<String, Arc<PerlSub>>) -> String {
             String::new()
         };
         let body = crate::fmt::format_block(&sub.body);
-        s.push_str(&format!("sub {}{} {{\n{}\n}}\n", name, sig, body));
+        s.push_str(&format!("fn {}{} {{\n{}\n}}\n", name, sig, body));
     }
     s
 }

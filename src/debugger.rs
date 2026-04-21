@@ -207,7 +207,7 @@ impl Debugger {
                     eprintln!("Breakpoint set at line {}", n);
                 } else {
                     self.sub_breakpoints.insert(arg.to_string());
-                    eprintln!("Breakpoint set at sub {}", arg);
+                    eprintln!("Breakpoint set at fn {}", arg);
                 }
                 DebugAction::Prompt
             }
@@ -221,7 +221,7 @@ impl Debugger {
                     eprintln!("Breakpoint at line {} deleted", n);
                 } else {
                     self.sub_breakpoints.remove(arg);
-                    eprintln!("Breakpoint at sub {} deleted", arg);
+                    eprintln!("Breakpoint at fn {} deleted", arg);
                 }
                 DebugAction::Prompt
             }
@@ -234,7 +234,7 @@ impl Debugger {
                         eprintln!("  line {}", bp);
                     }
                     for bp in &self.sub_breakpoints {
-                        eprintln!("  sub {}", bp);
+                        eprintln!("  fn {}", bp);
                     }
                 }
                 DebugAction::Prompt

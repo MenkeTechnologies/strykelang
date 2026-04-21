@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+# t/test_crypto.stk — cryptographic hash functions
+
+# SHA-256
+my $sha256 = sha256("hello")
+assert_eq length($sha256), 64, "sha256 length"
+assert_eq $sha256, "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", "sha256 hello"
+
+# SHA-512
+my $sha512 = sha512("hello")
+assert_eq length($sha512), 128, "sha512 length"
+
+# SHA-1
+my $sha1 = sha1("hello")
+assert_eq length($sha1), 40, "sha1 length"
+assert_eq $sha1, "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d", "sha1 hello"
+
+# MD5
+my $md5 = md5("hello")
+assert_eq length($md5), 32, "md5 length"
+assert_eq $md5, "5d41402abc4b2a76b9719d911017c592", "md5 hello"
+
+# CRC32
+my $crc = crc32("hello")
+assert_ok $crc > 0, "crc32 positive"
+
+# Consistency
+assert_eq sha256("test"), sha256("test"), "sha256 deterministic"
+assert_eq md5("test"), md5("test"), "md5 deterministic"
+
+# Different inputs produce different hashes
+assert_ok sha256("a") ne sha256("b"), "sha256 a != b"
+assert_ok md5("x") ne md5("y"), "md5 x != y"
+
+# Empty string hashing
+my $empty_sha = sha256("")
+assert_eq length($empty_sha), 64, "sha256 empty string length"
+my $empty_md5 = md5("")
+assert_eq length($empty_md5), 32, "md5 empty string length"
+
+# Hex encoding
+assert_eq hex_encode("abc"), "616263", "hex_encode"
+assert_eq hex_decode("616263"), "abc", "hex_decode"
+assert_eq hex_encode(""), "", "hex_encode empty"
+assert_eq hex_decode(""), "", "hex_decode empty"
+
+# Base64
+assert_eq base64_encode("hello"), "aGVsbG8=", "base64_encode"
+assert_eq base64_decode("aGVsbG8="), "hello", "base64_decode"
+assert_eq base64_encode(""), "", "base64_encode empty"
+assert_eq base64_encode("a"), "YQ==", "base64_encode a"
+assert_eq base64_encode("ab"), "YWI=", "base64_encode ab"
+assert_eq base64_encode("abc"), "YWJj", "base64_encode abc"
+
+test_run

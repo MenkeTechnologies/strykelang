@@ -5,12 +5,12 @@
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn slurp_self {
-    my $content = slurp("./lib/file_ops.stk")
+    my $content = slurp "./lib/file_ops.stk"
     defined($content) ? 1 : 0
 }
 
 fn slurp_has_content {
-    my $content = slurp("./lib/file_ops.stk")
+    my $content = slurp "./lib/file_ops.stk"
     length($content) > 100 ? 1 : 0
 }
 
@@ -26,36 +26,30 @@ fn slurp_missing {
 fn spew_and_read {
     my $tmpfile = "/tmp/stryke_test_spew_$$.txt"
     spurt($tmpfile, "hello world")
-    my $content = slurp($tmpfile)
-    unlink($tmpfile)
-    $content
+    my $content = slurp $tmpfile
+    unlink $tmpfile    $content
 }
 
 fn spew_overwrite {
     my $tmpfile = "/tmp/stryke_test_over_$$.txt"
     spurt($tmpfile, "first")
     spurt($tmpfile, "second")
-    my $content = slurp($tmpfile)
-    unlink($tmpfile)
-    $content
+    my $content = slurp $tmpfile
+    unlink $tmpfile    $content
 }
 
 fn spew_multiline {
     my $tmpfile = "/tmp/stryke_test_multi_$$.txt"
     spurt($tmpfile, "line1\nline2\nline3\n")
-    my $content = slurp($tmpfile)
-    unlink($tmpfile)
-    my @lines = split(/\n/, $content)
-    scalar(@lines)
-}
+    my $content = slurp $tmpfile
+    unlink $tmpfile    my @lines = split(/\n/, $content)
+    scalar @lines}
 
 fn spew_empty {
     my $tmpfile = "/tmp/stryke_test_empty_$$.txt"
     spurt($tmpfile, "")
-    my $content = slurp($tmpfile)
-    unlink($tmpfile)
-    length($content)
-}
+    my $content = slurp $tmpfile
+    unlink $tmpfile    length $content}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # FILE TEST OPERATORS
@@ -93,13 +87,11 @@ fn glob_test_files {
 
 fn glob_no_match {
     my @files = glob("./nonexistent/*.xyz")
-    scalar(@files)
-}
+    scalar @files}
 
 fn glob_single {
     my @files = glob("./lib/file_ops.stk")
-    scalar(@files)
-}
+    scalar @files}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # STAT
@@ -117,8 +109,7 @@ fn stat_size {
 
 fn stat_missing {
     my @s = stat("/nonexistent/file")
-    scalar(@s)
-}
+    scalar @s}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # UNLINK
@@ -128,13 +119,12 @@ fn unlink_created {
     my $tmpfile = "/tmp/stryke_unlink_test_$$.txt"
     spurt($tmpfile, "test")
     my $exists_before = -e $tmpfile ? 1 : 0
-    unlink($tmpfile)
-    my $exists_after = -e $tmpfile ? 1 : 0
+    unlink $tmpfile    my $exists_after = -e $tmpfile ? 1 : 0
     $exists_before == 1 && $exists_after == 0 ? 1 : 0
 }
 
 fn unlink_missing {
-    my $result = unlink("/nonexistent/file/to/delete")
+    my $result = unlink "/nonexistent/file/to/delete"
     $result == 0 ? 1 : 0
 }
 
@@ -195,19 +185,15 @@ fn open_read_close {
     spurt($tmpfile, "hello from file")
     open(my $fh, "<", $tmpfile)
     my $line = <$fh>
-    close($fh)
-    unlink($tmpfile)
-    $line =~ /hello/ ? 1 : 0
+    close $fh    unlink $tmpfile    $line =~ /hello/ ? 1 : 0
 }
 
 fn open_write_close {
     my $tmpfile = "/tmp/stryke_write_test_$$.txt"
     open(my $fh, ">", $tmpfile)
     print $fh "written via handle"
-    close($fh)
-    my $content = slurp($tmpfile)
-    unlink($tmpfile)
-    $content =~ /written/ ? 1 : 0
+    close $fh    my $content = slurp $tmpfile
+    unlink $tmpfile    $content =~ /written/ ? 1 : 0
 }
 
 fn open_append {
@@ -215,10 +201,8 @@ fn open_append {
     spurt($tmpfile, "first\n")
     open(my $fh, ">>", $tmpfile)
     print $fh "second\n"
-    close($fh)
-    my $content = slurp($tmpfile)
-    unlink($tmpfile)
-    $content =~ /first/ && $content =~ /second/ ? 1 : 0
+    close $fh    my $content = slurp $tmpfile
+    unlink $tmpfile    $content =~ /first/ && $content =~ /second/ ? 1 : 0
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -228,28 +212,23 @@ fn open_append {
 fn lines_count {
     my $tmpfile = "/tmp/stryke_lines_$$.txt"
     spurt($tmpfile, "line1\nline2\nline3")
-    my $content = slurp($tmpfile)
+    my $content = slurp $tmpfile
     my @lines = split(/\n/, $content)
-    unlink($tmpfile)
-    scalar(@lines)
-}
+    unlink $tmpfile    scalar @lines}
 
 fn lines_content {
     my $tmpfile = "/tmp/stryke_lines2_$$.txt"
     spurt($tmpfile, "alpha\nbeta\ngamma")
-    my $content = slurp($tmpfile)
+    my $content = slurp $tmpfile
     my @lines = split(/\n/, $content)
-    unlink($tmpfile)
-    $lines[1] =~ /beta/ ? 1 : 0
+    unlink $tmpfile    $lines[1] =~ /beta/ ? 1 : 0
 }
 
 fn lines_empty_file {
     my $tmpfile = "/tmp/stryke_empty_$$.txt"
     spurt($tmpfile, "")
-    my $content = slurp($tmpfile)
-    unlink($tmpfile)
-    length($content)
-}
+    my $content = slurp $tmpfile
+    unlink $tmpfile    length $content}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TEMP FILE OPERATIONS
@@ -258,18 +237,16 @@ fn lines_empty_file {
 fn temp_write_read {
     my $tmpfile = "/tmp/stryke_temp_wr_$$.txt"
     spurt($tmpfile, "temp data 12345")
-    my $back = slurp($tmpfile)
-    unlink($tmpfile)
-    $back eq "temp data 12345" ? 1 : 0
+    my $back = slurp $tmpfile
+    unlink $tmpfile    $back eq "temp data 12345" ? 1 : 0
 }
 
 fn temp_binary_like {
     my $tmpfile = "/tmp/stryke_binary_$$.bin"
     my $data = "ABCD"
     spurt($tmpfile, $data)
-    my $back = slurp($tmpfile)
-    unlink($tmpfile)
-    length($back) == 4 ? 1 : 0
+    my $back = slurp $tmpfile
+    unlink $tmpfile    length($back) == 4 ? 1 : 0
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -302,9 +279,8 @@ fn rename_file {
     rename($src, $dst)
     my $src_gone = -e $src ? 0 : 1
     my $dst_exists = -e $dst ? 1 : 0
-    my $content = slurp($dst)
-    unlink($dst)
-    $src_gone && $dst_exists && $content eq "rename test" ? 1 : 0
+    my $content = slurp $dst
+    unlink $dst    $src_gone && $dst_exists && $content eq "rename test" ? 1 : 0
 }
 
 fn copy_file {
@@ -314,10 +290,8 @@ fn copy_file {
     copy($src, $dst)
     my $src_exists = -e $src ? 1 : 0
     my $dst_exists = -e $dst ? 1 : 0
-    my $content = slurp($dst)
-    unlink($src)
-    unlink($dst)
-    $src_exists && $dst_exists && $content eq "copy test" ? 1 : 0
+    my $content = slurp $dst
+    unlink $src    unlink $dst    $src_exists && $dst_exists && $content eq "copy test" ? 1 : 0
 }
 
 # ══════════════════════════════════════════════════════════════════════════════

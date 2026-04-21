@@ -280,7 +280,7 @@ fn format_statement_indent(s: &Statement, depth: usize) -> String {
                     .unwrap_or_default()
             };
             format!(
-                "sub {}{} {{\n{}\n{}}}",
+                "fn {}{} {{\n{}\n{}}}",
                 name,
                 sig,
                 format_block_indent(body, depth + 1),
@@ -773,14 +773,14 @@ pub fn format_expr(e: &Expr) -> String {
         }
         ExprKind::CodeRef { params, body } => {
             if params.is_empty() {
-                format!("sub {{ {} }}", format_block_inline(body))
+                format!("fn {{ {} }}", format_block_inline(body))
             } else {
                 let sig = params
                     .iter()
                     .map(format_sub_sig_param)
                     .collect::<Vec<_>>()
                     .join(", ");
-                format!("sub ({}) {{ {} }}", sig, format_block_inline(body))
+                format!("fn ({}) {{ {} }}", sig, format_block_inline(body))
             }
         }
         ExprKind::SubroutineRef(name) => format!("&{}", name),

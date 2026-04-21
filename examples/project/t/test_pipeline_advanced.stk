@@ -11,11 +11,11 @@ my $square = fn($x) { $x * $x }
 my $is_even = fn($x) { $x % 2 == 0 }
 my $is_positive = fn($x) { $x > 0 }
 
-assert_eq $double->(5), 10, "double 5"
-assert_eq $inc->(5), 6, "inc 5"
-assert_eq $square->(4), 16, "square 4"
-assert_eq $is_even->(4), 1, "4 is even"
-assert_eq $is_even->(5), 0, "5 not even"
+assert_eq $double(5), 10, "double 5"
+assert_eq $inc(5), 6, "inc 5"
+assert_eq $square(4), 16, "square 4"
+assert_eq $is_even(4), 1, "4 is even"
+assert_eq $is_even(5), 0, "5 not even"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # MAP / GREP / REDUCE - Using builtins
@@ -73,7 +73,7 @@ assert_eq $piped_arr[4], 15, "pipeline array last"
 fn reduce_fn($fn, $init, @items) {
     my $acc = $init
     for my $item (@items) {
-        $acc = $fn->($acc, $item)
+        $acc = $fn($acc, $item)
     }
     $acc
 }
@@ -92,7 +92,7 @@ fn scan_fn($fn, $init, @items) {
     my @results = ($init)
     my $acc = $init
     for my $item (@items) {
-        $acc = $fn->($acc, $item)
+        $acc = $fn($acc, $item)
         push @results, $acc
     }
     @results
@@ -113,7 +113,7 @@ fn partition_fn($pred, @items) {
     my @true_part
     my @false_part
     for my $item (@items) {
-        if ($pred->($item)) {
+        if ($pred($item)) {
             push @true_part, $item
         } else {
             push @false_part, $item
@@ -137,7 +137,7 @@ assert_eq $part_odds->[0], 1, "first odd"
 fn take_while_fn($pred, @items) {
     my @result
     for my $item (@items) {
-        last unless $pred->($item)
+        last unless $pred($item)
         push @result, $item
     }
     @result
@@ -147,7 +147,7 @@ fn drop_while_fn($pred, @items) {
     my @result
     my $dropping = 1
     for my $item (@items) {
-        if ($dropping && $pred->($item)) {
+        if ($dropping && $pred($item)) {
             next
         }
         $dropping = 0
@@ -173,14 +173,14 @@ assert_eq $dropped[2], 7, "drop_while last"
 
 fn find_first_fn($pred, @items) {
     for my $item (@items) {
-        return $item if $pred->($item)
+        return $item if $pred($item)
     }
     undef
 }
 
 fn find_idx_fn($pred, @items) {
     for my $i (0..scalar(@items)-1) {
-        return $i if $pred->($items[$i])
+        return $i if $pred($items[$i])
     }
     -1
 }
@@ -188,7 +188,7 @@ fn find_idx_fn($pred, @items) {
 fn count_if_fn($pred, @items) {
     my $count = 0
     for my $item (@items) {
-        $count++ if $pred->($item)
+        $count++ if $pred($item)
     }
     $count
 }
@@ -204,21 +204,21 @@ assert_eq count_if_fn($is_even, @nums), 5, "count evens"
 
 fn all_fn($pred, @items) {
     for my $item (@items) {
-        return 0 unless $pred->($item)
+        return 0 unless $pred($item)
     }
     1
 }
 
 fn any_fn($pred, @items) {
     for my $item (@items) {
-        return 1 if $pred->($item)
+        return 1 if $pred($item)
     }
     0
 }
 
 fn none_fn($pred, @items) {
     for my $item (@items) {
-        return 0 if $pred->($item)
+        return 0 if $pred($item)
     }
     1
 }

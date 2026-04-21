@@ -3,7 +3,7 @@
 #
 # Usage: s examples/project/t/run.stk
 
-my $dir = dirname($0)
+my $dir = dirname $0
 my @test_files = glob("$dir/test_*.stk") |> sort
 my $total = scalar @test_files
 my $failed = 0

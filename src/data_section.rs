@@ -71,8 +71,8 @@ mod tests {
 
     #[test]
     fn splits_at_data() {
-        let (p, d) = split_data_section("say 1;\n__DATA__\na\nb\n");
-        assert_eq!(p, "say 1;");
+        let (p, d) = split_data_section("p 1;\n__DATA__\na\nb\n");
+        assert_eq!(p, "p 1;");
         assert_eq!(d, Some(b"a\nb\n".to_vec()));
     }
 

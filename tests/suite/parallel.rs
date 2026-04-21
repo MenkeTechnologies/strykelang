@@ -228,7 +228,7 @@ fn par_lines_invokes_block_per_line_with_mysync_count() {
     let p = dir.join("lines.txt");
     std::fs::write(&p, "a,b\n2,3").unwrap();
     let path = p.to_str().unwrap();
-    let code = format!(r#"mysync $n = 0; par_lines "{path}", sub {{ $n++ }}; $n"#);
+    let code = format!(r#"mysync $n = 0; par_lines "{path}", fn {{ $n++ }}; $n"#);
     assert_eq!(eval_int(&code), 2);
     std::fs::remove_dir_all(&dir).ok();
 }
@@ -255,7 +255,7 @@ fn par_walk_visits_files_and_dirs_with_mysync_count() {
     std::fs::write(dir.join("a/x.txt"), "1").unwrap();
     std::fs::write(dir.join("root.txt"), "2").unwrap();
     let path = dir.to_str().unwrap();
-    let code = format!(r#"mysync $n = 0; par_walk "{path}", sub {{ $n++ }}; $n"#);
+    let code = format!(r#"mysync $n = 0; par_walk "{path}", fn {{ $n++ }}; $n"#);
     // root dir, root.txt, subdir a, a/x.txt = 4 paths
     assert_eq!(eval_int(&code), 4);
     std::fs::remove_dir_all(&dir).ok();

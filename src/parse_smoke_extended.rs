@@ -38,7 +38,7 @@ parse_smoke_cases! {
     parse_smoke_028 => "do { 1 };";
     parse_smoke_029 => "if (1) { } elsif (0) { } else { }";
     parse_smoke_030 => "print 1;";
-    parse_smoke_031 => "say 1;";
+    parse_smoke_031 => "p 1;";
     parse_smoke_032 => "printf '%d', 1;";
     parse_smoke_033 => "m/foo/;";
     parse_smoke_034 => "m#bar#;";

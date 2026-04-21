@@ -1,4 +1,4 @@
-//! Memory-mapped parallel line iteration for `par_lines PATH, sub { ... }`.
+//! Memory-mapped parallel line iteration for `par_lines PATH, fn { ... }`.
 //! Splits the file into byte ranges aligned to line starts, then processes each chunk in parallel
 //! with rayon (each chunk scans its lines sequentially).
 

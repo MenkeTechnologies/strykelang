@@ -1,0 +1,76 @@
+# lib/classes.stk — full OOP with classes, inheritance, and traits
+
+# ── Traits ─────────────────────────────────────────────────────────
+
+trait Speakable {
+    fn speak;
+}
+
+# ── Base Class ─────────────────────────────────────────────────────
+
+class Animal impl Speakable {
+    name: Str = "Unknown";
+    age: Int = 0;
+    
+    fn speak { "Animal sound" }
+    fn to_str { $self->name . " (" . $self->age . ")" }
+}
+
+# ── Inheritance ────────────────────────────────────────────────────
+
+class Dog extends Animal {
+    breed: Str = "Unknown";
+    
+    fn speak { "Woof! I am " . $self->name }
+    fn fetch($item) { $self->name . " fetched the " . $item }
+}
+
+class Cat extends Animal {
+    lives: Int = 9;
+    
+    fn speak { "Meow" }
+}
+
+# ── Multiple Inheritance (supported in stryke) ──────────────────────
+
+class Robot {
+    model: Str = "generic";
+    fn battery { "90%" }
+}
+
+class RoboDog extends Dog, Robot {
+    fn speak { "Beep Woof" }
+}
+
+# ── Static Methods ─────────────────────────────────────────────────
+
+class SpeciesInfo {
+    fn Self.count { 1000 }
+    fn Self.classify($name) { "Species: $name" }
+}
+
+# ── Visibility ─────────────────────────────────────────────────────
+
+class Vault {
+    id: Int;
+    secret: Str;
+    
+    fn get_secret { $self->secret }
+    fn set_secret($val) { $self->secret($val) }
+}
+
+# ── Abstract-like pattern via trait ────────────────────────────────
+
+trait Shape {
+    fn area;
+}
+
+class Square impl Shape {
+    side: Float;
+    fn area { $self->side * $self->side }
+}
+
+class Circle impl Shape {
+    radius: Float;
+    fn area { 3.14159 * $self->radius * $self->radius }
+}

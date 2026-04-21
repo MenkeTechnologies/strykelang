@@ -82,13 +82,12 @@ fn str_rtrim($s) {
 
 fn str_chomp($s) {
     my $result = $s
-    chomp($result)
-    $result
+    chomp $result    $result
 }
 
 fn str_chop($s) {
     my $result = $s
-    my $char = chop($result)
+    my $char = chop $result
     ($result, $char)
 }
 
@@ -302,8 +301,7 @@ fn str_count_char($s, $char) {
 fn str_word_count($s) {
     my @words = split(/\s+/, $s)
     @words = grep { length($_) > 0 } @words
-    scalar(@words)
-}
+    scalar @words}
 
 fn str_lines($s) {
     my @lines = split(/\n/, $s)

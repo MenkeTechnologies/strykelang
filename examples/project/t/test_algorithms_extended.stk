@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# t/test_algorithms_extended.stk — search and sort tests
+
+require "./lib/algorithms.stk"
+
+# ── my_binary_search ──────────────────────────────────────────────────
+my @sorted = (1, 3, 5, 7, 9, 11, 13, 15)
+assert_eq my_binary_search(7, @sorted), 3, "binsearch found 7"
+assert_eq my_binary_search(1, @sorted), 0, "binsearch found first"
+assert_eq my_binary_search(15, @sorted), 7, "binsearch found last"
+assert_eq my_binary_search(8, @sorted), -1, "binsearch missing"
+assert_eq my_binary_search(0, @sorted), -1, "binsearch missing (too low)"
+assert_eq my_binary_search(20, @sorted), -1, "binsearch missing (too high)"
+assert_eq my_binary_search(5, (5)), 0, "binsearch single element found"
+assert_eq my_binary_search(5, ()), -1, "binsearch empty list"
+
+# ── bubble_sort ───────────────────────────────────────────────────
+my @unsorted = (5, 1, 9, 3, 7)
+my @res1 = bubble_sort(@unsorted)
+assert_eq join(",", @res1), "1,3,5,7,9", "bubble_sort basic"
+assert_eq join(",", bubble_sort(10, 5, 1)), "1,5,10", "bubble_sort three"
+assert_eq join(",", bubble_sort(42)), "42", "bubble_sort single"
+
+test_run

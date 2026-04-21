@@ -129,30 +129,30 @@ fn make_closures_with_explicit_capture {
 fn closure_modifies_outer {
     my $x = 10
     my $modifier = fn ($delta) { $x += $delta }
-    $modifier->(5)
-    $modifier->(3)
+    $modifier(5)
+    $modifier(3)
     $x
 }
 
 # ── Higher-order functions ─────────────────────────────────────────
 
 fn compose_fns($f, $g) {
-    fn ($x) { $f->($g->($x)) }
+    fn ($x) { $f($g($x)) }
 }
 
 fn pipe_fn($f, $g) {
-    fn ($x) { $g->($f->($x)) }
+    fn ($x) { $g($f($x)) }
 }
 
 fn apply_twice($f) {
-    fn ($x) { $f->($f->($x)) }
+    fn ($x) { $f($f($x)) }
 }
 
 fn apply_n_times($f, $n) {
     fn ($x) {
         my $result = $x
         for (1..$n) {
-            $result = $f->($result)
+            $result = $f($result)
         }
         $result
     }
@@ -181,22 +181,22 @@ fn make_toggle {
 fn outer_scope_test {
     my $x = "outer"
     my $get_outer = fn { $x }
-    my $result1 = $get_outer->()
+    my $result1 = $get_outer()
     my $x_inner = "inner"
     my $get_inner = fn { $x_inner }
-    my $r2 = $get_inner->()
-    my $r3 = $get_outer->()
+    my $r2 = $get_inner()
+    my $r3 = $get_outer()
     ($result1, $r2, $r3)
 }
 
 fn shadowing_with_modification {
     my $val = 10
     my $outer_mod = fn { $val *= 2 }
-    $outer_mod->()
+    $outer_mod()
     my $after_outer = $val
     my $val_inner = 100
     my $inner_mod = fn { $val_inner += 5 }
-    $inner_mod->()
+    $inner_mod()
     my $inner_val = $val_inner
     ($after_outer, $inner_val)
 }

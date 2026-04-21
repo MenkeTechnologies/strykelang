@@ -1,0 +1,37 @@
+# lib/algorithms.stk — various algorithm implementations
+
+# ── my_binary_search: returns index of target in sorted list, or -1 ─────
+fn my_binary_search($target, @list) {
+    my $low = 0
+    my $high = scalar(@list) - 1
+    
+    while ($low <= $high) {
+        my $mid = int(($low + $high) / 2)
+        my $guess = $list[$mid]
+        
+        if ($guess == $target) {
+            return $mid
+        }
+        if ($guess > $target) {
+            $high = $mid - 1
+        } else {
+            $low = $mid + 1
+        }
+    }
+    -1
+}
+
+# ── bubble_sort: classic inefficient sort for testing ─────
+fn bubble_sort(@list) {
+    my $len = scalar(@list)
+    for my $i (0..$len-1) {
+        for my $j (0..$len-$i-2) {
+            if ($list[$j] > $list[$j+1]) {
+                my $tmp = $list[$j]
+                $list[$j] = $list[$j+1]
+                $list[$j+1] = $tmp
+            }
+        }
+    }
+    @list
+}

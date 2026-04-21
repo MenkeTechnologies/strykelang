@@ -1349,7 +1349,7 @@ mod tests {
         let sub = interp
             .subs
             .get(fq)
-            .unwrap_or_else(|| panic!("missing sub {fq}"))
+            .unwrap_or_else(|| panic!("missing fn {fq}"))
             .clone();
         match native_dispatch(interp, &sub, args, want) {
             Some(Ok(v)) => v,

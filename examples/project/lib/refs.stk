@@ -114,7 +114,7 @@ fn make_code_ref {
 }
 
 fn call_code_ref($cref, $arg) {
-    $cref->($arg)
+    $cref($arg)
 }
 
 fn make_named_sub_ref {
@@ -124,8 +124,7 @@ fn make_named_sub_ref {
 # ── Reference type checking ────────────────────────────────────────
 
 fn ref_type($ref) {
-    ref($ref)
-}
+    ref $ref}
 
 fn is_array_ref($ref) {
     ref($ref) eq "ARRAY" ? 1 : 0

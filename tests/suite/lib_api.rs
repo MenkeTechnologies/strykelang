@@ -160,10 +160,10 @@ fn vendor_perl_inc_path_suffix_is_vendor_perl() {
 #[test]
 fn try_vm_execute_sub_def_visible_to_parse_and_run_string() {
     let mut interp = Interpreter::new();
-    let def = parse("sub lib_api_vm_sub { 41 }").expect("parse sub");
+    let def = parse("fn lib_api_vm_fn { 41 }").expect("parse fn");
     try_vm_execute(&def, &mut interp)
-        .expect("vm compiles sub")
+        .expect("vm compiles fn")
         .expect("vm run");
-    let v = parse_and_run_string("lib_api_vm_sub() + 1", &mut interp).expect("follow-up");
+    let v = parse_and_run_string("lib_api_vm_fn() + 1", &mut interp).expect("follow-up");
     assert_eq!(v.to_int(), 42);
 }

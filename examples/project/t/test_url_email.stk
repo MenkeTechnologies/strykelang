@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# t/test_url_email.stk — URL and email parsing
+
+# URL parsing
+my $url = "https://example.com:8080/path/to/page?foo=bar&baz=qux"
+assert_eq url_scheme($url), "https", "url_scheme"
+assert_eq url_host($url), "example.com:8080", "url_host"
+assert_eq url_path($url), "/path/to/page", "url_path"
+assert_eq url_query($url), "foo=bar&baz=qux", "url_query"
+
+# Simple URL
+my $simple = "http://test.org/hello"
+assert_eq url_scheme($simple), "http", "simple url_scheme"
+assert_eq url_host($simple), "test.org", "simple url_host"
+assert_eq url_path($simple), "/hello", "simple url_path"
+
+# URL validation
+assert_ok is_valid_url("https://example.com"), "valid https url"
+assert_ok is_valid_url("http://example.com/path"), "valid http with path"
+assert_ok is_valid_url("ftp://files.example.com"), "valid ftp url"
+assert_false is_valid_url("not a url"), "invalid url"
+assert_false is_valid_url("example.com"), "missing scheme"
+
+# Email parsing (use single quotes to avoid @array interpolation)
+my $email = 'user@example.com'
+assert_eq email_local($email), "user", "email_local"
+assert_eq email_domain($email), "example.com", "email_domain"
+
+my $complex_email = 'john.doe+tag@sub.example.org'
+assert_eq email_local($complex_email), "john.doe+tag", "complex email_local"
+assert_eq email_domain($complex_email), "sub.example.org", "complex email_domain"
+
+# Email validation
+assert_ok is_valid_email('test@example.com'), "valid email"
+assert_ok is_valid_email('user.name@domain.co.uk'), "valid email with dots"
+assert_false is_valid_email('invalid'), "invalid email no @"
+assert_false is_valid_email('@example.com'), "invalid email no local"
+assert_false is_valid_email('user@'), "invalid email no domain"
+
+# URL encoding
+my $encoded = url_encode("hello world?foo=bar")
+assert_ok $encoded =~ /%20/ || $encoded =~ /\+/, "url_encode encodes space"
+my $decoded = url_decode $encoded
+assert_eq $decoded, "hello world?foo=bar", "url_decode"
+
+# Special characters
+my $special = url_encode("a=1&b=2")
+assert_ok $special =~ /%/, "url_encode special chars"
+
+test_run

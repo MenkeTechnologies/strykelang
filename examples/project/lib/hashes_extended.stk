@@ -189,8 +189,7 @@ fn hash_iterate_sorted {
 fn hash_to_array {
     my %h = (a => 1, b => 2)
     my @arr = %h
-    scalar(@arr)
-}
+    scalar @arr}
 
 fn array_to_hash {
     my @arr = qw(a 1 b 2 c 3)
@@ -239,14 +238,12 @@ fn hash_merge_override {
 fn hash_grep_keys {
     my %h = (apple => 1, banana => 2, apricot => 3, cherry => 4)
     my @keys = grep { /^a/ } keys %h
-    scalar(@keys)
-}
+    scalar @keys}
 
 fn hash_grep_values {
     my %h = (a => 1, b => 2, c => 3, d => 4)
     my @big = grep { $h{$_} > 2 } keys %h
-    scalar(@big)
-}
+    scalar @big}
 
 fn hash_vals_map {
     my %h = (a => 1, b => 2)

@@ -30,7 +30,7 @@ fn dataframe_sum_and_filter() {
             {{ region => "east", amount => "100" }},
             {{ region => "west", amount => "200" }});
         my $df = dataframe("{ps}");
-        my $f = $df->filter(sub {{ $_->{{amount}} > 60 }});
+        my $f = $df->filter(fn {{ $_->{{amount}} > 60 }});
         "" . $df->sum("amount") . ":" . $f->nrows"#
     );
     let got = eval_string(&code);
@@ -222,7 +222,7 @@ my $n = par_pipeline(
     workers => [2, 2],
     buffer  => 8,
 );
-say $n;"#,
+p $n;"#,
         ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

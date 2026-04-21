@@ -98,7 +98,7 @@ fn bench_split {
 
 fn bench_closure_call {
     my $fn = fn ($x) { $x * 2 }
-    bench { $fn->(42) } 1000
+    bench { $fn(42) } 1000
 }
 
 fn bench_nested_loops {

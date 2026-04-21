@@ -84,8 +84,7 @@ fn spaces_normalize($str) {
 fn camelcase_to_snake($str) {
     my $result = $str
     $result =~ s/([a-z])([A-Z])/${1}_${2}/g
-    lc($result)
-}
+    lc $result}
 
 fn snake_to_camelcase($str) {
     my $result = $str

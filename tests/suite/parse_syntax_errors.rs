@@ -30,8 +30,8 @@ fn rejects_invalid_token_triple_dollar() {
 
 #[test]
 fn statement_anonymous_sub_block_parses() {
-    // Perl: `sub { 1 }` is a valid statement (void-context coderef).
-    assert!(stryke::parse("sub { 1 }").is_ok());
+    // Perl: `fn { 1 }` is a valid statement (void-context coderef).
+    assert!(stryke::parse("fn { 1 }").is_ok());
 }
 
 #[test]

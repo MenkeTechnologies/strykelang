@@ -17,7 +17,7 @@ fn adjacent_scalars($x, $y) {
 }
 
 fn scalar_with_method($s) {
-    my $len = length($s)
+    my $len = length $s
     "String '$s' has $len characters"
 }
 

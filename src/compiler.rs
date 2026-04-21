@@ -4699,7 +4699,7 @@ impl Compiler {
                         "read() needs tree-walker for lvalue buffer arg".into(),
                     ));
                 }
-                // `defer { BLOCK }` — desugared by parser to `defer__internal(sub { BLOCK })`
+                // `defer { BLOCK }` — desugared by parser to `defer__internal(fn { BLOCK })`
                 "defer__internal" => {
                     if args.len() != 1 {
                         return Err(CompileError::Unsupported(
@@ -8141,13 +8141,6 @@ mod tests {
     fn compile_print_statement() {
         let chunk = compile_snippet("print 1;").expect("compile");
         assert!(chunk.ops.iter().any(|o| matches!(o, Op::Print(_, _))));
-        assert_last_halt(&chunk);
-    }
-
-    #[test]
-    fn compile_say_statement() {
-        let chunk = compile_snippet("say 1;").expect("compile");
-        assert!(chunk.ops.iter().any(|o| matches!(o, Op::Say(_, _))));
         assert_last_halt(&chunk);
     }
 

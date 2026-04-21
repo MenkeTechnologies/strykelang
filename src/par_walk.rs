@@ -1,4 +1,4 @@
-//! Parallel recursive directory walk for `par_walk PATH, sub { ... }`.
+//! Parallel recursive directory walk for `par_walk PATH, fn { ... }`.
 //!
 //! Within each directory, entries are processed in parallel (rayon); recursion descends into
 //! subdirectories. Symlinks to directories are followed; non-directory symlinks are visited as

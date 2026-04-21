@@ -40,7 +40,7 @@ fn test_ppool_interpreter() {
     let code = r#"
         my $pool = ppool(2)
         for my $i (1..3) {
-            $pool->submit(sub { $_ * 10 }, $i)
+            $pool->submit(fn { $_ * 10 }, $i)
         }
         my @res = $pool->collect()
         join(",", sort { $a <=> $b } @res)

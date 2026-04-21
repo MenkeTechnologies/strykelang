@@ -97,16 +97,16 @@ assert_eq sum_to(100), 5050, "sum_to 100"
 # ══════════════════════════════════════════════════════════════════════════════
 
 my $add5 = get_adder(5)
-assert_eq $add5->(10), 15, "adder closure"
-assert_eq $add5->(0), 5, "adder closure zero"
+assert_eq $add5(10), 15, "adder closure"
+assert_eq $add5(0), 5, "adder closure zero"
 
 my $mul3 = get_multiplier(3)
-assert_eq $mul3->(4), 12, "multiplier closure"
+assert_eq $mul3(4), 12, "multiplier closure"
 
 assert_eq apply_twice(fn { $_0 * 2 }, 3), 12, "apply twice"
 
 my $composed = compose(fn { $_0 + 1 }, fn { $_0 * 2 })
-assert_eq $composed->(5), 11, "compose"
+assert_eq $composed(5), 11, "compose"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HIGHER ORDER FUNCTIONS
@@ -159,11 +159,11 @@ my $factory_fn = fn {
     my $n = shift;
     fn { $n * $_0 }
 };
-my $times5 = $factory_fn->(5);
-assert_eq $times5->(3), 15, "factory function"
+my $times5 = $factory_fn(5);
+assert_eq $times5(3), 15, "factory function"
 
 # Immediate call of anonymous sub
-my $imm = fn { 42 }->();
+my $imm = fn { 42 }();
 assert_eq $imm, 42, "immediate call"
 
 # Pass array by reference

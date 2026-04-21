@@ -114,11 +114,11 @@ fn get_multiplier($n) {
 }
 
 fn apply_twice($fn, $x) {
-    $fn->($fn->($x))
+    $fn($fn($x))
 }
 
 fn compose_fn($f, $g) {
-    fn { $f->($g->($_0)) }
+    fn { $f($g($_0)) }
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -126,17 +126,17 @@ fn compose_fn($f, $g) {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn apply_to_each($fn, @items) {
-    map { $fn->($_) } @items
+    map { $fn($_) } @items
 }
 
 fn filter_with($fn, @items) {
-    grep { $fn->($_) } @items
+    grep { $fn($_) } @items
 }
 
 fn reduce_with($fn, $init, @items) {
     my $acc = $init
     for my $item (@items) {
-        $acc = $fn->($acc, $item)
+        $acc = $fn($acc, $item)
     }
     $acc
 }
@@ -153,8 +153,7 @@ fn call_in_expression { 10 + one_arg(5) }
 
 fn method_chain_style {
     my @arr = (1, 2, 3)
-    scalar(@arr)
-}
+    scalar @arr}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SPECIAL CASES

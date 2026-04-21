@@ -406,7 +406,7 @@ fn lsp_stdio_completion_qualified_sub() {
 
 #[test]
 fn lsp_stdio_hover_builtin_say() {
-    let mut h = LspHarness::new("say 1;\n");
+    let mut h = LspHarness::new("p 1;\n");
     let result = h.hover(0, 1);
     h.finish();
     let md = result
@@ -460,8 +460,8 @@ fn lsp_stdio_document_symbol_lists_sub() {
         .filter_map(|s| s.get("name").and_then(Value::as_str))
         .collect();
     assert!(
-        names.contains(&"sub yellow_minion"),
-        "expected sub in {:?}",
+        names.contains(&"sub yellow_minion") || names.contains(&"fn yellow_minion"),
+        "expected sub/fn in {:?}",
         names
     );
 }

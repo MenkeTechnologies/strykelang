@@ -58,8 +58,7 @@ fn length_negative { length(-42) }
 
 fn length_var {
     my $s = "test"
-    length($s)
-}
+    length $s}
 
 fn length_concat {
     my $a = "foo"
@@ -109,7 +108,7 @@ fn wantarray_in_list {
 
 fn wantarray_nested {
     my $inner = fn { wantarray ? "list" : "scalar" }
-    my $result = $inner->()
+    my $result = $inner()
     $result
 }
 
@@ -127,7 +126,7 @@ fn caller_in_sub {
         my @c = caller()
         scalar(@c) > 0 ? 1 : 0
     }
-    $inner->()
+    $inner()
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -354,31 +353,26 @@ fn lvalue_concat_assign {
 
 fn chop_returns {
     my $s = "hello"
-    chop($s)
-}
+    chop $s}
 
 fn chop_modifies {
     my $s = "hello"
-    chop($s)
-    $s
+    chop $s    $s
 }
 
 fn chomp_newline {
     my $s = "hello\n"
-    chomp($s)
-    $s
+    chomp $s    $s
 }
 
 fn chomp_no_newline {
     my $s = "hello"
-    chomp($s)
-    $s
+    chomp $s    $s
 }
 
 fn chomp_returns {
     my $s = "hello\n"
-    chomp($s)
-}
+    chomp $s}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SPRINTF
@@ -429,8 +423,7 @@ fn reverse_palindrome { scalar(reverse("radar")) }
 fn reverse_array_count {
     my @a = (1, 2, 3, 4, 5)
     my @r = reverse(@a)
-    scalar(@r)
-}
+    scalar @r}
 
 fn reverse_array_first {
     my @a = (1, 2, 3, 4, 5)

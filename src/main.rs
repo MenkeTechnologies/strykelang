@@ -4256,7 +4256,7 @@ mod cli_argv_tests {
             ("-lane", "print 1", true, true),
             ("-le", "print 2", false, false),
             ("-lne", "print 3", false, true),
-            ("-lnE", "say 4", false, true),
+            ("-lnE", "p 4", false, true),
         ] {
             let a = expand_perl_bundled_argv(args(&["stryke", flag, code]));
             let cli = Cli::try_parse_from(&a).expect("parse bundled flags");

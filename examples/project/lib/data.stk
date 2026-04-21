@@ -45,7 +45,7 @@ fn split_by_pred ($pred, @items) {
     my $no = []
     for my $item (@items) {
         local $_ = $item
-        if ($pred->($item)) {
+        if ($pred($item)) {
             push @$yes, $item
         } else {
             push @$no, $item

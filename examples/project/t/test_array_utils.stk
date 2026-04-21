@@ -1,0 +1,68 @@
+#!/usr/bin/env stryke
+# t/test_array_utils.stk — array manipulation utilities
+
+# Basic array operations
+my @arr = (1, 2, 3, 4, 5)
+assert_eq scalar(@arr), 5, "array length"
+assert_eq join(",", @arr), "1,2,3,4,5", "join array"
+
+# Flatten
+my @nested = ([1, 2], [3, 4], 5)
+my @flat = flatten(@nested)
+assert_eq join(",", @flat), "1,2,3,4,5", "flatten"
+
+# Riffle/intersperse
+my @riffled = riffle([1, 2, 3], 0)
+assert_eq join(",", @riffled), "1,0,2,0,3", "riffle"
+
+# Take and drop via pipeline
+my @taken = 1..10 |> take(3) |> collect
+assert_eq join(",", @taken), "1,2,3", "pipeline take"
+my @dropped = 1..10 |> drop(7) |> collect
+assert_eq join(",", @dropped), "8,9,10", "pipeline drop"
+
+# Swap pairs
+my @swapped = swap_pairs([1, 2, 3, 4])
+assert_eq join(",", @swapped), "2,1,4,3", "swap_pairs"
+
+# Frequencies
+my $freq = frequencies("a", "b", "a", "c", "a", "b")
+assert_eq $freq->{a}, 3, "freq a = 3"
+assert_eq $freq->{b}, 2, "freq b = 2"
+assert_eq $freq->{c}, 1, "freq c = 1"
+
+# With index (pass list directly, not arrayref)
+my @indexed = with_index("a", "b", "c")
+assert_eq $indexed[0][0], "a", "with_index first val"
+assert_eq $indexed[0][1], 0, "with_index first idx"
+assert_eq $indexed[2][0], "c", "with_index last val"
+
+# Compact (remove undefs)
+my @sparse = (1, undef, 2, undef, 3)
+my @compacted = compact(@sparse)
+assert_eq join(",", @compacted), "1,2,3", "compact"
+
+# Concat/chain (pass flat lists)
+my @chained = concat(1, 2, 3, 4, 5, 6)
+assert_eq join(",", @chained), "1,2,3,4,5,6", "concat"
+
+# Uniq
+my @dupes = (1, 2, 2, 3, 3, 3, 1)
+my @unique = uniq(@dupes)
+assert_eq scalar(@unique), 3, "uniq count"
+
+# Count operations (TARGET, LIST)
+assert_eq count_eq(2, 1, 2, 2, 3, 2), 3, "count_eq"
+assert_eq count_ne(2, 1, 2, 2, 3, 2), 2, "count_ne"
+assert_ok all_eq([1, 1, 1]), "all_eq true"
+assert_false all_eq([1, 2, 1]), "all_eq false"
+assert_ok all_distinct([1, 2, 3]), "all_distinct true"
+assert_false all_distinct([1, 2, 1]), "all_distinct false"
+assert_ok has_duplicates([1, 2, 1]), "has_duplicates true"
+assert_false has_duplicates([1, 2, 3]), "has_duplicates false"
+
+# First or default (DEFAULT, LIST)
+assert_eq first_or("default"), "default", "first_or empty"
+assert_eq first_or("default", 1, 2, 3), 1, "first_or non-empty"
+
+test_run

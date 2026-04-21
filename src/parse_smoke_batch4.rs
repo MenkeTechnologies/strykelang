@@ -78,5 +78,5 @@ parse_batch4! {
     parse_b4_067 => "my @g = grep { $_ > 0 } @a;";
     parse_b4_068 => "sort { $a cmp $b } @a;";
     parse_b4_069 => "(0, @a) |> reduce { $a + $b };";
-    parse_b4_070 => "my $t = threads->create(sub { 1 });";
+    parse_b4_070 => "my $t = threads->create(fn { 1 });";
 }

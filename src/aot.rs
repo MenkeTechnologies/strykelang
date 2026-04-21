@@ -489,15 +489,15 @@ mod tests {
         fs::write(&src, b"pretend stryke binary bytes").unwrap();
         // Layer 1: embed script_a.
         fs::copy(&src, &mid).unwrap();
-        append_embedded_script(&mid, "a.pl", "say 1;").unwrap();
+        append_embedded_script(&mid, "a.pl", "p 1;").unwrap();
         // Layer 2: strip + embed script_b — should yield only script_b.
         copy_exe_without_trailer(&mid, &dst).unwrap();
-        append_embedded_script(&dst, "b.pl", "say 2;").unwrap();
+        append_embedded_script(&dst, "b.pl", "p 2;").unwrap();
         let loaded = try_load_embedded(&dst).expect("load layer 2");
         match loaded {
             EmbeddedPayload::Script(s) => {
                 assert_eq!(s.name, "b.pl");
-                assert_eq!(s.source, "say 2;");
+                assert_eq!(s.source, "p 2;");
             }
             EmbeddedPayload::Bundle(_) => panic!("expected Script, got Bundle"),
         }
