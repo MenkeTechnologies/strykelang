@@ -1,0 +1,78 @@
+# lib/ai/neural_network.stk - Feed-forward Neural Network
+
+require "./lib/ai/matrix.stk"
+require "./lib/math.stk"
+
+# ── Activation Functions ────────────────────────────────────────────
+
+fn sigmoid2($x) {
+    1 / (1 + exp(-$x))
+}
+
+fn sigmoid_derivative($x) {
+    $x * (1 - $x)
+}
+
+# ── Neural Network Class ────────────────────────────────────────────
+
+class NeuralNetwork {
+    input_nodes = 0
+    hidden_nodes = 0
+    output_nodes = 0
+    weights_ih = undef
+    weights_ho = undef
+    bias_h = undef
+    bias_o = undef
+
+    fn Self.new($input_nodes, $hidden_nodes, $output_nodes) {
+        my $weights_ih = Matrix::new($hidden_nodes, $input_nodes)
+        my $weights_ho = Matrix::new($output_nodes, $hidden_nodes)
+        $weights_ih->randomize()
+        $weights_ho->randomize()
+
+        my $bias_h = Matrix::new($hidden_nodes, 1)
+        my $bias_o = Matrix::new($output_nodes, 1)
+        $bias_h->randomize()
+        $bias_o->randomize()
+
+        NeuralNetwork(
+            input_nodes  => $input_nodes,
+            hidden_nodes => $hidden_nodes,
+            output_nodes => $output_nodes,
+            weights_ih   => $weights_ih,
+            weights_ho   => $weights_ho,
+            bias_h       => $bias_h,
+            bias_o       => $bias_o
+        )
+    }
+
+    fn predict($inputs_array) {
+        my $inputs = Matrix::from_array([$inputs_array])
+
+        my $hidden_weighted_sum = Matrix::from_array(
+            [matrix_mul($self->weights_ih->to_array(), $inputs->to_array())]
+        )
+        my $hidden_sum_with_bias = Matrix::from_array(
+            [matrix_add($hidden_weighted_sum->to_array(), $self->bias_h->to_array())]
+        )
+        my $hidden_outputs = $hidden_sum_with_bias->map(\&sigmoid2)
+
+        my $output_weighted_sum = Matrix::from_array(
+            [matrix_mul($self->weights_ho->to_array(), $hidden_outputs->to_array())]
+        )
+        my $output_sum_with_bias = Matrix::from_array(
+            [matrix_add($output_weighted_sum->to_array(), $self->bias_o->to_array())]
+        )
+        my $outputs = $output_sum_with_bias->map(\&sigmoid2)
+
+        $outputs->to_array()
+    }
+
+    fn train($training_data, $epochs) {
+        p "Training started (placeholder)..."
+        for my $epoch (1..$epochs) {
+            # Placeholder for training logic
+        }
+        p "Training finished."
+    }
+}

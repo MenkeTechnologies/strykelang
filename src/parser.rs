@@ -5294,6 +5294,30 @@ impl Parser {
             Token::Assign => {
                 self.advance();
                 let right = self.parse_assign_expr()?;
+                // Desugar `$obj->field = value` into `$obj->field(value)` (setter call)
+                if let ExprKind::MethodCall { ref args, .. } = expr.kind {
+                    if args.is_empty() {
+                        // Destructure again to take ownership
+                        let ExprKind::MethodCall {
+                            object,
+                            method,
+                            super_call,
+                            ..
+                        } = expr.kind
+                        else {
+                            unreachable!()
+                        };
+                        return Ok(Expr {
+                            kind: ExprKind::MethodCall {
+                                object,
+                                method,
+                                args: vec![right],
+                                super_call,
+                            },
+                            line,
+                        });
+                    }
+                }
                 self.validate_assignment(&expr, &right, line)?;
                 Ok(Expr {
                     kind: ExprKind::Assign {
@@ -13170,6 +13194,23 @@ impl Parser {
                 // `($a->b) ? $a->c : $a->d` — `->c` must not slurp the ternary `:` / `?`.
                 | Token::Question
                 | Token::Colon
+                // Assignment operators: `$obj->field = val` is setter sugar, not method arg.
+                | Token::Assign
+                | Token::PlusAssign
+                | Token::MinusAssign
+                | Token::MulAssign
+                | Token::DivAssign
+                | Token::ModAssign
+                | Token::PowAssign
+                | Token::DotAssign
+                | Token::AndAssign
+                | Token::OrAssign
+                | Token::XorAssign
+                | Token::DefinedOrAssign
+                | Token::ShiftLeftAssign
+                | Token::ShiftRightAssign
+                | Token::BitAndAssign
+                | Token::BitOrAssign
         )
     }
 

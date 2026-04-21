@@ -1,0 +1,139 @@
+#!/usr/bin/env stryke
+# t/test_functional_advanced.stk — simplified functional programming tests
+
+# ── Higher-Order Functions & Combinators ───────────────────────────────
+
+fn my_compose($f, $g) {
+    fn ($x) { $f->($g->($x)) }
+}
+
+fn my_pipe(@funcs) {
+    fn ($x) {
+        my $result = $x
+        for my $func (@funcs) {
+            $result = $func->($result)
+        }
+        $result
+    }
+}
+
+# Test composition
+my $add5 = fn ($x) { $x + 5 }
+my $mul2 = fn ($x) { $x * 2 }
+my $composed = my_compose($add5, $mul2)
+
+assert_eq $composed->(3), 11, "my_compose: add5(mul2(3))"
+
+# Test pipe
+my $pipeline = my_pipe($mul2, $add5, fn ($x) { $x ** 2 })
+assert_eq $pipeline->(3), 121, "pipe: ((3*2)+5)^2"
+
+# ── Maybe Monad for Error Handling ─────────────────────────────────────
+
+class Maybe {
+    value = undef
+    has_value = 0
+
+    fn Self.some($val) {
+        Maybe(value => $val, has_value => 1)
+    }
+
+    fn Self.none {
+        Maybe(has_value => 0)
+    }
+
+    fn is_some {
+        $self->has_value
+    }
+
+    fn is_none {
+        !$self->has_value
+    }
+
+    fn map($func) {
+        if ($self->is_some()) {
+            Maybe::some($func->($self->value))
+        } else {
+            Maybe::none()
+        }
+    }
+
+    fn flat_map($func) {
+        if ($self->is_some()) {
+            $func->($self->value)
+        } else {
+            Maybe::none()
+        }
+    }
+
+    fn unwrap_or($default) {
+        $self->is_some() ? $self->value : $default
+    }
+}
+
+fn safe_divide($a, $b) {
+    $b == 0 ? Maybe::none() : Maybe::some($a / $b)
+}
+
+my $result = Maybe::some(10)
+    ->flat_map(fn ($x) { safe_divide($x, 2) })
+    ->map(fn ($x) { $x + 1 })
+
+assert_eq $result->unwrap_or(0), 6, "maybe chain success"
+
+my $fail_result = Maybe::some(10)
+    ->flat_map(fn ($x) { safe_divide($x, 0) })
+    ->map(fn ($x) { $x + 1 })
+
+assert_eq $fail_result->unwrap_or(-1), -1, "maybe chain failure"
+
+# ── Function Utilities ─────────────────────────────────────────────────
+
+fn my_partial($func, $arg1) {
+    fn ($arg2) {
+        $func->($arg1, $arg2)
+    }
+}
+
+fn my_flip($func) {
+    fn ($a, $b, @rest) {
+        $func->($b, $a, @rest)
+    }
+}
+
+my $subtract = fn ($a, $b) { $a - $b }
+my $subtract_from_10 = my_partial($subtract, 10)
+assert_eq $subtract_from_10->(3), 7, "partial application"
+
+my $flipped_subtract = my_flip($subtract)
+assert_eq $flipped_subtract->(3, 10), 7, "flipped function"
+
+# ── Memoization ────────────────────────────────────────────────────────
+
+fn my_memoize($func) {
+    my %cache = ()
+    fn (@args) {
+        my $key = join(",", @args)
+        if (exists $cache{$key}) {
+            $cache{$key}
+        } else {
+            $cache{$key} = $func->(@args)
+        }
+    }
+}
+
+fn expensive_computation($n) {
+    my $result = $n
+    for (1..10) {  # simplified
+        $result = $result * 1.001
+    }
+    int($result)
+}
+
+my $memoized = my_memoize(\&expensive_computation)
+my $result1 = $memoized->(10)
+my $result2 = $memoized->(10)
+
+assert_eq $result1, $result2, "memoized results equal"
+
+test_run

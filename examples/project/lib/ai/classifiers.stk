@@ -1,0 +1,53 @@
+# lib/ai/classifiers.stk - K-Nearest Neighbor Classifier
+
+require "./lib/math.stk"
+
+# ── Euclidean Distance ────────────────────────────────────────────
+
+fn my_euclidean_distance($p1, $p2) {
+    my $sum = 0
+    for my $i (0..scalar(@$p1) - 1) {
+        $sum += ($p1->[$i] - $p2->[$i]) ** 2
+    }
+    sqrt($sum)
+}
+
+# ── KNN Classifier ────────────────────────────────────────────────
+
+class KNNClassifier {
+    k = 3
+    data = []
+    labels = []
+
+    fn fit($new_data, $new_labels) {
+        $self->data($new_data)
+        $self->labels($new_labels)
+    }
+
+    fn predict($point) {
+        my @distances
+        for my $i (0..scalar(@{$self->data}) - 1) {
+            my $dist = my_euclidean_distance($point, $self->data->[$i])
+            push @distances, [$dist, $self->labels->[$i]]
+        }
+
+        my @sorted_distances = sort { $a->[0] <=> $b->[0] } @distances
+        my @neighbors = @sorted_distances[0 .. $self->k - 1]
+
+        my %counts
+        for my $neighbor (@neighbors) {
+            my $label = $neighbor->[1]
+            $counts{$label}++
+        }
+
+        my $max_count = 0
+        my $best_label = undef
+        for my $label (keys %counts) {
+            if ($counts{$label} > $max_count) {
+                $max_count = $counts{$label}
+                $best_label = $label
+            }
+        }
+        $best_label
+    }
+}

@@ -1,0 +1,81 @@
+#!/usr/bin/env stryke
+# t/test_pattern_matching.stk — simple pattern matching tests
+
+# ── Basic Array Pattern Matching ───────────────────────────────────
+
+fn describe_array($arr) {
+    if (scalar(@$arr) == 0) {
+        "empty array"
+    } elsif (scalar(@$arr) == 1) {
+        "single element: " . $arr->[0]
+    } elsif (scalar(@$arr) == 2) {
+        "pair: " . $arr->[0] . ", " . $arr->[1]
+    } else {
+        "array with " . scalar(@$arr) . " elements"
+    }
+}
+
+assert_eq describe_array([]), "empty array", "match empty array"
+assert_eq describe_array([42]), "single element: 42", "match single"
+assert_eq describe_array([1, 2]), "pair: 1, 2", "match pair"
+assert_eq describe_array([1, 2, 3, 4, 5]), "array with 5 elements", "match many"
+
+# ── Guards in Pattern Matching ─────────────────────────────────────
+
+fn classify_number($n) {
+    if ($n < 0) {
+        "negative"
+    } elsif ($n == 0) {
+        "zero"
+    } elsif ($n > 0 && $n < 10) {
+        "small positive"
+    } elsif ($n >= 10 && $n < 100) {
+        "medium positive"
+    } elsif ($n >= 100) {
+        "large positive"
+    } else {
+        "unknown"
+    }
+}
+
+assert_eq classify_number(-5), "negative", "guard negative"
+assert_eq classify_number(0), "zero", "literal zero"
+assert_eq classify_number(7), "small positive", "guard small"
+assert_eq classify_number(42), "medium positive", "guard medium"
+assert_eq classify_number(500), "large positive", "guard large"
+
+# ── String Pattern Matching ────────────────────────────────────────
+
+fn classify_string($s) {
+    if ($s eq "") {
+        "empty"
+    } elsif (length($s) == 1) {
+        "single char: $s"
+    } elsif ($s =~ /^\d+$/) {
+        "all digits: $s"
+    } elsif ($s =~ /^[A-Z]+$/) {
+        "all caps: $s"
+    } else {
+        "mixed content"
+    }
+}
+
+assert_eq classify_string(""), "empty", "empty string"
+assert_eq classify_string("A"), "single char: A", "single char"
+assert_eq classify_string("123"), "all digits: 123", "digits"
+assert_eq classify_string("HELLO"), "all caps: HELLO", "caps"
+assert_eq classify_string("Hello123"), "mixed content", "mixed"
+
+# ── Simple Value Testing ───────────────────────────────────────────
+
+fn is_defined_and_true($val) {
+    defined($val) && $val
+}
+
+assert_true is_defined_and_true(1), "1 is true"
+assert_true is_defined_and_true("hello"), "string is true"
+assert_false is_defined_and_true(0), "0 is false"
+assert_false is_defined_and_true(""), "empty string is false"
+assert_false is_defined_and_true(undef), "undef is false"
+
+test_run

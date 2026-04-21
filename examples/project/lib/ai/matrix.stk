@@ -1,0 +1,45 @@
+# lib/ai/matrix.stk - Basic Matrix Class
+
+class Matrix {
+    data = []
+    rows = 0
+    cols = 0
+
+    fn Self.new($rows, $cols) {
+        my $data = [map { [(0) x $cols] } 1..$rows]
+        Matrix(data => $data, rows => $rows, cols => $cols)
+    }
+
+    fn Self.from_array($arr) {
+        my $rows = scalar(@$arr)
+        my $cols = $rows > 0 ? scalar(@{$arr->[0]}) : 0
+        Matrix(data => $arr, rows => $rows, cols => $cols)
+    }
+
+    fn get($row, $col) {
+        $self->data->[$row][$col]
+    }
+
+    fn set($row, $col, $value) {
+        $self->data->[$row][$col] = $value
+    }
+
+    fn map($func) {
+        my $new_data = [map {
+            [map { $func->($_) } @$_]
+        } @{$self->data}]
+        Matrix::from_array($new_data)
+    }
+
+    fn to_array {
+        $self->data
+    }
+
+    fn randomize {
+        for my $r (0..$self->rows - 1) {
+            for my $c (0..$self->cols - 1) {
+                $self->set($r, $c, rand() * 2 - 1)
+            }
+        }
+    }
+}
