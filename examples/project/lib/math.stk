@@ -2,13 +2,13 @@
 
 my %_fib_memo
 
-fn fib ($n) {
+fn fib_n ($n) {
     return $n if $n <= 1
     return $_fib_memo{$n} if exists $_fib_memo{$n}
-    $_fib_memo{$n} = fib($n - 1) + fib($n - 2)
+    $_fib_memo{$n} = fib_n($n - 1) + fib_n($n - 2)
 }
 
-fn factorial ($n) {
+fn factorial_n ($n) {
     my $r = 1
     $r *= $_ for 1..$n
     $r

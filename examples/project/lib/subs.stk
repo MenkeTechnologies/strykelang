@@ -80,18 +80,18 @@ fn return_in_context {
 # RECURSION
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn factorial($n) {
+fn fact_rec($n) {
     if ($n <= 1) {
         return 1
     }
-    $n * factorial($n - 1)
+    $n * fact_rec($n - 1)
 }
 
-fn fibonacci($n) {
+fn fib_rec($n) {
     if ($n <= 1) {
         return $n
     }
-    fibonacci($n - 1) + fibonacci($n - 2)
+    fib_rec($n - 1) + fib_rec($n - 2)
 }
 
 fn sum_to($n) {
@@ -117,7 +117,7 @@ fn apply_twice($fn, $x) {
     $fn->($fn->($x))
 }
 
-fn compose($f, $g) {
+fn compose_fn($f, $g) {
     fn { $f->($g->($_0)) }
 }
 

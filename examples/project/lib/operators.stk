@@ -46,7 +46,7 @@ fn num_le($a, $b) { $a <= $b ? 1 : 0 }
 fn num_gt($a, $b) { $a > $b ? 1 : 0 }
 fn num_ge($a, $b) { $a >= $b ? 1 : 0 }
 
-fn spaceship($a, $b) { $a <=> $b }
+fn cmp_spaceship($a, $b) { $a <=> $b }
 
 fn compare_chain($a, $b, $c) {
     ($a < $b) && ($b < $c) ? 1 : 0
@@ -103,19 +103,19 @@ fn complex_logical($a, $b, $c, $d) {
 # BITWISE OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn bit_and($a, $b) { $a & $b }
-fn bit_or($a, $b) { $a | $b }
-fn bit_xor($a, $b) { $a ^ $b }
-fn bit_not($a) { ~$a }
+fn bitwise_and($a, $b) { $a & $b }
+fn bitwise_or($a, $b) { $a | $b }
+fn bitwise_xor($a, $b) { $a ^ $b }
+fn bitwise_not($a) { ~$a }
 
 fn left_shift($a, $n) { $a << $n }
 fn right_shift($a, $n) { $a >> $n }
 
 fn bit_mask($val, $mask) { $val & $mask }
-fn bit_set($val, $bit) { $val | (1 << $bit) }
-fn bit_clear($val, $bit) { $val & ~(1 << $bit) }
-fn bit_toggle($val, $bit) { $val ^ (1 << $bit) }
-fn bit_test($val, $bit) { ($val & (1 << $bit)) ? 1 : 0 }
+fn set_bit($val, $bit) { $val | (1 << $bit) }
+fn clear_bit($val, $bit) { $val & ~(1 << $bit) }
+fn toggle_bit($val, $bit) { $val ^ (1 << $bit) }
+fn test_bit($val, $bit) { ($val & (1 << $bit)) ? 1 : 0 }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # STRING OPERATORS
@@ -264,7 +264,7 @@ fn ternary_with_ops($a, $b) {
 # RANGE OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn range_inclusive($a, $b) {
+fn incl_range($a, $b) {
     my @r = $a..$b
     @r
 }
@@ -320,7 +320,7 @@ fn not_not($val) { !!$val ? 1 : 0 }
 
 fn double_tilde($val) { ~~$val }
 
-fn stringify($val) { "" . $val }
+fn as_string($val) { "" . $val }
 fn numify($val) { 0 + $val }
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -138,7 +138,7 @@ fn clamp_val($val, $lo, $hi) {
     else { $val }
 }
 
-fn sign($n) {
+fn sign_of($n) {
     if ($n > 0) { 1 }
     elsif ($n < 0) { -1 }
     else { 0 }
@@ -162,14 +162,14 @@ fn all_positive(@nums) {
 
 # ── Recursive returns ────────────────────────────────────────────────
 
-fn factorial($n) {
+fn factorial_of($n) {
     if ($n <= 1) { 1 }
-    else { $n * factorial($n - 1) }
+    else { $n * factorial_of($n - 1) }
 }
 
-fn fib($n) {
+fn fib_of($n) {
     if ($n <= 1) { $n }
-    else { fib($n - 1) + fib($n - 2) }
+    else { fib_of($n - 1) + fib_of($n - 2) }
 }
 
 # ── Method chaining returns ──────────────────────────────────────────
@@ -196,8 +196,8 @@ fn nested_ternary($n) { $n > 0 ? "positive" : $n < 0 ? "negative" : "zero" }
 
 # ── Expression-bodied functions ──────────────────────────────────────
 
-fn double($x) { $x * 2 }
-fn square($x) { $x * $x }
-fn cube($x) { $x * $x * $x }
+fn dbl($x) { $x * 2 }
+fn square_it($x) { $x * $x }
+fn cube_it($x) { $x * $x * $x }
 fn greet($name) { "Hello, $name!" }
 fn full_name($first, $last) { "$first $last" }

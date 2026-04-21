@@ -45,6 +45,6 @@ fn caesar_cipher ($text, $shift) {
 }
 
 # Count vowels in a string via pipeline
-fn count_vowels ($s) {
+fn vowel_count ($s) {
     scalar(grep { $_ =~ /[aeiouAEIOU]/ } split("", $s))
 }

@@ -635,7 +635,7 @@ my $f = Fmt->new;
 
 #[test]
 fn closure_args_in_named_sub_single_arg() {
-    assert_eq!(eval_int(r#"sub double { $_0 * 2 } double(21)"#), 42);
+    assert_eq!(eval_int(r#"sub dbl { $_0 * 2 } dbl(21)"#), 42);
 }
 
 #[test]
@@ -662,7 +662,7 @@ fn closure_args_in_anonymous_fn() {
 #[test]
 fn closure_args_in_thread_with_named_subs() {
     assert_eq!(
-        eval_int(r#"sub double { $_0 * 2 } sub add10 { $_0 + 10 } thread 5 double add10"#),
+        eval_int(r#"sub dbl { $_0 * 2 } sub add10 { $_0 + 10 } thread 5 dbl add10"#),
         20
     );
 }
@@ -671,10 +671,10 @@ fn closure_args_in_thread_with_named_subs() {
 fn closure_args_in_thread_chain_of_udfs() {
     assert_eq!(
         eval_int(
-            r#"sub double { $_0 * 2 }
-               sub triple { $_0 * 3 }
+            r#"sub dbl { $_0 * 2 }
+               sub tripl { $_0 * 3 }
                sub add5   { $_0 + 5 }
-               thread 2 double triple add5"#
+               thread 2 dbl tripl add5"#
         ),
         17
     );
@@ -952,12 +952,12 @@ fn pipe_long_chain_string() {
 fn thread_user_defined_functions_long_chain() {
     assert_eq!(
         eval_string(
-            r#"sub double { $_0 * 2 }
-               sub triple { $_0 * 3 }
+            r#"sub dbl { $_0 * 2 }
+               sub tripl { $_0 * 3 }
                sub add5   { $_0 + 5 }
-               sub square { $_0 ** 2 }
-               sub half   { $_0 / 2 }
-               thread 2 double triple add5 square half"#
+               sub square_it { $_0 ** 2 }
+               sub halve   { $_0 / 2 }
+               thread 2 dbl tripl add5 square_it halve"#
         ),
         "144.5"
     );
@@ -982,8 +982,8 @@ fn thread_user_defined_string_functions() {
 fn thread_mixed_builtins_and_udfs() {
     assert_eq!(
         eval_int(
-            r#"sub double { $_0 * 2 }
-               thread 5 double uc length"#
+            r#"sub dbl { $_0 * 2 }
+               thread 5 dbl uc length"#
         ),
         2
     );

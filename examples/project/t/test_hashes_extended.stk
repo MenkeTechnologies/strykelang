@@ -144,9 +144,9 @@ assert_eq hash_group_by(), 3, "group by"
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Empty hash operations
-my %e = ()
-assert_eq scalar(keys %e), 0, "empty keys"
-assert_eq scalar(values %e), 0, "empty values"
+my %empty_h = ()
+assert_eq scalar(keys %empty_h), 0, "empty keys"
+assert_eq scalar(values %empty_h), 0, "empty values"
 
 # Hash in boolean context
 my %bool_empty = ()

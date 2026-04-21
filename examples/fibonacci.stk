@@ -3,18 +3,18 @@ use strict
 use warnings
 my %memo
 
-sub fib {
-    my $n = @_ |> shift
+sub fib_n {
+    my $n = shift @_
     if ($n <= 1) {
         return $n
     }
     if (exists $memo{$n}) {
         return $memo{$n}
     }
-    $memo{$n} = (($n - 1) |> fib) + (($n - 2) |> fib)
+    $memo{$n} = fib_n($n - 1) + fib_n($n - 2)
     $memo{$n}
 }
 
 for $i (0 .. 20) {
-    printf "fib(%2d) = %d\n", $i, $i |> fib
+    printf "fib(%2d) = %d\n", $i, fib_n($i)
 }

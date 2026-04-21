@@ -1426,59 +1426,59 @@ fn main() {
     // Use `-j N` for parallel execution: `st -j4 *.stk`
     // Only triggers when ALL args are existing script files on disk.
     // `st file.stk ARG1 ARG2` still works because ARG1/ARG2 won't exist as files.
-    if cli.script.is_some()
-        && cli.execute.is_empty()
-        && cli.execute_features.is_empty()
-        && !cli.line_mode
-        && !cli.print_mode
-        && !cli.args.is_empty()
-    {
-        let script = cli.script.as_ref().unwrap();
-        let is_stk_ext = |p: &str| {
-            p.ends_with(".stk") || p.ends_with(".pl") || p.ends_with(".pm") || p.ends_with(".t")
-        };
-        let is_existing_script = |p: &str| is_stk_ext(p) && Path::new(p).is_file();
-
-        if is_existing_script(script) && cli.args.iter().all(|a| is_existing_script(a)) {
-            let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from(&args[0]));
-            let mut all_files = vec![script.clone()];
-            all_files.extend(cli.args.iter().cloned());
-
-            // Parallel execution when -j is specified
-            let failed = if cli.threads.is_some() {
-                use std::sync::atomic::{AtomicUsize, Ordering};
-                let failed = AtomicUsize::new(0);
-                all_files.par_iter().for_each(|f| {
-                    let status = process::Command::new(&exe).arg(f).status();
-                    match status {
-                        Ok(s) if !s.success() => {
-                            failed.fetch_add(1, Ordering::Relaxed);
-                        }
-                        Err(e) => {
-                            eprintln!("{}: {}", f, e);
-                            failed.fetch_add(1, Ordering::Relaxed);
-                        }
-                        _ => {}
-                    }
-                });
-                failed.load(Ordering::Relaxed)
-            } else {
-                // Sequential execution (default)
-                let mut failed = 0usize;
-                for f in &all_files {
-                    let status = process::Command::new(&exe).arg(f).status();
-                    match status {
-                        Ok(s) if !s.success() => failed += 1,
-                        Err(e) => {
-                            eprintln!("{}: {}", f, e);
-                            failed += 1;
-                        }
-                        _ => {}
-                    }
-                }
-                failed
+    if let Some(script) = cli.script.as_ref() {
+        if cli.execute.is_empty()
+            && cli.execute_features.is_empty()
+            && !cli.line_mode
+            && !cli.print_mode
+            && !cli.args.is_empty()
+        {
+            let is_stk_ext = |p: &str| {
+                p.ends_with(".stk") || p.ends_with(".pl") || p.ends_with(".pm") || p.ends_with(".t")
             };
-            process::exit(if failed > 0 { 1 } else { 0 });
+            let is_existing_script = |p: &str| is_stk_ext(p) && Path::new(p).is_file();
+
+            if is_existing_script(script) && cli.args.iter().all(|a| is_existing_script(a)) {
+                let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from(&args[0]));
+                let mut all_files = vec![script.clone()];
+                all_files.extend(cli.args.iter().cloned());
+
+                // Parallel execution when -j is specified
+                let failed = if cli.threads.is_some() {
+                    use std::sync::atomic::{AtomicUsize, Ordering};
+                    let failed = AtomicUsize::new(0);
+                    all_files.par_iter().for_each(|f| {
+                        let status = process::Command::new(&exe).arg(f).status();
+                        match status {
+                            Ok(s) if !s.success() => {
+                                failed.fetch_add(1, Ordering::Relaxed);
+                            }
+                            Err(e) => {
+                                eprintln!("{}: {}", f, e);
+                                failed.fetch_add(1, Ordering::Relaxed);
+                            }
+                            _ => {}
+                        }
+                    });
+                    failed.load(Ordering::Relaxed)
+                } else {
+                    // Sequential execution (default)
+                    let mut failed = 0usize;
+                    for f in &all_files {
+                        let status = process::Command::new(&exe).arg(f).status();
+                        match status {
+                            Ok(s) if !s.success() => failed += 1,
+                            Err(e) => {
+                                eprintln!("{}: {}", f, e);
+                                failed += 1;
+                            }
+                            _ => {}
+                        }
+                    }
+                    failed
+                };
+                process::exit(if failed > 0 { 1 } else { 0 });
+            }
         }
     }
 

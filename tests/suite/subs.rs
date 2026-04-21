@@ -11,7 +11,7 @@ fn basic_sub() {
 #[test]
 fn recursive_fibonacci() {
     assert_eq!(
-        eval_int("sub fib { my $n = shift @_; return $n if $n <= 1; return fib($n-1) + fib($n-2); } fib(10)"),
+        eval_int("sub fib_n { my $n = shift @_; return $n if $n <= 1; return fib_n($n-1) + fib_n($n-2); } fib_n(10)"),
         55
     );
 }

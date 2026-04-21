@@ -1561,10 +1561,10 @@ mod tests {
 
     #[test]
     fn user_func_call_direct() {
-        let out = convert("sub trim { } trim(uc($x))");
-        assert!(out.contains("fn trim"));
+        let out = convert("sub my_trim { } my_trim(uc($x))");
+        assert!(out.contains("fn my_trim"));
         // 2-stage: direct call (inner-to-outer)
-        assert!(out.contains("uc trim $x"));
+        assert!(out.contains("uc my_trim $x"));
     }
 
     #[test]

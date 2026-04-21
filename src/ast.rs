@@ -30,7 +30,7 @@ impl Statement {
     }
 }
 
-/// Surface spelling for `grep` / `greps` / `filter` / `find_all`.
+/// Surface spelling for `grep` / `greps` / `filter` (`fi`) / `find_all`.
 /// `grep` is eager (Perl-compatible); `greps` / `filter` / `find_all` are lazy (streaming).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

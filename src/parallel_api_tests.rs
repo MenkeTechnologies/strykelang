@@ -52,9 +52,9 @@ fn test_ppool_interpreter() {
 fn test_pwatch_helpers() {
     // pwatch is hard to test without real FS events, but we can test the error cases.
     let code = r#"
-        sub cb { 1 }
+        sub callback { 1 }
         my $failed = 0
-        eval { pwatch("/no/such/dir/likely/*.log", \&cb) }
+        eval { pwatch("/no/such/dir/likely/*.log", \&callback) }
         if ($@) { $failed = 1; }
         $failed
     "#;

@@ -1520,6 +1520,14 @@ impl Scope {
         }
     }
 
+    /// Declare a frozen hash in the bottom (global) frame — prevents user reassignment.
+    pub fn declare_hash_global_frozen(&mut self, name: &str, val: IndexMap<String, PerlValue>) {
+        if let Some(frame) = self.frames.first_mut() {
+            frame.set_hash(name, val);
+            frame.frozen_hashes.insert(name.to_string());
+        }
+    }
+
     /// Returns `true` if a lexical (non-bottom) frame declares `%name`.
     pub fn has_lexical_hash(&self, name: &str) -> bool {
         self.frames.iter().skip(1).any(|f| f.has_hash(name))

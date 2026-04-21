@@ -781,9 +781,9 @@ pub enum Op {
     MapsWithExpr(u16),
     /// `flat_maps EXPR, LIST` — same pools as [`Op::MapsWithExpr`].
     MapsFlatMapWithExpr(u16),
-    /// `filter { BLOCK } LIST` — stack: \[list\] → lazy iterator (stryke; `grep` remains eager).
+    /// `filter` / `fi` `{ BLOCK } LIST` — stack: \[list\] → lazy iterator (stryke; `grep` remains eager).
     FilterWithBlock(u16),
-    /// `filter EXPR, LIST` — index into [`Chunk::grep_expr_entries`]; stack: \[list\] → iterator.
+    /// `filter` / `fi` `EXPR, LIST` — index into [`Chunk::grep_expr_entries`]; stack: \[list\] → iterator.
     FilterWithExpr(u16),
 }
 

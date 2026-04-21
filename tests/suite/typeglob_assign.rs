@@ -20,8 +20,8 @@ fn typeglob_assign_glob_copies_subroutine_slot() {
     assert_eq!(
         eval_int(
             r#"no strict 'vars';
-            sub one { 7 }
-            *two = *one;
+            sub first_fn { 7 }
+            *two = *first_fn;
             two() * 2"#,
         ),
         14

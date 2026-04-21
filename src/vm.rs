@@ -1556,13 +1556,19 @@ impl<'a> VM<'a> {
     }
 
     fn require_hash_mutable(&self, name: &str) -> PerlResult<()> {
-        if self.interp.scope.is_hash_frozen(name) {
+        if self.interp.scope.is_hash_frozen(name) || Self::is_reflection_hash(name) {
             return Err(PerlError::syntax(
                 format!("cannot modify frozen hash `%{}`", name),
                 self.line(),
             ));
         }
         Ok(())
+    }
+
+    /// Reflection hashes are frozen builtins even before lazy init.
+    fn is_reflection_hash(name: &str) -> bool {
+        matches!(name, "b" | "pc" | "e" | "a" | "d" | "c" | "p" | "all")
+            || name.starts_with("stryke::")
     }
 
     /// Run bytecode: first attempts Cranelift method JIT for eligible numeric fragments (unless
