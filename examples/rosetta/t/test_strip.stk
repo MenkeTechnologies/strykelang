@@ -2,19 +2,19 @@
 # Rosetta Code: Strip Whitespace
 
 fn strip_left($s) {
-    $s =~ s/^\s+//r
+    ~> $s s/^\s+//r
 }
 
 fn strip_right($s) {
-    $s =~ s/\s+$//r
+    ~> $s s/\s+$//r
 }
 
 fn strip_both($s) {
-    $s =~ s/^\s+|\s+$//gr
+    ~> $s s/^\s+|\s+$//gr
 }
 
 fn my_collapse_whitespace($s) {
-    $s =~ s/\s+/ /gr |> strip_both
+    ~> $s s/\s+/ /gr s/^\s+|\s+$//gr
 }
 
 assert_eq strip_left("  hello"), "hello", "strip left"

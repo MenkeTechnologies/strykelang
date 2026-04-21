@@ -2,7 +2,7 @@
 # Rosetta Code: Atbash Cipher
 
 fn my_atbash($s) {
-    $s |> split // |> map {
+    ~> $s >{split //, $_} map {
         $_ =~ /[A-Z]/ ? chr(90 - (ord($_) - 65))
       : $_ =~ /[a-z]/ ? chr(122 - (ord($_) - 97))
       : $_

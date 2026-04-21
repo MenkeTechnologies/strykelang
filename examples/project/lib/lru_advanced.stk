@@ -1,0 +1,102 @@
+# lib/lru_advanced.stk — Advanced LRU Cache with TTL support
+
+class AdvancedLRUCache {
+    max_size: Int = 100;
+    ttl: Int = 0;
+    cache: Hash = {};
+    order: Array = [];
+    timestamps: Hash = {};
+
+    fn init($max, $ttl) {
+        $self->max_size($max)
+        $self->ttl($ttl)
+        $self->cache({})
+        $self->order([])
+        $self->timestamps({})
+        $self
+    }
+
+    fn set($key, $val) {
+        my $c = $self->cache()
+        my $o = $self->order()
+        my $t = $self->timestamps()
+        
+        if (exists $c->{$key}) {
+            $self->_remove_from_order($key)
+            $o = $self->order()
+        } elsif (scalar(@$o) >= $self->max_size()) {
+            my $oldest = shift @$o
+            delete $c->{$oldest}
+            delete $t->{$oldest}
+        }
+        
+        $c->{$key} = $val
+        push @$o, $key
+        $t->{$key} = time()
+    }
+
+    fn get($key) {
+        my $c = $self->cache()
+        my $t = $self->timestamps()
+        
+        if (!exists $c->{$key}) {
+            return undef
+        }
+        
+        if ($self->ttl() > 0) {
+            my $age = time() - $t->{$key}
+            if ($age > $self->ttl()) {
+                $self->delete($key)
+                return undef
+            }
+        }
+        
+        $self->_remove_from_order($key)
+        my $o = $self->order()
+        push @$o, $key
+        
+        my $res = $c->{$key}
+        return $res
+    }
+
+    fn delete($key) {
+        my $c = $self->cache()
+        my $t = $self->timestamps()
+        if (exists $c->{$key}) {
+            $self->_remove_from_order($key)
+            delete $c->{$key}
+            delete $t->{$key}
+        }
+    }
+
+    fn size() {
+        my $c = $self->cache()
+        return scalar(keys %$c)
+    }
+
+    fn _remove_from_order($key) {
+        my $o = $self->order()
+        my @new_o = ()
+        for my $k (@$o) {
+            if ($k ne $key) { push @new_o, $k }
+        }
+        $self->order(\@new_o)
+    }
+
+    fn cleanup() {
+        if ($self->ttl() == 0) { return }
+        my $now = time()
+        my $c = $self->cache()
+        my $t = $self->timestamps()
+        my @ks = keys %$c
+        for my $k (@ks) {
+            if ($now - $t->{$k} > $self->ttl()) {
+                $self->delete($k)
+            }
+        }
+    }
+}
+
+fn lru_adv_new($max, $ttl) {
+    AdvancedLRUCache()->init($max, $ttl)
+}

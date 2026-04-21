@@ -3,7 +3,7 @@
 
 fn is_balanced($s) {
     my $depth = 0
-    for my $c ($s |> split //) {
+    for my $c (~> $s >{split //, $_}) {
         $depth++ if $c eq '['
         $depth-- if $c eq ']'
         return 0 if $depth < 0

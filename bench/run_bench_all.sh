@@ -107,32 +107,47 @@ ratio() {
 }
 
 # Build header dynamically based on available languages.
-hdr_langs='stryke ms  perl5 ms  python3 ms  ruby ms'
-hdr_sep='----------  --------  ----------  -------'
-hdr_ratios='vs perl5  vs python  vs ruby'
-sep_ratios='--------  ---------  -------'
+# Use printf %10s to match data rows which use %10.1f and %10s.
+hdr_fmt='  %-12s %10s  %10s  %10s  %10s'
+sep_fmt='  %-12s %10s  %10s  %10s  %10s'
+hdr_args=('bench' 'stryke ms' 'perl5 ms' 'python3 ms' 'ruby ms')
+sep_args=('------------' '----------' '----------' '----------' '----------')
+ratio_hdr_args=('vs perl5' 'vs python' 'vs ruby')
+ratio_sep_args=('----------' '----------' '----------')
 
 if [ "$HAVE_JULIA" = 1 ]; then
-    hdr_langs="$hdr_langs  julia ms"
-    hdr_sep="$hdr_sep  --------"
-    hdr_ratios="$hdr_ratios  vs julia"
-    sep_ratios="$sep_ratios  --------"
+    hdr_fmt="$hdr_fmt  %10s"
+    sep_fmt="$sep_fmt  %10s"
+    hdr_args+=('julia ms')
+    sep_args+=('----------')
+    ratio_hdr_args+=('vs julia')
+    ratio_sep_args+=('----------')
 fi
 if [ "$HAVE_RAKU" = 1 ]; then
-    hdr_langs="$hdr_langs  raku ms"
-    hdr_sep="$hdr_sep  -------"
-    hdr_ratios="$hdr_ratios  vs raku"
-    sep_ratios="$sep_ratios  -------"
+    hdr_fmt="$hdr_fmt  %10s"
+    sep_fmt="$sep_fmt  %10s"
+    hdr_args+=('raku ms')
+    sep_args+=('----------')
+    ratio_hdr_args+=('vs raku')
+    ratio_sep_args+=('----------')
 fi
 if [ "$HAVE_LUAJIT" = 1 ]; then
-    hdr_langs="$hdr_langs  luajit ms"
-    hdr_sep="$hdr_sep  ---------"
-    hdr_ratios="$hdr_ratios  vs luajit"
-    sep_ratios="$sep_ratios  ---------"
+    hdr_fmt="$hdr_fmt  %10s"
+    sep_fmt="$sep_fmt  %10s"
+    hdr_args+=('luajit ms')
+    sep_args+=('----------')
+    ratio_hdr_args+=('vs luajit')
+    ratio_sep_args+=('----------')
 fi
 
-printf '  %-12s %s  %s\n' 'bench' "$hdr_langs" "$hdr_ratios"
-printf '  %-12s %s  %s\n' '---------' "$hdr_sep" "$sep_ratios"
+# Add ratio columns to format
+for _ in "${ratio_hdr_args[@]}"; do
+    hdr_fmt="$hdr_fmt  %10s"
+    sep_fmt="$sep_fmt  %10s"
+done
+
+printf "${hdr_fmt}\n" "${hdr_args[@]}" "${ratio_hdr_args[@]}"
+printf "${sep_fmt}\n" "${sep_args[@]}" "${ratio_sep_args[@]}"
 
 for name in startup fib loop string hash array regex map_grep; do
     pl="$HERE/bench_${name}.pl"

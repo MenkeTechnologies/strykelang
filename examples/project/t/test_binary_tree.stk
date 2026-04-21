@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# t/test_binary_tree.stk — binary search tree tests
+
+require "./lib/binary_tree.stk"
+
+my $root = bst_new(10)
+$root->insert(5)
+$root->insert(15)
+$root->insert(2)
+$root->insert(7)
+$root->insert(12)
+$root->insert(20)
+
+# ── search ─────
+assert_ok $root->search(10), "found root"
+assert_ok $root->search(2), "found left leaf"
+assert_ok $root->search(20), "found right leaf"
+assert_false $root->search(100), "not found"
+
+# ── in_order ─────
+my $vals_ref = $root->in_order()
+assert_eq join(",", @$vals_ref), "2,5,7,10,12,15,20", "in_order traversal sorted"
+
+test_run

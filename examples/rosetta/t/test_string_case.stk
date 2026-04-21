@@ -1,15 +1,15 @@
 #!/usr/bin/env stryke
 # Rosetta Code: String Case
 
-fn to_upper($s) { uc($s) }
-fn to_lower($s) { lc($s) }
+fn to_upper($s) { ~> $s uc }
+fn to_lower($s) { ~> $s lc }
 
 fn to_title($s) {
-    $s |> split /\s+/ |> map { ucfirst(lc($_)) } |> join " "
+    ~> $s >{split /\s+/, $_} map { ucfirst(lc($_)) } |> join " "
 }
 
 fn my_swap_case($s) {
-    $s |> split // |> map {
+    ~> $s >{split //, $_} map {
         $_ eq uc($_) ? lc($_) : uc($_)
     } |> join ""
 }

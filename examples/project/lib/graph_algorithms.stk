@@ -1,0 +1,124 @@
+# lib/graph_algorithms.stk — graph algorithms (BFS, DFS, Cycle Detection)
+
+# ── adv_bfs: Breadth-First Search, returns list of visited nodes ─────
+fn adv_bfs($graph, $start_node) {
+    my @visited = ()
+    my %seen = ()
+    my @queue = ($start_node)
+    $seen{$start_node} = 1
+    
+    while (scalar(@queue) > 0) {
+        my $curr = shift @queue
+        push @visited, $curr
+        
+        my $neighbors = $graph->{$curr} // []
+        for my $neighbor (@$neighbors) {
+            unless (exists $seen{$neighbor}) {
+                $seen{$neighbor} = 1
+                push @queue, $neighbor
+            }
+        }
+    }
+    @visited
+}
+
+# ── adv_dfs: Depth-First Search, returns list of visited nodes ─────
+fn adv_dfs($graph, $start_node) {
+    my @visited = ()
+    my %seen = ()
+    my @stack = ($start_node)
+    
+    while (scalar(@stack) > 0) {
+        my $curr = pop @stack
+        unless (exists $seen{$curr}) {
+            $seen{$curr} = 1
+            push @visited, $curr
+            
+            my $neighbors = $graph->{$curr} // []
+            # Push in reverse to maintain same order as recursive DFS if desired
+            for my $i (reverse 0..scalar(@$neighbors)-1) {
+                my $neighbor = $neighbors->[$i]
+                unless (exists $seen{$neighbor}) {
+                    push @stack, $neighbor
+                }
+            }
+        }
+    }
+    @visited
+}
+
+require "./lib/priority_queue.stk"
+
+# ── adv_dijkstra: Shortest path in a weighted graph ─────
+# Graph format: { node => [[neighbor, weight], ...] }
+fn adv_dijkstra($graph, $start) {
+    my %dist = ()
+    for my $node (keys %$graph) {
+        $dist{$node} = 1e18 # Infinity
+    }
+    $dist{$start} = 0
+    
+    my $pq = pq_min_new()
+    $pq->push([0, $start])
+    
+    while (!$pq->is_empty()) {
+        my $top = $pq->pop()
+        my $d = $top->[0]
+        my $u = $top->[1]
+        
+        next if $d > $dist{$u}
+        
+        my $neighbors = $graph->{$u} // []
+        for my $edge (@$neighbors) {
+            my $v = $edge->[0]
+            my $weight = $edge->[1]
+            
+            if ($dist{$u} + $weight < $dist{$v}) {
+                $dist{$v} = $dist{$u} + $weight
+                $pq->push([$dist{$v}, $v])
+            }
+        }
+    }
+    { %dist }
+}
+fn adv_has_cycle($graph) {
+    my %visited = ()
+    
+    my @nodes = keys %$graph
+    for my $start_node (@nodes) {
+        next if exists $visited{$start_node}
+        
+        my %in_stack = ()
+        my @stack = ([$start_node, 0])
+        
+        while (scalar(@stack) > 0) {
+            my $top_ref = $stack[-1]
+            my $curr = $top_ref->[0]
+            my $edge_idx = $top_ref->[1]
+            
+            if ($edge_idx == 0) {
+                $visited{$curr} = 1
+                $in_stack{$curr} = 1
+            }
+            
+            my $neighbors = $graph->{$curr} // []
+            if ($edge_idx < scalar(@$neighbors)) {
+                # Update current node's edge index for next time we see it
+                $top_ref->[1]++
+                
+                my $neighbor = $neighbors->[$edge_idx]
+                if (exists $in_stack{$neighbor} && $in_stack{$neighbor}) {
+                    return 1
+                }
+                unless (exists $visited{$neighbor}) {
+                    push @stack, [$neighbor, 0]
+                }
+            } else {
+                # All neighbors visited, pop from stack
+                pop @stack
+                $in_stack{$curr} = 0
+            }
+        }
+    }
+    0
+}

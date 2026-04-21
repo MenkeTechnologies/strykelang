@@ -1,0 +1,59 @@
+#!/usr/bin/env stryke
+# t/test_graph_algorithms.stk — graph algorithms tests
+
+require "./lib/graph_algorithms.stk"
+
+my $graph = {
+    A => ["B", "C"],
+    B => ["D", "E"],
+    C => ["F"],
+    D => [],
+    E => ["F"],
+    F => []
+}
+
+# ── adv_bfs ─────
+my @bfs = adv_bfs($graph, "A")
+# BFS: A -> B, C -> D, E, F
+assert_eq $bfs[0], "A", "bfs 0"
+assert_ok grep { $_ eq "B" } @bfs[1,2], "bfs 1 or 2 is B"
+assert_ok grep { $_ eq "C" } @bfs[1,2], "bfs 1 or 2 is C"
+assert_eq scalar(@bfs), 6, "bfs all nodes"
+
+# ── adv_dfs ─────
+my @dfs = adv_dfs($graph, "A")
+assert_eq $dfs[0], "A", "dfs 0"
+assert_eq scalar(@dfs), 6, "dfs all nodes"
+
+# ── adv_has_cycle ─────
+assert_false adv_has_cycle($graph), "graph has no cycle"
+
+# ── adv_dijkstra ─────
+my $weighted_graph = {
+    A => [["B", 1], ["C", 4]],
+    B => [["C", 2], ["D", 5]],
+    C => [["D", 1]],
+    D => []
+}
+my $dists = adv_dijkstra($weighted_graph, "A")
+assert_eq $dists->{A}, 0, "dist A = 0"
+assert_eq $dists->{B}, 1, "dist B = 1"
+assert_eq $dists->{C}, 3, "dist C = 3 (A->B->C)"
+assert_eq $dists->{D}, 4, "dist D = 4 (A->B->C->D)"
+
+my $cyclic_graph = {
+    A => ["B"],
+    B => ["C"],
+    C => ["A"]
+}
+assert_ok adv_has_cycle($cyclic_graph), "cyclic_graph has cycle"
+
+my $complex_cyclic = {
+    1 => [2],
+    2 => [3],
+    3 => [4],
+    4 => [2]
+}
+assert_ok adv_has_cycle($complex_cyclic), "complex_cyclic has cycle"
+
+test_run

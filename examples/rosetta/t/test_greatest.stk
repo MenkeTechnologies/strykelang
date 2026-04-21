@@ -2,14 +2,22 @@
 # Rosetta Code: Greatest Element of a List
 
 fn greatest(@nums) {
-    @nums |> reduce { $a > $b ? $a : $b }
+    my $max = $nums[0]
+    for my $n (@nums) {
+        $max = $n if $n > $max
+    }
+    $max
 }
 
 fn least(@nums) {
-    @nums |> reduce { $a < $b ? $a : $b }
+    my $min = $nums[0]
+    for my $n (@nums) {
+        $min = $n if $n < $min
+    }
+    $min
 }
 
-fn minmax(@nums) {
+fn my_minmax(@nums) {
     my $min = $nums[0]
     my $max = $nums[0]
     for my $n (@nums) {
@@ -26,7 +34,7 @@ assert_eq greatest(-5, -2, -10, -1), -1, "greatest negative"
 assert_eq least(3, 1, 4, 1, 5, 9, 2, 6), 1, "least of list"
 assert_eq least(-5, -2, -10, -1), -10, "least negative"
 
-my ($min, $max) = minmax(3, 1, 4, 1, 5, 9, 2, 6)
+my ($min, $max) = my_minmax(3, 1, 4, 1, 5, 9, 2, 6)
 assert_eq $min, 1, "min via minmax"
 assert_eq $max, 9, "max via minmax"
 

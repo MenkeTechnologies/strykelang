@@ -1,31 +1,31 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Arithmetic Mean
 
-fn arithmetic_mean(@nums) {
+fn my_arithmetic_mean(@nums) {
     return 0 unless @nums
     (@nums |> reduce { $a + $b }) / scalar(@nums)
 }
 
-fn geometric_mean(@nums) {
+fn my_geometric_mean(@nums) {
     return 0 unless @nums
     my $product = @nums |> reduce { $a * $b }
     $product ** (1 / scalar(@nums))
 }
 
-fn harmonic_mean(@nums) {
+fn my_harmonic_mean(@nums) {
     return 0 unless @nums
     my $sum = @nums |> map { 1 / $_ } |> reduce { $a + $b }
     scalar(@nums) / $sum
 }
 
-assert_eq arithmetic_mean(1, 2, 3, 4, 5), 3, "mean 1..5"
-assert_eq arithmetic_mean(10, 20, 30), 20, "mean 10,20,30"
-assert_eq arithmetic_mean(5), 5, "mean single"
+assert_eq my_arithmetic_mean(1, 2, 3, 4, 5), 3, "mean 1..5"
+assert_eq my_arithmetic_mean(10, 20, 30), 20, "mean 10,20,30"
+assert_eq my_arithmetic_mean(5), 5, "mean single"
 
-my $gm = geometric_mean(1, 2, 4, 8)
+my $gm = my_geometric_mean(1, 2, 4, 8)
 assert_ok abs($gm - 2.828) < 0.01, "geometric mean"
 
-my $hm = harmonic_mean(1, 2, 4)
+my $hm = my_harmonic_mean(1, 2, 4)
 assert_ok abs($hm - 1.714) < 0.01, "harmonic mean"
 
 test_run

@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# t/test_priority_queue.stk — Priority Queue tests
+
+require "./lib/priority_queue.stk"
+
+my $pq = pq_new()
+assert_ok $pq->is_empty(), "pq is empty initially"
+
+$pq->push(10)
+$pq->push(5)
+$pq->push(20)
+$pq->push(15)
+
+assert_eq $pq->size(), 4, "pq size is 4"
+assert_eq $pq->peek(), 20, "pq peek is 20"
+assert_false $pq->is_empty(), "pq is not empty"
+
+assert_eq $pq->pop(), 20, "pq pop 20"
+assert_eq $pq->pop(), 15, "pq pop 15"
+assert_eq $pq->pop(), 10, "pq pop 10"
+assert_eq $pq->pop(), 5, "pq pop 5"
+assert_ok $pq->is_empty(), "pq is empty after pops"
+
+# ── heap_sort test (via algorithms.stk) ─────
+require "./lib/algorithms.stk"
+my @unsorted = (15, 5, 25, 10, 20)
+my @sorted = heap_sort(@unsorted)
+assert_eq join(",", @sorted), "5,10,15,20,25", "heap_sort basic"
+
+test_run

@@ -1,21 +1,21 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Combinations
 
-fn my_my_my_combinations($k, @arr) {
+fn my_combinations($k, @arr) {
     return ([]) if $k == 0
     return () if $k > scalar(@arr)
     return ([@arr]) if $k == scalar(@arr)
     
     my $first = shift @arr
-    my @with_first = my_my_combinations($k - 1, @arr)
+    my @with_first = my_combinations($k - 1, @arr)
     @with_first = map { [$first, @$_] } @with_first
     
-    my @without_first = my_my_combinations($k, @arr)
+    my @without_first = my_combinations($k, @arr)
     
     (@with_first, @without_first)
 }
 
-fn count_my_my_combinations($n, $k) {
+fn my_count_combinations($n, $k) {
     my $result = 1
     for my $i (1..$k) {
         $result = $result * ($n - $i + 1) / $i
@@ -23,20 +23,20 @@ fn count_my_my_combinations($n, $k) {
     int($result)
 }
 
-my @c2 = my_my_combinations(2, 1, 2, 3, 4)
+my @c2 = my_combinations(2, 1, 2, 3, 4)
 assert_eq scalar(@c2), 6, "C(4,2) = 6"
 
-my @c3 = my_my_combinations(3, 1, 2, 3, 4, 5)
+my @c3 = my_combinations(3, 1, 2, 3, 4, 5)
 assert_eq scalar(@c3), 10, "C(5,3) = 10"
 
-my @c0 = my_my_combinations(0, 1, 2, 3)
+my @c0 = my_combinations(0, 1, 2, 3)
 assert_eq scalar(@c0), 1, "C(n,0) = 1"
 
-my @cn = my_my_combinations(3, 1, 2, 3)
+my @cn = my_combinations(3, 1, 2, 3)
 assert_eq scalar(@cn), 1, "C(n,n) = 1"
 
-assert_eq count_my_my_combinations(4, 2), 6, "count C(4,2)"
-assert_eq count_my_my_combinations(10, 3), 120, "count C(10,3)"
-assert_eq count_my_my_combinations(5, 0), 1, "count C(5,0)"
+assert_eq my_count_combinations(4, 2), 6, "count C(4,2)"
+assert_eq my_count_combinations(10, 3), 120, "count C(10,3)"
+assert_eq my_count_combinations(5, 0), 1, "count C(5,0)"
 
 test_run

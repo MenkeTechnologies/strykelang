@@ -1,0 +1,76 @@
+# lib/collections_extended.stk — more collection utilities
+
+# ── ext_flatten: deep flattens an array of arrays ─────
+fn ext_flatten(@items) {
+    my @res = ()
+    for my $item (@items) {
+        if (ref($item) eq "ARRAY") {
+            push @res, ext_flatten(@$item)
+        } else {
+            push @res, $item
+        }
+    }
+    @res
+}
+
+# ── ext_zip: zips two lists into a list of pairs ─────
+fn ext_zip($a_ref, $b_ref) {
+    my @a = @$a_ref
+    my @b = @$b_ref
+    my @res = ()
+    my $len = scalar(@a) < scalar(@b) ? scalar(@a) : scalar(@b)
+    for my $i (0..$len-1) {
+        push @res, [$a[$i], $b[$i]]
+    }
+    @res
+}
+
+# ── ext_rotate: rotates a list by $n$ positions (right if positive, left if negative) ─────
+fn ext_rotate($n, @items) {
+    return @items if scalar(@items) <= 1
+    my $len = scalar(@items)
+    my $shift = $n % $len
+    if ($shift < 0) {
+        $shift += $len
+    }
+    return @items if $shift == 0
+    
+    my @part2 = @items[0..$len-$shift-1]
+    my @part1 = @items[$len-$shift..$len-1]
+    
+    (@part1, @part2)
+}
+
+# ── ext_list_is_empty: checks if a list is empty ─────
+fn ext_list_is_empty {
+    if (scalar(@_) == 0) {
+        return 1
+    }
+    return 0
+}
+
+# ── ext_is_empty_hash: checks if a hash is empty ─────
+fn ext_is_empty_hash($href) {
+    scalar(keys %$href) == 0 ? 1 : 0
+}
+
+# ── ext_first_where: returns first element matching a predicate ─────
+fn ext_first_where($fn, @items) {
+    for my $item (@items) {
+        if ($fn($item)) {
+            return $item
+        }
+    }
+    undef
+}
+
+# ── ext_last_where: returns last element matching a predicate ─────
+fn ext_last_where($fn, @items) {
+    my @reversed = reverse @items
+    for my $item (@reversed) {
+        if ($fn($item)) {
+            return $item
+        }
+    }
+    undef
+}

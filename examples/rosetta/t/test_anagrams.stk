@@ -2,7 +2,7 @@
 # Rosetta Code: Anagrams
 
 fn sorted_chars($s) {
-    $s |> lc |> split // |> sort |> join ""
+    ~> $s lc >{split //, $_} sort |> join ""
 }
 
 fn are_anagrams($a, $b) {

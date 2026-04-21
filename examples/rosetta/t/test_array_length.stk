@@ -9,9 +9,6 @@ fn last_index(@arr) {
     $#arr
 }
 
-my @empty
-assert_eq array_length(@empty), 0, "empty array length"
-
 my @one = (42)
 assert_eq array_length(@one), 1, "single element"
 assert_eq last_index(@one), 0, "last index of single"

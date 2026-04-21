@@ -1,0 +1,46 @@
+#!/usr/bin/env stryke
+# t/test_collections_extended.stk — extended collection utility tests
+
+require "./lib/collections_extended.stk"
+
+# ── ext_flatten ─────
+my @flat = ext_flatten(1, [2, [3, 4]], 5)
+assert_eq join(",", @flat), "1,2,3,4,5", "ext_flatten"
+
+# ── ext_zip ─────
+my @a = (1, 2, 3)
+my @b = ("a", "b", "c")
+my @zipped = ext_zip(\@a, \@b)
+assert_eq scalar(@zipped), 3, "zip count"
+assert_eq $zipped[0][0], 1, "zip 0 a"
+assert_eq $zipped[0][1], "a", "zip 0 b"
+assert_eq $zipped[2][0], 3, "zip 2 a"
+assert_eq $zipped[2][1], "c", "zip 2 b"
+
+# ── ext_rotate ─────
+my @r1 = ext_rotate(1, 1, 2, 3, 4)
+assert_eq join(",", @r1), "4,1,2,3", "rotate 1"
+my @r2 = ext_rotate(2, 1, 2, 3, 4)
+assert_eq join(",", @r2), "3,4,1,2", "rotate 2"
+my @r3 = ext_rotate(-1, 1, 2, 3, 4)
+assert_eq join(",", @r3), "2,3,4,1", "rotate -1"
+
+# ── ext_list_is_empty ─────
+assert_false ext_list_is_empty(1), "ext_list_is_empty false"
+
+
+# ── ext_is_empty_hash ─────
+assert_ok ext_is_empty_hash({}), "ext_is_empty_hash true"
+assert_false ext_is_empty_hash({a => 1}), "ext_is_empty_hash false"
+
+# ── ext_first_where ─────
+my $f = ext_first_where(fn { $_0 > 5 }, 1, 10, 2, 20)
+assert_eq $f, 10, "ext_first_where"
+my $f2 = ext_first_where(fn { $_0 > 100 }, 1, 10, 2, 20)
+assert_false defined($f2), "ext_first_where not found"
+
+# ── ext_last_where ─────
+my $l = ext_last_where(fn { $_0 > 5 }, 1, 10, 2, 20)
+assert_eq $l, 20, "ext_last_where"
+
+test_run

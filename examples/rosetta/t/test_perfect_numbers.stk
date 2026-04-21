@@ -1,36 +1,44 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Perfect Numbers
 
-fn divisors($n) {
+fn my_divisors($n) {
     1..int($n/2) |> filter { $n % $_ == 0 }
 }
 
-fn is_perfect($n) {
+fn sum_array(@arr) {
+    my $sum = 0
+    for my $x (@arr) {
+        $sum += $x
+    }
+    $sum
+}
+
+fn my_is_perfect($n) {
     return 0 if $n < 2
-    my @divs = divisors($n)
-    my $sum = @divs |> reduce { $a + $b }
+    my @divs = my_divisors($n)
+    my $sum = sum_array(@divs)
     $sum == $n
 }
 
-fn perfect_numbers($max) {
-    2..$max |> filter { is_perfect($_) }
+fn my_perfect_numbers($max) {
+    2..$max |> filter { my_is_perfect($_) }
 }
 
-assert_ok is_perfect(6), "6 is perfect (1+2+3)"
-assert_ok is_perfect(28), "28 is perfect (1+2+4+7+14)"
-assert_ok is_perfect(496), "496 is perfect"
+assert_ok my_is_perfect(6), "6 is perfect (1+2+3)"
+assert_ok my_is_perfect(28), "28 is perfect (1+2+4+7+14)"
+assert_ok my_is_perfect(496), "496 is perfect"
 
-assert_ok !is_perfect(1), "1 is not perfect"
-assert_ok !is_perfect(12), "12 is not perfect"
-assert_ok !is_perfect(100), "100 is not perfect"
+assert_ok !my_is_perfect(1), "1 is not perfect"
+assert_ok !my_is_perfect(12), "12 is not perfect"
+assert_ok !my_is_perfect(100), "100 is not perfect"
 
-my @perfects = perfect_numbers(500)
+my @perfects = my_perfect_numbers(500)
 assert_eq join(",", @perfects), "6,28,496", "perfect numbers up to 500"
 
-my @div6 = divisors(6)
+my @div6 = my_divisors(6)
 assert_eq join(",", @div6), "1,2,3", "divisors of 6"
 
-my @div28 = divisors(28)
+my @div28 = my_divisors(28)
 assert_eq join(",", @div28), "1,2,4,7,14", "divisors of 28"
 
 test_run

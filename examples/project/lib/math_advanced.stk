@@ -1,0 +1,238 @@
+# lib/math_advanced.stk — advanced mathematical functions
+
+# ── adv_prime_factors: returns a list of prime factors of $n ─────
+fn adv_prime_factors($n) {
+    my @factors = ()
+    my $d = 2
+    my $temp = $n
+    while ($temp > 1) {
+        while ($temp % $d == 0) {
+            push @factors, $d
+            $temp /= $d
+        }
+        $d++
+        if ($d * $d > $temp) {
+            if ($temp > 1) {
+                push @factors, $temp
+                last
+            }
+        }
+    }
+    @factors
+}
+
+# ── adv_is_perfect: checks if $n is a perfect number (sum of proper divisors == $n) ─────
+fn adv_is_perfect($n) {
+    return 0 if $n <= 1
+    my $sum = 1
+    my $sqrt = int(sqrt($n))
+    for my $i (2..$sqrt) {
+        if ($n % $i == 0) {
+            $sum += $i
+            my $other = $n / $i
+            $sum += $other if $other != $i
+        }
+    }
+    $sum == $n ? 1 : 0
+}
+
+# ── adv_combinations: nCr = n! / (k! * (n-k)!) ─────
+fn adv_combinations($n, $k) {
+    return 0 if $k < 0 || $k > $n
+    return 1 if $k == 0 || $k == $n
+    
+    # Optimize by using the smaller k
+    $k = $n - $k if $k > $n / 2
+    
+    my $res = 1
+    for my $i (1..$k) {
+        $res = $res * ($n - $i + 1) / $i
+    }
+    int($res)
+}
+
+# ── adv_permutations: nPr = n! / (n-k)! ─────
+fn adv_permutations($n, $k) {
+    return 0 if $k < 0 || $k > $n
+    my $res = 1
+    for my $i (0..$k-1) {
+        $res *= ($n - $i)
+    }
+    int($res)
+}
+
+# ── adv_factorial: recursive implementation ─────
+fn adv_factorial($n) {
+    return 1 if $n <= 1
+    $n * adv_factorial($n - 1)
+}
+
+# ── adv_gcd: greatest common divisor (iterative) ─────
+fn adv_gcd($a, $b) {
+    while ($b) {
+        ($a, $b) = ($b, $a % $b)
+    }
+    $a
+}
+
+# ── adv_lcm: least common multiple ─────
+fn adv_lcm($a, $b) {
+    return 0 if $a == 0 || $b == 0
+    my $res = abs($a * $b) / adv_gcd($a, $b)
+    return $res
+}
+
+# ── adv_gcd_many: GCD of a list of numbers ─────
+fn adv_gcd_many(@nums) {
+    return 0 if scalar(@nums) == 0
+    my $res = $nums[0]
+    for my $i (1..scalar(@nums)-1) {
+        $res = adv_gcd($res, $nums[$i])
+    }
+    return $res
+}
+
+# ── adv_lcm_many: LCM of a list of numbers ─────
+fn adv_lcm_many(@nums) {
+    return 0 if scalar(@nums) == 0
+    my $res = $nums[0]
+    for my $i (1..scalar(@nums)-1) {
+        $res = adv_lcm($res, $nums[$i])
+    }
+    return $res
+}
+
+# ── adv_prime_sieve: Sieve of Eratosthenes up to $n$ ─────
+fn adv_prime_sieve($n) {
+    return () if $n < 2
+    my @primes = ()
+    my %is_prime = ()
+    for my $i (2..$n) {
+        $is_prime{$i} = 1
+    }
+    
+    my $sqrt = int(sqrt($n))
+    for my $i (2..$sqrt) {
+        if ($is_prime{$i}) {
+            for (my $j = $i * $i; $j <= $n; $j += $i) {
+                $is_prime{$j} = 0
+            }
+        }
+    }
+    
+    for my $i (2..$n) {
+        push @primes, $i if $is_prime{$i}
+    }
+    @primes
+}
+
+# ── adv_mean: arithmetic mean of a list ─────
+fn adv_mean(@nums) {
+    my $n = scalar(@nums)
+    return 0 if $n == 0
+    my $sum = 0
+    for my $x (@nums) { $sum += $x }
+    return $sum / $n
+}
+
+# ── adv_median: median of a list ─────
+fn adv_median(@nums) {
+    my $n = scalar(@nums)
+    return 0 if $n == 0
+    my @sorted = sort { $a <=> $b } @nums
+    if ($n % 2 == 1) {
+        return $sorted[int($n / 2)]
+    } else {
+        my $m1 = $sorted[$n / 2 - 1]
+        my $m2 = $sorted[$n / 2]
+        return ($m1 + $m2) / 2.0
+    }
+}
+
+# ── adv_variance: variance of a list ─────
+fn adv_variance(@nums) {
+    my $n = scalar(@nums)
+    return 0 if $n < 2
+    my $mean = adv_mean(@nums)
+    my $sum_sq_diff = 0
+    for my $x (@nums) {
+        my $diff = $x - $mean
+        $sum_sq_diff += $diff * $diff
+    }
+    return $sum_sq_diff / ($n - 1)
+}
+
+# ── adv_stddev: standard deviation of a list ─────
+fn adv_stddev(@nums) {
+    return sqrt(adv_variance(@nums))
+}
+
+# ── adv_linear_regression: simple linear regression (y = mx + b) ─────
+# Returns [m, b]
+fn adv_linear_regression($x_ref, $y_ref) {
+    my @x = @$x_ref
+    my @y = @$y_ref
+    my $n = scalar(@x)
+    if ($n != scalar(@y) || $n < 2) {
+        die "Linear regression requires at least 2 points and equal number of X and Y values"
+    }
+    
+    my $sum_x = 0
+    my $sum_y = 0
+    my $sum_xy = 0
+    my $sum_xx = 0
+    
+    for my $i (0..$n-1) {
+        $sum_x += $x[$i]
+        $sum_y += $y[$i]
+        $sum_xy += $x[$i] * $y[$i]
+        $sum_xx += $x[$i] * $x[$i]
+    }
+    
+    my $m = ($n * $sum_xy - $sum_x * $sum_y) / ($n * $sum_xx - $sum_x * $sum_x)
+    my $b = ($sum_y - $m * $sum_x) / $n
+    
+    return [$m, $b]
+}
+
+# ── adv_weighted_mean: weighted mean of values and weights ─────
+fn adv_weighted_mean($vals_ref, $weights_ref) {
+    my @vals = @$vals_ref
+    my @weights = @$weights_ref
+    my $n = scalar(@vals)
+    if ($n != scalar(@weights) || $n == 0) {
+        die "Weighted mean requires equal number of values and weights"
+    }
+    
+    my $sum_weighted = 0
+    my $sum_weights = 0
+    for my $i (0..$n-1) {
+        $sum_weighted += $vals[$i] * $weights[$i]
+        $sum_weights += $weights[$i]
+    }
+    return $sum_weighted / $sum_weights
+}
+
+# ── adv_z_score: returns z-score of a value given a list ─────
+fn adv_z_score($val, @nums) {
+    my $mean = adv_mean(@nums)
+    my $stddev = adv_stddev(@nums)
+    return 0 if $stddev == 0
+    return ($val - $mean) / $stddev
+}
+
+# ── adv_is_prime: checks if $n is prime (optimized) ─────
+fn adv_is_prime($n) {
+    return 0 if $n < 2
+    return 1 if $n == 2 || $n == 3
+    return 0 if $n % 2 == 0 || $n % 3 == 0
+    
+    my $i = 5
+    while ($i * $i <= $n) {
+        if ($n % $i == 0 || $n % ($i + 2) == 0) {
+            return 0
+        }
+        $i += 6
+    }
+    1
+}

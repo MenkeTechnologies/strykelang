@@ -3951,6 +3951,18 @@ fn builtin_type_of(args: &[PerlValue]) -> PerlResult<PerlValue> {
         "arrayref"
     } else if v.as_hash_ref().is_some() {
         "hashref"
+    } else if v.as_struct_inst().is_some() {
+        "struct"
+    } else if v.as_enum_inst().is_some() {
+        "enum"
+    } else if v.as_class_inst().is_some() {
+        "class"
+    } else if crate::value::set_payload(&v).is_some() {
+        "set"
+    } else if v.as_deque().is_some() {
+        "deque"
+    } else if v.as_heap_pq().is_some() {
+        "heap"
     } else if v.as_array_vec().is_some() {
         "array"
     } else if v.as_hash_map().is_some() {

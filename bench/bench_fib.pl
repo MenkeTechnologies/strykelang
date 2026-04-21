@@ -1,6 +1,6 @@
-sub fib {
+sub fib_ {
     my $n = shift @_;
     return $n if $n <= 1;
-    return fib($n - 1) + fib($n - 2);
+    return fib_($n - 1) + fib_($n - 2);
 }
-print fib(30), "\n";
+print fib_(30), "\n";

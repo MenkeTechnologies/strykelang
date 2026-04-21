@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# t/test_huffman.stk — Huffman Coding tests
+
+require "./lib/huffman.stk"
+
+# ── Huffman Roundtrip ─────
+fn test_huffman($input) {
+    my $res = adv_huffman_encode($input)
+    my $binary = $res->[0]
+    my $root = $res->[1]
+    my $decoded = adv_huffman_decode($binary, $root)
+    return $decoded
+}
+
+assert_eq test_huffman("hello"), "hello", "huffman hello"
+assert_eq test_huffman("compress me please"), "compress me please", "huffman phrase"
+assert_eq test_huffman("aaaaa"), "aaaaa", "huffman repeated"
+assert_eq test_huffman("a"), "a", "huffman single"
+assert_eq test_huffman(""), "", "huffman empty"
+
+# ── Verify compression ─────
+my $input = "this is a test of huffman coding"
+my $res = adv_huffman_encode($input)
+my $binary = $res->[0]
+# Original: 32 chars * 8 bits = 256 bits
+# Huffman should be significantly less
+assert_ok length($binary) < 256, "huffman binary length < original"
+
+test_run
