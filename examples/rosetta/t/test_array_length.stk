@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Array Length
+
+fn array_length(@arr) {
+    scalar(@arr)
+}
+
+fn last_index(@arr) {
+    $#arr
+}
+
+my @empty
+assert_eq array_length(@empty), 0, "empty array length"
+
+my @one = (42)
+assert_eq array_length(@one), 1, "single element"
+assert_eq last_index(@one), 0, "last index of single"
+
+my @five = (1, 2, 3, 4, 5)
+assert_eq array_length(@five), 5, "five elements"
+assert_eq last_index(@five), 4, "last index of five"
+
+my @range = 1..100
+assert_eq array_length(@range), 100, "range length"
+assert_eq last_index(@range), 99, "range last index"
+
+my @nested = ([1,2], [3,4], [5,6])
+assert_eq array_length(@nested), 3, "nested arrays"
+
+test_run

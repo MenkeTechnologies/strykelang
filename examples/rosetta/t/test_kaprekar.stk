@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Kaprekar Numbers
+
+fn is_kaprekar($n) {
+    return 1 if $n == 1
+    my $sq = $n * $n
+    my $s = "$sq"
+    my $len = length($s)
+    
+    for my $i (1..$len-1) {
+        my $left = substr($s, 0, $i)
+        my $right = substr($s, $i)
+        next if $right =~ /^0+$/
+        if (int($left) + int($right) == $n) {
+            return 1
+        }
+    }
+    0
+}
+
+fn kaprekar_numbers($max) {
+    1..$max |> filter { is_kaprekar($_) }
+}
+
+assert_ok is_kaprekar(1), "1 is kaprekar"
+assert_ok is_kaprekar(9), "9 is kaprekar (81 = 8+1)"
+assert_ok is_kaprekar(45), "45 is kaprekar (2025 = 20+25)"
+assert_ok is_kaprekar(55), "55 is kaprekar (3025 = 30+25)"
+assert_ok is_kaprekar(99), "99 is kaprekar (9801 = 98+01)"
+assert_ok is_kaprekar(297), "297 is kaprekar (88209 = 88+209)"
+
+assert_ok !is_kaprekar(2), "2 is not kaprekar"
+assert_ok !is_kaprekar(10), "10 is not kaprekar"
+
+my @kap = kaprekar_numbers(100)
+assert_eq join(",", @kap), "1,9,45,55,99", "kaprekar up to 100"
+
+test_run

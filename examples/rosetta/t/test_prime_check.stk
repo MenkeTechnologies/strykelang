@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Primality by Trial Division
+
+fn prime_check($n) {
+    return 0 if $n < 2
+    return 1 if $n < 4
+    return 0 if $n % 2 == 0
+    my $i = 3
+    while ($i * $i <= $n) {
+        return 0 if $n % $i == 0
+        $i += 2
+    }
+    1
+}
+
+fn list_primes($max) {
+    2..$max |> filter { prime_check($_) }
+}
+
+assert_ok prime_check(2), "2 is prime"
+assert_ok prime_check(17), "17 is prime"
+assert_ok prime_check(97), "97 is prime"
+assert_ok !prime_check(1), "1 is not prime"
+assert_ok !prime_check(4), "4 is not prime"
+assert_ok !prime_check(15), "15 is not prime"
+
+my @primes = list_primes(20)
+assert_eq join(",", @primes), "2,3,5,7,11,13,17,19", "primes up to 20"
+
+test_run

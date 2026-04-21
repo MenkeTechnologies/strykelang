@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Filter
+
+fn filter_positive(@nums) {
+    @nums |> filter { $_ > 0 }
+}
+
+fn filter_by_predicate($pred, @nums) {
+    @nums |> filter { $pred->($_) }
+}
+
+my @pos = filter_positive(-2, -1, 0, 1, 2, 3)
+assert_eq join(",", @pos), "1,2,3", "filter positive"
+
+my @evens = 1..10 |> filter { $_ % 2 == 0 }
+assert_eq join(",", @evens), "2,4,6,8,10", "filter evens with pipe"
+
+my @gt5 = 1..10 |> filter { $_ > 5 }
+assert_eq join(",", @gt5), "6,7,8,9,10", "filter > 5"
+
+my @squares = 1..10 |> map { $_ * $_ } |> filter { $_ > 20 }
+assert_eq join(",", @squares), "25,36,49,64,81,100", "map then filter"
+
+my $is_prime = fn ($n) {
+    return 0 if $n < 2
+    for my $i (2..int(sqrt($n))) {
+        return 0 if $n % $i == 0
+    }
+    1
+}
+my @primes = filter_by_predicate($is_prime, 1..20)
+assert_eq join(",", @primes), "2,3,5,7,11,13,17,19", "filter with predicate fn"
+
+test_run

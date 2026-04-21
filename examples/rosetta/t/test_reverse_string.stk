@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Reverse a String
+
+fn rev_string($s) {
+    $s |> split // |> reverse |> join ""
+}
+
+fn rev_words($s) {
+    $s |> split /\s+/ |> reverse |> join " "
+}
+
+fn rev_each_word($s) {
+    $s |> split /\s+/ |> map { rev_string($_) } |> join " "
+}
+
+assert_eq rev_string("hello"), "olleh", "reverse hello"
+assert_eq rev_string("racecar"), "racecar", "palindrome unchanged"
+assert_eq rev_string("a"), "a", "single char"
+assert_eq rev_string(""), "", "empty string"
+assert_eq rev_string("12345"), "54321", "reverse digits"
+
+assert_eq rev_words("hello world"), "world hello", "reverse words"
+assert_eq rev_words("one two three"), "three two one", "reverse 3 words"
+
+assert_eq rev_each_word("hello world"), "olleh dlrow", "reverse each word"
+
+test_run

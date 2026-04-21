@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Luhn Test (Credit Card Validation)
+
+fn luhn_check($num) {
+    my @digits = "$num" |> split // |> reverse
+    my $sum = 0
+    for my $i (0..$#digits) {
+        my $d = $digits[$i]
+        if ($i % 2 == 1) {
+            $d *= 2
+            $d -= 9 if $d > 9
+        }
+        $sum += $d
+    }
+    $sum % 10 == 0
+}
+
+assert_ok luhn_check(49927398716), "49927398716 valid"
+assert_ok luhn_check(79927398713), "79927398713 valid"
+assert_ok luhn_check(1234567812345670), "1234567812345670 valid"
+
+assert_ok !luhn_check(49927398717), "49927398717 invalid"
+assert_ok !luhn_check(1234567812345678), "1234567812345678 invalid"
+
+assert_ok luhn_check(0), "0 valid"
+assert_ok !luhn_check(1), "1 invalid"
+
+test_run

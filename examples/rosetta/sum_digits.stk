@@ -1,6 +1,0 @@
-#!/usr/bin/env stryke
-# Rosetta Code: Sum of Digits
-
-fn sum_digits($n) { ~> { abs($n) } split // sum }
-
-~> { (1, 12345, 123045) } fore { p "sum_digits($_) = " . sum_digits($_) }

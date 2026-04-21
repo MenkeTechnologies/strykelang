@@ -1,4 +1,0 @@
-#!/usr/bin/env stryke
-# Rosetta Code: Hello World
-
-p "Hello, World!"

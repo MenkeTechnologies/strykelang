@@ -1,8 +1,0 @@
-#!/usr/bin/env stryke
-# Rosetta Code: Palindrome Detection
-
-fn pal_check($s) {
-    my $clean = lc($s) =~ s/[^a-z0-9]//gr
-    my $rev = $clean |> split // |> reverse |> join ""
-    $clean eq $rev
-}

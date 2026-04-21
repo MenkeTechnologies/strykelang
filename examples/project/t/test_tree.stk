@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+require "./lib/class_hierarchy.stk"
+
+class MyNode extends DocumentNode {
+    id: Int
+}
+
+fn build($d) {
+    my $n = MyNode(id => $d)
+    if ($d > 0) {
+        $n->add_child(build($d - 1))
+    }
+    $n
+}
+
+my $tree = build(2)
+print "Done: " . $tree->id . "\n"

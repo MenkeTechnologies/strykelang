@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Anagrams
+
+fn sorted_chars($s) {
+    $s |> lc |> split // |> sort |> join ""
+}
+
+fn are_anagrams($a, $b) {
+    sorted_chars($a) eq sorted_chars($b)
+}
+
+fn find_anagrams($word, @words) {
+    my $key = sorted_chars($word)
+    @words |> filter { sorted_chars($_) eq $key && $_ ne $word }
+}
+
+assert_ok are_anagrams("listen", "silent"), "listen/silent"
+assert_ok are_anagrams("evil", "vile"), "evil/vile"
+assert_ok are_anagrams("Elvis", "lives"), "Elvis/lives (case insensitive)"
+assert_ok !are_anagrams("hello", "world"), "hello/world not anagrams"
+
+my @words = qw(cat act tac dog god)
+my @cat_anagrams = find_anagrams("cat", @words)
+assert_eq join(",", @cat_anagrams |> sort), "act,tac", "anagrams of cat"
+
+my @dog_anagrams = find_anagrams("dog", @words)
+assert_eq join(",", @dog_anagrams), "god", "anagrams of dog"
+
+test_run

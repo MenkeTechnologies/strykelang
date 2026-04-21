@@ -1,0 +1,41 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Towers of Hanoi
+
+my @moves
+
+fn hanoi($n, $from, $to, $via) {
+    return if $n == 0
+    hanoi($n - 1, $from, $via, $to)
+    push @moves, "$from->$to"
+    hanoi($n - 1, $via, $to, $from)
+    return
+}
+
+fn count_hanoi_moves($n) {
+    2 ** $n - 1
+}
+
+@moves = ()
+hanoi(1, "A", "C", "B")
+assert_eq scalar(@moves), 1, "1 disk = 1 move"
+assert_eq $moves[0], "A->C", "move disk from A to C"
+
+@moves = ()
+hanoi(2, "A", "C", "B")
+assert_eq scalar(@moves), 3, "2 disks = 3 moves"
+
+@moves = ()
+hanoi(3, "A", "C", "B")
+assert_eq scalar(@moves), 7, "3 disks = 7 moves"
+assert_eq $moves[0], "A->C", "first move"
+assert_eq $moves[6], "A->C", "last move"
+
+@moves = ()
+hanoi(4, "A", "C", "B")
+assert_eq scalar(@moves), 15, "4 disks = 15 moves"
+
+assert_eq count_hanoi_moves(1), 1, "formula: 1 disk"
+assert_eq count_hanoi_moves(3), 7, "formula: 3 disks"
+assert_eq count_hanoi_moves(10), 1023, "formula: 10 disks"
+
+test_run

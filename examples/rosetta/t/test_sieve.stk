@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sieve of Eratosthenes
+
+fn my_sieve($limit) {
+    my @is_prime
+    push @is_prime, 0 for 0..1
+    push @is_prime, 1 for 2..$limit
+    
+    for (my $p = 2; $p * $p <= $limit; $p++) {
+        next unless $is_prime[$p]
+        for (my $i = $p * $p; $i <= $limit; $i += $p) {
+            $is_prime[$i] = 0
+        }
+    }
+    
+    2..$limit |> filter { $is_prime[$_] }
+}
+
+my @primes = my_sieve(30)
+assert_eq join(",", @primes), "2,3,5,7,11,13,17,19,23,29", "sieve(30)"
+
+my @small = my_sieve(10)
+assert_eq join(",", @small), "2,3,5,7", "sieve(10)"
+
+test_run

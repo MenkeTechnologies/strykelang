@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Ackermann Function
+
+fn ack($m, $n) {
+    return $n + 1 if $m == 0
+    return ack($m - 1, 1) if $n == 0
+    ack($m - 1, ack($m, $n - 1))
+}
+
+assert_eq ack(0, 0), 1, "ack(0,0)"
+assert_eq ack(0, 5), 6, "ack(0,5)"
+assert_eq ack(1, 0), 2, "ack(1,0)"
+assert_eq ack(1, 5), 7, "ack(1,5)"
+assert_eq ack(2, 0), 3, "ack(2,0)"
+assert_eq ack(2, 3), 9, "ack(2,3)"
+assert_eq ack(3, 0), 5, "ack(3,0)"
+assert_eq ack(3, 3), 61, "ack(3,3)"
+assert_eq ack(3, 4), 125, "ack(3,4)"
+
+test_run

@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Fibonacci Sequence
+
+fn my_fib($n) {
+    return $n if $n <= 1
+    my_fib($n - 1) + my_fib($n - 2)
+}
+
+fn fib_iter($n) {
+    my ($a, $b) = (0, 1)
+    for my $i (1..$n) {
+        ($a, $b) = ($b, $a + $b)
+    }
+    $a
+}
+
+assert_eq my_fib(0), 0, "fib(0)"
+assert_eq my_fib(1), 1, "fib(1)"
+assert_eq my_fib(10), 55, "fib(10)"
+assert_eq my_fib(20), 6765, "fib(20)"
+
+assert_eq fib_iter(0), 0, "fib_iter(0)"
+assert_eq fib_iter(10), 55, "fib_iter(10)"
+
+test_run

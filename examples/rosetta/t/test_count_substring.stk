@@ -1,0 +1,33 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Count Occurrences of a Substring
+
+fn count_substring($str, $sub) {
+    my $count = 0
+    my $pos = 0
+    while (($pos = index($str, $sub, $pos)) >= 0) {
+        $count++
+        $pos++
+    }
+    $count
+}
+
+fn count_non_overlapping($str, $sub) {
+    my $count = 0
+    my $pos = 0
+    my $len = length($sub)
+    while (($pos = index($str, $sub, $pos)) >= 0) {
+        $count++
+        $pos += $len
+    }
+    $count
+}
+
+assert_eq count_substring("the three truths", "th"), 3, "th in phrase"
+assert_eq count_substring("abababa", "aba"), 3, "overlapping aba"
+assert_eq count_substring("hello", "x"), 0, "not found"
+assert_eq count_substring("aaa", "a"), 3, "all same"
+
+assert_eq count_non_overlapping("abababa", "aba"), 2, "non-overlapping aba"
+assert_eq count_non_overlapping("aaa", "aa"), 1, "non-overlapping aa"
+
+test_run

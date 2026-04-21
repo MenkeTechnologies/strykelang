@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Happy Numbers
+
+fn sum_sq_digits($n) {
+    "$n" |> split // |> map { $_ * $_ } |> reduce { $a + $b }
+}
+
+fn is_happy($n) {
+    my %seen
+    while ($n != 1 && !$seen{$n}) {
+        $seen{$n} = 1
+        $n = sum_sq_digits($n)
+    }
+    $n == 1
+}
+
+fn happy_numbers($count) {
+    my @happy
+    my $n = 1
+    while (scalar(@happy) < $count) {
+        push @happy, $n if is_happy($n)
+        $n++
+    }
+    @happy
+}
+
+assert_ok is_happy(1), "1 is happy"
+assert_ok is_happy(7), "7 is happy"
+assert_ok is_happy(10), "10 is happy"
+assert_ok is_happy(13), "13 is happy"
+assert_ok is_happy(19), "19 is happy"
+
+assert_ok !is_happy(2), "2 is not happy"
+assert_ok !is_happy(4), "4 is not happy"
+
+my @first8 = happy_numbers(8)
+assert_eq join(",", @first8), "1,7,10,13,19,23,28,31", "first 8 happy numbers"
+
+test_run

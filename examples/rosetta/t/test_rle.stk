@@ -1,0 +1,45 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Run-Length Encoding
+
+fn rle_encode($s) {
+    return "" unless length($s)
+    my @chars = $s |> split //
+    my @result
+    my $prev = $chars[0]
+    my $count = 1
+    
+    for my $i (1..$#chars) {
+        if ($chars[$i] eq $prev) {
+            $count++
+        } else {
+            push @result, ($count > 1 ? "$count$prev" : $prev)
+            $prev = $chars[$i]
+            $count = 1
+        }
+    }
+    push @result, ($count > 1 ? "$count$prev" : $prev)
+    join "", @result
+}
+
+fn rle_decode($s) {
+    my $result = ""
+    while ($s =~ /(\d*)(.)/g) {
+        my $count = $1 eq "" ? 1 : $1
+        $result .= $2 x $count
+    }
+    $result
+}
+
+assert_eq rle_encode("WWWWWWWWWWWWBWWWWWWWWWWWWBBBWWWWWWWWWWWWWWWWWWWWWWWWB"), "12WB12W3B24WB", "encode example"
+assert_eq rle_encode("AABBBCCCC"), "2A3B4C", "simple encode"
+assert_eq rle_encode("ABC"), "ABC", "no runs"
+assert_eq rle_encode(""), "", "empty"
+
+assert_eq rle_decode("12WB12W3B24WB"), "WWWWWWWWWWWWBWWWWWWWWWWWWBBBWWWWWWWWWWWWWWWWWWWWWWWWB", "decode example"
+assert_eq rle_decode("2A3B4C"), "AABBBCCCC", "simple decode"
+assert_eq rle_decode("ABC"), "ABC", "decode no runs"
+
+my $original = "AABBBCCCC"
+assert_eq rle_decode(rle_encode($original)), $original, "roundtrip"
+
+test_run

@@ -1,0 +1,41 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Binary Digits
+
+fn to_binary($n) {
+    return "0" if $n == 0
+    my @bits
+    while ($n > 0) {
+        unshift @bits, $n % 2
+        $n = int($n / 2)
+    }
+    join "", @bits
+}
+
+fn from_binary($s) {
+    my $result = 0
+    for my $bit ($s |> split //) {
+        $result = $result * 2 + $bit
+    }
+    $result
+}
+
+fn count_ones($n) {
+    to_binary($n) |> split // |> grep { $_ eq "1" } |> scalar
+}
+
+assert_eq to_binary(0), "0", "binary 0"
+assert_eq to_binary(1), "1", "binary 1"
+assert_eq to_binary(5), "101", "binary 5"
+assert_eq to_binary(50), "110010", "binary 50"
+assert_eq to_binary(255), "11111111", "binary 255"
+
+assert_eq from_binary("0"), 0, "from binary 0"
+assert_eq from_binary("101"), 5, "from binary 101"
+assert_eq from_binary("110010"), 50, "from binary 110010"
+assert_eq from_binary("11111111"), 255, "from binary 11111111"
+
+assert_eq count_ones(5), 2, "5 has 2 ones"
+assert_eq count_ones(255), 8, "255 has 8 ones"
+assert_eq count_ones(0), 0, "0 has 0 ones"
+
+test_run
