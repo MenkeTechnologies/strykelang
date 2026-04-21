@@ -1,0 +1,72 @@
+# lib/linked_list.stk — recursive linked list using classes
+
+trait List {
+    fn head;
+    fn tail;
+    fn is_empty;
+}
+
+class Nil impl List {
+    fn head { die "head on empty list" }
+    fn tail { die "tail on empty list" }
+    fn is_empty { 1 }
+    fn to_str { "[]" }
+}
+
+class Cons impl List {
+    val: Any;
+    next: Any;
+    
+    fn head { $self->val }
+    fn tail { $self->next }
+    fn is_empty { 0 }
+    
+    fn to_str {
+        # Iterative to_str to avoid stack overflow
+        my $s = "[" . $self->val;
+        my $curr = $self->next;
+        while (!$curr->is_empty()) {
+            $s .= ", " . $curr->head();
+            $curr = $curr->tail();
+        }
+        $s . "]";
+    }
+}
+
+fn list_new(@vals) {
+    my $curr = Nil();
+    for my $v (reverse @vals) {
+        $curr = Cons(val => $v, next => $curr);
+    }
+    $curr;
+}
+
+fn list_length($l) {
+    my $len = 0;
+    my $curr = $l;
+    while (!$curr->is_empty()) {
+        $len++;
+        $curr = $curr->tail();
+    }
+    $len;
+}
+
+fn list_map($f, $l) {
+    my @arr;
+    my $curr = $l;
+    while (!$curr->is_empty()) {
+        push @arr, $f->($curr->head());
+        $curr = $curr->tail();
+    }
+    return list_new(@arr);
+}
+
+fn list_to_array($l) {
+    my @res;
+    my $curr = $l;
+    while (!$curr->is_empty()) {
+        push @res, $curr->head();
+        $curr = $curr->tail();
+    }
+    @res;
+}

@@ -1,0 +1,65 @@
+#!/usr/bin/env stryke
+# t/test_async.stk — test async, await, and channels
+
+# ── Basic Async/Await ──────────────────────────────────────────────
+my $t1 = async {
+    sleep 0.1
+    return 42
+}
+assert_eq await($t1), 42, "async return value"
+
+# ── Parallel Execution ─────────────────────────────────────────────
+my $start = el()
+my @tasks = map { 
+    async { sleep 0.2; $_ } 
+} (1..5)
+
+my @results = map { await($_) } @tasks
+my $elapsed = el() - $start
+
+assert_eq scalar(@results), 5, "all tasks finished"
+assert_eq join(",", sort @results), "1,2,3,4,5", "task results"
+assert_lt $elapsed, 0.8, "tasks ran in parallel" # 5 * 0.2 = 1.0 > 0.8
+
+# ── Channels (pchannel) ───────────────────────────────────────────
+my ($tx, $rx) = pchannel(10)
+async {
+    for (1..3) {
+        $tx->send("msg $_")
+        sleep 0.05
+    }
+}
+
+assert_eq $rx->recv(), "msg 1", "recv 1"
+assert_eq $rx->recv(), "msg 2", "recv 2"
+assert_eq $rx->recv(), "msg 3", "recv 3"
+
+# ── Multiplexing (pselect) ────────────────────────────────────────
+my ($tx1, $rx1) = pchannel()
+my ($tx2, $rx2) = pchannel()
+
+async { sleep 0.1; $tx2->send("from 2") }
+async { sleep 0.2; $tx1->send("from 1") }
+
+my ($val1, $idx1) = pselect($rx1, $rx2)
+assert_eq $val1, "from 2", "pselect first ready"
+assert_eq $idx1, 1, "pselect index 1"
+
+my ($val2, $idx2) = pselect($rx1, $rx2)
+assert_eq $val2, "from 1", "pselect second ready"
+assert_eq $idx2, 0, "pselect index 0"
+
+# ── Bounded Channels & Backpressure ──────────────────────────────
+my ($btx, $brx) = pchannel(1)
+$btx->send("buffered")
+my $t_full = async {
+    $btx->send("blocked")
+    return "unblocked"
+}
+sleep 0.1
+# $t_full should still be running because channel is full
+assert_eq $brx->recv(), "buffered", "recv buffered"
+assert_eq await($t_full), "unblocked", "async unblocked after recv"
+assert_eq $brx->recv(), "blocked", "recv blocked msg"
+
+test_run

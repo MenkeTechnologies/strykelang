@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+# t/test_generators.stk — test lazy generators
+
+require "./lib/generators.stk"
+
+# ── range10_12_gen ──────────────────────────────────────────────────
+my $rg = range10_12_gen()
+my $n1 = $rg->next()
+assert_eq $n1->[0], 10, "range10_12_gen 1"
+assert_eq $n1->[1], 1, "range10_12_gen 1 more"
+
+my $n2 = $rg->next()
+assert_eq $n2->[0], 11, "range10_12_gen 2"
+
+my $n3 = $rg->next()
+assert_eq $n3->[0], 12, "range10_12_gen 3"
+
+my $n4 = $rg->next()
+assert_false $n4->[1], "range10_12_gen exhausted"
+
+# ── simple_fib_gen ─────────────────────────────────────────────────
+my $fg = simple_fib_gen()
+my @fibs = take_gen(5, $fg)
+assert_eq join(",", @fibs), "0,1,1,2,3", "simple_fib_gen take 5"
+
+test_run
