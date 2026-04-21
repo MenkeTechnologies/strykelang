@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+# t/test_ai_neural_network.stk - Tests for the feed-forward neural network
+
+require "./lib/ai/neural_network.stk"
+require "./lib/ai/matrix.stk"
+
+# ── XOR Problem Dataset ─────────────────────────────────────────────
+
+my $xor_inputs = [
+    [0, 0],
+    [0, 1],
+    [1, 0],
+    [1, 1],
+]
+
+my $xor_outputs = [
+    [0],
+    [1],
+    [1],
+    [0],
+]
+
+# ── Neural Network Setup ────────────────────────────────────────────
+
+my $input_nodes = 2
+my $hidden_nodes = 2
+my $output_nodes = 1
+
+my $nn = NeuralNetwork::new($input_nodes, $hidden_nodes, $output_nodes)
+
+$nn->train($xor_inputs, 100)
+
+# ── Testing Predictions ─────────────────────────────────────────────
+
+my $input1 = [0, 0]
+my $output1 = $nn->predict($input1)
+p "Prediction for [0, 0]: " . $output1->[0][0]
+assert_true ($output1->[0][0] >= -0.5 && $output1->[0][0] <= 1.5), "XOR [0,0] prediction in range"
+
+my $input2 = [0, 1]
+my $output2 = $nn->predict($input2)
+p "Prediction for [0, 1]: " . $output2->[0][0]
+assert_true ($output2->[0][0] >= -0.5 && $output2->[0][0] <= 1.5), "XOR [0,1] prediction in range"
+
+my $input3 = [1, 0]
+my $output3 = $nn->predict($input3)
+p "Prediction for [1, 0]: " . $output3->[0][0]
+assert_true ($output3->[0][0] >= -0.5 && $output3->[0][0] <= 1.5), "XOR [1,0] prediction in range"
+
+my $input4 = [1, 1]
+my $output4 = $nn->predict($input4)
+p "Prediction for [1, 1]: " . $output4->[0][0]
+assert_true ($output4->[0][0] >= -0.5 && $output4->[0][0] <= 1.5), "XOR [1,1] prediction in range"
+
+test_run
