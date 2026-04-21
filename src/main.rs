@@ -1219,6 +1219,7 @@ fn main() {
         let mut failed = 0;
         let mut total_pass = 0usize;
         let mut total_fail = 0usize;
+        let mut failure_details: Vec<(String, String)> = Vec::new();
         eprintln!(
             "\x1b[36mRunning {} test file{}\x1b[0m\n",
             total,
@@ -1255,6 +1256,8 @@ fn main() {
                     let stderr = String::from_utf8_lossy(&out.stderr);
                     // Print the stderr (test output)
                     eprint!("{}", stderr);
+                    // Collect failure lines for this file
+                    let mut file_failures: Vec<String> = Vec::new();
                     // Count ✓ and ✗ in output (only lines starting with "  ✓" or "  ✗")
                     for line in stderr.lines() {
                         let trimmed = line.trim_start();
@@ -1269,16 +1272,43 @@ fn main() {
                             // Check it's not the summary "✗ X of Y tests failed" line
                             if !trimmed.contains(" of ") || !trimmed.contains(" failed") {
                                 total_fail += 1;
+                                file_failures.push(line.to_string());
                             }
                         }
                     }
-                    if !out.status.success() {
+                    // Count as failed if exit code non-zero OR any assertions failed
+                    let has_failures = !out.status.success() || !file_failures.is_empty();
+                    if has_failures {
                         failed += 1;
+                        // Capture error output for summary
+                        let error_output: String = stderr
+                            .lines()
+                            .filter(|l| {
+                                let t = l.trim_start();
+                                t.starts_with("\x1b[31m✗")
+                                    || t.starts_with("✗")
+                                    || t.contains("error:")
+                                    || t.contains("Error:")
+                                    || t.contains("panicked")
+                                    || t.contains("FAILED")
+                                    || t.contains(" at ")
+                                        && (t.contains(" line ") || t.contains(".stk"))
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        if !error_output.is_empty() {
+                            failure_details.push((name.clone(), error_output));
+                        } else if !file_failures.is_empty() {
+                            failure_details.push((name.clone(), file_failures.join("\n")));
+                        } else {
+                            failure_details.push((name.clone(), stderr.to_string()));
+                        }
                     }
                 }
                 Err(e) => {
                     eprintln!("  failed to run: {}", e);
                     failed += 1;
+                    failure_details.push((name.clone(), format!("failed to run: {}", e)));
                 }
             }
             eprintln!();
@@ -1294,6 +1324,29 @@ fn main() {
             );
             process::exit(0);
         } else {
+            // Print failure summary at the bottom
+            eprintln!();
+            eprintln!(
+                "\x1b[1;31m════════════════════════════════════════════════════════════════\x1b[0m"
+            );
+            eprintln!("\x1b[1;31m                        FAILURES SUMMARY\x1b[0m");
+            eprintln!(
+                "\x1b[1;31m════════════════════════════════════════════════════════════════\x1b[0m"
+            );
+            for (file_name, details) in &failure_details {
+                eprintln!();
+                eprintln!("\x1b[1;33m── {} ──\x1b[0m", file_name);
+                for line in details.lines().take(20) {
+                    eprintln!("  {}", line);
+                }
+                if details.lines().count() > 20 {
+                    eprintln!("  ... ({} more lines)", details.lines().count() - 20);
+                }
+            }
+            eprintln!();
+            eprintln!(
+                "\x1b[1;31m════════════════════════════════════════════════════════════════\x1b[0m"
+            );
             eprintln!(
                 "\x1b[31m✗ {} of {} test file{} failed ({} passed, {} failed)\x1b[0m",
                 failed,

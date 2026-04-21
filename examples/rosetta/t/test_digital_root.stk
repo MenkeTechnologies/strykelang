@@ -2,10 +2,16 @@
 # Rosetta Code: Digital Root
 
 fn sum_digits($n) {
-    "$n" |> split // |> map { int($_) } |> reduce { $a + $b }
+    my @digits = split //, "$n"
+    my $sum = 0
+    for my $d (@digits) {
+        next unless $d =~ /\d/
+        $sum += int($d)
+    }
+    $sum
 }
 
-fn digital_root($n) {
+fn my_digital_root($n) {
     my $persistence = 0
     while ($n >= 10) {
         $n = sum_digits($n)
@@ -14,19 +20,19 @@ fn digital_root($n) {
     ($n, $persistence)
 }
 
-my ($root, $pers) = digital_root(627615)
+my ($root, $pers) = my_digital_root(627615)
 assert_eq $root, 9, "digital root of 627615"
 assert_eq $pers, 2, "persistence of 627615"
 
-($root, $pers) = digital_root(39)
+($root, $pers) = my_digital_root(39)
 assert_eq $root, 3, "digital root of 39"
 assert_eq $pers, 2, "persistence of 39"
 
-($root, $pers) = digital_root(9)
+($root, $pers) = my_digital_root(9)
 assert_eq $root, 9, "digital root of 9"
 assert_eq $pers, 0, "persistence of 9"
 
-($root, $pers) = digital_root(999999999999)
+($root, $pers) = my_digital_root(999999999999)
 assert_eq $root, 9, "digital root of 999999999999"
 
 test_run

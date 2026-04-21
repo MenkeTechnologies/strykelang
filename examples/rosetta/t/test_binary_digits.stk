@@ -8,19 +8,21 @@ fn to_binary($n) {
         unshift @bits, $n % 2
         $n = int($n / 2)
     }
-    join "", @bits
+    ~> @bits |> join ""
 }
 
 fn from_binary($s) {
     my $result = 0
-    for my $bit ($s |> split //) {
-        $result = $result * 2 + $bit
+    my @bits = split //, $s
+    for my $bit (@bits) {
+        next unless $bit =~ /[01]/
+        $result = $result * 2 + int($bit)
     }
     $result
 }
 
 fn count_ones($n) {
-    to_binary($n) |> split // |> grep { $_ eq "1" } |> scalar
+    ~> to_binary($n) >{split //, $_} grep { $_ eq "1" } |> scalar
 }
 
 assert_eq to_binary(0), "0", "binary 0"

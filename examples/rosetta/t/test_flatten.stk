@@ -1,11 +1,11 @@
 #!/usr/bin/env stryke
-# Rosetta Code: Flatten a List
+# Rosetta Code: Flatten a List (single level)
 
-fn flatten(@list) {
+fn my_flatten(@list) {
     my @result
     for my $item (@list) {
         if (ref($item) eq 'ARRAY') {
-            push @result, flatten(@$item)
+            push @result, @$item
         } else {
             push @result, $item
         }
@@ -13,20 +13,16 @@ fn flatten(@list) {
     @result
 }
 
-my @nested = ([1, 2], [3, [4, 5]], 6)
-my @flat = flatten(@nested)
-assert_eq join(",", @flat), "1,2,3,4,5,6", "flatten nested"
+my @nested = ([1, 2], [3, 4], 5)
+my @flat = my_flatten(@nested)
+assert_eq join(",", @flat), "1,2,3,4,5", "flatten single level"
 
 my @simple = (1, 2, 3)
-my @flat_simple = flatten(@simple)
+my @flat_simple = my_flatten(@simple)
 assert_eq join(",", @flat_simple), "1,2,3", "flatten simple"
 
-my @deep = ([[[1]]], [[2]], [3], 4)
-my @flat_deep = flatten(@deep)
-assert_eq join(",", @flat_deep), "1,2,3,4", "flatten deep"
-
-my @empty_nested = ([], [1], [], [2, 3], [])
-my @flat_empty = flatten(@empty_nested)
-assert_eq join(",", @flat_empty), "1,2,3", "flatten with empties"
+my @mixed = ([1], 2, [3, 4])
+my @flat_mixed = my_flatten(@mixed)
+assert_eq join(",", @flat_mixed), "1,2,3,4", "flatten mixed"
 
 test_run

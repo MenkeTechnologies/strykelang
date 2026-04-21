@@ -1,0 +1,61 @@
+# lib/trie.stk — Trie (Prefix Tree) implementation
+
+class TrieNode {
+    children: Hash = {};
+    is_end: Int = 0;
+}
+
+class Trie {
+    root: TrieNode;
+
+    fn init() {
+        $self->root(TrieNode())
+        $self
+    }
+
+    fn insert($word) {
+        my $curr = $self->root()
+        my $len = length($word)
+        for my $i (0..$len-1) {
+            my $char = substr($word, $i, 1)
+            my $children = $curr->children()
+            unless (exists $children->{$char}) {
+                $children->{$char} = TrieNode()
+            }
+            $curr = $children->{$char}
+        }
+        $curr->is_end(1)
+    }
+
+    fn search($word) {
+        my $node = $self->_find_node($word)
+        if (defined($node)) {
+            my $res = $node->is_end() ? 1 : 0
+            return $res
+        }
+        return 0
+    }
+
+    fn starts_with($prefix) {
+        my $node = $self->_find_node($prefix)
+        return defined($node) ? 1 : 0
+    }
+
+    fn _find_node($str) {
+        my $curr = $self->root()
+        my $len = length($str)
+        for my $i (0..$len-1) {
+            my $char = substr($str, $i, 1)
+            my $children = $curr->children()
+            unless (exists $children->{$char}) {
+                return undef
+            }
+            $curr = $children->{$char}
+        }
+        return $curr
+    }
+}
+
+fn trie_new() {
+    Trie()->init()
+}

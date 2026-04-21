@@ -12012,6 +12012,7 @@ impl Parser {
             // ── Extended stdlib: Advanced Numeric ────────────────────────────
             | "lerp" | "inv_lerp" | "ilerp" | "smoothstep" | "smst" | "remap"
             | "dot_product" | "dotp" | "cross_product" | "crossp"
+            | "matrix_mul" | "matmul" | "mm"
             | "magnitude" | "mag" | "normalize_vec" | "nrmv"
             | "distance" | "dist" | "manhattan_distance" | "mdist"
             | "covariance" | "cov" | "correlation" | "corr"

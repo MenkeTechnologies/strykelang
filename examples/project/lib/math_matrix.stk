@@ -1,0 +1,59 @@
+# lib/math_matrix.stk — basic matrix operations
+
+# ── adv_matrix_add: adds two matrices of the same dimensions ─────
+fn adv_matrix_add($m1, $m2) {
+    my $rows = scalar(@$m1)
+    my $cols = scalar(@{$m1->[0]})
+    my @res = ()
+    for my $i (0..$rows-1) {
+        $res[$i] = []
+        for my $j (0..$cols-1) {
+            $res[$i][$j] = $m1->[$i][$j] + $m2->[$i][$j]
+        }
+    }
+    return [@res]
+}
+
+# ── adv_matrix_mul: multiplies two matrices (r1xc1 * r2xc2 where c1 == r2) ─────
+fn adv_matrix_mul($m1, $m2) {
+    my $r1 = scalar(@$m1)
+    my $c1 = scalar(@{$m1->[0]})
+    my $r2 = scalar(@$m2)
+    my $c2 = scalar(@{$m2->[0]})
+    
+    if ($c1 != $r2) {
+        die "Matrix dimensions mismatch for multiplication"
+    }
+    
+    my @res = ()
+    for my $i (0..$r1-1) {
+        $res[$i] = []
+        for my $j (0..$c2-1) {
+            my $sum = 0
+            for my $k (0..$c1-1) {
+                $sum += $m1->[$i][$k] * $m2->[$k][$j]
+            }
+            $res[$i][$j] = $sum
+        }
+    }
+    return [@res]
+}
+
+# ── adv_matrix_transpose: transposes a matrix (rows become columns) ─────
+fn adv_matrix_transpose($m) {
+    my $rows = scalar(@$m)
+    my $cols = scalar(@{$m->[0]})
+    my @res = ()
+    for my $j (0..$cols-1) {
+        $res[$j] = []
+        for my $i (0..$rows-1) {
+            $res[$j][$i] = $m->[$i][$j]
+        }
+    }
+    return [@res]
+}
+
+# ── adv_matrix_det2x2: returns the determinant of a 2x2 matrix ─────
+fn adv_matrix_det2x2($m) {
+    return $m->[0][0] * $m->[1][1] - $m->[0][1] * $m->[1][0]
+}

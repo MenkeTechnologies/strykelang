@@ -40,8 +40,8 @@ class Product {
 
 class TreeNode {
     value: Int
-    left: Any = undef
-    right: Any = undef
+    left: TreeNode = undef
+    right: TreeNode = undef
 
     fn is_leaf { !defined($self->left) && !defined($self->right) }
 }

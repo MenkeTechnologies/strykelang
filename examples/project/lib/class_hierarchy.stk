@@ -129,8 +129,8 @@ class Coordinate impl Cloneable {
 }
 
 class BoundingBox {
-    min: Any
-    max: Any
+    min: Coordinate
+    max: Coordinate
     
     fn width { $self->max->x - $self->min->x }
     fn height { $self->max->y - $self->min->y }

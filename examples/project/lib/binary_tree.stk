@@ -1,0 +1,60 @@
+# lib/binary_tree.stk — binary search tree implementation
+
+class BSTNode {
+    val: Int;
+    left: BSTNode = undef;
+    right: BSTNode = undef;
+    
+    fn insert($new_val) {
+        if ($new_val < $self->val) {
+            if (defined($self->left)) {
+                $self->left->insert($new_val)
+            } else {
+                my $node = BSTNode(val => $new_val)
+                $self->left($node)
+            }
+        } elsif ($new_val > $self->val) {
+            if (defined($self->right)) {
+                $self->right->insert($new_val)
+            } else {
+                my $node = BSTNode(val => $new_val)
+                $self->right($node)
+            }
+        }
+    }
+    
+    fn search($target) {
+        if ($target == $self->val) {
+            return 1
+        }
+        if ($target < $self->val) {
+            if (defined($self->left)) {
+                return $self->left->search($target)
+            }
+            return 0
+        } else {
+            if (defined($self->right)) {
+                return $self->right->search($target)
+            }
+            return 0
+        }
+    }
+    
+    fn in_order() {
+        my @res = ()
+        if (defined($self->left)) {
+            my $l_ref = $self->left->in_order()
+            push @res, @$l_ref
+        }
+        push @res, $self->val
+        if (defined($self->right)) {
+            my $r_ref = $self->right->in_order()
+            push @res, @$r_ref
+        }
+        return [@res]
+    }
+}
+
+fn bst_new($root_val) {
+    BSTNode(val => $root_val)
+}

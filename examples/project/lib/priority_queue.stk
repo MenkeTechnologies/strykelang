@@ -1,0 +1,151 @@
+# lib/priority_queue.stk — Priority Queue implementations (Max and Min Heaps)
+
+class PriorityQueue {
+    heap: Array = [];
+
+    fn init() {
+        $self->heap([])
+        $self
+    }
+
+    fn push($val) {
+        my $h = $self->heap()
+        push @$h, $val
+        $self->_bubble_up(scalar(@$h) - 1)
+    }
+
+    fn pop() {
+        my $h = $self->heap()
+        return undef if scalar(@$h) == 0
+        
+        my $top = $h->[0]
+        my $last = pop @$h
+        
+        if (scalar(@$h) > 0) {
+            $h->[0] = $last
+            $self->_bubble_down(0)
+        }
+        
+        return $top
+    }
+
+    fn peek() {
+        my $h = $self->heap()
+        return scalar(@$h) > 0 ? $h->[0] : undef
+    }
+
+    fn size() {
+        return scalar(@{$self->heap()})
+    }
+
+    fn is_empty() {
+        return $self->size() == 0 ? 1 : 0
+    }
+
+    # ── Internal Comparison ─────
+    fn _less($a, $b) {
+        if (ref($a) eq "ARRAY") {
+            return $a->[0] < $b->[0] ? 1 : 0
+        }
+        return $a < $b ? 1 : 0
+    }
+
+    fn _greater($a, $b) {
+        if (ref($a) eq "ARRAY") {
+            return $a->[0] > $b->[0] ? 1 : 0
+        }
+        return $a > $b ? 1 : 0
+    }
+
+    fn _bubble_up($idx) {
+        my $h = $self->heap()
+        while ($idx > 0) {
+            my $parent = int(($idx - 1) / 2)
+            if ($self->_greater($h->[$idx], $h->[$parent])) {
+                my $tmp = $h->[$idx]
+                $h->[$idx] = $h->[$parent]
+                $h->[$parent] = $tmp
+                $idx = $parent
+            } else {
+                last
+            }
+        }
+    }
+
+    fn _bubble_down($idx) {
+        my $h = $self->heap()
+        my $len = scalar(@$h)
+        while (1) {
+            my $left = 2 * $idx + 1
+            my $right = 2 * $idx + 2
+            my $largest = $idx
+            
+            if ($left < $len && $self->_greater($h->[$left], $h->[$largest])) {
+                $largest = $left
+            }
+            if ($right < $len && $self->_greater($h->[$right], $h->[$largest])) {
+                $largest = $right
+            }
+            
+            if ($largest != $idx) {
+                my $tmp = $h->[$idx]
+                $h->[$idx] = $h->[$largest]
+                $h->[$largest] = $tmp
+                $idx = $largest
+            } else {
+                last
+            }
+        }
+    }
+}
+
+fn pq_new() {
+    PriorityQueue()->init()
+}
+
+class MinPriorityQueue extends PriorityQueue {
+    fn _bubble_up($idx) {
+        my $h = $self->heap()
+        while ($idx > 0) {
+            my $parent = int(($idx - 1) / 2)
+            if ($self->_less($h->[$idx], $h->[$parent])) {
+                my $tmp = $h->[$idx]
+                $h->[$idx] = $h->[$parent]
+                $h->[$parent] = $tmp
+                $idx = $parent
+            } else {
+                last
+            }
+        }
+    }
+
+    fn _bubble_down($idx) {
+        my $h = $self->heap()
+        my $len = scalar(@$h)
+        while (1) {
+            my $left = 2 * $idx + 1
+            my $right = 2 * $idx + 2
+            my $smallest = $idx
+            
+            if ($left < $len && $self->_less($h->[$left], $h->[$smallest])) {
+                $smallest = $left
+            }
+            if ($right < $len && $self->_less($h->[$right], $h->[$smallest])) {
+                $smallest = $right
+            }
+            
+            if ($smallest != $idx) {
+                my $tmp = $h->[$idx]
+                $h->[$idx] = $h->[$smallest]
+                $h->[$smallest] = $tmp
+                $idx = $smallest
+            } else {
+                last
+            }
+        }
+    }
+}
+
+fn pq_min_new() {
+    MinPriorityQueue()->init()
+}

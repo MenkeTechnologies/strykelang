@@ -35,3 +35,85 @@ fn bubble_sort(@list) {
     }
     @list
 }
+
+# ── quick_sort: recursive divide and conquer ─────
+fn quick_sort(@list) {
+    if (scalar(@list) <= 1) {
+        return @list
+    }
+    
+    my $pivot = $list[0]
+    my @left = ()
+    my @right = ()
+    
+    for my $i (1..scalar(@list)-1) {
+        my $val = $list[$i]
+        if ($val <= $pivot) {
+            push @left, $val
+        } else {
+            push @right, $val
+        }
+    }
+    
+    my @sorted_left = ()
+    if (scalar(@left) > 0) {
+        @sorted_left = quick_sort(@left)
+    }
+    
+    my @sorted_right = ()
+    if (scalar(@right) > 0) {
+        @sorted_right = quick_sort(@right)
+    }
+    
+    (@sorted_left, $pivot, @sorted_right)
+}
+
+# ── merge_sort: stable divide and conquer ─────
+fn merge_sort(@list) {
+    if (scalar(@list) <= 1) {
+        return @list
+    }
+    
+    my $mid = int(scalar(@list) / 2)
+    my @left = @list[0..$mid-1]
+    my @right = @list[$mid..scalar(@list)-1]
+    
+    my @sorted_left = merge_sort(@left)
+    my @sorted_right = merge_sort(@right)
+    
+    _merge(\@sorted_left, \@sorted_right)
+}
+
+fn _merge($left_ref, $right_ref) {
+    my @left = @$left_ref
+    my @right = @$right_ref
+    my @res = ()
+    while (scalar(@left) > 0 && scalar(@right) > 0) {
+        if ($left[0] <= $right[0]) {
+            push @res, shift @left
+        } else {
+            push @res, shift @right
+        }
+    }
+    push @res, @left if scalar(@left) > 0
+    push @res, @right if scalar(@right) > 0
+    @res
+}
+
+require "./lib/priority_queue.stk"
+
+# ── heap_sort: sort using a priority queue (O(n log n)) ─────
+fn heap_sort(@list) {
+    return @list if scalar(@list) <= 1
+    
+    my $pq = pq_new()
+    for my $val (@list) {
+        $pq->push($val)
+    }
+    
+    my @res = ()
+    while (!$pq->is_empty()) {
+        unshift @res, $pq->pop()
+    }
+    @res
+}

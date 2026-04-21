@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# t/test_trie.stk — Trie tests
+
+require "./lib/trie.stk"
+
+my $trie = trie_new()
+$trie->insert("apple")
+$trie->insert("app")
+
+assert_ok $trie->search("apple"), "search apple"
+assert_ok $trie->search("app"), "search app"
+assert_false $trie->search("ap"), "search ap (not a word)"
+assert_false $trie->search("apples"), "search apples (missing)"
+
+assert_ok $trie->starts_with("app"), "starts_with app"
+assert_ok $trie->starts_with("ap"), "starts_with ap"
+assert_ok $trie->starts_with("apple"), "starts_with apple"
+assert_false $trie->starts_with("b"), "starts_with b (missing)"
+
+$trie->insert("banana")
+assert_ok $trie->search("banana"), "search banana"
+assert_ok $trie->starts_with("ban"), "starts_with ban"
+
+test_run

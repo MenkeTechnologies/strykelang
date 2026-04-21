@@ -2375,6 +2375,7 @@ pub(crate) fn try_builtin(
         "remap" => Some(builtin_remap(args)),
         "dot_product" | "dotp" => Some(builtin_dot_product(args)),
         "cross_product" | "crossp" => Some(builtin_cross_product(args)),
+        "matrix_mul" | "matmul" | "mm" => Some(builtin_matrix_mul(args)),
         "magnitude" | "mag" => Some(builtin_magnitude(args)),
         "normalize_vec" | "nrmv" => Some(builtin_normalize_vec(args)),
         "distance" | "dist" => Some(builtin_distance(args)),
@@ -3988,6 +3989,73 @@ fn stringify_value(buf: &mut String, val: &PerlValue) {
         buf.push_str(" { ");
         buf.push_str(&crate::deparse::deparse_block(&cr.body));
         buf.push_str(" }");
+        return;
+    }
+
+    // Handle enum instances: Color::Red or Maybe::Some(42)
+    if let Some(e) = val.as_enum_inst() {
+        let _ = write!(buf, "{}::{}", e.def.name, e.variant_name());
+        if e.def.variants[e.variant_idx].ty.is_some() {
+            buf.push('(');
+            stringify_value(buf, &e.data);
+            buf.push(')');
+        }
+        return;
+    }
+
+    // Handle class instances: Dog(name => "Rex", age => 5)
+    if let Some(c) = val.as_class_inst() {
+        let _ = write!(buf, "{}(", c.def.name);
+        let values = c.get_values();
+        for (i, field) in c.def.fields.iter().enumerate() {
+            if i > 0 {
+                buf.push_str(", ");
+            }
+            let _ = write!(buf, "{} => ", field.name);
+            stringify_value(buf, &values[i]);
+        }
+        buf.push(')');
+        return;
+    }
+
+    // Handle set: set(1, 2, 3)
+    if let Some(set_arc) = crate::value::set_payload(val) {
+        buf.push_str("set(");
+        for (i, v) in set_arc.values().enumerate() {
+            if i > 0 {
+                buf.push_str(", ");
+            }
+            stringify_value(buf, v);
+        }
+        buf.push(')');
+        return;
+    }
+
+    // Handle deque
+    if let Some(dq) = val.as_deque() {
+        buf.push_str("deque(");
+        let guard = dq.lock();
+        for (i, v) in guard.iter().enumerate() {
+            if i > 0 {
+                buf.push_str(", ");
+            }
+            stringify_value(buf, v);
+        }
+        buf.push(')');
+        return;
+    }
+
+    // Handle heap
+    if let Some(hp) = val.as_heap_pq() {
+        buf.push_str("heap(");
+        let guard = hp.lock();
+        for (i, v) in guard.items.iter().enumerate() {
+            if i > 0 {
+                buf.push_str(", ");
+            }
+            stringify_value(buf, v);
+        }
+        buf.push(')');
         return;
     }
 

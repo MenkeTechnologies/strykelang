@@ -1,0 +1,30 @@
+# lib/geometry.stk — basic geometry utilities
+
+# ── adv_dist_2d: Euclidean distance between (x1, y1) and (x2, y2) ─────
+fn adv_dist_2d($x1, $y1, $x2, $y2) {
+    my $dx = $x1 - $x2
+    my $dy = $y1 - $y2
+    return sqrt($dx * $dx + $dy * $dy)
+}
+
+# ── adv_area_polygon: area of a polygon using the Shoelace formula ─────
+# Expects array ref of point array refs: [[x1, y1], [x2, y2], ...]
+fn adv_area_polygon($pts_ref) {
+    my @pts = @$pts_ref
+    my $n = scalar(@pts)
+    return 0 if $n < 3
+    
+    my $area = 0
+    for my $i (0..$n-1) {
+        my $j = ($i + 1) % $n
+        $area += $pts[$i][0] * $pts[$j][1]
+        $area -= $pts[$j][0] * $pts[$i][1]
+    }
+    return abs($area) / 2.0
+}
+
+# ── adv_is_point_in_circle: checks if (px, py) is inside circle (cx, cy, r) ─────
+fn adv_is_point_in_circle($px, $py, $cx, $cy, $r) {
+    my $d = adv_dist_2d($px, $py, $cx, $cy)
+    return $d <= $r ? 1 : 0
+}

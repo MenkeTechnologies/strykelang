@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# t/test_geometry.stk — geometry utility tests
+
+require "./lib/geometry.stk"
+
+# ── adv_dist_2d ─────
+assert_near adv_dist_2d(0, 0, 3, 4), 5.0, 0.001, "dist(0,0 to 3,4) = 5"
+assert_near adv_dist_2d(1, 1, 1, 1), 0.0, 0.001, "dist same point = 0"
+
+# ── adv_area_polygon ─────
+# Square: (0,0), (2,0), (2,2), (0,2) -> Area = 4
+my $square = [[0, 0], [2, 0], [2, 2], [0, 2]]
+assert_near adv_area_polygon($square), 4.0, 0.001, "square area"
+
+# Triangle: (0,0), (4,0), (0,3) -> Area = (4*3)/2 = 6
+my $triangle = [[0, 0], [4, 0], [0, 3]]
+assert_near adv_area_polygon($triangle), 6.0, 0.001, "triangle area"
+
+# ── adv_is_point_in_circle ─────
+assert_ok adv_is_point_in_circle(1, 1, 0, 0, 2), "point inside"
+assert_ok adv_is_point_in_circle(2, 0, 0, 0, 2), "point on boundary"
+assert_false adv_is_point_in_circle(2, 2, 0, 0, 2), "point outside"
+
+test_run

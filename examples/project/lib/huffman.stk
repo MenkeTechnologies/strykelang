@@ -1,0 +1,117 @@
+# lib/huffman.stk — Huffman Coding for data compression
+
+require "./lib/priority_queue.stk"
+
+class HuffmanNode {
+    char: Str = "";
+    freq: Int = 0;
+    left: HuffmanNode = undef;
+    right: HuffmanNode = undef;
+
+    # ── Internal Comparison for MinPriorityQueue ─────
+    # MinPriorityQueue uses $a->[0] < $b->[0] for array refs.
+    # We will push [freq, node_ref] into the PQ.
+}
+
+# ── adv_huffman_encode: compresses string using Huffman coding ─────
+# Returns [encoded_binary_string, tree_root_node]
+fn adv_huffman_encode($text) {
+    return ["", undef] if length($text) == 0
+    
+    # 1. Count frequencies
+    my %freq = ()
+    my $len = length($text)
+    for my $i (0..$len-1) {
+        my $char = substr($text, $i, 1)
+        $freq{$char} = ($freq{$char} // 0) + 1
+    }
+    
+    # 2. Build Min-Heap
+    my $pq = pq_min_new()
+    for my $char (keys %freq) {
+        my $node = HuffmanNode(char => $char, freq => $freq{$char})
+        $pq->push([$freq{$char}, $node])
+    }
+    
+    # Special case: single character
+    if ($pq->size() == 1) {
+        my $top = $pq->pop()
+        my $node = $top->[1]
+        my $root = HuffmanNode(freq => $node->freq(), left => $node)
+        my %codes = ($node->char() => "0")
+        return [_build_binary($text, \%codes), $root]
+    }
+    
+    # 3. Build Huffman Tree
+    while ($pq->size() > 1) {
+        my $left_pair = $pq->pop()
+        my $right_pair = $pq->pop()
+        
+        my $left = $left_pair->[1]
+        my $right = $right_pair->[1]
+        
+        my $parent = HuffmanNode(
+            freq  => $left->freq() + $right->freq(),
+            left  => $left,
+            right => $right
+        )
+        $pq->push([$parent->freq(), $parent])
+    }
+    
+    my $root_pair = $pq->pop()
+    my $root = $root_pair->[1]
+    
+    # 4. Generate Codes
+    my %codes = ()
+    _generate_codes($root, "", \%codes)
+    
+    # 5. Build Result
+    return [_build_binary($text, \%codes), $root]
+}
+
+fn _generate_codes($node, $code, $codes_ref) {
+    if (defined($node->char()) && length($node->char()) > 0) {
+        $codes_ref->{$node->char()} = $code
+        return
+    }
+    if (defined($node->left())) {
+        _generate_codes($node->left(), $code . "0", $codes_ref)
+    }
+    if (defined($node->right())) {
+        _generate_codes($node->right(), $code . "1", $codes_ref)
+    }
+}
+
+fn _build_binary($text, $codes_ref) {
+    my $res = ""
+    my $len = length($text)
+    for my $i (0..$len-1) {
+        my $char = substr($text, $i, 1)
+        $res .= $codes_ref->{$char}
+    }
+    return $res
+}
+
+# ── adv_huffman_decode: decompresses binary string using Huffman tree ─────
+fn adv_huffman_decode($binary, $root) {
+    return "" if !defined($root) || length($binary) == 0
+    
+    my $res = ""
+    my $curr = $root
+    my $len = length($binary)
+    
+    for my $i (0..$len-1) {
+        my $bit = substr($binary, $i, 1)
+        if ($bit eq "0") {
+            $curr = $curr->left()
+        } else {
+            $curr = $curr->right()
+        }
+        
+        if (defined($curr->char()) && length($curr->char()) > 0) {
+            $res .= $curr->char()
+            $curr = $root
+        }
+    }
+    return $res
+}

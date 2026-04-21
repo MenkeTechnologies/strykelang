@@ -101,6 +101,8 @@ jobs:
       - run: cargo build --release --locked
       - name: Run stryke test on example project
         run: ./target/release/s test examples/project/t
+      - name: Run stryke test on rosetta project
+        run: ./target/release/s test examples/rosetta/t
 
   release-build:
     name: Release Build
