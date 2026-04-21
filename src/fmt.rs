@@ -833,9 +833,20 @@ pub fn format_expr(e: &Expr) -> String {
             from,
             to,
             exclusive,
+            step,
         } => {
             let op = if *exclusive { "..." } else { ".." };
-            format!("{} {} {}", format_expr(from), op, format_expr(to))
+            if let Some(s) = step {
+                format!(
+                    "{} {} {}:{}",
+                    format_expr(from),
+                    op,
+                    format_expr(to),
+                    format_expr(s)
+                )
+            } else {
+                format!("{} {} {}", format_expr(from), op, format_expr(to))
+            }
         }
         ExprKind::FuncCall { name, args } => format!(
             "{}({})",

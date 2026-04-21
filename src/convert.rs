@@ -1118,9 +1118,20 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
             from,
             to,
             exclusive,
+            step,
         } => {
             let op = if *exclusive { "..." } else { ".." };
-            format!("{} {} {}", convert_expr(from), op, convert_expr(to))
+            if let Some(s) = step {
+                format!(
+                    "{} {} {}:{}",
+                    convert_expr(from),
+                    op,
+                    convert_expr(to),
+                    convert_expr(s)
+                )
+            } else {
+                format!("{} {} {}", convert_expr(from), op, convert_expr(to))
+            }
         }
         ExprKind::Repeat { expr, count } => {
             format!("{} x {}", convert_expr(expr), convert_expr(count))

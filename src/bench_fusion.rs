@@ -479,8 +479,9 @@ pub(crate) fn try_match_map_grep_scalar_fusion(
                     from,
                     to,
                     exclusive,
+                    step,
                 } => {
-                    if *exclusive {
+                    if *exclusive || step.is_some() {
                         return None;
                     }
                     match (&from.kind, &to.kind) {

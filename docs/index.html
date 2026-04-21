@@ -185,14 +185,17 @@ cd strykelang &amp;&amp; cargo build --release
 
 # one-liners
 s 'p "hello, world"'
-s '1..20 |&gt; grep { $_ % 2 == 0 } |&gt; map { $_ * $_ } |&gt; sum |&gt; p'
+s '1..20 |&gt; fi even |&gt; map { $_ * $_ } |&gt; sum |&gt; p'
+s '~> 1..20 fi{even} map{sq} sum p'
 s 'qw(a b c) |&gt; map uc |&gt; join "," |&gt; p'
+s '~> qw(a,b,c) map{uc} join(",") p'
 
 # parallel primitives
-s '(1..8) |&gt; pmap { expensive($_) } |&gt; p'
+s '1..8 |&gt; pmap expensive |&gt; p'
 
 # read + parse JSON
-s 'read_json("data.json") |&gt; to_yaml |&gt; p'</pre>
+s 'read_json("data.json") |&gt; to_yaml |&gt; p'
+s 'p to_yaml read_json "data.json"'</pre>
         <p>Full install + usage live in the <a href="https://github.com/MenkeTechnologies/strykelang#readme">README</a>.</p>
         <p><strong><code>-e</code> is optional.</strong> If the first argument isn't a file and looks like code, <code>s</code> runs it directly. <code>s 'p 42'</code> and <code>s -e 'p 42'</code> are equivalent.</p>
       </section>

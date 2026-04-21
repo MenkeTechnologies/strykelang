@@ -4592,11 +4592,17 @@ impl Compiler {
                 from,
                 to,
                 exclusive,
+                step,
             } => {
                 if ctx == WantarrayCtx::List {
                     self.compile_expr_ctx(from, WantarrayCtx::Scalar)?;
                     self.compile_expr_ctx(to, WantarrayCtx::Scalar)?;
-                    self.emit_op(Op::Range, line, Some(root));
+                    if let Some(s) = step {
+                        self.compile_expr_ctx(s, WantarrayCtx::Scalar)?;
+                        self.emit_op(Op::RangeStep, line, Some(root));
+                    } else {
+                        self.emit_op(Op::Range, line, Some(root));
+                    }
                 } else if let (ExprKind::Regex(lp, lf), ExprKind::Regex(rp, rf)) =
                     (&from.kind, &to.kind)
                 {
