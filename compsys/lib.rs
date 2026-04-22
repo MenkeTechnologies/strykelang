@@ -24,6 +24,9 @@ pub mod library;
 pub mod matching;
 pub mod menu;
 pub mod state;
+pub mod shell_runner;
+pub mod system;
+pub mod zle;
 pub mod zpwr_colors;
 pub mod zstyle;
 
@@ -90,5 +93,10 @@ pub use menu::{
     SearchDirection, GROUP_COLORS,
 };
 pub use state::{CompParams, CompState, CompletionContext};
+pub use shell_runner::{
+    BuiltinDispatcher, ShellCompletionContext, CompletionResult, CompletionRunner, call_program,
+};
+pub use system::{users, groups, hosts, pids, ports, net_interfaces, urls, signals};
+pub use zle::{ZleCompletionState, ZleWidgets, ZleAction};
 pub use zpwr_colors::{zpwr_list_colors, load_zpwr_config, ZstyleColors, HeaderColors, DEFAULT_PREFIX_COLOR, MENU_SELECTION_COLOR};
 pub use zstyle::{ZStyle, ZStyleLookup, ZStyleStore};

@@ -555,6 +555,13 @@ impl MenuState {
         self.selected_idx
     }
 
+    /// Get the insert string for the currently selected completion
+    pub fn selected_insert_string(&self) -> Option<String> {
+        self.selected_idx
+            .and_then(|idx| self.items.get(idx))
+            .map(|m| m.completion.insert_str())
+    }
+
     /// Total number of matches
     pub fn count(&self) -> usize {
         self.items.len()
@@ -1233,10 +1240,9 @@ impl MenuState {
             line.content.push_str(rest_part);
             line.content.push_str(ansi::RESET);
         } else {
-            // zsh style: prefix is BOLD version of color, rest is regular
+            // zsh style: prefix is BOLD WHITE to stand out, rest uses group color
             if !prefix_part.is_empty() {
-                let bold_color = make_bold(&effective_color);
-                line.content.push_str(&ansi::from_codes(&bold_color));
+                line.content.push_str("\x1b[1;37m"); // Bold white for prefix
                 line.content.push_str(prefix_part);
                 line.content.push_str(ansi::RESET);
             }
@@ -1327,10 +1333,9 @@ impl MenuState {
             line.content.push_str(rest_part);
             line.content.push_str(ansi::RESET);
         } else {
-            // zsh style: prefix is BOLD version of color
+            // zsh style: prefix is BOLD WHITE to stand out, rest uses group color
             if !prefix_part.is_empty() {
-                let bold_color = make_bold(&effective_color);
-                line.content.push_str(&ansi::from_codes(&bold_color));
+                line.content.push_str("\x1b[1;37m"); // Bold white for prefix
                 line.content.push_str(prefix_part);
                 line.content.push_str(ansi::RESET);
             }
