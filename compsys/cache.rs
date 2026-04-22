@@ -373,14 +373,14 @@ impl CompsysCache {
         rows.collect()
     }
 
-    /// Fast prefix search (LIKE with index, avoids FTS5 join overhead for small datasets)
+    /// Fast prefix search (LIKE with index scan, ORDER BY is free on indexed column)
     pub fn comps_prefix(&self, prefix: &str) -> rusqlite::Result<Vec<(String, String)>> {
         if prefix.is_empty() {
             return self.comps_kv();
         }
         let pattern = format!("{}%", prefix);
         let mut stmt = self.conn.prepare(
-            "SELECT command, function FROM comps WHERE command LIKE ?1"
+            "SELECT command, function FROM comps WHERE command LIKE ?1 ORDER BY command"
         )?;
         let rows = stmt.query_map(params![pattern], |row| Ok((row.get(0)?, row.get(1)?)))?;
         rows.collect()
@@ -713,11 +713,11 @@ impl CompsysCache {
         self.comp_count()
     }
 
-    /// Get all _comps keys (for ${(k)_comps}) - no ORDER BY for speed
+    /// Get all _comps keys (for ${(k)_comps}) - ORDER BY is free on PRIMARY KEY
     pub fn comps_keys(&self) -> rusqlite::Result<Vec<String>> {
         let mut stmt = self
             .conn
-            .prepare("SELECT command FROM comps")?;
+            .prepare("SELECT command FROM comps ORDER BY command")?;
         let rows = stmt.query_map([], |row| row.get(0))?;
         rows.collect()
     }
@@ -726,7 +726,7 @@ impl CompsysCache {
     pub fn comps_values(&self) -> rusqlite::Result<Vec<String>> {
         let mut stmt = self
             .conn
-            .prepare("SELECT function FROM comps")?;
+            .prepare("SELECT function FROM comps ORDER BY command")?;
         let rows = stmt.query_map([], |row| row.get(0))?;
         rows.collect()
     }
@@ -735,7 +735,7 @@ impl CompsysCache {
     pub fn comps_kv(&self) -> rusqlite::Result<Vec<(String, String)>> {
         let mut stmt = self
             .conn
-            .prepare("SELECT command, function FROM comps")?;
+            .prepare("SELECT command, function FROM comps ORDER BY command")?;
         let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
         rows.collect()
     }
@@ -905,17 +905,17 @@ impl CompsysCache {
         rows.collect()
     }
 
-    /// Get executables matching prefix (LIKE fallback)
+    /// Get executables matching prefix (LIKE with index, ORDER BY free on PRIMARY KEY)
     pub fn get_executables_prefix(&self, prefix: &str) -> rusqlite::Result<Vec<(String, String)>> {
         if prefix.is_empty() {
-            let mut stmt = self.conn.prepare("SELECT name, path FROM executables")?;
+            let mut stmt = self.conn.prepare("SELECT name, path FROM executables ORDER BY name")?;
             let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
             return rows.collect();
         }
         let pattern = format!("{}%", prefix);
         let mut stmt = self
             .conn
-            .prepare("SELECT name, path FROM executables WHERE name LIKE ?1")?;
+            .prepare("SELECT name, path FROM executables WHERE name LIKE ?1 ORDER BY name")?;
         let rows = stmt.query_map(params![pattern], |row| Ok((row.get(0)?, row.get(1)?)))?;
         rows.collect()
     }
@@ -951,11 +951,11 @@ impl CompsysCache {
         tx.commit()
     }
 
-    /// Get all named directories
+    /// Get all named directories (ORDER BY free on PRIMARY KEY)
     pub fn get_named_dirs(&self) -> rusqlite::Result<Vec<(String, String)>> {
         let mut stmt = self
             .conn
-            .prepare("SELECT name, path FROM named_dirs")?;
+            .prepare("SELECT name, path FROM named_dirs ORDER BY name")?;
         let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
         rows.collect()
     }
@@ -968,7 +968,7 @@ impl CompsysCache {
         let pattern = format!("{}%", prefix);
         let mut stmt = self
             .conn
-            .prepare("SELECT name, path FROM named_dirs WHERE name LIKE ?1")?;
+            .prepare("SELECT name, path FROM named_dirs WHERE name LIKE ?1 ORDER BY name")?;
         let rows = stmt.query_map(params![pattern], |row| Ok((row.get(0)?, row.get(1)?)))?;
         rows.collect()
     }
@@ -1009,11 +1009,11 @@ impl CompsysCache {
         tx.commit()
     }
 
-    /// Get all shell function names
+    /// Get all shell function names (ORDER BY free on PRIMARY KEY)
     pub fn get_shell_function_names(&self) -> rusqlite::Result<Vec<String>> {
         let mut stmt = self
             .conn
-            .prepare("SELECT name FROM shell_functions")?;
+            .prepare("SELECT name FROM shell_functions ORDER BY name")?;
         let rows = stmt.query_map([], |row| row.get(0))?;
         rows.collect()
     }
@@ -1022,25 +1022,25 @@ impl CompsysCache {
     pub fn get_shell_functions(&self) -> rusqlite::Result<Vec<(String, String)>> {
         let mut stmt = self
             .conn
-            .prepare("SELECT name, source FROM shell_functions")?;
+            .prepare("SELECT name, source FROM shell_functions ORDER BY name")?;
         let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
         rows.collect()
     }
 
-    /// Fast prefix search using FTS5
+    /// Fast prefix search using FTS5 (note: FTS5 doesn't preserve order, needs post-sort)
     pub fn get_shell_functions_prefix_fts(&self, prefix: &str) -> rusqlite::Result<Vec<(String, String)>> {
         if prefix.is_empty() {
             return self.get_shell_functions();
         }
         let pattern = format!("{}*", prefix);
         let mut stmt = self.conn.prepare(
-            "SELECT s.name, s.source FROM fts_shell_functions f, shell_functions s WHERE f.name MATCH ?1 AND s.name = f.name"
+            "SELECT s.name, s.source FROM fts_shell_functions f, shell_functions s WHERE f.name MATCH ?1 AND s.name = f.name ORDER BY s.name"
         )?;
         let rows = stmt.query_map(params![pattern], |row| Ok((row.get(0)?, row.get(1)?)))?;
         rows.collect()
     }
 
-    /// Get shell functions matching prefix (LIKE fallback)
+    /// Get shell functions matching prefix (LIKE with index, ORDER BY free)
     pub fn get_shell_functions_prefix(&self, prefix: &str) -> rusqlite::Result<Vec<(String, String)>> {
         if prefix.is_empty() {
             return self.get_shell_functions();
@@ -1048,7 +1048,7 @@ impl CompsysCache {
         let pattern = format!("{}%", prefix);
         let mut stmt = self
             .conn
-            .prepare("SELECT name, source FROM shell_functions WHERE name LIKE ?1")?;
+            .prepare("SELECT name, source FROM shell_functions WHERE name LIKE ?1 ORDER BY name")?;
         let rows = stmt.query_map(params![pattern], |row| Ok((row.get(0)?, row.get(1)?)))?;
         rows.collect()
     }
@@ -1081,6 +1081,33 @@ impl CompsysCache {
                 |row| row.get(0),
             )
             .optional()
+    }
+
+    // =========================================================================
+    // Zstyle helpers
+    // =========================================================================
+
+    /// Check if zstyles cache is populated
+    pub fn has_zstyles(&self) -> rusqlite::Result<bool> {
+        let count: i64 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM zstyles", [], |row| row.get(0))?;
+        Ok(count > 0)
+    }
+
+    /// Count zstyles
+    pub fn zstyles_count(&self) -> rusqlite::Result<i64> {
+        self.conn
+            .query_row("SELECT COUNT(*) FROM zstyles", [], |row| row.get(0))
+    }
+
+    /// Get all zstyles (for debugging)
+    pub fn get_all_zstyles(&self) -> rusqlite::Result<Vec<(String, String, String)>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT pattern, style, value FROM zstyles ORDER BY pattern, style")?;
+        let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?;
+        rows.collect()
     }
 }
 

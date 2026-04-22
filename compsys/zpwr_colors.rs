@@ -410,3 +410,218 @@ mod tests {
         assert!(colors.tag_colors.len() >= 0);
     }
 }
+
+// =============================================================================
+// Full zstyle parser for cache population
+// =============================================================================
+
+/// Parsed zstyle entry
+#[derive(Debug, Clone)]
+pub struct ParsedZstyle {
+    pub pattern: String,
+    pub style: String,
+    pub values: Vec<String>,
+    pub eval: bool,
+}
+
+/// Parse all zstyles from shell config files
+pub fn parse_zstyles_from_config() -> Vec<ParsedZstyle> {
+    let mut styles = Vec::new();
+    
+    if let Ok(home) = std::env::var("HOME") {
+        // Parse main .zshrc
+        let zshrc = format!("{}/.zshrc", home);
+        if let Ok(content) = std::fs::read_to_string(&zshrc) {
+            styles.extend(parse_zstyles_from_content(&content));
+        }
+        
+        // Parse ZPWR .zshrc
+        let zpwr_zshrc = format!("{}/.zpwr/install/.zshrc", home);
+        if let Ok(content) = std::fs::read_to_string(&zpwr_zshrc) {
+            styles.extend(parse_zstyles_from_content(&content));
+        }
+        
+        // Parse zpwrBindZstyle
+        let zstyle_file = format!("{}/.zpwr/autoload/common/zpwrBindZstyle", home);
+        if let Ok(content) = std::fs::read_to_string(&zstyle_file) {
+            styles.extend(parse_zstyles_from_content(&content));
+        }
+        
+        // Parse zpwrBindMenu (where completer is set)
+        let menu_file = format!("{}/.zpwr/autoload/common/zpwrBindMenu", home);
+        if let Ok(content) = std::fs::read_to_string(&menu_file) {
+            styles.extend(parse_zstyles_from_content(&content));
+        }
+    }
+    
+    styles
+}
+
+/// Parse zstyle commands from shell script content
+pub fn parse_zstyles_from_content(content: &str) -> Vec<ParsedZstyle> {
+    let mut styles = Vec::new();
+    
+    for line in content.lines() {
+        let line = line.trim();
+        
+        // Skip comments and empty lines
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        
+        // Handle: zstyle 'pattern' style value...
+        // Also: builtin zstyle 'pattern' style value...
+        // Also: zstyle -e 'pattern' style 'eval-code'
+        let line = line.strip_prefix("builtin ").unwrap_or(line);
+        
+        if !line.starts_with("zstyle ") {
+            continue;
+        }
+        
+        let rest = &line[7..].trim_start(); // Skip "zstyle "
+        
+        // Check for -e (eval) flag
+        let (eval, rest) = if rest.starts_with("-e ") {
+            (true, rest[3..].trim_start())
+        } else {
+            (false, *rest)
+        };
+        
+        // Extract pattern (first quoted or unquoted string)
+        let (pattern, rest) = extract_zstyle_arg(rest);
+        if pattern.is_none() {
+            continue;
+        }
+        let pattern = pattern.unwrap();
+        
+        // Extract style name
+        let rest = rest.trim_start();
+        let (style, rest) = extract_zstyle_arg(rest);
+        if style.is_none() {
+            continue;
+        }
+        let style = style.unwrap();
+        
+        // Extract values (remaining arguments)
+        let mut values = Vec::new();
+        let mut remaining = rest.trim_start();
+        while !remaining.is_empty() {
+            let (val, r) = extract_zstyle_arg(remaining);
+            if let Some(v) = val {
+                values.push(v);
+                remaining = r.trim_start();
+            } else {
+                break;
+            }
+        }
+        
+        styles.push(ParsedZstyle {
+            pattern,
+            style,
+            values,
+            eval,
+        });
+    }
+    
+    styles
+}
+
+/// Extract a zstyle argument (quoted or unquoted)
+fn extract_zstyle_arg(s: &str) -> (Option<String>, &str) {
+    let s = s.trim_start();
+    if s.is_empty() {
+        return (None, s);
+    }
+    
+    // Single quoted string
+    if s.starts_with('\'') {
+        let mut i = 1;
+        let chars: Vec<char> = s.chars().collect();
+        while i < chars.len() {
+            if chars[i] == '\'' {
+                // Check for escaped quote ''
+                if i + 1 < chars.len() && chars[i + 1] == '\'' {
+                    i += 2;
+                    continue;
+                }
+                let content: String = chars[1..i].iter().collect();
+                // Handle '' escapes in content
+                let content = content.replace("''", "'");
+                return (Some(content), &s[i + 1..]);
+            }
+            i += 1;
+        }
+        return (None, s);
+    }
+    
+    // Double quoted string
+    if s.starts_with('"') {
+        let mut i = 1;
+        let chars: Vec<char> = s.chars().collect();
+        while i < chars.len() {
+            if chars[i] == '"' && (i == 0 || chars[i - 1] != '\\') {
+                let content: String = chars[1..i].iter().collect();
+                return (Some(content), &s[i + 1..]);
+            }
+            i += 1;
+        }
+        return (None, s);
+    }
+    
+    // $'...' ANSI-C quoting
+    if s.starts_with("$'") {
+        if let Some(end) = s[2..].find('\'') {
+            let content = &s[2..end + 2];
+            // Parse ANSI-C escape sequences
+            let content = parse_ansi_c_string(content);
+            return (Some(content), &s[end + 3..]);
+        }
+        return (None, s);
+    }
+    
+    // Unquoted word (until whitespace)
+    let end = s.find(|c: char| c.is_whitespace()).unwrap_or(s.len());
+    if end == 0 {
+        return (None, s);
+    }
+    (Some(s[..end].to_string()), &s[end..])
+}
+
+/// Parse ANSI-C escape sequences in $'...' strings
+fn parse_ansi_c_string(s: &str) -> String {
+    let mut result = String::new();
+    let mut chars = s.chars().peekable();
+    
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.next() {
+                Some('e') => result.push('\x1b'),
+                Some('n') => result.push('\n'),
+                Some('t') => result.push('\t'),
+                Some('r') => result.push('\r'),
+                Some('\\') => result.push('\\'),
+                Some('\'') => result.push('\''),
+                Some('[') => result.push('['),
+                Some('0') => {
+                    // Octal escape \0xxx
+                    let mut octal = String::new();
+                    while octal.len() < 3 && chars.peek().map_or(false, |c| c.is_ascii_digit()) {
+                        octal.push(chars.next().unwrap());
+                    }
+                    if let Ok(n) = u8::from_str_radix(&octal, 8) {
+                        result.push(n as char);
+                    }
+                }
+                Some(other) => {
+                    result.push('\\');
+                    result.push(other);
+                }
+                None => result.push('\\'),
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    
+    result
+}

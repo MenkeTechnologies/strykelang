@@ -103,5 +103,9 @@ pub use shell_runner::{
 };
 pub use system::{users, groups, hosts, pids, ports, net_interfaces, urls, signals};
 pub use zle::{ZleCompletionState, ZleWidgets, ZleAction};
-pub use zpwr_colors::{zpwr_list_colors, load_zpwr_config, ZstyleColors, HeaderColors, DEFAULT_PREFIX_COLOR, MENU_SELECTION_COLOR};
+pub use zpwr_colors::{
+    zpwr_list_colors, load_zpwr_config, ZstyleColors, HeaderColors,
+    DEFAULT_PREFIX_COLOR, MENU_SELECTION_COLOR,
+    parse_zstyles_from_config, parse_zstyles_from_content, ParsedZstyle,
+};
 pub use zstyle::{ZStyle, ZStyleLookup, ZStyleStore};

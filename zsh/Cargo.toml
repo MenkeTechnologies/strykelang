@@ -1,0 +1,15 @@
+[package]
+name = "zsh"
+version = "0.1.0"
+edition = "2021"
+description = "Zsh interpreter and parser in Rust"
+license = "MIT"
+authors = ["MenkeTechnologies"]
+
+[dependencies]
+regex = "1.11"
+glob = "0.3"
+libc = "0.2"
+indexmap = "2"
+parking_lot = "0.12"
+thiserror = "2"

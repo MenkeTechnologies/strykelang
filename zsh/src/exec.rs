@@ -2,7 +2,7 @@
 //!
 //! Executes the parsed shell AST.
 
-use crate::shell_history::HistoryEngine;
+use crate::history::HistoryEngine;
 
 /// Convert float to hex representation (%a/%A format)
 fn float_to_hex(val: f64, uppercase: bool) -> String {
@@ -95,9 +95,9 @@ fn shell_quote(s: &str) -> String {
     // Use single quotes, escaping single quotes as '\''
     format!("'{}'", s.replace('\'', "'\\''"))
 }
-use crate::shell_jobs::{continue_job, wait_for_child, wait_for_job, JobState, JobTable};
-use crate::shell_parse::*;
-use crate::shell_zwc::ZwcFile;
+use crate::jobs::{continue_job, wait_for_child, wait_for_job, JobState, JobTable};
+use crate::shell_ast::*;
+use crate::zwc::ZwcFile;
 use std::collections::HashMap;
 use std::env;
 use std::fs::{self, File, OpenOptions};
@@ -3729,7 +3729,7 @@ impl ShellExecutor {
 
     /// Parse zsh parameter expansion flags from a string like "L", "U", "j:,:"
     fn parse_zsh_flags(&self, s: &str) -> Vec<ZshParamFlag> {
-        use crate::shell_parse::ZshParamFlag;
+        use crate::shell_ast::ZshParamFlag;
         let mut flags = Vec::new();
         let mut chars = s.chars().peekable();
 
@@ -3876,7 +3876,7 @@ impl ShellExecutor {
 
     /// Apply a single zsh parameter expansion flag
     fn apply_zsh_param_flag(&self, val: &str, name: &str, flag: &ZshParamFlag) -> String {
-        use crate::shell_parse::ZshParamFlag;
+        use crate::shell_ast::ZshParamFlag;
         match flag {
             ZshParamFlag::Lower => val.to_lowercase(),
             ZshParamFlag::Upper => val.to_uppercase(),
@@ -5863,7 +5863,7 @@ impl ShellExecutor {
     }
 
     fn builtin_kill(&mut self, args: &[String]) -> i32 {
-        use crate::shell_jobs::send_signal;
+        use crate::jobs::send_signal;
         use nix::sys::signal::Signal;
 
         if args.is_empty() {
@@ -9788,7 +9788,7 @@ impl ShellExecutor {
 
     /// bindkey - key binding management
     fn builtin_bindkey(&mut self, args: &[String]) -> i32 {
-        use crate::shell_zle::{zle, KeymapName};
+        use crate::zle::{zle, KeymapName};
 
         if args.is_empty() {
             // List all bindings in main keymap
@@ -9890,7 +9890,7 @@ impl ShellExecutor {
 
     /// zle - line editor control
     fn builtin_zle(&mut self, args: &[String]) -> i32 {
-        use crate::shell_zle::zle;
+        use crate::zle::zle;
 
         if args.is_empty() {
             return 0;
