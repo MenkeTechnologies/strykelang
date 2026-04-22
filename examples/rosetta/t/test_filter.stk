@@ -22,16 +22,16 @@ my @squares = 1..10 |> map { $_ * $_ } |> filter { $_ > 20 }
 assert_eq join(",", @squares), "25,36,49,64,81,100", "map then filter"
 
 my $is_prime = fn ($n) {
-    if ($n < 2) { 0 }
-    else {
-        my $res = 1
+    if ($n < 2) {
+        0
+    } else {
+        my $prime = 1
         for my $i (2..int(sqrt($n))) {
             if ($n % $i == 0) {
-                $res = 0
-                last
+                $prime = 0
             }
         }
-        $res
+        $prime
     }
 }
 my @primes = filter_by_predicate($is_prime, 1..20)

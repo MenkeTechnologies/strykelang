@@ -4,25 +4,30 @@
 fn mandelbrot_iter($c_real, $c_imag, $max_iter) {
     my $z_real = 0
     my $z_imag = 0
+    my $result = -1
     
-    my $result = $max_iter
     for my $i (0..$max_iter-1) {
-        my $z_real_sq = $z_real * $z_real
-        my $z_imag_sq = $z_imag * $z_imag
-        
-        if ($z_real_sq + $z_imag_sq > 4) {
-            $result = $i
-            last
+        if ($result == -1) {
+            my $z_real_sq = $z_real * $z_real
+            my $z_imag_sq = $z_imag * $z_imag
+            
+            if ($z_real_sq + $z_imag_sq > 4) {
+                $result = $i
+            } else {
+                my $new_real = $z_real_sq - $z_imag_sq + $c_real
+                my $new_imag = 2 * $z_real * $z_imag + $c_imag
+                
+                $z_real = $new_real
+                $z_imag = $new_imag
+            }
         }
-        
-        my $new_real = $z_real_sq - $z_imag_sq + $c_real
-        my $new_imag = 2 * $z_real * $z_imag + $c_imag
-        
-        $z_real = $new_real
-        $z_imag = $new_imag
     }
     
-    $result
+    if ($result == -1) {
+        $max_iter
+    } else {
+        $result
+    }
 }
 
 fn draw_mandelbrot($width, $height, $max_iter) {

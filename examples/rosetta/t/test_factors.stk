@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Factors of an integer
+
+fn get_factors {
+    my $n = $_[0]
+    my @f
+    for my $i (1..$n) {
+        if ($n % $i == 0) { push @f, $i }
+    }
+    [@f]
+}
+
+my $f6 = get_factors(6)
+assert_eq join(",", @$f6), "1,2,3,6", "factors 6"
+
+my $f12 = get_factors(12)
+assert_eq join(",", @$f12), "1,2,3,4,6,12", "factors 12"
+
+my $f13 = get_factors(13)
+assert_eq join(",", @$f13), "1,13", "factors 13 (prime)"
+
+my $f1 = get_factors(1)
+assert_eq join(",", @$f1), "1", "factors 1"
+
+test_run

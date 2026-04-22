@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Root Mean Square
+
+fn root_mean_square {
+    my @nums = @_
+    if (scalar(@nums) == 0) {
+        0
+    } else {
+        ~> @nums map { $_ * $_ } reduce { $a + $b } |> { $_ / scalar(@nums) } |> sqrt
+    }
+}
+
+my @data = (1..10)
+my $rms = root_mean_square(@data)
+assert_ok abs($rms - 6.2048) < 0.001, "RMS of 1..10"
+
+my @data2 = (10, 20, 30)
+my $rms2 = root_mean_square(@data2)
+assert_ok abs($rms2 - 21.602) < 0.001, "RMS of 10,20,30"
+
+test_run

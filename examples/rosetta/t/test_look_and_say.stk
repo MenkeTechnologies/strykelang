@@ -1,0 +1,46 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Look-and-Say Sequence
+
+fn next_look_and_say {
+    my $s = $_[0]
+    if (length($s) == 0) { "" }
+    else {
+        my @chars = ~> $s chars
+        my $res = ""
+        my $curr = $chars[0]
+        my $count = 1
+        
+        for my $i (1..$#chars) {
+            if ($chars[$i] eq $curr) {
+                $count = $count + 1
+            } else {
+                $res = $res . $count . $curr
+                $curr = $chars[$i]
+                $count = 1
+            }
+        }
+        $res . $count . $curr
+    }
+}
+
+fn look_and_say_seq {
+    my $start = $_[0]
+    my $n = $_[1]
+    my @seq = ($start)
+    for my $i (1..$n-1) {
+        my $prev = $seq[-1]
+        my $next = next_look_and_say($prev)
+        push @seq, $next
+    }
+    [@seq]
+}
+
+assert_eq next_look_and_say("1"), "11", "1 -> 11"
+assert_eq next_look_and_say("11"), "21", "11 -> 21"
+assert_eq next_look_and_say("21"), "1211", "21 -> 1211"
+assert_eq next_look_and_say("1211"), "111221", "1211 -> 111221"
+
+my $s = look_and_say_seq("1", 5)
+assert_eq join(",", @$s), "1,11,21,1211,111221", "first 5 terms"
+
+test_run

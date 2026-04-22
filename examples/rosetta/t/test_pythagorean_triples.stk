@@ -1,0 +1,33 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pythagorean Triples
+
+fn my_is_square {
+    my $n = $_[0]
+    my $root = int($n ** 0.5)
+    $root * $root == $n
+}
+
+fn pythagorean_triples {
+    my $max = $_[0]
+    my @triples
+    for my $a (1..$max) {
+        for my $b ($a..$max) {
+            my $c2 = $a*$a + $b*$b
+            if (my_is_square($c2)) {
+                my $c = int($c2 ** 0.5)
+                if ($c <= $max) {
+                    push @triples, "$a,$b,$c"
+                }
+            }
+        }
+    }
+    [@triples]
+}
+
+my $t10 = pythagorean_triples(10)
+assert_eq join(";", @$t10), "3,4,5;6,8,10", "triples up to 10"
+
+my $t20 = pythagorean_triples(20)
+assert_eq join(";", @$t20), "3,4,5;5,12,13;6,8,10;8,15,17;9,12,15;12,16,20", "triples up to 20"
+
+test_run

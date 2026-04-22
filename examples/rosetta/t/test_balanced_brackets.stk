@@ -3,15 +3,21 @@
 
 fn is_balanced($s) {
     my $depth = 0
-    my $balanced = 1
-    for my $c (~> $s >{split //, $_}) {
-        if ($balanced) {
-            $depth++ if $c eq '['
-            $depth-- if $c eq ']'
-            if ($depth < 0) { $balanced = 0 }
+    my $ok = 1
+    for my $c (~> $s chars) {
+        if ($ok) {
+            if ($c eq '[') {
+                $depth++
+            } elsif ($c eq ']') {
+                $depth--
+            }
+            
+            if ($depth < 0) {
+                $ok = 0
+            }
         }
     }
-    if ($balanced) { $depth == 0 } else { 0 }
+    $ok && $depth == 0
 }
 
 assert_ok is_balanced(""), "empty is balanced"

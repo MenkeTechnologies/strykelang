@@ -1,24 +1,26 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Array Concatenation
 
-fn concat_arrays(@a, @b) {
-    (@a, @b)
+fn concat_arrays() {
+    my $a = $_[0]
+    my $b = $_[1]
+    ([@$a, @$b])
 }
 
 my @a = (1, 2, 3)
 my @b = (4, 5, 6)
 my @c = (@a, @b)
-assert_eq join(",", @c), "1,2,3,4,5,6", "concat with comma"
+join(",", @c) |> assert_eq("1,2,3,4,5,6", "concat with comma")
 
 my @d = (7, 8)
 my @all = (@a, @b, @d)
-assert_eq join(",", @all), "1,2,3,4,5,6,7,8", "concat three arrays"
+join(",", @all) |> assert_eq("1,2,3,4,5,6,7,8", "concat three arrays")
 
 my @empty = ()
 my @with_empty = (@a, @empty, @b)
-assert_eq join(",", @with_empty), "1,2,3,4,5,6", "concat with empty"
+join(",", @with_empty) |> assert_eq("1,2,3,4,5,6", "concat with empty")
 
 push @a, @b
-assert_eq join(",", @a), "1,2,3,4,5,6", "push array onto array"
+join(",", @a) |> assert_eq("1,2,3,4,5,6", "push array onto array")
 
 test_run

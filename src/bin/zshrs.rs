@@ -223,6 +223,10 @@ fn run_interactive() {
                 println!();
                 continue;
             }
+            Ok(_) => {
+                // Handle any other signals
+                continue;
+            }
             Err(err) => {
                 eprintln!("Error: {err}");
                 break;
@@ -303,6 +307,8 @@ impl Completer for ZshrsCompleter {
                     extra: Some(vec![c.kind.as_str().to_string()]),
                     span: Span::new(word_start, pos),
                     append_whitespace: true,
+                    display_override: None,
+                    match_indices: None,
                 })
                 .collect(),
             Err(_) => vec![],

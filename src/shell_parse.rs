@@ -8,6 +8,8 @@ use std::str::Chars;
 #[derive(Debug, Clone, PartialEq)]
 pub enum ShellToken {
     Word(String),
+    SingleQuotedWord(String),
+    DoubleQuotedWord(String),
     Number(i64),
 
     // Operators
@@ -109,6 +111,45 @@ pub enum VarModifier {
     ReplaceAll(ShellWord, ShellWord), // ${var//pat/repl}
     Upper,                            // ${var^} or ${var^^}
     Lower,                            // ${var,} or ${var,,}
+    // Zsh-style parameter expansion flags
+    ZshFlags(Vec<ZshParamFlag>), // ${(flags)var}
+}
+
+/// Zsh parameter expansion flags
+#[derive(Debug, Clone)]
+pub enum ZshParamFlag {
+    Lower,                 // L - lowercase
+    Upper,                 // U - uppercase
+    Capitalize,            // C - capitalize words
+    Join(String),          // j:sep: - join array with separator
+    JoinNewline,           // F - join with newlines
+    Split(String),         // s:sep: - split string into array
+    SplitLines,            // f - split on newlines
+    SplitWords,            // z - split into words (shell parsing)
+    Type,                  // t - type of variable
+    Words,                 // w - word splitting
+    Quote,                 // q - quote result
+    DoubleQuote,           // qq - double quote
+    QuoteBackslash,        // b - quote with backslashes for patterns
+    Unique,                // u - unique elements only
+    Reverse,               // O - reverse sort
+    Sort,                  // o - sort
+    NumericSort,           // n - numeric sort
+    IndexSort,             // a - sort in array index order
+    Keys,                  // k - associative array keys
+    Values,                // v - associative array values
+    Length,                // # - length (character codes)
+    CountChars,            // c - count total characters
+    Expand,                // e - perform shell expansions
+    PromptExpand,          // % - expand prompt escapes
+    PromptExpandFull,      // %% - full prompt expansion
+    Visible,               // V - make non-printable chars visible
+    Directory,             // D - substitute directory names
+    Head(usize),           // [1,n] - first n elements
+    Tail(usize),           // [-n,-1] - last n elements
+    PadLeft(usize, char),  // l:len:fill: - pad left
+    PadRight(usize, char), // r:len:fill: - pad right
+    Width(usize),          // m - use width for padding
 }
 
 #[derive(Debug, Clone)]
@@ -142,9 +183,10 @@ pub struct Redirect {
     pub op: RedirectOp,
     pub target: ShellWord,
     pub heredoc_content: Option<String>,
+    pub fd_var: Option<String>, // For {varname}>file syntax
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RedirectOp {
     Write,      // >
     Append,     // >>
@@ -674,15 +716,10 @@ impl<'a> ShellLexer<'a> {
 
                 // These could be word terminators, but check for extglob patterns first
                 '|' | '(' | ')' => {
-                    // If we have an extglob prefix right before (, consume the whole pattern
                     if c == '(' && !word.is_empty() {
                         let last_char = word.chars().last().unwrap();
-                        if last_char == '?'
-                            || last_char == '*'
-                            || last_char == '+'
-                            || last_char == '@'
-                            || last_char == '!'
-                        {
+                        // Check for extglob pattern
+                        if matches!(last_char, '?' | '*' | '+' | '@' | '!') {
                             // This is an extglob pattern, consume until matching )
                             word.push(self.next_char().unwrap()); // (
                             let mut depth = 1;
@@ -694,6 +731,63 @@ impl<'a> ShellLexer<'a> {
                                     depth -= 1;
                                     if depth == 0 {
                                         break;
+                                    }
+                                }
+                            }
+                            continue;
+                        }
+                        // Check for array assignment: var=(...)
+                        if last_char == '=' {
+                            // Array literal - consume until matching )
+                            word.push(self.next_char().unwrap()); // (
+                            let mut depth = 1;
+                            let mut in_sq = false;
+                            let mut in_dq = false;
+                            while let Some(ch) = self.peek() {
+                                if in_sq {
+                                    if ch == '\'' {
+                                        in_sq = false;
+                                    }
+                                    word.push(self.next_char().unwrap());
+                                } else if in_dq {
+                                    if ch == '"' {
+                                        in_dq = false;
+                                    } else if ch == '\\' {
+                                        word.push(self.next_char().unwrap());
+                                        if self.peek().is_some() {
+                                            word.push(self.next_char().unwrap());
+                                        }
+                                        continue;
+                                    }
+                                    word.push(self.next_char().unwrap());
+                                } else {
+                                    match ch {
+                                        '\'' => {
+                                            in_sq = true;
+                                            word.push(self.next_char().unwrap());
+                                        }
+                                        '"' => {
+                                            in_dq = true;
+                                            word.push(self.next_char().unwrap());
+                                        }
+                                        '(' => {
+                                            depth += 1;
+                                            word.push(self.next_char().unwrap());
+                                        }
+                                        ')' => {
+                                            depth -= 1;
+                                            word.push(self.next_char().unwrap());
+                                            if depth == 0 {
+                                                break;
+                                            }
+                                        }
+                                        '\\' => {
+                                            word.push(self.next_char().unwrap());
+                                            if self.peek().is_some() {
+                                                word.push(self.next_char().unwrap());
+                                            }
+                                        }
+                                        _ => word.push(self.next_char().unwrap()),
                                     }
                                 }
                             }
@@ -791,7 +885,7 @@ impl<'a> ShellLexer<'a> {
                     }
                 }
 
-                // Quotes
+                // Single quotes - content is literal, no expansion
                 '\'' => {
                     self.next_char();
                     while let Some(ch) = self.peek() {
@@ -799,7 +893,14 @@ impl<'a> ShellLexer<'a> {
                             self.next_char();
                             break;
                         }
-                        word.push(self.next_char().unwrap());
+                        let c = self.next_char().unwrap();
+                        // Escape special chars that would otherwise be expanded
+                        // Use \x00 prefix to mark chars that should be literal
+                        // Include parens to prevent subshell/array interpretation
+                        if matches!(c, '`' | '$' | '(' | ')') {
+                            word.push('\x00');
+                        }
+                        word.push(c);
                     }
                 }
                 '"' => {
@@ -811,8 +912,21 @@ impl<'a> ShellLexer<'a> {
                         }
                         if ch == '\\' {
                             self.next_char(); // consume backslash
-                            if let Some(escaped) = self.next_char() {
-                                word.push(escaped);
+                            if let Some(escaped) = self.peek() {
+                                // In double quotes, only these chars are special after backslash:
+                                // $, `, ", \, and newline
+                                match escaped {
+                                    '$' | '`' | '"' | '\\' | '\n' => {
+                                        word.push(self.next_char().unwrap());
+                                    }
+                                    _ => {
+                                        // Keep the backslash for other chars
+                                        word.push('\\');
+                                        word.push(self.next_char().unwrap());
+                                    }
+                                }
+                            } else {
+                                word.push('\\');
                             }
                         } else {
                             word.push(self.next_char().unwrap());
@@ -869,6 +983,81 @@ impl<'a> ShellParser<'a> {
         let mut lexer = ShellLexer::new(input);
         let current = lexer.next_token();
         Self { lexer, current }
+    }
+
+    /// Parse array elements, properly handling quotes
+    fn parse_array_elements(content: &str) -> Vec<ShellWord> {
+        let mut elements = Vec::new();
+        let mut current = String::new();
+        let mut chars = content.chars().peekable();
+        let mut in_single_quote = false;
+        let mut in_double_quote = false;
+
+        while let Some(c) = chars.next() {
+            if in_single_quote {
+                if c == '\'' {
+                    in_single_quote = false;
+                    // Single-quoted string - mark special chars with \x00
+                    let marked: String = current
+                        .chars()
+                        .flat_map(|ch| {
+                            if matches!(ch, '`' | '$' | '(' | ')') {
+                                vec!['\x00', ch]
+                            } else {
+                                vec![ch]
+                            }
+                        })
+                        .collect();
+                    elements.push(ShellWord::Literal(marked));
+                    current.clear();
+                } else {
+                    current.push(c);
+                }
+            } else if in_double_quote {
+                if c == '"' {
+                    in_double_quote = false;
+                    elements.push(ShellWord::Literal(current.clone()));
+                    current.clear();
+                } else if c == '\\' {
+                    if let Some(&next) = chars.peek() {
+                        if matches!(next, '$' | '`' | '"' | '\\') {
+                            chars.next();
+                            current.push(next);
+                        } else {
+                            current.push(c);
+                        }
+                    } else {
+                        current.push(c);
+                    }
+                } else {
+                    current.push(c);
+                }
+            } else {
+                match c {
+                    '\'' => in_single_quote = true,
+                    '"' => in_double_quote = true,
+                    ' ' | '\t' | '\n' => {
+                        if !current.is_empty() {
+                            elements.push(ShellWord::Literal(current.clone()));
+                            current.clear();
+                        }
+                    }
+                    '\\' => {
+                        if let Some(next) = chars.next() {
+                            current.push(next);
+                        }
+                    }
+                    _ => current.push(c),
+                }
+            }
+        }
+
+        // Push any remaining content
+        if !current.is_empty() {
+            elements.push(ShellWord::Literal(current));
+        }
+
+        elements
     }
 
     fn advance(&mut self) -> ShellToken {
@@ -1043,10 +1232,7 @@ impl<'a> ShellParser<'a> {
                                 // Check for array assignment: arr=(...)
                                 if val.starts_with('(') && val.ends_with(')') {
                                     let array_content = &val[1..val.len() - 1];
-                                    let elements: Vec<ShellWord> = array_content
-                                        .split_whitespace()
-                                        .map(|s| ShellWord::Literal(s.to_string()))
-                                        .collect();
+                                    let elements = Self::parse_array_elements(array_content);
                                     cmd.assignments
                                         .push((var, ShellWord::ArrayLiteral(elements)));
                                 } else {
@@ -1059,6 +1245,32 @@ impl<'a> ShellParser<'a> {
                     }
 
                     cmd.words.push(self.parse_word()?);
+                }
+
+                // Keywords can be used as words in argument position (not command position)
+                ShellToken::If
+                | ShellToken::Then
+                | ShellToken::Else
+                | ShellToken::Elif
+                | ShellToken::Fi
+                | ShellToken::Case
+                | ShellToken::Esac
+                | ShellToken::For
+                | ShellToken::While
+                | ShellToken::Until
+                | ShellToken::Do
+                | ShellToken::Done
+                | ShellToken::In
+                | ShellToken::Function
+                | ShellToken::Select
+                | ShellToken::Time
+                | ShellToken::Coproc => {
+                    // Only allow keywords as arguments (not as command name)
+                    if !cmd.words.is_empty() {
+                        cmd.words.push(self.parse_word()?);
+                    } else {
+                        break;
+                    }
                 }
 
                 // Redirections
@@ -1097,10 +1309,28 @@ impl<'a> ShellParser<'a> {
     }
 
     fn parse_word(&mut self) -> Result<ShellWord, String> {
-        if let ShellToken::Word(w) = self.advance() {
-            Ok(ShellWord::Literal(w))
-        } else {
-            Err("Expected word".to_string())
+        let token = self.advance();
+        match token {
+            ShellToken::Word(w) => Ok(ShellWord::Literal(w)),
+            // Keywords can be used as words in argument position
+            ShellToken::If => Ok(ShellWord::Literal("if".to_string())),
+            ShellToken::Then => Ok(ShellWord::Literal("then".to_string())),
+            ShellToken::Else => Ok(ShellWord::Literal("else".to_string())),
+            ShellToken::Elif => Ok(ShellWord::Literal("elif".to_string())),
+            ShellToken::Fi => Ok(ShellWord::Literal("fi".to_string())),
+            ShellToken::Case => Ok(ShellWord::Literal("case".to_string())),
+            ShellToken::Esac => Ok(ShellWord::Literal("esac".to_string())),
+            ShellToken::For => Ok(ShellWord::Literal("for".to_string())),
+            ShellToken::While => Ok(ShellWord::Literal("while".to_string())),
+            ShellToken::Until => Ok(ShellWord::Literal("until".to_string())),
+            ShellToken::Do => Ok(ShellWord::Literal("do".to_string())),
+            ShellToken::Done => Ok(ShellWord::Literal("done".to_string())),
+            ShellToken::In => Ok(ShellWord::Literal("in".to_string())),
+            ShellToken::Function => Ok(ShellWord::Literal("function".to_string())),
+            ShellToken::Select => Ok(ShellWord::Literal("select".to_string())),
+            ShellToken::Time => Ok(ShellWord::Literal("time".to_string())),
+            ShellToken::Coproc => Ok(ShellWord::Literal("coproc".to_string())),
+            _ => Err("Expected word".to_string()),
         }
     }
 
@@ -1115,7 +1345,18 @@ impl<'a> ShellParser<'a> {
                 op: RedirectOp::HereDoc,
                 target: ShellWord::Literal(delimiter),
                 heredoc_content: Some(content),
+                fd_var: None,
             });
+        }
+
+        // Check for {varname}>file syntax
+        let mut fd_var = None;
+        if let ShellToken::Word(w) = &self.current {
+            if w.starts_with('{') && w.ends_with('}') && w.len() > 2 {
+                let varname = w[1..w.len() - 1].to_string();
+                fd_var = Some(varname);
+                self.advance();
+            }
         }
 
         let op = match self.advance() {
@@ -1140,6 +1381,7 @@ impl<'a> ShellParser<'a> {
             op,
             target,
             heredoc_content: None,
+            fd_var,
         })
     }
 
@@ -1792,5 +2034,17 @@ mod tests {
         } else {
             panic!("Expected function def");
         }
+    }
+}
+
+#[test]
+fn test_echo_keyword_args() {
+    let mut parser = ShellParser::new("echo done");
+    let cmds = parser.parse_script().unwrap();
+    assert_eq!(cmds.len(), 1);
+    if let ShellCommand::Simple(cmd) = &cmds[0] {
+        assert_eq!(cmd.words.len(), 2);
+    } else {
+        panic!("Expected simple command");
     }
 }

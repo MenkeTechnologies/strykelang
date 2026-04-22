@@ -1,18 +1,11 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Atbash Cipher
 
-fn my_atbash {
-    my $s = $_[0]
+fn my_atbash($s) {
     ~> $s >{split //, $_} map {
-        if ($_ =~ /[A-Z]/) {
-            chr(90 - (ord($_) - 65))
-        } else {
-            if ($_ =~ /[a-z]/) {
-                chr(122 - (ord($_) - 97))
-            } else {
-                $_
-            }
-        }
+        $_ =~ /[A-Z]/ ? chr(90 - (ord($_) - 65))
+      : $_ =~ /[a-z]/ ? chr(122 - (ord($_) - 97))
+      : $_
     } |> join ""
 }
 

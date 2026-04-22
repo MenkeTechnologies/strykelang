@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Array Intersection
+
+fn intersection {
+    my $aref = $_[0]
+    my $bref = $_[1]
+    my %seen
+    for my $x (@$bref) { $seen{$x} = 1 }
+    my @res
+    for my $x (@$aref) {
+        if ($seen{$x}) { push @res, $x }
+    }
+    [@res]
+}
+
+my @a = (1, 2, 3, 4)
+my @b = (3, 4, 5, 6)
+my $res = intersection(\@a, \@b)
+assert_eq join(",", sort(@$res)), "3,4", "intersection 1"
+
+my @c = ("apple", "banana", "cherry")
+my @d = ("banana", "date")
+my $res2 = intersection(\@c, \@d)
+assert_eq join(",", @$res2), "banana", "intersection with strings"
+
+test_run

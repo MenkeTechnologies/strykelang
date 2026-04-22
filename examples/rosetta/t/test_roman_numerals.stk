@@ -4,8 +4,7 @@
 my @_roman_vals = (1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1)
 my @_roman_syms = qw(M CM D CD C XC L XL X IX V IV I)
 
-fn to_roman {
-    my $n = $_[0]
+fn to_roman($n) {
     my $result = ""
     for my $i (0..$#_roman_vals) {
         while ($n >= $_roman_vals[$i]) {
@@ -16,24 +15,14 @@ fn to_roman {
     $result
 }
 
-fn from_roman {
-    my $r = $_[0]
+fn from_roman($r) {
     my %val = (I => 1, V => 5, X => 10, L => 50, C => 100, D => 500, M => 1000)
-    my @chars = split //, $r
+    my @chars = $r |> split //
     my $total = 0
     for my $i (0..$#chars) {
         my $v = $val{$chars[$i]}
-        my $next = 0
-        if ($i < $#chars) {
-            $next = $val{$chars[$i + 1]}
-        }
-        
-        if ($v < $next) {
-            $total -= $v
-        }
-        else {
-            $total += $v
-        }
+        my $next = $i < $#chars ? $val{$chars[$i + 1]} : 0
+        $total += $v < $next ? -$v : $v
     }
     $total
 }

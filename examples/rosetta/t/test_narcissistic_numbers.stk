@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Narcissistic Numbers
+
+fn my_is_narcissistic {
+    my $n = $_[0]
+    my $s = "$n"
+    my $len = length($s)
+    my $sum = 0
+    my @digits = split //, $s
+    for my $d (@digits) {
+        $sum += $d ** $len
+    }
+    $sum == $n
+}
+
+fn list_narcissistic {
+    my $count = $_[0]
+    my @found
+    my $i = 0
+    while (scalar(@found) < $count) {
+        if (my_is_narcissistic($i)) { push @found, $i }
+        $i += 1
+    }
+    [@found]
+}
+
+assert_ok my_is_narcissistic(153), "153 is narcissistic (1^3 + 5^3 + 3^3 = 1 + 125 + 27 = 153)"
+assert_ok my_is_narcissistic(370), "370 is narcissistic"
+assert_ok my_is_narcissistic(9474), "9474 is narcissistic (9^4 + 4^4 + 7^4 + 4^4)"
+assert_ok !my_is_narcissistic(154), "154 is not narcissistic"
+
+my $first_10 = list_narcissistic(10)
+assert_eq scalar(@$first_10), 10, "found 10 single digits"
+assert_eq join(",", @$first_10), "0,1,2,3,4,5,6,7,8,9", "first 10"
+
+test_run

@@ -8,7 +8,9 @@ fn my_abs {
 
 fn my_sign {
     my $n = $_[0]
-    if ($n > 0) { 1 } elsif ($n < 0) { -1 } else { 0 }
+    if ($n > 0) { 1 }
+    elsif ($n < 0) { -1 }
+    else { 0 }
 }
 
 assert_eq abs(5), 5, "abs(5)"

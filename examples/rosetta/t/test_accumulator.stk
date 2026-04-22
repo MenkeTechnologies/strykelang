@@ -1,9 +1,10 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Accumulator Factory
 
-fn make_accumulator($initial) {
-    my $sum = $initial
-    fn ($n) {
+fn make_accumulator {
+    my $sum = $_[0]
+    fn {
+        my $n = $_[0]
         $sum += $n
         $sum
     }

@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Count the coins
+
+my @coins = (1, 5, 10, 25, 50, 100)
+my %memo
+
+fn count_change {
+    my $amount = $_[0]
+    my $coin_idx = $_[1]
+    
+    if ($amount == 0) {
+        1
+    } elsif ($amount < 0 || $coin_idx < 0) {
+        0
+    } else {
+        my $key = "$amount,$coin_idx"
+        if (%memo{$key}) {
+            %memo{$key}
+        } else {
+            my $res = count_change($amount, $coin_idx - 1) + count_change($amount - $coins[$coin_idx], $coin_idx)
+            %memo{$key} = $res
+            $res
+        }
+    }
+}
+
+assert_eq count_change(100, 5), 293, "ways to make 100"
+
+test_run

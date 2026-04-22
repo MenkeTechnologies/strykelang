@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Standard Deviation
+
+fn my_mean {
+    my @nums = @_
+    my $sum = @nums |> reduce { $a + $b }
+    $sum / scalar(@nums)
+}
+
+fn my_stddev {
+    my @nums = @_
+    my $m = my_mean(@nums)
+    my $sum_sq_diff = @nums |> map { ($_ - $m) ** 2 } |> reduce { $a + $b }
+    ($sum_sq_diff / scalar(@nums)) ** 0.5
+}
+
+my @data = (2, 4, 4, 4, 5, 5, 7, 9)
+assert_eq my_mean(@data), 5, "mean of data"
+assert_eq my_stddev(@data), 2, "stddev of data"
+
+my @data2 = (1, 2, 3)
+my $sd2 = my_stddev(@data2)
+assert_ok abs($sd2 - 0.81649) < 0.0001, "stddev of 1,2,3"
+
+test_run

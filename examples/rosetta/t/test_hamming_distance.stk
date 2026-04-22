@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Hamming Distance
+
+fn my_hamming_distance {
+    my $s1 = $_[0]
+    my $s2 = $_[1]
+    my @c1 = ~> $s1 chars
+    my @c2 = ~> $s2 chars
+    
+    0..scalar(@c1)-1 |> grep {
+        my $i = $_
+        $c1[$i] ne $c2[$i]
+    } |> scalar
+}
+
+assert_eq my_hamming_distance("karolin", "kathrin"), 3, "karolin vs kathrin"
+assert_eq my_hamming_distance("karolin", "kerstin"), 3, "karolin vs kerstin"
+assert_eq my_hamming_distance("1011101", "1001001"), 2, "binary distance"
+assert_eq my_hamming_distance("abc", "abc"), 0, "equal strings"
+
+test_run

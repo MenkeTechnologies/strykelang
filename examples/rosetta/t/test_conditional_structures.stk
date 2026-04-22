@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Conditional Structures
 
-fn conditional_examples {
+fn conditional_examples() {
     "Conditional Structure Examples:" |> p
     
     my $x = 42
@@ -33,10 +33,9 @@ fn conditional_examples {
         "   x is 50 or greater" |> p
     }
     
-    # Ternary-like using if-else as block
-    "4. Ternary-like with if-else:" |> p
-    my $result = ""
-    if ($x > $y) { $result = "x is larger" } else { $result = "y is larger or equal" }
+    # Ternary operator
+    "4. Ternary operator:" |> p
+    my $result = $x > $y ? "x is larger" : "y is larger or equal"
     "   $result" |> p
     
     # Logical operators
@@ -55,7 +54,7 @@ fn conditional_examples {
         "   x is not negative" |> p
     }
     
-    # Switch-like structure
+    # Switch-like structure using given/when (if supported)
     "7. Switch-like with if-elsif:" |> p
     my $grade = "B"
     if ($grade eq "A") {
@@ -75,4 +74,3 @@ fn conditional_examples {
 }
 
 conditional_examples
-test_run

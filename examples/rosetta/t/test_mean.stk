@@ -2,21 +2,26 @@
 # Rosetta Code: Arithmetic Mean
 
 fn my_arithmetic_mean(@nums) {
-    if (!@nums) { 0 }
-    else { (@nums |> reduce { $a + $b }) / scalar(@nums) }
+    if (!@nums) {
+        0
+    } else {
+        (@nums |> reduce { $a + $b }) / scalar(@nums)
+    }
 }
 
 fn my_geometric_mean(@nums) {
-    if (!@nums) { 0 }
-    else {
+    if (!@nums) {
+        0
+    } else {
         my $product = @nums |> reduce { $a * $b }
         $product ** (1 / scalar(@nums))
     }
 }
 
 fn my_harmonic_mean(@nums) {
-    if (!@nums) { 0 }
-    else {
+    if (!@nums) {
+        0
+    } else {
         my $sum = @nums |> map { 1 / $_ } |> reduce { $a + $b }
         scalar(@nums) / $sum
     }

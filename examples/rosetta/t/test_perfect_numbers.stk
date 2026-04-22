@@ -14,8 +14,9 @@ fn sum_array(@arr) {
 }
 
 fn my_is_perfect($n) {
-    if ($n < 2) { 0 }
-    else {
+    if ($n < 2) {
+        0
+    } else {
         my @divs = my_divisors($n)
         my $sum = sum_array(@divs)
         $sum == $n

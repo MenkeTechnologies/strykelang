@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Heronian triangles
+
+fn my_gcd {
+    my $a = $_[0]
+    my $b = $_[1]
+    while ($b) {
+        ($a, $b) = ($b, $a % $b)
+    }
+    $a
+}
+
+fn heronian_triangles {
+    my $max_p = $_[0]
+    my @triangles
+    
+    for my $c (1..$max_p) {
+        for my $b (1..$c) {
+            for my $a (1..$b) {
+                if ($a + $b > $c) {
+                    my $s = ($a + $b + $c) / 2
+                    my $area_sq = $s * ($s - $a) * ($s - $b) * ($s - $c)
+                    if ($area_sq > 0) {
+                        my $area = sqrt($area_sq)
+                        if ($area == int($area)) {
+                            if (my_gcd($a, my_gcd($b, $c)) == 1) {
+                                push @triangles, "[$a,$b,$c]"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    ([@triangles])
+}
+
+# Just a small check as this is computationally intensive
+my $res = heronian_triangles(25)
+assert_ok scalar(@$res) > 0, "found at least one Heronian triangle"
+
+test_run

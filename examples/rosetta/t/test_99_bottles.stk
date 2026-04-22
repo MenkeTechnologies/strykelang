@@ -1,32 +1,38 @@
 #!/usr/bin/env stryke
 # Rosetta Code: 99 Bottles of Beer
 
-fn bottle_str {
+fn bottles {
     my $n = $_[0]
-    if ($n == 0) { "no more bottles" }
-    elsif ($n == 1) { "1 bottle" }
-    else { "$n bottles" }
+    $n == 0 ? "no more bottles"
+  : $n == 1 ? "1 bottle"
+  : "$n bottles"
 }
 
-fn beer {
+fn verse {
     my $n = $_[0]
-    my $s = bottle_str($n)
-    my $take = "one"
-    if ($n == 1) { $take = "it" }
-    
-    my $res = "$s of beer on the wall, $s of beer.\n"
-    if ($n > 0) {
-        my $next = bottle_str($n - 1)
-        $res .= "Take $take down and pass it around, $next of beer on the wall.\n"
-    } else {
-        $res .= "Go to the store and buy some more, 99 bottles of beer on the wall.\n"
-    }
-    $res
+    my $b = bottles($n)
+    my $b1 = bottles($n - 1)
+    my $take = $n == 1 ? "it" : "one"
+    "$b of beer on the wall, $b of beer.\n" .
+    "Take $take down and pass it around, $b1 of beer on the wall."
 }
 
-# Just test a few cases
-assert_ok beer(99) =~ /^99 bottles/, "99 bottles"
-assert_ok beer(1) =~ /1 bottle/, "1 bottle"
-assert_ok beer(0) =~ /no more bottles/, "0 bottles"
+fn song {
+    my $from = $_[0]
+    my $to = $_[1]
+    ~> $from..$to map { verse($_) } join("\n\n")
+}
+
+assert_eq bottles(99), "99 bottles", "bottles(99)"
+assert_eq bottles(1), "1 bottle", "bottles(1)"
+assert_eq bottles(0), "no more bottles", "bottles(0)"
+
+my $v99 = verse(99)
+assert_ok $v99 =~ /99 bottles/, "verse 99 contains 99 bottles"
+assert_ok $v99 =~ /98 bottles/, "verse 99 mentions 98"
+
+my $v1 = verse(1)
+assert_ok $v1 =~ /1 bottle of beer/, "verse 1 is singular"
+assert_ok $v1 =~ /Take it down/, "verse 1 uses 'it'"
 
 test_run

@@ -3,24 +3,20 @@
 
 fn my_find_first($needle, @haystack) {
     my $found = -1
-    my $i = 0
-    while ($found == -1 && $i <= $#haystack) {
-        if ($haystack[$i] eq $needle) {
+    for my $i (0..$#haystack) {
+        if ($found == -1 && $haystack[$i] eq $needle) {
             $found = $i
         }
-        $i++
     }
     $found
 }
 
 fn my_find_last($needle, @haystack) {
     my $found = -1
-    my $i = $#haystack
-    while ($found == -1 && $i >= 0) {
+    for my $i (0..$#haystack) {
         if ($haystack[$i] eq $needle) {
             $found = $i
         }
-        $i--
     }
     $found
 }

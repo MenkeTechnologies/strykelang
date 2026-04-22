@@ -1,0 +1,37 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Amicable Pairs
+
+fn sum_proper_divisors {
+    my $n = $_[0]
+    if ($n < 2) {
+        0
+    } else {
+        my @divs = 1..int($n / 2) |> filter { $n % $_ == 0 }
+        if (scalar(@divs) == 0) {
+            0
+        } else {
+            @divs |> reduce { $a + $b }
+        }
+    }
+}
+
+fn are_amicable {
+    my $a = $_[0]
+    my $b = $_[1]
+    if ($a == $b) {
+        0
+    } else {
+        if (sum_proper_divisors($a) == $b && sum_proper_divisors($b) == $a) {
+            1
+        } else {
+            0
+        }
+    }
+}
+
+assert_ok are_amicable(220, 284), "220 and 284 are amicable"
+assert_ok are_amicable(1184, 1210), "1184 and 1210 are amicable"
+assert_ok !are_amicable(220, 220), "same numbers are not amicable"
+assert_ok !are_amicable(100, 200), "100 and 200 are not amicable"
+
+test_run

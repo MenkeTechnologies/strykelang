@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Unique Elements
+
+fn unique_elements {
+    my $list = $_[0]
+    my $seen = {}
+    my @res = ~> @$list grep {
+        if ($seen->{$_}) {
+            0
+        } else {
+            $seen->{$_} = 1
+            1
+        }
+    }
+    ([@res])
+}
+
+my $data = [1, 2, 3, 2, 1, 4]
+my $uniq = unique_elements($data)
+assert_eq join(",", @$uniq), "1,2,3,4", "unique of [1,2,3,2,1,4]"
+
+my $data2 = ["a", "b", "a", "c"]
+my $uniq2 = unique_elements($data2)
+assert_eq join(",", @$uniq2), "a,b,c", "unique of strings"
+
+test_run
