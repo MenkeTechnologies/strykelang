@@ -725,9 +725,23 @@ pub fn extensions(state: &mut CompletionState, extensions: &[&str]) -> bool {
             };
 
             let mut comp = Completion::new(&full);
-            if entry.path().is_dir() {
+            let is_dir = entry.path().is_dir();
+            if is_dir {
+                comp.modec = '/';
                 comp.suf = Some("/".to_string());
                 comp.flags |= CompletionFlags::NOSPACE;
+            } else if entry.path().is_symlink() {
+                comp.modec = '@';
+            } else {
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    if let Ok(meta) = entry.metadata() {
+                        if meta.permissions().mode() & 0o111 != 0 {
+                            comp.modec = '*';
+                        }
+                    }
+                }
             }
             state.add_match(comp, Some("files"));
             matched = true;

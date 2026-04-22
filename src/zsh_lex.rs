@@ -146,6 +146,8 @@ pub struct ZshLexer<'a> {
     pub isnewlin: i32,
     /// Error message if any
     pub error: Option<String>,
+    /// Global iteration counter for infinite loop detection
+    global_iterations: usize,
 }
 
 impl<'a> ZshLexer<'a> {
@@ -179,11 +181,30 @@ impl<'a> ZshLexer<'a> {
             lexbuf: LexBuf::new(),
             isnewlin: 0,
             error: None,
+            global_iterations: 0,
+        }
+    }
+    
+    /// Check and increment global iteration counter; returns true if limit exceeded
+    #[inline]
+    fn check_iterations(&mut self) -> bool {
+        self.global_iterations += 1;
+        if self.global_iterations > 50_000 {
+            self.error = Some("lexer exceeded 50K iterations".to_string());
+            self.lexstop = true;
+            self.tok = LexTok::Lexerr;
+            true
+        } else {
+            false
         }
     }
 
     /// Get next character from input
     fn hgetc(&mut self) -> Option<char> {
+        if self.check_iterations() {
+            return None;
+        }
+        
         if let Some(c) = self.unget_buf.pop_front() {
             return Some(c);
         }
@@ -250,6 +271,9 @@ impl<'a> ZshLexer<'a> {
         if self.tok == LexTok::Lexerr {
             return;
         }
+        
+        // Reset iteration counter for this token
+        self.global_iterations = 0;
 
         loop {
             if self.inrepeat > 0 {
@@ -387,7 +411,13 @@ impl<'a> ZshLexer<'a> {
         self.tokfd = -1;
 
         // Skip whitespace
+        let mut ws_iterations = 0;
         loop {
+            ws_iterations += 1;
+            if ws_iterations > 100_000 {
+                self.error = Some("gettok: infinite loop in whitespace skip".to_string());
+                return LexTok::Lexerr;
+            }
             let c = match self.hgetc() {
                 Some(c) => c,
                 None => {
@@ -801,12 +831,20 @@ impl<'a> ZshLexer<'a> {
         let mut intpos = 1;
         let mut unmatched = '\0';
         let mut c = c;
+        const MAX_ITERATIONS: usize = 100_000;
+        let mut iterations = 0;
 
         if !sub {
             self.lexbuf.clear();
         }
 
         loop {
+            iterations += 1;
+            if iterations > MAX_ITERATIONS {
+                self.error = Some("gettokstr exceeded maximum iterations".to_string());
+                return LexTok::Lexerr;
+            }
+
             let inbl = Self::is_inblank(c);
 
             if inbl && in_brace_param == 0 && pct == 0 {
@@ -917,7 +955,7 @@ impl<'a> ZshLexer<'a> {
                 }
 
                 '{' => {
-                    if in_brace_param > 0 {
+                    if in_brace_param > 0 || bct > 0 {
                         bct += 1;
                     }
                     self.add(c);
@@ -1011,8 +1049,9 @@ impl<'a> ZshLexer<'a> {
                             if self.is_valid_assignment_target(&tok_so_far) {
                                 let next = self.hgetc();
                                 if next == Some('(') {
-                                    // VAR=(...) array assignment
-                                    self.tokstr = Some(tok_so_far);
+                                    // VAR=(...) array assignment - include '=' in tokstr
+                                    self.add(char_tokens::EQUALS);
+                                    self.tokstr = Some(self.lexbuf.as_str().to_string());
                                     return LexTok::Envarray;
                                 }
                                 if let Some(next) = next {
@@ -1249,8 +1288,15 @@ impl<'a> ZshLexer<'a> {
         let mut bct = 0; // brace count (for ${...})
         let mut intick = false; // inside backtick
         let is_math = endchar == ')' || endchar == ']' || self.infor > 0;
+        const MAX_ITERATIONS: usize = 100_000;
+        let mut iterations = 0;
 
         loop {
+            iterations += 1;
+            if iterations > MAX_ITERATIONS {
+                self.error = Some("dquote_parse exceeded maximum iterations".to_string());
+                return Err(());
+            }
             let c = self.hgetc();
             let c = match c {
                 Some(c) if c == endchar && !intick && bct == 0 => {
@@ -1466,61 +1512,73 @@ impl<'a> ZshLexer<'a> {
 
     /// Parse $(...) or $((...))
     fn cmd_or_math_sub(&mut self) -> CmdOrMath {
-        let c = self.hgetc();
-        if c == Some('\\') {
+        const MAX_CONTINUATIONS: usize = 10_000;
+        let mut continuations = 0;
+        
+        loop {
+            continuations += 1;
+            if continuations > MAX_CONTINUATIONS {
+                self.error = Some("cmd_or_math_sub: too many line continuations".to_string());
+                return CmdOrMath::Err;
+            }
+
             let c = self.hgetc();
-            if c != Some('\n') {
-                if let Some(c) = c {
-                    self.hungetc(c);
+            if c == Some('\\') {
+                let c2 = self.hgetc();
+                if c2 != Some('\n') {
+                    if let Some(c2) = c2 {
+                        self.hungetc(c2);
+                    }
+                    self.hungetc('\\');
+                    self.lexstop = false;
+                    return if self.skip_command_sub().is_err() {
+                        CmdOrMath::Err
+                    } else {
+                        CmdOrMath::Cmd
+                    };
                 }
-                self.hungetc('\\');
+                // Line continuation, try again (loop instead of recursion)
+                continue;
+            }
+
+            // Not a line continuation, process normally
+            if c == Some('(') {
+                // Might be $((...))
+                let lexpos = self.lexbuf.len();
+                self.add(char_tokens::INPAR);
+                self.add('(');
+
+                if self.dquote_parse(')', false).is_ok() {
+                    let c2 = self.hgetc();
+                    if c2 == Some(')') {
+                        self.add(')');
+                        return CmdOrMath::Math;
+                    }
+                    if let Some(c2) = c2 {
+                        self.hungetc(c2);
+                    }
+                }
+
+                // Not math, restore and parse as command
+                while self.lexbuf.len() > lexpos {
+                    if let Some(ch) = self.lexbuf.pop() {
+                        self.hungetc(ch);
+                    }
+                }
+                self.hungetc('(');
                 self.lexstop = false;
-                return if self.skip_command_sub().is_err() {
-                    CmdOrMath::Err
-                } else {
-                    CmdOrMath::Cmd
-                };
-            }
-            // Line continuation, try again
-            return self.cmd_or_math_sub();
-        }
-
-        if c == Some('(') {
-            // Might be $((...))
-            let lexpos = self.lexbuf.len();
-            self.add(char_tokens::INPAR);
-            self.add('(');
-
-            if self.dquote_parse(')', false).is_ok() {
-                let c = self.hgetc();
-                if c == Some(')') {
-                    self.add(')');
-                    return CmdOrMath::Math;
-                }
+            } else {
                 if let Some(c) = c {
                     self.hungetc(c);
                 }
+                self.lexstop = false;
             }
 
-            // Not math, restore and parse as command
-            while self.lexbuf.len() > lexpos {
-                if let Some(c) = self.lexbuf.pop() {
-                    self.hungetc(c);
-                }
-            }
-            self.hungetc('(');
-            self.lexstop = false;
-        } else {
-            if let Some(c) = c {
-                self.hungetc(c);
-            }
-            self.lexstop = false;
-        }
-
-        if self.skip_command_sub().is_err() {
-            CmdOrMath::Err
-        } else {
-            CmdOrMath::Cmd
+            return if self.skip_command_sub().is_err() {
+                CmdOrMath::Err
+            } else {
+                CmdOrMath::Cmd
+            };
         }
     }
 
@@ -1528,10 +1586,18 @@ impl<'a> ZshLexer<'a> {
     fn skip_command_sub(&mut self) -> Result<(), ()> {
         let mut pct = 1;
         let mut start = true;
+        const MAX_ITERATIONS: usize = 100_000;
+        let mut iterations = 0;
 
         self.add(char_tokens::INPAR);
 
         loop {
+            iterations += 1;
+            if iterations > MAX_ITERATIONS {
+                self.error = Some("skip_command_sub exceeded maximum iterations".to_string());
+                return Err(());
+            }
+
             let c = self.hgetc();
             let c = match c {
                 Some(c) => c,

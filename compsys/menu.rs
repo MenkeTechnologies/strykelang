@@ -173,6 +173,10 @@ pub struct GroupLayout {
     pub rows_first: bool,
     /// ANSI color code for this group (cyberpunk!)
     pub color: String,
+    /// Whether items in this group have descriptions
+    pub has_descriptions: bool,
+    /// Width of completion column (for aligning descriptions)
+    pub comp_col_width: usize,
 }
 
 /// ZPWR-style color palette for completion groups (from ~/.zpwr zstyle configs)
@@ -321,6 +325,8 @@ pub struct MenuRendering {
 }
 
 /// Menu completion state machine
+///
+/// Implements zsh menuselect behavior from Src/Zle/complist.c
 #[derive(Clone, Debug)]
 pub struct MenuState {
     /// All completion items, flattened
@@ -329,7 +335,7 @@ pub struct MenuState {
     groups: Vec<GroupLayout>,
     /// Current selection index (None = not in menu mode)
     selected_idx: Option<usize>,
-    /// Column memory for vertical navigation
+    /// Column memory for vertical navigation (zsh: wishcol)
     wish_col: usize,
     /// First visible row
     viewport_start: usize,
@@ -342,10 +348,14 @@ pub struct MenuState {
     colors: MenuColors,
     /// Prefix being completed
     prefix: String,
-    /// Search/filter string
+    /// Search/filter string (used in MM_FSEARCH/MM_BSEARCH and MM_INTER modes)
     search: String,
-    /// Whether search is active
+    /// Whether incremental search is active (MM_FSEARCH or MM_BSEARCH)
     search_active: bool,
+    /// Search direction for incremental search
+    search_direction: SearchDirection,
+    /// Whether interactive filter mode is active (MM_INTER, toggled by vi-insert)
+    interactive_mode: bool,
     /// Unfiltered items (for search restore)
     unfiltered_items: Vec<MenuItem>,
     /// Layout cache valid
@@ -360,6 +370,12 @@ pub struct MenuState {
     show_headers: bool,
     /// Custom colors for groups by name (from zstyle)
     group_colors: std::collections::HashMap<String, String>,
+    /// Menu selection color (ma= from zstyle)
+    selection_color: String,
+    /// Prefix match color (from zstyle list-colors pattern)
+    prefix_color: String,
+    /// List separator (ZPWR_CHAR_LOGO)
+    list_separator: String,
 }
 
 impl Default for MenuState {
@@ -370,6 +386,9 @@ impl Default for MenuState {
 
 impl MenuState {
     pub fn new() -> Self {
+        // Load config from zpwr zstyle files
+        let config = crate::zpwr_colors::load_zpwr_config();
+        
         Self {
             items: Vec::new(),
             groups: Vec::new(),
@@ -380,16 +399,33 @@ impl MenuState {
             term_height: 24,
             available_rows: 20,
             colors: MenuColors::default(),
-            group_colors: std::collections::HashMap::new(),
+            group_colors: config.tag_colors,
             prefix: String::new(),
             search: String::new(),
             search_active: false,
+            search_direction: SearchDirection::Forward,
+            interactive_mode: false,
             unfiltered_items: Vec::new(),
             layout_valid: false,
             cached_total_rows: 0,
             cached_cols: 0,
             cached_col_width: 0,
             show_headers: true,
+            selection_color: if config.menu_selection.is_empty() {
+                "37;1;4;44".to_string() // fallback
+            } else {
+                config.menu_selection
+            },
+            prefix_color: if config.prefix_color.is_empty() {
+                "1;30".to_string() // fallback
+            } else {
+                config.prefix_color
+            },
+            list_separator: if config.list_separator.is_empty() {
+                "/////////".to_string() // fallback
+            } else {
+                config.list_separator
+            },
         }
     }
 
@@ -475,6 +511,11 @@ impl MenuState {
                 .cloned()
                 .unwrap_or_else(|| GROUP_COLORS[group_idx % GROUP_COLORS.len()].to_string());
 
+            // Check if any items in this group have descriptions
+            let has_descs = group.matches.iter().any(|m| {
+                m.desc.is_some() || m.exp.is_some()
+            });
+            
             self.groups.push(GroupLayout {
                 name: group.name.clone(),
                 explanation: group
@@ -490,6 +531,8 @@ impl MenuState {
                 packed: false,
                 rows_first: false,
                 color,
+                has_descriptions: has_descs,
+                comp_col_width: 0,
             });
         }
 
@@ -574,33 +617,71 @@ impl MenuState {
             | MenuMotion::PageUp
             | MenuMotion::PageDown => {
                 if let Some(idx) = self.selected_idx {
-                    let (row, col) = self.idx_to_row_col(idx, rows, cols);
+                    // Use group-aware row/col calculation
+                    let (row, col) = self.idx_to_visual_row_col(idx);
+                    let total_rows = rows;
+                    
                     let (new_row, new_col) = match motion {
                         MenuMotion::Up => {
                             if row > 0 {
-                                (row - 1, self.wish_col.min(cols - 1))
+                                (row - 1, self.wish_col)
                             } else {
-                                let new_col = if col > 0 { col - 1 } else { cols - 1 };
-                                (rows.saturating_sub(1), new_col)
+                                // Wrap to bottom
+                                (total_rows.saturating_sub(1), self.wish_col)
                             }
                         }
                         MenuMotion::Down => {
-                            if row + 1 < rows {
-                                (row + 1, self.wish_col.min(cols - 1))
+                            if row + 1 < total_rows {
+                                (row + 1, self.wish_col)
                             } else {
-                                let new_col = (col + 1) % cols;
-                                (0, new_col)
+                                // Wrap to top
+                                (0, self.wish_col)
                             }
                         }
                         MenuMotion::Left => {
-                            let new_col = if col > 0 { col - 1 } else { cols - 1 };
-                            self.wish_col = new_col;
-                            (row, new_col)
+                            if col > 0 {
+                                self.wish_col = col - 1;
+                                (row, col - 1)
+                            } else {
+                                // Wrap to previous row, last column
+                                if row > 0 {
+                                    // Get column count for previous row's group
+                                    if let Some(prev_idx) = self.visual_row_col_to_idx(row - 1, 0) {
+                                        if let Some((_, group, _)) = self.find_group_for_idx(prev_idx) {
+                                            let last_col = group.cols.saturating_sub(1);
+                                            self.wish_col = last_col;
+                                            (row - 1, last_col)
+                                        } else {
+                                            (row, col)
+                                        }
+                                    } else {
+                                        (row, col)
+                                    }
+                                } else {
+                                    (row, col)
+                                }
+                            }
                         }
                         MenuMotion::Right => {
-                            let new_col = (col + 1) % cols;
-                            self.wish_col = new_col;
-                            (row, new_col)
+                            // Get current group's column count
+                            let max_col = if let Some((_, group, _)) = self.find_group_for_idx(idx) {
+                                group.cols.saturating_sub(1)
+                            } else {
+                                cols.saturating_sub(1)
+                            };
+                            
+                            if col < max_col {
+                                self.wish_col = col + 1;
+                                (row, col + 1)
+                            } else {
+                                // Wrap to next row, first column
+                                if row + 1 < total_rows {
+                                    self.wish_col = 0;
+                                    (row + 1, 0)
+                                } else {
+                                    (row, col)
+                                }
+                            }
                         }
                         MenuMotion::PageUp => {
                             let page = self.available_rows.saturating_sub(1);
@@ -608,21 +689,21 @@ impl MenuState {
                         }
                         MenuMotion::PageDown => {
                             let page = self.available_rows.saturating_sub(1);
-                            ((row + page).min(rows.saturating_sub(1)), col)
+                            ((row + page).min(total_rows.saturating_sub(1)), col)
                         }
                         _ => (row, col),
                     };
 
-                    let new_idx = self.row_col_to_idx(new_row, new_col, rows, cols);
-                    if new_idx < self.items.len() {
+                    // Convert back to index using group-aware function
+                    if let Some(new_idx) = self.visual_row_col_to_idx(new_row, new_col) {
                         self.selected_idx = Some(new_idx);
                     } else {
-                        // Clamp to last item in column
-                        let last_row = (self.items.len().saturating_sub(1)) % rows;
-                        let clamped =
-                            self.row_col_to_idx(last_row.min(new_row), new_col, rows, cols);
-                        if clamped < self.items.len() {
-                            self.selected_idx = Some(clamped);
+                        // Try to find a valid item in that row
+                        for try_col in (0..=new_col).rev() {
+                            if let Some(new_idx) = self.visual_row_col_to_idx(new_row, try_col) {
+                                self.selected_idx = Some(new_idx);
+                                break;
+                            }
                         }
                     }
                 }
@@ -635,16 +716,68 @@ impl MenuState {
 
     /// Number of rows needed for items (excluding headers)
     fn rows_for_items(&self) -> usize {
-        let cols = self.cached_cols.max(1);
-        (self.items.len() + cols - 1) / cols
+        // Sum up rows from all groups
+        self.groups.iter().map(|g| g.row_count).sum()
+    }
+    
+    /// Find which group an item index belongs to, and its local index within that group
+    fn find_group_for_idx(&self, idx: usize) -> Option<(usize, &GroupLayout, usize)> {
+        let mut offset = 0;
+        for (gi, group) in self.groups.iter().enumerate() {
+            if idx < offset + group.count {
+                return Some((gi, group, idx - offset));
+            }
+            offset += group.count;
+        }
+        None
+    }
+    
+    /// Convert global item index to (visual_row, col) accounting for per-group column counts
+    fn idx_to_visual_row_col(&self, idx: usize) -> (usize, usize) {
+        let mut row_offset = 0;
+        let mut item_offset = 0;
+        
+        for group in &self.groups {
+            if idx < item_offset + group.count {
+                let local_idx = idx - item_offset;
+                let cols = group.cols.max(1);
+                let local_row = local_idx / cols;
+                let col = local_idx % cols;
+                return (row_offset + local_row, col);
+            }
+            row_offset += group.row_count;
+            item_offset += group.count;
+        }
+        (0, 0)
+    }
+    
+    /// Convert (visual_row, col) back to global item index
+    fn visual_row_col_to_idx(&self, target_row: usize, target_col: usize) -> Option<usize> {
+        let mut row_offset = 0;
+        let mut item_offset = 0;
+        
+        for group in &self.groups {
+            let group_end_row = row_offset + group.row_count;
+            if target_row < group_end_row {
+                let local_row = target_row - row_offset;
+                let cols = group.cols.max(1);
+                let local_idx = local_row * cols + target_col.min(cols - 1);
+                if local_idx < group.count {
+                    return Some(item_offset + local_idx);
+                }
+                return None;
+            }
+            row_offset += group.row_count;
+            item_offset += group.count;
+        }
+        None
     }
 
     /// Ensure the selected item is visible in the viewport
     fn ensure_selection_visible(&mut self) {
         if let Some(idx) = self.selected_idx {
-            let rows = self.rows_for_items();
-            let cols = self.cached_cols.max(1);
-            let (item_row, _) = self.idx_to_row_col(idx, rows, cols);
+            // Use group-aware row calculation
+            let (item_row, _) = self.idx_to_visual_row_col(idx);
 
             // Account for headers
             let display_row = self.item_row_to_display_row(item_row);
@@ -655,6 +788,140 @@ impl MenuState {
                 self.viewport_start = display_row.saturating_sub(self.available_rows - 1);
             }
         }
+    }
+
+    /// Navigate to first item of next group
+    fn navigate_to_next_group(&mut self) {
+        if self.groups.is_empty() || self.items.is_empty() {
+            return;
+        }
+        
+        let current_idx = self.selected_idx.unwrap_or(0);
+        
+        // Find which group current selection is in
+        let mut current_group = 0;
+        let mut offset = 0;
+        for (i, g) in self.groups.iter().enumerate() {
+            if current_idx < offset + g.count {
+                current_group = i;
+                break;
+            }
+            offset += g.count;
+        }
+        
+        // Move to next group (wrap around)
+        let next_group = (current_group + 1) % self.groups.len();
+        let mut new_idx = 0;
+        for (i, g) in self.groups.iter().enumerate() {
+            if i == next_group {
+                break;
+            }
+            new_idx += g.count;
+        }
+        
+        self.selected_idx = Some(new_idx);
+        self.ensure_selection_visible();
+    }
+    
+    /// Navigate to first item of previous group
+    fn navigate_to_prev_group(&mut self) {
+        if self.groups.is_empty() || self.items.is_empty() {
+            return;
+        }
+        
+        let current_idx = self.selected_idx.unwrap_or(0);
+        
+        // Find which group current selection is in
+        let mut current_group = 0;
+        let mut offset = 0;
+        for (i, g) in self.groups.iter().enumerate() {
+            if current_idx < offset + g.count {
+                current_group = i;
+                break;
+            }
+            offset += g.count;
+        }
+        
+        // Move to previous group (wrap around)
+        let prev_group = if current_group == 0 {
+            self.groups.len() - 1
+        } else {
+            current_group - 1
+        };
+        
+        let mut new_idx = 0;
+        for (i, g) in self.groups.iter().enumerate() {
+            if i == prev_group {
+                break;
+            }
+            new_idx += g.count;
+        }
+        
+        self.selected_idx = Some(new_idx);
+        self.ensure_selection_visible();
+    }
+
+    /// Navigate to start of current row (vi-beginning-of-line)
+    fn navigate_to_row_start(&mut self) {
+        if self.items.is_empty() {
+            return;
+        }
+        self.ensure_layout();
+        
+        if let Some(idx) = self.selected_idx {
+            let (row, _col) = self.idx_to_visual_row_col(idx);
+            
+            // Find first valid item in this row (column 0)
+            if let Some(new_idx) = self.visual_row_col_to_idx(row, 0) {
+                self.selected_idx = Some(new_idx);
+                self.wish_col = 0;
+            }
+        }
+    }
+
+    /// Navigate to end of current row (vi-end-of-line)
+    fn navigate_to_row_end(&mut self) {
+        if self.items.is_empty() {
+            return;
+        }
+        self.ensure_layout();
+        
+        if let Some(idx) = self.selected_idx {
+            let (row, _col) = self.idx_to_visual_row_col(idx);
+            
+            // Get the group's column count for this row
+            let max_col = if let Some((_, group, _)) = self.find_group_for_idx(idx) {
+                group.cols.saturating_sub(1)
+            } else {
+                0
+            };
+            
+            // Find last valid item in this row
+            for try_col in (0..=max_col).rev() {
+                if let Some(new_idx) = self.visual_row_col_to_idx(row, try_col) {
+                    self.selected_idx = Some(new_idx);
+                    self.wish_col = try_col;
+                    return;
+                }
+            }
+        }
+    }
+    
+    #[allow(dead_code)]
+    /// Old function kept for compatibility - use idx_to_visual_row_col instead
+    fn idx_to_row_col(&self, idx: usize, _rows: usize, cols: usize) -> (usize, usize) {
+        if cols == 0 {
+            return (0, 0);
+        }
+        let row = idx / cols;
+        let col = idx % cols;
+        (row, col)
+    }
+
+    #[allow(dead_code)]
+    /// Old function kept for compatibility - use visual_row_col_to_idx instead
+    fn row_col_to_idx(&self, row: usize, col: usize, _rows: usize, cols: usize) -> usize {
+        row * cols + col
     }
 
     /// Convert item row to display row (accounting for headers)
@@ -692,21 +959,6 @@ impl MenuState {
         display_row
     }
 
-    /// Convert flat index to (row, col) in column-major order
-    fn idx_to_row_col(&self, idx: usize, rows: usize, _cols: usize) -> (usize, usize) {
-        if rows == 0 {
-            return (0, 0);
-        }
-        let col = idx / rows;
-        let row = idx % rows;
-        (row, col)
-    }
-
-    /// Convert (row, col) to flat index in column-major order
-    fn row_col_to_idx(&self, row: usize, col: usize, rows: usize, _cols: usize) -> usize {
-        col * rows + row
-    }
-
     /// Calculate layout if needed
     fn ensure_layout(&mut self) {
         if self.layout_valid {
@@ -742,52 +994,56 @@ impl MenuState {
             let items = &self.items[item_offset..item_offset + group.count];
             let n = group.count;
 
-            // Try to fit as many columns as possible
-            let max_cols = n.min(tw / 2); // At least 2 chars per item
-            let mut best_cols = 1;
-            let mut best_widths = vec![tw];
-
             // Check if any items have descriptions
             let has_descriptions = items.iter().any(|item| !item.description.is_empty());
-
-            // If items have descriptions, use single column to show them properly
-            // This matches zsh behavior for _describe completions
-            let effective_max_cols = if has_descriptions {
-                1 // Single column when descriptions present - like zsh
+            group.has_descriptions = has_descriptions;
+            
+            if has_descriptions {
+                // Single column with aligned descriptions
+                // Calculate max completion width and max description width
+                let max_comp_width = items.iter().map(|i| i.comp_width).max().unwrap_or(10);
+                let separator_width = 12; // " ///////// "
+                
+                // Completion column gets enough space for longest completion
+                let comp_col = max_comp_width + 2;
+                group.comp_col_width = comp_col;
+                group.cols = 1;
+                group.col_widths = vec![tw];
+                group.row_count = n;
             } else {
-                max_cols
-            };
+                // Multi-column layout for items without descriptions
+                let max_cols = n.min(tw / 2); // At least 2 chars per item
+                let mut best_cols = 1;
+                let mut best_widths = vec![tw];
 
-            for try_cols in (1..=effective_max_cols).rev() {
-                // Calculate per-column max width (row-major layout)
-                let mut col_widths = vec![0usize; try_cols];
-                for (i, item) in items.iter().enumerate() {
-                    let col = i % try_cols;
-                    // Include description width for layout calculation
-                    let item_width = if has_descriptions && !item.description.is_empty() {
-                        item.comp_width + 4 + item.desc_width.min(30) // " -- " + desc (max 30)
-                    } else {
-                        item.comp_width + 2
-                    };
-                    col_widths[col] = col_widths[col].max(item_width);
-                }
-
-                let total: usize = col_widths.iter().sum();
-                if total <= tw {
-                    best_cols = try_cols;
-                    // Distribute extra space
-                    let extra = (tw - total) / try_cols;
-                    for w in &mut col_widths {
-                        *w += extra;
+                for try_cols in (1..=max_cols).rev() {
+                    // Calculate per-column max width (row-major layout)
+                    let mut col_widths = vec![0usize; try_cols];
+                    for (i, item) in items.iter().enumerate() {
+                        let col = i % try_cols;
+                        let item_width = item.comp_width + 2;
+                        col_widths[col] = col_widths[col].max(item_width);
                     }
-                    best_widths = col_widths;
-                    break;
-                }
-            }
 
-            group.cols = best_cols;
-            group.col_widths = best_widths;
-            group.row_count = (n + best_cols - 1) / best_cols;
+                    let total: usize = col_widths.iter().sum();
+                    if total <= tw {
+                        best_cols = try_cols;
+                        // Distribute extra space
+                        let extra = (tw - total) / try_cols;
+                        for w in &mut col_widths {
+                            *w += extra;
+                        }
+                        best_widths = col_widths;
+                        break;
+                    }
+                }
+
+                group.cols = best_cols;
+                group.col_widths = best_widths;
+                group.row_count = (n + best_cols - 1) / best_cols;
+                group.comp_col_width = 0;
+            }
+            
             group.start_row = total_rows;
             total_rows += group.row_count;
             item_offset += group.count;
@@ -851,32 +1107,47 @@ impl MenuState {
             for row in 0..group.row_count {
                 if display_row >= self.viewport_start && display_row < rendering.row_end {
                     let mut line = MenuLine::new();
-                    let mut x = 0usize;
-
-                    for col in 0..cols {
-                        let local_idx = row * cols + col;
-                        let idx = global_idx + local_idx;
-                        let cw = group
-                            .col_widths
-                            .get(col)
-                            .copied()
-                            .unwrap_or(self.term_width / cols);
-
-                        if local_idx < group.count {
-                            if let Some(item) = self.items.get(idx) {
-                                self.render_item(
-                                    &mut line,
-                                    item,
-                                    idx,
-                                    col,
-                                    cw,
-                                    display_row % 2 == 1,
-                                    &group.color,
-                                );
-                            }
+                    
+                    if group.has_descriptions {
+                        // Single-column with aligned descriptions
+                        let idx = global_idx + row;
+                        if let Some(item) = self.items.get(idx) {
+                            self.render_item_with_desc_column(
+                                &mut line,
+                                item,
+                                idx,
+                                group.comp_col_width,
+                                &group.color,
+                            );
                         }
-                        line.pad_to(x + cw);
-                        x += cw;
+                    } else {
+                        // Multi-column layout
+                        let mut x = 0usize;
+                        for col in 0..cols {
+                            let local_idx = row * cols + col;
+                            let idx = global_idx + local_idx;
+                            let cw = group
+                                .col_widths
+                                .get(col)
+                                .copied()
+                                .unwrap_or(self.term_width / cols);
+
+                            if local_idx < group.count {
+                                if let Some(item) = self.items.get(idx) {
+                                    self.render_item(
+                                        &mut line,
+                                        item,
+                                        idx,
+                                        col,
+                                        cw,
+                                        display_row % 2 == 1,
+                                        &group.color,
+                                    );
+                                }
+                            }
+                            line.pad_to(x + cw);
+                            x += cw;
+                        }
                     }
                     rendering.lines.push(line);
                 }
@@ -951,51 +1222,168 @@ impl MenuState {
         } else {
             ("", display.as_str())
         };
+        
+        // Determine effective color - use LS_COLORS for file completions
+        let effective_color = self.get_item_color(item, group_color);
 
-        // Selected highlight
+        // Selected highlight - use parsed ma= color from zstyle
         if is_selected {
-            line.content.push_str("\x1b[7m"); // Reverse video
+            line.content.push_str(&ansi::from_codes(&self.selection_color));
             line.content.push_str(prefix_part);
             line.content.push_str(rest_part);
-            line.content.push_str("\x1b[0m");
+            line.content.push_str(ansi::RESET);
         } else {
-            // zstyle format: =(#b)(*)=PREFIX_COLOR=REST_COLOR
-            // PREFIX_COLOR is typically 1;30 (bold dark gray)
-            // REST_COLOR is the group-specific color
+            // zsh style: prefix is BOLD version of color, rest is regular
             if !prefix_part.is_empty() {
-                line.content.push_str("\x1b[1;30m"); // Bold dark gray for prefix
+                let bold_color = make_bold(&effective_color);
+                line.content.push_str(&ansi::from_codes(&bold_color));
                 line.content.push_str(prefix_part);
                 line.content.push_str(ansi::RESET);
             }
-            // Group color for the rest
-            line.content.push_str(&ansi::from_codes(group_color));
+            // Item color for the rest
+            line.content.push_str(&ansi::from_codes(&effective_color));
             line.content.push_str(rest_part);
             line.content.push_str(ansi::RESET);
         }
 
-        line.width += display_width(&display);
+        let disp_width = display_width(&display);
+        line.width += disp_width;
+    }
+    
+    /// Get the color for an item, using LS_COLORS for file completions
+    fn get_item_color(&self, item: &MenuItem, group_color: &str) -> String {
+        // Check if this looks like a file completion
+        let display = &item.display;
+        let is_dir = display.ends_with('/') || item.completion.modec == '/';
+        let is_link = item.completion.modec == '@';
+        let is_exec = item.completion.modec == '*';
+        
+        // Check if this is a file-related group (use LS_COLORS for all items)
+        let group_name = self.groups.get(item.group_idx).map(|g| g.name.as_str()).unwrap_or("");
+        let is_file_group = matches!(group_name, 
+            "files" | "file" | "all-files" | "globbed-files" | 
+            "local-directories" | "directories" | "directory" | "path" | "paths"
+        );
+        
+        // Use LS_COLORS for file groups or items with file mode set
+        if is_file_group || is_dir || is_link || is_exec {
+            let color = crate::zpwr_colors::ls_color_for_file(display, is_dir, is_exec, is_link);
+            if !color.is_empty() {
+                return color;
+            }
+        }
+        
+        // Fall back to group color
+        group_color.to_string()
+    }
+    
+    /// Render item with properly aligned description column (zsh-style)
+    fn render_item_with_desc_column(
+        &self,
+        line: &mut MenuLine,
+        item: &MenuItem,
+        idx: usize,
+        comp_col_width: usize,
+        group_color: &str,
+    ) {
+        let is_selected = self.selected_idx == Some(idx);
+        
+        // Split display into main part and alias (e.g. "--help  -h" -> "--help" + "-h")
+        let display = &item.display;
+        let parts: Vec<&str> = display.split_whitespace().collect();
+        let (main_part, alias_part) = if parts.len() >= 2 {
+            (parts[0], Some(parts[1..].join(" ")))
+        } else {
+            (display.as_str(), None)
+        };
 
-        // Always add description if present - use ZPWR separator style
-        if !item.description.is_empty() {
-            let separator = std::env::var("ZPWR_CHAR_LOGO").unwrap_or_else(|_| " -- ".to_string());
-            let sep_width = UnicodeWidthStr::width(separator.as_str());
-            let desc_space = available.saturating_sub(display_width(&display) + sep_width);
-
-            // Dim separator, cyan description
-            line.content.push_str("\x1b[2m"); // dim
-            line.content.push_str(&separator);
-            line.content.push_str(ansi::RESET);
-
-            line.content
-                .push_str(&ansi::from_codes(&self.colors.description));
-            let desc = if desc_space > 0 && item.desc_width > desc_space {
-                truncate_with_ellipsis(&item.description, desc_space.max(3))
+        // Calculate prefix match on main part
+        let prefix_len = if !self.prefix.is_empty() {
+            let prefix_lower = self.prefix.to_lowercase();
+            let main_lower = main_part.to_lowercase();
+            if main_lower.starts_with(&prefix_lower) {
+                self.prefix.chars().count()
             } else {
-                item.description.clone()
-            };
-            line.content.push_str(&desc);
+                0
+            }
+        } else {
+            0
+        };
+
+        let (prefix_part, rest_part) = if prefix_len > 0 {
+            let char_boundary: usize = main_part.chars().take(prefix_len).map(|c| c.len_utf8()).sum();
+            (&main_part[..char_boundary], &main_part[char_boundary..])
+        } else {
+            ("", main_part)
+        };
+
+        // Determine effective color - use LS_COLORS for file completions
+        let effective_color = self.get_item_color(item, group_color);
+        
+        // Render main completion with color
+        if is_selected {
+            line.content.push_str(&ansi::from_codes(&self.selection_color));
+            line.content.push_str(prefix_part);
+            line.content.push_str(rest_part);
             line.content.push_str(ansi::RESET);
-            line.width += sep_width + display_width(&desc);
+        } else {
+            // zsh style: prefix is BOLD version of color
+            if !prefix_part.is_empty() {
+                let bold_color = make_bold(&effective_color);
+                line.content.push_str(&ansi::from_codes(&bold_color));
+                line.content.push_str(prefix_part);
+                line.content.push_str(ansi::RESET);
+            }
+            // Rest in item color
+            line.content.push_str(&ansi::from_codes(&effective_color));
+            line.content.push_str(rest_part);
+            line.content.push_str(ansi::RESET);
+        }
+        
+        // Pad main part to 16 chars, then add alias in yellow
+        let main_width = display_width(main_part);
+        let main_col = 16;
+        for _ in main_width..main_col {
+            line.content.push(' ');
+        }
+        
+        // Alias in yellow (like zsh) - also highlight if selected
+        if let Some(ref alias) = alias_part {
+            if is_selected {
+                line.content.push_str(&ansi::from_codes(&self.selection_color));
+                line.content.push_str(alias);
+                line.content.push_str(ansi::RESET);
+            } else {
+                line.content.push_str("\x1b[33m"); // yellow
+                line.content.push_str(alias);
+                line.content.push_str(ansi::RESET);
+            }
+            let alias_width = display_width(alias);
+            for _ in alias_width..12 {
+                line.content.push(' ');
+            }
+        } else {
+            for _ in 0..12 {
+                line.content.push(' ');
+            }
+        }
+        
+        line.width = main_col + 12;
+        
+        // Separator from zstyle (ZPWR_CHAR_LOGO)
+        let separator = &self.list_separator;
+        line.content.push_str("\x1b[2m");
+        line.content.push_str(&separator);
+        line.content.push_str(ansi::RESET);
+        line.content.push(' ');
+        line.width += UnicodeWidthStr::width(separator.as_str()) + 1;
+        
+        // Description column (cyan)
+        if !item.description.is_empty() {
+            line.content.push_str(&ansi::from_codes(&self.colors.description));
+            line.content.push_str(&item.description);
+            line.content.push_str(ansi::RESET);
+            line.width += item.desc_width;
         }
     }
 
@@ -1067,6 +1455,20 @@ fn display_width(s: &str) -> usize {
     UnicodeWidthStr::width(s)
 }
 
+/// Make a color code bold by prepending "1;" if not already bold
+/// e.g., "32" -> "1;32", "1;32" -> "1;32"
+fn make_bold(color: &str) -> String {
+    if color.is_empty() {
+        return "1".to_string();
+    }
+    // Check if already has bold (starts with "1;" or contains ";1;" or is just "1")
+    if color == "1" || color.starts_with("1;") || color.contains(";1;") || color.contains(";1") {
+        color.to_string()
+    } else {
+        format!("1;{}", color)
+    }
+}
+
 /// Truncate string with ellipsis to fit width
 fn truncate_with_ellipsis(s: &str, max_width: usize) -> String {
     if max_width == 0 {
@@ -1095,53 +1497,109 @@ fn truncate_with_ellipsis(s: &str, max_width: usize) -> String {
 }
 
 /// Key actions for menu completion (maps to zsh widget bindings)
+///
+/// These actions match zsh's Src/Zle/complist.c behavior exactly:
+/// - Navigation (Up/Down/Left/Right) moves in the menu grid with wrapping
+/// - Accept exits the menu and inserts the selection
+/// - AcceptAndMenuComplete accepts current, then runs a NEW completion cycle
+/// - AcceptAndInferNextHistory same as above (both push state stack, call do_menucmp)
+/// - ReverseMenuComplete cycles to previous match via completion (not just prev item)
+/// - ToggleInteractive enters/exits MM_INTER mode for type-to-filter
+/// - SearchForward/Backward enters MM_FSEARCH/MM_BSEARCH incremental search
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MenuAction {
+    /// Exit menu, accept current selection (accept-line)
     Accept,
-    AcceptAndHold,
-    AcceptAndInferNext,
+    /// Accept current + trigger NEW completion on modified line (accept-and-menu-complete)
+    /// This is NOT "advance to next item" - it runs a fresh completion cycle
+    AcceptAndMenuComplete,
+    /// Accept current + trigger NEW completion (accept-and-infer-next-history)
+    /// Same behavior as AcceptAndMenuComplete in menuselect context
+    AcceptAndInferNextHistory,
+    /// Exit menu without accepting (send-break)
     Cancel,
+    /// Move up in menu grid, wrap to bottom+left at top (up-history)
     Up,
+    /// Move down in menu grid, wrap to top+right at bottom (down-history)
     Down,
+    /// Move left in menu grid, wrap to prev row at col 0 (vi-backward-char)
     Left,
+    /// Move right in menu grid, wrap to next row at end (vi-forward-char)
     Right,
+    /// Page up by screenful (vi-backward-word)
     PageUp,
+    /// Page down by screenful (vi-forward-word)
     PageDown,
+    /// Jump to first item (beginning-of-history)
     Beginning,
+    /// Jump to last item (end-of-history)
     End,
+    /// Jump to beginning of current row (vi-beginning-of-line)
     BeginningOfLine,
+    /// Jump to end of current row (vi-end-of-line)
     EndOfLine,
+    /// Cycle to next match via completion (menu-complete)
     Next,
+    /// Cycle to previous match via completion with zmult=-1 (reverse-menu-complete)
+    /// This calls do_menucmp(0) with negative multiplier
     Prev,
+    /// Jump to next group (vi-forward-blank-word)
     NextGroup,
+    /// Jump to previous group (vi-backward-blank-word)
     PrevGroup,
+    /// Toggle interactive/filter mode MM_INTER (vi-insert)
     ToggleInteractive,
+    /// Enter forward incremental search MM_FSEARCH (history-incremental-search-forward)
     SearchForward,
+    /// Enter backward incremental search MM_BSEARCH (history-incremental-search-backward)
     SearchBackward,
+    /// Undo last accept (pops from menu stack)
     Undo,
+    /// Force redisplay
     Redisplay,
+    /// Generic search (alias for SearchForward)
     Search,
+    /// Clear current search string
     ClearSearch,
+    /// Insert character (in interactive/search mode)
     Insert(char),
+    /// Delete last character (in interactive/search mode)
     Backspace,
 }
 
 /// Result of processing a menu action
 #[derive(Clone, Debug)]
 pub enum MenuResult {
+    /// Stay in menu, continue processing
     Continue,
+    /// Exit menu, insert this string
     Accept(String),
-    AcceptAndContinue(String),
+    /// Accept this string AND advance to next item in SAME menu (accept-and-menu-complete)
+    /// The caller should: 1) insert the string, 2) stay in menu mode showing next item
+    AcceptAndHold(String),
+    /// Exit menu without inserting anything
     Cancel,
+    /// Force redisplay
     Redisplay,
+    /// Undo requested - caller should pop state stack and restore previous line
+    UndoRequested,
+    /// No action taken
     None,
 }
 
 impl MenuState {
     /// Process a menu action and return the result
+    ///
+    /// This matches zsh's Src/Zle/complist.c menuselect behavior:
+    /// - Accept: exit menu, insert selection
+    /// - AcceptAndMenuComplete/AcceptAndInferNextHistory: accept + request NEW completion
+    /// - Navigation: move in grid with proper wrapping
+    /// - ToggleInteractive: enter/exit filter mode
+    /// - SearchForward/Backward: enter incremental search
     pub fn process_action(&mut self, action: MenuAction) -> MenuResult {
         match action {
             MenuAction::Accept => {
+                // zsh: sets acc=1, breaks loop - exit menu with current selection
                 if let Some(comp) = self.selected() {
                     let insert = comp.insert_str();
                     self.stop();
@@ -1149,81 +1607,135 @@ impl MenuState {
                 }
                 MenuResult::Cancel
             }
-            MenuAction::AcceptAndHold | MenuAction::AcceptAndInferNext => {
+            MenuAction::AcceptAndMenuComplete | MenuAction::AcceptAndInferNextHistory => {
+                // zsh: accept_last() then do_menucmp(0) - accept current, advance to next
+                // This accepts current match AND moves to next item in SAME menu
+                // The menu stays open showing the next item
                 if let Some(idx) = self.selected_idx {
                     if let Some(item) = self.items.get(idx) {
                         let insert = item.completion.insert_str();
-                        self.navigate(MenuMotion::Next);
-                        return MenuResult::AcceptAndContinue(insert);
+                        // Advance to next item (wrap around)
+                        self.selected_idx = Some((idx + 1) % self.items.len());
+                        self.ensure_selection_visible();
+                        return MenuResult::AcceptAndHold(insert);
                     }
                 }
                 MenuResult::None
             }
             MenuAction::Cancel => {
+                // zsh: send-break - exit without accepting
                 self.stop();
                 MenuResult::Cancel
             }
             MenuAction::Up => {
+                // zsh: up-history - move up in grid, wrap to bottom+left at top
                 self.navigate(MenuMotion::Up);
                 MenuResult::Continue
             }
             MenuAction::Down => {
+                // zsh: down-history - move down in grid, wrap to top+right at bottom
                 self.navigate(MenuMotion::Down);
                 MenuResult::Continue
             }
             MenuAction::Left => {
+                // zsh: vi-backward-char - move left, wrap to prev row at col 0
                 self.navigate(MenuMotion::Left);
                 MenuResult::Continue
             }
             MenuAction::Right => {
+                // zsh: vi-forward-char - move right, wrap to next row at end
                 self.navigate(MenuMotion::Right);
                 MenuResult::Continue
             }
             MenuAction::PageUp => {
+                // zsh: vi-backward-word - page up by screenful
                 self.navigate(MenuMotion::PageUp);
                 MenuResult::Continue
             }
             MenuAction::PageDown => {
+                // zsh: vi-forward-word - page down by screenful
                 self.navigate(MenuMotion::PageDown);
                 MenuResult::Continue
             }
             MenuAction::Beginning => {
+                // zsh: beginning-of-history - jump to first item
                 self.navigate(MenuMotion::First);
                 MenuResult::Continue
             }
             MenuAction::End => {
+                // zsh: end-of-history - jump to last item
                 self.navigate(MenuMotion::Last);
                 MenuResult::Continue
             }
-            MenuAction::BeginningOfLine | MenuAction::EndOfLine => MenuResult::Continue,
+            MenuAction::BeginningOfLine => {
+                // zsh: vi-beginning-of-line - jump to start of current row
+                self.navigate_to_row_start();
+                MenuResult::Continue
+            }
+            MenuAction::EndOfLine => {
+                // zsh: vi-end-of-line - jump to end of current row
+                self.navigate_to_row_end();
+                MenuResult::Continue
+            }
             MenuAction::Next => {
+                // zsh: menu-complete - this actually cycles via completion
+                // For simplicity we just advance in menu; true zsh calls do_menucmp
                 self.navigate(MenuMotion::Next);
                 MenuResult::Continue
             }
             MenuAction::Prev => {
+                // zsh: reverse-menu-complete - cycles backward via do_menucmp with zmult=-1
+                // For simplicity we just go back in menu
                 self.navigate(MenuMotion::Prev);
                 MenuResult::Continue
             }
-            MenuAction::NextGroup | MenuAction::PrevGroup => MenuResult::Continue,
-            MenuAction::ToggleInteractive => MenuResult::Continue,
+            MenuAction::NextGroup => {
+                // zsh: vi-forward-blank-word - jump to next completion group
+                self.navigate_to_next_group();
+                MenuResult::Continue
+            }
+            MenuAction::PrevGroup => {
+                // zsh: vi-backward-blank-word - jump to previous completion group
+                self.navigate_to_prev_group();
+                MenuResult::Continue
+            }
+            MenuAction::ToggleInteractive => {
+                // zsh: vi-insert - toggle MM_INTER mode (type-to-filter)
+                self.interactive_mode = !self.interactive_mode;
+                if self.interactive_mode {
+                    self.search_active = true;
+                } else {
+                    self.search_clear();
+                }
+                MenuResult::Continue
+            }
             MenuAction::SearchForward | MenuAction::SearchBackward | MenuAction::Search => {
+                // zsh: history-incremental-search-forward/backward - enter search mode
                 self.search_active = true;
+                self.search_direction = if matches!(action, MenuAction::SearchBackward) {
+                    SearchDirection::Backward
+                } else {
+                    SearchDirection::Forward
+                };
                 MenuResult::Continue
             }
             MenuAction::ClearSearch => {
                 self.search_clear();
                 MenuResult::Continue
             }
-            MenuAction::Undo => MenuResult::None,
+            MenuAction::Undo => {
+                // zsh: undo - pops from Menustack, restores previous line/state
+                MenuResult::UndoRequested
+            }
             MenuAction::Redisplay => MenuResult::Redisplay,
             MenuAction::Insert(c) => {
-                if self.search_active {
+                if self.search_active || self.interactive_mode {
                     self.search_input(c);
                 }
                 MenuResult::Continue
             }
             MenuAction::Backspace => {
-                if self.search_active {
+                if self.search_active || self.interactive_mode {
                     self.search_backspace();
                 }
                 MenuResult::Continue
@@ -1282,6 +1794,190 @@ mod tests {
 
         menu.navigate(MenuMotion::Deselect);
         assert!(!menu.is_active());
+    }
+
+    #[test]
+    fn test_multi_column_navigation() {
+        // Test navigation in multi-column layout (no descriptions = multi-col)
+        let mut menu = MenuState::new();
+        menu.set_term_size(80, 24);
+        menu.set_available_rows(10);
+
+        let mut group = CompletionGroup::new("test");
+        // 20 items with longer names to force multiple rows
+        for i in 0..20 {
+            let comp = Completion::new(format!("longer_item_{:02}", i));
+            group.matches.push(comp);
+        }
+
+        menu.set_completions(&[group]);
+        menu.start();
+        
+        // Debug: print layout info
+        eprintln!("Groups: {:?}", menu.groups);
+        eprintln!("Initial selected_idx: {:?}", menu.selected_index());
+        
+        let cols = menu.groups[0].cols;
+        let rows = menu.groups[0].row_count;
+        eprintln!("Layout: {} cols x {} rows", cols, rows);
+        
+        // With 80-width and ~15 char items, we should get ~4-5 columns
+        // So 20 items / 5 cols = 4 rows
+        // Row 0: items 0-4
+        // Row 1: items 5-9
+        // etc.
+        
+        let initial_idx = menu.selected_index().unwrap();
+        let (initial_row, initial_col) = menu.idx_to_visual_row_col(initial_idx);
+        eprintln!("Initial: idx={}, row={}, col={}", initial_idx, initial_row, initial_col);
+        
+        // Only test if we actually have multiple rows
+        if rows > 1 {
+            menu.navigate(MenuMotion::Down);
+            
+            let after_idx = menu.selected_index().unwrap();
+            let (after_row, after_col) = menu.idx_to_visual_row_col(after_idx);
+            eprintln!("After Down: idx={}, row={}, col={}", after_idx, after_row, after_col);
+            
+            // Down should move exactly one row
+            assert_eq!(after_row, initial_row + 1, "Down should move exactly 1 row");
+            assert_eq!(after_col, initial_col, "Down should keep same column");
+            
+            // Expected: if we have 5 cols, item 0 -> item 5
+            let expected_idx = cols;
+            assert_eq!(after_idx, expected_idx, "Should move by number of columns");
+        }
+    }
+    
+    #[test]
+    fn test_multi_group_navigation() {
+        // Test navigation across multiple groups
+        let mut menu = MenuState::new();
+        menu.set_term_size(80, 24);
+        menu.set_available_rows(10);
+
+        // Group 1: files (short names)
+        let mut group1 = CompletionGroup::new("files");
+        for i in 0..15 {
+            let comp = Completion::new(format!("file_{:02}.txt", i));
+            group1.matches.push(comp);
+        }
+        
+        // Group 2: directories (short names)
+        let mut group2 = CompletionGroup::new("directories");
+        for i in 0..8 {
+            let comp = Completion::new(format!("dir_{}/", i));
+            group2.matches.push(comp);
+        }
+
+        menu.set_completions(&[group1, group2]);
+        menu.start();
+        
+        eprintln!("Groups: {:?}", menu.groups);
+        
+        // Navigate through first group
+        let initial_idx = menu.selected_index().unwrap();
+        let (r0, c0) = menu.idx_to_visual_row_col(initial_idx);
+        eprintln!("Start: idx={}, row={}, col={}", initial_idx, r0, c0);
+        
+        menu.navigate(MenuMotion::Down);
+        let (r1, c1) = menu.idx_to_visual_row_col(menu.selected_index().unwrap());
+        eprintln!("After Down: idx={}, row={}, col={}", menu.selected_index().unwrap(), r1, c1);
+        assert_eq!(r1, r0 + 1, "Down should move 1 row");
+        
+        // Move to first group's last row, then down into second group
+        let rows_g1 = menu.groups[0].row_count;
+        eprintln!("Group 1 rows: {}", rows_g1);
+        
+        // Keep going down to reach group boundary
+        for _ in 0..(rows_g1 - r1) {
+            menu.navigate(MenuMotion::Down);
+        }
+        let (row_after, _col_after) = menu.idx_to_visual_row_col(menu.selected_index().unwrap());
+        eprintln!("After reaching group boundary: idx={}, row={}", menu.selected_index().unwrap(), row_after);
+    }
+    
+    #[test]
+    fn test_varied_column_groups() {
+        // Reproduce user's 'a<TAB>' scenario with varied column counts
+        let mut menu = MenuState::new();
+        menu.set_term_size(200, 24);  // Wide terminal
+        menu.set_available_rows(20);
+
+        // Group 1: external commands - 20 items, ~4 columns = 5 rows
+        let mut group1 = CompletionGroup::new("external command");
+        for i in 0..20 {
+            let comp = Completion::new(format!("ext_cmd_{:02}_longish_name", i));
+            group1.matches.push(comp);
+        }
+        
+        // Group 2: alias - 1 item with description = 1 row, 1 column
+        let mut group2 = CompletionGroup::new("alias");
+        let mut alias = Completion::new("ai");
+        alias.desc = Some("forDirZipRar.zsh && mountInstall.zsh".to_string());
+        group2.matches.push(alias);
+        
+        // Group 3: shell functions - 9 short items = 1 row, ~9 columns
+        let mut group3 = CompletionGroup::new("shell function");
+        for name in ["a", "add-zle-hook", "add-zsh-hook", "after", "age", "allopt", "apz", "asg", "aws_comp"] {
+            let comp = Completion::new(name);
+            group3.matches.push(comp);
+        }
+        
+        // Group 4: builtins - 2 items = 1 row, 2 columns
+        let mut group4 = CompletionGroup::new("builtin command");
+        group4.matches.push(Completion::new("alias"));
+        group4.matches.push(Completion::new("autoload"));
+
+        menu.set_completions(&[group1, group2, group3, group4]);
+        menu.start();
+        
+        eprintln!("\nGroups layout:");
+        for (i, g) in menu.groups.iter().enumerate() {
+            eprintln!("  Group {}: '{}' - {} items, {} cols, {} rows, start_row={}",
+                i, g.name, g.count, g.cols, g.row_count, g.start_row);
+        }
+        
+        let total_rows: usize = menu.groups.iter().map(|g| g.row_count).sum();
+        
+        // Test: Starting at first item, navigate down multiple times
+        // Each Down should move exactly 1 visual row
+        eprintln!("\n=== Testing Down navigation ===");
+        let mut prev_row = 0;
+        for step in 0..10 {
+            let idx = menu.selected_index().unwrap();
+            let (row, col) = menu.idx_to_visual_row_col(idx);
+            eprintln!("Step {}: idx={}, row={}, col={}", step, idx, row, col);
+            
+            if step > 0 {
+                // Should have moved exactly 1 row (or wrapped from last to first)
+                let expected = (prev_row + 1) % total_rows;
+                assert_eq!(row, expected, "Down should move exactly 1 row (step {})", step);
+            }
+            prev_row = row;
+            
+            menu.navigate(MenuMotion::Down);
+        }
+        
+        // Test Up navigation too
+        eprintln!("\n=== Testing Up navigation ===");
+        // Reset to start
+        menu.navigate(MenuMotion::First);
+        prev_row = 0;
+        for step in 0..10 {
+            let idx = menu.selected_index().unwrap();
+            let (row, col) = menu.idx_to_visual_row_col(idx);
+            eprintln!("Step {}: idx={}, row={}, col={}", step, idx, row, col);
+            
+            if step > 0 {
+                // Up should move exactly 1 row back (or wrap from 0 to last)
+                let expected = if prev_row == 0 { total_rows - 1 } else { prev_row - 1 };
+                assert_eq!(row, expected, "Up should move exactly 1 row back (step {})", step);
+            }
+            prev_row = row;
+            
+            menu.navigate(MenuMotion::Up);
+        }
     }
 
     #[test]
@@ -1425,48 +2121,73 @@ impl KeySequence {
 }
 
 /// Default menuselect keymap bindings
+///
+/// Maps zsh widget names to MenuAction based on Src/Zle/complist.c behavior
 pub fn default_menuselect_bindings() -> Vec<(&'static str, MenuAction)> {
     vec![
+        // Exit and accept
         ("accept-line", MenuAction::Accept),
+        (".accept-line", MenuAction::Accept),
+        ("accept-search", MenuAction::Accept),
         ("send-break", MenuAction::Cancel),
-        ("accept-and-hold", MenuAction::AcceptAndHold),
-        ("accept-and-menu-complete", MenuAction::AcceptAndHold),
-        (
-            "accept-and-infer-next-history",
-            MenuAction::AcceptAndInferNext,
-        ),
+        // Accept + recompute (NOT advance to next item!)
+        ("accept-and-hold", MenuAction::AcceptAndMenuComplete),
+        ("accept-and-menu-complete", MenuAction::AcceptAndMenuComplete),
+        ("accept-and-infer-next-history", MenuAction::AcceptAndInferNextHistory),
+        // Vertical navigation
         ("down-history", MenuAction::Down),
         ("down-line-or-history", MenuAction::Down),
+        ("down-line-or-search", MenuAction::Down),
+        ("vi-down-line-or-history", MenuAction::Down),
         ("up-history", MenuAction::Up),
         ("up-line-or-history", MenuAction::Up),
+        ("up-line-or-search", MenuAction::Up),
+        ("vi-up-line-or-history", MenuAction::Up),
+        // Horizontal navigation
         ("forward-char", MenuAction::Right),
         ("vi-forward-char", MenuAction::Right),
         ("backward-char", MenuAction::Left),
         ("vi-backward-char", MenuAction::Left),
+        // Page navigation (by screenful)
         ("forward-word", MenuAction::PageDown),
         ("vi-forward-word", MenuAction::PageDown),
+        ("vi-forward-word-end", MenuAction::PageDown),
+        ("emacs-forward-word", MenuAction::PageDown),
         ("backward-word", MenuAction::PageUp),
         ("vi-backward-word", MenuAction::PageUp),
+        ("emacs-backward-word", MenuAction::PageUp),
+        // Group navigation
         ("vi-forward-blank-word", MenuAction::NextGroup),
         ("vi-backward-blank-word", MenuAction::PrevGroup),
+        // Jump to first/last
         ("beginning-of-history", MenuAction::Beginning),
+        ("beginning-of-buffer-or-history", MenuAction::Beginning),
         ("end-of-history", MenuAction::End),
+        ("end-of-buffer-or-history", MenuAction::End),
+        // Row navigation
         ("vi-beginning-of-line", MenuAction::BeginningOfLine),
+        ("beginning-of-line", MenuAction::BeginningOfLine),
+        ("beginning-of-line-hist", MenuAction::BeginningOfLine),
         ("vi-end-of-line", MenuAction::EndOfLine),
+        ("end-of-line", MenuAction::EndOfLine),
+        ("end-of-line-hist", MenuAction::EndOfLine),
+        // Completion cycling (these call do_menucmp in zsh)
         ("complete-word", MenuAction::Next),
         ("menu-complete", MenuAction::Next),
+        ("expand-or-complete", MenuAction::Next),
+        ("menu-expand-or-complete", MenuAction::Next),
         ("reverse-menu-complete", MenuAction::Prev),
+        // Interactive mode (MM_INTER)
         ("vi-insert", MenuAction::ToggleInteractive),
-        (
-            "history-incremental-search-forward",
-            MenuAction::SearchForward,
-        ),
-        (
-            "history-incremental-search-backward",
-            MenuAction::SearchBackward,
-        ),
+        // Incremental search (MM_FSEARCH/MM_BSEARCH)
+        ("history-incremental-search-forward", MenuAction::SearchForward),
+        ("history-incremental-search-backward", MenuAction::SearchBackward),
+        // Undo (pops from menu stack)
         ("undo", MenuAction::Undo),
+        ("backward-delete-char", MenuAction::Backspace),
+        // Redisplay
         ("redisplay", MenuAction::Redisplay),
+        ("clear-screen", MenuAction::Redisplay),
     ]
 }
 
@@ -1576,13 +2297,23 @@ pub fn parse_bindkey_output(output: &str, keymap: &mut MenuKeymap) {
 }
 
 impl MenuState {
+    /// Check if interactive filter mode is active (MM_INTER)
     pub fn is_interactive(&self) -> bool {
-        false
+        self.interactive_mode
     }
+    
+    /// Check if incremental search is active (MM_FSEARCH or MM_BSEARCH)
     pub fn is_search_active(&self) -> bool {
         self.search_active
     }
+    
+    /// Get current search/filter string
     pub fn search_string(&self) -> &str {
         &self.search
+    }
+    
+    /// Get search direction
+    pub fn search_direction(&self) -> SearchDirection {
+        self.search_direction
     }
 }
