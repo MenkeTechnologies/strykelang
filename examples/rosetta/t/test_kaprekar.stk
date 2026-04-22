@@ -2,20 +2,27 @@
 # Rosetta Code: Kaprekar Numbers
 
 fn my_is_kaprekar($n) {
-    return 1 if $n == 1
-    my $sq = $n * $n
-    my $s = "$sq"
-    my $len = length($s)
-    
-    for my $i (1..$len-1) {
-        my $left = substr($s, 0, $i)
-        my $right = substr($s, $i)
-        next if $right =~ /^0+$/
-        if (int($left) + int($right) == $n) {
-            return 1
+    if ($n == 1) {
+        1
+    } else {
+        my $sq = $n * $n
+        my $s = "$sq"
+        my $len = length($s)
+        
+        my $found = 0
+        my $i = 1
+        while (!$found && $i < $len) {
+            my $left = substr($s, 0, $i)
+            my $right = substr($s, $i)
+            if ($right !~ /^0+$/) {
+                if (int($left) + int($right) == $n) {
+                    $found = 1
+                }
+            }
+            $i++
         }
+        $found
     }
-    0
 }
 
 fn kaprekar_numbers($max) {

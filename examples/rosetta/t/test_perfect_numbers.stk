@@ -14,10 +14,12 @@ fn sum_array(@arr) {
 }
 
 fn my_is_perfect($n) {
-    return 0 if $n < 2
-    my @divs = my_divisors($n)
-    my $sum = sum_array(@divs)
-    $sum == $n
+    if ($n < 2) { 0 }
+    else {
+        my @divs = my_divisors($n)
+        my $sum = sum_array(@divs)
+        $sum == $n
+    }
 }
 
 fn my_perfect_numbers($max) {

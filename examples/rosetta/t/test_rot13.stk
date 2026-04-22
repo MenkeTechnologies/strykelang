@@ -1,11 +1,16 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Rot-13
 
-fn my_rot13($s) {
-    ~> $s >{split //, $_} map {
-        $_ =~ /[A-Ma-m]/ ? chr(ord($_) + 13)
-      : $_ =~ /[N-Zn-z]/ ? chr(ord($_) - 13)
-      : $_
+fn my_rot13 {
+    my $s = $_[0]
+    ~> $s >{ split //, $_ } map {
+        if ($_ =~ /[A-Ma-m]/) {
+            chr(ord($_) + 13)
+        } elsif ($_ =~ /[N-Zn-z]/) {
+            chr(ord($_) - 13)
+        } else {
+            $_
+        }
     } |> join ""
 }
 

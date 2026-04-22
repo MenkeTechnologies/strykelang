@@ -763,6 +763,7 @@ pub(crate) fn try_builtin(
         "du" | "dir_size" => Some(builtin_du(interp, args, line)),
         "du_tree" | "dir_sizes" => Some(builtin_du_tree(interp, args, line)),
         "process_list" | "ps" | "procs" => Some(builtin_process_list(line)),
+        "proc_grep" | "prgrep" | "psg" => Some(builtin_proc_grep(args, line)),
         // ── Testing framework ──
         "assert_eq" | "aeq" => Some(builtin_assert_eq(interp, args, line)),
         "assert_ne" | "ane" => Some(builtin_assert_ne(interp, args, line)),
@@ -1539,6 +1540,7 @@ pub(crate) fn try_builtin(
         "read_bytes" | "slurp_raw" | "rb" => Some(builtin_read_bytes(args, line)),
         "move" | "mv" => Some(builtin_move(args, line)),
         "which" | "wh" => Some(builtin_which(args, line)),
+        "exe" => Some(builtin_exe(interp, args)),
         "json_encode" | "je" => Some(builtin_json_encode(args)),
         "json_decode" | "jd" => Some(builtin_json_decode(args)),
         "json_jq" | "jq" => Some(builtin_json_jq(args)),
@@ -3770,6 +3772,63 @@ fn builtin_which_all(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
             }
         }
     }
+    Ok(PerlValue::array(results))
+}
+
+/// `exe [DIR]` — list all executable files in DIR (default: $PWD).
+#[cfg(unix)]
+fn builtin_exe(_interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = if args.is_empty() || args[0].is_undef() {
+        std::env::current_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| ".".to_string())
+    } else {
+        args[0].to_string()
+    };
+    let mut results = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                if let Ok(meta) = path.metadata() {
+                    if meta.permissions().mode() & 0o111 != 0 {
+                        if let Some(name) = path.file_name() {
+                            results.push(PerlValue::string(name.to_string_lossy().to_string()));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    results.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+    Ok(PerlValue::array(results))
+}
+
+#[cfg(not(unix))]
+fn builtin_exe(_interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let dir = if args.is_empty() || args[0].is_undef() {
+        std::env::current_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| ".".to_string())
+    } else {
+        args[0].to_string()
+    };
+    let mut results = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                let s = path.to_string_lossy();
+                if s.ends_with(".exe") || s.ends_with(".bat") || s.ends_with(".cmd") {
+                    if let Some(name) = path.file_name() {
+                        results.push(PerlValue::string(name.to_string_lossy().to_string()));
+                    }
+                }
+            }
+        }
+    }
+    results.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
     Ok(PerlValue::array(results))
 }
 
@@ -9187,6 +9246,70 @@ fn builtin_process_list(_line: usize) -> PerlResult<PerlValue> {
         ap.cmp(&bp)
     });
     Ok(PerlValue::array(result))
+}
+
+/// `proc_grep PATTERN` — search processes by name regex, return array of hashrefs (like ps but filtered).
+#[cfg(unix)]
+fn builtin_proc_grep(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    use sysinfo::System;
+    let pattern = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("proc_grep needs a pattern", line))?;
+    let re = regex::Regex::new(&pattern)
+        .map_err(|e| PerlError::runtime(format!("proc_grep: invalid regex: {}", e), line))?;
+    let mut sys = System::new();
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+    let mut result = Vec::new();
+    for (pid, proc_) in sys.processes() {
+        let name = proc_.name().to_string_lossy();
+        if re.is_match(&name) {
+            let mut h = indexmap::IndexMap::new();
+            h.insert("pid".into(), PerlValue::integer(pid.as_u32() as i64));
+            h.insert("name".into(), PerlValue::string(name.to_string()));
+            h.insert("cpu".into(), PerlValue::float(proc_.cpu_usage() as f64));
+            h.insert("mem".into(), PerlValue::integer(proc_.memory() as i64));
+            h.insert(
+                "status".into(),
+                PerlValue::string(format!("{:?}", proc_.status())),
+            );
+            if let Some(parent) = proc_.parent() {
+                h.insert("ppid".into(), PerlValue::integer(parent.as_u32() as i64));
+            }
+            h.insert(
+                "cmd".into(),
+                PerlValue::string(
+                    proc_
+                        .cmd()
+                        .iter()
+                        .map(|s| s.to_string_lossy())
+                        .collect::<Vec<_>>()
+                        .join(" "),
+                ),
+            );
+            result.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+        }
+    }
+    result.sort_by(|a, b| {
+        let ap = a
+            .as_hash_ref()
+            .map(|h| h.read().get("pid").map(|v| v.to_int()).unwrap_or(0))
+            .unwrap_or(0);
+        let bp = b
+            .as_hash_ref()
+            .map(|h| h.read().get("pid").map(|v| v.to_int()).unwrap_or(0))
+            .unwrap_or(0);
+        ap.cmp(&bp)
+    });
+    Ok(PerlValue::array(result))
+}
+
+#[cfg(not(unix))]
+fn builtin_proc_grep(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    Err(PerlError::runtime(
+        "proc_grep not supported on this platform",
+        line,
+    ))
 }
 
 // ── Testing framework ──────────────────────────────────────────────────

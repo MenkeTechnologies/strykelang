@@ -4,13 +4,11 @@
 my @moves
 
 fn do_hanoi($n, $from, $to, $via) {
-    if ($n == 0) {
-        return
+    if ($n > 0) {
+        do_hanoi($n - 1, $from, $via, $to)
+        push @moves, "$from->$to"
+        do_hanoi($n - 1, $via, $to, $from)
     }
-    do_hanoi($n - 1, $from, $via, $to)
-    push @moves, "$from->$to"
-    do_hanoi($n - 1, $via, $to, $from)
-    return
 }
 
 fn count_hanoi_moves($n) {

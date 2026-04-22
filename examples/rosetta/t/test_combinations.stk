@@ -2,17 +2,21 @@
 # Rosetta Code: Combinations
 
 fn my_combinations($k, @arr) {
-    return ([]) if $k == 0
-    return () if $k > scalar(@arr)
-    return ([@arr]) if $k == scalar(@arr)
-    
-    my $first = shift @arr
-    my @with_first = my_combinations($k - 1, @arr)
-    @with_first = map { [$first, @$_] } @with_first
-    
-    my @without_first = my_combinations($k, @arr)
-    
-    (@with_first, @without_first)
+    if ($k == 0) { ([]) }
+    elsif ($k > scalar(@arr)) { () }
+    elsif ($k == scalar(@arr)) { ([@arr]) }
+    else {
+        my $first = shift @arr
+        my @with_first = my_combinations($k - 1, @arr)
+        my @res_with
+        for my $c (@with_first) {
+            push @res_with, [$first, @$c]
+        }
+        
+        my @without_first = my_combinations($k, @arr)
+        
+        (@res_with, @without_first)
+    }
 }
 
 fn my_count_combinations($n, $k) {

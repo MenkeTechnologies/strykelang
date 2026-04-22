@@ -8,12 +8,12 @@ fn greet($name) {
 
 # Function with multiple parameters
 fn add($a, $b) {
-    return $a + $b
+    $a + $b
 }
 
 # Function with default parameters  
 fn power($base, $exp = 2) {
-    return $base ** $exp
+    $base ** $exp
 }
 
 # Function with variable arguments
@@ -25,7 +25,7 @@ fn sum_all(@numbers) {
 fn divide_with_remainder($dividend, $divisor) {
     my $quotient = int($dividend / $divisor)
     my $remainder = $dividend % $divisor
-    return ($quotient, $remainder)
+    ($quotient, $remainder)
 }
 
 # Anonymous function (lambda)

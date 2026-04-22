@@ -2,17 +2,27 @@
 # Rosetta Code: Find First and Last Index
 
 fn my_find_first($needle, @haystack) {
-    for my $i (0..$#haystack) {
-        return $i if $haystack[$i] eq $needle
+    my $found = -1
+    my $i = 0
+    while ($found == -1 && $i <= $#haystack) {
+        if ($haystack[$i] eq $needle) {
+            $found = $i
+        }
+        $i++
     }
-    -1
+    $found
 }
 
 fn my_find_last($needle, @haystack) {
-    for (my $i = $#haystack; $i >= 0; $i--) {
-        return $i if $haystack[$i] eq $needle
+    my $found = -1
+    my $i = $#haystack
+    while ($found == -1 && $i >= 0) {
+        if ($haystack[$i] eq $needle) {
+            $found = $i
+        }
+        $i--
     }
-    -1
+    $found
 }
 
 fn my_find_all($needle, @haystack) {
