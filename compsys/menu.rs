@@ -373,6 +373,7 @@ pub struct MenuState {
     /// Menu selection color (ma= from zstyle)
     selection_color: String,
     /// Prefix match color (from zstyle list-colors pattern)
+    #[allow(dead_code)]
     prefix_color: String,
     /// List separator (ZPWR_CHAR_LOGO)
     list_separator: String,
@@ -1319,7 +1320,7 @@ impl MenuState {
         line: &mut MenuLine,
         item: &MenuItem,
         idx: usize,
-        comp_col_width: usize,
+        _comp_col_width: usize,
         group_color: &str,
     ) {
         let is_selected = self.selected_idx == Some(idx);
@@ -1492,6 +1493,7 @@ fn display_width(s: &str) -> usize {
 
 /// Make a color code bold by prepending "1;" if not already bold
 /// e.g., "32" -> "1;32", "1;32" -> "1;32"
+#[allow(dead_code)]
 fn make_bold(color: &str) -> String {
     if color.is_empty() {
         return "1".to_string();

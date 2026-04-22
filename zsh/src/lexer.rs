@@ -57,6 +57,7 @@ impl LexBuf {
         }
     }
 
+    #[allow(dead_code)]
     fn add_str(&mut self, s: &str) {
         self.data.push_str(s);
     }
@@ -69,10 +70,12 @@ impl LexBuf {
         &self.data
     }
 
+    #[allow(dead_code)]
     fn into_string(self) -> String {
         self.data
     }
 
+    #[allow(dead_code)]
     fn last_char(&self) -> Option<char> {
         self.data.chars().last()
     }
@@ -139,6 +142,7 @@ pub struct ZshLexer<'a> {
     /// Whether this is the first line
     pub isfirstln: bool,
     /// Whether this is the first char of command
+    #[allow(dead_code)]
     isfirstch: bool,
     /// Pending here-documents
     pub heredocs: Vec<HereDoc>,
@@ -252,6 +256,7 @@ impl<'a> ZshLexer<'a> {
     }
 
     /// Peek at next character without consuming
+    #[allow(dead_code)]
     fn peek(&mut self) -> Option<char> {
         if let Some(&c) = self.unget_buf.front() {
             return Some(c);
@@ -280,6 +285,7 @@ impl<'a> ZshLexer<'a> {
     }
 
     /// Check if character is identifier start
+    #[allow(dead_code)]
     fn is_ident_start(c: char) -> bool {
         c.is_ascii_alphabetic() || c == '_'
     }

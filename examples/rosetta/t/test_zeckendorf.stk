@@ -1,0 +1,52 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Zeckendorf number representation
+
+fn my_rev(@arr) {
+    my @reversed
+    my $i = $#arr
+    while ($i >= 0) {
+        push @reversed, $arr[$i]
+        $i = $i - 1
+    }
+    @reversed
+}
+
+fn fib_seq_until($max) {
+    my @fibs
+    my ($a, $b) = (1, 2)
+    while ($a <= $max) {
+        push @fibs, $a
+        ($a, $b) = ($b, $a + $b)
+    }
+    @fibs
+}
+
+fn zeckendorf($n) {
+    if ($n == 0) {
+        return ()
+    }
+    my @fibs = my_rev(fib_seq_until($n))
+    my @result
+    for my $fib (@fibs) {
+        if ($n >= $fib) {
+            push @result, $fib
+            $n = $n - $fib
+        }
+    }
+    my @rev_res = my_rev(@result)
+    @rev_res
+}
+
+my @z100 = zeckendorf(100)
+join(",", @z100) |> assert_eq("3,8,89", "zeckendorf(100)")
+
+my @z20 = zeckendorf(20)
+join(",", @z20) |> assert_eq("2,5,13", "zeckendorf(20)")
+
+my @z0 = zeckendorf(0)
+assert_eq(scalar(@z0), 0, "zeckendorf(0)")
+
+my @z8 = zeckendorf(8)
+join(",", @z8) |> assert_eq("8", "zeckendorf(8)")
+
+test_run

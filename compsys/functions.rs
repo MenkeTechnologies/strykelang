@@ -92,7 +92,7 @@ pub fn setup(state: &mut MainCompleteState, tag: &str) {
 
 /// _dispatch - Dispatch to the appropriate completion function
 pub fn dispatch(
-    state: &mut MainCompleteState,
+    _state: &mut MainCompleteState,
     comps: &HashMap<String, String>,
     commands: &[&str],
 ) -> CompleterResult {

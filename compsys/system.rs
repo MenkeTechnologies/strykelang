@@ -2,7 +2,7 @@
 //!
 //! Provides completions for system resources like users, groups, hosts, PIDs, etc.
 
-use crate::{Completion, CompletionGroup, CompletionReceiver};
+use crate::{Completion, CompletionReceiver};
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufRead, BufReader};

@@ -1405,6 +1405,7 @@ impl DecodedOp {
 }
 
 /// Helper to convert redir type to our RedirectOp
+#[allow(dead_code)]
 fn redir_type_to_op(redir_type: u32) -> Option<RedirectOp> {
     // Zsh redirect types from zsh.h
     const REDIR_WRITE: u32 = 0;
