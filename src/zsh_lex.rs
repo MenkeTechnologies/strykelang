@@ -148,7 +148,11 @@ pub struct ZshLexer<'a> {
     pub error: Option<String>,
     /// Global iteration counter for infinite loop detection
     global_iterations: usize,
+    /// Recursion depth counter
+    recursion_depth: usize,
 }
+
+const MAX_LEXER_RECURSION: usize = 200;
 
 impl<'a> ZshLexer<'a> {
     /// Create a new lexer for the given input
@@ -182,6 +186,19 @@ impl<'a> ZshLexer<'a> {
             isnewlin: 0,
             error: None,
             global_iterations: 0,
+            recursion_depth: 0,
+        }
+    }
+    
+    /// Check recursion depth; returns true if exceeded
+    #[inline]
+    fn check_recursion(&mut self) -> bool {
+        if self.recursion_depth > MAX_LEXER_RECURSION {
+            self.error = Some("lexer exceeded max recursion depth".to_string());
+            self.lexstop = true;
+            true
+        } else {
+            false
         }
     }
     
@@ -272,8 +289,8 @@ impl<'a> ZshLexer<'a> {
             return;
         }
         
-        // Reset iteration counter for this token
-        self.global_iterations = 0;
+        // Note: Do NOT reset global_iterations here - it must accumulate across all
+        // zshlex calls in a parse to prevent infinite loops in the parser
 
         loop {
             if self.inrepeat > 0 {
@@ -321,6 +338,8 @@ impl<'a> ZshLexer<'a> {
         }
 
         // Update command position for next token based on current token
+        // Note: In case patterns (incasepat > 0), | is a pattern separator, not pipeline,
+        // so we don't set incmdpos after Bar in that context
         match self.tok {
             LexTok::Seper
             | LexTok::Newlin
@@ -334,7 +353,6 @@ impl<'a> ZshLexer<'a> {
             | LexTok::Inbrace
             | LexTok::Dbar
             | LexTok::Damper
-            | LexTok::Bar
             | LexTok::Baramp
             | LexTok::Inoutpar
             | LexTok::Doloop
@@ -345,6 +363,12 @@ impl<'a> ZshLexer<'a> {
             | LexTok::Func => {
                 self.incmdpos = true;
             }
+            LexTok::Bar => {
+                // In case patterns, | is a pattern separator - don't change incmdpos
+                if self.incasepat <= 0 {
+                    self.incmdpos = true;
+                }
+            }
             LexTok::String
             | LexTok::Typeset
             | LexTok::Envarray
@@ -354,6 +378,27 @@ impl<'a> ZshLexer<'a> {
                 self.incmdpos = false;
             }
             _ => {}
+        }
+        
+        // Track 'for' keyword for C-style for loop: for (( init; cond; step ))
+        // When we see 'for', set infor=2 to expect the init and cond parts
+        // Each Dinpar (after semicolon in arithmetic) decrements it
+        if self.tok != LexTok::Dinpar {
+            self.infor = if self.tok == LexTok::For { 2 } else { 0 };
+        }
+        
+        // Handle redirection context
+        let oldpos = self.incmdpos;
+        if self.tok.is_redirop()
+            || self.tok == LexTok::For
+            || self.tok == LexTok::Foreach
+            || self.tok == LexTok::Select
+        {
+            self.inredir = true;
+            self.incmdpos = false;
+        } else if self.inredir {
+            self.incmdpos = oldpos;
+            self.inredir = false;
         }
     }
 
@@ -955,9 +1000,8 @@ impl<'a> ZshLexer<'a> {
                 }
 
                 '{' => {
-                    if in_brace_param > 0 || bct > 0 {
-                        bct += 1;
-                    }
+                    // Track braces for both ${...} param expansion and {...} brace expansion
+                    bct += 1;
                     self.add(c);
                 }
 
@@ -969,8 +1013,9 @@ impl<'a> ZshLexer<'a> {
                         bct -= 1;
                         self.add(char_tokens::OUTBRACE);
                     } else if bct > 0 {
+                        // Closing a brace expansion like {a,b}
                         bct -= 1;
-                        self.add(char_tokens::OUTBRACE);
+                        self.add(c);
                     } else {
                         break;
                     }
@@ -1283,6 +1328,18 @@ impl<'a> ZshLexer<'a> {
 
     /// Parse double-quoted string content
     fn dquote_parse(&mut self, endchar: char, sub: bool) -> Result<(), ()> {
+        self.recursion_depth += 1;
+        if self.check_recursion() {
+            self.recursion_depth -= 1;
+            return Err(());
+        }
+        
+        let result = self.dquote_parse_inner(endchar, sub);
+        self.recursion_depth -= 1;
+        result
+    }
+    
+    fn dquote_parse_inner(&mut self, endchar: char, sub: bool) -> Result<(), ()> {
         let mut pct = 0; // parenthesis count
         let mut brct = 0; // bracket count
         let mut bct = 0; // brace count (for ${...})

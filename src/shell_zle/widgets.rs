@@ -23,6 +23,12 @@ pub enum WidgetResult {
     Refresh,
     /// Clear screen
     Clear,
+    /// Trigger completion (expand-or-complete, complete-word)
+    TriggerCompletion,
+    /// Menu complete (cycle forward)
+    MenuComplete,
+    /// Reverse menu complete (cycle backward)
+    ReverseMenuComplete,
 }
 
 /// A ZLE widget
@@ -34,67 +40,266 @@ pub enum Widget {
     User(String),
 }
 
-/// Built-in widget types
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Built-in widget types - all ZLE widgets from `man zshzle`
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BuiltinWidget {
+    // =========================================================================
     // Movement
+    // =========================================================================
     ForwardChar,
     BackwardChar,
     ForwardWord,
     BackwardWord,
+    EmacsForwardWord,
+    EmacsBackwardWord,
     BeginningOfLine,
     EndOfLine,
+    ViBeginningOfLine,
+    ViEndOfLine,
+    ViFirstNonBlank,
+    ViForwardChar,
+    ViBackwardChar,
+    ViForwardWord,
+    ViBackwardWord,
+    ViForwardWordEnd,
+    ViBackwardWordEnd,
+    ViForwardBlankWord,
+    ViBackwardBlankWord,
+    ViForwardBlankWordEnd,
+    ViBackwardBlankWordEnd,
+    ViFindNextChar,
+    ViFindNextCharSkip,
+    ViFindPrevChar,
+    ViFindPrevCharSkip,
+    ViRepeatFind,
+    ViRevRepeatFind,
+    ViGotoColumn,
+    ViGotoMark,
+    ViGotoMarkLine,
+    UpLine,
+    DownLine,
 
-    // Editing
-    SelfInsert,
-    DeleteChar,
-    BackwardDeleteChar,
-    KillLine,
-    BackwardKillLine,
-    KillWord,
-    BackwardKillWord,
-    KillWholeLine,
-    Yank,
-    YankPop,
-
-    // Undo
-    Undo,
-    Redo,
-
-    // History
+    // =========================================================================
+    // History Navigation
+    // =========================================================================
     UpLineOrHistory,
     DownLineOrHistory,
+    ViUpLineOrHistory,
+    ViDownLineOrHistory,
+    UpLineOrSearch,
+    DownLineOrSearch,
+    UpHistory,
+    DownHistory,
     BeginningOfHistory,
     EndOfHistory,
+    BeginningOfBufferOrHistory,
+    EndOfBufferOrHistory,
+    BeginningOfLineHist,
+    EndOfLineHist,
+    ViFetchHistory,
     HistoryIncrementalSearchBackward,
     HistoryIncrementalSearchForward,
+    HistoryIncrementalPatternSearchBackward,
+    HistoryIncrementalPatternSearchForward,
+    HistorySearchBackward,
+    HistorySearchForward,
+    ViHistorySearchBackward,
+    ViHistorySearchForward,
+    HistoryBeginningSearchBackward,
+    HistoryBeginningSearchForward,
+    InferNextHistory,
+    InsertLastWord,
+    ViRepeatSearch,
+    ViRevRepeatSearch,
+    SetLocalHistory,
 
-    // Completion
-    ExpandOrComplete,
-    CompleteWord,
-    MenuComplete,
-    ReverseMenuComplete,
+    // =========================================================================
+    // Editing - Insert/Delete
+    // =========================================================================
+    SelfInsert,
+    SelfInsertUnmeta,
+    QuotedInsert,
+    ViQuotedInsert,
+    DeleteChar,
+    BackwardDeleteChar,
+    ViDeleteChar,
+    ViBackwardDeleteChar,
+    DeleteWord,
+    BackwardDeleteWord,
 
-    // Accept/Execute
-    AcceptLine,
-    AcceptAndHold,
-    SendBreak,
+    // =========================================================================
+    // Editing - Kill/Yank
+    // =========================================================================
+    KillLine,
+    BackwardKillLine,
+    ViKillLine,
+    ViKillEol,
+    KillWord,
+    BackwardKillWord,
+    ViBackwardKillWord,
+    KillWholeLine,
+    KillBuffer,
+    KillRegion,
+    CopyRegionAsKill,
+    CopyPrevWord,
+    CopyPrevShellWord,
+    Yank,
+    YankPop,
+    ViYank,
+    ViYankWholeLine,
+    ViYankEol,
+    ViPutBefore,
+    ViPutAfter,
+    PutReplaceSelection,
 
-    // Misc
-    ClearScreen,
-    Redisplay,
-    TransposeChars,
-    TransposeWords,
+    // =========================================================================
+    // Editing - Case change
+    // =========================================================================
     CapitalizeWord,
     DownCaseWord,
     UpCaseWord,
-    QuotedInsert,
-    ViCmdMode,
+    ViDownCase,
+    ViUpCase,
+    ViSwapCase,
+    ViOperSwapCase,
+
+    // =========================================================================
+    // Editing - Transpose
+    // =========================================================================
+    TransposeChars,
+    TransposeWords,
+    GosmacsTransposeChars,
+
+    // =========================================================================
+    // Editing - Vi operators/changes
+    // =========================================================================
+    ViChange,
+    ViChangeEol,
+    ViChangeWholeLine,
+    ViDelete,
+    ViIndent,
+    ViUnindent,
+    ViSubstitute,
+    ViAddNext,
+    ViAddEol,
     ViInsert,
+    ViInsertBol,
+    ViOpenLineAbove,
+    ViOpenLineBelow,
+    ViReplace,
+    ViReplaceChars,
+    ViRepeatChange,
+    ViJoin,
+    ViMatchBracket,
+
+    // =========================================================================
+    // Undo/Redo
+    // =========================================================================
+    Undo,
+    Redo,
+    ViUndoChange,
+    SplitUndo,
+
+    // =========================================================================
+    // Completion
+    // =========================================================================
+    ExpandOrComplete,
+    ExpandOrCompletePrefix,
+    CompleteWord,
+    MenuComplete,
+    MenuExpandOrComplete,
+    ReverseMenuComplete,
+    AcceptAndMenuComplete,
+    DeleteCharOrList,
+    ExpandCmdPath,
+    ExpandHistory,
+    ExpandWord,
+    ListChoices,
+    ListExpand,
+    MagicSpace,
+    EndOfList,
+
+    // =========================================================================
+    // Accept/Execute
+    // =========================================================================
+    AcceptLine,
+    AcceptAndHold,
+    AcceptAndInferNextHistory,
+    AcceptLineAndDownHistory,
+    SendBreak,
+
+    // =========================================================================
+    // Mode switching
+    // =========================================================================
+    ViCmdMode,
+    ViCapsLockPanic,
+
+    // =========================================================================
+    // Numeric argument
+    // =========================================================================
+    DigitArgument,
+    NegArgument,
+    UniversalArgument,
+    ArgumentBase,
+    ViDigitOrBeginningOfLine,
+
+    // =========================================================================
+    // Marks and Region
+    // =========================================================================
     SetMarkCommand,
     ExchangePointAndMark,
-    KillRegion,
-    CopyRegionAsKill,
+    ViSetMark,
+    ViSetBuffer,
+    DeactivateRegion,
+    VisualMode,
+    VisualLineMode,
+    SelectAWord,
+    SelectABlankWord,
+    SelectAShellWord,
+    SelectInWord,
+    SelectInBlankWord,
+    SelectInShellWord,
+
+    // =========================================================================
+    // Miscellaneous
+    // =========================================================================
+    ClearScreen,
+    Redisplay,
+    ResetPrompt,
+    OverwriteMode,
+    UndefinedKey,
+    BracketedPaste,
+    PushLine,
+    PushLineOrEdit,
+    PushInput,
+    GetLine,
+    PoundInsert,
+    ViPoundInsert,
+    QuoteLine,
+    QuoteRegion,
+    ReadCommand,
+    RecursiveEdit,
+    RunHelp,
+    SpellWord,
+    WhatCursorPosition,
+    WhereIs,
+    WhichCommand,
+    ExecuteNamedCmd,
+    ExecuteLastNamedCmd,
+    DescribeKeyBriefly,
+    AutoSuffixRemove,
+    AutoSuffixRetain,
+
+    // =========================================================================
+    // Special hooks (user-defined but special names)
+    // =========================================================================
+    ZleLineInit,
+    ZleLineFinish,
+    ZleLinePreRedraw,
+    ZleKeymapSelect,
+    ZleHistoryLineSet,
+    ZleIsearchUpdate,
+    ZleIsearchExit,
 }
 
 /// Execute a builtin widget
@@ -311,15 +516,42 @@ pub fn execute_builtin(
         BuiltinWidget::HistoryIncrementalSearchBackward => WidgetResult::Ok,
         BuiltinWidget::HistoryIncrementalSearchForward => WidgetResult::Ok,
 
-        // Completion
-        BuiltinWidget::ExpandOrComplete => WidgetResult::Ok,
-        BuiltinWidget::CompleteWord => WidgetResult::Ok,
-        BuiltinWidget::MenuComplete => WidgetResult::Ok,
-        BuiltinWidget::ReverseMenuComplete => WidgetResult::Ok,
+        // Completion - trigger compsys
+        BuiltinWidget::ExpandOrComplete
+        | BuiltinWidget::ExpandOrCompletePrefix
+        | BuiltinWidget::CompleteWord
+        | BuiltinWidget::ExpandWord
+        | BuiltinWidget::ExpandCmdPath
+        | BuiltinWidget::ListChoices
+        | BuiltinWidget::ListExpand => WidgetResult::TriggerCompletion,
+        BuiltinWidget::MenuComplete
+        | BuiltinWidget::MenuExpandOrComplete
+        | BuiltinWidget::AcceptAndMenuComplete => WidgetResult::MenuComplete,
+        BuiltinWidget::ReverseMenuComplete => WidgetResult::ReverseMenuComplete,
+        BuiltinWidget::DeleteCharOrList => {
+            let chars: Vec<char> = state.buffer.chars().collect();
+            if state.cursor >= chars.len() {
+                WidgetResult::TriggerCompletion
+            } else {
+                let mut new_buffer = String::new();
+                for (i, ch) in chars.iter().enumerate() {
+                    if i != state.cursor {
+                        new_buffer.push(*ch);
+                    }
+                }
+                state.buffer = new_buffer;
+                WidgetResult::Ok
+            }
+        }
+        BuiltinWidget::ExpandHistory | BuiltinWidget::MagicSpace | BuiltinWidget::EndOfList => {
+            WidgetResult::Ok
+        }
 
         // Accept/Execute
         BuiltinWidget::AcceptLine => WidgetResult::Accept,
-        BuiltinWidget::AcceptAndHold => WidgetResult::Accept,
+        BuiltinWidget::AcceptAndHold
+        | BuiltinWidget::AcceptAndInferNextHistory
+        | BuiltinWidget::AcceptLineAndDownHistory => WidgetResult::Accept,
         BuiltinWidget::SendBreak => WidgetResult::Abort,
 
         // Misc
@@ -489,5 +721,8 @@ pub fn execute_builtin(
             }
             WidgetResult::Ok
         }
+        
+        // Unimplemented widgets return Ok to avoid breaking the editor
+        _ => WidgetResult::Ok,
     }
 }
