@@ -409,6 +409,139 @@ mod tests {
         // This test will pass even without zpwr (empty is valid)
         assert!(colors.tag_colors.len() >= 0);
     }
+
+    #[test]
+    fn test_parse_zstyles_basic() {
+        let content = r#"
+zstyle ':completion:*' menu select
+zstyle ':completion:*:descriptions' format '%d'
+"#;
+        let styles = parse_zstyles_from_content(content);
+        assert_eq!(styles.len(), 2);
+        
+        assert_eq!(styles[0].pattern, ":completion:*");
+        assert_eq!(styles[0].style, "menu");
+        assert_eq!(styles[0].values, vec!["select"]);
+        assert!(!styles[0].eval);
+        
+        assert_eq!(styles[1].pattern, ":completion:*:descriptions");
+        assert_eq!(styles[1].style, "format");
+        assert_eq!(styles[1].values, vec!["%d"]);
+    }
+
+    #[test]
+    fn test_parse_zstyles_with_builtin() {
+        let content = r#"
+builtin zstyle ':completion:*' verbose yes
+"#;
+        let styles = parse_zstyles_from_content(content);
+        assert_eq!(styles.len(), 1);
+        assert_eq!(styles[0].style, "verbose");
+        assert_eq!(styles[0].values, vec!["yes"]);
+    }
+
+    #[test]
+    fn test_parse_zstyles_with_eval() {
+        let content = r#"
+zstyle -e ':completion:*' hosts 'reply=($myhosts)'
+"#;
+        let styles = parse_zstyles_from_content(content);
+        assert_eq!(styles.len(), 1);
+        assert!(styles[0].eval);
+        assert_eq!(styles[0].style, "hosts");
+    }
+
+    #[test]
+    fn test_parse_zstyles_multiple_values() {
+        let content = r#"
+zstyle ':completion:*' completer _complete _approximate _correct
+"#;
+        let styles = parse_zstyles_from_content(content);
+        assert_eq!(styles.len(), 1);
+        assert_eq!(styles[0].values, vec!["_complete", "_approximate", "_correct"]);
+    }
+
+    #[test]
+    fn test_parse_zstyles_quoted_values() {
+        let content = r#"
+zstyle ':completion:*' format "-- %d --"
+zstyle ':completion:*' list-prompt 'At %p'
+"#;
+        let styles = parse_zstyles_from_content(content);
+        assert_eq!(styles.len(), 2);
+        assert_eq!(styles[0].values, vec!["-- %d --"]);
+        assert_eq!(styles[1].values, vec!["At %p"]);
+    }
+
+    #[test]
+    fn test_parse_zstyles_ignores_comments() {
+        let content = r#"
+# This is a comment
+zstyle ':completion:*' menu select
+# Another comment
+"#;
+        let styles = parse_zstyles_from_content(content);
+        assert_eq!(styles.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_zstyles_ignores_empty_lines() {
+        let content = r#"
+
+zstyle ':completion:*' menu select
+
+zstyle ':completion:*' verbose yes
+
+"#;
+        let styles = parse_zstyles_from_content(content);
+        assert_eq!(styles.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_ansi_c_string_basic() {
+        assert_eq!(parse_ansi_c_string("hello"), "hello");
+        assert_eq!(parse_ansi_c_string(r"hello\nworld"), "hello\nworld");
+        assert_eq!(parse_ansi_c_string(r"tab\there"), "tab\there");
+    }
+
+    #[test]
+    fn test_parse_ansi_c_string_escapes() {
+        assert_eq!(parse_ansi_c_string(r"\\"), "\\");
+        assert_eq!(parse_ansi_c_string(r"\'"), "'");
+        assert_eq!(parse_ansi_c_string(r"\r\n"), "\r\n");
+    }
+
+    #[test]
+    fn test_header_colors_default() {
+        let hc = HeaderColors::default();
+        assert_eq!(hc.pre, "-<<");
+        assert_eq!(hc.post, ">>-");
+        assert_eq!(hc.pre_color, "1;31");
+        assert_eq!(hc.text_color, "34");
+        assert_eq!(hc.post_color, "1;31");
+    }
+
+    #[test]
+    fn test_zstyle_colors_default() {
+        let colors = ZstyleColors::default();
+        assert!(colors.menu_selection.is_empty());
+        assert!(colors.prefix_color.is_empty());
+        assert!(colors.tag_colors.is_empty());
+    }
+
+    #[test]
+    fn test_parsed_zstyle_struct() {
+        let zstyle = ParsedZstyle {
+            pattern: ":completion:*".to_string(),
+            style: "menu".to_string(),
+            values: vec!["select".to_string()],
+            eval: false,
+        };
+        
+        assert_eq!(zstyle.pattern, ":completion:*");
+        assert_eq!(zstyle.style, "menu");
+        assert!(!zstyle.eval);
+    }
 }
 
 // =============================================================================

@@ -168,6 +168,31 @@ impl CompletionState {
         }
     }
 
+    /// Apply group-order style to reorder completion groups
+    /// group-order values are group names in the desired order
+    /// Groups not in the list appear at the end in original order
+    pub fn apply_group_order(&mut self, order: &[String]) {
+        if order.is_empty() {
+            return;
+        }
+        
+        let mut ordered: Vec<CompletionGroup> = Vec::with_capacity(self.groups.len());
+        let mut remaining: Vec<CompletionGroup> = Vec::new();
+        
+        // First, add groups in the specified order
+        for name in order {
+            if let Some(pos) = self.groups.iter().position(|g| &g.name == name) {
+                ordered.push(self.groups.remove(pos));
+            }
+        }
+        
+        // Then add remaining groups
+        remaining.append(&mut self.groups);
+        ordered.append(&mut remaining);
+        
+        self.groups = ordered;
+    }
+
     /// Add a match to the current or specified group
     pub fn add_match(&mut self, comp: Completion, group_name: Option<&str>) {
         let group_name = group_name.unwrap_or("default");
@@ -402,5 +427,218 @@ mod tests {
         assert_eq!(groups[0].matches[0].str_, "alpha");
         assert_eq!(groups[0].matches[1].str_, "beta");
         assert_eq!(groups[0].matches[2].str_, "zebra");
+    }
+
+    #[test]
+    fn test_apply_group_order() {
+        let mut state = CompletionState::new();
+        
+        state.begin_group("files", true);
+        state.add_match(Completion::new("file1"), Some("files"));
+        state.end_group();
+        
+        state.begin_group("directories", true);
+        state.add_match(Completion::new("dir1"), Some("directories"));
+        state.end_group();
+        
+        state.begin_group("commands", true);
+        state.add_match(Completion::new("cmd1"), Some("commands"));
+        state.end_group();
+
+        // Original order: files, directories, commands
+        assert_eq!(state.groups[0].name, "files");
+        assert_eq!(state.groups[1].name, "directories");
+        assert_eq!(state.groups[2].name, "commands");
+
+        // Apply custom order: commands first, then directories
+        state.apply_group_order(&[
+            "commands".to_string(),
+            "directories".to_string(),
+        ]);
+
+        // New order: commands, directories, files (files at end since not in order list)
+        assert_eq!(state.groups[0].name, "commands");
+        assert_eq!(state.groups[1].name, "directories");
+        assert_eq!(state.groups[2].name, "files");
+    }
+
+    #[test]
+    fn test_apply_group_order_empty() {
+        let mut state = CompletionState::new();
+        
+        state.begin_group("files", true);
+        state.add_match(Completion::new("file1"), Some("files"));
+        state.end_group();
+        
+        state.begin_group("commands", true);
+        state.add_match(Completion::new("cmd1"), Some("commands"));
+        state.end_group();
+
+        // Empty order should not change anything
+        state.apply_group_order(&[]);
+
+        assert_eq!(state.groups[0].name, "files");
+        assert_eq!(state.groups[1].name, "commands");
+    }
+
+    #[test]
+    fn test_apply_group_order_nonexistent_groups() {
+        let mut state = CompletionState::new();
+        
+        state.begin_group("files", true);
+        state.add_match(Completion::new("file1"), Some("files"));
+        state.end_group();
+
+        // Order includes non-existent group
+        state.apply_group_order(&[
+            "nonexistent".to_string(),
+            "files".to_string(),
+        ]);
+
+        // Should still work, just files at the start (from order)
+        assert_eq!(state.groups.len(), 1);
+        assert_eq!(state.groups[0].name, "files");
+    }
+
+    #[test]
+    fn test_completion_state_multiple_groups() {
+        let mut state = CompletionState::new();
+        
+        state.begin_group("options", true);
+        state.add_match(Completion::new("--help"), Some("options"));
+        state.add_match(Completion::new("--version"), Some("options"));
+        state.end_group();
+        
+        state.begin_group("files", true);
+        state.add_match(Completion::new("foo.txt"), Some("files"));
+        state.end_group();
+
+        assert_eq!(state.groups.len(), 2);
+        assert_eq!(state.nmatches, 3);
+        assert_eq!(state.groups[0].matches.len(), 2);
+        assert_eq!(state.groups[1].matches.len(), 1);
+    }
+
+    #[test]
+    fn test_completion_state_add_to_existing_group() {
+        let mut state = CompletionState::new();
+        
+        state.begin_group("files", true);
+        state.add_match(Completion::new("a.txt"), Some("files"));
+        state.end_group();
+        
+        // Add more to the same group
+        state.begin_group("files", true);
+        state.add_match(Completion::new("b.txt"), Some("files"));
+        state.end_group();
+
+        // Should be one group with two matches
+        assert_eq!(state.groups.len(), 1);
+        assert_eq!(state.groups[0].matches.len(), 2);
+    }
+
+    #[test]
+    fn test_completion_state_explanation() {
+        let mut state = CompletionState::new();
+        
+        state.begin_group("files", true);
+        state.add_explanation("Select a file".to_string(), Some("files"));
+        state.add_match(Completion::new("test.txt"), Some("files"));
+        state.end_group();
+
+        // add_explanation adds to explanations vec, not the explanation field
+        assert!(state.groups[0].explanations.contains(&"Select a file".to_string()));
+    }
+
+    #[test]
+    fn test_do_completion() {
+        let mut state = CompletionState::new();
+        
+        let matches = do_completion("git ch", 6, &mut state, |s| {
+            s.add_match(Completion::new("checkout"), None);
+            s.add_match(Completion::new("cherry-pick"), None);
+        });
+
+        assert_eq!(matches, 2);
+        assert_eq!(state.ainfo.prefix, "che");
+    }
+
+    #[test]
+    fn test_completion_mode_default() {
+        let mode = CompletionMode::default();
+        assert!(!mode.no_files);
+        assert!(!mode.force_files);
+        assert!(!mode.requires_param);
+    }
+
+    #[test]
+    fn test_comp_params_from_line_empty() {
+        let params = CompParams::from_line("", 0);
+        assert_eq!(params.words.len(), 1);
+        assert_eq!(params.words[0], "");
+        assert_eq!(params.current, 1);
+        assert_eq!(params.prefix, "");
+        assert_eq!(params.suffix, "");
+    }
+
+    #[test]
+    fn test_comp_params_from_line_single_word() {
+        let params = CompParams::from_line("git", 3);
+        assert_eq!(params.words, vec!["git"]);
+        assert_eq!(params.current, 1);
+        assert_eq!(params.prefix, "git");
+    }
+
+    #[test]
+    fn test_comp_params_from_line_multiple_words() {
+        let params = CompParams::from_line("git checkout main", 17);
+        assert_eq!(params.words, vec!["git", "checkout", "main"]);
+        assert_eq!(params.current, 3);
+        assert_eq!(params.prefix, "main");
+    }
+
+    #[test]
+    fn test_comp_params_cursor_mid_word() {
+        let params = CompParams::from_line("git check", 7);
+        assert_eq!(params.current, 2);
+        assert_eq!(params.prefix, "che");
+        assert_eq!(params.suffix, "ck");
+    }
+
+    #[test]
+    fn test_comp_params_cursor_between_words() {
+        let params = CompParams::from_line("git checkout ", 13);
+        assert_eq!(params.current, 3);
+        assert_eq!(params.prefix, "");
+    }
+
+    #[test]
+    fn test_unambiguous_no_matches() {
+        let mut state = CompletionState::new();
+        state.calculate_unambiguous();
+        
+        assert_eq!(state.ainfo.prefix, "");
+        assert!(!state.ainfo.exact);
+    }
+
+    #[test]
+    fn test_unambiguous_common_prefix() {
+        let mut state = CompletionState::new();
+        state.add_match(Completion::new("foobar"), None);
+        state.add_match(Completion::new("foobaz"), None);
+        state.add_match(Completion::new("fooqux"), None);
+        state.calculate_unambiguous();
+
+        assert_eq!(state.ainfo.prefix, "foo");
+        assert!(!state.ainfo.exact);
+    }
+
+    #[test]
+    fn test_compstate_context_string() {
+        let mut state = CompletionState::new();
+        state.params.compstate.context = crate::state::CompletionContext::Command;
+        
+        let ctx = state.context_string();
+        assert!(ctx.contains("completion"));
     }
 }

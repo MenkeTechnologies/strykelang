@@ -11,26 +11,27 @@ exclude = ["/parity/", "/.github/"]
 
 [lib]
 name = "stryke"
+path = "strykelang/lib.rs"
 
 [[bin]]
 name = "stryke"
-path = "src/main.rs"
+path = "strykelang/main.rs"
 
 [[bin]]
 name = "st"
-path = "src/main.rs"
+path = "strykelang/main.rs"
 
 [[bin]]
 name = "s"
-path = "src/main.rs"
+path = "strykelang/main.rs"
 
 [[bin]]
 name = "gen-docs"
-path = "src/bin/gen_docs.rs"
+path = "strykelang/bin/gen_docs.rs"
 
 [[bin]]
 name = "zshrs"
-path = "src/bin/zshrs.rs"
+path = "strykelang/bin/zshrs.rs"
 
 [dependencies]
 rayon = "1.10"
@@ -144,6 +145,9 @@ lsp-server = "0.7.9"
 lsp-types = "0.97.0"
 unicode_names2 = "2"
 reedline = "0.47.0"
+nu-ansi-term = "0.50"
+compsys = { path = "compsys" }
+zsh = { path = "zsh" }
 dirs = "6.0.0"
 hostname = "0.4.2"
 atty = "0.2.14"
@@ -183,3 +187,6 @@ opt-level = 1
 
 [build-dependencies]
 regex = "1.11"
+
+[workspace]
+members = [".", "compsys", "zsh"]

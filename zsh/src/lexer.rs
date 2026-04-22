@@ -1990,7 +1990,7 @@ impl<'a> ZshLexer<'a> {
     pub fn check_reserved_word(&mut self) -> bool {
         if let Some(ref tokstr) = self.tokstr {
             if self.incmdpos || (tokstr == "}" && self.tok == LexTok::String) {
-                if let Some(tok) = crate::zsh_tokens::lookup_reserved_word(tokstr) {
+                if let Some(tok) = crate::tokens::lookup_reserved_word(tokstr) {
                     self.tok = tok;
                     if tok == LexTok::Repeat {
                         self.inrepeat = 1;

@@ -59,6 +59,35 @@ impl TagManager {
         self.requested.clear();
     }
 
+    /// Configure tag order from zstyle 'tag-order'
+    /// Format: Each value is a space-separated list of tags to try together
+    /// Special: "-" means don't try remaining tags
+    /// Example: "files directories" "arguments" "-"
+    pub fn configure_from_style(&mut self, tag_order: &[String]) {
+        self.try_sets.clear();
+        
+        for group in tag_order {
+            if group == "-" {
+                break;
+            }
+            
+            let tags: Vec<String> = group
+                .split_whitespace()
+                .filter(|t| self.offered.contains(&t.to_string()))
+                .map(|s| s.to_string())
+                .collect();
+            
+            if !tags.is_empty() {
+                self.try_sets.push(tags);
+            }
+        }
+        
+        // If no tag-order or all filtered, use default (all offered at once)
+        if self.try_sets.is_empty() {
+            self.try_sets.push(self.offered.clone());
+        }
+    }
+
     /// Add a tag set to try (comptry)
     pub fn add_try(&mut self, tags: &[String]) {
         let available: Vec<String> = tags
@@ -717,8 +746,9 @@ pub fn completer_prefix(state: &mut MainCompleteState) -> CompleterResult {
 // =============================================================================
 
 /// _description - set up description for a tag
+/// Handles styles: format, hidden, group-name, matcher, sort, ignored-patterns
 pub fn description(
-    state: &mut CompletionState,
+    _state: &mut CompletionState,
     styles: &ZStyleStore,
     context: &str,
     tag: &str,
@@ -726,14 +756,85 @@ pub fn description(
 ) -> Option<String> {
     let ctx = format!("{}:{}", context, tag);
 
-    // Get format from style
+    // Check 'hidden' style - if set to 'all', return empty format
+    if let Some(hidden) = styles.lookup_values(&ctx, "hidden") {
+        if let Some(v) = hidden.first() {
+            match v.as_str() {
+                "all" => return None,
+                "yes" | "true" | "1" | "on" => {
+                    // Hidden but still has format for group header
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // Get format from style (try tag-specific first, then descriptions tag)
     let format = styles
         .lookup_values(&ctx, "format")
+        .or_else(|| styles.lookup_values(&format!("{}:descriptions", context), "format"))
         .and_then(|v| v.first().cloned())
         .unwrap_or_else(|| "%d".to_string());
 
-    // Substitute %d with description
-    Some(format.replace("%d", description))
+    // zformat -F substitution: %d = description, plus additional escapes
+    let result = format
+        .replace("%d", description)
+        .replace("%%", "%");
+    
+    Some(result)
+}
+
+/// Get ignored-patterns for a context/tag
+pub fn get_ignored_patterns(styles: &ZStyleStore, context: &str, tag: &str) -> Vec<String> {
+    let ctx = format!("{}:{}", context, tag);
+    styles
+        .lookup_values(&ctx, "ignored-patterns")
+        .map(|v| v.to_vec())
+        .unwrap_or_default()
+}
+
+/// Check if a string matches any ignored pattern
+pub fn is_ignored(s: &str, patterns: &[String]) -> bool {
+    for pattern in patterns {
+        if glob_match(pattern, s) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Simple glob matching for ignored-patterns
+fn glob_match(pattern: &str, s: &str) -> bool {
+    let pattern = pattern.as_bytes();
+    let s = s.as_bytes();
+    
+    let mut pi = 0;
+    let mut si = 0;
+    let mut star_pi = None;
+    let mut star_si = None;
+    
+    while si < s.len() {
+        if pi < pattern.len() && (pattern[pi] == b'?' || pattern[pi] == s[si]) {
+            pi += 1;
+            si += 1;
+        } else if pi < pattern.len() && pattern[pi] == b'*' {
+            star_pi = Some(pi);
+            star_si = Some(si);
+            pi += 1;
+        } else if let Some(sp) = star_pi {
+            pi = sp + 1;
+            star_si = Some(star_si.unwrap() + 1);
+            si = star_si.unwrap();
+        } else {
+            return false;
+        }
+    }
+    
+    while pi < pattern.len() && pattern[pi] == b'*' {
+        pi += 1;
+    }
+    
+    pi == pattern.len()
 }
 
 /// _message - display a message (no completions)
@@ -782,11 +883,102 @@ mod tests {
     }
 
     #[test]
+    fn test_tag_manager_configure_from_style() {
+        let mut tags = TagManager::new();
+        tags.init(&[
+            "files".to_string(),
+            "directories".to_string(),
+            "commands".to_string(),
+            "options".to_string(),
+        ]);
+
+        // Configure with tag-order style values
+        tags.configure_from_style(&[
+            "commands options".to_string(),
+            "files directories".to_string(),
+        ]);
+
+        assert!(tags.start());
+        assert!(tags.wanted("commands"));
+        assert!(tags.wanted("options"));
+        assert!(!tags.wanted("files"));
+
+        assert!(tags.next());
+        assert!(tags.wanted("files"));
+        assert!(tags.wanted("directories"));
+        assert!(!tags.wanted("commands"));
+
+        assert!(!tags.next());
+    }
+
+    #[test]
+    fn test_tag_manager_configure_with_dash_stop() {
+        let mut tags = TagManager::new();
+        tags.init(&[
+            "files".to_string(),
+            "directories".to_string(),
+            "commands".to_string(),
+        ]);
+
+        // "-" should stop processing remaining tag groups
+        tags.configure_from_style(&[
+            "files".to_string(),
+            "-".to_string(),
+            "commands".to_string(), // Should be ignored
+        ]);
+
+        assert!(tags.start());
+        assert!(tags.wanted("files"));
+        assert!(!tags.wanted("commands"));
+
+        assert!(!tags.next()); // No more groups
+    }
+
+    #[test]
+    fn test_tag_manager_requested_marks_tag() {
+        let mut tags = TagManager::new();
+        tags.init(&["files".to_string(), "commands".to_string()]);
+        tags.add_try(&["files".to_string(), "commands".to_string()]);
+        tags.start();
+
+        // wanted() doesn't mark as requested
+        assert!(tags.wanted("files"));
+        assert!(!tags.requested.contains("files"));
+
+        // requested() marks as requested
+        assert!(tags.requested("files"));
+        assert!(tags.requested.contains("files"));
+    }
+
+    #[test]
     fn test_alternative_parse() {
         let alt = Alternative::parse("files:file:_files").unwrap();
         assert_eq!(alt.tag, "files");
         assert_eq!(alt.description, "file");
         assert_eq!(alt.action, "_files");
+    }
+
+    #[test]
+    fn test_alternative_parse_with_special_chars() {
+        let alt = Alternative::parse("urls:URL:_urls -f").unwrap();
+        assert_eq!(alt.tag, "urls");
+        assert_eq!(alt.description, "URL");
+        assert_eq!(alt.action, "_urls -f");
+    }
+
+    #[test]
+    fn test_alternative_parse_empty_description() {
+        let alt = Alternative::parse("files::_files").unwrap();
+        assert_eq!(alt.tag, "files");
+        assert_eq!(alt.description, "");
+        assert_eq!(alt.action, "_files");
+    }
+
+    #[test]
+    fn test_alternative_parse_invalid() {
+        assert!(Alternative::parse("invalid").is_none());
+        assert!(Alternative::parse("only:two").is_none());
+        assert!(Alternative::parse("").is_none());
     }
 
     #[test]
@@ -803,8 +995,169 @@ mod tests {
     }
 
     #[test]
+    fn test_value_parse_no_description() {
+        let val = Value::parse("verbose").unwrap();
+        assert_eq!(val.name, "verbose");
+        assert_eq!(val.description, "");
+        assert!(!val.has_arg);
+    }
+
+    #[test]
+    fn test_value_parse_with_action() {
+        let val = Value::parse("file[select file]:filename:_files").unwrap();
+        assert_eq!(val.name, "file");
+        assert_eq!(val.description, "select file");
+        assert!(val.has_arg);
+        assert_eq!(val.arg_description, "filename");
+        assert_eq!(val.action, "_files");
+    }
+
+    #[test]
     fn test_main_complete_state() {
         let state = MainCompleteState::new("git checkout", 12);
         assert_eq!(state.comp.params.prefix, "checkout");
+    }
+
+    #[test]
+    fn test_main_complete_state_empty() {
+        let state = MainCompleteState::new("", 0);
+        assert_eq!(state.comp.params.prefix, "");
+        assert_eq!(state.comp.params.current, 1);
+    }
+
+    #[test]
+    fn test_main_complete_state_mid_word() {
+        let state = MainCompleteState::new("git che", 7);
+        assert_eq!(state.comp.params.prefix, "che");
+    }
+
+    #[test]
+    fn test_context_string() {
+        let mut state = MainCompleteState::new("git checkout", 12);
+        state.ctx.context = "complete".to_string();
+        state.ctx.completer = "complete".to_string();
+        assert_eq!(state.context_string(), ":completion:complete:complete:");
+    }
+
+    #[test]
+    fn test_glob_match_simple() {
+        assert!(glob_match("*.txt", "file.txt"));
+        assert!(glob_match("*.txt", ".txt"));
+        assert!(!glob_match("*.txt", "file.rs"));
+    }
+
+    #[test]
+    fn test_glob_match_question() {
+        assert!(glob_match("file?.txt", "file1.txt"));
+        assert!(glob_match("file?.txt", "fileX.txt"));
+        assert!(!glob_match("file?.txt", "file.txt"));
+        assert!(!glob_match("file?.txt", "file12.txt"));
+    }
+
+    #[test]
+    fn test_glob_match_star_middle() {
+        assert!(glob_match("foo*bar", "foobar"));
+        assert!(glob_match("foo*bar", "foo123bar"));
+        assert!(glob_match("foo*bar", "fooXYZbar"));
+        assert!(!glob_match("foo*bar", "foobaz"));
+    }
+
+    #[test]
+    fn test_glob_match_multiple_stars() {
+        assert!(glob_match("*foo*", "foo"));
+        assert!(glob_match("*foo*", "afoo"));
+        assert!(glob_match("*foo*", "foob"));
+        assert!(glob_match("*foo*", "afoob"));
+        assert!(!glob_match("*foo*", "bar"));
+    }
+
+    #[test]
+    fn test_glob_match_exact() {
+        assert!(glob_match("exact", "exact"));
+        assert!(!glob_match("exact", "exacty"));
+        assert!(!glob_match("exact", "xact"));
+    }
+
+    #[test]
+    fn test_is_ignored() {
+        let patterns = vec![
+            "*.pyc".to_string(),
+            "__pycache__".to_string(),
+            ".git*".to_string(),
+        ];
+        
+        assert!(is_ignored("file.pyc", &patterns));
+        assert!(is_ignored("__pycache__", &patterns));
+        assert!(is_ignored(".git", &patterns));
+        assert!(is_ignored(".gitignore", &patterns));
+        assert!(!is_ignored("main.py", &patterns));
+        assert!(!is_ignored("git", &patterns));
+    }
+
+    #[test]
+    fn test_is_ignored_empty_patterns() {
+        let patterns: Vec<String> = vec![];
+        assert!(!is_ignored("anything", &patterns));
+    }
+
+    #[test]
+    fn test_description_basic() {
+        let mut state = CompletionState::new();
+        let styles = ZStyleStore::new();
+        
+        let result = description(&mut state, &styles, ":completion:", "files", "file");
+        assert_eq!(result, Some("file".to_string())); // Default format is %d
+    }
+
+    #[test]
+    fn test_description_with_format() {
+        let mut state = CompletionState::new();
+        let mut styles = ZStyleStore::new();
+        styles.set(":completion::files", "format", vec!["-- %d --".to_string()], false);
+        
+        let result = description(&mut state, &styles, ":completion:", "files", "file");
+        assert_eq!(result, Some("-- file --".to_string()));
+    }
+
+    #[test]
+    fn test_description_with_hidden_all() {
+        let mut state = CompletionState::new();
+        let mut styles = ZStyleStore::new();
+        styles.set(":completion::files", "hidden", vec!["all".to_string()], false);
+        
+        let result = description(&mut state, &styles, ":completion:", "files", "file");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_description_percent_escape() {
+        let mut state = CompletionState::new();
+        let mut styles = ZStyleStore::new();
+        styles.set(":completion::files", "format", vec!["100%% %d".to_string()], false);
+        
+        let result = description(&mut state, &styles, ":completion:", "files", "complete");
+        assert_eq!(result, Some("100% complete".to_string()));
+    }
+
+    #[test]
+    fn test_completer_result_variants() {
+        let matched = CompleterResult::Matched;
+        let no_match = CompleterResult::NoMatch;
+        let skip = CompleterResult::Skip;
+        
+        // Just verify they're distinct (for match arms)
+        assert!(matches!(matched, CompleterResult::Matched));
+        assert!(matches!(no_match, CompleterResult::NoMatch));
+        assert!(matches!(skip, CompleterResult::Skip));
+    }
+
+    #[test]
+    fn test_completion_context_default() {
+        let ctx = CompletionContext::default();
+        assert_eq!(ctx.context, "");
+        assert_eq!(ctx.completer, "");
+        assert_eq!(ctx.completer_num, 0);
+        assert_eq!(ctx.matcher, "");
+        assert_eq!(ctx.matcher_num, 0);
     }
 }

@@ -50,6 +50,8 @@ pub use base::{
     // Messages
     description as base_description,
     dispatch_complete,
+    get_ignored_patterns,
+    is_ignored,
     main_complete,
     message,
     multi_parts,
@@ -108,4 +110,7 @@ pub use zpwr_colors::{
     DEFAULT_PREFIX_COLOR, MENU_SELECTION_COLOR,
     parse_zstyles_from_config, parse_zstyles_from_content, ParsedZstyle,
 };
-pub use zstyle::{ZStyle, ZStyleLookup, ZStyleStore};
+pub use zstyle::{
+    ZStyle, ZStyleLookup, ZStyleStore,
+    STANDARD_STYLES, STANDARD_TAGS, STANDARD_COMPLETERS,
+};

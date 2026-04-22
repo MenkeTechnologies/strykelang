@@ -18,14 +18,14 @@ use std::fs;
 use std::path::PathBuf;
 
 fn main() {
-    println!("cargo:rerun-if-changed=src/builtins.rs");
-    println!("cargo:rerun-if-changed=src/parser.rs");
-    println!("cargo:rerun-if-changed=src/lsp.rs");
+    println!("cargo:rerun-if-changed=strykelang/builtins.rs");
+    println!("cargo:rerun-if-changed=strykelang/parser.rs");
+    println!("cargo:rerun-if-changed=strykelang/lsp.rs");
     println!("cargo:rerun-if-changed=build.rs");
 
-    let builtins_src = fs::read_to_string("src/builtins.rs").expect("read src/builtins.rs");
-    let parser_src = fs::read_to_string("src/parser.rs").expect("read src/parser.rs");
-    let lsp_src = fs::read_to_string("src/lsp.rs").expect("read src/lsp.rs");
+    let builtins_src = fs::read_to_string("strykelang/builtins.rs").expect("read strykelang/builtins.rs");
+    let parser_src = fs::read_to_string("strykelang/parser.rs").expect("read strykelang/parser.rs");
+    let lsp_src = fs::read_to_string("strykelang/lsp.rs").expect("read strykelang/lsp.rs");
 
     let arms = extract_try_builtin_arms(&builtins_src);
     // `is_perl5_core` uses `matches!(name, …)` (parens), `stryke_extension_name`

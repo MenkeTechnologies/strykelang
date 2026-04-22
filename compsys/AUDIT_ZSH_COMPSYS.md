@@ -207,6 +207,97 @@ All zsh special completion contexts are supported:
 
 ---
 
+## Zstyle Configuration (155 styles parsed)
+
+### Standard Styles Implemented
+
+| Style | Type | Description |
+|-------|------|-------------|
+| `accept-exact` | bool | Accept exact match immediately |
+| `accept-exact-dirs` | bool | Accept exact directory match |
+| `add-space` | bool | Add space after completion |
+| `ambiguous` | bool | Leave cursor after ambiguous component |
+| `auto-description` | string | Format for auto-generated descriptions |
+| `cache-path` | string | Directory for cache files |
+| `cache-policy` | string | Cache validity check function |
+| `command` | array | Override command for matches |
+| `completer` | array | List of completers to use |
+| `delimiters` | array | Word delimiters |
+| `format` | string | Format for group headers |
+| `group-name` | string | Group name (empty = by tag) |
+| `group-order` | array | Order of completion groups |
+| `hidden` | bool | Hide matches from listing |
+| `ignored-patterns` | array | Patterns to exclude |
+| `insert-tab` | bool | Insert tab when nothing to complete |
+| `last-prompt` | bool | Return cursor after list |
+| `list-colors` | array | Colors for completion list |
+| `list-packed` | bool | Pack completion list |
+| `list-prompt` | string | Prompt for paging |
+| `list-rows-first` | bool | List by rows |
+| `list-separator` | string | Separator char |
+| `matcher-list` | array | Matcher specs to try |
+| `max-errors` | int | Max errors for approximate |
+| `menu` | string | Menu selection options |
+| `select-prompt` | string | Prompt during selection |
+| `show-ambiguity` | bool | Highlight ambiguous part |
+| `tag-order` | array | Order to try tags |
+| `use-cache` | bool | Enable caching |
+| `verbose` | bool | Verbose completions |
+
+### Standard Tags (70+)
+
+| Tag | Description |
+|-----|-------------|
+| `accounts` | User accounts |
+| `all-files` | All files |
+| `arguments` | Command arguments |
+| `builtins` | Builtin commands |
+| `commands` | External commands |
+| `corrections` | Spelling corrections |
+| `default` | Default fallback |
+| `descriptions` | For format lookups |
+| `directories` | Directory names |
+| `files` | Generic filenames |
+| `functions` | Function names |
+| `groups` | User groups |
+| `history-words` | History words |
+| `hosts` | Hostnames |
+| `messages` | Message lookups |
+| `named-directories` | ~name directories |
+| `options` | Command options |
+| `parameters` | Shell parameters |
+| `processes` | Process IDs |
+| `signals` | Signal names |
+| `urls` | URLs |
+| `users` | Usernames |
+| `warnings` | Warning lookups |
+
+### Standard Completers
+
+| Completer | Description |
+|-----------|-------------|
+| `_complete` | Standard completion |
+| `_approximate` | Fuzzy matching |
+| `_correct` | Spelling correction |
+| `_expand` | Expand globs/vars/history |
+| `_history` | Complete from history |
+| `_ignored` | Restore ignored matches |
+| `_match` | Pattern matching |
+| `_menu` | Menu completion |
+| `_prefix` | Complete prefix |
+
+### SQLite Cache Statistics
+
+| Table | Count |
+|-------|-------|
+| `comps` | 17,604 |
+| `shell_functions` | 17,747 |
+| `executables` | 2,036 |
+| `zstyles` | 155 |
+| `named_dirs` | 31 |
+
+---
+
 ## Date
 
 Generated: 2026-04-22
