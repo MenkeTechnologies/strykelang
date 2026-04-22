@@ -1,30 +1,31 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Hofstadter Q sequence
 
-my %q
+my %memo
 
-fn Q {
+fn hofstadter_q {
     my $n = $_[0]
-    if (exists %q{$n}) {
-        %q{$n}
+    if (exists $memo{$n}) {
+        $memo{$n}
     } else {
-        if ($n <= 0) {
-            0 
-        } else {
-            my $res = Q($n - Q($n-1)) + Q($n - Q($n-2))
-            %q{$n} = $res
-            $res
-        }
+        my $prev1 = hofstadter_q($n - 1)
+        my $prev2 = hofstadter_q($n - 2)
+        my $res = hofstadter_q($n - $prev1) + hofstadter_q($n - $prev2)
+        $memo{$n} = $res
+        $res
     }
 }
 
 # Initialize for first test
-%q = ( 1=>1, 2=>1 )
-assert_eq Q(10), 6, "Q(10) is 6"
+$memo{1} = 1
+$memo{2} = 1
+assert_eq hofstadter_q(10), 6, "Q(10) is 6"
 
-# Clear memoization for sequence test
-%q = ( 1=>1, 2=>1 )
-my @seq = (1..10) |> map { Q($_) }
+# Clear memoization for sequence test  
+delete $memo{$_} for keys %memo
+$memo{1} = 1
+$memo{2} = 1
+my @seq = (1..10) |> map { hofstadter_q($_) }
 assert_eq join(",", @seq), "1,1,2,3,3,4,5,5,6,6", "first 10 Q numbers"
 
 test_run

@@ -14,11 +14,13 @@ fn count_change {
         0
     } else {
         my $key = "$amount,$coin_idx"
-        if (%memo{$key}) {
-            %memo{$key}
+        if (exists $memo{$key}) {
+            $memo{$key}
         } else {
-            my $res = count_change($amount, $coin_idx - 1) + count_change($amount - $coins[$coin_idx], $coin_idx)
-            %memo{$key} = $res
+            my $without = count_change($amount, $coin_idx - 1)
+            my $with = count_change($amount - $coins[$coin_idx], $coin_idx)
+            my $res = $without + $with
+            $memo{$key} = $res
             $res
         }
     }

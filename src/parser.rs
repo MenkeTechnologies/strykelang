@@ -1477,6 +1477,10 @@ impl Parser {
 
     fn parse_block(&mut self) -> PerlResult<Block> {
         self.expect(&Token::LBrace)?;
+        // Statements inside a block are NOT pipe RHS - reset depth so nested `~>`
+        // parses its own input instead of using `$_[0]` placeholder.
+        let saved_pipe_rhs_depth = self.pipe_rhs_depth;
+        self.pipe_rhs_depth = 0;
         let mut stmts = Vec::new();
         // `{ |$a, $b| body }` — Ruby-style block params.
         // Desugars to `my $a = $_` (1 param), `my $a = $a; my $b = $b` (2 — sort/reduce),
@@ -1491,6 +1495,7 @@ impl Parser {
             stmts.push(self.parse_statement()?);
         }
         self.expect(&Token::RBrace)?;
+        self.pipe_rhs_depth = saved_pipe_rhs_depth;
         Self::default_topic_for_sole_bareword(&mut stmts);
         Ok(stmts)
     }

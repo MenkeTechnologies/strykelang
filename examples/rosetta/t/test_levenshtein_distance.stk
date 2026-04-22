@@ -16,9 +16,9 @@ fn my_levenshtein {
     
     for my $i (1..$len1) {
         for my $j (1..$len2) {
-            my $cost = if ($c1[$i-1] eq $c2[$j-1]) { 0 } else { 1 }
+            my $cost = ($c1[$i-1] eq $c2[$j-1]) ? 0 : 1
             my @v = ($d[$i-1][$j] + 1, $d[$i][$j-1] + 1, $d[$i-1][$j-1] + $cost)
-            $d[$i][$j] = @v |> reduce { if ($a < $b) { $a } else { $b } }
+            $d[$i][$j] = @v |> reduce { ($a < $b) ? $a : $b }
         }
     }
     
