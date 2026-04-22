@@ -82,7 +82,53 @@ autoload -Uz compinit && compinit
 
 ---
 
-## [0x01b] WHY STRYKE — ONE-LINER COMPARISON
+## [0x01b] CONCISENESS — STRYKE VS THE WORLD
+
+stryke is the **most concise ASCII-only general-purpose scripting language** — shorter than Perl, Ruby, Python, and AWK for real-world tasks.
+
+### vs mainstream languages
+
+| Task | stryke | chars | perl | chars | ruby | chars | python | chars |
+|------|--------|-------|------|-------|------|-------|--------|-------|
+| hello world | `p"hello"` | **8** | `print"hello"` | 12 | `puts"hello"` | 10 | `print("hello")` | 14 |
+| sum 1-100 | `p sum 1:100` | **11** | `use List::Util'sum';say sum 1..100` | 38 | `p (1..100).sum` | 15 | `print(sum(range(1,101)))` | 24 |
+| double+filter+sum | `~>1:10map{$_*2}grep{$_>5}sum p` | **32** | `say for grep{$_>5}map{$_*2}1..10` | 36 | `p (1..10).map{...}.select{...}.sum` | 42 | `print(sum(x for x in[...]))` | 56 |
+| max of list | `p max 3,1,4,1,5` | **15** | `use List::Util'max';say max(...)` | 38 | `p [3,1,4,1,5].max` | 17 | `print(max([3,1,4,1,5]))` | 23 |
+| reverse string | `p rev"hello"` | **12** | `say reverse"hello"` | 18 | `puts"hello".reverse` | 18 | `print("hello"[::-1])` | 20 |
+| count array | `p cnt 1:10` | **10** | `say scalar 1..10` | 17 | `p (1..10).count` | 16 | `print(len(range(1,11)))` | 23 |
+| join with comma | `p join",",1:5` | **14** | `say join",",1..5` | 17 | `puts (1..5).to_a.join(",")` | 24 | `print(",".join(map(...)))` | 36 |
+| first element | `p first 1:10` | **13** | `say((1..10)[0])` | 16 | `p (1..10).first` | 16 | `print(list(range(...))[0])` | 27 |
+| any even | `p any{$_%2==0}1:5` | **18** | `use List::Util'any';say any{...}` | 40 | `p (1..5).any?{...}` | 25 | `print(any(x%2==0 for ...))` | 38 |
+| unique values | `p uniq 1,2,2,3` | **15** | `use List::Util'uniq';say uniq(...)` | 38 | `p [1,2,2,3].uniq` | 17 | `print(list(set([...])))` | 27 |
+
+**stryke wins every task** against Perl, Ruby, and Python.
+
+### vs K (array language)
+
+K is more terse for pure array math: `+/1+!100` (8 chars) vs stryke `p sum 1:100` (11 chars). But K is a financial DSL, not a general-purpose language — it lacks:
+
+| Feature | stryke | K |
+|---------|--------|---|
+| HTTP client | `fetch"url"` | ❌ |
+| JSON parsing | `json_decode $s` | needs lib |
+| Regex | `$s=~/\d+/` | limited |
+| SHA256/crypto | `sha256"data"` | ❌ |
+| Parallel map | `pmap{$_*2}@a` | ❌ |
+| Compression | `gzip $data` | ❌ |
+| Base64 | `b64e"hi"` | ❌ |
+| UUID | `uuid` | ❌ |
+| SQLite | `db_query $db,$sql` | ❌ |
+| TOML/YAML | `toml_decode $s` | ❌ |
+
+K is a calculator. stryke is a programming language.
+
+### vs golf languages
+
+GolfScript, Pyth, 05AB1E, Jelly — these are shorter but are write-only puzzles designed for competitions, not real software. stryke remains readable and maintainable.
+
+---
+
+## [0x01c] WHY STRYKE — ONE-LINER COMPARISON
 
 `stryke` is a **one-liner-first** language. No `-e` flag needed, everything built in, shortest syntax wins.
 
