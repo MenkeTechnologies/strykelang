@@ -98,7 +98,7 @@ stryke is the **most concise ASCII-only general-purpose scripting language** —
 | count array | `p cnt 1:10` | **10** | `say scalar 1..10` | 17 | `p (1..10).count` | 16 | `print(len(range(1,11)))` | 23 |
 | join with comma | `p join",",1:5` | **14** | `say join",",1..5` | 17 | `puts (1..5).to_a.join(",")` | 24 | `print(",".join(map(...)))` | 36 |
 | first element | `p first 1:10` | **13** | `say((1..10)[0])` | 16 | `p (1..10).first` | 16 | `print(list(range(...))[0])` | 27 |
-| any even | `p any{$_%2==0}1:5` | **18** | `use List::Util'any';say any{...}` | 40 | `p (1..5).any?{...}` | 25 | `print(any(x%2==0 for ...))` | 38 |
+| any even | `p any{even}1:5` | **14** | `use List::Util'any';say any{$_%2==0}1..5` | 42 | `p (1..5).any?{|x|x%2==0}` | 25 | `print(any(x%2==0 for x in range(1,6)))` | 38 |
 | unique values | `p uniq 1,2,2,3` | **15** | `use List::Util'uniq';say uniq(...)` | 38 | `p [1,2,2,3].uniq` | 17 | `print(list(set([...])))` | 27 |
 
 **stryke wins every task** against Perl, Ruby, and Python.
