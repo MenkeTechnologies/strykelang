@@ -237,6 +237,146 @@ fn cached_executable_path() -> String {
         .clone()
 }
 
+fn build_term_hash() -> IndexMap<String, PerlValue> {
+    let mut m = IndexMap::new();
+    m.insert(
+        "TERM".into(),
+        PerlValue::string(std::env::var("TERM").unwrap_or_default()),
+    );
+    m.insert(
+        "COLORTERM".into(),
+        PerlValue::string(std::env::var("COLORTERM").unwrap_or_default()),
+    );
+
+    let (rows, cols) = term_size();
+    m.insert("rows".into(), PerlValue::integer(rows));
+    m.insert("cols".into(), PerlValue::integer(cols));
+
+    #[cfg(unix)]
+    let is_tty = unsafe { libc::isatty(1) != 0 };
+    #[cfg(not(unix))]
+    let is_tty = false;
+    m.insert(
+        "is_tty".into(),
+        PerlValue::integer(if is_tty { 1 } else { 0 }),
+    );
+
+    m
+}
+
+fn term_size() -> (i64, i64) {
+    #[cfg(unix)]
+    {
+        unsafe {
+            let mut ws: libc::winsize = std::mem::zeroed();
+            if libc::ioctl(1, libc::TIOCGWINSZ, &mut ws) == 0 {
+                return (ws.ws_row as i64, ws.ws_col as i64);
+            }
+        }
+    }
+    let rows = std::env::var("LINES")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(24);
+    let cols = std::env::var("COLUMNS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(80);
+    (rows, cols)
+}
+
+#[cfg(unix)]
+fn build_uname_hash() -> IndexMap<String, PerlValue> {
+    fn uts_field(slice: &[libc::c_char]) -> String {
+        let n = slice.iter().take_while(|&&c| c != 0).count();
+        let bytes: Vec<u8> = slice[..n].iter().map(|&c| c as u8).collect();
+        String::from_utf8_lossy(&bytes).into_owned()
+    }
+    let mut m = IndexMap::new();
+    let mut uts: libc::utsname = unsafe { std::mem::zeroed() };
+    if unsafe { libc::uname(&mut uts) } == 0 {
+        m.insert(
+            "sysname".into(),
+            PerlValue::string(uts_field(uts.sysname.as_slice())),
+        );
+        m.insert(
+            "nodename".into(),
+            PerlValue::string(uts_field(uts.nodename.as_slice())),
+        );
+        m.insert(
+            "release".into(),
+            PerlValue::string(uts_field(uts.release.as_slice())),
+        );
+        m.insert(
+            "version".into(),
+            PerlValue::string(uts_field(uts.version.as_slice())),
+        );
+        m.insert(
+            "machine".into(),
+            PerlValue::string(uts_field(uts.machine.as_slice())),
+        );
+    }
+    m
+}
+
+#[cfg(unix)]
+fn build_limits_hash() -> IndexMap<String, PerlValue> {
+    use libc::{getrlimit, rlimit, RLIM_INFINITY};
+    fn get_limit(resource: libc::c_int) -> (i64, i64) {
+        let mut rlim = rlimit {
+            rlim_cur: 0,
+            rlim_max: 0,
+        };
+        if unsafe { getrlimit(resource, &mut rlim) } == 0 {
+            let cur = if rlim.rlim_cur == RLIM_INFINITY {
+                -1
+            } else {
+                rlim.rlim_cur as i64
+            };
+            let max = if rlim.rlim_max == RLIM_INFINITY {
+                -1
+            } else {
+                rlim.rlim_max as i64
+            };
+            (cur, max)
+        } else {
+            (-1, -1)
+        }
+    }
+    let mut m = IndexMap::new();
+    let (cur, max) = get_limit(libc::RLIMIT_NOFILE);
+    m.insert("nofile".into(), PerlValue::integer(cur));
+    m.insert("nofile_max".into(), PerlValue::integer(max));
+    let (cur, max) = get_limit(libc::RLIMIT_STACK);
+    m.insert("stack".into(), PerlValue::integer(cur));
+    m.insert("stack_max".into(), PerlValue::integer(max));
+    let (cur, max) = get_limit(libc::RLIMIT_AS);
+    m.insert("as".into(), PerlValue::integer(cur));
+    m.insert("as_max".into(), PerlValue::integer(max));
+    let (cur, max) = get_limit(libc::RLIMIT_DATA);
+    m.insert("data".into(), PerlValue::integer(cur));
+    m.insert("data_max".into(), PerlValue::integer(max));
+    let (cur, max) = get_limit(libc::RLIMIT_FSIZE);
+    m.insert("fsize".into(), PerlValue::integer(cur));
+    m.insert("fsize_max".into(), PerlValue::integer(max));
+    let (cur, max) = get_limit(libc::RLIMIT_CORE);
+    m.insert("core".into(), PerlValue::integer(cur));
+    m.insert("core_max".into(), PerlValue::integer(max));
+    let (cur, max) = get_limit(libc::RLIMIT_CPU);
+    m.insert("cpu".into(), PerlValue::integer(cur));
+    m.insert("cpu_max".into(), PerlValue::integer(max));
+    let (cur, max) = get_limit(libc::RLIMIT_NPROC);
+    m.insert("nproc".into(), PerlValue::integer(cur));
+    m.insert("nproc_max".into(), PerlValue::integer(max));
+    #[cfg(target_os = "linux")]
+    {
+        let (cur, max) = get_limit(libc::RLIMIT_MEMLOCK);
+        m.insert("memlock".into(), PerlValue::integer(cur));
+        m.insert("memlock_max".into(), PerlValue::integer(max));
+    }
+    m
+}
+
 /// Context of the **current** subroutine call (`wantarray`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum WantarrayCtx {
@@ -1219,8 +1359,55 @@ impl Interpreter {
         scope.declare_hash("INC", IndexMap::new());
         scope.declare_array("ARGV", vec![]);
         scope.declare_array("_", vec![]);
+
+        // @path / @p — $PATH split by OS path separator, frozen (immutable)
+        let path_vec: Vec<PerlValue> = std::env::var("PATH")
+            .unwrap_or_default()
+            .split(if cfg!(windows) { ';' } else { ':' })
+            .filter(|s| !s.is_empty())
+            .map(|p| PerlValue::string(p.to_string()))
+            .collect();
+        scope.declare_array_frozen("path", path_vec.clone(), true);
+        scope.declare_array_frozen("p", path_vec, true);
+
+        // @fpath / @f — $FPATH (zsh function path) split by ':', frozen
+        let fpath_vec: Vec<PerlValue> = std::env::var("FPATH")
+            .unwrap_or_default()
+            .split(':')
+            .filter(|s| !s.is_empty())
+            .map(|p| PerlValue::string(p.to_string()))
+            .collect();
+        scope.declare_array_frozen("fpath", fpath_vec.clone(), true);
+        scope.declare_array_frozen("f", fpath_vec, true);
         scope.declare_hash("ENV", IndexMap::new());
         scope.declare_hash("SIG", IndexMap::new());
+
+        // %term — terminal info (frozen)
+        let term_map = build_term_hash();
+        scope.declare_hash_global_frozen("term", term_map);
+
+        // %uname — system identification (frozen, Unix only)
+        #[cfg(unix)]
+        {
+            let uname_map = build_uname_hash();
+            scope.declare_hash_global_frozen("uname", uname_map);
+        }
+        #[cfg(not(unix))]
+        {
+            scope.declare_hash_global_frozen("uname", IndexMap::new());
+        }
+
+        // %limits — resource limits (frozen, Unix only)
+        #[cfg(unix)]
+        {
+            let limits_map = build_limits_hash();
+            scope.declare_hash_global_frozen("limits", limits_map);
+        }
+        #[cfg(not(unix))]
+        {
+            scope.declare_hash_global_frozen("limits", IndexMap::new());
+        }
+
         // Reflection hashes — populated from `build.rs`-generated tables so
         // they track the real parser/dispatcher/LSP without hand-maintenance.
         // Seven hashes; all lookups are O(1). Forward maps:

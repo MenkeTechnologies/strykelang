@@ -1,12 +1,14 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Absolute Value
 
-fn my_abs($n) {
-    $n < 0 ? -$n : $n
+fn my_abs {
+    my $n = $_[0]
+    if ($n < 0) { -$n } else { $n }
 }
 
-fn my_sign($n) {
-    $n > 0 ? 1 : $n < 0 ? -1 : 0
+fn my_sign {
+    my $n = $_[0]
+    if ($n > 0) { 1 } elsif ($n < 0) { -1 } else { 0 }
 }
 
 assert_eq abs(5), 5, "abs(5)"

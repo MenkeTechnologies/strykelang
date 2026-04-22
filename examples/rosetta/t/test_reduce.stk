@@ -1,23 +1,36 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Reduce (Fold)
 
-fn my_sum(@nums) {
-    @nums |> reduce { $a + $b }
+fn my_sum {
+    my @nums = @_
+    if (!@nums) { 0 }
+    else { @nums |> reduce { $a + $b } }
 }
 
-fn my_product(@nums) {
-    @nums |> reduce { $a * $b }
+fn my_product {
+    my @nums = @_
+    if (!@nums) { 1 }
+    else { @nums |> reduce { $a * $b } }
 }
 
-fn my_max(@nums) {
-    @nums |> reduce { $a > $b ? $a : $b }
+fn my_max {
+    my @nums = @_
+    @nums |> reduce {
+        if ($a > $b) { $a }
+        else { $b }
+    }
 }
 
-fn my_min(@nums) {
-    @nums |> reduce { $a < $b ? $a : $b }
+fn my_min {
+    my @nums = @_
+    @nums |> reduce {
+        if ($a < $b) { $a }
+        else { $b }
+    }
 }
 
-fn concat_strings(@strs) {
+fn concat_strings {
+    my @strs = @_
     @strs |> reduce { "$a$b" }
 }
 

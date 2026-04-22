@@ -2,8 +2,8 @@
 # Rosetta Code: Fibonacci Sequence
 
 fn my_fib($n) {
-    return $n if $n <= 1
-    my_fib($n - 1) + my_fib($n - 2)
+    if ($n <= 1) { $n }
+    else { my_fib($n - 1) + my_fib($n - 2) }
 }
 
 fn fib_iter($n) {

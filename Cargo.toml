@@ -32,6 +32,10 @@ path = "src/main.rs"
 name = "gen-docs"
 path = "src/bin/gen_docs.rs"
 
+[[bin]]
+name = "zshrs"
+path = "src/bin/zshrs.rs"
+
 [dependencies]
 rayon = "1.10"
 regex = "1.11"
@@ -129,6 +133,10 @@ chrono-tz = "0.10"
 csv = "1.3"
 rusqlite = { version = "0.32", features = ["bundled"] }
 rustyline = "14"
+reedline = "0.38"
+nix = { version = "0.29", features = ["process", "signal", "term", "fs"] }
+dirs = "6"
+atty = "0.2"
 cranelift-jit = "0.130"
 cranelift-codegen = "0.130"
 cranelift-frontend = "0.130"
@@ -143,6 +151,11 @@ inferno = { version = "0.12", default-features = false }
 lsp-server = "0.7.9"
 lsp-types = "0.97.0"
 unicode_names2 = "2"
+os_pipe = "1.2.3"
+ctrlc = "3.5.2"
+hostname = "0.4.2"
+nu-ansi-term = "0.50.3"
+tempfile = "3"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.3"

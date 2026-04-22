@@ -2,15 +2,23 @@
 # Rosetta Code: Primality by Trial Division
 
 fn prime_check($n) {
-    return 0 if $n < 2
-    return 1 if $n < 4
-    return 0 if $n % 2 == 0
-    my $i = 3
-    while ($i * $i <= $n) {
-        return 0 if $n % $i == 0
-        $i += 2
+    if ($n < 2) {
+        0
+    } elsif ($n < 4) {
+        1
+    } elsif ($n % 2 == 0) {
+        0
+    } else {
+        my $i = 3
+        my $is_prime = 1
+        while ($is_prime && $i * $i <= $n) {
+            if ($n % $i == 0) {
+                $is_prime = 0
+            }
+            $i += 2
+        }
+        $is_prime
     }
-    1
 }
 
 fn list_primes($max) {

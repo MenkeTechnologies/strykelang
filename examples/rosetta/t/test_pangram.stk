@@ -3,10 +3,8 @@
 
 fn my_is_pangram($s) {
     my $lower = lc($s)
-    for my $c ('a'..'z') {
-        return 0 unless index($lower, $c) >= 0
-    }
-    1
+    my @missing = 'a'..'z' |> filter { index($lower, $_) < 0 }
+    scalar(@missing) == 0
 }
 
 fn missing_letters($s) {

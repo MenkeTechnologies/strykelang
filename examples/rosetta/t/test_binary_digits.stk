@@ -2,13 +2,17 @@
 # Rosetta Code: Binary Digits
 
 fn to_binary($n) {
-    return "0" if $n == 0
-    my @bits
-    while ($n > 0) {
-        unshift @bits, $n % 2
-        $n = int($n / 2)
+    if ($n == 0) {
+        "0"
+    } else {
+        my @bits
+        my $num = $n
+        while ($num > 0) {
+            unshift @bits, $num % 2
+            $num = int($num / 2)
+        }
+        ~> @bits |> join ""
     }
-    ~> @bits |> join ""
 }
 
 fn from_binary($s) {

@@ -1,15 +1,24 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Caesar Cipher
 
-fn caesar_encode($str, $shift) {
+fn caesar_encode {
+    my $str = $_[0]
+    my $shift = $_[1]
     ~> $str >{split //, $_} map {
-        $_ =~ /[A-Z]/ ? chr((ord($_) - 65 + $shift) % 26 + 65)
-      : $_ =~ /[a-z]/ ? chr((ord($_) - 97 + $shift) % 26 + 97)
-      : $_
+        if ($_ =~ /[A-Z]/) {
+            chr((ord($_) - 65 + $shift) % 26 + 65)
+        } else {
+            if ($_ =~ /[a-z]/) {
+                chr((ord($_) - 97 + $shift) % 26 + 97)
+            } else {
+                $_
+            }
+        }
     } |> join ""
 }
 
-fn my_rot13($str) {
+fn my_rot13 {
+    my $str = $_[0]
     caesar_encode($str, 13)
 }
 

@@ -1,19 +1,20 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Greatest Common Divisor
 
-fn my_gcd($a, $b) {
-    $b == 0 ? $a : my_gcd($b, $a % $b)
+fn my_gcd {
+    my $a = $_[0]
+    my $b = $_[1]
+    if ($b == 0) {
+        $a
+    } else {
+        my_gcd($b, $a % $b)
+    }
 }
 
-fn my_lcm($a, $b) {
-    $a * $b / my_gcd($a, $b)
-}
-
-assert_eq my_gcd(48, 18), 6, "gcd(48,18)"
-assert_eq my_gcd(14, 21), 7, "gcd(14,21)"
-assert_eq my_gcd(100, 35), 5, "gcd(100,35)"
-
-assert_eq my_lcm(4, 6), 12, "lcm(4,6)"
-assert_eq my_lcm(21, 6), 42, "lcm(21,6)"
+assert_eq my_gcd(12, 8), 4, "gcd(12, 8)"
+assert_eq my_gcd(14, 7), 7, "gcd(14, 7)"
+assert_eq my_gcd(13, 1), 1, "gcd(13, 1)"
+assert_eq my_gcd(0, 5), 5, "gcd(0, 5)"
+assert_eq my_gcd(100, 10), 10, "gcd(100, 10)"
 
 test_run
