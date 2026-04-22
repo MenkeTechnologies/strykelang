@@ -248,7 +248,11 @@ pub struct ZshParser<'a> {
     errors: Vec<ParseError>,
     /// Global iteration counter to prevent infinite loops
     global_iterations: usize,
+    /// Recursion depth counter to prevent stack overflow
+    recursion_depth: usize,
 }
+
+const MAX_RECURSION_DEPTH: usize = 500;
 
 impl<'a> ZshParser<'a> {
     /// Create a new parser
@@ -257,6 +261,7 @@ impl<'a> ZshParser<'a> {
             lexer: ZshLexer::new(input),
             errors: Vec::new(),
             global_iterations: 0,
+            recursion_depth: 0,
         }
     }
     
@@ -265,6 +270,12 @@ impl<'a> ZshParser<'a> {
     fn check_limit(&mut self) -> bool {
         self.global_iterations += 1;
         self.global_iterations > 10_000
+    }
+    
+    /// Check recursion depth; returns true if exceeded
+    #[inline]
+    fn check_recursion(&mut self) -> bool {
+        self.recursion_depth > MAX_RECURSION_DEPTH
     }
 
     /// Parse the complete input
@@ -316,6 +327,8 @@ impl<'a> ZshParser<'a> {
             }
 
             // Also stop at these tokens when not explicitly looking for them
+            // Note: Else/Elif/Then are NOT here - they're handled by parse_if
+            // to allow nested if statements inside case arms, loops, etc.
             match self.lexer.tok {
                 LexTok::Outbrace
                 | LexTok::Dsemi
@@ -324,9 +337,6 @@ impl<'a> ZshParser<'a> {
                 | LexTok::Done
                 | LexTok::Fi
                 | LexTok::Esac
-                | LexTok::Elif
-                | LexTok::Else
-                | LexTok::Then
                 | LexTok::Zend => break,
                 _ => {}
             }
@@ -371,6 +381,13 @@ impl<'a> ZshParser<'a> {
 
     /// Parse a sublist (pipelines connected by && or ||)
     fn parse_sublist(&mut self) -> Option<ZshSublist> {
+        self.recursion_depth += 1;
+        if self.check_recursion() {
+            self.error("parse_sublist: max recursion depth exceeded");
+            self.recursion_depth -= 1;
+            return None;
+        }
+        
         let mut flags = SublistFlags::default();
 
         // Handle coproc and !
@@ -382,7 +399,13 @@ impl<'a> ZshParser<'a> {
             self.lexer.zshlex();
         }
 
-        let pipe = self.parse_pipe()?;
+        let pipe = match self.parse_pipe() {
+            Some(p) => p,
+            None => {
+                self.recursion_depth -= 1;
+                return None;
+            }
+        };
 
         // Check for && or ||
         let next = match self.lexer.tok {
@@ -399,13 +422,27 @@ impl<'a> ZshParser<'a> {
             _ => None,
         };
 
+        self.recursion_depth -= 1;
         Some(ZshSublist { pipe, next, flags })
     }
 
     /// Parse a pipeline
     fn parse_pipe(&mut self) -> Option<ZshPipe> {
+        self.recursion_depth += 1;
+        if self.check_recursion() {
+            self.error("parse_pipe: max recursion depth exceeded");
+            self.recursion_depth -= 1;
+            return None;
+        }
+        
         let lineno = self.lexer.toklineno;
-        let cmd = self.parse_cmd()?;
+        let cmd = match self.parse_cmd() {
+            Some(c) => c,
+            None => {
+                self.recursion_depth -= 1;
+                return None;
+            }
+        };
 
         // Check for | or |&
         let next = match self.lexer.tok {
@@ -418,6 +455,7 @@ impl<'a> ZshParser<'a> {
             _ => None,
         };
 
+        self.recursion_depth -= 1;
         Some(ZshPipe { cmd, next, lineno })
     }
 
@@ -562,8 +600,15 @@ impl<'a> ZshParser<'a> {
             // Array assignment: name=(...)
             let mut elements = Vec::new();
             self.lexer.zshlex(); // skip past token
-
+            
+            let mut arr_iters = 0;
+            const MAX_ARRAY_ELEMENTS: usize = 10_000;
             while matches!(self.lexer.tok, LexTok::String | LexTok::Seper | LexTok::Newlin) {
+                arr_iters += 1;
+                if arr_iters > MAX_ARRAY_ELEMENTS {
+                    self.error("array assignment exceeded maximum elements");
+                    break;
+                }
                 if self.lexer.tok == LexTok::String {
                     if let Some(ref s) = self.lexer.tokstr {
                         elements.push(s.clone());
@@ -746,35 +791,38 @@ impl<'a> ZshParser<'a> {
 
     /// Parse C-style for loop: for (( init; cond; step ))
     fn parse_for_cstyle(&mut self) -> Option<ZshCommand> {
-        // We're at ((
-        self.lexer.zshlex();
-
+        // We're at (( (Dinpar None) - the opening ((
+        // Lexer returns:
+        //   Dinpar None     - opening ((
+        //   Dinpar "init"   - init expression, semicolon consumed
+        //   Dinpar "cond"   - cond expression, semicolon consumed  
+        //   Doutpar "step"  - step expression, closing )) consumed
+        
+        self.lexer.zshlex(); // Get init: Dinpar "i=0"
+        
+        if self.lexer.tok != LexTok::Dinpar {
+            self.error("expected init expression in for ((");
+            return None;
+        }
         let init = self.lexer.tokstr.clone().unwrap_or_default();
-        self.lexer.zshlex();
-
+        
+        self.lexer.zshlex(); // Get cond: Dinpar "i<10"
+        
         if self.lexer.tok != LexTok::Dinpar {
-            self.error("expected ;; in for ((");
+            self.error("expected condition in for ((");
             return None;
         }
-
-        self.lexer.zshlex();
         let cond = self.lexer.tokstr.clone().unwrap_or_default();
-        self.lexer.zshlex();
-
-        if self.lexer.tok != LexTok::Dinpar {
-            self.error("expected ;; in for ((");
-            return None;
-        }
-
-        self.lexer.zshlex();
-        let step = self.lexer.tokstr.clone().unwrap_or_default();
-        self.lexer.zshlex();
+        
+        self.lexer.zshlex(); // Get step: Doutpar "i++"
 
         if self.lexer.tok != LexTok::Doutpar {
             self.error("expected )) in for");
             return None;
         }
-        self.lexer.zshlex();
+        let step = self.lexer.tokstr.clone().unwrap_or_default();
+        
+        self.lexer.zshlex(); // Move past ))
 
         self.skip_separators();
         let body = self.parse_loop_body(false)?;
@@ -832,18 +880,24 @@ impl<'a> ZshParser<'a> {
                 break;
             }
 
+            // Set incasepat BEFORE skipping separators so lexer knows we're in case pattern context
+            // This affects how [ and | are lexed
+            self.lexer.incasepat = 1;
+
             self.skip_separators();
 
             // Check for end
             if (use_brace && self.lexer.tok == LexTok::Outbrace)
                 || (!use_brace && self.lexer.tok == LexTok::Esac)
             {
+                self.lexer.incasepat = 0;
                 self.lexer.zshlex();
                 break;
             }
 
             // Also break on EOF
             if self.lexer.tok == LexTok::Endinput || self.lexer.tok == LexTok::Lexerr {
+                self.lexer.incasepat = 0;
                 break;
             }
 
@@ -852,13 +906,14 @@ impl<'a> ZshParser<'a> {
                 self.lexer.zshlex();
             }
 
-            // Parse patterns
+            // incasepat is already set above
             let mut patterns = Vec::new();
             let mut pattern_iterations = 0;
             loop {
                 pattern_iterations += 1;
                 if pattern_iterations > 1000 {
                     self.error("parse_case: too many pattern iterations");
+                    self.lexer.incasepat = 0;
                     return None;
                 }
 
@@ -868,17 +923,22 @@ impl<'a> ZshParser<'a> {
                         break;
                     }
                     patterns.push(self.lexer.tokstr.clone().unwrap_or_default());
+                    // After first pattern token, set incasepat=2 so ( is treated as part of pattern
+                    self.lexer.incasepat = 2;
                     self.lexer.zshlex();
                 } else if self.lexer.tok != LexTok::Bar {
                     break;
                 }
 
                 if self.lexer.tok == LexTok::Bar {
+                    // Reset to 1 (start of next alternative pattern)
+                    self.lexer.incasepat = 1;
                     self.lexer.zshlex();
                 } else {
                     break;
                 }
             }
+            self.lexer.incasepat = 0;
 
             // Expect )
             if self.lexer.tok != LexTok::Outpar {
@@ -923,7 +983,8 @@ impl<'a> ZshParser<'a> {
     fn parse_if(&mut self) -> Option<ZshCommand> {
         self.lexer.zshlex(); // skip 'if'
 
-        let cond = Box::new(self.parse_program());
+        // Parse condition - stops at 'then' or '{' (zsh allows { instead of then)
+        let cond = Box::new(self.parse_program_until(Some(&[LexTok::Then, LexTok::Inbrace])));
 
         self.skip_separators();
 
@@ -935,62 +996,84 @@ impl<'a> ZshParser<'a> {
         }
         self.lexer.zshlex();
 
-        let then = Box::new(self.parse_program());
-
-        if use_brace {
+        // Parse then-body - stops at else/elif/fi, or } if using brace syntax
+        let then = if use_brace {
+            let body = self.parse_program_until(Some(&[LexTok::Outbrace]));
             if self.lexer.tok == LexTok::Outbrace {
                 self.lexer.zshlex();
             }
-        }
+            Box::new(body)
+        } else {
+            Box::new(self.parse_program_until(Some(&[LexTok::Else, LexTok::Elif, LexTok::Fi])))
+        };
 
-        // Parse elif and else
+        // Parse elif and else (only for then/fi syntax, not brace syntax)
         let mut elif = Vec::new();
         let mut else_ = None;
 
-        loop {
-            self.skip_separators();
+        if !use_brace {
+            loop {
+                self.skip_separators();
 
-            match self.lexer.tok {
-                LexTok::Elif => {
-                    self.lexer.zshlex();
-                    let econd = self.parse_program();
-                    self.skip_separators();
-
-                    let use_brace = self.lexer.tok == LexTok::Inbrace;
-                    if self.lexer.tok != LexTok::Then && !use_brace {
-                        self.error("expected 'then' after elif");
-                        return None;
-                    }
-                    self.lexer.zshlex();
-
-                    let ebody = self.parse_program();
-                    if use_brace && self.lexer.tok == LexTok::Outbrace {
+                match self.lexer.tok {
+                    LexTok::Elif => {
                         self.lexer.zshlex();
-                    }
+                        // elif condition stops at 'then' or '{'
+                        let econd = self.parse_program_until(Some(&[LexTok::Then, LexTok::Inbrace]));
+                        self.skip_separators();
 
-                    elif.push((econd, ebody));
-                }
-                LexTok::Else => {
-                    self.lexer.zshlex();
-                    self.skip_separators();
-
-                    let use_brace = self.lexer.tok == LexTok::Inbrace;
-                    if use_brace {
+                        let elif_use_brace = self.lexer.tok == LexTok::Inbrace;
+                        if self.lexer.tok != LexTok::Then && !elif_use_brace {
+                            self.error("expected 'then' after elif");
+                            return None;
+                        }
                         self.lexer.zshlex();
+
+                        // elif body stops at else/elif/fi or } if using braces
+                        let ebody = if elif_use_brace {
+                            let body = self.parse_program_until(Some(&[LexTok::Outbrace]));
+                            if self.lexer.tok == LexTok::Outbrace {
+                                self.lexer.zshlex();
+                            }
+                            body
+                        } else {
+                            self.parse_program_until(Some(&[LexTok::Else, LexTok::Elif, LexTok::Fi]))
+                        };
+
+                        elif.push((econd, ebody));
                     }
-
-                    else_ = Some(Box::new(self.parse_program()));
-
-                    if use_brace && self.lexer.tok == LexTok::Outbrace {
+                    LexTok::Else => {
                         self.lexer.zshlex();
+                        self.skip_separators();
+
+                        let else_use_brace = self.lexer.tok == LexTok::Inbrace;
+                        if else_use_brace {
+                            self.lexer.zshlex();
+                        }
+
+                        // else body stops at 'fi' or '}'
+                        else_ = Some(Box::new(if else_use_brace {
+                            let body = self.parse_program_until(Some(&[LexTok::Outbrace]));
+                            if self.lexer.tok == LexTok::Outbrace {
+                                self.lexer.zshlex();
+                            }
+                            body
+                        } else {
+                            self.parse_program_until(Some(&[LexTok::Fi]))
+                        }));
+
+                        // Consume the 'fi' if present (not for brace syntax)
+                        if !else_use_brace && self.lexer.tok == LexTok::Fi {
+                            self.lexer.zshlex();
+                        }
+                        break;
                     }
-                    break;
+                    LexTok::Fi => {
+                        self.lexer.zshlex();
+                        break;
+                    }
+                    _ => break,
                 }
-                LexTok::Fi => {
-                    self.lexer.zshlex();
-                    break;
-                }
-                _ => break,
             }
         }
 
@@ -1243,56 +1326,115 @@ impl<'a> ZshParser<'a> {
     }
 
     fn parse_cond_or(&mut self) -> Option<ZshCond> {
-        let left = self.parse_cond_and()?;
+        self.recursion_depth += 1;
+        if self.check_recursion() {
+            self.error("parse_cond_or: max recursion depth exceeded");
+            self.recursion_depth -= 1;
+            return None;
+        }
+        
+        let left = match self.parse_cond_and() {
+            Some(l) => l,
+            None => {
+                self.recursion_depth -= 1;
+                return None;
+            }
+        };
 
         self.skip_cond_separators();
 
-        if self.lexer.tok == LexTok::Dbar {
+        let result = if self.lexer.tok == LexTok::Dbar {
             self.lexer.zshlex();
             self.skip_cond_separators();
-            let right = self.parse_cond_or()?;
-            Some(ZshCond::Or(Box::new(left), Box::new(right)))
+            match self.parse_cond_or() {
+                Some(right) => Some(ZshCond::Or(Box::new(left), Box::new(right))),
+                None => None,
+            }
         } else {
             Some(left)
-        }
+        };
+        
+        self.recursion_depth -= 1;
+        result
     }
 
     fn parse_cond_and(&mut self) -> Option<ZshCond> {
-        let left = self.parse_cond_not()?;
+        self.recursion_depth += 1;
+        if self.check_recursion() {
+            self.error("parse_cond_and: max recursion depth exceeded");
+            self.recursion_depth -= 1;
+            return None;
+        }
+        
+        let left = match self.parse_cond_not() {
+            Some(l) => l,
+            None => {
+                self.recursion_depth -= 1;
+                return None;
+            }
+        };
 
         self.skip_cond_separators();
 
-        if self.lexer.tok == LexTok::Damper {
+        let result = if self.lexer.tok == LexTok::Damper {
             self.lexer.zshlex();
             self.skip_cond_separators();
-            let right = self.parse_cond_and()?;
-            Some(ZshCond::And(Box::new(left), Box::new(right)))
+            match self.parse_cond_and() {
+                Some(right) => Some(ZshCond::And(Box::new(left), Box::new(right))),
+                None => None,
+            }
         } else {
             Some(left)
-        }
+        };
+        
+        self.recursion_depth -= 1;
+        result
     }
 
     fn parse_cond_not(&mut self) -> Option<ZshCond> {
+        self.recursion_depth += 1;
+        if self.check_recursion() {
+            self.error("parse_cond_not: max recursion depth exceeded");
+            self.recursion_depth -= 1;
+            return None;
+        }
+        
         self.skip_cond_separators();
 
         if self.lexer.tok == LexTok::Bang {
             self.lexer.zshlex();
-            let inner = self.parse_cond_not()?;
+            let inner = match self.parse_cond_not() {
+                Some(i) => i,
+                None => {
+                    self.recursion_depth -= 1;
+                    return None;
+                }
+            };
+            self.recursion_depth -= 1;
             return Some(ZshCond::Not(Box::new(inner)));
         }
 
         if self.lexer.tok == LexTok::Inpar {
             self.lexer.zshlex();
             self.skip_cond_separators();
-            let inner = self.parse_cond_expr()?;
+            let inner = match self.parse_cond_expr() {
+                Some(i) => i,
+                None => {
+                    self.recursion_depth -= 1;
+                    return None;
+                }
+            };
             self.skip_cond_separators();
             if self.lexer.tok == LexTok::Outpar {
                 self.lexer.zshlex();
             }
+            self.recursion_depth -= 1;
             return Some(inner);
         }
 
-        self.parse_cond_primary()
+        let result = self.parse_cond_primary();
+        self.recursion_depth -= 1;
+        result
     }
 
     fn parse_cond_primary(&mut self) -> Option<ZshCond> {

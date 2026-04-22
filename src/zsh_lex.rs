@@ -114,6 +114,8 @@ pub struct ZshLexer<'a> {
     pub incmdpos: bool,
     /// In condition [[ ... ]]
     pub incond: i32,
+    /// In pattern context (RHS of == != =~ in [[ ]])
+    pub incondpat: bool,
     /// In case pattern
     pub incasepat: i32,
     /// In redirection
@@ -140,6 +142,8 @@ pub struct ZshLexer<'a> {
     isfirstch: bool,
     /// Pending here-documents
     pub heredocs: Vec<HereDoc>,
+    /// Expecting heredoc terminator (0 = no, 1 = <<, 2 = <<-)
+    heredoc_pending: u8,
     /// Token buffer
     lexbuf: LexBuf,
     /// After newline
@@ -148,7 +152,11 @@ pub struct ZshLexer<'a> {
     pub error: Option<String>,
     /// Global iteration counter for infinite loop detection
     global_iterations: usize,
+    /// Recursion depth counter
+    recursion_depth: usize,
 }
+
+const MAX_LEXER_RECURSION: usize = 200;
 
 impl<'a> ZshLexer<'a> {
     /// Create a new lexer for the given input
@@ -165,6 +173,7 @@ impl<'a> ZshLexer<'a> {
             lexstop: false,
             incmdpos: true,
             incond: 0,
+            incondpat: false,
             incasepat: 0,
             inredir: false,
             infor: 0,
@@ -178,10 +187,24 @@ impl<'a> ZshLexer<'a> {
             isfirstln: true,
             isfirstch: true,
             heredocs: Vec::new(),
+            heredoc_pending: 0,
             lexbuf: LexBuf::new(),
             isnewlin: 0,
             error: None,
             global_iterations: 0,
+            recursion_depth: 0,
+        }
+    }
+    
+    /// Check recursion depth; returns true if exceeded
+    #[inline]
+    fn check_recursion(&mut self) -> bool {
+        if self.recursion_depth > MAX_LEXER_RECURSION {
+            self.error = Some("lexer exceeded max recursion depth".to_string());
+            self.lexstop = true;
+            true
+        } else {
+            false
         }
     }
     
@@ -272,8 +295,8 @@ impl<'a> ZshLexer<'a> {
             return;
         }
         
-        // Reset iteration counter for this token
-        self.global_iterations = 0;
+        // Note: Do NOT reset global_iterations here - it must accumulate across all
+        // zshlex calls in a parse to prevent infinite loops in the parser
 
         loop {
             if self.inrepeat > 0 {
@@ -319,8 +342,49 @@ impl<'a> ZshLexer<'a> {
                 }
             }
         }
+        
+        // If we were expecting a heredoc terminator, register it now
+        if self.heredoc_pending > 0 && self.tok == LexTok::String {
+            if let Some(ref terminator) = self.tokstr {
+                let strip_tabs = self.heredoc_pending == 2;
+                // Handle quoted terminators (e.g., 'EOF' or "EOF")
+                let term = terminator.trim_matches(|c| c == '\'' || c == '"').to_string();
+                self.heredocs.push(HereDoc {
+                    terminator: term,
+                    strip_tabs,
+                    content: String::new(),
+                });
+            }
+            self.heredoc_pending = 0;
+        }
+        
+        // Track pattern context inside [[ ... ]] - after = == != =~ the RHS is a pattern
+        if self.incond > 0 {
+            if let Some(ref s) = self.tokstr {
+                // Check if this token is a comparison operator
+                // Note: single = is also a comparison operator in [[ ]]
+                // The internal marker \u{8d} is used for =
+                if s == "=" || s == "==" || s == "!=" || s == "=~" 
+                    || s == "\u{8d}" || s == "\u{8d}\u{8d}" || s == "!\u{8d}" || s == "\u{8d}~" {
+                    self.incondpat = true;
+                } else if self.incondpat {
+                    // We were in pattern context, now we've consumed the pattern
+                    // Reset after the pattern token is consumed
+                    // But actually, pattern can span multiple tokens, so we should
+                    // stay in pattern mode until ]] or && or ||
+                }
+            }
+            // Reset pattern context on ]] or logical operators
+            if self.tok == LexTok::Doutbrack {
+                self.incondpat = false;
+            }
+        } else {
+            self.incondpat = false;
+        }
 
         // Update command position for next token based on current token
+        // Note: In case patterns (incasepat > 0), | is a pattern separator, not pipeline,
+        // so we don't set incmdpos after Bar in that context
         match self.tok {
             LexTok::Seper
             | LexTok::Newlin
@@ -334,7 +398,6 @@ impl<'a> ZshLexer<'a> {
             | LexTok::Inbrace
             | LexTok::Dbar
             | LexTok::Damper
-            | LexTok::Bar
             | LexTok::Baramp
             | LexTok::Inoutpar
             | LexTok::Doloop
@@ -344,6 +407,12 @@ impl<'a> ZshLexer<'a> {
             | LexTok::Doutbrack
             | LexTok::Func => {
                 self.incmdpos = true;
+            }
+            LexTok::Bar => {
+                // In case patterns, | is a pattern separator - don't change incmdpos
+                if self.incasepat <= 0 {
+                    self.incmdpos = true;
+                }
             }
             LexTok::String
             | LexTok::Typeset
@@ -355,6 +424,27 @@ impl<'a> ZshLexer<'a> {
             }
             _ => {}
         }
+        
+        // Track 'for' keyword for C-style for loop: for (( init; cond; step ))
+        // When we see 'for', set infor=2 to expect the init and cond parts
+        // Each Dinpar (after semicolon in arithmetic) decrements it
+        if self.tok != LexTok::Dinpar {
+            self.infor = if self.tok == LexTok::For { 2 } else { 0 };
+        }
+        
+        // Handle redirection context
+        let oldpos = self.incmdpos;
+        if self.tok.is_redirop()
+            || self.tok == LexTok::For
+            || self.tok == LexTok::Foreach
+            || self.tok == LexTok::Select
+        {
+            self.inredir = true;
+            self.incmdpos = false;
+        } else if self.inredir {
+            self.incmdpos = oldpos;
+            self.inredir = false;
+        }
     }
 
     /// Process pending here-documents
@@ -363,8 +453,16 @@ impl<'a> ZshLexer<'a> {
 
         for mut hdoc in heredocs {
             let mut content = String::new();
+            let mut line_count = 0;
 
             loop {
+                line_count += 1;
+                if line_count > 10000 {
+                    self.error = Some("heredoc exceeded 10000 lines".to_string());
+                    self.tok = LexTok::Lexerr;
+                    return;
+                }
+                
                 let line = self.read_line();
                 if line.is_none() {
                     self.error = Some("here document too large or unterminated".to_string());
@@ -390,15 +488,25 @@ impl<'a> ZshLexer<'a> {
         }
     }
 
-    /// Read a line from input
+    /// Read a line from input (returns partial line at EOF)
     fn read_line(&mut self) -> Option<String> {
         let mut line = String::new();
 
         loop {
-            let c = self.hgetc()?;
-            line.push(c);
-            if c == '\n' {
-                break;
+            match self.hgetc() {
+                Some(c) => {
+                    line.push(c);
+                    if c == '\n' {
+                        break;
+                    }
+                }
+                None => {
+                    // EOF - return partial line if any
+                    if line.is_empty() {
+                        return None;
+                    }
+                    break;
+                }
             }
         }
 
@@ -644,7 +752,12 @@ impl<'a> ZshLexer<'a> {
                             self.hungetc(d);
                         }
                         self.lexstop = false;
-                        if self.incond == 1 || self.incmdpos {
+                        // In pattern context (after == != =~ in [[ ]]), ( is part of pattern
+                        // In case pattern context, ( at start is optional delimiter, not pattern
+                        // incasepat == 1 means "at start of pattern", > 1 means "inside pattern"
+                        if self.incondpat || self.incasepat > 1 {
+                            self.gettokstr('(', false)
+                        } else if self.incond == 1 || self.incmdpos || self.incasepat == 1 {
                             LexTok::Inpar
                         } else {
                             self.gettokstr('(', false)
@@ -656,9 +769,23 @@ impl<'a> ZshLexer<'a> {
             ')' => LexTok::Outpar,
 
             '{' => {
+                // { is a command group only if followed by whitespace or newline
+                // {a,b} is brace expansion, not a command group
                 if self.incmdpos {
-                    self.tokstr = Some("{".to_string());
-                    LexTok::Inbrace
+                    let next = self.hgetc();
+                    let is_brace_group = match next {
+                        Some(' ') | Some('\t') | Some('\n') | None => true,
+                        _ => false,
+                    };
+                    if let Some(ch) = next {
+                        self.hungetc(ch);
+                    }
+                    if is_brace_group {
+                        self.tokstr = Some("{".to_string());
+                        LexTok::Inbrace
+                    } else {
+                        self.gettokstr(c, false)
+                    }
                 } else {
                     self.gettokstr(c, false)
                 }
@@ -673,9 +800,64 @@ impl<'a> ZshLexer<'a> {
                 }
             }
 
-            '<' => self.lex_inang(),
+            '[' => {
+                // [[ is a conditional expression start
+                // [ can also be a command (test builtin) or array subscript
+                // In case patterns (incasepat > 0), [ is part of glob pattern like [yY]
+                if self.incasepat > 0 {
+                    self.gettokstr(c, false)
+                } else if self.incmdpos {
+                    let next = self.hgetc();
+                    if next == Some('[') {
+                        // [[ - double bracket conditional
+                        self.tokstr = Some("[[".to_string());
+                        self.incond = 1;
+                        return LexTok::Dinbrack;
+                    }
+                    // Single [ - either test command or start of glob pattern
+                    if let Some(ch) = next {
+                        self.hungetc(ch);
+                    }
+                    self.tokstr = Some("[".to_string());
+                    LexTok::String
+                } else {
+                    self.gettokstr(c, false)
+                }
+            }
 
-            '>' => self.lex_outang(),
+            ']' => {
+                // ]] ends a conditional expression started by [[
+                if self.incond > 0 {
+                    let next = self.hgetc();
+                    if next == Some(']') {
+                        self.tokstr = Some("]]".to_string());
+                        self.incond = 0;
+                        return LexTok::Doutbrack;
+                    }
+                    if let Some(ch) = next {
+                        self.hungetc(ch);
+                    }
+                }
+                self.gettokstr(c, false)
+            }
+
+            '<' => {
+                // In pattern context, < is literal (e.g., <-> in glob)
+                if self.incondpat || self.incasepat > 0 {
+                    self.gettokstr(c, false)
+                } else {
+                    self.lex_inang()
+                }
+            }
+
+            '>' => {
+                // In pattern context, > is literal
+                if self.incondpat || self.incasepat > 0 {
+                    self.gettokstr(c, false)
+                } else {
+                    self.lex_outang()
+                }
+            }
 
             _ => self.gettokstr(c, false),
         }
@@ -735,12 +917,16 @@ impl<'a> ZshLexer<'a> {
                         return LexTok::Inang;
                     }
                     Some('<') => return LexTok::Trinang,
-                    Some('-') => return LexTok::Dinangdash,
+                    Some('-') => {
+                        self.heredoc_pending = 2; // <<- expects terminator next
+                        return LexTok::Dinangdash;
+                    }
                     _ => {
                         if let Some(e) = e {
                             self.hungetc(e);
                         }
                         self.lexstop = false;
+                        self.heredoc_pending = 1; // << expects terminator next
                         return LexTok::Dinang;
                     }
                 }
@@ -955,9 +1141,8 @@ impl<'a> ZshLexer<'a> {
                 }
 
                 '{' => {
-                    if in_brace_param > 0 || bct > 0 {
-                        bct += 1;
-                    }
+                    // Track braces for both ${...} param expansion and {...} brace expansion
+                    bct += 1;
                     self.add(c);
                 }
 
@@ -969,15 +1154,17 @@ impl<'a> ZshLexer<'a> {
                         bct -= 1;
                         self.add(char_tokens::OUTBRACE);
                     } else if bct > 0 {
+                        // Closing a brace expansion like {a,b}
                         bct -= 1;
-                        self.add(char_tokens::OUTBRACE);
+                        self.add(c);
                     } else {
                         break;
                     }
                 }
 
                 '>' => {
-                    if in_brace_param > 0 || sub {
+                    // In pattern context (incondpat), > is literal
+                    if in_brace_param > 0 || sub || self.incondpat || self.incasepat > 0 {
                         self.add(c);
                     } else {
                         let e = self.hgetc();
@@ -999,7 +1186,8 @@ impl<'a> ZshLexer<'a> {
                 }
 
                 '<' => {
-                    if in_brace_param > 0 || sub {
+                    // In pattern context (incondpat), < is literal
+                    if in_brace_param > 0 || sub || self.incondpat || self.incasepat > 0 {
                         self.add(c);
                     } else {
                         let e = self.hgetc();
@@ -1283,6 +1471,18 @@ impl<'a> ZshLexer<'a> {
 
     /// Parse double-quoted string content
     fn dquote_parse(&mut self, endchar: char, sub: bool) -> Result<(), ()> {
+        self.recursion_depth += 1;
+        if self.check_recursion() {
+            self.recursion_depth -= 1;
+            return Err(());
+        }
+        
+        let result = self.dquote_parse_inner(endchar, sub);
+        self.recursion_depth -= 1;
+        result
+    }
+    
+    fn dquote_parse_inner(&mut self, endchar: char, sub: bool) -> Result<(), ()> {
         let mut pct = 0; // parenthesis count
         let mut brct = 0; // bracket count
         let mut bct = 0; // brace count (for ${...})
@@ -1774,6 +1974,15 @@ impl<'a> ZshLexer<'a> {
             self.incmdpos = oldpos;
             self.inredir = false;
         }
+    }
+
+    /// Register a heredoc to be processed at next newline
+    pub fn register_heredoc(&mut self, terminator: String, strip_tabs: bool) {
+        self.heredocs.push(HereDoc {
+            terminator,
+            strip_tabs,
+            content: String::new(),
+        });
     }
 
     /// Check for reserved word

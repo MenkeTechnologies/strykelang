@@ -555,6 +555,13 @@ impl MenuState {
         self.selected_idx
     }
 
+    /// Get the insert string for the currently selected completion
+    pub fn selected_insert_string(&self) -> Option<String> {
+        self.selected_idx
+            .and_then(|idx| self.items.get(idx))
+            .map(|m| m.completion.insert_str())
+    }
+
     /// Total number of matches
     pub fn count(&self) -> usize {
         self.items.len()
@@ -1157,14 +1164,31 @@ impl MenuState {
             global_idx += group.count;
         }
 
-        // Status line
+        // Status line - zsh style "Scrolling active: current selection at X"
         if rendering.scrollable {
+            let position = if let Some(sel_idx) = self.selected_idx {
+                // Determine position based on where selection is in viewport
+                let (item_row, _) = self.idx_to_visual_row_col(sel_idx);
+                let sel_row = self.item_row_to_display_row(item_row);
+                if sel_row <= self.viewport_start + 2 {
+                    "Top"
+                } else if sel_row >= self.viewport_start + self.available_rows.saturating_sub(3) {
+                    "Bottom"
+                } else {
+                    "Middle"
+                }
+            } else {
+                if self.viewport_start == 0 {
+                    "Top"
+                } else if self.viewport_start + self.available_rows >= self.cached_total_rows {
+                    "Bottom"
+                } else {
+                    "Middle"
+                }
+            };
             rendering.status = Some(format!(
-                "rows {}-{} of {} ({} matches)",
-                rendering.row_start + 1,
-                rendering.row_end,
-                self.cached_total_rows,
-                self.items.len()
+                "Scrolling active: current selection at {}",
+                position
             ));
         } else if self.search_active {
             rendering.status = Some(format!(
@@ -1233,10 +1257,9 @@ impl MenuState {
             line.content.push_str(rest_part);
             line.content.push_str(ansi::RESET);
         } else {
-            // zsh style: prefix is BOLD version of color, rest is regular
+            // zsh style: prefix is BOLD WHITE to stand out, rest uses group color
             if !prefix_part.is_empty() {
-                let bold_color = make_bold(&effective_color);
-                line.content.push_str(&ansi::from_codes(&bold_color));
+                line.content.push_str("\x1b[1;37m"); // Bold white for prefix
                 line.content.push_str(prefix_part);
                 line.content.push_str(ansi::RESET);
             }
@@ -1327,10 +1350,9 @@ impl MenuState {
             line.content.push_str(rest_part);
             line.content.push_str(ansi::RESET);
         } else {
-            // zsh style: prefix is BOLD version of color
+            // zsh style: prefix is BOLD WHITE to stand out, rest uses group color
             if !prefix_part.is_empty() {
-                let bold_color = make_bold(&effective_color);
-                line.content.push_str(&ansi::from_codes(&bold_color));
+                line.content.push_str("\x1b[1;37m"); // Bold white for prefix
                 line.content.push_str(prefix_part);
                 line.content.push_str(ansi::RESET);
             }
