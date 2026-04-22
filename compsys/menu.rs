@@ -1804,9 +1804,10 @@ mod tests {
         menu.set_available_rows(10);
 
         let mut group = CompletionGroup::new("test");
+        // Long descriptions force single-column layout, so Down = next item
         for i in 0..20 {
             let mut comp = Completion::new(format!("item{:02}", i));
-            comp.desc = Some(format!("description {}", i));
+            comp.desc = Some(format!("A long description for item {} that takes up most of the line width", i));
             group.matches.push(comp);
         }
 
@@ -1819,6 +1820,7 @@ mod tests {
         assert!(menu.is_active());
         assert_eq!(menu.selected_index(), Some(0));
 
+        // In single-column, Down moves to next row = next item
         menu.navigate(MenuMotion::Down);
         assert_eq!(menu.selected_index(), Some(1));
 

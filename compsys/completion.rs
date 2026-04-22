@@ -387,3 +387,243 @@ impl CompletionReceiver {
 
 /// Type alias for a list of completions
 pub type CompletionList = Vec<Completion>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_completion_flags_empty() {
+        let flags = CompletionFlags::empty();
+        assert_eq!(flags.bits(), 0);
+        assert!(!flags.contains(CompletionFlags::FILE));
+    }
+
+    #[test]
+    fn test_completion_flags_contains() {
+        let flags = CompletionFlags::FILE | CompletionFlags::DIRECTORY;
+        assert!(flags.contains(CompletionFlags::FILE));
+        assert!(flags.contains(CompletionFlags::DIRECTORY));
+        assert!(!flags.contains(CompletionFlags::REMOVE));
+    }
+
+    #[test]
+    fn test_completion_flags_bitor() {
+        let mut flags = CompletionFlags::FILE;
+        flags |= CompletionFlags::NOSPACE;
+        assert!(flags.contains(CompletionFlags::FILE));
+        assert!(flags.contains(CompletionFlags::NOSPACE));
+    }
+
+    #[test]
+    fn test_completion_flags_bitand() {
+        let flags1 = CompletionFlags::FILE | CompletionFlags::DIRECTORY;
+        let flags2 = CompletionFlags::FILE | CompletionFlags::NOSPACE;
+        let result = flags1 & flags2;
+        assert!(result.contains(CompletionFlags::FILE));
+        assert!(!result.contains(CompletionFlags::DIRECTORY));
+        assert!(!result.contains(CompletionFlags::NOSPACE));
+    }
+
+    #[test]
+    fn test_completion_new() {
+        let comp = Completion::new("test");
+        assert_eq!(comp.str_, "test");
+        assert!(comp.orig.is_empty()); // orig is String, not Option
+        assert_eq!(comp.pre, None);
+        assert_eq!(comp.suf, None);
+        assert_eq!(comp.exp, None);
+        assert_eq!(comp.disp, None);
+        assert_eq!(comp.flags, CompletionFlags::NONE);
+    }
+
+    #[test]
+    fn test_completion_with_description() {
+        let comp = Completion::new("checkout").with_description("checkout a branch");
+        assert_eq!(comp.exp, Some("checkout a branch".to_string()));
+    }
+
+    #[test]
+    fn test_completion_with_flags() {
+        let comp = Completion::new("dir/").with_flags(CompletionFlags::DIRECTORY);
+        assert!(comp.flags.contains(CompletionFlags::DIRECTORY));
+    }
+
+    #[test]
+    fn test_completion_display_str() {
+        let comp = Completion::new("test");
+        assert_eq!(comp.display_str(), "test");
+
+        let mut comp2 = Completion::new("test");
+        comp2.disp = Some("Test Display".to_string());
+        assert_eq!(comp2.display_str(), "Test Display");
+    }
+
+    #[test]
+    fn test_completion_insert_str() {
+        let mut comp = Completion::new("test");
+        assert_eq!(comp.insert_str(), "test");
+
+        comp.pre = Some("pre-".to_string());
+        comp.suf = Some("-suf".to_string());
+        assert_eq!(comp.insert_str(), "pre-test-suf");
+    }
+
+    #[test]
+    fn test_completion_group_new() {
+        let group = CompletionGroup::new("files");
+        assert_eq!(group.name, "files");
+        assert!(group.matches.is_empty());
+        assert!(group.sorted);
+        assert!(group.explanation.is_none());
+    }
+
+    #[test]
+    fn test_completion_group_new_unsorted() {
+        let group = CompletionGroup::new_unsorted("history");
+        assert!(!group.sorted);
+    }
+
+    #[test]
+    fn test_completion_group_explanations() {
+        let mut group = CompletionGroup::new("files");
+        group.add_explanation("file completions");
+        assert!(group.explanations.contains(&"file completions".to_string()));
+    }
+
+    #[test]
+    fn test_completion_group_add_match() {
+        let mut group = CompletionGroup::new("test");
+        group.add_match(Completion::new("foo"));
+        group.add_match(Completion::new("bar"));
+        
+        assert_eq!(group.matches.len(), 2);
+        assert_eq!(group.matches[0].str_, "foo");
+        assert_eq!(group.matches[1].str_, "bar");
+    }
+
+    #[test]
+    fn test_completion_group_add_explanation() {
+        let mut group = CompletionGroup::new("test");
+        group.add_explanation("Select an option");
+        
+        // add_explanation adds to the explanations vec
+        assert!(group.explanations.contains(&"Select an option".to_string()));
+    }
+
+    #[test]
+    fn test_group_flags_default() {
+        let flags = GroupFlags::default();
+        assert!(!flags.contains(GroupFlags::PACKED));
+        assert!(!flags.contains(GroupFlags::ROWS_FIRST));
+        assert!(!flags.contains(GroupFlags::HAS_DISPLINE));
+    }
+
+    #[test]
+    fn test_completion_receiver_new() {
+        let receiver = CompletionReceiver::unlimited();
+        assert_eq!(receiver.total_count(), 0);
+        // Has default group
+        assert_eq!(receiver.groups().len(), 1);
+    }
+
+    #[test]
+    fn test_completion_receiver_add() {
+        let mut receiver = CompletionReceiver::unlimited();
+        receiver.begin_group("files", true);
+        receiver.add(Completion::new("test.txt"));
+        
+        assert_eq!(receiver.total_count(), 1);
+        assert!(receiver.groups().contains_key("files"));
+    }
+
+    #[test]
+    fn test_completion_receiver_multiple_groups() {
+        let mut receiver = CompletionReceiver::unlimited();
+        
+        receiver.begin_group("files", true);
+        receiver.add(Completion::new("file1.txt"));
+        receiver.add(Completion::new("file2.txt"));
+        
+        receiver.begin_group("directories", true);
+        receiver.add(Completion::new("dir1/"));
+        
+        assert_eq!(receiver.total_count(), 3);
+        // 3 groups: default + files + directories
+        assert_eq!(receiver.groups().len(), 3);
+    }
+
+    #[test]
+    fn test_completion_receiver_all_matches() {
+        let mut receiver = CompletionReceiver::unlimited();
+        
+        receiver.begin_group("a", true);
+        receiver.add(Completion::new("alpha"));
+        
+        receiver.begin_group("b", true);
+        receiver.add(Completion::new("beta"));
+        
+        let matches = receiver.all_matches();
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn test_completion_receiver_take() {
+        let mut receiver = CompletionReceiver::unlimited();
+        receiver.begin_group("test", true);
+        receiver.add(Completion::new("item"));
+        
+        let groups = receiver.take();
+        // default group + test group
+        assert!(groups.len() >= 1);
+    }
+
+    #[test]
+    fn test_completion_with_all_fields() {
+        let mut comp = Completion::new("main");
+        comp.orig = "original".to_string();
+        comp.pre = Some("pre".to_string());
+        comp.suf = Some("suf".to_string());
+        comp.exp = Some("description".to_string());
+        comp.disp = Some("display".to_string());
+        comp.flags = CompletionFlags::FILE | CompletionFlags::REMOVE;
+        comp.rnum = 5;
+        comp.gnum = 10;
+        comp.modec = '/';
+        
+        assert_eq!(comp.orig, "original");
+        assert_eq!(comp.modec, '/');
+        assert!(comp.flags.contains(CompletionFlags::FILE));
+    }
+
+    #[test]
+    fn test_completion_flags_all_flags() {
+        // Verify all flags are distinct
+        let all_flags = [
+            CompletionFlags::REMOVE,
+            CompletionFlags::FILE,
+            CompletionFlags::DIRECTORY,
+            CompletionFlags::NOLIST,
+            CompletionFlags::DISPLINE,
+            CompletionFlags::NOSPACE,
+            CompletionFlags::QUOTE,
+            CompletionFlags::ISPAR,
+            CompletionFlags::PACKED,
+            CompletionFlags::ROWS,
+            CompletionFlags::ALL,
+            CompletionFlags::DUMMY,
+            CompletionFlags::MULT,
+            CompletionFlags::FMULT,
+            CompletionFlags::DELETE,
+            CompletionFlags::NOQUOTE,
+        ];
+        
+        for (i, flag1) in all_flags.iter().enumerate() {
+            for (j, flag2) in all_flags.iter().enumerate() {
+                if i != j {
+                    assert_ne!(flag1.bits(), flag2.bits(), "Flags at {} and {} have same bits", i, j);
+                }
+            }
+        }
+    }
+}

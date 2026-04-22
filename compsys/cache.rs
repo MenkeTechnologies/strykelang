@@ -1302,4 +1302,186 @@ mod tests {
 
         assert_eq!(cache.autoload_count().unwrap(), 10000);
     }
+
+    #[test]
+    fn test_executables_cache() {
+        let mut cache = CompsysCache::memory().unwrap();
+        
+        let executables = vec![
+            ("ls".to_string(), "/bin/ls".to_string()),
+            ("cat".to_string(), "/bin/cat".to_string()),
+            ("git".to_string(), "/usr/bin/git".to_string()),
+        ];
+        cache.set_executables_bulk(&executables).unwrap();
+        
+        assert!(cache.has_executables().unwrap());
+        assert!(cache.has_executable("ls").unwrap());
+        assert!(cache.has_executable("git").unwrap());
+        assert!(!cache.has_executable("nonexistent").unwrap());
+        
+        assert_eq!(cache.get_executable_path("ls").unwrap(), Some("/bin/ls".to_string()));
+        assert_eq!(cache.executables_count().unwrap(), 3);
+    }
+
+    #[test]
+    fn test_executables_prefix_search() {
+        let mut cache = CompsysCache::memory().unwrap();
+        
+        let executables = vec![
+            ("git".to_string(), "/usr/bin/git".to_string()),
+            ("gitk".to_string(), "/usr/bin/gitk".to_string()),
+            ("grep".to_string(), "/bin/grep".to_string()),
+            ("gzip".to_string(), "/bin/gzip".to_string()),
+        ];
+        cache.set_executables_bulk(&executables).unwrap();
+        
+        // FTS prefix search returns (name, path) tuples
+        let git_cmds = cache.get_executables_prefix_fts("git").unwrap();
+        assert_eq!(git_cmds.len(), 2);
+        assert!(git_cmds.iter().any(|(name, _)| name == "git"));
+        assert!(git_cmds.iter().any(|(name, _)| name == "gitk"));
+        
+        let g_cmds = cache.get_executables_prefix_fts("g").unwrap();
+        assert_eq!(g_cmds.len(), 4);
+    }
+
+    #[test]
+    fn test_named_dirs_cache() {
+        let mut cache = CompsysCache::memory().unwrap();
+        
+        let dirs = vec![
+            ("proj".to_string(), "/home/user/projects".to_string()),
+            ("docs".to_string(), "/home/user/documents".to_string()),
+        ];
+        cache.set_named_dirs_bulk(&dirs).unwrap();
+        
+        assert!(cache.has_named_dirs().unwrap());
+        
+        let all = cache.get_named_dirs().unwrap();
+        assert_eq!(all.len(), 2);
+        
+        let p_dirs = cache.get_named_dirs_prefix("p").unwrap();
+        assert_eq!(p_dirs.len(), 1);
+        assert_eq!(p_dirs[0].0, "proj");
+    }
+
+    #[test]
+    fn test_shell_functions_cache() {
+        let mut cache = CompsysCache::memory().unwrap();
+        
+        let functions = vec![
+            ("myFunc".to_string(), "/home/user/.zshrc".to_string()),
+            ("zpwrClearList".to_string(), "/home/user/.zpwr/autoload".to_string()),
+            ("zpwrTop".to_string(), "/home/user/.zpwr/autoload".to_string()),
+        ];
+        cache.set_shell_functions_bulk(&functions).unwrap();
+        
+        assert!(cache.has_shell_functions().unwrap());
+        assert_eq!(cache.shell_functions_count().unwrap(), 3);
+        
+        let zpwr = cache.get_shell_functions_prefix("zpwr").unwrap();
+        assert_eq!(zpwr.len(), 2);
+        // Results are tuples (name, source)
+        assert!(zpwr.iter().any(|(name, _)| name == "zpwrClearList"));
+        assert!(zpwr.iter().any(|(name, _)| name == "zpwrTop"));
+    }
+
+    #[test]
+    fn test_metadata() {
+        let cache = CompsysCache::memory().unwrap();
+        
+        cache.set_metadata("version", "1.0.0").unwrap();
+        cache.set_metadata("build_time", "2026-04-22").unwrap();
+        
+        assert_eq!(cache.get_metadata("version").unwrap(), Some("1.0.0".to_string()));
+        assert_eq!(cache.get_metadata("build_time").unwrap(), Some("2026-04-22".to_string()));
+        assert_eq!(cache.get_metadata("nonexistent").unwrap(), None);
+    }
+
+    #[test]
+    fn test_comps_keys() {
+        let mut cache = CompsysCache::memory().unwrap();
+        
+        let comps = vec![
+            ("git".to_string(), "_git".to_string()),
+            ("docker".to_string(), "_docker".to_string()),
+        ];
+        cache.set_comps_bulk(&comps).unwrap();
+        
+        let keys = cache.comps_keys().unwrap();
+        assert_eq!(keys.len(), 2);
+        assert!(keys.contains(&"docker".to_string()));
+        assert!(keys.contains(&"git".to_string()));
+    }
+
+    #[test]
+    fn test_comps_prefix() {
+        let mut cache = CompsysCache::memory().unwrap();
+        
+        let comps = vec![
+            ("git".to_string(), "_git".to_string()),
+            ("gitk".to_string(), "_gitk".to_string()),
+            ("docker".to_string(), "_docker".to_string()),
+        ];
+        cache.set_comps_bulk(&comps).unwrap();
+        
+        let git_comps = cache.comps_prefix("git").unwrap();
+        assert_eq!(git_comps.len(), 2);
+    }
+
+    #[test]
+    fn test_zstyles_bulk() {
+        let mut cache = CompsysCache::memory().unwrap();
+        
+        let styles = vec![
+            (":completion:*".to_string(), "menu".to_string(), vec!["select".to_string()], false),
+            (":completion:*".to_string(), "verbose".to_string(), vec!["yes".to_string()], false),
+            (":completion:*:descriptions".to_string(), "format".to_string(), vec!["%d".to_string()], false),
+        ];
+        cache.set_zstyles_bulk(&styles).unwrap();
+        
+        assert!(cache.has_zstyles().unwrap());
+        assert_eq!(cache.zstyles_count().unwrap(), 3);
+    }
+
+    #[test]
+    fn test_services() {
+        let cache = CompsysCache::memory().unwrap();
+        
+        cache.set_service("git", "scm").unwrap();
+        cache.set_service("hg", "scm").unwrap();
+        
+        assert_eq!(cache.get_service("git").unwrap(), Some("scm".to_string()));
+        assert_eq!(cache.get_service("unknown").unwrap(), None);
+    }
+
+    #[test]
+    fn test_cache_overwrite() {
+        let cache = CompsysCache::memory().unwrap();
+        
+        cache.set_comp("git", "_git_old").unwrap();
+        assert_eq!(cache.get_comp("git").unwrap(), Some("_git_old".to_string()));
+        
+        cache.set_comp("git", "_git_new").unwrap();
+        assert_eq!(cache.get_comp("git").unwrap(), Some("_git_new".to_string()));
+    }
+
+    #[test]
+    fn test_executable_names() {
+        let mut cache = CompsysCache::memory().unwrap();
+        
+        let executables = vec![
+            ("alpha".to_string(), "/bin/alpha".to_string()),
+            ("beta".to_string(), "/bin/beta".to_string()),
+            ("gamma".to_string(), "/bin/gamma".to_string()),
+        ];
+        cache.set_executables_bulk(&executables).unwrap();
+        
+        let names = cache.get_executable_names().unwrap();
+        assert_eq!(names.len(), 3);
+        // Returns a HashSet, so check contains
+        assert!(names.contains("alpha"));
+        assert!(names.contains("beta"));
+        assert!(names.contains("gamma"));
+    }
 }

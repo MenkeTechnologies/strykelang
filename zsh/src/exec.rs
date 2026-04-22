@@ -3370,7 +3370,7 @@ impl ShellExecutor {
         use std::process::Stdio;
 
         // Parse the command
-        let mut parser = crate::shell_parse::ShellParser::new(cmd_str);
+        let mut parser = crate::shell_ast::ShellParser::new(cmd_str);
         let commands = match parser.parse_script() {
             Ok(cmds) => cmds,
             Err(_) => return String::new(),
@@ -3421,7 +3421,7 @@ impl ShellExecutor {
         use std::process::Stdio;
 
         // Parse the command
-        let mut parser = crate::shell_parse::ShellParser::new(cmd_str);
+        let mut parser = crate::shell_ast::ShellParser::new(cmd_str);
         let commands = match parser.parse_script() {
             Ok(cmds) => cmds,
             Err(_) => return String::new(),
@@ -3472,7 +3472,7 @@ impl ShellExecutor {
         use std::process::Stdio;
 
         // Parse and execute the command
-        let mut parser = crate::shell_parse::ShellParser::new(cmd_str);
+        let mut parser = crate::shell_ast::ShellParser::new(cmd_str);
         let commands = match parser.parse_script() {
             Ok(cmds) => cmds,
             Err(_) => return String::new(),
@@ -5705,7 +5705,7 @@ impl ShellExecutor {
         let content = std::fs::read_to_string(&path).ok()?;
 
         // Parse the content
-        let mut parser = crate::shell_parse::ShellParser::new(&content);
+        let mut parser = crate::shell_ast::ShellParser::new(&content);
 
         if let Ok(commands) = parser.parse_script() {
             if commands.is_empty() {
@@ -9976,12 +9976,12 @@ impl ShellExecutor {
                     // Call widget
                     let mut zle = zle();
                     match zle.execute_widget(widget_name, None) {
-                        crate::shell_zle::WidgetResult::Ok => return 0,
-                        crate::shell_zle::WidgetResult::Error(e) => {
+                        crate::zle::WidgetResult::Ok => return 0,
+                        crate::zle::WidgetResult::Error(e) => {
                             eprintln!("zle: {}", e);
                             return 1;
                         }
-                        crate::shell_zle::WidgetResult::CallFunction(func) => {
+                        crate::zle::WidgetResult::CallFunction(func) => {
                             // Would need to call shell function
                             drop(zle);
                             if let Some(f) = self.functions.get(&func).cloned() {
@@ -10013,7 +10013,7 @@ impl ShellExecutor {
 
     /// zcompile - compile shell scripts to ZWC format
     fn builtin_zcompile(&mut self, args: &[String]) -> i32 {
-        use crate::shell_zwc::{ZwcBuilder, ZwcFile};
+        use crate::zwc::{ZwcBuilder, ZwcFile};
 
         let mut list_mode = false; // -t: list functions in zwc
         let mut compile_current = false; // -c: compile current functions

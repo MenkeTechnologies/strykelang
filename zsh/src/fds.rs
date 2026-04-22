@@ -43,7 +43,7 @@ fn heightenize_fd(fd: OwnedFd) -> io::Result<OwnedFd> {
     }
 
     // Dup to high range with CLOEXEC
-    let new_fd = nix::fcntl::fcntl(&fd, nix::fcntl::FcntlArg::F_DUPFD_CLOEXEC(FIRST_HIGH_FD))
+    let new_fd = nix::fcntl::fcntl(raw_fd, nix::fcntl::FcntlArg::F_DUPFD_CLOEXEC(FIRST_HIGH_FD))
         .map_err(|e| io::Error::from_raw_os_error(e as i32))?;
 
     Ok(unsafe { OwnedFd::from_raw_fd(new_fd) })
