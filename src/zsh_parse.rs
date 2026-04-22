@@ -887,9 +887,11 @@ impl<'a> ZshParser<'a> {
             self.skip_separators();
 
             // Check for end
-            if (use_brace && self.lexer.tok == LexTok::Outbrace)
-                || (!use_brace && self.lexer.tok == LexTok::Esac)
-            {
+            // Note: 'esac' might be String "esac" if incasepat > 0 prevents reserved word recognition
+            let is_esac = self.lexer.tok == LexTok::Esac
+                || (self.lexer.tok == LexTok::String
+                    && self.lexer.tokstr.as_ref().map(|s| s == "esac").unwrap_or(false));
+            if (use_brace && self.lexer.tok == LexTok::Outbrace) || (!use_brace && is_esac) {
                 self.lexer.incasepat = 0;
                 self.lexer.zshlex();
                 break;
@@ -1401,7 +1403,11 @@ impl<'a> ZshParser<'a> {
         
         self.skip_cond_separators();
 
-        if self.lexer.tok == LexTok::Bang {
+        // ! can be either LexTok::Bang or String "!"
+        let is_not = self.lexer.tok == LexTok::Bang
+            || (self.lexer.tok == LexTok::String
+                && self.lexer.tokstr.as_ref().map(|s| s == "!").unwrap_or(false));
+        if is_not {
             self.lexer.zshlex();
             let inner = match self.parse_cond_not() {
                 Some(i) => i,

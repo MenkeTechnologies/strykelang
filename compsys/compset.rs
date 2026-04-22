@@ -319,7 +319,7 @@ fn match_suffix_pattern(text: &str, pattern: &str) -> Option<String> {
 }
 
 /// Simple glob matching
-fn glob_match(text: &str, pattern: &str) -> bool {
+pub fn glob_match(text: &str, pattern: &str) -> bool {
     let text_chars: Vec<char> = text.chars().collect();
     let pat_chars: Vec<char> = pattern.chars().collect();
     glob_match_impl(&text_chars, &pat_chars)
@@ -471,4 +471,149 @@ mod tests {
             Some("user:".to_string())
         );
     }
+}
+
+// =============================================================================
+// compquote builtin
+// =============================================================================
+
+/// compquote options
+#[derive(Clone, Debug, Default)]
+pub struct CompquoteOpts {
+    /// -p: quote special characters in PREFIX/SUFFIX for patterns
+    pub pattern: bool,
+}
+
+impl CompquoteOpts {
+    pub fn parse(args: &[String]) -> Result<(Self, Vec<String>), String> {
+        let mut opts = Self::default();
+        let mut names = Vec::new();
+        let mut i = 0;
+
+        while i < args.len() {
+            let arg = &args[i];
+            if arg == "-p" {
+                opts.pattern = true;
+            } else if arg.starts_with('-') {
+                return Err(format!("compquote: unknown option: {}", arg));
+            } else {
+                names.push(arg.clone());
+            }
+            i += 1;
+        }
+
+        Ok((opts, names))
+    }
+}
+
+/// Execute compquote builtin
+/// 
+/// compquote quotes special characters in the values of named parameters
+/// so they can be used as completion matches. This is needed when the
+/// values contain characters that would be interpreted by the shell.
+pub fn compquote_execute(
+    params: &mut CompParams,
+    opts: &CompquoteOpts,
+    names: &[String],
+) -> bool {
+    for name in names {
+        match name.as_str() {
+            "PREFIX" => {
+                params.prefix = quote_for_completion(&params.prefix, opts.pattern);
+            }
+            "SUFFIX" => {
+                params.suffix = quote_for_completion(&params.suffix, opts.pattern);
+            }
+            "IPREFIX" => {
+                params.iprefix = quote_for_completion(&params.iprefix, opts.pattern);
+            }
+            "ISUFFIX" => {
+                params.isuffix = quote_for_completion(&params.isuffix, opts.pattern);
+            }
+            _ => {
+                // For other parameters, we'd need access to the shell's parameter table
+                // In practice, compquote is mainly used for PREFIX/SUFFIX
+            }
+        }
+    }
+    true
+}
+
+/// Quote special characters for use in completion
+fn quote_for_completion(s: &str, for_pattern: bool) -> String {
+    let mut result = String::with_capacity(s.len() * 2);
+    
+    for c in s.chars() {
+        if for_pattern {
+            // Quote pattern metacharacters: * ? [ ] # ~ ^ 
+            match c {
+                '*' | '?' | '[' | ']' | '#' | '~' | '^' => {
+                    result.push('\\');
+                }
+                _ => {}
+            }
+        }
+        // Always quote shell metacharacters: \ ' " $ ` ! { } ( ) | & ; < > space tab newline
+        match c {
+            '\\' | '\'' | '"' | '$' | '`' | '!' | '{' | '}' | '(' | ')' 
+            | '|' | '&' | ';' | '<' | '>' | ' ' | '\t' | '\n' => {
+                result.push('\\');
+            }
+            _ => {}
+        }
+        result.push(c);
+    }
+    
+    result
+}
+
+// =============================================================================
+// compcall builtin (compctl compatibility)
+// =============================================================================
+
+/// compcall options
+#[derive(Clone, Debug, Default)]
+pub struct CompcallOpts {
+    /// -T: use completion for command specified by words[1] (like -T flag to compctl)
+    pub use_command: bool,
+    /// -D: use default completion
+    pub use_default: bool,
+}
+
+impl CompcallOpts {
+    pub fn parse(args: &[String]) -> Result<Self, String> {
+        let mut opts = Self::default();
+        
+        for arg in args {
+            match arg.as_str() {
+                "-T" => opts.use_command = true,
+                "-D" => opts.use_default = true,
+                _ if arg.starts_with('-') => {
+                    return Err(format!("compcall: unknown option: {}", arg));
+                }
+                _ => {}
+            }
+        }
+        
+        Ok(opts)
+    }
+}
+
+/// Execute compcall builtin
+///
+/// compcall allows calling completions defined with the old compctl builtin
+/// from within a completion widget. This provides backward compatibility.
+///
+/// Returns true if completions were added, false otherwise.
+pub fn compcall_execute(
+    _params: &CompParams,
+    _opts: &CompcallOpts,
+) -> bool {
+    // compcall invokes the old compctl completion system
+    // For now, we return false as we don't support compctl
+    // In a full implementation, this would:
+    // 1. Look up the compctl definition for the current command
+    // 2. Generate completions according to that definition
+    // 3. Add them via compadd
+    false
 }
