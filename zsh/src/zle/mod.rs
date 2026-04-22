@@ -16,7 +16,7 @@ pub use keymaps::{Keymap, KeymapName};
 pub use widgets::{BuiltinWidget, Widget, WidgetResult};
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 /// ZLE state - the line editor context
 #[derive(Debug, Clone)]

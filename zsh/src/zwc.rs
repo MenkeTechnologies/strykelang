@@ -4,7 +4,7 @@
 //! that can be executed by zshrs.
 
 use crate::shell_ast::{
-    CompoundCommand, ListOp, Redirect, RedirectOp, ShellCommand, ShellWord, SimpleCommand,
+    CompoundCommand, ListOp, RedirectOp, ShellCommand, ShellWord, SimpleCommand,
 };
 use std::fs::File;
 use std::io::{self, Read, Seek, SeekFrom};

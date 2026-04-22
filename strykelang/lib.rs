@@ -60,7 +60,6 @@ pub mod remote_wire;
 pub mod rust_ffi;
 pub mod rust_sugar;
 pub mod scope;
-pub mod shell_completion;
 pub mod shell_exec;
 pub mod shell_fds;
 pub mod shell_history;

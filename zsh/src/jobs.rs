@@ -9,7 +9,6 @@ use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd::Pid;
 use std::cell::Cell;
 use std::collections::HashMap;
-use std::num::NonZeroUsize;
 use std::process::Child;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;

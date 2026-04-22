@@ -489,7 +489,7 @@ impl<'a> ZshParser<'a> {
         // Parse trailing redirections
         if cmd.is_some() {
             while self.lexer.tok.is_redirop() {
-                if let Some(redir) = self.parse_redir() {
+                if let Some(_redir) = self.parse_redir() {
                     // Append to command redirections
                     // (for non-simple commands, we'd need to handle this differently)
                 }

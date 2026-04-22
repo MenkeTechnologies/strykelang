@@ -3,6 +3,74 @@
 //! Executes the parsed shell AST.
 
 use crate::history::HistoryEngine;
+use std::collections::HashSet;
+use std::sync::LazyLock;
+use parking_lot::Mutex;
+
+/// Cached compiled regexes for hot paths
+static REGEX_CACHE: LazyLock<Mutex<std::collections::HashMap<String, regex::Regex>>> =
+    LazyLock::new(|| Mutex::new(std::collections::HashMap::with_capacity(64)));
+
+/// Get or compile a regex, caching the result
+fn cached_regex(pattern: &str) -> Option<regex::Regex> {
+    let mut cache = REGEX_CACHE.lock();
+    if let Some(re) = cache.get(pattern) {
+        return Some(re.clone());
+    }
+    match regex::Regex::new(pattern) {
+        Ok(re) => {
+            cache.insert(pattern.to_string(), re.clone());
+            Some(re)
+        }
+        Err(_) => None,
+    }
+}
+
+/// HashSet of all zsh options for O(1) lookup
+static ZSH_OPTIONS_SET: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+    [
+        "aliases", "allexport", "alwayslastprompt", "alwaystoend", "appendcreate",
+        "appendhistory", "autocd", "autocontinue", "autolist", "automenu",
+        "autonamedirs", "autoparamkeys", "autoparamslash", "autopushd",
+        "autoremoveslash", "autoresume", "badpattern", "banghist", "bareglobqual",
+        "bashautolist", "bashrematch", "beep", "bgnice", "braceccl", "bsdecho",
+        "caseglob", "casematch", "cbases", "cdablevars", "cdsilent", "chasedots",
+        "chaselinks", "checkjobs", "checkrunningjobs", "clobber", "combiningchars",
+        "completealiases", "completeinword", "continueonerror", "correct",
+        "correctall", "cprecedences", "cshjunkiehistory", "cshjunkieloops",
+        "cshjunkiequotes", "cshnullcmd", "cshnullglob", "debugbeforecmd", "dotglob",
+        "dvorak", "emacs", "equals", "errexit", "errreturn", "evallineno", "exec",
+        "extendedglob", "extendedhistory", "flowcontrol", "forcefloat",
+        "functionargzero", "glob", "globassign", "globcomplete", "globdots",
+        "globstarshort", "globsubst", "globalexport", "globalrcs", "hashall",
+        "hashcmds", "hashdirs", "hashexecutablesonly", "hashlistall",
+        "histallowclobber", "histappend", "histbeep", "histexpand",
+        "histexpiredupsfirst", "histfcntllock", "histfindnodups", "histignorealldups",
+        "histignoredups", "histignorespace", "histlexwords", "histnofunctions",
+        "histnostore", "histreduceblanks", "histsavebycopy", "histsavenodups",
+        "histsubstpattern", "histverify", "hup", "ignorebraces", "ignoreclosebraces",
+        "ignoreeof", "incappendhistory", "incappendhistorytime", "interactive",
+        "interactivecomments", "ksharrays", "kshautoload", "kshglob",
+        "kshoptionprint", "kshtypeset", "kshzerosubscript", "listambiguous",
+        "listbeep", "listpacked", "listrowsfirst", "listtypes", "localloops",
+        "localoptions", "localpatterns", "localtraps", "log", "login", "longlistjobs",
+        "magicequalsubst", "mailwarn", "mailwarning", "markdirs", "menucomplete",
+        "monitor", "multibyte", "multifuncdef", "multios", "nomatch", "notify",
+        "nullglob", "numericglobsort", "octalzeroes", "onecmd", "overstrike",
+        "pathdirs", "pathscript", "physical", "pipefail", "posixaliases",
+        "posixargzero", "posixbuiltins", "posixcd", "posixidentifiers", "posixjobs",
+        "posixstrings", "posixtraps", "printeightbit", "printexitvalue", "privileged",
+        "promptbang", "promptcr", "promptpercent", "promptsp", "promptsubst",
+        "promptvars", "pushdignoredups", "pushdminus", "pushdsilent", "pushdtohome",
+        "rcexpandparam", "rcquotes", "rcs", "recexact", "rematchpcre", "restricted",
+        "rmstarsilent", "rmstarwait", "sharehistory", "shfileexpansion", "shglob",
+        "shinstdin", "shnullcmd", "shoptionletters", "shortloops", "shortrepeat",
+        "shwordsplit", "singlecommand", "singlelinezle", "sourcetrace", "stdin",
+        "sunkeyboardhack", "trackall", "transientrprompt", "trapsasync",
+        "typesetsilent", "typesettounset", "unset", "verbose", "vi",
+        "warncreateglobal", "warnnestedvar", "xtrace", "zle",
+    ].into_iter().collect()
+});
 
 /// Convert float to hex representation (%a/%A format)
 fn float_to_hex(val: f64, uppercase: bool) -> String {
@@ -245,6 +313,10 @@ pub struct ShellExecutor {
     pub comp_isuffix: String,         // ISUFFIX parameter
     pub readonly_vars: std::collections::HashSet<String>, // Read-only variables
     pub autoload_pending: HashMap<String, AutoloadFlags>, // Functions marked for autoload
+    // zsh hooks (precmd, preexec, chpwd, etc.)
+    pub hook_functions: HashMap<String, Vec<String>>, // hook_name -> [function_names]
+    // Named directories (hash -d)
+    pub named_dirs: HashMap<String, PathBuf>, // name -> path
 }
 
 impl ShellExecutor {
@@ -289,7 +361,65 @@ impl ShellExecutor {
             comp_isuffix: String::new(),
             readonly_vars: std::collections::HashSet::new(),
             autoload_pending: HashMap::new(),
+            hook_functions: HashMap::new(),
+            named_dirs: HashMap::new(),
         }
+    }
+    
+    /// Run hook functions (precmd, preexec, chpwd, etc.)
+    pub fn run_hooks(&mut self, hook_name: &str) {
+        if let Some(funcs) = self.hook_functions.get(hook_name).cloned() {
+            for func_name in funcs {
+                if self.functions.contains_key(&func_name) {
+                    let _ = self.execute_script(&format!("{}", func_name));
+                }
+            }
+        }
+        // Also check for hook arrays (e.g., precmd_functions)
+        let array_name = format!("{}_functions", hook_name);
+        if let Some(funcs) = self.arrays.get(&array_name).cloned() {
+            for func_name in funcs {
+                if self.functions.contains_key(&func_name) {
+                    let _ = self.execute_script(&format!("{}", func_name));
+                }
+            }
+        }
+    }
+    
+    /// Add a function to a hook
+    pub fn add_hook(&mut self, hook_name: &str, func_name: &str) {
+        self.hook_functions
+            .entry(hook_name.to_string())
+            .or_default()
+            .push(func_name.to_string());
+    }
+    
+    /// Add a named directory (hash -d name=path)
+    pub fn add_named_dir(&mut self, name: &str, path: &str) {
+        self.named_dirs.insert(name.to_string(), PathBuf::from(path));
+    }
+    
+    /// Expand ~ with named directories
+    pub fn expand_tilde_named(&self, path: &str) -> String {
+        if path.starts_with('~') {
+            let rest = &path[1..];
+            // Check for ~name or ~name/...
+            let (name, suffix) = if let Some(slash_pos) = rest.find('/') {
+                (&rest[..slash_pos], &rest[slash_pos..])
+            } else {
+                (rest, "")
+            };
+            
+            if name.is_empty() {
+                // Regular ~ expansion
+                if let Ok(home) = std::env::var("HOME") {
+                    return format!("{}{}", home, suffix);
+                }
+            } else if let Some(dir) = self.named_dirs.get(name) {
+                return format!("{}{}", dir.display(), suffix);
+            }
+        }
+        path.to_string()
     }
 
     fn all_zsh_options() -> &'static [&'static str] {
@@ -564,8 +694,8 @@ impl ShellExecutor {
     fn normalize_option_name(name: &str) -> (String, bool) {
         let normalized = name.to_lowercase().replace(['-', '_'], "");
         if let Some(stripped) = normalized.strip_prefix("no") {
-            // Check if the stripped version is a valid option
-            if Self::all_zsh_options().contains(&stripped) {
+            // O(1) lookup in HashSet instead of linear scan
+            if ZSH_OPTIONS_SET.contains(stripped) {
                 return (stripped.to_string(), false);
             }
         }
@@ -578,9 +708,9 @@ impl ShellExecutor {
         let opt_lower = opt.to_lowercase();
 
         if pat.contains('*') || pat.contains('?') || pat.contains('[') {
-            // Simple glob matching
             let regex_pat = pat.replace('.', "\\.").replace('*', ".*").replace('?', ".");
-            regex::Regex::new(&format!("^{}$", regex_pat))
+            let full_pattern = format!("^{}$", regex_pat);
+            cached_regex(&full_pattern)
                 .map(|re| re.is_match(&opt_lower))
                 .unwrap_or(false)
         } else {
@@ -595,8 +725,9 @@ impl ShellExecutor {
             return Some(func.clone());
         }
 
-        // Search fpath for the function
-        for dir in &self.fpath.clone() {
+        // Search fpath for the function - use index to avoid borrow issues
+        for i in 0..self.fpath.len() {
+            let dir = self.fpath[i].clone();
             // Try directory.zwc first
             let zwc_path = dir.with_extension("zwc");
             if zwc_path.exists() {
@@ -615,7 +746,7 @@ impl ShellExecutor {
 
             // Look for directory/*.zwc files containing this function
             if dir.is_dir() {
-                if let Ok(entries) = fs::read_dir(dir) {
+                if let Ok(entries) = fs::read_dir(&dir) {
                     for entry in entries.flatten() {
                         let path = entry.path();
                         if path.extension().map_or(false, |e| e == "zwc") {
@@ -910,6 +1041,7 @@ impl ShellExecutor {
             "getopts" => self.builtin_getopts(args),
             "type" => self.builtin_type(args),
             "hash" => self.builtin_hash(args),
+            "add-zsh-hook" => self.builtin_add_zsh_hook(args),
             "command" => self.builtin_command(args, &cmd.redirects),
             "builtin" => self.builtin_builtin(args, &cmd.redirects),
             "let" => self.builtin_let(args),
@@ -926,9 +1058,6 @@ impl ShellExecutor {
             // Control flow
             "break" => self.builtin_break(args),
             "continue" => self.builtin_continue(args),
-            // Aliases for existing builtins
-            "bye" | "logout" => self.builtin_exit(args),
-            "chdir" => self.builtin_cd(args),
             // Enable/disable builtins
             "disable" => self.builtin_disable(args),
             "enable" => self.builtin_enable(args),
@@ -1583,7 +1712,7 @@ impl ShellExecutor {
                         .map(|w| self.expand_word(w))
                         .collect::<Vec<_>>()
                         .join(" "),
-                    ShellCommand::Compound(CompoundCommand::BraceGroup(cmds)) => {
+                    ShellCommand::Compound(CompoundCommand::BraceGroup(_cmds)) => {
                         // Just run as a subshell with the commands
                         // For simplicity, we'll use bash -c
                         "bash -c 'true'".to_string()
@@ -2514,9 +2643,9 @@ impl ShellExecutor {
         // Convert file pattern to regex for positive extglob
         let regex_str = self.extglob_to_regex(file_pattern);
 
-        let re = match regex::Regex::new(&regex_str) {
-            Ok(r) => r,
-            Err(_) => return vec![pattern.to_string()],
+        let re = match cached_regex(&regex_str) {
+            Some(r) => r,
+            None => return vec![pattern.to_string()],
         };
 
         let mut results = Vec::new();
@@ -2577,7 +2706,8 @@ impl ShellExecutor {
                 let matches_neg = alts.iter().any(|alt| {
                     if alt.contains('*') || alt.contains('?') {
                         let alt_re = self.extglob_inner_to_regex(alt);
-                        if let Ok(r) = regex::Regex::new(&format!("^{}$", alt_re)) {
+                        let full_pattern = format!("^{}$", alt_re);
+                        if let Some(r) = cached_regex(&full_pattern) {
                             r.is_match(basename)
                         } else {
                             *alt == basename
@@ -3042,12 +3172,12 @@ impl ShellExecutor {
                     let pattern = if long { &rest[1..] } else { rest };
 
                     // Convert shell glob pattern to regex-style for matching prefixes
-                    // Escape special regex chars, then convert glob wildcards
                     let pattern_regex = regex::escape(pattern)
                         .replace(r"\*", ".*")
                         .replace(r"\?", ".");
+                    let full_pattern = format!("^{}", pattern_regex);
 
-                    if let Ok(re) = regex::Regex::new(&format!("^{}", pattern_regex)) {
+                    if let Some(re) = cached_regex(&full_pattern) {
                         if long {
                             // Remove longest prefix match - find all matches and use the longest
                             let mut longest_end = 0;
@@ -4722,7 +4852,7 @@ impl ShellExecutor {
             CondExpr::StringMatch(a, b) => {
                 let val = self.expand_word(a);
                 let pattern = self.expand_word(b);
-                regex::Regex::new(&pattern)
+                cached_regex(&pattern)
                     .map(|re| re.is_match(&val))
                     .unwrap_or(false)
             }
@@ -5369,7 +5499,7 @@ impl ShellExecutor {
                 if rest.starts_with('(') {
                     // Array assignment - collect all elements until we find ')'
                     let mut elements = Vec::new();
-                    let mut current = rest[1..].to_string(); // skip '('
+                    let current = rest[1..].to_string(); // skip '('
 
                     // Check if closing ) is in this arg
                     if let Some(close_pos) = current.find(')') {
@@ -5475,8 +5605,7 @@ impl ShellExecutor {
         let mut resolve = false; // -r
         let mut trace = false; // -t
         let mut use_caller_dir = false; // -d
-        let mut list_mode = false;
-        let mut plus_mode = false; // +U, +z, etc. to turn off flags
+        let _list_mode = false;
 
         let mut i = 0;
         while i < args.len() {
@@ -5488,7 +5617,6 @@ impl ShellExecutor {
             }
 
             if arg.starts_with('+') {
-                plus_mode = true;
                 let flags = &arg[1..];
                 for c in flags.chars() {
                     match c {
@@ -7250,12 +7378,65 @@ impl ShellExecutor {
     }
 
     fn builtin_hash(&mut self, args: &[String]) -> i32 {
-        // Simplified hash - just report if command exists
-        if args.is_empty() {
+        // hash [-d] [-r] [name[=value] ...]
+        let mut dir_mode = false;
+        let mut rehash = false;
+        let mut names = Vec::new();
+        
+        let mut i = 0;
+        while i < args.len() {
+            let arg = &args[i];
+            if arg == "-d" {
+                dir_mode = true;
+            } else if arg == "-r" {
+                rehash = true;
+            } else if arg == "-rd" || arg == "-dr" {
+                dir_mode = true;
+                rehash = true;
+            } else if arg.starts_with('-') {
+                // Other flags, skip for now
+            } else {
+                names.push(arg.clone());
+            }
+            i += 1;
+        }
+        
+        if dir_mode {
+            // Named directories mode (hash -d)
+            if names.is_empty() {
+                // List named directories
+                for (name, path) in &self.named_dirs {
+                    println!("{}={}", name, path.display());
+                }
+                return 0;
+            }
+            
+            if rehash {
+                // Remove named directories
+                for name in &names {
+                    self.named_dirs.remove(name);
+                }
+                return 0;
+            }
+            
+            // Add named directories
+            for name in &names {
+                if let Some((n, p)) = name.split_once('=') {
+                    self.add_named_dir(n, p);
+                } else {
+                    eprintln!("hash: -d: {} not in name=value format", name);
+                    return 1;
+                }
+            }
+            return 0;
+        }
+        
+        // Regular hash - command path lookup
+        if names.is_empty() {
             return 0;
         }
 
-        for name in args {
+        for name in &names {
             if let Ok(output) = std::process::Command::new("which").arg(name).output() {
                 if output.status.success() {
                     let path = String::from_utf8_lossy(&output.stdout);
@@ -7265,6 +7446,36 @@ impl ShellExecutor {
                     return 1;
                 }
             }
+        }
+        0
+    }
+    
+    /// add-zsh-hook builtin - add function to hook
+    fn builtin_add_zsh_hook(&mut self, args: &[String]) -> i32 {
+        // add-zsh-hook [-d] hook function
+        if args.len() < 2 {
+            eprintln!("usage: add-zsh-hook [-d] hook function");
+            return 1;
+        }
+        
+        let (delete, hook, func) = if args[0] == "-d" {
+            if args.len() < 3 {
+                eprintln!("usage: add-zsh-hook -d hook function");
+                return 1;
+            }
+            (true, &args[1], &args[2])
+        } else {
+            (false, &args[0], &args[1])
+        };
+        
+        if delete {
+            // Remove function from hook
+            if let Some(funcs) = self.hook_functions.get_mut(hook.as_str()) {
+                funcs.retain(|f| f != func);
+            }
+        } else {
+            // Add function to hook
+            self.add_hook(hook, func);
         }
         0
     }
@@ -7316,6 +7527,7 @@ impl ShellExecutor {
             "getopts" => self.builtin_getopts(cmd_args),
             "type" => self.builtin_type(cmd_args),
             "hash" => self.builtin_hash(cmd_args),
+            "add-zsh-hook" => self.builtin_add_zsh_hook(cmd_args),
             "autoload" => self.builtin_autoload(cmd_args),
             "source" | "." => self.builtin_source(cmd_args),
             "functions" => self.builtin_functions(cmd_args),
@@ -7463,7 +7675,7 @@ impl ShellExecutor {
         }
 
         // Handle glob pattern
-        if let Some(pattern) = globpat {
+        if let Some(_pattern) = globpat {
             let full_pattern = format!("{}*", prefix);
             if let Ok(paths) = glob::glob(&full_pattern) {
                 for path in paths.flatten() {
