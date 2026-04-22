@@ -700,6 +700,147 @@ s --remote-worker      // worker process for distributed cluster</pre>
       </section>
 
       <section class="tutorial-section">
+        <h2>zshrs — The Most Powerful Shell Ever Created</h2>
+        <p><code>zshrs</code> is a drop-in zsh replacement written in Rust. Full bash/zsh/fish compatibility, SQLite-indexed completions, and native stryke parallel operations.</p>
+
+        <h3>Why zshrs?</h3>
+        <table class="reflection-table" style="font-size:11px;">
+          <thead><tr><th>vs zsh</th><th>vs fish</th><th>vs bash</th></tr></thead>
+          <tbody>
+            <tr><td>10x faster startup</td><td>Full POSIX compat</td><td>Fish-quality UX</td></tr>
+            <tr><td>SQLite history (frequency, duration, exit status)</td><td>Runs <code>.bashrc</code> unchanged</td><td>Modern completions</td></tr>
+            <tr><td>Native stryke parallel ops</td><td>No syntax translation needed</td><td>Syntax highlighting</td></tr>
+            <tr><td>ZWC precompiled function support</td><td>Global/suffix aliases</td><td>Autosuggestions</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Core features</h3>
+        <table class="reflection-table">
+          <thead><tr><th>Feature</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><strong>zsh/bash/fish compat</strong></td><td>Runs <code>.zshrc</code>, <code>.bashrc</code>, shell scripts unchanged</td></tr>
+            <tr><td><strong>Fish-style highlighting</strong></td><td>Real-time colorization — commands green, strings yellow, errors red, variables cyan</td></tr>
+            <tr><td><strong>Fish-style autosuggestions</strong></td><td>Ghost-text completions from history, accept with →</td></tr>
+            <tr><td><strong>Fish-style abbreviations</strong></td><td><code>g</code> → <code>git</code>, <code>gco</code> → <code>git checkout</code>, expand with space</td></tr>
+            <tr><td><strong>SQLite completions</strong></td><td>FTS5 prefix search indexes all PATH executables for instant fuzzy completion</td></tr>
+            <tr><td><strong>SQLite history</strong></td><td>Frequency-ranked, timestamped, tracks duration and exit status per command</td></tr>
+            <tr><td><strong>Stryke mode</strong></td><td>Prefix any line with <code>@</code> for full parallel primitives</td></tr>
+            <tr><td><strong>ZWC support</strong></td><td>Reads compiled <code>.zwc</code> files for fast function loading</td></tr>
+            <tr><td><strong>Job control</strong></td><td>Full <code>&amp;</code>, <code>fg</code>, <code>bg</code>, <code>jobs</code>, <code>wait</code>, <code>disown</code></td></tr>
+            <tr><td><strong>Traps &amp; signals</strong></td><td><code>trap 'cmd' EXIT INT TERM ERR DEBUG</code></td></tr>
+            <tr><td><strong>Hooks</strong></td><td><code>precmd</code>, <code>preexec</code>, <code>chpwd</code>, <code>add-zsh-hook</code></td></tr>
+            <tr><td><strong>zsh modules</strong></td><td><code>zpty</code>, <code>zsocket</code>, <code>zprof</code>, <code>sched</code>, <code>zparseopts</code></td></tr>
+            <tr><td><strong>PCRE regex</strong></td><td><code>pcre_compile</code>, <code>pcre_match</code> with capture groups</td></tr>
+            <tr><td><strong>Shell emulation</strong></td><td><code>emulate zsh</code>, <code>bash</code>, <code>ksh</code>, <code>sh</code></td></tr>
+          </tbody>
+        </table>
+
+        <h3>Usage</h3>
+<pre>zshrs                       # interactive shell
+zshrs -c 'echo hello'       # execute command
+zshrs script.sh             # run script file
+zshrs --dump-zwc file.zwc   # inspect compiled zsh files
+
+# In interactive mode, @ enters stryke:
+$ @ 1..100 |&gt; sum |&gt; p
+5050
+$ @ fetch_json("https://api.github.com/users/octocat") |&gt; dd
+$ @ ls |&gt; pmap { stat($_)-&gt;{size} } |&gt; sum |&gt; p    # parallel file sizes
+$ @ glob("**/*.rs") |&gt; pgrep { slurp($_) =~ /TODO/ } |&gt; p</pre>
+
+        <h3>Default abbreviations (fish-style)</h3>
+        <p>Abbreviations expand inline when you press space — type <code>gs&lt;space&gt;</code> and it becomes <code>git status </code>.</p>
+        <table class="reflection-table" style="font-size:11px;">
+          <thead><tr><th>Abbr</th><th>Expansion</th><th>Abbr</th><th>Expansion</th></tr></thead>
+          <tbody>
+            <tr><td><code>g</code></td><td>git</td><td><code>ga</code></td><td>git add</td></tr>
+            <tr><td><code>gaa</code></td><td>git add --all</td><td><code>gc</code></td><td>git commit</td></tr>
+            <tr><td><code>gcm</code></td><td>git commit -m</td><td><code>gco</code></td><td>git checkout</td></tr>
+            <tr><td><code>gd</code></td><td>git diff</td><td><code>gds</code></td><td>git diff --staged</td></tr>
+            <tr><td><code>gp</code></td><td>git push</td><td><code>gpl</code></td><td>git pull</td></tr>
+            <tr><td><code>gs</code></td><td>git status</td><td><code>gsw</code></td><td>git switch</td></tr>
+            <tr><td><code>gb</code></td><td>git branch</td><td><code>gl</code></td><td>git log --oneline</td></tr>
+            <tr><td><code>cb</code></td><td>cargo build</td><td><code>cr</code></td><td>cargo run</td></tr>
+            <tr><td><code>ct</code></td><td>cargo test</td><td><code>cc</code></td><td>cargo check</td></tr>
+            <tr><td><code>cf</code></td><td>cargo fmt</td><td><code>ccl</code></td><td>cargo clippy</td></tr>
+            <tr><td><code>dc</code></td><td>docker compose</td><td><code>dcu</code></td><td>docker compose up</td></tr>
+            <tr><td><code>k</code></td><td>kubectl</td><td><code>kgp</code></td><td>kubectl get pods</td></tr>
+            <tr><td><code>...</code></td><td>../..</td><td><code>....</code></td><td>../../..</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Full feature reference</h3>
+        <div class="cat-grid">
+          <div class="cat-card">
+            <h4>Parameter expansion</h4>
+            <p><code>${var:-default}</code>, <code>${#var}</code>, <code>${var:offset:len}</code>, <code>${var#pat}</code>, <code>${var/old/new}</code>, <code>${(U)var}</code>, <code>${(s/:/)var}</code>, <code>${(o)arr}</code>, <code>${(k)assoc}</code></p>
+          </div>
+          <div class="cat-card">
+            <h4>Arrays</h4>
+            <p><code>arr=(a b c)</code>, <code>${arr[1]}</code>, <code>${arr[-1]}</code>, <code>${arr[2,4]}</code>, <code>arr+=(d)</code>, <code>declare -A map</code>, <code>map[k]=v</code></p>
+          </div>
+          <div class="cat-card">
+            <h4>Control flow</h4>
+            <p><code>if/elif/else/fi</code>, <code>for/do/done</code>, <code>for ((;;))</code>, <code>while/until</code>, <code>case/esac</code>, <code>select</code>, <code>repeat N cmd</code>, <code>{} always {}</code></p>
+          </div>
+          <div class="cat-card">
+            <h4>Arithmetic</h4>
+            <p><code>$((expr))</code>, <code>((stmt))</code>, <code>let</code>, <code>+ - * / % **</code>, <code>&amp; | ^ ~ &lt;&lt; &gt;&gt;</code>, <code>++ --</code>, <code>?: ,</code>, hex/octal/binary literals</p>
+          </div>
+          <div class="cat-card">
+            <h4>Conditionals</h4>
+            <p><code>[[ ]]</code>, <code>[ ]</code>, <code>-eq -ne -lt -gt</code>, <code>== != &lt; &gt;</code>, <code>-z -n</code>, <code>=~</code> regex, <code>-e -f -d -L -r -w -x -s -nt -ot</code></p>
+          </div>
+          <div class="cat-card">
+            <h4>Redirection</h4>
+            <p><code>&gt; &gt;&gt; &lt; 2&gt; &amp;&gt;</code>, <code>2&gt;&amp;1</code>, <code>&gt;|</code> force, heredoc <code>&lt;&lt;EOF</code>, herestring <code>&lt;&lt;&lt;</code>, process sub <code>&lt;(cmd)</code> <code>&gt;(cmd)</code></p>
+          </div>
+          <div class="cat-card">
+            <h4>Globbing</h4>
+            <p><code>* ? [abc] [!a] [a-z]</code>, <code>{a,b,c}</code>, <code>{1..10}</code>, <code>{0..10..2}</code>, <code>**/*.rs</code>, qualifiers <code>*(.) *(/) *(@) *(om)</code></p>
+          </div>
+          <div class="cat-card">
+            <h4>Functions</h4>
+            <p><code>f() {}</code>, <code>function f {}</code>, <code>local</code>, <code>return</code>, <code>$@ $* $#</code>, <code>autoload -Uz</code>, <code>functions</code>, <code>unfunction</code></p>
+          </div>
+          <div class="cat-card">
+            <h4>Aliases</h4>
+            <p><code>alias</code>, <code>unalias</code>, global <code>alias -g G='|grep'</code>, suffix <code>alias -s txt=cat</code></p>
+          </div>
+          <div class="cat-card">
+            <h4>Job control</h4>
+            <p><code>&amp;</code>, <code>jobs</code>, <code>fg</code>, <code>bg</code>, <code>wait</code>, <code>disown</code>, <code>suspend</code>, <code>kill</code>, <code>%1 %+ %- %?str</code></p>
+          </div>
+          <div class="cat-card">
+            <h4>Traps</h4>
+            <p><code>trap 'cmd' EXIT INT TERM ERR DEBUG CHLD</code>, <code>trap -</code> reset, <code>trap ''</code> ignore, <code>kill -l</code></p>
+          </div>
+          <div class="cat-card">
+            <h4>History</h4>
+            <p><code>history</code>, <code>fc</code>, <code>!!</code>, <code>!-2</code>, <code>!42</code>, <code>!echo</code>, <code>!?pat</code>, <code>!$ !^ !*</code>, <code>^old^new</code></p>
+          </div>
+          <div class="cat-card">
+            <h4>Prompt</h4>
+            <p><code>%n %m %~ %? %j %T %D</code>, <code>\u \h \w \W \$</code>, <code>RPROMPT</code>, colors <code>%F{red} %f</code></p>
+          </div>
+          <div class="cat-card">
+            <h4>Hooks</h4>
+            <p><code>precmd</code>, <code>preexec</code>, <code>chpwd</code>, <code>periodic</code>, <code>add-zsh-hook</code></p>
+          </div>
+          <div class="cat-card">
+            <h4>zsh modules</h4>
+            <p><code>zpty</code>, <code>zsocket</code>, <code>zprof</code>, <code>sched</code>, <code>zformat</code>, <code>zparseopts</code>, <code>zregexparse</code>, <code>pcre_compile/match</code>, <code>zstyle</code>, <code>zstat</code></p>
+          </div>
+          <div class="cat-card">
+            <h4>Options</h4>
+            <p><code>setopt/unsetopt</code>: <code>autocd</code>, <code>extendedglob</code>, <code>nullglob</code>, <code>pipefail</code>, <code>noclobber</code>, <code>histignorespace</code>, <code>sharehistory</code></p>
+          </div>
+        </div>
+
+        <p>See the <a href="https://github.com/MenkeTechnologies/strykelang#0x13-zshrs-shell">full zshrs documentation in README</a> for complete reference with examples.</p>
+      </section>
+
+      <section class="tutorial-section">
         <h2>Repository &amp; links</h2>
         <ul>
           <li><strong>Source</strong> — <a href="https://github.com/MenkeTechnologies/strykelang">github.com/MenkeTechnologies/stryke</a></li>

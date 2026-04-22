@@ -45,6 +45,7 @@ The 2nd fastest dynamic language runtime ever benchmarked — behind only Mike P
 - [\[0x10\] Distributed `pmap_on` over SSH (`cluster`)](#0x10-distributed-pmap_on-over-ssh-cluster)
 - [\[0x11\] Language Server (`stryke lsp`)](#0x11-language-server-stryke-lsp)
 - [\[0x12\] Language Reflection](#0x12-language-reflection)
+- [\[0x13\] zshrs Shell](#0x13-zshrs-shell)
 - [\[0xFF\] License](#0xff-license)
 
 ---
@@ -1984,6 +1985,838 @@ stryke 'for my $h (qw(b all pc e a d c p)) {
 - A value of `"uncategorized"` in `%builtins` means the name is dispatched
   at runtime but doesn't match any `// ── category ──` section comment in
   `parser.rs` yet — a flag for "add a section header here", not an error.
+
+---
+
+## [0x13] ZSHRS SHELL
+
+`zshrs` is the most powerful shell ever created — a drop-in zsh replacement written in Rust that combines full bash/zsh/fish script compatibility with SQLite-indexed completions and native stryke parallel operations.
+
+### Install
+
+```sh
+cargo install strykelang   # includes zshrs binary
+# or from source
+cargo build                # produces target/debug/zshrs
+```
+
+### Why zshrs?
+
+| vs zsh | vs fish | vs bash |
+|--------|---------|---------|
+| 10x faster startup | Full POSIX compat | Fish-quality UX |
+| SQLite history (frequency, duration, exit status) | Runs `.bashrc` unchanged | Modern completions |
+| Native stryke parallel ops | No syntax translation needed | Syntax highlighting |
+| ZWC precompiled function support | Global/suffix aliases | Autosuggestions |
+
+### Core features
+
+| Feature | Description |
+|---------|-------------|
+| **Full zsh/bash/fish compatibility** | Runs existing `.zshrc`, `.bashrc`, shell scripts unchanged |
+| **Fish-style syntax highlighting** | Real-time colorization as you type — commands green, strings yellow, errors red, variables cyan |
+| **Fish-style autosuggestions** | Ghost-text completions from history, accept with → |
+| **Fish-style abbreviations** | `g` → `git`, `gco` → `git checkout`, expandable with space |
+| **SQLite-indexed completions** | FTS5 prefix search indexes all PATH executables for instant fuzzy completion |
+| **SQLite history** | Frequency-ranked, timestamped, tracks duration and exit status per command |
+| **Native stryke mode** | Prefix any line with `@` to execute as stryke code with full parallel primitives |
+| **ZWC support** | Reads compiled `.zwc` files for fast function loading from fpath |
+| **Job control** | Full `&`, `fg`, `bg`, `jobs`, `wait`, `disown`, `suspend` support |
+| **Traps & signals** | `trap 'cmd' EXIT INT TERM ERR DEBUG` with proper cleanup |
+| **PS1/PROMPT escapes** | `%n`, `%m`, `%~`, `%?`, `%j`, `%T`, `%D`, `\u`, `\h`, `\w`, `\W`, `\$` |
+| **Named directories** | `hash -d proj=/path/to/project` then `cd ~proj` |
+| **Hooks** | `precmd`, `preexec`, `chpwd`, `periodic`, `add-zsh-hook` |
+| **zsh modules** | `zpty`, `zsocket`, `zprof`, `sched`, `zformat`, `zparseopts`, `zregexparse` |
+| **PCRE regex** | `pcre_compile`, `pcre_match` with capture groups |
+| **Shell emulation** | `emulate zsh`, `emulate bash`, `emulate ksh`, `emulate sh` |
+
+### Usage
+
+```sh
+zshrs                       # interactive shell
+zshrs -c 'echo hello'       # execute command
+zshrs script.sh             # run script file
+zshrs --dump-zwc file.zwc   # inspect compiled zsh files
+zshrs -c '@ 1..10 |> pmap { $_ * 2 } |> p'  # stryke mode via -c
+```
+
+In interactive mode, prefix any line with `@` to enter stryke mode:
+
+```sh
+$ @ 1..100 |> sum |> p
+5050
+$ @ fetch_json("https://api.github.com/users/octocat") |> dd
+$ @ ls |> pmap { stat($_)->{size} } |> sum |> p    # parallel file sizes
+$ @ 1..1000000 |> pgrep { is_prime($_) } |> cnt |> p  # parallel prime count
+```
+
+### Default abbreviations (fish-style)
+
+Abbreviations expand inline when you press space — type `gs<space>` and it becomes `git status `.
+
+| Abbr | Expansion | Abbr | Expansion |
+|------|-----------|------|-----------|
+| `g` | `git` | `ga` | `git add` |
+| `gaa` | `git add --all` | `gc` | `git commit` |
+| `gcm` | `git commit -m` | `gco` | `git checkout` |
+| `gd` | `git diff` | `gds` | `git diff --staged` |
+| `gp` | `git push` | `gpl` | `git pull` |
+| `gs` | `git status` | `gsw` | `git switch` |
+| `gb` | `git branch` | `gl` | `git log --oneline` |
+| `gst` | `git stash` | `grb` | `git rebase` |
+| `gm` | `git merge` | `gf` | `git fetch` |
+| `cb` | `cargo build` | `cr` | `cargo run` |
+| `ct` | `cargo test` | `cc` | `cargo check` |
+| `cf` | `cargo fmt` | `ccl` | `cargo clippy` |
+| `dc` | `docker compose` | `dcu` | `docker compose up` |
+| `dcd` | `docker compose down` | `dps` | `docker ps` |
+| `k` | `kubectl` | `kgp` | `kubectl get pods` |
+| `kgs` | `kubectl get services` | `kgd` | `kubectl get deployments` |
+| `l` | `ls -la` | `ll` | `ls -l` |
+| `la` | `ls -la` | `md` | `mkdir -p` |
+| `...` | `../..` | `....` | `../../..` |
+| `.....` | `../../../..` | | |
+
+### Builtins (complete list)
+
+**I/O**: `echo`, `printf`, `print`, `read`, `cat`
+
+**Navigation**: `cd`, `pwd`, `pushd`, `popd`, `dirs`
+
+**Variables**: `export`, `unset`, `readonly`, `typeset`, `declare`, `local`, `integer`, `float`, `set`
+
+**Aliases**: `alias`, `unalias`
+
+**Sourcing**: `source`, `.`, `eval`, `exec`
+
+**Control flow**: `exit`, `return`, `break`, `continue`, `shift`
+
+**Options**: `setopt`, `unsetopt`, `shopt`
+
+**Functions**: `autoload`, `functions`, `unfunction`
+
+**Hashing**: `hash`, `unhash`, `rehash`
+
+**Lookup**: `whence`, `where`, `which`, `type`, `command`, `builtin`
+
+**Enable/disable**: `enable`, `disable`
+
+**Completion**: `compgen`, `complete`, `compopt`, `compadd`, `compset`, `compctl`
+
+**Jobs**: `jobs`, `fg`, `bg`, `wait`, `disown`, `suspend`, `kill`
+
+**Limits**: `ulimit`, `umask`, `limit`, `unlimit`, `times`
+
+**History**: `history`, `fc`
+
+**Traps**: `trap`
+
+**Tests**: `test`, `[`, `[[`, `true`, `false`, `:`
+
+**Arithmetic**: `let`, `(( ))`
+
+**Emulation**: `emulate`
+
+**Modules**: `zmodload`
+
+**zsh-specific**: `zpty`, `zsocket`, `zprof`, `sched`, `zformat`, `zparseopts`, `zregexparse`, `pcre_compile`, `pcre_match`, `zstyle`, `zstat`, `zle`, `bindkey`, `vared`, `strftime`, `promptinit`, `add-zsh-hook`, `noglob`, `nocorrect`, `repeat`, `coproc`
+
+**Bash compat**: `shopt`, `help`, `caller`, `mapfile`, `readarray`
+
+### Parameter expansion (full zsh support)
+
+**Defaults and assignment**:
+```sh
+${var:-default}      # use default if unset/empty
+${var:=assign}       # assign default if unset/empty  
+${var:?error}        # error if unset/empty
+${var:+alternate}    # use alternate if set
+```
+
+**Length and substring**:
+```sh
+${#var}              # string length
+${#arr[@]}           # array length
+${var:offset}        # substring from offset
+${var:offset:length} # substring with length
+```
+
+**Pattern removal**:
+```sh
+${var#pattern}       # remove shortest prefix
+${var##pattern}      # remove longest prefix
+${var%pattern}       # remove shortest suffix  
+${var%%pattern}      # remove longest suffix
+```
+
+**Replacement**:
+```sh
+${var/pat/rep}       # replace first match
+${var//pat/rep}      # replace all matches
+${var/#pat/rep}      # replace prefix
+${var/%pat/rep}      # replace suffix
+```
+
+**Case conversion (zsh flags)**:
+```sh
+${(U)var}            # UPPERCASE
+${(L)var}            # lowercase
+${(C)var}            # Capitalize
+```
+
+**Array operations (zsh flags)**:
+```sh
+${(s/:/)var}         # split on delimiter
+${(j/,/)arr}         # join with delimiter
+${(o)arr}            # sort ascending
+${(O)arr}            # sort descending
+${(u)arr}            # unique elements
+${(k)assoc}          # associative array keys
+${(v)assoc}          # associative array values
+${(q)var}            # quote for reuse
+${(P)var}            # indirect expansion
+${(w)#var}           # word count
+```
+
+**Nested expansion**:
+```sh
+${${base}${suffix}}  # concatenate expansions
+${${var#prefix}%suffix}  # chained operations
+```
+
+### Arrays
+
+**Indexed arrays**:
+```sh
+arr=(a b c d e)      # create array
+echo ${arr[1]}       # first element (zsh is 1-indexed)
+echo ${arr[-1]}      # last element
+echo ${arr[2,4]}     # slice elements 2-4
+echo ${arr[@]}       # all elements
+echo ${#arr[@]}      # array length
+arr[2]=X             # assign element
+arr+=(f g)           # append elements
+arr=($(echo a b c))  # from command substitution
+```
+
+**Associative arrays**:
+```sh
+declare -A map       # or: typeset -A map
+map[key]=value       # assign
+echo ${map[key]}     # lookup
+echo ${(k)map[@]}    # all keys
+echo ${(v)map[@]}    # all values
+unset 'map[key]'     # delete key
+```
+
+### Control flow
+
+**Conditionals**:
+```sh
+if [[ $x -eq 5 ]]; then echo yes; fi
+if [[ $x -eq 5 ]]; then echo yes; else echo no; fi
+if [[ $x -eq 1 ]]; then echo one; elif [[ $x -eq 2 ]]; then echo two; fi
+```
+
+**Loops**:
+```sh
+for i in a b c; do echo $i; done
+for i in {1..10}; do echo $i; done
+for ((i=0; i<10; i++)); do echo $i; done
+while [[ $i -lt 10 ]]; do echo $i; ((i++)); done
+until [[ $i -ge 10 ]]; do echo $i; ((i++)); done
+repeat 5 echo hello
+```
+
+**Case**:
+```sh
+case $x in
+  foo) echo foo;;
+  bar|baz) echo bar or baz;;    # multiple patterns
+  [0-9]*) echo starts with digit;;
+  *) echo default;;
+esac
+
+# Fallthrough with ;&
+case $x in
+  1) echo one;&
+  2) echo two;;
+esac
+```
+
+**Select menu**:
+```sh
+select x in a b c; do echo $x; break; done
+```
+
+**Always block (zsh)**:
+```sh
+{ echo try; } always { echo cleanup; }
+```
+
+### Arithmetic
+
+**Basic operations**:
+```sh
+echo $((2 + 3))      # 5
+echo $((10 - 4))     # 6  
+echo $((3 * 4))      # 12
+echo $((10 / 2))     # 5
+echo $((10 % 3))     # 1
+echo $((2 ** 10))    # 1024
+```
+
+**Bitwise**:
+```sh
+echo $((12 & 10))    # 8 (AND)
+echo $((12 | 10))    # 14 (OR)
+echo $((12 ^ 10))    # 6 (XOR)
+echo $((~5))         # -6 (NOT)
+echo $((1 << 4))     # 16 (left shift)
+echo $((16 >> 2))    # 4 (right shift)
+```
+
+**Increment/decrement**:
+```sh
+((x++))              # post-increment
+((x--))              # post-decrement
+echo $((++x))        # pre-increment
+echo $((--x))        # pre-decrement
+```
+
+**Compound assignment**:
+```sh
+((x += 5))
+((x -= 3))
+((x *= 2))
+((x /= 4))
+((x %= 3))
+((x &= 0xf))
+((x |= 0x10))
+```
+
+**Ternary and comma**:
+```sh
+echo $((x > 5 ? 1 : 0))
+echo $((a=1, b=2, a+b))
+```
+
+**Number bases**:
+```sh
+echo $((0x10))       # 16 (hex)
+echo $((010))        # 8 (octal)
+echo $((2#1010))     # 10 (binary)
+```
+
+**let builtin**:
+```sh
+let x=5+3
+let "y = x * 2"
+```
+
+### Conditionals (`[[ ]]` and `[ ]`)
+
+**Numeric**:
+```sh
+[[ $x -eq $y ]]      # equal
+[[ $x -ne $y ]]      # not equal
+[[ $x -lt $y ]]      # less than
+[[ $x -gt $y ]]      # greater than
+[[ $x -le $y ]]      # less or equal
+[[ $x -ge $y ]]      # greater or equal
+```
+
+**String**:
+```sh
+[[ "$a" == "$b" ]]   # equal
+[[ "$a" != "$b" ]]   # not equal
+[[ "$a" < "$b" ]]    # lexically less
+[[ "$a" > "$b" ]]    # lexically greater
+[[ -z "$a" ]]        # empty
+[[ -n "$a" ]]        # non-empty
+[[ "$a" == *.txt ]]  # glob match
+[[ "$a" =~ [0-9]+ ]] # regex match (BASH_REMATCH captures)
+```
+
+**File tests**:
+```sh
+[[ -e $f ]]          # exists
+[[ -f $f ]]          # regular file
+[[ -d $f ]]          # directory
+[[ -L $f ]]          # symlink
+[[ -r $f ]]          # readable
+[[ -w $f ]]          # writable
+[[ -x $f ]]          # executable
+[[ -s $f ]]          # non-empty
+[[ $a -nt $b ]]      # a newer than b
+[[ $a -ot $b ]]      # a older than b
+[[ $a -ef $b ]]      # same file (inode)
+```
+
+**Logical**:
+```sh
+[[ $a && $b ]]       # AND
+[[ $a || $b ]]       # OR
+[[ ! $a ]]           # NOT
+```
+
+### Redirection
+
+**Basic**:
+```sh
+cmd > file           # stdout to file
+cmd >> file          # stdout append
+cmd < file           # stdin from file
+cmd 2> file          # stderr to file
+cmd 2>> file         # stderr append
+cmd &> file          # both stdout+stderr
+cmd &>> file         # both append
+```
+
+**File descriptor manipulation**:
+```sh
+cmd 2>&1             # stderr to stdout
+cmd 1>&2             # stdout to stderr
+cmd 3>&1 1>&2 2>&3   # swap stdout/stderr
+exec 3< file         # open fd 3 for reading
+exec 3> file         # open fd 3 for writing
+exec 3>&-            # close fd 3
+```
+
+**Noclobber**:
+```sh
+setopt noclobber     # prevent overwriting
+cmd >| file          # force overwrite anyway
+```
+
+**Here documents**:
+```sh
+cat <<EOF
+multi-line
+content here
+EOF
+
+cat <<'EOF'          # no variable expansion
+$VAR stays literal
+EOF
+
+cat <<-EOF           # strip leading tabs
+	indented content
+EOF
+```
+
+**Here strings**:
+```sh
+cat <<< "single line input"
+grep pattern <<< "$variable"
+```
+
+**Process substitution**:
+```sh
+diff <(cmd1) <(cmd2)           # input from commands
+cmd > >(tee log.txt)           # output to command
+paste <(cut -f1 a) <(cut -f2 b)  # join columns
+```
+
+### Pipelines
+
+```sh
+cmd1 | cmd2 | cmd3   # basic pipeline
+cmd1 |& cmd2         # pipe stderr too (zsh)
+
+setopt pipefail      # exit status from first failure
+echo ${pipestatus[@]}  # array of all exit statuses
+```
+
+### Globbing
+
+**Basic patterns**:
+```sh
+ls *.txt             # match .txt files
+ls ?.txt             # single char wildcard
+ls [abc].txt         # character class
+ls [!abc].txt        # negated class
+ls [a-z].txt         # range
+```
+
+**Brace expansion**:
+```sh
+echo {a,b,c}         # a b c
+echo {1..5}          # 1 2 3 4 5
+echo {01..10}        # 01 02 ... 10 (zero-padded)
+echo {0..10..2}      # 0 2 4 6 8 10 (step)
+echo {a..e}          # a b c d e
+echo file{1,2}.{txt,md}  # cartesian product
+```
+
+**Extended glob (setopt extendedglob)**:
+```sh
+ls **/*.rs           # recursive
+ls *.txt~old.txt     # exclude pattern
+ls (foo|bar)*.txt    # alternation
+ls file<1-10>.txt    # numeric range
+```
+
+**Glob qualifiers (zsh)**:
+```sh
+ls *(.)              # regular files only
+ls *(/)              # directories only
+ls *(@)              # symlinks only
+ls *(x)              # executable
+ls *(r)              # readable
+ls *(w)              # writable
+ls *(n)              # numeric sort
+ls *(on)             # sort by name
+ls *(om)             # sort by modification time
+ls *(oL)             # sort by size
+ls *(.om[1,5])       # 5 most recently modified files
+```
+
+**Glob options**:
+```sh
+setopt nullglob      # no matches → empty
+setopt dotglob       # include hidden files
+setopt nocaseglob    # case insensitive
+setopt numericglobsort  # sort numbers properly
+setopt globstarshort # ** recursive
+```
+
+### Functions
+
+```sh
+# Definition styles
+greet() { echo "Hello, $1"; }
+function greet { echo "Hello, $1"; }
+function greet() { echo "Hello, $1"; }
+
+# Arguments
+f() {
+  echo $0              # function name
+  echo $1 $2 $3        # positional args
+  echo $#              # arg count
+  echo $@              # all args (separate)
+  echo $*              # all args (joined)
+  shift                # remove first arg
+}
+
+# Local variables  
+f() {
+  local x=inner        # function-local
+  local -a arr=(1 2 3) # local array
+}
+
+# Return values
+f() {
+  return 42            # exit status 0-255
+}
+f; echo $?             # get return value
+
+# Recursive
+factorial() {
+  [[ $1 -le 1 ]] && echo 1 && return
+  echo $(( $1 * $(factorial $(($1-1))) ))
+}
+```
+
+**Autoloading (zsh)**:
+```sh
+autoload -Uz compinit  # mark for autoload
+compinit               # loads from fpath on first call
+```
+
+**Function inspection**:
+```sh
+functions              # list all
+functions greet        # show definition
+whence -f greet        # show definition
+unfunction greet       # remove
+```
+
+### Aliases
+
+**Regular aliases**:
+```sh
+alias ll='ls -la'
+alias grep='grep --color=auto'
+unalias ll
+alias                  # list all
+```
+
+**Global aliases (zsh)** — expand anywhere:
+```sh
+alias -g G='| grep'
+alias -g L='| less'
+alias -g H='| head'
+alias -g T='| tail'
+alias -g NE='2>/dev/null'
+
+echo hello G hello     # → echo hello | grep hello
+```
+
+**Suffix aliases (zsh)** — run by extension:
+```sh
+alias -s txt=cat
+alias -s json='python -m json.tool'
+alias -s md=glow
+
+file.txt               # → cat file.txt
+data.json              # → python -m json.tool data.json
+```
+
+### Job control
+
+```sh
+cmd &                  # run in background
+jobs                   # list jobs
+fg %1                  # bring job 1 to foreground
+bg %1                  # continue job 1 in background
+kill %1                # kill job 1
+disown %1              # remove from job table
+wait                   # wait for all background jobs
+wait %1                # wait for job 1
+wait $pid              # wait for specific PID
+
+# Job specs
+%1                     # job number
+%+                     # current job
+%-                     # previous job
+%?string               # job containing string
+```
+
+### Traps and signals
+
+```sh
+trap 'echo bye' EXIT          # on shell exit
+trap 'echo interrupted' INT   # on Ctrl-C
+trap 'echo terminated' TERM   # on kill
+trap 'echo error' ERR         # on command failure
+trap 'echo debug' DEBUG       # before each command
+trap 'echo child done' CHLD   # on child exit
+
+trap                          # list traps
+trap - EXIT                   # reset trap
+trap '' INT                   # ignore signal
+
+kill -l                       # list all signals
+kill -TERM $pid               # send signal
+```
+
+### History
+
+**Commands**:
+```sh
+history                # show history
+history 20             # last 20 entries
+fc -l                  # list (same as history)
+fc -l -10              # last 10
+fc -s old=new          # re-run with substitution
+```
+
+**Expansion**:
+```sh
+!!                     # last command
+!-2                    # 2 commands ago
+!42                    # history entry 42
+!echo                  # last command starting with echo
+!?pattern              # last command containing pattern
+!$                     # last argument of previous command
+!^                     # first argument of previous command
+!*                     # all arguments of previous command
+^old^new               # quick substitution
+```
+
+**Options**:
+```sh
+setopt histignorespace      # ignore commands starting with space
+setopt histignoredups       # ignore consecutive duplicates
+setopt histignorealldups    # remove older duplicates
+setopt sharehistory         # share across sessions
+setopt incappendhistory     # append immediately
+setopt extendedhistory      # save timestamps
+```
+
+### Prompt customization
+
+**Zsh escapes** (`PROMPT` / `PS1`):
+```sh
+%n                     # username
+%m                     # hostname (short)
+%M                     # hostname (full)
+%~                     # current directory (~ for home)
+%/                     # current directory (full path)
+%c %C %1~              # trailing directory component
+%#                     # # if root, % otherwise
+%?                     # exit status
+%j                     # job count
+%T                     # time (HH:MM 24h)
+%t %@                  # time (HH:MM am/pm)
+%*                     # time (HH:MM:SS 24h)
+%D                     # date (YY-MM-DD)
+%B %b                  # bold on/off
+%F{color} %f           # foreground color on/off
+%K{color} %k           # background color on/off
+```
+
+**Bash escapes** (`PS1`):
+```sh
+\u                     # username
+\h                     # hostname (short)
+\H                     # hostname (full)
+\w                     # working directory
+\W                     # basename of working directory
+\$                     # $ or # for root
+\n                     # newline
+\[...\]                # non-printing sequence
+```
+
+**Right prompt** (zsh):
+```sh
+RPROMPT='%T'           # show time on right
+```
+
+### Hooks (zsh)
+
+```sh
+# Define hook functions
+precmd() { echo "about to show prompt"; }
+preexec() { echo "about to run: $1"; }
+chpwd() { echo "changed to $PWD"; }
+periodic() { echo "periodic check"; }
+
+# Or use add-zsh-hook
+autoload -Uz add-zsh-hook
+add-zsh-hook precmd my_precmd_function
+add-zsh-hook preexec my_preexec_function
+add-zsh-hook chpwd my_chpwd_function
+```
+
+### zsh modules
+
+**zpty** — pseudo-terminal:
+```sh
+zpty mypty cmd         # create pty running cmd
+zpty -w mypty "input"  # write to pty
+zpty -r mypty output   # read from pty
+zpty -d mypty          # delete pty
+zpty                   # list ptys
+```
+
+**zsocket** — Unix domain sockets:
+```sh
+zsocket /tmp/sock      # connect
+zsocket -l /tmp/sock   # listen
+```
+
+**zprof** — profiling:
+```sh
+zmodload zsh/zprof
+# ... run code ...
+zprof                  # show profile data
+```
+
+**sched** — scheduled commands:
+```sh
+sched +5 echo "5 seconds later"
+sched 14:30 echo "at 2:30 PM"
+sched                  # list scheduled
+sched -3               # remove entry 3
+```
+
+**zformat** — formatted output:
+```sh
+zformat -f result "%a %b" a:hello b:world
+```
+
+**zparseopts** — option parsing:
+```sh
+zparseopts -D -E a=flag b:=opt -- "$@"
+```
+
+**zregexparse** — regex with captures:
+```sh
+zregexparse result "([0-9]+)" "abc123def"
+echo $result           # 123
+```
+
+**pcre** — Perl-compatible regex:
+```sh
+pcre_compile "hello.*world"
+pcre_match "hello beautiful world"
+echo $MATCH            # hello beautiful world
+```
+
+### zstyle (completion configuration)
+
+```sh
+# Basic format: zstyle 'pattern' style value...
+zstyle ':completion:*' menu select
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
+zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
+zstyle ':completion:*:descriptions' format '%B%d%b'
+zstyle ':completion:*:warnings' format 'No matches: %d'
+
+# Query styles
+zstyle -L                    # list all
+zstyle -L ':completion:*'    # list matching pattern
+```
+
+### Shell options (setopt/unsetopt)
+
+**Common options**:
+```sh
+setopt autocd              # cd by typing directory name
+setopt autopushd           # auto pushd on cd
+setopt cdablevars          # cd to variable contents
+setopt correct             # spell correction for commands
+setopt correctall          # spell correction for arguments
+setopt extendedglob        # extended globbing
+setopt globdots            # include dotfiles in globs
+setopt histignorespace     # ignore history starting with space
+setopt interactivecomments # allow # comments
+setopt noclobber           # don't overwrite files with >
+setopt nullglob            # no matches → empty
+setopt pipefail            # pipeline fails if any command fails
+setopt promptsubst         # expand variables in prompt
+```
+
+**List all options**:
+```sh
+setopt                 # list enabled
+unsetopt               # list disabled
+set -o                 # list all with status
+```
+
+### Shell emulation
+
+```sh
+emulate zsh            # zsh mode (default)
+emulate bash           # bash compatibility
+emulate ksh            # ksh compatibility
+emulate sh             # POSIX sh compatibility
+```
+
+### Integration with stryke
+
+The killer feature — prefix any line with `@` to access stryke's parallel primitives:
+
+```sh
+# Parallel operations on shell data
+$ @ ls | pmap { stat($_)->{size} } | sum | p
+1048576
+
+# Fetch and process JSON
+$ @ fetch_json("https://api.github.com/repos/rust-lang/rust") |> $_->{stargazers_count} |> p
+85000
+
+# Parallel grep across files
+$ @ glob("**/*.rs") |> pgrep { slurp($_) =~ /TODO/ } |> p
+
+# Pipeline with stryke operators
+$ @ cat /var/log/system.log |> lines |> pgrep { /error/i } |> cnt |> p
+
+# Mixed shell + stryke
+$ for f in *.json; do @ read_json("$f") |> keys |> cnt |> p; done
+```
 
 ---
 
