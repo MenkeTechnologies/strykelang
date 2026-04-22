@@ -644,16 +644,16 @@ fn stat_missing_path_is_empty_list() {
 
 #[test]
 fn glob_finds_rs_sources_under_src() {
-    let n = ri(r#"scalar glob "src/*.rs";"#);
+    let n = ri(r#"scalar glob "strykelang/*.rs";"#);
     assert!(
         n > 0,
-        "glob src/*.rs should match at least one file, got {n}"
+        "glob strykelang/*.rs should match at least one file, got {n}"
     );
 }
 
 #[test]
 fn glob_par_plain_list_context_count() {
-    let n = ri(r#"glob_par "src/*.rs";"#);
+    let n = ri(r#"glob_par "strykelang/*.rs";"#);
     assert!(
         n > 0,
         "glob_par without scalar should yield array len as to_int, got {n}"
@@ -662,16 +662,16 @@ fn glob_par_plain_list_context_count() {
 
 #[test]
 fn glob_par_finds_rs_sources_under_src() {
-    let n = ri(r#"scalar glob_par "src/*.rs";"#);
+    let n = ri(r#"scalar glob_par "strykelang/*.rs";"#);
     assert!(
         n > 0,
-        "glob_par src/*.rs should match at least one file, got {n}"
+        "glob_par strykelang/*.rs should match at least one file, got {n}"
     );
 }
 
 #[test]
 fn glob_par_tree_walker_plain_matches_count() {
-    let program = crate::parse(r#"glob_par "src/*.rs";"#).expect("parse");
+    let program = crate::parse(r#"glob_par "strykelang/*.rs";"#).expect("parse");
     let mut interp = crate::interpreter::Interpreter::new();
     let n = interp
         .execute_tree(&program)
@@ -685,7 +685,7 @@ fn glob_par_tree_walker_plain_matches_count() {
 
 #[test]
 fn glob_par_tree_walker_matches_count() {
-    let program = crate::parse(r#"scalar glob_par "src/*.rs";"#).expect("parse");
+    let program = crate::parse(r#"scalar glob_par "strykelang/*.rs";"#).expect("parse");
     let mut interp = crate::interpreter::Interpreter::new();
     let n = interp
         .execute_tree(&program)
@@ -3318,7 +3318,7 @@ fn local_with_typeglob_filehandle_alias() {
         rs(r#"
             sub read_it {
                 local *FH;
-                open FH, "<", "src/lib.rs" or return "fail";
+                open FH, "<", "strykelang/lib.rs" or return "fail";
                 my $line = <FH>;
                 close FH;
                 "ok"

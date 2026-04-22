@@ -5,7 +5,6 @@
 use nix::sys::signal::{sigprocmask, SigmaskHow};
 use nix::sys::signal::{SaFlags, SigAction, SigHandler, SigSet, Signal as NixSignal};
 use nix::unistd::getpid;
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::Mutex;
 
