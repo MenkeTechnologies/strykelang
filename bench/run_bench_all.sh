@@ -4,7 +4,7 @@
 # Extends run_bench.sh with Python 3, Ruby, Julia, and Raku columns. Same methodology:
 # hyperfine with warmup, mean of N runs, includes process startup.
 
-set -euo pipefail
+set -eo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 STRYKE="$HERE/../target/release/stryke"
@@ -14,6 +14,8 @@ RUBY="${RUBY:-ruby}"
 JULIA="${JULIA:-julia}"
 RAKU="${RAKU:-raku}"
 LUAJIT="${LUAJIT:-luajit}"
+ZSH_BIN="${ZSH_BIN:-zsh}"
+FISH="${FISH:-fish}"
 RUNS="${RUNS:-10}"
 WARMUP="${WARMUP:-3}"
 
@@ -59,13 +61,25 @@ luajit_version() {
     "$LUAJIT" -v 2>&1 | head -1
 }
 
+zsh_version() {
+    "$ZSH_BIN" --version 2>&1 | head -1
+}
+
+fish_version() {
+    "$FISH" --version 2>&1 | head -1
+}
+
 # Detect which languages are available.
 HAVE_JULIA=1
 HAVE_RAKU=1
 HAVE_LUAJIT=1
+HAVE_ZSH=1
+HAVE_FISH=1
 command -v "$JULIA"  >/dev/null 2>&1 || HAVE_JULIA=0
 command -v "$RAKU"   >/dev/null 2>&1 || HAVE_RAKU=0
 command -v "$LUAJIT" >/dev/null 2>&1 || HAVE_LUAJIT=0
+command -v "$ZSH_BIN" >/dev/null 2>&1 || HAVE_ZSH=0
+command -v "$FISH"   >/dev/null 2>&1 || HAVE_FISH=0
 
 printf '\n'
 printf ' stryke benchmark harness (multi-language)\n'
@@ -83,17 +97,26 @@ fi
 if [ "$HAVE_LUAJIT" = 1 ]; then
     printf '  luajit:  %s\n'   "$(luajit_version)"
 fi
+if [ "$HAVE_ZSH" = 1 ]; then
+    printf '  zsh:     %s\n'   "$(zsh_version)"
+fi
+if [ "$HAVE_FISH" = 1 ]; then
+    printf '  fish:    %s\n'   "$(fish_version)"
+fi
 printf '  cores:   %s\n'   "$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo ?)"
 printf '  warmup:  %s runs\n' "$WARMUP"
 printf '  measure: hyperfine (min %s runs)\n\n' "$RUNS"
 
 # Parse mean ms from hyperfine --export-json output.
 measure() {
-    local label="$1" cmd="$2"
+    local label="$1" cmd="$2" timeout="${3:-300}"
     local json="$TMPDIR_/hf.json"
-    hyperfine --warmup "$WARMUP" --min-runs "$RUNS" --shell=none \
+    if ! timeout "$timeout" hyperfine --warmup "$WARMUP" --min-runs "$RUNS" --shell=none \
         --export-json "$json" \
-        --command-name "$label" "$cmd" >/dev/null 2>&1 || return 1
+        --command-name "$label" "$cmd" >/dev/null 2>&1; then
+        echo "DNF"
+        return 0
+    fi
     "$PERL" -MJSON::PP -e '
         local $/; my $j = <STDIN>;
         my $d = JSON::PP::decode_json($j);
@@ -102,7 +125,13 @@ measure() {
     ' < "$json"
 }
 
+SHELL_TIMEOUT=30
+
 ratio() {
+    if [ "$1" = "DNF" ] || [ "$2" = "DNF" ]; then
+        echo "DNF"
+        return
+    fi
     "$PERL" -e 'printf "%.2fx", $ARGV[0]/$ARGV[1]' -- "$1" "$2"
 }
 
@@ -139,6 +168,22 @@ if [ "$HAVE_LUAJIT" = 1 ]; then
     ratio_hdr_args+=('vs luajit')
     ratio_sep_args+=('----------')
 fi
+if [ "$HAVE_ZSH" = 1 ]; then
+    hdr_fmt="$hdr_fmt  %10s"
+    sep_fmt="$sep_fmt  %10s"
+    hdr_args+=('zsh ms')
+    sep_args+=('----------')
+    ratio_hdr_args+=('vs zsh')
+    ratio_sep_args+=('----------')
+fi
+if [ "$HAVE_FISH" = 1 ]; then
+    hdr_fmt="$hdr_fmt  %10s"
+    sep_fmt="$sep_fmt  %10s"
+    hdr_args+=('fish ms')
+    sep_args+=('----------')
+    ratio_hdr_args+=('vs fish')
+    ratio_sep_args+=('----------')
+fi
 
 # Add ratio columns to format
 for _ in "${ratio_hdr_args[@]}"; do
@@ -156,6 +201,8 @@ for name in startup fib loop string hash array regex map_grep; do
     jl="$HERE/bench_${name}.jl"
     rk="$HERE/bench_${name}.raku"
     lj="$HERE/bench_${name}.lua"
+    zs="$HERE/bench_${name}.zsh"
+    fs="$HERE/bench_${name}.fish"
     [ -f "$pl" ] || continue
     [ -f "$py" ] || continue
     [ -f "$rb" ] || continue
@@ -194,6 +241,28 @@ for name in startup fib loop string hash array regex map_grep; do
         ratios=$(printf '%s  %10s' "$ratios" "$r_lj")
     fi
 
+    if [ "$HAVE_ZSH" = 1 ] && [ -f "$zs" ]; then
+        zs_mean=$(measure "zsh_$name" "$ZSH_BIN $zs" "$SHELL_TIMEOUT")
+        r_zs=$(ratio "$rs_mean" "$zs_mean")
+        if [ "$zs_mean" = "DNF" ]; then
+            row=$(printf '%s  %10s' "$row" "DNF")
+        else
+            row=$(printf '%s  %10.1f' "$row" "$zs_mean")
+        fi
+        ratios=$(printf '%s  %10s' "$ratios" "$r_zs")
+    fi
+
+    if [ "$HAVE_FISH" = 1 ] && [ -f "$fs" ]; then
+        fs_mean=$(measure "fish_$name" "$FISH $fs" "$SHELL_TIMEOUT")
+        r_fs=$(ratio "$rs_mean" "$fs_mean")
+        if [ "$fs_mean" = "DNF" ]; then
+            row=$(printf '%s  %10s' "$row" "DNF")
+        else
+            row=$(printf '%s  %10.1f' "$row" "$fs_mean")
+        fi
+        ratios=$(printf '%s  %10s' "$ratios" "$r_fs")
+    fi
+
     printf '%s  %s\n' "$row" "$ratios"
 done
 
@@ -204,5 +273,7 @@ printf '    - "vs X" = stryke_ms / X_ms — values <1.0x mean stryke is faster.\
 printf '    - Julia timings include JIT compilation (first-run cost).\n'
 printf '    - Raku timings include MoarVM startup overhead.\n'
 printf '    - LuaJIT uses Lua patterns (not PCRE) for regex bench.\n'
+printf '    - zsh/fish are single-threaded with no JIT — expect 10-100x slower.\n'
+printf '    - DNF = Did Not Finish (timeout after %ss) — shell fork-bombed itself.\n' "$SHELL_TIMEOUT"
 printf '    - To override: RUNS=30 WARMUP=5 bash %s\n' "$(basename "$0")"
 printf '\n'
