@@ -1,24 +1,20 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Factorial
 
-fn my_factorial {
-    my $n = $_[0]
-    if ($n <= 1) { 1 } else { $n * my_factorial($n - 1) }
+fn my_factorial($n) {
+    $n <= 1 ? 1 : $n * my_factorial($n - 1)
 }
 
-fn fact_iter {
-    my $n = $_[0]
-    if ($n < 1) { 1 } else {
-        1..$n |> reduce { $a * $b }
-    }
+fn factorial_iter($n) {
+    $n < 1 ? 1 : (1..$n |> reduce { $a * $b })
 }
 
-assert_eq my_factorial(0), 1, "0!"
-assert_eq my_factorial(1), 1, "1!"
-assert_eq my_factorial(5), 120, "5!"
-assert_eq my_factorial(10), 3628800, "10!"
+assert_eq my_factorial(0), 1, "factorial(0)"
+assert_eq my_factorial(1), 1, "factorial(1)"
+assert_eq my_factorial(5), 120, "factorial(5)"
+assert_eq my_factorial(10), 3628800, "factorial(10)"
 
-assert_eq fact_iter(5), 120, "iter 5!"
-assert_eq fact_iter(10), 3628800, "iter 10!"
+assert_eq factorial_iter(0), 1, "factorial_iter(0)"
+assert_eq factorial_iter(5), 120, "factorial_iter(5)"
 
 test_run

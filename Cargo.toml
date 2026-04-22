@@ -7,8 +7,6 @@ license = "MIT"
 authors = ["MenkeTechnologies"]
 repository = "https://github.com/MenkeTechnologies/strykelang"
 documentation = "https://docs.rs/strykelang"
-# `cargo package` uses the git file list; `exclude` drops paths from the tarball.
-# `vendor/perl` stays tracked and ships (e.g. `List/Util.pm`). `parity/` is local/CI only.
 exclude = ["/parity/", "/.github/"]
 
 [lib]
@@ -26,8 +24,6 @@ path = "src/main.rs"
 name = "s"
 path = "src/main.rs"
 
-# Offline tool: regenerate `docs/reference.html` from the LSP doc strings.
-# Not shipped to end users — runs locally + in CI before GitHub Pages deploy.
 [[bin]]
 name = "gen-docs"
 path = "src/bin/gen_docs.rs"
@@ -133,10 +129,6 @@ chrono-tz = "0.10"
 csv = "1.3"
 rusqlite = { version = "0.32", features = ["bundled"] }
 rustyline = "14"
-reedline = "0.38"
-nix = { version = "0.29", features = ["process", "signal", "term", "fs"] }
-dirs = "6"
-atty = "0.2"
 cranelift-jit = "0.130"
 cranelift-codegen = "0.130"
 cranelift-frontend = "0.130"
@@ -151,11 +143,21 @@ inferno = { version = "0.12", default-features = false }
 lsp-server = "0.7.9"
 lsp-types = "0.97.0"
 unicode_names2 = "2"
-os_pipe = "1.2.3"
-ctrlc = "3.5.2"
+reedline = "0.47.0"
+dirs = "6.0.0"
 hostname = "0.4.2"
-nu-ansi-term = "0.50.3"
-tempfile = "3"
+atty = "0.2.14"
+nix = { version = "0.31.2", features = ["signal", "process", "fs", "term"] }
+tempfile = "3.27.0"
+os_pipe = "1.2.3"
+ctrlc = { version = "3.5.2", features = ["termination"] }
+bitflags = "2.5"
+cfg-if = "1.0"
+errno = "0.3"
+lru = "0.16"
+once_cell = "1.19"
+itertools = "0.14"
+libm = "0.2.16"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.3"

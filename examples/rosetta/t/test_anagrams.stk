@@ -1,17 +1,28 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Anagrams
 
-fn sorted_chars($s) {
+fn sorted_chars {
+    my $s = $_[0]
     ~> $s lc chars sort join("")
 }
 
-fn are_anagrams($a, $b) {
-    sorted_chars($a) eq sorted_chars($b)
+fn are_anagrams {
+    my $a = $_[0]
+    my $b = $_[1]
+    my $s1 = sorted_chars($a)
+    my $s2 = sorted_chars($b)
+    $s1 eq $s2
 }
 
-fn find_anagrams($word, @words) {
+fn find_anagrams {
+    my $word = $_[0]
+    my @words = @_[1..scalar(@_)-1]
     my $key = sorted_chars($word)
-    @words |> filter { sorted_chars($_) eq $key && $_ ne $word }
+    my @res = ~> @words grep {
+        my $sc = sorted_chars($_)
+        $sc eq $key && $_ ne $word
+    }
+    ([@res])
 }
 
 assert_ok are_anagrams("listen", "silent"), "listen/silent"
@@ -20,10 +31,11 @@ assert_ok are_anagrams("Elvis", "lives"), "Elvis/lives (case insensitive)"
 assert_ok !are_anagrams("hello", "world"), "hello/world not anagrams"
 
 my @words = qw(cat act tac dog god)
-my @cat_anagrams = find_anagrams("cat", @words)
-assert_eq join(",", @cat_anagrams |> sort), "act,tac", "anagrams of cat"
+my $cat_anagrams = find_anagrams("cat", @words)
+my @sorted_cat = sort(@$cat_anagrams)
+assert_eq join(",", @sorted_cat), "act,tac", "anagrams of cat"
 
-my @dog_anagrams = find_anagrams("dog", @words)
-assert_eq join(",", @dog_anagrams), "god", "anagrams of dog"
+my $dog_anagrams = find_anagrams("dog", @words)
+assert_eq join(",", @$dog_anagrams), "god", "anagrams of dog"
 
 test_run

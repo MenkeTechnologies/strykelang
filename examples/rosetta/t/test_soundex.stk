@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Soundex
+
+fn my_soundex {
+    my $name = $_[0]
+    my $s = ~> $name uc
+    my @chars = ~> $s chars
+    
+    my $first = $chars[0]
+    my %codes = (
+        B=>1, F=>1, P=>1, V=>1,
+        C=>2, G=>2, J=>2, K=>2, Q=>2, S=>2, X=>2, Z=>2,
+        D=>3, T=>3,
+        L=>4,
+        M=>5, N=>5,
+        R=>6
+    )
+    
+    my $first_code = if (%codes{$first}) { %codes{$first} } else { "" }
+    
+    my @rest_codes = ~> @chars[1..$#chars] map {
+        if (%codes{$_}) { %codes{$_} } else { "" }
+    } |> grep { $_ ne "" }
+    
+    my @unique
+    my $prev = $first_code
+    for my $c (@rest_codes) {
+        if ($c != $prev) {
+            push @unique, $c
+        }
+        $prev = $c
+    }
+    
+    my $code = $first . join("", @unique)
+    $code .= "000"
+    substr($code, 0, 4)
+}
+
+assert_eq my_soundex("Robert"), "R163", "Soundex of Robert"
+assert_eq my_soundex("Rupert"), "R163", "Soundex of Rupert"
+assert_eq my_soundex("Ashcraft"), "A261", "Soundex of Ashcraft"
+
+test_run

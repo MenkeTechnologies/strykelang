@@ -62,9 +62,12 @@ pub mod rust_sugar;
 pub mod scope;
 pub mod shell_completion;
 pub mod shell_exec;
+pub mod shell_fds;
 pub mod shell_history;
 pub mod shell_jobs;
 pub mod shell_parse;
+pub mod shell_signal;
+pub mod shell_zle;
 pub mod shell_zwc;
 mod sort_fast;
 pub mod special_vars;
@@ -72,6 +75,9 @@ pub mod static_analysis;
 pub mod token;
 pub mod value;
 pub mod vm;
+pub mod zsh_lex;
+pub mod zsh_parse;
+pub mod zsh_tokens;
 
 pub use interpreter::{
     perl_bracket_version, FEAT_SAY, FEAT_STATE, FEAT_SWITCH, FEAT_UNICODE_STRINGS,

@@ -11,7 +11,7 @@ fn prime_check($n) {
     } else {
         my $i = 3
         my $is_prime = 1
-        while ($is_prime && $i * $i <= $n) {
+        while ($i * $i <= $n && $is_prime) {
             if ($n % $i == 0) {
                 $is_prime = 0
             }

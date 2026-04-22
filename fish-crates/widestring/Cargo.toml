@@ -1,0 +1,15 @@
+[package]
+name = "fish-widestring"
+edition.workspace = true
+rust-version.workspace = true
+version = "0.0.0"
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+libc.workspace = true
+unicode-width.workspace = true
+widestring.workspace = true
+
+[lints]
+workspace = true

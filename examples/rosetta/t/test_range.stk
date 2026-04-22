@@ -1,10 +1,10 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Range Extraction and Expansion
 
-fn extract_ranges {
-    my @nums = @_
-    if (!@nums) { "" }
-    else {
+fn extract_ranges(@nums) {
+    if (!@nums) {
+        ""
+    } else {
         @nums = sort { $a <=> $b } @nums
         
         my @ranges
@@ -15,40 +15,36 @@ fn extract_ranges {
             if ($nums[$i] == $end + 1) {
                 $end = $nums[$i]
             } else {
-                if ($end > $start + 1) { push @ranges, "$start-$end" }
-                elsif ($end > $start) { push @ranges, "$start,$end" }
-                else { push @ranges, "$start" }
+                push @ranges, ($end > $start + 1 ? "$start-$end" : $end > $start ? "$start,$end" : "$start")
                 $start = $nums[$i]
                 $end = $nums[$i]
             }
         }
-        if ($end > $start + 1) { push @ranges, "$start-$end" }
-        elsif ($end > $start) { push @ranges, "$start,$end" }
-        else { push @ranges, "$start" }
-        
+        push @ranges, ($end > $start + 1 ? "$start-$end" : $end > $start ? "$start,$end" : "$start")
         join ",", @ranges
     }
 }
 
-fn expand_range {
-    my $spec = $_[0]
-    my @result = (1, 2, 3, 5, 7, 8, 9)
-    if ($spec eq "5") {
-        [5]
-    } else {
-        [@result]
+fn expand_range($spec) {
+    my @result
+    for my $part ($spec |> split /,/) {
+        if ($part =~ /^(-?\d+)-(-?\d+)$/) {
+            push @result, ($1..$2)
+        } else {
+            push @result, int($part)
+        }
     }
+    @result
 }
 
 assert_eq extract_ranges(1, 2, 3, 5, 7, 8, 9), "1-3,5,7-9", "extract ranges"
 assert_eq extract_ranges(1, 3, 5, 7), "1,3,5,7", "no ranges"
 assert_eq extract_ranges(1, 2, 3, 4, 5), "1-5", "single range"
 
-my $expanded_ref = expand_range("1-3,5,7-9")
-assert_eq join(",", @$expanded_ref), "1,2,3,5,7,8,9", "expand range"
+my @expanded = expand_range("1-3,5,7-9")
+assert_eq join(",", @expanded), "1,2,3,5,7,8,9", "expand range"
 
-my $single_ref = expand_range("5")
-assert_eq $single_ref->[0], 5, "expand single first element"
-assert_eq join(",", @$single_ref), "5", "expand single"
+my @single = expand_range("5")
+assert_eq join(",", @single), "5", "expand single"
 
 test_run

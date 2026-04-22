@@ -16,8 +16,8 @@ fn my_fizzbuzz {
 
 fn fizzbuzz_list {
     my $max = $_[0]
-    my @res = (1..$max) |> map { my_fizzbuzz($_) }
-    [@res]
+    my @res = ~> 1..$max map { my_fizzbuzz($_) }
+    ([@res])
 }
 
 assert_eq my_fizzbuzz(1), 1, "fizzbuzz(1)"

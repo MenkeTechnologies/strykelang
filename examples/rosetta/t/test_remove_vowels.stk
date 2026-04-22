@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Remove Vowels
+
+fn my_remove_vowels {
+    my $s = $_[0]
+    ~> $s s/[aeiouAEIOU]//gr
+}
+
+assert_eq my_remove_vowels("Hello World"), "Hll Wrld", "remove from hello world"
+assert_eq my_remove_vowels("Stryke Language"), "Stryk Lngg", "remove from stryke"
+assert_eq my_remove_vowels("AEIOU"), "", "only vowels"
+assert_eq my_remove_vowels("bcd"), "bcd", "no vowels"
+
+test_run

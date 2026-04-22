@@ -1,0 +1,31 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Matrix Addition
+
+fn my_matrix_add {
+    my $m1 = $_[0]
+    my $m2 = $_[1]
+    my $rows = scalar(@$m1)
+    my $cols = scalar(@{$m1->[0]})
+    my @res = ~> 0..$rows-1 map {
+        my $i = $_
+        my @row = map {
+            my $j = $_
+            $m1->[$i][$j] + $m2->[$i][$j]
+        } (0..$cols-1)
+        ([@row])
+    }
+    ([@res])
+}
+
+fn matrix_to_string {
+    my $m = $_[0]
+    my @rows = ~> @$m map { join(",", @$_) }
+    join(";", @rows)
+}
+
+my $a = [[1, 2], [3, 4]]
+my $b = [[5, 6], [7, 8]]
+my $sum = my_matrix_add($a, $b)
+assert_eq matrix_to_string($sum), "6,8;10,12", "matrix add 2x2"
+
+test_run

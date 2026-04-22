@@ -119,6 +119,10 @@ pub struct Parser {
     /// When > 0, the lexer should not interpret `m/`, `s/`, etc. as regex-starters.
     /// Used by thread macro to prevent `/m/` from being misparsed.
     pub suppress_m_regex: u32,
+    /// When > 0, `parse_range` will not consume `:` as the short-form range operator.
+    /// Bumped while parsing the then-branch of a ternary `? :` so `a ? b : c` doesn't
+    /// misparse `b : c` as a range.
+    suppress_colon_range: u32,
 }
 
 impl Parser {
@@ -141,6 +145,7 @@ impl Parser {
             suppress_parenless_call: 0,
             suppress_slash_as_div: 0,
             suppress_m_regex: 0,
+            suppress_colon_range: 0,
         }
     }
 
@@ -5527,7 +5532,10 @@ impl Parser {
         let expr = self.parse_pipe_forward()?;
         if self.eat(&Token::Question) {
             let line = expr.line;
-            let then_expr = self.parse_assign_expr()?;
+            self.suppress_colon_range = self.suppress_colon_range.saturating_add(1);
+            let then_expr = self.parse_assign_expr();
+            self.suppress_colon_range = self.suppress_colon_range.saturating_sub(1);
+            let then_expr = then_expr?;
             self.expect(&Token::Colon)?;
             let else_expr = self.parse_assign_expr()?;
             return Ok(Expr {
@@ -6722,7 +6730,7 @@ impl Parser {
             (true, false)
         } else if self.eat(&Token::Range) {
             (false, false)
-        } else if self.eat(&Token::Colon) {
+        } else if self.suppress_colon_range == 0 && self.eat(&Token::Colon) {
             // `1:10` short form — only valid for numeric ranges, not ternary
             // Lookahead: must be followed by something that looks like a range endpoint
             (false, true)

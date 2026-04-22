@@ -1,16 +1,19 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Sum Digits of an Integer
 
-fn sum_digits($n) {
-    abs($n) |> sprintf("%d", $_) |> split // |> map { int($_) } |> reduce { $a + $b }
+fn sum_digits {
+    my $n = $_[0]
+    ~> $n abs >{ sprintf("%d", $_) } chars map { int($_) } reduce { $a + $b }
 }
 
-fn sum_digits_base($n, $base) {
+fn sum_digits_base {
+    my $n = $_[0]
+    my $base = $_[1]
     my $sum = 0
-    $n = abs($n)
-    while ($n > 0) {
-        $sum += $n % $base
-        $n = int($n / $base)
+    my $curr = abs($n)
+    while ($curr > 0) {
+        $sum = $sum + ($curr % $base)
+        $curr = int($curr / $base)
     }
     $sum
 }

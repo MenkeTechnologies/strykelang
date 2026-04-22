@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Lychrel numbers
+
+fn reverse_string {
+    my $s = $_[0]
+    ~> $s chars rev join("")
+}
+
+fn my_is_palindrome {
+    my $s = $_[0]
+    $s eq reverse_string($s)
+}
+
+fn is_lychrel {
+    my $n = $_[0]
+    my $max_iter = 500
+    my $current = $n
+    
+    for my $i (1..$max_iter) {
+        my $rev = reverse_string("$current")
+        $current = $current + $rev
+        if (my_is_palindrome("$current")) {
+            0
+        }
+    }
+    
+    1
+}
+
+assert_ok is_lychrel(196), "196 is a Lychrel number"
+assert_ok !is_lychrel(56), "56 is not Lychrel"
+assert_ok !is_lychrel(1), "1 is not Lychrel"
+
+test_run

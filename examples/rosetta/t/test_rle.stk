@@ -1,10 +1,10 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Run-Length Encoding
 
-fn rle_encode {
-    my $s = $_[0]
-    if (length($s) == 0) { "" }
-    else {
+fn rle_encode($s) {
+    if (length($s) == 0) {
+        ""
+    } else {
         my @chars = $s |> split //
         my @result
         my $prev = $chars[0]
@@ -14,34 +14,20 @@ fn rle_encode {
             if ($chars[$i] eq $prev) {
                 $count++
             } else {
-                if ($count > 1) {
-                    push @result, "$count$prev"
-                } else {
-                    push @result, $prev
-                }
+                push @result, ($count > 1 ? "$count$prev" : $prev)
                 $prev = $chars[$i]
                 $count = 1
             }
         }
-        if ($count > 1) {
-            push @result, "$count$prev"
-        } else {
-            push @result, $prev
-        }
+        push @result, ($count > 1 ? "$count$prev" : $prev)
         join "", @result
     }
 }
 
-fn rle_decode {
-    my $s = $_[0]
+fn rle_decode($s) {
     my $result = ""
     while ($s =~ /(\d*)(.)/g) {
-        my $count = 1
-        if ($1 eq "") {
-            $count = 1
-        } else {
-            $count = $1
-        }
+        my $count = $1 eq "" ? 1 : $1
         $result .= $2 x $count
     }
     $result

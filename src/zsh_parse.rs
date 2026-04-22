@@ -1,0 +1,1795 @@
+//! Zsh parser - Direct port from zsh/Src/parse.c
+//!
+//! This parser takes tokens from the ZshLexer and builds an AST.
+//! It follows the zsh grammar closely, producing structures that
+//! can be executed by the shell executor.
+
+use crate::zsh_lex::ZshLexer;
+use crate::zsh_tokens::LexTok;
+
+/// AST node for a complete program (list of commands)
+#[derive(Debug, Clone)]
+pub struct ZshProgram {
+    pub lists: Vec<ZshList>,
+}
+
+/// A list is a sequence of sublists separated by ; or & or newline
+#[derive(Debug, Clone)]
+pub struct ZshList {
+    pub sublist: ZshSublist,
+    pub flags: ListFlags,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ListFlags {
+    /// Run asynchronously (&)
+    pub async_: bool,
+    /// Disown after running (&| or &!)
+    pub disown: bool,
+}
+
+/// A sublist is pipelines connected by && or ||
+#[derive(Debug, Clone)]
+pub struct ZshSublist {
+    pub pipe: ZshPipe,
+    pub next: Option<(SublistOp, Box<ZshSublist>)>,
+    pub flags: SublistFlags,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SublistOp {
+    And, // &&
+    Or,  // ||
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SublistFlags {
+    /// Coproc
+    pub coproc: bool,
+    /// Negated with !
+    pub not: bool,
+}
+
+/// A pipeline is commands connected by |
+#[derive(Debug, Clone)]
+pub struct ZshPipe {
+    pub cmd: ZshCommand,
+    pub next: Option<Box<ZshPipe>>,
+    pub lineno: u64,
+}
+
+/// A command
+#[derive(Debug, Clone)]
+pub enum ZshCommand {
+    Simple(ZshSimple),
+    Subsh(Box<ZshProgram>), // (list)
+    Cursh(Box<ZshProgram>), // {list}
+    For(ZshFor),
+    Case(ZshCase),
+    If(ZshIf),
+    While(ZshWhile),
+    Until(ZshWhile),
+    Repeat(ZshRepeat),
+    FuncDef(ZshFuncDef),
+    Time(Option<Box<ZshSublist>>),
+    Cond(ZshCond), // [[ ... ]]
+    Arith(String), // (( ... ))
+    Try(ZshTry),   // { ... } always { ... }
+}
+
+/// A simple command (assignments, words, redirections)
+#[derive(Debug, Clone)]
+pub struct ZshSimple {
+    pub assigns: Vec<ZshAssign>,
+    pub words: Vec<String>,
+    pub redirs: Vec<ZshRedir>,
+}
+
+/// An assignment
+#[derive(Debug, Clone)]
+pub struct ZshAssign {
+    pub name: String,
+    pub value: ZshAssignValue,
+    pub append: bool, // +=
+}
+
+#[derive(Debug, Clone)]
+pub enum ZshAssignValue {
+    Scalar(String),
+    Array(Vec<String>),
+}
+
+/// A redirection
+#[derive(Debug, Clone)]
+pub struct ZshRedir {
+    pub rtype: RedirType,
+    pub fd: i32,
+    pub name: String,
+    pub heredoc: Option<HereDocInfo>,
+    pub varid: Option<String>, // {var}>file
+}
+
+#[derive(Debug, Clone)]
+pub struct HereDocInfo {
+    pub content: String,
+    pub terminator: String,
+}
+
+/// Redirection type
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedirType {
+    Write,        // >
+    Writenow,     // >|
+    Append,       // >>
+    Appendnow,    // >>|
+    Read,         // <
+    ReadWrite,    // <>
+    Heredoc,      // <<
+    HeredocDash,  // <<-
+    Herestr,      // <<<
+    MergeIn,      // <&
+    MergeOut,     // >&
+    ErrWrite,     // &>
+    ErrWritenow,  // &>|
+    ErrAppend,    // >>&
+    ErrAppendnow, // >>&|
+    InPipe,       // < <(...)
+    OutPipe,      // > >(...)
+}
+
+/// For loop
+#[derive(Debug, Clone)]
+pub struct ZshFor {
+    pub var: String,
+    pub list: ForList,
+    pub body: Box<ZshProgram>,
+}
+
+#[derive(Debug, Clone)]
+pub enum ForList {
+    Words(Vec<String>),
+    CStyle {
+        init: String,
+        cond: String,
+        step: String,
+    },
+    Positional,
+}
+
+/// Case statement
+#[derive(Debug, Clone)]
+pub struct ZshCase {
+    pub word: String,
+    pub arms: Vec<CaseArm>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CaseArm {
+    pub patterns: Vec<String>,
+    pub body: ZshProgram,
+    pub terminator: CaseTerm,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CaseTerm {
+    Break,    // ;;
+    Continue, // ;&
+    TestNext, // ;|
+}
+
+/// If statement
+#[derive(Debug, Clone)]
+pub struct ZshIf {
+    pub cond: Box<ZshProgram>,
+    pub then: Box<ZshProgram>,
+    pub elif: Vec<(ZshProgram, ZshProgram)>,
+    pub else_: Option<Box<ZshProgram>>,
+}
+
+/// While/Until loop
+#[derive(Debug, Clone)]
+pub struct ZshWhile {
+    pub cond: Box<ZshProgram>,
+    pub body: Box<ZshProgram>,
+    pub until: bool,
+}
+
+/// Repeat loop
+#[derive(Debug, Clone)]
+pub struct ZshRepeat {
+    pub count: String,
+    pub body: Box<ZshProgram>,
+}
+
+/// Function definition
+#[derive(Debug, Clone)]
+pub struct ZshFuncDef {
+    pub names: Vec<String>,
+    pub body: Box<ZshProgram>,
+    pub tracing: bool,
+}
+
+/// Conditional expression [[ ... ]]
+#[derive(Debug, Clone)]
+pub enum ZshCond {
+    Not(Box<ZshCond>),
+    And(Box<ZshCond>, Box<ZshCond>),
+    Or(Box<ZshCond>, Box<ZshCond>),
+    Unary(String, String),          // -f file, -n str, etc.
+    Binary(String, String, String), // str = pat, a -eq b, etc.
+    Regex(String, String),          // str =~ regex
+}
+
+/// Try/always block
+#[derive(Debug, Clone)]
+pub struct ZshTry {
+    pub try_block: Box<ZshProgram>,
+    pub always: Box<ZshProgram>,
+}
+
+/// Parse errors
+#[derive(Debug, Clone)]
+pub struct ParseError {
+    pub message: String,
+    pub line: u64,
+}
+
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "parse error at line {}: {}", self.line, self.message)
+    }
+}
+
+impl std::error::Error for ParseError {}
+
+/// The Zsh Parser
+pub struct ZshParser<'a> {
+    lexer: ZshLexer<'a>,
+    errors: Vec<ParseError>,
+}
+
+impl<'a> ZshParser<'a> {
+    /// Create a new parser
+    pub fn new(input: &'a str) -> Self {
+        ZshParser {
+            lexer: ZshLexer::new(input),
+            errors: Vec::new(),
+        }
+    }
+
+    /// Parse the complete input
+    pub fn parse(&mut self) -> Result<ZshProgram, Vec<ParseError>> {
+        self.lexer.zshlex();
+
+        let program = self.parse_program_until(None);
+
+        if !self.errors.is_empty() {
+            return Err(std::mem::take(&mut self.errors));
+        }
+
+        Ok(program)
+    }
+
+    /// Parse a program (list of lists)
+    fn parse_program(&mut self) -> ZshProgram {
+        self.parse_program_until(None)
+    }
+
+    /// Parse a program until we hit an end token
+    fn parse_program_until(&mut self, end_tokens: Option<&[LexTok]>) -> ZshProgram {
+        let mut lists = Vec::new();
+
+        loop {
+            // Skip separators
+            while self.lexer.tok == LexTok::Seper || self.lexer.tok == LexTok::Newlin {
+                self.lexer.zshlex();
+            }
+
+            if self.lexer.tok == LexTok::Endinput {
+                break;
+            }
+
+            // Check for end tokens
+            if let Some(end_toks) = end_tokens {
+                if end_toks.contains(&self.lexer.tok) {
+                    break;
+                }
+            }
+
+            // Also stop at these tokens when not explicitly looking for them
+            match self.lexer.tok {
+                LexTok::Outpar
+                | LexTok::Outbrace
+                | LexTok::Dsemi
+                | LexTok::Semiamp
+                | LexTok::Semibar
+                | LexTok::Done
+                | LexTok::Fi
+                | LexTok::Esac
+                | LexTok::Elif
+                | LexTok::Else
+                | LexTok::Then
+                | LexTok::Zend => break,
+                _ => {}
+            }
+
+            match self.parse_list() {
+                Some(list) => lists.push(list),
+                None => break,
+            }
+        }
+
+        ZshProgram { lists }
+    }
+
+    /// Parse a list (sublist with optional & or ;)
+    fn parse_list(&mut self) -> Option<ZshList> {
+        let sublist = self.parse_sublist()?;
+
+        let flags = match self.lexer.tok {
+            LexTok::Amper => {
+                self.lexer.zshlex();
+                ListFlags {
+                    async_: true,
+                    disown: false,
+                }
+            }
+            LexTok::Amperbang => {
+                self.lexer.zshlex();
+                ListFlags {
+                    async_: true,
+                    disown: true,
+                }
+            }
+            LexTok::Seper | LexTok::Semi | LexTok::Newlin => {
+                self.lexer.zshlex();
+                ListFlags::default()
+            }
+            _ => ListFlags::default(),
+        };
+
+        Some(ZshList { sublist, flags })
+    }
+
+    /// Parse a sublist (pipelines connected by && or ||)
+    fn parse_sublist(&mut self) -> Option<ZshSublist> {
+        let mut flags = SublistFlags::default();
+
+        // Handle coproc and !
+        if self.lexer.tok == LexTok::Coproc {
+            flags.coproc = true;
+            self.lexer.zshlex();
+        } else if self.lexer.tok == LexTok::Bang {
+            flags.not = true;
+            self.lexer.zshlex();
+        }
+
+        let pipe = self.parse_pipe()?;
+
+        // Check for && or ||
+        let next = match self.lexer.tok {
+            LexTok::Damper => {
+                self.lexer.zshlex();
+                self.skip_separators();
+                self.parse_sublist().map(|s| (SublistOp::And, Box::new(s)))
+            }
+            LexTok::Dbar => {
+                self.lexer.zshlex();
+                self.skip_separators();
+                self.parse_sublist().map(|s| (SublistOp::Or, Box::new(s)))
+            }
+            _ => None,
+        };
+
+        Some(ZshSublist { pipe, next, flags })
+    }
+
+    /// Parse a pipeline
+    fn parse_pipe(&mut self) -> Option<ZshPipe> {
+        let lineno = self.lexer.toklineno;
+        let cmd = self.parse_cmd()?;
+
+        // Check for | or |&
+        let next = match self.lexer.tok {
+            LexTok::Bar | LexTok::Baramp => {
+                let _merge_stderr = self.lexer.tok == LexTok::Baramp;
+                self.lexer.zshlex();
+                self.skip_separators();
+                self.parse_pipe().map(Box::new)
+            }
+            _ => None,
+        };
+
+        Some(ZshPipe { cmd, next, lineno })
+    }
+
+    /// Parse a command
+    fn parse_cmd(&mut self) -> Option<ZshCommand> {
+        // Parse leading redirections
+        let mut redirs = Vec::new();
+        while self.lexer.tok.is_redirop() {
+            if let Some(redir) = self.parse_redir() {
+                redirs.push(redir);
+            }
+        }
+
+        let cmd = match self.lexer.tok {
+            LexTok::For | LexTok::Foreach => self.parse_for(),
+            LexTok::Select => self.parse_select(),
+            LexTok::Case => self.parse_case(),
+            LexTok::If => self.parse_if(),
+            LexTok::While => self.parse_while(false),
+            LexTok::Until => self.parse_while(true),
+            LexTok::Repeat => self.parse_repeat(),
+            LexTok::Inpar => self.parse_subsh(),
+            LexTok::Inbrace => self.parse_cursh(),
+            LexTok::Func => self.parse_funcdef(),
+            LexTok::Dinbrack => self.parse_cond(),
+            LexTok::Dinpar => self.parse_arith(),
+            LexTok::Time => self.parse_time(),
+            _ => self.parse_simple(redirs),
+        };
+
+        // Parse trailing redirections
+        if cmd.is_some() {
+            while self.lexer.tok.is_redirop() {
+                if let Some(redir) = self.parse_redir() {
+                    // Append to command redirections
+                    // (for non-simple commands, we'd need to handle this differently)
+                }
+            }
+        }
+
+        cmd
+    }
+
+    /// Parse a simple command
+    fn parse_simple(&mut self, mut redirs: Vec<ZshRedir>) -> Option<ZshCommand> {
+        let mut assigns = Vec::new();
+        let mut words = Vec::new();
+
+        // Parse leading assignments
+        while self.lexer.tok == LexTok::Envstring || self.lexer.tok == LexTok::Envarray {
+            if let Some(assign) = self.parse_assign() {
+                assigns.push(assign);
+            }
+            self.lexer.zshlex();
+        }
+
+        // Parse words and redirections
+        loop {
+            match self.lexer.tok {
+                LexTok::String | LexTok::Typeset => {
+                    let s = self.lexer.tokstr.clone();
+                    if let Some(s) = s {
+                        words.push(s);
+                    }
+                    self.lexer.zshlex();
+                    // Check for function definition foo() { ... }
+                    if words.len() == 1 && self.peek_inoutpar() {
+                        return self.parse_inline_funcdef(words.pop().unwrap());
+                    }
+                }
+                _ if self.lexer.tok.is_redirop() => {
+                    if let Some(redir) = self.parse_redir() {
+                        redirs.push(redir);
+                    }
+                }
+                LexTok::Inoutpar if !words.is_empty() => {
+                    // foo() { ... } style function
+                    return self.parse_inline_funcdef(words.pop().unwrap());
+                }
+                _ => break,
+            }
+        }
+
+        if assigns.is_empty() && words.is_empty() && redirs.is_empty() {
+            return None;
+        }
+
+        Some(ZshCommand::Simple(ZshSimple {
+            assigns,
+            words,
+            redirs,
+        }))
+    }
+
+    /// Parse an assignment
+    fn parse_assign(&mut self) -> Option<ZshAssign> {
+        use crate::zsh_tokens::char_tokens;
+
+        let tokstr = self.lexer.tokstr.as_ref()?;
+
+        // Parse name=value or name+=value
+        // The '=' is encoded as char_tokens::EQUALS in the token string
+        let (name, value_str, append) = if let Some(pos) = tokstr.find(char_tokens::EQUALS) {
+            let name_part = &tokstr[..pos];
+            let (name, append) = if name_part.ends_with('+') {
+                (&name_part[..name_part.len() - 1], true)
+            } else {
+                (name_part, false)
+            };
+            (
+                name.to_string(),
+                tokstr[pos + char_tokens::EQUALS.len_utf8()..].to_string(),
+                append,
+            )
+        } else if let Some(pos) = tokstr.find('=') {
+            // Fallback to literal '=' for compatibility
+            let name_part = &tokstr[..pos];
+            let (name, append) = if name_part.ends_with('+') {
+                (&name_part[..name_part.len() - 1], true)
+            } else {
+                (name_part, false)
+            };
+            (name.to_string(), tokstr[pos + 1..].to_string(), append)
+        } else {
+            return None;
+        };
+
+        let value = if self.lexer.tok == LexTok::Envarray {
+            // Array assignment: name=(...)
+            let mut elements = Vec::new();
+            self.lexer.zshlex(); // skip past token
+
+            while self.lexer.tok == LexTok::String || self.lexer.tok == LexTok::Seper {
+                if self.lexer.tok == LexTok::String {
+                    if let Some(ref s) = self.lexer.tokstr {
+                        elements.push(s.clone());
+                    }
+                }
+                self.lexer.zshlex();
+            }
+
+            // Expect OUTPAR
+            if self.lexer.tok == LexTok::Outpar {
+                self.lexer.zshlex();
+            }
+
+            ZshAssignValue::Array(elements)
+        } else {
+            ZshAssignValue::Scalar(value_str)
+        };
+
+        Some(ZshAssign {
+            name,
+            value,
+            append,
+        })
+    }
+
+    /// Parse a redirection
+    fn parse_redir(&mut self) -> Option<ZshRedir> {
+        let rtype = match self.lexer.tok {
+            LexTok::Outang => RedirType::Write,
+            LexTok::Outangbang => RedirType::Writenow,
+            LexTok::Doutang => RedirType::Append,
+            LexTok::Doutangbang => RedirType::Appendnow,
+            LexTok::Inang => RedirType::Read,
+            LexTok::Inoutang => RedirType::ReadWrite,
+            LexTok::Dinang => RedirType::Heredoc,
+            LexTok::Dinangdash => RedirType::HeredocDash,
+            LexTok::Trinang => RedirType::Herestr,
+            LexTok::Inangamp => RedirType::MergeIn,
+            LexTok::Outangamp => RedirType::MergeOut,
+            LexTok::Ampoutang => RedirType::ErrWrite,
+            LexTok::Outangampbang => RedirType::ErrWritenow,
+            LexTok::Doutangamp => RedirType::ErrAppend,
+            LexTok::Doutangampbang => RedirType::ErrAppendnow,
+            _ => return None,
+        };
+
+        let fd = if self.lexer.tokfd >= 0 {
+            self.lexer.tokfd
+        } else if matches!(
+            rtype,
+            RedirType::Read
+                | RedirType::ReadWrite
+                | RedirType::MergeIn
+                | RedirType::Heredoc
+                | RedirType::HeredocDash
+                | RedirType::Herestr
+        ) {
+            0
+        } else {
+            1
+        };
+
+        self.lexer.zshlex();
+
+        let name = match self.lexer.tok {
+            LexTok::String | LexTok::Envstring => {
+                let n = self.lexer.tokstr.clone().unwrap_or_default();
+                self.lexer.zshlex();
+                n
+            }
+            _ => {
+                self.error("expected word after redirection");
+                return None;
+            }
+        };
+
+        // Handle heredoc
+        let heredoc = if matches!(rtype, RedirType::Heredoc | RedirType::HeredocDash) {
+            // Heredoc content will be filled in by the lexer
+            None // Placeholder
+        } else {
+            None
+        };
+
+        Some(ZshRedir {
+            rtype,
+            fd,
+            name,
+            heredoc,
+            varid: None,
+        })
+    }
+
+    /// Parse for/foreach loop
+    fn parse_for(&mut self) -> Option<ZshCommand> {
+        let is_foreach = self.lexer.tok == LexTok::Foreach;
+        self.lexer.zshlex();
+
+        // Check for C-style: for (( init; cond; step ))
+        if self.lexer.tok == LexTok::Dinpar {
+            return self.parse_for_cstyle();
+        }
+
+        // Get variable name
+        let var = match self.lexer.tok {
+            LexTok::String => {
+                let v = self.lexer.tokstr.clone().unwrap_or_default();
+                self.lexer.zshlex();
+                v
+            }
+            _ => {
+                self.error("expected variable name in for");
+                return None;
+            }
+        };
+
+        // Skip newlines
+        self.skip_separators();
+
+        // Get list
+        let list = if self.lexer.tok == LexTok::String {
+            let s = self.lexer.tokstr.as_ref();
+            if s.map(|s| s == "in").unwrap_or(false) {
+                self.lexer.zshlex();
+                let mut words = Vec::new();
+                while self.lexer.tok == LexTok::String {
+                    if let Some(ref s) = self.lexer.tokstr {
+                        words.push(s.clone());
+                    }
+                    self.lexer.zshlex();
+                }
+                ForList::Words(words)
+            } else {
+                ForList::Positional
+            }
+        } else if self.lexer.tok == LexTok::Inpar {
+            // for var (...)
+            self.lexer.zshlex();
+            let mut words = Vec::new();
+            while self.lexer.tok == LexTok::String || self.lexer.tok == LexTok::Seper {
+                if self.lexer.tok == LexTok::String {
+                    if let Some(ref s) = self.lexer.tokstr {
+                        words.push(s.clone());
+                    }
+                }
+                self.lexer.zshlex();
+            }
+            if self.lexer.tok == LexTok::Outpar {
+                self.lexer.zshlex();
+            }
+            ForList::Words(words)
+        } else {
+            ForList::Positional
+        };
+
+        // Skip to body
+        self.skip_separators();
+
+        // Parse body
+        let body = self.parse_loop_body(is_foreach)?;
+
+        Some(ZshCommand::For(ZshFor {
+            var,
+            list,
+            body: Box::new(body),
+        }))
+    }
+
+    /// Parse C-style for loop: for (( init; cond; step ))
+    fn parse_for_cstyle(&mut self) -> Option<ZshCommand> {
+        // We're at ((
+        self.lexer.zshlex();
+
+        let init = self.lexer.tokstr.clone().unwrap_or_default();
+        self.lexer.zshlex();
+
+        if self.lexer.tok != LexTok::Dinpar {
+            self.error("expected ;; in for ((");
+            return None;
+        }
+
+        self.lexer.zshlex();
+        let cond = self.lexer.tokstr.clone().unwrap_or_default();
+        self.lexer.zshlex();
+
+        if self.lexer.tok != LexTok::Dinpar {
+            self.error("expected ;; in for ((");
+            return None;
+        }
+
+        self.lexer.zshlex();
+        let step = self.lexer.tokstr.clone().unwrap_or_default();
+        self.lexer.zshlex();
+
+        if self.lexer.tok != LexTok::Doutpar {
+            self.error("expected )) in for");
+            return None;
+        }
+        self.lexer.zshlex();
+
+        self.skip_separators();
+        let body = self.parse_loop_body(false)?;
+
+        Some(ZshCommand::For(ZshFor {
+            var: String::new(),
+            list: ForList::CStyle { init, cond, step },
+            body: Box::new(body),
+        }))
+    }
+
+    /// Parse select loop (same syntax as for)
+    fn parse_select(&mut self) -> Option<ZshCommand> {
+        self.parse_for()
+    }
+
+    /// Parse case statement
+    fn parse_case(&mut self) -> Option<ZshCommand> {
+        self.lexer.zshlex(); // skip 'case'
+
+        let word = match self.lexer.tok {
+            LexTok::String => {
+                let w = self.lexer.tokstr.clone().unwrap_or_default();
+                self.lexer.zshlex();
+                w
+            }
+            _ => {
+                self.error("expected word after case");
+                return None;
+            }
+        };
+
+        self.skip_separators();
+
+        // Expect 'in' or {
+        let use_brace = self.lexer.tok == LexTok::Inbrace;
+        if self.lexer.tok == LexTok::String {
+            let s = self.lexer.tokstr.as_ref();
+            if s.map(|s| s != "in").unwrap_or(true) {
+                self.error("expected 'in' in case");
+                return None;
+            }
+        } else if !use_brace {
+            self.error("expected 'in' or '{' in case");
+            return None;
+        }
+        self.lexer.zshlex();
+
+        let mut arms = Vec::new();
+
+        loop {
+            self.skip_separators();
+
+            // Check for end
+            if (use_brace && self.lexer.tok == LexTok::Outbrace)
+                || (!use_brace && self.lexer.tok == LexTok::Esac)
+            {
+                self.lexer.zshlex();
+                break;
+            }
+
+            // Skip optional (
+            if self.lexer.tok == LexTok::Inpar {
+                self.lexer.zshlex();
+            }
+
+            // Parse patterns
+            let mut patterns = Vec::new();
+            loop {
+                if self.lexer.tok == LexTok::String {
+                    let s = self.lexer.tokstr.as_ref();
+                    if s.map(|s| s == "esac").unwrap_or(false) {
+                        break;
+                    }
+                    patterns.push(self.lexer.tokstr.clone().unwrap_or_default());
+                    self.lexer.zshlex();
+                }
+
+                if self.lexer.tok == LexTok::Bar {
+                    self.lexer.zshlex();
+                } else {
+                    break;
+                }
+            }
+
+            // Expect )
+            if self.lexer.tok != LexTok::Outpar {
+                self.error("expected ')' in case pattern");
+                return None;
+            }
+            self.lexer.zshlex();
+
+            // Parse body
+            let body = self.parse_program();
+
+            // Get terminator
+            let terminator = match self.lexer.tok {
+                LexTok::Dsemi => {
+                    self.lexer.zshlex();
+                    CaseTerm::Break
+                }
+                LexTok::Semiamp => {
+                    self.lexer.zshlex();
+                    CaseTerm::Continue
+                }
+                LexTok::Semibar => {
+                    self.lexer.zshlex();
+                    CaseTerm::TestNext
+                }
+                _ => CaseTerm::Break,
+            };
+
+            if !patterns.is_empty() {
+                arms.push(CaseArm {
+                    patterns,
+                    body,
+                    terminator,
+                });
+            }
+        }
+
+        Some(ZshCommand::Case(ZshCase { word, arms }))
+    }
+
+    /// Parse if statement
+    fn parse_if(&mut self) -> Option<ZshCommand> {
+        self.lexer.zshlex(); // skip 'if'
+
+        let cond = Box::new(self.parse_program());
+
+        self.skip_separators();
+
+        // Expect 'then' or {
+        let use_brace = self.lexer.tok == LexTok::Inbrace;
+        if self.lexer.tok != LexTok::Then && !use_brace {
+            self.error("expected 'then' or '{' after if condition");
+            return None;
+        }
+        self.lexer.zshlex();
+
+        let then = Box::new(self.parse_program());
+
+        if use_brace {
+            if self.lexer.tok == LexTok::Outbrace {
+                self.lexer.zshlex();
+            }
+        }
+
+        // Parse elif and else
+        let mut elif = Vec::new();
+        let mut else_ = None;
+
+        loop {
+            self.skip_separators();
+
+            match self.lexer.tok {
+                LexTok::Elif => {
+                    self.lexer.zshlex();
+                    let econd = self.parse_program();
+                    self.skip_separators();
+
+                    let use_brace = self.lexer.tok == LexTok::Inbrace;
+                    if self.lexer.tok != LexTok::Then && !use_brace {
+                        self.error("expected 'then' after elif");
+                        return None;
+                    }
+                    self.lexer.zshlex();
+
+                    let ebody = self.parse_program();
+                    if use_brace && self.lexer.tok == LexTok::Outbrace {
+                        self.lexer.zshlex();
+                    }
+
+                    elif.push((econd, ebody));
+                }
+                LexTok::Else => {
+                    self.lexer.zshlex();
+                    self.skip_separators();
+
+                    let use_brace = self.lexer.tok == LexTok::Inbrace;
+                    if use_brace {
+                        self.lexer.zshlex();
+                    }
+
+                    else_ = Some(Box::new(self.parse_program()));
+
+                    if use_brace && self.lexer.tok == LexTok::Outbrace {
+                        self.lexer.zshlex();
+                    }
+                    break;
+                }
+                LexTok::Fi => {
+                    self.lexer.zshlex();
+                    break;
+                }
+                _ => break,
+            }
+        }
+
+        Some(ZshCommand::If(ZshIf {
+            cond,
+            then,
+            elif,
+            else_,
+        }))
+    }
+
+    /// Parse while/until loop
+    fn parse_while(&mut self, until: bool) -> Option<ZshCommand> {
+        self.lexer.zshlex(); // skip while/until
+
+        let cond = Box::new(self.parse_program());
+
+        self.skip_separators();
+        let body = self.parse_loop_body(false)?;
+
+        Some(ZshCommand::While(ZshWhile {
+            cond,
+            body: Box::new(body),
+            until,
+        }))
+    }
+
+    /// Parse repeat loop
+    fn parse_repeat(&mut self) -> Option<ZshCommand> {
+        self.lexer.zshlex(); // skip 'repeat'
+
+        let count = match self.lexer.tok {
+            LexTok::String => {
+                let c = self.lexer.tokstr.clone().unwrap_or_default();
+                self.lexer.zshlex();
+                c
+            }
+            _ => {
+                self.error("expected count after repeat");
+                return None;
+            }
+        };
+
+        self.skip_separators();
+        let body = self.parse_loop_body(false)?;
+
+        Some(ZshCommand::Repeat(ZshRepeat {
+            count,
+            body: Box::new(body),
+        }))
+    }
+
+    /// Parse loop body (do...done, {...}, or shortloop)
+    fn parse_loop_body(&mut self, foreach_style: bool) -> Option<ZshProgram> {
+        if self.lexer.tok == LexTok::Doloop {
+            self.lexer.zshlex();
+            let body = self.parse_program();
+            if self.lexer.tok == LexTok::Done {
+                self.lexer.zshlex();
+            }
+            Some(body)
+        } else if self.lexer.tok == LexTok::Inbrace {
+            self.lexer.zshlex();
+            let body = self.parse_program();
+            if self.lexer.tok == LexTok::Outbrace {
+                self.lexer.zshlex();
+            }
+            Some(body)
+        } else if foreach_style {
+            // foreach allows 'end' terminator
+            let body = self.parse_program();
+            if self.lexer.tok == LexTok::Zend {
+                self.lexer.zshlex();
+            }
+            Some(body)
+        } else {
+            // Short loop - single command
+            match self.parse_list() {
+                Some(list) => Some(ZshProgram { lists: vec![list] }),
+                None => None,
+            }
+        }
+    }
+
+    /// Parse (...) subshell
+    fn parse_subsh(&mut self) -> Option<ZshCommand> {
+        self.lexer.zshlex(); // skip (
+        let prog = self.parse_program();
+        if self.lexer.tok == LexTok::Outpar {
+            self.lexer.zshlex();
+        }
+        Some(ZshCommand::Subsh(Box::new(prog)))
+    }
+
+    /// Parse {...} cursh
+    fn parse_cursh(&mut self) -> Option<ZshCommand> {
+        self.lexer.zshlex(); // skip {
+        let prog = self.parse_program();
+
+        // Check for { ... } always { ... }
+        if self.lexer.tok == LexTok::Outbrace {
+            self.lexer.zshlex();
+
+            // Check for 'always'
+            if self.lexer.tok == LexTok::String {
+                let s = self.lexer.tokstr.as_ref();
+                if s.map(|s| s == "always").unwrap_or(false) {
+                    self.lexer.zshlex();
+                    self.skip_separators();
+
+                    if self.lexer.tok == LexTok::Inbrace {
+                        self.lexer.zshlex();
+                        let always = self.parse_program();
+                        if self.lexer.tok == LexTok::Outbrace {
+                            self.lexer.zshlex();
+                        }
+                        return Some(ZshCommand::Try(ZshTry {
+                            try_block: Box::new(prog),
+                            always: Box::new(always),
+                        }));
+                    }
+                }
+            }
+        }
+
+        Some(ZshCommand::Cursh(Box::new(prog)))
+    }
+
+    /// Parse function definition
+    fn parse_funcdef(&mut self) -> Option<ZshCommand> {
+        self.lexer.zshlex(); // skip 'function'
+
+        let mut names = Vec::new();
+        let mut tracing = false;
+
+        // Handle options like -T and function names
+        loop {
+            match self.lexer.tok {
+                LexTok::String => {
+                    let s = self.lexer.tokstr.as_ref()?;
+                    if s.starts_with('-') {
+                        if s.contains('T') {
+                            tracing = true;
+                        }
+                        self.lexer.zshlex();
+                        continue;
+                    }
+                    names.push(s.clone());
+                    self.lexer.zshlex();
+                }
+                LexTok::Inbrace | LexTok::Inoutpar | LexTok::Seper | LexTok::Newlin => break,
+                _ => break,
+            }
+        }
+
+        // Optional ()
+        if self.lexer.tok == LexTok::Inoutpar {
+            self.lexer.zshlex();
+        }
+
+        self.skip_separators();
+
+        // Parse body
+        if self.lexer.tok == LexTok::Inbrace {
+            self.lexer.zshlex();
+            let body = self.parse_program();
+            if self.lexer.tok == LexTok::Outbrace {
+                self.lexer.zshlex();
+            }
+            Some(ZshCommand::FuncDef(ZshFuncDef {
+                names,
+                body: Box::new(body),
+                tracing,
+            }))
+        } else {
+            // Short form
+            match self.parse_list() {
+                Some(list) => Some(ZshCommand::FuncDef(ZshFuncDef {
+                    names,
+                    body: Box::new(ZshProgram { lists: vec![list] }),
+                    tracing,
+                })),
+                None => None,
+            }
+        }
+    }
+
+    /// Parse inline function definition: name() { ... }
+    fn parse_inline_funcdef(&mut self, name: String) -> Option<ZshCommand> {
+        // Skip ()
+        if self.lexer.tok == LexTok::Inoutpar {
+            self.lexer.zshlex();
+        }
+
+        self.skip_separators();
+
+        // Parse body
+        if self.lexer.tok == LexTok::Inbrace {
+            self.lexer.zshlex();
+            let body = self.parse_program();
+            if self.lexer.tok == LexTok::Outbrace {
+                self.lexer.zshlex();
+            }
+            Some(ZshCommand::FuncDef(ZshFuncDef {
+                names: vec![name],
+                body: Box::new(body),
+                tracing: false,
+            }))
+        } else {
+            match self.parse_cmd() {
+                Some(cmd) => {
+                    let list = ZshList {
+                        sublist: ZshSublist {
+                            pipe: ZshPipe {
+                                cmd,
+                                next: None,
+                                lineno: self.lexer.lineno,
+                            },
+                            next: None,
+                            flags: SublistFlags::default(),
+                        },
+                        flags: ListFlags::default(),
+                    };
+                    Some(ZshCommand::FuncDef(ZshFuncDef {
+                        names: vec![name],
+                        body: Box::new(ZshProgram { lists: vec![list] }),
+                        tracing: false,
+                    }))
+                }
+                None => None,
+            }
+        }
+    }
+
+    /// Parse [[ ... ]] conditional
+    fn parse_cond(&mut self) -> Option<ZshCommand> {
+        self.lexer.zshlex(); // skip [[
+        let cond = self.parse_cond_expr();
+
+        if self.lexer.tok == LexTok::Doutbrack {
+            self.lexer.zshlex();
+        }
+
+        cond.map(ZshCommand::Cond)
+    }
+
+    /// Parse conditional expression
+    fn parse_cond_expr(&mut self) -> Option<ZshCond> {
+        self.parse_cond_or()
+    }
+
+    fn parse_cond_or(&mut self) -> Option<ZshCond> {
+        let left = self.parse_cond_and()?;
+
+        self.skip_cond_separators();
+
+        if self.lexer.tok == LexTok::Dbar {
+            self.lexer.zshlex();
+            self.skip_cond_separators();
+            let right = self.parse_cond_or()?;
+            Some(ZshCond::Or(Box::new(left), Box::new(right)))
+        } else {
+            Some(left)
+        }
+    }
+
+    fn parse_cond_and(&mut self) -> Option<ZshCond> {
+        let left = self.parse_cond_not()?;
+
+        self.skip_cond_separators();
+
+        if self.lexer.tok == LexTok::Damper {
+            self.lexer.zshlex();
+            self.skip_cond_separators();
+            let right = self.parse_cond_and()?;
+            Some(ZshCond::And(Box::new(left), Box::new(right)))
+        } else {
+            Some(left)
+        }
+    }
+
+    fn parse_cond_not(&mut self) -> Option<ZshCond> {
+        self.skip_cond_separators();
+
+        if self.lexer.tok == LexTok::Bang {
+            self.lexer.zshlex();
+            let inner = self.parse_cond_not()?;
+            return Some(ZshCond::Not(Box::new(inner)));
+        }
+
+        if self.lexer.tok == LexTok::Inpar {
+            self.lexer.zshlex();
+            self.skip_cond_separators();
+            let inner = self.parse_cond_expr()?;
+            self.skip_cond_separators();
+            if self.lexer.tok == LexTok::Outpar {
+                self.lexer.zshlex();
+            }
+            return Some(inner);
+        }
+
+        self.parse_cond_primary()
+    }
+
+    fn parse_cond_primary(&mut self) -> Option<ZshCond> {
+        let s1 = match self.lexer.tok {
+            LexTok::String => {
+                let s = self.lexer.tokstr.clone().unwrap_or_default();
+                self.lexer.zshlex();
+                s
+            }
+            _ => return None,
+        };
+
+        self.skip_cond_separators();
+
+        // Check for unary operator
+        if s1.starts_with('-') && s1.len() == 2 {
+            let s2 = match self.lexer.tok {
+                LexTok::String => {
+                    let s = self.lexer.tokstr.clone().unwrap_or_default();
+                    self.lexer.zshlex();
+                    s
+                }
+                _ => return Some(ZshCond::Unary("-n".to_string(), s1)),
+            };
+            return Some(ZshCond::Unary(s1, s2));
+        }
+
+        // Check for binary operator
+        let op = match self.lexer.tok {
+            LexTok::String => {
+                let s = self.lexer.tokstr.clone().unwrap_or_default();
+                self.lexer.zshlex();
+                s
+            }
+            LexTok::Inang => {
+                self.lexer.zshlex();
+                "<".to_string()
+            }
+            LexTok::Outang => {
+                self.lexer.zshlex();
+                ">".to_string()
+            }
+            _ => return Some(ZshCond::Unary("-n".to_string(), s1)),
+        };
+
+        self.skip_cond_separators();
+
+        let s2 = match self.lexer.tok {
+            LexTok::String => {
+                let s = self.lexer.tokstr.clone().unwrap_or_default();
+                self.lexer.zshlex();
+                s
+            }
+            _ => return Some(ZshCond::Binary(s1, op, String::new())),
+        };
+
+        if op == "=~" {
+            Some(ZshCond::Regex(s1, s2))
+        } else {
+            Some(ZshCond::Binary(s1, op, s2))
+        }
+    }
+
+    fn skip_cond_separators(&mut self) {
+        while self.lexer.tok == LexTok::Seper && {
+            let s = self.lexer.tokstr.as_ref();
+            s.map(|s| !s.contains(';')).unwrap_or(true)
+        } {
+            self.lexer.zshlex();
+        }
+    }
+
+    /// Parse (( ... )) arithmetic command
+    fn parse_arith(&mut self) -> Option<ZshCommand> {
+        let expr = self.lexer.tokstr.clone().unwrap_or_default();
+        self.lexer.zshlex();
+        Some(ZshCommand::Arith(expr))
+    }
+
+    /// Parse time command
+    fn parse_time(&mut self) -> Option<ZshCommand> {
+        self.lexer.zshlex(); // skip 'time'
+
+        // Check if there's a pipeline to time
+        if self.lexer.tok == LexTok::Seper
+            || self.lexer.tok == LexTok::Newlin
+            || self.lexer.tok == LexTok::Endinput
+        {
+            Some(ZshCommand::Time(None))
+        } else {
+            let sublist = self.parse_sublist();
+            Some(ZshCommand::Time(sublist.map(Box::new)))
+        }
+    }
+
+    /// Check if next token is ()
+    fn peek_inoutpar(&mut self) -> bool {
+        self.lexer.tok == LexTok::Inoutpar
+    }
+
+    /// Skip separator tokens
+    fn skip_separators(&mut self) {
+        while self.lexer.tok == LexTok::Seper || self.lexer.tok == LexTok::Newlin {
+            self.lexer.zshlex();
+        }
+    }
+
+    /// Record an error
+    fn error(&mut self, msg: &str) {
+        self.errors.push(ParseError {
+            message: msg.to_string(),
+            line: self.lexer.lineno,
+        });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(input: &str) -> Result<ZshProgram, Vec<ParseError>> {
+        let mut parser = ZshParser::new(input);
+        parser.parse()
+    }
+
+    #[test]
+    fn test_simple_command() {
+        let prog = parse("echo hello world").unwrap();
+        assert_eq!(prog.lists.len(), 1);
+        match &prog.lists[0].sublist.pipe.cmd {
+            ZshCommand::Simple(s) => {
+                assert_eq!(s.words, vec!["echo", "hello", "world"]);
+            }
+            _ => panic!("expected simple command"),
+        }
+    }
+
+    #[test]
+    fn test_pipeline() {
+        let prog = parse("ls | grep foo | wc -l").unwrap();
+        assert_eq!(prog.lists.len(), 1);
+
+        let pipe = &prog.lists[0].sublist.pipe;
+        assert!(pipe.next.is_some());
+
+        let pipe2 = pipe.next.as_ref().unwrap();
+        assert!(pipe2.next.is_some());
+    }
+
+    #[test]
+    fn test_and_or() {
+        let prog = parse("cmd1 && cmd2 || cmd3").unwrap();
+        let sublist = &prog.lists[0].sublist;
+
+        assert!(sublist.next.is_some());
+        let (op, _) = sublist.next.as_ref().unwrap();
+        assert_eq!(*op, SublistOp::And);
+    }
+
+    #[test]
+    fn test_if_then() {
+        let prog = parse("if test -f foo; then echo yes; fi").unwrap();
+        match &prog.lists[0].sublist.pipe.cmd {
+            ZshCommand::If(_) => {}
+            _ => panic!("expected if command"),
+        }
+    }
+
+    #[test]
+    fn test_for_loop() {
+        let prog = parse("for i in a b c; do echo $i; done").unwrap();
+        match &prog.lists[0].sublist.pipe.cmd {
+            ZshCommand::For(f) => {
+                assert_eq!(f.var, "i");
+                match &f.list {
+                    ForList::Words(w) => assert_eq!(w, &vec!["a", "b", "c"]),
+                    _ => panic!("expected word list"),
+                }
+            }
+            _ => panic!("expected for command"),
+        }
+    }
+
+    #[test]
+    fn test_case() {
+        let prog = parse("case $x in a) echo a;; b) echo b;; esac").unwrap();
+        match &prog.lists[0].sublist.pipe.cmd {
+            ZshCommand::Case(c) => {
+                assert_eq!(c.arms.len(), 2);
+            }
+            _ => panic!("expected case command"),
+        }
+    }
+
+    #[test]
+    fn test_function() {
+        // First test just parsing "function foo" to see what happens
+        let prog = parse("function foo { }").unwrap();
+        match &prog.lists[0].sublist.pipe.cmd {
+            ZshCommand::FuncDef(f) => {
+                assert_eq!(f.names, vec!["foo"]);
+            }
+            _ => panic!(
+                "expected function, got {:?}",
+                prog.lists[0].sublist.pipe.cmd
+            ),
+        }
+    }
+
+    #[test]
+    fn test_redirection() {
+        let prog = parse("echo hello > file.txt").unwrap();
+        match &prog.lists[0].sublist.pipe.cmd {
+            ZshCommand::Simple(s) => {
+                assert_eq!(s.redirs.len(), 1);
+                assert_eq!(s.redirs[0].rtype, RedirType::Write);
+            }
+            _ => panic!("expected simple command"),
+        }
+    }
+
+    #[test]
+    fn test_assignment() {
+        let prog = parse("FOO=bar echo $FOO").unwrap();
+        match &prog.lists[0].sublist.pipe.cmd {
+            ZshCommand::Simple(s) => {
+                assert_eq!(s.assigns.len(), 1);
+                assert_eq!(s.assigns[0].name, "FOO");
+            }
+            _ => panic!("expected simple command"),
+        }
+    }
+
+    #[test]
+    fn test_parse_completion_function() {
+        let input = r#"_2to3_fixes() {
+  local -a fixes
+  fixes=( ${${(M)${(f)"$(2to3 --list-fixes 2>/dev/null)"}:#*}//[[:space:]]/} )
+  (( ${#fixes} )) && _describe -t fixes 'fix' fixes
+}"#;
+        let result = parse(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse completion function: {:?}",
+            result.err()
+        );
+        let prog = result.unwrap();
+        assert!(
+            !prog.lists.is_empty(),
+            "Expected at least one list in program"
+        );
+    }
+
+    #[test]
+    fn test_parse_array_with_complex_elements() {
+        let input = r#"arguments=(
+  '(- * :)'{-h,--help}'[show this help message and exit]'
+  {-d,--doctests_only}'[fix up doctests only]'
+  '*:filename:_files'
+)"#;
+        let result = parse(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse array assignment: {:?}",
+            result.err()
+        );
+    }
+
+    #[test]
+    fn test_parse_full_completion_file() {
+        let input = r##"#compdef 2to3
+
+# zsh completions for '2to3'
+
+_2to3_fixes() {
+  local -a fixes
+  fixes=( ${${(M)${(f)"$(2to3 --list-fixes 2>/dev/null)"}:#*}//[[:space:]]/} )
+  (( ${#fixes} )) && _describe -t fixes 'fix' fixes
+}
+
+local -a arguments
+
+arguments=(
+  '(- * :)'{-h,--help}'[show this help message and exit]'
+  {-d,--doctests_only}'[fix up doctests only]'
+  {-f,--fix}'[each FIX specifies a transformation; default: all]:fix name:_2to3_fixes'
+  {-j,--processes}'[run 2to3 concurrently]:number: '
+  {-x,--nofix}'[prevent a transformation from being run]:fix name:_2to3_fixes'
+  {-l,--list-fixes}'[list available transformations]'
+  {-p,--print-function}'[modify the grammar so that print() is a function]'
+  {-v,--verbose}'[more verbose logging]'
+  '--no-diffs[do not show diffs of the refactoring]'
+  {-w,--write}'[write back modified files]'
+  {-n,--nobackups}'[do not write backups for modified files]'
+  {-o,--output-dir}'[put output files in this directory instead of overwriting]:directory:_directories'
+  {-W,--write-unchanged-files}'[also write files even if no changes were required]'
+  '--add-suffix[append this string to all output filenames]:suffix: '
+  '*:filename:_files'
+)
+
+_arguments -s -S $arguments
+"##;
+        let result = parse(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse full completion file: {:?}",
+            result.err()
+        );
+        let prog = result.unwrap();
+        // Should have parsed successfully with at least one statement
+        assert!(!prog.lists.is_empty(), "Expected at least one list");
+    }
+
+    #[test]
+    fn test_parse_logs_sh() {
+        let input = r#"#!/usr/bin/env bash
+shopt -s globstar
+
+if [[ $(uname) == Darwin ]]; then
+    tail -f /var/log/**/*.log /var/log/**/*.out | lolcat
+else
+    if [[ $ZPWR_DISTRO_NAME == raspbian ]]; then
+        tail -f /var/log/**/*.log | lolcat
+    else
+        printf "Unsupported...\n" >&2
+    fi
+fi
+"#;
+        let result = parse(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse logs.sh: {:?}",
+            result.err()
+        );
+    }
+
+    #[test]
+    fn test_parse_case_with_glob() {
+        let input = r#"case "$ZPWR_OS_TYPE" in
+    darwin*)  open_cmd='open'
+      ;;
+    cygwin*)  open_cmd='cygstart'
+      ;;
+    linux*)
+        open_cmd='xdg-open'
+      ;;
+esac"#;
+        let result = parse(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse case with glob: {:?}",
+            result.err()
+        );
+    }
+
+    #[test]
+    fn test_parse_case_with_nested_if() {
+        // Test case with nested if and glob patterns
+        let input = r##"function zpwrGetOpenCommand(){
+    local open_cmd
+    case "$ZPWR_OS_TYPE" in
+        darwin*)  open_cmd='open' ;;
+        cygwin*)  open_cmd='cygstart' ;;
+        linux*)
+            if [[ "$_zpwr_uname_r" != *icrosoft* ]];then
+                open_cmd='nohup xdg-open'
+            fi
+            ;;
+    esac
+}"##;
+        let result = parse(input);
+        assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    }
+
+    #[test]
+    fn test_parse_zpwr_scripts() {
+        use std::fs;
+        use std::path::Path;
+        use std::sync::mpsc;
+        use std::thread;
+        use std::time::{Duration, Instant};
+
+        let scripts_dir = Path::new("/Users/wizard/.zpwr/scripts");
+        if !scripts_dir.exists() {
+            eprintln!("Skipping test: scripts directory not found");
+            return;
+        }
+
+        let mut total = 0;
+        let mut passed = 0;
+        let mut failed_files = Vec::new();
+        let mut timeout_files = Vec::new();
+
+        for ext in &["sh", "zsh"] {
+            let pattern = scripts_dir.join(format!("*.{}", ext));
+            if let Ok(entries) = glob::glob(pattern.to_str().unwrap()) {
+                for entry in entries.flatten() {
+                    total += 1;
+                    let file_path = entry.display().to_string();
+                    let content = match fs::read_to_string(&entry) {
+                        Ok(c) => c,
+                        Err(e) => {
+                            failed_files.push((file_path, format!("read error: {}", e)));
+                            continue;
+                        }
+                    };
+
+                    // Parse with timeout
+                    let content_clone = content.clone();
+                    let (tx, rx) = mpsc::channel();
+                    let handle = thread::spawn(move || {
+                        let result = parse(&content_clone);
+                        let _ = tx.send(result);
+                    });
+
+                    match rx.recv_timeout(Duration::from_secs(2)) {
+                        Ok(Ok(_)) => passed += 1,
+                        Ok(Err(errors)) => {
+                            let first_err = errors
+                                .first()
+                                .map(|e| format!("line {}: {}", e.line, e.message))
+                                .unwrap_or_default();
+                            failed_files.push((file_path, first_err));
+                        }
+                        Err(_) => {
+                            timeout_files.push(file_path);
+                            // Thread will be abandoned
+                        }
+                    }
+                }
+            }
+        }
+
+        eprintln!("\n=== ZPWR Scripts Parse Results ===");
+        eprintln!("Passed: {}/{}", passed, total);
+
+        if !timeout_files.is_empty() {
+            eprintln!("\nTimeout files (>2s):");
+            for file in &timeout_files {
+                eprintln!("  {}", file);
+            }
+        }
+
+        if !failed_files.is_empty() {
+            eprintln!("\nFailed files:");
+            for (file, err) in &failed_files {
+                eprintln!("  {} - {}", file, err);
+            }
+        }
+
+        // Allow some failures initially, but track progress
+        let pass_rate = if total > 0 {
+            (passed as f64 / total as f64) * 100.0
+        } else {
+            0.0
+        };
+        eprintln!("Pass rate: {:.1}%", pass_rate);
+
+        // Require at least 50% pass rate for now
+        assert!(pass_rate >= 50.0, "Pass rate too low: {:.1}%", pass_rate);
+    }
+
+    #[test]
+    fn test_parse_zsh_stdlib_functions() {
+        use std::fs;
+        use std::path::Path;
+        use std::sync::mpsc;
+        use std::thread;
+        use std::time::Duration;
+
+        let functions_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("test_data/zsh_functions");
+        if !functions_dir.exists() {
+            eprintln!(
+                "Skipping test: zsh_functions directory not found at {:?}",
+                functions_dir
+            );
+            return;
+        }
+
+        let mut total = 0;
+        let mut passed = 0;
+        let mut failed_files = Vec::new();
+        let mut timeout_files = Vec::new();
+
+        if let Ok(entries) = fs::read_dir(&functions_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !path.is_file() {
+                    continue;
+                }
+
+                total += 1;
+                let file_path = path.display().to_string();
+                let content = match fs::read_to_string(&path) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        failed_files.push((file_path, format!("read error: {}", e)));
+                        continue;
+                    }
+                };
+
+                // Parse with timeout
+                let content_clone = content.clone();
+                let (tx, rx) = mpsc::channel();
+                thread::spawn(move || {
+                    let result = parse(&content_clone);
+                    let _ = tx.send(result);
+                });
+
+                match rx.recv_timeout(Duration::from_secs(2)) {
+                    Ok(Ok(_)) => passed += 1,
+                    Ok(Err(errors)) => {
+                        let first_err = errors
+                            .first()
+                            .map(|e| format!("line {}: {}", e.line, e.message))
+                            .unwrap_or_default();
+                        failed_files.push((file_path, first_err));
+                    }
+                    Err(_) => {
+                        timeout_files.push(file_path);
+                    }
+                }
+            }
+        }
+
+        eprintln!("\n=== Zsh Stdlib Functions Parse Results ===");
+        eprintln!("Passed: {}/{}", passed, total);
+
+        if !timeout_files.is_empty() {
+            eprintln!("\nTimeout files (>2s): {}", timeout_files.len());
+            for file in timeout_files.iter().take(10) {
+                eprintln!("  {}", file);
+            }
+            if timeout_files.len() > 10 {
+                eprintln!("  ... and {} more", timeout_files.len() - 10);
+            }
+        }
+
+        if !failed_files.is_empty() {
+            eprintln!("\nFailed files: {}", failed_files.len());
+            for (file, err) in failed_files.iter().take(20) {
+                let filename = Path::new(file)
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy();
+                eprintln!("  {} - {}", filename, err);
+            }
+            if failed_files.len() > 20 {
+                eprintln!("  ... and {} more", failed_files.len() - 20);
+            }
+        }
+
+        let pass_rate = if total > 0 {
+            (passed as f64 / total as f64) * 100.0
+        } else {
+            0.0
+        };
+        eprintln!("Pass rate: {:.1}%", pass_rate);
+
+        // Require at least 50% pass rate
+        assert!(pass_rate >= 50.0, "Pass rate too low: {:.1}%", pass_rate);
+    }
+}

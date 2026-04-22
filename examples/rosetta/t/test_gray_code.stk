@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Gray code
+
+fn to_gray {
+    my $n = $_[0]
+    $n ^ ($n >> 1)
+}
+
+fn from_gray {
+    my $n = $_[0]
+    my $mask = $n >> 1
+    while ($mask != 0) {
+        $n = $n ^ $mask
+        $mask = $mask >> 1
+    }
+    $n
+}
+
+# Test a few values
+assert_eq to_gray(0b1010), 0b1111, "gray of 1010 is 1111"
+assert_eq from_gray(0b1111), 0b1010, "from_gray of 1111 is 1010"
+
+assert_eq to_gray(5), 7, "to_gray(5) is 7"
+assert_eq from_gray(7), 5, "from_gray(7) is 5"
+
+# Print first 10 gray codes
+my @grays = (0..9) |> map { to_gray($_) }
+assert_eq join(",", @grays), "0,1,3,2,6,7,5,4,12,13", "first 10 gray codes"
+
+test_run

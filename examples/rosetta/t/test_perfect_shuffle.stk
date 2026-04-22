@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Perfect shuffle
+
+fn perfect_shuffle {
+    my $deck = $_[0]
+    my $len = scalar(@$deck)
+    my $mid = int($len / 2)
+    
+    my @left = @{$deck}[0..$mid-1]
+    my @right = @{$deck}[$mid..$len-1]
+    my @shuffled
+    
+    for my $i (0..$mid-1) {
+        push @shuffled, $left[$i]
+        push @shuffled, $right[$i]
+    }
+    
+    ([@shuffled])
+}
+
+my $deck = [1..8]
+my $shuffled = perfect_shuffle($deck)
+assert_eq join(",", @$shuffled), "1,5,2,6,3,7,4,8", "perfect shuffle of 1..8"
+
+my $deck2 = ["A", "B", "C", "D"]
+my $shuffled2 = perfect_shuffle($deck2)
+assert_eq join(",", @$shuffled2), "A,C,B,D", "perfect shuffle of ABCD"
+
+test_run

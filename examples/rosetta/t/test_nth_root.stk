@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Nth Root
+
+fn my_nth_root {
+    my $x = $_[0]
+    my $n = $_[1]
+    if ($x == 0) { 0 }
+    else {
+        my $guess = $x / $n
+        my $prev = 0
+        while (abs($guess - $prev) > 0.00000001) {
+            $prev = $guess
+            $guess = (($n - 1) * $guess + $x / ($guess ** ($n - 1))) / $n
+        }
+        $guess
+    }
+}
+
+my $r1 = my_nth_root(2, 2)
+assert_ok abs($r1 - 1.41421356) < 0.000001, "sqrt(2)"
+
+my $r2 = my_nth_root(125, 3)
+assert_ok abs($r2 - 5) < 0.000001, "cbrt(125)"
+
+my $r3 = my_nth_root(625, 4)
+assert_ok abs($r3 - 5) < 0.000001, "4th root of 625"
+
+test_run

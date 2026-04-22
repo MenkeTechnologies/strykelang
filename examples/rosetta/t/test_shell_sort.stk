@@ -1,0 +1,33 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Shell sort
+
+fn shell_sort {
+    my $list = $_[0]
+    my @arr = @$list
+    my $len = scalar(@arr)
+    my @gaps = (701, 301, 132, 57, 23, 10, 4, 1)
+    
+    for my $gap (@gaps) {
+        for my $i ($gap..$len-1) {
+            my $temp = $arr[$i]
+            my $j = $i
+            while ($j >= $gap && $arr[$j - $gap] > $temp) {
+                $arr[$j] = $arr[$j - $gap]
+                $j -= $gap
+            }
+            $arr[$j] = $temp
+        }
+    }
+    
+    ([@arr])
+}
+
+my $data = [9, 8, 3, 7, 5, 6, 4, 1]
+my $sorted = shell_sort($data)
+assert_eq join(",", @$sorted), "1,3,4,5,6,7,8,9", "shell sort"
+
+my $data2 = [5, 1, 4, 2, 8]
+my $sorted2 = shell_sort($data2)
+assert_eq join(",", @$sorted2), "1,2,4,5,8", "shell sort 2"
+
+test_run

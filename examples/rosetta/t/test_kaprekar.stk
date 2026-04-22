@@ -8,10 +8,8 @@ fn my_is_kaprekar($n) {
         my $sq = $n * $n
         my $s = "$sq"
         my $len = length($s)
-        
         my $found = 0
-        my $i = 1
-        while (!$found && $i < $len) {
+        for my $i (1..$len-1) {
             my $left = substr($s, 0, $i)
             my $right = substr($s, $i)
             if ($right !~ /^0+$/) {
@@ -19,7 +17,6 @@ fn my_is_kaprekar($n) {
                     $found = 1
                 }
             }
-            $i++
         }
         $found
     }

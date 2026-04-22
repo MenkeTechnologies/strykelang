@@ -317,6 +317,11 @@ impl ZwcFile {
         self.functions.len()
     }
 
+    /// Create a new empty ZWC file for building
+    pub fn new_builder() -> ZwcBuilder {
+        ZwcBuilder::new()
+    }
+
     pub fn get_function(&self, name: &str) -> Option<&ZwcFunction> {
         self.functions
             .iter()
@@ -348,6 +353,110 @@ impl ZwcFile {
             name: func.name.clone(),
             body: decoder.decode(),
         })
+    }
+}
+
+/// Builder for creating ZWC files
+#[derive(Debug)]
+pub struct ZwcBuilder {
+    functions: Vec<(String, Vec<u8>)>, // (name, source code)
+}
+
+impl ZwcBuilder {
+    pub fn new() -> Self {
+        Self {
+            functions: Vec::new(),
+        }
+    }
+
+    /// Add a function from source code
+    pub fn add_source(&mut self, name: &str, source: &str) {
+        self.functions
+            .push((name.to_string(), source.as_bytes().to_vec()));
+    }
+
+    /// Add a function from a file
+    pub fn add_file(&mut self, path: &std::path::Path) -> io::Result<()> {
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Invalid filename"))?;
+        let source = std::fs::read(path)?;
+        self.functions.push((name.to_string(), source));
+        Ok(())
+    }
+
+    /// Write the ZWC file
+    /// Note: This writes a simplified format that stores raw source code
+    /// rather than compiled wordcode. The loader handles both formats.
+    pub fn write<P: AsRef<std::path::Path>>(&self, path: P) -> io::Result<()> {
+        use std::io::Write;
+
+        let mut file = std::fs::File::create(path)?;
+
+        // Write magic
+        file.write_all(&FD_MAGIC.to_ne_bytes())?;
+
+        // Write flags (0 = not mapped)
+        file.write_all(&[0u8])?;
+
+        // Write other offset placeholder (3 bytes)
+        file.write_all(&[0u8; 3])?;
+
+        // Write version string (padded to 4-byte boundary)
+        let version = env!("CARGO_PKG_VERSION");
+        let version_bytes = version.as_bytes();
+        file.write_all(version_bytes)?;
+        file.write_all(&[0u8])?; // null terminator
+                                 // Pad to 4-byte boundary
+        let padding = (4 - ((version_bytes.len() + 1) % 4)) % 4;
+        file.write_all(&vec![0u8; padding])?;
+
+        // Calculate header length (in words)
+        let mut header_words = FD_PRELEN;
+        for (name, _) in &self.functions {
+            // 6 words for fdhead struct + name (padded)
+            header_words += 6 + (name.len() + 1 + 3) / 4;
+        }
+
+        // Write header length
+        file.write_all(&(header_words as u32).to_ne_bytes())?;
+
+        // Track positions for function data
+        let mut data_offset = header_words;
+        let mut func_data: Vec<(u32, u32, Vec<u8>)> = Vec::new(); // (start, len, data)
+
+        // Write function headers
+        for (name, source) in &self.functions {
+            let source_words = (source.len() + 3) / 4;
+
+            // fdhead: start, len, npats, strs, hlen, flags
+            file.write_all(&(data_offset as u32).to_ne_bytes())?; // start
+            file.write_all(&(source.len() as u32).to_ne_bytes())?; // len (in bytes)
+            file.write_all(&0u32.to_ne_bytes())?; // npats
+            file.write_all(&0u32.to_ne_bytes())?; // strs offset
+            let hlen = 6 + (name.len() + 1 + 3) / 4;
+            file.write_all(&(hlen as u32).to_ne_bytes())?; // hlen
+            file.write_all(&0u32.to_ne_bytes())?; // flags
+
+            // Write name (null-terminated, padded)
+            file.write_all(name.as_bytes())?;
+            file.write_all(&[0u8])?;
+            let name_padding = (4 - ((name.len() + 1) % 4)) % 4;
+            file.write_all(&vec![0u8; name_padding])?;
+
+            func_data.push((data_offset as u32, source.len() as u32, source.clone()));
+            data_offset += source_words;
+        }
+
+        // Write function data (source code, padded to 4 bytes)
+        for (_, _, data) in &func_data {
+            file.write_all(data)?;
+            let padding = (4 - (data.len() % 4)) % 4;
+            file.write_all(&vec![0u8; padding])?;
+        }
+
+        Ok(())
     }
 }
 
@@ -1380,5 +1489,36 @@ mod tests {
     fn test_wc_data() {
         let wc = WC_SIMPLE | (42 << WC_CODEBITS);
         assert_eq!(wc_data(wc), 42);
+    }
+
+    #[test]
+    fn test_load_src_zwc() {
+        let path = "/Users/wizard/.zinit/plugins/MenkeTechnologies---zsh-more-completions/src.zwc";
+        if !std::path::Path::new(path).exists() {
+            eprintln!("Skipping test - {} not found", path);
+            return;
+        }
+
+        let zwc = ZwcFile::load(path).expect("Failed to load src.zwc");
+        println!("Loaded {} functions from src.zwc", zwc.function_count());
+
+        // Should have thousands of completion functions
+        assert!(
+            zwc.function_count() > 1000,
+            "Expected > 1000 functions, got {}",
+            zwc.function_count()
+        );
+
+        // Check some known functions exist
+        let funcs = zwc.list_functions();
+        println!("First 10 functions: {:?}", &funcs[..10.min(funcs.len())]);
+
+        // Try to decode _ls
+        if let Some(func) = zwc.get_function("_ls") {
+            println!("Found _ls function");
+            if let Some(decoded) = zwc.decode_function(func) {
+                println!("Decoded _ls: {} ops", decoded.body.len());
+            }
+        }
     }
 }

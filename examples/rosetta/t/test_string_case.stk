@@ -1,34 +1,17 @@
 #!/usr/bin/env stryke
 # Rosetta Code: String Case
 
-fn to_upper {
-    my $s = $_[0]
-    uc($s)
+fn to_upper($s) { ~> $s uc }
+fn to_lower($s) { ~> $s lc }
+
+fn to_title($s) {
+    ~> $s >{split /\s+/, $_} map { ucfirst(lc($_)) } |> join " "
 }
 
-fn to_lower {
-    my $s = $_[0]
-    lc($s)
-}
-
-fn to_title {
-    my $s = $_[0]
-    my @parts = split /\s+/, $s
-    my @res = @parts |> map { ucfirst(lc($_)) }
-    join(" ", @res)
-}
-
-fn my_swap_case {
-    my $s = $_[0]
-    my @chars = ~> $s chars
-    my @res = @chars |> map {
-        if ($_ eq uc($_)) {
-            lc($_)
-        } else {
-            uc($_)
-        }
-    }
-    join("", @res)
+fn my_swap_case($s) {
+    ~> $s >{split //, $_} map {
+        $_ eq uc($_) ? lc($_) : uc($_)
+    } |> join ""
 }
 
 assert_eq to_upper("hello"), "HELLO", "upper"

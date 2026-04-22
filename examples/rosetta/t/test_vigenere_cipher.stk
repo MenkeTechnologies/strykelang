@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Vigenere Cipher
+
+fn vigenere_encrypt {
+    my $text = $_[0]
+    my $key = $_[1]
+    my @tc = ~> $text uc chars grep { $_ =~ /[A-Z]/ }
+    my @kc = ~> $key uc chars grep { $_ =~ /[A-Z]/ }
+    my $klen = scalar(@kc)
+    
+    0..scalar(@tc)-1 |> map {
+        my $i = $_
+        my $shift = ord($kc[$i % $klen]) - 65
+        chr((ord($tc[$i]) - 65 + $shift) % 26 + 65)
+    } |> join ""
+}
+
+fn vigenere_decrypt {
+    my $text = $_[0]
+    my $key = $_[1]
+    my @tc = ~> $text uc chars grep { $_ =~ /[A-Z]/ }
+    my @kc = ~> $key uc chars grep { $_ =~ /[A-Z]/ }
+    my $klen = scalar(@kc)
+    
+    0..scalar(@tc)-1 |> map {
+        my $i = $_
+        my $shift = ord($kc[$i % $klen]) - 65
+        chr((ord($tc[$i]) - 65 - $shift + 26) % 26 + 65)
+    } |> join ""
+}
+
+my $msg = "ATTACKATDAWN"
+my $key = "LEMON"
+my $enc = vigenere_encrypt($msg, $key)
+assert_eq $enc, "LXFOPVEFRNHR", "encrypt ATTACKATDAWN with LEMON"
+assert_eq vigenere_decrypt($enc, $key), "ATTACKATDAWN", "decrypt roundtrip"
+
+test_run

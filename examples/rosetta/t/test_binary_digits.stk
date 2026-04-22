@@ -19,14 +19,15 @@ fn from_binary($s) {
     my $result = 0
     my @bits = split //, $s
     for my $bit (@bits) {
-        next unless $bit =~ /[01]/
-        $result = $result * 2 + int($bit)
+        if ($bit =~ /[01]/) {
+            $result = $result * 2 + int($bit)
+        }
     }
     $result
 }
 
 fn count_ones($n) {
-    ~> to_binary($n) >{split //, $_} grep { $_ eq "1" } |> scalar
+    ~> to_binary($n) chars grep { $_ eq "1" } |> scalar
 }
 
 assert_eq to_binary(0), "0", "binary 0"

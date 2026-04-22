@@ -10,27 +10,27 @@ fn arithmetic_demo() {
     "a = $a, b = $b" |> p
     
     # Basic arithmetic operations
-    "Addition: $a + $b = " . ($a + $b) |> p
-    "Subtraction: $a - $b = " . ($a - $b) |> p
-    "Multiplication: $a * $b = " . ($a * $b) |> p
-    "Division: $a / $b = " . ($a / $b) |> p
-    "Integer division: $a ÷ $b = " . int($a / $b) |> p
-    "Modulo: $a % $b = " . ($a % $b) |> p
-    "Exponentiation: $a ** $b = " . ($a ** $b) |> p
+    ($a + $b) |> map { "Addition: $a + $b = $_" } |> p
+    ($a - $b) |> map { "Subtraction: $a - $b = $_" } |> p
+    ($a * $b) |> map { "Multiplication: $a * $b = $_" } |> p
+    ($a / $b) |> map { "Division: $a / $b = $_" } |> p
+    ($a / $b) |> int |> map { "Integer division: $a ÷ $b = $_" } |> p
+    ($a % $b) |> map { "Modulo: $a % $b = $_" } |> p
+    ($a ** $b) |> map { "Exponentiation: $a ** $b = $_" } |> p
     
     # Bitwise operations
-    "Bitwise AND: $a & $b = " . ($a & $b) |> p
-    "Bitwise OR: $a | $b = " . ($a | $b) |> p
-    "Bitwise XOR: $a ^ $b = " . ($a ^ $b) |> p
-    "Left shift: $a << 2 = " . ($a << 2) |> p
-    "Right shift: $a >> 2 = " . ($a >> 2) |> p
+    ($a & $b) |> map { "Bitwise AND: $a & $b = $_" } |> p
+    ($a | $b) |> map { "Bitwise OR: $a | $b = $_" } |> p
+    ($a ^ $b) |> map { "Bitwise XOR: $a ^ $b = $_" } |> p
+    ($a << 2) |> map { "Left shift: $a << 2 = $_" } |> p
+    ($a >> 2) |> map { "Right shift: $a >> 2 = $_" } |> p
     
     # Assignment operators
     my $c = $a
     $c += $b
     "After +=: $c" |> p
     
-    $c -= $b  
+    $c -= $b
     "After -=: $c" |> p
     
     $c *= 2
@@ -41,10 +41,10 @@ fn arithmetic_demo() {
     
     # Increment/decrement
     my $x = 10
-    "Pre-increment: " . ++$x |> p
-    "Post-increment: " . $x++ . " (x is now $x)" |> p
-    "Pre-decrement: " . --$x |> p
-    "Post-decrement: " . $x-- . " (x is now $x)" |> p
+    (++$x) |> map { "Pre-increment: $_" } |> p
+    ($x++) |> map { "Post-increment: $_ (x is now $x)" } |> p
+    (--$x) |> map { "Pre-decrement: $_" } |> p
+    ($x--) |> map { "Post-decrement: $_ (x is now $x)" } |> p
 }
 
 arithmetic_demo

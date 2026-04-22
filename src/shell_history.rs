@@ -418,7 +418,8 @@ mod tests {
         engine.add("cd /tmp", Some("/home/user")).unwrap();
         engine.add("echo hello", Some("/tmp")).unwrap();
 
-        let results = engine.search("ls", 10).unwrap();
+        // Use prefix search for short queries (trigram FTS5 needs 3+ chars)
+        let results = engine.search_prefix("ls", 10).unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].command, "ls -la");
     }

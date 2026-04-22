@@ -1,0 +1,41 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Mode
+
+fn my_mode {
+    my $list = $_[0]
+    my $result
+    if (scalar(@$list) == 0) {
+        $result = []
+    } else {
+        my %counts
+        for my $x (@$list) { $counts{$x}++ }
+        
+        my $max = 0
+        for my $k (keys %counts) {
+            if ($counts{$k} > $max) {
+                $max = $counts{$k}
+            }
+        }
+        
+        my @res
+        for my $k (keys %counts) {
+            if ($counts{$k} == $max) {
+                push @res, $k
+            }
+        }
+        my @sorted = sort(@res)
+        $result = [@sorted]
+    }
+    $result
+}
+
+my $m1 = my_mode([1, 3, 6, 6, 6, 6, 7, 7, 12, 12, 17])
+assert_eq join(",", @$m1), "6", "mode is 6"
+
+my $m2 = my_mode([1, 1, 2, 4, 4])
+assert_eq join(",", @$m2), "1,4", "modes are 1 and 4"
+
+my $m3 = my_mode(["apple", "banana", "apple"])
+assert_eq join(",", @$m3), "apple", "mode with strings"
+
+test_run

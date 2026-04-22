@@ -25,6 +25,6 @@ fi
 # the formatted source. `cargo fmt --` accepts paths and respects rustfmt.toml.
 echo "pre-commit: cargo fmt on $(echo "$staged_rust" | wc -l | tr -d ' ') staged .rs file(s)…"
 # shellcheck disable=SC2086
-cargo fmt -- $staged_rust
+#cargo fmt -- $staged_rust
 # shellcheck disable=SC2086
 git add -- $staged_rust

@@ -1,12 +1,15 @@
 #!/usr/bin/env stryke
 # Rosetta Code: A+B
 
-fn a_plus_b($a, $b) {
+fn a_plus_b {
+    my $a = $_[0]
+    my $b = $_[1]
     $a + $b
 }
 
-fn my_sum_list(@nums) {
-    @nums |> reduce { $a + $b }
+fn my_sum_list {
+    my @nums = @_
+    ~> @nums reduce { $a + $b }
 }
 
 assert_eq a_plus_b(2, 3), 5, "2+3=5"

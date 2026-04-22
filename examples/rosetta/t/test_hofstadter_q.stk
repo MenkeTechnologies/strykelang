@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Hofstadter Q sequence
+
+my %q
+
+fn Q {
+    my $n = $_[0]
+    if (exists %q{$n}) {
+        %q{$n}
+    } else {
+        if ($n <= 0) {
+            0 
+        } else {
+            my $res = Q($n - Q($n-1)) + Q($n - Q($n-2))
+            %q{$n} = $res
+            $res
+        }
+    }
+}
+
+# Initialize for first test
+%q = ( 1=>1, 2=>1 )
+assert_eq Q(10), 6, "Q(10) is 6"
+
+# Clear memoization for sequence test
+%q = ( 1=>1, 2=>1 )
+my @seq = (1..10) |> map { Q($_) }
+assert_eq join(",", @seq), "1,1,2,3,3,4,5,5,6,6", "first 10 Q numbers"
+
+test_run

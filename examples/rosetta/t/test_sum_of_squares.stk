@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sum of Squares
+
+fn sum_of_squares {
+    my @nums = @_
+    if (scalar(@nums) == 0) { 0 }
+    else {
+        my $res = @nums |> map { $_ * $_ } |> reduce { $a + $b }
+        $res
+    }
+}
+
+assert_eq sum_of_squares(1, 2, 3), 14, "1^2 + 2^2 + 3^2 = 1+4+9 = 14"
+assert_eq sum_of_squares(4, 5), 41, "16 + 25 = 41"
+assert_eq sum_of_squares(0), 0, "zero"
+assert_eq sum_of_squares(), 0, "empty"
+
+my @data = 1..10
+assert_eq sum_of_squares(@data), 385, "sum of squares 1..10"
+
+test_run
