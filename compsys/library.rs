@@ -443,9 +443,23 @@ pub fn path_files(state: &mut CompletionState, opts: &PathFilesOpts) -> bool {
 
                 let mut comp = Completion::new(full_path);
 
+                // Set file mode character for LS_COLORS coloring
                 if is_dir {
+                    comp.modec = '/';
                     comp.suf = Some("/".to_string());
                     comp.flags |= CompletionFlags::NOSPACE;
+                } else if entry.path().is_symlink() {
+                    comp.modec = '@';
+                } else {
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::PermissionsExt;
+                        if let Ok(meta) = entry.metadata() {
+                            if meta.permissions().mode() & 0o111 != 0 {
+                                comp.modec = '*';
+                            }
+                        }
+                    }
                 }
 
                 // Apply prefix/suffix

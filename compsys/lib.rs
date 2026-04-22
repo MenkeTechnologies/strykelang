@@ -90,5 +90,5 @@ pub use menu::{
     SearchDirection, GROUP_COLORS,
 };
 pub use state::{CompParams, CompState, CompletionContext};
-pub use zpwr_colors::{zpwr_list_colors, HeaderColors, DEFAULT_PREFIX_COLOR, MENU_SELECTION_COLOR};
+pub use zpwr_colors::{zpwr_list_colors, load_zpwr_config, ZstyleColors, HeaderColors, DEFAULT_PREFIX_COLOR, MENU_SELECTION_COLOR};
 pub use zstyle::{ZStyle, ZStyleLookup, ZStyleStore};

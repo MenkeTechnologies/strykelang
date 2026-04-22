@@ -110,44 +110,6 @@ impl FilesOpts {
     }
 }
 
-/// Get file type description
-fn file_type_desc(path: &Path) -> &'static str {
-    if path.is_dir() {
-        "directory"
-    } else if path.is_symlink() {
-        "symbolic link"
-    } else if let Ok(meta) = path.metadata() {
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::FileTypeExt;
-            let ft = meta.file_type();
-            if ft.is_block_device() {
-                return "block device";
-            } else if ft.is_char_device() {
-                return "character device";
-            } else if ft.is_fifo() {
-                return "named pipe";
-            } else if ft.is_socket() {
-                return "socket";
-            }
-        }
-        if meta.is_file() {
-            // Check if executable
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                if meta.permissions().mode() & 0o111 != 0 {
-                    return "executable";
-                }
-            }
-            "file"
-        } else {
-            "file"
-        }
-    } else {
-        "file"
-    }
-}
 
 /// Check if filename matches a glob pattern
 fn matches_glob(name: &str, pattern: &str) -> bool {
@@ -275,13 +237,26 @@ pub fn files_execute(state: &mut CompletionState, opts: &FilesOpts) -> bool {
 
         let mut comp = Completion::new(&comp_str);
 
-        // Set display with file type
-        let type_desc = file_type_desc(&path);
-        comp.disp = Some(format!("{} -- {}", name_str, type_desc));
+        // Don't set descriptions for files - zsh doesn't show them in normal tab completion
+        // The file type is already indicated by color and trailing / for directories
 
-        // No space after directories
+        // Set file mode character for LS_COLORS coloring
         if is_dir {
+            comp.modec = '/';
             comp.flags |= CompletionFlags::NOSPACE;
+        } else if path.is_symlink() {
+            comp.modec = '@';
+        } else {
+            // Check if executable
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if let Ok(meta) = path.metadata() {
+                    if meta.permissions().mode() & 0o111 != 0 {
+                        comp.modec = '*';
+                    }
+                }
+            }
         }
 
         state.add_match(comp, Some(group_name));
