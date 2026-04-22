@@ -337,7 +337,9 @@ impl<'a> ZshLexer<'a> {
                     self.tok = LexTok::Inbrace;
                 } else if s == "}" {
                     self.tok = LexTok::Outbrace;
-                } else {
+                } else if self.incasepat == 0 {
+                    // Skip reserved word checking in case pattern context
+                    // Words like "time", "end", etc. should be patterns, not reserved words
                     self.check_reserved_word();
                 }
             }
@@ -792,12 +794,10 @@ impl<'a> ZshLexer<'a> {
             }
 
             '}' => {
-                if self.incmdpos {
-                    self.tokstr = Some("}".to_string());
-                    LexTok::Outbrace
-                } else {
-                    self.gettokstr(c, false)
-                }
+                // } at start of token is always Outbrace (ends command group)
+                // Inside a word, } would be handled by gettokstr but we never reach here mid-word
+                self.tokstr = Some("}".to_string());
+                LexTok::Outbrace
             }
 
             '[' => {
@@ -1231,8 +1231,9 @@ impl<'a> ZshLexer<'a> {
                             && (self.incmdpos || self.intypeset)
                             && bct == 0
                             && brct == 0
+                            && self.incasepat == 0
                         {
-                            // Check for VAR=value assignment
+                            // Check for VAR=value assignment (but not in case pattern context)
                             let tok_so_far = self.lexbuf.as_str().to_string();
                             if self.is_valid_assignment_target(&tok_so_far) {
                                 let next = self.hgetc();

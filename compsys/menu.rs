@@ -1006,17 +1006,23 @@ impl MenuState {
             group.has_descriptions = has_descriptions;
             
             if has_descriptions {
-                // Single column with aligned descriptions
-                // Calculate max completion width and max description width
+                // Multi-column layout WITH descriptions (like zsh - pack tightly!)
+                // Each "column" = completion + separator + description
                 let max_comp_width = items.iter().map(|i| i.comp_width).max().unwrap_or(10);
-                let separator_width = 12; // " ///////// "
+                let max_desc_width = items.iter().map(|i| i.desc_width).max().unwrap_or(10);
+                let separator_width = 11; // " ///////// "
                 
-                // Completion column gets enough space for longest completion
-                let comp_col = max_comp_width + 2;
-                group.comp_col_width = comp_col;
-                group.cols = 1;
-                group.col_widths = vec![tw];
-                group.row_count = n;
+                // Width of one complete entry (comp + sep + desc + small padding)
+                let entry_width = max_comp_width + separator_width + max_desc_width + 2;
+                
+                // How many columns fit? Pack tightly!
+                let cols = (tw / entry_width).max(1).min(n);
+                
+                // Use actual entry width, not distributed width - no dead space!
+                group.comp_col_width = max_comp_width + 2;
+                group.cols = cols;
+                group.col_widths = vec![entry_width; cols];
+                group.row_count = (n + cols - 1) / cols;
             } else {
                 // Multi-column layout for items without descriptions
                 let max_cols = n.min(tw / 2); // At least 2 chars per item
@@ -1116,19 +1122,26 @@ impl MenuState {
                     let mut line = MenuLine::new();
                     
                     if group.has_descriptions {
-                        // Single-column with aligned descriptions
-                        let idx = global_idx + row;
-                        if let Some(item) = self.items.get(idx) {
-                            self.render_item_with_desc_column(
-                                &mut line,
-                                item,
-                                idx,
-                                group.comp_col_width,
-                                &group.color,
-                            );
+                        // Multi-column with descriptions - pack tightly, no extra padding!
+                        for col in 0..group.cols {
+                            let local_idx = row * group.cols + col;
+                            let idx = global_idx + local_idx;
+
+                            if local_idx < group.count {
+                                if let Some(item) = self.items.get(idx) {
+                                    self.render_item_with_desc_column(
+                                        &mut line,
+                                        item,
+                                        idx,
+                                        group.comp_col_width,
+                                        &group.color,
+                                    );
+                                }
+                            }
+                            // No pad_to - items are already formatted with internal padding
                         }
                     } else {
-                        // Multi-column layout
+                        // Multi-column layout without descriptions
                         let mut x = 0usize;
                         for col in 0..cols {
                             let local_idx = row * cols + col;

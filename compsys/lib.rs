@@ -82,10 +82,13 @@ pub use compinit::{
 pub use completion::{
     Completion, CompletionFlags, CompletionGroup, CompletionReceiver, GroupFlags,
 };
-pub use compset::{compset_execute, CompsetOp};
+pub use compset::{
+    compset_execute, compquote_execute, compcall_execute,
+    CompsetOp, CompquoteOpts, CompcallOpts,
+};
 pub use computil::{
     describe_execute, ArgSpec as UtilArgSpec, CompArguments, CompDescribe, CompTags, CompValues,
-    ValueSpec,
+    ValueSpec, CompFiles, CompGroups, CompGroupConfig,
 };
 pub use describe::{describe_execute as native_describe, parse_items, DescribeItem, DescribeOpts};
 pub use files::{directories_execute, files_execute, FilesOpts};
