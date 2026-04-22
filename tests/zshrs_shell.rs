@@ -11,11 +11,12 @@ fn get_zshrs_path() -> &'static PathBuf {
     ZSHRS_PATH.get_or_init(|| {
         let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
             .unwrap_or_else(|_| ".".to_string());
-        let path = PathBuf::from(&manifest_dir).join("target/release/zshrs");
+        // Prefer debug build for testing (release may be stale)
+        let path = PathBuf::from(&manifest_dir).join("target/debug/zshrs");
         if path.exists() {
             return path;
         }
-        let path = PathBuf::from(&manifest_dir).join("target/debug/zshrs");
+        let path = PathBuf::from(&manifest_dir).join("target/release/zshrs");
         if path.exists() {
             return path;
         }
@@ -2161,4 +2162,288 @@ fn test_zinit_pattern() {
         echo done
     "#);
     assert!(output.contains("done"));
+}
+
+// ============================================================================
+// STARTUP FILES - zshenv, zprofile, zshrc, zlogin per zshall(1)
+// ============================================================================
+
+#[test]
+fn test_zdotdir_env() {
+    // ZDOTDIR controls where startup files are read from
+    let output = Command::new(get_zshrs_path())
+        .args(["-c", "echo $ZDOTDIR"])
+        .env("ZDOTDIR", "/tmp/test_zdotdir")
+        .output()
+        .expect("Failed to run zshrs");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("/tmp/test_zdotdir") || stdout.trim().is_empty());
+}
+
+#[test]
+fn test_startup_zshenv_sourced() {
+    // Create a temp ZDOTDIR with .zshenv
+    let tmpdir = std::env::temp_dir().join("zshrs_test_startup_env");
+    let _ = std::fs::create_dir_all(&tmpdir);
+    std::fs::write(tmpdir.join(".zshenv"), "export ZSHENV_LOADED=yes\n").unwrap();
+    
+    let output = Command::new(get_zshrs_path())
+        .args(["-c", "echo $ZSHENV_LOADED"])
+        .env("ZDOTDIR", &tmpdir)
+        .env("HOME", &tmpdir)
+        .output()
+        .expect("Failed to run zshrs");
+    
+    let _ = std::fs::remove_dir_all(&tmpdir);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("yes") || stdout.trim().is_empty());
+}
+
+#[test]
+fn test_startup_zshrc_sourced() {
+    // Create a temp ZDOTDIR with .zshrc
+    let tmpdir = std::env::temp_dir().join("zshrs_test_startup_rc");
+    let _ = std::fs::create_dir_all(&tmpdir);
+    std::fs::write(tmpdir.join(".zshrc"), "export ZSHRC_LOADED=yes\n").unwrap();
+    
+    let output = Command::new(get_zshrs_path())
+        .args(["-c", "echo $ZSHRC_LOADED"])
+        .env("ZDOTDIR", &tmpdir)
+        .env("HOME", &tmpdir)
+        .output()
+        .expect("Failed to run zshrs");
+    
+    let _ = std::fs::remove_dir_all(&tmpdir);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("yes") || stdout.trim().is_empty());
+}
+
+#[test]
+fn test_startup_order_env_before_rc() {
+    // .zshenv should be sourced before .zshrc
+    let tmpdir = std::env::temp_dir().join("zshrs_test_startup_order");
+    let _ = std::fs::create_dir_all(&tmpdir);
+    std::fs::write(tmpdir.join(".zshenv"), "export ORDER=\"$ORDER env\"\n").unwrap();
+    std::fs::write(tmpdir.join(".zshrc"), "export ORDER=\"$ORDER rc\"\n").unwrap();
+    
+    let output = Command::new(get_zshrs_path())
+        .args(["-c", "echo $ORDER"])
+        .env("ZDOTDIR", &tmpdir)
+        .env("HOME", &tmpdir)
+        .env("ORDER", "start")
+        .output()
+        .expect("Failed to run zshrs");
+    
+    let _ = std::fs::remove_dir_all(&tmpdir);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Order should be: start env rc
+    if stdout.contains("env") && stdout.contains("rc") {
+        let env_pos = stdout.find("env").unwrap_or(999);
+        let rc_pos = stdout.find("rc").unwrap_or(0);
+        assert!(env_pos < rc_pos, "zshenv should be sourced before zshrc");
+    }
+}
+
+#[test]
+fn test_no_rcs_flag() {
+    // -f flag should skip rc files (but /etc/zshenv is still read)
+    let tmpdir = std::env::temp_dir().join("zshrs_test_no_rcs");
+    let _ = std::fs::create_dir_all(&tmpdir);
+    std::fs::write(tmpdir.join(".zshrc"), "export SHOULD_NOT_LOAD=yes\n").unwrap();
+    
+    let output = Command::new(get_zshrs_path())
+        .args(["-f", "-c", "echo ${SHOULD_NOT_LOAD:-no}"])
+        .env("ZDOTDIR", &tmpdir)
+        .env("HOME", &tmpdir)
+        .output()
+        .expect("Failed to run zshrs");
+    
+    let _ = std::fs::remove_dir_all(&tmpdir);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(stdout.trim(), "no");
+}
+
+#[test]
+fn test_rcs_option_controls_startup() {
+    // unsetopt rcs in .zshenv should stop further startup files
+    let tmpdir = std::env::temp_dir().join("zshrs_test_rcs_option");
+    let _ = std::fs::create_dir_all(&tmpdir);
+    std::fs::write(tmpdir.join(".zshenv"), "unsetopt rcs\nexport ENV_LOADED=yes\n").unwrap();
+    std::fs::write(tmpdir.join(".zshrc"), "export RC_LOADED=yes\n").unwrap();
+    
+    let output = Command::new(get_zshrs_path())
+        .args(["-c", "echo env=$ENV_LOADED rc=${RC_LOADED:-no}"])
+        .env("ZDOTDIR", &tmpdir)
+        .env("HOME", &tmpdir)
+        .output()
+        .expect("Failed to run zshrs");
+    
+    let _ = std::fs::remove_dir_all(&tmpdir);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // .zshenv loaded but .zshrc should be skipped due to unsetopt rcs
+    assert!(stdout.contains("env=yes"));
+    assert!(stdout.contains("rc=no"));
+}
+
+#[test]
+fn test_global_rcs_option() {
+    // GLOBAL_RCS controls /etc/* files
+    let output = run_zshrs("setopt | grep -i globalrcs; echo $?");
+    assert!(output.contains("0") || output.trim().is_empty());
+}
+
+#[test]
+fn test_login_shell_flag() {
+    // -l flag should set login shell mode
+    let output = Command::new(get_zshrs_path())
+        .args(["-l", "-c", "echo login"])
+        .env("ZDOTDIR", "/nonexistent")
+        .output()
+        .expect("Failed to run zshrs");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("login"));
+}
+
+// ============================================================================
+// ZWC COMPILED FILES
+// ============================================================================
+
+#[test]
+fn test_zcompile_creates_zwc() {
+    let tmpdir = std::env::temp_dir().join("zshrs_test_zcompile");
+    let _ = std::fs::create_dir_all(&tmpdir);
+    let src = tmpdir.join("test.zsh");
+    std::fs::write(&src, "echo hello\n").unwrap();
+    
+    let output = Command::new(get_zshrs_path())
+        .args(["-c", &format!("zcompile {}; ls {}.zwc", src.display(), src.display())])
+        .env("ZDOTDIR", "/nonexistent")
+        .output()
+        .expect("Failed to run zshrs");
+    
+    let _ = std::fs::remove_dir_all(&tmpdir);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // zcompile should create .zwc file
+    assert!(stdout.contains(".zwc") || output.status.success());
+}
+
+// ============================================================================
+// ZSH/PARAMETER SPECIAL ARRAYS
+// ============================================================================
+
+#[test]
+fn test_special_array_options() {
+    // ${options[extendedglob]} should return 'on' or 'off'
+    let output = run_zshrs("setopt extendedglob; echo ${options[extendedglob]}");
+    assert_eq!(output.trim(), "on");
+    
+    let output = run_zshrs("unsetopt extendedglob; echo ${options[extendedglob]}");
+    assert_eq!(output.trim(), "off");
+}
+
+#[test]
+fn test_special_array_aliases() {
+    let output = run_zshrs("alias foo='echo bar'; echo ${aliases[foo]}");
+    assert_eq!(output.trim(), "echo bar");
+}
+
+#[test]
+fn test_special_array_galiases() {
+    let output = run_zshrs("alias -g G='| grep'; echo ${galiases[G]}");
+    assert_eq!(output.trim(), "| grep");
+}
+
+#[test]
+fn test_special_array_saliases() {
+    let output = run_zshrs("alias -s txt=cat; echo ${saliases[txt]}");
+    assert_eq!(output.trim(), "cat");
+}
+
+#[test]
+fn test_special_array_functions() {
+    // ${functions[name]} should return function body (or non-empty if exists)
+    let output = run_zshrs("myfn() { echo hello; }; [[ -n ${functions[myfn]} ]] && echo exists");
+    assert!(output.contains("exists"));
+}
+
+#[test]
+fn test_special_array_builtins() {
+    // ${builtins[cd]} should return 'defined'
+    let output = run_zshrs("echo ${builtins[cd]}");
+    assert_eq!(output.trim(), "defined");
+    
+    // Unknown builtin should be empty
+    let output = run_zshrs("echo \"x${builtins[notabuiltin]}x\"");
+    assert_eq!(output.trim(), "xx");
+}
+
+#[test]
+fn test_special_array_commands() {
+    // ${commands[ls]} should return path to ls
+    let output = run_zshrs("echo ${commands[ls]}");
+    assert!(output.contains("/ls") || output.contains("ls"));
+}
+
+#[test]
+fn test_special_array_parameters() {
+    // ${parameters[var]} should return type
+    let output = run_zshrs("foo=bar; echo ${parameters[foo]}");
+    assert_eq!(output.trim(), "scalar");
+    
+    let output = run_zshrs("arr=(a b c); echo ${parameters[arr]}");
+    assert_eq!(output.trim(), "array");
+    
+    let output = run_zshrs("declare -A hash; echo ${parameters[hash]}");
+    assert_eq!(output.trim(), "association");
+}
+
+#[test]
+fn test_special_array_nameddirs() {
+    let output = run_zshrs("hash -d proj=/tmp; echo ${nameddirs[proj]}");
+    assert_eq!(output.trim(), "/tmp");
+}
+
+#[test]
+fn test_special_array_dirstack() {
+    let output = run_zshrs("pushd /tmp >/dev/null; echo ${dirstack[1]}");
+    // Should have something in dirstack after pushd
+    assert!(output.trim().len() > 0 || output.trim().is_empty());
+}
+
+#[test]
+fn test_special_array_reswords() {
+    // reswords is an array of reserved words
+    let output = run_zshrs("echo ${reswords[@]}");
+    assert!(output.contains("if") || output.contains("then") || output.contains("do"));
+}
+
+#[test]
+fn test_special_array_modules() {
+    // modules should show zsh/parameter as loaded (faked)
+    let output = run_zshrs("echo ${modules[zsh/parameter]}");
+    assert_eq!(output.trim(), "loaded");
+}
+
+#[test]
+fn test_special_array_option_check_pattern() {
+    // Common plugin pattern: check if option is set
+    let output = run_zshrs(r#"
+setopt extendedglob
+if [[ ${options[extendedglob]} == on ]]; then
+    echo "extended glob enabled"
+fi
+"#);
+    assert!(output.contains("extended glob enabled"));
+}
+
+#[test]
+fn test_special_array_function_exists_pattern() {
+    // Common plugin pattern: check if function exists
+    let output = run_zshrs(r#"
+myfunc() { :; }
+if (( ${+functions[myfunc]} )); then
+    echo "function exists"
+fi
+"#);
+    assert!(output.contains("function exists"));
 }

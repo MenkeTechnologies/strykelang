@@ -340,6 +340,11 @@ impl JobTable {
         self.jobs.len()
     }
 
+    /// Iterate over all jobs
+    pub fn iter(&self) -> impl Iterator<Item = (&usize, &Job)> {
+        self.jobs.iter()
+    }
+
     pub fn get_mut(&mut self, id: usize) -> Option<&mut Job> {
         self.jobs.get_mut(&id)
     }
