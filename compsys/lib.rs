@@ -24,6 +24,9 @@ pub mod library;
 pub mod matching;
 pub mod menu;
 pub mod state;
+pub mod shell_runner;
+pub mod system;
+pub mod zle;
 pub mod zpwr_colors;
 pub mod zstyle;
 
@@ -72,7 +75,9 @@ pub use compcore::{
     CompletionState, MenuInfo,
 };
 pub use compinit::{
-    check_dump, compdump, compinit, CompDef, CompFile, CompFileDef, CompInitOpts, CompInitResult,
+    build_cache_from_fpath, cache_entry_count, cache_is_valid, check_dump, compdump, 
+    compinit, compinit_lazy, get_system_fpath, load_from_cache,
+    CompDef, CompFile, CompFileDef, CompInitOpts, CompInitResult,
 };
 pub use completion::{
     Completion, CompletionFlags, CompletionGroup, CompletionReceiver, GroupFlags,
@@ -90,5 +95,10 @@ pub use menu::{
     SearchDirection, GROUP_COLORS,
 };
 pub use state::{CompParams, CompState, CompletionContext};
+pub use shell_runner::{
+    BuiltinDispatcher, ShellCompletionContext, CompletionResult, CompletionRunner, call_program,
+};
+pub use system::{users, groups, hosts, pids, ports, net_interfaces, urls, signals};
+pub use zle::{ZleCompletionState, ZleWidgets, ZleAction};
 pub use zpwr_colors::{zpwr_list_colors, load_zpwr_config, ZstyleColors, HeaderColors, DEFAULT_PREFIX_COLOR, MENU_SELECTION_COLOR};
 pub use zstyle::{ZStyle, ZStyleLookup, ZStyleStore};

@@ -81,6 +81,16 @@ pub struct CompInitResult {
 }
 
 /// Parse the first line of a completion file
+/// 
+/// Handles all #compdef variants:
+/// - `#compdef cmd1 cmd2` - regular commands
+/// - `#compdef - cmd1 cmd2` - bare hyphen + commands (hyphen maps to '-')
+/// - `#compdef -default-` - special context entries
+/// - `#compdef -value-,VAR,-default-` - value context entries  
+/// - `#compdef -p pattern` - pattern completions
+/// - `#compdef -P pattern` - post-pattern completions
+/// - `#compdef -k style key` - key bindings
+/// - `#compdef -K widget style key` - widget key bindings
 fn parse_first_line(line: &str) -> CompFileDef {
     let line = line.trim();
 
@@ -95,13 +105,34 @@ fn parse_first_line(line: &str) -> CompFileDef {
             return CompFileDef::None;
         }
 
-        // Check for options
+        // Check for special options first
         match parts[0] {
             "-p" if parts.len() >= 2 => {
                 CompFileDef::CompDef(CompDef::Pattern(parts[1].to_string()))
             }
             "-P" if parts.len() >= 2 => {
-                CompFileDef::CompDef(CompDef::PostPattern(parts[1].to_string()))
+                // -P patterns go directly into _comps (not _patcomps!)
+                // zsh puts these patterns as keys in _comps hash
+                // Can have multiple: #compdef -P pattern1 -P pattern2 cmd1 cmd2
+                let mut all_cmds = Vec::new();
+                let mut i = 0;
+                while i < parts.len() {
+                    if parts[i] == "-P" && i + 1 < parts.len() {
+                        // Pattern goes directly as a key in _comps
+                        all_cmds.push(parts[i + 1].to_string());
+                        i += 2;
+                    } else if !parts[i].starts_with('-') || is_context_entry(parts[i]) {
+                        all_cmds.push(parts[i].to_string());
+                        i += 1;
+                    } else {
+                        i += 1;
+                    }
+                }
+                if all_cmds.is_empty() {
+                    CompFileDef::None
+                } else {
+                    CompFileDef::CompDef(CompDef::Commands(all_cmds))
+                }
             }
             "-k" if parts.len() >= 3 => CompFileDef::CompDef(CompDef::KeyBinding {
                 style: parts[1].to_string(),
@@ -113,10 +144,21 @@ fn parse_first_line(line: &str) -> CompFileDef {
                 key: parts[3].to_string(),
             }),
             _ => {
-                // Regular command definitions
+                // Parse command definitions, including:
+                // - bare "-" (maps to '-' in _comps)
+                // - context entries like "-default-", "-redirect-", "-value-,VAR,-default-"
+                // - regular commands
+                // 
+                // Skip actual option flags like "-n" but keep context entries
                 let cmds: Vec<String> = parts
                     .iter()
-                    .filter(|s| !s.starts_with('-'))
+                    .filter(|s| {
+                        // Keep if:
+                        // - bare hyphen "-"
+                        // - context entry like "-foo-" or "-value-,X,-default-"
+                        // - regular command (no leading hyphen)
+                        **s == "-" || is_context_entry(s) || !s.starts_with('-')
+                    })
                     .map(|s| s.to_string())
                     .collect();
                 if cmds.is_empty() {
@@ -132,6 +174,27 @@ fn parse_first_line(line: &str) -> CompFileDef {
     } else {
         CompFileDef::None
     }
+}
+
+/// Check if a string is a zsh completion context entry
+/// Context entries are like: -default-, -redirect-, -command-, -value-,VAR,-default-
+/// Also handles service syntax: -redirect-,<,bunzip2=bunzip2
+fn is_context_entry(s: &str) -> bool {
+    if !s.starts_with('-') {
+        return false;
+    }
+    // Strip service suffix for checking
+    let base = s.split('=').next().unwrap_or(s);
+    
+    // Check if it's a known context pattern:
+    // 1. Ends with '-' like -default-, -redirect-
+    // 2. Contains comma (context specifiers like -redirect-,<,bunzip2 or -value-,VAR,-default-)
+    // 3. But NOT single letter options like -p, -P, -k, -K, -n
+    if base.len() <= 2 {
+        return base == "-";  // bare hyphen is a context entry
+    }
+    
+    base.ends_with('-') || base.contains(',')
 }
 
 /// Scan a single completion file
@@ -242,6 +305,8 @@ pub fn compinit(fpath: &[PathBuf]) -> CompInitResult {
                         }
                     }
                     CompDef::Pattern(pat) => {
+                        // -p patterns go to BOTH _comps and _patcomps (zsh behavior)
+                        result.comps.insert(pat.clone(), file.name.clone());
                         result.patcomps.insert(pat.clone(), file.name.clone());
                     }
                     CompDef::PostPattern(pat) => {
@@ -403,6 +468,160 @@ fn escape_zsh_string(s: &str) -> String {
     s.replace('\'', "'\\''")
 }
 
+/// Build SQLite cache from fpath scan
+/// 
+/// This is the main entry point for initializing the completion system.
+/// It scans fpath directories, parses #compdef directives, and populates
+/// the SQLite cache for fast lookups.
+pub fn build_cache_from_fpath(
+    fpath: &[PathBuf], 
+    cache: &mut crate::cache::CompsysCache
+) -> std::io::Result<CompInitResult> {
+    let result = compinit(fpath);
+    
+    // Populate comps table (_comps hash)
+    let comps: Vec<(String, String)> = result.comps
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    cache.set_comps_bulk(&comps)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+    
+    // Populate services table (_services hash)
+    let services: Vec<(String, String)> = result.services
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    cache.set_services_bulk(&services)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+    
+    // Populate patcomps table (_patcomps hash)
+    for (pattern, function) in &result.patcomps {
+        cache.set_patcomp(pattern, function)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+    }
+    
+    // Populate postpatcomps (stored in patcomps with a marker, or separate table if needed)
+    // For now, we'll merge them into patcomps
+    for (pattern, function) in &result.postpatcomps {
+        cache.set_patcomp(pattern, function)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+    }
+    
+    // Populate autoloads table with file offsets for lazy loading
+    let autoloads: Vec<(String, String, i64, i64)> = result.files
+        .iter()
+        .filter(|f| matches!(f.def, CompFileDef::CompDef(_) | CompFileDef::Autoload(_)))
+        .map(|f| {
+            let path_str = f.path.to_string_lossy().to_string();
+            // For now, offset=0 and size=file size (will be refined for .zwc archives)
+            let size = std::fs::metadata(&f.path)
+                .map(|m| m.len() as i64)
+                .unwrap_or(0);
+            (f.name.clone(), path_str, 0i64, size)
+        })
+        .collect();
+    cache.add_autoloads_bulk(&autoloads)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+    
+    Ok(result)
+}
+
+/// Load _comps from existing cache (instantaneous)
+/// 
+/// Returns a CompInitResult populated from the SQLite cache without rescanning fpath.
+/// Use this after the cache has been built with `build_cache_from_fpath`.
+/// 
+/// This is the equivalent of `compinit -C` with a valid zcompdump - it skips
+/// the fpath scan entirely and just loads from cache.
+pub fn load_from_cache(cache: &crate::cache::CompsysCache) -> std::io::Result<CompInitResult> {
+    use std::time::Instant;
+    let start = Instant::now();
+    
+    let mut result = CompInitResult::default();
+    
+    // Load comps - single query
+    result.comps = cache.get_all_comps()
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+    
+    // Load patcomps - single query  
+    for (pat, func) in cache.patcomps_kv()
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))? 
+    {
+        result.patcomps.insert(pat, func);
+    }
+    
+    // Services are loaded on-demand via cache.get_service() - no need to preload
+    // This matches zsh behavior where $_services is lazily populated
+    
+    result.scan_time_ms = start.elapsed().as_millis() as u64;
+    result.files_scanned = result.comps.len();
+    
+    Ok(result)
+}
+
+/// Fast check if compinit is needed
+/// 
+/// Returns the number of completion entries in cache, or 0 if cache is empty/invalid.
+/// Use this to decide whether to run full compinit or load_from_cache.
+pub fn cache_entry_count(cache: &crate::cache::CompsysCache) -> usize {
+    cache.comp_count().unwrap_or(0) as usize
+}
+
+/// Lazy compinit - validates cache exists but doesn't load into memory
+/// 
+/// This is the fastest option for shell startup. It just verifies the cache
+/// is valid and returns immediately. Actual lookups happen via cache.get_comp().
+/// 
+/// Returns (is_valid, entry_count) in microseconds.
+pub fn compinit_lazy(cache: &crate::cache::CompsysCache) -> (bool, usize) {
+    let count = cache.comp_count().unwrap_or(0) as usize;
+    (count > 0, count)
+}
+
+/// Check if cache is valid and up-to-date
+/// 
+/// Returns true if cache exists and has entries, false if cache needs to be rebuilt.
+pub fn cache_is_valid(cache: &crate::cache::CompsysCache) -> bool {
+    cache.comp_count().unwrap_or(0) > 0
+}
+
+/// Get system fpath from environment or defaults
+pub fn get_system_fpath() -> Vec<PathBuf> {
+    // Try FPATH env var first
+    if let Ok(fpath_str) = std::env::var("FPATH") {
+        if !fpath_str.is_empty() {
+            return fpath_str.split(':').map(PathBuf::from).collect();
+        }
+    }
+    
+    // Default paths for common systems
+    let mut paths = Vec::new();
+    
+    // macOS Homebrew
+    for base in &["/opt/homebrew", "/usr/local"] {
+        paths.push(PathBuf::from(format!("{}/share/zsh/site-functions", base)));
+        paths.push(PathBuf::from(format!("{}/share/zsh/functions", base)));
+    }
+    
+    // System zsh
+    for version in &["5.9", "5.8", "5.7"] {
+        paths.push(PathBuf::from(format!("/usr/share/zsh/{}/functions", version)));
+    }
+    paths.push(PathBuf::from("/usr/share/zsh/functions"));
+    paths.push(PathBuf::from("/usr/share/zsh/site-functions"));
+    
+    // Zinit/zplugin common paths
+    if let Ok(home) = std::env::var("HOME") {
+        paths.push(PathBuf::from(format!("{}/.zinit/completions", home)));
+        paths.push(PathBuf::from(format!("{}/.zplugin/completions", home)));
+        paths.push(PathBuf::from(format!("{}/.local/share/zsh/site-functions", home)));
+    }
+    
+    // Filter to existing directories
+    paths.into_iter().filter(|p| p.exists()).collect()
+}
+
 /// Options for compinit
 #[derive(Clone, Debug, Default)]
 pub struct CompInitOpts {
@@ -498,5 +717,72 @@ mod tests {
     fn test_escape_zsh_string() {
         assert_eq!(escape_zsh_string("hello"), "hello");
         assert_eq!(escape_zsh_string("it's"), "it'\\''s");
+    }
+
+    #[test]
+    fn test_parse_compdef_redirect_context() {
+        // _bzip2 line: has regular commands + context entries with services
+        let def = parse_first_line("#compdef bzip2 bunzip2 bzcat=bunzip2 bzip2recover -redirect-,<,bunzip2=bunzip2 -redirect-,>,bzip2=bunzip2 -redirect-,<,bzip2=bzip2");
+        match def {
+            CompFileDef::CompDef(CompDef::Commands(cmds)) => {
+                // Should contain all entries
+                assert!(cmds.contains(&"bzip2".to_string()), "missing bzip2");
+                assert!(cmds.contains(&"bunzip2".to_string()), "missing bunzip2");
+                assert!(cmds.contains(&"bzcat=bunzip2".to_string()), "missing bzcat=bunzip2");
+                assert!(cmds.contains(&"bzip2recover".to_string()), "missing bzip2recover");
+                assert!(cmds.contains(&"-redirect-,<,bunzip2=bunzip2".to_string()), "missing redirect bunzip2");
+                assert!(cmds.contains(&"-redirect-,>,bzip2=bunzip2".to_string()), "missing redirect >,bzip2");
+                assert!(cmds.contains(&"-redirect-,<,bzip2=bzip2".to_string()), "missing redirect <,bzip2");
+                assert_eq!(cmds.len(), 7, "cmds: {:?}", cmds);
+            }
+            other => panic!("Expected Commands, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_parse_compdef_context_entries() {
+        // -default- style entries
+        let def = parse_first_line("#compdef -default-");
+        match def {
+            CompFileDef::CompDef(CompDef::Commands(cmds)) => {
+                assert_eq!(cmds, vec!["-default-"]);
+            }
+            other => panic!("Expected Commands, got {:?}", other),
+        }
+
+        // bare hyphen + commands
+        let def = parse_first_line("#compdef - nohup eval time");
+        match def {
+            CompFileDef::CompDef(CompDef::Commands(cmds)) => {
+                assert!(cmds.contains(&"-".to_string()));
+                assert!(cmds.contains(&"nohup".to_string()));
+                assert!(cmds.contains(&"eval".to_string()));
+                assert!(cmds.contains(&"time".to_string()));
+            }
+            other => panic!("Expected Commands, got {:?}", other),
+        }
+
+        // -value- entries
+        let def = parse_first_line("#compdef -value- -array-value- -value-,-default-,-default-");
+        match def {
+            CompFileDef::CompDef(CompDef::Commands(cmds)) => {
+                assert!(cmds.contains(&"-value-".to_string()));
+                assert!(cmds.contains(&"-array-value-".to_string()));
+                assert!(cmds.contains(&"-value-,-default-,-default-".to_string()));
+            }
+            other => panic!("Expected Commands, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_is_context_entry() {
+        assert!(is_context_entry("-default-"));
+        assert!(is_context_entry("-redirect-"));
+        assert!(is_context_entry("-value-,DISPLAY,-default-"));
+        assert!(is_context_entry("-redirect-,<,bunzip2=bunzip2"));
+        assert!(is_context_entry("-redirect-,>,bzip2"));
+        assert!(!is_context_entry("-p"));  // option flag, not context
+        assert!(!is_context_entry("-P"));  // option flag
+        assert!(!is_context_entry("git")); // regular command
     }
 }
