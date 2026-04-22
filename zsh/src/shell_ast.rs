@@ -150,6 +150,11 @@ pub enum ZshParamFlag {
     PadLeft(usize, char),  // l:len:fill: - pad left
     PadRight(usize, char), // r:len:fill: - pad right
     Width(usize),          // m - use width for padding
+    Match,                 // M - include matched portion
+    Remove,                // R - include non-matched portion (complement of M)
+    Subscript,             // S - subscript scanning
+    Parameter,             // P - use value as parameter name (indirection)
+    Glob,                  // ~ - glob patterns in pattern
 }
 
 #[derive(Debug, Clone)]
@@ -243,6 +248,7 @@ pub enum CompoundCommand {
     },
     Cond(CondExpr),
     Arith(String),
+    WithRedirects(Box<ShellCommand>, Vec<Redirect>),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -323,24 +329,30 @@ impl<'a> ShellLexer<'a> {
         c
     }
 
-    fn skip_whitespace(&mut self) {
+    fn skip_whitespace(&mut self) -> bool {
+        let mut had_whitespace = false;
         while let Some(c) = self.peek() {
             if c == ' ' || c == '\t' {
                 self.next_char();
+                had_whitespace = true;
             } else if c == '\\' {
                 // Line continuation
                 self.next_char();
                 if self.peek() == Some('\n') {
                     self.next_char();
                 }
+                had_whitespace = true;
             } else {
                 break;
             }
         }
+        had_whitespace
     }
 
-    fn skip_comment(&mut self) {
-        if self.peek() == Some('#') {
+    fn skip_comment(&mut self, after_whitespace: bool) {
+        // In shell, # only starts a comment when it's after whitespace or at start of line
+        // Inside words or after non-whitespace, # is just a regular character
+        if after_whitespace && self.peek() == Some('#') {
             while let Some(c) = self.peek() {
                 if c == '\n' {
                     break;
@@ -351,8 +363,11 @@ impl<'a> ShellLexer<'a> {
     }
 
     pub fn next_token(&mut self) -> ShellToken {
-        self.skip_whitespace();
-        self.skip_comment();
+        let was_at_line_start = self.at_line_start;
+        
+        let had_whitespace = self.skip_whitespace();
+        // Comments start with # when at line start or after whitespace
+        self.skip_comment(had_whitespace || was_at_line_start);
 
         let c = match self.peek() {
             Some(c) => c,
@@ -362,8 +377,12 @@ impl<'a> ShellLexer<'a> {
         // Newline
         if c == '\n' {
             self.next_char();
+            self.at_line_start = true;
             return ShellToken::Newline;
         }
+        
+        // No longer at line start
+        self.at_line_start = false;
 
         // Multi-char operators first
         if c == ';' {
@@ -712,7 +731,38 @@ impl<'a> ShellLexer<'a> {
         while let Some(c) = self.peek() {
             match c {
                 // Word terminators (note: { and } handled specially for brace expansion)
-                ' ' | '\t' | '\n' | ';' | '&' | '<' | '>' | '[' | ']' => break,
+                ' ' | '\t' | '\n' | ';' | '&' | '<' | '>' => break,
+                
+                // [ is a word terminator only at word start (for test command)
+                // When inside a word, [ starts array subscript or glob character class
+                '[' => {
+                    if word.is_empty() {
+                        break;
+                    }
+                    // Inside a word - consume the bracket expression
+                    word.push(self.next_char().unwrap()); // [
+                    let mut bracket_depth = 1;
+                    while let Some(ch) = self.peek() {
+                        word.push(self.next_char().unwrap());
+                        if ch == '[' {
+                            bracket_depth += 1;
+                        } else if ch == ']' {
+                            bracket_depth -= 1;
+                            if bracket_depth == 0 {
+                                break;
+                            }
+                        }
+                    }
+                    continue;
+                }
+                // ] at word start breaks, otherwise it's part of the word (shouldn't happen if [ is handled)
+                ']' => {
+                    if word.is_empty() {
+                        break;
+                    }
+                    word.push(self.next_char().unwrap());
+                    continue;
+                }
 
                 // These could be word terminators, but check for extglob patterns first
                 '|' | '(' | ')' => {
@@ -825,10 +875,26 @@ impl<'a> ShellLexer<'a> {
 
                 '}' => break, // Lone } is always a terminator
 
-                // Variable expansion with ${...}
+                // Variable expansion with ${...} or $'...' ANSI-C quoting
                 '$' => {
                     word.push(self.next_char().unwrap());
-                    if self.peek() == Some('{') {
+                    if self.peek() == Some('\'') {
+                        // $'...' ANSI-C quoting - content is literal with escape sequences
+                        word.push(self.next_char().unwrap()); // '
+                        while let Some(ch) = self.peek() {
+                            if ch == '\'' {
+                                word.push(self.next_char().unwrap());
+                                break;
+                            } else if ch == '\\' {
+                                word.push(self.next_char().unwrap()); // \
+                                if let Some(escaped) = self.peek() {
+                                    word.push(self.next_char().unwrap());
+                                }
+                            } else {
+                                word.push(self.next_char().unwrap());
+                            }
+                        }
+                    } else if self.peek() == Some('{') {
                         // Handle ${...} including brackets inside
                         word.push(self.next_char().unwrap()); // {
                         let mut depth = 1;
@@ -1196,19 +1262,102 @@ impl<'a> ShellParser<'a> {
     }
 
     fn parse_command(&mut self) -> Result<ShellCommand, String> {
-        match &self.current {
+        let cmd = match &self.current {
             ShellToken::If => self.parse_if(),
             ShellToken::For => self.parse_for(),
             ShellToken::While => self.parse_while(),
             ShellToken::Until => self.parse_until(),
             ShellToken::Case => self.parse_case(),
             ShellToken::LBrace => self.parse_brace_group(),
-            ShellToken::LParen => self.parse_subshell(),
+            ShellToken::LParen => {
+                // Check if this is () { ... } anonymous function or ( ... ) subshell
+                self.advance(); // consume (
+                if self.current == ShellToken::RParen {
+                    // Could be () followed by { ... } (anonymous function)
+                    self.advance(); // consume )
+                    self.skip_newlines();
+                    if self.current == ShellToken::LBrace {
+                        // This is an anonymous function () { ... }
+                        let body = self.parse_brace_group()?;
+                        return Ok(ShellCommand::FunctionDef(String::new(), Box::new(body)));
+                    } else {
+                        // Just () - empty subshell, return empty command
+                        return Ok(ShellCommand::Compound(CompoundCommand::Subshell(vec![])));
+                    }
+                } else {
+                    // Regular subshell ( ... )
+                    self.skip_newlines();
+                    let body = self.parse_compound_list()?;
+                    self.expect(ShellToken::RParen)?;
+                    return Ok(ShellCommand::Compound(CompoundCommand::Subshell(body)));
+                }
+            },
             ShellToken::DoubleLBracket => self.parse_cond_command(),
             ShellToken::DoubleLParen => self.parse_arith_command(),
             ShellToken::Function => self.parse_function(),
             ShellToken::Coproc => self.parse_coproc(),
             _ => self.parse_simple_command(),
+        }?;
+        
+        // Check for redirects after compound commands (e.g., { ... } 2>/dev/null)
+        let mut redirects = Vec::new();
+        loop {
+            // Check for fd number followed by redirect
+            if let ShellToken::Word(w) = &self.current {
+                if w.chars().all(|c| c.is_ascii_digit()) {
+                    let fd_str = w.clone();
+                    self.advance();
+                    match &self.current {
+                        ShellToken::Less
+                        | ShellToken::Greater
+                        | ShellToken::GreaterGreater
+                        | ShellToken::LessAmp
+                        | ShellToken::GreaterAmp
+                        | ShellToken::LessLess
+                        | ShellToken::LessLessLess
+                        | ShellToken::LessGreater
+                        | ShellToken::GreaterPipe => {
+                            let fd = fd_str.parse::<i32>().ok();
+                            redirects.push(self.parse_redirect_with_fd(fd)?);
+                            continue;
+                        }
+                        _ => {
+                            // Not a redirect, this shouldn't happen in valid shell
+                            // Put the token back conceptually by not consuming further
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            match &self.current {
+                ShellToken::Less
+                | ShellToken::Greater
+                | ShellToken::GreaterGreater
+                | ShellToken::LessAmp
+                | ShellToken::GreaterAmp
+                | ShellToken::LessLess
+                | ShellToken::LessLessLess
+                | ShellToken::LessGreater
+                | ShellToken::GreaterPipe
+                | ShellToken::AmpGreater
+                | ShellToken::AmpGreaterGreater => {
+                    redirects.push(self.parse_redirect_with_fd(None)?);
+                }
+                _ => break,
+            }
+        }
+        
+        // If we have redirects, wrap the command in a compound with redirects
+        if !redirects.is_empty() {
+            // For now, just attach redirects to the command if it's compound
+            // This is a simplification - proper handling would modify CompoundCommand
+            Ok(ShellCommand::Compound(CompoundCommand::WithRedirects(
+                Box::new(cmd),
+                redirects,
+            )))
+        } else {
+            Ok(cmd)
         }
     }
 
@@ -1223,12 +1372,50 @@ impl<'a> ShellParser<'a> {
         loop {
             match &self.current {
                 ShellToken::Word(w) => {
-                    // Check for assignment (VAR=value or arr=(a b c))
+                    // Check for fd number followed by redirect (e.g., 2>/dev/null)
+                    // Must check this BEFORE treating as a regular word
+                    if w.chars().all(|c| c.is_ascii_digit()) {
+                        let fd_str = w.clone();
+                        self.advance(); // consume the number
+                        match &self.current {
+                            ShellToken::Less
+                            | ShellToken::Greater
+                            | ShellToken::GreaterGreater
+                            | ShellToken::LessAmp
+                            | ShellToken::GreaterAmp
+                            | ShellToken::LessLess
+                            | ShellToken::LessLessLess
+                            | ShellToken::LessGreater
+                            | ShellToken::GreaterPipe => {
+                                let fd = fd_str.parse::<i32>().ok();
+                                cmd.redirects.push(self.parse_redirect_with_fd(fd)?);
+                                continue;
+                            }
+                            _ => {
+                                // Not a redirect, treat as a regular word
+                                cmd.words.push(ShellWord::Literal(fd_str));
+                                continue;
+                            }
+                        }
+                    }
+                    
+                    // Check for assignment (VAR=value or arr=(a b c) or arr[idx]=value)
                     if cmd.words.is_empty() && w.contains('=') && !w.starts_with('=') {
                         if let Some(eq_pos) = w.find('=') {
                             let var = w[..eq_pos].to_string();
                             let val = w[eq_pos + 1..].to_string();
-                            if var.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                            // Check if var is valid: either simple name or name[subscript]
+                            let is_valid_var = if let Some(bracket_pos) = var.find('[') {
+                                // Array element: name[subscript]
+                                let name = &var[..bracket_pos];
+                                let rest = &var[bracket_pos..];
+                                name.chars().all(|c| c.is_alphanumeric() || c == '_')
+                                    && rest.ends_with(']')
+                            } else {
+                                // Simple variable
+                                var.chars().all(|c| c.is_alphanumeric() || c == '_')
+                            };
+                            if is_valid_var {
                                 // Check for array assignment: arr=(...)
                                 if val.starts_with('(') && val.ends_with(')') {
                                     let array_content = &val[1..val.len() - 1];
@@ -1247,6 +1434,22 @@ impl<'a> ShellParser<'a> {
                     cmd.words.push(self.parse_word()?);
                 }
 
+                // [ as command (test builtin) or as argument (glob pattern)
+                ShellToken::LBracket => {
+                    // [ is always treated as a word (either as the test command or as glob pattern)
+                    cmd.words.push(ShellWord::Literal("[".to_string()));
+                    self.advance();
+                }
+                // ] as argument (closing bracket or glob pattern)
+                ShellToken::RBracket => {
+                    // ] is treated as a word in argument position
+                    if !cmd.words.is_empty() {
+                        cmd.words.push(ShellWord::Literal("]".to_string()));
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
                 // Keywords can be used as words in argument position (not command position)
                 ShellToken::If
                 | ShellToken::Then
@@ -1286,7 +1489,7 @@ impl<'a> ShellParser<'a> {
                 | ShellToken::AmpGreater
                 | ShellToken::AmpGreaterGreater
                 | ShellToken::HereDoc(_, _) => {
-                    cmd.redirects.push(self.parse_redirect()?);
+                    cmd.redirects.push(self.parse_redirect_with_fd(None)?);
                 }
 
                 _ => break,
@@ -1335,13 +1538,17 @@ impl<'a> ShellParser<'a> {
     }
 
     fn parse_redirect(&mut self) -> Result<Redirect, String> {
+        self.parse_redirect_with_fd(None)
+    }
+
+    fn parse_redirect_with_fd(&mut self, fd: Option<i32>) -> Result<Redirect, String> {
         // Check for HereDoc token first
         if let ShellToken::HereDoc(delimiter, content) = &self.current {
             let delimiter = delimiter.clone();
             let content = content.clone();
             self.advance();
             return Ok(Redirect {
-                fd: None,
+                fd,
                 op: RedirectOp::HereDoc,
                 target: ShellWord::Literal(delimiter),
                 heredoc_content: Some(content),
@@ -1377,7 +1584,7 @@ impl<'a> ShellParser<'a> {
         let target = self.parse_word()?;
 
         Ok(Redirect {
-            fd: None,
+            fd,
             op,
             target,
             heredoc_content: None,
@@ -1391,34 +1598,69 @@ impl<'a> ShellParser<'a> {
 
         let mut conditions = Vec::new();
 
-        // if condition
-        let cond = self.parse_compound_list()?;
-        self.expect(ShellToken::Then)?;
+        // if condition - parse until Then or LBrace
+        let cond = self.parse_compound_list_until(&[ShellToken::Then, ShellToken::LBrace])?;
+        
+        // zsh supports both `if cond; then body; fi` and `if cond { body }`
+        let use_brace = self.current == ShellToken::LBrace;
+        if self.current == ShellToken::Then {
+            self.advance();
+        } else if self.current == ShellToken::LBrace {
+            self.advance();
+        } else {
+            return Err(format!("Expected Then or LBrace, got {:?}", self.current));
+        }
         self.skip_newlines();
-        let body = self.parse_compound_list()?;
+        
+        let body = if use_brace {
+            let b = self.parse_compound_list_until(&[ShellToken::RBrace])?;
+            if self.current == ShellToken::RBrace {
+                self.advance();
+            }
+            b
+        } else {
+            self.parse_compound_list()?
+        };
         conditions.push((cond, body));
 
-        // elif parts
-        while self.current == ShellToken::Elif {
-            self.advance();
-            self.skip_newlines();
-            let cond = self.parse_compound_list()?;
-            self.expect(ShellToken::Then)?;
-            self.skip_newlines();
-            let body = self.parse_compound_list()?;
-            conditions.push((cond, body));
+        // elif/else parts only for then/fi syntax
+        let mut else_part = None;
+        if !use_brace {
+            // elif parts
+            while self.current == ShellToken::Elif {
+                self.advance();
+                self.skip_newlines();
+                let cond = self.parse_compound_list_until(&[ShellToken::Then, ShellToken::LBrace])?;
+                let elif_use_brace = self.current == ShellToken::LBrace;
+                if self.current == ShellToken::Then || self.current == ShellToken::LBrace {
+                    self.advance();
+                } else {
+                    return Err(format!("Expected Then or LBrace after elif, got {:?}", self.current));
+                }
+                self.skip_newlines();
+                let body = if elif_use_brace {
+                    let b = self.parse_compound_list_until(&[ShellToken::RBrace])?;
+                    if self.current == ShellToken::RBrace {
+                        self.advance();
+                    }
+                    b
+                } else {
+                    self.parse_compound_list()?
+                };
+                conditions.push((cond, body));
+            }
+
+            // else part
+            else_part = if self.current == ShellToken::Else {
+                self.advance();
+                self.skip_newlines();
+                Some(self.parse_compound_list()?)
+            } else {
+                None
+            };
+
+            self.expect(ShellToken::Fi)?;
         }
-
-        // else part
-        let else_part = if self.current == ShellToken::Else {
-            self.advance();
-            self.skip_newlines();
-            Some(self.parse_compound_list()?)
-        } else {
-            None
-        };
-
-        self.expect(ShellToken::Fi)?;
 
         Ok(ShellCommand::Compound(CompoundCommand::If {
             conditions,
@@ -1934,12 +2176,17 @@ impl<'a> ShellParser<'a> {
         }))
     }
 
-    fn parse_compound_list(&mut self) -> Result<Vec<ShellCommand>, String> {
+    fn parse_compound_list_until(&mut self, stop_tokens: &[ShellToken]) -> Result<Vec<ShellCommand>, String> {
         let mut cmds = Vec::new();
 
         self.skip_newlines();
 
         loop {
+            // Check for stop tokens
+            if stop_tokens.contains(&self.current) {
+                break;
+            }
+            
             // Check for terminators
             match &self.current {
                 ShellToken::Then
@@ -1970,6 +2217,10 @@ impl<'a> ShellParser<'a> {
         }
 
         Ok(cmds)
+    }
+
+    fn parse_compound_list(&mut self) -> Result<Vec<ShellCommand>, String> {
+        self.parse_compound_list_until(&[])
     }
 }
 

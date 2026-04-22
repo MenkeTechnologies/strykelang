@@ -1522,4 +1522,55 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_load_zshrc_zwc() {
+        let home = std::env::var("HOME").unwrap_or_default();
+        let path = format!("{}/.zshrc.zwc", home);
+        if !std::path::Path::new(&path).exists() {
+            eprintln!("Skipping test - {} not found", path);
+            return;
+        }
+
+        let zwc = ZwcFile::load(&path).expect("Failed to load .zshrc.zwc");
+        println!("Loaded {} functions from .zshrc.zwc", zwc.function_count());
+
+        for name in zwc.list_functions() {
+            println!("  Function: {}", name);
+            if let Some(func) = zwc.get_function(name) {
+                if let Some(decoded) = zwc.decode_function(func) {
+                    println!("    Decoded: {} ops", decoded.body.len());
+                    for (i, op) in decoded.body.iter().take(3).enumerate() {
+                        if let Some(cmd) = op.to_shell_command() {
+                            println!("      [{}] -> ShellCommand OK", i);
+                        } else {
+                            println!("      [{}] {:?}", i, op);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_load_zshenv_zwc() {
+        let home = std::env::var("HOME").unwrap_or_default();
+        let path = format!("{}/.zshenv.zwc", home);
+        if !std::path::Path::new(&path).exists() {
+            eprintln!("Skipping test - {} not found", path);
+            return;
+        }
+
+        let zwc = ZwcFile::load(&path).expect("Failed to load .zshenv.zwc");
+        println!("Loaded {} functions from .zshenv.zwc", zwc.function_count());
+
+        for name in zwc.list_functions() {
+            println!("  Function: {}", name);
+            if let Some(func) = zwc.get_function(name) {
+                if let Some(decoded) = zwc.decode_function(func) {
+                    println!("    Decoded: {} ops", decoded.body.len());
+                }
+            }
+        }
+    }
 }

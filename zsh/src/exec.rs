@@ -319,6 +319,8 @@ pub struct UnixSocketState {
 pub struct ShellExecutor {
     pub functions: HashMap<String, ShellCommand>,
     pub aliases: HashMap<String, String>,
+    pub global_aliases: HashMap<String, String>,  // alias -g: expand anywhere
+    pub suffix_aliases: HashMap<String, String>,  // alias -s: expand by file extension
     pub last_status: i32,
     pub variables: HashMap<String, String>,
     pub arrays: HashMap<String, Vec<String>>,
@@ -383,6 +385,8 @@ impl ShellExecutor {
         Self {
             functions: HashMap::new(),
             aliases: HashMap::new(),
+            global_aliases: HashMap::new(),
+            suffix_aliases: HashMap::new(),
             last_status: 0,
             variables: HashMap::new(),
             arrays: HashMap::new(),
@@ -854,6 +858,47 @@ impl ShellExecutor {
         }
     }
 
+    /// Match a string against a shell glob pattern
+    fn glob_match(&self, s: &str, pattern: &str) -> bool {
+        // Convert shell glob to regex
+        let mut regex_pattern = String::from("^");
+        let mut chars = pattern.chars().peekable();
+        
+        while let Some(c) = chars.next() {
+            match c {
+                '*' => regex_pattern.push_str(".*"),
+                '?' => regex_pattern.push('.'),
+                '[' => {
+                    regex_pattern.push('[');
+                    // Handle character class
+                    while let Some(cc) = chars.next() {
+                        if cc == ']' {
+                            regex_pattern.push(']');
+                            break;
+                        }
+                        regex_pattern.push(cc);
+                    }
+                }
+                '(' => {
+                    // Handle alternation (a|b|c) -> (a|b|c)
+                    regex_pattern.push('(');
+                }
+                ')' => regex_pattern.push(')'),
+                '|' => regex_pattern.push('|'),
+                '.' | '+' | '^' | '$' | '\\' | '{' | '}' => {
+                    regex_pattern.push('\\');
+                    regex_pattern.push(c);
+                }
+                _ => regex_pattern.push(c),
+            }
+        }
+        regex_pattern.push('$');
+        
+        regex::Regex::new(&regex_pattern)
+            .map(|re| re.is_match(s))
+            .unwrap_or(false)
+    }
+
     pub fn execute_script(&mut self, script: &str) -> Result<i32, String> {
         // Expand history references before parsing
         let expanded = self.expand_history(script);
@@ -1015,9 +1060,15 @@ impl ShellExecutor {
             ShellCommand::List(items) => self.execute_list(items),
             ShellCommand::Compound(compound) => self.execute_compound(compound),
             ShellCommand::FunctionDef(name, body) => {
-                self.functions.insert(name.clone(), (**body).clone());
-                self.last_status = 0;
-                Ok(0)
+                if name.is_empty() {
+                    // Anonymous function - execute immediately
+                    self.execute_command(body)
+                } else {
+                    // Named function - just define it
+                    self.functions.insert(name.clone(), (**body).clone());
+                    self.last_status = 0;
+                    Ok(0)
+                }
             }
         }
     }
@@ -1033,6 +1084,38 @@ impl ShellExecutor {
                 }
                 _ => {
                     let expanded = self.expand_word(val);
+                    
+                    // Check for array element assignment: arr[idx]=value or assoc[key]=value
+                    if let Some(bracket_pos) = var.find('[') {
+                        if var.ends_with(']') {
+                            let array_name = &var[..bracket_pos];
+                            let key = &var[bracket_pos + 1..var.len() - 1];
+                            let key = self.expand_string(key); // Expand the key/index
+                            
+                            // Check if it's an associative array
+                            if self.assoc_arrays.contains_key(array_name) {
+                                self.assoc_arrays
+                                    .get_mut(array_name)
+                                    .unwrap()
+                                    .insert(key, expanded);
+                            } else if let Ok(idx) = key.parse::<i64>() {
+                                // Regular indexed array
+                                let idx = if idx < 0 { 0 } else { (idx - 1) as usize }; // zsh is 1-indexed
+                                let arr = self.arrays.entry(array_name.to_string()).or_insert_with(Vec::new);
+                                while arr.len() <= idx {
+                                    arr.push(String::new());
+                                }
+                                arr[idx] = expanded;
+                            } else {
+                                // Non-numeric key on non-assoc array - treat as assoc
+                                let assoc = self.assoc_arrays.entry(array_name.to_string())
+                                    .or_insert_with(HashMap::new);
+                                assoc.insert(key, expanded);
+                            }
+                            continue;
+                        }
+                    }
+                    
                     if cmd.words.is_empty() {
                         // Just assignment, set in environment
                         env::set_var(var, &expanded);
@@ -1047,7 +1130,7 @@ impl ShellExecutor {
             return Ok(0);
         }
 
-        let words: Vec<String> = cmd
+        let mut words: Vec<String> = cmd
             .words
             .iter()
             .flat_map(|w| self.expand_word_glob(w))
@@ -1056,7 +1139,40 @@ impl ShellExecutor {
             self.last_status = 0;
             return Ok(0);
         }
+        
+        // Expand global aliases (alias -g) in all word positions
+        if !self.global_aliases.is_empty() {
+            let global_aliases = self.global_aliases.clone();
+            words = words.into_iter().map(|w| {
+                global_aliases.get(&w).cloned().unwrap_or(w)
+            }).collect();
+        }
+        
+        // Check for regular alias expansion (alias > builtin > function > command)
         let cmd_name = &words[0];
+        if let Some(alias_value) = self.aliases.get(cmd_name).cloned() {
+            // Expand the alias: replace cmd_name with alias value, keep remaining args
+            let expanded_cmd = if words.len() > 1 {
+                format!("{} {}", alias_value, words[1..].join(" "))
+            } else {
+                alias_value
+            };
+            // Re-execute the expanded command
+            return self.execute_script(&expanded_cmd);
+        }
+        
+        // Check for suffix alias expansion (alias -s) when command is a file path
+        if !self.suffix_aliases.is_empty() {
+            let cmd_path = std::path::Path::new(cmd_name);
+            if let Some(ext) = cmd_path.extension().and_then(|e| e.to_str()) {
+                if let Some(handler) = self.suffix_aliases.get(ext).cloned() {
+                    // Suffix alias: "alias -s txt=vim" makes "foo.txt" run "vim foo.txt"
+                    let expanded_cmd = format!("{} {}", handler, words.join(" "));
+                    return self.execute_script(&expanded_cmd);
+                }
+            }
+        }
+        
         let args = &words[1..];
 
         // Check for shell builtins
@@ -1843,6 +1959,83 @@ impl ShellExecutor {
                         }
                     }
                 }
+            }
+            
+            CompoundCommand::WithRedirects(cmd, redirects) => {
+                // Execute the command with redirects applied
+                let mut saved_fds: Vec<(i32, i32)> = Vec::new();
+                
+                // Set up redirects
+                for redirect in redirects {
+                    let fd = redirect.fd.unwrap_or(match redirect.op {
+                        RedirectOp::Read | RedirectOp::HereDoc | RedirectOp::HereString | RedirectOp::ReadWrite => 0,
+                        _ => 1,
+                    });
+                    
+                    let target = self.expand_word(&redirect.target);
+                    
+                    match redirect.op {
+                        RedirectOp::Write | RedirectOp::Clobber => {
+                            use std::os::unix::io::IntoRawFd;
+                            let saved = unsafe { libc::dup(fd) };
+                            if saved >= 0 {
+                                saved_fds.push((fd, saved));
+                            }
+                            if let Ok(file) = std::fs::File::create(&target) {
+                                let new_fd = file.into_raw_fd();
+                                unsafe { libc::dup2(new_fd, fd); }
+                                unsafe { libc::close(new_fd); }
+                            }
+                        }
+                        RedirectOp::Append => {
+                            use std::os::unix::io::IntoRawFd;
+                            let saved = unsafe { libc::dup(fd) };
+                            if saved >= 0 {
+                                saved_fds.push((fd, saved));
+                            }
+                            if let Ok(file) = std::fs::OpenOptions::new().create(true).append(true).open(&target) {
+                                let new_fd = file.into_raw_fd();
+                                unsafe { libc::dup2(new_fd, fd); }
+                                unsafe { libc::close(new_fd); }
+                            }
+                        }
+                        RedirectOp::Read => {
+                            use std::os::unix::io::IntoRawFd;
+                            let saved = unsafe { libc::dup(fd) };
+                            if saved >= 0 {
+                                saved_fds.push((fd, saved));
+                            }
+                            if let Ok(file) = std::fs::File::open(&target) {
+                                let new_fd = file.into_raw_fd();
+                                unsafe { libc::dup2(new_fd, fd); }
+                                unsafe { libc::close(new_fd); }
+                            }
+                        }
+                        RedirectOp::DupWrite | RedirectOp::DupRead => {
+                            if let Ok(target_fd) = target.parse::<i32>() {
+                                let saved = unsafe { libc::dup(fd) };
+                                if saved >= 0 {
+                                    saved_fds.push((fd, saved));
+                                }
+                                unsafe { libc::dup2(target_fd, fd); }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                
+                // Execute the inner command
+                let result = self.execute_command(cmd);
+                
+                // Restore saved fds
+                for (fd, saved) in saved_fds.into_iter().rev() {
+                    unsafe {
+                        libc::dup2(saved, fd);
+                        libc::close(saved);
+                    }
+                }
+                
+                result
             }
         }
     }
@@ -3046,13 +3239,55 @@ impl ShellExecutor {
                 let flags_str = &content[1..close_paren];
                 let rest = &content[close_paren + 1..];
                 let flags = self.parse_zsh_flags(flags_str);
+                
+                // Check for (M) match flag
+                let has_match_flag = flags.iter().any(|f| matches!(f, ZshParamFlag::Match));
 
-                // Get the base variable value
-                let var_name = rest
-                    .split(|c: char| !c.is_alphanumeric() && c != '_')
-                    .next()
-                    .unwrap_or("");
+                // Handle ${(M)var:#pattern} - pattern filter with flags
+                if let Some(filter_pos) = rest.find(":#") {
+                    let var_name = &rest[..filter_pos];
+                    let pattern = &rest[filter_pos + 2..];
+                    let val = self.get_variable(var_name);
+                    
+                    let matches = self.glob_match(&val, pattern);
+                    
+                    return if has_match_flag {
+                        // (M) - return value if matches, empty otherwise
+                        if matches { val } else { String::new() }
+                    } else {
+                        // No (M) - return empty if matches, value otherwise
+                        if matches { String::new() } else { val }
+                    };
+                }
+
+                // Handle ${(%):-%n} style - empty var with default after flags
+                // rest could be ":-%n" or ":-default" or "var:-default" or just "var"
+                let (var_name, default_val) = if rest.starts_with(":-") {
+                    // Empty variable name with default: ${(%):-default}
+                    ("", Some(&rest[2..]))
+                } else if let Some(pos) = rest.find(":-") {
+                    // Variable with default: ${(%)var:-default}
+                    (&rest[..pos], Some(&rest[pos + 2..]))
+                } else if rest.starts_with(':') {
+                    // Just ":" means empty var name, no default
+                    ("", None)
+                } else {
+                    // Normal variable reference
+                    let vn = rest
+                        .split(|c: char| !c.is_alphanumeric() && c != '_')
+                        .next()
+                        .unwrap_or("");
+                    (vn, None)
+                };
+
                 let mut val = self.get_variable(var_name);
+                
+                // Use default if variable is empty
+                if val.is_empty() {
+                    if let Some(def) = default_val {
+                        val = def.to_string();
+                    }
+                }
 
                 // Apply flags in order
                 for flag in &flags {
@@ -3085,13 +3320,81 @@ impl ShellExecutor {
             return val.len().to_string();
         }
 
-        // Handle ${arr[idx]}
+        // Handle ${+var} and ${+arr[key]} - test if variable/element is set (returns 1 if set, 0 if not)
+        if content.starts_with('+') {
+            let rest = &content[1..];
+            
+            // Check for array/assoc access: ${+arr[key]}
+            if let Some(bracket_start) = rest.find('[') {
+                let var_name = &rest[..bracket_start];
+                let bracket_content = &rest[bracket_start + 1..];
+                if let Some(bracket_end) = bracket_content.find(']') {
+                    let key = &bracket_content[..bracket_end];
+                    
+                    // Check special arrays first
+                    if let Some(val) = self.get_special_array_value(var_name, key) {
+                        return if val.is_empty() { "0".to_string() } else { "1".to_string() };
+                    }
+                    
+                    // Check user assoc arrays
+                    if self.assoc_arrays.contains_key(var_name) {
+                        let expanded_key = self.expand_string(key);
+                        let has_key = self.assoc_arrays.get(var_name)
+                            .map(|a| a.contains_key(&expanded_key))
+                            .unwrap_or(false);
+                        return if has_key { "1".to_string() } else { "0".to_string() };
+                    }
+                    
+                    // Check regular arrays
+                    if let Some(arr) = self.arrays.get(var_name) {
+                        if let Ok(idx) = key.parse::<usize>() {
+                            let actual_idx = if idx > 0 { idx - 1 } else { 0 };
+                            return if arr.get(actual_idx).is_some() { "1".to_string() } else { "0".to_string() };
+                        }
+                    }
+                    
+                    return "0".to_string();
+                }
+            }
+            
+            // Simple variable: ${+var}
+            let is_set = self.variables.contains_key(rest) 
+                || self.arrays.contains_key(rest)
+                || self.assoc_arrays.contains_key(rest)
+                || std::env::var(rest).is_ok()
+                || self.functions.contains_key(rest);
+            return if is_set { "1".to_string() } else { "0".to_string() };
+        }
+
+        // Handle ${arr[idx]} or ${assoc[key]}
         if let Some(bracket_start) = content.find('[') {
             let var_name = &content[..bracket_start];
             let bracket_content = &content[bracket_start + 1..];
             if let Some(bracket_end) = bracket_content.find(']') {
                 let index = &bracket_content[..bracket_end];
 
+                // Check for zsh/parameter special associative arrays (options, commands, etc.)
+                if let Some(val) = self.get_special_array_value(var_name, index) {
+                    return val;
+                }
+
+                // Check if it's a user-defined associative array
+                if self.assoc_arrays.contains_key(var_name) {
+                    if index == "@" || index == "*" {
+                        // ${assoc[@]} - return all values
+                        return self.assoc_arrays.get(var_name)
+                            .map(|a| a.values().cloned().collect::<Vec<_>>().join(" "))
+                            .unwrap_or_default();
+                    } else {
+                        // ${assoc[key]} - return value for key
+                        let key = self.expand_string(index);
+                        return self.assoc_arrays.get(var_name)
+                            .and_then(|a| a.get(&key).cloned())
+                            .unwrap_or_default();
+                    }
+                }
+
+                // Regular indexed array
                 if index == "@" || index == "*" {
                     // ${arr[@]} - return all elements
                     return self
@@ -3122,6 +3425,8 @@ impl ShellExecutor {
                             })
                             .unwrap_or_default();
                     }
+                    // If index is not numeric, return empty (not an array or invalid index)
+                    return String::new();
                 }
             }
         }
@@ -3169,6 +3474,16 @@ impl ShellExecutor {
                     Some(v) if !v.is_empty() => self.expand_string(&rest[1..]),
                     _ => String::new(),
                 };
+            } else if rest.starts_with('#') {
+                // ${var:#pattern} - filter: remove elements matching pattern
+                // With (M) flag, keep only matching elements
+                let pattern = &rest[1..];
+                // For scalars, return empty if matches, value if not
+                if self.glob_match(&val, pattern) {
+                    return String::new();
+                } else {
+                    return val;
+                }
             } else if rest == "l" {
                 // ${var:l} - lowercase (zsh history modifier style)
                 return val.to_lowercase();
@@ -3746,14 +4061,340 @@ impl ShellExecutor {
         }
     }
 
+    /// Get value from zsh/parameter special arrays (options, commands, functions, etc.)
+    /// Returns Some(value) if this is a special array access, None otherwise
+    fn get_special_array_value(&self, array_name: &str, key: &str) -> Option<String> {
+        match array_name {
+            // === SHELL OPTIONS ===
+            "options" => {
+                if key == "@" || key == "*" {
+                    // Return all options as "name=on/off" pairs
+                    let opts: Vec<String> = self.options.iter()
+                        .map(|(k, v)| format!("{}={}", k, if *v { "on" } else { "off" }))
+                        .collect();
+                    return Some(opts.join(" "));
+                }
+                let opt_name = key.to_lowercase().replace('_', "");
+                let is_on = self.options.get(&opt_name).copied().unwrap_or(false);
+                Some(if is_on { "on".to_string() } else { "off".to_string() })
+            }
+
+            // === ALIASES ===
+            "aliases" => {
+                if key == "@" || key == "*" {
+                    let vals: Vec<String> = self.aliases.values().cloned().collect();
+                    return Some(vals.join(" "));
+                }
+                Some(self.aliases.get(key).cloned().unwrap_or_default())
+            }
+            "galiases" => {
+                if key == "@" || key == "*" {
+                    let vals: Vec<String> = self.global_aliases.values().cloned().collect();
+                    return Some(vals.join(" "));
+                }
+                Some(self.global_aliases.get(key).cloned().unwrap_or_default())
+            }
+            "saliases" => {
+                if key == "@" || key == "*" {
+                    let vals: Vec<String> = self.suffix_aliases.values().cloned().collect();
+                    return Some(vals.join(" "));
+                }
+                Some(self.suffix_aliases.get(key).cloned().unwrap_or_default())
+            }
+
+            // === FUNCTIONS ===
+            "functions" => {
+                if key == "@" || key == "*" {
+                    let names: Vec<String> = self.functions.keys().cloned().collect();
+                    return Some(names.join(" "));
+                }
+                if let Some(body) = self.functions.get(key) {
+                    Some(format!("{:?}", body))
+                } else {
+                    Some(String::new())
+                }
+            }
+            "functions_source" => {
+                // We don't track source locations, return empty
+                Some(String::new())
+            }
+
+            // === COMMANDS (command hash table) ===
+            "commands" => {
+                if key == "@" || key == "*" {
+                    return Some(String::new()); // Would need to enumerate PATH
+                }
+                // Look up command in PATH
+                if let Some(path) = self.find_in_path(key) {
+                    Some(path)
+                } else {
+                    Some(String::new())
+                }
+            }
+
+            // === BUILTINS ===
+            "builtins" => {
+                let builtins = Self::get_builtin_names();
+                if key == "@" || key == "*" {
+                    return Some(builtins.join(" "));
+                }
+                if builtins.contains(&key) {
+                    Some("defined".to_string())
+                } else {
+                    Some(String::new())
+                }
+            }
+
+            // === PARAMETERS ===
+            "parameters" => {
+                if key == "@" || key == "*" {
+                    let mut names: Vec<String> = self.variables.keys().cloned().collect();
+                    names.extend(self.arrays.keys().cloned());
+                    names.extend(self.assoc_arrays.keys().cloned());
+                    return Some(names.join(" "));
+                }
+                // Return type of parameter
+                if self.assoc_arrays.contains_key(key) {
+                    Some("association".to_string())
+                } else if self.arrays.contains_key(key) {
+                    Some("array".to_string())
+                } else if self.variables.contains_key(key) || std::env::var(key).is_ok() {
+                    Some("scalar".to_string())
+                } else {
+                    Some(String::new())
+                }
+            }
+
+            // === NAMED DIRECTORIES ===
+            "nameddirs" => {
+                if key == "@" || key == "*" {
+                    let vals: Vec<String> = self.named_dirs.values()
+                        .map(|p| p.display().to_string())
+                        .collect();
+                    return Some(vals.join(" "));
+                }
+                Some(self.named_dirs.get(key)
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_default())
+            }
+
+            // === USER DIRECTORIES ===
+            "userdirs" => {
+                if key == "@" || key == "*" {
+                    return Some(String::new());
+                }
+                // Get home directory for user
+                #[cfg(unix)]
+                {
+                    use std::ffi::CString;
+                    if let Ok(name) = CString::new(key) {
+                        unsafe {
+                            let pwd = libc::getpwnam(name.as_ptr());
+                            if !pwd.is_null() {
+                                let dir = std::ffi::CStr::from_ptr((*pwd).pw_dir);
+                                return Some(dir.to_string_lossy().to_string());
+                            }
+                        }
+                    }
+                }
+                Some(String::new())
+            }
+
+            // === USER GROUPS ===
+            "usergroups" => {
+                if key == "@" || key == "*" {
+                    return Some(String::new());
+                }
+                // Get GID for group name
+                #[cfg(unix)]
+                {
+                    use std::ffi::CString;
+                    if let Ok(name) = CString::new(key) {
+                        unsafe {
+                            let grp = libc::getgrnam(name.as_ptr());
+                            if !grp.is_null() {
+                                return Some((*grp).gr_gid.to_string());
+                            }
+                        }
+                    }
+                }
+                Some(String::new())
+            }
+
+            // === DIRECTORY STACK ===
+            "dirstack" => {
+                if key == "@" || key == "*" {
+                    let dirs: Vec<String> = self.dir_stack.iter()
+                        .map(|p| p.display().to_string())
+                        .collect();
+                    return Some(dirs.join(" "));
+                }
+                if let Ok(idx) = key.parse::<usize>() {
+                    Some(self.dir_stack.get(idx)
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_default())
+                } else {
+                    Some(String::new())
+                }
+            }
+
+            // === JOBS ===
+            "jobstates" => {
+                if key == "@" || key == "*" {
+                    let states: Vec<String> = self.jobs.iter()
+                        .map(|(id, job)| format!("{}:{:?}", id, job.state))
+                        .collect();
+                    return Some(states.join(" "));
+                }
+                if let Ok(id) = key.parse::<usize>() {
+                    if let Some(job) = self.jobs.get(id) {
+                        return Some(format!("{:?}", job.state));
+                    }
+                }
+                Some(String::new())
+            }
+            "jobtexts" => {
+                if key == "@" || key == "*" {
+                    let texts: Vec<String> = self.jobs.iter()
+                        .map(|(_, job)| job.command.clone())
+                        .collect();
+                    return Some(texts.join(" "));
+                }
+                if let Ok(id) = key.parse::<usize>() {
+                    if let Some(job) = self.jobs.get(id) {
+                        return Some(job.command.clone());
+                    }
+                }
+                Some(String::new())
+            }
+            "jobdirs" => {
+                // We don't track job directories separately - return current dir
+                if key == "@" || key == "*" {
+                    return Some(String::new());
+                }
+                Some(String::new())
+            }
+
+            // === HISTORY ===
+            "history" => {
+                if key == "@" || key == "*" {
+                    // Return recent history
+                    if let Some(ref engine) = self.history {
+                        if let Ok(entries) = engine.recent(100) {
+                            let cmds: Vec<String> = entries.iter().map(|e| e.command.clone()).collect();
+                            return Some(cmds.join("\n"));
+                        }
+                    }
+                    return Some(String::new());
+                }
+                if let Ok(num) = key.parse::<usize>() {
+                    if let Some(ref engine) = self.history {
+                        if let Ok(Some(entry)) = engine.get_by_offset(num.saturating_sub(1)) {
+                            return Some(entry.command);
+                        }
+                    }
+                }
+                Some(String::new())
+            }
+            "historywords" => {
+                // Array of words from history - simplified
+                Some(String::new())
+            }
+
+            // === MODULES ===
+            "modules" => {
+                // zshrs doesn't have loadable modules like zsh
+                // Return empty or fake "loaded" for common modules
+                if key == "@" || key == "*" {
+                    return Some("zsh/parameter zsh/zutil".to_string());
+                }
+                match key {
+                    "zsh/parameter" | "zsh/zutil" | "zsh/complete" | "zsh/complist" => {
+                        Some("loaded".to_string())
+                    }
+                    _ => Some(String::new())
+                }
+            }
+
+            // === RESERVED WORDS ===
+            "reswords" => {
+                let reswords = ["do", "done", "esac", "then", "elif", "else", "fi", "for",
+                    "case", "if", "while", "function", "repeat", "time", "until",
+                    "select", "coproc", "nocorrect", "foreach", "end", "in"];
+                if key == "@" || key == "*" {
+                    return Some(reswords.join(" "));
+                }
+                if let Ok(idx) = key.parse::<usize>() {
+                    Some(reswords.get(idx).map(|s| s.to_string()).unwrap_or_default())
+                } else {
+                    Some(String::new())
+                }
+            }
+
+            // === PATCHARS (characters with special meaning in patterns) ===
+            "patchars" => {
+                let patchars = ["?", "*", "[", "]", "^", "#", "~", "(", ")", "|"];
+                if key == "@" || key == "*" {
+                    return Some(patchars.join(" "));
+                }
+                if let Ok(idx) = key.parse::<usize>() {
+                    Some(patchars.get(idx).map(|s| s.to_string()).unwrap_or_default())
+                } else {
+                    Some(String::new())
+                }
+            }
+
+            // === FUNCTION CALL STACK ===
+            "funcstack" | "functrace" | "funcfiletrace" | "funcsourcetrace" => {
+                // Would need call stack tracking - return empty for now
+                Some(String::new())
+            }
+
+            // === DISABLED VARIANTS (dis_*) ===
+            "dis_aliases" | "dis_galiases" | "dis_saliases" |
+            "dis_functions" | "dis_functions_source" |
+            "dis_builtins" | "dis_reswords" | "dis_patchars" => {
+                // We don't track disabled items - return empty
+                Some(String::new())
+            }
+
+            // Not a special array
+            _ => None
+        }
+    }
+
+    /// Get list of all builtin command names
+    fn get_builtin_names() -> Vec<&'static str> {
+        vec![
+            ".", ":", "[", "alias", "autoload", "bg", "bind", "bindkey", "break",
+            "builtin", "bye", "caller", "cd", "cdreplay", "chdir", "clone", "command",
+            "compadd", "comparguments", "compcall", "compctl", "compdef", "compdescribe",
+            "compfiles", "compgen", "compgroups", "compinit", "complete", "compopt",
+            "compquote", "compset", "comptags", "comptry", "compvalues", "continue",
+            "coproc", "declare", "dirs", "disable", "disown", "echo", "echotc", "echoti",
+            "emulate", "enable", "eval", "exec", "exit", "export", "false", "fc", "fg",
+            "float", "functions", "getln", "getopts", "hash", "help", "history",
+            "integer", "jobs", "kill", "let", "limit", "local", "log", "logout",
+            "mapfile", "noglob", "popd", "print", "printf", "private", "prompt",
+            "promptinit", "pushd", "pushln", "pwd", "r", "read", "readarray", "readonly",
+            "rehash", "return", "sched", "set", "setopt", "shift", "shopt", "source",
+            "stat", "strftime", "suspend", "test", "times", "trap", "true", "ttyctl",
+            "type", "typeset", "ulimit", "umask", "unalias", "unfunction", "unhash",
+            "unlimit", "unset", "unsetopt", "vared", "wait", "whence", "where", "which",
+            "zcompile", "zcurses", "zformat", "zle", "zmodload", "zparseopts", "zprof",
+            "zpty", "zregexparse", "zsocket", "zstyle", "ztcp", "add-zsh-hook",
+        ]
+    }
+
     fn get_variable(&self, name: &str) -> String {
         // Handle special parameters
         match name {
+            "" => String::new(), // Empty name returns empty
             "@" | "*" => self.positional_params.join(" "),
             "#" => self.positional_params.len().to_string(),
             "?" => self.last_status.to_string(),
             "0" => env::args().next().unwrap_or_default(),
-            n if n.chars().all(|c| c.is_ascii_digit()) => {
+            n if !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()) => {
                 let idx: usize = n.parse().unwrap_or(0);
                 if idx == 0 {
                     env::args().next().unwrap_or_default()
@@ -4005,6 +4646,11 @@ impl ShellExecutor {
                 }
                 'V' => flags.push(ZshParamFlag::Visible),
                 'D' => flags.push(ZshParamFlag::Directory),
+                'M' => flags.push(ZshParamFlag::Match),
+                'R' => flags.push(ZshParamFlag::Remove),
+                'S' => flags.push(ZshParamFlag::Subscript),
+                'P' => flags.push(ZshParamFlag::Parameter),
+                '~' => flags.push(ZshParamFlag::Glob),
                 'l' => {
                     // l:len:fill: - pad left
                     if chars.peek() == Some(&':') {
@@ -4254,6 +4900,27 @@ impl ShellExecutor {
             }
             ZshParamFlag::Width(_) => {
                 // Width modifier - used with padding, just return value
+                val.to_string()
+            }
+            ZshParamFlag::Match => {
+                // Match flag - used with pattern operations, just pass through
+                // Actual matching is handled in the pattern operations below
+                val.to_string()
+            }
+            ZshParamFlag::Remove => {
+                // Remove flag - complement of Match
+                val.to_string()
+            }
+            ZshParamFlag::Subscript => {
+                // Subscript scanning
+                val.to_string()
+            }
+            ZshParamFlag::Parameter => {
+                // Parameter indirection - treat val as parameter name
+                self.get_variable(val)
+            }
+            ZshParamFlag::Glob => {
+                // Glob patterns in pattern matching
                 val.to_string()
             }
         }
@@ -6576,24 +7243,84 @@ impl ShellExecutor {
     }
 
     fn builtin_alias(&mut self, args: &[String]) -> i32 {
-        if args.is_empty() {
-            // List all aliases
-            for (name, value) in &self.aliases {
-                println!("alias {}='{}'", name, value);
+        // Parse flags: -g (global), -s (suffix), -L (list definition form)
+        let mut is_global = false;
+        let mut is_suffix = false;
+        let mut list_form = false;
+        let mut positional_args = Vec::new();
+
+        let mut i = 0;
+        while i < args.len() {
+            let arg = &args[i];
+            if arg.starts_with('-') && arg != "-" {
+                for ch in arg[1..].chars() {
+                    match ch {
+                        'g' => is_global = true,
+                        's' => is_suffix = true,
+                        'L' => list_form = true,
+                        'm' => {} // pattern match mode, ignore for now
+                        'r' => {} // regular alias (default)
+                        _ => {
+                            eprintln!("zshrs: alias: bad option: -{}", ch);
+                            return 1;
+                        }
+                    }
+                }
+            } else {
+                positional_args.push(arg.clone());
+            }
+            i += 1;
+        }
+
+        if positional_args.is_empty() {
+            // List aliases
+            let prefix = if is_suffix {
+                "alias -s"
+            } else if is_global {
+                "alias -g"
+            } else {
+                "alias"
+            };
+            let alias_map: Vec<(String, String)> = if is_suffix {
+                self.suffix_aliases.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+            } else if is_global {
+                self.global_aliases.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+            } else {
+                self.aliases.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+            };
+            for (name, value) in alias_map {
+                if list_form {
+                    println!("{}{}='{}'", prefix, name, value);
+                } else {
+                    println!("{}='{}'", name, value);
+                }
             }
             return 0;
         }
 
-        for arg in args {
+        for arg in &positional_args {
             if let Some(eq_pos) = arg.find('=') {
                 // Define alias: name=value
                 let name = &arg[..eq_pos];
                 let value = &arg[eq_pos + 1..];
-                self.aliases.insert(name.to_string(), value.to_string());
+                if is_suffix {
+                    self.suffix_aliases.insert(name.to_string(), value.to_string());
+                } else if is_global {
+                    self.global_aliases.insert(name.to_string(), value.to_string());
+                } else {
+                    self.aliases.insert(name.to_string(), value.to_string());
+                }
             } else {
-                // Print alias
-                if let Some(value) = self.aliases.get(arg) {
-                    println!("alias {}='{}'", arg, value);
+                // Print alias - look up directly without holding borrow
+                let value = if is_suffix {
+                    self.suffix_aliases.get(arg.as_str()).cloned()
+                } else if is_global {
+                    self.global_aliases.get(arg.as_str()).cloned()
+                } else {
+                    self.aliases.get(arg.as_str()).cloned()
+                };
+                if let Some(v) = value {
+                    println!("{}='{}'", arg, v);
                 } else {
                     eprintln!("zshrs: alias: {}: not found", arg);
                     return 1;
@@ -6605,21 +7332,62 @@ impl ShellExecutor {
 
     fn builtin_unalias(&mut self, args: &[String]) -> i32 {
         if args.is_empty() {
-            eprintln!("zshrs: unalias: usage: unalias [-a] name [name ...]");
+            eprintln!("zshrs: unalias: usage: unalias [-agsm] name [name ...]");
             return 1;
         }
 
-        if args.len() == 1 && args[0] == "-a" {
-            // Remove all aliases
-            self.aliases.clear();
+        let mut is_global = false;
+        let mut is_suffix = false;
+        let mut remove_all = false;
+        let mut positional_args = Vec::new();
+
+        for arg in args {
+            if arg.starts_with('-') && arg != "-" {
+                for ch in arg[1..].chars() {
+                    match ch {
+                        'a' => remove_all = true,
+                        'g' => is_global = true,
+                        's' => is_suffix = true,
+                        'm' => {} // pattern match, ignore for now
+                        _ => {
+                            eprintln!("zshrs: unalias: bad option: -{}", ch);
+                            return 1;
+                        }
+                    }
+                }
+            } else {
+                positional_args.push(arg.clone());
+            }
+        }
+
+        if remove_all {
+            if is_suffix {
+                self.suffix_aliases.clear();
+            } else if is_global {
+                self.global_aliases.clear();
+            } else {
+                // -a without -g/-s clears all three
+                self.aliases.clear();
+                self.global_aliases.clear();
+                self.suffix_aliases.clear();
+            }
             return 0;
         }
 
-        for name in args {
-            if name == "-a" {
-                continue;
-            }
-            if self.aliases.remove(name).is_none() {
+        if positional_args.is_empty() {
+            eprintln!("zshrs: unalias: usage: unalias [-agsm] name [name ...]");
+            return 1;
+        }
+
+        for name in positional_args {
+            let removed = if is_suffix {
+                self.suffix_aliases.remove(&name).is_some()
+            } else if is_global {
+                self.global_aliases.remove(&name).is_some()
+            } else {
+                self.aliases.remove(&name).is_some()
+            };
+            if !removed {
                 eprintln!("zshrs: unalias: {}: not found", name);
                 return 1;
             }
@@ -7757,6 +8525,34 @@ impl ShellExecutor {
             "compdef" => self.builtin_compdef(cmd_args),
             "compinit" => self.builtin_compinit(cmd_args),
             "cdreplay" => self.builtin_cdreplay(cmd_args),
+            "zmodload" => self.builtin_zmodload(cmd_args),
+            "zcompile" => self.builtin_zcompile(cmd_args),
+            "zformat" => self.builtin_zformat(cmd_args),
+            "zprof" => self.builtin_zprof(cmd_args),
+            "print" => self.builtin_print(cmd_args),
+            "printf" => self.builtin_printf(cmd_args),
+            "command" => self.builtin_command(cmd_args, redirects),
+            "whence" => self.builtin_whence(cmd_args),
+            "which" => self.builtin_which(cmd_args),
+            "where" => self.builtin_where(cmd_args),
+            "fc" => self.builtin_fc(cmd_args),
+            "history" => self.builtin_history(cmd_args),
+            "dirs" => self.builtin_dirs(cmd_args),
+            "pushd" => self.builtin_pushd(cmd_args),
+            "popd" => self.builtin_popd(cmd_args),
+            "bg" => self.builtin_bg(cmd_args),
+            "fg" => self.builtin_fg(cmd_args),
+            "jobs" => self.builtin_jobs(cmd_args),
+            "kill" => self.builtin_kill(cmd_args),
+            "wait" => self.builtin_wait(cmd_args),
+            "trap" => self.builtin_trap(cmd_args),
+            "umask" => self.builtin_umask(cmd_args),
+            "ulimit" => self.builtin_ulimit(cmd_args),
+            "times" => self.builtin_times(cmd_args),
+            "let" => self.builtin_let(cmd_args),
+            "integer" => self.builtin_integer(cmd_args),
+            "float" => self.builtin_float(cmd_args),
+            "readonly" => self.builtin_readonly(cmd_args),
             _ => {
                 eprintln!("zshrs: builtin: {}: not a shell builtin", cmd);
                 1
@@ -8085,8 +8881,8 @@ impl ShellExecutor {
         
         if !quiet {
             eprintln!(
-                "compinit: {} functions in {} dirs ({} ms)",
-                result.files_scanned, result.dirs_scanned, result.scan_time_ms
+                "compinit: {} functions, {} comps in {} dirs ({} ms)",
+                result.files_scanned, result.comps.len(), result.dirs_scanned, result.scan_time_ms
             );
         }
         
@@ -8945,23 +9741,99 @@ impl ShellExecutor {
 
     /// emulate - set up zsh emulation mode
     fn builtin_emulate(&mut self, args: &[String]) -> i32 {
-        let mode = args.first().map(|s| s.as_str()).unwrap_or("zsh");
+        // Parse flags: -L (local), -R (reset), -l (list), -c (command)
+        let mut local_mode = false;
+        let mut reset_mode = false;
+        let mut mode: Option<&str> = None;
+        
+        let mut i = 0;
+        while i < args.len() {
+            let arg = &args[i];
+            if arg.starts_with('-') && arg.len() > 1 {
+                for ch in arg[1..].chars() {
+                    match ch {
+                        'L' => local_mode = true,  // Set options locally
+                        'R' => reset_mode = true,  // Reset to defaults first
+                        'l' => {
+                            // List available modes
+                            println!("zsh\nsh\nksh\ncsh\nbash");
+                            return 0;
+                        }
+                        'c' => {
+                            // -c cmd: run command in emulation mode
+                            // For now, just continue parsing
+                        }
+                        _ => {
+                            eprintln!("emulate: bad option: -{}", ch);
+                            return 1;
+                        }
+                    }
+                }
+            } else {
+                mode = Some(arg.as_str());
+            }
+            i += 1;
+        }
+        
+        let mode = mode.unwrap_or("zsh");
+        
+        // Reset options to defaults if -R
+        if reset_mode {
+            self.options = Self::default_options();
+        }
+        
         match mode {
             "zsh" => {
-                self.options.insert("emulate".to_string(), true);
-                self.variables
-                    .insert("EMULATE".to_string(), "zsh".to_string());
+                self.variables.insert("EMULATE".to_string(), "zsh".to_string());
+                // zsh defaults - most features enabled
+                if reset_mode || !local_mode {
+                    self.options.insert("aliases".to_string(), true);
+                    self.options.insert("functionargzero".to_string(), true);
+                    self.options.insert("ksharrays".to_string(), false);
+                    self.options.insert("shwordsplit".to_string(), false);
+                }
             }
-            "sh" | "ksh" | "csh" => {
-                self.options.insert("emulate".to_string(), true);
-                self.variables
-                    .insert("EMULATE".to_string(), mode.to_string());
+            "sh" => {
+                self.variables.insert("EMULATE".to_string(), "sh".to_string());
+                // POSIX sh mode
+                if reset_mode || !local_mode {
+                    self.options.insert("ksharrays".to_string(), true);
+                    self.options.insert("shwordsplit".to_string(), true);
+                    self.options.insert("posixbuiltins".to_string(), true);
+                }
+            }
+            "ksh" => {
+                self.variables.insert("EMULATE".to_string(), "ksh".to_string());
+                // Korn shell mode
+                if reset_mode || !local_mode {
+                    self.options.insert("ksharrays".to_string(), true);
+                    self.options.insert("kshglob".to_string(), true);
+                    self.options.insert("shwordsplit".to_string(), true);
+                }
+            }
+            "csh" => {
+                self.variables.insert("EMULATE".to_string(), "csh".to_string());
+                // C shell mode (limited support)
+            }
+            "bash" => {
+                self.variables.insert("EMULATE".to_string(), "bash".to_string());
+                // Bash mode
+                if reset_mode || !local_mode {
+                    self.options.insert("ksharrays".to_string(), true);
+                    self.options.insert("shwordsplit".to_string(), true);
+                    self.options.insert("posixbuiltins".to_string(), false);
+                }
             }
             _ => {
                 eprintln!("emulate: unknown mode: {}", mode);
                 return 1;
             }
         }
+        
+        // Note: -L (local) would normally save/restore options on function exit
+        // For now we just set them; proper local scope would need function call tracking
+        let _ = local_mode; // Acknowledge the flag
+        
         0
     }
 
@@ -9069,6 +9941,7 @@ impl ShellExecutor {
     fn builtin_print(&self, args: &[String]) -> i32 {
         let mut no_newline = false;
         let mut interpret_escapes = false;
+        let mut prompt_expand = false;
         let mut to_stderr = false;
         let mut columns = 0usize;
         let mut null_terminate = false;
@@ -9082,6 +9955,7 @@ impl ShellExecutor {
                 "-r" => interpret_escapes = false, // raw
                 "-e" => interpret_escapes = true,
                 "-E" => interpret_escapes = false,
+                "-P" => prompt_expand = true,
                 "-u" => to_stderr = true,
                 "-N" => null_terminate = true,
                 "-z" => push_to_stack = true,
@@ -9104,7 +9978,13 @@ impl ShellExecutor {
 
         let _ = push_to_stack; // TODO: implement push to buffer stack
 
-        let output = if interpret_escapes {
+        let output = if prompt_expand {
+            output_args
+                .iter()
+                .map(|s| self.expand_prompt_string(s))
+                .collect::<Vec<_>>()
+                .join(" ")
+        } else if interpret_escapes {
             output_args
                 .iter()
                 .map(|s| self.expand_printf_escapes(s))
