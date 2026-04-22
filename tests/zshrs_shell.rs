@@ -2102,3 +2102,63 @@ fn test_print_format() {
     let output = run_zshrs("print -f '%s:%s\\n' key value");
     assert!(output.contains("key:value"));
 }
+
+// ============================================================================
+// ZINIT COMPATIBILITY - compdef, compinit, cdreplay
+// ============================================================================
+
+#[test]
+fn test_compdef_basic() {
+    let output = run_zshrs("compdef _git git; echo $?");
+    assert_eq!(output.trim(), "0");
+}
+
+#[test]
+fn test_compdef_multiple() {
+    let output = run_zshrs("compdef _docker docker docker-compose podman; echo $?");
+    assert_eq!(output.trim(), "0");
+}
+
+#[test]
+fn test_compdef_delete() {
+    let output = run_zshrs("compdef _git git; compdef -d git; echo $?");
+    assert_eq!(output.trim(), "0");
+}
+
+#[test]
+fn test_compinit_runs() {
+    let output = run_zshrs("compinit -q; echo $?");
+    assert_eq!(output.trim(), "0");
+}
+
+#[test]
+fn test_compinit_cache_check() {
+    let output = run_zshrs("compinit -C -q; echo $?");
+    assert_eq!(output.trim(), "0");
+}
+
+#[test]
+fn test_cdreplay_empty() {
+    let output = run_zshrs("cdreplay -q; echo $?");
+    assert_eq!(output.trim(), "0");
+}
+
+#[test]
+fn test_cdreplay_with_deferred() {
+    // Simulate zinit turbo mode: defer compdef, then replay
+    let output = run_zshrs("compdef _git git; compdef _docker docker; cdreplay -q; echo $?");
+    assert_eq!(output.trim(), "0");
+}
+
+#[test]
+fn test_zinit_pattern() {
+    // Test typical zinit initialization pattern
+    let output = run_zshrs(r#"
+        autoload -Uz compinit
+        compinit -q
+        compdef _git git
+        cdreplay -q
+        echo done
+    "#);
+    assert!(output.contains("done"));
+}

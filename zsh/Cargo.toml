@@ -6,7 +6,16 @@ description = "Zsh interpreter and parser in Rust"
 license = "MIT"
 authors = ["MenkeTechnologies"]
 
+[[bin]]
+name = "zshrs"
+path = "bin/zshrs.rs"
+
 [dependencies]
+ctrlc = "3"
+atty = "0.2"
+reedline = "0.47.0"
+nu-ansi-term = "0.50"
+compsys = { path = "../compsys" }
 regex = "1.11"
 glob = "0.3"
 libc = "0.2"
