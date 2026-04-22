@@ -735,13 +735,22 @@ s --remote-worker      // worker process for distributed cluster</pre>
           </tbody>
         </table>
 
+        <h3>Build options</h3>
+        <table class="reflection-table" style="font-size:11px;">
+          <thead><tr><th>Build</th><th>Size</th><th>@ mode</th><th>Command</th></tr></thead>
+          <tbody>
+            <tr><td>Fat</td><td>~24MB</td><td>Yes</td><td><code>cargo build --release</code> (strykelang)</td></tr>
+            <tr><td>Lean</td><td>~4MB</td><td>No</td><td><code>cargo build --release -p zsh</code></td></tr>
+          </tbody>
+        </table>
+
         <h3>Usage</h3>
 <pre>zshrs                       # interactive shell
 zshrs -c 'echo hello'       # execute command
 zshrs script.sh             # run script file
 zshrs --dump-zwc file.zwc   # inspect compiled zsh files
 
-# In interactive mode, @ enters stryke:
+# In interactive mode, @ enters stryke (fat build only):
 $ @ 1..100 |&gt; sum |&gt; p
 5050
 $ @ fetch_json("https://api.github.com/users/octocat") |&gt; dd

@@ -3,6 +3,7 @@
 //! Executes the parsed shell AST.
 
 use crate::history::HistoryEngine;
+use compsys::cache::CompsysCache;
 use std::collections::HashSet;
 use std::sync::LazyLock;
 use parking_lot::Mutex;
@@ -361,6 +362,10 @@ pub struct ShellExecutor {
     pub profiling_enabled: bool,
     // zsocket - Unix domain sockets
     pub unix_sockets: HashMap<i32, UnixSocketState>,
+    // compsys - completion system cache
+    pub compsys_cache: Option<CompsysCache>,
+    // cdreplay - deferred compdef calls for zinit turbo mode
+    pub deferred_compdefs: Vec<Vec<String>>,
 }
 
 impl ShellExecutor {
@@ -414,6 +419,8 @@ impl ShellExecutor {
             profile_data: HashMap::new(),
             profiling_enabled: false,
             unix_sockets: HashMap::new(),
+            compsys_cache: CompsysCache::memory().ok(),
+            deferred_compdefs: Vec::new(),
         }
     }
     
@@ -1106,6 +1113,9 @@ impl ShellExecutor {
             "compopt" => self.builtin_compopt(args),
             "compadd" => self.builtin_compadd(args),
             "compset" => self.builtin_compset(args),
+            "compdef" => self.builtin_compdef(args),
+            "compinit" => self.builtin_compinit(args),
+            "cdreplay" => self.builtin_cdreplay(args),
             "zstyle" => self.builtin_zstyle(args),
             "pushd" => self.builtin_pushd(args),
             "popd" => self.builtin_popd(args),
@@ -7744,6 +7754,9 @@ impl ShellExecutor {
             "zstyle" => self.builtin_zstyle(cmd_args),
             "compadd" => self.builtin_compadd(cmd_args),
             "compset" => self.builtin_compset(cmd_args),
+            "compdef" => self.builtin_compdef(cmd_args),
+            "compinit" => self.builtin_compinit(cmd_args),
+            "cdreplay" => self.builtin_cdreplay(cmd_args),
             _ => {
                 eprintln!("zshrs: builtin: {}: not a shell builtin", cmd);
                 1
@@ -8013,6 +8026,121 @@ impl ShellExecutor {
     fn builtin_compset(&mut self, args: &[String]) -> i32 {
         // Basic stub for zsh completion system
         let _ = args;
+        0
+    }
+
+    /// compdef - register completion functions for commands
+    /// Usage: compdef _git git
+    ///        compdef _docker docker docker-compose
+    ///        compdef -d git  # delete
+    fn builtin_compdef(&mut self, args: &[String]) -> i32 {
+        if let Some(cache) = &mut self.compsys_cache {
+            compsys::compdef::compdef_execute(cache, args)
+        } else {
+            // No cache - defer for cdreplay (zinit turbo mode)
+            self.deferred_compdefs.push(args.to_vec());
+            0
+        }
+    }
+
+    /// compinit - initialize the completion system
+    /// Scans fpath for completion functions and registers them
+    fn builtin_compinit(&mut self, args: &[String]) -> i32 {
+        // Parse options
+        let mut quiet = false;
+        let mut dump = false;
+        let mut cache_dir: Option<String> = None;
+        
+        let mut i = 0;
+        while i < args.len() {
+            match args[i].as_str() {
+                "-q" => quiet = true,
+                "-C" => {
+                    // Use cache if valid
+                    if let Some(cache) = &self.compsys_cache {
+                        if compsys::cache_is_valid(cache) {
+                            if !quiet {
+                                eprintln!("compinit: using cached completions");
+                            }
+                            return 0;
+                        }
+                    }
+                }
+                "-d" => {
+                    i += 1;
+                    if i < args.len() {
+                        cache_dir = Some(args[i].clone());
+                    }
+                    dump = true;
+                }
+                "-D" => dump = true,
+                "-u" | "-i" => {} // ignore security checks
+                _ => {}
+            }
+            i += 1;
+        }
+        
+        // Run compinit on fpath
+        let result = compsys::compinit(&self.fpath);
+        
+        if !quiet {
+            eprintln!(
+                "compinit: {} functions in {} dirs ({} ms)",
+                result.files_scanned, result.dirs_scanned, result.scan_time_ms
+            );
+        }
+        
+        // Populate the cache
+        if let Some(cache) = &mut self.compsys_cache {
+            for (cmd, func) in &result.comps {
+                let _ = cache.set_comp(cmd, func);
+            }
+            for (cmd, service) in &result.services {
+                let _ = cache.set_service(cmd, service);
+            }
+            for (pat, func) in &result.patcomps {
+                let _ = cache.set_patcomp(pat, func);
+            }
+        }
+        
+        // Dump to file if requested
+        if dump {
+            if let Some(dir) = cache_dir {
+                let dump_path = PathBuf::from(dir).join(".zcompdump");
+                let _ = compsys::compdump(&result, &dump_path, "zshrs-0.1.0");
+            }
+        }
+        
+        // Set up _comps associative array
+        self.assoc_arrays.insert("_comps".to_string(), result.comps.clone());
+        self.assoc_arrays.insert("_services".to_string(), result.services.clone());
+        self.assoc_arrays.insert("_patcomps".to_string(), result.patcomps.clone());
+        
+        0
+    }
+
+    /// cdreplay - replay deferred compdef calls (zinit turbo mode)
+    /// Usage: cdreplay [-q]
+    fn builtin_cdreplay(&mut self, args: &[String]) -> i32 {
+        let quiet = args.contains(&"-q".to_string());
+        
+        if self.deferred_compdefs.is_empty() {
+            return 0;
+        }
+        
+        let deferred = std::mem::take(&mut self.deferred_compdefs);
+        let count = deferred.len();
+        
+        if let Some(cache) = &mut self.compsys_cache {
+            for compdef_args in deferred {
+                compsys::compdef::compdef_execute(cache, &compdef_args);
+            }
+        }
+        
+        if !quiet {
+            eprintln!("cdreplay: replayed {} compdef calls", count);
+        }
+        
         0
     }
 
@@ -9214,13 +9342,16 @@ impl ShellExecutor {
                 | "comparguments"
                 | "compcall"
                 | "compctl"
+                | "compdef"
                 | "compdescribe"
                 | "compfiles"
                 | "compgroups"
+                | "compinit"
                 | "compquote"
                 | "comptags"
                 | "comptry"
                 | "compvalues"
+                | "cdreplay"
                 | "cap"
                 | "getcap"
                 | "setcap"

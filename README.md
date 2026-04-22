@@ -1994,11 +1994,21 @@ stryke 'for my $h (qw(b all pc e a d c p)) {
 
 ### Install
 
+Two build options:
+
 ```sh
-cargo install strykelang   # includes zshrs binary
-# or from source
-cargo build                # produces target/debug/zshrs
+# FAT build (24MB) - includes stryke for @ parallel mode
+cargo install strykelang        # includes zshrs binary with stryke
+cargo build --release           # target/release/zshrs (fat)
+
+# LEAN build (5MB) - pure shell, no stryke dependency  
+cargo build --release -p zsh    # target/release/zshrs (lean)
 ```
+
+| Build | Size | `@ mode` | Use case |
+|-------|------|----------|----------|
+| Fat (`strykelang`) | ~24MB | Yes | Full power — parallel ops, JSON, HTTP in shell |
+| Lean (`zsh` crate) | ~4MB | No | Minimal — just the shell, fast startup |
 
 ### Why zshrs?
 
