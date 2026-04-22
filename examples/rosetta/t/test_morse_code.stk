@@ -15,8 +15,8 @@ fn to_morse {
     my $s = $_[0]
     my @parts
     for my $c (~> $s uc chars) {
-        if (%morse{$c}) {
-            push @parts, %morse{$c}
+        if ($morse{$c}) {
+            push @parts, $morse{$c}
         }
     }
     join(" ", @parts)

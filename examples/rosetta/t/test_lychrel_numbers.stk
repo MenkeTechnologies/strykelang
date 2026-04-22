@@ -3,7 +3,8 @@
 
 fn reverse_string {
     my $s = $_[0]
-    ~> $s chars rev join("")
+    my @chars = split("", $s)
+    join("", rev @chars)
 }
 
 fn my_is_palindrome {
@@ -20,7 +21,7 @@ fn is_lychrel {
         my $rev = reverse_string("$current")
         $current = $current + $rev
         if (my_is_palindrome("$current")) {
-            0
+            return 0
         }
     }
     

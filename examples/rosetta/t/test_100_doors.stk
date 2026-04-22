@@ -7,7 +7,8 @@ fn doors_puzzle {
         my $door = $_
         # A door is open if it is toggled an odd number of times.
         # It is toggled for every divisor it has.
-        my $divisors = ~> (1..$door) grep { $door % $_ == 0 } |> len
+        my @divs = grep { $door % $_ == 0 } (1..$door)
+        my $divisors = scalar(@divs)
         $divisors % 2 == 1
     }
     ([@res])

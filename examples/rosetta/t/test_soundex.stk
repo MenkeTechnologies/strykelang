@@ -16,10 +16,10 @@ fn my_soundex {
         R=>6
     )
     
-    my $first_code = if (%codes{$first}) { %codes{$first} } else { "" }
+    my $first_code = $codes{$first} ? $codes{$first} : ""
     
     my @rest_codes = ~> @chars[1..$#chars] map {
-        if (%codes{$_}) { %codes{$_} } else { "" }
+        $codes{$_} ? $codes{$_} : ""
     } |> grep { $_ ne "" }
     
     my @unique
