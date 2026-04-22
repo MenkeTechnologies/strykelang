@@ -6349,9 +6349,11 @@ impl<'a> VM<'a> {
                     Op::RevListOp => {
                         let val = self.pop();
                         if val.is_iterator() {
-                            self.push(PerlValue::iterator(std::sync::Arc::new(
-                                crate::value::RevIterator::new(val.into_iterator()),
-                            )));
+                            // Collect the iterator fully and reverse the list order.
+                            // RevIterator does per-element char reversal, not list reversal.
+                            let mut items = val.to_list();
+                            items.reverse();
+                            self.push(PerlValue::array(items));
                         } else if let Some(s) = crate::value::set_payload(&val) {
                             let mut out = crate::value::PerlSet::new();
                             for (k, v) in s.iter().rev() {
