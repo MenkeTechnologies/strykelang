@@ -6,7 +6,7 @@
 use crate::compcore::CompletionState;
 use crate::completion::{Completion, CompletionFlags};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// Options for file completion
 #[derive(Clone, Debug, Default)]

@@ -525,14 +525,11 @@ mod tests {
 /// - Pattern matching on file names
 /// - Prefix/suffix stripping
 #[derive(Clone, Debug, Default)]
+#[allow(dead_code)]
 pub struct CompFiles {
-    /// Paths being completed
     paths: Vec<String>,
-    /// Pattern to match
     pattern: Option<String>,
-    /// Prefix to strip
     prefix: Option<String>,
-    /// Suffix to strip
     suffix: Option<String>,
 }
 
@@ -603,8 +600,8 @@ impl CompFiles {
 /// Creates multiple completion groups with different sorting/uniqueness options
 /// for each named group.
 #[derive(Clone, Debug, Default)]
+#[allow(dead_code)]
 pub struct CompGroups {
-    /// Group configurations
     groups: Vec<CompGroupConfig>,
 }
 

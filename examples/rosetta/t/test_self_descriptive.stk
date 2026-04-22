@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Self-descriptive numbers
+
+fn is_self_descriptive($n) {
+    my $s = str($n)
+    my $len = scalar(split //, $s)
+
+    for my $i (0..$len-1) {
+        my $digit_at_pos_i = int(substr($s, $i, 1))
+        my $char_to_count = str($i)
+        my $count = 0
+        for my $char (split //, $s) {
+            if ($char eq $char_to_count) {
+                $count = $count + 1
+            }
+        }
+        if ($digit_at_pos_i != $count) {
+            return 0 # Not self-descriptive
+        }
+    }
+    1 # Is self-descriptive
+}
+
+assert_eq is_self_descriptive(2020), 1, "2020 is self-descriptive"
+assert_eq is_self_descriptive(1210), 1, "1210 is self-descriptive"
+assert_eq is_self_descriptive(21200), 1, "21200 is self-descriptive"
+assert_eq is_self_descriptive(3211000), 1, "3211000 is self-descriptive"
+assert_eq is_self_descriptive(42101000), 1, "42101000 is self-descriptive"
+assert_eq is_self_descriptive(1), 0, "1 is not self-descriptive"
+
+# Check for numbers that are not self-descriptive
+assert_eq is_self_descriptive(11), 0, "11 is not self-descriptive"
+assert_eq is_self_descriptive(22), 0, "22 is not self-descriptive"
+
+test_run

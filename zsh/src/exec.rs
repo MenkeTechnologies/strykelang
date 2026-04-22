@@ -283,6 +283,38 @@ bitflags::bitflags! {
     }
 }
 
+/// State for a zpty pseudo-terminal
+pub struct ZptyState {
+    pub pid: u32,
+    pub cmd: String,
+    pub stdin: Option<std::process::ChildStdin>,
+    pub stdout: Option<std::process::ChildStdout>,
+    pub child: Option<std::process::Child>,
+}
+
+/// Scheduled command for sched builtin
+pub struct ScheduledCommand {
+    pub id: u32,
+    pub run_at: std::time::SystemTime,
+    pub command: String,
+}
+
+/// Profiling entry for zprof
+#[derive(Clone, Default)]
+pub struct ProfileEntry {
+    pub calls: u64,
+    pub total_time_us: u64,
+    pub self_time_us: u64,
+}
+
+/// Unix domain socket state
+pub struct UnixSocketState {
+    pub path: Option<PathBuf>,
+    pub listening: bool,
+    pub stream: Option<std::os::unix::net::UnixStream>,
+    pub listener: Option<std::os::unix::net::UnixListener>,
+}
+
 pub struct ShellExecutor {
     pub functions: HashMap<String, ShellCommand>,
     pub aliases: HashMap<String, String>,
@@ -317,6 +349,18 @@ pub struct ShellExecutor {
     pub hook_functions: HashMap<String, Vec<String>>, // hook_name -> [function_names]
     // Named directories (hash -d)
     pub named_dirs: HashMap<String, PathBuf>, // name -> path
+    // zpty - pseudo-terminal management
+    pub zptys: HashMap<String, ZptyState>,
+    // sysopen - file descriptor management  
+    pub open_fds: HashMap<i32, std::fs::File>,
+    pub next_fd: i32,
+    // sched - scheduled commands
+    pub scheduled_commands: Vec<ScheduledCommand>,
+    // zprof - profiling data
+    pub profile_data: HashMap<String, ProfileEntry>,
+    pub profiling_enabled: bool,
+    // zsocket - Unix domain sockets
+    pub unix_sockets: HashMap<i32, UnixSocketState>,
 }
 
 impl ShellExecutor {
@@ -363,6 +407,13 @@ impl ShellExecutor {
             autoload_pending: HashMap::new(),
             hook_functions: HashMap::new(),
             named_dirs: HashMap::new(),
+            zptys: HashMap::new(),
+            open_fds: HashMap::new(),
+            next_fd: 10,
+            scheduled_commands: Vec::new(),
+            profile_data: HashMap::new(),
+            profiling_enabled: false,
+            unix_sockets: HashMap::new(),
         }
     }
     
@@ -1036,6 +1087,11 @@ impl ShellExecutor {
             "unalias" => self.builtin_unalias(args),
             "set" => self.builtin_set(args),
             "shopt" => self.builtin_shopt(args),
+            // Bash compatibility
+            "bind" => self.builtin_bindkey(args),
+            "caller" => self.builtin_caller(args),
+            "help" => self.builtin_help(args),
+            "readarray" | "mapfile" => self.builtin_readarray(args),
             "setopt" => self.builtin_setopt(args),
             "unsetopt" => self.builtin_unsetopt(args),
             "getopts" => self.builtin_getopts(args),
@@ -1063,6 +1119,13 @@ impl ShellExecutor {
             "enable" => self.builtin_enable(args),
             // Emulation
             "emulate" => self.builtin_emulate(args),
+            // Prompt themes
+            "promptinit" => self.builtin_promptinit(args),
+            "prompt" => self.builtin_prompt(args),
+            // PCRE
+            "pcre_compile" => self.builtin_pcre_compile(args),
+            "pcre_match" => self.builtin_pcre_match(args),
+            "pcre_study" => self.builtin_pcre_study(args),
             // Exec
             "exec" => self.builtin_exec(args),
             // Typed variables
@@ -6958,6 +7021,148 @@ impl ShellExecutor {
         }
     }
 
+    /// caller - display call stack (bash)
+    fn builtin_caller(&self, args: &[String]) -> i32 {
+        let depth: usize = args.first().and_then(|s| s.parse().ok()).unwrap_or(0);
+        // In a real implementation, we'd track the call stack
+        // For now, show basic info
+        if depth == 0 {
+            println!("1 main");
+        } else {
+            println!("{} main", depth);
+        }
+        0
+    }
+    
+    /// help - display help for builtins (bash)
+    fn builtin_help(&self, args: &[String]) -> i32 {
+        if args.is_empty() {
+            println!("zshrs shell builtins:");
+            println!("");
+            println!("  alias, bg, bind, break, builtin, cd, command, continue,");
+            println!("  declare, dirs, disown, echo, enable, eval, exec, exit,");
+            println!("  export, false, fc, fg, getopts, hash, help, history,");
+            println!("  jobs, kill, let, local, logout, popd, printf, pushd,");
+            println!("  pwd, read, readonly, return, set, shift, shopt, source,");
+            println!("  suspend, test, times, trap, true, type, typeset, ulimit,");
+            println!("  umask, unalias, unset, wait, whence, where, which");
+            println!("");
+            println!("Type 'help name' for more information about 'name'.");
+            return 0;
+        }
+        
+        let cmd = &args[0];
+        match cmd.as_str() {
+            "cd" => println!("cd: cd [-L|-P] [dir]\n    Change the shell working directory."),
+            "echo" => println!("echo: echo [-neE] [arg ...]\n    Write arguments to standard output."),
+            "export" => println!("export: export [-fn] [name[=value] ...]\n    Set export attribute for shell variables."),
+            "alias" => println!("alias: alias [-p] [name[=value] ...]\n    Define or display aliases."),
+            "history" => println!("history: history [-c] [-d offset] [n]\n    Display or manipulate the history list."),
+            "jobs" => println!("jobs: jobs [-lnprs] [jobspec ...]\n    Display status of jobs."),
+            "kill" => println!("kill: kill [-s sigspec | -n signum | -sigspec] pid | jobspec ...\n    Send a signal to a job."),
+            "read" => println!("read: read [-ers] [-a array] [-d delim] [-i text] [-n nchars] [-N nchars] [-p prompt] [-t timeout] [-u fd] [name ...]\n    Read a line from standard input."),
+            "set" => println!("set: set [-abefhkmnptuvxBCHP] [-o option-name] [--] [arg ...]\n    Set or unset values of shell options and positional parameters."),
+            "test" | "[" => println!("test: test [expr]\n    Evaluate conditional expression."),
+            "type" => println!("type: type [-afptP] name [name ...]\n    Display information about command type."),
+            _ => println!("{}: no help available", cmd),
+        }
+        0
+    }
+    
+    /// readarray/mapfile - read lines into array (bash)
+    fn builtin_readarray(&mut self, args: &[String]) -> i32 {
+        use std::io::{BufRead, BufReader};
+        
+        let mut array_name = "MAPFILE".to_string();
+        let mut delimiter = '\n';
+        let mut count = 0usize; // 0 = unlimited
+        let mut skip = 0usize;
+        let mut strip_trailing = false;
+        let mut callback: Option<String> = None;
+        let mut callback_quantum = 0usize;
+        
+        let mut i = 0;
+        while i < args.len() {
+            match args[i].as_str() {
+                "-d" => {
+                    i += 1;
+                    if i < args.len() && !args[i].is_empty() {
+                        delimiter = args[i].chars().next().unwrap_or('\n');
+                    }
+                }
+                "-n" => {
+                    i += 1;
+                    if i < args.len() {
+                        count = args[i].parse().unwrap_or(0);
+                    }
+                }
+                "-O" => {
+                    i += 1;
+                    // Origin - start index (ignored, we always start at 0)
+                }
+                "-s" => {
+                    i += 1;
+                    if i < args.len() {
+                        skip = args[i].parse().unwrap_or(0);
+                    }
+                }
+                "-t" => strip_trailing = true,
+                "-C" => {
+                    i += 1;
+                    if i < args.len() {
+                        callback = Some(args[i].clone());
+                    }
+                }
+                "-c" => {
+                    i += 1;
+                    if i < args.len() {
+                        callback_quantum = args[i].parse().unwrap_or(5000);
+                    }
+                }
+                "-u" => {
+                    i += 1;
+                    // fd - ignored, we read from stdin
+                }
+                s if !s.starts_with('-') => {
+                    array_name = s.to_string();
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+        
+        let stdin = std::io::stdin();
+        let reader = BufReader::new(stdin.lock());
+        let mut lines = Vec::new();
+        let mut line_count = 0usize;
+        
+        for line_result in reader.lines() {
+            if let Ok(mut line) = line_result {
+                line_count += 1;
+                
+                if line_count <= skip {
+                    continue;
+                }
+                
+                if strip_trailing {
+                    while line.ends_with('\n') || line.ends_with('\r') {
+                        line.pop();
+                    }
+                }
+                
+                lines.push(line);
+                
+                if count > 0 && lines.len() >= count {
+                    break;
+                }
+            }
+        }
+        
+        self.arrays.insert(array_name, lines);
+        let _ = (callback, callback_quantum);
+        0
+    }
+    
     fn builtin_shopt(&mut self, args: &[String]) -> i32 {
         if args.is_empty() {
             // List all shell options
@@ -9396,8 +9601,8 @@ impl ShellExecutor {
         let mut show_all = true;
         let mut symbolic_mode = false;
         let mut show_link = false;
-        let mut as_array = false;
-        let mut array_name = String::new();
+        let mut _as_array = false;
+        let mut _array_name = String::new();
         let mut format_time = String::new();
         let mut elements: Vec<String> = Vec::new();
         let mut files: Vec<&str> = Vec::new();
@@ -9411,9 +9616,9 @@ impl ShellExecutor {
                 "-n" => {} // Numeric user/group
                 "-o" => show_all = false,
                 "-A" => {
-                    as_array = true;
+                    _as_array = true;
                     if let Some(name) = iter.next() {
-                        array_name = name.clone();
+                        _array_name = name.clone();
                     }
                 }
                 "-F" => {
@@ -9451,7 +9656,7 @@ impl ShellExecutor {
             };
 
             let output_element = |name: &str, value: &str| {
-                if as_array {
+                if _as_array {
                     // Would need mutable self to store in array
                     println!("{}={}", name, value);
                 } else if show_all || elements.contains(&name.to_string()) {
@@ -9724,7 +9929,7 @@ impl ShellExecutor {
         let mut keep_going = false; // -E
         let mut fail_on_error = false; // -F
         let mut keep_values = false; // -K
-        let mut map_names = false; // -M
+        let mut _map_names = false; // -M (TODO: implement)
         let mut array_name: Option<String> = None; // -a
         let mut assoc_name: Option<String> = None; // -A
         let mut specs: Vec<String> = Vec::new();
@@ -9738,7 +9943,7 @@ impl ShellExecutor {
                 "-E" => keep_going = true,
                 "-F" => fail_on_error = true,
                 "-K" => keep_values = true,
-                "-M" => map_names = true,
+                "-M" => _map_names = true,
                 "-a" => {
                     if let Some(name) = iter.next() {
                         array_name = Some(name.clone());
@@ -9768,6 +9973,7 @@ impl ShellExecutor {
             name: String,
             takes_arg: bool,
             optional_arg: bool,
+            #[allow(dead_code)]
             append: bool,
             target_array: Option<String>,
         }
@@ -10213,13 +10419,91 @@ impl ShellExecutor {
 
     /// sched - scheduled command execution (stub)
     fn builtin_sched(&mut self, args: &[String]) -> i32 {
+        use std::time::{Duration, SystemTime};
+        
         if args.is_empty() {
             // List scheduled commands
-            println!("(no scheduled commands)");
+            if self.scheduled_commands.is_empty() {
+                return 0;
+            }
+            let now = SystemTime::now();
+            for cmd in &self.scheduled_commands {
+                let remaining = cmd.run_at.duration_since(now).unwrap_or(Duration::ZERO);
+                println!("{:3}  +{:5}  {}", cmd.id, remaining.as_secs(), cmd.command);
+            }
             return 0;
         }
-        // Would need background scheduler - stub for now
-        eprintln!("sched: scheduling not implemented");
+        
+        let mut i = 0;
+        while i < args.len() {
+            match args[i].as_str() {
+                "-" => {
+                    // Remove scheduled item
+                    i += 1;
+                    if i >= args.len() {
+                        eprintln!("sched: -: need item number");
+                        return 1;
+                    }
+                    if let Ok(id) = args[i].parse::<u32>() {
+                        self.scheduled_commands.retain(|c| c.id != id);
+                        return 0;
+                    } else {
+                        eprintln!("sched: invalid item number");
+                        return 1;
+                    }
+                }
+                "+" => {
+                    // Schedule relative time
+                    i += 1;
+                    if i >= args.len() {
+                        eprintln!("sched: +: need time");
+                        return 1;
+                    }
+                    let secs: u64 = args[i].parse().unwrap_or(0);
+                    i += 1;
+                    let command = args[i..].join(" ");
+                    
+                    let id = self.scheduled_commands.len() as u32 + 1;
+                    self.scheduled_commands.push(ScheduledCommand {
+                        id,
+                        run_at: SystemTime::now() + Duration::from_secs(secs),
+                        command,
+                    });
+                    return 0;
+                }
+                time_str => {
+                    // Parse HH:MM or HH:MM:SS
+                    let parts: Vec<&str> = time_str.split(':').collect();
+                    if parts.len() >= 2 {
+                        let hour: u32 = parts[0].parse().unwrap_or(0);
+                        let min: u32 = parts[1].parse().unwrap_or(0);
+                        let sec: u32 = parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(0);
+                        
+                        // Calculate duration until that time today/tomorrow
+                        let now = SystemTime::now();
+                        let target_secs = (hour * 3600 + min * 60 + sec) as u64;
+                        let day_secs = 86400u64;
+                        
+                        // Simplified: just add as seconds from now
+                        let run_at = now + Duration::from_secs(target_secs);
+                        
+                        i += 1;
+                        let command = args[i..].join(" ");
+                        
+                        let id = self.scheduled_commands.len() as u32 + 1;
+                        self.scheduled_commands.push(ScheduledCommand {
+                            id,
+                            run_at,
+                            command,
+                        });
+                        return 0;
+                    } else {
+                        eprintln!("sched: invalid time format");
+                        return 1;
+                    }
+                }
+            }
+        }
         0
     }
 
@@ -10440,8 +10724,39 @@ impl ShellExecutor {
                 println!("{}", result);
             }
             "-a" => {
-                // Format into array elements
-                println!("zformat -a: not implemented");
+                // Format into array elements: zformat -a array sep specs...
+                // Each spec is "text:value" or "text:value:cond"
+                if args.len() < 4 {
+                    eprintln!("zformat -a: need array, separator, and specs");
+                    return 1;
+                }
+                let _array_name = &args[1];
+                let sep = &args[2];
+                
+                let mut results = Vec::new();
+                for spec in &args[3..] {
+                    let parts: Vec<&str> = spec.splitn(3, ':').collect();
+                    if parts.len() >= 2 {
+                        let text = parts[0];
+                        let value = parts[1];
+                        let cond = parts.get(2).copied();
+                        
+                        // If condition exists and is empty/false, skip
+                        if let Some(c) = cond {
+                            if c.is_empty() || c == "0" {
+                                continue;
+                            }
+                        }
+                        
+                        if !value.is_empty() {
+                            results.push(format!("{}{}{}", text, sep, value));
+                        }
+                    }
+                }
+                
+                for r in results {
+                    println!("{}", r);
+                }
             }
             _ => {
                 eprintln!("zformat: unknown option: {}", args[0]);
@@ -10461,7 +10776,7 @@ impl ShellExecutor {
         let mut var_name = String::new();
         let mut prompt = String::new();
         let mut rprompt = String::new();
-        let mut history = false;
+        let mut _history = false; // TODO: implement history completion
         let mut i = 0;
 
         while i < args.len() {
@@ -10474,7 +10789,7 @@ impl ShellExecutor {
                     i += 1;
                     rprompt = args[i].clone();
                 }
-                "-h" => history = true,
+                "-h" => _history = true,
                 "-c" => {} // Use completion - ignored
                 "-e" => {} // Use emacs mode - ignored
                 "-M" | "-m" => {
@@ -10610,93 +10925,372 @@ impl ShellExecutor {
 
     /// zpty - manage pseudo-terminals
     fn builtin_zpty(&mut self, args: &[String]) -> i32 {
-        // Stub - PTY management is complex
+        use std::io::{Read, Write};
+        use std::process::{Command, Stdio};
+        
         if args.is_empty() {
-            // List ptys
-            println!("zpty: no ptys active");
+            // List all ptys
+            if self.zptys.is_empty() {
+                return 0;
+            }
+            for (name, state) in &self.zptys {
+                println!("{}: {} (pid {})", name, state.cmd, state.pid);
+            }
             return 0;
         }
 
-        match args[0].as_str() {
-            "-d" => {
-                // Delete pty
-                if args.len() < 2 {
-                    eprintln!("zpty: -d requires pty name");
+        let mut i = 0;
+        while i < args.len() {
+            match args[i].as_str() {
+                "-d" => {
+                    // Delete pty
+                    i += 1;
+                    if i >= args.len() {
+                        eprintln!("zpty: -d requires pty name");
+                        return 1;
+                    }
+                    let name = &args[i];
+                    if let Some(mut state) = self.zptys.remove(name) {
+                        if let Some(ref mut child) = state.child {
+                            let _ = child.kill();
+                        }
+                        return 0;
+                    } else {
+                        eprintln!("zpty: no such pty: {}", name);
+                        return 1;
+                    }
+                }
+                "-w" => {
+                    // Write to pty: zpty -w name string...
+                    i += 1;
+                    if i >= args.len() {
+                        eprintln!("zpty: -w requires pty name");
+                        return 1;
+                    }
+                    let name = args[i].clone();
+                    i += 1;
+                    let data = args[i..].join(" ") + "\n";
+                    
+                    if let Some(state) = self.zptys.get_mut(&name) {
+                        if let Some(ref mut stdin) = state.stdin {
+                            if stdin.write_all(data.as_bytes()).is_ok() {
+                                let _ = stdin.flush();
+                                return 0;
+                            }
+                        }
+                        eprintln!("zpty: write failed");
+                        return 1;
+                    } else {
+                        eprintln!("zpty: no such pty: {}", name);
+                        return 1;
+                    }
+                }
+                "-r" => {
+                    // Read from pty: zpty -r name [param]
+                    i += 1;
+                    if i >= args.len() {
+                        eprintln!("zpty: -r requires pty name");
+                        return 1;
+                    }
+                    let name = args[i].clone();
+                    i += 1;
+                    let var_name = if i < args.len() {
+                        args[i].clone()
+                    } else {
+                        "REPLY".to_string()
+                    };
+                    
+                    if let Some(state) = self.zptys.get_mut(&name) {
+                        if let Some(ref mut stdout) = state.stdout {
+                            let mut buf = vec![0u8; 4096];
+                            match stdout.read(&mut buf) {
+                                Ok(n) => {
+                                    let data = String::from_utf8_lossy(&buf[..n]).to_string();
+                                    self.variables.insert(var_name, data);
+                                    return 0;
+                                }
+                                Err(_) => return 1,
+                            }
+                        }
+                        return 1;
+                    } else {
+                        eprintln!("zpty: no such pty: {}", name);
+                        return 1;
+                    }
+                }
+                "-t" => {
+                    // Test if data available
+                    i += 1;
+                    if i >= args.len() {
+                        return 1;
+                    }
+                    let name = &args[i];
+                    if self.zptys.contains_key(name) {
+                        return 0; // Assume data available if pty exists
+                    }
                     return 1;
                 }
-                println!("zpty: {} deleted", args[1]);
+                "-L" => {
+                    // List in script-friendly format
+                    for (name, state) in &self.zptys {
+                        println!("zpty {} {}", name, state.cmd);
+                    }
+                    return 0;
+                }
+                "-b" | "-e" => {
+                    // Options: -b (blocking), -e (echo)
+                    i += 1;
+                    continue;
+                }
+                name if !name.starts_with('-') => {
+                    // Create new pty: zpty name command [args...]
+                    i += 1;
+                    if i >= args.len() {
+                        eprintln!("zpty: command required");
+                        return 1;
+                    }
+                    let cmd_str = args[i..].join(" ");
+                    
+                    match Command::new("sh")
+                        .arg("-c")
+                        .arg(&cmd_str)
+                        .stdin(Stdio::piped())
+                        .stdout(Stdio::piped())
+                        .stderr(Stdio::piped())
+                        .spawn()
+                    {
+                        Ok(mut child) => {
+                            let pid = child.id();
+                            let stdin = child.stdin.take();
+                            let stdout = child.stdout.take();
+                            
+                            self.zptys.insert(name.to_string(), ZptyState {
+                                pid,
+                                cmd: cmd_str,
+                                stdin,
+                                stdout,
+                                child: Some(child),
+                            });
+                            return 0;
+                        }
+                        Err(e) => {
+                            eprintln!("zpty: failed to start: {}", e);
+                            return 1;
+                        }
+                    }
+                }
+                _ => {
+                    i += 1;
+                }
             }
-            "-w" => {
-                // Write to pty
-                eprintln!("zpty: -w not implemented");
-                return 1;
-            }
-            "-r" => {
-                // Read from pty
-                eprintln!("zpty: -r not implemented");
-                return 1;
-            }
-            "-t" => {
-                // Test if data available
-                return 1; // No data
-            }
-            "-L" => {
-                // List in script-friendly format
-                println!("zpty: no ptys active");
-            }
-            _ => {
-                // Create new pty
-                eprintln!("zpty: pty creation not implemented");
-                return 1;
-            }
+            i += 1;
         }
         0
     }
 
     /// zprof - profiling support
-    fn builtin_zprof(&self, _args: &[String]) -> i32 {
-        println!("num  calls                time                       self            name");
-        println!(
-            "-----------------------------------------------------------------------------------"
-        );
-        println!("(profiling not implemented)");
+    fn builtin_zprof(&mut self, args: &[String]) -> i32 {
+        if args.is_empty() {
+            // Display profiling data
+            println!("num  calls                time                       self            name");
+            println!("-----------------------------------------------------------------------------------");
+            
+            if self.profile_data.is_empty() {
+                if !self.profiling_enabled {
+                    println!("(profiling not enabled - run 'zmodload zsh/zprof' first)");
+                } else {
+                    println!("(no profiling data collected)");
+                }
+                return 0;
+            }
+            
+            // Sort by total time descending
+            let mut entries: Vec<_> = self.profile_data.iter().collect();
+            entries.sort_by(|a, b| b.1.total_time_us.cmp(&a.1.total_time_us));
+            
+            for (i, (name, entry)) in entries.iter().enumerate() {
+                let total_ms = entry.total_time_us as f64 / 1000.0;
+                let self_ms = entry.self_time_us as f64 / 1000.0;
+                println!(
+                    "{:3})  {:5}           {:10.2}ms  {:5.1}%    {:10.2}ms  {:5.1}%    {}",
+                    i + 1,
+                    entry.calls,
+                    total_ms,
+                    if total_ms > 0.0 { 100.0 } else { 0.0 },
+                    self_ms,
+                    if total_ms > 0.0 { (self_ms / total_ms) * 100.0 } else { 0.0 },
+                    name
+                );
+            }
+            return 0;
+        }
+        
+        match args[0].as_str() {
+            "-c" => {
+                // Clear profiling data
+                self.profile_data.clear();
+                println!("zprof: profiling data cleared");
+            }
+            _ => {
+                eprintln!("zprof: unknown option: {}", args[0]);
+                return 1;
+            }
+        }
         0
     }
 
     /// zsocket - create/manage sockets
     fn builtin_zsocket(&mut self, args: &[String]) -> i32 {
+        use std::os::unix::net::{UnixListener, UnixStream};
+        
         if args.is_empty() {
-            eprintln!("zsocket: not enough arguments");
-            return 1;
+            // List open sockets
+            if self.unix_sockets.is_empty() {
+                return 0;
+            }
+            for (fd, state) in &self.unix_sockets {
+                let path = state.path.as_ref().map(|p| p.display().to_string()).unwrap_or_default();
+                let status = if state.listening { "listening" } else { "connected" };
+                println!("{}: {} ({})", fd, path, status);
+            }
+            return 0;
         }
 
-        match args[0].as_str() {
-            "-l" => {
-                // Listen on socket
-                eprintln!("zsocket: listening not implemented");
-                return 1;
-            }
-            "-a" => {
-                // Accept connection
-                eprintln!("zsocket: accept not implemented");
-                return 1;
-            }
-            "-d" => {
-                // Close socket
-                if args.len() >= 2 {
-                    println!("zsocket: closed fd {}", args[1]);
+        let mut i = 0;
+        let mut verbose = false;
+        let mut var_name = "REPLY".to_string();
+        
+        while i < args.len() {
+            match args[i].as_str() {
+                "-v" => {
+                    verbose = true;
+                    i += 1;
+                    if i < args.len() && !args[i].starts_with('-') {
+                        var_name = args[i].clone();
+                    }
                 }
+                "-l" => {
+                    // Listen on Unix socket: zsocket -l path
+                    i += 1;
+                    if i >= args.len() {
+                        eprintln!("zsocket: -l requires path");
+                        return 1;
+                    }
+                    let path = PathBuf::from(&args[i]);
+                    
+                    // Remove existing socket file
+                    let _ = std::fs::remove_file(&path);
+                    
+                    match UnixListener::bind(&path) {
+                        Ok(listener) => {
+                            let fd = self.next_fd;
+                            self.next_fd += 1;
+                            
+                            self.unix_sockets.insert(fd, UnixSocketState {
+                                path: Some(path),
+                                listening: true,
+                                stream: None,
+                                listener: Some(listener),
+                            });
+                            
+                            if verbose {
+                                self.variables.insert(var_name.clone(), fd.to_string());
+                            }
+                            println!("{}", fd);
+                            return 0;
+                        }
+                        Err(e) => {
+                            eprintln!("zsocket: bind failed: {}", e);
+                            return 1;
+                        }
+                    }
+                }
+                "-a" => {
+                    // Accept connection: zsocket -a fd
+                    i += 1;
+                    if i >= args.len() {
+                        eprintln!("zsocket: -a requires fd");
+                        return 1;
+                    }
+                    let listen_fd: i32 = args[i].parse().unwrap_or(-1);
+                    
+                    if let Some(state) = self.unix_sockets.get(&listen_fd) {
+                        if let Some(ref listener) = state.listener {
+                            match listener.accept() {
+                                Ok((stream, _addr)) => {
+                                    let new_fd = self.next_fd;
+                                    self.next_fd += 1;
+                                    
+                                    self.unix_sockets.insert(new_fd, UnixSocketState {
+                                        path: None,
+                                        listening: false,
+                                        stream: Some(stream),
+                                        listener: None,
+                                    });
+                                    
+                                    if verbose {
+                                        self.variables.insert(var_name.clone(), new_fd.to_string());
+                                    }
+                                    println!("{}", new_fd);
+                                    return 0;
+                                }
+                                Err(e) => {
+                                    eprintln!("zsocket: accept failed: {}", e);
+                                    return 1;
+                                }
+                            }
+                        }
+                    }
+                    eprintln!("zsocket: invalid fd");
+                    return 1;
+                }
+                "-d" => {
+                    // Close socket: zsocket -d fd
+                    i += 1;
+                    if i >= args.len() {
+                        eprintln!("zsocket: -d requires fd");
+                        return 1;
+                    }
+                    let fd: i32 = args[i].parse().unwrap_or(-1);
+                    
+                    if let Some(state) = self.unix_sockets.remove(&fd) {
+                        if let Some(path) = state.path {
+                            let _ = std::fs::remove_file(path);
+                        }
+                        return 0;
+                    }
+                    eprintln!("zsocket: no such fd");
+                    return 1;
+                }
+                path if !path.starts_with('-') => {
+                    // Connect to Unix socket: zsocket path
+                    match UnixStream::connect(path) {
+                        Ok(stream) => {
+                            let fd = self.next_fd;
+                            self.next_fd += 1;
+                            
+                            self.unix_sockets.insert(fd, UnixSocketState {
+                                path: Some(PathBuf::from(path)),
+                                listening: false,
+                                stream: Some(stream),
+                                listener: None,
+                            });
+                            
+                            if verbose {
+                                self.variables.insert(var_name.clone(), fd.to_string());
+                            }
+                            println!("{}", fd);
+                            return 0;
+                        }
+                        Err(e) => {
+                            eprintln!("zsocket: connect failed: {}", e);
+                            return 1;
+                        }
+                    }
+                }
+                _ => {}
             }
-            "-v" => {
-                // Verbose - store fd in variable
-                eprintln!("zsocket: -v not implemented");
-                return 1;
-            }
-            _ => {
-                // Connect to host:port
-                eprintln!("zsocket: connect not implemented");
-                return 1;
-            }
+            i += 1;
         }
         0
     }
@@ -10710,23 +11304,91 @@ impl ShellExecutor {
     /// zregexparse - parse with regex
     fn builtin_zregexparse(&mut self, args: &[String]) -> i32 {
         if args.len() < 2 {
-            eprintln!("zregexparse: not enough arguments");
+            eprintln!("zregexparse: usage: zregexparse var pattern [string]");
             return 1;
         }
 
-        // zregexparse var regex [action ...]
-        // This is a complex builtin for parsing strings with regexes
-        // Stub implementation
-        eprintln!("zregexparse: not fully implemented");
-        0
+        let var_name = &args[0];
+        let pattern = &args[1];
+        let string = if args.len() > 2 {
+            args[2].clone()
+        } else {
+            self.variables.get("REPLY").cloned().unwrap_or_default()
+        };
+
+        match regex::Regex::new(pattern) {
+            Ok(re) => {
+                if let Some(captures) = re.captures(&string) {
+                    // Store full match in var
+                    if let Some(m) = captures.get(0) {
+                        self.variables.insert(var_name.clone(), m.as_str().to_string());
+                    }
+                    
+                    // Store capture groups in MATCH array
+                    let mut match_array = Vec::new();
+                    let mut mbegin_array = Vec::new();
+                    let mut mend_array = Vec::new();
+                    
+                    for (i, cap) in captures.iter().enumerate() {
+                        if let Some(c) = cap {
+                            match_array.push(c.as_str().to_string());
+                            mbegin_array.push((c.start() + 1).to_string());
+                            mend_array.push(c.end().to_string());
+                            self.variables.insert(format!("match[{}]", i), c.as_str().to_string());
+                        }
+                    }
+                    self.arrays.insert("match".to_string(), match_array);
+                    self.arrays.insert("mbegin".to_string(), mbegin_array);
+                    self.arrays.insert("mend".to_string(), mend_array);
+                    
+                    // Store match positions
+                    if let Some(m) = captures.get(0) {
+                        self.variables.insert("MBEGIN".to_string(), (m.start() + 1).to_string());
+                        self.variables.insert("MEND".to_string(), m.end().to_string());
+                    }
+                    
+                    0
+                } else {
+                    1
+                }
+            }
+            Err(e) => {
+                eprintln!("zregexparse: invalid regex: {}", e);
+                2
+            }
+        }
     }
 
-    /// clone - create a subshell
-    fn builtin_clone(&mut self, _args: &[String]) -> i32 {
-        // Clone creates a subshell with the same state
-        // In a real implementation, this would fork
-        eprintln!("clone: not implemented (would fork)");
-        0
+    /// clone - create a subshell with forked state
+    fn builtin_clone(&mut self, args: &[String]) -> i32 {
+        use std::process::Command;
+        
+        // clone creates a subshell that shares the parent's state
+        // We simulate this by spawning a new zshrs process
+        let mut cmd = Command::new(std::env::current_exe().unwrap_or_else(|_| PathBuf::from("zshrs")));
+        
+        if !args.is_empty() {
+            // If args provided, run them in the subshell
+            cmd.arg("-c").arg(args.join(" "));
+        }
+        
+        // Export current variables to child
+        for (k, v) in &self.variables {
+            cmd.env(k, v);
+        }
+        
+        match cmd.spawn() {
+            Ok(mut child) => {
+                match child.wait() {
+                    Ok(status) => status.code().unwrap_or(0),
+                    Err(_) => 1,
+                }
+            }
+            Err(e) => {
+                eprintln!("clone: failed to spawn subshell: {}", e);
+                1
+            }
+        }
     }
 
     /// log - same as logout for login shells
@@ -11028,24 +11690,138 @@ impl ShellExecutor {
 
     /// sysopen - open file descriptor (zsh/system module)
     fn builtin_sysopen(&mut self, args: &[String]) -> i32 {
-        if args.is_empty() {
+        use std::fs::OpenOptions;
+        
+        let mut filename = String::new();
+        let mut var_name = "REPLY".to_string();
+        let mut read = false;
+        let mut write = false;
+        let mut append = false;
+        let mut create = false;
+        let mut truncate = false;
+        
+        let mut i = 0;
+        while i < args.len() {
+            match args[i].as_str() {
+                "-r" => read = true,
+                "-w" => write = true,
+                "-a" => append = true,
+                "-c" => create = true,
+                "-t" => truncate = true,
+                "-u" => {
+                    i += 1;
+                    if i < args.len() {
+                        var_name = args[i].clone();
+                    }
+                }
+                "-o" => {
+                    i += 1;
+                    // Mode flags like O_RDONLY etc - parse as needed
+                }
+                s if !s.starts_with('-') => {
+                    filename = s.to_string();
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+        
+        if filename.is_empty() {
             eprintln!("sysopen: need filename");
             return 1;
         }
-        // Stub - would need fd management
-        eprintln!("sysopen: not fully implemented");
-        0
+        
+        // Default to read if nothing specified
+        if !read && !write && !append {
+            read = true;
+        }
+        
+        let file = OpenOptions::new()
+            .read(read)
+            .write(write || append || truncate)
+            .append(append)
+            .create(create || write)
+            .truncate(truncate)
+            .open(&filename);
+        
+        match file {
+            Ok(f) => {
+                let fd = self.next_fd;
+                self.next_fd += 1;
+                self.open_fds.insert(fd, f);
+                self.variables.insert(var_name, fd.to_string());
+                0
+            }
+            Err(e) => {
+                eprintln!("sysopen: {}: {}", filename, e);
+                1
+            }
+        }
     }
 
     /// sysseek - seek on file descriptor (zsh/system module)
     fn builtin_sysseek(&mut self, args: &[String]) -> i32 {
-        if args.len() < 2 {
-            eprintln!("sysseek: need fd and offset");
+        use std::io::{Seek, SeekFrom};
+        
+        let mut fd = -1i32;
+        let mut offset = 0i64;
+        let mut whence = SeekFrom::Start(0);
+        
+        let mut i = 0;
+        while i < args.len() {
+            match args[i].as_str() {
+                "-u" => {
+                    i += 1;
+                    if i < args.len() {
+                        fd = args[i].parse().unwrap_or(-1);
+                    }
+                }
+                "-w" => {
+                    i += 1;
+                    if i < args.len() {
+                        whence = match args[i].as_str() {
+                            "start" | "set" | "0" => SeekFrom::Start(offset as u64),
+                            "current" | "cur" | "1" => SeekFrom::Current(offset),
+                            "end" | "2" => SeekFrom::End(offset),
+                            _ => SeekFrom::Start(offset as u64),
+                        };
+                    }
+                }
+                s if !s.starts_with('-') => {
+                    offset = s.parse().unwrap_or(0);
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+        
+        if fd < 0 {
+            eprintln!("sysseek: need fd (-u)");
             return 1;
         }
-        // Stub
-        eprintln!("sysseek: not fully implemented");
-        0
+        
+        // Update whence with actual offset
+        whence = match whence {
+            SeekFrom::Start(_) => SeekFrom::Start(offset as u64),
+            SeekFrom::Current(_) => SeekFrom::Current(offset),
+            SeekFrom::End(_) => SeekFrom::End(offset),
+        };
+        
+        if let Some(file) = self.open_fds.get_mut(&fd) {
+            match file.seek(whence) {
+                Ok(pos) => {
+                    self.variables.insert("REPLY".to_string(), pos.to_string());
+                    0
+                }
+                Err(e) => {
+                    eprintln!("sysseek: {}", e);
+                    1
+                }
+            }
+        } else {
+            eprintln!("sysseek: bad fd: {}", fd);
+            1
+        }
     }
 
     /// private - declare private variables (zsh/param/private module)
@@ -11248,6 +12024,165 @@ impl ShellExecutor {
                 eprintln!("zftp: unknown command: {}", cmd);
                 1
             }
+        }
+    }
+
+    /// promptinit - initialize prompt theme system
+    fn builtin_promptinit(&mut self, _args: &[String]) -> i32 {
+        self.arrays.insert("prompt_themes".to_string(), vec![
+            "adam1".to_string(), "adam2".to_string(), "bart".to_string(),
+            "bigfade".to_string(), "clint".to_string(), "default".to_string(),
+            "elite".to_string(), "elite2".to_string(), "fade".to_string(),
+            "fire".to_string(), "minimal".to_string(), "off".to_string(),
+            "oliver".to_string(), "pws".to_string(), "redhat".to_string(),
+            "restore".to_string(), "suse".to_string(), "walters".to_string(),
+            "zefram".to_string(),
+        ]);
+        self.variables.insert("prompt_theme".to_string(), "default".to_string());
+        0
+    }
+
+    /// prompt - set or list prompt themes
+    fn builtin_prompt(&mut self, args: &[String]) -> i32 {
+        if args.is_empty() {
+            let theme = self.variables.get("prompt_theme").cloned().unwrap_or_else(|| "default".to_string());
+            println!("Current prompt theme: {}", theme);
+            return 0;
+        }
+        match args[0].as_str() {
+            "-l" | "--list" => {
+                println!("Available prompt themes:");
+                if let Some(themes) = self.arrays.get("prompt_themes") {
+                    for theme in themes {
+                        println!("  {}", theme);
+                    }
+                }
+            }
+            "-p" | "--preview" => {
+                let theme = args.get(1).map(|s| s.as_str()).unwrap_or("default");
+                self.apply_prompt_theme(theme, true);
+            }
+            "-h" | "--help" => {
+                println!("prompt [options] [theme]");
+                println!("  -l, --list     List available themes");
+                println!("  -p, --preview  Preview a theme");
+                println!("  -s, --setup    Set up a theme");
+            }
+            _ => {
+                let theme = if args[0].starts_with('-') {
+                    args.get(1).map(|s| s.as_str()).unwrap_or("default")
+                } else {
+                    args[0].as_str()
+                };
+                self.apply_prompt_theme(theme, false);
+            }
+        }
+        0
+    }
+
+    fn apply_prompt_theme(&mut self, theme: &str, preview: bool) {
+        let (ps1, rps1) = match theme {
+            "minimal" => ("%# ", ""),
+            "off" => ("$ ", ""),
+            "adam1" => ("%B%F{cyan}%n@%m %F{blue}%~%f%b %# ", "%F{yellow}%D{%H:%M}%f"),
+            "redhat" => ("[%n@%m %~]$ ", ""),
+            _ => ("%n@%m %~ %# ", ""),
+        };
+        if preview {
+            println!("PS1={:?}", ps1);
+            println!("RPS1={:?}", rps1);
+        } else {
+            self.variables.insert("PS1".to_string(), ps1.to_string());
+            self.variables.insert("RPS1".to_string(), rps1.to_string());
+            self.variables.insert("prompt_theme".to_string(), theme.to_string());
+        }
+    }
+
+    /// pcre_compile - compile a PCRE pattern
+    fn builtin_pcre_compile(&mut self, args: &[String]) -> i32 {
+        let mut pattern = String::new();
+        let mut flags = String::new();
+        let mut i = 0;
+        while i < args.len() {
+            match args[i].as_str() {
+                "-a" => flags.push('A'),
+                "-i" | "-s" => flags.push_str(&args[i][1..]),
+                "-x" => flags.push('x'),
+                s if !s.starts_with('-') => pattern = s.to_string(),
+                _ => {}
+            }
+            i += 1;
+        }
+        if pattern.is_empty() {
+            eprintln!("pcre_compile: no pattern specified");
+            return 1;
+        }
+        let regex_pattern = if flags.is_empty() {
+            pattern
+        } else {
+            format!("(?{}){}", flags.to_lowercase(), pattern)
+        };
+        match regex::Regex::new(&regex_pattern) {
+            Ok(_) => {
+                self.variables.insert("PCRE_PATTERN".to_string(), regex_pattern);
+                0
+            }
+            Err(e) => {
+                eprintln!("pcre_compile: {}", e);
+                1
+            }
+        }
+    }
+
+    /// pcre_match - match string against compiled PCRE
+    fn builtin_pcre_match(&mut self, args: &[String]) -> i32 {
+        let mut var_name = "MATCH".to_string();
+        let mut array_name = "match".to_string();
+        let mut string = String::new();
+        let mut i = 0;
+        while i < args.len() {
+            match args[i].as_str() {
+                "-v" => { i += 1; if i < args.len() { var_name = args[i].clone(); } }
+                "-a" => { i += 1; if i < args.len() { array_name = args[i].clone(); } }
+                s if !s.starts_with('-') => string = s.to_string(),
+                _ => {}
+            }
+            i += 1;
+        }
+        let pattern = match self.variables.get("PCRE_PATTERN") {
+            Some(p) => p.clone(),
+            None => {
+                eprintln!("pcre_match: no pattern compiled");
+                return 1;
+            }
+        };
+        let re = match regex::Regex::new(&pattern) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("pcre_match: {}", e);
+                return 1;
+            }
+        };
+        if let Some(caps) = re.captures(&string) {
+            if let Some(m) = caps.get(0) {
+                self.variables.insert(var_name, m.as_str().to_string());
+            }
+            let matches: Vec<String> = caps.iter()
+                .skip(1)
+                .filter_map(|m| m.map(|m| m.as_str().to_string()))
+                .collect();
+            self.arrays.insert(array_name, matches);
+            0
+        } else {
+            1
+        }
+    }
+
+    /// pcre_study - optimize compiled PCRE (no-op in Rust regex)
+    fn builtin_pcre_study(&mut self, _args: &[String]) -> i32 {
+        if self.variables.contains_key("PCRE_PATTERN") { 0 } else {
+            eprintln!("pcre_study: no pattern compiled");
+            1
         }
     }
 }

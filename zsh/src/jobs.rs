@@ -18,6 +18,7 @@ use std::sync::Mutex;
 // ============================================================================
 
 /// Thread-safe job ID allocator. Job IDs are recycled when jobs complete.
+#[allow(dead_code)]
 static NEXT_JOB_ID: AtomicUsize = AtomicUsize::new(1);
 static CONSUMED_JOB_IDS: Mutex<Vec<usize>> = Mutex::new(Vec::new());
 
