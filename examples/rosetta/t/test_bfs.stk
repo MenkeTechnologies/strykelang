@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Breadth-first search
+
+fn my_bfs($graph, $start) {
+    my @queue = ($start)
+    my %visited = ($start => 1)
+    my @order = ()
+    
+    while (scalar(@queue) > 0) {
+        my $u = shift @queue
+        push @order, $u
+        for my $v (@{$graph->{$u}}) {
+            if (!exists $visited{$v}) {
+                $visited{$v} = 1
+                push @queue, $v
+            }
+        }
+    }
+    ([@order])
+}
+
+my $graph = {
+    "A" => ["B", "C"],
+    "B" => ["D", "E"],
+    "C" => ["F"],
+    "D" => [],
+    "E" => ["F"],
+    "F" => []
+}
+
+my $res = my_bfs($graph, "A")
+assert_eq join(",", @$res), "A,B,C,D,E,F", "BFS order from A"
+
+test_run

@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pascal's triangle
+
+fn my_pascals_triangle($n) {
+    my @res = ([1])
+    for my $i (1..$n-1) {
+        my @row = (1)
+        my $prev = $res[$i-1]
+        for my $j (1..$i-1) {
+            push @row, $prev->[$j-1] + $prev->[$j]
+        }
+        push @row, 1
+        push @res, [@row]
+    }
+    ([@res])
+}
+
+my $tri = my_pascals_triangle(5)
+assert_eq scalar(@$tri), 5, "5 rows"
+assert_eq join(",", @{$tri->[0]}), "1", "row 0"
+assert_eq join(",", @{$tri->[2]}), "1,2,1", "row 2"
+assert_eq join(",", @{$tri->[4]}), "1,4,6,4,1", "row 4"
+
+test_run

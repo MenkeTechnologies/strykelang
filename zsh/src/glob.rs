@@ -1770,6 +1770,626 @@ pub mod qualifiers {
             .map(|m| m.nlink().cmp(&nlinks) == cmp)
             .unwrap_or(false)
     }
+    
+    /// Check if file is an executable command (from glob.c qualiscom)
+    pub fn is_command(path: &str) -> bool {
+        let meta = match std::fs::metadata(path) {
+            Ok(m) => m,
+            Err(_) => return false,
+        };
+        
+        if !meta.is_file() {
+            return false;
+        }
+        
+        // Check if executable
+        let mode = meta.mode();
+        if mode & 0o111 == 0 {
+            return false;
+        }
+        
+        // Check if in PATH would make it a command
+        // For now just check executable bit
+        true
+    }
+}
+
+// ============================================================================
+// Pattern matching with replacement (from glob.c getmatch family)
+// ============================================================================
+
+/// Match flags for getmatch
+#[derive(Debug, Clone, Copy)]
+pub struct MatchFlags {
+    /// Match at start
+    pub anchored_start: bool,
+    /// Match at end
+    pub anchored_end: bool,
+    /// Shortest match
+    pub shortest: bool,
+    /// Subexpression matching
+    pub subexpr: bool,
+}
+
+impl Default for MatchFlags {
+    fn default() -> Self {
+        MatchFlags {
+            anchored_start: false,
+            anchored_end: false,
+            shortest: false,
+            subexpr: false,
+        }
+    }
+}
+
+/// Internal match data
+#[derive(Debug, Clone)]
+pub struct MatchData {
+    pub str: String,
+    pub pattern: String,
+    pub match_start: usize,
+    pub match_end: usize,
+    pub replacement: Option<String>,
+}
+
+/// Get match return value (from glob.c get_match_ret lines 2338-2420)
+pub fn get_match_ret(data: &MatchData, start: usize, end: usize) -> String {
+    if start >= end || start >= data.str.len() {
+        return String::new();
+    }
+    
+    let end = end.min(data.str.len());
+    data.str[start..end].to_string()
+}
+
+/// Compile pattern and get match info (from glob.c compgetmatch lines 2430-2510)
+pub fn compgetmatch(pat: &str) -> Option<(String, MatchFlags)> {
+    let mut flags = MatchFlags::default();
+    let mut pattern = pat.to_string();
+    
+    // Check for anchors
+    if pattern.starts_with('#') {
+        flags.anchored_start = true;
+        pattern = pattern[1..].to_string();
+    }
+    if pattern.starts_with("##") {
+        flags.anchored_start = true;
+        flags.shortest = false;
+        pattern = pattern[2..].to_string();
+    }
+    if pattern.ends_with('%') {
+        flags.anchored_end = true;
+        pattern.pop();
+    }
+    if pattern.ends_with("%%") {
+        flags.anchored_end = true;
+        flags.shortest = false;
+        pattern.truncate(pattern.len().saturating_sub(2));
+    }
+    
+    Some((pattern, flags))
+}
+
+/// Get pattern match with optional replacement (from glob.c getmatch lines 2520-2680)
+/// 
+/// This implements ${var#pat}, ${var##pat}, ${var%pat}, ${var%%pat},
+/// ${var/pat/repl}, ${var//pat/repl}
+pub fn getmatch(s: &str, pat: &str, flags: MatchFlags, n: i32, replstr: Option<&str>) -> String {
+    let chars: Vec<char> = s.chars().collect();
+    let len = chars.len();
+    
+    if len == 0 {
+        return s.to_string();
+    }
+    
+    // Find match
+    let (match_start, match_end) = if flags.anchored_start && flags.anchored_end {
+        // Full match
+        if pattern_match(pat, s, true, true) {
+            (0, len)
+        } else {
+            return s.to_string();
+        }
+    } else if flags.anchored_start {
+        // Match from start (# or ##)
+        let mut best_end = 0;
+        for end in 1..=len {
+            let substr: String = chars[..end].iter().collect();
+            if pattern_match(pat, &substr, true, true) {
+                if flags.shortest {
+                    return match replstr {
+                        Some(r) => format!("{}{}", r, chars[end..].iter().collect::<String>()),
+                        None => chars[end..].iter().collect(),
+                    };
+                }
+                best_end = end;
+            }
+        }
+        if best_end > 0 {
+            (0, best_end)
+        } else {
+            return s.to_string();
+        }
+    } else if flags.anchored_end {
+        // Match from end (% or %%)
+        let mut best_start = len;
+        for start in (0..len).rev() {
+            let substr: String = chars[start..].iter().collect();
+            if pattern_match(pat, &substr, true, true) {
+                if flags.shortest {
+                    return match replstr {
+                        Some(r) => format!("{}{}", chars[..start].iter().collect::<String>(), r),
+                        None => chars[..start].iter().collect(),
+                    };
+                }
+                best_start = start;
+            }
+        }
+        if best_start < len {
+            (best_start, len)
+        } else {
+            return s.to_string();
+        }
+    } else {
+        // Floating match (/ or //)
+        for start in 0..len {
+            for end in (start + 1)..=len {
+                let substr: String = chars[start..end].iter().collect();
+                if pattern_match(pat, &substr, true, true) {
+                    let prefix: String = chars[..start].iter().collect();
+                    let suffix: String = chars[end..].iter().collect();
+                    return match replstr {
+                        Some(r) => format!("{}{}{}", prefix, r, suffix),
+                        None => format!("{}{}", prefix, suffix),
+                    };
+                }
+            }
+        }
+        return s.to_string();
+    };
+    
+    // Apply replacement
+    let prefix: String = chars[..match_start].iter().collect();
+    let suffix: String = chars[match_end..].iter().collect();
+    
+    match replstr {
+        Some(r) => format!("{}{}{}", prefix, r, suffix),
+        None => format!("{}{}", prefix, suffix),
+    }
+}
+
+/// Get match for array elements (from glob.c getmatcharr lines 2690-2750)
+pub fn getmatcharr(arr: &[String], pat: &str, flags: MatchFlags, n: i32, replstr: Option<&str>) -> Vec<String> {
+    arr.iter()
+        .map(|s| getmatch(s, pat, flags, n, replstr))
+        .collect()
+}
+
+/// Get match list for global replacement (from glob.c getmatchlist lines 2760-2850)
+pub fn getmatchlist(s: &str, pat: &str) -> Vec<(usize, usize)> {
+    let mut matches = Vec::new();
+    let chars: Vec<char> = s.chars().collect();
+    let len = chars.len();
+    
+    let mut pos = 0;
+    while pos < len {
+        for end in (pos + 1)..=len {
+            let substr: String = chars[pos..end].iter().collect();
+            if pattern_match(pat, &substr, true, true) {
+                matches.push((pos, end));
+                pos = end;
+                break;
+            }
+        }
+        if matches.last().map(|&(_, e)| e) != Some(pos) {
+            pos += 1;
+        }
+    }
+    
+    matches
+}
+
+/// Set pattern start offset (from glob.c set_pat_start)
+pub fn set_pat_start(pattern: &str, offset: usize) -> String {
+    if offset == 0 || offset >= pattern.len() {
+        return pattern.to_string();
+    }
+    pattern[offset..].to_string()
+}
+
+/// Set pattern end (from glob.c set_pat_end)
+pub fn set_pat_end(pattern: &str, end: usize) -> String {
+    if end >= pattern.len() {
+        return pattern.to_string();
+    }
+    pattern[..end].to_string()
+}
+
+// ============================================================================
+// Tokenization (from glob.c tokenize family)
+// ============================================================================
+
+/// Token types for glob tokenization
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GlobToken {
+    Literal(char),
+    Star,           // *
+    Question,       // ?
+    BracketOpen,    // [
+    BracketClose,   // ]
+    ParenOpen,      // (
+    ParenClose,     // )
+    Pipe,           // |
+    Hash,           // # (extended)
+    Tilde,          // ~ (extended)
+    Caret,          // ^ (extended)
+    BraceOpen,      // {
+    BraceClose,     // }
+    Comma,          // , (in braces)
+    Range,          // .. (in braces)
+}
+
+/// Tokenize a glob pattern (from glob.c tokenize lines 3100-3180)
+pub fn tokenize(s: &str) -> Vec<GlobToken> {
+    let mut tokens = Vec::new();
+    let mut chars = s.chars().peekable();
+    
+    while let Some(c) = chars.next() {
+        let token = match c {
+            '\\' => {
+                // Escaped character
+                if let Some(next) = chars.next() {
+                    GlobToken::Literal(next)
+                } else {
+                    GlobToken::Literal('\\')
+                }
+            }
+            '*' => GlobToken::Star,
+            '?' => GlobToken::Question,
+            '[' => GlobToken::BracketOpen,
+            ']' => GlobToken::BracketClose,
+            '(' => GlobToken::ParenOpen,
+            ')' => GlobToken::ParenClose,
+            '|' => GlobToken::Pipe,
+            '#' => GlobToken::Hash,
+            '~' => GlobToken::Tilde,
+            '^' => GlobToken::Caret,
+            '{' => GlobToken::BraceOpen,
+            '}' => GlobToken::BraceClose,
+            ',' => GlobToken::Comma,
+            '.' if chars.peek() == Some(&'.') => {
+                chars.next();
+                GlobToken::Range
+            }
+            _ => GlobToken::Literal(c),
+        };
+        tokens.push(token);
+    }
+    
+    tokens
+}
+
+/// Tokenize for shell (from glob.c shtokenize lines 3190-3250)
+/// Handles shell-specific quoting
+pub fn shtokenize(s: &str) -> Vec<GlobToken> {
+    let mut tokens = Vec::new();
+    let mut chars = s.chars().peekable();
+    let mut in_single_quote = false;
+    let mut in_double_quote = false;
+    
+    while let Some(c) = chars.next() {
+        if in_single_quote {
+            if c == '\'' {
+                in_single_quote = false;
+            } else {
+                tokens.push(GlobToken::Literal(c));
+            }
+            continue;
+        }
+        
+        if in_double_quote {
+            if c == '"' {
+                in_double_quote = false;
+            } else if c == '\\' {
+                if let Some(next) = chars.next() {
+                    tokens.push(GlobToken::Literal(next));
+                }
+            } else {
+                tokens.push(GlobToken::Literal(c));
+            }
+            continue;
+        }
+        
+        match c {
+            '\'' => in_single_quote = true,
+            '"' => in_double_quote = true,
+            '\\' => {
+                if let Some(next) = chars.next() {
+                    tokens.push(GlobToken::Literal(next));
+                }
+            }
+            '*' => tokens.push(GlobToken::Star),
+            '?' => tokens.push(GlobToken::Question),
+            '[' => tokens.push(GlobToken::BracketOpen),
+            ']' => tokens.push(GlobToken::BracketClose),
+            _ => tokens.push(GlobToken::Literal(c)),
+        }
+    }
+    
+    tokens
+}
+
+/// Tokenize with zsh-specific flags (from glob.c zshtokenize lines 3260-3380)
+pub fn zshtokenize(s: &str, extended_glob: bool, sh_glob: bool) -> Vec<GlobToken> {
+    let mut tokens = Vec::new();
+    let mut chars = s.chars().peekable();
+    
+    while let Some(c) = chars.next() {
+        let token = match c {
+            '\\' => {
+                if let Some(next) = chars.next() {
+                    GlobToken::Literal(next)
+                } else {
+                    GlobToken::Literal('\\')
+                }
+            }
+            '*' => GlobToken::Star,
+            '?' => GlobToken::Question,
+            '[' => GlobToken::BracketOpen,
+            ']' => GlobToken::BracketClose,
+            '#' if extended_glob => GlobToken::Hash,
+            '^' if extended_glob => GlobToken::Caret,
+            '~' if extended_glob => GlobToken::Tilde,
+            '(' if extended_glob => GlobToken::ParenOpen,
+            ')' if extended_glob => GlobToken::ParenClose,
+            '|' if extended_glob => GlobToken::Pipe,
+            '{' if !sh_glob => GlobToken::BraceOpen,
+            '}' if !sh_glob => GlobToken::BraceClose,
+            ',' if !sh_glob => GlobToken::Comma,
+            _ => GlobToken::Literal(c),
+        };
+        tokens.push(token);
+    }
+    
+    tokens
+}
+
+/// Remove null arguments from token list (from glob.c remnulargs lines 3390-3420)
+pub fn remnulargs(tokens: &mut Vec<GlobToken>) {
+    tokens.retain(|t| {
+        if let GlobToken::Literal(c) = t {
+            *c != '\0'
+        } else {
+            true
+        }
+    });
+}
+
+// ============================================================================
+// Mode specification parsing (from glob.c qgetmodespec)
+// ============================================================================
+
+/// Parsed mode specification
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ModeSpec {
+    pub who: u32,   // u, g, o, a masks
+    pub op: char,   // +, -, =
+    pub perm: u32,  // r, w, x, s, t masks
+}
+
+/// Parse mode specification like chmod (from glob.c qgetmodespec lines 790-920)
+/// Examples: u+x, go-w, a=r, 755
+pub fn qgetmodespec(s: &str) -> Option<(ModeSpec, &str)> {
+    let mut chars = s.chars().peekable();
+    let mut spec = ModeSpec::default();
+    
+    // Check for octal mode
+    if chars.peek().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+        let mut mode_str = String::new();
+        while let Some(&c) = chars.peek() {
+            if c.is_ascii_digit() && c < '8' {
+                mode_str.push(c);
+                chars.next();
+            } else {
+                break;
+            }
+        }
+        if let Ok(mode) = u32::from_str_radix(&mode_str, 8) {
+            spec.perm = mode;
+            spec.op = '=';
+            spec.who = 0o7777;
+            let rest_pos = s.len() - chars.collect::<String>().len();
+            return Some((spec, &s[rest_pos..]));
+        }
+        return None;
+    }
+    
+    // Parse symbolic mode
+    // Who: u, g, o, a
+    let mut who = 0u32;
+    while let Some(&c) = chars.peek() {
+        match c {
+            'u' => { who |= 0o4700; chars.next(); }
+            'g' => { who |= 0o2070; chars.next(); }
+            'o' => { who |= 0o1007; chars.next(); }
+            'a' => { who |= 0o7777; chars.next(); }
+            _ => break,
+        }
+    }
+    if who == 0 {
+        who = 0o7777; // Default to all
+    }
+    spec.who = who;
+    
+    // Op: +, -, =
+    spec.op = match chars.next() {
+        Some('+') => '+',
+        Some('-') => '-',
+        Some('=') => '=',
+        _ => return None,
+    };
+    
+    // Perm: r, w, x, X, s, t
+    let mut perm = 0u32;
+    while let Some(&c) = chars.peek() {
+        match c {
+            'r' => { perm |= 0o444; chars.next(); }
+            'w' => { perm |= 0o222; chars.next(); }
+            'x' => { perm |= 0o111; chars.next(); }
+            'X' => { perm |= 0o111; chars.next(); } // Conditional execute
+            's' => { perm |= 0o6000; chars.next(); }
+            't' => { perm |= 0o1000; chars.next(); }
+            _ => break,
+        }
+    }
+    spec.perm = perm & who;
+    
+    let rest_pos = s.len() - chars.collect::<String>().len();
+    Some((spec, &s[rest_pos..]))
+}
+
+/// Apply mode spec to existing mode
+pub fn apply_modespec(mode: u32, spec: &ModeSpec) -> u32 {
+    match spec.op {
+        '+' => mode | spec.perm,
+        '-' => mode & !spec.perm,
+        '=' => (mode & !spec.who) | spec.perm,
+        _ => mode,
+    }
+}
+
+// ============================================================================
+// Brace char range parsing (from glob.c bracechardots)
+// ============================================================================
+
+/// Parse character range in braces like {a..z} (from glob.c bracechardots lines 1780-1850)
+pub fn bracechardots(s: &str) -> Option<(char, char, i32)> {
+    let chars: Vec<char> = s.chars().collect();
+    
+    // Must be at least "a..b"
+    if chars.len() < 4 {
+        return None;
+    }
+    
+    // Find ..
+    let dotdot_pos = s.find("..")?;
+    if dotdot_pos == 0 {
+        return None;
+    }
+    
+    let left = &s[..dotdot_pos];
+    let right = &s[dotdot_pos + 2..];
+    
+    // Check for increment
+    let (end_str, incr) = if let Some(pos) = right.find("..") {
+        let end = &right[..pos];
+        let inc: i32 = right[pos + 2..].parse().unwrap_or(1);
+        (end, inc)
+    } else {
+        (right, 1)
+    };
+    
+    // Single character range
+    if left.chars().count() == 1 && end_str.chars().count() == 1 {
+        let c1 = left.chars().next()?;
+        let c2 = end_str.chars().next()?;
+        return Some((c1, c2, incr));
+    }
+    
+    None
+}
+
+// ============================================================================
+// Redirect expansion (from glob.c xpandredir)
+// ============================================================================
+
+/// Redirect types
+#[derive(Debug, Clone)]
+pub struct Redirect {
+    pub fd: i32,
+    pub target: String,
+    pub rtype: RedirectType,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedirectType {
+    Read,       // <
+    Write,      // >
+    Append,     // >>
+    ReadWrite,  // <>
+    Clobber,    // >|
+    Here,       // <<
+    HereStr,    // <<<
+    Dup,        // >&, <&
+    Pipe,       // |
+}
+
+/// Expand redirections with glob patterns (from glob.c xpandredir lines 1690-1770)
+pub fn xpandredir(redir: &Redirect, options: &GlobOptions) -> Vec<Redirect> {
+    // Check if target has wildcards
+    if !has_wildcards(&redir.target) {
+        return vec![redir.clone()];
+    }
+    
+    // Glob expand the target
+    let mut state = GlobState::new(options.clone());
+    let matches = state.glob(&redir.target);
+    
+    if matches.is_empty() {
+        return vec![redir.clone()];
+    }
+    
+    // For redirections, we usually only want one match
+    if matches.len() > 1 {
+        // Ambiguous redirect - return original
+        return vec![redir.clone()];
+    }
+    
+    vec![Redirect {
+        fd: redir.fd,
+        target: matches[0].clone(),
+        rtype: redir.rtype,
+    }]
+}
+
+// ============================================================================
+// Exec string for sorting (from glob.c glob_exec_string)
+// ============================================================================
+
+/// Execute a command and capture output for sorting (from glob.c glob_exec_string lines 920-1020)
+/// This is used for the `e` glob qualifier: *(e:'cmd':)
+pub fn glob_exec_string(cmd: &str, filename: &str) -> Option<String> {
+    use std::process::Command;
+    
+    // Replace $REPLY or {} with filename
+    let cmd = cmd.replace("$REPLY", filename).replace("{}", filename);
+    
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg(&cmd)
+        .output()
+        .ok()?;
+    
+    if output.status.success() {
+        Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    } else {
+        None
+    }
+}
+
+/// Execute a qualifier expression (from glob.c qualsheval full impl)
+pub fn qualsheval(filename: &str, expr: &str) -> bool {
+    use std::process::Command;
+    
+    // Set REPLY to filename and evaluate expression
+    let script = format!("REPLY='{}'; {}", filename.replace("'", "'\\''"), expr);
+    
+    Command::new("sh")
+        .arg("-c")
+        .arg(&script)
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
 }
 
 #[cfg(test)]

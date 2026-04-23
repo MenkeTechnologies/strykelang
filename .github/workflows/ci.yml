@@ -130,12 +130,31 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+  zshrs-ztst:
+    name: zshrs ztst integration tests
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --locked -p zsh
+      - name: Run ztst integration tests
+        run: cargo test --locked -p zsh --test ztst_runner -- --nocapture
+        env:
+          ZSHRS: ${{ github.workspace }}/target/debug/zshrs
+          ZTST_VERBOSE: 1
+
   release-build:
     name: Release Build
     # Only blocks on real-bug signals. fmt / clippy are advisory (see
     # their `continue-on-error`); listing them here would make the entire
     # release pipeline wait on cosmetic lints.
-    needs: [check, test, doc, parity, stryke-test, zshrs-corpus]
+    needs: [check, test, doc, parity, stryke-test, zshrs-corpus, zshrs-ztst]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
