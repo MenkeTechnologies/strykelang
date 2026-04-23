@@ -368,6 +368,95 @@ And nobody noticed because nobody reads shell source code.
 
 Apple chose zsh as the macOS default in 2019 because the license changed from GPL to MIT. Not because anyone audited the code. Not because anyone ran the tests. Not because anyone profiled the completion system. Because of a license.
 
+## The ztst Test Harness: A Case Study in How Not to Test Software
+
+The zsh test suite isn't just bad — it's a masterclass in violating every principle of test design that's existed since the concept of unit testing was invented.
+
+### The Harness Tests Itself
+
+`ztst.zsh` is a **631-line zsh script** that tests zsh **by running inside zsh**. The test harness uses `eval`, `zmodload`, `setopt`, `autoload`, `emulate`, and `typeset` — the very features it's supposed to be testing. If any of those features are broken, the harness itself breaks, and you get false passes or incomprehensible failures with no way to tell which.
+
+This is like testing a compiler by writing the tests in the language the compiler compiles. If the compiler has a bug in `if` statements, your `if`-based test assertions silently pass.
+
+### Zero Test Isolation
+
+- **879 global state modifications** across test blocks — `typeset -g`, `export`, `setopt`, `alias`
+- **29 test files** `cd` in `%prep` — changing the working directory for every subsequent test in the file
+- **21 test files** use `eval` inside test blocks — can modify literally any state
+- Tests run sequentially in **one shell process** — every variable, function, alias, option, and working directory change leaks into subsequent tests
+
+There is no teardown. There is no reset. Test 47 runs in whatever state test 46 left behind.
+
+### %prep: Shared Mutable Setup
+
+Every test file has a `%prep` section that runs once and creates state for all tests. This state is shared, mutable, and invisible:
+
+| File | %prep Lines | What it does |
+|------|-------------|-------------|
+| K01nameref.ztst | **1,092** | Defines an entire program — functions, nested scopes, reference chains — as "setup" |
+| B01cd.ztst | 91 | Creates directories, changes cwd for all tests |
+| B02typeset.ztst | 73 | Declares variables that all tests depend on |
+| X04zlehighlight.ztst | 69 | Sets up ZLE state |
+| C02cond.ztst | 44 | Creates test files and directories |
+| V01zmodload.ztst | 43 | Loads modules that affect all tests |
+
+`K01nameref.ztst` has **1,092 lines of %prep**. That's not test setup — that's an entire program masquerading as test infrastructure. The file is 2,019 lines total, meaning **54% of the "test file" is setup code.**
+
+### Can't Run One Test
+
+Want to debug why test 47 in `D04parameter.ztst` fails? You can't run just that test. You have to:
+
+1. Run all 46 tests before it (to build up the shared state it depends on)
+2. Hope none of those tests have side effects that change the outcome
+3. Hope the `%prep` section (which runs once for all tests) doesn't interact with your test
+4. Read through 222 test blocks to understand the accumulated state
+
+There is no `--filter`. There is no `--only`. There is no test ID system. You run the whole file or nothing.
+
+### Can't Parallelize
+
+Since every test depends on shared mutable state from the tests before it, you can't run tests in parallel. You can't even run test *files* in parallel reliably, because they modify the working directory and create temporary files in shared locations.
+
+### Can't Bisect Failures
+
+When a test fails after a code change, you can't tell if:
+- The test itself broke (the feature is buggy)
+- A prior test changed (leaving different state for this test)
+- The `%prep` section interacts differently with the code change
+- The test harness itself is affected by the change (since it uses the features it tests)
+
+### No Timeout, No Cleanup
+
+The harness has no per-test timeout. If a test hangs (infinite loop, blocking I/O, waiting for input), the entire test run hangs forever. There's no watchdog. There's no cleanup on interrupt. You kill the process and hope the temp files get cleaned up (they don't — the cleanup function runs on normal exit only).
+
+### The Numbers
+
+- **631 lines** of test harness code (zsh testing itself)
+- **70 test files**, **27,090 lines** of test code
+- **879 global state modifications** across test blocks
+- **29 test files** change working directory in %prep
+- **21 test files** use `eval` in test blocks
+- **Zero** ability to run a single test in isolation
+- **Zero** ability to parallelize
+- **Zero** per-test timeout
+- **Zero** automated cleanup on failure
+
+### The zshrs Test Runner
+
+The zshrs test runner (`ztst_runner.rs`) fixes every one of these problems:
+
+| ztst.zsh | ztst_runner.rs |
+|----------|---------------|
+| Zsh tests itself (circular) | Rust tests zshrs from the outside |
+| One process, shared state | One process per test, clean slate |
+| No test isolation | Each test gets its own prep |
+| Can't run one test | `cargo test specific_test` |
+| Can't parallelize | Process-per-test, parallelizable |
+| No timeout | 200ms timeout per test, process group kill |
+| No cleanup on hang | Process groups — SIGKILL entire tree |
+| Hangs block everything | Timeout kills and moves on |
+| 631 lines of zsh script | Compiled Rust, no circular dependency |
+
 ## Security Vulnerabilities
 
 ### 7 CVEs (and counting)
