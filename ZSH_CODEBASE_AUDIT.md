@@ -428,6 +428,28 @@ This is not shell development. This is shell script maintenance. The underlying 
 
 The barrier to entry ensures the bus factor stays at 2.
 
+## Fish Got Rewritten in Rust. Why Not ZSH?
+
+Fish shell was rewritten from C++ to Rust in months. The fish team had the engineering discipline and humility to say "C++ isn't cutting it, let's rewrite in Rust." They did it. It shipped. It works.
+
+ZSH will never be rewritten by its own team. Here's why:
+
+1. **The codebase is impenetrable.** No one on the current team understands all of it. Peter Stephenson (48% of all commits) has essentially stopped. The remaining developers edit shell scripts — they don't touch the C engine because they can't navigate it. 1,502-line functions with 18 gotos and 1,940 global statics aren't something you casually refactor.
+
+2. **No tests to validate a rewrite.** Fish had tests. ZSH has zero unit tests. How do you verify a rewrite is correct when you have no specification of correct behavior? The only "tests" are integration tests with ordering dependencies that can't run in isolation.
+
+3. **The team edits shell scripts, not systems code.** 32% of commits in the last 3 years are completion shell script edits. 1.5% touch core C. Adding `--verbose` to `_apt` is not the same skill set as rewriting a parser in Rust.
+
+4. **No infrastructure to support a rewrite.** No CI, no GitHub, no issue tracker. You can't coordinate a multi-month rewrite over a mailing list with emailed patches. Fish had GitHub, PRs, CI, code review. ZSH has email.
+
+5. **No urgency.** Apple ships it. Users don't complain. Nobody reads the source. The 465 unsafe string operations, 174 memory leak points, and 7 CVEs are invisible to users who just want tab completion to work. Why rewrite something nobody's looking at?
+
+6. **Bus factor of 2.** Two developers doing 60% of the work. They don't have bandwidth to maintain what exists, let alone rewrite it. And they're not systems programmers — they're shell script maintainers.
+
+7. **No one left who can.** The people who understood the C code (Paul Falstad, Peter Stephenson) are gone or inactive. The people who remain lack the expertise to rewrite 147,233 lines of C in any language, let alone Rust.
+
+Fish got rewritten because fish developers are engineers. ZSH rots because the people left aren't equipped to do anything about it. That's why zshrs exists — because the zsh team can't do it and won't do it, so someone else has to.
+
 ## Worst Engineering Principles Known to Man
 
 Every principle of software engineering — violated:
