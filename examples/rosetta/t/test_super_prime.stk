@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Super-prime numbers
+
+fn my_is_prime($n) {
+    if ($n < 2) { 0 }
+    elsif ($n == 2) { 1 }
+    elsif ($n % 2 == 0) { 0 }
+    else {
+        my $limit = sqrt($n)
+        my $res = 1
+        for my $i (3..int($limit)) {
+            if ($n % $i == 0) {
+                $res = 0
+                $i = $n
+            }
+        }
+        $res
+    }
+}
+
+fn my_nth_prime($n) {
+    my $count = 0
+    my $candidate = 1
+    while ($count < $n) {
+        $candidate++
+        if (my_is_prime($candidate)) { $count++ }
+    }
+    $candidate
+}
+
+fn is_super_prime($n) {
+    # Check if n is the i-th prime where i is also prime
+    if (!my_is_prime($n)) {
+        0
+    } else {
+        # Find which prime n is
+        my $count = 0
+        my $p = 1
+        while ($p < $n) {
+            $p++
+            if (my_is_prime($p)) { $count++ }
+        }
+        my_is_prime($count)
+    }
+}
+
+assert_ok is_super_prime(3), "3 is 2nd prime, 2 is prime"
+assert_ok is_super_prime(5), "5 is 3rd prime, 3 is prime"
+assert_ok is_super_prime(11), "11 is 5th prime, 5 is prime"
+assert_ok !is_super_prime(2), "2 is 1st prime, 1 is not prime"
+assert_ok !is_super_prime(7), "7 is 4th prime, 4 is not prime"
+
+11 |> is_super_prime |> assert_ok("pipe Super-prime")
+
+test_run

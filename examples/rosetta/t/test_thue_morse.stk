@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Thue-Morse sequence
+
+fn thue_morse($n) {
+    if ($n == 0) {
+        "0"
+    } else {
+        my $s = "0"
+        for my $i (1..$n) {
+            my $complement = $s
+            $complement =~ tr/01/10/
+            $s = $s . $complement
+        }
+        $s
+    }
+}
+
+assert_eq thue_morse(0), "0", "TM 0"
+assert_eq thue_morse(1), "01", "TM 1"
+assert_eq thue_morse(2), "0110", "TM 2"
+assert_eq thue_morse(3), "01101001", "TM 3"
+
+3 |> thue_morse |> assert_eq("01101001", "pipe Thue-Morse")
+
+test_run

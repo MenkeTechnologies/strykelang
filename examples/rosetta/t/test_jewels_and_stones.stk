@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Jewels and Stones
+
+fn count_jewels($jewels, $stones) {
+    my %j_map
+    my @j_chars = chars($jewels)
+    for my $j (@j_chars) { $j_map{$j} = 1 }
+    
+    my $count = 0
+    my @s_chars = chars($stones)
+    for my $s (@s_chars) {
+        if (exists $j_map{$s}) { $count++ }
+    }
+    $count
+}
+
+assert_eq count_jewels("aA", "aAAbbbb"), 3, "2 jewels in stones"
+assert_eq count_jewels("z", "ZZ"), 0, "no jewels (case sensitive)"
+
+# Chaining
+"aA" |> count_jewels("aAAbbbb") |> assert_eq(3, "pipe jewels")
+
+test_run

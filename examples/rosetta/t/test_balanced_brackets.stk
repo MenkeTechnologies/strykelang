@@ -1,33 +1,30 @@
 #!/usr/bin/env stryke
-# Rosetta Code: Balanced Brackets
+# Rosetta Code: Balanced brackets
 
-fn is_balanced($s) {
-    my $depth = 0
-    my $ok = 1
-    for my $c (~> $s chars) {
-        if ($ok) {
-            if ($c eq '[') {
-                $depth++
-            } elsif ($c eq ']') {
-                $depth--
-            }
-            
-            if ($depth < 0) {
-                $ok = 0
-            }
+fn are_balanced($s) {
+    my $count = 0
+    my $balanced = 1
+    my @chars = chars($s)
+    for my $c (@chars) {
+        if ($c eq "[") {
+            $count++
+        } elsif ($c eq "]") {
+            $count--
+            if ($count < 0) { $balanced = 0 }
         }
     }
-    $ok && $depth == 0
+    if ($count != 0) { $balanced = 0 }
+    $balanced
 }
 
-assert_ok is_balanced(""), "empty is balanced"
-assert_ok is_balanced("[]"), "[] is balanced"
-assert_ok is_balanced("[[]]"), "[[]] is balanced"
-assert_ok is_balanced("[][]"), "[][] is balanced"
-assert_ok is_balanced("[[][]]"), "[[][]] is balanced"
+assert_ok are_balanced(""), "empty is balanced"
+assert_ok are_balanced("[]"), "[] is balanced"
+assert_ok are_balanced("[[][]]"), "[[ ] []] is balanced"
+assert_ok !are_balanced("["), "[ is not"
+assert_ok !are_balanced("]"), "] is not"
+assert_ok !are_balanced("]["), "][ is not"
+assert_ok !are_balanced("[]]"), "[]] is not"
 
-assert_ok !is_balanced("]["), "][ is not balanced"
-assert_ok !is_balanced("[]]"), "[]] is not balanced"
-assert_ok !is_balanced("["), "[ alone is not balanced"
+"[[[]]]" |> are_balanced |> assert_ok("pipe balanced")
 
 test_run

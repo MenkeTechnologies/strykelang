@@ -1177,6 +1177,9 @@ impl Scope {
             frame.set_array(name, val);
             if frozen {
                 frame.frozen_arrays.insert(name.to_string());
+            } else {
+                // Redeclaring as non-frozen should unfreeze if previously frozen
+                frame.frozen_arrays.remove(name);
             }
         }
     }

@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pernicious numbers
+
+fn my_is_prime($n) {
+    if ($n < 2) { 0 }
+    elsif ($n == 2) { 1 }
+    elsif ($n % 2 == 0) { 0 }
+    else {
+        my $limit = sqrt($n)
+        my $res = 1
+        for my $i (3..int($limit)) {
+            if ($n % $i == 0) {
+                $res = 0
+                $i = $n
+            }
+        }
+        $res
+    }
+}
+
+fn count_bits($n) {
+    my $count = 0
+    while ($n > 0) {
+        if ($n % 2 == 1) { $count++ }
+        $n = int($n / 2)
+    }
+    $count
+}
+
+fn is_pernicious($n) {
+    my $bits = count_bits($n)
+    my_is_prime($bits)
+}
+
+assert_ok is_pernicious(3), "3 is pernicious (bits 2)"
+assert_ok is_pernicious(5), "5 is pernicious (bits 2)"
+assert_ok is_pernicious(6), "6 is pernicious (bits 2)"
+assert_ok is_pernicious(7), "7 is pernicious (bits 3)"
+assert_ok !is_pernicious(1), "1 is not (bits 1)"
+assert_ok !is_pernicious(8), "8 is not (bits 1)"
+
+7 |> is_pernicious |> assert_ok("pipe Pernicious")
+
+test_run

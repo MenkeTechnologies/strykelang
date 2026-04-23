@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Juggler sequence
+
+fn juggler_step($n) {
+    if ($n % 2 == 0) {
+        int($n ** 0.5)
+    } else {
+        int($n ** 1.5)
+    }
+}
+
+fn juggler_sequence($start) {
+    my @res = ($start)
+    my $curr = $start
+    while ($curr != 1) {
+        $curr = juggler_step($curr)
+        push @res, $curr
+    }
+    ([@res])
+}
+
+assert_eq join(",", @{ juggler_sequence(3) }), "3,5,11,36,6,2,1", "juggler 3"
+assert_eq join(",", @{ juggler_sequence(2) }), "2,1", "juggler 2"
+
+3 |> juggler_sequence |> map { join(",", @$_) } |> assert_eq("3,5,11,36,6,2,1", "pipe juggler")
+
+test_run

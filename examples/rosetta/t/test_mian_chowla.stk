@@ -1,0 +1,40 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Mian-Chowla sequence
+
+fn mian_chowla($n) {
+    my @a = (1)
+    while (scalar(@a) < $n) {
+        my $next = $a[-1] + 1
+        my $found = 0
+        while (!$found) {
+            my %sums
+            my $valid = 1
+            my @temp = (@a, $next)
+            for my $i (0..scalar(@temp)-1) {
+                for my $j ($i..scalar(@temp)-1) {
+                    my $s = $temp[$i] + $temp[$j]
+                    if (exists $sums{$s}) {
+                        $valid = 0
+                        $i = scalar(@temp) # break
+                        $j = scalar(@temp) # break
+                    }
+                    $sums{$s} = 1
+                }
+            }
+            if ($valid) {
+                push @a, $next
+                $found = 1
+            } else {
+                $next++
+            }
+        }
+    }
+    ([@a])
+}
+
+my $res = mian_chowla(5)
+assert_eq join(",", @$res), "1,2,4,8,13", "Mian-Chowla first 5"
+
+5 |> mian_chowla |> map { $_->[4] } |> assert_eq(13, "pipe Mian-Chowla")
+
+test_run

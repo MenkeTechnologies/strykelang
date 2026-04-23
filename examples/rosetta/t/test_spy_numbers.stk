@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Spy numbers
+
+fn is_spy($n) {
+    my @digits = ~> "$n" chars map { int($_) }
+    my $sum = 0
+    my $prod = 1
+    for my $d (@digits) {
+        $sum += $d
+        $prod *= $d
+    }
+    $sum == $prod
+}
+
+assert_ok is_spy(1124), "1124 is spy (1+1+2+4=8, 1*1*2*4=8)"
+assert_ok is_spy(123), "123 is spy (1+2+3=6, 1*2*3=6)"
+assert_ok !is_spy(124), "124 is not (sum 7, prod 8)"
+
+1124 |> is_spy |> assert_ok("pipe Spy")
+
+test_run

@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Evil and odious numbers
+
+fn count_bits($n) {
+    my $count = 0
+    while ($n > 0) {
+        if ($n % 2 == 1) { $count++ }
+        $n = int($n / 2)
+    }
+    $count
+}
+
+fn is_evil($n) {
+    count_bits($n) % 2 == 0
+}
+
+fn is_odious($n) {
+    count_bits($n) % 2 == 1
+}
+
+assert_ok is_evil(3), "3 is evil (binary 11, bits 2)"
+assert_ok is_evil(5), "5 is evil (binary 101, bits 2)"
+assert_ok is_odious(1), "1 is odious (binary 1, bits 1)"
+assert_ok is_odious(7), "7 is odious (binary 111, bits 3)"
+
+3 |> is_evil |> assert_ok("pipe evil")
+
+test_run

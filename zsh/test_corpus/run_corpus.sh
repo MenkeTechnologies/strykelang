@@ -6,7 +6,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ZSHRS="${ZSHRS:-$SCRIPT_DIR/../../target/release/zshrs}"
+ZSHRS="${ZSHRS:-$SCRIPT_DIR/../../target/debug/zshrs}"
 CORPUS_DIR="$SCRIPT_DIR"
 TIMEOUT=5
 FAILURES_LOG="$SCRIPT_DIR/corpus_failures.log"

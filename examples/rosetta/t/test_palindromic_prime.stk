@@ -1,0 +1,41 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Palindromic primes
+
+fn my_is_prime($n) {
+    if ($n < 2) { 0 }
+    elsif ($n == 2) { 1 }
+    elsif ($n % 2 == 0) { 0 }
+    else {
+        my $limit = sqrt($n)
+        my $res = 1
+        my $i = 3
+        while ($i <= $limit) {
+            if ($n % $i == 0) {
+                $res = 0
+                $i = $n
+            }
+            $i += 2
+        }
+        $res
+    }
+}
+
+fn my_is_palindrome($n) {
+    my $s = "$n"
+    my $rev = ~> $s >{split //, $_} rev |> join("")
+    $s eq $rev
+}
+
+fn is_palindromic_prime($n) {
+    my_is_prime($n) && my_is_palindrome($n)
+}
+
+assert_ok is_palindromic_prime(2), "2 is palindromic prime"
+assert_ok is_palindromic_prime(11), "11 is palindromic prime"
+assert_ok is_palindromic_prime(131), "131 is palindromic prime"
+assert_ok !is_palindromic_prime(13), "13 is prime but not palindrome"
+assert_ok !is_palindromic_prime(121), "121 is palindrome but not prime (11*11)"
+
+131 |> is_palindromic_prime |> assert_ok("pipe Palindromic prime")
+
+test_run

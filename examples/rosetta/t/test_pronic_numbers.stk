@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pronic numbers
+
+fn is_pronic($n) {
+    if ($n < 0) {
+        0
+    } else {
+        my $root = int(sqrt($n))
+        $root * ($root + 1) == $n
+    }
+}
+
+fn pronic_list($max) {
+    ~> 0..$max filter { is_pronic($_) }
+}
+
+assert_ok is_pronic(0), "0 is pronic (0*1)"
+assert_ok is_pronic(2), "2 is pronic (1*2)"
+assert_ok is_pronic(6), "6 is pronic (2*3)"
+assert_ok is_pronic(12), "12 is pronic (3*4)"
+assert_ok !is_pronic(5), "5 is not pronic"
+
+my @list = pronic_list(30)
+assert_eq join(",", @list), "0,2,6,12,20,30", "pronic up to 30"
+
+42 |> is_pronic |> assert_ok("42 is pronic (6*7)")
+
+test_run

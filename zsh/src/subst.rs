@@ -634,6 +634,403 @@ fn parse_range(s: &str) -> Option<(i32, i32)> {
     Some((start, end))
 }
 
+/// Remove trailing path component(s)
+/// Port from remtpath() in zsh/Src/subst.c
+pub fn remtpath(path: &str, count: usize) -> String {
+    let mut result = path.to_string();
+    for _ in 0..count {
+        if let Some(pos) = result.rfind('/') {
+            if pos == 0 {
+                result = "/".to_string();
+            } else {
+                result = result[..pos].to_string();
+            }
+        } else {
+            result = ".".to_string();
+            break;
+        }
+    }
+    result
+}
+
+/// Remove leading path component(s)
+/// Port from remlpaths() in zsh/Src/subst.c
+pub fn remlpaths(path: &str, count: usize) -> String {
+    let mut result = path;
+    for _ in 0..count {
+        if let Some(pos) = result.find('/') {
+            result = &result[pos + 1..];
+        } else {
+            return result.to_string();
+        }
+    }
+    result.to_string()
+}
+
+/// Remove text after last dot (extension)
+/// Port from remtext() in zsh/Src/subst.c
+pub fn remtext(path: &str) -> String {
+    if let Some(slash_pos) = path.rfind('/') {
+        let filename = &path[slash_pos + 1..];
+        if let Some(dot_pos) = filename.rfind('.') {
+            if dot_pos > 0 {
+                return format!("{}{}", &path[..=slash_pos], &filename[..dot_pos]);
+            }
+        }
+        path.to_string()
+    } else if let Some(dot_pos) = path.rfind('.') {
+        if dot_pos > 0 {
+            return path[..dot_pos].to_string();
+        }
+        path.to_string()
+    } else {
+        path.to_string()
+    }
+}
+
+/// Remove everything but the extension
+/// Port from rembutext() in zsh/Src/subst.c
+pub fn rembutext(path: &str) -> String {
+    let filename = if let Some(slash_pos) = path.rfind('/') {
+        &path[slash_pos + 1..]
+    } else {
+        path
+    };
+    
+    if let Some(dot_pos) = filename.rfind('.') {
+        if dot_pos > 0 && dot_pos < filename.len() - 1 {
+            return filename[dot_pos + 1..].to_string();
+        }
+    }
+    String::new()
+}
+
+/// Get the tail (filename) part of a path
+pub fn path_tail(path: &str) -> String {
+    if let Some(pos) = path.rfind('/') {
+        path[pos + 1..].to_string()
+    } else {
+        path.to_string()
+    }
+}
+
+/// Get the head (directory) part of a path
+pub fn path_head(path: &str) -> String {
+    remtpath(path, 1)
+}
+
+/// Case modification modes
+/// Port from CASMOD_* in zsh.h
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum CaseMod {
+    Lower,
+    Upper,
+    Caps,
+}
+
+/// Modify case of a string
+/// Port from casemodify() in zsh/Src/subst.c
+pub fn casemodify(s: &str, mode: CaseMod) -> String {
+    match mode {
+        CaseMod::Lower => s.to_lowercase(),
+        CaseMod::Upper => s.to_uppercase(),
+        CaseMod::Caps => {
+            let mut result = String::with_capacity(s.len());
+            let mut cap_next = true;
+            for c in s.chars() {
+                if c.is_whitespace() || !c.is_alphabetic() {
+                    result.push(c);
+                    cap_next = true;
+                } else if cap_next {
+                    for uc in c.to_uppercase() {
+                        result.push(uc);
+                    }
+                    cap_next = false;
+                } else {
+                    for lc in c.to_lowercase() {
+                        result.push(lc);
+                    }
+                }
+            }
+            result
+        }
+    }
+}
+
+/// Convert path to absolute path
+/// Port from chabspath() in zsh/Src/subst.c
+pub fn chabspath(path: &str) -> String {
+    if path.starts_with('/') {
+        return clean_path(path);
+    }
+    
+    let cwd = env::current_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| "/".to_string());
+    
+    clean_path(&format!("{}/{}", cwd, path))
+}
+
+/// Clean up path by removing redundant components
+fn clean_path(path: &str) -> String {
+    let mut components: Vec<&str> = Vec::new();
+    
+    for part in path.split('/') {
+        match part {
+            "" | "." => continue,
+            ".." => {
+                if !components.is_empty() && components.last() != Some(&"..") {
+                    components.pop();
+                } else if !path.starts_with('/') {
+                    components.push("..");
+                }
+            }
+            p => components.push(p),
+        }
+    }
+    
+    if path.starts_with('/') {
+        format!("/{}", components.join("/"))
+    } else if components.is_empty() {
+        ".".to_string()
+    } else {
+        components.join("/")
+    }
+}
+
+/// Perform single substitution (no word splitting)
+/// Port from singsub() in zsh/Src/subst.c
+pub fn singsub(s: &str, params: &HashMap<String, String>) -> Result<String, String> {
+    let opts = SubstOptions::default();
+    subst_string(s, params, &opts)
+}
+
+/// Perform multiple substitution with word splitting
+/// Port from multsub() in zsh/Src/subst.c
+pub fn multsub(s: &str, params: &HashMap<String, String>) -> Result<Vec<String>, String> {
+    let mut opts = SubstOptions::default();
+    opts.word_split = true;
+    
+    let expanded = subst_string(s, params, &opts)?;
+    
+    // Split on IFS
+    let ifs = params.get("IFS")
+        .map(|s| s.as_str())
+        .unwrap_or(" \t\n");
+    
+    Ok(expanded.split(|c: char| ifs.contains(c))
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect())
+}
+
+/// Untokenize a string (remove internal tokens)
+/// Port from untokenize() in zsh/Src/subst.c
+pub fn untokenize(s: &str) -> String {
+    s.to_string()
+}
+
+/// Remove null arguments
+/// Port from remnulargs() in zsh/Src/subst.c
+pub fn remnulargs(s: &str) -> String {
+    s.to_string()
+}
+
+/// Pad string to specified width (from subst.c dopadding lines 892-1332)
+pub fn dopadding(
+    s: &str,
+    prenum: usize,
+    postnum: usize,
+    preone: Option<&str>,
+    postone: Option<&str>,
+    premul: Option<&str>,
+    postmul: Option<&str>,
+) -> String {
+    let default_pad = " ";
+    let preone = preone.unwrap_or("");
+    let postone = postone.unwrap_or("");
+    let premul = if premul.map(|s| s.is_empty()).unwrap_or(true) { default_pad } else { premul.unwrap() };
+    let postmul = if postmul.map(|s| s.is_empty()).unwrap_or(true) { default_pad } else { postmul.unwrap() };
+    
+    let slen = s.chars().count();
+    
+    if prenum + postnum == slen {
+        return s.to_string();
+    }
+    
+    let mut result = String::new();
+    
+    if prenum > 0 {
+        let f = prenum.saturating_sub(slen);
+        if f == 0 {
+            // String is longer than prenum, truncate from left
+            let skip = slen - prenum;
+            result.extend(s.chars().skip(skip));
+        } else {
+            // Need to pad on left
+            let mut pad_needed = f.saturating_sub(preone.chars().count());
+            
+            // Add repeated premul padding
+            while pad_needed > 0 {
+                let plen = premul.chars().count();
+                if pad_needed >= plen {
+                    result.push_str(premul);
+                    pad_needed -= plen;
+                } else {
+                    // Partial pad
+                    result.extend(premul.chars().take(pad_needed));
+                    pad_needed = 0;
+                }
+            }
+            
+            // Add preone
+            if !preone.is_empty() && f >= preone.chars().count() {
+                result.push_str(preone);
+            } else if !preone.is_empty() {
+                // Truncate preone
+                let skip = preone.chars().count() - f;
+                result.extend(preone.chars().skip(skip));
+            }
+            
+            // Add the string
+            result.push_str(s);
+        }
+    } else if postnum > 0 {
+        let f = postnum.saturating_sub(slen);
+        if f == 0 {
+            // String is longer than postnum, truncate from right
+            result.extend(s.chars().take(postnum));
+        } else {
+            // Add the string
+            result.push_str(s);
+            
+            // Add postone
+            if !postone.is_empty() {
+                if f >= postone.chars().count() {
+                    result.push_str(postone);
+                } else {
+                    result.extend(postone.chars().take(f));
+                }
+            }
+            
+            // Add repeated postmul padding
+            let mut pad_needed = f.saturating_sub(postone.chars().count());
+            while pad_needed > 0 {
+                let plen = postmul.chars().count();
+                if pad_needed >= plen {
+                    result.push_str(postmul);
+                    pad_needed -= plen;
+                } else {
+                    result.extend(postmul.chars().take(pad_needed));
+                    pad_needed = 0;
+                }
+            }
+        }
+    } else {
+        result.push_str(s);
+    }
+    
+    result
+}
+
+/// Get delimited string argument (from subst.c get_strarg lines 1346-1417)
+pub fn get_strarg(s: &str) -> Option<(&str, char)> {
+    let mut chars = s.chars();
+    let delim = chars.next()?;
+    
+    let end_delim = match delim {
+        '(' => ')',
+        '[' => ']',
+        '{' => '}',
+        '<' => '>',
+        _ => delim,
+    };
+    
+    let rest: String = chars.collect();
+    if let Some(pos) = rest.find(end_delim) {
+        Some((&s[1..pos+1], end_delim))
+    } else {
+        None
+    }
+}
+
+/// Do =foo substitution (from subst.c equalsubstr lines 714-733)
+pub fn equalsubstr(cmd: &str) -> Option<String> {
+    crate::utils::find_in_path(cmd).and_then(|p| p.to_str().map(|s| s.to_string()))
+}
+
+/// File substitution - tilde and equals (from subst.c filesubstr lines 736-807)
+pub fn filesubstr(name: &str, assign: bool) -> Option<String> {
+    if name.starts_with('~') {
+        let rest = &name[1..];
+        
+        // ~ alone
+        if rest.is_empty() || rest.starts_with('/') {
+            let home = std::env::var("HOME").unwrap_or_default();
+            return Some(format!("{}{}", home, rest));
+        }
+        
+        // ~+
+        if rest.starts_with('+') && (rest.len() == 1 || rest.chars().nth(1) == Some('/')) {
+            let pwd = std::env::var("PWD").unwrap_or_else(|_| ".".to_string());
+            return Some(format!("{}{}", pwd, &rest[1..]));
+        }
+        
+        // ~-
+        if rest.starts_with('-') && (rest.len() == 1 || rest.chars().nth(1) == Some('/')) {
+            let oldpwd = std::env::var("OLDPWD").unwrap_or_else(|_| ".".to_string());
+            return Some(format!("{}{}", oldpwd, &rest[1..]));
+        }
+        
+        // ~user
+        let (user, suffix) = match rest.find('/') {
+            Some(pos) => (&rest[..pos], &rest[pos..]),
+            None => (rest, ""),
+        };
+        
+        #[cfg(unix)]
+        {
+            if let Some(home) = crate::subst::get_user_home(user) {
+                return Some(format!("{}{}", home, suffix));
+            }
+        }
+    } else if name.starts_with('=') && name.len() > 1 {
+        // =cmd substitution
+        if let Some(path) = equalsubstr(&name[1..]) {
+            return Some(path);
+        }
+    }
+    
+    None
+}
+
+/// Subst eval char - evaluate numeric expression to character (from subst.c substevalchar lines 1489-1520)
+pub fn substevalchar(expr: &str) -> Option<char> {
+    let value: i64 = expr.parse().ok()?;
+    if value < 0 || value > 0x10FFFF {
+        return None;
+    }
+    char::from_u32(value as u32)
+}
+
+/// Check if string is a subscript or length after colon (from subst.c check_colon_subscript lines 1565-1599)
+pub fn check_colon_subscript(s: &str) -> Option<(String, &str)> {
+    if s.is_empty() || s.starts_with(|c: char| c.is_alphabetic()) || s.starts_with('&') {
+        return None;
+    }
+    
+    if s.starts_with(':') {
+        return Some(("0".to_string(), s));
+    }
+    
+    // Find the end of the subscript expression
+    let end = s.find(':').unwrap_or(s.len());
+    let expr = &s[..end];
+    let rest = &s[end..];
+    
+    Some((expr.to_string(), rest))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -680,5 +1077,45 @@ mod tests {
         assert!(results.contains(&"file1".to_string()));
         assert!(results.contains(&"file2".to_string()));
         assert!(results.contains(&"file3".to_string()));
+    }
+
+    #[test]
+    fn test_remtpath() {
+        assert_eq!(remtpath("/a/b/c", 1), "/a/b");
+        assert_eq!(remtpath("/a/b/c", 2), "/a");
+        assert_eq!(remtpath("foo", 1), ".");
+    }
+
+    #[test]
+    fn test_remlpaths() {
+        assert_eq!(remlpaths("/a/b/c", 1), "a/b/c");
+        assert_eq!(remlpaths("a/b/c", 2), "c");
+    }
+
+    #[test]
+    fn test_remtext() {
+        assert_eq!(remtext("file.txt"), "file");
+        assert_eq!(remtext("/path/to/file.txt"), "/path/to/file");
+        assert_eq!(remtext("noext"), "noext");
+    }
+
+    #[test]
+    fn test_rembutext() {
+        assert_eq!(rembutext("file.txt"), "txt");
+        assert_eq!(rembutext("/path/to/file.rs"), "rs");
+        assert_eq!(rembutext("noext"), "");
+    }
+
+    #[test]
+    fn test_casemodify() {
+        assert_eq!(casemodify("Hello World", CaseMod::Lower), "hello world");
+        assert_eq!(casemodify("Hello World", CaseMod::Upper), "HELLO WORLD");
+        assert_eq!(casemodify("hello world", CaseMod::Caps), "Hello World");
+    }
+
+    #[test]
+    fn test_clean_path() {
+        assert_eq!(chabspath("/a/b/../c"), "/a/c");
+        assert_eq!(chabspath("/a/./b/c"), "/a/b/c");
     }
 }

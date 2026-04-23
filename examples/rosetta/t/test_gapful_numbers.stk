@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Gapful numbers
+
+fn is_gapful($n) {
+    my $s = "$n"
+    my $len = length($s)
+    if ($len < 3) {
+        0
+    } else {
+        my @c = chars($s)
+        my $divisor = int($c[0] . $c[$len-1])
+        $n % $divisor == 0
+    }
+}
+
+assert_ok is_gapful(187), "187 is gapful (187 % 17 == 0)"
+assert_ok is_gapful(100), "100 is gapful (100 % 10 == 0)"
+assert_ok !is_gapful(188), "188 is not gapful"
+assert_ok !is_gapful(10), "10 is too short"
+
+187 |> is_gapful |> assert_ok("pipe gapful")
+
+test_run

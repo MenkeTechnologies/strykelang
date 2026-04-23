@@ -1,0 +1,80 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Poker hand analyser
+
+fn card_value($c) {
+    my $v = substr($c, 0, length($c)-1)
+    if ($v eq "A") { 14 }
+    elsif ($v eq "K") { 13 }
+    elsif ($v eq "Q") { 12 }
+    elsif ($v eq "J") { 11 }
+    elsif ($v eq "T") { 10 }
+    else { int($v) }
+}
+
+fn card_suit($c) {
+    substr($c, length($c)-1, 1)
+}
+
+fn analyze_hand(@cards) {
+    my @raw_vals = ~> @cards map { card_value($_) }
+    my @vals = sort { $a <=> $b } @raw_vals
+    my @suits = ~> @cards map { card_suit($_) }
+    
+    my $is_flush = 0
+    my %suit_counts
+    for my $s (@suits) { $suit_counts{$s}++ }
+    for my $s (keys %suit_counts) {
+        if ($suit_counts{$s} == 5) { $is_flush = 1 }
+    }
+    
+    my $is_straight = 1
+    for my $i (1..4) { 
+        my $v1 = int($vals[$i])
+        my $v0 = int($vals[$i-1])
+        if ($v1 - $v0 != 1) { $is_straight = 0 }
+    }
+    if (!$is_straight) {
+        my $v_s = join(",", @vals)
+        if ($v_s eq "2,3,4,5,14") { $is_straight = 1 }
+    }
+    
+    my %counts
+    for my $v (@vals) { 
+        my $key = "$v"
+        $counts{$key}++ 
+    }
+    my @c = ~> values %counts sort { $b <=> $a }
+    my $max_c = int($c[0])
+    my $second_c = int($c[1])
+    
+    my $res = "high card"
+    if ($is_straight) {
+        if ($is_flush) { $res = "straight flush" }
+        else { $res = "straight" }
+    } elsif ($is_flush) {
+        $res = "flush"
+    } elsif ($max_c eq "4") {
+        $res = "four of a kind"
+    } elsif ($max_c eq "3") {
+        if ($second_c eq "2") { $res = "full house" }
+        else { $res = "three of a kind" }
+    } elsif ($max_c eq "2") {
+        if ($second_c eq "2") { $res = "two pair" }
+        else { $res = "one pair" }
+    }
+    $res
+}
+
+assert_eq analyze_hand("AS", "KS", "QS", "JS", "TS"), "straight flush", "royal flush"
+assert_eq analyze_hand("2H", "3H", "4H", "5H", "6H"), "straight flush", "straight flush"
+assert_eq analyze_hand("AS", "AD", "AH", "AC", "2D"), "four of a kind", "four of a kind"
+assert_eq analyze_hand("2S", "2D", "2H", "3C", "3D"), "full house", "full house"
+assert_eq analyze_hand("2S", "4S", "6S", "8S", "TS"), "flush", "flush"
+assert_eq analyze_hand("2S", "3D", "4H", "5C", "6S"), "straight", "straight"
+assert_eq analyze_hand("AS", "2D", "3H", "4C", "5S"), "straight", "ace-low straight"
+assert_eq analyze_hand("2S", "2D", "2H", "3C", "4D"), "three of a kind", "three of a kind"
+assert_eq analyze_hand("2S", "2D", "3H", "3C", "4D"), "two pair", "two pair"
+assert_eq analyze_hand("2S", "2D", "3H", "4C", "5D"), "one pair", "one pair"
+assert_eq analyze_hand("2S", "3D", "5H", "7C", "9D"), "high card", "high card"
+
+test_run

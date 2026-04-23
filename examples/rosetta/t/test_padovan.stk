@@ -1,0 +1,33 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Padovan sequence
+
+fn padovan($n) {
+    if ($n < 3) {
+        1
+    } else {
+        my $p0 = 1
+        my $p1 = 1
+        my $p2 = 1
+        for my $i (3..$n) {
+            my $p3 = $p1 + $p0
+            ($p0, $p1, $p2) = ($p1, $p2, $p3)
+        }
+        $p2
+    }
+}
+
+fn padovan_list($max_n) {
+    ~> 0..$max_n map { padovan($_) }
+}
+
+assert_eq padovan(0), 1, "P0"
+assert_eq padovan(3), 2, "P3"
+assert_eq padovan(5), 3, "P5"
+assert_eq padovan(10), 12, "P10"
+
+my @list = padovan_list(5)
+assert_eq join(",", @list), "1,1,1,2,2,3", "Padovan list"
+
+10 |> padovan |> assert_eq(12, "pipe padovan")
+
+test_run

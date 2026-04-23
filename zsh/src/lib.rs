@@ -54,6 +54,7 @@ pub mod ksh93;
 pub mod langinfo;
 pub mod mapfile;
 pub mod subst;
+pub mod subscript;
 pub mod params;
 pub mod pcre;
 pub mod utils;

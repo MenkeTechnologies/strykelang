@@ -1,0 +1,61 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Strong primes
+
+fn my_is_prime($n) {
+    if ($n < 2) { 0 }
+    elsif ($n == 2) { 1 }
+    elsif ($n % 2 == 0) { 0 }
+    else {
+        my $limit = sqrt($n)
+        my $res = 1
+        my $i = 3
+        while ($i <= $limit) {
+            if ($n % $i == 0) {
+                $res = 0
+                $i = $n
+            }
+            $i += 2
+        }
+        $res
+    }
+}
+
+fn my_prev_prime($n) {
+    my $p = $n - 1
+    while ($p > 1) {
+        if (my_is_prime($p)) { return $p }
+        $p--
+    }
+    0
+}
+
+fn my_next_prime($n) {
+    my $p = $n + 1
+    while (1) {
+        if (my_is_prime($p)) { return $p }
+        $p++
+    }
+}
+
+fn is_strong_prime($n) {
+    if (!my_is_prime($n)) {
+        0
+    } else {
+        my $prev = my_prev_prime($n)
+        if ($prev == 0) {
+            0
+        } else {
+            my $next = my_next_prime($n)
+            $n * 2 > $prev + $next
+        }
+    }
+}
+
+assert_ok is_strong_prime(11), "11 is strong (7, 11, 13 average 10)"
+assert_ok is_strong_prime(17), "17 is strong (13, 17, 19 average 16)"
+assert_ok !is_strong_prime(5), "5 is not (3, 5, 7 average 5)"
+assert_ok !is_strong_prime(7), "7 is not (5, 7, 11 average 8)"
+
+11 |> is_strong_prime |> assert_ok("pipe strong prime")
+
+test_run

@@ -1,0 +1,32 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Least Common Multiple
+
+fn my_gcd($a, $b) {
+    while ($b != 0) {
+        ($a, $b) = ($b, $a % $b)
+    }
+    $a
+}
+
+fn my_lcm($a, $b) {
+    if ($a == 0 || $b == 0) {
+        0
+    } else {
+        my $prod = $a * $b
+        my $res = $prod / my_gcd($a, $b)
+        ~> $res abs
+    }
+}
+
+fn lcm_multi(@nums) {
+    @nums |> reduce { my_lcm($a, $b) }
+}
+
+assert_eq my_lcm(12, 18), 36, "lcm(12, 18)"
+assert_eq my_lcm(10, 5), 10, "lcm(10, 5) is 10"
+assert_eq my_lcm(7, 13), 91, "lcm(7, 13) is 91"
+assert_eq lcm_multi(2, 3, 4), 12, "lcm_multi(2, 3, 4)"
+
+12 |> my_lcm(18) |> assert_eq(36, "pipe lcm")
+
+test_run

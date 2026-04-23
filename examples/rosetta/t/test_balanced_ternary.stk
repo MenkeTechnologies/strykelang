@@ -1,0 +1,59 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Balanced ternary
+
+fn to_balanced_ternary($n) {
+    if ($n == 0) {
+        "0"
+    } else {
+        my $res = ""
+        my $temp = $n
+        while ($temp != 0) {
+            my $rem = $temp % 3
+            $temp = int($temp / 3)
+            if ($rem == 2) {
+                $res = "-" . $res
+                $temp++
+            } elsif ($rem == 1) {
+                $res = "+" . $res
+            } elsif ($rem == 0) {
+                $res = "0" . $res
+            } elsif ($rem == -1) {
+                $res = "-" . $res
+            } elsif ($rem == -2) {
+                $res = "+" . $res
+                $temp--
+            }
+        }
+        $res
+    }
+}
+
+fn from_balanced_ternary($s) {
+    my @chars = chars($s)
+    my $val = 0
+    my $p = 1
+    for my $i (~> 0..scalar(@chars)-1 rev) {
+        my $c = $chars[$i]
+        if ($c eq "+") {
+            $val += $p
+        } elsif ($c eq "-") {
+            $val -= $p
+        }
+        $p *= 3
+    }
+    $val
+}
+
+assert_eq to_balanced_ternary(2), "+-", "2 is +-"
+assert_eq to_balanced_ternary(6), "+-0", "6 is +-0"
+assert_eq to_balanced_ternary(8), "+0-", "8 is +0-"
+assert_eq to_balanced_ternary(0), "0", "0 is 0"
+
+assert_eq from_balanced_ternary("+-"), 2, "+- is 2"
+assert_eq from_balanced_ternary("+-0"), 6, "+-0 is 6"
+assert_eq from_balanced_ternary("+0-"), 8, "+0- is 8"
+
+8 |> to_balanced_ternary |> assert_eq("+0-", "pipe to_balanced_ternary")
+"+0-" |> from_balanced_ternary |> assert_eq(8, "pipe from_balanced_ternary")
+
+test_run

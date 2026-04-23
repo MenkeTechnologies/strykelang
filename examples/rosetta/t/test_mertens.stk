@@ -1,0 +1,54 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Mertens function
+
+fn my_prime_factors($n) {
+    my @factors
+    my $d = 2
+    my $temp = $n
+    while ($temp > 1) {
+        while ($temp % $d == 0) {
+            push @factors, $d
+            $temp = int($temp / $d)
+        }
+        $d++
+    }
+    ([@factors])
+}
+
+fn moebius($n) {
+    if ($n == 1) {
+        1
+    } else {
+        my $factors_ref = my_prime_factors($n)
+        my @factors = @$factors_ref
+        my %counts
+        my $has_square = 0
+        for my $f (@factors) {
+            $counts{$f}++
+            if ($counts{$f} > 1) { $has_square = 1 }
+        }
+        if ($has_square) { 0 }
+        else {
+            my $num_factors = scalar(@factors)
+            if ($num_factors % 2 == 0) { 1 }
+            else { -1 }
+        }
+    }
+}
+
+fn mertens($n) {
+    my $sum = 0
+    for my $k (1..$n) {
+        $sum += moebius($k)
+    }
+    $sum
+}
+
+assert_eq mertens(1), 1, "M(1) = 1"
+assert_eq mertens(10), -1, "M(10) = -1"
+assert_eq mertens(20), -3, "M(20) = -3"
+assert_eq mertens(100), 1, "M(100) = 1"
+
+10 |> mertens |> assert_eq(-1, "pipe Mertens")
+
+test_run

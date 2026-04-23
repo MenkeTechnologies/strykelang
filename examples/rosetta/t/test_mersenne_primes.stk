@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Mersenne primes
+
+fn my_is_prime($n) {
+    if ($n < 2) { 0 }
+    elsif ($n == 2) { 1 }
+    elsif ($n % 2 == 0) { 0 }
+    else {
+        my $limit = sqrt($n)
+        my $res = 1
+        my $i = 3
+        while ($i <= $limit) {
+            if ($n % $i == 0) {
+                $res = 0
+                $i = $n
+            }
+            $i += 2
+        }
+        $res
+    }
+}
+
+fn is_mersenne_prime($p) {
+    # Check if 2^p - 1 is prime
+    # (Note: p must be prime itself for 2^p - 1 to be prime)
+    if (!my_is_prime($p)) {
+        0
+    } else {
+        my $m = 2**$p - 1
+        my_is_prime($m)
+    }
+}
+
+assert_ok is_mersenne_prime(2), "2^2-1=3 is prime"
+assert_ok is_mersenne_prime(3), "2^3-1=7 is prime"
+assert_ok is_mersenne_prime(5), "2^5-1=31 is prime"
+assert_ok is_mersenne_prime(7), "2^7-1=127 is prime"
+assert_ok !is_mersenne_prime(11), "2^11-1=2047 is not (23*89)"
+
+7 |> is_mersenne_prime |> assert_ok("pipe Mersenne prime")
+
+test_run

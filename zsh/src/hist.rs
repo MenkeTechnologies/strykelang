@@ -469,7 +469,7 @@ impl History {
     }
 }
 
-/// Save history context
+/// Save history context (from hist.c hist_context_save/restore)
 #[derive(Clone)]
 pub struct HistStack {
     pub histactive: u32,
@@ -480,6 +480,7 @@ pub struct HistStack {
     pub chwords: Vec<(usize, usize)>,
     pub hlinesz: usize,
     pub defev: i64,
+    pub hist_keep_comment: bool,
 }
 
 impl Default for HistStack {
@@ -493,7 +494,403 @@ impl Default for HistStack {
             chwords: Vec::new(),
             hlinesz: 0,
             defev: 0,
+            hist_keep_comment: false,
         }
+    }
+}
+
+/// History done flags (from hist.c)
+pub const HISTFLAG_DONE: i32 = 1;
+pub const HISTFLAG_NOEXEC: i32 = 2;
+pub const HISTFLAG_RECALL: i32 = 4;
+pub const HISTFLAG_SETTY: i32 = 8;
+
+/// Case modification types (from hist.c casemodify)
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum CaseMod {
+    Lower,
+    Upper,
+    Caps,
+}
+
+/// Case modify a string (from hist.c casemodify lines 2194-2323)
+pub fn casemodify(s: &str, how: CaseMod) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut nextupper = true;
+
+    for c in s.chars() {
+        let modified = match how {
+            CaseMod::Lower => c.to_lowercase().collect::<String>(),
+            CaseMod::Upper => c.to_uppercase().collect::<String>(),
+            CaseMod::Caps => {
+                if !c.is_alphanumeric() {
+                    nextupper = true;
+                    c.to_string()
+                } else if nextupper {
+                    nextupper = false;
+                    c.to_uppercase().collect::<String>()
+                } else {
+                    c.to_lowercase().collect::<String>()
+                }
+            }
+        };
+        result.push_str(&modified);
+    }
+
+    result
+}
+
+/// Remove trailing path component (from hist.c remtpath lines 2056-2117)
+pub fn remtpath(s: &str, count: i32) -> String {
+    let s = s.trim_end_matches('/');
+    
+    if s.is_empty() {
+        return "/".to_string();
+    }
+
+    if count == 0 {
+        if let Some(pos) = s.rfind('/') {
+            if pos == 0 {
+                return "/".to_string();
+            }
+            return s[..pos].trim_end_matches('/').to_string();
+        }
+        return ".".to_string();
+    }
+
+    let parts: Vec<&str> = s.split('/').filter(|p| !p.is_empty()).collect();
+    if count as usize >= parts.len() {
+        return s.to_string();
+    }
+
+    let leading_slash = s.starts_with('/');
+    let result: String = parts.iter()
+        .take(count as usize)
+        .map(|s| *s)
+        .collect::<Vec<&str>>()
+        .join("/");
+
+    if leading_slash {
+        format!("/{}", result)
+    } else {
+        result
+    }
+}
+
+/// Remove leading path components (from hist.c remlpaths lines 2151-2186)
+pub fn remlpaths(s: &str, count: i32) -> String {
+    let s = s.trim_end_matches('/');
+    
+    if s.is_empty() {
+        return String::new();
+    }
+
+    let parts: Vec<&str> = s.split('/').filter(|p| !p.is_empty()).collect();
+    
+    if count == 0 {
+        if let Some(last) = parts.last() {
+            return last.to_string();
+        }
+        return String::new();
+    }
+
+    if count as usize >= parts.len() {
+        return s.to_string();
+    }
+
+    parts.iter()
+        .rev()
+        .take(count as usize)
+        .rev()
+        .map(|s| *s)
+        .collect::<Vec<&str>>()
+        .join("/")
+}
+
+/// Remove extension (from hist.c remtext lines 2122-2131)
+pub fn remtext(s: &str) -> String {
+    if let Some(slash_pos) = s.rfind('/') {
+        let after_slash = &s[slash_pos + 1..];
+        if let Some(dot_pos) = after_slash.rfind('.') {
+            if dot_pos > 0 {
+                return format!("{}/{}", &s[..slash_pos], &after_slash[..dot_pos]);
+            }
+        }
+        return s.to_string();
+    }
+
+    if let Some(dot_pos) = s.rfind('.') {
+        if dot_pos > 0 {
+            return s[..dot_pos].to_string();
+        }
+    }
+    s.to_string()
+}
+
+/// Get extension (from hist.c rembutext lines 2136-2148)
+pub fn rembutext(s: &str) -> String {
+    if let Some(slash_pos) = s.rfind('/') {
+        let after_slash = &s[slash_pos + 1..];
+        if let Some(dot_pos) = after_slash.rfind('.') {
+            return after_slash[dot_pos + 1..].to_string();
+        }
+        return String::new();
+    }
+
+    if let Some(dot_pos) = s.rfind('.') {
+        return s[dot_pos + 1..].to_string();
+    }
+    String::new()
+}
+
+/// Convert to absolute path (from hist.c chabspath lines 1877-1955)
+pub fn chabspath(s: &str) -> std::io::Result<String> {
+    if s.is_empty() {
+        return Ok(String::new());
+    }
+
+    let path = if !s.starts_with('/') {
+        let cwd = std::env::current_dir()?;
+        format!("{}/{}", cwd.display(), s)
+    } else {
+        s.to_string()
+    };
+
+    let mut result = Vec::new();
+    for component in path.split('/') {
+        match component {
+            "" | "." => continue,
+            ".." => {
+                if !result.is_empty() && result.last() != Some(&"..") {
+                    result.pop();
+                } else if result.is_empty() && !path.starts_with('/') {
+                    result.push("..");
+                }
+            }
+            c => result.push(c),
+        }
+    }
+
+    if path.starts_with('/') {
+        Ok(format!("/{}", result.join("/")))
+    } else if result.is_empty() {
+        Ok(".".to_string())
+    } else {
+        Ok(result.join("/"))
+    }
+}
+
+/// Quote a string for shell (from hist.c quote lines 2486-2523)
+pub fn quote(s: &str) -> String {
+    let mut result = String::with_capacity(s.len() + 10);
+    result.push('\'');
+
+    for c in s.chars() {
+        if c == '\'' {
+            result.push_str("'\\''");
+        } else {
+            result.push(c);
+        }
+    }
+
+    result.push('\'');
+    result
+}
+
+/// Quote with word breaking (from hist.c quotebreak lines 2527-2556)
+pub fn quotebreak(s: &str) -> String {
+    let mut result = String::with_capacity(s.len() + 10);
+    result.push('\'');
+
+    for c in s.chars() {
+        if c == '\'' {
+            result.push_str("'\\''");
+        } else if c.is_whitespace() {
+            result.push('\'');
+            result.push(c);
+            result.push('\'');
+        } else {
+            result.push(c);
+        }
+    }
+
+    result.push('\'');
+    result
+}
+
+/// Perform history substitution (from hist.c subst lines 2336-2391)
+pub fn subst(s: &str, in_pattern: &str, out_pattern: &str, global: bool) -> String {
+    if in_pattern.is_empty() {
+        return s.to_string();
+    }
+
+    let out_expanded = convamps(out_pattern, in_pattern);
+
+    if global {
+        s.replace(in_pattern, &out_expanded)
+    } else {
+        s.replacen(in_pattern, &out_expanded, 1)
+    }
+}
+
+/// Convert & to matched pattern (from hist.c convamps lines 2394-2418)
+fn convamps(out: &str, in_pattern: &str) -> String {
+    let mut result = String::with_capacity(out.len());
+    let mut chars = out.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            if let Some(&next) = chars.peek() {
+                result.push(next);
+                chars.next();
+            }
+        } else if c == '&' {
+            result.push_str(in_pattern);
+        } else {
+            result.push(c);
+        }
+    }
+
+    result
+}
+
+/// Get argument specification (from hist.c getargspec lines 1792-1829)
+pub fn getargspec(argc: usize, c: char, marg: Option<usize>, evset: bool) -> Option<usize> {
+    match c {
+        '0' => Some(0),
+        '1'..='9' => Some(c.to_digit(10).unwrap() as usize),
+        '^' => Some(1),
+        '$' => Some(argc),
+        '%' => {
+            if evset {
+                return None;
+            }
+            marg
+        }
+        _ => None,
+    }
+}
+
+/// History search containing pattern (from hist.c hconsearch lines 1836-1854)
+impl History {
+    pub fn hconsearch(&self, pattern: &str) -> Option<(i64, usize)> {
+        for num in &self.ring {
+            if let Some(entry) = self.entries.get(num) {
+                if let Some(pos) = entry.text.find(pattern) {
+                    let words: Vec<&str> = entry.text.split_whitespace().collect();
+                    let mut word_idx = 0;
+                    let mut char_count = 0;
+                    for (i, word) in words.iter().enumerate() {
+                        if char_count + word.len() > pos {
+                            word_idx = i;
+                            break;
+                        }
+                        char_count += word.len() + 1;
+                    }
+                    return Some((entry.histnum, word_idx));
+                }
+            }
+        }
+        None
+    }
+
+    /// History search by prefix (from hist.c hcomsearch lines 1859-1872)
+    pub fn hcomsearch(&self, prefix: &str) -> Option<i64> {
+        for num in &self.ring {
+            if let Some(entry) = self.entries.get(num) {
+                if entry.text.starts_with(prefix) {
+                    return Some(entry.histnum);
+                }
+            }
+        }
+        None
+    }
+
+    /// Get arguments from history entry (from hist.c getargs lines 2453-2482)
+    pub fn getargs(&self, ev: i64, arg1: usize, arg2: usize) -> Option<String> {
+        let entry = self.entries.get(&ev)?;
+        let words: Vec<&str> = entry.text.split_whitespace().collect();
+
+        if arg2 < arg1 || arg1 >= words.len() || arg2 >= words.len() {
+            return None;
+        }
+
+        if arg1 == 0 && arg2 == words.len() - 1 {
+            return Some(entry.text.clone());
+        }
+
+        Some(words[arg1..=arg2].join(" "))
+    }
+
+    /// Save history context (from hist.c hist_context_save lines 248-290)
+    pub fn save_context(&self) -> HistStack {
+        HistStack {
+            histactive: self.histactive,
+            histdone: self.histdone,
+            stophist: self.stophist,
+            chline: self.curline.as_ref().map(|e| e.text.clone()),
+            hptr: 0,
+            chwords: Vec::new(),
+            hlinesz: 0,
+            defev: self.curhist - 1,
+            hist_keep_comment: false,
+        }
+    }
+
+    /// Restore history context (from hist.c hist_context_restore lines 296-325)
+    pub fn restore_context(&mut self, ctx: &HistStack) {
+        self.histactive = ctx.histactive;
+        self.histdone = ctx.histdone;
+        self.stophist = ctx.stophist;
+    }
+
+    /// Set history in-word state (from hist.c hist_in_word lines 339-345)
+    pub fn hist_in_word(&mut self, yesno: bool) {
+        if yesno {
+            self.histactive |= HA_INWORD;
+        } else {
+            self.histactive &= !HA_INWORD;
+        }
+    }
+
+    /// Check if in word (from hist.c hist_is_in_word lines 348-352)
+    pub fn hist_is_in_word(&self) -> bool {
+        (self.histactive & HA_INWORD) != 0
+    }
+
+    /// Add history number with offset (from hist.c addhistnum lines 1265-1280)
+    pub fn addhistnum(&self, hl: i64, n: i64) -> i64 {
+        let target = hl + n;
+        if target < 1 {
+            0
+        } else if target > self.curhist {
+            self.curhist + 1
+        } else {
+            target
+        }
+    }
+
+    /// Reduce blanks in history line (from hist.c histreduceblanks lines 1199-1250)
+    pub fn histreduceblanks(line: &str, words: &[(usize, usize)]) -> String {
+        if words.is_empty() {
+            return line.to_string();
+        }
+
+        let mut result = String::new();
+        let chars: Vec<char> = line.chars().collect();
+        
+        for (i, (start, end)) in words.iter().enumerate() {
+            if i > 0 {
+                result.push(' ');
+            }
+            for j in *start..*end {
+                if j < chars.len() {
+                    result.push(chars[j]);
+                }
+            }
+        }
+
+        result
     }
 }
 

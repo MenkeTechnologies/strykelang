@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Semiprime
+
+fn is_semiprime($n) {
+    my $count = 0
+    my $temp = $n
+    my $i = 2
+    while ($i * $i <= $temp) {
+        while ($temp % $i == 0) {
+            $temp = $temp / $i
+            $count++
+        }
+        $i++
+    }
+    if ($temp > 1) {
+        $count++
+    }
+    $count == 2
+}
+
+assert_ok is_semiprime(4), "4 is semiprime (2*2)"
+assert_ok is_semiprime(6), "6 is semiprime (2*3)"
+assert_ok is_semiprime(9), "9 is semiprime (3*3)"
+assert_ok is_semiprime(10), "10 is semiprime (2*5)"
+assert_ok !is_semiprime(2), "2 is not semiprime"
+assert_ok !is_semiprime(8), "8 is not semiprime (2*2*2)"
+
+15 |> is_semiprime |> assert_ok("15 is semiprime")
+
+test_run

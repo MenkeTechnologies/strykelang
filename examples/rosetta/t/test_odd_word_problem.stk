@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Odd word problem
+
+fn reverse_string($s) {
+    ~> $s >{split //, $_} rev |> join("")
+}
+
+fn odd_word($s) {
+    my $clean = $s =~ s/\.$//r
+    my @words = split /\s+/, $clean
+    my @res
+    for my $i (0..scalar(@words)-1) {
+        if ($i % 2 == 1) {
+            push @res, reverse_string($words[$i])
+        } else {
+            push @res, $words[$i]
+        }
+    }
+    join(" ", @res) . "."
+}
+
+assert_eq odd_word("whats the matter with kansas."), "whats eht matter htiw kansas.", "odd word kansas"
+assert_eq odd_word("apple banana orange."), "apple ananab orange.", "odd word fruits"
+
+"hello world." |> odd_word |> assert_eq("hello dlrow.", "pipe odd word")
+
+test_run

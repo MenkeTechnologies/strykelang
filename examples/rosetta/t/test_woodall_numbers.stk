@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Woodall numbers
+
+fn woodall($n) {
+    $n * (2 ** $n) - 1
+}
+
+fn woodall_list($max_n) {
+    ~> 1..$max_n map { woodall($_) }
+}
+
+assert_eq woodall(1), 1, "W1"
+assert_eq woodall(2), 7, "W2 (2*4-1)"
+assert_eq woodall(3), 23, "W3 (3*8-1)"
+assert_eq woodall(4), 63, "W4"
+
+my @list = woodall_list(5)
+assert_eq join(",", @list), "1,7,23,63,159", "Woodall list"
+
+5 |> woodall |> assert_eq(159, "pipe woodall 5")
+
+test_run

@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Subfactorial
+
+fn my_subfactorial($n) {
+    if ($n == 0) {
+        1
+    } elsif ($n == 1) {
+        0
+    } else {
+        my $s0 = 1
+        my $s1 = 0
+        for my $i (2..$n) {
+            my $s2 = ($i - 1) * ($s1 + $s0)
+            ($s0, $s1) = ($s1, $s2)
+        }
+        $s1
+    }
+}
+
+assert_eq my_subfactorial(0), 1, "!0"
+assert_eq my_subfactorial(1), 0, "!1"
+assert_eq my_subfactorial(2), 1, "!2"
+assert_eq my_subfactorial(3), 2, "!3"
+assert_eq my_subfactorial(4), 9, "!4"
+assert_eq my_subfactorial(5), 44, "!5"
+assert_eq my_subfactorial(10), 1334961, "!10"
+
+10 |> my_subfactorial |> assert_eq(1334961, "pipe subfactorial")
+
+test_run

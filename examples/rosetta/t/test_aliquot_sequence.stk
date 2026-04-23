@@ -1,0 +1,52 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Aliquot sequence
+
+fn sum_proper_divisors($n) {
+    if ($n < 2) {
+        0
+    } else {
+        my $sum = 1
+        my $limit = int(sqrt($n))
+        for my $i (2..$limit) {
+            if ($n % $i == 0) {
+                $sum += $i
+                my $j = $n / $i
+                if ($j != $i) {
+                    $sum += $j
+                }
+            }
+        }
+        $sum
+    }
+}
+
+fn aliquot_sequence($start, $max_len) {
+    my @res = ($start)
+    my $curr = $start
+    for my $i (1..$max_len-1) {
+        if ($curr > 0) {
+            my $next = sum_proper_divisors($curr)
+            my $already_seen = 0
+            for my $j (0..scalar(@res)-1) {
+                if ($res[$j] == $next) { $already_seen = 1 }
+            }
+            push @res, $next
+            if ($already_seen) { $curr = 0 }
+            else { $curr = $next }
+        }
+    }
+    ([@res])
+}
+
+my $res10 = aliquot_sequence(10, 10)
+assert_eq join(",", @$res10), "10,8,7,1,0", "aliquot 10"
+
+my $res11 = aliquot_sequence(11, 10)
+assert_eq join(",", @$res11), "11,1,0", "aliquot 11"
+
+my $res6 = aliquot_sequence(6, 10)
+assert_eq join(",", @$res6), "6,6", "aliquot 6 (perfect)"
+
+10 |> aliquot_sequence(5) |> map { join(",", @$_) } |> assert_eq("10,8,7,1,0", "pipe aliquot")
+
+test_run

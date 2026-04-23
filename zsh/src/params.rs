@@ -682,6 +682,86 @@ pub fn get_array_element(arr: &[String], idx: i64, ksh_arrays: bool) -> Option<S
     arr.get(actual_idx).cloned()
 }
 
+/// Get integer parameter value (from params.c getiparam lines 3043-3052)
+pub fn getiparam(table: &ParamTable, name: &str) -> i64 {
+    table.get(name).map(|v| v.as_integer()).unwrap_or(0)
+}
+
+/// Get scalar (string) parameter (from params.c getsparam lines 3075-3084)
+pub fn getsparam(table: &ParamTable, name: &str) -> Option<String> {
+    table.get(name).map(|v| v.as_string())
+}
+
+/// Get array parameter (from params.c getaparam lines 3099-3109)
+pub fn getaparam(table: &ParamTable, name: &str) -> Option<Vec<String>> {
+    match table.get(name) {
+        Some(ParamValue::Array(arr)) => Some(arr.clone()),
+        _ => None,
+    }
+}
+
+/// Get hash parameter values as array (from params.c gethparam lines 3114-3124)
+pub fn gethparam(table: &ParamTable, name: &str) -> Option<Vec<String>> {
+    match table.get(name) {
+        Some(ParamValue::Assoc(h)) => Some(h.values().cloned().collect()),
+        _ => None,
+    }
+}
+
+/// Get hash parameter keys as array (from params.c gethkparam lines 3129-3139)
+pub fn gethkparam(table: &ParamTable, name: &str) -> Option<Vec<String>> {
+    match table.get(name) {
+        Some(ParamValue::Assoc(h)) => Some(h.keys().cloned().collect()),
+        _ => None,
+    }
+}
+
+/// Numeric type for parameters (from params.c mnumber)
+#[derive(Clone, Debug)]
+pub enum MNumber {
+    Integer(i64),
+    Float(f64),
+}
+
+impl Default for MNumber {
+    fn default() -> Self {
+        MNumber::Integer(0)
+    }
+}
+
+/// Get numeric parameter (from params.c getnparam lines 3057-3070)
+pub fn getnparam(table: &ParamTable, name: &str) -> MNumber {
+    match table.get(name) {
+        Some(ParamValue::Integer(i)) => MNumber::Integer(*i),
+        Some(ParamValue::Float(f)) => MNumber::Float(*f),
+        Some(ParamValue::Scalar(s)) => {
+            if let Ok(i) = s.parse::<i64>() {
+                MNumber::Integer(i)
+            } else if let Ok(f) = s.parse::<f64>() {
+                MNumber::Float(f)
+            } else {
+                MNumber::default()
+            }
+        }
+        _ => MNumber::default(),
+    }
+}
+
+/// Assign string parameter (from params.c assignsparam lines 3192-3300)
+pub fn assignsparam(table: &mut ParamTable, name: &str, val: &str) -> bool {
+    table.set_scalar(name, val)
+}
+
+/// Assign integer parameter (from params.c assigniparam)
+pub fn assigniparam(table: &mut ParamTable, name: &str, val: i64) -> bool {
+    table.set_integer(name, val)
+}
+
+/// Assign array parameter (from params.c assignaparam)
+pub fn assignaparam(table: &mut ParamTable, name: &str, val: Vec<String>) -> bool {
+    table.set_array(name, val)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

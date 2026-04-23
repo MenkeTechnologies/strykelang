@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Centered square numbers
+
+fn centered_square($n) {
+    $n * $n + ($n + 1) * ($n + 1)
+}
+
+assert_eq centered_square(0), 1, "CS 0"
+assert_eq centered_square(1), 5, "CS 1"
+assert_eq centered_square(2), 13, "CS 2"
+assert_eq centered_square(3), 25, "CS 3"
+
+10 |> centered_square |> assert_eq(221, "pipe centered square")
+
+test_run

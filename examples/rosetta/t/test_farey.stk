@@ -1,0 +1,37 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Farey sequence
+
+fn my_gcd($a, $b) {
+    while ($b != 0) { ($a, $b) = ($b, $a % $b) }
+    $a
+}
+
+fn totient($n) {
+    if ($n == 1) {
+        1
+    } else {
+        my $count = 0
+        for my $i (1..$n) {
+            if (my_gcd($i, $n) == 1) { $count++ }
+        }
+        $count
+    }
+}
+
+fn farey_length($n) {
+    my $sum = 0
+    for my $i (1..$n) {
+        $sum += totient($i)
+    }
+    $sum + 1
+}
+
+assert_eq farey_length(1), 2, "F1 length"
+assert_eq farey_length(2), 3, "F2 length"
+assert_eq farey_length(3), 5, "F3 length"
+assert_eq farey_length(4), 7, "F4 length"
+assert_eq farey_length(5), 11, "F5 length"
+
+5 |> farey_length |> assert_eq(11, "pipe Farey length")
+
+test_run
