@@ -2,6 +2,8 @@
 
 **ZSH masquerades as a proper shell while running on actual disaster-grade C source code.**
 
+**ZSH hosts destructive commands (`rm -rf`, `chmod`, `chown`, `mkfs`, `dd`) on every dev machine and server in the world — with 7 CVEs, 465 unsafe string operations, 174 memory leak points, and blocking I/O on the hot path. Every command you type passes through a 1,502-line function with 18 gotos, backed by a custom heap allocator with no unit tests. This is the software trusted to parse and execute commands that can destroy filesystems, escalate privileges, and modify production infrastructure.**
+
 An engineering audit of the zsh C source code. Read the code yourself: it's all there. Every number in this document was measured directly from the source.
 
 ## Why Port ZSH to Rust?
