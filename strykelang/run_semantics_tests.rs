@@ -4549,3 +4549,95 @@ fn core_builtins_stats_entropy_zscore() {
     // zscore of 10 should be 0
     assert_eq!(run("zscore(10, 5, 10, 15)").expect("run").to_number(), 0.0);
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// Thread macro tests: ~> (thread-first) vs ->> (thread-last)
+// ════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn thread_first_injects_as_first_arg() {
+    // ~> 10 div(2) → div(10, 2) = 5
+    assert_eq!(ri("sub div { $_0 / $_1 }; ~> 10 div(2)"), 5);
+}
+
+#[test]
+fn thread_last_injects_as_last_arg() {
+    // ->> 10 div(2) → div(2, 10) = 0.2
+    assert_eq!(
+        run("sub div { $_0 / $_1 }; ->> 10 div(2)")
+            .expect("run")
+            .to_number(),
+        0.2
+    );
+}
+
+#[test]
+fn thread_first_explicit_topic_overrides() {
+    // ~> 10 div(2, $_) → div(2, 10) = 0.2 (explicit $_ placement)
+    assert_eq!(
+        run("sub div { $_0 / $_1 }; ~> 10 div(2, $_)")
+            .expect("run")
+            .to_number(),
+        0.2
+    );
+}
+
+#[test]
+fn thread_last_explicit_topic_overrides() {
+    // ->> 10 div($_, 2) → div(10, 2) = 5 (explicit $_ placement)
+    assert_eq!(ri("sub div { $_0 / $_1 }; ->> 10 div($_, 2)"), 5);
+}
+
+#[test]
+fn thread_keyword_is_thread_first() {
+    // `thread` keyword should be thread-first like ~>
+    assert_eq!(ri("sub div { $_0 / $_1 }; thread 10 div(2)"), 5);
+}
+
+#[test]
+fn thread_t_alias_is_thread_first() {
+    // `t` alias should be thread-first like ~>
+    assert_eq!(ri("sub div { $_0 / $_1 }; t 10 div(2)"), 5);
+}
+
+#[test]
+fn thread_first_chains_correctly() {
+    // ~> 100 div(2) div(5) → div(div(100, 2), 5) = div(50, 5) = 10
+    assert_eq!(ri("sub div { $_0 / $_1 }; ~> 100 div(2) div(5)"), 10);
+}
+
+#[test]
+fn thread_last_chains_correctly() {
+    // ->> 10 div(100) div(2) → div(2, div(100, 10)) = div(2, 10) = 0.2
+    assert_eq!(
+        run("sub div { $_0 / $_1 }; ->> 10 div(100) div(2)")
+            .expect("run")
+            .to_number(),
+        0.2
+    );
+}
+
+#[test]
+fn thread_first_with_builtins() {
+    // ~> " hello " tm uc → uc(tm(" hello ")) = "HELLO"
+    assert_eq!(rs(r#"~> " hello " tm uc"#), "HELLO");
+}
+
+#[test]
+fn thread_last_with_multi_arg_func() {
+    // ->> 3 sub_from(10) → sub_from(10, 3) = 10 - 3 = 7
+    assert_eq!(ri("sub sub_from { $_0 - $_1 }; ->> 3 sub_from(10)"), 7);
+    // vs thread-first: ~> 3 sub_from(10) → sub_from(3, 10) = 3 - 10 = -7
+    assert_eq!(ri("sub sub_from { $_0 - $_1 }; ~> 3 sub_from(10)"), -7);
+}
+
+#[test]
+fn thread_last_tilde_spelling() {
+    // ~>> is symmetric with ~> and behaves as thread-last
+    assert_eq!(
+        run("sub div { $_0 / $_1 }; ~>> 10 div(2)")
+            .expect("run")
+            .to_number(),
+        0.2
+    );
+}

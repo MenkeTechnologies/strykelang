@@ -111,8 +111,10 @@ pub enum Token {
     FatArrow,
     /// `|>` — pipe-forward (F#/Elixir): `x |> f(a)` desugars to `f(x, a)` at parse time.
     PipeForward,
-    /// `~>` or `->>` — thread macro alias: `~> EXPR stage1 stage2 ...` == `t EXPR stage1 stage2 ...`
+    /// `~>` — thread-first macro: `~> EXPR stage1 stage2 ...` injects as first arg
     ThreadArrow,
+    /// `~>>` / `->>` — thread-last macro: injects as last arg
+    ThreadArrowLast,
     /// Two-dot range / inclusive flip-flop (`..`).
     Range,
     /// Three-dot range / exclusive flip-flop (`...`); list expansion matches `..` (Perl).

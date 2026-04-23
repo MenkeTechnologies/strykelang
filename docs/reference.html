@@ -516,16 +516,28 @@ $url |&gt; fetch_json |&gt; json_jq &#39;.name&#39; |&gt; p
         <p>Zero runtime cost (parse-time desugaring). Binds looser than <code>||</code>, tighter than <code>?:</code>.</p>
       </article>
       <article class="doc-entry" id="doc-thread">
-        <h3><a class="doc-anchor" href="#doc-thread">#</a> <code>thread</code></h3>
-        <p>Clojure-inspired threading macro — chain stages without repeating <code>|&gt;</code>.</p>
+        <h3><a class="doc-anchor" href="#doc-thread">#</a> <code>thread</code> / <code>~&gt;</code> (thread-first)</h3>
+        <p>Thread-first macro — chain stages where the threaded value is injected as the <strong>first</strong> argument (like Clojure's <code>-&gt;</code>).</p>
         <pre><code class="lang-perl">~&gt; @data grep { $_ &gt; 5 } map { $_ * 2 } sort { $_0 &lt;=&gt; $_1 } |&gt; join &quot;,&quot; |&gt; p
 ~&gt; &quot; hello &quot; tm uc rv lc ufc sc cc kc tj p  # short aliases
-sub add2 { $_0 + $_1 }
-~&gt; 10 add2($_, 5) p                          # add2(10, 5) = 15
-~&gt; 10 add2(5, $_) p                          # add2(5, 10) = 15  (any position)
-~&gt; 10 add2($_, 5) add2($_, 100) p            # 115 (chained)
+sub div { $_0 / $_1 }
+~&gt; 10 div(2) p                               # div(10, 2) = 5
+~&gt; 10 div($_, 2) p                           # explicit $_ position: div(10, 2) = 5
 </code></pre>
-        <p>Four equivalent spellings: <code>~&gt;</code>, <code>thread</code>, <code>t</code>, <code>-&gt;&gt;</code>. Stages: bare function (<code>uc</code>, <code>tm</code>, …), function with block (<code>map { … }</code>, <code>grep { … }</code>), <code>name(args)</code> call where <code>$_</code> is the threaded-value placeholder (must appear at least once in args), or <code>&gt;{}</code> anonymous block. <code>|&gt;</code> terminates the <code>~&gt;</code> macro.</p>
+        <p>Spellings: <code>~&gt;</code>, <code>thread</code>, <code>t</code>. Stages: bare function (<code>uc</code>, <code>tm</code>, …), function with block (<code>map { … }</code>, <code>grep { … }</code>), <code>name(args)</code> call where <code>$_</code> is the threaded-value placeholder, or <code>&gt;{}</code> anonymous block. <code>|&gt;</code> terminates the macro.</p>
+      </article>
+      <article class="doc-entry" id="doc-thread-last">
+        <h3><a class="doc-anchor" href="#doc-thread-last">#</a> <code>~&gt;&gt;</code> / <code>-&gt;&gt;</code> (thread-last)</h3>
+        <p>Thread-last macro — chain stages where the threaded value is injected as the <strong>last</strong> argument (like Clojure's <code>-&gt;&gt;</code>).</p>
+        <pre><code class="lang-perl">sub div { $_0 / $_1 }
+~&gt;&gt; 10 div(2) p                              # div(2, 10) = 0.2
+-&gt;&gt; 10 div($_, 2) p                          # explicit $_ position overrides: div(10, 2) = 5
+
+# Thread-last is useful for list-consuming functions:
+sub take_n { @_[0..$_[-1]-1] }               # take_n(list, n)
+~&gt;&gt; (1,2,3,4,5) take_n(3) p                  # take_n(1,2,3,4,5, 3) = (1,2,3)
+</code></pre>
+        <p>Spellings: <code>~&gt;&gt;</code>, <code>-&gt;&gt;</code>. The explicit <code>$_</code> placeholder always takes precedence.</p>
       </article>
       <article class="doc-entry" id="doc-pipeline">
         <h3><a class="doc-anchor" href="#doc-pipeline">#</a> <code>pipeline</code></h3>

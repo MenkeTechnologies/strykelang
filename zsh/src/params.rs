@@ -526,6 +526,162 @@ pub fn array_to_colonarr(arr: &[String]) -> String {
     arr.join(":")
 }
 
+/// Subscript index result from getindex
+/// Port from zsh params.c Value struct's start/end fields
+#[derive(Debug, Clone)]
+pub struct SubscriptIndex {
+    pub start: i64,
+    pub end: i64,
+    pub is_all: bool,  // True for @ or *
+}
+
+impl SubscriptIndex {
+    pub fn single(idx: i64) -> Self {
+        SubscriptIndex {
+            start: idx,
+            end: idx + 1,
+            is_all: false,
+        }
+    }
+
+    pub fn range(start: i64, end: i64) -> Self {
+        SubscriptIndex {
+            start,
+            end,
+            is_all: false,
+        }
+    }
+
+    pub fn all() -> Self {
+        SubscriptIndex {
+            start: 0,
+            end: -1,
+            is_all: true,
+        }
+    }
+}
+
+/// Parse a subscript expression like "[1]", "[1,5]", "[@]", "[*]"
+/// Port from zsh/Src/params.c getindex()
+///
+/// Returns the subscript index with start and end positions.
+/// For zsh, arrays are 1-indexed by default unless KSH_ARRAYS is set.
+pub fn parse_subscript(subscript: &str, ksh_arrays: bool) -> Option<SubscriptIndex> {
+    let s = subscript.trim();
+    
+    // Handle @ and * for all elements
+    if s == "@" || s == "*" {
+        return Some(SubscriptIndex::all());
+    }
+    
+    // Check for range notation: start,end
+    if let Some(comma_pos) = s.find(',') {
+        let start_str = s[..comma_pos].trim();
+        let end_str = s[comma_pos + 1..].trim();
+        
+        let start = parse_index_value(start_str, ksh_arrays)?;
+        let end = parse_index_value(end_str, ksh_arrays)?;
+        
+        return Some(SubscriptIndex::range(start, end));
+    }
+    
+    // Single index
+    let idx = parse_index_value(s, ksh_arrays)?;
+    Some(SubscriptIndex::single(idx))
+}
+
+/// Parse a single index value, handling negative indices
+/// Port from zsh/Src/params.c getarg()
+fn parse_index_value(s: &str, ksh_arrays: bool) -> Option<i64> {
+    let s = s.trim();
+    if s.is_empty() {
+        return None;
+    }
+    
+    // Try parsing as integer
+    if let Ok(idx) = s.parse::<i64>() {
+        // In zsh (non-KSH mode), adjust 1-indexed to 0-indexed internally
+        // but return as-is since caller will handle indexing
+        if !ksh_arrays && idx > 0 {
+            // Keep as 1-indexed for the caller
+        }
+        return Some(idx);
+    }
+    
+    // Could be an arithmetic expression - for now just fail
+    None
+}
+
+/// Get array slice based on subscript index
+/// Port from zsh array access logic in params.c
+pub fn get_array_slice(arr: &[String], idx: &SubscriptIndex, ksh_arrays: bool) -> Vec<String> {
+    if idx.is_all {
+        return arr.to_vec();
+    }
+    
+    let len = arr.len() as i64;
+    
+    // Convert indices (zsh is 1-indexed, arrays are 0-indexed internally)
+    let start = if idx.start < 0 {
+        // Negative index counts from end
+        (len + idx.start).max(0) as usize
+    } else if ksh_arrays {
+        // KSH_ARRAYS: 0-indexed
+        idx.start as usize
+    } else {
+        // zsh default: 1-indexed, convert to 0-indexed
+        if idx.start > 0 {
+            (idx.start - 1) as usize
+        } else {
+            0
+        }
+    };
+    
+    let end = if idx.end < 0 {
+        // Negative index counts from end
+        ((len + idx.end + 1).max(0) as usize).min(arr.len())
+    } else if ksh_arrays {
+        // KSH_ARRAYS: 0-indexed, end is exclusive
+        (idx.end as usize).min(arr.len())
+    } else {
+        // zsh default: 1-indexed, end is inclusive
+        (idx.end as usize).min(arr.len())
+    };
+    
+    if start >= arr.len() || start >= end {
+        return Vec::new();
+    }
+    
+    arr[start..end].to_vec()
+}
+
+/// Get single array element by index
+/// Port from zsh array access in params.c
+pub fn get_array_element(arr: &[String], idx: i64, ksh_arrays: bool) -> Option<String> {
+    let len = arr.len() as i64;
+    
+    let actual_idx = if idx < 0 {
+        // Negative index counts from end
+        let adj = len + idx;
+        if adj < 0 {
+            return None;
+        }
+        adj as usize
+    } else if ksh_arrays {
+        // KSH_ARRAYS: 0-indexed
+        idx as usize
+    } else {
+        // zsh default: 1-indexed
+        if idx > 0 {
+            (idx - 1) as usize
+        } else {
+            return None;
+        }
+    };
+    
+    arr.get(actual_idx).cloned()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
