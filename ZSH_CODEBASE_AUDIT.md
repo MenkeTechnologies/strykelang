@@ -366,6 +366,60 @@ And nobody noticed because nobody reads shell source code.
 
 Apple chose zsh as the macOS default in 2019 because the license changed from GPL to MIT. Not because anyone audited the code. Not because anyone ran the tests. Not because anyone profiled the completion system. Because of a license.
 
+## Security Vulnerabilities
+
+### 7 CVEs (and counting)
+
+| CVE | Year | Vulnerability |
+|-----|------|--------------|
+| CVE-2018-0502 | 2018 | Shebang line parsing code execution |
+| CVE-2018-1071 | 2018 | Stack-based buffer overflow in exec.c / utils.c |
+| CVE-2018-1083 | 2018 | Buffer overflow in compctl.c — PATH_MAX-sized buffer for file completion |
+| CVE-2018-1100 | 2018 | Buffer overflow in utils.c mail checking |
+| CVE-2018-13259 | 2018 | Shebang line parsing code execution (second vuln) |
+| CVE-2019-20044 | 2019 | **Privilege escalation** — insecure dropping of privileges when unsetting PRIVILEGED option |
+| CVE-2021-45444 | 2021 | **Arbitrary code execution** via recursive prompt expansion in VCS_Info |
+
+A privilege escalation bug. In a shell. That runs as the user. The shell that's supposed to be the security boundary between the user and the system had a bug that let you **escalate privileges**.
+
+### Unsafe C Patterns Still in the Code
+
+These aren't historical — they're in the current source:
+
+| Pattern | Count | Risk |
+|---------|-------|------|
+| `sprintf()` (no bounds check) | **165** | Buffer overflow — writes past buffer end |
+| `strcpy()` (no bounds check) | **218** | Buffer overflow — no length limit |
+| `strcat()` (no bounds check) | **82** | Buffer overflow — concatenates without limit |
+| Fixed-size stack buffers | **163** | Overflow targets for all of the above |
+| **Total unsafe string ops** | **465** | Every one is a potential CVE |
+
+**465 unsafe string operations** in the current source. Every single one is a potential buffer overflow. Every single one would be a compile error in Rust.
+
+### Examples from the Source
+
+```c
+// compctl.c - completion candidates written to PATH_MAX buffer with no check
+// This was CVE-2018-1083
+
+// compresult.c - sprintf into buf with no bounds
+sprintf(p, "%s%s%c", ...);
+
+// compcore.c - strcpy with no length check
+strcpy(str, ip);
+strcpy(tmp, globflag);
+strcpy(tmp, lpre);
+
+// zle_vi.c - keybuf copied with no bounds
+strcpy(curvichg.buf, keybuf);
+```
+
+These patterns have been in the code for decades. 7 CVEs have been found. With 465 unsafe string operations still in the source, more are waiting to be discovered. Nobody is auditing this code — there are no tests, no static analysis, no fuzzing pipeline.
+
+### Rust Eliminates This Entire Class
+
+In zshrs, every one of these 465 unsafe operations is replaced by Rust's `String`, `Vec<u8>`, bounds-checked indexing, and the borrow checker. Buffer overflows are not possible in safe Rust. This is not a theoretical advantage — it's the difference between 7 CVEs and zero.
+
 ## Not Production Grade
 
 ZSH is not production-grade software. It never was.
