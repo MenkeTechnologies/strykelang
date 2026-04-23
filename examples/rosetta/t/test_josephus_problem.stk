@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Josephus problem
+
+fn josephus($n, $k) {
+    my $p = 0
+    for my $i (1..$n) {
+        $p = ($p + $k) % $i
+    }
+    $p + 1
+}
+
+assert_eq josephus(41, 3), 31, "Josephus(41, 3) is 31"
+assert_eq josephus(5, 2), 3, "Josephus(5, 2) is 3"
+
+# Chaining
+41 |> josephus(3) |> assert_eq(31, "pipe josephus")
+
+test_run

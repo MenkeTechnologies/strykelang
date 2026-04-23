@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sastry numbers
+
+fn is_sastry($n) {
+    my $m = $n + 1
+    my $s = "$n" . "$m"
+    my $val = int($s)
+    my $root = int(sqrt($val))
+    $root * $root == $val
+}
+
+assert_ok is_sastry(183), "183 is Sastry (183184 = 428^2)"
+assert_ok is_sastry(328), "328 is Sastry (328329 = 573^2)"
+assert_ok !is_sastry(1), "1 is not (12 is not square)"
+
+183 |> is_sastry |> assert_ok("pipe Sastry")
+
+test_run

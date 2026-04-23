@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Left factorials
+
+fn my_factorial($n) {
+    if ($n < 2) { 1 }
+    else { 1..$n |> reduce { $a * $b } }
+}
+
+fn left_factorial($n) {
+    if ($n == 0) {
+        0
+    } else {
+        my $sum = 0
+        for my $i (0..$n-1) {
+            $sum += my_factorial($i)
+        }
+        $sum
+    }
+}
+
+assert_eq left_factorial(0), 0, "!0 (left)"
+assert_eq left_factorial(1), 1, "!1 (left) = 0!"
+assert_eq left_factorial(2), 2, "!2 (left) = 0!+1!"
+assert_eq left_factorial(3), 4, "!3 (left) = 0!+1!+2!"
+assert_eq left_factorial(10), 409114, "!10 (left)"
+
+10 |> left_factorial |> assert_eq(409114, "pipe left factorial")
+
+test_run

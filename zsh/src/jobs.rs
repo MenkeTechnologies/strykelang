@@ -488,3 +488,274 @@ pub fn wait_for_child(child: &mut Child) -> Result<i32, String> {
         Err(e) => Err(e.to_string()),
     }
 }
+
+/// Get clock ticks per second (from jobs.c get_clktck lines 720-748)
+pub fn get_clktck() -> i64 {
+    #[cfg(unix)]
+    {
+        use std::sync::OnceLock;
+        static CLKTCK: OnceLock<i64> = OnceLock::new();
+        *CLKTCK.get_or_init(|| unsafe { libc::sysconf(libc::_SC_CLK_TCK) as i64 })
+    }
+    #[cfg(not(unix))]
+    {
+        100 // Default on non-Unix
+    }
+}
+
+/// Format time as hh:mm:ss.xx (from jobs.c printhhmmss lines 752-765)
+pub fn format_hhmmss(secs: f64) -> String {
+    let mins = (secs / 60.0) as i32;
+    let hours = mins / 60;
+    let secs = secs - (mins * 60) as f64;
+    let mins = mins - (hours * 60);
+
+    if hours > 0 {
+        format!("{}:{:02}:{:05.2}", hours, mins, secs)
+    } else if mins > 0 {
+        format!("{}:{:05.2}", mins, secs)
+    } else {
+        format!("{:.3}", secs)
+    }
+}
+
+/// Time format specifiers (from jobs.c printtime lines 768-949)
+pub fn format_time(elapsed_secs: f64, user_secs: f64, system_secs: f64, format: &str, job_name: &str) -> String {
+    let mut result = String::new();
+    let total_time = user_secs + system_secs;
+    let percent = if elapsed_secs > 0.0 {
+        (100.0 * total_time / elapsed_secs) as i32
+    } else {
+        0
+    };
+
+    let mut chars = format.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '%' {
+            match chars.next() {
+                Some('E') => result.push_str(&format!("{:.2}s", elapsed_secs)),
+                Some('U') => result.push_str(&format!("{:.2}s", user_secs)),
+                Some('S') => result.push_str(&format!("{:.2}s", system_secs)),
+                Some('P') => result.push_str(&format!("{}%", percent)),
+                Some('J') => result.push_str(job_name),
+                Some('m') => match chars.next() {
+                    Some('E') => result.push_str(&format!("{:.0}ms", elapsed_secs * 1000.0)),
+                    Some('U') => result.push_str(&format!("{:.0}ms", user_secs * 1000.0)),
+                    Some('S') => result.push_str(&format!("{:.0}ms", system_secs * 1000.0)),
+                    _ => result.push_str("%m"),
+                },
+                Some('u') => match chars.next() {
+                    Some('E') => result.push_str(&format!("{:.0}us", elapsed_secs * 1_000_000.0)),
+                    Some('U') => result.push_str(&format!("{:.0}us", user_secs * 1_000_000.0)),
+                    Some('S') => result.push_str(&format!("{:.0}us", system_secs * 1_000_000.0)),
+                    _ => result.push_str("%u"),
+                },
+                Some('n') => match chars.next() {
+                    Some('E') => result.push_str(&format!("{:.0}ns", elapsed_secs * 1_000_000_000.0)),
+                    Some('U') => result.push_str(&format!("{:.0}ns", user_secs * 1_000_000_000.0)),
+                    Some('S') => result.push_str(&format!("{:.0}ns", system_secs * 1_000_000_000.0)),
+                    _ => result.push_str("%n"),
+                },
+                Some('*') => match chars.next() {
+                    Some('E') => result.push_str(&format_hhmmss(elapsed_secs)),
+                    Some('U') => result.push_str(&format_hhmmss(user_secs)),
+                    Some('S') => result.push_str(&format_hhmmss(system_secs)),
+                    _ => result.push_str("%*"),
+                },
+                Some('%') => result.push('%'),
+                Some(other) => {
+                    result.push('%');
+                    result.push(other);
+                }
+                None => result.push('%'),
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+/// Default time format (from jobs.c DEFAULT_TIMEFMT)
+pub const DEFAULT_TIMEFMT: &str = "%J  %U user %S system %P cpu %*E total";
+
+/// Time a command's execution
+pub struct CommandTimer {
+    start: std::time::Instant,
+    job_name: String,
+}
+
+impl CommandTimer {
+    pub fn new(job_name: &str) -> Self {
+        CommandTimer {
+            start: std::time::Instant::now(),
+            job_name: job_name.to_string(),
+        }
+    }
+
+    pub fn elapsed(&self) -> Duration {
+        self.start.elapsed()
+    }
+
+    pub fn format(&self, user_time: Duration, sys_time: Duration, format_str: Option<&str>) -> String {
+        let elapsed = self.start.elapsed().as_secs_f64();
+        let user = user_time.as_secs_f64();
+        let sys = sys_time.as_secs_f64();
+        
+        format_time(elapsed, user, sys, format_str.unwrap_or(DEFAULT_TIMEFMT), &self.job_name)
+    }
+}
+
+/// Pipestats management (from jobs.c storepipestats lines 420-454)
+pub struct PipeStats {
+    stats: Vec<i32>,
+}
+
+impl Default for PipeStats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PipeStats {
+    pub fn new() -> Self {
+        PipeStats { stats: Vec::new() }
+    }
+
+    pub fn clear(&mut self) {
+        self.stats.clear();
+    }
+
+    pub fn add(&mut self, status: i32) {
+        if self.stats.len() < MAX_PIPESTATS {
+            self.stats.push(status);
+        }
+    }
+
+    pub fn get(&self) -> &[i32] {
+        &self.stats
+    }
+
+    pub fn len(&self) -> usize {
+        self.stats.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.stats.is_empty()
+    }
+
+    pub fn pipefail_status(&self) -> i32 {
+        *self.stats.iter().rev().find(|&&s| s != 0).unwrap_or(&0)
+    }
+}
+
+/// Signal message lookup (from jobs.c sigmsg lines 1106-1118)
+pub fn sigmsg(sig: i32) -> &'static str {
+    match sig {
+        libc::SIGHUP => "hangup",
+        libc::SIGINT => "interrupt",
+        libc::SIGQUIT => "quit",
+        libc::SIGILL => "illegal instruction",
+        libc::SIGTRAP => "trace trap",
+        libc::SIGABRT => "abort",
+        libc::SIGBUS => "bus error",
+        libc::SIGFPE => "floating point exception",
+        libc::SIGKILL => "killed",
+        libc::SIGUSR1 => "user-defined signal 1",
+        libc::SIGSEGV => "segmentation fault",
+        libc::SIGUSR2 => "user-defined signal 2",
+        libc::SIGPIPE => "broken pipe",
+        libc::SIGALRM => "alarm",
+        libc::SIGTERM => "terminated",
+        libc::SIGCHLD => "child exited",
+        libc::SIGCONT => "continued",
+        libc::SIGSTOP => "stopped (signal)",
+        libc::SIGTSTP => "stopped",
+        libc::SIGTTIN => "stopped (tty input)",
+        libc::SIGTTOU => "stopped (tty output)",
+        libc::SIGURG => "urgent I/O condition",
+        libc::SIGXCPU => "CPU time exceeded",
+        libc::SIGXFSZ => "file size exceeded",
+        libc::SIGVTALRM => "virtual timer expired",
+        libc::SIGPROF => "profiling timer expired",
+        libc::SIGWINCH => "window changed",
+        libc::SIGIO => "I/O ready",
+        libc::SIGSYS => "bad system call",
+        _ => "unknown signal",
+    }
+}
+
+/// Format process status for display (from jobs.c printjob lines 1136-1400)
+pub fn format_process_status(status: i32) -> String {
+    if status == SP_RUNNING {
+        "running".to_string()
+    } else if (status & 0x7f) == 0 {
+        // Exited normally
+        let code = (status >> 8) & 0xff;
+        if code == 0 {
+            "done".to_string()
+        } else {
+            format!("exit {}", code)
+        }
+    } else if (status & 0xff) == 0x7f {
+        // Stopped
+        let sig = (status >> 8) & 0xff;
+        format!("suspended ({})", sigmsg(sig))
+    } else {
+        // Signaled
+        let sig = status & 0x7f;
+        let core = (status >> 7) & 1;
+        if core != 0 {
+            format!("{} (core dumped)", sigmsg(sig))
+        } else {
+            sigmsg(sig).to_string()
+        }
+    }
+}
+
+/// Print job in long format (from jobs.c printjob)
+pub fn format_job_long(job_num: usize, current: bool, pid: i32, status: &str, text: &str) -> String {
+    let marker = if current { '+' } else { '-' };
+    format!("[{}]  {} {:>5} {}  {}", job_num, marker, pid, status, text)
+}
+
+/// Print job in short format
+pub fn format_job_short(job_num: usize, current: bool, status: &str, text: &str) -> String {
+    let marker = if current { '+' } else { '-' };
+    format!("[{}]  {} {}  {}", job_num, marker, status, text)
+}
+
+/// Background status tracking (from jobs.c bgstatus)
+pub struct BgStatus {
+    statuses: std::collections::HashMap<i32, i32>,
+}
+
+impl Default for BgStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BgStatus {
+    pub fn new() -> Self {
+        BgStatus {
+            statuses: std::collections::HashMap::new(),
+        }
+    }
+
+    pub fn add(&mut self, pid: i32, status: i32) {
+        self.statuses.insert(pid, status);
+    }
+
+    pub fn get(&self, pid: i32) -> Option<i32> {
+        self.statuses.get(&pid).copied()
+    }
+
+    pub fn remove(&mut self, pid: i32) -> Option<i32> {
+        self.statuses.remove(&pid)
+    }
+
+    pub fn clear(&mut self) {
+        self.statuses.clear();
+    }
+}

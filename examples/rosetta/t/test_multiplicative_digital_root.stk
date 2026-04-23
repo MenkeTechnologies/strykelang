@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Multiplicative digital root and persistence
+
+fn multiplicative_digital_root_and_persistence($n) {
+    my $persistence = 0
+    my $curr = $n
+    while (length("$curr") > 1) {
+        my @digits = ~> "$curr" chars map { int($_) }
+        my $prod = 1
+        for my $d (@digits) { $prod *= $d }
+        $curr = $prod
+        $persistence++
+    }
+    ($curr, $persistence)
+}
+
+my ($root, $pers) = multiplicative_digital_root_and_persistence(327)
+assert_eq $root, 8, "MDR(327) is 8"
+assert_eq $pers, 2, "MP(327) is 2"
+
+($root, $pers) = multiplicative_digital_root_and_persistence(77)
+assert_eq $root, 8, "MDR(77) is 8"
+assert_eq $pers, 4, "MP(77) is 4"
+
+test_run

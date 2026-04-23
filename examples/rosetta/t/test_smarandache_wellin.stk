@@ -1,0 +1,48 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Smarandache-Wellin numbers
+
+fn my_is_prime($n) {
+    if ($n < 2) {
+        0
+    } elsif ($n == 2) {
+        1
+    } elsif ($n % 2 == 0) {
+        0
+    } else {
+        my $i = 3
+        my $limit = sqrt($n)
+        my $res = 1
+        while ($i <= $limit) {
+            if ($n % $i == 0) {
+                $res = 0
+                $i = $n
+            }
+            $i += 2
+        }
+        $res
+    }
+}
+
+fn smarandache_wellin($n) {
+    my $count = 0
+    my $p = 2
+    my $s = ""
+    while ($count < $n) {
+        if (my_is_prime($p)) {
+            $s = $s . $p
+            $count++
+        }
+        $p++
+    }
+    $s
+}
+
+assert_eq smarandache_wellin(1), "2", "SW(1)"
+assert_eq smarandache_wellin(2), "23", "SW(2)"
+assert_eq smarandache_wellin(3), "235", "SW(3)"
+assert_eq smarandache_wellin(4), "2357", "SW(4)"
+assert_eq smarandache_wellin(5), "235711", "SW(5)"
+
+5 |> smarandache_wellin |> assert_eq("235711", "pipe SW(5)")
+
+test_run

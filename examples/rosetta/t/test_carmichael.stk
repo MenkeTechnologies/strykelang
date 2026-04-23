@@ -1,0 +1,53 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Carmichael numbers
+
+fn my_prime_factors($n) {
+    my @factors
+    my $d = 2
+    my $temp = $n
+    while ($temp > 1) {
+        while ($temp % $d == 0) {
+            push @factors, $d
+            $temp = int($temp / $d)
+        }
+        $d++
+    }
+    ([@factors])
+}
+
+fn is_carmichael($n) {
+    my $factors_ref = my_prime_factors($n)
+    my @factors = @$factors_ref
+    if (scalar(@factors) < 2) {
+        0
+    } else {
+        # Check if square-free
+        my %counts
+        my $square_free = 1
+        for my $f (@factors) {
+            $counts{$f}++
+            if ($counts{$f} > 1) { $square_free = 0 }
+        }
+        
+        if (!$square_free) {
+            0
+        } else {
+            my $all_div = 1
+            for my $p (keys %counts) {
+                if (($n - 1) % ($p - 1) != 0) {
+                    $all_div = 0
+                }
+            }
+            $all_div
+        }
+    }
+}
+
+assert_ok is_carmichael(561), "561 is Carmichael (3*11*17)"
+assert_ok is_carmichael(1105), "1105 is Carmichael (5*13*17)"
+assert_ok !is_carmichael(562), "562 is not"
+assert_ok !is_carmichael(7), "7 is prime, not Carmichael"
+
+561 |> is_carmichael |> assert_ok("pipe Carmichael")
+
+test_run

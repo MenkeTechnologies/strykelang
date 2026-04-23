@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Rep-string
+
+fn find_rep_string($s) {
+    my $len = length($s)
+    my $res = ""
+    # Try all possible cycle lengths from 1 to len-1
+    for my $i (1..$len-1) {
+        my $sub = substr($s, 0, $i)
+        my $repeated = ""
+        while (length($repeated) < $len) {
+            $repeated = $repeated . $sub
+        }
+        if (substr($repeated, 0, $len) eq $s) {
+            $res = $sub
+        }
+    }
+    $res
+}
+
+assert_eq find_rep_string("100100100100100"), "100100100100", "100 rep-string (longest)"
+assert_eq find_rep_string("abcabcabcabc"), "abcabcabc", "abc rep-string (longest)"
+assert_eq find_rep_string("abcdef"), "", "no rep-string"
+assert_eq find_rep_string("aaaaa"), "aaaa", "aaaaa -> aaaa"
+
+"101010" |> find_rep_string |> assert_eq("1010", "pipe 101010")
+
+test_run

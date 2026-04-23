@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Greatest Common Divisor
+
+fn my_gcd($a, $b) {
+    while ($b != 0) {
+        ($a, $b) = ($b, $a % $b)
+    }
+    $a
+}
+
+# gcd of multiple numbers
+fn gcd_multi(@nums) {
+    @nums |> reduce { my_gcd($a, $b) }
+}
+
+assert_eq my_gcd(12, 18), 6, "gcd(12, 18)"
+assert_eq my_gcd(10, 5), 5, "gcd(10, 5)"
+assert_eq my_gcd(7, 13), 1, "gcd(7, 13)"
+assert_eq gcd_multi(12, 18, 24), 6, "gcd_multi(12, 18, 24)"
+
+# Use pipe and threading
+12 |> my_gcd(18) |> assert_eq(6, "pipe gcd")
+~> (12, 18, 24) gcd_multi |> assert_eq(6, "threaded gcd_multi")
+
+test_run

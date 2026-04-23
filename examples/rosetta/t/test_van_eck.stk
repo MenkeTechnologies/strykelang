@@ -1,2 +1,25 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Van Eck sequence
+
+fn van_eck($n) {
+    my @seq = (0)
+    my %last_seen
+    for my $i (0..$n-2) {
+        my $val = $seq[$i]
+        my $next_val = 0
+        if (exists $last_seen{$val}) {
+            $next_val = $i - $last_seen{$val}
+        }
+        push @seq, $next_val
+        $last_seen{$val} = $i
+    }
+    ([@seq])
+}
+
+my $res = van_eck(10)
+assert_eq join(",", @$res), "0,0,1,0,2,0,2,2,1,6", "van eck first 10"
+
+# Using |> and ~>
+van_eck(12) |> map { join(",", @$_) } |> assert_eq("0,0,1,0,2,0,2,2,1,6,0,5", "van eck first 12")
+
+test_run

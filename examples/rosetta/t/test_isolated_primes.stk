@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Isolated primes
+
+fn my_is_prime($n) {
+    if ($n < 2) { 0 }
+    elsif ($n == 2) { 1 }
+    elsif ($n % 2 == 0) { 0 }
+    else {
+        my $limit = sqrt($n)
+        my $res = 1
+        my $i = 3
+        while ($i <= $limit) {
+            if ($n % $i == 0) {
+                $res = 0
+                $i = $n
+            }
+            $i += 2
+        }
+        $res
+    }
+}
+
+fn is_isolated_prime($p) {
+    my_is_prime($p) && !my_is_prime($p - 2) && !my_is_prime($p + 2)
+}
+
+assert_ok is_isolated_prime(2), "2 is isolated (0 and 4 not prime)"
+assert_ok is_isolated_prime(23), "23 is isolated (21 and 25 not prime)"
+assert_ok !is_isolated_prime(3), "3 is not (5 is prime)"
+assert_ok !is_isolated_prime(5), "5 is not (3 and 7 are prime)"
+assert_ok !is_isolated_prime(7), "5 is prime"
+
+23 |> is_isolated_prime |> assert_ok("pipe isolated prime")
+
+test_run

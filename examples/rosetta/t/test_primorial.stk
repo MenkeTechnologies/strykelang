@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Primorial numbers
+
+fn my_is_prime($n) {
+    if ($n < 2) {
+        0
+    } elsif ($n == 2) {
+        1
+    } elsif ($n % 2 == 0) {
+        0
+    } else {
+        my $i = 3
+        my $limit = sqrt($n)
+        my $res = 1
+        while ($i <= $limit) {
+            if ($n % $i == 0) {
+                $res = 0
+                $i = $n
+            }
+            $i += 2
+        }
+        $res
+    }
+}
+
+fn primorial($n) {
+    if ($n == 0) {
+        1
+    } else {
+        my @primes
+        my $p = 2
+        while (scalar(@primes) < $n) {
+            if (my_is_prime($p)) {
+                push @primes, $p
+            }
+            $p++
+        }
+        @primes |> reduce { $a * $b }
+    }
+}
+
+assert_eq primorial(0), 1, "P0"
+assert_eq primorial(1), 2, "P1"
+assert_eq primorial(2), 6, "P2 (2*3)"
+assert_eq primorial(3), 30, "P3 (2*3*5)"
+assert_eq primorial(5), 2310, "P5"
+
+5 |> primorial |> assert_eq(2310, "pipe primorial")
+
+test_run

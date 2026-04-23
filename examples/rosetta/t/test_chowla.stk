@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Chowla numbers
+
+fn chowla($n) {
+    if ($n < 2) {
+        0
+    } else {
+        my $sum = 0
+        for my $i (2..int($n/2)) {
+            if ($n % $i == 0) { $sum += $i }
+        }
+        $sum
+    }
+}
+
+assert_eq chowla(1), 0, "chowla(1)"
+assert_eq chowla(6), 5, "chowla(6) = 2+3=5"
+assert_eq chowla(20), 21, "chowla(20) = 2+4+5+10=21"
+assert_eq chowla(37), 0, "chowla(37) is prime"
+
+20 |> chowla |> assert_eq(21, "pipe chowla")
+
+test_run

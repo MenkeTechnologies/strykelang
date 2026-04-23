@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Equilibrium index
+
+fn my_sum_list(@list) {
+    if (scalar(@list) == 0) {
+        0
+    } else {
+        ~> @list reduce { $a + $b }
+    }
+}
+
+fn equilibrium_indices(@arr) {
+    my @res
+    my $n = scalar(@arr)
+    for my $i (0..$n-1) {
+        my $ls = 0
+        if ($i > 0) {
+            my @left = @arr[0..$i-1]
+            $ls = my_sum_list(@left)
+        }
+        
+        my $rs = 0
+        if ($i < $n - 1) {
+            my @right = @arr[$i+1..$n-1]
+            $rs = my_sum_list(@right)
+        }
+        
+        if ($ls == $rs) {
+            push @res, $i
+        }
+    }
+    ([@res])
+}
+
+my @data = (-7, 1, 5, 2, -4, 3, 0)
+my $res = equilibrium_indices(@data)
+assert_eq join(",", @$res), "3,6", "equilibrium indices of -7,1,5,2,-4,3,0"
+
+# Pipe example
+@data |> equilibrium_indices |> { join(",", @$_) } |> assert_eq("3,6", "pipe equilibrium")
+
+test_run

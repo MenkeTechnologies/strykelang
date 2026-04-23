@@ -217,6 +217,86 @@ impl io::Write for BorrowedFdFile {
 }
 
 // ============================================================================
+// Port from zsh/Src/utils.c: File descriptor table and management
+// ============================================================================
+
+/// File descriptor type constants (from zsh.h FDT_*)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FdType {
+    Unused = 0,
+    External = 1,
+    Internal = 2,
+    Module = 3,
+    Flock = 4,
+    FlockExec = 5,
+    Proc = 6,
+}
+
+/// Move file descriptor to >= 10 to keep low fds free for user redirection
+/// Port from zsh/Src/utils.c movefd() lines 1980-2012
+pub fn movefd(fd: RawFd) -> RawFd {
+    if fd < 0 || fd >= FIRST_HIGH_FD {
+        return fd;
+    }
+
+    unsafe {
+        let new_fd = libc::fcntl(fd, libc::F_DUPFD_CLOEXEC, FIRST_HIGH_FD);
+        if new_fd != -1 {
+            libc::close(fd);
+            return new_fd;
+        }
+    }
+    fd
+}
+
+/// Duplicate fd x to y. If x == -1, fd y is closed.
+/// Port from zsh/Src/utils.c redup() lines 2019-2068
+pub fn redup(x: RawFd, y: RawFd) -> RawFd {
+    if x < 0 {
+        unsafe { libc::close(y) };
+        return y;
+    }
+
+    if x == y {
+        return y;
+    }
+
+    let result = unsafe { libc::dup2(x, y) };
+    if result == -1 {
+        return -1;
+    }
+
+    unsafe { libc::close(x) };
+    y
+}
+
+/// Close a file descriptor
+/// Port from zsh/Src/utils.c zclose() lines 2126-2148
+pub fn zclose(fd: RawFd) -> i32 {
+    if fd >= 0 {
+        unsafe { libc::close(fd) }
+    } else {
+        -1
+    }
+}
+
+/// Duplicate file descriptor
+pub fn zdup(fd: RawFd) -> RawFd {
+    if fd < 0 {
+        return -1;
+    }
+    unsafe { libc::dup(fd) }
+}
+
+/// Check if file descriptor is open
+pub fn fd_is_open(fd: RawFd) -> bool {
+    if fd < 0 {
+        return false;
+    }
+    unsafe { libc::fcntl(fd, libc::F_GETFD, 0) >= 0 }
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 

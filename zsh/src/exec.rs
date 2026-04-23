@@ -1487,7 +1487,18 @@ impl ShellExecutor {
             "strftime" => self.builtin_strftime(args),
             // sleep with fractional seconds
             "zsleep" => self.builtin_zsleep(args),
-            // zsh/files module
+            // zsh/system module - ported from Src/Modules/system.c
+            "zsystem" => self.builtin_zsystem(args),
+            // zsh/files module - ported from Src/Modules/files.c
+            "sync" => self.builtin_sync(args),
+            "mkdir" => self.builtin_mkdir(args),
+            "rmdir" => self.builtin_rmdir(args),
+            "ln" => self.builtin_ln(args),
+            "mv" => self.builtin_mv(args),
+            "cp" => self.builtin_cp(args),
+            "rm" => self.builtin_rm(args),
+            "chown" => self.builtin_chown(args),
+            "chmod" => self.builtin_chmod(args),
             "zln" | "zmv" | "zcp" => self.builtin_zfiles(cmd_name, args),
             // coproc management
             "coproc" => self.builtin_coproc(args),
@@ -3661,6 +3672,14 @@ impl ShellExecutor {
                     }
                 }
             }
+            // ${#arr} - if rest is an array name, return array length
+            if self.arrays.contains_key(rest) {
+                return self.arrays.get(rest).map(|arr| arr.len().to_string()).unwrap_or_else(|| "0".to_string());
+            }
+            // ${#assoc} - if rest is an assoc array name, return assoc length
+            if self.assoc_arrays.contains_key(rest) {
+                return self.assoc_arrays.get(rest).map(|h| h.len().to_string()).unwrap_or_else(|| "0".to_string());
+            }
             // ${#var} - string length
             let val = self.get_variable(rest);
             return val.len().to_string();
@@ -3749,43 +3768,56 @@ impl ShellExecutor {
                         .map(|arr| arr.join(" "))
                         .unwrap_or_default();
                 }
+
+                // Use the ported subscript module for comprehensive index parsing
+                use crate::subscript::{getindex, get_array_by_subscript, get_array_element_by_subscript};
+                let ksh_arrays = self.options.get("ksh_arrays").copied().unwrap_or(false);
                 
-                // Try to get index as a number (could be negative for reverse indexing)
-                let idx_result = if index.starts_with('-') || index.chars().all(|c| c.is_ascii_digit()) {
-                    index.parse::<i64>().ok()
-                } else {
-                    // Index is a variable, expand it first
-                    let expanded_idx = self.expand_string(index);
-                    expanded_idx.parse::<i64>().ok()
-                };
-                
-                if let Some(idx) = idx_result {
+                if let Ok(v) = getindex(index, false, ksh_arrays) {
                     // Check if it's an array first
                     if let Some(arr) = self.arrays.get(var_name) {
-                        let actual_idx = if idx < 0 {
-                            // Negative index: -1 is last element
-                            (arr.len() as i64 + idx).max(0) as usize
-                        } else if idx > 0 {
-                            (idx - 1) as usize // zsh is 1-indexed
+                        if v.is_all() {
+                            return arr.join(" ");
+                        }
+                        // Check if this is a range (comma in subscript) vs single element
+                        // For a single element, v.end == v.start + 1 after adjustment
+                        // But for negative single indices, we need to handle specially
+                        let is_range = index.contains(',');
+                        if is_range {
+                            // Range: ${arr[2,4]} returns elements 2 through 4
+                            return get_array_by_subscript(arr, &v, ksh_arrays).join(" ");
                         } else {
-                            0
-                        };
-                        return arr.get(actual_idx).cloned().unwrap_or_default();
+                            // Single element (including negative indices like -1)
+                            return get_array_element_by_subscript(arr, &v, ksh_arrays)
+                                .unwrap_or_default();
+                        }
                     }
                     
                     // Not an array - treat as string subscripting
                     let val = self.get_variable(var_name);
                     if !val.is_empty() {
                         let chars: Vec<char> = val.chars().collect();
+                        let idx = v.start;
                         let actual_idx = if idx < 0 {
-                            // Negative index: -1 is last char
                             (chars.len() as i64 + idx).max(0) as usize
                         } else if idx > 0 {
                             (idx - 1) as usize // zsh is 1-indexed
                         } else {
                             0
                         };
-                        return chars.get(actual_idx).map(|c| c.to_string()).unwrap_or_default();
+                        
+                        if v.end > v.start + 1 {
+                            // String range
+                            let end_idx = if v.end < 0 {
+                                (chars.len() as i64 + v.end + 1).max(0) as usize
+                            } else {
+                                v.end as usize
+                            };
+                            let end_idx = end_idx.min(chars.len());
+                            return chars[actual_idx..end_idx].iter().collect();
+                        } else {
+                            return chars.get(actual_idx).map(|c| c.to_string()).unwrap_or_default();
+                        }
                     }
                     return String::new();
                 }
@@ -4050,25 +4082,30 @@ impl ShellExecutor {
     }
 
     fn expand_array_access(&mut self, name: &str, index: &ShellWord) -> String {
+        use crate::subscript::{getindex, get_array_by_subscript, get_array_element_by_subscript};
+        
         let idx_str = self.expand_word(index);
+        let ksh_arrays = self.options.get("ksh_arrays").copied().unwrap_or(false);
 
-        if idx_str == "@" || idx_str == "*" {
-            // Return all elements
-            if let Some(arr) = self.arrays.get(name) {
-                arr.join(" ")
-            } else {
-                String::new()
+        // Use the ported subscript module for index parsing
+        match getindex(&idx_str, false, ksh_arrays) {
+            Ok(v) => {
+                if let Some(arr) = self.arrays.get(name) {
+                    if v.is_all() {
+                        arr.join(" ")
+                    } else if v.start == v.end - 1 {
+                        // Single element
+                        get_array_element_by_subscript(arr, &v, ksh_arrays)
+                            .unwrap_or_default()
+                    } else {
+                        // Range
+                        get_array_by_subscript(arr, &v, ksh_arrays).join(" ")
+                    }
+                } else {
+                    String::new()
+                }
             }
-        } else if let Ok(idx) = idx_str.parse::<i64>() {
-            // Return element at index (zsh is 1-indexed by default)
-            if let Some(arr) = self.arrays.get(name) {
-                let actual_idx = if idx > 0 { (idx - 1) as usize } else { 0 };
-                arr.get(actual_idx).cloned().unwrap_or_default()
-            } else {
-                String::new()
-            }
-        } else {
-            String::new()
+            Err(_) => String::new(),
         }
     }
 
@@ -5685,7 +5722,11 @@ impl ShellExecutor {
     }
 
     // Builtins
+    // Ported from zsh/Src/builtin.c
 
+    /// cd builtin - change directory
+    /// Ported from zsh/Src/builtin.c bin_cd() lines 839-859, cd_get_dest() lines 864-957,
+    /// cd_do_chdir() lines 967-1081, cd_try_chdir() lines 1116-1181
     fn builtin_cd(&mut self, args: &[String]) -> i32 {
         // cd [ -qsLP ] [ arg ]
         // cd [ -qsLP ] old new
@@ -7911,28 +7952,175 @@ impl ShellExecutor {
         }
     }
 
+    /// fc builtin - fix command (history manipulation)
+    /// Ported from zsh/Src/builtin.c bin_fc() lines 1426-1700
+    /// Options: -l (list), -n (no numbers), -r (reverse), -d/-f/-E/-i/-t (time formats),
+    /// -D (duration), -e editor, -m pattern, -R/-W/-A (read/write/append history file),
+    /// -p/-P (push/pop history stack), -I (skip old), -L (local), -s (substitute)
     fn builtin_fc(&mut self, args: &[String]) -> i32 {
         let Some(ref engine) = self.history else {
             eprintln!("fc: history engine not available");
             return 1;
         };
 
-        // fc -l: list
-        // fc -e -: re-execute last command
-        // fc -s old=new: substitute and execute
-
-        if args.is_empty() || args[0] == "-l" {
-            // List mode
-            let count = if args.len() > 1 {
-                args[1].parse().unwrap_or(16)
+        // Parse options
+        let mut list_mode = false;
+        let mut no_numbers = false;
+        let mut reverse = false;
+        let mut show_time = false;
+        let mut show_duration = false;
+        let mut editor: Option<String> = None;
+        let mut read_file = false;
+        let mut write_file = false;
+        let mut append_file = false;
+        let mut substitute_mode = false;
+        let mut positional: Vec<&str> = Vec::new();
+        let mut substitutions: Vec<(String, String)> = Vec::new();
+        
+        let mut i = 0;
+        while i < args.len() {
+            let arg = &args[i];
+            if arg == "--" {
+                i += 1;
+                while i < args.len() {
+                    positional.push(&args[i]);
+                    i += 1;
+                }
+                break;
+            }
+            if arg.starts_with('-') && arg.len() > 1 {
+                let chars: Vec<char> = arg[1..].chars().collect();
+                let mut j = 0;
+                while j < chars.len() {
+                    match chars[j] {
+                        'l' => list_mode = true,
+                        'n' => no_numbers = true,
+                        'r' => reverse = true,
+                        'd' | 'f' | 'E' | 'i' => show_time = true,
+                        'D' => show_duration = true,
+                        'R' => read_file = true,
+                        'W' => write_file = true,
+                        'A' => append_file = true,
+                        's' => substitute_mode = true,
+                        'e' => {
+                            if j + 1 < chars.len() {
+                                editor = Some(chars[j+1..].iter().collect());
+                                break;
+                            } else {
+                                i += 1;
+                                if i < args.len() {
+                                    editor = Some(args[i].clone());
+                                }
+                            }
+                        }
+                        't' => {
+                            show_time = true;
+                            if j + 1 < chars.len() {
+                                break;
+                            } else {
+                                i += 1;
+                            }
+                        }
+                        'p' | 'P' | 'a' | 'I' | 'L' | 'm' => {} // Handled but no-op for now
+                        _ => {
+                            if chars[j].is_ascii_digit() {
+                                positional.push(arg);
+                                break;
+                            }
+                        }
+                    }
+                    j += 1;
+                }
+            } else if arg.contains('=') && !list_mode {
+                if let Some((old, new)) = arg.split_once('=') {
+                    substitutions.push((old.to_string(), new.to_string()));
+                }
             } else {
-                16
-            };
+                positional.push(arg);
+            }
+            i += 1;
+        }
 
-            match engine.recent(count) {
-                Ok(entries) => {
-                    for entry in entries.into_iter().rev() {
-                        println!("{:>6}  {}", entry.id, entry.command);
+        // Handle file operations (read/write/append)
+        // Note: HistoryEngine uses SQLite, so file ops are simplified
+        if read_file || write_file || append_file {
+            let filename = positional.first().map(|s| *s).unwrap_or("~/.zsh_history");
+            let path = if filename.starts_with("~/") {
+                dirs::home_dir()
+                    .map(|h| h.join(&filename[2..]))
+                    .unwrap_or_else(|| std::path::PathBuf::from(filename))
+            } else {
+                std::path::PathBuf::from(filename)
+            };
+            
+            if read_file {
+                // Read plain text history file and import
+                if let Ok(contents) = std::fs::read_to_string(&path) {
+                    for line in contents.lines() {
+                        if !line.is_empty() && !line.starts_with('#') && !line.starts_with(':') {
+                            let _ = engine.add(line, None);
+                        }
+                    }
+                } else {
+                    eprintln!("fc: cannot read {}", path.display());
+                    return 1;
+                }
+            } else if write_file || append_file {
+                // Export history to plain text file
+                let mode = if append_file {
+                    std::fs::OpenOptions::new().create(true).append(true).open(&path)
+                } else {
+                    std::fs::File::create(&path)
+                };
+                match mode {
+                    Ok(mut file) => {
+                        use std::io::Write;
+                        if let Ok(entries) = engine.recent(10000) {
+                            for entry in entries.iter().rev() {
+                                let _ = writeln!(file, ": {}:0;{}", entry.timestamp, entry.command);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("fc: cannot write {}: {}", path.display(), e);
+                        return 1;
+                    }
+                }
+            }
+            return 0;
+        }
+
+        // List mode (fc -l)
+        if list_mode || args.is_empty() {
+            let (first, last) = match positional.len() {
+                0 => (-16i64, -1i64),
+                1 => {
+                    let n = positional[0].parse::<i64>().unwrap_or(-16);
+                    (n, -1)
+                }
+                _ => {
+                    let f = positional[0].parse::<i64>().unwrap_or(-16);
+                    let l = positional[1].parse::<i64>().unwrap_or(-1);
+                    (f, l)
+                }
+            };
+            
+            let count = if first < 0 { (-first) as usize } else { 16 };
+            match engine.recent(count.max(100)) {
+                Ok(mut entries) => {
+                    if reverse {
+                        entries.reverse();
+                    }
+                    for entry in entries.iter().rev().take(count) {
+                        if no_numbers {
+                            println!("{}", entry.command);
+                        } else if show_time {
+                            println!("{:>6}  {:>10}  {}", entry.id, entry.timestamp, entry.command);
+                        } else if show_duration {
+                            println!("{:>6}  {:>5}  {}", entry.id, entry.duration_ms.unwrap_or(0), entry.command);
+                        } else {
+                            println!("{:>6}  {}", entry.id, entry.command);
+                        }
                     }
                     0
                 }
@@ -7941,36 +8129,14 @@ impl ShellExecutor {
                     1
                 }
             }
-        } else if args[0] == "-e" && args.get(1).map(|s| s.as_str()) == Some("-") {
-            // Re-execute last command
-            match engine.get_by_offset(0) {
-                Ok(Some(entry)) => {
-                    println!("{}", entry.command);
-                    self.execute_script(&entry.command).unwrap_or(1)
-                }
-                Ok(None) => {
-                    eprintln!("fc: no command to re-execute");
-                    1
-                }
-                Err(e) => {
-                    eprintln!("fc: {}", e);
-                    1
-                }
-            }
-        } else if args[0] == "-s" {
-            // Substitution mode: fc -s old=new or fc -s pattern
-            let substitution = args.get(1);
-
+        } else if substitute_mode || !substitutions.is_empty() {
+            // Substitution mode: fc -s old=new
             match engine.get_by_offset(0) {
                 Ok(Some(entry)) => {
                     let mut cmd = entry.command.clone();
-
-                    if let Some(sub) = substitution {
-                        if let Some((old, new)) = sub.split_once('=') {
-                            cmd = cmd.replace(old, new);
-                        }
+                    for (old, new) in &substitutions {
+                        cmd = cmd.replace(old, new);
                     }
-
                     println!("{}", cmd);
                     self.execute_script(&cmd).unwrap_or(1)
                 }
@@ -7983,16 +8149,15 @@ impl ShellExecutor {
                     1
                 }
             }
-        } else if args[0].starts_with('-') && args[0].chars().skip(1).all(|c| c.is_ascii_digit()) {
-            // fc -N: re-execute Nth previous command
-            let n: usize = args[0][1..].parse().unwrap_or(1);
-            match engine.get_by_offset(n - 1) {
+        } else if editor.as_deref() == Some("-") {
+            // fc -e -: re-execute last command without editor
+            match engine.get_by_offset(0) {
                 Ok(Some(entry)) => {
                     println!("{}", entry.command);
                     self.execute_script(&entry.command).unwrap_or(1)
                 }
                 Ok(None) => {
-                    eprintln!("fc: event not found");
+                    eprintln!("fc: no command to re-execute");
                     1
                 }
                 Err(e) => {
@@ -8000,16 +8165,51 @@ impl ShellExecutor {
                     1
                 }
             }
-        } else {
-            // Try to find command by prefix
-            let prefix = &args[0];
-            match engine.search_prefix(prefix, 1) {
-                Ok(entries) if !entries.is_empty() => {
-                    println!("{}", entries[0].command);
-                    self.execute_script(&entries[0].command).unwrap_or(1)
+        } else if let Some(arg) = positional.first() {
+            if arg.starts_with('-') || arg.starts_with('+') {
+                // fc -N or fc +N: re-execute Nth command
+                let n: usize = arg[1..].parse().unwrap_or(1);
+                let offset = if arg.starts_with('-') { n - 1 } else { n };
+                match engine.get_by_offset(offset) {
+                    Ok(Some(entry)) => {
+                        println!("{}", entry.command);
+                        self.execute_script(&entry.command).unwrap_or(1)
+                    }
+                    Ok(None) => {
+                        eprintln!("fc: event not found");
+                        1
+                    }
+                    Err(e) => {
+                        eprintln!("fc: {}", e);
+                        1
+                    }
                 }
-                Ok(_) => {
-                    eprintln!("fc: event not found: {}", prefix);
+            } else {
+                // Try to find command by prefix
+                match engine.search_prefix(arg, 1) {
+                    Ok(entries) if !entries.is_empty() => {
+                        println!("{}", entries[0].command);
+                        self.execute_script(&entries[0].command).unwrap_or(1)
+                    }
+                    Ok(_) => {
+                        eprintln!("fc: event not found: {}", arg);
+                        1
+                    }
+                    Err(e) => {
+                        eprintln!("fc: {}", e);
+                        1
+                    }
+                }
+            }
+        } else {
+            // Default: edit and execute last command
+            match engine.get_by_offset(0) {
+                Ok(Some(entry)) => {
+                    println!("{}", entry.command);
+                    self.execute_script(&entry.command).unwrap_or(1)
+                }
+                Ok(None) => {
+                    eprintln!("fc: no command to re-execute");
                     1
                 }
                 Err(e) => {
@@ -12776,6 +12976,779 @@ impl ShellExecutor {
         };
 
         std::thread::sleep(std::time::Duration::from_secs_f64(secs));
+        0
+    }
+
+    /// zsystem - system interface (zsh/system module)
+    /// Ported from zsh/Src/Modules/system.c bin_zsystem() lines 805-816
+    fn builtin_zsystem(&mut self, args: &[String]) -> i32 {
+        if args.is_empty() {
+            eprintln!("zsystem: subcommand expected");
+            return 1;
+        }
+        match args[0].as_str() {
+            "flock" => self.builtin_zsystem_flock(&args[1..]),
+            "supports" => self.builtin_zsystem_supports(&args[1..]),
+            _ => {
+                eprintln!("zsystem: unknown subcommand: {}", args[0]);
+                1
+            }
+        }
+    }
+
+    /// zsystem supports - ported from system.c bin_zsystem_supports() lines 780-801
+    fn builtin_zsystem_supports(&self, args: &[String]) -> i32 {
+        if args.is_empty() {
+            eprintln!("zsystem: supports: not enough arguments");
+            return 255;
+        }
+        if args.len() > 1 {
+            eprintln!("zsystem: supports: too many arguments");
+            return 255;
+        }
+        match args[0].as_str() {
+            "supports" | "flock" => 0,
+            _ => 1,
+        }
+    }
+
+    /// zsystem flock - ported from system.c bin_zsystem_flock() lines 546-774
+    fn builtin_zsystem_flock(&mut self, args: &[String]) -> i32 {
+        #[cfg(unix)]
+        {
+            use std::os::unix::io::AsRawFd;
+
+            let mut cloexec = true;
+            let mut readlock = false;
+            let mut timeout: Option<f64> = None;
+            let mut fdvar: Option<String> = None;
+            let mut file: Option<&str> = None;
+
+            let mut i = 0;
+            while i < args.len() {
+                let arg = &args[i];
+                if arg == "--" {
+                    i += 1;
+                    if i < args.len() {
+                        file = Some(&args[i]);
+                    }
+                    break;
+                }
+                if !arg.starts_with('-') {
+                    file = Some(arg);
+                    break;
+                }
+                let mut chars = arg[1..].chars().peekable();
+                while let Some(c) = chars.next() {
+                    match c {
+                        'e' => cloexec = false,
+                        'r' => readlock = true,
+                        'u' => return 0,
+                        'f' => {
+                            let rest: String = chars.collect();
+                            if !rest.is_empty() {
+                                fdvar = Some(rest);
+                            } else {
+                                i += 1;
+                                if i < args.len() {
+                                    fdvar = Some(args[i].clone());
+                                } else {
+                                    eprintln!("zsystem: flock: option f requires a variable name");
+                                    return 1;
+                                }
+                            }
+                            break;
+                        }
+                        't' => {
+                            let rest: String = chars.collect();
+                            let val = if !rest.is_empty() {
+                                rest
+                            } else {
+                                i += 1;
+                                if i < args.len() {
+                                    args[i].clone()
+                                } else {
+                                    eprintln!("zsystem: flock: option t requires a numeric timeout");
+                                    return 1;
+                                }
+                            };
+                            match val.parse::<f64>() {
+                                Ok(t) => timeout = Some(t),
+                                Err(_) => {
+                                    eprintln!("zsystem: flock: invalid timeout value: '{}'", val);
+                                    return 1;
+                                }
+                            }
+                            break;
+                        }
+                        'i' => {
+                            let rest: String = chars.collect();
+                            if rest.is_empty() {
+                                i += 1;
+                                if i >= args.len() {
+                                    eprintln!("zsystem: flock: option i requires a numeric retry interval");
+                                    return 1;
+                                }
+                            }
+                            break;
+                        }
+                        _ => {
+                            eprintln!("zsystem: flock: unknown option: -{}", c);
+                            return 1;
+                        }
+                    }
+                }
+                i += 1;
+            }
+
+            let filepath = match file {
+                Some(f) => f,
+                None => {
+                    eprintln!("zsystem: flock: not enough arguments");
+                    return 1;
+                }
+            };
+
+            use std::fs::OpenOptions;
+            let file_handle = match OpenOptions::new()
+                .read(true)
+                .write(!readlock)
+                .create(true)
+                .truncate(false)
+                .open(filepath)
+            {
+                Ok(f) => f,
+                Err(e) => {
+                    eprintln!("zsystem: flock: {}: {}", filepath, e);
+                    return 1;
+                }
+            };
+
+            let lock_type = if readlock {
+                libc::F_RDLCK as i16
+            } else {
+                libc::F_WRLCK as i16
+            };
+
+            let mut flock = libc::flock {
+                l_type: lock_type,
+                l_whence: libc::SEEK_SET as i16,
+                l_start: 0,
+                l_len: 0,
+                l_pid: 0,
+            };
+
+            let cmd = if timeout.is_some() { libc::F_SETLK } else { libc::F_SETLKW };
+            let start = std::time::Instant::now();
+            let timeout_duration = timeout.map(|t| std::time::Duration::from_secs_f64(t));
+
+            loop {
+                let ret = unsafe { libc::fcntl(file_handle.as_raw_fd(), cmd, &mut flock) };
+                if ret == 0 {
+                    if let Some(ref var) = fdvar {
+                        let fd = file_handle.as_raw_fd();
+                        std::mem::forget(file_handle);
+                        self.variables.insert(var.clone(), fd.to_string());
+                    } else {
+                        std::mem::forget(file_handle);
+                    }
+                    let _ = cloexec;
+                    return 0;
+                }
+                let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
+                if errno != libc::EACCES && errno != libc::EAGAIN {
+                    eprintln!("zsystem: flock: {}: {}", filepath, std::io::Error::last_os_error());
+                    return 1;
+                }
+                if let Some(td) = timeout_duration {
+                    if start.elapsed() >= td {
+                        return 2;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                } else {
+                    eprintln!("zsystem: flock: {}: {}", filepath, std::io::Error::last_os_error());
+                    return 1;
+                }
+            }
+        }
+        #[cfg(not(unix))]
+        {
+            eprintln!("zsystem: flock: not supported on this platform");
+            1
+        }
+    }
+
+    /// sync - flush filesystem buffers
+    /// Port from zsh/Src/Modules/files.c bin_sync() lines 52-57
+    fn builtin_sync(&self, _args: &[String]) -> i32 {
+        #[cfg(unix)]
+        unsafe {
+            libc::sync();
+        }
+        0
+    }
+
+    /// mkdir - create directories
+    /// Port from zsh/Src/Modules/files.c bin_mkdir() lines 62-111
+    fn builtin_mkdir(&self, args: &[String]) -> i32 {
+        let mut mode: u32 = 0o777;
+        let mut parents = false;
+        let mut dirs: Vec<&str> = Vec::new();
+
+        let mut i = 0;
+        while i < args.len() {
+            let arg = &args[i];
+            if arg == "-p" {
+                parents = true;
+            } else if arg == "-m" && i + 1 < args.len() {
+                i += 1;
+                mode = u32::from_str_radix(&args[i], 8).unwrap_or(0o777);
+            } else if arg.starts_with("-m") {
+                mode = u32::from_str_radix(&arg[2..], 8).unwrap_or(0o777);
+            } else if !arg.starts_with('-') || arg == "-" || arg == "--" {
+                if arg == "--" {
+                    dirs.extend(args[i + 1..].iter().map(|s| s.as_str()));
+                    break;
+                }
+                dirs.push(arg);
+            }
+            i += 1;
+        }
+
+        let mut err = 0;
+        for dir in dirs {
+            let path = std::path::Path::new(dir);
+            let result = if parents {
+                std::fs::create_dir_all(path)
+            } else {
+                std::fs::create_dir(path)
+            };
+            if let Err(e) = result {
+                eprintln!("mkdir: cannot create directory '{}': {}", dir, e);
+                err = 1;
+            } else {
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode));
+                }
+            }
+        }
+        err
+    }
+
+    /// rmdir - remove directories
+    /// Port from zsh/Src/Modules/files.c bin_rmdir() lines 149-166
+    fn builtin_rmdir(&self, args: &[String]) -> i32 {
+        let mut err = 0;
+        for arg in args {
+            if arg.starts_with('-') {
+                continue;
+            }
+            if let Err(e) = std::fs::remove_dir(arg) {
+                eprintln!("rmdir: cannot remove '{}': {}", arg, e);
+                err = 1;
+            }
+        }
+        err
+    }
+
+    /// ln - create links
+    /// Port from zsh/Src/Modules/files.c bin_ln() lines 200-294
+    fn builtin_ln(&self, args: &[String]) -> i32 {
+        let mut symbolic = false;
+        let mut force = false;
+        let mut no_deref = false;
+        let mut files: Vec<&str> = Vec::new();
+
+        for arg in args {
+            match arg.as_str() {
+                "-s" => symbolic = true,
+                "-f" => force = true,
+                "-n" | "-h" => no_deref = true,
+                s if !s.starts_with('-') => files.push(s),
+                _ => {}
+            }
+        }
+
+        if files.len() < 2 {
+            if files.len() == 1 {
+                let src = files[0];
+                let target = std::path::Path::new(src)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| src.to_string());
+                files.push(Box::leak(target.into_boxed_str()));
+            } else {
+                eprintln!("ln: missing file operand");
+                return 1;
+            }
+        }
+
+        let target = files.pop().unwrap();
+        let target_path = std::path::Path::new(target);
+        let is_dir = !no_deref && target_path.is_dir();
+
+        for src in files {
+            let dest = if is_dir {
+                format!(
+                    "{}/{}",
+                    target,
+                    std::path::Path::new(src)
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| src.to_string())
+                )
+            } else {
+                target.to_string()
+            };
+
+            let dest_path = std::path::Path::new(&dest);
+            if force && dest_path.exists() {
+                let _ = std::fs::remove_file(&dest);
+            }
+
+            let result = if symbolic {
+                #[cfg(unix)]
+                {
+                    std::os::unix::fs::symlink(src, &dest)
+                }
+                #[cfg(not(unix))]
+                {
+                    Err(std::io::Error::new(
+                        std::io::ErrorKind::Unsupported,
+                        "symlinks not supported",
+                    ))
+                }
+            } else {
+                std::fs::hard_link(src, &dest)
+            };
+
+            if let Err(e) = result {
+                eprintln!("ln: cannot create link '{}' -> '{}': {}", dest, src, e);
+                return 1;
+            }
+        }
+        0
+    }
+
+    /// mv - move/rename files
+    /// Port from zsh/Src/Modules/files.c bin_ln()/domove() for mv mode
+    fn builtin_mv(&self, args: &[String]) -> i32 {
+        let mut force = false;
+        let mut interactive = false;
+        let mut verbose = false;
+        let mut files: Vec<&str> = Vec::new();
+
+        for arg in args {
+            match arg.as_str() {
+                "-f" => force = true,
+                "-i" => interactive = true,
+                "-v" => verbose = true,
+                s if !s.starts_with('-') => files.push(s),
+                _ => {}
+            }
+        }
+
+        if files.len() < 2 {
+            eprintln!("mv: missing file operand");
+            return 1;
+        }
+
+        let target = files.pop().unwrap();
+        let target_path = std::path::Path::new(target);
+        let is_dir = target_path.is_dir();
+
+        for src in files {
+            let dest = if is_dir {
+                format!(
+                    "{}/{}",
+                    target,
+                    std::path::Path::new(src)
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| src.to_string())
+                )
+            } else {
+                target.to_string()
+            };
+
+            let dest_path = std::path::Path::new(&dest);
+            if dest_path.exists() && !force {
+                if interactive {
+                    eprint!("mv: overwrite '{}'? ", dest);
+                    let mut response = String::new();
+                    if std::io::stdin().read_line(&mut response).is_err()
+                        || !response.trim().eq_ignore_ascii_case("y")
+                    {
+                        continue;
+                    }
+                } else {
+                    eprintln!("mv: cannot overwrite '{}': File exists", dest);
+                    return 1;
+                }
+            }
+
+            if let Err(e) = std::fs::rename(src, &dest) {
+                eprintln!("mv: cannot move '{}' to '{}': {}", src, dest, e);
+                return 1;
+            }
+
+            if verbose {
+                println!("'{}' -> '{}'", src, dest);
+            }
+        }
+        0
+    }
+
+    /// cp - copy files
+    /// Port from zsh/Src/Modules/files.c recursive copy functionality
+    fn builtin_cp(&self, args: &[String]) -> i32 {
+        let mut recursive = false;
+        let mut force = false;
+        let mut interactive = false;
+        let mut preserve = false;
+        let mut verbose = false;
+        let mut files: Vec<&str> = Vec::new();
+
+        for arg in args {
+            match arg.as_str() {
+                "-r" | "-R" => recursive = true,
+                "-f" => force = true,
+                "-i" => interactive = true,
+                "-p" => preserve = true,
+                "-v" => verbose = true,
+                s if !s.starts_with('-') => files.push(s),
+                _ => {}
+            }
+        }
+
+        let _ = preserve; // unused for now
+
+        if files.len() < 2 {
+            eprintln!("cp: missing file operand");
+            return 1;
+        }
+
+        let target = files.pop().unwrap();
+        let target_path = std::path::Path::new(target);
+        let is_dir = target_path.is_dir();
+
+        for src in files {
+            let src_path = std::path::Path::new(src);
+            let dest = if is_dir {
+                format!(
+                    "{}/{}",
+                    target,
+                    src_path
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| src.to_string())
+                )
+            } else {
+                target.to_string()
+            };
+
+            let dest_path = std::path::Path::new(&dest);
+            if dest_path.exists() && !force {
+                if interactive {
+                    eprint!("cp: overwrite '{}'? ", dest);
+                    let mut response = String::new();
+                    if std::io::stdin().read_line(&mut response).is_err()
+                        || !response.trim().eq_ignore_ascii_case("y")
+                    {
+                        continue;
+                    }
+                }
+            }
+
+            let result = if src_path.is_dir() {
+                if recursive {
+                    Self::copy_dir_recursive(src_path, dest_path)
+                } else {
+                    eprintln!("cp: -r not specified; omitting directory '{}'", src);
+                    continue;
+                }
+            } else {
+                std::fs::copy(src, &dest).map(|_| ())
+            };
+
+            if let Err(e) = result {
+                eprintln!("cp: cannot copy '{}' to '{}': {}", src, dest, e);
+                return 1;
+            }
+
+            if verbose {
+                println!("'{}' -> '{}'", src, dest);
+            }
+        }
+        0
+    }
+
+    fn copy_dir_recursive(
+        src: &std::path::Path,
+        dest: &std::path::Path,
+    ) -> std::io::Result<()> {
+        if !dest.exists() {
+            std::fs::create_dir_all(dest)?;
+        }
+        for entry in std::fs::read_dir(src)? {
+            let entry = entry?;
+            let file_type = entry.file_type()?;
+            let src_path = entry.path();
+            let dest_path = dest.join(entry.file_name());
+
+            if file_type.is_dir() {
+                Self::copy_dir_recursive(&src_path, &dest_path)?;
+            } else {
+                std::fs::copy(&src_path, &dest_path)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// rm - remove files
+    fn builtin_rm(&self, args: &[String]) -> i32 {
+        let mut recursive = false;
+        let mut force = false;
+        let mut interactive = false;
+        let mut verbose = false;
+        let mut files: Vec<&str> = Vec::new();
+
+        for arg in args {
+            match arg.as_str() {
+                "-r" | "-R" => recursive = true,
+                "-f" => force = true,
+                "-i" => interactive = true,
+                "-v" => verbose = true,
+                "-rf" | "-fr" => {
+                    recursive = true;
+                    force = true;
+                }
+                s if !s.starts_with('-') => files.push(s),
+                _ => {}
+            }
+        }
+
+        for file in files {
+            let path = std::path::Path::new(file);
+
+            if !path.exists() {
+                if !force {
+                    eprintln!("rm: cannot remove '{}': No such file or directory", file);
+                    return 1;
+                }
+                continue;
+            }
+
+            if interactive {
+                let file_type = if path.is_dir() { "directory" } else { "file" };
+                eprint!("rm: remove {} '{}'? ", file_type, file);
+                let mut response = String::new();
+                if std::io::stdin().read_line(&mut response).is_err()
+                    || !response.trim().eq_ignore_ascii_case("y")
+                {
+                    continue;
+                }
+            }
+
+            let result = if path.is_dir() {
+                if recursive {
+                    std::fs::remove_dir_all(path)
+                } else {
+                    eprintln!("rm: cannot remove '{}': Is a directory", file);
+                    return 1;
+                }
+            } else {
+                std::fs::remove_file(path)
+            };
+
+            if let Err(e) = result {
+                if !force {
+                    eprintln!("rm: cannot remove '{}': {}", file, e);
+                    return 1;
+                }
+            } else if verbose {
+                println!("removed '{}'", file);
+            }
+        }
+        0
+    }
+
+    /// chown - change file owner (Unix only)
+    #[cfg(unix)]
+    fn builtin_chown(&self, args: &[String]) -> i32 {
+        use std::os::unix::fs::MetadataExt;
+
+        let mut recursive = false;
+        let mut positional: Vec<&str> = Vec::new();
+
+        for arg in args {
+            match arg.as_str() {
+                "-R" => recursive = true,
+                "-h" => {} // don't deference symlinks (default on most systems)
+                s if !s.starts_with('-') => positional.push(s),
+                _ => {}
+            }
+        }
+
+        if positional.len() < 2 {
+            eprintln!("chown: missing operand");
+            return 1;
+        }
+
+        let owner_spec = positional[0];
+        let files = &positional[1..];
+
+        // Parse owner[:group]
+        let (user, group) = if let Some(colon_pos) = owner_spec.find(':') {
+            (&owner_spec[..colon_pos], Some(&owner_spec[colon_pos + 1..]))
+        } else {
+            (owner_spec, None)
+        };
+
+        let uid: u32 = if user.is_empty() {
+            u32::MAX
+        } else if let Ok(id) = user.parse() {
+            id
+        } else {
+            // Look up user name
+            unsafe {
+                let c_user = std::ffi::CString::new(user).unwrap();
+                let pw = libc::getpwnam(c_user.as_ptr());
+                if pw.is_null() {
+                    eprintln!("chown: invalid user: '{}'", user);
+                    return 1;
+                }
+                (*pw).pw_uid
+            }
+        };
+
+        let gid: u32 = match group {
+            Some(g) if !g.is_empty() => {
+                if let Ok(id) = g.parse() {
+                    id
+                } else {
+                    unsafe {
+                        let c_group = std::ffi::CString::new(g).unwrap();
+                        let gr = libc::getgrnam(c_group.as_ptr());
+                        if gr.is_null() {
+                            eprintln!("chown: invalid group: '{}'", g);
+                            return 1;
+                        }
+                        (*gr).gr_gid
+                    }
+                }
+            }
+            _ => u32::MAX,
+        };
+
+        fn do_chown(path: &std::path::Path, uid: u32, gid: u32, recursive: bool) -> i32 {
+            let c_path = match std::ffi::CString::new(path.to_string_lossy().as_bytes()) {
+                Ok(p) => p,
+                Err(_) => return 1,
+            };
+
+            let ret = unsafe { libc::chown(c_path.as_ptr(), uid, gid) };
+            if ret != 0 {
+                eprintln!(
+                    "chown: changing ownership of '{}': {}",
+                    path.display(),
+                    std::io::Error::last_os_error()
+                );
+                return 1;
+            }
+
+            if recursive && path.is_dir() {
+                if let Ok(entries) = std::fs::read_dir(path) {
+                    for entry in entries.flatten() {
+                        if do_chown(&entry.path(), uid, gid, true) != 0 {
+                            return 1;
+                        }
+                    }
+                }
+            }
+            0
+        }
+
+        for file in files {
+            if do_chown(std::path::Path::new(file), uid, gid, recursive) != 0 {
+                return 1;
+            }
+        }
+        0
+    }
+
+    #[cfg(not(unix))]
+    fn builtin_chown(&self, _args: &[String]) -> i32 {
+        eprintln!("chown: not supported on this platform");
+        1
+    }
+
+    /// chmod - change file permissions
+    fn builtin_chmod(&self, args: &[String]) -> i32 {
+        let mut recursive = false;
+        let mut positional: Vec<&str> = Vec::new();
+
+        for arg in args {
+            match arg.as_str() {
+                "-R" => recursive = true,
+                s if !s.starts_with('-') => positional.push(s),
+                _ => {}
+            }
+        }
+
+        if positional.len() < 2 {
+            eprintln!("chmod: missing operand");
+            return 1;
+        }
+
+        let mode_spec = positional[0];
+        let files = &positional[1..];
+
+        // Parse mode (octal or symbolic)
+        let mode: Option<u32> = u32::from_str_radix(mode_spec, 8).ok();
+
+        if mode.is_none() {
+            // Symbolic mode not fully implemented
+            eprintln!("chmod: symbolic mode not implemented, use octal");
+            return 1;
+        }
+
+        let mode = mode.unwrap();
+
+        fn do_chmod(path: &std::path::Path, mode: u32, recursive: bool) -> i32 {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if let Err(e) = std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))
+                {
+                    eprintln!("chmod: changing permissions of '{}': {}", path.display(), e);
+                    return 1;
+                }
+
+                if recursive && path.is_dir() {
+                    if let Ok(entries) = std::fs::read_dir(path) {
+                        for entry in entries.flatten() {
+                            if do_chmod(&entry.path(), mode, true) != 0 {
+                                return 1;
+                            }
+                        }
+                    }
+                }
+            }
+            #[cfg(not(unix))]
+            {
+                let _ = (path, mode, recursive);
+            }
+            0
+        }
+
+        for file in files {
+            if do_chmod(std::path::Path::new(file), mode, recursive) != 0 {
+                return 1;
+            }
+        }
         0
     }
 

@@ -1522,6 +1522,24 @@ impl Chunk {
             i += 1;
         }
         // Pass 2: fuse multi-op patterns
+        // Helper: check if any jump targets position `pos`.
+        let has_jump_to = |ops: &[Op], pos: usize| -> bool {
+            for op in ops {
+                let t = match op {
+                    Op::Jump(t)
+                    | Op::JumpIfFalse(t)
+                    | Op::JumpIfTrue(t)
+                    | Op::JumpIfFalseKeep(t)
+                    | Op::JumpIfTrueKeep(t)
+                    | Op::JumpIfDefinedKeep(t) => Some(*t),
+                    _ => None,
+                };
+                if t == Some(pos) {
+                    return true;
+                }
+            }
+            false
+        };
         let len = self.ops.len();
         if len >= 4 {
             i = 0;
@@ -1538,6 +1556,16 @@ impl Chunk {
                     &self.ops[i + 3],
                 ) {
                     if let Ok(n32) = i32::try_from(*n) {
+                        // Don't fuse if any jump targets the ops that will become Nop.
+                        // This prevents breaking short-circuit &&/|| that jump to the
+                        // JumpIfFalse for the while condition exit check.
+                        if has_jump_to(&self.ops, i + 1)
+                            || has_jump_to(&self.ops, i + 2)
+                            || has_jump_to(&self.ops, i + 3)
+                        {
+                            i += 1;
+                            continue;
+                        }
                         let slot = *slot;
                         let target = *target;
                         self.ops[i] = Op::SlotLtIntJumpIfFalse(slot, n32, target);
@@ -2017,7 +2045,9 @@ impl Chunk {
         for op in &mut self.ops {
             match op {
                 Op::Jump(t) | Op::JumpIfFalse(t) | Op::JumpIfTrue(t) => *t = remap[*t],
-                Op::JumpIfTrueKeep(t) | Op::JumpIfDefinedKeep(t) => *t = remap[*t],
+                Op::JumpIfFalseKeep(t) | Op::JumpIfTrueKeep(t) | Op::JumpIfDefinedKeep(t) => {
+                    *t = remap[*t]
+                }
                 Op::SlotLtIntJumpIfFalse(_, _, t) => *t = remap[*t],
                 Op::SlotIncLtIntJumpBack(_, _, t) => *t = remap[*t],
                 _ => {}

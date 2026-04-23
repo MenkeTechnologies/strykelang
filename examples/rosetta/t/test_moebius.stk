@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Moebius function
+
+fn my_prime_factors($n) {
+    my @factors
+    my $d = 2
+    my $temp = $n
+    while ($temp > 1) {
+        while ($temp % $d == 0) {
+            push @factors, $d
+            $temp = int($temp / $d)
+        }
+        $d++
+    }
+    ([@factors])
+}
+
+fn moebius($n) {
+    if ($n == 1) {
+        1
+    } else {
+        my $factors_ref = my_prime_factors($n)
+        my @factors = @$factors_ref
+        my %counts
+        my $has_square = 0
+        for my $f (@factors) {
+            $counts{$f}++
+            if ($counts{$f} > 1) { $has_square = 1 }
+        }
+        
+        if ($has_square) {
+            0
+        } else {
+            my $num_factors = scalar(@factors)
+            if ($num_factors % 2 == 0) { 1 }
+            else { -1 }
+        }
+    }
+}
+
+assert_eq moebius(1), 1, "mu(1) = 1"
+assert_eq moebius(2), -1, "mu(2) = -1"
+assert_eq moebius(4), 0, "mu(4) = 0"
+assert_eq moebius(6), 1, "mu(6) = 1 (2*3)"
+assert_eq moebius(10), 1, "mu(10) = 1 (2*5)"
+assert_eq moebius(30), -1, "mu(30) = -1 (2*3*5)"
+
+6 |> moebius |> assert_eq(1, "pipe Moebius")
+
+test_run

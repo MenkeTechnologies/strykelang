@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sphenic numbers
+
+fn my_prime_factors($n) {
+    my @factors
+    my $d = 2
+    my $temp = $n
+    while ($temp > 1) {
+        while ($temp % $d == 0) {
+            push @factors, $d
+            $temp = int($temp / $d)
+        }
+        $d++
+    }
+    ([@factors])
+}
+
+fn is_sphenic($n) {
+    my $factors_ref = my_prime_factors($n)
+    my @factors = @$factors_ref
+    if (scalar(@factors) != 3) {
+        0
+    } else {
+        my %counts
+        for my $f (@factors) { $counts{$f}++ }
+        scalar(keys %counts) == 3
+    }
+}
+
+assert_ok is_sphenic(30), "30 is sphenic (2*3*5)"
+assert_ok is_sphenic(42), "42 is sphenic (2*3*7)"
+assert_ok is_sphenic(66), "66 is sphenic (2*3*11)"
+assert_ok !is_sphenic(60), "60 is not (2*2*3*5)"
+assert_ok !is_sphenic(8), "8 is not (2*2*2)"
+assert_ok !is_sphenic(12), "12 is not (2*2*3)"
+
+30 |> is_sphenic |> assert_ok("pipe sphenic")
+
+test_run

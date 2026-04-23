@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Harmonic series
+
+fn my_harmonic($n) {
+    my $sum = 0
+    for my $i (1..$n) {
+        $sum += 1 / $i
+    }
+    $sum
+}
+
+assert_eq my_harmonic(1), 1, "H1"
+my $h2 = my_harmonic(2)
+assert_ok abs($h2 - 1.5) < 0.0001, "H2"
+my $h4 = my_harmonic(4)
+assert_ok abs($h4 - 2.0833) < 0.001, "H4"
+
+10 |> my_harmonic |> { $_ > 2.9 } |> assert_ok("pipe harmonic")
+
+test_run

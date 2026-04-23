@@ -7331,7 +7331,11 @@ impl Compiler {
                 self.check_hash_mutable(hash, line)?;
                 let idx = self.chunk.intern_name(hash);
                 self.compile_expr(key)?;
-                self.emit_op(Op::SetHashElem(idx), line, ast);
+                if keep {
+                    self.emit_op(Op::SetHashElemKeep(idx), line, ast);
+                } else {
+                    self.emit_op(Op::SetHashElem(idx), line, ast);
+                }
             }
             ExprKind::HashSlice { hash, keys } => {
                 if keys.is_empty() {

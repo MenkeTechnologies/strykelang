@@ -307,24 +307,210 @@ pub fn get_term_height() -> usize {
         .unwrap_or(24)
 }
 
-/// Quote a string for safe shell use
+/// Quote type constants for quotestring()
+/// Port from zsh.h QT_* enum
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QuoteType {
+    None = 0,
+    Backslash = 1,
+    Single = 2,
+    Double = 3,
+    Dollars = 4,
+    Backtick = 5,
+    SingleOptional = 6,
+    BackslashPattern = 7,
+    BackslashShownull = 8,
+}
+
+impl QuoteType {
+    /// Convert q flag count to QuoteType
+    /// (q)=Backslash, (qq)=Single, (qqq)=Double, (qqqq)=Dollars
+    pub fn from_q_count(count: u32) -> Self {
+        match count {
+            0 => QuoteType::None,
+            1 => QuoteType::Backslash,
+            2 => QuoteType::Single,
+            3 => QuoteType::Double,
+            _ => QuoteType::Dollars,
+        }
+    }
+}
+
+/// Check if character is special for shell
+/// Port from ispecial() macro in zsh.h
+fn is_special(c: char) -> bool {
+    matches!(c,
+        '|' | '&' | ';' | '<' | '>' | '(' | ')' | '$' | '`' | '"' | '\'' | '\\' |
+        ' ' | '\t' | '\n' | '=' | '[' | ']' | '*' | '?' | '#' | '~' | '{' | '}' | '!' | '^'
+    )
+}
+
+/// Check if character is a pattern character
+/// Port from ipattern() macro in zsh.h
+fn is_pattern(c: char) -> bool {
+    matches!(c, '*' | '?' | '[' | ']' | '<' | '>' | '(' | ')' | '|' | '#' | '^' | '~')
+}
+
+/// Quote a string according to the specified type
+/// Port from zsh/Src/utils.c quotestring() (lines 6141-6452)
+pub fn quotestring(s: &str, quote_type: QuoteType) -> String {
+    if s.is_empty() {
+        return match quote_type {
+            QuoteType::None => String::new(),
+            QuoteType::BackslashShownull | QuoteType::Backslash => "''".to_string(),
+            QuoteType::Single | QuoteType::SingleOptional => "''".to_string(),
+            QuoteType::Double => "\"\"".to_string(),
+            QuoteType::Dollars => "$''".to_string(),
+            QuoteType::BackslashPattern => String::new(),
+            QuoteType::Backtick => String::new(),
+        };
+    }
+
+    match quote_type {
+        QuoteType::None => s.to_string(),
+
+        QuoteType::BackslashPattern => {
+            // Only quote pattern characters (lines 6242-6247)
+            let mut result = String::with_capacity(s.len() * 2);
+            for c in s.chars() {
+                if is_pattern(c) {
+                    result.push('\\');
+                }
+                result.push(c);
+            }
+            result
+        }
+
+        QuoteType::Backslash | QuoteType::BackslashShownull => {
+            // Backslash quoting (lines 6260-6416)
+            let mut result = String::with_capacity(s.len() * 2);
+            for c in s.chars() {
+                if is_special(c) {
+                    result.push('\\');
+                }
+                result.push(c);
+            }
+            result
+        }
+
+        QuoteType::Single => {
+            // Single quote: 'string' (lines 6359-6382)
+            let mut result = String::with_capacity(s.len() + 4);
+            result.push('\'');
+            for c in s.chars() {
+                if c == '\'' {
+                    // End quote, add escaped quote, start new quote
+                    result.push_str("'\\''");
+                } else if c == '\n' {
+                    // Newlines need $'...' quoting
+                    result.push_str("'$'\\n''");
+                } else {
+                    result.push(c);
+                }
+            }
+            result.push('\'');
+            result
+        }
+
+        QuoteType::SingleOptional => {
+            // Only add quotes where necessary (lines 6314-6363)
+            let needs_quoting = s.chars().any(|c| is_special(c));
+            if !needs_quoting {
+                return s.to_string();
+            }
+
+            let mut result = String::with_capacity(s.len() + 4);
+            let mut in_quotes = false;
+
+            for c in s.chars() {
+                if c == '\'' {
+                    if in_quotes {
+                        result.push('\'');
+                        in_quotes = false;
+                    }
+                    result.push_str("\\'");
+                } else if is_special(c) {
+                    if !in_quotes {
+                        result.push('\'');
+                        in_quotes = true;
+                    }
+                    result.push(c);
+                } else {
+                    if in_quotes {
+                        result.push('\'');
+                        in_quotes = false;
+                    }
+                    result.push(c);
+                }
+            }
+            if in_quotes {
+                result.push('\'');
+            }
+            result
+        }
+
+        QuoteType::Double => {
+            // Double quote: "string" (lines 6272-6280, 6311-6312)
+            let mut result = String::with_capacity(s.len() + 4);
+            result.push('"');
+            for c in s.chars() {
+                if matches!(c, '$' | '`' | '"' | '\\') {
+                    result.push('\\');
+                }
+                result.push(c);
+            }
+            result.push('"');
+            result
+        }
+
+        QuoteType::Dollars => {
+            // $'...' quoting with escape sequences (lines 6203-6241)
+            let mut result = String::with_capacity(s.len() + 4);
+            result.push_str("$'");
+            for c in s.chars() {
+                match c {
+                    '\\' | '\'' => {
+                        result.push('\\');
+                        result.push(c);
+                    }
+                    '\n' => result.push_str("\\n"),
+                    '\r' => result.push_str("\\r"),
+                    '\t' => result.push_str("\\t"),
+                    '\x1b' => result.push_str("\\e"),
+                    '\x07' => result.push_str("\\a"),
+                    '\x08' => result.push_str("\\b"),
+                    '\x0c' => result.push_str("\\f"),
+                    '\x0b' => result.push_str("\\v"),
+                    c if c.is_ascii_control() => {
+                        // Octal escape for control characters
+                        result.push_str(&format!("\\{:03o}", c as u8));
+                    }
+                    c => result.push(c),
+                }
+            }
+            result.push('\'');
+            result
+        }
+
+        QuoteType::Backtick => {
+            // Backtick quoting (minimal - just escape backticks)
+            s.replace('`', "\\`")
+        }
+    }
+}
+
+/// Quote a string for safe shell use (convenience wrapper)
 pub fn quote_string(s: &str) -> String {
     if s.is_empty() {
         return "''".to_string();
     }
     
-    let needs_quotes = s.chars().any(|c| {
-        matches!(
-            c,
-            ' ' | '\t' | '\n' | '\'' | '"' | '\\' | '$' | '`' | '!' | '*' | '?' | '[' | ']'
-            | '{' | '}' | '(' | ')' | '<' | '>' | '|' | '&' | ';' | '#' | '~'
-        )
-    });
+    let needs_quotes = s.chars().any(is_special);
 
     if !needs_quotes {
         s.to_string()
     } else {
-        format!("'{}'", s.replace('\'', "'\\''"))
+        quotestring(s, QuoteType::Single)
     }
 }
 
@@ -363,9 +549,90 @@ pub fn split_quoted(s: &str) -> Vec<String> {
     result
 }
 
+/// Split string by separator - port from zsh/Src/utils.c sepsplit() lines 3961-3992
+///
+/// If sep is None, performs IFS-style word splitting (spacesplit).
+/// Otherwise splits on the given separator string.
+/// allownull: if true, allows empty strings in result
+pub fn sepsplit(s: &str, sep: Option<&str>, allownull: bool) -> Vec<String> {
+    // Handle Nularg at start (zsh internal marker) - line 3968
+    let s = if s.starts_with('\x00') && s.len() > 1 {
+        &s[1..]
+    } else {
+        s
+    };
+
+    match sep {
+        None => spacesplit(s, allownull),
+        Some(sep) if sep.is_empty() => {
+            // Empty separator: split into characters
+            if allownull {
+                s.chars().map(|c| c.to_string()).collect()
+            } else {
+                s.chars()
+                    .map(|c| c.to_string())
+                    .filter(|c| !c.is_empty())
+                    .collect()
+            }
+        }
+        Some(sep) => {
+            let parts: Vec<String> = s.split(sep).map(|p| p.to_string()).collect();
+            if allownull {
+                parts
+            } else {
+                parts.into_iter().filter(|p| !p.is_empty()).collect()
+            }
+        }
+    }
+}
+
+/// IFS-style word splitting - port from zsh/Src/utils.c spacesplit()
+///
+/// Splits on whitespace (space, tab, newline), treating consecutive
+/// whitespace as a single separator.
+pub fn spacesplit(s: &str, allownull: bool) -> Vec<String> {
+    if allownull {
+        s.split(|c: char| c == ' ' || c == '\t' || c == '\n')
+            .map(|p| p.to_string())
+            .collect()
+    } else {
+        s.split_whitespace().map(|p| p.to_string()).collect()
+    }
+}
+
+/// Join array with separator - port from zsh/Src/utils.c sepjoin() lines 3926-3958
+///
+/// If sep is None, uses first char of IFS (defaults to space).
+pub fn sepjoin(arr: &[String], sep: Option<&str>) -> String {
+    if arr.is_empty() {
+        return String::new();
+    }
+    let sep = sep.unwrap_or(" ");
+    arr.join(sep)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_sepsplit() {
+        assert_eq!(sepsplit("a:b:c", Some(":"), false), vec!["a", "b", "c"]);
+        assert_eq!(sepsplit("a::b", Some(":"), false), vec!["a", "b"]);
+        assert_eq!(sepsplit("a::b", Some(":"), true), vec!["a", "", "b"]);
+    }
+
+    #[test]
+    fn test_spacesplit() {
+        assert_eq!(spacesplit("a b c", false), vec!["a", "b", "c"]);
+        assert_eq!(spacesplit("a  b", false), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn test_sepjoin() {
+        assert_eq!(sepjoin(&["a".into(), "b".into(), "c".into()], Some(":")), "a:b:c");
+        assert_eq!(sepjoin(&["a".into(), "b".into()], None), "a b");
+    }
 
     #[test]
     fn test_is_identifier() {
@@ -397,6 +664,46 @@ mod tests {
         assert_eq!(quote_string("simple"), "simple");
         assert_eq!(quote_string("has space"), "'has space'");
         assert_eq!(quote_string("it's"), "'it'\\''s'");
+    }
+
+    #[test]
+    fn test_quotestring_backslash() {
+        assert_eq!(quotestring("hello", QuoteType::Backslash), "hello");
+        assert_eq!(quotestring("has space", QuoteType::Backslash), "has\\ space");
+        assert_eq!(quotestring("$var", QuoteType::Backslash), "\\$var");
+    }
+
+    #[test]
+    fn test_quotestring_single() {
+        assert_eq!(quotestring("hello", QuoteType::Single), "'hello'");
+        assert_eq!(quotestring("it's", QuoteType::Single), "'it'\\''s'");
+    }
+
+    #[test]
+    fn test_quotestring_double() {
+        assert_eq!(quotestring("hello", QuoteType::Double), "\"hello\"");
+        assert_eq!(quotestring("say \"hi\"", QuoteType::Double), "\"say \\\"hi\\\"\"");
+    }
+
+    #[test]
+    fn test_quotestring_dollars() {
+        assert_eq!(quotestring("hello", QuoteType::Dollars), "$'hello'");
+        assert_eq!(quotestring("line\nbreak", QuoteType::Dollars), "$'line\\nbreak'");
+        assert_eq!(quotestring("tab\there", QuoteType::Dollars), "$'tab\\there'");
+    }
+
+    #[test]
+    fn test_quotestring_pattern() {
+        assert_eq!(quotestring("*.txt", QuoteType::BackslashPattern), "\\*.txt");
+        assert_eq!(quotestring("file[1]", QuoteType::BackslashPattern), "file\\[1\\]");
+    }
+
+    #[test]
+    fn test_quotetype_from_q_count() {
+        assert_eq!(QuoteType::from_q_count(1), QuoteType::Backslash);
+        assert_eq!(QuoteType::from_q_count(2), QuoteType::Single);
+        assert_eq!(QuoteType::from_q_count(3), QuoteType::Double);
+        assert_eq!(QuoteType::from_q_count(4), QuoteType::Dollars);
     }
 
     #[test]

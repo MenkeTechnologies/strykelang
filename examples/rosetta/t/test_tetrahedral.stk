@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Tetrahedral numbers
+
+fn tetrahedral($n) {
+    int($n * ($n + 1) * ($n + 2) / 6)
+}
+
+fn tetrahedral_list($max_n) {
+    ~> 1..$max_n map { tetrahedral($_) }
+}
+
+assert_eq tetrahedral(1), 1, "T1"
+assert_eq tetrahedral(2), 4, "T2"
+assert_eq tetrahedral(3), 10, "T3"
+assert_eq tetrahedral(4), 20, "T4"
+assert_eq tetrahedral(5), 35, "T5"
+
+my @list = tetrahedral_list(5)
+assert_eq join(",", @list), "1,4,10,20,35", "Tetrahedral list"
+
+5 |> tetrahedral |> assert_eq(35, "pipe tetrahedral")
+
+test_run

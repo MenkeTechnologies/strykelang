@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Ulam sequence
+
+fn ulam($n) {
+    my @u = (1, 2)
+    while (scalar(@u) < $n) {
+        my $next = $u[-1] + 1
+        my $found = 0
+        while (!$found) {
+            my $ways = 0
+            for my $i (0..scalar(@u)-2) {
+                for my $j ($i+1..scalar(@u)-1) {
+                    if ($u[$i] + $u[$j] == $next) {
+                        $ways++
+                    }
+                }
+            }
+            if ($ways == 1) {
+                push @u, $next
+                $found = 1
+            } else {
+                $next++
+            }
+        }
+    }
+    ([@u])
+}
+
+my $res = ulam(10)
+assert_eq join(",", @$res), "1,2,3,4,6,8,11,13,16,18", "Ulam first 10"
+
+10 |> ulam |> { $_->[9] } |> assert_eq(18, "pipe Ulam(10)")
+
+test_run

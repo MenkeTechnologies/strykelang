@@ -1,0 +1,40 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Stern-Brocot sequence
+
+fn stern_brocot($n) {
+    my @sb = (0, 1, 1)
+    my $i = 3
+    while ($i <= $n) {
+        if ($i % 2 == 0) {
+            push @sb, $sb[$i / 2]
+        } else {
+            my $half = int($i / 2)
+            push @sb, $sb[$half] + $sb[$half + 1]
+        }
+        $i++
+    }
+    ([@sb])
+}
+
+my $res = stern_brocot(15)
+# Skip index 0
+my @vals = @$res[1..15]
+assert_eq join(",", @vals), "1,1,2,1,3,2,3,1,4,3,5,2,5,3,4", "stern-brocot first 15"
+
+# GCD of consecutive SB numbers is always 1
+fn check_sb_gcd($n) {
+    my $sb = stern_brocot($n)
+    my $all_one = 1
+    for my $i (1..$n-1) {
+        my ($a, $b) = ($sb->[$i], $sb->[$i+1])
+        while ($b != 0) { ($a, $b) = ($b, $a % $b) }
+        if ($a != 1) { $all_one = 0 }
+    }
+    $all_one
+}
+
+assert_ok check_sb_gcd(50), "GCD of consecutive SB is 1"
+
+10 |> stern_brocot |> { $_->[10] } |> assert_eq(3, "SB(10) is 3")
+
+test_run

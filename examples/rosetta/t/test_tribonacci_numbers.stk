@@ -1,0 +1,37 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Tribonacci numbers
+
+fn my_tribonacci($n) {
+    if ($n == 0) { 0 }
+    elsif ($n == 1) { 0 }
+    elsif ($n == 2) { 1 }
+    else {
+        my $t0 = 0
+        my $t1 = 0
+        my $t2 = 1
+        for my $i (3..$n) {
+            my $t3 = $t0 + $t1 + $t2
+            ($t0, $t1, $t2) = ($t1, $t2, $t3)
+        }
+        $t2
+    }
+}
+
+fn tribonacci_list($max) {
+    ~> 0..$max map { my_tribonacci($_) }
+}
+
+assert_eq my_tribonacci(0), 0, "T0"
+assert_eq my_tribonacci(1), 0, "T1"
+assert_eq my_tribonacci(2), 1, "T2"
+assert_eq my_tribonacci(3), 1, "T3 (0+0+1)"
+assert_eq my_tribonacci(4), 2, "T4 (0+1+1)"
+assert_eq my_tribonacci(5), 4, "T5 (1+1+2)"
+assert_eq my_tribonacci(10), 81, "T10"
+
+my @list = tribonacci_list(6)
+assert_eq join(",", @list), "0,0,1,1,2,4,7", "Tribonacci list"
+
+10 |> my_tribonacci |> assert_eq(81, "pipe tribonacci")
+
+test_run

@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Recaman's sequence
+
+fn recaman($n) {
+    my @a = (0)
+    my %used = ("0" => 1)
+    for my $i (1..$n) {
+        my $prev = $a[$i-1]
+        my $next = $prev - $i
+        if ($next > 0 && !exists $used{$next}) {
+            push @a, $next
+            $used{$next} = 1
+        } else {
+            $next = $prev + $i
+            push @a, $next
+            $used{$next} = 1
+        }
+    }
+    ([@a])
+}
+
+my $res10 = recaman(10)
+assert_eq join(",", @$res10), "0,1,3,6,2,7,13,20,12,21,11", "recaman 10"
+
+10 |> recaman |> map { join(",", @$_) } |> assert_eq("0,1,3,6,2,7,13,20,12,21,11", "pipe recaman")
+
+test_run

@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Munchausen numbers
+
+fn is_munchausen($n) {
+    if ($n == 0) { 0 }
+    else {
+        my $sum = 0
+        my @digits = ~> "$n" chars
+        for my $d (@digits) {
+            my $val = int($d)
+            if ($val == 0) {
+                # 0^0 is usually 0 in Munchausen number context, or ignored
+                # but standard definition for Rosetta task says 0^0 = 0
+                $sum += 0
+            } else {
+                $sum += $val ** $val
+            }
+        }
+        $sum == $n
+    }
+}
+
+assert_ok is_munchausen(1), "1 is Munchausen (1^1 = 1)"
+assert_ok is_munchausen(3435), "3435 is Munchausen (3^3 + 4^4 + 3^3 + 5^5 = 27 + 256 + 27 + 3125 = 3435)"
+assert_ok !is_munchausen(153), "153 is not Munchausen"
+
+3435 |> is_munchausen |> assert_ok("pipe Munchausen")
+
+test_run

@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Staircase problem
+
+fn staircase($n) {
+    if ($n < 2) {
+        1
+    } else {
+        my $a = 1
+        my $b = 1
+        for my $i (2..$n) {
+            ($a, $b) = ($b, $a + $b)
+        }
+        $b
+    }
+}
+
+assert_eq staircase(1), 1, "staircase(1) = 1"
+assert_eq staircase(2), 2, "staircase(2) = 2 (1+1, 2)"
+assert_eq staircase(3), 3, "staircase(3) = 3 (1+1+1, 1+2, 2+1)"
+assert_eq staircase(4), 5, "staircase(4) = 5"
+assert_eq staircase(10), 89, "staircase(10) = 89"
+
+10 |> staircase |> assert_eq(89, "pipe staircase")
+
+test_run

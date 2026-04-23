@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Balanced primes
+
+fn my_is_prime($n) {
+    if ($n < 2) { 0 }
+    elsif ($n == 2) { 1 }
+    elsif ($n % 2 == 0) { 0 }
+    else {
+        my $limit = sqrt($n)
+        my $res = 1
+        my $i = 3
+        while ($i <= $limit) {
+            if ($n % $i == 0) {
+                $res = 0
+                $i = $n
+            }
+            $i += 2
+        }
+        $res
+    }
+}
+
+fn my_prev_prime($n) {
+    my $p = $n - 1
+    while ($p > 1) {
+        if (my_is_prime($p)) { return $p }
+        $p--
+    }
+    0
+}
+
+fn my_next_prime($n) {
+    my $p = $n + 1
+    while (1) {
+        if (my_is_prime($p)) { return $p }
+        $p++
+    }
+}
+
+fn is_balanced_prime($n) {
+    if (!my_is_prime($n)) {
+        0
+    } else {
+        my $prev = my_prev_prime($n)
+        if ($prev == 0) {
+            0
+        } else {
+            my $next = my_next_prime($n)
+            $n * 2 == $prev + $next
+        }
+    }
+}
+
+assert_ok is_balanced_prime(5), "5 is balanced (3, 5, 7 gaps 2,2)"
+assert_ok is_balanced_prime(53), "53 is balanced (47, 53, 59 gaps 6,6)"
+assert_ok !is_balanced_prime(7), "7 is not (5, 7, 11 gaps 2,4)"
+
+5 |> is_balanced_prime |> assert_ok("pipe balanced prime")
+
+test_run

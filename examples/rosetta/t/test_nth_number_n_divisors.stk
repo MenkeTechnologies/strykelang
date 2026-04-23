@@ -1,0 +1,46 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sequence: nth number with exactly n divisors
+
+fn count_divisors($n) {
+    my $count = 0
+    for my $i (1..$n) {
+        if ($n % $i == 0) { $count++ }
+    }
+    $count
+}
+
+fn nth_number_with_n_divisors($n) {
+    my $i = 1
+    while (1) {
+        if (count_divisors($i) == $n) {
+            return $i
+        }
+        $i++
+    }
+}
+
+# Avoid return if possible
+fn my_nth_div($n) {
+    my $i = 1
+    my $found = 0
+    my $res = 0
+    while (!$found) {
+        if (count_divisors($i) == $n) {
+            $res = $i
+            $found = 1
+        }
+        $i++
+    }
+    $res
+}
+
+assert_eq my_nth_div(1), 1, "a(1) = 1"
+assert_eq my_nth_div(2), 2, "a(2) = 2"
+assert_eq my_nth_div(3), 4, "a(3) = 4"
+assert_eq my_nth_div(4), 6, "a(4) = 6"
+assert_eq my_nth_div(5), 16, "a(5) = 16"
+assert_eq my_nth_div(6), 12, "a(6) = 12"
+
+6 |> my_nth_div |> assert_eq(12, "pipe nth_div")
+
+test_run

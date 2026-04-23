@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pythagorean quadruples
+
+fn is_pythagorean_quadruple($a, $b, $c, $d) {
+    $a**2 + $b**2 + $c**2 == $d**2
+}
+
+assert_ok is_pythagorean_quadruple(1, 2, 2, 3), "(1, 2, 2, 3)"
+assert_ok is_pythagorean_quadruple(2, 3, 6, 7), "(2, 3, 6, 7)"
+assert_ok is_pythagorean_quadruple(3, 4, 12, 13), "(3, 4, 12, 13)"
+assert_ok !is_pythagorean_quadruple(1, 2, 3, 4), "not (1, 2, 3, 4)"
+
+# Chaining
+(1, 2, 2) |> is_pythagorean_quadruple(3) |> assert_ok("pipe quadruple")
+
+test_run

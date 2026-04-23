@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Self numbers
+
+fn sum_digits($n) {
+    ~> $n chars map { int($_) } reduce { $a + $b }
+}
+
+fn is_self_number($n) {
+    my $found = 0
+    # A candidate m must be less than n
+    # Also m must be > n - 9 * digits(n)
+    my $start = $n - 100
+    $start = 1 if $start < 1
+    for my $m ($start..$n-1) {
+        if ($m + sum_digits($m) == $n) {
+            $found = 1
+            $m = $n # break
+        }
+    }
+    !$found
+}
+
+assert_ok is_self_number(1), "1 is self number"
+assert_ok is_self_number(20), "20 is self number"
+assert_ok !is_self_number(21), "21 is not (15+6)"
+assert_ok is_self_number(31), "31 is self number"
+
+20 |> is_self_number |> assert_ok("pipe self number check")
+
+test_run

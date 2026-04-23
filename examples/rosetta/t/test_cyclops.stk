@@ -1,0 +1,37 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Cyclops numbers
+
+fn is_cyclops($n) {
+    my $s = sprintf("%d", $n)
+    my @c = chars($s)
+    my $len = scalar(@c)
+    if ($len % 2 == 0) {
+        0
+    } else {
+        my $mid = int($len / 2)
+        if ($c[$mid] eq "0") {
+            my $all_nonzero = 1
+            for my $i (0..$len-1) {
+                if ($i != $mid) {
+                    if ($c[$i] eq "0") {
+                        $all_nonzero = 0
+                    }
+                }
+            }
+            $all_nonzero
+        } else {
+            0
+        }
+    }
+}
+
+assert_ok is_cyclops(0), "0 is cyclops"
+assert_ok is_cyclops(101), "101 is cyclops"
+assert_ok is_cyclops(12034), "12034 is cyclops"
+assert_ok !is_cyclops(1001), "1001 is not (even digits)"
+assert_ok !is_cyclops(123), "123 is not (mid not 0)"
+assert_ok !is_cyclops(10203), "10203 is not (multiple zeros)"
+
+101 |> is_cyclops |> assert_ok("pipe cyclops check")
+
+test_run

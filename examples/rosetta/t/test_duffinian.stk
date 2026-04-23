@@ -1,0 +1,41 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Duffinian numbers
+
+fn my_gcd($a, $b) {
+    while ($b != 0) { ($a, $b) = ($b, $a % $b) }
+    $a
+}
+
+fn my_sum_divisors($n) {
+    my $sum = 0
+    for my $i (1..$n) {
+        if ($n % $i == 0) { $sum += $i }
+    }
+    $sum
+}
+
+fn is_duffinian($n) {
+    my $sigma = my_sum_divisors($n)
+    my $rel_prime = my_gcd($n, $sigma) == 1
+    # Duffinian numbers must be composite
+    my $is_composite = 0
+    if ($n > 1) {
+        for my $i (2..int(sqrt($n))) {
+            if ($n % $i == 0) {
+                $is_composite = 1
+                $i = $n
+            }
+        }
+    }
+    $rel_prime && $is_composite
+}
+
+assert_ok is_duffinian(4), "4 is Duffinian (sigma 7, gcd(4,7)=1, composite)"
+assert_ok is_duffinian(8), "8 is Duffinian (sigma 15, gcd(8,15)=1, composite)"
+assert_ok is_duffinian(9), "9 is Duffinian (sigma 13, gcd(9,13)=1, composite)"
+assert_ok !is_duffinian(6), "6 is not (sigma 12, gcd(6,12)=6)"
+assert_ok !is_duffinian(7), "7 is not (prime)"
+
+4 |> is_duffinian |> assert_ok("pipe Duffinian")
+
+test_run

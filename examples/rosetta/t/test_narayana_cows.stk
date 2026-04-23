@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Narayana's cows sequence
+
+fn narayana($n) {
+    if ($n < 3) {
+        1
+    } else {
+        my $a0 = 1
+        my $a1 = 1
+        my $a2 = 1
+        for my $i (3..$n) {
+            my $a3 = $a2 + $a0
+            ($a0, $a1, $a2) = ($a1, $a2, $a3)
+        }
+        $a2
+    }
+}
+
+assert_eq narayana(0), 1, "a(0)"
+assert_eq narayana(3), 2, "a(3)"
+assert_eq narayana(4), 3, "a(4)"
+assert_eq narayana(5), 4, "a(5)"
+assert_eq narayana(10), 28, "a(10)"
+
+10 |> narayana |> assert_eq(28, "pipe narayana")
+
+test_run

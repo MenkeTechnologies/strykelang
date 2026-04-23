@@ -1,0 +1,46 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Powerful numbers
+
+fn my_prime_factors($n) {
+    my @factors
+    my $d = 2
+    my $temp = $n
+    while ($temp > 1) {
+        while ($temp % $d == 0) {
+            push @factors, $d
+            $temp = int($temp / $d)
+        }
+        $d++
+    }
+    ([@factors])
+}
+
+fn is_powerful($n) {
+    if ($n == 1) {
+        1
+    } else {
+        my $factors_ref = my_prime_factors($n)
+        my @factors = @$factors_ref
+        my %unique_factors
+        for my $f (@factors) { $unique_factors{$f} = 1 }
+        
+        my $all_sq = 1
+        for my $p (keys %unique_factors) {
+            if ($n % ($p * $p) != 0) {
+                $all_sq = 0
+            }
+        }
+        $all_sq
+    }
+}
+
+assert_ok is_powerful(1), "1 is powerful"
+assert_ok is_powerful(4), "4 is powerful (2^2)"
+assert_ok is_powerful(8), "8 is powerful (2^3, 2^2 is factor)"
+assert_ok is_powerful(9), "9 is powerful (3^2)"
+assert_ok is_powerful(72), "72 is powerful (2^3 * 3^2, 4 and 9 are factors)"
+assert_ok !is_powerful(12), "12 is not (2^2 * 3, but 3^2 is not factor)"
+
+72 |> is_powerful |> assert_ok("pipe powerful")
+
+test_run

@@ -1,0 +1,37 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Perrin numbers
+
+fn perrin($n) {
+    if ($n == 0) { 3 }
+    elsif ($n == 1) { 0 }
+    elsif ($n == 2) { 2 }
+    else {
+        my $p0 = 3
+        my $p1 = 0
+        my $p2 = 2
+        for my $i (3..$n) {
+            my $p3 = $p1 + $p0
+            ($p0, $p1, $p2) = ($p1, $p2, $p3)
+        }
+        $p2
+    }
+}
+
+fn perrin_list($max) {
+    ~> 0..$max map { perrin($_) }
+}
+
+assert_eq perrin(0), 3, "P0"
+assert_eq perrin(1), 0, "P1"
+assert_eq perrin(2), 2, "P2"
+assert_eq perrin(3), 3, "P3 (0+3)"
+assert_eq perrin(4), 2, "P4 (2+0)"
+assert_eq perrin(5), 5, "P5 (3+2)"
+assert_eq perrin(10), 17, "P10"
+
+my @list = perrin_list(6)
+assert_eq join(",", @list), "3,0,2,3,2,5,5", "Perrin list"
+
+10 |> perrin |> assert_eq(17, "pipe perrin")
+
+test_run

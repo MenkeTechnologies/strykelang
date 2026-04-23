@@ -1,0 +1,45 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Goldbach's conjecture
+
+fn my_is_prime($n) {
+    if ($n < 2) {
+        0
+    } elsif ($n == 2) {
+        1
+    } elsif ($n % 2 == 0) {
+        0
+    } else {
+        my $i = 3
+        my $limit = sqrt($n)
+        my $res = 1
+        while ($i <= $limit) {
+            if ($n % $i == 0) {
+                $res = 0
+                $i = $n
+            }
+            $i += 2
+        }
+        $res
+    }
+}
+
+fn my_goldbach($n) {
+    my @res
+    if ($n % 2 == 0 && $n > 2) {
+        for my $i (2..int($n/2)) {
+            if (my_is_prime($i) && my_is_prime($n - $i)) {
+                push @res, "$i + " . ($n - $i)
+            }
+        }
+    }
+    ([@res])
+}
+
+assert_eq my_goldbach(4)->[0], "2 + 2", "Goldbach(4)"
+assert_eq my_goldbach(10)->[0], "3 + 7", "Goldbach(10) first"
+my $res10 = my_goldbach(10)
+assert_eq join(",", @$res10), "3 + 7,5 + 5", "Goldbach(10) all"
+
+10 |> my_goldbach |> map { join(",", @$_) } |> assert_eq("3 + 7,5 + 5", "pipe goldbach")
+
+test_run
